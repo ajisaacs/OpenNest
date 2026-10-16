@@ -378,6 +378,29 @@ accepted as given (user decision D1a, 2026-10-14). Its violations are not refusa
 - The [pre-post review](post-verification.md) checks locked leads again before posting;
   accepting the plan is not posting consent.
 
+### Drawing pins
+
+A drawing's cut pins (`Drawing.CutPins`, from the drawing library) fix how named contours are
+cut: the entry point, lead-in, lead-out and tab (user decision D1: the drawing wins over the
+plate's settings). Capture resolves each regenerated part's pins against its own rotated
+clean contours with `CutPinResolver` and prepares them with
+`PreparedContours.Capture(program, parameters, pins)`:
+
+- A pinned contour has exactly one entry, the pin's; every candidate catalogue returns it
+  alone and emission refuses any other entry for that contour, so the search can never move
+  it. It is emitted through the same emitter with the pin's own lead-in and lead-out for
+  every contour type, the pin's tab (or none) and angle rounding off; the emitter's own
+  geometry rules (pierce clearance, small-circle clamping) still apply as in any emission.
+  The certified tab gap is the pinned outside's own.
+- Unpinned contours on the same part, and every other part, keep the plate's automatic
+  selection; a plate without pins plans exactly as before.
+- A pin is never guessed (invariant 5). One that lies on no contour, on several, shares a
+  contour with another pin, or cannot be placed on the program leaves its contour automatic
+  and adds a `FixedLead` warning naming the pin (`FixedLeadWarning.PinNumber`), for example
+  "Drawing pin 2 no longer matches the geometry; planned with nest settings.", which makes the
+  plate UNVERIFIED. A tab pinned on an internal contour is not honoured either: only the
+  outside is tabbed.
+
 ## Apply
 
 ```csharp

@@ -23,16 +23,105 @@ public sealed class PreparedContours
     private readonly Shape[] shapes;
     private readonly CuttingParameters parameters;
     private readonly List<Entity> scribes;
+    // By contour ordinal; all null without pins. A pinned contour has exactly one entry and
+    // its own owned settings (the pin's lead-in, lead-out and tab).
+    private readonly ContourChoice[] pinned;
+    private readonly CuttingParameters[] contourParameters;
+    private readonly int[] pinNumbers;
 
     private PreparedContours(Shape[] shapes, List<Entity> scribes, CuttingParameters parameters)
     {
         this.shapes = shapes;
         this.scribes = scribes;
         this.parameters = parameters;
+        pinned = new ContourChoice[shapes.Length];
+        pinNumbers = new int[shapes.Length];
+    }
+
+    private PreparedContours(PreparedContours unpinned, IReadOnlyList<CutPinResolution> pins, CancellationToken token)
+        : this(unpinned.shapes, unpinned.scribes, unpinned.parameters)
+    {
+        contourParameters = new CuttingParameters[shapes.Length];
+        var rejected = new List<CutPinResolution>();
+        foreach (var pin in pins)
+        {
+            token.ThrowIfCancellationRequested();
+            if (pin == null)
+                throw new ArgumentException("A pin resolution is missing.", nameof(pins));
+            if (!pin.IsResolved)
+                continue; // The caller reports why; the contour stays automatic.
+            var contour = pin.ContourOrdinal;
+            if (contour < 0 || contour >= Count || pin.EntityOrdinal < 0
+                || pin.EntityOrdinal >= shapes[contour].Entities.Count)
+                throw new ArgumentException("A pin resolution does not belong to these contours.", nameof(pins));
+            if (pinned[contour] != null)
+                throw new ArgumentException("Two pins resolve to one contour.", nameof(pins));
+            // The emitter tabs only the outside, so a tab elsewhere cannot be cut as pinned.
+            if (pin.Pin.HasTab && contour != PerimeterOrdinal)
+            {
+                rejected.Add(pin);
+                continue;
+            }
+            var choice = new ContourChoice(contour, pin.EntityOrdinal, pin.Point) { Owner = this };
+            ValidateChoice(choice);
+            pinned[contour] = choice;
+            pinNumbers[contour] = pin.PinIndex + 1;
+            contourParameters[contour] = PinParameters(parameters, pin.Pin);
+        }
+        RejectedPins = rejected.AsReadOnly();
     }
 
     public int Count => shapes.Length;
     public int PerimeterOrdinal => Count - 1;
+
+    /// <summary>Resolved pins this preparation could not honour: a tab on an internal contour.</summary>
+    public IReadOnlyList<CutPinResolution> RejectedPins { get; } = Array.Empty<CutPinResolution>();
+
+    /// <summary>True when a drawing pin fixes this contour's entry, leads and tab.</summary>
+    public bool IsPinned(int contourOrdinal) => GetShape(contourOrdinal) != null && pinned[contourOrdinal] != null;
+
+    /// <summary>The one-based drawing pin that fixes this contour, or null.</summary>
+    public int? PinNumberOf(int contourOrdinal) => IsPinned(contourOrdinal) ? pinNumbers[contourOrdinal] : null;
+
+    /// <summary>The pinned contour's only entry, or null for an automatic contour.</summary>
+    public ContourChoice PinnedEntry(int contourOrdinal) => IsPinned(contourOrdinal) ? pinned[contourOrdinal] : null;
+
+    /// <summary>
+    /// As <see cref="Capture(Program, CuttingParameters, CancellationToken)"/>, then fixes every
+    /// resolved pin's contour: that contour's only entry is the pin's point and it is emitted with
+    /// the pin's own lead-in, lead-out and tab through the same emitter, so its tab gap is genuine
+    /// and certifiable. <paramref name="pins"/> must come from <see cref="CutPinResolver"/> against
+    /// contours of this same program; unresolved pins are skipped (the caller reports them), a pin
+    /// with a tab on an internal contour is listed in <see cref="RejectedPins"/>, and every other
+    /// contour keeps the automatic selection with <paramref name="parameters"/>.
+    /// </summary>
+    public static PreparedContours Capture(Program program, CuttingParameters parameters,
+        IReadOnlyList<CutPinResolution> pins, CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(pins);
+        var unpinned = Capture(program, parameters, token);
+        return pins.Any(p => p?.IsResolved != false) ? new PreparedContours(unpinned, pins, token) : unpinned;
+    }
+
+    // The pin's leads replace every contour type's leads, since the type the emitter detects is
+    // not the caller's concern; angle rounding is off because a pinned entry never moves.
+    private static CuttingParameters PinParameters(CuttingParameters shared, ContourCutPin pin)
+    {
+        var owned = OwnedCuttingParameters.Copy(shared);
+        owned.ExternalLeadIn = pin.LeadIn;
+        owned.InternalLeadIn = pin.LeadIn;
+        owned.ArcCircleLeadIn = pin.LeadIn;
+        owned.ExternalLeadOut = pin.LeadOut;
+        owned.InternalLeadOut = pin.LeadOut;
+        owned.ArcCircleLeadOut = pin.LeadOut;
+        owned.RoundLeadInAngles = false;
+        owned.TabsEnabled = pin.HasTab;
+        if (pin.HasTab)
+            owned.TabConfig = pin.Tab;
+        return owned;
+    }
+
+    private CuttingParameters ParametersFor(int contourOrdinal) => contourParameters?[contourOrdinal] ?? parameters;
 
     public static PreparedContours Capture(Program program, CuttingParameters parameters, CancellationToken token = default)
     {
@@ -100,10 +189,13 @@ public sealed class PreparedContours
         }
     }
 
+    /// <summary>The closest native entry to <paramref name="approach"/>; a pinned contour's pinned entry.</summary>
     public ContourChoice ClosestEntry(int contourOrdinal, Vector approach)
     {
         PostVerificationGeometry.Validate(approach);
         var shape = GetShape(contourOrdinal);
+        if (pinned[contourOrdinal] is { } pin)
+            return pin;
         var point = shape.ClosestPointTo(approach, out var entity);
         return Entry(contourOrdinal, shape.Entities.IndexOf(entity), point);
     }
@@ -112,6 +204,7 @@ public sealed class PreparedContours
     /// Closest native point first, then source-order vertices/midpoints or eight circle
     /// angles (0 through 315 degrees). Geometrical duplicates keep their first entity.
     /// Emit before validating actual paths: circle rounding/clamping may move this point.
+    /// A pinned contour has its pinned entry only.
     /// </summary>
     public IReadOnlyList<ContourChoice> Entries(int contourOrdinal, Vector approach, int maxEntries = 16, CancellationToken token = default)
     {
@@ -119,6 +212,8 @@ public sealed class PreparedContours
         if (maxEntries <= 0)
             throw new ArgumentOutOfRangeException(nameof(maxEntries));
         var shape = GetShape(contourOrdinal);
+        if (pinned[contourOrdinal] is { } pin)
+            return new[] { pin };
         var entries = new List<ContourChoice>();
         entries.Add(ClosestEntry(contourOrdinal, approach));
         for (var i = 0; i < shape.Entities.Count && entries.Count < maxEntries; i++)
@@ -189,6 +284,8 @@ public sealed class PreparedContours
     {
         token.ThrowIfCancellationRequested();
         var shape = GetShape(contourOrdinal);
+        if (pinned[contourOrdinal] is { } pin)
+            return new[] { new ContourEntryCandidate(pin, AutomaticEntryKind.Pinned) };
         if (IsSingleCircle(shape))
             throw new ArgumentException("Circles have no preferred corners or joints; use the fallback catalogue.");
         return MergeByGeometry(PreferredCandidates(shape, contourOrdinal, token));
@@ -202,7 +299,8 @@ public sealed class PreparedContours
     /// <paramref name="lookAhead"/> (pass the arrival point there when there is no next cut).
     /// A pure-circle contour therefore yields compass points instead of refusing. Every
     /// fallback passes the same reflex/cusp exclusion and geometric duplicate merge as the
-    /// preferred tier; fallbacks never replace a preferred point at the same geometry.
+    /// preferred tier; fallbacks never replace a preferred point at the same geometry. A
+    /// pinned contour's catalogue is its pinned entry alone: nothing may relocate it.
     /// </summary>
     internal IReadOnlyList<ContourEntryCandidate> AutomaticEntryCandidatesWithFallbacks(
         int contourOrdinal,
@@ -211,6 +309,8 @@ public sealed class PreparedContours
     {
         token.ThrowIfCancellationRequested();
         var shape = GetShape(contourOrdinal);
+        if (pinned[contourOrdinal] is { } pin)
+            return new[] { new ContourEntryCandidate(pin, AutomaticEntryKind.Pinned) };
         var all = IsSingleCircle(shape)
             ? new List<ContourEntryCandidate>()
             : PreferredCandidates(shape, contourOrdinal, token);
@@ -461,7 +561,8 @@ public sealed class PreparedContours
         // Same owned clones as a real emission; the source shapes/settings are never used
         // directly, so the probe cannot drift the preparation or mutate it.
         return new ContourCuttingStrategy { Parameters = parameters }.EmitCandidateIsolated(
-            shapes.Select(s => (Shape)s.Clone()).ToArray(), scribes.Select(e => e.Clone()).ToList(), choice);
+            shapes.Select(s => (Shape)s.Clone()).ToArray(), scribes.Select(e => e.Clone()).ToList(), choice,
+            contourParameters);
     }
 
     // Each prefix is a standalone owned program, including the same scribes once.
@@ -469,7 +570,8 @@ public sealed class PreparedContours
     {
         Validate(choices, false);
         return new ContourCuttingStrategy { Parameters = parameters }.EmitPrepared(
-            shapes.Select(s => (Shape)s.Clone()).ToArray(), scribes.Select(e => e.Clone()).ToList(), choices);
+            shapes.Select(s => (Shape)s.Clone()).ToArray(), scribes.Select(e => e.Clone()).ToList(), choices,
+            contourParameters);
     }
 
     internal void ValidateCompleteChoices(IReadOnlyList<ContourChoice> choices) => Validate(choices, true);
@@ -481,7 +583,9 @@ public sealed class PreparedContours
     {
         token.ThrowIfCancellationRequested();
         var expected = ExecutionMotionReader.ReadSupported(Emit(choices), location, null, token);
-        return new(this, choices, expected, parameters.TabsEnabled ? parameters.TabConfig.Size : 0);
+        // Only the outside is tabbed, with its own pin's tab when it is pinned.
+        var perimeter = ParametersFor(PerimeterOrdinal);
+        return new(this, choices, expected, perimeter.TabsEnabled ? perimeter.TabConfig.Size : 0);
     }
 
     private void Validate(IReadOnlyList<ContourChoice> choices, bool complete)
@@ -508,6 +612,9 @@ public sealed class PreparedContours
         var distance = shape.Entities[choice.EntityOrdinal].ClosestPointTo(choice.Point).DistanceTo(choice.Point);
         if (!double.IsFinite(distance) || distance > PostVerificationGeometry.Epsilon)
             throw new ArgumentException("Entry is not on the selected native entity.");
+        // A pinned contour is cut exactly as pinned: no other entry may be emitted for it.
+        if (pinned[choice.ContourOrdinal] is { } pin && pin != choice)
+            throw new ArgumentException("A pinned contour keeps its drawing pin's entry.");
     }
 
     private Shape GetShape(int ordinal) => ordinal < 0 || ordinal >= Count

@@ -122,7 +122,8 @@ public static class CuttingPlanService
                         warnings.Add(new(index, source, null, null, PostVerificationKind.Incomplete, material.Reason));
                     }
                     if (!source.LeadInsLocked && (request.EligibleParts == null || eligible.Contains(source)))
-                        prepared = PreparedContours.Capture(ownedClean, request.ConfirmedParameters, token);
+                        prepared = DrawingPinCapture.Prepare(source, index, ownedClean, request.ConfirmedParameters,
+                            warnings, token);
                 }
                 var captured = material;
                 // Fixed-route material is captured only for a pair whose bounds admit containment.
@@ -263,8 +264,9 @@ public static class CuttingPlanService
             if (snapshot.Regeneration)
             {
                 var joint = JointCuttingPlanSearch.Run(snapshot, token);
+                // Capture warnings (drawing pins that could not be honoured) stay visible on a refusal.
                 if (joint.Status != CuttingPlanStatus.Ready)
-                    return new(joint.Status, findings: joint.Findings, expansions: joint.Expansions);
+                    return new(joint.Status, findings: snapshot.Findings.Concat(joint.Findings), expansions: joint.Expansions);
                 return ReplayPrograms(snapshot, joint.Order, joint.Expansions, token);
             }
             var search = FixedProgramSearch.Run(snapshot, token);
@@ -328,7 +330,8 @@ public static class CuttingPlanService
         var distance = 0.0;
         var findings = new List<CuttingPlanFinding>();
         // Violations inside fixed emissions: accepted as given, reported, never refused (D1a).
-        var warnings = new List<CuttingPlanFinding>();
+        // Capture adds the drawing pins it could not honour; their contours were planned normally.
+        var warnings = new List<CuttingPlanFinding>(snapshot.Findings);
         var materialOwners = snapshot.Placements.Where(p => !p.IsCutOff).ToArray();
         var materials = materialOwners.Select(p => p.Material).ToArray();
         foreach (var proposal in order)
