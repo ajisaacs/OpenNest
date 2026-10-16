@@ -141,6 +141,64 @@ only the requested page of metadata (never archive bytes):
   bounds before sending, and reports an HTTP 404 from an older server as a
   server version that must be updated.
 
+## Drawing library endpoints
+
+The server also keeps a shared library of drawings (schema v4). The desktop
+workflow is not built yet; these routes and `OpenNest.Data.RemoteDrawingLibrary`
+are the storage layer for it. A drawing's geometry travels as an opaque
+**drawing package**: a `.nest` archive holding exactly one drawing and no plates,
+written and read on the client by `OpenNest.IO.DrawingPackage`. The server never
+parses it.
+
+`OpenNest.Data.DrawingLibraryRecord` fields: `id` (client-allocated before the
+first upload), `revision`, `name`, `customer`, `materialName`, `materialGrade`,
+`thickness` (stored rounded to 4 decimals), `units` (`inches` | `millimeters`),
+`cutType` (`laser` | `waterjet` | `plasma`), `notes`, `archived`, `savedBy`, and
+the server-computed `packageSha256` (lower-case hex), `packageSize` and `savedAt`.
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| POST | `/api/drawings` | multipart: `metadata` (JSON record with a nonempty `id`) + `package` | Revision 1; 409 with the current record when the id exists |
+| GET | `/api/drawings/query?search=&customer=&materialName=&materialGrade=&thickness=&cutType=&includeArchived=&sort=&order=&offset=&limit=` | — | `{ items, total, offset, limit }` |
+| GET | `/api/drawings/{id}` / `/{id}/file` | — | Current record / package bytes (archived drawings included), or 404 |
+| GET | `/api/drawings/{id}/revisions?offset=0&limit=100` | — | Revision page, newest first; limit 1–200 |
+| GET | `/api/drawings/{id}/revisions/{revision}/file` | — | Exact immutable package bytes |
+| PUT | `/api/drawings/{id}/file` | multipart: `metadata` + `package` | New revision |
+| PUT | `/api/drawings/{id}/metadata` | JSON record | New revision with the same package |
+| POST | `/api/drawings/{id}/archive` / `/restore` | — | New revision with `archived` changed |
+
+- Existing-drawing writes require `If-Match` exactly as for nests: 428 missing,
+  400 malformed, 409 stale with the current record. Writing to an archived
+  drawing, archiving an archived one or restoring an active one is also 409.
+  None of these change data. There is no delete; archive hides a drawing from
+  the query unless `includeArchived=true`.
+- Every change appends an immutable revision in the same transaction that
+  updates the current row, including metadata-only edits and archive/restore.
+  An identical save at the current revision is a no-op.
+- Validation (400, no state change): `cutType` and `units` must be single enum
+  names (no numbers or combinations); `thickness` finite and at least 0; `name`
+  nonblank; name, customer, material, grade and savedBy at most 200 characters,
+  notes at most 4000; no NUL characters; package nonempty, at most 16 MiB and
+  starting with a ZIP signature. Metadata `id` on a PUT must be empty or match
+  the route.
+- Query: `search` is a literal, case-insensitive (ASCII) substring of name,
+  customer or notes (`%`, `_`, `\` literal). `customer`, `materialName` and
+  `materialGrade` match exactly after `SharedListNames.Key` normalization
+  (trimmed, collapsed spaces, case-insensitive); blank means any. `thickness`
+  matches exactly after rounding to 4 decimals. `sort` is one of `savedAt`
+  (default), `name`, `customer`, `materialName`, `materialGrade`, `thickness`,
+  `cutType`, `revision`; ties break by `id`. Paging, `order` and the refusal of
+  unknown, repeated or out-of-range parameters follow the nest query.
+- An older server answers 404 on these routes; the client reports that the
+  server must be updated and never falls back to another store.
+
+Schema v4 adds the `drawings` and `drawing_revisions` tables to the same file
+and leaves the nest tables untouched. A server older than v4 refuses to open a
+v4 database, so rolling back after the upgrade needs the pre-upgrade backup (see
+[Backup, restore, and upgrade](#backup-restore-and-upgrade)). The stopped-volume
+`tar` backup includes the drawing tables, but `nest_manifest.py` and
+`restore_check` do not verify drawings yet.
+
 ## Storage
 
 `OpenNest.Server.NestDatabase` uses SQLite (`Microsoft.Data.Sqlite`) with
