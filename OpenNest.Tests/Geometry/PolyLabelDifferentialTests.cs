@@ -83,6 +83,19 @@ public class PolyLabelDifferentialTests
         Assert.InRange(unbounded.Y, 0, 1);
     }
 
+    // Delta review: past the grid, refining a cell whose half-step no longer moves its centre
+    // made four identical children per level, so a fine unbounded search exhausted memory.
+    [Fact]
+    public async Task Find_UnboundedRefinementFinishesWhenSplitsStopAdvancing()
+    {
+        var far = Rectangle(1e16, 0, 8, 1);
+
+        var search = Task.Run(() => PolyLabel.Find(far, null, 1e-6));
+
+        Assert.Same(search, await Task.WhenAny(search, Task.Delay(TimeSpan.FromSeconds(20))));
+        Assert.InRange((await search).Y, 0, 1);
+    }
+
     private static (Polygon outer, List<Polygon> holes) RandomShape(Random random)
     {
         var scale = System.Math.Pow(10, random.NextDouble() * 4 - 1);

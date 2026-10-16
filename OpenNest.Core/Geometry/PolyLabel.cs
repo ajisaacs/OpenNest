@@ -120,6 +120,12 @@ namespace OpenNest.Geometry
 
                 halfCell = cell.HalfSize / 2;
 
+                // Far from the origin a half-step may no longer move the centre; such a cell
+                // cannot be split, and its identical children would multiply without end.
+                if (cell.X - halfCell == cell.X || cell.X + halfCell == cell.X
+                    || cell.Y - halfCell == cell.Y || cell.Y + halfCell == cell.Y)
+                    continue;
+
                 var newCells = new[]
                 {
                     new Cell(cell.X - halfCell, cell.Y - halfCell, halfCell, outer, holes),
