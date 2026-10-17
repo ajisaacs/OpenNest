@@ -4,9 +4,9 @@ using System.IO.Compression;
 using System.Text.Json;
 using System.Threading.Tasks;
 using OpenNest.Api;
+using OpenNest.Engine.Jobs;
 using OpenNest.Geometry;
 using OpenNest.IO;
-using OpenNest.Engine.Jobs;
 
 namespace OpenNest.Tests.Api;
 
@@ -50,6 +50,7 @@ public class NestResponsePersistenceTests
             Status = NestJobStatus.Complete,
             StopReason = NestJobStopReason.Completed,
             Fulfillment = [new NestPartFulfillment("test-part", 5, 5, 0)],
+            Unplaced = [new NestUnplacedRequestPart("other-part", 2, NestUnplacedReason.NoStockFits)],
             StockUsage = [new NestStockUsage("sheet", 1, 0)],
             PlateStockMappings = [new NestPlateStockMapping(0, "sheet")],
             Nest = nest,
@@ -70,6 +71,7 @@ public class NestResponsePersistenceTests
             Assert.Equal(NestJobStatus.Complete, loaded.Status);
             Assert.Equal(NestJobStopReason.Completed, loaded.StopReason);
             Assert.Equal(original.Fulfillment, loaded.Fulfillment);
+            Assert.Equal(original.Unplaced, loaded.Unplaced);
             Assert.Equal(original.StockUsage, loaded.StockUsage);
             Assert.Equal(original.PlateStockMappings, loaded.PlateStockMappings);
 
@@ -105,6 +107,7 @@ public class NestResponsePersistenceTests
             Assert.Null(loaded.Status);
             Assert.Null(loaded.StopReason);
             Assert.Empty(loaded.Fulfillment);
+            Assert.Empty(loaded.Unplaced);
             Assert.Empty(loaded.StockUsage);
             Assert.Empty(loaded.PlateStockMappings);
             Assert.Equal(1, loaded.SheetCount);

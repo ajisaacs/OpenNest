@@ -315,6 +315,8 @@ namespace OpenNest.Mcp.Tools
             var sb = new StringBuilder();
             foreach (var violation in result.Violations)
                 sb.AppendLine($"Violation: {violation}");
+            foreach (var unplaced in result.Unplaced)
+                sb.AppendLine($"Unplaced: {unplaced.Describe()}");
             if (!result.CanKeep || result.Raw.Plates.Count > 1 || (!result.IsValid && !allow_invalid))
             {
                 sb.AppendLine(result.Raw.Plates.Count > 1
@@ -437,7 +439,8 @@ namespace OpenNest.Mcp.Tools
             {
                 var summary = string.Join(", ", remaining.Select(item =>
                     $"{item.Drawing.Name}: {placed.GetValueOrDefault(item.Drawing)}/{item.Quantity} newly placed"));
-                return $"Error: incomplete whole-job proposal ({result.StopReason}); {summary}. Nothing committed. A solver's no-placement result does not prove geometric impossibility.";
+                var reasons = string.Join("; ", result.Unplaced.Select(u => u.Describe()));
+                return $"Error: incomplete whole-job proposal ({result.StopReason}); {summary}. Unplaced: {reasons}. Nothing committed. A solver's no-placement result does not prove geometric impossibility.";
             }
             if (result.Raw.Plates.Count > limit)
                 return "Error: proposal exceeds the allowed sheet count. Nothing committed.";

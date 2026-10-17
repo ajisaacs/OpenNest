@@ -54,7 +54,8 @@ public class RepeatedPlateResponseTests
 
     private static void AssertResponse(NestResponse response)
     {
-        Assert.Equal(4, response.SchemaVersion);
+        Assert.Equal(NestResponse.CurrentSchemaVersion, response.SchemaVersion);
+        Assert.Empty(response.Unplaced);
         Assert.Equal(NestValidationStatus.Valid, response.ValidationStatus);
         Assert.Equal(NestJobStatus.Complete, response.Status);
         Assert.Empty(response.Violations);

@@ -14,6 +14,9 @@ namespace OpenNest.Api;
 /// <summary>Stable fulfillment metadata for one requested part identity.</summary>
 public sealed record NestPartFulfillment(string PartId, int Requested, int Placed, int Unplaced);
 
+/// <summary>Copies of one requested part identity the proposal leaves unplaced, and why.</summary>
+public sealed record NestUnplacedRequestPart(string PartId, int Count, NestUnplacedReason Reason);
+
 /// <summary>Physical-sheet usage for one stock identity.</summary>
 public sealed record NestStockUsage(string StockId, int Used, int? Remaining);
 
@@ -26,7 +29,7 @@ public enum NestValidationStatus { Valid, Invalid, Unrepresentable }
 
 public class NestResponse
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     /// <summary>Zero identifies an archive written before response metadata was versioned.</summary>
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
@@ -45,6 +48,9 @@ public class NestResponse
     public NestValidationStatus? ValidationStatus { get; init; }
     public IReadOnlyList<string> Violations { get; init; } = [];
     public IReadOnlyList<NestPartFulfillment> Fulfillment { get; init; } = [];
+    /// <summary>Every unplaced copy by requested part and reason; empty when everything was
+    /// placed. Archives before schema 5 did not record it and load empty.</summary>
+    public IReadOnlyList<NestUnplacedRequestPart> Unplaced { get; init; } = [];
     public IReadOnlyList<NestStockUsage> StockUsage { get; init; } = [];
     public IReadOnlyList<NestPlateStockMapping> PlateStockMappings { get; init; } = [];
     public NestCostSummary Costs { get; init; }
@@ -90,6 +96,7 @@ public class NestResponse
                     Fulfillment = Fulfillment is null
                         ? []
                         : new List<NestPartFulfillment>(Fulfillment),
+                    Unplaced = Unplaced is null ? [] : new List<NestUnplacedRequestPart>(Unplaced),
                     Costs = Costs,
                     StockUsage = StockUsage is null ? [] : new List<NestStockUsage>(StockUsage),
                     PlateStockMappings = PlateStockMappings is null
@@ -174,6 +181,7 @@ public class NestResponse
             ValidationStatus = archive.ValidationStatus,
             Violations = archive.Violations ?? [],
             Fulfillment = hasStatusMetadata ? archive.Fulfillment ?? [] : [],
+            Unplaced = hasSchemaVersion && archive.SchemaVersion >= 5 ? archive.Unplaced ?? [] : [],
             StockUsage = hasStatusMetadata ? archive.StockUsage ?? [] : [],
             PlateStockMappings = hasStatusMetadata ? archive.PlateStockMappings ?? [] : [],
             Costs = archive.Costs,
@@ -195,6 +203,7 @@ public class NestResponse
         public NestValidationStatus? ValidationStatus { get; init; }
         public List<string> Violations { get; init; } = [];
         public List<NestPartFulfillment> Fulfillment { get; init; } = [];
+        public List<NestUnplacedRequestPart> Unplaced { get; init; } = [];
         public List<NestStockUsage> StockUsage { get; init; } = [];
         public List<NestPlateStockMapping> PlateStockMappings { get; init; } = [];
     }

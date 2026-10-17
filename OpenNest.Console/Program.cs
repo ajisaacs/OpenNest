@@ -513,6 +513,8 @@ static class NestConsole
             engineName, nestItems, NestStockBuilder.SinglePlate(plate)), token: token);
         foreach (var violation in result.Violations)
             Console.Error.WriteLine($"Violation: {violation}");
+        foreach (var unplaced in result.Unplaced)
+            Console.Error.WriteLine($"Unplaced: {unplaced.Describe()}");
 
         if (!result.CanKeep || result.Raw.Plates.Count > 1 || (!result.IsValid && !allowInvalid))
         {

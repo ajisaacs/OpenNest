@@ -33,7 +33,19 @@ Every invalid result shows the validation report before any plates are changed:
 - **Keep anyway** requires an explicit click and keeps the entire representable proposal, then enables Overlap Check.
 - Malformed output (unknown requirements or nonfinite poses) is not keepable. It cannot be faithfully represented as the proposed layout; no partial/truncated proposal is offered.
 
-Overlap Check displays material overlaps, not every spacing/stock/rotation failure in the report. A layout passing validation may still be incomplete; completeness and stop reason are separate from geometric validity. This check does not replace pre-post CNC verification.
+Overlap Check displays material overlaps, not every spacing/stock/rotation failure in the report. A layout passing validation may still be incomplete; completeness and stop reason are separate from geometric validity.
+
+## Unplaced parts
+
+Unplaced demand is never dropped silently. `NestPipelineResult.Unplaced` lists every requested copy the proposal leaves unplaced, by requirement (caller drawing) and `NestUnplacedReason`, counted from the returned placements rather than engine metadata:
+
+- `NoStockFits`: the part's material bounds exceed every offered sheet's work area at each sampled legal rotation (up to 16; automatic rotation keeps its quarter turns).
+- `FrameUnplaced`: the copy was reserved inside a cutout of a frame copy the engine did not place (see [filling cutouts](nesting-engines.md#filling-cutouts)).
+- `StockExhausted`, `PlateLimitReached`: from the engine's stop reason.
+- `NoPlacementFound`: the engine found no position; this does not prove none exists.
+- `ProposalNotKeepable`: the proposal cannot be kept, so all demand is listed.
+
+An incomplete but valid proposal is keepable like any other; keeping it is still an explicit action. Desktop Auto Nest lists each unplaced drawing, count and reason after committing (the drawing list keeps showing remaining quantities); Console `--autonest` writes `Unplaced:` lines to standard error; MCP `autonest_plate` adds `Unplaced:` lines and `autonest_job` names the reasons when it refuses an incomplete proposal; the API returns `NestResponse.Unplaced` by request part ID. This check does not replace pre-post CNC verification.
 
 The selected engine is saved in `%APPDATA%\OpenNest\engine-selection.json`.
 Selection is restored after plug-ins load. A saved name from an earlier release
@@ -167,7 +179,7 @@ Set `NestRequest.Engine` to a registered engine name; null retains `PlacementStr
 
 The API returns a detached proposal. `ValidationStatus` is `Valid`, `Invalid`, or `Unrepresentable`, and `Violations` lists the problems. Representable invalid proposals retain their parts for caller review; unrepresentable proposals contain no sheets. Consumers must inspect validation before applying, quoting or posting the proposal. `Status` describes fulfillment, not acceptance: counts, stock usage and completeness are derived from returned placements rather than trusting plug-in summary metadata.
 
-Response archive schema 4 records grouped-layout semantics. `SheetCount` is the physical sum of `Nest.Plates[*].Quantity`; fulfillment, stock usage, utilization (part area / physical sheet area), cutting time and costs are quantity-weighted. `PlateStockMappings[*].PlateIndex` indexes the actual materialized `Nest.Plates` layout entries, so mappings may be fewer than `SheetCount`. Schema 3 and unversioned archives still load unchanged: no regrouping or metadata reinterpretation occurs. Validation status and violations remain persisted; older archives without validation metadata load with null status, which is not a successful check. Saving a proposal archive does not authorize CNC posting.
+Response archive schema 5 adds `Unplaced`; earlier archives load it empty (not recorded). Schema 4 records grouped-layout semantics. `SheetCount` is the physical sum of `Nest.Plates[*].Quantity`; fulfillment, stock usage, utilization (part area / physical sheet area), cutting time and costs are quantity-weighted. `PlateStockMappings[*].PlateIndex` indexes the actual materialized `Nest.Plates` layout entries, so mappings may be fewer than `SheetCount`. Schema 3 and unversioned archives still load unchanged: no regrouping or metadata reinterpretation occurs. Validation status and violations remain persisted; older archives without validation metadata load with null status, which is not a successful check. Saving a proposal archive does not authorize CNC posting.
 
 ## Verification
 

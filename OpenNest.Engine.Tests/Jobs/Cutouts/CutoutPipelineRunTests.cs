@@ -115,6 +115,12 @@ public class CutoutPipelineRunTests
         Assert.Equal(new[] { "part-1", "part-0" },
             Assert.Single(result.Raw.Plates).Placements.Select(p => p.PartId));
         Assert.All(result.Raw.Fulfillment, f => Assert.Equal((2, 1, 1), (f.Requested, f.Placed, f.Unplaced)));
+        // The second frame copy found no position; its reserved insert is named as such.
+        Assert.Equal(new[] {
+                ("part-0", 1, NestUnplacedReason.NoPlacementFound),
+                ("part-1", 1, NestUnplacedReason.FrameUnplaced) },
+            result.Unplaced.Select(u => (u.PartId, u.Count, u.Reason)));
+        Assert.Same(request.Items[1].Drawing, result.Unplaced[1].Drawing);
 
         static bool IsProxy(NestJobPart part) => part.Id.StartsWith("__cutout-proxy-");
     }
@@ -131,5 +137,43 @@ public class CutoutPipelineRunTests
         Assert.Throws<OperationCanceledException>(() =>
             NestPipeline.Run(engine, "stub", Request("stub"), token: cts.Token));
         Assert.True(IsTrial(Assert.Single(engine.Jobs)));
+    }
+
+    [Fact]
+    public void UnplacedPartsNameTheirRequirementAndReason()
+    {
+        var oversized = new NestItem { Drawing = new Drawing("oversized", TestShapes.Rectangle(30, 30)), Quantity = 2 };
+        var request = Request("stub") with
+        {
+            Items = new[] { Request("stub").Items[0], oversized },
+        };
+        request.Items[0].Quantity = 3;
+        var result = NestPipeline.Run(new Stub(job => Place(job, ("part-0", 11, 11))), "stub", request);
+        Assert.True(result.IsValid, string.Join("; ", result.Violations));
+        Assert.Equal(new[] {
+                ("part-0", 2, NestUnplacedReason.NoPlacementFound),
+                ("part-1", 2, NestUnplacedReason.NoStockFits) },
+            result.Unplaced.Select(u => (u.PartId, u.Count, u.Reason)));
+
+        var complete = NestPipeline.Run(Request("Irregular"));
+        Assert.Equal(NestJobStatus.Complete, complete.Status);
+        Assert.Empty(complete.Unplaced);
+    }
+
+    [Fact]
+    public void UnkeepableProposalListsAllDemandAsNotKeepable()
+    {
+        var request = Request("stub");
+        var result = NestPipeline.Run(new Stub(job => new NestJobResult(
+            NestJobStatus.Complete, NestJobStopReason.Completed,
+            new[] { new NestJobPlateResult(0, job.Plates[0], new[] {
+                new NestJobPlacement("ghost", 0, 11, 11, 0) }) },
+            Array.Empty<PartFulfillment>(), Array.Empty<StockUsage>())), "stub", request);
+        Assert.False(result.CanKeep);
+        Assert.NotEmpty(result.RefusedCutoutTrial);
+        Assert.Equal(new[] {
+                ("part-0", 1, NestUnplacedReason.ProposalNotKeepable),
+                ("part-1", 1, NestUnplacedReason.ProposalNotKeepable) },
+            result.Unplaced.Select(u => (u.PartId, u.Count, u.Reason)));
     }
 }

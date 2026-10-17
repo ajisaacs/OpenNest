@@ -1830,8 +1830,11 @@ namespace OpenNest.Forms
                 if (costs?.Basis == "supplied-cost")
                     MessageBox.Show(this, $"Gross sheet cost: {costs.GrossTotal:G}\nEstimated salvage credit: {costs.SalvageCredit:G}\nNet score: {costs.NetScore:G}",
                         "Auto Nest Cost", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                if (result.Status != NestJobStatus.Complete)
-                    MessageBox.Show(this, $"{engineName} could not place every part ({result.StopReason}).",
+                // Never drop demand silently: name every unplaced part and why (the drawing
+                // list keeps showing the remaining quantities after this closes).
+                if (result.Unplaced.Count > 0)
+                    MessageBox.Show(this, $"{engineName} could not place every part:\n\n"
+                            + string.Join("\n", result.Unplaced.Select(u => u.Describe())),
                         "Auto Nest", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (OperationCanceledException) when (cts.IsCancellationRequested)

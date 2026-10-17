@@ -119,6 +119,8 @@ public static class NestRunner
             return new NestPartFulfillment(part.Id, part.Request.Quantity, placed,
                 System.Math.Max(0, part.Request.Quantity - placed));
         }).ToArray();
+        var unplaced = result.Unplaced.Select(u => new NestUnplacedRequestPart(
+            parts[items.FindIndex(item => ReferenceEquals(item.Drawing, u.Drawing))].Id, u.Count, u.Reason)).ToArray();
         var usage = stock.Select(s =>
         {
             var used = result.Plates.Where(p => p.Stock.Id == s.Id).Sum(p => p.Quantity);
@@ -146,6 +148,7 @@ public static class NestRunner
                     : result.IsValid ? NestValidationStatus.Valid : NestValidationStatus.Invalid,
                 Violations = result.Violations,
                 Fulfillment = fulfillment,
+                Unplaced = unplaced,
                 StockUsage = usage,
                 Costs = result.CanKeep && result.IsValid ? NestCostSummary.FromAccepted(result) : null,
                 PlateStockMappings = result.Plates.Select((value, index) =>

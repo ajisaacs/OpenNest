@@ -47,7 +47,8 @@ public sealed class NestPipelineResult
         bool canKeep,
         TimeSpan solveTime,
         TimeSpan validationTime,
-        IReadOnlyDictionary<string, Drawing> drawingsByPartId
+        IReadOnlyDictionary<string, Drawing> drawingsByPartId,
+        IReadOnlyList<NestUnplacedPart> unplaced
     )
     {
         EngineName = engineName;
@@ -59,6 +60,7 @@ public sealed class NestPipelineResult
         SolveTime = solveTime;
         ValidationTime = validationTime;
         DrawingsByPartId = drawingsByPartId;
+        Unplaced = unplaced;
     }
 
     public string EngineName { get; }
@@ -76,6 +78,11 @@ public sealed class NestPipelineResult
     public TimeSpan ValidationTime { get; }
     internal IReadOnlyDictionary<string, Drawing> DrawingsByPartId { get; }
 
+    /// <summary>Every requested copy this proposal leaves unplaced, by requirement and reason,
+    /// counted from the returned placements. Empty when the proposal places every copy; when it
+    /// cannot be kept, all demand is listed as <see cref="NestUnplacedReason.ProposalNotKeepable"/>.</summary>
+    public IReadOnlyList<NestUnplacedPart> Unplaced { get; }
+
     /// <summary>Why a bundled cutout trial was refused before this ordinary solve replaced it;
     /// empty when no trial ran or the trial was not refused. Never part of <see cref="Violations"/>:
     /// the refused trial has no bindable plates.</summary>
@@ -83,7 +90,7 @@ public sealed class NestPipelineResult
 
     internal NestPipelineResult WithRefusedCutoutTrial(IReadOnlyList<string> refusals) =>
         new(EngineName, Job, Raw, Plates, Violations, CanKeep, SolveTime, ValidationTime,
-            DrawingsByPartId)
+            DrawingsByPartId, Unplaced)
         { RefusedCutoutTrial = refusals };
 }
 
@@ -251,6 +258,7 @@ public static class NestPipeline
     )
     {
         var engineJob = prepass?.EngineJob ?? job;
+        IReadOnlyDictionary<string, int> released = new Dictionary<string, int>();
         if (prepass != null)
             NestJobValidator.Validate(engineJob);
 
@@ -292,6 +300,7 @@ public static class NestPipeline
             var failure = "Cutout engine output failed reconciliation";
             if (violations.Count == 0 && prepass.TryExpand(job, raw, token, out var expanded, out failure))
             {
+                released = prepass.ReleasedInserts(raw);
                 raw = expanded;
                 violations.AddRange(NestLayoutCheck.Violations(job, raw, names, out var physicalKeep));
                 canKeep = physicalKeep && violations.Count == 0;
@@ -347,7 +356,8 @@ public static class NestPipeline
             canKeep,
             solveTime,
             validationTime,
-            drawingsByPartId
+            drawingsByPartId,
+            NestUnplacedParts.Classify(job, raw, canKeep, drawingsByPartId, released)
         );
     }
 }

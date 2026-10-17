@@ -59,7 +59,7 @@ internal sealed class CutoutPipelinePrepass
                 foreach (var angle in frame.Rotation.EnumerateAngles(maxSamples: 16))
                 {
                     token.ThrowIfCancellationRequested();
-                    if (!FitsOfferedStock(frame, angle, original.Plates))
+                    if (!NestUnplacedParts.FitsOfferedStock(frame, angle, original.Plates))
                         continue;
                     var local = new List<NestJobPlacement>();
                     var available = new Dictionary<string, int>(remaining);
@@ -132,14 +132,18 @@ internal sealed class CutoutPipelinePrepass
                 original.End - frameAngle, original.Step, original.Allow180Equivalent),
         };
 
-    private static bool FitsOfferedStock(NestJobPart frame, double angle,
-        IReadOnlyList<NestPlateStock> stock)
+    /// <summary>Reserved insert copies per original requirement whose frame proxy the engine
+    /// did not place; call only on engine output that <see cref="TryExpand"/> accepted.</summary>
+    internal IReadOnlyDictionary<string, int> ReleasedInserts(NestJobResult engineResult)
     {
-        var part = new Part(DrawingJobMapper.CreateDrawing(frame));
-        part.Rotate(angle);
-        var bounds = NestLayoutCheck.MaterialBounds(part);
-        return stock.Any(s => s.Quantity != 0 && s.Fits(bounds.Length, bounds.Width,
-            NestTolerances.WorkAreaSlack));
+        var placed = engineResult.Plates.SelectMany(p => p.Placements)
+            .Select(p => p.PartId).ToHashSet(StringComparer.Ordinal);
+        var released = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var (proxyId, bundle) in bundles)
+            if (!placed.Contains(proxyId))
+                foreach (var insert in bundle.LocalInserts)
+                    released[insert.PartId] = released.GetValueOrDefault(insert.PartId) + 1;
+        return released;
     }
 
     /// <summary>Reject untrusted accounting before expansion. A failed trial is never bindable,
