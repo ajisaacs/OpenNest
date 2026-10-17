@@ -177,6 +177,16 @@ A placement may write `drawingPinsOff: true` to ignore its drawing's pins on tha
 part only; it is omitted when false. Any value other than a boolean loads as
 false (the drawing's pins apply) with a warning naming the plate and part.
 
+## Drawing breakoffs
+
+A drawing may carry a `breakoffs` array, omitted when empty. Each entry has
+`edgeIds` (source entity IDs of the breakoff's outside edges), `tabWidth`,
+`slotWidth` and `tabCenters` (distances along the break line), all in the source
+frame; see [breakoffs](breakoffs.md). The stored program already has them applied,
+so readers never rebuild geometry from them. An entry with no edges, a width that is
+not positive and finite, or a nonfinite tab center is dropped with a reader warning;
+the drawing and its program load unchanged, only the breakoff stops being editable.
+
 ## Verification and limits
 
 The automated tests cover save/reopen/re-save, rotated/manual/locked parts,

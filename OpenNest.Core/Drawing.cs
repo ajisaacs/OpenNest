@@ -126,6 +126,12 @@ namespace OpenNest
         public List<CNC.CuttingStrategy.ContourCutPin> CutPins { get; set; } = new List<CNC.CuttingStrategy.ContourCutPin>();
 
         /// <summary>
+        /// Scrap pieces tabbed to the part, in the source frame. <see cref="Program"/> already has
+        /// them applied; they are kept so an editor can change them from <see cref="SourceEntities"/>.
+        /// </summary>
+        public List<Breakoffs.Breakoff> Breakoffs { get; set; } = new List<Breakoffs.Breakoff>();
+
+        /// <summary>
         /// Complete set of source entities with stable GUIDs.
         /// Null when the drawing was created from G-code or an older nest file.
         /// </summary>

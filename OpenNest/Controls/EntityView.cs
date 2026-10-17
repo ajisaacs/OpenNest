@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -10,7 +10,7 @@ using OpenNest.Math;
 
 namespace OpenNest.Controls
 {
-    public class EntityView : DrawControl
+    public partial class EntityView : DrawControl
     {
         public List<Entity> Entities;
         public List<Bend> Bends = new List<Bend>();
@@ -74,6 +74,9 @@ namespace OpenNest.Controls
             if (!Focused)
                 Focus();
 
+            if (HandleBreakoffClick(e))
+                return;
+
             if (IsPickingBendLine && e.Button == MouseButtons.Left)
             {
                 var line = HitTestLine(e.Location);
@@ -123,6 +126,7 @@ namespace OpenNest.Controls
             }
 
             DrawBendLines(e.Graphics);
+            DrawBreakoffs(e.Graphics);
 
             foreach (var entity in Entities)
             {
@@ -200,6 +204,7 @@ namespace OpenNest.Controls
             {
                 LastPoint = CurrentPoint;
                 CurrentPoint = PointControlToWorld(e.Location);
+                HandleBreakoffMouseMove(e);
             }
 
             lastPoint = e.Location;
@@ -222,9 +227,10 @@ namespace OpenNest.Controls
             if (e.KeyCode == Keys.F)
                 ZoomToFit();
 
-            if (IsPickingBendLine && e.KeyCode == Keys.Escape)
+            if ((IsPickingBendLine || IsPickingBreakoff) && e.KeyCode == Keys.Escape)
             {
                 IsPickingBendLine = false;
+                IsPickingBreakoff = false;
                 PickCancelled?.Invoke(this, EventArgs.Empty);
             }
         }

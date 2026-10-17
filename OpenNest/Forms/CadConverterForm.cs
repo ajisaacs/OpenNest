@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Bending;
+using OpenNest.Breakoffs;
 using OpenNest.CNC;
 using OpenNest.Controls;
 using OpenNest.Converters;
@@ -49,6 +50,12 @@ namespace OpenNest.Forms
             filterPanel.BendLineRemoved += OnBendLineRemoved;
             filterPanel.BendLineEdited += OnBendLineEdited;
             filterPanel.AddBendLineClicked += OnAddBendLineClicked;
+            filterPanel.AddBreakoffClicked += OnAddBreakoffClicked;
+            filterPanel.BreakoffSelected += OnBreakoffSelected;
+            filterPanel.BreakoffEdited += OnBreakoffEdited;
+            filterPanel.BreakoffRemoved += OnBreakoffRemoved;
+            entityView1.BreakoffEdgePicked += OnBreakoffEdgePicked;
+            entityView1.TabDragged += OnTabDragged;
             entityView1.LinePicked += OnLinePicked;
             entityView1.PickCancelled += OnPickCancelled;
             entityView1.TextConvertRequested += OnTextConvertRequested;
@@ -166,6 +173,12 @@ namespace OpenNest.Forms
                 entityView1.IsPickingBendLine = false;
                 filterPanel.SetPickMode(false);
             }
+            if (entityView1.IsPickingBreakoff)
+            {
+                entityView1.IsPickingBreakoff = false;
+                filterPanel.SetBreakoffPickMode(false);
+            }
+            entityView1.SelectedBreakoffIndex = -1;
             entityView1.OriginalEntities = chkShowOriginal.Checked ? item.OriginalEntities : null;
             entityView1.Entities.Clear();
             entityView1.Entities.AddRange(item.Entities);
@@ -179,6 +192,7 @@ namespace OpenNest.Forms
             ReHideSuppressedEntities(item);
 
             filterPanel.LoadItem(item.Entities, item.Bends);
+            RefreshBreakoffs(item);
 
             numQuantity.Value = item.Quantity;
             txtCustomer.Text = item.Customer ?? "";
@@ -259,7 +273,7 @@ namespace OpenNest.Forms
             filterPanel.ApplyFilters(item.Entities);
             ReHidePromotedEntities(item.Bends);
             SyncSuppressedState(item);
-            entityView1.Invalidate();
+            RefreshBreakoffs(item);
             staleProgram = true;
         }
 
@@ -287,7 +301,8 @@ namespace OpenNest.Forms
                 return;
             }
 
-            var normalized = ShapeProfile.NormalizeEntities(entities);
+            var cut = BreakoffBuilder.Apply(entities, item.Breakoffs, out _);
+            var normalized = ShapeProfile.NormalizeEntities(cut);
             programEditor.LoadEntities(normalized);
             staleProgram = false;
         }
@@ -464,6 +479,8 @@ namespace OpenNest.Forms
 
         private void OnAddBendLineClicked(object sender, EventArgs e)
         {
+            entityView1.IsPickingBreakoff = false;
+            filterPanel.SetBreakoffPickMode(false);
             var active = !entityView1.IsPickingBendLine;
             entityView1.IsPickingBendLine = active;
             filterPanel.SetPickMode(active);
@@ -503,7 +520,161 @@ namespace OpenNest.Forms
         {
             entityView1.IsPickingBendLine = false;
             filterPanel.SetPickMode(false);
+            entityView1.IsPickingBreakoff = false;
+            filterPanel.SetBreakoffPickMode(false);
         }
+
+        private static List<Entity> VisibleEntities(FileListItem item) =>
+            item.Entities.Where(en => en.Layer.IsVisible && en.IsVisible).ToList();
+
+        private void RefreshBreakoffs(FileListItem item)
+        {
+            var visible = VisibleEntities(item);
+            var allEdges = item.Breakoffs.SelectMany(b => b.EdgeIds).ToList();
+            var layouts = item.Breakoffs.Select(b => BreakoffBuilder.Layout(visible, b, allEdges)).ToList();
+            entityView1.BreakoffLayouts = layouts;
+            filterPanel.LoadBreakoffs(layouts
+                .Select((l, i) => l.IsValid
+                    ? $"Breakoff {i + 1}: {l.TabCenters.Count} tabs"
+                    : $"Breakoff {i + 1} (not applied): {l.Error}")
+                .ToList(), entityView1.SelectedBreakoffIndex);
+            entityView1.Invalidate();
+        }
+
+        private void OnAddBreakoffClicked(object sender, EventArgs e)
+        {
+            entityView1.IsPickingBendLine = false;
+            filterPanel.SetPickMode(false);
+            var active = !entityView1.IsPickingBreakoff;
+            entityView1.IsPickingBreakoff = active;
+            filterPanel.SetBreakoffPickMode(active);
+        }
+
+        private void OnBreakoffEdgePicked(object sender, Entity entity)
+        {
+            entityView1.IsPickingBreakoff = false;
+            filterPanel.SetBreakoffPickMode(false);
+            var item = CurrentItem;
+            if (item == null)
+                return;
+
+            var visible = VisibleEntities(item);
+            var chain = BreakoffBuilder.FindEdgeChain(visible, entity);
+            var used = item.Breakoffs.SelectMany(b => b.EdgeIds).ToHashSet();
+            if (chain.Any(en => used.Contains(en.Id)))
+            {
+                ShowBreakoffMessage("That edge already belongs to a breakoff.");
+                return;
+            }
+
+            var breakoff = new Breakoff { EdgeIds = chain.Select(en => en.Id).ToList() };
+            var layout = BreakoffBuilder.Layout(visible, breakoff, used);
+            if (!layout.IsValid)
+            {
+                ShowBreakoffMessage("Could not make a breakoff from that edge: " + layout.Error
+                    + "\n\nClick an outside edge of the scrap piece. Its edges must form one chain whose "
+                    + "ends touch the part outline.");
+                return;
+            }
+
+            using var dialog = new BreakoffDialog();
+            if (!AskBreakoffSettings(dialog))
+                return;
+            if (!TryConfigure(item, breakoff, dialog, keepTabs: false))
+                return;
+
+            item.Breakoffs.Add(breakoff);
+            entityView1.SelectedBreakoffIndex = item.Breakoffs.Count - 1;
+            RefreshBreakoffs(item);
+            staleProgram = true;
+        }
+
+        private void OnBreakoffEdited(object sender, int index)
+        {
+            var item = CurrentItem;
+            if (item == null || index < 0 || index >= item.Breakoffs.Count)
+                return;
+
+            var current = item.Breakoffs[index];
+            using var dialog = new BreakoffDialog();
+            dialog.LoadBreakoff(current);
+            if (!AskBreakoffSettings(dialog))
+                return;
+
+            var edited = current.Clone();
+            var keepTabs = dialog.TabCount == current.TabCenters.Count
+                && Math.Tolerance.IsEqualTo(dialog.TabWidth, current.TabWidth);
+            if (!TryConfigure(item, edited, dialog, keepTabs))
+                return;
+
+            item.Breakoffs[index] = edited;
+            RefreshBreakoffs(item);
+            staleProgram = true;
+        }
+
+        // Applies the dialog's settings, spacing the tabs evenly unless asked to keep them, and
+        // refuses settings that do not resolve.
+        private bool TryConfigure(FileListItem item, Breakoff breakoff, BreakoffDialog dialog, bool keepTabs)
+        {
+            var visible = VisibleEntities(item);
+            var others = item.Breakoffs.Where(b => !b.EdgeIds.SequenceEqual(breakoff.EdgeIds))
+                .SelectMany(b => b.EdgeIds).ToList();
+
+            breakoff.TabWidth = dialog.TabWidth;
+            breakoff.SlotWidth = dialog.SlotWidth;
+            if (!keepTabs)
+            {
+                var probe = breakoff.Clone();
+                probe.TabCenters.Clear();
+                var length = BreakoffBuilder.Layout(visible, probe, others).Length;
+                breakoff.TabCenters = BreakoffBuilder.EvenTabCenters(length, dialog.TabCount, dialog.TabWidth);
+            }
+
+            var layout = BreakoffBuilder.Layout(visible, breakoff, others);
+            if (layout.IsValid)
+                return true;
+            ShowBreakoffMessage("Those settings do not fit this breakoff: " + layout.Error);
+            return false;
+        }
+
+        private void OnBreakoffRemoved(object sender, int index)
+        {
+            var item = CurrentItem;
+            if (item == null || index < 0 || index >= item.Breakoffs.Count)
+                return;
+
+            item.Breakoffs.RemoveAt(index);
+            entityView1.SelectedBreakoffIndex = -1;
+            RefreshBreakoffs(item);
+            staleProgram = true;
+        }
+
+        private void OnBreakoffSelected(object sender, int index)
+        {
+            entityView1.SelectedBreakoffIndex = index;
+            entityView1.Invalidate();
+        }
+
+        private void OnTabDragged(object sender, TabDragEventArgs e)
+        {
+            var item = CurrentItem;
+            if (item == null || e.Breakoff >= item.Breakoffs.Count)
+                return;
+
+            var breakoff = item.Breakoffs[e.Breakoff];
+            if (e.Tab >= breakoff.TabCenters.Count)
+                return;
+            breakoff.TabCenters[e.Tab] = e.Center;
+            entityView1.SelectedBreakoffIndex = e.Breakoff;
+            RefreshBreakoffs(item);
+            staleProgram = true;
+        }
+
+        internal virtual bool AskBreakoffSettings(BreakoffDialog dialog) =>
+            dialog.ShowDialog(this) == DialogResult.OK;
+
+        internal virtual void ShowBreakoffMessage(string message) =>
+            MessageBox.Show(this, message, "Breakoff", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
         private void OnTextConvertRequested(object sender, Controls.CadText text)
         {
@@ -815,6 +986,7 @@ namespace OpenNest.Forms
                     Quantity = drawing.Quantity.Required,
                     Customer = drawing.Customer ?? string.Empty,
                     Bends = drawing.Bends?.ToList() ?? new List<Bend>(),
+                    Breakoffs = drawing.Breakoffs?.Select(b => b.Clone()).ToList() ?? new List<Breakoff>(),
                     SuppressedEntityIds =
                         drawing.SuppressedEntityIds.Count > 0
                             ? new HashSet<Guid>(drawing.SuppressedEntityIds)
@@ -864,7 +1036,8 @@ namespace OpenNest.Forms
                     result.Bends,
                     item.Quantity,
                     item.Customer,
-                    editedProgram
+                    editedProgram,
+                    item.Breakoffs
                 );
 
                 drawings.Add(drawing);

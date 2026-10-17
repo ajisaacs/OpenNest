@@ -200,6 +200,15 @@ namespace OpenNest.IO
                             ?? new List<BendDto>(),
                         Library = ToLibraryLinkDto(d.Library),
                         CutPins = d.CutPins?.Count > 0 ? d.CutPins.Select(CutPinFormat.ToDto).ToList() : null,
+                        Breakoffs = d.Breakoffs?.Count > 0
+                            ? d.Breakoffs.Select(b => new BreakoffDto
+                            {
+                                EdgeIds = b.EdgeIds.ToList(),
+                                TabWidth = b.TabWidth,
+                                SlotWidth = b.SlotWidth,
+                                TabCenters = b.TabCenters.ToList(),
+                            }).ToList()
+                            : null,
                     }
                 );
             }

@@ -20,6 +20,10 @@ namespace OpenNest.Controls
         private readonly CheckedListBox lineTypesList;
         private readonly ListBox bendLinesList;
         private readonly LinkLabel bendAddLink;
+        private readonly CollapsiblePanel breakoffsPanel;
+        private readonly ListBox breakoffsList;
+        private readonly LinkLabel breakoffAddLink;
+        private bool loadingBreakoffs;
 
         private List<Entity> currentEntities;
         private List<Bend> currentBends;
@@ -29,11 +33,69 @@ namespace OpenNest.Controls
         public event EventHandler<int> BendLineRemoved;
         public event EventHandler<int> BendLineEdited;
         public event EventHandler AddBendLineClicked;
+        public event EventHandler<int> BreakoffSelected;
+        public event EventHandler<int> BreakoffEdited;
+        public event EventHandler<int> BreakoffRemoved;
+        public event EventHandler AddBreakoffClicked;
 
         public FilterPanel()
         {
             AutoScroll = true;
             BackColor = Color.White;
+
+            // Breakoffs
+            breakoffsPanel = new CollapsiblePanel
+            {
+                HeaderText = "Breakoffs (0)",
+                Dock = DockStyle.Top,
+                ExpandedHeight = 110,
+                IsExpanded = false,
+            };
+            breakoffsList = new ListBox
+            {
+                Dock = DockStyle.Fill,
+                BorderStyle = BorderStyle.None,
+                Font = new Font("Segoe UI", 9f),
+            };
+            breakoffsList.SelectedIndexChanged += (s, e) =>
+            {
+                if (!loadingBreakoffs)
+                    BreakoffSelected?.Invoke(this, breakoffsList.SelectedIndex);
+            };
+            breakoffsList.DoubleClick += (s, e) =>
+            {
+                if (breakoffsList.SelectedIndex >= 0)
+                    BreakoffEdited?.Invoke(this, breakoffsList.SelectedIndex);
+            };
+
+            breakoffAddLink = new LinkLabel { Text = "Add Breakoff", AutoSize = true, Font = new Font("Segoe UI", 8f) };
+            breakoffAddLink.LinkClicked += (s, e) => AddBreakoffClicked?.Invoke(this, EventArgs.Empty);
+            var breakoffEditLink = new LinkLabel { Text = "Edit", AutoSize = true, Font = new Font("Segoe UI", 8f) };
+            breakoffEditLink.LinkClicked += (s, e) =>
+            {
+                if (breakoffsList.SelectedIndex >= 0)
+                    BreakoffEdited?.Invoke(this, breakoffsList.SelectedIndex);
+            };
+            var breakoffRemoveLink = new LinkLabel { Text = "Remove", AutoSize = true, Font = new Font("Segoe UI", 8f) };
+            breakoffRemoveLink.LinkClicked += (s, e) =>
+            {
+                if (breakoffsList.SelectedIndex >= 0)
+                    BreakoffRemoved?.Invoke(this, breakoffsList.SelectedIndex);
+            };
+
+            var breakoffLinksPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 20,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+            };
+            breakoffLinksPanel.Controls.Add(breakoffAddLink);
+            breakoffLinksPanel.Controls.Add(breakoffEditLink);
+            breakoffLinksPanel.Controls.Add(breakoffRemoveLink);
+
+            breakoffsPanel.ContentPanel.Controls.Add(breakoffsList);
+            breakoffsPanel.ContentPanel.Controls.Add(breakoffLinksPanel);
 
             // Bend Lines
             bendLinesPanel = new CollapsiblePanel
@@ -169,6 +231,7 @@ namespace OpenNest.Controls
             layersPanel.ContentPanel.Controls.Add(checkAllPanel);
 
             // Add panels in reverse order (Dock.Top stacks top-down)
+            Controls.Add(breakoffsPanel);
             Controls.Add(bendLinesPanel);
             Controls.Add(lineTypesPanel);
             Controls.Add(colorsPanel);
@@ -338,6 +401,35 @@ namespace OpenNest.Controls
         {
             bendAddLink.Text = active ? "Cancel (Esc)" : "Add Bend Line";
             bendAddLink.LinkColor = active ? Color.OrangeRed : Color.Empty;
+        }
+
+        public void SetBreakoffPickMode(bool active)
+        {
+            breakoffAddLink.Text = active ? "Cancel (Esc)" : "Add Breakoff";
+            breakoffAddLink.LinkColor = active ? Color.OrangeRed : Color.Empty;
+        }
+
+        /// <summary>Shows one line per breakoff with <paramref name="selected"/> selected, without raising selection events.</summary>
+        public void LoadBreakoffs(IReadOnlyList<string> labels, int selected)
+        {
+            var added = labels.Count > breakoffsList.Items.Count;
+            loadingBreakoffs = true;
+            try
+            {
+                breakoffsList.BeginUpdate();
+                breakoffsList.Items.Clear();
+                foreach (var label in labels)
+                    breakoffsList.Items.Add(label);
+                breakoffsList.SelectedIndex = selected >= 0 && selected < labels.Count ? selected : -1;
+                breakoffsList.EndUpdate();
+            }
+            finally
+            {
+                loadingBreakoffs = false;
+            }
+            breakoffsPanel.HeaderText = $"Breakoffs ({labels.Count})";
+            if (added)
+                breakoffsPanel.IsExpanded = true;
         }
     }
 

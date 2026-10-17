@@ -202,6 +202,21 @@ namespace OpenNest.IO
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             [JsonConverter(typeof(LenientCutPinListConverter))]
             public List<CutPinDto> CutPins { get; init; }
+
+            /// <summary>
+            /// Breakoffs in the source frame, already applied to the stored program. Omitted when
+            /// there are none.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public List<BreakoffDto> Breakoffs { get; init; }
+        }
+
+        public record BreakoffDto
+        {
+            public List<Guid> EdgeIds { get; init; } = new();
+            public double TabWidth { get; init; }
+            public double SlotWidth { get; init; }
+            public List<double> TabCenters { get; init; } = new();
         }
 
         public record CutPinDto

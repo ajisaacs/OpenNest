@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.Json;
 using OpenNest.Bending;
 using OpenNest.BestFit;
+using OpenNest.Breakoffs;
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Converters;
@@ -276,6 +277,7 @@ namespace OpenNest.IO
 
                 drawing.Library = ReadLibraryLink(d);
                 drawing.CutPins = ReadCutPins(d);
+                drawing.Breakoffs = ReadBreakoffs(d);
                 map[d.Id] = drawing;
             }
             return map;
@@ -324,6 +326,38 @@ namespace OpenNest.IO
                         + "skipped it, so that contour uses the nest's cutting settings.");
             }
             return pins;
+        }
+
+        // The program already has breakoffs applied; a dropped definition only loses editability.
+        private List<Breakoff> ReadBreakoffs(DrawingDto d)
+        {
+            var breakoffs = new List<Breakoff>();
+            if (d.Breakoffs == null)
+                return breakoffs;
+
+            for (var i = 0; i < d.Breakoffs.Count; i++)
+            {
+                var dto = d.Breakoffs[i];
+                if (dto?.EdgeIds is { Count: > 0 } && dto.TabCenters != null
+                    && dto.TabWidth > 0 && double.IsFinite(dto.TabWidth)
+                    && dto.SlotWidth > 0 && double.IsFinite(dto.SlotWidth)
+                    && dto.TabCenters.All(double.IsFinite))
+                {
+                    breakoffs.Add(new Breakoff
+                    {
+                        EdgeIds = dto.EdgeIds.ToList(),
+                        TabWidth = dto.TabWidth,
+                        SlotWidth = dto.SlotWidth,
+                        TabCenters = dto.TabCenters.ToList(),
+                    });
+                }
+                else
+                {
+                    warnings.Add($"Drawing '{d.Name}': breakoff {i + 1} could not be read; its cut geometry "
+                        + "is kept, but it can no longer be edited as a breakoff.");
+                }
+            }
+            return breakoffs;
         }
 
         private bool ReadPinsOff(PartDto dto, int plateId, int partIndex, Part part)

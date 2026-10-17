@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using OpenNest.Bending;
+using OpenNest.Breakoffs;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO.Bending;
@@ -130,19 +131,27 @@ namespace OpenNest.IO
         /// in-place G-code edits). Source.Offset is still populated from the
         /// generated program so round-trips stay consistent.
         /// </param>
+        /// <param name="breakoffs">
+        /// Breakoffs to merge into the program and keep on the drawing; ones that cannot be
+        /// resolved against <paramref name="entities"/> are kept but not applied.
+        /// </param>
         public static Drawing BuildDrawing(
             CadImportResult result,
             IEnumerable<Entity> entities,
             IEnumerable<Bend> bends,
             int quantity,
             string customer,
-            OpenNest.CNC.Program editedProgram
+            OpenNest.CNC.Program editedProgram,
+            IReadOnlyList<Breakoff> breakoffs = null
         )
         {
             var visible = entities as IList<Entity> ?? new List<Entity>(entities);
             var bendList = bends as IList<Bend> ?? new List<Bend>(bends);
 
-            var normalized = ShapeProfile.NormalizeEntities(visible);
+            var cut = breakoffs is { Count: > 0 }
+                ? BreakoffBuilder.Apply(visible.ToList(), breakoffs, out _)
+                : visible;
+            var normalized = ShapeProfile.NormalizeEntities(cut);
             var pgm = ConvertGeometry.ToProgram(normalized);
 
             var offset = Vector.Zero;
@@ -166,6 +175,7 @@ namespace OpenNest.IO
             drawing.Source.Offset = offset;
             drawing.Quantity.Required = quantity;
             drawing.Bends.AddRange(bendList);
+            drawing.Breakoffs = breakoffs?.Select(b => b.Clone()).ToList() ?? new List<Breakoff>();
             drawing.Program = editedProgram ?? pgm;
 
             var bendSources = new HashSet<Entity>(
@@ -234,6 +244,7 @@ namespace OpenNest.IO
             existing.Quantity.Required = edited.Quantity.Required;
             existing.Bends.Clear();
             existing.Bends.AddRange(edited.Bends);
+            existing.Breakoffs = edited.Breakoffs;
         }
 
         private static bool IsRepairMark(Entity e) =>
