@@ -274,6 +274,16 @@ namespace OpenNest.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap drawing_library {
+            get {
+                var obj = ResourceManager.GetObject("drawing_library", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap shapes {
             get {
                 object obj = ResourceManager.GetObject("shapes", resourceCulture);

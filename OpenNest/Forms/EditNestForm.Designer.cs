@@ -251,10 +251,11 @@
             //
             // drawingLibraryButton
             //
-            drawingLibraryButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            drawingLibraryButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            drawingLibraryButton.Image = Properties.Resources.drawing_library;
             drawingLibraryButton.Name = "drawingLibraryButton";
             drawingLibraryButton.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            drawingLibraryButton.Size = new System.Drawing.Size(58, 24);
+            drawingLibraryButton.Size = new System.Drawing.Size(34, 24);
             drawingLibraryButton.Text = "Library";
             drawingLibraryButton.ToolTipText = "Add from Drawing Library";
             drawingLibraryButton.Click += DrawingLibrary_Click;
