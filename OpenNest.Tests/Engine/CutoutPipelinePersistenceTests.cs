@@ -26,12 +26,13 @@ public class CutoutPipelinePersistenceTests
             new NestItem { Drawing = insert, Quantity = 2 } },
             new[] { new NestPlateStock("sheet", new Size(22, 22), 2, 0.25) },
             new NestJobOptions(maxPlates: 2));
-        var ordinary = NestPipeline.Run(request);
+        var ordinary = NestPipeline.RunWithoutCutouts(request);
         Assert.Contains(ordinary.Raw.Fulfillment, f => f.Unplaced > 0);
-        var result = NestPipeline.RunCutoutPreview(request);
+        var result = NestPipeline.Run(request);
+        Assert.Empty(result.RefusedCutoutTrial);
         Assert.True(result.IsValid, string.Join("; ", result.Violations));
         Assert.Equal(2, result.Raw.Plates.Count);
-        Assert.All(result.Raw.Plates, p => Assert.Equal(new[] { "part-0", "part-1" },
+        Assert.All(result.Raw.Plates, p => Assert.Equal(new[] { "part-1", "part-0" },
             p.Placements.Select(x => x.PartId)));
 
         var nest = new Nest();
@@ -41,7 +42,7 @@ public class CutoutPipelinePersistenceTests
         {
             var committed = NestPipelineCommit.ApplyToEmptyPlates(result, manager);
             Assert.Equal(2, committed.Sum(p => p.Quantity));
-            Assert.All(committed, plate => Assert.Equal(new[] { frame, insert },
+            Assert.All(committed, plate => Assert.Equal(new[] { insert, frame },
                 plate.Parts.Select(p => p.BaseDrawing)));
         }
         Assert.Equal(2, frame.Quantity.Nested);
@@ -59,7 +60,7 @@ public class CutoutPipelinePersistenceTests
             Assert.Equal(expected.PartSpacing, actual.PartSpacing);
             Assert.Equal(expected.Quadrant, actual.Quadrant);
             Assert.Equal(expected.EdgeSpacing, actual.EdgeSpacing);
-            Assert.Equal(new[] { "neutral-frame", "neutral-insert" },
+            Assert.Equal(new[] { "neutral-insert", "neutral-frame" },
                 actual.Parts.Select(p => p.BaseDrawing.Name));
             for (var j = 0; j < actual.Parts.Count; j++)
             {

@@ -10,14 +10,14 @@ using OpenNest.Tests.CuttingPlanning;
 namespace OpenNest.Tests.Engine;
 
 /// <summary>
-/// Cutouts-first placements are only cut-safe once the insert is cut before its host and the
-/// host's hole leads clear it. Posting review must say so on the committed parts, and a fresh
-/// Plan Cutting run on those actual parts must produce that order.
+/// Cutouts-first placements are only cut-safe while the insert is cut before its host and the
+/// host's hole leads clear it. Auto Nest commits inserts first; posting review must warn once
+/// that order is lost, and a fresh Plan Cutting run on those actual parts must restore it.
 /// </summary>
 public class CutoutCuttingSafetyTests
 {
     [Fact]
-    public void CommittedCutoutPreview_WarnsUntilPlanCuttingCutsTheInsertFirst()
+    public void CommittedCutoutNest_CutsTheInsertFirstAndWarnsWhenReordered()
     {
         var frame = new OpenNest.Shapes.RingShape { OuterDiameter = 20, InnerDiameter = 10 }.GetDrawing();
         frame.Name = "neutral-frame";
@@ -33,7 +33,8 @@ public class CutoutCuttingSafetyTests
             new NestItem { Drawing = insert, Quantity = 1 } },
             new[] { new NestPlateStock("sheet", new Size(22, 22), 1, 0.25) },
             new NestJobOptions(maxPlates: 1));
-        var preview = NestPipeline.RunCutoutPreview(request);
+        var preview = NestPipeline.Run(request);
+        Assert.Empty(preview.RefusedCutoutTrial);
         Assert.True(preview.IsValid, string.Join("; ", preview.Violations));
         var nest = new Nest();
         nest.Drawings.Add(frame);
@@ -41,11 +42,15 @@ public class CutoutCuttingSafetyTests
         using (var manager = new PlateManager(nest))
             NestPipelineCommit.ApplyToEmptyPlates(preview, manager);
         var plate = Assert.Single(nest.Plates, p => p.Parts.Count != 0);
-        Assert.Equal(new[] { frame, insert }, plate.Parts.Select(p => p.BaseDrawing));
-        var host = plate.Parts[0];
-        var inner = plate.Parts[1];
+        Assert.Equal(new[] { insert, frame }, plate.Parts.Select(p => p.BaseDrawing));
+        var inner = plate.Parts[0];
+        var host = plate.Parts[1];
+        var committed = PostVerificationAnalyzer.Analyze(nest);
+        Assert.DoesNotContain(committed.Findings, f => f.Kind is PostVerificationKind.NestedCutOrder
+            or PostVerificationKind.NestedLead or PostVerificationKind.Incomplete);
 
-        // As committed, the frame (and so its cutout) is cut before the insert inside it.
+        // Reordered (for example by hand), the frame's cutout is cut before the insert inside it.
+        plate.Parts.Reorder(new[] { host, inner });
         var before = PostVerificationAnalyzer.Analyze(nest);
         var order = Assert.Single(before.Findings, f => f.Kind == PostVerificationKind.NestedCutOrder);
         Assert.Equal((2, 1), (order.PartNumber, order.OtherPartNumber));

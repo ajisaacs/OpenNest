@@ -109,6 +109,9 @@ the final replay enforce them:
   pairs; containment is proven on native clean material. Touching or crossing boundaries, or material that cannot be
   captured, refuse as `UnsupportedGeometry` naming both parts. A part in a concave
   pocket outside the host's material has no dependency.
+  Auto Nest's cutout pre-pass commits each insert before its frame, so an unedited
+  cutouts-first plate already satisfies this order; its leads are still checked
+  ([nesting engines](nesting-engines.md#filling-cutouts)).
 - A preserved manual order that violates a prerequisite, or a cycle, is a
   `ConstraintConflict`. Replay rechecks the captured prerequisites and refuses a
   violating order rather than trusting the search.

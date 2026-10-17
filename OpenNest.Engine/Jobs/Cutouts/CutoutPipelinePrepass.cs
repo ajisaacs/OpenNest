@@ -7,7 +7,9 @@ using OpenNest.Engine.Jobs.Adapters;
 
 namespace OpenNest.Engine.Jobs.Cutouts;
 
-/// <summary>Internal-only frame bundles. No normal pipeline caller enables this.</summary>
+/// <summary>Frame bundles prepared by <see cref="NestPipeline"/> before every whole-job solve:
+/// engines place a frame proxy and never see its reserved inserts. Only actually placed
+/// proxies expand, and the expanded physical layout is validated again.</summary>
 internal sealed class CutoutPipelinePrepass
 {
     // A job with thousands of repeats still offers the residual as ordinary demand;
@@ -141,7 +143,8 @@ internal sealed class CutoutPipelinePrepass
     }
 
     /// <summary>Reject untrusted accounting before expansion. A failed trial is never bindable,
-    /// including with allowInvalid. Only actually placed proxies consume reserved inserts.</summary>
+    /// including with allowInvalid. Only actually placed proxies consume reserved inserts;
+    /// an unplaced proxy's inserts stay unplaced demand of their own requirements.</summary>
     internal bool TryExpand(NestJob original, NestJobResult result, CancellationToken token,
         out NestJobResult? expanded,
         out string failure)
@@ -215,7 +218,8 @@ internal sealed class CutoutPipelinePrepass
                     poses.Add((pose.PartId, pose.X, pose.Y, pose.Rotation));
                     continue;
                 }
-                poses.Add((bundle.FrameId, pose.X, pose.Y, pose.Rotation));
+                // Inserts precede their frame: cutting the frame's cutout releases the slug
+                // each insert is cut from, so placed order is the safe cutting order.
                 var sine = System.Math.Sin(pose.Rotation);
                 var cosine = System.Math.Cos(pose.Rotation);
                 foreach (var local in bundle.LocalInserts)
@@ -223,6 +227,7 @@ internal sealed class CutoutPipelinePrepass
                         pose.X + local.X * cosine - local.Y * sine,
                         pose.Y + local.X * sine + local.Y * cosine,
                         pose.Rotation + local.Rotation));
+                poses.Add((bundle.FrameId, pose.X, pose.Y, pose.Rotation));
             }
             // Canonical stock reference, not an engine-supplied object with altered settings.
             var stock = original.Plates.Single(s => s.Id == sheet.StockId);

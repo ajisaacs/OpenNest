@@ -133,12 +133,12 @@ Default inherits these fast paths by running the two engines; other engines and 
 keep their existing search behavior. Quantity-bearing presentation is a separate validated-pipeline
 representation; repeating does not bypass whole-job validation or change cutting programs.
 
-## Filling cutouts (not yet in production)
+## Filling cutouts
 
-Placing parts inside another part's enclosed cutout is being built as a step that runs before any
-engine, so every engine benefits. Only an internal test-only pipeline preview calls it: a part
-inside a cutout must be cut before the cutout's contour. Ordinary whole-job calls do not enable
-this path.
+Every whole-job `NestPipeline.Run` (desktop Auto Nest, Console, MCP and API) first places parts
+inside other parts' enclosed cutouts, before the selected engine, so every engine benefits and
+none needs to know about holes. The steps below prepare frame-plus-insert bundles; the engine
+places each bundle's frame as an ordinary part and never sees its reserved inserts.
 
 `CutoutLatticeFill` (`OpenNest.Engine/Jobs/Cutouts/`) fills one closed cutout with copies of one
 part. It runs Fill over the cutout's bounds plus one part step on every side, then shifts
@@ -163,7 +163,7 @@ NFP first, then Fill if demand remains, taking the higher-count valid proposal.
 An 0.20 NFP-only rule would lose a second 4-inch square in a 10-inch round hole.
 Six geometry-only, anonymized real-job probes and neutral ring fixtures informed
 the search-order hints; these limited cases are not a global density guarantee.
-The internal `NestPipeline.RunCutoutPreview` builds quantity-one proxy instances for eligible
+`CutoutPipelinePrepass` builds quantity-one proxy instances for eligible
 closed-cutout frames. It considers legal frame rotations without outer-perimeter symmetry
 reduction, shifts insert rotation policies into the local frame, and reserves certified router
 poses by original requirement ID. It can fill multiple holes and repeated/different frame
@@ -174,21 +174,35 @@ offered to the selected engine once. Only actually placed proxies expand to orig
 insert identities. An unplaced proxy's reservations return to the original unplaced demand;
 they cannot be packed retroactively in that same solve. Engine indices and metadata are checked,
 then every physical pose, stock, rotation, quantity and fulfillment is independently validated
-before binding caller drawings. Incomplete, forged or geometrically invalid composites return
-no bindable plates even with invalid-result consent. Candidate evaluation progress is forwarded
+before binding caller drawings. Forged or geometrically invalid composites return no bindable
+plates even with invalid-result consent. Candidate evaluation progress is forwarded
 with unverified proxy commitment counts zeroed; transformed proxy commits are hidden. Physical
 commits are reported only after physical validation. Preparation is bounded to 32 bundles
 and 16 base sweep-angle samples per frame (automatic quarter-turns are all retained);
 remaining copies stay ordinary requirements. Fixed legal proxy orientations are a
 conservative search choice, not full engine choice among all legal orientations; unsupported
-bundles remain ordinary independent requirements. This is an internal pipeline path, not a
-production setting or cut-ready nest.
+bundles remain ordinary independent requirements.
 
-Committed preview parts keep the frame before its inserts, so they are not cut-ready as placed.
-Pre-post verification warns on a nested part cut after its host and on host/insert leads that
-meet the other part (see [pre-post verification](post-verification.md)); Plan Cutting on those
-parts cuts each insert before its frame and refuses a kept order that does not. Enabling the
-pre-pass for ordinary whole-job calls is still pending (Windows acceptance and front-end wiring).
+`NestPipeline.Run` keeps a bundled trial that is valid and complete. Otherwise it also runs the
+ordinary solve of the same job (with last-resort clamp removal, which the bundled trial does not
+offer) and returns:
+
+- the ordinary solve when the trial was refused, with the refusal on
+  `NestPipelineResult.RefusedCutoutTrial` (never in `Violations`, since the refused trial has no
+  bindable plates);
+- the ordinary solve when the trial was incomplete and the valid ordinary solve places more
+  physical parts;
+- otherwise the incomplete trial, which is a keepable layout like any other incomplete result.
+
+So a job with cutouts may take up to two engine solves; a job without eligible frames takes
+one, exactly as before. Expanded sheets list each frame's inserts immediately before the frame,
+so the committed part order cuts every insert before the cutout that would release its slug.
+Leads are not changed: pre-post verification still warns when a host's hole lead or an insert's
+lead meets the other part, or when a later reorder (by hand or Auto Sequence) puts the host
+first (see [pre-post verification](post-verification.md)); Plan Cutting cuts each insert before
+its frame and refuses a kept order that does not. Engine benchmarks call engines directly and do
+not run this pre-pass; internal `NestPipeline.RunWithoutCutouts` is the ordinary-solve baseline
+for tests.
 
 ## Renamed engines
 

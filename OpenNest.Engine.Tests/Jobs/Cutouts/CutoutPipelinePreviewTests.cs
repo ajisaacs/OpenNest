@@ -28,14 +28,15 @@ public class CutoutPipelinePreviewTests
     public void RegisteredEngineExpandsOnlyPhysicalOriginalDrawings(string engine)
     {
         var request = Request(engine);
-        var result = NestPipeline.RunCutoutPreview(request);
+        var result = NestPipeline.RunCutoutTrial(request);
         Assert.True(result.IsValid, string.Join("; ", result.Violations));
         Assert.True(result.CanKeep);
         var plate = Assert.Single(result.Plates);
         Assert.Equal(2, plate.Parts.Count);
-        Assert.Same(request.Items[0].Drawing, plate.Parts[0].BaseDrawing);
-        Assert.Same(request.Items[1].Drawing, plate.Parts[1].BaseDrawing);
-        Assert.Equal(new[] { "part-0", "part-1" }, result.Raw.Plates[0].Placements.Select(p => p.PartId));
+        // The insert precedes its frame so placed order cuts it before the frame's cutout.
+        Assert.Same(request.Items[1].Drawing, plate.Parts[0].BaseDrawing);
+        Assert.Same(request.Items[0].Drawing, plate.Parts[1].BaseDrawing);
+        Assert.Equal(new[] { "part-1", "part-0" }, result.Raw.Plates[0].Placements.Select(p => p.PartId));
         Assert.All(result.Raw.Fulfillment, f => Assert.Equal((1, 1, 0), (f.Requested, f.Placed, f.Unplaced)));
         Assert.Equal(0, request.Items[0].Drawing.Quantity.Nested);
         Assert.Equal(0, request.Items[1].Drawing.Quantity.Nested);
@@ -66,7 +67,7 @@ public class CutoutPipelinePreviewTests
     {
         var called = 0;
         var request = Request("stub");
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             called++;
             var proxy = Assert.Single(job.Parts);
@@ -81,24 +82,23 @@ public class CutoutPipelinePreviewTests
     }
 
     [Fact]
-    public void IncompleteEngineDoesNotBindReservedInsertEvenWithInvalidConsent()
+    public void UnplacedProxyLeavesItsReservedInsertAsUnplacedDemand()
     {
         var request = Request("stub");
-        var result = NestPipeline.RunCutoutPreview(new Stub(job => Result(job)), "stub", request);
-        Assert.False(result.CanKeep);
+        var result = NestPipeline.RunCutoutTrial(new Stub(job => Result(job)), "stub", request);
+        Assert.True(result.CanKeep);
+        Assert.True(result.IsValid, string.Join("; ", result.Violations));
         Assert.Empty(result.Plates);
-        Assert.Contains(result.Violations, v => v.Contains("did not complete"));
         Assert.All(result.Raw.Fulfillment, f => Assert.Equal((1, 0, 1),
             (f.Requested, f.Placed, f.Unplaced)));
         Assert.Equal(0, request.Items[1].Drawing.Quantity.Nested);
-        AssertCannotCommit(result, request);
     }
 
     [Fact]
     public void ForgedFulfillmentOrDuplicateIndexDoesNotBindComposite()
     {
         var request = Request("stub");
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             var id = job.Parts.Single(p => p.Id.StartsWith("__cutout-proxy-")).Id;
             var pose = new NestJobPlacement(id, 1, 11, 11, 0);
@@ -115,7 +115,7 @@ public class CutoutPipelinePreviewTests
         var request = Request("stub");
         request.Items[1].Quantity = 2;
         request = request with { Stock = new[] { new NestPlateStock("sheet", new Size(26, 26), 1, 0.25) } };
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             var proxy = job.Parts.Single(p => p.Id.StartsWith("__cutout-proxy-"));
             var residual = job.Parts.Single(p => p.Id == "part-1");
@@ -124,7 +124,7 @@ public class CutoutPipelinePreviewTests
                 new NestJobPlacement(residual.Id, 0, 22, 1, 0));
         }), "stub", request);
         Assert.True(result.IsValid, string.Join("; ", result.Violations));
-        Assert.Equal(new[] { "part-0", "part-1", "part-1" },
+        Assert.Equal(new[] { "part-1", "part-0", "part-1" },
             result.Raw.Plates.Single().Placements.Select(p => p.PartId));
         Assert.Equal(new[] { 0, 1 }, result.Raw.Plates.Single().Placements
             .Where(p => p.PartId == "part-1").Select(p => p.InstanceIndex));
@@ -136,7 +136,7 @@ public class CutoutPipelinePreviewTests
     public void UntrustedStockOverdrawOrRotationCannotBindAComposite()
     {
         var request = Request("stub");
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             var proxy = job.Parts.Single(p => p.Id.StartsWith("__cutout-proxy-"));
             return Result(job, new NestJobPlacement(proxy.Id, 0, 11, 11,
@@ -146,7 +146,7 @@ public class CutoutPipelinePreviewTests
         Assert.Empty(result.Plates);
         Assert.Contains(result.Violations, v => v.Contains("rotation constraint"));
 
-        var overdraw = NestPipeline.RunCutoutPreview(new Stub(job => new NestJobResult(
+        var overdraw = NestPipeline.RunCutoutTrial(new Stub(job => new NestJobResult(
             NestJobStatus.Complete, NestJobStopReason.Completed,
             new[] { new NestJobPlateResult(0, job.Plates[0], new[] {
                     new NestJobPlacement(job.Parts[0].Id, 0, 11, 11, 0) }),
@@ -165,7 +165,7 @@ public class CutoutPipelinePreviewTests
         cts.Cancel();
         var engine = new Stub(_ => throw new Exception("Must not call Solve"));
         Assert.Throws<OperationCanceledException>(() =>
-            NestPipeline.RunCutoutPreview(engine, "stub", Request("stub"), token: cts.Token));
+            NestPipeline.RunCutoutTrial(engine, "stub", Request("stub"), token: cts.Token));
     }
 
     [Fact]
@@ -173,7 +173,7 @@ public class CutoutPipelinePreviewTests
     {
         var request = Request("stub");
         request.Items[1].Quantity = 2;
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             var proxy = job.Parts.Single(p => p.Id.StartsWith("__cutout-proxy-"));
             return Result(job, new NestJobPlacement(proxy.Id, 0, 11, 11, 0),
@@ -210,8 +210,8 @@ public class CutoutPipelinePreviewTests
     {
         var request = Request("stub");
         var progress = new CollectProgress();
-        var result = NestPipeline.RunCutoutPreview(new ProgressStub(), "stub", request, progress);
-        Assert.False(result.CanKeep);
+        var result = NestPipeline.RunCutoutTrial(new ProgressStub(), "stub", request, progress);
+        Assert.Empty(result.Plates);
         Assert.Single(progress.Events);
         Assert.Equal(NestJobStage.EvaluatingCandidate, progress.Events[0].Stage);
         Assert.Equal(0, progress.Events[0].CommittedPlates);
@@ -238,7 +238,7 @@ public class CutoutPipelinePreviewTests
         request.Items[1].Quantity = 3;
         request.Items[1].Drawing.Program = TestShapes.Rectangle(6, 6);
         request = request with { Stock = new[] { new NestPlateStock("sheet", new Size(30, 30), 1, 0.25) } };
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             var proxy = job.Parts.Single(p => p.Id.StartsWith("__cutout-proxy-"));
             Assert.Equal(2, job.Parts.Single(p => p.Id == "part-1").Quantity);
@@ -257,7 +257,7 @@ public class CutoutPipelinePreviewTests
     public void ForgedFulfillmentOrStockMetadataCannotBind(bool fulfillment)
     {
         var request = Request("stub");
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             var proxy = job.Parts.Single(p => p.Id.StartsWith("__cutout-proxy-"));
             var good = Result(job, new NestJobPlacement(proxy.Id, 0, 11, 11, 0));
@@ -280,7 +280,7 @@ public class CutoutPipelinePreviewTests
             new NestItem { Drawing = initial.Items[1].Drawing, Quantity = 1 } },
             Stock = new[] { new NestPlateStock("sheet", new Size(30, 30), 1, 0.25) }
         };
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             var proxy = job.Parts.Single(p => p.Id.StartsWith("__cutout-proxy-"));
             var residual = job.Parts.Where(p => p.Id != proxy.Id)
@@ -289,9 +289,9 @@ public class CutoutPipelinePreviewTests
                 .Concat(residual).ToArray());
         }), "stub", request);
         Assert.True(result.IsValid, string.Join("; ", result.Violations));
-        Assert.Equal(new[] { "part-0", "part-1", "part-2" },
+        Assert.Equal(new[] { "part-1", "part-0", "part-2" },
             result.Raw.Plates.Single().Placements.Select(p => p.PartId));
-        Assert.Same(result.Plates.Single().Parts[1].BaseDrawing,
+        Assert.Same(result.Plates.Single().Parts[0].BaseDrawing,
             result.Plates.Single().Parts[2].BaseDrawing);
     }
 
@@ -308,7 +308,7 @@ public class CutoutPipelinePreviewTests
             Options = new NestJobOptions(maxPlates: 2)
         };
         var calls = 0;
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             calls++;
             var proxies = job.Parts.Where(p => p.Id.StartsWith("__cutout-proxy-")).ToArray();
@@ -322,7 +322,7 @@ public class CutoutPipelinePreviewTests
         Assert.Equal(1, calls);
         Assert.True(result.IsValid, string.Join("; ", result.Violations));
         Assert.Equal(2, result.Raw.Plates.Count);
-        Assert.All(result.Raw.Plates, plate => Assert.Equal(new[] { "part-0", "part-1" },
+        Assert.All(result.Raw.Plates, plate => Assert.Equal(new[] { "part-1", "part-0" },
             plate.Placements.Select(p => p.PartId)));
         Assert.All(result.Raw.Fulfillment, f => Assert.Equal((2, 2, 0),
             (f.Requested, f.Placed, f.Unplaced)));
@@ -331,7 +331,7 @@ public class CutoutPipelinePreviewTests
     }
 
     [Fact]
-    public void UnplacedFrameReleasesInsertDemandWithoutABindablePartialProposal()
+    public void UnplacedFrameReleasesInsertDemandAndKeepsTheValidPartialProposal()
     {
         var request = Request("stub");
         request.Items[0].Quantity = 2;
@@ -339,7 +339,7 @@ public class CutoutPipelinePreviewTests
         request.Items[1].Drawing.Program = TestShapes.Rectangle(6, 6);
         request = request with { Stock = new[] { new NestPlateStock("sheet", new Size(22, 22), 2, 0.25) } };
         var calls = 0;
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             calls++;
             var first = job.Parts.Single(p => p.Id.EndsWith("-0"));
@@ -348,13 +348,13 @@ public class CutoutPipelinePreviewTests
             return builder.Build(NestJobStopReason.NoPlacementFound);
         }), "stub", request);
         Assert.Equal(1, calls);
-        Assert.False(result.CanKeep);
-        Assert.Empty(result.Plates);
+        Assert.True(result.CanKeep);
+        Assert.True(result.IsValid, string.Join("; ", result.Violations));
+        Assert.Equal(2, Assert.Single(result.Plates).Parts.Count);
         Assert.Equal(NestJobStatus.Incomplete, result.Raw.Status);
         Assert.All(result.Raw.Fulfillment, f => Assert.Equal((2, 1, 1),
             (f.Requested, f.Placed, f.Unplaced)));
-        Assert.Equal(new[] { "part-0", "part-1" }, result.Raw.Plates.Single().Placements.Select(p => p.PartId));
-        AssertCannotCommit(result, request);
+        Assert.Equal(new[] { "part-1", "part-0" }, result.Raw.Plates.Single().Placements.Select(p => p.PartId));
     }
 
     [Fact]
@@ -370,7 +370,7 @@ public class CutoutPipelinePreviewTests
             new NestItem { Drawing = frame2, Quantity = 1 }, initial.Items[1] },
             Stock = new[] { new NestPlateStock("sheet", new Size(22, 22), 2, 0.25) }
         };
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             var proxies = job.Parts.Where(p => p.Id.StartsWith("__cutout-proxy-")).ToArray();
             Assert.Equal(2, proxies.Length);
@@ -381,7 +381,7 @@ public class CutoutPipelinePreviewTests
             return builder.Build(NestJobStopReason.Completed);
         }), "stub", request);
         Assert.True(result.IsValid, string.Join("; ", result.Violations));
-        Assert.Equal(new[] { "part-0", "part-2", "part-1", "part-2" },
+        Assert.Equal(new[] { "part-2", "part-0", "part-2", "part-1" },
             result.Raw.Plates.SelectMany(p => p.Placements).Select(p => p.PartId));
         Assert.Equal(new[] { 0, 1 }, result.Raw.Plates.SelectMany(p => p.Placements)
             .Where(p => p.PartId == "part-2").Select(p => p.InstanceIndex));
@@ -403,7 +403,7 @@ public class CutoutPipelinePreviewTests
             new NestItem { Drawing = new Drawing("insert", TestShapes.Rectangle(3, 3)), Quantity = 1,
                 StepAngle = quarter, RotationStart = quarter, RotationEnd = quarter } },
             new[] { new NestPlateStock("sheet", new Size(22, 22), 1, 0.25) });
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             var proxy = Assert.Single(job.Parts);
             Assert.True(proxy.Rotation.Allows(quarter));
@@ -412,11 +412,11 @@ public class CutoutPipelinePreviewTests
         }), "stub", request);
         Assert.True(result.IsValid, string.Join("; ", result.Violations));
         var poses = result.Raw.Plates.Single().Placements;
-        Assert.Equal(quarter, poses[0].Rotation, 8);
         Assert.Equal(quarter, poses[1].Rotation, 8);
+        Assert.Equal(quarter, poses[0].Rotation, 8);
         // Independent square-hole oracle, not the production clearance predicate.
-        var localX = poses[1].Y - poses[0].Y;
-        var localY = -(poses[1].X - poses[0].X);
+        var localX = poses[0].Y - poses[1].Y;
+        var localY = -(poses[0].X - poses[1].X);
         foreach (var dx in new[] { 0.0, 3.0 })
             foreach (var dy in new[] { 0.0, 3.0 })
             {
@@ -434,7 +434,7 @@ public class CutoutPipelinePreviewTests
             new NestPlateStock("tight", new Size(22, 22), 1, 0.25),
             new NestPlateStock("wide", new Size(22, 22), 1, 0.6, quadrant: 3) }
         };
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             var proxy = Assert.Single(job.Parts);
             var builder = new NestJobResultBuilder(job);
@@ -461,10 +461,10 @@ public class CutoutPipelinePreviewTests
         }));
         try
         {
-            var result = NestPipeline.RunCutoutPreview(Request(name));
+            var result = NestPipeline.RunCutoutTrial(Request(name));
             Assert.Equal(1, calls);
             Assert.True(result.IsValid, string.Join("; ", result.Violations));
-            Assert.Equal(new[] { "part-0", "part-1" },
+            Assert.Equal(new[] { "part-1", "part-0" },
                 result.Raw.Plates.Single().Placements.Select(p => p.PartId));
         }
         finally
@@ -492,13 +492,13 @@ public class CutoutPipelinePreviewTests
             new NestItem { Drawing = frame, Quantity = 1 },
             new NestItem { Drawing = insert, Quantity = 2 } },
             new[] { new NestPlateStock("sheet", new Size(22, 22), 1, 0.25) });
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             var proxy = Assert.Single(job.Parts);
             return Result(job, new NestJobPlacement(proxy.Id, 0, 1, 1, 0));
         }), "stub", request);
         Assert.True(result.IsValid, string.Join("; ", result.Violations));
-        var inserts = result.Raw.Plates.Single().Placements.Skip(1).ToArray();
+        var inserts = result.Raw.Plates.Single().Placements.Take(2).ToArray();
         Assert.Equal(2, inserts.Length);
         Assert.All(inserts, p =>
         {
@@ -515,7 +515,7 @@ public class CutoutPipelinePreviewTests
     {
         var request = Request("stub");
         request.Items[1].Priority = 3;
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             Assert.DoesNotContain(job.Parts, p => p.Id.StartsWith("__cutout-proxy-"));
             return Result(job);
@@ -538,13 +538,13 @@ public class CutoutPipelinePreviewTests
                 new Spacing(0.5, 0.5), quadrant) },
             Options = new NestJobOptions(maxPlates: 1)
         };
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
             Result(job, new NestJobPlacement(Assert.Single(job.Parts).Id, 0, x, y, 0))),
             "stub", request);
         Assert.True(result.IsValid, string.Join("; ", result.Violations));
         Assert.Equal(quadrant, result.Plates.Single().Stock.Quadrant);
-        Assert.Equal((x, y), (result.Raw.Plates.Single().Placements[0].X,
-            result.Raw.Plates.Single().Placements[0].Y));
+        Assert.Equal((x, y), (result.Raw.Plates.Single().Placements.Last().X,
+            result.Raw.Plates.Single().Placements.Last().Y));
     }
 
     [Fact]
@@ -552,7 +552,7 @@ public class CutoutPipelinePreviewTests
     {
         var request = Request("stub");
         using var cts = new CancellationTokenSource();
-        Assert.Throws<OperationCanceledException>(() => NestPipeline.RunCutoutPreview(
+        Assert.Throws<OperationCanceledException>(() => NestPipeline.RunCutoutTrial(
             new Stub(job =>
             {
                 var proxy = Assert.Single(job.Parts);
@@ -566,7 +566,7 @@ public class CutoutPipelinePreviewTests
     public void CompleteStatusWithMissingProxyIsUntrustedAndNotBindable()
     {
         var request = Request("stub");
-        var result = NestPipeline.RunCutoutPreview(new Stub(job => new NestJobResult(
+        var result = NestPipeline.RunCutoutTrial(new Stub(job => new NestJobResult(
             NestJobStatus.Complete, NestJobStopReason.Completed,
             Array.Empty<NestJobPlateResult>(),
             job.Parts.Select(p => new PartFulfillment(p.Id, p.Quantity, 0, p.Quantity)),
@@ -582,7 +582,7 @@ public class CutoutPipelinePreviewTests
     {
         var request = Request("stub");
         var progress = new CollectProgress();
-        var result = NestPipeline.RunCutoutPreview(new ReportingStub(), "stub", request, progress);
+        var result = NestPipeline.RunCutoutTrial(new ReportingStub(), "stub", request, progress);
         Assert.True(result.IsValid, string.Join("; ", result.Violations));
         Assert.Equal(new[] { NestJobStage.EvaluatingCandidate, NestJobStage.PlateCommitted },
             progress.Events.Select(e => e.Stage));
@@ -617,11 +617,11 @@ public class CutoutPipelinePreviewTests
             new NestItem { Drawing = new Drawing("long-frame", program), Quantity = 1 },
             new NestItem { Drawing = new Drawing("insert", TestShapes.Rectangle(3, 3)), Quantity = 1 } },
             new[] { new NestPlateStock("narrow", new Size(22, 12), 1, 0.25) });
-        var result = NestPipeline.RunCutoutPreview(request);
+        var result = NestPipeline.RunCutoutTrial(request);
         Assert.True(result.IsValid, string.Join("; ", result.Violations));
-        var frame = result.Raw.Plates.Single().Placements[0];
+        var frame = result.Raw.Plates.Single().Placements.Last();
         Assert.Equal(System.Math.PI / 2, frame.Rotation, 7);
-        Assert.Equal(new[] { "part-0", "part-1" },
+        Assert.Equal(new[] { "part-1", "part-0" },
             result.Raw.Plates.Single().Placements.Select(p => p.PartId));
     }
 
@@ -629,7 +629,7 @@ public class CutoutPipelinePreviewTests
     public void ChangedLiveInsertDuringSolveNeverBindsUncheckedComposite()
     {
         var request = Request("stub");
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             request.Items[1].Drawing.Program = TestShapes.Rectangle(40, 40);
             var proxy = Assert.Single(job.Parts);
@@ -655,7 +655,7 @@ public class CutoutPipelinePreviewTests
             Stock = new[] { new NestPlateStock("sheet", new Size(22, 22), 2, 0.25) },
             Options = options
         };
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             Assert.Same(options, job.Options);
             Assert.Equal("Strip", job.Options.PlacementStrategy);
@@ -687,14 +687,14 @@ public class CutoutPipelinePreviewTests
             new NestItem { Drawing = new Drawing("insert", TestShapes.Rectangle(3, 3)),
                 Quantity = 1, StepAngle = 1, RotationStart = angle, RotationEnd = angle } },
             new[] { new NestPlateStock("sheet", new Size(40, 40), 1, 0.25) });
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
             Result(job, new NestJobPlacement(Assert.Single(job.Parts).Id, 0, 15, 5, angle))),
             "stub", request);
         Assert.True(result.IsValid, string.Join("; ", result.Violations));
         var poses = result.Raw.Plates.Single().Placements;
-        Assert.Equal(angle, poses[1].Rotation, 8);
-        var dx = poses[1].X - poses[0].X;
-        var dy = poses[1].Y - poses[0].Y;
+        Assert.Equal(angle, poses[0].Rotation, 8);
+        var dx = poses[0].X - poses[1].X;
+        var dy = poses[0].Y - poses[1].Y;
         var cosine = System.Math.Cos(angle);
         var sine = System.Math.Sin(angle);
         var localX = dx * cosine + dy * sine;
@@ -722,28 +722,15 @@ public class CutoutPipelinePreviewTests
             new NestItem { Drawing = new Drawing("insert", TestShapes.Rectangle(6, 6)),
                 Quantity = 40, StepAngle = 1, RotationStart = 0, RotationEnd = 0 } },
             new[] { new NestPlateStock("sheet", new Size(22, 22), 40, 0.25) });
-        var result = NestPipeline.RunCutoutPreview(new Stub(job =>
+        var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
             Assert.Equal(32, job.Parts.Count(p => p.Id.StartsWith("__cutout-proxy-")));
             Assert.Equal(8, job.Parts.Single(p => p.Id == "part-0").Quantity);
             Assert.Equal(8, job.Parts.Single(p => p.Id == "part-1").Quantity);
             return Result(job);
         }), "stub", request);
-        Assert.False(result.CanKeep);
+        Assert.Empty(result.Plates);
         Assert.All(result.Raw.Fulfillment, f => Assert.Equal((40, 0, 40),
             (f.Requested, f.Placed, f.Unplaced)));
-    }
-
-    [Fact]
-    public void OrdinaryPipelineIsStillUnchanged()
-    {
-        var request = Request("stub");
-        var result = NestPipeline.Run(new Stub(job =>
-        {
-            Assert.DoesNotContain(job.Parts, p => p.Id.StartsWith("__cutout-proxy-"));
-            return Result(job);
-        }), "stub", request);
-        Assert.True(result.CanKeep);
-        Assert.Empty(result.Plates);
     }
 }

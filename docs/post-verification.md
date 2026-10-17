@@ -102,8 +102,10 @@ shows the first three check categories, even when there are no findings:
   material. Leads already reported as fixed leads are not reported again. A pair whose
   containment cannot be established (touching or crossing boundaries, uncapturable material)
   is incomplete, never clear. Each line appears in the summary only when there is such a
-  finding. Plan Cutting's Ready result for the plate cuts nested parts first with leads that
-  clear them; this review checks the live programs again before posting.
+  finding. Auto Nest commits cutout inserts before their frame, so an unedited plate has no
+  order finding; leads keep their own checks. Plan Cutting's Ready result for the plate cuts
+  nested parts first with leads that clear them; this review checks the live programs again
+  before posting.
 
 Findings identify the plate and part's position in the cutting sequence. Read the
 scrollable report, cancel to fix the nest, then post again to rerun verification.

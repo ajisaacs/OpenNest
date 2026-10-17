@@ -4,9 +4,10 @@
 
 1. Snapshot caller requirements and stock into a `NestJob`.
 2. Resolve the selected name through `NestingEngineRegistry` (built-ins and plug-ins use the same path).
-3. Run the engine without mutating caller drawings or plates.
-4. Check returned placements with the independent `NestLayoutCheck` used by the benchmark.
-5. Consolidate exact ordered nonempty layouts only when the entire result is valid, then bind each layout to the caller's drawing references; the caller decides whether to commit it.
+3. Bundle parts that fit other parts' enclosed cutouts into their frames ([filling cutouts](nesting-engines.md#filling-cutouts)); a refused or less complete bundled trial is replaced by the ordinary solve.
+4. Run the engine without mutating caller drawings or plates.
+5. Check returned placements with the independent `NestLayoutCheck` used by the benchmark (for bundles, again after expanding them to physical frames and inserts).
+6. Consolidate exact ordered nonempty layouts only when the entire result is valid, then bind each layout to the caller's drawing references; the caller decides whether to commit it.
 
 `NestStockBuilder.FromTemplate` snapshots sheet options and spacing settings for multiple-sheet jobs. `SinglePlate` offers exactly one physical sheet, regardless of the legacy plate repeat quantity. `NestPipelineCommit.ApplyToEmptyPlates` applies accepted desktop proposals to empty/new plates with the checked size, quadrant, spacing and total-copy quantity semantics. Quantity is set before parts are attached, so drawing counts multiply exactly once. It never fills occupied plates.
 

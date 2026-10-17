@@ -75,6 +75,16 @@ public sealed class NestPipelineResult
     public TimeSpan SolveTime { get; }
     public TimeSpan ValidationTime { get; }
     internal IReadOnlyDictionary<string, Drawing> DrawingsByPartId { get; }
+
+    /// <summary>Why a bundled cutout trial was refused before this ordinary solve replaced it;
+    /// empty when no trial ran or the trial was not refused. Never part of <see cref="Violations"/>:
+    /// the refused trial has no bindable plates.</summary>
+    public IReadOnlyList<string> RefusedCutoutTrial { get; private init; } = Array.Empty<string>();
+
+    internal NestPipelineResult WithRefusedCutoutTrial(IReadOnlyList<string> refusals) =>
+        new(EngineName, Job, Raw, Plates, Violations, CanKeep, SolveTime, ValidationTime,
+            DrawingsByPartId)
+        { RefusedCutoutTrial = refusals };
 }
 
 /// <summary>
@@ -108,39 +118,85 @@ public static class NestPipeline
         return Run(engine, request.EngineName, request, progress, token);
     }
 
-    /// <summary>Runs a caller-supplied engine instance through the same validation and binding.</summary>
+    /// <summary>Runs a caller-supplied engine instance through the same validation and binding.
+    /// Parts that fit other parts' enclosed cutouts are first bundled into their frames
+    /// (engine-agnostic); see <see cref="CutoutPipelinePrepass"/>. The engine then solves once.
+    /// A bundled trial that fails physical validation, or leaves demand unplaced, is compared
+    /// with an ordinary solve of the same job and the better valid proposal is returned.</summary>
     public static NestPipelineResult Run(
         INestingEngine engine,
         string engineName,
         NestPipelineRequest request,
         IProgress<NestJobProgress> progress = null,
         CancellationToken token = default
-    ) => RunCore(engine, engineName, request, progress, token, cutoutPreview: false);
+    ) => Run(engine, engineName, request, progress, token, cutouts: true);
 
-    /// <summary>Internal test-only integration trial. Normal Run never prepares cutouts;
-    /// this entry point must not be called by production front ends before cutting/post gates.</summary>
-    internal static NestPipelineResult RunCutoutPreview(
+    /// <summary>The ordinary solve alone, with no cutout pre-pass: a characterization baseline
+    /// for tests and benchmarks, not a front-end setting.</summary>
+    internal static NestPipelineResult RunWithoutCutouts(
+        NestPipelineRequest request,
+        IProgress<NestJobProgress> progress = null,
+        CancellationToken token = default
+    ) => Run(NestingEngineRegistry.Create(request.EngineName), request.EngineName, request,
+        progress, token, cutouts: false);
+
+    /// <summary>The bundled cutout trial alone, without the ordinary-solve comparison, so tests
+    /// can exercise its validation boundary. Jobs without bundles run the ordinary solve.</summary>
+    internal static NestPipelineResult RunCutoutTrial(
         INestingEngine engine,
         string engineName,
         NestPipelineRequest request,
         IProgress<NestJobProgress> progress = null,
         CancellationToken token = default
-    ) => RunCore(engine, engineName, request, progress, token, cutoutPreview: true);
+    )
+    {
+        var (job, drawingsByPartId) = CreateJob(engine, request, token);
+        var prepass = CutoutPipelinePrepass.Prepare(job, token);
+        var result = Evaluate(engine, engineName, job, prepass, drawingsByPartId, progress, token);
+        return prepass != null && result.CanKeep && result.IsValid
+            ? Committed(result, progress, token) : result;
+    }
 
-    internal static NestPipelineResult RunCutoutPreview(
+    internal static NestPipelineResult RunCutoutTrial(
         NestPipelineRequest request,
         IProgress<NestJobProgress> progress = null,
         CancellationToken token = default
-    ) => RunCutoutPreview(NestingEngineRegistry.Create(request.EngineName),
+    ) => RunCutoutTrial(NestingEngineRegistry.Create(request.EngineName),
         request.EngineName, request, progress, token);
 
-    private static NestPipelineResult RunCore(
+    private static NestPipelineResult Run(
         INestingEngine engine,
         string engineName,
         NestPipelineRequest request,
         IProgress<NestJobProgress> progress,
         CancellationToken token,
-        bool cutoutPreview
+        bool cutouts
+    )
+    {
+        var (job, drawingsByPartId) = CreateJob(engine, request, token);
+        var prepass = cutouts ? CutoutPipelinePrepass.Prepare(job, token) : null;
+        if (prepass == null)
+            return Evaluate(engine, engineName, job, null, drawingsByPartId, progress, token);
+
+        var trial = Evaluate(engine, engineName, job, prepass, drawingsByPartId, progress, token);
+        var trialKeepable = trial.CanKeep && trial.IsValid;
+        if (trialKeepable && trial.Status == NestJobStatus.Complete)
+            return Committed(trial, progress, token);
+
+        // Unplaced frames return their reserved inserts to unplaced demand, and an untrusted
+        // composite is never bindable; the ordinary solve is the established baseline.
+        var plain = Evaluate(engine, engineName, job, null, drawingsByPartId, progress, token);
+        if (!trialKeepable)
+            return plain.WithRefusedCutoutTrial(trial.Violations);
+        if (plain.CanKeep && plain.IsValid && Placed(plain) > Placed(trial))
+            return plain;
+        return Committed(trial, progress, token);
+    }
+
+    private static (NestJob Job, Dictionary<string, Drawing> Drawings) CreateJob(
+        INestingEngine engine,
+        NestPipelineRequest request,
+        CancellationToken token
     )
     {
         ArgumentNullException.ThrowIfNull(engine);
@@ -163,7 +219,37 @@ public static class NestPipeline
 
         var job = new NestJob(parts, request.Stock, request.Options);
         NestJobValidator.Validate(job);
-        var prepass = cutoutPreview ? CutoutPipelinePrepass.Prepare(job, token) : null;
+        return (job, drawingsByPartId);
+    }
+
+    private static int Placed(NestPipelineResult result) =>
+        result.Raw.Plates.Sum(p => p.Placements.Count);
+
+    // Trial progress hid the engine's proxy commit counts; report validated physical ones.
+    private static NestPipelineResult Committed(NestPipelineResult result,
+        IProgress<NestJobProgress> progress, CancellationToken token)
+    {
+        var count = 0;
+        for (var i = 0; i < result.Raw.Plates.Count; i++)
+        {
+            count += result.Raw.Plates[i].Placements.Count;
+            progress?.Report(new NestJobProgress(NestJobStage.PlateCommitted,
+                result.Raw.Plates[i].StockId, i, i + 1, count));
+        }
+        token.ThrowIfCancellationRequested();
+        return result;
+    }
+
+    private static NestPipelineResult Evaluate(
+        INestingEngine engine,
+        string engineName,
+        NestJob job,
+        CutoutPipelinePrepass prepass,
+        IReadOnlyDictionary<string, Drawing> drawingsByPartId,
+        IProgress<NestJobProgress> progress,
+        CancellationToken token
+    )
+    {
         var engineJob = prepass?.EngineJob ?? job;
         if (prepass != null)
             NestJobValidator.Validate(engineJob);
@@ -176,8 +262,8 @@ public static class NestPipeline
         var solveTime = clock.Elapsed;
         token.ThrowIfCancellationRequested();
 
-        // D8/C10: only the main (non-cutout-preview) path offers last-resort clamp removal.
-        // No-op whenever nothing is blocked, so an ordinary solve is unaffected (C10).
+        // D8/C10: only the ordinary solve offers last-resort clamp removal; an incomplete
+        // cutout trial is compared with that solve instead. No-op whenever nothing is blocked.
         if (prepass == null)
         {
             var recovered = ClampRemovalRecovery.TryRecover(job, raw, engine, token);
@@ -208,8 +294,6 @@ public static class NestPipeline
             {
                 raw = expanded;
                 violations.AddRange(NestLayoutCheck.Violations(job, raw, names, out var physicalKeep));
-                if (raw.Status != NestJobStatus.Complete)
-                    violations.Add("Cutout engine did not complete the transformed job; unplaced frames' reserved inserts remain unplaced in the original job");
                 canKeep = physicalKeep && violations.Count == 0;
             }
             else
@@ -253,17 +337,6 @@ public static class NestPipeline
             }
         }
 
-        token.ThrowIfCancellationRequested();
-        if (prepass != null && canKeep)
-        {
-            var count = 0;
-            for (var i = 0; i < raw.Plates.Count; i++)
-            {
-                count += raw.Plates[i].Placements.Count;
-                progress?.Report(new NestJobProgress(NestJobStage.PlateCommitted,
-                    raw.Plates[i].StockId, i, i + 1, count));
-            }
-        }
         token.ThrowIfCancellationRequested();
         return new NestPipelineResult(
             engineName,
