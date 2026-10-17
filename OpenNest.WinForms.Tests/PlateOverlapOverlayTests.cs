@@ -456,7 +456,7 @@ public class PlateOverlapOverlayTests
             form.PlateView.Plate.Parts[0].BaseDrawing.Name = "changed";
             result.SetResult(PlateOverlapAnalyzer.Analyze(snapshot));
             context.Pump(task);
-            var center = form.PlateView.PointWorldToControl(form.PlateView.OverlapReport.Pairs[0].Centroid);
+            var center = form.PlateView.PointWorldToControl(form.PlateView.OverlapReport.Pairs[0].Marker);
             form.PlateView.OverlapOverlay.UpdateHover(center);
             Assert.Contains(" mm²", form.PlateView.OverlapOverlay.HoverText);
             Assert.Contains("same name / same name", form.PlateView.OverlapOverlay.HoverText);
@@ -536,7 +536,7 @@ public class PlateOverlapOverlayTests
             graphics.TranslateTransform(60, 320);
             run.View.OverlapOverlay.Draw(graphics);
             Assert.Null(run.View.OverlapOverlay.CachedPath);
-            var center = run.View.PointWorldToControl(pair.Centroid);
+            var center = run.View.PointWorldToControl(pair.Marker);
             var radius = (int)OverlapPairPresentation.MarkerHalfSize(run.View.DeviceDpi);
             Assert.NotEqual(Color.White.ToArgb(), image.GetPixel(center.X - radius + 1, center.Y).ToArgb());
             Assert.Equal(Color.White.ToArgb(), image.GetPixel(center.X - radius - 4, center.Y).ToArgb());
@@ -550,7 +550,7 @@ public class PlateOverlapOverlayTests
     });
 
     [Fact]
-    public void MarkerAndHoverUsePairMaterialCentroidRatherThanBoundsCenter() => RunSta(() =>
+    public void MarkerAndHoverUseThePoleOfTheSharedMaterialRatherThanBoundsCenter() => RunSta(() =>
     {
         using var run = new OverlayRun();
         run.View.Plate.Parts.Clear();
@@ -571,7 +571,12 @@ public class PlateOverlapOverlayTests
         graphics.Clear(Color.White);
         graphics.TranslateTransform(60, 220);
         run.View.OverlapOverlay.Draw(graphics);
-        var materialCenter = run.View.PointWorldToControl(new Vector(6.0 / 3, 3.0 / 3));
+        // The marker is the shared triangle's pole: its incenter (r, r), r = 2A / P.
+        var marker = Assert.Single(run.View.OverlapReport.Pairs).Marker;
+        var inradius = 2 * 9 / (6 + 3 + System.Math.Sqrt(45));
+        Assert.InRange(marker.X, inradius - 0.06, inradius + 0.06);
+        Assert.InRange(marker.Y, inradius - 0.06, inradius + 0.06);
+        var materialCenter = run.View.PointWorldToControl(marker);
         var boundsCenter = run.View.PointWorldToControl(new Vector(6.0 / 2, 3.0 / 2));
         Assert.NotEqual(Color.White.ToArgb(), image.GetPixel(materialCenter.X, materialCenter.Y).ToArgb());
         Assert.Equal(Color.White.ToArgb(), image.GetPixel(boundsCenter.X, boundsCenter.Y).ToArgb());
@@ -620,7 +625,7 @@ public class PlateOverlapOverlayTests
         run.Finish();
         run.View.ZoomToPoint(new Vector(), 20);
         run.View.SetOrigin(60, 220);
-        run.View.MoveTo(run.View.PointWorldToControl(run.View.OverlapReport.Pairs[0].Centroid));
+        run.View.MoveTo(run.View.PointWorldToControl(run.View.OverlapReport.Pairs[0].Marker));
         var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
         var hoverCheck = typeof(PlateView).GetMethod("HoverCheck", flags)!;
         var normalVisible = typeof(PlateView).GetField("showTooltip", flags)!;
@@ -657,7 +662,7 @@ public class PlateOverlapOverlayTests
         run.Finish();
         run.View.ZoomToPoint(new Vector(), 20);
         run.View.SetOrigin(60, 220);
-        var center = run.View.PointWorldToControl(run.View.OverlapReport.Pairs[0].Centroid);
+        var center = run.View.PointWorldToControl(run.View.OverlapReport.Pairs[0].Marker);
         run.View.MoveTo(center);
         Assert.NotNull(run.View.OverlapOverlay.HoverText);
         switch (change)
@@ -726,7 +731,7 @@ public class PlateOverlapOverlayTests
         var lastIndex = pages.PageIndex;
         Assert.False(run.View.Command(Keys.Control | Keys.PageDown));
         Assert.Equal(lastIndex, pages.PageIndex);
-        run.View.MoveTo(run.View.PointWorldToControl(report.Pairs[0].Centroid));
+        run.View.MoveTo(run.View.PointWorldToControl(report.Pairs[0].Marker));
         Assert.Equal(lastIndex, pages.PageIndex); // Moving within the same hit group retains the page.
         Assert.Equal(selection, run.View.SelectedParts);
         Assert.Equal(positions, run.View.Plate.Parts.Select(p => p.Location));
@@ -734,7 +739,7 @@ public class PlateOverlapOverlayTests
         Assert.Equal(1, run.Calls);
 
         var scale = run.View.ViewScale;
-        run.View.WheelAt(run.View.PointWorldToControl(report.Pairs[0].Centroid));
+        run.View.WheelAt(run.View.PointWorldToControl(report.Pairs[0].Marker));
         Assert.True(run.View.ViewScale > scale); // Wheel remains zoom, never paging.
         Assert.Null(overlay.HoverText);
         Assert.Null(overlay.HoverPages);
@@ -792,7 +797,7 @@ public class PlateOverlapOverlayTests
         Assert.True(overlay.DrawHover(graphics));
         Assert.True(run.View.Command(Keys.PageDown));
         Assert.Equal(1, overlay.HoverPages.PageIndex);
-        var center = run.View.PointWorldToControl(run.View.OverlapReport.Pairs[0].Centroid);
+        var center = run.View.PointWorldToControl(run.View.OverlapReport.Pairs[0].Marker);
         using var largerFont = new Font(run.View.Font.FontFamily, run.View.Font.Size + 1);
         switch (change)
         {
@@ -834,7 +839,7 @@ public class PlateOverlapOverlayTests
         run.Finish();
         run.View.ZoomToPoint(new Vector(), 10);
         run.View.SetOrigin(30, 90);
-        var center = run.View.PointWorldToControl(run.View.OverlapReport.Pairs[0].Centroid);
+        var center = run.View.PointWorldToControl(run.View.OverlapReport.Pairs[0].Marker);
         run.View.MoveTo(center);
         using var image = new Bitmap(150, 120);
         using var graphics = Graphics.FromImage(image);
@@ -852,7 +857,7 @@ public class PlateOverlapOverlayTests
         }
         Assert.Equal(overlay.HoverText.Replace("\n", ""), string.Concat(content));
         run.View.Size = new System.Drawing.Size(40, 20);
-        overlay.UpdateHover(run.View.PointWorldToControl(run.View.OverlapReport.Pairs[0].Centroid));
+        overlay.UpdateHover(run.View.PointWorldToControl(run.View.OverlapReport.Pairs[0].Marker));
         Assert.True(overlay.DrawHover(graphics));
         Assert.True(overlay.HoverPages.NeedsLargerViewport);
         Assert.False(run.View.Command(Keys.PageDown));
@@ -1004,7 +1009,7 @@ public class PlateOverlapOverlayTests
         run.Finish();
         run.View.ZoomToPoint(new Vector(), 15);
         run.View.SetOrigin(60, 120);
-        run.View.MoveTo(run.View.PointWorldToControl(run.View.OverlapReport.Pairs[0].Centroid));
+        run.View.MoveTo(run.View.PointWorldToControl(run.View.OverlapReport.Pairs[0].Marker));
     }
 
     // These waits are deliberate: only Task.Run workers use the result gate; the test's

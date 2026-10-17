@@ -113,6 +113,19 @@ namespace OpenNest
         public List<Bend> Bends { get; set; } = new List<Bend>();
 
         /// <summary>
+        /// The library revision this drawing was copied from, or null when it did not come
+        /// from a drawing library. Editing the drawing in a nest keeps the link as provenance.
+        /// </summary>
+        public DrawingLibraryLink Library { get; set; }
+
+        /// <summary>
+        /// Contours this drawing says must be cut a fixed way, in the source frame. At most one
+        /// pin per contour is used; <see cref="CNC.CuttingPlanning.CutPinResolver"/> maps them to
+        /// a placement. Pins do not follow geometry into new drawings (split pieces).
+        /// </summary>
+        public List<CNC.CuttingStrategy.ContourCutPin> CutPins { get; set; } = new List<CNC.CuttingStrategy.ContourCutPin>();
+
+        /// <summary>
         /// Complete set of source entities with stable GUIDs.
         /// Null when the drawing was created from G-code or an older nest file.
         /// </summary>

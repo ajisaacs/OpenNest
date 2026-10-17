@@ -12,7 +12,7 @@ namespace OpenNest.CNC.CuttingPlanning;
 /// Exact caller-thread record of everything a cutting proposal for one plate depends on:
 /// part list instance and order, plate quantity/size/quadrant/settings, cutoff definitions, and
 /// each part's complete cutting state with owned copies of its placed and drawing programs,
-/// drawing cutoff classification and exact settings content.
+/// drawing cutoff classification, drawing pins and pins-off, and exact settings content.
 /// A commit compares it with the live plate and refuses when anything differs.
 /// </summary>
 public sealed class PlateCuttingState
@@ -24,12 +24,12 @@ public sealed class PlateCuttingState
     private readonly int quadrant;
     private readonly ObservableList<CutOff> cutOffList;
     private readonly CutOffRecord[] cutOffs;
-    private readonly Dictionary<Drawing, (Program Program, Program Copy, bool IsCutOff)> drawings;
+    private readonly Dictionary<Drawing, DrawingRecord> drawings;
     private readonly Dictionary<CuttingParameters, string> settings;
     private readonly CuttingParameters plateSettings;
 
     private PlateCuttingState(Plate plate, PartRecord[] parts, CutOffRecord[] cutOffs,
-        Dictionary<Drawing, (Program, Program, bool)> drawings, Dictionary<CuttingParameters, string> settings)
+        Dictionary<Drawing, DrawingRecord> drawings, Dictionary<CuttingParameters, string> settings)
     {
         this.settings = settings;
         plateSettings = plate.CuttingParameters;
@@ -61,7 +61,7 @@ public sealed class PlateCuttingState
         ArgumentNullException.ThrowIfNull(plate);
         if (plate.Parts == null || plate.CutOffs == null)
             throw new ArgumentException("Plate part and cutoff lists are required.");
-        var drawings = new Dictionary<Drawing, (Program, Program, bool)>(ReferenceEqualityComparer.Instance);
+        var drawings = new Dictionary<Drawing, DrawingRecord>(ReferenceEqualityComparer.Instance);
         var settings = new Dictionary<CuttingParameters, string>(ReferenceEqualityComparer.Instance);
         Fingerprint(plate.CuttingParameters);
         var records = new List<PartRecord>(plate.Parts.Count);
@@ -72,11 +72,13 @@ public sealed class PlateCuttingState
                 throw new ArgumentException("Plate contains a missing part, drawing or program.");
             var drawing = part.BaseDrawing;
             if (!drawings.ContainsKey(drawing))
-                drawings.Add(drawing, (drawing.Program, drawing.Program == null ? null
-                    : OwnedProgramCopy.Copy(drawing.Program, token), drawing.IsCutOff));
+                drawings.Add(drawing, new(drawing.Program, drawing.Program == null ? null
+                    : OwnedProgramCopy.Copy(drawing.Program, token), drawing.IsCutOff,
+                    drawing.CutPins, StateFingerprint.Of(drawing.CutPins)));
             var state = part.CaptureCuttingState();
             Fingerprint(state.CuttingParameters);
-            records.Add(new(part, state, OwnedProgramCopy.Copy(part.Program, token), BoxValues(state.BoundingBox)));
+            records.Add(new(part, state, OwnedProgramCopy.Copy(part.Program, token), BoxValues(state.BoundingBox),
+                part.DrawingPinsOff));
         }
         var cutOffs = plate.CutOffs.Select(c => c == null
             ? throw new ArgumentException("Plate contains a missing cutoff definition.")
@@ -130,12 +132,19 @@ public sealed class PlateCuttingState
                 return $"Part {i + 1} program was edited in place.";
             if (!SameSettings(live.CuttingParameters))
                 return $"Part {i + 1} cutting settings were edited in place.";
-            var (drawingProgram, drawingCopy, isCutOff) = drawings[part.BaseDrawing];
-            if (!ReferenceEquals(part.BaseDrawing.Program, drawingProgram)
-                || !ProgramContent.Equal(drawingProgram, drawingCopy, token))
+            var drawing = drawings[part.BaseDrawing];
+            if (!ReferenceEquals(part.BaseDrawing.Program, drawing.Program)
+                || !ProgramContent.Equal(drawing.Program, drawing.Copy, token))
                 return $"Part {i + 1} drawing program changed.";
-            if (part.BaseDrawing.IsCutOff != isCutOff)
+            if (part.BaseDrawing.IsCutOff != drawing.IsCutOff)
                 return $"Part {i + 1} cutoff classification changed.";
+            // The drawing's pins decide how its pinned contours are cut, and pins-off whether
+            // they apply to this placement: either change makes the proposal stale.
+            if (part.DrawingPinsOff != record.DrawingPinsOff)
+                return $"Part {i + 1} drawing pins were switched on or off.";
+            if (!ReferenceEquals(part.BaseDrawing.CutPins, drawing.Pins)
+                || StateFingerprint.Of(drawing.Pins) != drawing.PinsFingerprint)
+                return $"Part {i + 1} drawing pins changed.";
         }
         if (plate.CutOffs.Count != cutOffs.Length)
             return "Cutoffs were added or removed.";
@@ -188,7 +197,11 @@ public sealed class PlateCuttingState
     private static bool Bits(double? a, double? b) => a.HasValue == b.HasValue
         && (!a.HasValue || Bits(a.Value, b.Value));
 
-    private sealed record PartRecord(Part Part, PartCuttingState State, Program Program, long[] Bounds);
+    private sealed record PartRecord(Part Part, PartCuttingState State, Program Program, long[] Bounds,
+        bool DrawingPinsOff);
+
+    private sealed record DrawingRecord(Program Program, Program Copy, bool IsCutOff,
+        List<ContourCutPin> Pins, string PinsFingerprint);
 
     private sealed record CutOffRecord(CutOff CutOff, Drawing Drawing, CutOffAxis Axis, Vector Position,
         double? StartLimit, double? EndLimit);

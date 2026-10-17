@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
@@ -6,10 +7,10 @@ using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Actions;
-using OpenNest.Api;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Collections;
 using OpenNest.Controls;
+using OpenNest.Data;
 using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.Sequencing;
@@ -438,8 +439,11 @@ namespace OpenNest.Forms
             Text = Nest.Name;
             drawingListBox1.Units = Nest.Units;
             drawingListBox1.DeleteRequested += drawingListBox1_DeleteRequested;
+            drawingListBox1.SaveToLibraryRequested += drawingListBox1_SaveToLibraryRequested;
             drawingListBox1.DrawingPickedUp += drawingListBox1_DrawingPickedUp;
             drawingListBox1.DrawingDropped += drawingListBox1_DrawingDropped;
+            Activated += (_, _) => UpdateDrawingLibraryCommand();
+            UpdateDrawingLibraryCommand();
         }
 
         public void UpdatePlateList()
@@ -1037,12 +1041,13 @@ namespace OpenNest.Forms
             SaveCuttingParameters(parameters);
 
             var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
-            assigner.Assign(plate);
+            var kept = assigner.Assign(plate);
 
             foreach (var lp in PlateView.Parts)
                 lp.IsDirty = true;
 
             PlateView.Invalidate();
+            ShowKeptDrawingLeadIns([(Nest.Plates.IndexOf(plate) + 1, PartNumbers(plate, kept))]);
         }
 
         public void RemoveLeadIns_Click(object sender, EventArgs e)
@@ -1094,15 +1099,29 @@ namespace OpenNest.Forms
             SaveCuttingParameters(parameters);
 
             var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
+            var kept = new List<(int, IReadOnlyList<int>)>();
 
-            foreach (var plate in Nest.Plates)
+            for (var index = 0; index < Nest.Plates.Count; index++)
             {
+                var plate = Nest.Plates[index];
                 plate.CuttingParameters = parameters;
-                assigner.Assign(plate);
+                kept.Add((index + 1, PartNumbers(plate, assigner.Assign(plate))));
             }
 
             PlateView.Invalidate();
+            ShowKeptDrawingLeadIns(kept);
         }
+
+        // Assign Lead-ins never overwrites drawing pins; say which parts it left for Plan Cutting.
+        private void ShowKeptDrawingLeadIns(IReadOnlyList<(int PlateNumber, IReadOnlyList<int> PartNumbers)> kept)
+        {
+            var message = LeadInAssigner.KeptMessage(kept);
+            if (message != null)
+                MessageBox.Show(this, message, "Assign Lead-ins", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private static IReadOnlyList<int> PartNumbers(Plate plate, IReadOnlyList<Part> parts) =>
+            parts.Select(part => plate.Parts.IndexOf(part) + 1).Order().ToList();
 
         public void RemoveLeadInsAllPlates()
         {
@@ -1187,6 +1206,80 @@ namespace OpenNest.Forms
             UpdateDrawingList();
         }
 
+        private void DrawingLibrary_Click(object sender, EventArgs e)
+        {
+            AddFromDrawingLibrary();
+        }
+
+        /// <summary>The library is on the nest server, so it is offered in Database mode only.</summary>
+        public void UpdateDrawingLibraryCommand()
+        {
+            var enabled = NestStorage.Settings.IsDatabaseMode;
+            drawingLibraryButton.Enabled = enabled;
+            drawingLibraryButton.ToolTipText = enabled ? "Add from Drawing Library" : NestStorage.DatabaseModeOnly;
+            drawingListBox1.SaveToLibraryUnavailableReason = enabled ? null : NestStorage.DatabaseModeOnly;
+        }
+
+        /// <summary>Opens the drawing library browser and lists whatever it added.</summary>
+        public void AddFromDrawingLibrary()
+        {
+            if (!NestStorage.Settings.IsDatabaseMode)
+                return;
+
+            IDrawingLibrary library;
+            try
+            {
+                library = NestStorage.CreateDrawingLibrary();
+            }
+            catch (ArgumentException ex)
+            {
+                MessageBox.Show(this, ex.Message, "Drawing Library", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            using var form = new DrawingLibraryForm(library, NestStorage.Settings.ServerUrl, Nest);
+            form.ShowDialog(this);
+            if (form.AddedDrawings.Count > 0)
+                UpdateDrawingList();
+        }
+
+        private void drawingListBox1_SaveToLibraryRequested(object sender, Drawing drawing)
+        {
+            SaveDrawingToLibrary(drawing);
+        }
+
+        /// <summary>
+        /// Saves one nest drawing to the drawing library as a new drawing or a revision of a
+        /// matching one. On success only the drawing's library link changes.
+        /// </summary>
+        public void SaveDrawingToLibrary(Drawing drawing)
+        {
+            if (drawing == null || !NestStorage.Settings.IsDatabaseMode)
+                return;
+
+            IDrawingLibraryStore library;
+            try
+            {
+                library = NestStorage.CreateDrawingLibrary();
+            }
+            catch (ArgumentException ex)
+            {
+                MessageBox.Show(this, ex.Message, "Drawing Library", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            var lastCutType = Enum.TryParse<CutType>(Properties.Settings.Default.DrawingLibraryCutType, out var cutType)
+                && Enum.IsDefined(cutType) ? cutType : CutType.Laser;
+            using var form = new SaveToDrawingLibraryForm(library, NestStorage.Settings.ServerUrl, Nest, drawing,
+                lastCutType, Environment.UserName);
+            if (form.ShowDialog(this) != DialogResult.OK || form.Result == null)
+                return;
+
+            Properties.Settings.Default.DrawingLibraryCutType = form.Result.Saved.CutType.ToString();
+            Properties.Settings.Default.Save();
+            UpdateDrawingList();
+        }
+
         private void EditDrawingsInConverter_Click(object sender, EventArgs e)
         {
             if (Nest.Drawings.Count == 0)
@@ -1213,14 +1306,7 @@ namespace OpenNest.Forms
             {
                 if (newByName.TryGetValue(existing.Name, out var updated))
                 {
-                    existing.Program = updated.Program;
-                    existing.SourceEntities = updated.SourceEntities;
-                    existing.SuppressedEntityIds = updated.SuppressedEntityIds;
-                    existing.Source = updated.Source;
-                    existing.Customer = updated.Customer;
-                    existing.Quantity.Required = updated.Quantity.Required;
-                    existing.Bends.Clear();
-                    existing.Bends.AddRange(updated.Bends);
+                    CadImporter.ApplyEdit(existing, updated);
                     newByName.Remove(existing.Name);
                 }
                 else

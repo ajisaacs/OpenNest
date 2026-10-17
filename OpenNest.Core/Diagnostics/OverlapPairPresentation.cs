@@ -23,7 +23,7 @@ public static class OverlapPairPresentation
             : $"Pair {Label(pair)}: {pair.PartAName} / {pair.PartBName}";
         return head + "\n"
             + $"Shared area ≈ {Number(pair.Area, provider)} {units}²\n"
-            + $"Centroid: ({Number(pair.Centroid.X, provider)}, {Number(pair.Centroid.Y, provider)}) {units}";
+            + $"Marker: ({Number(pair.Marker.X, provider)}, {Number(pair.Marker.Y, provider)}) {units}";
     }
 
     // Significant figures adapt to scale: a positive sliver must never read as zero.
@@ -34,7 +34,7 @@ public static class OverlapPairPresentation
     public static double HitRadius(int deviceDpi) => 10.0 * deviceDpi / 96;
 
     /// <summary>
-    /// Projects cached centroids into a screen-pixel coordinate space. The pointer must
+    /// Projects cached markers into a screen-pixel coordinate space. The pointer must
     /// use that same space; view zoom never scales the DPI-adjusted hit radius.
     /// Coincident or nearby markers return every matching pair in stable ID order.
     /// </summary>
@@ -44,7 +44,7 @@ public static class OverlapPairPresentation
         var radius = HitRadius(deviceDpi);
         return pairs.Where(pair =>
         {
-            var center = worldToScreen(pair.Centroid);
+            var center = worldToScreen(pair.Marker);
             var dx = pointer.X - center.X;
             var dy = pointer.Y - center.Y;
             return dx * dx + dy * dy <= radius * radius;

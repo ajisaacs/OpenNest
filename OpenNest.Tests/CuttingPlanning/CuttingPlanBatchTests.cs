@@ -44,26 +44,24 @@ public class CuttingPlanBatchTests
     {
         var nest = new Nest();
         var ready = Plate(nest, Clean("open", 1, 1));
-        var locked = Clean("locked", 1, 1);
-        var crossing = OwnedProgramCopy.Copy(locked.Program);
-        crossing.MoveTo(5, 5); // Rapid enters the already completed square.
-        Assert.True(locked.RestoreLeadInProgram(crossing, true));
-        var blocked = Plate(nest, locked);
+        // Overlapping material is a hard block (a locked program's own violations only warn).
+        var blocked = Plate(nest, Clean("first", 1, 1), Clean("second", 6, 6));
         var readyProgram = ready.Parts[0].Program;
 
         var proposal = CuttingPlanBatch.Capture([ready, blocked], ExplicitContourTests.Parameters(),
             preservePartOrder: false, plateNumbers: [3, 7]).Plan();
 
         Assert.False(proposal.CanApply);
+        Assert.False(proposal.CanApplyWithWarnings);
         Assert.True(proposal.Plates[0].IsReady);
         var refused = proposal.Plates[1];
-        Assert.Equal(CuttingPlanStatus.ConstraintConflict, refused.Result.Status);
+        Assert.False(refused.CanApplyWithWarnings);
         Assert.False(refused.KeptCurrentOrder); // Only a budget-exhausted search is retried.
         var text = string.Join("\n", proposal.Describe("in"));
         Assert.StartsWith("Apply is unavailable: 1 of 2 plates", text);
         Assert.Contains("Plate 3: ready.", text);
         Assert.Contains("Plate 7: blocked", text);
-        Assert.Contains("- Part 1 (locked):", text);
+        Assert.Contains("- Part 1 (first) overlaps part 2 (second).", text);
 
         var commit = proposal.Apply();
 
@@ -315,16 +313,12 @@ public class CuttingPlanBatchTests
     {
         var nest = new Nest();
         var ready = Plate(nest, Clean("a", 1, 1));
-        var locked = Clean("locked", 1, 1);
-        var crossing = OwnedProgramCopy.Copy(locked.Program);
-        crossing.MoveTo(5, 5); // Rapid enters the already completed square.
-        Assert.True(locked.RestoreLeadInProgram(crossing, true));
-        var blocked = Plate(nest, locked);
+        var blocked = Plate(nest, Clean("first", 1, 1), Clean("second", 6, 6));
         var proposal = CuttingPlanBatch.Capture([ready, blocked], ExplicitContourTests.Parameters(), false).Plan();
         Assert.True(proposal.Plates[0].IsReady);
-        Assert.False(proposal.Plates[1].IsReady);
+        Assert.False(proposal.Plates[1].CanApplyWithWarnings);
 
-        // A refused plate may hold graphs that are unsafe to copy, so it is never previewed.
+        // A blocked plate may hold graphs that are unsafe to copy, so it is never previewed.
         Assert.Null(proposal.BuildPreview(1));
         Assert.NotNull(proposal.BuildPreview(0));
 

@@ -12,5 +12,7 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
     <Using Include="Xunit" />
     <ProjectReference Include="../OpenNest.IO/OpenNest.IO.csproj" />
+    <!-- Some round-trip tests drive whole jobs; OpenNest.IO itself must not reference the engine. -->
+    <ProjectReference Include="../OpenNest.Engine/OpenNest.Engine.csproj" />
   </ItemGroup>
 </Project>

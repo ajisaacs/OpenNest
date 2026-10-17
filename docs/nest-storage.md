@@ -28,6 +28,17 @@ The desktop app can save nests two ways:
   previous one. On the Versions tab, **Open read-only...** previews one snapshot
   without binding an editable document, and **Download selected version...** saves
   its exact archived bytes.
+  Select a nest and click **Nest Information...** above the list (or use the
+  row's right-click menu) to edit the same information as **Nest > Nest Info**
+  without opening the nest in the main editor. **OK** saves immediately to the
+  same database ID as a new version, then refreshes the list, preview and history;
+  **Cancel** makes no change. The dialog starts with the latest saved metadata.
+  Plate defaults follow the same rules as the open editor: populated sheets are
+  not resized or re-nested. This action requires a version-aware server and
+  refuses to overwrite a newer save from another PC. After a conflict or network
+  error, refresh and reopen the information dialog before trying again; a lost
+  reply can mean the save already reached the server. An already-open editor is
+  not modified; reload it before saving further changes to that same nest.
   A separate confirmed **Restore selected version...** creates a new current
   revision of the same ID and keeps all intervening versions. **Delete...** hides
   the record from ordinary browsing but retains every archive; **Deleted nests...**
@@ -129,6 +140,119 @@ only the requested page of metadata (never archive bytes):
   being ignored or clamped. `RemoteNestRepository.QueryAsync` checks the same
   bounds before sending, and reports an HTTP 404 from an older server as a
   server version that must be updated.
+
+## Drawing library endpoints
+
+The server also keeps a shared library of drawings (schema v4). The desktop
+adds library drawings to a nest and saves nest drawings to the library (below).
+A drawing's geometry travels as an opaque
+**drawing package**: a `.nest` archive holding exactly one drawing and no plates,
+written and read on the client by `OpenNest.IO.DrawingPackage`. The server never
+parses it.
+
+`OpenNest.Data.DrawingLibraryRecord` fields: `id` (client-allocated before the
+first upload), `revision`, `name`, `customer`, `materialName`, `materialGrade`,
+`thickness` (stored rounded to 4 decimals), `units` (`inches` | `millimeters`),
+`cutType` (`laser` | `waterjet` | `plasma`), `notes`, `archived`, `savedBy`, and
+the server-computed `packageSha256` (lower-case hex), `packageSize` and `savedAt`.
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| POST | `/api/drawings` | multipart: `metadata` (JSON record with a nonempty `id`) + `package` | Revision 1; 409 with the current record when the id exists |
+| GET | `/api/drawings/query?search=&customer=&materialName=&materialGrade=&thickness=&cutType=&includeArchived=&sort=&order=&offset=&limit=` | — | `{ items, total, offset, limit }` |
+| GET | `/api/drawings/{id}` / `/{id}/file` | — | Current record / package bytes (archived drawings included), or 404 |
+| GET | `/api/drawings/{id}/revisions?offset=0&limit=100` | — | Revision page, newest first; limit 1–200 |
+| GET | `/api/drawings/{id}/revisions/{revision}/file` | — | Exact immutable package bytes |
+| PUT | `/api/drawings/{id}/file` | multipart: `metadata` + `package` | New revision |
+| PUT | `/api/drawings/{id}/metadata` | JSON record | New revision with the same package |
+| POST | `/api/drawings/{id}/archive` / `/restore` | — | New revision with `archived` changed |
+
+- Existing-drawing writes require `If-Match` exactly as for nests: 428 missing,
+  400 malformed, 409 stale with the current record. Writing to an archived
+  drawing, archiving an archived one or restoring an active one is also 409.
+  None of these change data. There is no delete; archive hides a drawing from
+  the query unless `includeArchived=true`.
+- Every change appends an immutable revision in the same transaction that
+  updates the current row, including metadata-only edits and archive/restore.
+  An identical save at the current revision is a no-op.
+- Validation (400, no state change): `cutType` and `units` must be single enum
+  names (no numbers or combinations); `thickness` finite and at least 0; `name`
+  nonblank; name, customer, material, grade and savedBy at most 200 characters,
+  notes at most 4000; no NUL characters; package nonempty, at most 16 MiB and
+  starting with a ZIP signature. Metadata `id` on a PUT must be empty or match
+  the route.
+- Query: `search` is a literal, case-insensitive (ASCII) substring of name,
+  customer or notes (`%`, `_`, `\` literal). `customer`, `materialName` and
+  `materialGrade` match exactly after `SharedListNames.Key` normalization
+  (trimmed, collapsed spaces, case-insensitive); blank means any. `thickness`
+  matches exactly after rounding to 4 decimals. `sort` is one of `savedAt`
+  (default), `name`, `customer`, `materialName`, `materialGrade`, `thickness`,
+  `cutType`, `revision`; ties break by `id`. Paging, `order` and the refusal of
+  unknown, repeated or out-of-range parameters follow the nest query.
+- An older server answers 404 on these routes; the client reports that the
+  server must be updated and never falls back to another store.
+
+Schema v4 adds the `drawings` and `drawing_revisions` tables to the same file
+and leaves the nest tables untouched. A server older than v4 refuses to open a
+v4 database, so rolling back after the upgrade needs the pre-upgrade backup (see
+[Backup, restore, and upgrade](#backup-restore-and-upgrade)). The stopped-volume
+`tar` backup includes the drawing tables, but `nest_manifest.py` and
+`restore_check` do not verify drawings yet.
+
+### Add from Drawing Library (desktop)
+
+**Nest > Add from Drawing Library...** and the **Library** button above the
+drawing list open a paged browser of active library drawings (Database mode
+only; in File mode both are disabled with "Database mode only"). It starts
+filtered to the nest's material, grade and thickness; **Show all** lifts that
+filter. Selecting a drawing shows its notes. **Add to Nest** (or double-click /
+Enter) downloads that exact revision, checks its SHA-256 against the record and
+plans the insert (`OpenNest.Data.LibraryDrawingInsert`) before changing anything:
+
+- Material, grade or thickness differing from the nest: a warning names each
+  difference and the operator confirms. The drawing is added, but its cut pins
+  will not apply; the nest's cutting settings do.
+- Different units: refused (no conversion).
+- The same revision from the same server already in the nest: only the
+  quantity is raised. A different revision of that drawing: refused; change
+  revisions through Update Drawings.
+- Another drawing with the same name: refused, naming both.
+
+The added drawing is an independent copy carrying a library link (server key,
+id, revision and a snapshot of the library details) that is saved with the nest
+(see [the nest file format](nest-file-format.md#drawing-library-links)). Editing it
+in the nest never changes the library.
+
+### Save to Drawing Library (desktop)
+
+Right-click a drawing in the drawing list > **Save to Drawing Library...**
+(Database mode only; disabled with "Database mode only" in File mode). The
+dialog (`OpenNest.Data.DrawingLibrarySaveSession`) prefills name and customer
+from the drawing (the nest's customer when the drawing has none), material,
+grade, thickness and units from the nest (the drawing's material when the nest
+has none), and the cut type and notes of the linked revision when the drawing
+came from this server's library, otherwise the cut type last saved on this PC.
+Units follow the nest and cannot be changed.
+
+Whenever the details change, the dialog looks up active library drawings with
+the same normalized customer, name, material and grade and the exact thickness,
+units and cut type, and offers **Save as**:
+
+- No match: a separate (new) library drawing.
+- One match, or the drawing's own linked library drawing among several: the
+  next revision of it, guarded by `If-Match` on the revision listed.
+- Several matches: no default; the operator chooses one or a separate drawing.
+- A linked drawing whose details no longer match is offered but never the
+  default, so changing thickness cannot silently rewrite it.
+
+Save stays disabled until the lookup for the current details has finished. A
+409 (someone else saved first) is shown and the choices are refreshed. A save
+that fails without a definite answer stays pending: the next Save first looks
+for the revision it would have produced and adopts it when the package hash
+and details match, so it is never stored twice and a retried new drawing keeps
+its client-allocated id. Saving identical content at the current revision is a
+no-op. On success only the nest drawing's library link changes, to the saved
+revision; save the nest to keep it.
 
 ## Storage
 

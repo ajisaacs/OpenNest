@@ -2,14 +2,37 @@ using System.Collections.Generic;
 
 namespace OpenNest.Geometry
 {
+    /// <summary>
+    /// Pole of inaccessibility: the interior point farthest from the outline and holes,
+    /// found by best-first quadtree refinement to within <c>precision</c>.
+    /// </summary>
     public static class PolyLabel
     {
         public static Vector Find(
             Polygon outer,
             IList<Polygon> holes = null,
             double precision = 0.5
+        ) => Find(outer, holes, precision, int.MaxValue, out _);
+
+        /// <summary>
+        /// Bounded search for callers that cannot afford refinement along a long thin shape:
+        /// stops after about <paramref name="maxCells"/> distance evaluations and returns the best
+        /// cell centre so far. When the starting grid would exceed a quarter of the budget it is
+        /// coarsened so the whole shape is sampled first. The result can lie outside a shape
+        /// thinner than the remaining refinement, so callers must check it.
+        /// </summary>
+        public static Vector Find(Polygon outer, IList<Polygon> holes, double precision, int maxCells) =>
+            Find(outer, holes, precision, maxCells, out _);
+
+        internal static Vector Find(
+            Polygon outer,
+            IList<Polygon> holes,
+            double precision,
+            int maxCells,
+            out int evaluatedCells
         )
         {
+            evaluatedCells = 0;
             if (outer.Vertices.Count < 3)
                 return outer.Vertices.Count > 0 ? outer.Vertices[0] : new Vector();
 
@@ -38,29 +61,53 @@ namespace OpenNest.Geometry
             if (cellSize == 0)
                 return new Vector((minX + maxX) / 2, (minY + maxY) / 2);
 
+            if (maxCells < int.MaxValue)
+            {
+                var gridLimit = System.Math.Max(1, maxCells / 4);
+                while (System.Math.Ceiling(width / cellSize) * System.Math.Ceiling(height / cellSize) > gridLimit)
+                    cellSize *= 2;
+            }
+
             var halfCell = cellSize / 2;
 
-            var queue = new List<Cell>();
+            var initial = new List<Cell>();
 
             for (var x = minX; x < maxX; x += cellSize)
-            for (var y = minY; y < maxY; y += cellSize)
-                queue.Add(new Cell(x + halfCell, y + halfCell, halfCell, outer, holes));
+            {
+                for (var y = minY; y < maxY; y += cellSize)
+                {
+                    initial.Add(new Cell(x + halfCell, y + halfCell, halfCell, outer, holes));
+                    // Far from the origin a step smaller than the coordinate's precision
+                    // no longer advances; the grid would never end.
+                    if (y + cellSize == y)
+                        break;
+                }
+                if (x + cellSize == x)
+                    break;
+            }
 
-            queue.Sort((a, b) => b.MaxDist.CompareTo(a.MaxDist));
+            initial.Sort((a, b) => b.MaxDist.CompareTo(a.MaxDist));
 
             var bestCell = GetCentroidCell(outer, holes);
+            evaluatedCells = initial.Count + 1;
 
-            for (var i = 0; i < queue.Count; i++)
-                if (queue[i].Dist > bestCell.Dist)
+            for (var i = 0; i < initial.Count; i++)
+                if (initial[i].Dist > bestCell.Dist)
                 {
-                    bestCell = queue[i];
+                    bestCell = initial[i];
                     break;
                 }
 
+            // Highest MaxDist first. Equal bounds pop newest first, and the initial cells in
+            // sorted order, exactly as the former sorted list did (insertion ahead of equals).
+            var queue = new PriorityQueue<Cell, (double, long)>();
+            for (var i = 0; i < initial.Count; i++)
+                queue.Enqueue(initial[i], (-initial[i].MaxDist, i - (long)initial.Count));
+            var sequence = (long)initial.Count;
+
             while (queue.Count > 0)
             {
-                var cell = queue[0];
-                queue.RemoveAt(0);
+                var cell = queue.Dequeue();
 
                 if (cell.Dist > bestCell.Dist)
                     bestCell = cell;
@@ -68,7 +115,16 @@ namespace OpenNest.Geometry
                 if (cell.MaxDist - bestCell.Dist <= precision)
                     continue;
 
+                if (evaluatedCells > maxCells - 4)
+                    break;
+
                 halfCell = cell.HalfSize / 2;
+
+                // Far from the origin a half-step may no longer move the centre; such a cell
+                // cannot be split, and its identical children would multiply without end.
+                if (cell.X - halfCell == cell.X || cell.X + halfCell == cell.X
+                    || cell.Y - halfCell == cell.Y || cell.Y + halfCell == cell.Y)
+                    continue;
 
                 var newCells = new[]
                 {
@@ -77,23 +133,16 @@ namespace OpenNest.Geometry
                     new Cell(cell.X - halfCell, cell.Y + halfCell, halfCell, outer, holes),
                     new Cell(cell.X + halfCell, cell.Y + halfCell, halfCell, outer, holes),
                 };
+                evaluatedCells += newCells.Length;
 
                 for (var i = 0; i < newCells.Length; i++)
                 {
                     if (newCells[i].MaxDist > bestCell.Dist + precision)
-                        InsertSorted(queue, newCells[i]);
+                        queue.Enqueue(newCells[i], (-newCells[i].MaxDist, -++sequence));
                 }
             }
 
             return new Vector(bestCell.X, bestCell.Y);
-        }
-
-        private static void InsertSorted(List<Cell> list, Cell cell)
-        {
-            var idx = 0;
-            while (idx < list.Count && list[idx].MaxDist > cell.MaxDist)
-                idx++;
-            list.Insert(idx, cell);
         }
 
         private static Cell GetCentroidCell(Polygon outer, IList<Polygon> holes)

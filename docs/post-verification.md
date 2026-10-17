@@ -9,8 +9,10 @@ in **Validate Nest (live programs)** mode, distinct from the panel's unapplied
 missing lead-ins, and rapid crossings in the existing placed programs and cutting
 order. Findings identify plate and part sequence numbers in a read-only grid;
 incomplete or failed checks are never reported as clear. Select a row to switch
-the main plate view to that plate and focus the finding. The scrollable report
-retains every result and the selected finding's explanation.
+the main plate view to that plate and focus the finding. A colored headline gives
+the warning count by kind (or says the check is incomplete or clear), a single line
+explains the selected marker, and the grid retains every result. **Plan Cutting**
+marks its overlap and route findings with the same overlay.
 While a finding is selected, its named parts retain their normal colors; other
 parts use muted gray fills and visible gray outlines, lead-ins, and marks. Selecting
 another finding updates the emphasis. Clearing the finding or closing validation
@@ -18,8 +20,8 @@ restores normal rendering without changing drawing colors or selection.
 
 Overlaps use the same magenta material shading as **View > Overlap Check**. A
 DPI-scaled ring expands and fades continuously while the finding is selected;
-both its color and contrasting halo fade as it grows. For overlaps the ring marks the area centroid (possibly between
-separate patches); for missing lead-ins it marks the contour start. Rapid warnings
+both its color and contrasting halo fade as it grows. For overlaps the ring marks a point inside the largest
+shared patch; for missing lead-ins it marks the contour start. Rapid warnings
 pulse the offending orange dashed segment continuously and mark its contacts with
 the completed contour using fixed-screen-size magenta crosshairs with white halos.
 Contacts use native lines/arcs and the rapid check's existing numerical tolerances;
@@ -52,7 +54,7 @@ shared `PostVerificationAnalyzer` without an editor UI dependency.
 
 The desktop's **Nest > Post > (post processor)** workflow checks every plate after
 post settings are accepted and before asking where to save CNC output. The review
-shows all three check categories, even when there are no findings:
+shows the first three check categories, even when there are no findings:
 
 - **Overlapping parts and clamps:** shared material between placed parts, including containment,
   and physical material overlapping an active clamp. Holes are subtracted; placing a part inside
@@ -78,6 +80,18 @@ shows all three check categories, even when there are no findings:
   A clamp whose footprint covers the program start point warns on every posting
   attempt by design; there is no exemption for the first rapid and no persisted
   bypass (settled decision D10).
+- **Fixed leads:** Plan Cutting accepts fixed emissions as given and only warns (see
+  [cutting planner](cutting-planner.md#fixed-emissions-warn)), so posting checks them
+  again: every lead-in and lead-out of a locked program, and of each contour a part's
+  active drawing pins fix, against the clean material of every part on the plate (its own
+  included) and against active clamps. A pinned contour counts as applied only where the
+  placed program cuts it exactly as the pin's own emission, motion for motion, with the
+  part's cutting settings. A part with active drawing pins that its program does not apply
+  (never planned, hand-edited, locked lead-ins overriding the pins, or a pin that no longer
+  matches the geometry) warns "Drawing pins not applied"; pins switched off for that part
+  are not reported. A part whose clean material cannot be captured makes the check
+  incomplete for leads near it. This line appears in the summary only when there is such
+  a finding.
 
 Findings identify the plate and part's position in the cutting sequence. Read the
 scrollable report, cancel to fix the nest, then post again to rerun verification.

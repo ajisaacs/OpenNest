@@ -488,7 +488,7 @@ internal sealed class OverlapOverlayController : IDisposable
         var labelRows = new Dictionary<PointF, int>();
         foreach (var pair in state.DisplayPairs.OrderBy(pair => pair.PartAId).ThenBy(pair => pair.PartBId))
         {
-            var center = view.PointWorldToGraph(pair.Centroid);
+            var center = view.PointWorldToGraph(pair.Marker);
             if (!float.IsFinite(center.X) || !float.IsFinite(center.Y))
                 continue;
             foreach (var pen in new[] { halo, crosshair })
@@ -571,21 +571,11 @@ internal sealed class OverlapOverlayController : IDisposable
             {
                 foreach (var region in pair.Regions)
                 {
-                    var vertices = region.Vertices;
-                    var points = new PointF[vertices.Count - 1]; // Analyzer repeats the closing vertex.
-                    var signedArea = 0.0;
-                    var start = vertices[0];
-                    for (var i = 0; i < points.Length; i++)
-                    {
-                        var a = vertices[i] - start;
-                        var b = vertices[i + 1] - start;
-                        signedArea += a.X * b.Y - b.X * a.Y;
-                        // The host has already translated by origin: graph, not control coordinates.
-                        points[i] = view.PointWorldToGraph(vertices[i]);
-                    }
-                    if (signedArea < 0)
-                        Array.Reverse(points);
-                    next.AddPolygon(points);
+                    // Outlines wind one way and holes the other, so the winding fill leaves
+                    // holes empty while overlapping pairs' islands still merge.
+                    next.AddPolygon(GraphRing(region.Vertices, positive: true));
+                    foreach (var hole in region.Holes)
+                        next.AddPolygon(GraphRing(hole, positive: false));
                 }
             }
             path = next;
@@ -597,6 +587,28 @@ internal sealed class OverlapOverlayController : IDisposable
             next.Dispose();
             throw;
         }
+    }
+
+    /// <summary>
+    /// Graph points of a closed world ring (the analyzer repeats the closing vertex), wound
+    /// positive for outlines or negative for holes in world space whatever the input order.
+    /// </summary>
+    private PointF[] GraphRing(IReadOnlyList<Vector> vertices, bool positive)
+    {
+        var points = new PointF[vertices.Count - 1];
+        var signedArea = 0.0;
+        var start = vertices[0];
+        for (var i = 0; i < points.Length; i++)
+        {
+            var a = vertices[i] - start;
+            var b = vertices[i + 1] - start;
+            signedArea += a.X * b.Y - b.X * a.Y;
+            // The host has already translated by origin: graph, not control coordinates.
+            points[i] = view.PointWorldToGraph(vertices[i]);
+        }
+        if (signedArea < 0 == positive)
+            Array.Reverse(points);
+        return points;
     }
 
     private void DrawCutOffClampContacts(Graphics graphics)

@@ -19,7 +19,6 @@ using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
-using OpenNest.Gpu;
 using OpenNest.IO;
 using OpenNest.Properties;
 
@@ -136,13 +135,6 @@ namespace OpenNest.Forms
             LoadPosts();
             EnableCheck();
             UpdateStatus();
-            UpdateGpuStatus();
-
-            //if (GpuEvaluatorFactory.GpuAvailable)
-            //    BestFitCache.CreateEvaluator = (drawing, spacing) => GpuEvaluatorFactory.Create(drawing, spacing);
-
-            //if (GpuEvaluatorFactory.GpuAvailable)
-            //    BestFitCache.CreateSlideComputer = () => GpuEvaluatorFactory.CreateSlideComputer();
 
             // Jobs-side plug-in discovery: INestingEngine implementations are registered per
             // assembly/type with per-DLL isolation. Existing plug-ins must implement the jobs
@@ -197,7 +189,7 @@ namespace OpenNest.Forms
                 if (result == DialogResult.Yes)
                     updater.ApplyAndRestart();
             };
-            statusStrip1.Items.Insert(statusStrip1.Items.IndexOf(gpuStatusLabel), updateStatusLabel);
+            statusStrip1.Items.Add(updateStatusLabel);
 
             updater = new global::OpenNest.UpdaterService();
             updater.UpdateReady += version =>
@@ -523,20 +515,6 @@ namespace OpenNest.Forms
             UpdateSelectionStatus();
         }
 
-        private void UpdateGpuStatus()
-        {
-            if (GpuEvaluatorFactory.GpuAvailable)
-            {
-                gpuStatusLabel.Text = $"GPU : {GpuEvaluatorFactory.DeviceName}";
-                gpuStatusLabel.ForeColor = Color.DarkGreen;
-            }
-            else
-            {
-                gpuStatusLabel.Text = "GPU : None (CPU)";
-                gpuStatusLabel.ForeColor = Color.Gray;
-            }
-        }
-
         private void EngineComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (engineComboBox.SelectedItem is string name)
@@ -670,6 +648,8 @@ namespace OpenNest.Forms
             activeForm.PlateView.SelectionChanged += PlateView_SelectionChanged;
             activeForm.PlateView.PartAdded += PlateView_PartAdded;
             activeForm.PlateView.PartRemoved += PlateView_PartRemoved;
+            var activeNest = activeForm.Nest;
+            activeForm.PlateView.CanEditClamps = () => !ClampsInUse(activeNest);
             mnuViewDrawRapids.Checked = activeForm.PlateView.DrawRapid;
             mnuViewDrawPiercePoints.Checked = activeForm.PlateView.DrawPiercePoints;
             mnuViewDrawBounds.Checked = activeForm.PlateView.DrawBounds;
@@ -705,7 +685,7 @@ namespace OpenNest.Forms
             {
                 try
                 {
-                    var nest = new NestReader(templatePath).Read();
+                    var nest = new NestReader(templatePath) { BestFitStore = BestFitCacheStore.Shared }.Read();
                     NestDefaults.FromNest(nest).Save(NestDefaults.DefaultPath);
                 }
                 catch (Exception ex)
@@ -757,7 +737,7 @@ namespace OpenNest.Forms
                 if (!string.Equals(Path.GetExtension(path), NestFormat.FileExtension, StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                var reader = new NestReader(path);
+                var reader = new NestReader(path) { BestFitStore = BestFitCacheStore.Shared };
                 var nest = reader.Read();
                 LoadNest(nest);
                 ShowNestWarnings(reader);
@@ -801,7 +781,7 @@ namespace OpenNest.Forms
                 using var dlg = new OpenFileDialog { Filter = NestFormat.FileFilter, Multiselect = true };
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
-                    var reader = new NestReader(dlg.FileName);
+                    var reader = new NestReader(dlg.FileName) { BestFitStore = BestFitCacheStore.Shared };
                     var nest = reader.Read();
                     LoadNest(nest);
                     ShowNestWarnings(reader);
@@ -822,7 +802,7 @@ namespace OpenNest.Forms
                 mnuToolsOptions.Enabled = false;
                 var snapshot = await NestHistorySession.ReadCurrentAsync(repository, dlg.SelectedId, serverUrl);
                 using var stream = new MemoryStream(snapshot.Archive);
-                var reader = new NestReader(stream);
+                var reader = new NestReader(stream) { BestFitStore = BestFitCacheStore.Shared };
                 var nest = reader.Read();
                 // Metadata edits create revisions without rewriting the archive. Use their
                 // current editable fields rather than silently reverting them on the next save.
@@ -882,13 +862,27 @@ namespace OpenNest.Forms
             if (form == null || databaseSaveInProgress)
                 return;
             if (NestStorage.Settings.Mode == NestStorageMode.File)
+            {
                 form.SaveAs();
-            else
-                await SaveDatabaseAsync(form, saveCopy: true);
+                return;
+            }
+
+            // A pending upload is reconciled without writing, so only ask for a name
+            // when this click will actually create the copy.
+            string copyName = null;
+            if (!form.Document.PendingCreateRequiresReconciliation)
+            {
+                using var dlg = new NestNameForm(form.Nest.Name);
+                if (dlg.ShowDialog(this) != DialogResult.OK)
+                    return;
+                copyName = dlg.NestName;
+            }
+            await SaveDatabaseAsync(form, saveCopy: true, copyName);
         }
 
-        private async Task SaveDatabaseAsync(EditNestForm form, bool saveCopy)
+        private async Task SaveDatabaseAsync(EditNestForm form, bool saveCopy, string copyName = null)
         {
+            var originalName = form.Nest.Name;
             databaseSaveInProgress = true;
             storageModeMenu.Enabled = false;
             mnuToolsOptions.Enabled = false;
@@ -906,6 +900,8 @@ namespace OpenNest.Forms
                             : $"Found saved version {reconciled.Revision}. Review the current nest before saving again.";
                     return; // Never combine reconciliation with a write in the same click.
                 }
+                if (copyName != null)
+                    form.Nest.Name = copyName;
                 var saved = await form.Document.SaveToDatabaseAsync(
                     repository, serverUrl, saveCopy);
                 if (!form.IsDisposed)
@@ -915,6 +911,10 @@ namespace OpenNest.Forms
             }
             catch (Exception ex)
             {
+                // Keep the new name only while its copy may still be pending on the server;
+                // otherwise a later Save would rename the original nest.
+                if (copyName != null && !form.Document.PendingCreateWasCopy)
+                    form.Nest.Name = originalName;
                 if (!IsDisposed)
                     ShowStorageError("save", ex);
             }
@@ -939,6 +939,8 @@ namespace OpenNest.Forms
             {
                 NestStorage.Save(dlg.SelectedMode, dlg.ServerUrl);
                 statusLabel1.Text = $"Nest storage: {dlg.SelectedMode}";
+                foreach (var form in MdiChildren.OfType<EditNestForm>())
+                    form.UpdateDrawingLibraryCommand();
             }
             catch (Exception ex)
             {
@@ -957,7 +959,7 @@ namespace OpenNest.Forms
             try
             {
                 // Export never changes the document's save path, remote id, or nest name.
-                new NestWriter(form.Nest).Write(dlg.FileName);
+                new NestWriter(form.Nest) { BestFitStore = BestFitCacheStore.Shared }.Write(dlg.FileName);
                 statusLabel1.Text = $"Exported .nest to {dlg.FileName}";
             }
             catch (Exception ex)
@@ -1558,12 +1560,42 @@ namespace OpenNest.Forms
             activeForm.UpdateDrawingList();
         }
 
+        private void DrawingLibrary_Click(object sender, EventArgs e)
+        {
+            activeForm?.AddFromDrawingLibrary();
+        }
+
+        private void NestMenu_Opening(object sender, EventArgs e)
+        {
+            // The drawing library lives on the nest server; File mode has nothing to browse.
+            var databaseMode = NestStorage.Settings.IsDatabaseMode;
+            mnuNest.DropDown.ShowItemToolTips = true;
+            mnuNestDrawingLibrary.Enabled = activeForm != null && databaseMode;
+            mnuNestDrawingLibrary.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
+        }
+
         private void EditNest_Click(object sender, EventArgs e)
         {
             if (activeForm == null)
                 return;
             activeForm.ShowNestInfoEditor();
         }
+
+        private PlateView[] ViewsOf(Nest nest) =>
+            MdiChildren
+                .OfType<EditNestForm>()
+                .Where(form => ReferenceEquals(form.Nest, nest))
+                .Select(form => form.PlateView)
+                .ToArray();
+
+        /// <summary>
+        /// True while a nest run or fill may be reading <paramref name="nest"/>'s clamps.
+        /// Clamps feed nesting and validation: never change them under a running operation.
+        /// </summary>
+        private bool ClampsInUse(Nest nest) =>
+            nestingInProgress
+            || Application.OpenForms.OfType<NestProgressForm>().Any()
+            || ViewsOf(nest).Any(v => v.IsFillInProgress);
 
         private void Clamps_Click(object sender, EventArgs e)
         {
@@ -1572,17 +1604,8 @@ namespace OpenNest.Forms
                 return;
 
             var nest = editForm.Nest;
-            var views = MdiChildren
-                .OfType<EditNestForm>()
-                .Where(form => ReferenceEquals(form.Nest, nest))
-                .Select(form => form.PlateView)
-                .ToArray();
-            // Clamps feed nesting and validation: never change them under a running operation.
-            if (
-                nestingInProgress
-                || Application.OpenForms.OfType<NestProgressForm>().Any()
-                || views.Any(v => v.IsFillInProgress || v.Actions.CurrentAction?.IsBusy() == true)
-            )
+            var views = ViewsOf(nest);
+            if (ClampsInUse(nest) || views.Any(v => v.Actions.CurrentAction?.IsBusy() == true))
             {
                 MessageBox.Show(
                     this,

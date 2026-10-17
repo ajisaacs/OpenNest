@@ -271,9 +271,6 @@ namespace OpenNest.Forms
             dgvParts.AllowUserToAddRows = false;
             dgvParts.AllowUserToDeleteRows = false;
             dgvParts.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
-            dgvParts.BackgroundColor = System.Drawing.SystemColors.Window;
-            dgvParts.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            dgvParts.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             dgvParts.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { colItemNum, colFileName, colDescription, colMaterial, colThickness, colQty, colStatus });
             dgvParts.Dock = System.Windows.Forms.DockStyle.Fill;
             dgvParts.Name = "dgvParts";
@@ -367,9 +364,6 @@ namespace OpenNest.Forms
             dgvGroups.AllowUserToAddRows = false;
             dgvGroups.AllowUserToDeleteRows = false;
             dgvGroups.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
-            dgvGroups.BackgroundColor = System.Drawing.SystemColors.Window;
-            dgvGroups.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            dgvGroups.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             dgvGroups.Dock = System.Windows.Forms.DockStyle.Fill;
             dgvGroups.Name = "dgvGroups";
             dgvGroups.RowHeadersVisible = false;

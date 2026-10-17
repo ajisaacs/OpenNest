@@ -54,6 +54,7 @@ namespace OpenNest.Engine
                 Priority = drawing.Priority,
                 Customer = drawing.Customer,
                 IsCutOff = drawing.IsCutOff,
+                Library = drawing.Library,
                 Source = new SourceInfo
                 {
                     Path = drawing.Source?.Path,

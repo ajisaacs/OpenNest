@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -42,38 +43,36 @@ internal sealed class CuttingInspectionPanel : UserControl
     internal Func<Nest, CancellationToken, Task<PostVerificationReport>> Analyze { get; set; }
         = (nest, token) => Task.Run(() => PostVerificationAnalyzer.Analyze(nest, token), token);
     private readonly Button planButton = new() { Text = "Replan", AutoSize = true };
-    private readonly Button cancelButton = new() { Text = "Cancel / Close", AutoSize = true };
-    private readonly TextBox resultLabel = new()
+    private readonly Button cancelButton = new() { Text = "Close", AutoSize = true };
+    // One headline the operator reads first; detail holds at most a remedy or a marker hint.
+    private readonly Label statusLabel = new()
     {
-        Dock = DockStyle.Fill,
-        Multiline = true,
-        ReadOnly = true,
-        ScrollBars = ScrollBars.Vertical,
-        WordWrap = true,
-        MaxLength = int.MaxValue,
-        AccessibleName = "Cutting plan outcome and remedies"
+        AutoSize = true,
+        MaximumSize = new Size(410, 0),
+        Margin = Padding.Empty,
+        BackColor = Color.Transparent,
+        AccessibleName = "Cutting plan outcome"
     };
+    private readonly StatusBanner statusBanner = new() { Dock = DockStyle.Fill, Margin = new Padding(3, 0, 3, 8) };
+    private readonly Label detailLabel = new()
+    {
+        AutoSize = true,
+        MaximumSize = new Size(440, 0),
+        AccessibleName = "Cutting plan remedy or marker hint"
+    };
+    private readonly ToolTip toolTip = new();
     private readonly Button settingsButton = new() { Text = "Cutting Settings…", AutoSize = true };
     private readonly Button applyButton = new() { Text = "Apply", AutoSize = true, Enabled = false };
     private readonly Button previousButton = new() { Text = "Previous", AutoSize = true };
     private readonly Button nextButton = new() { Text = "Next", AutoSize = true };
     private readonly CheckBox keepOrderCheckBox = new() { Text = "Keep current part order", AutoSize = true };
     private readonly CheckBox autoCutOffsCheckBox = new() { AutoSize = true, MaximumSize = new Size(440, 0) };
-    private readonly FlowLayoutPanel existingWorkBanner = new()
-    {
-        AutoSize = true,
-        FlowDirection = FlowDirection.TopDown,
-        WrapContents = false,
-        BackColor = Color.FromArgb(192, 0, 0),
-        Padding = new Padding(6),
-        Margin = new Padding(3, 3, 3, 6),
-        Visible = false
-    };
+    private readonly StatusBanner existingWorkBanner = new() { Margin = new Padding(3, 3, 3, 8) };
     private readonly Label existingWorkLabel = new()
     {
         AutoSize = true,
-        MaximumSize = new Size(428, 0),
-        ForeColor = Color.White,
+        MaximumSize = new Size(410, 0),
+        Margin = new Padding(0, 0, 0, 6),
         BackColor = Color.Transparent,
         AccessibleName = "Existing lead-ins and cut-offs warning"
     };
@@ -91,17 +90,25 @@ internal sealed class CuttingInspectionPanel : UserControl
     // Last cut-off settings chosen here, per unit system, for the rest of this session.
     private static readonly System.Collections.Generic.Dictionary<Units, AutomaticCutOffOptions> lastCutOffOptions = new();
     private AutomaticCutOffStaging stagedCutOffs;
-    private readonly CheckBox acceptWarningsCheckBox = new() { Text = "Accept UNVERIFIED plan warnings (post consent happens separately)", AutoSize = true, Visible = false };
-    private readonly Label settingsLabel = new() { AutoSize = true, MaximumSize = new Size(440, 0) };
+    private readonly CheckBox acceptWarningsCheckBox = new() { Text = "Accept the unverified plan", AutoSize = true, Visible = false };
+    private readonly Label settingsLabel = new()
+    {
+        AutoSize = true,
+        MaximumSize = new Size(300, 0),
+        ForeColor = SystemColors.GrayText,
+        Anchor = AnchorStyles.Left,
+    };
     private readonly Label previewLabel = new() { AutoSize = true, MaximumSize = new Size(440, 0) };
     private readonly Label validationScopeLabel = new()
     {
         AutoSize = true,
         MaximumSize = new Size(440, 0),
         Visible = false,
-        Text = "LIVE NEST only — reviews overlaps, lead-ins and rapid crossings. Confirm minimum spacing, plate boundaries and final post output separately, before posting."
+        ForeColor = SystemColors.GrayText,
+        Text = "Checks the live nest for overlaps, missing lead-ins and rapid crossings. "
+            + "Spacing, plate edges and post output are not checked."
     };
-    private readonly DataGridView warningGrid = new()
+    private readonly DataGridView warningGrid = GridStyle.Apply(new DataGridView
     {
         Dock = DockStyle.Fill,
         ReadOnly = true,
@@ -111,7 +118,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         SelectionMode = DataGridViewSelectionMode.FullRowSelect,
         RowHeadersVisible = false,
         AutoGenerateColumns = false
-    };
+    });
     private ValidationInspectionScope scope;
     private bool closed;
     private int generation;
@@ -133,10 +140,15 @@ internal sealed class CuttingInspectionPanel : UserControl
         viewport = view.CaptureViewport();
         overlapDisplay = view.OverlapDisplay;
         var header = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
-        var buttons = new FlowLayoutPanel { AutoSize = true };
-        buttons.Controls.AddRange([settingsButton, planButton, applyButton, cancelButton]);
-        var navigation = new FlowLayoutPanel { AutoSize = true };
+        var settingsRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        settingsRow.Controls.AddRange([settingsButton, settingsLabel]);
+        var buttons = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 6, 0, 0) };
+        buttons.Controls.AddRange([planButton, applyButton, cancelButton]);
+        var navigation = new FlowLayoutPanel { AutoSize = true, Margin = Padding.Empty };
         navigation.Controls.AddRange([previousButton, nextButton]);
+        statusLabel.Font = new Font(Font.FontFamily, Font.Size + 1, FontStyle.Bold);
+        toolTip.SetToolTip(acceptWarningsCheckBox, "Some checks did not pass. Posting still runs its own checks and asks separately.");
+        toolTip.SetToolTip(keepOrderCheckBox, "Plan lead-ins and cut direction without changing which part is cut first.");
         modeSelector.Items.AddRange(["Plan Cutting", "Validate Nest (live programs)"]);
         Mode = mode;
         modeSelector.SelectedIndex = (int)mode;
@@ -158,23 +170,25 @@ internal sealed class CuttingInspectionPanel : UserControl
         cutOffRow.Controls.AddRange([autoCutOffsCheckBox, cutOffSettingsButton]);
         existingWorkLabel.Font = new Font(Font, FontStyle.Bold);
         existingWorkBanner.Controls.AddRange([existingWorkLabel, clearExistingButton]);
-        header.Controls.AddRange([modeSelector, existingWorkBanner, settingsLabel, keepOrderCheckBox, cutOffRow, buttons,
-            acceptWarningsCheckBox, navigation, previewLabel, validationScopeLabel]);
+        existingWorkBanner.SetTone(Tone.Bad);
+        header.Controls.AddRange([modeSelector, existingWorkBanner, settingsRow, keepOrderCheckBox, cutOffRow,
+            validationScopeLabel, buttons, acceptWarningsCheckBox, navigation, previewLabel, detailLabel]);
+        statusBanner.Controls.Add(statusLabel);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 70));
-        layout.Controls.Add(header, 0, 0);
-        layout.Controls.Add(resultLabel, 0, 1);
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.Controls.Add(statusBanner, 0, 0);
+        layout.Controls.Add(header, 0, 1);
         layout.Controls.Add(warningGrid, 0, 2);
         Controls.Add(layout);
-        foreach (var name in new[] { "Plate", "Part", "With", "Warning / finding" })
+        foreach (var name in new[] { "Plate", "Part", "With", "Issue" })
             warningGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 HeaderText = name,
                 Width = 48,
                 SortMode = DataGridViewColumnSortMode.NotSortable,
-                AutoSizeMode = name == "Warning / finding" ? DataGridViewAutoSizeColumnMode.Fill : DataGridViewAutoSizeColumnMode.None
+                AutoSizeMode = name == "Issue" ? DataGridViewAutoSizeColumnMode.Fill : DataGridViewAutoSizeColumnMode.None
             });
         Padding = new Padding(10);
         planButton.Click += (_, _) => StartCurrentMode();
@@ -190,8 +204,23 @@ internal sealed class CuttingInspectionPanel : UserControl
         nextButton.Click += (_, _) => ShowPlate(selectedPlate + 1);
         warningGrid.SelectionChanged += (_, _) => NavigateFinding();
         ShowSettings();
-        resultLabel.Text = "Read-only proposal inspection. Nothing live changes before Apply, except automatic cut-offs "
-            + "you choose to add; those are removed again unless you Apply.";
+    }
+
+    private enum Tone { Neutral, Good, Warning, Bad }
+
+    /// <summary>Sets the headline banner and replaces the detail line (empty hides either).</summary>
+    private void SetStatus(Tone tone, string text, string detail = null)
+    {
+        statusLabel.Text = text;
+        statusBanner.SetTone(tone);
+        statusBanner.Visible = !string.IsNullOrEmpty(text);
+        SetDetail(detail);
+    }
+
+    private void SetDetail(string text)
+    {
+        detailLabel.Text = text ?? string.Empty;
+        detailLabel.Visible = !string.IsNullOrEmpty(text);
     }
 
     internal bool IsPlanning => inspection.IsRunning || validationCancellation != null;
@@ -223,8 +252,9 @@ internal sealed class CuttingInspectionPanel : UserControl
     private void ShowCutOffOptions()
     {
         var unit = UnitsHelper.GetShortString(units);
-        autoCutOffsCheckBox.Text = $"Add automatic scrap cut-offs ({cutOffOptions.Spacing:0.###} {unit} strips, "
-            + $"keep tails of {cutOffOptions.MinimumTailLength:0.###} {unit} or more)";
+        autoCutOffsCheckBox.Text = $"Add scrap cut-offs ({cutOffOptions.Spacing:0.###} {unit} strips)";
+        toolTip.SetToolTip(autoCutOffsCheckBox, $"Keeps tails of {cutOffOptions.MinimumTailLength:0.###} {unit} or more. "
+            + "The cut-offs are added for planning and removed again unless you Apply.");
     }
 
     /// <summary>
@@ -243,7 +273,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         }
         catch (Exception ex)
         {
-            resultLabel.Text = $"Unable to remove the unapplied automatic cut-offs: {ex.Message}";
+            SetStatus(Tone.Bad, "Couldn't remove the unapplied cut-offs.", ex.Message);
             return;
         }
         RefreshExistingWork();
@@ -257,7 +287,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         }
         catch (Exception ex)
         {
-            resultLabel.Text = $"Unable to open the cut-off settings: {ex.Message}";
+            SetStatus(Tone.Bad, "Couldn't open the cut-off settings.", ex.Message);
         }
         finally
         {
@@ -317,10 +347,11 @@ internal sealed class CuttingInspectionPanel : UserControl
         settingsButton.Visible = settingsLabel.Visible = keepOrderCheckBox.Visible = applyButton.Visible = planning;
         autoCutOffsCheckBox.Visible = cutOffSettingsButton.Visible = planning;
         RefreshExistingWork();
-        previousButton.Visible = nextButton.Visible = planning;
+        previousButton.Visible = nextButton.Visible = planning && plates.Length > 1;
+        previewLabel.Visible = planning;
         validationScopeLabel.Visible = !planning;
         planButton.Text = planning ? "Replan" : "Recheck all plates";
-        previewLabel.Text = planning ? "No current preview." : "LIVE NEST — read-only validation of all plates.";
+        previewLabel.Text = "No current preview.";
     }
 
     internal void SwitchMode(CuttingInspectionMode mode)
@@ -329,7 +360,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         pendingMode = mode;
         ClearResult();
         SetPlanning(true);
-        resultLabel.Text = "Switching modes… waiting for the worker.";
+        SetStatus(Tone.Neutral, "Switching…");
         if (validationCancellation != null) validationCancellation.Cancel();
         if (inspection.IsRunning) inspection.RequestClose();
         if (!IsPlanning) FinishTransition();
@@ -364,12 +395,12 @@ internal sealed class CuttingInspectionPanel : UserControl
         try { RevertStagedCutOffs(); } // Validate what is really on the plates, not an unapplied plan.
         catch (Exception ex)
         {
-            resultLabel.Text = $"Unable to remove the unapplied automatic cut-offs: {ex.Message}";
+            SetStatus(Tone.Bad, "Couldn't remove the unapplied cut-offs.", ex.Message);
             return;
         }
         ConfigureMode();
         SetPlanning(true);
-        resultLabel.Text = "Checking all live plates: overlaps, missing lead-ins and rapid crossings…";
+        SetStatus(Tone.Neutral, "Checking all plates…");
         var cancellation = validationCancellation = new CancellationTokenSource();
         var run = ++generation;
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -389,23 +420,22 @@ internal sealed class CuttingInspectionPanel : UserControl
                 SetPlanning(false);
                 if (!task.IsCompletedSuccessfully)
                 {
-                    resultLabel.Text = task.IsCanceled ? "Validation cancelled. Run it again to review this nest."
-                        : $"Validation failed. Run it again to review this nest. {task.Exception?.GetBaseException().Message}";
+                    if (task.IsCanceled)
+                        SetStatus(Tone.Neutral, "Validation cancelled.", "Recheck to review this nest.");
+                    else
+                        SetStatus(Tone.Bad, "Validation failed. Recheck to review this nest.",
+                            task.Exception?.GetBaseException().Message);
                     return;
                 }
                 ValidationReport = task.Result;
-                resultLabel.Text = ValidationReport.ToDisplayText("Nest validation (live programs)");
-                previewLabel.Text = ValidationReport.Findings.Any(f => f.Kind == PostVerificationKind.Incomplete)
-                    ? "Validation incomplete. Review the findings below."
-                    : ValidationReport.HasWarnings ? "Warnings found. Review the findings below."
-                    : "Validation complete. No warnings found by these checks.";
+                ShowValidationStatus();
                 populatingWarnings = true;
                 try
                 {
                     foreach (var finding in ValidationReport.Findings)
                     {
                         var index = warningGrid.Rows.Add(finding.PlateNumber, finding.PartNumber, finding.OtherPartNumber,
-                            $"{finding.Kind}: {finding.Message}");
+                            $"{KindName(finding.Kind)}: {finding.Message}");
                         warningGrid.Rows[index].Tag = finding;
                     }
                     warningGrid.ClearSelection();
@@ -415,11 +445,40 @@ internal sealed class CuttingInspectionPanel : UserControl
             catch (Exception ex)
             {
                 view.ClearValidationFinding();
-                resultLabel.Text = $"Validation failed. Run it again to review this nest. {ex.Message}";
+                SetStatus(Tone.Bad, "Validation failed. Recheck to review this nest.", ex.Message);
             }
             finally { completion.TrySetResult(); }
         }, null), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
     }
+
+    private void ShowValidationStatus()
+    {
+        var findings = ValidationReport.Findings;
+        if (findings.Any(f => f.Kind == PostVerificationKind.Incomplete))
+            SetStatus(Tone.Bad, "Validation incomplete: some checks could not run.", SelectIssueHint);
+        else if (findings.Count == 0)
+            SetStatus(Tone.Good, "No warnings found.");
+        else
+        {
+            var counts = findings.GroupBy(f => f.Kind).OrderBy(g => g.Key)
+                .Select(g => Count(g.Count(), KindName(g.Key).ToLowerInvariant()));
+            SetStatus(Tone.Warning, $"{Count(findings.Count, "warning")}: {string.Join(", ", counts)}.", SelectIssueHint);
+        }
+    }
+
+    private const string SelectIssueHint = "Select an issue below to see it on the plate.";
+
+    private static string KindName(PostVerificationKind kind) => kind switch
+    {
+        PostVerificationKind.Overlap => "Overlap",
+        PostVerificationKind.MissingLeadIn => "Missing lead-in",
+        PostVerificationKind.RapidCrossing => "Rapid crossing",
+        PostVerificationKind.Incomplete => "Not checked",
+        PostVerificationKind.FixedLead => "Fixed lead",
+        _ => kind.ToString(),
+    };
+
+    private static string Count(int count, string noun) => $"{count} {noun}{(count == 1 ? string.Empty : "s")}";
 
     private void NavigateValidationFinding()
     {
@@ -433,40 +492,52 @@ internal sealed class CuttingInspectionPanel : UserControl
         var location = finding.Location;
         if (location == null && finding.PartNumber is { } part && part > 0 && part <= view.Plate.Parts.Count)
             location = view.Plate.Parts[part - 1]?.BoundingBox?.Center;
-        if (location is { } point && double.IsFinite(point.X) && double.IsFinite(point.Y))
+        if (!ShowMarker(finding with { Location = location }))
         {
-            var extent = finding.Overlap?.Bounds;
-            var size = System.Math.Max(10, System.Math.Max(extent?.Length ?? 0, extent?.Width ?? 0) * 2);
-            if (finding.RapidStart is { } start && finding.RapidEnd is { } end)
-                size = System.Math.Max(size, start.DistanceTo(end) * 1.5);
-            view.ZoomToArea(point.X - size / 2, point.Y - size / 2, size, size);
-            // A narrow docked canvas can put a contact at its edge after zoom.
-            // Centre a typed witness, never infer one from the diagnostic text.
-            var focus = finding.Kind == PostVerificationKind.RapidCrossing
-                && finding.ContactPoints.Any(contact => double.IsFinite(contact.X) && double.IsFinite(contact.Y))
-                ? finding.ContactPoints.First(contact => double.IsFinite(contact.X) && double.IsFinite(contact.Y))
-                : point;
-            view.CenterValidationPoint(focus, new Point(view.Width / 2, view.Height / 2));
+            view.ZoomToFit();
+            view.ShowValidationFinding(finding with { Location = location });
         }
-        else view.ZoomToFit();
-        view.ShowValidationFinding(finding with { Location = location });
-        var hint = finding.Kind switch
-        {
-            PostVerificationKind.Overlap when finding.ClampId != null =>
-                "The ring marks a nominal cut-off contacting a clamp; no material-overlap area is implied.",
-            PostVerificationKind.Overlap => "Shaded material is the overlap. The ring marks its area centroid, which can lie between separate patches.",
-            PostVerificationKind.RapidCrossing when finding.ClampId != null =>
-                "The crosshair marks the rapid's contact with the clamp. Head height is not modeled.",
-            PostVerificationKind.RapidCrossing => finding.ContactPoints.Count > 0
-                ? "Crosshairs mark contacts with the completed contour. The pulsing dashed orange line shows the rapid."
-                : "The pulsing dashed orange line shows the rapid inside the completed contour; there is no boundary contact point to mark.",
-            PostVerificationKind.MissingLeadIn => "The ring marks the cutting contour start where a lead-in is missing.",
-            _ => "The ring marks the affected part's center when available; no exact problem location is known."
-        };
-        // Keep the complete report visible; selecting a finding does not hide completeness or other warnings.
-        resultLabel.Text = $"Plate {finding.PlateNumber}, part {finding.PartNumber}: {finding.Message}\r\n{hint}\r\n\r\n"
-            + ValidationReport.ToDisplayText("Nest validation (live programs)");
+        // The headline keeps completeness and the warning count; the grid keeps every finding.
+        SetDetail(MarkerHint(finding));
     }
+
+    /// <summary>
+    /// Zooms to a finding's world-coordinate witness and marks it with the validation overlay.
+    /// False, with nothing shown, when the finding has no usable location.
+    /// </summary>
+    private bool ShowMarker(PostVerificationFinding finding)
+    {
+        var location = finding.Location ?? finding.Overlap?.Marker;
+        if (location is not { } point || !double.IsFinite(point.X) || !double.IsFinite(point.Y))
+            return false;
+        var extent = finding.Overlap?.Bounds;
+        var size = System.Math.Max(10, System.Math.Max(extent?.Length ?? 0, extent?.Width ?? 0) * 2);
+        if (finding.RapidStart is { } start && finding.RapidEnd is { } end)
+            size = System.Math.Max(size, start.DistanceTo(end) * 1.5);
+        view.ZoomToArea(point.X - size / 2, point.Y - size / 2, size, size);
+        // A narrow docked canvas can put a contact at its edge after zoom.
+        // Centre a typed witness, never infer one from the diagnostic text.
+        var focus = finding.Kind == PostVerificationKind.RapidCrossing
+            && finding.ContactPoints.Any(contact => double.IsFinite(contact.X) && double.IsFinite(contact.Y))
+            ? finding.ContactPoints.First(contact => double.IsFinite(contact.X) && double.IsFinite(contact.Y))
+            : point;
+        view.CenterValidationPoint(focus, new Point(view.Width / 2, view.Height / 2));
+        view.ShowValidationFinding(finding with { Location = point });
+        return true;
+    }
+
+    private static string MarkerHint(PostVerificationFinding finding) => finding.Kind switch
+    {
+        PostVerificationKind.Overlap when finding.ClampId != null => "The ring marks where a cut-off touches a clamp.",
+        PostVerificationKind.Overlap => "Red shading is the overlapping material.",
+        PostVerificationKind.RapidCrossing when finding.ClampId != null =>
+            "The crosshair marks where the rapid hits the clamp. Head height is not modeled.",
+        PostVerificationKind.RapidCrossing => finding.ContactPoints.Count > 0
+            ? "Orange dashes show the rapid; crosshairs mark where it crosses a cut contour."
+            : "Orange dashes show the rapid running inside a cut contour.",
+        PostVerificationKind.MissingLeadIn => "The ring marks the contour start that has no lead-in.",
+        _ => "The ring marks the affected part; the exact spot is not known."
+    };
 
     internal void StartPlanning()
     {
@@ -480,9 +551,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         }
         RefreshExistingWork();
         SetPlanning(true);
-        resultLabel.Text = stagedCutOffs != null
-            ? "Planning… Automatic cut-offs were added for this plan; they are removed again unless you Apply."
-            : "Planning… Read-only; the live plate is unchanged.";
+        SetStatus(Tone.Neutral, "Planning…");
         try
         {
             // Capture on the owner thread; no worker recapture of the live plate or settings.
@@ -493,7 +562,8 @@ internal sealed class CuttingInspectionPanel : UserControl
             var progress = new PostingProgress(context, value =>
             {
                 if (!closed && !inspection.CloseRequested && inspection.IsRunning && generation == run)
-                    resultLabel.Text = $"Planning plate {value.PlateNumber}: {value.Phase}…";
+                    SetStatus(Tone.Neutral, (plates.Length > 1 ? $"Planning plate {value.PlateNumber}: " : "Planning: ")
+                        + PhaseText(value.Phase) + "…");
             });
             var work = inspection.BeginPlanning(batch, BeforePlan, progress);
             work.ContinueWith(task => context.Post(_ => FinishPlanning(task, run, completion), null),
@@ -501,10 +571,18 @@ internal sealed class CuttingInspectionPanel : UserControl
         }
         catch (Exception ex)
         {
-            resultLabel.Text = $"Unable to start planning: {ex.Message}. No current preview.";
+            SetStatus(Tone.Bad, "Couldn't start planning.", ex.Message);
             SetPlanning(false);
         }
     }
+
+    private static string PhaseText(CuttingPlanPhase phase) => phase switch
+    {
+        CuttingPlanPhase.Reordering => "finding a part order",
+        CuttingPlanPhase.KeepingOrder => "keeping the current order",
+        CuttingPlanPhase.CheckingOverlap => "checking for overlaps",
+        _ => phase.ToString(),
+    };
 
     private void FinishPlanning(Task<CuttingPlanProposal> work, int run, TaskCompletionSource completion)
     {
@@ -521,18 +599,15 @@ internal sealed class CuttingInspectionPanel : UserControl
             SetPlanning(false);
             if (work.IsFaulted)
             {
-                resultLabel.Text = $"Planning failed: {work.Exception.GetBaseException().Message}. No current preview.";
+                SetStatus(Tone.Bad, "Planning failed. Replan to try again.", work.Exception.GetBaseException().Message);
                 return;
             }
             if (work.IsCanceled)
             {
-                resultLabel.Text = "Cancelled. No current preview; nothing changed.";
+                SetStatus(Tone.Neutral, "Planning cancelled. Nothing changed.");
                 return;
             }
             invalidated = false;
-            resultLabel.Text = string.Join(Environment.NewLine, work.Result.Describe(UnitsHelper.GetShortString(editor.Nest.Units))
-                .Where(line => !line.TrimStart().StartsWith("- ", StringComparison.Ordinal)
-                    && !line.TrimStart().StartsWith("... and ", StringComparison.Ordinal)));
             populatingWarnings = true;
             try
             {
@@ -544,6 +619,7 @@ internal sealed class CuttingInspectionPanel : UserControl
                 warningGrid.ClearSelection();
             }
             finally { populatingWarnings = false; }
+            ShowPlanStatus();
             acceptWarningsCheckBox.Visible = Proposal.RequiresWarningAcceptance;
             UpdateApply();
             BeforePresent?.Invoke();
@@ -557,14 +633,83 @@ internal sealed class CuttingInspectionPanel : UserControl
             acceptWarningsCheckBox.Checked = false;
             acceptWarningsCheckBox.Visible = false;
             applyButton.Enabled = false;
-            previewLabel.Text = "No current preview. Replan to continue.";
-            resultLabel.Text = $"Unable to show the plan: {ex.Message}. Nothing can be applied until replanning.";
+            previewLabel.Text = "No current preview.";
+            SetStatus(Tone.Bad, "Couldn't show the plan. Nothing can be applied until you replan.", ex.Message);
             SetPlanning(false);
         }
         finally
         {
             completion.TrySetResult();
         }
+    }
+
+    /// <summary>One headline for the whole proposal; per-plate state goes on the plate line.</summary>
+    private void ShowPlanStatus()
+    {
+        var issues = warningGrid.Rows.Count;
+        if (Proposal.IsCancelled)
+            SetStatus(Tone.Neutral, "Planning cancelled. Nothing changed.");
+        else if (Proposal.CanApply)
+            SetStatus(Tone.Good, plates.Length > 1 ? $"Ready to apply to {Count(plates.Length, "plate")}." : "Ready to apply.");
+        else if (Proposal.RequiresWarningAcceptance)
+            SetStatus(Tone.Warning, $"Unverified plan: review {Count(issues, "issue")}, then accept it to apply.",
+                issues > 0 ? SelectIssueHint : null);
+        else
+        {
+            var blocked = Proposal.Plates.Count(p => !p.CanApplyWithWarnings);
+            SetStatus(Tone.Bad, plates.Length > 1
+                ? $"Can't apply: {blocked} of {Count(plates.Length, "plate")} blocked."
+                : "Can't apply: the plate is blocked.", issues > 0 ? SelectIssueHint : null);
+        }
+    }
+
+    /// <summary>What the operator needs to know about one planned plate, in one line.</summary>
+    private string DescribePlate(int index)
+    {
+        var planned = Proposal.Plates[index];
+        var name = plates.Length > 1 ? $"Plate {plateNumbers[index]} ({index + 1} of {plates.Length})" : $"Plate {plateNumbers[index]}";
+        if (planned.IsReady)
+        {
+            var order = planned.KeptCurrentOrder ? "current order kept (no better order found)"
+                : planned.OrderChanged ? "new part order" : "part order unchanged";
+            var rapid = planned.Result.RapidDistance.ToString("0.#", CultureInfo.CurrentCulture);
+            return $"{name}: {Count(planned.PartCount, "part")}, {order}, {rapid} {UnitsHelper.GetShortString(units)} of rapids.";
+        }
+        if (planned.CanApplyWithWarnings)
+            return $"{name}: UNVERIFIED. Check its lead-ins and cut order before applying.";
+        return $"{name}: blocked — {BlockReason(planned)}.";
+    }
+
+    private static string BlockReason(CuttingPlanPlateResult plate)
+    {
+        if (plate.Overlap is { } overlap && overlap.Pairs.Count > 0)
+            return "parts overlap";
+        if (plate.IsRouteReady)
+            return "the overlap check could not finish";
+        if (plate.Result.Findings.Any(f => f.Kind == PostVerificationKind.MissingLeadIn))
+            return "missing or zero-length lead-in";
+        return plate.Result.Status switch
+        {
+            CuttingPlanStatus.Ready => "the plan could not be verified",
+            CuttingPlanStatus.ConstraintConflict => "the required cut order conflicts",
+            CuttingPlanStatus.UnsupportedGeometry => "unsupported geometry",
+            CuttingPlanStatus.InvalidInput => "invalid input",
+            CuttingPlanStatus.NoSolutionWithinBudget => "no plan found within the search limit",
+            CuttingPlanStatus.Cancelled => "cancelled",
+            var status => status.ToString(),
+        };
+    }
+
+    /// <summary>The fix for a blocked plate's main problem, or null when there is no simple one.</summary>
+    private static string Remedy(CuttingPlanPlateResult plate)
+    {
+        if (plate.CanApplyWithWarnings)
+            return null;
+        if (plate.Overlap is { } overlap && overlap.Pairs.Count > 0)
+            return "Move the overlapping parts apart, then Replan.";
+        if (!plate.IsRouteReady && plate.Result.Findings.Any(f => f.Kind == PostVerificationKind.MissingLeadIn))
+            return "In Cutting Settings, choose a lead-in with a nonzero length (or unlock the part), then Replan.";
+        return null;
     }
 
     private void ClearResult()
@@ -578,6 +723,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         acceptWarningsCheckBox.Visible = false;
         applyButton.Enabled = false;
         previewLabel.Text = "No current preview.";
+        SetStatus(Tone.Neutral, string.Empty);
         populatingWarnings = true;
         try { warningGrid.Rows.Clear(); }
         finally { populatingWarnings = false; }
@@ -607,7 +753,8 @@ internal sealed class CuttingInspectionPanel : UserControl
         preview = null;
         acceptWarningsCheckBox.Checked = false;
         applyButton.Enabled = false;
-        resultLabel.Text = previewLabel.Text = "No current preview: the plate changed. Replan to inspect it. Nothing applied.";
+        previewLabel.Text = "No current preview.";
+        SetStatus(Tone.Bad, "The plate changed. Replan to continue; nothing was applied.");
         return false;
     }
 
@@ -624,7 +771,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         if (sourceIndex < 0)
         {
             ClearResult();
-            resultLabel.Text = "The selected plate changed after capture. Replan to continue.";
+            SetStatus(Tone.Bad, "The selected plate changed after planning. Replan to continue.");
             return;
         }
         if (!ReferenceEquals(view.Plate, plates[index]))
@@ -632,7 +779,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         if (!ReferenceEquals(view.Plate, plates[index]))
         {
             ClearResult();
-            resultLabel.Text = "The selected plate is no longer current. Replan to continue.";
+            SetStatus(Tone.Bad, "The selected plate is no longer current. Replan to continue.");
             return;
         }
         if (plates[index].Parts.Count == 0)
@@ -644,16 +791,23 @@ internal sealed class CuttingInspectionPanel : UserControl
         }
         preview = inspection.RefreshPreview(index); // Only the guarded authority may clone programs.
         SetPlanning(false);
+        previewLabel.Text = DescribePlate(index);
+        SetDetail(Remedy(Proposal.Plates[index]) ?? (warningGrid.Rows.Count > 0 ? SelectIssueHint : null));
         if (preview == null)
         {
-            previewLabel.Text = $"Plate {plateNumbers[index]}: no current preview — stale, blocked or unsupported. Live plate shown; source numbers are not canvas locations.";
+            // Blocked or stale: the live plate stays on screen, numbered in its current order.
+            if (Proposal.Plates[index].CanApplyWithWarnings)
+                previewLabel.Text += " No current preview: the plate changed since planning.";
             return;
         }
-        previewLabel.Text = (Proposal.Plates[index].IsReady ? "PROPOSAL" : "UNVERIFIED PROPOSAL")
-            + $" — Plate {plateNumbers[index]} ({index + 1} of {plates.Length}), numbered in proposed cutting order; read-only.";
         view.ShowProposalDisplay(preview, IsPreviewCurrent);
         view.ZoomToFit();
     }
+
+    /// <summary>A source part number as numbered on the canvas: proposed order on a preview, else unchanged.</summary>
+    private int? ShownPartNumber(int plateIndex, int? sourceNumber) =>
+        preview == null || sourceNumber is not int source ? sourceNumber
+            : CuttingProposalInspection.ProposedPosition(Proposal, plateIndex, source) + 1;
 
     private void NavigateFinding()
     {
@@ -666,6 +820,17 @@ internal sealed class CuttingInspectionPanel : UserControl
             || warningGrid.SelectedRows[0].Tag is not CuttingPlanDiagnosticRow row)
             return;
         ShowPlate(row.PlateIndex);
+        // Witnesses are world coordinates, so they mark the proposal and a blocked plate's live view alike.
+        // Their part numbers drive which parts stay highlighted: use the shown plate's numbering.
+        if (row.Witness is { } witness && ShowMarker(witness with
+        {
+            PartNumber = ShownPartNumber(row.PlateIndex, row.PartNumber),
+            OtherPartNumber = ShownPartNumber(row.PlateIndex, row.OtherPartNumber),
+        }))
+        {
+            SetDetail(MarkerHint(witness));
+            return;
+        }
         if (preview == null || row.PartNumber is not int source)
             return;
         var position = CuttingProposalInspection.ProposedPosition(Proposal, row.PlateIndex, source);
@@ -688,7 +853,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             var pad = System.Math.Max(0.5, System.Math.Max(bounds.Length, bounds.Width) * 0.12);
             view.ZoomToArea(bounds.X - pad, bounds.Y - pad, bounds.Length + 2 * pad, bounds.Width + 2 * pad);
         }
-        previewLabel.Text += " Showing affected part extent, not an exact warning point.";
+        SetDetail("Zoomed to the affected part; this issue has no exact location.");
     }
 
     internal CuttingCommitResult CommitResult { get; private set; }
@@ -729,7 +894,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             return;
         }
         ClearResult();
-        resultLabel.Text = $"Nothing applied: {CommitResult.Message ?? CommitResult.Status.ToString()}. Replan to continue.";
+        SetStatus(Tone.Bad, "Nothing applied. Replan to continue.", CommitResult.Message ?? CommitResult.Status.ToString());
     }
 
     private void EditSettings()
@@ -745,7 +910,8 @@ internal sealed class CuttingInspectionPanel : UserControl
 
     private void ShowSettings()
     {
-        settingsLabel.Text = $"Lead-ins: outside {Describe(parameters.ExternalLeadIn)}, holes {Describe(parameters.InternalLeadIn)}, arcs/circles {Describe(parameters.ArcCircleLeadIn)}. Tabs {(parameters.TabsEnabled ? "on" : "off")}.";
+        settingsLabel.Text = $"Outside: {Describe(parameters.ExternalLeadIn)} · Holes: {Describe(parameters.InternalLeadIn)} · "
+            + $"Arcs: {Describe(parameters.ArcCircleLeadIn)} · Tabs: {(parameters.TabsEnabled ? "on" : "off")}";
     }
 
     private static string Describe(LeadIn leadIn)
@@ -776,9 +942,9 @@ internal sealed class CuttingInspectionPanel : UserControl
             {
                 var reasons = staging.Plans.SelectMany((plan, index) => plan.Diagnostics.Where(d => d.IsBlocking)
                     .Select(d => $"Plate {plateNumbers[index]}: {d.Message}"));
-                resultLabel.Text = "Automatic cut-offs were not added, so nothing was planned:" + Environment.NewLine
-                    + string.Join(Environment.NewLine, reasons) + Environment.NewLine
-                    + "Untick \"Add automatic scrap cut-offs\" to plan without them, or clear or fix the existing cut-offs.";
+                SetStatus(Tone.Bad, "Scrap cut-offs couldn't be added, so nothing was planned.",
+                    string.Join(Environment.NewLine, reasons) + Environment.NewLine
+                    + "Untick scrap cut-offs to plan without them, or clear the existing cut-offs.");
                 return false;
             }
             stagedCutOffs = staging.CanRevert ? staging : null;
@@ -787,7 +953,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         }
         catch (Exception ex)
         {
-            resultLabel.Text = $"Automatic cut-offs could not be added: {ex.Message} Nothing was planned.";
+            SetStatus(Tone.Bad, "Scrap cut-offs couldn't be added, so nothing was planned.", ex.Message);
             return false;
         }
     }
@@ -835,7 +1001,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         catch (Exception ex)
         {
             RefreshExistingWork();
-            resultLabel.Text = $"Clearing stopped part-way: {ex.Message} Review the plates before planning or posting.";
+            SetStatus(Tone.Bad, "Clearing stopped part-way. Review the plates before planning or posting.", ex.Message);
             return;
         }
         finally
@@ -860,7 +1026,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         ClearResult();
         SetPlanning(true);
         cancelButton.Enabled = false;
-        resultLabel.Text = "Cancelling… waiting for the worker. Nothing has changed.";
+        SetStatus(Tone.Neutral, "Closing… nothing has changed.");
         validationCancellation?.Cancel();
         inspection.RequestClose();
         if (!IsPlanning)
@@ -934,6 +1100,8 @@ internal sealed class CuttingInspectionPanel : UserControl
             if (!closed)
                 return; // The worker still owns the inspection lock and controls.
         }
+        if (disposing)
+            toolTip.Dispose();
         base.Dispose(disposing);
     }
 
@@ -945,6 +1113,49 @@ internal sealed class CuttingInspectionPanel : UserControl
             return true;
         }
         return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    /// <summary>
+    /// One alert style for the panel: a pale tint with dark text and border in the same hue.
+    /// </summary>
+    private sealed class StatusBanner : FlowLayoutPanel
+    {
+        private Color ink = SystemColors.ControlText;
+
+        public StatusBanner()
+        {
+            AutoSize = true;
+            AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            FlowDirection = FlowDirection.TopDown;
+            WrapContents = false;
+            Padding = new Padding(12, 10, 12, 10);
+            Visible = false;
+            DoubleBuffered = true;
+            ResizeRedraw = true;
+        }
+
+        public void SetTone(Tone tone)
+        {
+            (BackColor, ink) = tone switch
+            {
+                Tone.Good => (Color.FromArgb(221, 240, 214), Color.FromArgb(28, 88, 28)),
+                Tone.Warning => (Color.FromArgb(252, 241, 200), Color.FromArgb(118, 78, 0)),
+                Tone.Bad => (Color.FromArgb(248, 215, 215), Color.FromArgb(132, 20, 20)),
+                _ => (Color.FromArgb(236, 236, 236), Color.FromArgb(60, 60, 60)),
+            };
+            foreach (var label in Controls.OfType<Label>())
+                label.ForeColor = ink;
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            const int border = 2;
+            const ButtonBorderStyle style = ButtonBorderStyle.Solid;
+            ControlPaint.DrawBorder(e.Graphics, ClientRectangle, ink, border, style, ink, border, style,
+                ink, border, style, ink, border, style);
+        }
     }
 
     private sealed class PostingProgress(SynchronizationContext context, Action<CuttingPlanProgress> handler)

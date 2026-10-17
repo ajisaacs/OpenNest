@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
 
@@ -290,7 +291,7 @@ namespace OpenNest.Benchmark
                     // Manifest jobs have no source nest to copy from, so they keep the job's name.
                     if (job.SourceFile.EndsWith(".nest", StringComparison.OrdinalIgnoreCase))
                     {
-                        var source = new OpenNest.IO.NestReader(job.SourceFile).Read();
+                        var source = new OpenNest.IO.NestReader(job.SourceFile) { BestFitStore = BestFitCacheStore.Shared }.Read();
                         materialized.Nest.Name = source.Name;
                         materialized.Nest.Units = source.Units;
                         materialized.Nest.Material = source.Material;
@@ -316,7 +317,7 @@ namespace OpenNest.Benchmark
                         throw new InvalidOperationException(
                             "Output must not overwrite the source nest."
                         );
-                    new OpenNest.IO.NestWriter(materialized.Nest).Write(path);
+                    new OpenNest.IO.NestWriter(materialized.Nest) { BestFitStore = BestFitCacheStore.Shared }.Write(path);
                     var report = new
                     {
                         Source = job.SourceFile,

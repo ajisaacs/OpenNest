@@ -122,7 +122,10 @@ public static class CuttingPlanService
                         warnings.Add(new(index, source, null, null, PostVerificationKind.Incomplete, material.Reason));
                     }
                     if (!source.LeadInsLocked && (request.EligibleParts == null || eligible.Contains(source)))
-                        prepared = PreparedContours.Capture(ownedClean, request.ConfirmedParameters, token);
+                        prepared = DrawingPinCapture.Prepare(source, index, ownedClean, request.ConfirmedParameters,
+                            warnings, token);
+                    else if (source.HasActiveDrawingPins)
+                        warnings.Add(DrawingPinCapture.NotApplied(source, index));
                 }
                 var captured = material;
                 // Fixed-route material is captured only for a pair whose bounds admit containment.
@@ -245,6 +248,11 @@ public static class CuttingPlanService
                 token.ThrowIfCancellationRequested();
                 if (placement.Prepared != null)
                     continue; // An eligible old crossing is precisely what regeneration may repair.
+                // With confirmed parameters a locked program is accepted as given: replay reports
+                // its internal violations as warnings (D1a). The no-parameter route and unlocked
+                // programs left ineligible keep refusing them.
+                if (snapshot.Regeneration && placement.FixedMotions(placement.Execution) != null)
+                    continue;
                 // Ignore only the unknown incoming rapid. Every fixed internal motion is checked.
                 var findings = new ReleasedContourState(reportMissingLeadIns: false).Check(placement.Execution, null,
                     placement.SourceOrdinal + 1, placement.IsCutOff, token);
@@ -258,8 +266,9 @@ public static class CuttingPlanService
             if (snapshot.Regeneration)
             {
                 var joint = JointCuttingPlanSearch.Run(snapshot, token);
+                // Capture warnings (drawing pins that could not be honoured) stay visible on a refusal.
                 if (joint.Status != CuttingPlanStatus.Ready)
-                    return new(joint.Status, findings: joint.Findings, expansions: joint.Expansions);
+                    return new(joint.Status, findings: snapshot.Findings.Concat(joint.Findings), expansions: joint.Expansions);
                 return ReplayPrograms(snapshot, joint.Order, joint.Expansions, token);
             }
             var search = FixedProgramSearch.Run(snapshot, token);
@@ -322,7 +331,11 @@ public static class CuttingPlanService
         var position = snapshot.StartPoint;
         var distance = 0.0;
         var findings = new List<CuttingPlanFinding>();
-        var materials = snapshot.Placements.Where(p => !p.IsCutOff).Select(p => p.Material).ToArray();
+        // Violations inside fixed emissions: accepted as given, reported, never refused (D1a).
+        // Capture adds the drawing pins it could not honour; their contours were planned normally.
+        var warnings = new List<CuttingPlanFinding>(snapshot.Findings);
+        var materialOwners = snapshot.Placements.Where(p => !p.IsCutOff).ToArray();
+        var materials = materialOwners.Select(p => p.Material).ToArray();
         foreach (var proposal in order)
         {
             token.ThrowIfCancellationRequested();
@@ -356,14 +369,25 @@ public static class CuttingPlanService
                 return new(CuttingPlanStatus.UnsupportedGeometry,
                     findings: [JointCuttingPlanSearch.Finding(source, PostVerificationKind.Incomplete, ex.Message)], expansions: expansions);
             }
-            findings.AddRange(JointCuttingPlanSearch.Map(snapshot,
-                checker.Check(execution, position, source.SourceOrdinal + 1, source.IsCutOff, token)));
+            var isFixed = proposal.FixedMotions(execution);
+            var (strict, fixedFindings) = checker.Check(execution, position, source.SourceOrdinal + 1,
+                source.IsCutOff, isFixed, token);
+            findings.AddRange(JointCuttingPlanSearch.Map(snapshot, strict));
+            warnings.AddRange(fixedFindings.Select(f => FixedLeadWarnings.FromChecker(snapshot, source, f)));
+            var fixedLeads = new List<FixedLeadFailure>();
             var lead = source.IsCutOff ? new LeadPathValidationResult(true, true, null)
-                : LeadPathValidator.Check(execution, source.Material, materials, token);
+                : LeadPathValidator.Check(execution, source.Material, materials, isFixed, fixedLeads, token);
             if (!lead.IsComplete || !lead.IsClear)
                 findings.Add(JointCuttingPlanSearch.Finding(source,
                     lead.IsComplete ? null : PostVerificationKind.Incomplete, lead.Reason));
-            if (!complete && findings.Count == 0)
+            var pins = proposal.PinsByMotion(execution);
+            warnings.AddRange(fixedLeads.Select(f => FixedLeadWarnings.FromLead(source, execution, f, materialOwners,
+                pins?[f.Motion])));
+            // A locked program's coverage (a tab gap, a partial or reversed cut) has no certified
+            // selection to compare with; a regenerated program's never escapes the strict rule.
+            if (!complete && source.Prepared == null && isFixed != null)
+                warnings.Add(FixedLeadWarnings.Uncertified(source));
+            else if (!complete && findings.Count == 0)
                 return new(CuttingPlanStatus.InvalidInput,
                     findings: [JointCuttingPlanSearch.Finding(source, null,
                         "Selected program does not preserve complete directed contours, certified tabs or selected entry/style geometry.")],
@@ -376,6 +400,11 @@ public static class CuttingPlanService
             return new(findings.Any(f => f.Kind == PostVerificationKind.Incomplete)
                 ? CuttingPlanStatus.UnsupportedGeometry : CuttingPlanStatus.ConstraintConflict,
                 findings: findings, expansions: expansions);
+        // Every planner-chosen motion passed. Fixed-emission warnings make the proposal
+        // UNVERIFIED: never Ready, applicable only through explicit warning acceptance.
+        if (warnings.Count != 0)
+            return new(CuttingPlanStatus.BestEffort, order, warnings.Distinct(), expansions,
+                distance, independentlyReplayed: true);
         return new(CuttingPlanStatus.Ready, order, expansions: expansions,
             rapidDistance: distance, independentlyReplayed: true);
     }
@@ -403,6 +432,7 @@ public static class CuttingPlanService
         var source = finding.PartNumber is { } part ? snapshot.Placements[part - 1] : null;
         var other = finding.OtherPartNumber is { } otherPart ? snapshot.Placements[otherPart - 1] : null;
         return new CuttingPlanFinding(source?.SourceOrdinal, source?.SourcePart,
-            other?.SourceOrdinal, other?.SourcePart, finding.Kind, finding.Message);
+            other?.SourceOrdinal, other?.SourcePart, finding.Kind, finding.Message)
+        { Witness = finding };
     });
 }

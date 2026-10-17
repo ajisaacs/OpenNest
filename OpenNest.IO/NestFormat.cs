@@ -184,6 +184,170 @@ namespace OpenNest.IO
             public MaterialDto Material { get; init; } = new();
             public SourceDto Source { get; init; } = new();
             public List<BendDto> Bends { get; init; } = new();
+
+            /// <summary>
+            /// The drawing library revision this drawing was copied from. Omitted when the
+            /// drawing did not come from a library. Read leniently: a malformed value reads
+            /// as <see cref="DrawingLibraryLinkDto.Malformed"/> and the reader drops it with a warning.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            [JsonConverter(typeof(LenientDrawingLibraryLinkConverter))]
+            public DrawingLibraryLinkDto Library { get; init; }
+
+            /// <summary>
+            /// Drawing cut pins in the source frame. Omitted when there are none. Read leniently:
+            /// an entry that cannot be read becomes <see cref="CutPinDto.Malformed"/> and the
+            /// reader skips it with a warning; the other pins load.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            [JsonConverter(typeof(LenientCutPinListConverter))]
+            public List<CutPinDto> CutPins { get; init; }
+        }
+
+        public record CutPinDto
+        {
+            public double X { get; init; }
+            public double Y { get; init; }
+            public CuttingParametersDto.LeadInDto LeadIn { get; init; }
+            public CuttingParametersDto.LeadOutDto LeadOut { get; init; }
+
+            /// <summary>Omitted for a closed contour.</summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public CuttingParametersDto.TabDto Tab { get; init; }
+
+            /// <summary>Set only by the lenient reader for an entry it could not read.</summary>
+            [JsonIgnore]
+            public bool Malformed { get; init; }
+        }
+
+        /// <summary>
+        /// Reads each cut pin on its own, so one wrongly shaped entry does not lose the rest or
+        /// fail the nest. A value that is not an array reads as a single malformed entry.
+        /// </summary>
+        public sealed class LenientCutPinListConverter : JsonConverter<List<CutPinDto>>
+        {
+            public override List<CutPinDto> Read(
+                ref Utf8JsonReader reader,
+                Type typeToConvert,
+                JsonSerializerOptions options
+            )
+            {
+                using var document = JsonDocument.ParseValue(ref reader);
+                if (document.RootElement.ValueKind != JsonValueKind.Array)
+                    return new List<CutPinDto> { new() { Malformed = true } };
+
+                var list = new List<CutPinDto>();
+                foreach (var element in document.RootElement.EnumerateArray())
+                    list.Add(ReadPin(element, options));
+                return list;
+            }
+
+            private static CutPinDto ReadPin(JsonElement element, JsonSerializerOptions options)
+            {
+                if (element.ValueKind != JsonValueKind.Object)
+                    return new CutPinDto { Malformed = true };
+
+                try
+                {
+                    return element.Deserialize<CutPinDto>(options) ?? new CutPinDto { Malformed = true };
+                }
+                catch (Exception ex) when (ex is JsonException || ex is FormatException || ex is InvalidOperationException)
+                {
+                    return new CutPinDto { Malformed = true };
+                }
+            }
+
+            public override void Write(
+                Utf8JsonWriter writer,
+                List<CutPinDto> value,
+                JsonSerializerOptions options
+            )
+            {
+                writer.WriteStartArray();
+                foreach (var pin in value)
+                    JsonSerializer.Serialize(writer, pin, options);
+                writer.WriteEndArray();
+            }
+        }
+
+        /// <summary>
+        /// Reads only a JSON boolean. Anything else, null included, reads as null so the reader
+        /// can warn; the property's initializer covers a missing value.
+        /// </summary>
+        public sealed class LenientFlagConverter : JsonConverter<bool?>
+        {
+            public override bool HandleNull => true;
+
+            public override bool? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+                if (reader.TokenType == JsonTokenType.True)
+                    return true;
+                if (reader.TokenType == JsonTokenType.False)
+                    return false;
+                reader.Skip();
+                return null;
+            }
+
+            public override void Write(Utf8JsonWriter writer, bool? value, JsonSerializerOptions options)
+            {
+                if (value is bool flag)
+                    writer.WriteBooleanValue(flag);
+                else
+                    writer.WriteNullValue();
+            }
+        }
+
+        public record DrawingLibraryLinkDto
+        {
+            public string ServerKey { get; init; } = "";
+            public Guid Id { get; init; }
+            public int Revision { get; init; }
+            public string CutType { get; init; } = "";
+            public double Thickness { get; init; }
+            public string MaterialName { get; init; } = "";
+            public string MaterialGrade { get; init; } = "";
+            public string Units { get; init; } = "";
+            public string Notes { get; init; } = "";
+            public string PackageSha256 { get; init; } = "";
+
+            /// <summary>Set only by the lenient reader for a value it could not read.</summary>
+            [JsonIgnore]
+            public bool Malformed { get; init; }
+        }
+
+        /// <summary>
+        /// Reads a wrongly shaped or typed library link as a malformed marker instead of
+        /// failing the whole nest; the nest reader validates the values it receives.
+        /// </summary>
+        public sealed class LenientDrawingLibraryLinkConverter : JsonConverter<DrawingLibraryLinkDto>
+        {
+            public override DrawingLibraryLinkDto Read(
+                ref Utf8JsonReader reader,
+                Type typeToConvert,
+                JsonSerializerOptions options
+            )
+            {
+                using var document = JsonDocument.ParseValue(ref reader);
+                if (document.RootElement.ValueKind != JsonValueKind.Object)
+                    return new DrawingLibraryLinkDto { Malformed = true };
+
+                try
+                {
+                    return document.RootElement.Deserialize<DrawingLibraryLinkDto>(options)
+                        ?? new DrawingLibraryLinkDto { Malformed = true };
+                }
+                catch (Exception ex) when (ex is JsonException || ex is FormatException || ex is InvalidOperationException)
+                {
+                    return new DrawingLibraryLinkDto { Malformed = true };
+                }
+            }
+
+            // The converter sits on the property, not the type, so this does not recurse.
+            public override void Write(
+                Utf8JsonWriter writer,
+                DrawingLibraryLinkDto value,
+                JsonSerializerOptions options
+            ) => JsonSerializer.Serialize(writer, value, options);
         }
 
         public record PlateDto
@@ -248,6 +412,15 @@ namespace OpenNest.IO
             public bool LeadInsLocked { get; init; }
             public string Program { get; init; }
             public string DrawingHash { get; init; }
+
+            /// <summary>
+            /// True when this placement ignores its drawing's cut pins. Written only when true;
+            /// missing means false. Any value other than a boolean reads as null, which the
+            /// reader reports and treats as false.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            [JsonConverter(typeof(LenientFlagConverter))]
+            public bool? DrawingPinsOff { get; init; } = false;
         }
 
         public record CutOffDto

@@ -93,7 +93,7 @@ zones are kept as written.
 
 The rail's optional `removalMinutes` is the time to take one clamp off and put
 it back; a missing or invalid value loads as five minutes. A plate on which
-Auto Nest removed clamps as a last resort lists their rail ids in an optional
+clamps were removed (by Auto Nest as a last resort, or by hand) lists their rail ids in an optional
 `removedClamps` array (omitted when none were removed); its `clamps` already
 exclude them, and it follows the rail minus those ids. A malformed
 `removedClamps` value reads as none removed (non-string entries are skipped);
@@ -124,6 +124,58 @@ keys this comparison. The desktop invalidates the affected layout graphics.
 Name, quantity, and color edits leave placed programs alone. The properties
 editor previously called `LayoutPart.Update`, a color refresh, not `Part.Update`;
 it now explicitly refreshes only the edited drawing's layout colors.
+
+## Saved best-fit pairs (cache only)
+
+Optional `bestfits/bestfit-N` entries hold drawing N's cached best-fit pair
+results: a JSON array of sets, each with `plateWidth`, `plateHeight` and
+`spacing` (the plate size and part spacing it was filtered for) and `results`.
+Each result has `part1Rotation`, `part2Rotation`, `part2OffsetX`,
+`part2OffsetY`, `strategyType`, `testNumber`, `candidateSpacing`,
+`rotatedArea`, `boundingWidth`, `boundingHeight`, `optimalRotation`, `keep`,
+`reason`, `trueArea` and `hullAngles`. Angles are radians; pair geometry is in
+the drawing's canonical frame.
+
+The entries are only a cache: readers may ignore them and writers may omit
+them, at the cost of recomputing pairs. Writers save only sets whose
+(width, length, spacing) matches a plate in the nest, and only kept results; a
+drawing without such a set gets no entry. `NestReader` and `NestWriter` touch
+these entries only when given an `IBestFitStore` through `BestFitStore`;
+without one, a reader skips them unparsed and a writer writes none. The front
+ends pass the engine's `BestFitCacheStore.Shared`, which adds loaded sets to
+the process-wide `BestFitCache` without replacing sets already computed.
+
+## Drawing library links
+
+A drawing copied from a server drawing library carries a `library` object:
+`serverKey` (the normalized server URL), `id`, `revision`, and a snapshot of that
+revision's `cutType`, `thickness`, `materialName`, `materialGrade`, `units`, `notes`
+and `packageSha256`. It is omitted for other drawings. Read leniently: a value that
+is not an object, has the wrong types, a blank server key, an empty id, a revision
+below 1, a cut type or units that are not one supported name, or a negative
+thickness loads the drawing without a link and adds a reader warning. Converter
+edits keep the link as provenance; split pieces get none. Drawing packages leave
+the link out, so linking a drawing does not change its package bytes.
+
+## Drawing cut pins
+
+A drawing may carry a `cutPins` array, omitted when empty. Each pin has `x`/`y`
+in the drawing's source frame (the frame of its source entities, which does not
+move when the program is re-origined at its first rapid; the program frame is the
+source frame minus `source.offset`), a `leadIn` and `leadOut` in the same shape as
+plate cutting parameters, and an optional `tab` omitted for a closed contour.
+Pins are part of the drawing's content, so drawing packages carry them and they
+change the package hash. Pins are read strictly per entry but leniently per file:
+an entry that is not an object, has wrong types, an unknown lead or tab type, an
+invalid dimension, or a tab together with a lead-out is skipped with a reader
+warning naming the drawing and pin; the other pins and the drawing load. A
+`cutPins` value that is not an array loads no pins, with a warning. Converter
+edits keep pins (they stay in the source frame); split pieces and canonical
+engine copies get none.
+
+A placement may write `drawingPinsOff: true` to ignore its drawing's pins on that
+part only; it is omitted when false. Any value other than a boolean loads as
+false (the drawing's pins apply) with a warning naming the plate and part.
 
 ## Verification and limits
 

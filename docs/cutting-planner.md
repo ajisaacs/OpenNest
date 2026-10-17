@@ -328,7 +328,8 @@ produce a separate `BestEffort` proposal as described below; it never labels it 
 sets `IndependentlyReplayed`.
 
 - `ConstraintConflict`: fixed programs or explored fixed routing violate the
-  modeled constraints. Locked internal crossings cannot be repaired by regeneration.
+  modeled constraints. Locked internal crossings cannot be repaired by regeneration;
+  with confirmed parameters they warn instead (see [fixed emissions](#fixed-emissions-warn)).
 - `UnsupportedGeometry`: unsupported motion/material semantics or an incomplete
   check. Open nominal outlines, ambiguous release states or containment, cutoffs
   in a detached part list and scribe-only source drawings are not silently accepted.
@@ -341,13 +342,90 @@ sets `IndependentlyReplayed`.
 Malformed original executed graphs are refused, not salvaged. Valid but incomplete
 old programs can regenerate from clean geometry. Regenerated programs retain genuine
 configured tab gaps; stale tab settings do not establish retention. In confirmed-
-parameters mode, locked/ineligible programs must cover the complete directed clean
-boundary: an open fixed program has no certified selected tab metadata and is refused,
-not repaired, even if it may have been intentionally tabbed. The no-parameter route
-retains its narrower compatibility contract. A lead-out that may bridge a tab, or
-a malformed emitted arc, is refused, not automatically repaired. Tabbed lead-outs
-leave from the trimmed cut end, but a lead-out after an open contour still needs
-manual review of its retention gap, so confirmed-parameters planning refuses it.
+parameters mode, an unlocked program a caller left ineligible must cover the complete
+directed clean boundary: an open one has no certified selected tab metadata and is
+refused, not repaired. A locked program that does not (a tab gap, a partial, reversed
+or retraced cut) is kept as given with a fixed-lead warning instead; see below. The
+no-parameter route retains its narrower compatibility contract and still refuses
+fixed-program violations. A planned lead-out that may bridge a tab, or a malformed
+emitted arc, is refused, not automatically repaired. Tabbed lead-outs leave from the
+trimmed cut end, but a lead-out after an open contour still needs manual review of
+its retention gap, so confirmed-parameters planning refuses it in a planned contour.
+
+### Fixed emissions warn
+
+With confirmed parameters, a locked program (Place Lead-in locks, PEP-imported locked
+parts) is a fixed emission: everything it does after the planner's rapid into it is
+accepted as given (user decision D1a, 2026-10-14). So is each drawing-pinned contour of a
+regenerated part (see [drawing pins](#drawing-pins)). Their violations are not refusals:
+
+- Its lead-ins and lead-outs meeting another part's material or its own, a rapid inside
+  it crossing a completed contour, a lead-out after its own open contour, and coverage
+  that cannot be certified (a tab gap, a partial, reversed or retraced cut) each become a
+  `PostVerificationKind.FixedLead` finding naming the part, the cutting contour where
+  known and the other part hit (`CuttingPlanFinding.FixedLead`).
+- Fixed emissions never constrain the search: they neither reject a candidate nor teach
+  an order rule. Independent replay reports them. Every planner-chosen motion keeps
+  every strict check, including the rapid into the locked program and every
+  regenerated lead.
+- A plate whose only findings are these warnings yields `BestEffort` with
+  `IndependentlyReplayed` set (`CuttingPlanPlateResult.HasOnlyFixedLeadWarnings`): never
+  `Ready`, so `IsReady`/`CanApply` stay false and `CanApplyWithWarnings` with the
+  per-proposal acceptance checkbox is the only way to Apply. `CuttingPlanService.Apply`
+  still rejects it. The locked program is never replaced.
+- Known part-to-part material overlap, unreadable or unsupported programs, stale input
+  and cancellation still block. Unlocked programs a caller left ineligible keep the
+  strict rule above.
+- The [pre-post review](post-verification.md) checks locked leads again before posting;
+  accepting the plan is not posting consent.
+
+### Drawing pins
+
+A drawing's cut pins (`Drawing.CutPins`, from the drawing library) fix how named contours are
+cut: the entry point, lead-in, lead-out and tab (user decision D1: the drawing wins over the
+plate's settings). Capture resolves each regenerated part's pins against its own rotated
+clean contours with `CutPinResolver` and prepares them with
+`PreparedContours.Capture(program, parameters, pins)`:
+
+- A pinned contour has exactly one entry, the pin's; every candidate catalogue returns it
+  alone and emission refuses any other entry for that contour, so the search can never move
+  it. It is emitted through the same emitter with the pin's own lead-in and lead-out for
+  every contour type, the pin's tab (or none) and angle rounding off; the emitter's own
+  geometry rules (pierce clearance, small-circle clamping) still apply as in any emission.
+  The certified tab gap is the pinned outside's own.
+- Unpinned contours on the same part, and every other part, keep the plate's automatic
+  selection; a plate without pins plans exactly as before.
+- A pin is never guessed (invariant 5). One that lies on no contour, on several, shares a
+  contour with another pin, or cannot be placed on the program leaves its contour automatic
+  and adds a `FixedLead` warning naming the pin (`FixedLeadWarning.PinNumber`), for example
+  "Drawing pin 2 no longer matches the geometry; planned with nest settings.", which makes the
+  plate UNVERIFIED. A tab pinned on an internal contour is not honoured either: only the
+  outside is tabbed.
+- A pinned contour's lead-in, cut, lead-out and tab are a fixed emission like a locked program
+  (see [fixed emissions](#fixed-emissions-warn)): a pinned lead that meets another part's
+  material or its own part's (an already-cut hole included) is a `FixedLead` warning naming
+  the part, cutting contour, pin and the part hit, with the advice "Increase spacing or switch
+  off drawing pins for this part (right-click > Drawing Pins Off)". The entry is never moved
+  and the lead never shortened to fit; the feasibility precheck accepts it as given. The
+  rapids between contours, including the one into a pinned contour, stay strict. Plan
+  Cutting does not model clamps, for pinned leads or any other.
+- A placement with `Part.DrawingPinsOff` ignores its drawing's pins and plans entirely from
+  the plate settings, with no warning (D1's per-part escape hatch). `Part.HasActiveDrawingPins`
+  is the shared test for "pins apply here".
+- A pinned part is regenerated like any unlocked part, whatever lead-ins or settings it
+  carried before. A locked part keeps its exact locked program and warns "Locked lead-ins
+  override drawing pins on part N; Clear Lead-ins to apply the pins." It is not refused. An
+  unlocked part a caller left ineligible warns that its pins are not applied.
+- The plate state compared by `Apply` includes each drawing's pin list (reference and exact
+  content, `StateFingerprint.Of(pins)`) and each part's pins-off flag, so changing either
+  after capture makes the proposal `Stale`.
+- Only Plan Cutting applies pins. The legacy Assign Lead-ins (`LeadInAssigner`) leaves every
+  unlocked part with active pins unchanged and returns those parts; the desktop then says
+  "N parts kept their drawing lead-ins (plate P: parts ...); use Plan Cutting to apply their
+  drawing pins." It never overwrites a pin with the plate's settings.
+- The [pre-post review](post-verification.md) warns "Drawing pins not applied" for a part
+  with active pins whose placed program does not cut its pinned contours as pinned, and
+  re-checks pinned leads like locked ones.
 
 ## Apply
 
@@ -360,8 +438,8 @@ results from plate-scoped requests; anything else is `InvalidInput`. Apply never
 replans. Each plate is compared exactly with the state captured with its request:
 part list instance and order, plate quantity/size/quadrant and settings, cutoff
 definitions, and for every part its program reference and exact content (an
-in-place edit counts), drawing program and cutoff classification, pose bits,
-lead-in/lock flags, settings (reference and exact content) and bounds. Any
+in-place edit counts), drawing program, cutoff classification and cut pins, pose bits,
+lead-in/lock/pins-off flags, settings (reference and exact content) and bounds. Any
 difference on any plate returns `Stale` and changes nothing, so a proposal that
 changes a plate can be applied once; an unchanged (no-op) proposal stays current.
 A malformed live program is also `Stale`, not an exception. A part repeated on
@@ -397,8 +475,9 @@ on an `Applied` result, not as a rollback.
 It captures scope on the editor thread, plans on a worker, and shows only a fresh,
 supported detached proposal in that canvas, including proposed part numbers and
 rapids. The live `Plate`, part order, programs and quantities remain unchanged
-until Apply. The summary and complete structured findings remain available while
-navigating plates; selecting a finding frames its affected part extent, not an
+until Apply. The outcome and complete structured findings remain available while
+navigating plates; selecting a finding marks its recorded witness (overlap area, rapid,
+contacts) like Validate Nest, or frames the affected part extent when it has none, never an
 invented contact point. Unsupported or stale output has no proposal preview.
 
 The panel shows the current cutting settings; editing them or switching Keep current
@@ -407,7 +486,7 @@ the exact captured proposal, with an unchecked per-proposal acceptance required
 for UNVERIFIED results; a blocked plate disables the whole-batch Apply. A successful
 Apply persists the confirmed settings and refreshes the editor; a failed/stale Apply
 changes nothing and requires replanning. Escape, the panel X or Cancel restores the
-live view and prior viewport; closing during planning waits for the worker before
+live view and prior viewport; Close during planning waits for the worker before
 unlocking inspection. Planning is not live-nest validation or posting consent. The
 panel's **Validate Nest (live programs)** mode separately checks current installed
 programs across all plates and navigates typed findings on the live canvas; it
@@ -418,20 +497,22 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
 - The panel starts from the plate's cutting settings (or the last-used settings) and plans
   at once. `Cutting Settings...` edits them and `Keep the current part order` fixes the
   whole-part order; either change replans. The settings are confirmed parameters: every
-  unlocked part's lead-ins are regenerated. Locked parts keep their exact programs;
-  the strict route checks them, while any best-effort warnings require explicit review below.
+  unlocked part's lead-ins are regenerated. Locked parts keep their exact programs; their
+  own violations are fixed-lead warnings on an UNVERIFIED plate (see
+  [fixed emissions](#fixed-emissions-warn)), and any warnings require explicit review below.
 - When a plate in scope already carries applied lead-ins or cut-offs, a red banner
   above the settings says how many (and how many lead-ins are locked), and that the
   plan keeps locked lead-ins and existing cut-offs unchanged. `Clear Lead-ins &
   Cut-offs...` asks first, then removes every applied lead-in (locked and hand-placed
   ones too), every cut-off and the plates' recorded cutting settings, keeping part
   poses, order and quantities, and replans from scratch. There is no undo.
-- `Add automatic scrap cut-offs` runs the automatic cut-off planner (defaults 35 in /
+- `Add scrap cut-offs` runs the automatic cut-off planner (defaults 35 in /
   889 mm strips, half-strip minimum, 12 in / 304.8 mm tail) on every plate in scope
   *before* capture, so the cutting plan sequences the new lines like any
   other cut-off. These are the only live changes made before Apply: Apply keeps them,
-  while unticking the box, Cancel/Close or switching to Validate removes them and
-  restores the earlier cut-offs and sequence. A blocked cut-off plan adds nothing and
+  while unticking the box, Close or switching to Validate removes them and
+  restores the earlier cut-offs and sequence. The proposal preview draws planned cut-offs
+  with the same orange-red dashed line as the editor. A blocked cut-off plan adds nothing and
   plans nothing; the panel names the plate and reason.
   `Cut-off Settings...` opens the Automatic Scrap Cut-offs dialog in settings mode for
   the same scope: it previews on the active plate as usual, but `Use These Settings`
@@ -466,19 +547,22 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   `NoSolutionWithinBudget` is retried once with the current part order, and the summary
   says the order was kept. Both are allowed 400 expansions per part (at least the
   default 20000), because both still plan contour order and entries for every part.
-- The docked panel keeps the batch outcome and plate headings above a
-  read-only, unsorted warning grid with Plate, source Part, With, and full finding text. Every
-  overlap issue/pair and every planner finding has its own selectable row, including findings
-  hidden by the compact blocked-plate summary. **Previous**/**Next** and warning selection
-  navigate the editor to that plate's live source sheet, then display its detached proposal
-  when available. Warning selection zooms to the affected part extent (or both parts for a
-  pair), mapping source positions to proposed cutting order. This is not an exact contact
-  marker: most findings do not carry a geometric witness. If a plate cannot produce a
-  current, supported proposal preview, its own live sheet remains visible; no unsupported
-  geometry is cloned or focused. Replanning, cancellation and stale Apply clear old warning
-  targets.
-- The summary lists every plate: ready plates with part counts and rapid travel, others
-  with their status and findings. Unverified proposals retain every overlap and route
+- The docked panel keeps text short: one colored outcome line for the batch, one line for the
+  shown plate, and one detail line (a remedy for a blocked plate, or what the selected marker
+  shows). Below them is a read-only, unsorted issue grid with Plate, source Part, With, and full
+  finding text. Every overlap issue/pair and every planner finding has its own selectable row.
+  **Previous**/**Next** (shown for more than one plate) and issue selection navigate the editor
+  to that plate's live source sheet, then display its detached proposal when available.
+  Overlap pairs and checker findings carry their world-coordinate witness
+  (`CuttingPlanDiagnosticRow.Witness`, from `CuttingPlanFinding.Witness`), so selection shades
+  the overlap or draws the rapid and its contacts with the Validate Nest overlay, on the
+  proposal or on a blocked plate's live sheet. Findings without a witness zoom to the affected
+  part extent (or both parts for a pair), mapping source positions to proposed cutting order.
+  If a plate cannot produce a current, supported proposal preview, its own live sheet remains
+  visible; no unsupported geometry is cloned. Replanning, cancellation and stale Apply clear
+  old warning targets.
+- The plate line gives ready plates' part counts, order change and rapid travel, and other
+  plates' blocking reason. Unverified proposals retain every overlap and route
   warning in the selectable grid before the acceptance checkbox is used; they do
   not truncate later parts' warnings. Finding part numbers are the plate's current order, as the
   editor numbers them. The panel shows the selected plate detached from the nest (quantity
@@ -486,14 +570,14 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   programs. Ready and best-effort proposals can be previewed only while the plate still
   matches capture. Best-effort previews are labelled `UNVERIFIED`. Refused program graphs
   are never copied, and changed plates require replanning.
-- Apply requires usable output for every plate and remains all or nothing. The summary
+- Apply requires usable output for every plate and remains all or nothing. The outcome line
   counts best-effort proposals as usable when reporting how many plates block Apply;
   their warnings still require acceptance. Open nominal contour findings identify the
   contour number, endpoint gap in model units (the nest's linear units), and closure
   tolerance, so the source can be reviewed in the drawing editor. Reporting never
   closes gaps or changes the validation tolerance. A fully ready batch
   can apply immediately; an unverified batch requires the unchecked, per-proposal
-  `Accept UNVERIFIED plan warnings (post consent happens separately)` checkbox. Replanning clears it.
+  `Accept the unverified plan` checkbox (posting consent is still separate). Replanning clears it.
   Both use the same owned-program, freshness and rollback boundary. After it applies, each plate keeps its own copy of the
   confirmed settings, which also become the saved defaults. `Stale` keeps the panel open
   and asks for a replan; nothing changes.
@@ -552,7 +636,10 @@ dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release --filter 'FullyQuali
 ```
 
 Synthetic fixtures exercise whole-part routing and internal-hole crossing repair,
-locked/ineligible refusal, actual native lead paths, shared subprograms, ownership,
+ineligible refusal and locked fixed-lead warnings, actual native lead paths, shared subprograms, ownership,
 entry/whole-part backtracking, deterministic budgets, cancellation and fresh replay
 rejection. Retained emission characterizations cover styles, winding, corner rules,
 circle rounding/clamping and tabs; unsupported cases remain explicit refusals.
+`PlanningCharacterizationTests` freeze the batch output (proposals, expansions, emitted
+motions) for the six synthetic nests and focused fixtures; a change that is meant to
+leave plates without fixed-lead warnings untouched must keep those digests.

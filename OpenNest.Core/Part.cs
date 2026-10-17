@@ -64,6 +64,15 @@ namespace OpenNest
 
         public bool LeadInsLocked { get; set; }
 
+        /// <summary>
+        /// True when this placement ignores its drawing's cut pins and is cut with the nest's
+        /// settings instead. Saved with the nest; never changes the drawing or its library.
+        /// </summary>
+        public bool DrawingPinsOff { get; set; }
+
+        /// <summary>True when the drawing has cut pins and this placement has not switched them off.</summary>
+        public bool HasActiveDrawingPins => !DrawingPinsOff && BaseDrawing?.CutPins is { Count: > 0 };
+
         public CNC.CuttingStrategy.CuttingParameters CuttingParameters { get; set; }
 
         public void ApplyLeadIns(
@@ -426,11 +435,13 @@ namespace OpenNest
         /// Copies the lead-in state that goes with a copied program. Without it a copy of a
         /// lead-in part reads its rotation from the rebuilt program (zero), and lead-in
         /// assignment does not know to strip the copied lead-ins before adding new ones.
+        /// A copy of a placement with drawing pins off keeps them off.
         /// </summary>
         private void CopyLeadInStateFrom(Part source)
         {
             HasManualLeadIns = source.HasManualLeadIns;
             LeadInsLocked = source.LeadInsLocked;
+            DrawingPinsOff = source.DrawingPinsOff;
             CuttingParameters = source.CuttingParameters;
             preLeadInRotation = source.preLeadInRotation;
         }

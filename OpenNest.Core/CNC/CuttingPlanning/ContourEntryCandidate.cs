@@ -33,6 +33,9 @@ internal enum AutomaticEntryKind
 
     /// <summary>Tier 3 (fallback): one of the eight compass points of a whole circle.</summary>
     CircleCompass = 6,
+
+    /// <summary>A drawing pin's own entry: the one and only candidate of a pinned contour.</summary>
+    Pinned = 7,
 }
 
 /// <summary>

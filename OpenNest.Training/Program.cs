@@ -75,7 +75,7 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
             Console.Error.WriteLine($"Error: Template not found: {template}");
             return 1;
         }
-        templateNest = new NestReader(template).Read();
+        templateNest = new NestReader(template) { BestFitStore = BestFitCacheStore.Shared }.Read();
         Console.WriteLine($"Using template: {template}");
     }
 
@@ -289,7 +289,7 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                     plateObj.PartSpacing = s;
                     plateObj.Parts.AddRange(result.PlacedParts);
 
-                    var writer = new NestWriter(nestObj);
+                    var writer = new NestWriter(nestObj) { BestFitStore = BestFitCacheStore.Shared };
                     writer.Write(savedFilePath);
                 }
 

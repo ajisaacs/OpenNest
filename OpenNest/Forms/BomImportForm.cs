@@ -5,6 +5,7 @@ using System.Data;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
+using OpenNest.Controls;
 using OpenNest.Data;
 using OpenNest.IO;
 using OpenNest.IO.Bom;
@@ -24,6 +25,8 @@ namespace OpenNest.Forms
         public BomImportForm()
         {
             InitializeComponent();
+            GridStyle.Apply(dgvParts);
+            GridStyle.Apply(dgvGroups);
             _parts = new BindingList<BomPartRow>();
             _parts.ListChanged += Parts_ListChanged;
             dgvParts.AutoGenerateColumns = false;

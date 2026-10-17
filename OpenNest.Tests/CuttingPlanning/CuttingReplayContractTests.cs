@@ -72,7 +72,19 @@ public class CuttingReplayContractTests
         var result = CuttingPlanService.Plan(snapshot);
         Assert.NotEqual(CuttingPlanStatus.Ready, result.Status);
         Assert.NotEqual(CuttingPlanStatus.Ready, CuttingPlanService.ReplayPrograms(snapshot, snapshot.Placements, 0, default).Status);
-        Assert.Empty(result.ProposedOrder);
+        if (locked)
+        {
+            // D1a: a locked program is kept as given; its uncertifiable coverage is a named
+            // warning on an UNVERIFIED proposal, never repaired and never Ready.
+            Assert.Equal(CuttingPlanStatus.BestEffort, result.Status);
+            Assert.True(result.IndependentlyReplayed);
+            var warning = Assert.Single(result.Findings);
+            Assert.Equal(PostVerificationKind.FixedLead, warning.Kind);
+            Assert.Contains("retention cannot be certified", warning.Message);
+            Assert.Equal(before, ExplicitContourTests.Fingerprint(Assert.Single(result.ProposedOrder).CopyProgram()));
+        }
+        else
+            Assert.Empty(result.ProposedOrder);
         Assert.Equal(before, ExplicitContourTests.Fingerprint(part.Program));
     }
 

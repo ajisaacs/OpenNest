@@ -91,6 +91,7 @@ namespace OpenNest.Forms
             mnuNestClamps = new System.Windows.Forms.ToolStripMenuItem();
             mnuNestImportDrawing = new System.Windows.Forms.ToolStripMenuItem();
             mnuNestShapeLibrary = new System.Windows.Forms.ToolStripMenuItem();
+            mnuNestDrawingLibrary = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem7 = new System.Windows.Forms.ToolStripSeparator();
             mnuNestFirstPlate = new System.Windows.Forms.ToolStripMenuItem();
             mnuNestLastPlate = new System.Windows.Forms.ToolStripMenuItem();
@@ -168,7 +169,6 @@ namespace OpenNest.Forms
             plateSizeStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             plateQtyStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             plateUtilStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
-            gpuStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             selectionStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             toolStrip1 = new System.Windows.Forms.ToolStrip();
             btnNew = new System.Windows.Forms.ToolStripButton();
@@ -390,7 +390,7 @@ namespace OpenNest.Forms
             // mnuOverlapCentroids
             //
             mnuOverlapCentroids.Name = "mnuOverlapCentroids";
-            mnuOverlapCentroids.Text = "Centroids";
+            mnuOverlapCentroids.Text = "Markers";
             mnuOverlapCentroids.Click += OverlapCentroids_Click;
             //
             // mnuOverlapBoth
@@ -574,10 +574,11 @@ namespace OpenNest.Forms
             // 
             // mnuNest
             // 
-            mnuNest.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuNestEdit, mnuNestClamps, mnuNestImportDrawing, mnuNestShapeLibrary, toolStripMenuItem7, mnuNestFirstPlate, mnuNestLastPlate, toolStripMenuItem6, mnuNestNextPlate, mnuNestPreviousPlate, toolStripMenuItem12, runAutoNestToolStripMenuItem, autoSequenceAllPlatesToolStripMenuItem, mnuNestRemoveEmptyPlates, mnuNestValidate, mnuNestPost, toolStripMenuItem19, calculateCutTimeToolStripMenuItem, toolStripMenuItem22, mnuNestAutomaticCutOff, mnuNestPlanCutting, mnuNestAssignLeadIns, mnuNestRemoveLeadIns });
+            mnuNest.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuNestEdit, mnuNestClamps, mnuNestImportDrawing, mnuNestShapeLibrary, mnuNestDrawingLibrary, toolStripMenuItem7, mnuNestFirstPlate, mnuNestLastPlate, toolStripMenuItem6, mnuNestNextPlate, mnuNestPreviousPlate, toolStripMenuItem12, runAutoNestToolStripMenuItem, autoSequenceAllPlatesToolStripMenuItem, mnuNestRemoveEmptyPlates, mnuNestValidate, mnuNestPost, toolStripMenuItem19, calculateCutTimeToolStripMenuItem, toolStripMenuItem22, mnuNestAutomaticCutOff, mnuNestPlanCutting, mnuNestAssignLeadIns, mnuNestRemoveLeadIns });
             mnuNest.Name = "mnuNest";
             mnuNest.Size = new System.Drawing.Size(43, 20);
             mnuNest.Text = "&Nest";
+            mnuNest.DropDownOpening += NestMenu_Opening;
             // 
             // mnuNestEdit
             // 
@@ -607,6 +608,13 @@ namespace OpenNest.Forms
             mnuNestShapeLibrary.Size = new System.Drawing.Size(205, 22);
             mnuNestShapeLibrary.Text = "Shape Library";
             mnuNestShapeLibrary.Click += ShapeLibrary_Click;
+            //
+            // mnuNestDrawingLibrary
+            //
+            mnuNestDrawingLibrary.Name = "mnuNestDrawingLibrary";
+            mnuNestDrawingLibrary.Size = new System.Drawing.Size(205, 22);
+            mnuNestDrawingLibrary.Text = "Add from Drawing Library...";
+            mnuNestDrawingLibrary.Click += DrawingLibrary_Click;
             //
             // toolStripMenuItem7
             // 
@@ -1071,7 +1079,7 @@ namespace OpenNest.Forms
             // 
             // statusStrip1
             // 
-            statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { statusLabel1, locationStatusLabel, selectionStatusLabel, spacerLabel, plateIndexStatusLabel, plateSizeStatusLabel, plateQtyStatusLabel, plateUtilStatusLabel, gpuStatusLabel });
+            statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { statusLabel1, locationStatusLabel, selectionStatusLabel, spacerLabel, plateIndexStatusLabel, plateSizeStatusLabel, plateQtyStatusLabel, plateUtilStatusLabel });
             statusStrip1.Location = new System.Drawing.Point(0, 630);
             statusStrip1.Name = "statusStrip1";
             statusStrip1.Padding = new System.Windows.Forms.Padding(1, 0, 16, 0);
@@ -1139,13 +1147,6 @@ namespace OpenNest.Forms
             plateUtilStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
             plateUtilStatusLabel.Size = new System.Drawing.Size(75, 19);
             plateUtilStatusLabel.Text = "Util : 0.0%";
-            //
-            // gpuStatusLabel
-            // 
-            gpuStatusLabel.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
-            gpuStatusLabel.Name = "gpuStatusLabel";
-            gpuStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            gpuStatusLabel.Size = new System.Drawing.Size(14, 19);
             // 
             // toolStrip1
             // 
@@ -1342,6 +1343,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuNestClamps;
         private System.Windows.Forms.ToolStripMenuItem mnuNestImportDrawing;
         private System.Windows.Forms.ToolStripMenuItem mnuNestShapeLibrary;
+        private System.Windows.Forms.ToolStripMenuItem mnuNestDrawingLibrary;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem7;
         private System.Windows.Forms.ToolStripMenuItem mnuNestFirstPlate;
         private System.Windows.Forms.ToolStripMenuItem mnuNestLastPlate;
@@ -1430,7 +1432,6 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuPlateExpandSpacing;
         private System.Windows.Forms.ToolStripButton btnSaveAs;
         private System.Windows.Forms.ToolStripMenuItem centerPartsToolStripMenuItem;
-        private System.Windows.Forms.ToolStripStatusLabel gpuStatusLabel;
         private System.Windows.Forms.ToolStripStatusLabel selectionStatusLabel;
         private System.Windows.Forms.ToolStripLabel engineLabel;
         private System.Windows.Forms.ToolStripComboBox engineComboBox;

@@ -205,7 +205,8 @@ namespace OpenNest.Controls
             }
         }
 
-        // D8: a clamp Auto Nest pulled as a last resort. Distinct from an active clamp - a
+        // D8: a clamp taken off this sheet, by Auto Nest as a last resort or by hand (right-click).
+        // Distinct from an active clamp - a
         // dashed grey outline and a small "remove" marker, still display + exclusion only
         // (no hit test, selection or sequencing).
         private static readonly Color RemovedClampOutlineColor = Color.FromArgb(200, 110, 110, 110);
@@ -249,6 +250,11 @@ namespace OpenNest.Controls
         public void DrawCutOffs(Graphics g)
         {
             var plate = view.DisplayPlate;
+            if (view.HasProposalDisplay)
+            {
+                DrawProposedCutOffs(g, plate);
+                return;
+            }
             if (plate?.CutOffs == null || plate.CutOffs.Count == 0)
                 return;
 
@@ -272,6 +278,36 @@ namespace OpenNest.Controls
                     {
                         DrawLine(g, rapid.EndPoint, linear.EndPoint, activePen);
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// A proposal preview carries cut-off parts but no cut-off definitions, so draw each
+        /// cut-off part's own (absolute) cutting moves in the same dashed style.
+        /// </summary>
+        private void DrawProposedCutOffs(Graphics g, Plate plate)
+        {
+            if (plate == null)
+                return;
+
+            using var pen = new Pen(CutOffLineColor, 2.0f) { DashStyle = DashStyle.Dash };
+
+            foreach (var part in plate.Parts)
+            {
+                var program = part.BaseDrawing.IsCutOff ? part.Program : null;
+                if (program == null || program.Mode != Mode.Absolute)
+                    continue;
+
+                Vector? position = null;
+                foreach (var code in program.Codes)
+                {
+                    if (code is not Motion motion)
+                        continue;
+                    var end = motion.EndPoint + part.Location;
+                    if (motion is LinearMove && position is { } start)
+                        DrawLine(g, start, end, pen);
+                    position = end;
                 }
             }
         }

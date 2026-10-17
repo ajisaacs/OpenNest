@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Controls;
 using OpenNest.Data;
 using OpenNest.Engine.Strategies;
 using OpenNest.Properties;
@@ -13,6 +14,7 @@ namespace OpenNest.Forms
         public OptionsForm()
         {
             InitializeComponent();
+            GridStyle.Apply(strategyGrid);
             BuildStrategyGrid();
         }
 

@@ -71,7 +71,13 @@ internal sealed class ValidationOverlay : IDisposable
                     areas?.Dispose();
                     areas = new GraphicsPath(FillMode.Winding);
                     foreach (var region in overlap.Regions)
+                    {
+                        // The analyzer winds outlines counterclockwise and holes clockwise,
+                        // so the winding fill leaves each island's holes empty.
                         areas.AddPolygon(region.Vertices.Select(view.PointWorldToGraph).ToArray());
+                        foreach (var hole in region.Holes)
+                            areas.AddPolygon(hole.Select(view.PointWorldToGraph).ToArray());
+                    }
                     scale = view.ViewScale;
                 }
                 using var brush = new SolidBrush(Color.FromArgb(100, 255, 0, 80));

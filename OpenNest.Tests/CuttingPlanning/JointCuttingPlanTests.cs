@@ -87,8 +87,22 @@ public class JointCuttingPlanTests
         unchanged();
     }
 
+    [Fact]
+    public void JointSearch_LockedInternalCrossing_IsAnUnverifiedWarningWithoutMutating()
+    {
+        var (part, parameters) = Crossing();
+        part.LeadInsLocked = true;
+        var unchanged = Unchanged(part, parameters);
+        var result = CuttingPlanService.Plan(new CuttingPlanRequest([part], confirmedParameters: parameters));
+        Assert.Equal(CuttingPlanStatus.BestEffort, result.Status);
+        Assert.True(result.IndependentlyReplayed);
+        Assert.False(Assert.Single(result.ProposedOrder).IsRegenerated);
+        Assert.All(result.Findings, f => Assert.Equal(PostVerificationKind.FixedLead, f.Kind));
+        Assert.Contains(result.Findings, f => f.Message.Contains("rapid crosses") && f.Witness?.RapidStart != null);
+        unchanged();
+    }
+
     [Theory]
-    [InlineData("locked")]
     [InlineData("ineligible")]
     [InlineData("unsupported")]
     public void JointSearch_RefusesWithoutInstallingFallbackOrMutating(string fault)
@@ -96,7 +110,6 @@ public class JointCuttingPlanTests
         var (part, parameters) = Crossing();
         Part[]? eligible = null;
         var expected = CuttingPlanStatus.ConstraintConflict;
-        if (fault == "locked") part.LeadInsLocked = true;
         if (fault == "ineligible") eligible = [];
         if (fault == "unsupported")
         {
@@ -277,7 +290,7 @@ public class JointCuttingPlanTests
     }
 
     [Fact]
-    public void FixedLeads_SearchAndReplayRejectNativeTargetMaterialCrossing()
+    public void FixedLeads_NativeTargetMaterialCrossing_IsAcceptedAsGivenAndWarnedByReplay()
     {
         var parameters = ExplicitContourTests.Parameters();
         var clean = LeadPathValidationTests.Rectangle(0, 0, 10, 10);
@@ -289,12 +302,17 @@ public class JointCuttingPlanTests
         Assert.True(part.RestoreLeadInProgram(unsafeProgram, true));
         Assert.Empty(new ReleasedContourState().Check(Read(unsafeProgram, Vector.Zero), Vector.Zero, 1));
         var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest([part], confirmedParameters: parameters));
+        // D1a: the locked lead never constrains the search; replay names it as a warning.
         var search = JointCuttingPlanSearch.Run(snapshot, default);
-        Assert.Equal(CuttingPlanStatus.ConstraintConflict, search.Status);
-        Assert.Empty(search.Order);
-        var replay = CuttingPlanService.ReplayPrograms(snapshot, snapshot.Placements, 0, default);
-        Assert.Equal(CuttingPlanStatus.ConstraintConflict, replay.Status);
-        Assert.Contains(replay.Findings, f => f.Message.Contains("target material"));
+        Assert.Equal(CuttingPlanStatus.Ready, search.Status);
+        var replay = CuttingPlanService.ReplayPrograms(snapshot, search.Order, 0, default);
+        Assert.Equal(CuttingPlanStatus.BestEffort, replay.Status);
+        Assert.True(replay.IndependentlyReplayed);
+        var warning = Assert.Single(replay.Findings);
+        Assert.Equal(PostVerificationKind.FixedLead, warning.Kind);
+        Assert.Contains("own part's material", warning.Message);
+        Assert.Contains("target material", warning.Message);
+        Assert.Equal(new FixedLeadWarning(1, null, null), warning.FixedLead);
     }
 
     [Fact]
@@ -313,7 +331,7 @@ public class JointCuttingPlanTests
     }
 
     [Fact]
-    public void FixedLead_SearchChecksOtherUncutHoleAwareMaterial_NotOnlyReleasedContours()
+    public void FixedLead_ReplayChecksOtherUncutHoleAwareMaterial_NotOnlyReleasedContours()
     {
         var parameters = ExplicitContourTests.Parameters();
         var first = SimplePart(Vector.Zero, parameters); first.LeadInsLocked = true;
@@ -327,9 +345,15 @@ public class JointCuttingPlanTests
             snapshot.Placements.Select(p => p.Material).ToArray());
         Assert.True(direct.IsComplete); Assert.False(direct.IsClear);
         Assert.Contains("another placed material", direct.Reason);
-        var search = JointCuttingPlanSearch.Run(snapshot, default);
-        Assert.Equal(CuttingPlanStatus.ConstraintConflict, search.Status);
-        Assert.Contains(search.Findings, f => f.Message.Contains("another placed material"));
+        // The not-yet-cut neighbour is still material: replay names it as the obstacle.
+        var result = CuttingPlanService.Plan(snapshot);
+        Assert.Equal(CuttingPlanStatus.BestEffort, result.Status);
+        Assert.True(result.IndependentlyReplayed);
+        var warning = Assert.Single(result.Findings, f => f.SourceOrdinal == 0);
+        Assert.Equal(PostVerificationKind.FixedLead, warning.Kind);
+        Assert.Same(obstacle, warning.OtherSourcePart);
+        Assert.Equal(new FixedLeadWarning(1, null, 1), warning.FixedLead);
+        Assert.Contains("another part's material", warning.Message);
     }
 
     [Fact]

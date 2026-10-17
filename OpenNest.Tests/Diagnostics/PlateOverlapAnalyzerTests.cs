@@ -487,7 +487,8 @@ public class PlateOverlapAnalyzerTests
         Assert.False(report.IsComplete);
         var issue = Assert.Single(report.Issues);
         Assert.Equal((0, (int?)1), (issue.PartAId, issue.PartBId));
-        Assert.Contains("moment", issue.Message, StringComparison.OrdinalIgnoreCase);
+        // The exact clipping range refuses the pair before any moment could overflow.
+        Assert.Contains("range", issue.Message, StringComparison.OrdinalIgnoreCase);
         var valid = Assert.Single(report.Pairs);
         Assert.Equal((2, 3), (valid.PartAId, valid.PartBId));
         AssertCentroid(valid, -1.5, -1.5);
@@ -499,6 +500,148 @@ public class PlateOverlapAnalyzerTests
         Assert.True(double.IsFinite(pair.Centroid.Y));
         Assert.Equal(x, pair.Centroid.X, 7);
         Assert.Equal(y, pair.Centroid.Y, 7);
+    }
+
+    // Regions are connected islands of shared material, not triangulation fragments: a
+    // C-shaped overlap (frame half beside its hole) is one region with the C's area.
+    [Fact]
+    public void Analyze_ConcaveOverlapIsOneConnectedRegion()
+    {
+        var frame = WithContours(Square(0, 0, 4), Square(1, 1, 2));
+
+        var report = PlateOverlapAnalyzer.Analyze(new[] { frame, Rectangle(2, -1, 4, 6) });
+
+        Assert.True(report.IsComplete, string.Join("; ", report.Issues));
+        var pair = Assert.Single(report.Pairs);
+        var region = Assert.Single(pair.Regions);
+        Assert.Equal(6, pair.Area, 8);
+        Assert.Equal(6, region.Area, 8);
+        Assert.Equal(region.Vertices[0], region.Vertices[^1]);
+    }
+
+    // A part covering a whole frame shares one island whose hole is the frame's hole.
+    [Fact]
+    public void Analyze_RegionKeepsTheHoleOfSharedMaterial()
+    {
+        var frame = WithContours(Square(0, 0, 4), Square(1, 1, 2));
+
+        var report = PlateOverlapAnalyzer.Analyze(new[] { Rectangle(-1, -1, 6, 6), frame });
+
+        Assert.True(report.IsComplete, string.Join("; ", report.Issues));
+        var pair = Assert.Single(report.Pairs);
+        var region = Assert.Single(pair.Regions);
+        Assert.Equal(12, pair.Area, 8);
+        AssertCentroid(pair, 2, 2);
+        var hole = Assert.Single(region.Holes);
+        Assert.Equal(hole[0], hole[^1]);
+        Assert.Equal(16, SignedArea(region.Vertices), 8); // Outline counterclockwise.
+        Assert.Equal(-4, SignedArea(hole), 8);             // Hole clockwise.
+        Assert.All(hole, point =>
+        {
+            Assert.InRange(point.X, 1, 3);
+            Assert.InRange(point.Y, 1, 3);
+        });
+        Assert.Throws<NotSupportedException>(() => ((IList<IReadOnlyList<Vector>>)region.Holes).Clear());
+        Assert.Throws<NotSupportedException>(() => ((IList<Vector>)hole)[0] = new Vector(9, 9));
+    }
+
+    private static double SignedArea(IReadOnlyList<Vector> ring)
+    {
+        var twice = 0.0;
+        for (var i = 0; i + 1 < ring.Count; i++)
+            twice += ring[i].X * ring[i + 1].Y - ring[i + 1].X * ring[i].Y;
+        return twice / 2;
+    }
+
+    // Each row's area centroid lies off the red material (between patches, in a hole, or
+    // inside a curve); the marker must sit on the shared material instead.
+    [Theory]
+    [InlineData("two patches")]
+    [InlineData("frame covered")]
+    [InlineData("half annulus")]
+    [InlineData("thin crescent")]
+    public void Analyze_MarkerLiesOnSharedMaterialWhereTheCentroidDoesNot(string scenario)
+    {
+        var parts = scenario switch
+        {
+            "two patches" => new[]
+            {
+                WithContours(new[]
+                {
+                    new Vector(0, 0), new Vector(3, 0), new Vector(3, 3), new Vector(2, 3),
+                    new Vector(2, 1), new Vector(1, 1), new Vector(1, 3), new Vector(0, 3)
+                }),
+                Rectangle(0, 2, 3, 1)
+            },
+            "frame covered" => new[] { Rectangle(-1, -1, 6, 6), WithContours(Square(0, 0, 4), Square(1, 1, 2)) },
+            "half annulus" => new[] { WithContours(Circle(0, 0, 5), Circle(0, 0, 4.5)), Rectangle(0, -10, 10, 20) },
+            _ => new[] { WithContours(Circle(0, 0, 10)), WithContours(Square(-15, -15, 30), Circle(0.01, 0, 10)) },
+        };
+
+        var report = PlateOverlapAnalyzer.Analyze(parts);
+
+        Assert.True(report.IsComplete, string.Join("; ", report.Issues));
+        var pair = Assert.Single(report.Pairs);
+        Assert.False(OnMaterial(pair, pair.Centroid), "precondition: the centroid is off the material");
+        Assert.True(OnMaterial(pair, pair.Marker), $"marker {pair.Marker.X:R}, {pair.Marker.Y:R}");
+    }
+
+    [Fact]
+    public void Analyze_LongStraightSliverMarkerIsOnTheSliver()
+    {
+        var report = PlateOverlapAnalyzer.Analyze(new[] { Rectangle(0, 0, 48, 24), Rectangle(0, 23.998, 48, 24) });
+
+        var pair = Assert.Single(report.Pairs);
+        Assert.True(OnMaterial(pair, pair.Marker), $"marker {pair.Marker.X:R}, {pair.Marker.Y:R}");
+    }
+
+    private static bool OnMaterial(PlateOverlapPair pair, Vector point) =>
+        pair.Regions.Any(region => InsideRing(region.Vertices, point)
+            && !region.Holes.Any(hole => InsideRing(hole, point)));
+
+    private static bool InsideRing(IReadOnlyList<Vector> ring, Vector point)
+    {
+        var inside = false;
+        for (int i = 0, j = ring.Count - 1; i < ring.Count; j = i++)
+            if ((ring[i].Y > point.Y) != (ring[j].Y > point.Y)
+                && point.X < (ring[j].X - ring[i].X) * (point.Y - ring[i].Y) / (ring[j].Y - ring[i].Y) + ring[i].X)
+                inside = !inside;
+        return inside;
+    }
+
+    private static Vector[] Circle(double x, double y, double radius) =>
+        Enumerable.Range(0, 256).Select(i => new Vector(x + radius * System.Math.Cos(i * System.Math.PI / 128),
+            y + radius * System.Math.Sin(i * System.Math.PI / 128))).ToArray();
+
+    // A's square hole closes the mouth of B's C-shaped hole, so the material enclosed by
+    // both holes is a separate island inside the shared hole and must not be dropped.
+    [Fact]
+    public void Analyze_IslandEnclosedByBothPartsHolesIsKept()
+    {
+        var a = WithContours(Square(0, 0, 10), new[]
+        {
+            new Vector(6.5, 3.5), new Vector(7.5, 3.5), new Vector(7.5, 6.5), new Vector(6.5, 6.5)
+        });
+        var b = WithContours(Square(0, 0, 10), new[]
+        {
+            new Vector(3, 3), new Vector(7, 3), new Vector(7, 4), new Vector(4, 4),
+            new Vector(4, 6), new Vector(7, 6), new Vector(7, 7), new Vector(3, 7)
+        });
+
+        var report = PlateOverlapAnalyzer.Analyze(new[] { a, b });
+
+        Assert.True(report.IsComplete, string.Join("; ", report.Issues));
+        var pair = Assert.Single(report.Pairs);
+        Assert.Equal(87.5, pair.Area, 8); // 100 - |H1 u H2| = 100 - (3 + 10 - 0.5).
+        Assert.Equal(new[] { 5.0, 82.5 }, pair.Regions.Select(r => System.Math.Round(r.Area, 8)).Order());
+        var island = pair.Regions.Single(r => r.Area < 10);
+        Assert.Empty(island.Holes);
+        Assert.All(island.Vertices, point =>
+        {
+            Assert.InRange(point.X, 4, 6.5);
+            Assert.InRange(point.Y, 4, 6);
+        });
+        Assert.Single(pair.Regions.Single(r => r.Area > 10).Holes);
     }
 
     [Theory]

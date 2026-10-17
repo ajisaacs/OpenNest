@@ -176,12 +176,14 @@ public class ContourEntryFeasibilityTests
         var (other, _, _) = PreparedSquare();
         var forgedContour = choice with { Owner = other, ContourOrdinal = 99 };
         var forgedEntity = choice with { Owner = prepared, EntityOrdinal = 99 };
+        var forgedOwnedContour = choice with { Owner = prepared, ContourOrdinal = 99 };
         var feasibility = new ContourEntryFeasibility(prepared, At, own, []);
 
         var verdict = feasibility.Check(forgedContour);
         Assert.Equal(ContourFeasibilityStatus.Incomplete, verdict.Status);
         Assert.False(string.IsNullOrEmpty(verdict.Reason));
         Assert.Equal(ContourFeasibilityStatus.Incomplete, feasibility.Check(forgedEntity).Status);
+        Assert.Equal(ContourFeasibilityStatus.Incomplete, feasibility.Check(forgedOwnedContour).Status);
     }
 
     [Fact]

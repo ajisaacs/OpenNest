@@ -1,5 +1,3 @@
-using OpenNest.Api;
-
 namespace OpenNest.Tests.Api;
 
 public class CutParametersTests

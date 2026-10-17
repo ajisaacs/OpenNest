@@ -6,17 +6,17 @@ Choose **View > Overlap Check > Check Active Plate** to check committed parts on
 this plate. Shared material is shaded red/magenta without changing the nest,
 selection, cutting paths, or export behavior. Cutoffs and temporary preview parts
 are excluded. **Cancel Check** discards the running request. **Display > Off /
-Areas / Centroids / Both** changes visibility without rerunning analysis. Areas
+Areas / Markers / Both** changes visibility without rerunning analysis. Areas
 is the default; rechecking preserves a visible mode, while checking from Off
 shows Areas. Clamp overlaps are shown as part/clamp findings with the clamp ID
 in hover details; clamps are not selectable parts and are not added to quantity
 or machining. A clamp edit invalidates the diagnostic and schedules a fresh
 check. Display preferences belong to the current document and are not saved.
 
-Centroids and Both show fixed-screen-size, DPI-scaled pair crosshairs with a
+Markers and Both show fixed-screen-size, DPI-scaled pair crosshairs with a
 contrasting halo. Labels such as `1/3` identify the two plate sequence positions
 at capture time, including gaps occupied by cutoffs. Hover near a marker to see
-captured names, approximate shared area in in² or mm², and centroid coordinates
+captured names, approximate shared area in in² or mm², and marker coordinates
 in the same linear units. Units are captured with the request; hover does not
 relabel an old report from live settings. Nearby/coincident markers show all
 matching pairs in sequence order. If details exceed the view, the tooltip wraps
@@ -57,11 +57,10 @@ material), even if the dialog is later canceled. There is no check during export
 ## Analysis API
 
 `OpenNest.Diagnostics.PlateOverlapAnalyzer` in OpenNest.Core checks a group of placed
-parts and returns the shared polygon areas for each overlapping pair. Existing
-`Part.Intersects`, `PartOverlapChecker`, `Plate.HasOverlappingParts`, engine
-validators, and CLI entry points are unchanged. A separate shared-triangulator fix
-uses translation-stable winding, correcting missed clockwise outlines/holes far
-from the origin without changing contact or fragment-area tolerance policies.
+parts and returns the shared material for each overlapping pair as connected
+islands. It clips with Clipper2. Existing `Part.Intersects`, `PartOverlapChecker`,
+`Plate.HasOverlappingParts`, engine validators, and CLI entry points are unchanged
+and still use the hand-written `Collision` kernel (its GPU port is on hold).
 
 ## Synchronous use
 
@@ -74,11 +73,12 @@ var areas = report.Pairs.SelectMany(pair => pair.Regions).ToList();
 foreach (var pair in report.Pairs)
 {
     // IDs are zero-based positions in the original input list, including skipped cutoffs.
-    Console.WriteLine($"{pair.PartAId} / {pair.PartBId}: {pair.Area}, centroid {pair.Centroid}");
+    Console.WriteLine($"{pair.PartAId} / {pair.PartBId}: {pair.Area}, marker {pair.Marker}");
     foreach (var region in pair.Regions)
     {
-        // region.Vertices: closed, read-only world-coordinate polygon
-        // region.Area: positive shared material area, in model units squared
+        // region.Vertices: closed, read-only, counterclockwise world-coordinate outline
+        // region.Holes: closed, read-only, clockwise hole rings inside that outline
+        // region.Area: positive net shared material area, in model units squared
     }
 }
 
@@ -116,17 +116,20 @@ conversion cost; callers must not mutate inputs while capture runs.
 
 Analysis clones captured entities before chaining, prepares polygons once per
 source, then prepares each pose. An X-sorted bounds sweep prunes separated pairs.
-It invokes the existing hole-aware `Collision.Check` once per candidate pair,
-without an earlier boolean collision pass. Pairs are rebased near the origin for
-clipping/triangulation and restored to world coordinates; area calculation uses
-translated-origin products to avoid cancellation far from the origin. Snapshots
-can be reused and analyzed concurrently. Callers own freshness checks and must
-not publish results after geometry changes or after a newer request supersedes them.
+Each candidate pair is intersected once with Clipper2: each operand is its outline
+minus the union of its holes (outline positive, holes negative, positive fill rule).
+Pairs are rebased near the origin and rounded to a 1e-8 model-unit grid for
+clipping, then restored to world coordinates. A coordinate more than 1e9 units from
+the pair's origin, or a nonfinite one, makes that pair incomplete rather than clear.
+Area calculation uses translated-origin products to avoid cancellation far from the
+origin. Snapshots can be reused and analyzed concurrently. Callers own freshness
+checks and must not publish results after geometry changes or after a newer request
+supersedes them.
 
 Cancellation throws `OperationCanceledException`; it never returns a partial
 all-clear. Checks occur between source/pose preparation, validation loops, and
 candidate pairs, and before return. An individual conversion, polygonization,
-triangulation, or `Collision.Check` call is not internally interruptible.
+or Clipper2 intersection is not internally interruptible.
 
 ## Material contract
 
@@ -171,23 +174,37 @@ quadrant change moves the zones); posting runs its own fresh check with per-atte
 
 ## Interpretation and limits
 
-Regions are the kernel's convex, hole-subtracted fragments, not merged connected
-islands. Fill the fragments for a visual overlay; do not outline triangulation
-seams as physical boundaries. Areas within one pair may be summed. Areas across
+Regions are connected islands of shared material. Each has a counterclockwise
+outline and clockwise `Holes`; an island can also sit inside a hole that both parts'
+holes enclose together. Fill outlines and holes in one nonzero-winding path so holes
+stay empty. Areas within one pair may be summed. Areas across
 pairs are not a union: three coincident parts produce three overlapping pairs,
 so summing all pair areas double-counts shared plate locations.
 
-`pair.Centroid` is the true area-weighted center of every shared-material fragment
+`pair.Centroid` is the true area-weighted center of every shared-material island
 for that pair, after hole subtraction. It is not an average of crossings or
-vertices. For a disconnected or concave overlap, the mathematical centroid can
-lie outside the red material (for example, between two separate patches). This
-is intentional: shaded Areas are authoritative for actual overlap locations;
-use Both for detailed inspection rather than interpreting a centroid as an
-interior collision point. There is one centroid per pair, not per connected island.
+vertices. For a disconnected, holed or concave overlap it can lie outside the red
+material (between two patches, in a hole, or inside a curve).
 
-`PolygonAreaMoments` evaluates signed moments about local origins and combines
-fragments with positive area weights independent of winding. The analyzer does
-this on rebased clipping fragments before adding the world origin back. Invalid,
+`pair.Marker` is where markers, hover hit testing and cutting-inspection rings go:
+a point on the shared material, inside the pair's largest island. It is that
+island's pole of inaccessibility (`PolyLabel`), searched to a tenth of the island's
+area/perimeter with a budget of 4096 distance evaluations. If that bounded search
+does not land inside (a long thin sliver), the marker is the midpoint of the widest
+interior run of a horizontal scan line through the island, placed between vertex
+heights. There is one marker per pair, not per island: a second patch has shading
+but no crosshair.
+
+A clamp narrower than the 0.001 chord tolerance is judged tolerance-free against
+finely re-read material rather than by Clipper2. Any material entering it is reported,
+even below the area threshold. The finding's region is then the whole clamp
+rectangle, and its centroid and marker are the clamp's centre: within half the
+clamp's size (under 0.0005) of the material, though not necessarily on it.
+
+`PolygonAreaMoments` evaluates signed moments about local origins. The analyzer
+subtracts each island's hole moments from its outline's (`TrySubtract`), then
+combines the islands with positive area weights (`TryCombine`), on rebased
+coordinates before adding the world origin back. Invalid,
 degenerate, or nonfinite moments produce an incomplete pair issue, not a marker
 at zero. Curved-outline centroids inherit the polygonization approximation.
 
@@ -198,11 +215,14 @@ repairs, export blocks, or machining-validity guarantees.
 
 Arc/circle flattening uses a chord tolerance of `0.001` model units (also exposed
 as `report.ChordTolerance`). Curved overlaps and topology are therefore polygonal
-approximations. The unchanged collision kernel applies dimensional bounds and
-fragment-area thresholds using `Tolerance.Epsilon` (`0.00001`); sufficiently small
-slivers are below its reporting policy. Floating-point coordinates still have
-finite resolution. Contact and fragment thresholds are unchanged; only the shared
-triangulator's winding arithmetic was stabilized in the prerequisite fix.
+approximations. A pair is reported when its total shared area exceeds
+`Tolerance.Epsilon` (`0.00001` square units). Contact and rounding dust below that
+are not overlap. The engine's `Collision` kernel instead drops each convex fragment
+at or below that area, so a sliver it splits into small fragments can read clear
+there while this diagnostic reports it. Rounding to the 1e-8 grid can move an area
+that is within rounding error of the threshold to either side of it, in either
+direction relative to the kernel. Floating-point coordinates still have finite
+resolution.
 
 ## Desktop lifecycle and rendering
 
@@ -247,42 +267,50 @@ whose ordered input slots changed; this display-only path does not renumber them
 Explicit geometry invalidation, plate switch, handle loss, cancellation and
 failure clear all retained highlights.
 
-Measured on 501 real PEP-converted plates with 2 to 384 parts, a from-scratch check
-takes median 1 ms, p99 368 ms and max 6.5 s (a 299-part plate); an incremental
-recheck after moving one part takes median 0.1 ms, p99 20 ms and max 35 ms. A
-comparison against uncached full analysis over 2505 edits (nudge, drag onto
+Measured on 389 real PEP-converted plates (252 nests), a from-scratch check takes
+median 0.8 ms, p99 97 ms and max 3.2 s. Nearly all of the slow cases are first-time
+material preparation for a hole-heavy drawing. With material prepared, clipping every
+candidate pair and placing markers takes median 0.05 ms, p99 34 ms and max 76 ms
+(markers added about 0.4 ms per overlapping pair). The triangle-pair kernel
+took up to 2.6 s on the same plates. On those plates Clipper2 and the previous kernel
+found identical pair, clamp and issue sets. Areas differed by at most 0.0002 square
+units, always smaller from the kernel, consistent with its dropping fragments below
+its area threshold. With the previous kernel, an
+incremental recheck after moving one part took median 0.1 ms, p99 20 ms and max
+35 ms. A comparison against uncached full analysis over 2505 edits (nudge, drag onto
 another part, move three, delete first, swap order) matched exactly. It checks freshness before
 publication and painting. Handle destruction/disposal cancels work and releases
 paths; old completions cannot replace a newer report. Snapshot conversion and
 clipping never run in paint or mouse-move handlers.
 
 PlateView draws the controller overlay after work-area/debug-remnant drawing and
-before action paint subscribers and hover tooltips. One consistently wound path
-is filled once, avoiding fragment outlines, internal triangulation seams, and
-darker triple coverage. World-to-graph conversion excludes pan, because PlateView
-already applies origin translation. Paths are rebuilt for displayed-pair/scale changes,
-not ordinary repaints or panning. The state label saves/restores graphics state.
-Centroid hit tests use only cached report coordinates and DPI-scaled screen
+before action paint subscribers and hover tooltips. Island outlines and reversed
+holes go into one consistently wound path that is filled once, so holes stay empty
+and triple coverage does not darken. World-to-graph conversion excludes pan,
+because PlateView already applies origin translation. Paths are rebuilt for
+displayed-pair/scale changes, not ordinary repaints or panning. The state label
+saves/restores graphics state.
+Marker hit tests use only cached report coordinates and DPI-scaled screen
 radii. Hover clears on edits, mode/request/view changes, leave, and teardown.
 Diagnostic details draw above action adorners and take precedence over the normal
 part-name tooltip only while visible.
 
 Next hardening: the first check of a plate with a hole-heavy drawing can still
 take seconds, and cancellation cannot interrupt the interior of material
-preparation or one kernel operation. Prepared per-part triangulations are not yet
-cached across requests.
+preparation or one Clipper2 intersection.
 
 ## Verification
 
 `OpenNest.Tests/Diagnostics/PlateOverlapAnalyzerTests.cs` exercises analytical
 rectangle regions/areas, containment and contact, both operands' holes, concave
-and disconnected intersections, curves, baseline rotation, large translations,
+and disconnected intersections, connected islands with holes (including an island
+enclosed by both parts' holes), curves, baseline rotation, large translations,
 deterministic pair ordering against an exhaustive rectangle oracle, invalid
 inputs, snapshot isolation, read-only output, cutting-program independence, and
 cancellation. Run:
 
 ```sh
-dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter 'FullyQualifiedName~PlateOverlapAnalyzerTests|FullyQualifiedName~OverlapReportStateTests|FullyQualifiedName~PolygonAreaMomentsTests|FullyQualifiedName~OverlapPairPresentationTests|FullyQualifiedName~OverlapHoverPagesTests|FullyQualifiedName~IncrementalOverlapAnalysisTests|FullyQualifiedName~OverlapAutoCheckSchedulerTests'
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter 'FullyQualifiedName~PlateOverlapAnalyzerTests|FullyQualifiedName~OverlapReportStateTests|FullyQualifiedName~PolygonAreaMomentsTests|FullyQualifiedName~OverlapPairPresentationTests|FullyQualifiedName~OverlapHoverPagesTests|FullyQualifiedName~IncrementalOverlapAnalysisTests|FullyQualifiedName~OverlapAutoCheckSchedulerTests|FullyQualifiedName~OverlapMarkerTests|FullyQualifiedName~PolyLabel'
 ```
 
 `IncrementalOverlapAnalysisTests` compares incremental rechecks with uncached full
@@ -294,11 +322,15 @@ waits, and the no-retry rule for canceled or failed layouts.
 freshness, per-pair display retention through repeated edits and pending checks,
 hard invalidation, cancellation, and incomplete-versus-clear messaging.
 `PolygonAreaMomentsTests` covers analytic
-centers, unequal/disconnected fragments, winding, closure, large translations,
-and invalid/overflow cases. `OverlapPairPresentationTests` checks adaptive unit
+centers, unequal/disconnected fragments, hole subtraction, winding, closure, large
+translations, and invalid/overflow cases. `OverlapPairPresentationTests` checks adaptive unit
 formatting, sequence labels, coincident ordering, and zoom-independent DPI hit
 radii. `OverlapHoverPagesTests` proves bounded continuation pages retain every
 pair and long/Unicode name, with navigation bounds and explicit tiny-view failure.
+`OverlapMarkerTests` covers the pole, the scan-line fallback after an exhausted search
+budget, and the last-resort fallback; `PolyLabelDifferentialTests` proves the heap
+queue returns bit-identical poles to the former sorted list, so label positions
+elsewhere do not move.
 `OpenNest.WinForms.Tests/PlateOverlapOverlayTests.cs` adds STA worker/publication,
 menu/MDI, path-cache, uniform-fill pixel, control-lifetime, and automatic-recheck
 (debounce, drag detection, busy wait, supersession, display/status) checks. Run those
@@ -310,7 +342,8 @@ dotnet test OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj
 
 Linux can cross-build with `-p:EnableWindowsTargeting=true`, but that does not
 execute Windows tests or verify appearance, DPI, or interaction. On Windows,
-check partial overlap, containment, inside-hole placement, pan/zoom and quadrant
+check partial overlap, containment, inside-hole placement, markers on concave,
+holed and two-patch overlaps, pan/zoom and quadrant
 alignment, changed-pair clearing and unchanged-pair retention during edits and
 pending rechecks, full clearing on plate switches and converter cancellation,
 the pending label and automatic recheck after dragging a part onto another,

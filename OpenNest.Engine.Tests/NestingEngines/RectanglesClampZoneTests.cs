@@ -43,7 +43,9 @@ public class RectanglesClampZoneTests
             new[] { Stock("sheet", 48, 96, spacing: 0.25) }))));
 
     [Theory]
-    [InlineData("9B343B6C5CF2CE8753F2E04ACB0A9C4D5921F4ADC15AA2586AF466769C0F019B")]
+    // Two complete candidates tie here on cost and placed material; the tie must fall to
+    // enumeration order on every platform (hash identical on Windows and Linux).
+    [InlineData("BEEEDEC81A7F987720FB5F331873103AD2470C839D568CE587F230BC39D210CC")]
     public void ZeroClampMixedShapeLayoutIsBitIdenticalToBaseline(string hash) =>
         Assert.Equal(hash, LayoutHash(Engine().Solve(Job(
             new[]

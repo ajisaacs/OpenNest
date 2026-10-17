@@ -52,6 +52,7 @@ public sealed class PlateOverlapPair
         Regions = source.Regions;
         Area = source.Area;
         Centroid = source.Centroid;
+        Marker = source.Marker;
         bounds = source.bounds;
     }
 
@@ -60,7 +61,7 @@ public sealed class PlateOverlapPair
         new(this, partAId, partBId, partAName, partBName);
 
     internal PlateOverlapPair(int partAId, int partBId, string partAName, string partBName,
-        List<PlateOverlapRegion> regions, Vector centroid)
+        List<PlateOverlapRegion> regions, Vector centroid, Vector marker)
     {
         PartAId = partAId;
         PartBId = partBId;
@@ -69,6 +70,7 @@ public sealed class PlateOverlapPair
         Regions = regions.AsReadOnly();
         Area = regions.Sum(region => region.Area);
         Centroid = centroid;
+        Marker = marker;
         var points = regions.SelectMany(region => region.Vertices).ToArray();
         var left = points.Min(point => point.X);
         var bottom = points.Min(point => point.Y);
@@ -80,7 +82,7 @@ public sealed class PlateOverlapPair
     public int PartBId { get; }
     public string PartAName { get; }
     public string PartBName { get; }
-    /// <summary>Convex fragments, not connected islands; no mutable kernel polygons are exposed.</summary>
+    /// <summary>Connected islands of shared material; no mutable kernel polygons are exposed.</summary>
     public IReadOnlyList<PlateOverlapRegion> Regions { get; }
     public double Area { get; }
     /// <summary>
@@ -88,21 +90,47 @@ public sealed class PlateOverlapPair
     /// This can lie outside disconnected or concave shared material. Returned by value.
     /// </summary>
     public Vector Centroid { get; }
+    /// <summary>
+    /// Finite world-coordinate point on the shared material, inside the pair's largest island:
+    /// its pole of inaccessibility, or an interior scan-line point when a thin island defeats
+    /// the bounded pole search. Markers, hit testing and inspection rings use this point.
+    /// A tolerance-free tiny-clamp finding (a clamp narrower than the chord tolerance) keeps
+    /// its conservative whole-clamp region, so its marker is the clamp's centre, within half
+    /// the clamp's size of the material. Returned by value.
+    /// </summary>
+    public Vector Marker { get; }
     /// <summary>A fresh world-coordinate bounds copy.</summary>
     public Box Bounds => new(bounds.X, bounds.Y, bounds.Length, bounds.Width);
 }
 
-/// <summary>A positive-area, hole-subtracted convex polygon in world coordinates.</summary>
+/// <summary>
+/// One connected island of shared material in world coordinates, after hole subtraction:
+/// a counterclockwise outline and its clockwise holes.
+/// </summary>
 public sealed class PlateOverlapRegion
 {
-    internal PlateOverlapRegion(IEnumerable<Vector> vertices, double area)
+    private static readonly IReadOnlyList<IReadOnlyList<Vector>> NoHoles = System.Array.AsReadOnly(
+        System.Array.Empty<IReadOnlyList<Vector>>());
+
+    internal PlateOverlapRegion(IEnumerable<Vector> vertices, double area,
+        IEnumerable<IEnumerable<Vector>> holes = null)
     {
         Vertices = System.Array.AsReadOnly(vertices.ToArray());
         Area = area;
+        Holes = holes == null
+            ? NoHoles
+            : System.Array.AsReadOnly(holes
+                .Select(hole => (IReadOnlyList<Vector>)System.Array.AsReadOnly(hole.ToArray()))
+                .ToArray());
     }
 
-    /// <summary>Read-only vertices with an exactly repeated closing vertex.</summary>
+    /// <summary>Read-only counterclockwise outline with an exactly repeated closing vertex.</summary>
     public IReadOnlyList<Vector> Vertices { get; }
+
+    /// <summary>Read-only clockwise hole rings, each with an exactly repeated closing vertex.</summary>
+    public IReadOnlyList<IReadOnlyList<Vector>> Holes { get; }
+
+    /// <summary>Positive net area: the outline's area minus its holes'.</summary>
     public double Area { get; }
 }
 

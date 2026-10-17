@@ -94,7 +94,7 @@ public class CuttingPlanMessageTests
         Assert.Same(program, part.Program);
     }
     [Fact]
-    public void Describe_LeadHitsNeighbour_SuggestsSpacingOrShorterLeadWithoutAllowingApply()
+    public void Describe_LockedLeadHitsNeighbour_WarnsWithAdviceAndNeedsAcceptance()
     {
         var settings = ExplicitContourTests.Parameters();
         var clean = LeadPathValidationTests.Rectangle(0, 0, 10, 10);
@@ -110,11 +110,14 @@ public class CuttingPlanMessageTests
         var proposal = CuttingPlanBatch.Capture([plate], settings, true).Plan();
         var text = string.Join("\n", proposal.Describe("in"));
 
+        // D1a: the locked lead is a named warning on an UNVERIFIED plate, not a refusal.
         Assert.False(proposal.CanApply);
-        Assert.Contains("another placed material", text);
-        Assert.Contains("spacing the parts farther apart", text);
-        Assert.Contains("reducing the lead-in", text);
-        Assert.Contains("then replan", text);
+        Assert.True(proposal.RequiresWarningAcceptance);
+        Assert.StartsWith("Unverified plan available: fixed lead-ins could not be certified.", text);
+        Assert.Contains("Plate 1: unverified: fixed lead-ins need review.", text);
+        Assert.Contains("- Part 1 (lead blocked): Locked lead on cutting contour 1 contacts or enters another "
+            + "part's material. The locked program is kept as given. Increase spacing, or edit or unlock "
+            + "this part's lead-ins and replan. (with part 2 (neighbour))", text);
         Assert.DoesNotContain("other than None", text);
         Assert.Equal(CuttingCommitStatus.InvalidInput, proposal.Apply().Status);
         Assert.True(ProgramContent.Equal(original, part.Program));

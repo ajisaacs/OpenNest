@@ -84,10 +84,7 @@ namespace OpenNest.Forms
             //
             this.partsGrid.AllowUserToAddRows = false;
             this.partsGrid.AllowUserToDeleteRows = false;
-            this.partsGrid.AllowUserToResizeRows = false;
             this.partsGrid.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
-            this.partsGrid.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.partsGrid.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.partsGrid.Location = new System.Drawing.Point(10, 10);
             this.partsGrid.Name = "partsGrid";
             this.partsGrid.RowHeadersVisible = false;
@@ -167,10 +164,7 @@ namespace OpenNest.Forms
             //
             // plateGrid
             //
-            this.plateGrid.AllowUserToResizeRows = false;
             this.plateGrid.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
-            this.plateGrid.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.plateGrid.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.plateGrid.Location = new System.Drawing.Point(10, 22);
             this.plateGrid.Name = "plateGrid";
             this.plateGrid.RowHeadersVisible = true;

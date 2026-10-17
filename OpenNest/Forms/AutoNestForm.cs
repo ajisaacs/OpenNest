@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using OpenNest.Controls;
 using OpenNest.Engine;
 
 namespace OpenNest.Forms
@@ -19,6 +20,8 @@ namespace OpenNest.Forms
         public AutoNestForm(Nest nest)
         {
             InitializeComponent();
+            GridStyle.Apply(partsGrid);
+            GridStyle.Apply(plateGrid);
             cancelButton.CausesValidation = false;
             SetupPartsGrid();
             SetupPlateGrid();

@@ -145,8 +145,9 @@ namespace OpenNest
         private static readonly IReadOnlySet<string> NoRemovedClamps = ImmutableHashSet<string>.Empty;
 
         /// <summary>
-        /// Rail clamp ids taken off this sheet as a last resort (D8) so a part that could not
-        /// be nested anywhere with every clamp in place still fits. Empty unless
+        /// Rail clamp ids taken off this sheet, by Auto Nest as a last resort (D8) so a part
+        /// that could not be nested anywhere with every clamp in place still fits, or by hand
+        /// (<see cref="SetClampRemoved"/>). Empty unless
         /// <see cref="ClampRail"/> is set; <see cref="ClampZones"/> already excludes them, so
         /// nothing else needs to consult this list to avoid them. Ids stay listed across a
         /// resize/rotate even when the matching clamp is temporarily beyond the sheet, so it
@@ -186,6 +187,44 @@ namespace OpenNest
                 ? NoRemovedClamps
                 : removedClamps.ToImmutableHashSet(StringComparer.Ordinal);
             ReplaceClampZones(ResolveRailZones());
+        }
+
+        /// <summary>
+        /// The rail clamp this sheet places at <paramref name="point"/> (the parts' placement
+        /// frame, see <see cref="ClampZoneFrame"/>), whether in place or removed, grown by
+        /// <paramref name="tolerance"/> on every side; null without a rail or a clamp there.
+        /// Returned bounds are in the placement frame.
+        /// </summary>
+        public ClampZone RailClampAt(Vector point, double tolerance = 0)
+        {
+            if (ClampRail == null)
+                return null;
+            var left = Quadrant is 2 or 3 ? -Size.Length : 0;
+            var bottom = Quadrant is 3 or 4 ? -Size.Width : 0;
+            foreach (var zone in ClampRail.ResolveFor(Size, Quadrant))
+            {
+                var box = zone.Bounds.Translate(left, bottom);
+                if (box.Offset(tolerance).Contains(point))
+                    return new ClampZone(zone.Id, box);
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Takes the rail clamp <paramref name="id"/> off this sheet, or puts it back, as a
+        /// manual counterpart to Auto Nest's last-resort removal (D8): the zones and
+        /// <see cref="ClampRemovalMinutes"/> follow. False when nothing changed: no rail, a clamp
+        /// the rail does not place on this sheet, or one already in the requested state.
+        /// </summary>
+        public bool SetClampRemoved(string id, bool removed)
+        {
+            if (ClampRail == null || id == null || RemovedClamps.Contains(id) == removed)
+                return false;
+            if (removed && !ClampRail.ResolveFor(Size, Quadrant).Any(zone => zone.Id == id))
+                return false;
+            var ids = removed ? RemovedClamps.Append(id) : RemovedClamps.Where(x => x != id);
+            SetClampRail(ClampRail, ids);
+            return true;
         }
 
         private void ResolveClampRail()
@@ -291,50 +330,59 @@ namespace OpenNest
                 if (part.BaseDrawing.IsCutOff)
                     continue;
 
-                Geometry.Entity perimeter = null;
-                try
-                {
-                    var entities = Converters
-                        .ConvertProgram.ToGeometry(part.Program)
-                        .Where(e => SpecialLayers.IsMaterial(e.Layer))
-                        .ToList();
-
-                    if (entities.Count > 0)
-                    {
-                        // Leads are cutting paths in scrap, not boundary edges. Chaining them
-                        // into the outline can make a closed part appear open and replace its
-                        // recesses with a convex hull. Keep the full geometry for the existing
-                        // conservative fallback when the material contour really is open.
-                        var outline = entities.Where(e => e.Layer != SpecialLayers.Leadin &&
-                            e.Layer != SpecialLayers.Leadout).ToList();
-                        var profile = new Geometry.ShapeProfile(outline);
-
-                        if (profile.Perimeter.IsClosed())
-                        {
-                            perimeter = profile.Perimeter;
-                            perimeter.Offset(part.Location);
-                        }
-                        else
-                        {
-                            var points = entities.CollectPoints();
-                            if (points.Count >= 3)
-                            {
-                                var hull = Geometry.ConvexHull.Compute(points);
-                                hull.Offset(part.Location);
-                                perimeter = hull;
-                            }
-                        }
-                    }
-                }
-                catch
-                {
-                    perimeter = null;
-                }
-
-                cache[part] = perimeter;
+                cache[part] = BuildPartPerimeter(part);
             }
 
             return cache;
+        }
+
+        /// <summary>
+        /// Converts one part's own program into its placed perimeter entity (closed
+        /// profile, or a convex hull fallback for a genuinely open contour). This is
+        /// the same conversion <see cref="BuildPerimeterCache"/> runs per part; callers
+        /// without a pre-built cache (e.g. a direct, uncached <see cref="CutOff.Regenerate"/>
+        /// call) use it to get the same conservative, converted-material envelope instead
+        /// of trusting the part's cached bounding box alone.
+        /// </summary>
+        public static Geometry.Entity BuildPartPerimeter(Part part)
+        {
+            try
+            {
+                var entities = Converters
+                    .ConvertProgram.ToGeometry(part.Program)
+                    .Where(e => SpecialLayers.IsMaterial(e.Layer))
+                    .ToList();
+
+                if (entities.Count == 0)
+                    return null;
+
+                // Leads are cutting paths in scrap, not boundary edges. Chaining them
+                // into the outline can make a closed part appear open and replace its
+                // recesses with a convex hull. Keep the full geometry for the existing
+                // conservative fallback when the material contour really is open.
+                var outline = entities.Where(e => e.Layer != SpecialLayers.Leadin &&
+                    e.Layer != SpecialLayers.Leadout).ToList();
+                var profile = new Geometry.ShapeProfile(outline);
+
+                if (profile.Perimeter.IsClosed())
+                {
+                    var perimeter = profile.Perimeter;
+                    perimeter.Offset(part.Location);
+                    return perimeter;
+                }
+
+                var points = entities.CollectPoints();
+                if (points.Count < 3)
+                    return null;
+
+                var hull = Geometry.ConvexHull.Compute(points);
+                hull.Offset(part.Location);
+                return hull;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>

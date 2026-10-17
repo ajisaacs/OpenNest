@@ -6,9 +6,10 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
 using OpenNest.Bending;
+using OpenNest.BestFit;
 using OpenNest.CNC;
+using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Converters;
-using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
 using static OpenNest.IO.NestFormat;
 
@@ -21,8 +22,14 @@ namespace OpenNest.IO
         private readonly Dictionary<int, string> drawingHashes = new();
         private readonly List<string> warnings = new();
 
-        /// <summary>Part programs that could not be restored; other parts still load.</summary>
+        /// <summary>Part programs and library links that could not be restored; everything else still loads.</summary>
         public IReadOnlyList<string> Warnings => warnings.AsReadOnly();
+
+        /// <summary>
+        /// Receives saved best-fit sets. Without a store, <c>bestfits/</c> entries are skipped
+        /// unread; they are only a cache.
+        /// </summary>
+        public IBestFitStore BestFitStore { get; init; }
 
         public NestReader(string file)
         {
@@ -267,13 +274,84 @@ namespace OpenNest.IO
                     }
                 }
 
+                drawing.Library = ReadLibraryLink(d);
+                drawing.CutPins = ReadCutPins(d);
                 map[d.Id] = drawing;
             }
             return map;
         }
 
+        // A link that cannot be fully trusted is dropped: the drawing loads as a plain nest
+        // drawing, which is what it is without a verifiable library revision.
+        private DrawingLibraryLink ReadLibraryLink(DrawingDto d)
+        {
+            var link = d.Library;
+            if (link == null)
+                return null;
+
+            if (!link.Malformed
+                && !string.IsNullOrWhiteSpace(link.ServerKey)
+                && link.Id != Guid.Empty
+                && link.Revision >= 1
+                && TryParseName<CutType>(link.CutType, out var cutType)
+                && TryParseName<Units>(link.Units, out var units)
+                && double.IsFinite(link.Thickness)
+                && link.Thickness >= 0)
+            {
+                return new DrawingLibraryLink(link.ServerKey, link.Id, link.Revision, cutType, link.Thickness,
+                    link.MaterialName, link.MaterialGrade, units, link.Notes, link.PackageSha256);
+            }
+
+            warnings.Add($"Drawing '{d.Name}': its drawing library link could not be read; "
+                + "loaded it as a nest drawing without a library revision.");
+            return null;
+        }
+
+        // Pins are independent: one that cannot be trusted is skipped and the rest still apply.
+        private List<ContourCutPin> ReadCutPins(DrawingDto d)
+        {
+            var pins = new List<ContourCutPin>();
+            if (d.CutPins == null)
+                return pins;
+
+            for (var i = 0; i < d.CutPins.Count; i++)
+            {
+                var pin = CutPinFormat.Read(d.CutPins[i], out var problem);
+                if (pin != null)
+                    pins.Add(pin);
+                else
+                    warnings.Add($"Drawing '{d.Name}': cut pin {i + 1} could not be read ({problem}); "
+                        + "skipped it, so that contour uses the nest's cutting settings.");
+            }
+            return pins;
+        }
+
+        private bool ReadPinsOff(PartDto dto, int plateId, int partIndex, Part part)
+        {
+            if (dto.DrawingPinsOff is bool pinsOff)
+                return pinsOff;
+
+            warnings.Add($"Plate {plateId}, part {partIndex} ('{part.BaseDrawing.Name}'): its drawing pins "
+                + "setting could not be read; the drawing's cut pins apply.");
+            return false;
+        }
+
+        // Single enum names only: Enum.TryParse also accepts numbers and comma lists.
+        private static bool TryParseName<T>(string text, out T value)
+            where T : struct, Enum
+        {
+            value = default;
+            return !string.IsNullOrEmpty(text)
+                && text.All(char.IsAsciiLetter)
+                && Enum.TryParse(text, ignoreCase: false, out value)
+                && Enum.IsDefined(value);
+        }
+
         private void ReadBestFits(Dictionary<int, Drawing> drawingMap)
         {
+            if (BestFitStore == null)
+                return;
+
             foreach (var kvp in drawingMap)
             {
                 var entry = zipArchive.GetEntry($"bestfits/bestfit-{kvp.Key}");
@@ -288,47 +366,33 @@ namespace OpenNest.IO
                 if (sets == null)
                     continue;
 
-                PopulateBestFitSets(kvp.Value, sets);
+                BestFitStore.Import(kvp.Value, sets.Select(FromDto).ToList());
             }
         }
 
-        private void PopulateBestFitSets(Drawing drawing, List<BestFitSetDto> sets)
-        {
-            foreach (var set in sets)
-            {
-                var results = set
-                    .Results.Select(r => new BestFitResult
-                    {
-                        Candidate = new PairCandidate
-                        {
-                            Drawing = drawing,
-                            Part1Rotation = r.Part1Rotation,
-                            Part2Rotation = r.Part2Rotation,
-                            Part2Offset = new Vector(r.Part2OffsetX, r.Part2OffsetY),
-                            StrategyIndex = r.StrategyType,
-                            TestNumber = r.TestNumber,
-                            Spacing = r.CandidateSpacing,
-                        },
-                        RotatedArea = r.RotatedArea,
-                        BoundingWidth = r.BoundingWidth,
-                        BoundingHeight = r.BoundingHeight,
-                        OptimalRotation = r.OptimalRotation,
-                        Keep = r.Keep,
-                        Reason = r.Reason,
-                        TrueArea = r.TrueArea,
-                        HullAngles = r.HullAngles,
-                    })
-                    .ToList();
-
-                BestFitCache.Populate(
-                    drawing,
-                    set.PlateWidth,
-                    set.PlateHeight,
-                    set.Spacing,
-                    results
-                );
-            }
-        }
+        private static SavedPairSet FromDto(BestFitSetDto set) =>
+            new(
+                set.PlateWidth,
+                set.PlateHeight,
+                set.Spacing,
+                set.Results.Select(r => new SavedPairResult(
+                    r.Part1Rotation,
+                    r.Part2Rotation,
+                    r.Part2OffsetX,
+                    r.Part2OffsetY,
+                    r.StrategyType,
+                    r.TestNumber,
+                    r.CandidateSpacing,
+                    r.RotatedArea,
+                    r.BoundingWidth,
+                    r.BoundingHeight,
+                    r.OptimalRotation,
+                    r.Keep,
+                    r.Reason,
+                    r.TrueArea,
+                    r.HullAngles
+                )).ToList()
+            );
 
         /// <summary>
         /// The saved machine clamp rail, or null when absent, empty or malformed (a bad rail
@@ -470,6 +534,7 @@ namespace OpenNest.IO
                     part.Rotate(partDto.Rotation);
                     part.Offset(new Vector(partDto.X, partDto.Y));
                     RestorePartProgram(part, partDto, p.Id, partIndex);
+                    part.DrawingPinsOff = ReadPinsOff(partDto, p.Id, partIndex, part);
                     plate.Parts.Add(part);
                 }
 

@@ -38,14 +38,7 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
     {
         _httpClient = httpClient;
         _ownsClient = false;
-        var url = (baseUrl ?? "").Trim().TrimEnd('/');
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var baseUri)
-            || (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps))
-        {
-            throw new ArgumentException($"Invalid nest server URL: '{baseUrl}'", nameof(baseUrl));
-        }
-        // Keep the trailing slash so relative combines replace no path segment.
-        _baseUri = new Uri(baseUri.AbsoluteUri.TrimEnd('/') + "/");
+        _baseUri = ServerUrl.ParseBase(baseUrl, nameof(baseUrl));
     }
 
     private Uri Url(string relative) => new(_baseUri, relative);

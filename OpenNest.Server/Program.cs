@@ -70,7 +70,7 @@ app.MapGet("/api/nests/{id:guid}/revisions/{revision:int}/file", (Guid id, int r
 
 app.MapPut("/api/nests/{id:guid}/file", async (Guid id, HttpContext http, NestDatabase db) =>
 {
-    var precondition = ReadPrecondition(http.Request, out var expected);
+    var precondition = IfMatch.Read(http.Request, out var expected);
     if (precondition is not null) return precondition;
     var (record, file, error) = await ReadMultipart(http);
     if (error is not null) return error;
@@ -87,7 +87,7 @@ app.MapPut("/api/nests/{id:guid}/file", async (Guid id, HttpContext http, NestDa
 
 app.MapPut("/api/nests/{id:guid}/metadata", async (Guid id, HttpRequest request, NestDatabase db) =>
 {
-    var error = ReadPrecondition(request, out var expected);
+    var error = IfMatch.Read(request, out var expected);
     if (error is not null) return error;
     NestRecord? record;
     try { record = await request.ReadFromJsonAsync<NestRecord>(); }
@@ -120,7 +120,7 @@ app.MapGet("/api/nests/deleted/{id:guid}/revisions/{revision:int}/file", (Guid i
 
 app.MapPost("/api/nests/{id:guid}/revisions/{revision:int}/restore", (Guid id, int revision, HttpRequest request, NestDatabase db) =>
 {
-    var error = ReadPrecondition(request, out var expected);
+    var error = IfMatch.Read(request, out var expected);
     if (error is not null) return error;
     if (revision < 1) return Results.BadRequest("Invalid revision.");
     try
@@ -131,24 +131,13 @@ app.MapPost("/api/nests/{id:guid}/revisions/{revision:int}/restore", (Guid id, i
     catch (RevisionConflictException conflict) { return Results.Json(conflict.Current, statusCode: 409); }
 });
 
-app.Run();
+app.MapDrawingLibrary();
 
-static IResult? ReadPrecondition(HttpRequest request, out int revision)
-{
-    revision = 0;
-    var values = request.Headers.IfMatch;
-    if (values.Count == 0) return Results.Json("Upgrade/reload required: send If-Match with the current revision.", statusCode: 428);
-    var text = values.Count == 1 ? values[0] : null;
-    if (text is null || text.Length < 3 || text[0] != '"' || text[^1] != '"' ||
-        !text[1..^1].All(c => c is >= '0' and <= '9') ||
-        !int.TryParse(text[1..^1], out revision) || revision < 1)
-        return Results.BadRequest("If-Match must contain one quoted positive integer revision.");
-    return null;
-}
+app.Run();
 
 static IResult ChangeVisibility(Guid id, bool deleted, HttpRequest request, NestDatabase db)
 {
-    var error = ReadPrecondition(request, out var expected);
+    var error = IfMatch.Read(request, out var expected);
     if (error is not null) return error;
     try
     {

@@ -642,7 +642,7 @@
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.MarkerAndHoverUsePairMaterialCentroidRatherThanBoundsCenter",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.MarkerAndHoverUseThePoleOfTheSharedMaterialRatherThanBoundsCenter",
           "minimum_cases": 1
         },
         {

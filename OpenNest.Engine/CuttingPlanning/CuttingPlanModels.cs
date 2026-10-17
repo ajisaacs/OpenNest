@@ -130,6 +130,74 @@ public sealed class FixedProgramPlacement
     public Program CopyProgram() => program == null ? null : OwnedProgramCopy.Copy(program);
     internal SelectedContourProgram SelectedProgram { get; private init; }
 
+    /// <summary>
+    /// The motions of <paramref name="execution"/> (this placement's own program read with its
+    /// incoming rapid first) that are a fixed emission, accepted as given in regeneration mode:
+    /// everything a locked program does after the planner's rapid into it, and the lead-in, cut,
+    /// lead-out and tab of every drawing-pinned contour in a regenerated program, whose
+    /// <paramref name="choices"/> (default: this proposal's) were emitted. The rapids between
+    /// contours stay the planner's. Null when nothing is fixed. Cutoffs and unlocked programs a
+    /// caller left ineligible keep their strict checks.
+    /// </summary>
+    internal Func<int, bool> FixedMotions(OwnedExecution execution, IReadOnlyList<ContourChoice> choices = null)
+    {
+        if (IsCutOff)
+            return null;
+        if (Prepared != null)
+        {
+            var pins = PinsByMotion(execution, choices);
+            return pins == null ? null : motion => pins[motion] != null;
+        }
+        if (!LeadInsLocked)
+            return null;
+        var opensWithRapid = execution.Motions.Count != 0 && execution.Motions[0].Rapid;
+        return motion => motion > 0 || !opensWithRapid;
+    }
+
+    /// <summary>
+    /// For each motion of a regenerated program emitted from <paramref name="choices"/>, the
+    /// one-based drawing pin whose contour it cuts (lead-ins, cuts, lead-outs; never the rapid
+    /// into the contour), or null. Null overall when no choice is pinned, or when the motions do
+    /// not split into one group per choice after the scribes, so nothing is treated as fixed.
+    /// </summary>
+    internal int?[] PinsByMotion(OwnedExecution execution, IReadOnlyList<ContourChoice> choices = null)
+    {
+        choices ??= ContourChoices;
+        if (Prepared == null || !choices.Any(c => Prepared.IsPinned(c.ContourOrdinal)))
+            return null;
+        var pins = new int?[execution.Motions.Count];
+        var group = -1;
+        var opening = true; // Inside the rapids that open a group.
+        int? pin = null;
+        for (var index = 0; index < execution.Motions.Count; index++)
+        {
+            var motion = execution.Motions[index];
+            if (motion.Rapid)
+            {
+                if (!opening)
+                    opening = true;
+                continue;
+            }
+            if (opening)
+            {
+                opening = false;
+                // Scribes are emitted first, before any contour.
+                if (motion.Layer == LayerType.Scribe)
+                {
+                    pin = null;
+                    if (group >= 0)
+                        return null;
+                    continue;
+                }
+                if (++group >= choices.Count)
+                    return null;
+                pin = Prepared.PinNumberOf(choices[group].ContourOrdinal);
+            }
+            pins[index] = pin;
+        }
+        return group == choices.Count - 1 ? pins : null;
+    }
+
     internal FixedProgramPlacement Propose(Program proposed, OwnedExecution execution, IReadOnlyList<ContourChoice> choices,
         System.Threading.CancellationToken token = default)
     {
@@ -178,13 +246,47 @@ public enum CuttingPlanStatus
 
 /// <summary>Ordinals are zero-based source positions, not proposed sequence positions.</summary>
 public sealed record CuttingPlanFinding(int? SourceOrdinal, Part SourcePart,
-    int? OtherSourceOrdinal, Part OtherSourcePart, PostVerificationKind? Kind, string Message);
+    int? OtherSourceOrdinal, Part OtherSourcePart, PostVerificationKind? Kind, string Message)
+{
+    /// <summary>
+    /// The check's own finding, for its world-coordinate markers (location, rapid, contacts).
+    /// Its part numbers are check positions, not source ordinals. Null when the check gave none.
+    /// Not part of equality: repeated rejections of the same problem stay one finding.
+    /// </summary>
+    public PostVerificationFinding Witness { get; init; }
+
+    /// <summary>
+    /// For a <see cref="PostVerificationKind.FixedLead"/> warning, what the fixed emission is and
+    /// what it hits; null otherwise. Not part of equality (the message already names both).
+    /// </summary>
+    public FixedLeadWarning FixedLead { get; init; }
+
+    public bool Equals(CuttingPlanFinding other) => other is not null
+        && SourceOrdinal == other.SourceOrdinal && Equals(SourcePart, other.SourcePart)
+        && OtherSourceOrdinal == other.OtherSourceOrdinal && Equals(OtherSourcePart, other.OtherSourcePart)
+        && Kind == other.Kind && Message == other.Message;
+
+    public override int GetHashCode() =>
+        HashCode.Combine(SourceOrdinal, SourcePart, OtherSourceOrdinal, OtherSourcePart, Kind, Message);
+}
+
+/// <summary>
+/// A violation inside a fixed emission, accepted as given rather than refused (D1a); the part is
+/// the finding's source part. <see cref="ContourNumber"/> is one-based in the part's program
+/// (null when the whole program is concerned); <see cref="PinNumber"/> is the one-based drawing
+/// pin, or null for a locked program; <see cref="ObstacleSourceOrdinal"/> is the other part hit,
+/// or null for the part's own material, a released contour named in the message, or an
+/// uncertifiable gap.
+/// </summary>
+public sealed record FixedLeadWarning(int? ContourNumber, int? PinNumber, int? ObstacleSourceOrdinal);
 
 /// <summary>
 /// A replayed direct-XY proposal, optionally with regenerated programs, that respects the
 /// captured cutoff/containment prerequisites. Not physical safety or posting consent. Apply
 /// installs it only for a plate-scoped request whose plate is unchanged. BestEffort is explicitly
-/// unverified and requires batch warning acceptance; other failures contain no proposals.
+/// unverified and requires batch warning acceptance; other failures contain no proposals. A
+/// BestEffort result that is also <see cref="IndependentlyReplayed"/> passed every strict check
+/// except inside fixed emissions, whose violations are its FixedLead warnings.
 /// </summary>
 public sealed class CuttingPlanResult
 {

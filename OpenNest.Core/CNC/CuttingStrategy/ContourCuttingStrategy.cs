@@ -234,12 +234,15 @@ namespace OpenNest.CNC.CuttingStrategy
             return null;
         }
 
+        /// <param name="contourParameters">Per-contour settings by contour ordinal (a drawing pin's
+        /// own lead-in, lead-out and tab); a null list or entry uses <see cref="Parameters"/>.</param>
         internal Program EmitPrepared(Shape[] shapes, List<Entity> scribes,
-            IReadOnlyList<CuttingPlanning.ContourChoice> choices)
+            IReadOnlyList<CuttingPlanning.ContourChoice> choices,
+            IReadOnlyList<CuttingParameters> contourParameters = null)
         {
             var result = new Program(Mode.Absolute);
             EmitScribeContours(result, scribes);
-            EmitChosenContours(result, shapes, choices);
+            EmitChosenContours(result, shapes, choices, contourParameters);
             result.Mode = Mode.Incremental;
             return result;
         }
@@ -250,11 +253,11 @@ namespace OpenNest.CNC.CuttingStrategy
         // perimeter never degrades to a hole because it was isolated. Output must not be
         // installed on a Part or accepted as a complete plan.
         internal Program EmitCandidateIsolated(Shape[] shapes, List<Entity> scribes,
-            CuttingPlanning.ContourChoice choice)
+            CuttingPlanning.ContourChoice choice, IReadOnlyList<CuttingParameters> contourParameters = null)
         {
             var result = new Program(Mode.Absolute);
             EmitScribeContours(result, scribes);
-            EmitChosenContours(result, shapes, new[] { choice });
+            EmitChosenContours(result, shapes, new[] { choice }, contourParameters);
             result.Mode = Mode.Incremental;
             return result;
         }
@@ -263,14 +266,25 @@ namespace OpenNest.CNC.CuttingStrategy
         // Contour emission itself reads only the contour's own geometry and settings, never
         // prior choices — the differential tests in ContourCandidateEmissionTests pin this.
         private void EmitChosenContours(Program result, Shape[] shapes,
-            IReadOnlyList<CuttingPlanning.ContourChoice> choices)
+            IReadOnlyList<CuttingPlanning.ContourChoice> choices, IReadOnlyList<CuttingParameters> contourParameters)
         {
-            foreach (var choice in choices)
+            var shared = Parameters;
+            try
             {
-                var shape = shapes[choice.ContourOrdinal];
-                EmitContour(result, shape, choice.Point, shape.Entities[choice.EntityOrdinal],
-                    choice.ContourOrdinal == shapes.Length - 1 ? ContourType.External : null,
-                    exactCirclePrograms: true);
+                foreach (var choice in choices)
+                {
+                    // A contour's own settings apply to its emission alone; scribes and every
+                    // other contour keep the shared settings.
+                    Parameters = contourParameters?[choice.ContourOrdinal] ?? shared;
+                    var shape = shapes[choice.ContourOrdinal];
+                    EmitContour(result, shape, choice.Point, shape.Entities[choice.EntityOrdinal],
+                        choice.ContourOrdinal == shapes.Length - 1 ? ContourType.External : null,
+                        exactCirclePrograms: true);
+                }
+            }
+            finally
+            {
+                Parameters = shared;
             }
         }
 

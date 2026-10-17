@@ -179,7 +179,8 @@ internal static class JointCuttingPlanSearch
             var source = f.PartNumber is { } p ? snapshot.Placements[p - 1] : null;
             var other = f.OtherPartNumber is { } o ? snapshot.Placements[o - 1] : null;
             return new CuttingPlanFinding(source?.SourceOrdinal, source?.SourcePart,
-                other?.SourceOrdinal, other?.SourcePart, f.Kind, f.Message);
+                other?.SourceOrdinal, other?.SourcePart, f.Kind, f.Message)
+            { Witness = f };
         });
 
     /// <summary>
@@ -501,7 +502,7 @@ internal static class JointCuttingPlanSearch
                         }
                         // Prefix includes all earlier cuts and scribes. Replay from BEFORE the whole part.
                         var checker = before.Copy();
-                        if (!Check(source, execution, arrival, checker, attempt)) continue;
+                        if (!Check(source, execution, arrival, checker, attempt, prefix)) continue;
                         var distance = execution.RapidDistanceFrom(arrival);
                         var next = prefix.Length == prepared.Count
                             ? new Node([.. node.Order, source.Propose(program, execution, prefix, token)],
@@ -555,7 +556,7 @@ internal static class JointCuttingPlanSearch
                 var execution = ExecutionMotionReader.Read(program, source.Location, node.Position, token);
                 var checker = node.Checker.Copy();
                 CountExpansion(source);
-                if (!Check(source, execution, node.Position, checker, attempt)) continue;
+                if (!Check(source, execution, node.Position, checker, attempt, chain)) continue;
                 var proposal = source.Propose(program, execution, chain, token);
                 yield return new(new([.. node.Order, proposal], execution.DeparturePoint, checker, null, node),
                     execution.RapidDistanceFrom(node.Position), source.SourceOrdinal, -1, endpoint, endpoint);
@@ -727,15 +728,20 @@ internal static class JointCuttingPlanSearch
             token.ThrowIfCancellationRequested();
         }
 
+        // choices: the contours a regenerated execution emits, so its pinned ones are known.
         private bool Check(FixedProgramPlacement source, OwnedExecution execution, Vector arrival,
-            ReleasedContourState checker, Attempt attempt)
+            ReleasedContourState checker, Attempt attempt, IReadOnlyList<ContourChoice> choices = null)
         {
-            var findings = checker.Check(execution, arrival, source.SourceOrdinal + 1, source.IsCutOff, token);
+            // A fixed emission is accepted as given and never constrains the search: its own
+            // violations neither reject this candidate nor teach an order rule. Final replay
+            // reports them as warnings. Every planner-chosen motion stays strict.
+            var isFixed = source.FixedMotions(execution, choices);
+            var findings = checker.Check(execution, arrival, source.SourceOrdinal + 1, source.IsCutOff, isFixed, token).Strict;
             rejected.AddRange(Map(snapshot, findings));
             attempt.NoteCrossings(source.SourceOrdinal, findings);
             // A fixed cutoff has no material or leads to certify; its rapids are still checked.
             var lead = source.IsCutOff ? new LeadPathValidationResult(true, true, null)
-                : LeadPathValidator.Check(execution, source.Material, materials, token);
+                : LeadPathValidator.Check(execution, source.Material, materials, isFixed, [], token);
             if (!lead.IsComplete || !lead.IsClear)
                 rejected.Add(Finding(source, lead.IsComplete ? null : PostVerificationKind.Incomplete, lead.Reason));
             return findings.Count == 0 && lead.IsComplete && lead.IsClear;

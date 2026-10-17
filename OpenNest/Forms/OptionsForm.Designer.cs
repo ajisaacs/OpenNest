@@ -152,10 +152,6 @@
             //
             this.strategyGrid.AllowUserToAddRows = false;
             this.strategyGrid.AllowUserToDeleteRows = false;
-            this.strategyGrid.AllowUserToResizeRows = false;
-            this.strategyGrid.BackgroundColor = System.Drawing.SystemColors.Window;
-            this.strategyGrid.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.strategyGrid.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.strategyGrid.Dock = System.Windows.Forms.DockStyle.Fill;
             this.strategyGrid.Location = new System.Drawing.Point(3, 18);
             this.strategyGrid.Name = "strategyGrid";

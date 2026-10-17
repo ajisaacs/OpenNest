@@ -194,6 +194,8 @@ public static class PostVerificationAnalyzer
                     plateNumber, partNumber, null, message));
             }
             cancellationToken.ThrowIfCancellationRequested();
+            // Leads Plan Cutting accepted as given (locked and drawing-pinned) are checked again here.
+            FixedLeadReview.Add(plate, plateNumber, findings, clamps, cancellationToken);
             var overlap = PlateOverlapAnalyzer.Analyze(
                 PlateOverlapAnalyzer.Capture(materialParts, (clamps ?? Array.Empty<ClampZone>()).ToArray(),
                     cancellationToken),
@@ -201,11 +203,11 @@ public static class PostVerificationAnalyzer
             foreach (var pair in overlap.Pairs)
                 findings.Add(new(PostVerificationKind.Overlap, plateNumber, indices[pair.PartAId],
                     indices[pair.PartBId], "Clean drawing material overlaps (holes subtracted).")
-                { Location = pair.Centroid, Overlap = pair });
+                { Location = pair.Marker, Overlap = pair });
             foreach (var pair in overlap.ClampFindings)
                 findings.Add(new(PostVerificationKind.Overlap, plateNumber, indices[pair.PartAId],
                     null, $"Clean drawing material overlaps {pair.PartBName} (holes subtracted).")
-                { Location = pair.Centroid, Overlap = pair });
+                { Location = pair.Marker, Overlap = pair });
             foreach (var issue in overlap.Issues)
                 findings.Add(new(PostVerificationKind.Incomplete, plateNumber, indices[issue.PartAId],
                     issue.PartBId is { } other ? indices[other] : null, "Overlap check: " + issue.Message));
@@ -215,7 +217,7 @@ public static class PostVerificationAnalyzer
     }
 
     // Lines are tested exactly; an arc conservatively by its whole supporting extent.
-    private static bool CutTouches(ExecutionMotion move, Vector from, Box zone, out Vector contact)
+    internal static bool CutTouches(ExecutionMotion move, Vector from, Box zone, out Vector contact)
     {
         if (move.Curve == null || move.Curve.IsLine)
             return ClampCutDiagnostics.Intersects(from, move.End, zone, out contact);

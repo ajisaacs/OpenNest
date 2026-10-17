@@ -159,11 +159,9 @@ public class CuttingInspectionPanelTests
         using var editor = Editor();
         var second = editor.Nest.Plates[^1]; // Fill the managed empty sentinel; a new one is appended.
         second.Size = new OpenNest.Geometry.Size(100, 100);
-        var locked = Square("locked", 1);
-        var crossing = (OpenNest.CNC.Program)locked.Program.Clone();
-        crossing.MoveTo(5, 5);
-        Assert.True(locked.RestoreLeadInProgram(crossing, true));
-        second.Parts.Add(locked);
+        // Overlapping material blocks the plate (a locked program's own crossing only warns).
+        second.Parts.Add(Square("first", 1));
+        second.Parts.Add(Square("second", 5));
         editor.Show();
         editor.PlateManager.LoadAt(editor.Nest.Plates.Count - 1); // Different empty sentinel.
         var original = editor.PlateView.Plate;
@@ -171,13 +169,13 @@ public class CuttingInspectionPanelTests
         var panel = editor.CuttingInspection!;
         PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
         Assert.Equal(2, panel.Proposal.Plates.Count);
-        Assert.Equal(ScrollBars.Vertical, Field<TextBox>(panel, "resultLabel").ScrollBars);
+        Assert.Contains("Can't apply", Field<Label>(panel, "statusLabel").Text);
         Assert.False(Field<Button>(panel, "applyButton").Enabled);
         Assert.True(editor.PlateView.HasProposalDisplay);
         Field<Button>(panel, "nextButton").PerformClick();
         Assert.Same(second, editor.PlateView.Plate); // Refusal shows the requested live plate, not the opening plate.
         Assert.False(editor.PlateView.HasProposalDisplay);
-        Assert.Contains("no current preview", Field<Label>(panel, "previewLabel").Text);
+        Assert.Contains("blocked", Field<Label>(panel, "previewLabel").Text);
         var grid = Field<DataGridView>(panel, "warningGrid");
         Assert.Equal(panel.Proposal.DiagnosticRows().Count, grid.Rows.Count);
         var row = grid.Rows.Cast<DataGridViewRow>().First(r => r.Tag is OpenNest.Engine.CuttingPlanning.CuttingPlanDiagnosticRow d && d.PlateIndex == 1);
@@ -187,6 +185,69 @@ public class CuttingInspectionPanelTests
         Assert.All(editor.Nest.Plates[0].Parts, p => Assert.False(p.HasManualLeadIns));
         panel.RequestClose();
         Assert.Same(original, editor.PlateView.Plate);
+    });
+
+    [Fact]
+    public void BlockedOverlapRowShadesTheOverlapOnTheLivePlate() => RunSta(() =>
+    {
+        using var editor = Editor();
+        var plate = editor.Nest.Plates[0];
+        plate.Parts.Add(Square("overlapping", 5));
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.False(Field<Button>(panel, "applyButton").Enabled);
+        Assert.Contains("Can't apply", Field<Label>(panel, "statusLabel").Text);
+        Assert.Contains("parts overlap", Field<Label>(panel, "previewLabel").Text);
+        var view = editor.PlateView;
+        Assert.False(view.HasProposalDisplay);
+        var grid = Field<DataGridView>(panel, "warningGrid");
+        var row = grid.Rows.Cast<DataGridViewRow>().First(r =>
+            r.Tag is OpenNest.Engine.CuttingPlanning.CuttingPlanDiagnosticRow { Witness.Overlap: not null });
+        grid.ClearSelection();
+        row.Selected = true;
+        Assert.Same(plate, view.Plate);
+        Assert.NotNull(view.ValidationOverlay.Finding?.Overlap);
+        Assert.Contains("overlapping material", Field<Label>(panel, "detailLabel").Text);
+        panel.RequestClose();
+        Assert.Null(view.ValidationOverlay.Finding);
+    });
+
+    [Fact]
+    public void PlannedCutOffsKeepTheCutOffLineStyleOnTheProposal() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Size = new System.Drawing.Size(1300, 800);
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        var view = editor.PlateView;
+        var baseline = CutOffPixels(view);
+        Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked = true;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.True(view.HasProposalDisplay);
+        Assert.Contains(view.DisplayPlate.Parts, part => part.BaseDrawing.IsCutOff);
+        Assert.True(CutOffPixels(view) > baseline + 50, "Planned cut-offs should draw as orange-red dashes.");
+        panel.RequestClose();
+
+        static int CutOffPixels(OpenNest.Controls.PlateView view)
+        {
+            using var bitmap = new System.Drawing.Bitmap(view.Width, view.Height);
+            view.DrawToBitmap(bitmap, new System.Drawing.Rectangle(0, 0, view.Width, view.Height));
+            var count = 0;
+            for (var x = 0; x < bitmap.Width; x++)
+                for (var y = 0; y < bitmap.Height; y++)
+                {
+                    var pixel = bitmap.GetPixel(x, y);
+                    if (pixel.R > 220 && pixel.G is > 40 and < 110 && pixel.B < 40)
+                        count++;
+                }
+            return count;
+        }
     });
 
     [Fact]
@@ -260,7 +321,10 @@ public class CuttingInspectionPanelTests
         var partRow = grid.Rows.Cast<DataGridViewRow>().First(r => r.Cells[1].Value is int);
         grid.ClearSelection();
         partRow.Selected = true;
-        Assert.Contains("affected part extent", Field<Label>(panel, "previewLabel").Text);
+        if (partRow.Tag is OpenNest.Engine.CuttingPlanning.CuttingPlanDiagnosticRow { Witness.Location: not null })
+            Assert.NotNull(editor.PlateView.ValidationOverlay.Finding);
+        else
+            Assert.Contains("affected part", Field<Label>(panel, "detailLabel").Text);
         Field<Button>(panel, "applyButton").PerformClick();
         Assert.Null(panel.CommitResult);
         Assert.All(plate.Parts, part => Assert.False(part.HasManualLeadIns));
@@ -287,7 +351,7 @@ public class CuttingInspectionPanelTests
         Assert.False(editor.PlateView.HasProposalDisplay);
         Assert.False(Field<Button>(panel, "applyButton").Enabled);
         Assert.False(Field<CheckBox>(panel, "acceptWarningsCheckBox").Checked);
-        Assert.Contains("Replan", Field<TextBox>(panel, "resultLabel").Text);
+        Assert.Contains("Replan", Field<Label>(panel, "statusLabel").Text);
         Assert.Equal(programs, plate.Parts.Select(p => p.Program));
         Assert.All(plate.Parts, p => Assert.False(p.HasManualLeadIns));
         panel.StartPlanning();
@@ -349,7 +413,7 @@ public class CuttingInspectionPanelTests
         Assert.False(Field<Button>(panel, "applyButton").Enabled);
         Assert.False(Field<CheckBox>(panel, "acceptWarningsCheckBox").Checked);
         Assert.False(editor.PlateView.HasProposalDisplay);
-        Assert.Contains("Nothing can be applied", Field<TextBox>(panel, "resultLabel").Text);
+        Assert.Contains("Nothing can be applied", Field<Label>(panel, "statusLabel").Text);
         Assert.Equal(original, editor.PlateView.Plate.Parts);
         panel.RequestClose();
     });
@@ -456,7 +520,7 @@ public class CuttingInspectionPanelTests
         Assert.NotEmpty(plate.CutOffs);
         Assert.Equal(plate.CutOffs.Count, plate.Parts.Count(p => p.BaseDrawing.IsCutOff));
         Assert.Equal(plate.CutOffs.Count, panel.Proposal.Plates[0].Result.ProposedOrder.Count(p => p.IsCutOff));
-        Assert.False(Field<FlowLayoutPanel>(panel, "existingWorkBanner").Visible); // Staged lines are not "existing".
+        Assert.False(Field<Control>(panel, "existingWorkBanner").Visible); // Staged lines are not "existing".
 
         Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked = false;
         PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
@@ -508,7 +572,7 @@ public class CuttingInspectionPanelTests
         editor.OpenCuttingInspection();
         var first = editor.CuttingInspection!;
         PumpUntil(() => first.Proposal != null && !first.IsPlanning);
-        Assert.False(Field<FlowLayoutPanel>(first, "existingWorkBanner").Visible);
+        Assert.False(Field<Control>(first, "existingWorkBanner").Visible);
         Field<Button>(first, "applyButton").PerformClick();
         Assert.All(plate.Parts, part => Assert.True(part.HasManualLeadIns));
         plate.CutOffs.Add(new CutOff(new Vector(60, 0), CutOffAxis.Vertical));
@@ -518,7 +582,7 @@ public class CuttingInspectionPanelTests
         editor.OpenCuttingInspection();
         var panel = editor.CuttingInspection!;
         PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
-        var banner = Field<FlowLayoutPanel>(panel, "existingWorkBanner");
+        var banner = Field<Control>(panel, "existingWorkBanner");
         Assert.True(banner.Visible);
         Assert.Contains("ALREADY APPLIED: lead-ins on 2 parts and 1 cut-off on plate 1.",
             Field<Label>(panel, "existingWorkLabel").Text);
@@ -609,7 +673,7 @@ public class CuttingInspectionPanelTests
         protected override void OnLoad(EventArgs e) { }
     }
 
-    private static T Field<T>(object target, string name) => Assert.IsType<T>(target.GetType()
+    private static T Field<T>(object target, string name) => Assert.IsAssignableFrom<T>(target.GetType()
         .GetField(name, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(target));
 
     private static void OpenAll(EditNestForm editor)

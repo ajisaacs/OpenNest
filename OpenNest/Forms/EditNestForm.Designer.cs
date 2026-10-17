@@ -51,6 +51,7 @@
             toolStrip2 = new System.Windows.Forms.ToolStrip();
             toolStripButton2 = new System.Windows.Forms.ToolStripButton();
             shapeLibraryButton = new System.Windows.Forms.ToolStripButton();
+            drawingLibraryButton = new System.Windows.Forms.ToolStripButton();
             editDrawingsButton = new System.Windows.Forms.ToolStripButton();
             toolStripButton3 = new System.Windows.Forms.ToolStripButton();
             hideNestedButton = new System.Windows.Forms.ToolStripButton();
@@ -219,7 +220,7 @@
             // 
             toolStrip2.GripStyle = System.Windows.Forms.ToolStripGripStyle.Hidden;
             toolStrip2.ImageScalingSize = new System.Drawing.Size(20, 20);
-            toolStrip2.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { toolStripButton2, shapeLibraryButton, editDrawingsButton, toolStripButton3, hideNestedButton });
+            toolStrip2.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { toolStripButton2, shapeLibraryButton, drawingLibraryButton, editDrawingsButton, toolStripButton3, hideNestedButton });
             toolStrip2.Location = new System.Drawing.Point(4, 3);
             toolStrip2.Name = "toolStrip2";
             toolStrip2.Size = new System.Drawing.Size(265, 27);
@@ -247,6 +248,16 @@
             shapeLibraryButton.Size = new System.Drawing.Size(34, 24);
             shapeLibraryButton.Text = "Shape Library";
             shapeLibraryButton.Click += ShapeLibrary_Click;
+            //
+            // drawingLibraryButton
+            //
+            drawingLibraryButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            drawingLibraryButton.Name = "drawingLibraryButton";
+            drawingLibraryButton.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
+            drawingLibraryButton.Size = new System.Drawing.Size(58, 24);
+            drawingLibraryButton.Text = "Library";
+            drawingLibraryButton.ToolTipText = "Add from Drawing Library";
+            drawingLibraryButton.Click += DrawingLibrary_Click;
             //
             // editDrawingsButton
             //
@@ -325,6 +336,7 @@
         private System.Windows.Forms.ToolStrip toolStrip2;
         private System.Windows.Forms.ToolStripButton toolStripButton2;
         private System.Windows.Forms.ToolStripButton shapeLibraryButton;
+        private System.Windows.Forms.ToolStripButton drawingLibraryButton;
         private System.Windows.Forms.ToolStripButton editDrawingsButton;
         private System.Windows.Forms.ToolStripButton toolStripButton3;
         private System.Windows.Forms.ToolStripButton hideNestedButton;

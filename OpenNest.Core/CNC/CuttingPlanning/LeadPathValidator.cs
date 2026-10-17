@@ -10,11 +10,28 @@ namespace OpenNest.CNC.CuttingPlanning;
 /// <summary>A complete unsafe result is distinct from an incomplete/unsupported check.</summary>
 public sealed record LeadPathValidationResult(bool IsComplete, bool IsClear, string Reason);
 
+/// <summary>
+/// One lead motion of a fixed emission that failed validation. <see cref="Obstacle"/> indexes the
+/// other materials passed to the check, or is null when the lead meets its own part's material
+/// or could not be checked.
+/// </summary>
+internal sealed record FixedLeadFailure(int Motion, LeadPathValidationResult Result, int? Obstacle);
+
 /// <summary>Certifies actual emitted native lead paths against owned nominal material.</summary>
 public static class LeadPathValidator
 {
     public static LeadPathValidationResult Check(OwnedExecution execution, LeadMaterialSnapshot target,
-        IReadOnlyList<LeadMaterialSnapshot> otherMaterials, CancellationToken token = default)
+        IReadOnlyList<LeadMaterialSnapshot> otherMaterials, CancellationToken token = default) =>
+        Check(execution, target, otherMaterials, null, null, token);
+
+    /// <summary>
+    /// As the public check, but a lead motion that <paramref name="isFixed"/> owns (by motion
+    /// index) is part of a fixed emission: its failure is added to <paramref name="fixedFailures"/>
+    /// and checking continues. Any other failure is returned exactly as the public check returns it.
+    /// </summary>
+    internal static LeadPathValidationResult Check(OwnedExecution execution, LeadMaterialSnapshot target,
+        IReadOnlyList<LeadMaterialSnapshot> otherMaterials, Func<int, bool> isFixed,
+        List<FixedLeadFailure> fixedFailures, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         if (execution == null || target == null || otherMaterials == null)
@@ -30,11 +47,25 @@ public static class LeadPathValidator
                 var move = execution.Motions[i];
                 if (move.Layer is not (LayerType.Leadin or LayerType.Leadout))
                     continue;
+                var (failure, obstacle) = CheckMotion(i);
+                if (failure == null)
+                    continue;
+                if (isFixed?.Invoke(i) != true || fixedFailures == null)
+                    return failure;
+                fixedFailures.Add(new(i, failure, obstacle));
+            }
+            // No lead motion is valid for direct contour piercing. The caller still
+            // checks rapid travel and contour accounting for the complete program.
+            return new(true, true, null);
+
+            (LeadPathValidationResult Failure, int? Obstacle) CheckMotion(int i)
+            {
+                var move = execution.Motions[i];
                 if (move.Rapid || move.Start is not { } start || move.Curve == null
                     || !double.IsFinite(move.Length) || move.Length <= PostVerificationGeometry.Epsilon
                     || start.DistanceTo(move.Curve.Start) > PostVerificationGeometry.Epsilon
                     || move.End.DistanceTo(move.Curve.End) > PostVerificationGeometry.Epsilon)
-                    return new(false, false, "Lead motion is missing, degenerate or inconsistent.");
+                    return (new(false, false, "Lead motion is missing, degenerate or inconsistent."), null);
                 Vector? allowed = null;
                 var groupEdge = i;
                 var step = move.Layer == LayerType.Leadin ? 1 : -1;
@@ -77,23 +108,25 @@ public static class LeadPathValidator
                     }
                 }
                 if (!genuineJoint)
-                    return new(true, false, "Lead chain has no genuine adjacent target contour entry or exit.");
+                    return (new(true, false, "Lead chain has no genuine adjacent target contour entry or exit."), null);
                 if (allowed is { } jointPoint
                     && (move.Layer == LayerType.Leadin ? start : move.End).DistanceTo(jointPoint) <= PostVerificationGeometry.Epsilon)
-                    return new(true, false, "A positive-length lead returns to its contour joint; contact is not endpoint-only.");
+                    return (new(true, false, "A positive-length lead returns to its contour joint; contact is not endpoint-only."), null);
                 var failure = CheckMaterial(target, allowed);
                 if (failure != null)
-                    return new(true, false, $"Lead motion {i} contacts or enters target material outside its adjacent contour joint ({failure}).");
-                foreach (var material in otherMaterials)
+                    return (new(true, false, $"Lead motion {i} contacts or enters target material outside its adjacent contour joint ({failure})."), null);
+                for (var other = 0; other < otherMaterials.Count; other++)
                 {
                     token.ThrowIfCancellationRequested();
+                    var material = otherMaterials[other];
                     if (ReferenceEquals(material, target))
                         continue;
                     if (CheckMaterial(material, null) != null)
-                        return new(true, false, "Lead contacts or enters another placed material. "
+                        return (new(true, false, "Lead contacts or enters another placed material. "
                             + "Try spacing the parts farther apart or reducing the lead-in/lead-out length, then replan. "
-                            + "For locked parts, edit the leads or unlock the part before replanning.");
+                            + "For locked parts, edit the leads or unlock the part before replanning."), other);
                 }
+                return (null, null);
 
                 string CheckMaterial(LeadMaterialSnapshot material, Vector? permittedJoint)
                 {
@@ -113,9 +146,6 @@ public static class LeadPathValidator
                     return material.ContainsMaterial(move.Curve.Midpoint, token) ? "interior" : null;
                 }
             }
-            // No lead motion is valid for direct contour piercing. The caller still
-            // checks rapid travel and contour accounting for the complete program.
-            return new(true, true, null);
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
         {

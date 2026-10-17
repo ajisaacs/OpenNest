@@ -77,6 +77,35 @@ public class SeamClosureReplayTests
         Assert.True(result.IndependentlyReplayed);
     }
 
+    [Theory]
+    [InlineData(5e-7)]
+    [InlineData(1e-6)]
+    public void AdmittedClosureSeam_ThatLengthensThePath_StillReplays(double seam)
+    {
+        // The ring stops short of its start across the following edge, so bridging the seam adds
+        // up to the admitted gap to the cut length and extends that edge before the next corner
+        // (A0227-08's sprocket outline). Entering on the top edge puts the seam mid-path.
+        var program = new Program();
+        program.MoveTo(0, 0);
+        program.LineTo(0, 10);
+        program.LineTo(10, 10);
+        program.LineTo(10, 0);
+        program.LineTo(0, -seam);
+        var settings = ExplicitContourTests.Parameters();
+        var part = new Part(new Drawing("seam", program));
+        var snapshot = Capture(part, settings);
+        var source = snapshot.Placements[0];
+        Assert.True(source.Material!.IsComplete, source.Material.Reason);
+
+        var choice = source.Prepared!.Entry(0, 1, new Vector(5, 10));
+        var emitted = source.Prepared.Emit([choice]);
+        var result = CuttingPlanService.ReplayPrograms(snapshot,
+            [source.Propose(emitted, Read(emitted), [choice])], 0, default);
+
+        Assert.Equal(CuttingPlanStatus.Ready, result.Status);
+        Assert.True(result.IndependentlyReplayed);
+    }
+
     [Fact]
     public void AdmittedClosureSeam_StillPlansWithGeneratedLeadIns()
     {
