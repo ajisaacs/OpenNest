@@ -36,6 +36,13 @@ namespace OpenNest.Controls
                     SaveToLibraryRequested?.Invoke(this, drawing);
             };
             var saveToLibrarySeparator = new ToolStripSeparator();
+            var openInConverterItem = new ToolStripMenuItem("Open in CAD Converter...");
+            openInConverterItem.Click += (s, e) =>
+            {
+                if (SelectedItem is Drawing drawing)
+                    OpenInConverterRequested?.Invoke(this, drawing);
+            };
+            var openInConverterSeparator = new ToolStripSeparator();
             menu.ShowItemToolTips = true;
             menu.Opening += (s, e) =>
             {
@@ -49,9 +56,12 @@ namespace OpenNest.Controls
                 saveToLibraryItem.Visible = saveToLibrarySeparator.Visible = SaveToLibraryRequested != null;
                 saveToLibraryItem.Enabled = SaveToLibraryUnavailableReason == null;
                 saveToLibraryItem.ToolTipText = SaveToLibraryUnavailableReason ?? "";
+                openInConverterItem.Visible = openInConverterSeparator.Visible = OpenInConverterRequested != null;
             };
             menu.Items.Add(saveToLibraryItem);
             menu.Items.Add(saveToLibrarySeparator);
+            menu.Items.Add(openInConverterItem);
+            menu.Items.Add(openInConverterSeparator);
             menu.Items.Add(deleteItem);
             ContextMenuStrip = menu;
         }
@@ -63,6 +73,9 @@ namespace OpenNest.Controls
 
         /// <summary>Why Save to Drawing Library is disabled, shown as its tooltip; null enables it.</summary>
         public string SaveToLibraryUnavailableReason { get; set; }
+
+        /// <summary>Raised when Open in CAD Converter is chosen for the selected drawing.</summary>
+        public event EventHandler<Drawing> OpenInConverterRequested;
 
         /// <summary>
         /// Raised when the left button is pressed on a drawing's row.

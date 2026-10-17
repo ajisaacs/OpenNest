@@ -440,6 +440,7 @@ namespace OpenNest.Forms
             drawingListBox1.Units = Nest.Units;
             drawingListBox1.DeleteRequested += drawingListBox1_DeleteRequested;
             drawingListBox1.SaveToLibraryRequested += drawingListBox1_SaveToLibraryRequested;
+            drawingListBox1.OpenInConverterRequested += drawingListBox1_OpenInConverterRequested;
             drawingListBox1.DrawingPickedUp += drawingListBox1_DrawingPickedUp;
             drawingListBox1.DrawingDropped += drawingListBox1_DrawingDropped;
             Activated += (_, _) => UpdateDrawingLibraryCommand();
@@ -1285,15 +1286,27 @@ namespace OpenNest.Forms
             if (Nest.Drawings.Count == 0)
                 return;
 
+            EditDrawingsInConverter(Nest.Drawings);
+        }
+
+        private void drawingListBox1_OpenInConverterRequested(object sender, Drawing drawing)
+        {
+            EditDrawingsInConverter(new[] { drawing });
+        }
+
+        private void EditDrawingsInConverter(IEnumerable<Drawing> drawings)
+        {
+            var editedDrawings = drawings.ToList();
+
             // Capture before loading the editor: its conversion can mutate programs in place.
             var snapshot = DrawingProgramSnapshot.Capture(
-                Nest.Drawings,
+                editedDrawings,
                 program => NestWriter.GetProgramText(program) + "\0" + NestWriter.GetSubProgramsText(program)
             );
             var converter = new CadConverterForm();
             // LoadDrawings can edit live programs even when the dialog is canceled.
             PlateView.InvalidateOverlapCheck();
-            converter.LoadDrawings(Nest.Drawings);
+            converter.LoadDrawings(editedDrawings);
 
             if (converter.ShowDialog() != DialogResult.OK)
                 return;
@@ -1302,7 +1315,7 @@ namespace OpenNest.Forms
             var newByName = newDrawings.ToDictionary(d => d.Name);
 
             // Update existing drawings in-place so parts keep their BaseDrawing references
-            foreach (var existing in Nest.Drawings.ToList())
+            foreach (var existing in editedDrawings)
             {
                 if (newByName.TryGetValue(existing.Name, out var updated))
                 {
