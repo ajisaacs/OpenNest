@@ -539,6 +539,43 @@ public class CuttingInspectionPanelTests
     });
 
     [Fact]
+    public void TogglingScrapCutOffsWhilePlanningCancelsAndRestartsWithTheNewValue() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        var plate = editor.PlateView.Plate;
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        editor.CuttingBeforePlan = _ =>
+        {
+            entered.Set();
+            release.Wait(TimeSpan.FromSeconds(30));
+        };
+        try
+        {
+            editor.OpenCuttingInspection();
+            var panel = editor.CuttingInspection!;
+            PumpUntil(() => entered.IsSet);
+            Assert.True(panel.IsPlanning);
+            var checkBox = Field<CheckBox>(panel, "autoCutOffsCheckBox");
+            Assert.True(checkBox.Enabled); // stays selectable instead of being disabled like the other controls
+
+            checkBox.Checked = true; // toggled mid-plan: cancels the run in progress and restarts
+            Assert.True(checkBox.Enabled);
+            release.Set();
+
+            PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+            Assert.NotNull(panel.StagedCutOffs);
+            Assert.NotEmpty(plate.CutOffs);
+        }
+        finally
+        {
+            release.Set();
+        }
+    });
+
+    [Fact]
     public void ApplyKeepsTheStagedAutomaticCutOffsInThePlannedOrder() => RunSta(() =>
     {
         using var editor = Editor();

@@ -38,6 +38,7 @@ internal sealed class CuttingInspectionPanel : UserControl
     private bool closeRequested;
     private CuttingInspectionMode? pendingMode;
     private bool configuringMode;
+    private bool pendingReplan;
     internal CuttingInspectionMode Mode { get; private set; }
     internal PostVerificationReport ValidationReport { get; private set; }
     internal Func<Nest, CancellationToken, Task<PostVerificationReport>> Analyze { get; set; }
@@ -195,7 +196,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         cancelButton.Click += (_, _) => RequestClose();
         settingsButton.Click += (_, _) => EditSettings();
         keepOrderCheckBox.CheckedChanged += (_, _) => StartPlanning();
-        autoCutOffsCheckBox.CheckedChanged += (_, _) => StartPlanning();
+        autoCutOffsCheckBox.CheckedChanged += (_, _) => RestartPlanning();
         cutOffSettingsButton.Click += (_, _) => EditCutOffSettings();
         clearExistingButton.Click += (_, _) => ClearExistingWork();
         acceptWarningsCheckBox.CheckedChanged += (_, _) => UpdateApply();
@@ -539,6 +540,29 @@ internal sealed class CuttingInspectionPanel : UserControl
         _ => "The ring marks the affected part; the exact spot is not known."
     };
 
+    /// <summary>
+    /// Starts planning with the current settings. The scrap cut-offs checkbox stays enabled while
+    /// planning runs, so toggling it mid-plan cancels the run in progress and starts a fresh one
+    /// once that cancellation lands, instead of being ignored like other, disabled, controls.
+    /// </summary>
+    private void RestartPlanning()
+    {
+        if (Mode != CuttingInspectionMode.Plan || closed || closeRequested || pendingMode != null)
+            return;
+        if (!IsPlanning)
+        {
+            StartPlanning();
+            return;
+        }
+        if (inspection.CloseRequested)
+            return; // Already finishing; the checkbox's latest value is picked up when that lands.
+        pendingReplan = true;
+        ClearResult();
+        SetPlanning(true);
+        SetStatus(Tone.Neutral, "Restarting…");
+        inspection.RequestClose();
+    }
+
     internal void StartPlanning()
     {
         if (Mode != CuttingInspectionMode.Plan || closed || IsPlanning || closeRequested || inspection.CloseRequested)
@@ -591,7 +615,16 @@ internal sealed class CuttingInspectionPanel : UserControl
             inspection.CompletePlanning(work);
             if (closeRequested || pendingMode != null)
             {
+                pendingReplan = false;
                 FinishTransition();
+                return;
+            }
+            if (pendingReplan)
+            {
+                pendingReplan = false;
+                if (closed) return;
+                inspection = new CuttingProposalInspection();
+                StartPlanning();
                 return;
             }
             if (closed || run != generation)
@@ -731,7 +764,7 @@ internal sealed class CuttingInspectionPanel : UserControl
 
     private void SetPlanning(bool running)
     {
-        settingsButton.Enabled = keepOrderCheckBox.Enabled = autoCutOffsCheckBox.Enabled = planButton.Enabled = !running;
+        settingsButton.Enabled = keepOrderCheckBox.Enabled = planButton.Enabled = !running;
         cutOffSettingsButton.Enabled = !running;
         clearExistingButton.Enabled = !running;
         previousButton.Enabled = !running && selectedPlate > 0;
