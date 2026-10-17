@@ -54,6 +54,7 @@ namespace OpenNest.Forms
             filterPanel.BreakoffSelected += OnBreakoffSelected;
             filterPanel.BreakoffEdited += OnBreakoffEdited;
             filterPanel.BreakoffRemoved += OnBreakoffRemoved;
+            filterPanel.BreakoffFlipped += OnBreakoffFlipped;
             entityView1.BreakoffEdgePicked += OnBreakoffEdgePicked;
             entityView1.TabDragged += OnTabDragged;
             entityView1.LinePicked += OnLinePicked;
@@ -533,12 +534,36 @@ namespace OpenNest.Forms
             var allEdges = item.Breakoffs.SelectMany(b => b.EdgeIds).ToList();
             var layouts = item.Breakoffs.Select(b => BreakoffBuilder.Layout(visible, b, allEdges)).ToList();
             entityView1.BreakoffLayouts = layouts;
+            entityView1.BreakCutEntries = BreakCutEntries(visible, item.Breakoffs, layouts);
             filterPanel.LoadBreakoffs(layouts
                 .Select((l, i) => l.IsValid
                     ? $"Breakoff {i + 1}: {l.TabCenters.Count} tabs"
                     : $"Breakoff {i + 1} (not applied): {l.Error}")
                 .ToList(), entityView1.SelectedBreakoffIndex);
             entityView1.Invalidate();
+        }
+
+        // Entered where the cutting strategies will enter them: against the part's contours as
+        // they will be cut, with every breakoff applied.
+        private static List<(Vector, Vector)> BreakCutEntries(List<Entity> visible, List<Breakoff> breakoffs,
+            List<BreakoffLayout> layouts)
+        {
+            var entries = new List<(Vector, Vector)>();
+            if (!layouts.Any(l => l.IsValid))
+                return entries;
+            var contours = BreakoffBuilder.Apply(visible, breakoffs, out _)
+                .Where(en => en.Layer != SpecialLayers.Break && en is Geometry.Line or Arc or Circle
+                    && !string.Equals(en.Layer?.Name, "ETCH", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(en.Layer?.Name, SpecialLayers.Scribe.Name, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var shapes = ShapeBuilder.GetShapes(contours);
+            foreach (var cut in layouts.Where(l => l.IsValid).SelectMany(l => l.Cuts))
+            {
+                var (entry, scrap, _) = CNC.CuttingStrategy.ContourCuttingStrategy.BreakCutEntry(
+                    new Shape { Entities = cut.ToList() }, shapes);
+                entries.Add((entry, scrap));
+            }
+            return entries;
         }
 
         private void OnAddBreakoffClicked(object sender, EventArgs e)
@@ -550,7 +575,7 @@ namespace OpenNest.Forms
             filterPanel.SetBreakoffPickMode(active);
         }
 
-        private void OnBreakoffEdgePicked(object sender, Entity entity)
+        private void OnBreakoffEdgePicked(object sender, (Entity Entity, Vector Point) pick)
         {
             entityView1.IsPickingBreakoff = false;
             filterPanel.SetBreakoffPickMode(false);
@@ -558,12 +583,17 @@ namespace OpenNest.Forms
             if (item == null)
                 return;
 
+            SplitAtJunctions(item);
             var visible = VisibleEntities(item);
+            var entity = visible.Where(en => en is Geometry.Line or Arc)
+                .OrderBy(en => en.ClosestPointTo(pick.Point).DistanceTo(pick.Point)).FirstOrDefault();
+            if (entity == null)
+                return;
             var chain = BreakoffBuilder.FindEdgeChain(visible, entity);
             var used = item.Breakoffs.SelectMany(b => b.EdgeIds).ToHashSet();
             if (chain.Any(en => used.Contains(en.Id)))
             {
-                ShowBreakoffMessage("That edge already belongs to a breakoff.");
+                ShowBreakoffMessage("That line already belongs to a breakoff.");
                 return;
             }
 
@@ -571,9 +601,9 @@ namespace OpenNest.Forms
             var layout = BreakoffBuilder.Layout(visible, breakoff, used);
             if (!layout.IsValid)
             {
-                ShowBreakoffMessage("Could not make a breakoff from that edge: " + layout.Error
-                    + "\n\nClick an outside edge of the scrap piece. Its edges must form one chain whose "
-                    + "ends touch the part outline.");
+                ShowBreakoffMessage("Could not make a breakoff from that line: " + layout.Error
+                    + "\n\nClick the line that joins the part and the scrap. Its ends must touch the "
+                    + "outline around both.");
                 return;
             }
 
@@ -587,6 +617,25 @@ namespace OpenNest.Forms
             entityView1.SelectedBreakoffIndex = item.Breakoffs.Count - 1;
             RefreshBreakoffs(item);
             staleProgram = true;
+        }
+
+        // A joining line often ends partway along an outline segment; splitting there lets it be
+        // picked exactly. Existing breakoffs keep every piece of a split joining line.
+        private void SplitAtJunctions(FileListItem item)
+        {
+            var split = BreakoffBuilder.SplitAtJunctions(item.Entities);
+            if (split.Count == 0)
+                return;
+
+            foreach (var breakoff in item.Breakoffs)
+                foreach (var id in breakoff.EdgeIds.ToList())
+                    if (split.TryGetValue(id, out var pieces))
+                        breakoff.EdgeIds.AddRange(pieces.Where(p => p != id));
+
+            item.EntityCount = item.Entities.Count;
+            entityView1.Entities.Clear();
+            entityView1.Entities.AddRange(item.Entities);
+            lblEntityCount.Text = $"{item.EntityCount} entities";
         }
 
         private void OnBreakoffEdited(object sender, int index)
@@ -621,7 +670,7 @@ namespace OpenNest.Forms
                 .SelectMany(b => b.EdgeIds).ToList();
 
             breakoff.TabWidth = dialog.TabWidth;
-            breakoff.SlotWidth = dialog.SlotWidth;
+            breakoff.Flip = dialog.Flip;
             if (!keepTabs)
             {
                 var probe = breakoff.Clone();
@@ -645,6 +694,28 @@ namespace OpenNest.Forms
 
             item.Breakoffs.RemoveAt(index);
             entityView1.SelectedBreakoffIndex = -1;
+            RefreshBreakoffs(item);
+            staleProgram = true;
+        }
+
+        private void OnBreakoffFlipped(object sender, int index)
+        {
+            var item = CurrentItem;
+            if (item == null || index < 0 || index >= item.Breakoffs.Count)
+                return;
+
+            var flipped = item.Breakoffs[index].Clone();
+            flipped.Flip = !flipped.Flip;
+            var others = item.Breakoffs.Where((_, i) => i != index).SelectMany(b => b.EdgeIds).ToList();
+            var layout = BreakoffBuilder.Layout(VisibleEntities(item), flipped, others);
+            if (!layout.IsValid)
+            {
+                ShowBreakoffMessage("Cannot flip this breakoff: " + layout.Error);
+                return;
+            }
+
+            item.Breakoffs[index] = flipped;
+            entityView1.SelectedBreakoffIndex = index;
             RefreshBreakoffs(item);
             staleProgram = true;
         }

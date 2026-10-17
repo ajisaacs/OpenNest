@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Math;
@@ -9,7 +9,24 @@ namespace OpenNest.Converters
     {
         public static Program ToProgram(IList<Entity> geometry)
         {
-            var shapes = ShapeBuilder.GetShapes(geometry);
+            // Break cuts keep their order and direction (their scrap side): they are emitted as
+            // given, one program run per continuous chain, before the contours.
+            var breakCuts = new List<Shape>();
+            var contours = new List<Entity>();
+            foreach (var entity in geometry)
+            {
+                if (entity.Layer != SpecialLayers.Break)
+                {
+                    contours.Add(entity);
+                    continue;
+                }
+                var last = breakCuts.Count == 0 ? null : breakCuts[^1].Entities[^1];
+                if (last == null || EndOf(last).DistanceTo(StartOf(entity)) > Tolerance.Epsilon)
+                    breakCuts.Add(new Shape());
+                breakCuts[^1].Entities.Add(entity);
+            }
+
+            var shapes = ShapeBuilder.GetShapes(contours);
 
             if (shapes.Count == 0)
                 return null;
@@ -34,6 +51,9 @@ namespace OpenNest.Converters
 
             var pgm = new Program();
 
+            foreach (var cut in breakCuts)
+                pgm.Merge(ToProgram(cut));
+
             foreach (var shape in shapes)
             {
                 var subpgm = ToProgram(shape);
@@ -45,6 +65,10 @@ namespace OpenNest.Converters
 
             return pgm;
         }
+
+        private static Vector StartOf(Entity entity) => entity is Arc arc ? arc.StartPoint() : ((Line)entity).StartPoint;
+
+        private static Vector EndOf(Entity entity) => entity is Arc arc ? arc.EndPoint() : ((Line)entity).EndPoint;
 
         public static Program ToProgram(Shape shape)
         {
@@ -152,6 +176,9 @@ namespace OpenNest.Converters
                 || string.Equals(name, SpecialLayers.Scribe.Name, System.StringComparison.OrdinalIgnoreCase)
             )
                 return LayerType.Scribe;
+
+            if (string.Equals(name, SpecialLayers.Break.Name, System.StringComparison.OrdinalIgnoreCase))
+                return LayerType.Break;
 
             return LayerType.Cut;
         }

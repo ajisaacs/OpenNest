@@ -166,6 +166,7 @@ public sealed class FixedProgramPlacement
         if (Prepared == null || !choices.Any(c => Prepared.IsPinned(c.ContourOrdinal)))
             return null;
         var pins = new int?[execution.Motions.Count];
+        var breakCuts = BreakCutMotions.Mask(execution.Motions);
         var group = -1;
         var opening = true; // Inside the rapids that open a group.
         int? pin = null;
@@ -176,6 +177,14 @@ public sealed class FixedProgramPlacement
             {
                 if (!opening)
                     opening = true;
+                continue;
+            }
+            // Break cuts are emitted after the scribes and before any contour.
+            if (breakCuts[index])
+            {
+                if (group >= 0)
+                    return null;
+                opening = true;
                 continue;
             }
             if (opening)

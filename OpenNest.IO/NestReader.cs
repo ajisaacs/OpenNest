@@ -340,14 +340,13 @@ namespace OpenNest.IO
                 var dto = d.Breakoffs[i];
                 if (dto?.EdgeIds is { Count: > 0 } && dto.TabCenters != null
                     && dto.TabWidth > 0 && double.IsFinite(dto.TabWidth)
-                    && dto.SlotWidth > 0 && double.IsFinite(dto.SlotWidth)
                     && dto.TabCenters.All(double.IsFinite))
                 {
                     breakoffs.Add(new Breakoff
                     {
                         EdgeIds = dto.EdgeIds.ToList(),
+                        Flip = dto.Flip,
                         TabWidth = dto.TabWidth,
-                        SlotWidth = dto.SlotWidth,
                         TabCenters = dto.TabCenters.ToList(),
                     });
                 }

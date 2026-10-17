@@ -79,10 +79,27 @@ public static class LeadPathValidator
                 }
                 var adjacentIndex = groupEdge + step;
                 var genuineJoint = false;
+                var breakLead = false;
                 if (adjacentIndex >= 0 && adjacentIndex < execution.Motions.Count)
                 {
                     var adjacent = execution.Motions[adjacentIndex];
-                    if (!adjacent.Rapid && adjacent.Layer is LayerType.Cut or LayerType.Display
+                    // A break cut lies inside its part's material, so its lead joins no boundary:
+                    // the joint is the cut's own start (or end for a lead-out).
+                    if (!adjacent.Rapid && adjacent.Layer == LayerType.Break
+                        && adjacent.Curve != null && adjacent.Length > PostVerificationGeometry.Epsilon)
+                    {
+                        var edge = execution.Motions[groupEdge];
+                        var joint = move.Layer == LayerType.Leadin ? edge.End : edge.Curve.Start;
+                        var cutJoint = move.Layer == LayerType.Leadin ? adjacent.Curve.Start : adjacent.End;
+                        if (joint.DistanceTo(cutJoint) <= PostVerificationGeometry.Epsilon)
+                        {
+                            genuineJoint = true;
+                            breakLead = true;
+                            if (groupEdge == i)
+                                allowed = joint;
+                        }
+                    }
+                    else if (!adjacent.Rapid && adjacent.Layer is LayerType.Cut or LayerType.Display
                         && adjacent.Curve != null && adjacent.Length > PostVerificationGeometry.Epsilon)
                     {
                         var edge = execution.Motions[groupEdge];
@@ -112,9 +129,15 @@ public static class LeadPathValidator
                 if (allowed is { } jointPoint
                     && (move.Layer == LayerType.Leadin ? start : move.End).DistanceTo(jointPoint) <= PostVerificationGeometry.Epsilon)
                     return (new(true, false, "A positive-length lead returns to its contour joint; contact is not endpoint-only."), null);
-                var failure = CheckMaterial(target, allowed);
+                // A break cut's lead runs through its own breakoff scrap: entering the target's
+                // material is expected there, but touching any of its boundaries is not.
+                var failure = breakLead
+                    ? MaterialContact(move.Curve, target, null, ref budget, token, allowInterior: true)
+                    : CheckMaterial(target, allowed);
                 if (failure != null)
-                    return (new(true, false, $"Lead motion {i} contacts or enters target material outside its adjacent contour joint ({failure})."), null);
+                    return (new(true, false, breakLead
+                        ? $"Break cut lead motion {i} contacts its part's boundary ({failure}). Try a shorter lead-in or move the tabs."
+                        : $"Lead motion {i} contacts or enters target material outside its adjacent contour joint ({failure})."), null);
                 for (var other = 0; other < otherMaterials.Count; other++)
                 {
                     token.ThrowIfCancellationRequested();
@@ -143,7 +166,7 @@ public static class LeadPathValidator
     /// A contact at <paramref name="permittedJoint"/> is allowed. Exceeding the budget throws.
     /// </summary>
     internal static string MaterialContact(PostVerificationGeometry.Curve curve, LeadMaterialSnapshot material,
-        Vector? permittedJoint, ref int budget, CancellationToken token)
+        Vector? permittedJoint, ref int budget, CancellationToken token, bool allowInterior = false)
     {
         foreach (var boundary in material.Rings.SelectMany(r => r))
         {
@@ -158,6 +181,6 @@ public static class LeadPathValidator
         // With all other boundary contacts excluded, the connected open path
         // has constant material membership. Use the native arc midpoint, not
         // the chord midpoint or endpoints (which can both lie in scrap).
-        return material.ContainsMaterial(curve.Midpoint, token) ? "interior" : null;
+        return !allowInterior && material.ContainsMaterial(curve.Midpoint, token) ? "interior" : null;
     }
 }

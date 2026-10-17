@@ -19,6 +19,7 @@ namespace OpenNest.CNC.CuttingStrategy
         public CuttingResult Apply(Program partProgram, Vector approachPoint, Vector nextPartStart)
         {
             var entities = partProgram.ToGeometry();
+            var breakCuts = TakeBreakCuts(entities);
             entities.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
 
             var scribeEntities = entities.FindAll(e => e.Layer == SpecialLayers.Scribe);
@@ -77,6 +78,7 @@ namespace OpenNest.CNC.CuttingStrategy
             var result = new Program(Mode.Absolute);
 
             EmitScribeContours(result, scribeEntities);
+            EmitBreakCuts(result, breakCuts, BreakCutContours(profile));
 
             foreach (var entry in cutoutEntries)
             {
@@ -110,6 +112,7 @@ namespace OpenNest.CNC.CuttingStrategy
         )
         {
             var entities = partProgram.ToGeometry();
+            var breakCuts = TakeBreakCuts(entities);
             entities.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
 
             var scribeEntities = entities.FindAll(e => e.Layer == SpecialLayers.Scribe);
@@ -120,11 +123,12 @@ namespace OpenNest.CNC.CuttingStrategy
             var result = new Program(Mode.Absolute);
 
             EmitScribeContours(result, scribeEntities);
+            EmitBreakCuts(result, breakCuts, BreakCutContours(profile));
 
             // Find the target shape that contains the clicked entity
             var (targetShape, matchedEntity) = FindTargetShape(profile, point, entity);
 
-            // Emit cutouts — only the target gets lead-in/out (skip open contours)
+            // Emit cutouts â€” only the target gets lead-in/out (skip open contours)
             foreach (var cutout in profile.Cutouts)
             {
                 if (!cutout.IsClosed())
@@ -238,10 +242,11 @@ namespace OpenNest.CNC.CuttingStrategy
         /// own lead-in, lead-out and tab); a null list or entry uses <see cref="Parameters"/>.</param>
         internal Program EmitPrepared(Shape[] shapes, List<Entity> scribes,
             IReadOnlyList<CuttingPlanning.ContourChoice> choices,
-            IReadOnlyList<CuttingParameters> contourParameters = null)
+            IReadOnlyList<CuttingParameters> contourParameters = null, IReadOnlyList<Shape> breakCuts = null)
         {
             var result = new Program(Mode.Absolute);
             EmitScribeContours(result, scribes);
+            EmitBreakCuts(result, breakCuts, shapes);
             EmitChosenContours(result, shapes, choices, contourParameters);
             result.Mode = Mode.Incremental;
             return result;
@@ -249,7 +254,7 @@ namespace OpenNest.CNC.CuttingStrategy
 
         // Diagnostic seam for candidate lead validation (PreparedContours
         // .EmitCandidateForValidation): emit a single already-validated choice with its
-        // ORIGINAL contour type — the last shape is External even when emitted alone, so a
+        // ORIGINAL contour type â€” the last shape is External even when emitted alone, so a
         // perimeter never degrades to a hole because it was isolated. Output must not be
         // installed on a Part or accepted as a complete plan.
         internal Program EmitCandidateIsolated(Shape[] shapes, List<Entity> scribes,
@@ -264,7 +269,7 @@ namespace OpenNest.CNC.CuttingStrategy
 
         // One contour per choice in order; the perimeter (last shape) is always External.
         // Contour emission itself reads only the contour's own geometry and settings, never
-        // prior choices — the differential tests in ContourCandidateEmissionTests pin this.
+        // prior choices â€” the differential tests in ContourCandidateEmissionTests pin this.
         private void EmitChosenContours(Program result, Shape[] shapes,
             IReadOnlyList<CuttingPlanning.ContourChoice> choices, IReadOnlyList<CuttingParameters> contourParameters)
         {
@@ -797,7 +802,7 @@ namespace OpenNest.CNC.CuttingStrategy
         {
             var normal = ComputeNormal(point, corner.Outgoing, contourType, winding);
             var adjacentNormal = ComputeNormal(point, corner.Incoming, contourType, winding);
-            // Sum unit normals rather than averaging angles (which fails at 0/2π).
+            // Sum unit normals rather than averaging angles (which fails at 0/2Ï€).
             // Winding makes this point into the scrap even at reflex corners.
             var x = System.Math.Cos(normal) + System.Math.Cos(adjacentNormal);
             var y = System.Math.Sin(normal) + System.Math.Sin(adjacentNormal);
@@ -854,7 +859,7 @@ namespace OpenNest.CNC.CuttingStrategy
 
             if (entity is Line line)
             {
-                // Perpendicular to line direction: tangent + π/2 = left side.
+                // Perpendicular to line direction: tangent + Ï€/2 = left side.
                 // Left side = outward for CW winding; for CCW winding, outward
                 // is on the right side, so flip.
                 var tangent = line.EndPoint.AngleFrom(line.StartPoint);
@@ -865,7 +870,7 @@ namespace OpenNest.CNC.CuttingStrategy
             else if (entity is Arc arc)
             {
                 // Radial direction from center to point.
-                // Flip when the arc direction differs from the contour winding —
+                // Flip when the arc direction differs from the contour winding â€”
                 // that indicates a concave feature where radial points inward.
                 normal = point.AngleFrom(arc.Center);
                 if (arc.Rotation != winding)
@@ -873,7 +878,7 @@ namespace OpenNest.CNC.CuttingStrategy
             }
             else if (entity is Circle circle)
             {
-                // Radial outward — always correct regardless of winding
+                // Radial outward â€” always correct regardless of winding
                 normal = point.AngleFrom(circle.Center);
             }
             else
@@ -1012,7 +1017,7 @@ namespace OpenNest.CNC.CuttingStrategy
                     break;
                 }
 
-                // No intersection — entity is entirely inside circle, remove it
+                // No intersection â€” entity is entirely inside circle, remove it
                 if (EntityStartPoint(entity).DistanceTo(center) <= tabSize + Tolerance.Epsilon)
                 {
                     entities.RemoveAt(entities.Count - 1);
@@ -1078,6 +1083,113 @@ namespace OpenNest.CNC.CuttingStrategy
             }
 
             return moves;
+        }
+
+        /// <summary>
+        /// Removes break-cut entities from <paramref name="entities"/> (in program order) and
+        /// returns them as travel-ordered open chains, one per uninterrupted run.
+        /// </summary>
+        internal static List<Shape> TakeBreakCuts(List<Entity> entities)
+        {
+            var cuts = new List<Shape>();
+            Shape current = null;
+            foreach (var entity in entities)
+            {
+                if (entity.Layer != SpecialLayers.Break)
+                {
+                    current = null;
+                    continue;
+                }
+                if (current == null
+                    || EntityEndPoint(current.Entities[^1]).DistanceTo(EntityStartPoint(entity)) > Tolerance.Epsilon)
+                {
+                    current = new Shape();
+                    cuts.Add(current);
+                }
+                current.Entities.Add(entity);
+            }
+            entities.RemoveAll(e => e.Layer == SpecialLayers.Break);
+            foreach (var cut in cuts)
+                cut.UpdateBounds();
+            return cuts;
+        }
+
+        // A clean program's break cut travels with its scrap on the left. It is entered from the
+        // scrap, with the internal lead-in (holes are pierced in scrap the same way), at whichever
+        // end has more scrap before the part's contours: near the outline the scrap narrows to a
+        // wedge. NoLeadIn pierces on the line. There is no lead-out: the cut ends at a tab, which a
+        // run-out would cut into. Entering at the far end cuts it the other way round.
+        private void EmitBreakCuts(Program program, IReadOnlyList<Shape> cuts, IReadOnlyList<Shape> contours)
+        {
+            if (cuts == null)
+                return;
+            var leadIn = Parameters?.InternalLeadIn ?? new NoLeadIn();
+            foreach (var cut in cuts)
+            {
+                var (entry, scrap, fromEnd) = BreakCutEntry(cut, contours);
+                var path = cut;
+                if (fromEnd)
+                {
+                    path = (Shape)cut.Clone();
+                    path.Reverse();
+                }
+                var normal = Angle.NormalizeRad(System.Math.Atan2(scrap.Y, scrap.X));
+                program.Codes.AddRange(leadIn.Generate(entry, normal, fromEnd ? RotationType.CW : RotationType.CCW));
+                program.Codes.AddRange(ConvertShapeToMoves(path, entry, LayerType.Break));
+            }
+        }
+
+        /// <summary>
+        /// Where a break cut (travelling with its scrap on the left) is entered: the end with more
+        /// scrap before <paramref name="contours"/>, the unit direction into the scrap there, and
+        /// whether that is the cut's far end.
+        /// </summary>
+        public static (Vector Entry, Vector ScrapDirection, bool FromEnd) BreakCutEntry(Shape cut,
+            IReadOnlyList<Shape> contours)
+        {
+            var start = EntityStartPoint(cut.Entities[0]);
+            var end = EntityEndPoint(cut.Entities[^1]);
+            var startScrap = LeftOf(Tangent(cut.Entities[0], atEnd: false));
+            var endScrap = LeftOf(Tangent(cut.Entities[^1], atEnd: true));
+            return Room(end, endScrap, contours) > Room(start, startScrap, contours)
+                ? (end, endScrap, true)
+                : (start, startScrap, false);
+        }
+
+        private static List<Shape> BreakCutContours(ShapeProfile profile) =>
+            new List<Shape>(profile.Cutouts) { profile.Perimeter };
+
+        // Distance from a break cut end along its scrap direction to the nearest contour.
+        private static double Room(Vector point, Vector direction, IReadOnlyList<Shape> contours)
+        {
+            const double reach = 1e6;
+            var ray = new Line(point, point + direction * reach);
+            var nearest = reach;
+            foreach (var contour in contours ?? Array.Empty<Shape>())
+                foreach (var entity in contour.Entities)
+                    if (entity.Intersects(ray, out var hits))
+                        foreach (var hit in hits)
+                            nearest = System.Math.Min(nearest, hit.DistanceTo(point));
+            return nearest;
+        }
+
+        private static Vector LeftOf(Vector tangent)
+        {
+            var length = System.Math.Sqrt(tangent.X * tangent.X + tangent.Y * tangent.Y);
+            return length <= 0 ? new Vector(0, 1) : new Vector(-tangent.Y / length, tangent.X / length);
+        }
+
+        private static Vector Tangent(Entity entity, bool atEnd)
+        {
+            if (entity is Arc arc)
+            {
+                var angle = atEnd ? arc.EndAngle : arc.StartAngle;
+                return arc.IsReversed
+                    ? new Vector(System.Math.Sin(angle), -System.Math.Cos(angle))
+                    : new Vector(-System.Math.Sin(angle), System.Math.Cos(angle));
+            }
+            var line = (Line)entity;
+            return line.EndPoint - line.StartPoint;
         }
 
         private static Vector GetShapeStartPoint(Shape shape)

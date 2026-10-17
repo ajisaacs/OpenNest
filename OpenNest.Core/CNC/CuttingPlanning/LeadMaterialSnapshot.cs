@@ -34,7 +34,8 @@ public sealed class LeadMaterialSnapshot
             foreach (var motion in execution.Motions)
             {
                 token.ThrowIfCancellationRequested();
-                if (motion.Rapid || motion.Layer is LayerType.Scribe or LayerType.Leadin or LayerType.Leadout)
+                // Break cuts run through material that stays attached at tabs; they bound nothing.
+                if (motion.Rapid || motion.Layer is LayerType.Scribe or LayerType.Leadin or LayerType.Leadout or LayerType.Break)
                 {
                     Finish();
                     continue;

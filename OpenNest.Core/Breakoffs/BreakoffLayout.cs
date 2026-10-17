@@ -4,9 +4,8 @@ using OpenNest.Geometry;
 namespace OpenNest.Breakoffs
 {
     /// <summary>
-    /// A <see cref="Breakoff"/> resolved against a drawing's entities: the break line, the merged
-    /// outline and the slots that cut the break line between tabs. When <see cref="Error"/> is set
-    /// nothing else is meaningful and the breakoff is not applied.
+    /// A <see cref="Breakoff"/> resolved against a drawing's entities. When <see cref="Error"/> is
+    /// set nothing else is meaningful and the breakoff is not applied.
     /// </summary>
     public sealed class BreakoffLayout
     {
@@ -18,35 +17,39 @@ namespace OpenNest.Breakoffs
 
         public bool IsValid => Error == null;
 
-        /// <summary>The outline section shared by the part and the breakoff, in travel order from its start.</summary>
+        /// <summary>The joining line in travel order from its start.</summary>
         public IReadOnlyList<Entity> BreakLine { get; internal set; }
 
         public double Length { get; internal set; }
 
-        /// <summary>The part outline with the break line replaced by the breakoff's edges.</summary>
+        /// <summary>The closed outline around part and scrap, with its joints made exact.</summary>
         public IReadOnlyList<Entity> Outline { get; internal set; }
 
-        /// <summary>One closed contour per cut section of the break line.</summary>
-        public IReadOnlyList<IReadOnlyList<Entity>> Slots { get; internal set; }
+        /// <summary>The scrap side's closed boundary (part of the outline plus the joining line).</summary>
+        public IReadOnlyList<Entity> Scrap { get; internal set; }
+
+        /// <summary>
+        /// One open cut per section of the joining line between tabs, on the break layer and
+        /// travel-ordered with the scrap to its left, so each is entered from the scrap.
+        /// </summary>
+        public IReadOnlyList<IReadOnlyList<Entity>> Cuts { get; internal set; }
 
         /// <summary>Tab centers used, as distances along <see cref="BreakLine"/>.</summary>
         public IReadOnlyList<double> TabCenters { get; internal set; }
 
         public double TabWidth { get; internal set; }
 
-        /// <summary>Entities the outline and slots replace: the original outline and breakoff edges.</summary>
+        /// <summary>Entities the outline and cuts replace: the original outline and joining line.</summary>
         internal IReadOnlyList<Entity> ReplacedEntities { get; set; }
 
         public Vector PointAt(double distance) => BreakoffPath.PointAt(BreakLine, distance);
 
-        public Vector TangentAt(double distance) => BreakoffPath.TangentAt(BreakLine, distance);
-
-        /// <summary>The distance along the break line closest to <paramref name="point"/>.</summary>
+        /// <summary>The distance along the joining line closest to <paramref name="point"/>.</summary>
         public double DistanceOf(Vector point) => BreakoffPath.DistanceOf(BreakLine, point);
 
         /// <summary>
         /// <paramref name="center"/> for tab <paramref name="index"/> limited so the tab stays on the
-        /// break line and keeps a gap from its neighbours.
+        /// joining line and keeps a gap from its neighbours.
         /// </summary>
         public double ClampTabCenter(int index, double center)
         {

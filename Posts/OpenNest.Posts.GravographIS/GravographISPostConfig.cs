@@ -79,6 +79,7 @@ namespace OpenNest.Posts.GravographIS
                 case LayerType.Scribe:
                     return Engrave;
                 case LayerType.Cut:
+                case LayerType.Break:
                 case LayerType.Leadin:
                 case LayerType.Leadout:
                     return Cut;

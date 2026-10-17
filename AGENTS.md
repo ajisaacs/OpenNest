@@ -58,7 +58,7 @@ Read the relevant contract before changing its behavior:
 - [Nest file format](docs/nest-file-format.md)
 - [Directional slides](docs/geometry/directional-slides.md) and [pair-spacing limits](docs/geometry/pair-spacing.md)
 - [Lead-in placement](docs/geometry/lead-in-placement.md)
-- [Breakoffs](docs/breakoffs.md): CAD Converter tabbed scrap, cut as closed slots
+- [Breakoffs](docs/breakoffs.md): tabbed scrap; `Break`-layer open cuts that are cut but are not material
 - [Material-overlap diagnostics](docs/geometry/visual-overlap-check.md)
 - [Automatic cutoffs and sequencing](docs/automatic-scrap-cutoffs.md)
 - [Pre-post verification](docs/post-verification.md)

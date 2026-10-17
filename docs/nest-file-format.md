@@ -180,12 +180,17 @@ false (the drawing's pins apply) with a warning naming the plate and part.
 ## Drawing breakoffs
 
 A drawing may carry a `breakoffs` array, omitted when empty. Each entry has
-`edgeIds` (source entity IDs of the breakoff's outside edges), `tabWidth`,
-`slotWidth` and `tabCenters` (distances along the break line), all in the source
+`edgeIds` (source entity IDs of the joining line), `flip` (omitted when false),
+`tabWidth` and `tabCenters` (distances along the joining line), all in the source
 frame; see [breakoffs](breakoffs.md). The stored program already has them applied,
-so readers never rebuild geometry from them. An entry with no edges, a width that is
-not positive and finite, or a nonfinite tab center is dropped with a reader warning;
-the drawing and its program load unchanged, only the breakoff stops being editable.
+so readers never rebuild geometry from them. An entry with no edges, a tab width that
+is not positive and finite, or a nonfinite tab center is dropped with a reader
+warning; the drawing and its program load unchanged, only the breakoff stops being
+editable.
+
+Break cuts are saved as motions tagged `:BREAK`. In a drawing program each break cut
+travels with its scrap on the left; placed programs may cut it either way. Versions
+without breakoff support cannot read the tag.
 
 ## Verification and limits
 

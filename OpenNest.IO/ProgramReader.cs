@@ -280,6 +280,10 @@ namespace OpenNest.IO
                                         layer = LayerType.Scribe;
                                         break;
 
+                                    case "BREAK":
+                                        layer = LayerType.Break;
+                                        break;
+
                                     case "SUPPRESSED":
                                         suppressed = true;
                                         break;
@@ -376,6 +380,10 @@ namespace OpenNest.IO
 
                                     case "SCRIBE":
                                         layer = LayerType.Scribe;
+                                        break;
+
+                                    case "BREAK":
+                                        layer = LayerType.Break;
                                         break;
 
                                     case "SUPPRESSED":

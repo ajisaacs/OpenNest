@@ -326,10 +326,11 @@ public class ContourEntryCandidateTests
         // build it directly to characterize its legal, sub-tolerance joint discrepancy.
         var constructor = typeof(PreparedContours).GetConstructor(
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance,
-            null, [typeof(Shape[]), typeof(List<Entity>), typeof(OpenNest.CNC.CuttingStrategy.CuttingParameters)], null);
+            null, [typeof(Shape[]), typeof(List<Entity>), typeof(List<Shape>),
+                typeof(OpenNest.CNC.CuttingStrategy.CuttingParameters)], null);
         Assert.NotNull(constructor);
         var prepared = (PreparedContours)constructor.Invoke([
-            new[] { shape }, new List<Entity>(), ExplicitContourTests.Parameters()]);
+            new[] { shape }, new List<Entity>(), new List<Shape>(), ExplicitContourTests.Parameters()]);
         var near = prepared.AutomaticEntryCandidatesWithFallbacks(0)
             .Where(c => c.Kind == AutomaticEntryKind.NearCorner).ToList();
         Assert.NotEmpty(near);

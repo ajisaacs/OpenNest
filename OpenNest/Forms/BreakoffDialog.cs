@@ -1,4 +1,3 @@
-using System;
 using System.Drawing;
 using System.Windows.Forms;
 using OpenNest.Breakoffs;
@@ -9,7 +8,7 @@ namespace OpenNest.Forms
     {
         private readonly NumericUpDown numTabs;
         private readonly NumericUpDown numTabWidth;
-        private readonly NumericUpDown numSlotWidth;
+        private readonly CheckBox chkFlip;
 
         public BreakoffDialog()
         {
@@ -25,12 +24,20 @@ namespace OpenNest.Forms
 
             numTabs = AddRow("Tabs:", 12, Breakoff.MinTabCount, 50, 0, 1, Breakoff.DefaultTabCount);
             numTabWidth = AddRow("Tab width:", 44, 0.001m, 10, 4, 0.0625m, (decimal)Breakoff.DefaultTabWidth);
-            numSlotWidth = AddRow("Slot width:", 76, 0.001m, 10, 4, 0.0625m, (decimal)Breakoff.DefaultSlotWidth);
+            chkFlip = new CheckBox
+            {
+                Text = "Larger side is scrap",
+                Location = new Point(12, 78),
+                AutoSize = true,
+                Font = font,
+            };
+            Controls.Add(chkFlip);
 
             Controls.Add(new Label
             {
-                Text = "Tabs at both ends are included. Slots are cut into the breakoff between tabs.",
-                Location = new Point(12, 108),
+                Text = "Tabs at both ends are included. The joining line is cut between tabs, "
+                    + "with lead-ins on the scrap side.",
+                Location = new Point(12, 106),
                 Size = new Size(260, 34),
                 ForeColor = Color.DimGray,
                 Font = font,
@@ -79,13 +86,13 @@ namespace OpenNest.Forms
 
         public double TabWidth => (double)numTabWidth.Value;
 
-        public double SlotWidth => (double)numSlotWidth.Value;
+        public bool Flip => chkFlip.Checked;
 
         public void LoadBreakoff(Breakoff breakoff)
         {
             numTabs.Value = Clamp(numTabs, breakoff.TabCenters.Count == 0 ? Breakoff.DefaultTabCount : breakoff.TabCenters.Count);
             numTabWidth.Value = Clamp(numTabWidth, breakoff.TabWidth);
-            numSlotWidth.Value = Clamp(numSlotWidth, breakoff.SlotWidth);
+            chkFlip.Checked = breakoff.Flip;
         }
 
         private static decimal Clamp(NumericUpDown input, double value) =>

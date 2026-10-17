@@ -204,8 +204,8 @@ namespace OpenNest.IO
                             ? d.Breakoffs.Select(b => new BreakoffDto
                             {
                                 EdgeIds = b.EdgeIds.ToList(),
+                                Flip = b.Flip,
                                 TabWidth = b.TabWidth,
-                                SlotWidth = b.SlotWidth,
                                 TabCenters = b.TabCenters.ToList(),
                             }).ToList()
                             : null,
@@ -673,6 +673,9 @@ namespace OpenNest.IO
 
                 case LayerType.Scribe:
                     return ":SCRIBE";
+
+                case LayerType.Break:
+                    return ":BREAK";
 
                 default:
                     return string.Empty;

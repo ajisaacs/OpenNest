@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Math;
@@ -206,6 +206,9 @@ namespace OpenNest.Converters
 
                 case LayerType.Scribe:
                     return SpecialLayers.Scribe;
+
+                case LayerType.Break:
+                    return SpecialLayers.Break;
 
                 default:
                     return new Layer(layer.ToString());

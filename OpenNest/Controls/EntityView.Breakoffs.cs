@@ -39,7 +39,12 @@ namespace OpenNest.Controls
 
         public int SelectedBreakoffIndex { get; set; } = -1;
 
-        public event EventHandler<Entity> BreakoffEdgePicked;
+        /// <summary>Where each break cut is entered and the direction into its scrap, in world coordinates.</summary>
+        public IReadOnlyList<(Vector Entry, Vector ScrapDirection)> BreakCutEntries { get; set; } =
+            Array.Empty<(Vector, Vector)>();
+
+        /// <summary>A line or arc was clicked while picking a joining line; the point is where.</summary>
+        public event EventHandler<(Entity Entity, Vector Point)> BreakoffEdgePicked;
         public event EventHandler<TabDragEventArgs> TabDragged;
 
         public bool IsPickingBreakoff
@@ -82,7 +87,7 @@ namespace OpenNest.Controls
                 return false;
             var entity = HitTestEdge(e.Location);
             if (entity != null)
-                BreakoffEdgePicked?.Invoke(this, entity);
+                BreakoffEdgePicked?.Invoke(this, (entity, PointControlToWorld(e.Location)));
             return true;
         }
 
@@ -139,9 +144,10 @@ namespace OpenNest.Controls
             if (BreakoffLayouts.Count == 0)
                 return;
 
-            using var slotFill = new SolidBrush(Color.FromArgb(70, 0, 200, 255));
-            using var slotPen = new Pen(Color.FromArgb(0, 200, 255), 1f);
-            using var selectedSlotPen = new Pen(Color.White, 1.5f);
+            using var scrapFill = new SolidBrush(Color.FromArgb(55, 255, 170, 0));
+            using var selectedScrapFill = new SolidBrush(Color.FromArgb(95, 255, 170, 0));
+            using var cutPen = new Pen(Color.FromArgb(0, 200, 255), 2.5f);
+            using var leadPen = new Pen(Color.FromArgb(0, 200, 255), 1.5f);
             using var tabPen = new Pen(Color.Red, 3f);
             using var handleBrush = new SolidBrush(Color.Red);
             using var handlePen = new Pen(Color.White, 1f);
@@ -153,13 +159,15 @@ namespace OpenNest.Controls
                     continue;
                 var selected = b == SelectedBreakoffIndex;
 
-                foreach (var slot in layout.Slots)
+                var scrap = Outline(layout.Scrap);
+                if (scrap.Length >= 3)
+                    g.FillPolygon(selected ? selectedScrapFill : scrapFill, scrap);
+
+                foreach (var cut in layout.Cuts)
                 {
-                    var points = SlotOutline(slot);
-                    if (points.Length < 3)
-                        continue;
-                    g.FillPolygon(slotFill, points);
-                    g.DrawPolygon(selected ? selectedSlotPen : slotPen, points);
+                    var points = Outline(cut);
+                    if (points.Length >= 2)
+                        g.DrawLines(cutPen, points);
                 }
 
                 foreach (var center in layout.TabCenters)
@@ -174,12 +182,26 @@ namespace OpenNest.Controls
                     g.DrawEllipse(handlePen, rect);
                 }
             }
+
+            DrawEntryMarks(g, leadPen);
         }
 
-        private PointF[] SlotOutline(IReadOnlyList<Entity> slot)
+        // A short stroke from the pierce side into each cut's entry, a fixed size on screen.
+        private void DrawEntryMarks(Graphics g, Pen pen)
+        {
+            foreach (var (entry, scrap) in BreakCutEntries)
+            {
+                var at = PointWorldToGraph(entry);
+                var pierce = PointWorldToGraph(entry + scrap * LengthGuiToWorld(12));
+                g.DrawLine(pen, pierce, at);
+                g.DrawEllipse(pen, pierce.X - 2.5f, pierce.Y - 2.5f, 5f, 5f);
+            }
+        }
+
+        private PointF[] Outline(IReadOnlyList<Entity> path)
         {
             var points = new List<PointF>();
-            foreach (var entity in slot)
+            foreach (var entity in path)
             {
                 if (entity is Arc arc)
                     points.AddRange(arc.ToPoints(System.Math.Max(2, arc.SegmentsForTolerance(LengthGuiToWorld(0.5f))))

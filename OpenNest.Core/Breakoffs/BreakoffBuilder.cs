@@ -7,21 +7,22 @@ using OpenNest.Math;
 namespace OpenNest.Breakoffs
 {
     /// <summary>
-    /// Resolves and applies <see cref="Breakoff"/>s. The break line is cut as closed slots on the
-    /// breakoff side rather than as open cuts, because the cutting planner only prepares closed
-    /// contours: each slot's pierce and lead-in fall inside the slot, which is breakoff scrap.
+    /// Resolves and applies <see cref="Breakoff"/>s: the joining line becomes open cuts on the
+    /// break layer between tabs, each travelling with the scrap on its left so the cutting
+    /// strategies pierce and lead in from the scrap.
     /// </summary>
     public static class BreakoffBuilder
     {
-        /// <summary>How close the breakoff's ends must be to the outline.</summary>
+        /// <summary>How close the joining line's ends must be to the outline.</summary>
         public const double JoinTolerance = 0.001;
 
         private const double ArcTolerance = 0.0005;
 
         /// <summary>
-        /// <paramref name="entities"/> with every valid breakoff merged into its outline and its
-        /// break line slotted. Inputs are not modified; generated entities are new. Breakoffs that
-        /// cannot be resolved are skipped and described in <paramref name="errors"/>.
+        /// <paramref name="entities"/> with every valid breakoff applied: its joining line replaced
+        /// by break cuts and its outline's joints made exact. Inputs are not modified; generated
+        /// entities are new. Breakoffs that cannot be resolved are skipped and described in
+        /// <paramref name="errors"/>.
         /// </summary>
         public static List<Entity> Apply(IReadOnlyList<Entity> entities, IReadOnlyList<Breakoff> breakoffs,
             out List<string> errors)
@@ -43,43 +44,40 @@ namespace OpenNest.Breakoffs
 
                 var replaced = new HashSet<Entity>(layout.ReplacedEntities, ReferenceEqualityComparer.Instance);
                 working.RemoveAll(replaced.Contains);
-                // Fresh IDs: the outline holds copies of this breakoff's edges, which later
-                // breakoffs exclude by ID when they look for the outline.
                 working.AddRange(layout.Outline.Select(e => e.Clone()));
-                working.AddRange(layout.Slots.SelectMany(s => s).Select(e => e.Clone()));
+                working.AddRange(layout.Cuts.SelectMany(c => c).Select(e => e.Clone()));
             }
             return working;
         }
 
         /// <summary>
         /// Resolves <paramref name="breakoff"/> against <paramref name="entities"/> (the entities that
-        /// will be cut). <paramref name="otherEdgeIds"/> are edges of other breakoffs on the same
-        /// drawing, which are ignored while finding the outline.
+        /// will be cut). <paramref name="otherEdgeIds"/> are joining lines of other breakoffs on the
+        /// same drawing, which are ignored while finding the outline.
         /// </summary>
         public static BreakoffLayout Layout(IReadOnlyList<Entity> entities, Breakoff breakoff,
             IEnumerable<Guid> otherEdgeIds = null)
         {
             ArgumentNullException.ThrowIfNull(entities);
             ArgumentNullException.ThrowIfNull(breakoff);
-            if (!(breakoff.TabWidth > 0) || !double.IsFinite(breakoff.TabWidth)
-                || !(breakoff.SlotWidth > 0) || !double.IsFinite(breakoff.SlotWidth))
-                return Fail("Tab and slot widths must be greater than zero.");
+            if (!(breakoff.TabWidth > 0) || !double.IsFinite(breakoff.TabWidth))
+                return Fail("The tab width must be greater than zero.");
 
             var edgeIds = breakoff.EdgeIds.ToHashSet();
             var edgeSources = entities.Where(e => edgeIds.Contains(e.Id)).ToList();
             if (edgeIds.Count == 0 || edgeSources.Count != edgeIds.Count)
-                return Fail("Some of its edges are hidden or missing.");
+                return Fail("Its joining line is hidden or missing.");
 
-            var edges = BreakoffPath.ChainOpen(edgeSources, JoinTolerance);
-            if (edges == null)
-                return Fail("Its edges must form one open chain.");
+            var line = BreakoffPath.ChainOpen(edgeSources, JoinTolerance);
+            if (line == null)
+                return Fail("Its joining line must be one open chain.");
 
             // Measure tabs from a fixed end so positions survive re-chaining.
-            var a = BreakoffPath.Start(edges[0]);
-            var b = BreakoffPath.End(edges[^1]);
+            var a = BreakoffPath.Start(line[0]);
+            var b = BreakoffPath.End(line[^1]);
             if (b.X < a.X - JoinTolerance || (System.Math.Abs(b.X - a.X) <= JoinTolerance && b.Y < a.Y))
             {
-                edges = BreakoffPath.Reversed(edges);
+                line = BreakoffPath.Reversed(line);
                 (a, b) = (b, a);
             }
 
@@ -98,7 +96,7 @@ namespace OpenNest.Breakoffs
 
             Shape outline = null;
             var outlineArea = 0.0;
-            foreach (var shape in ShapeBuilder.GetShapes(candidates))
+            foreach (var shape in ShapeBuilder.GetShapes(WithoutDanglingEnds(candidates)))
             {
                 if (shape.Entities.Count < 2 || !shape.IsClosed()
                     || shape.ClosestPointTo(a).DistanceTo(a) > JoinTolerance
@@ -112,80 +110,70 @@ namespace OpenNest.Breakoffs
                 }
             }
             if (outline == null)
-                return Fail("Both ends must touch a closed outline.");
+                return Fail("Both ends of the joining line must touch a closed outline.");
 
-            var loop = outline.Entities;
+            var loop = CloseExactly(outline.Entities);
             var total = BreakoffPath.Length(loop);
             var atA = BreakoffPath.DistanceOf(loop, a);
             var rotated = BreakoffPath.Sub(loop, atA, total).Concat(BreakoffPath.Sub(loop, 0, atA)).ToList();
             var atB = BreakoffPath.DistanceOf(rotated, b);
             if (atB <= JoinTolerance || atB >= total - JoinTolerance)
-                return Fail("Its ends must touch the outline at two different points.");
+                return Fail("The joining line must touch the outline at two different points.");
             var toB = BreakoffPath.Sub(rotated, 0, atB);
             var backToA = BreakoffPath.Sub(rotated, atB, total);
-            // The planner closes contours far tighter than the join tolerance, so the edges must
-            // end exactly where the outline was split.
-            edges = SnapEnds(edges, BreakoffPath.Start(toB[0]), BreakoffPath.Start(backToA[0]));
 
-            var viaBack = edges.Concat(backToA).ToList();
-            var viaTo = edges.Concat(BreakoffPath.Reversed(toB)).ToList();
-            var viaBackArea = System.Math.Abs(BreakoffPath.SignedArea(BreakoffPath.ToPoints(viaBack, ArcTolerance)));
-            var viaToArea = System.Math.Abs(BreakoffPath.SignedArea(BreakoffPath.ToPoints(viaTo, ArcTolerance)));
+            // The two sides: the outline from A to B closed back along the line, and the line
+            // closed back along the rest of the outline.
+            var sideTo = toB.Concat(BreakoffPath.Reversed(line)).ToList();
+            var sideBack = line.Concat(backToA).ToList();
+            var sideToArea = System.Math.Abs(BreakoffPath.SignedArea(BreakoffPath.ToPoints(sideTo, ArcTolerance)));
+            var sideBackArea = System.Math.Abs(BreakoffPath.SignedArea(BreakoffPath.ToPoints(sideBack, ArcTolerance)));
+            if (System.Math.Abs(sideToArea + sideBackArea - outlineArea) > 0.01 * outlineArea)
+                return Fail("The joining line must run inside the outline.");
 
-            // The breakoff region is the smaller loop; the merged outline is the other one.
-            List<Entity> region, merged, breakLine;
-            double regionArea, mergedArea;
-            if (viaBackArea <= viaToArea)
-            {
-                (region, regionArea, merged, mergedArea) = (viaBack, viaBackArea, viaTo, viaToArea);
-                breakLine = BreakoffPath.Reversed(backToA);
-            }
-            else
-            {
-                (region, regionArea, merged, mergedArea) = (viaTo, viaToArea, viaBack, viaBackArea);
-                breakLine = toB;
-            }
+            var scrap = (sideToArea <= sideBackArea) != breakoff.Flip ? sideTo : sideBack;
+            var scrapPoints = BreakoffPath.ToPoints(scrap, ArcTolerance);
 
-            if (System.Math.Abs(mergedArea - (outlineArea + regionArea)) > 0.01 * mergedArea)
-                return Fail("It must sit outside the part outline.");
-
-            var length = BreakoffPath.Length(breakLine);
+            var length = BreakoffPath.Length(line);
             var tabWidth = breakoff.TabWidth;
             var centers = breakoff.TabCenters.Count == 0
                 ? EvenTabCenters(length, Breakoff.DefaultTabCount, tabWidth)
                 : breakoff.TabCenters.OrderBy(c => c).ToList();
             if (centers.Count < Breakoff.MinTabCount || length <= tabWidth * centers.Count)
-                return Fail("The break line is too short for its tabs.");
+                return Fail("The joining line is too short for its tabs.");
             if (centers[0] < tabWidth / 2 - JoinTolerance || centers[^1] > length - tabWidth / 2 + JoinTolerance)
-                return Fail("A tab runs off the break line; space the tabs evenly again.");
+                return Fail("A tab runs off the joining line; space the tabs evenly again.");
             for (var i = 1; i < centers.Count; i++)
                 if (centers[i] - centers[i - 1] <= tabWidth + JoinTolerance)
                     return Fail("Two tabs overlap; space the tabs evenly again.");
 
-            var regionPoints = BreakoffPath.ToPoints(region, ArcTolerance);
-            var side = SideOf(breakLine, length, regionPoints, System.Math.Min(breakoff.SlotWidth, length) * 0.05);
+            var side = SideOf(line, length, scrapPoints);
             if (side == 0)
-                return Fail("Could not tell which side of the break line the breakoff is on.");
+                return Fail("Could not tell which side of the joining line is scrap.");
 
-            var slots = new List<IReadOnlyList<Entity>>();
+            var cuts = new List<IReadOnlyList<Entity>>();
             for (var i = 0; i + 1 < centers.Count; i++)
             {
-                var slot = BuildSlot(breakLine, centers[i] + tabWidth / 2, centers[i + 1] - tabWidth / 2,
-                    side, breakoff.SlotWidth, tabWidth, edges, regionPoints);
-                if (slot == null)
-                    return Fail($"There is no room for slot {i + 1} inside the breakoff; "
-                        + "use a narrower slot or move the tabs.");
-                slots.Add(slot);
+                var cut = BreakoffPath.Sub(line, centers[i] + tabWidth / 2, centers[i + 1] - tabWidth / 2);
+                if (side < 0)
+                    cut = BreakoffPath.Reversed(cut);
+                foreach (var e in cut)
+                {
+                    e.Id = Guid.NewGuid();
+                    e.Layer = SpecialLayers.Break;
+                }
+                cuts.Add(cut);
             }
 
             var replaced = outline.Entities.Select(e => sources[e]).ToList();
             replaced.AddRange(edgeSources);
             return new BreakoffLayout
             {
-                BreakLine = breakLine,
+                BreakLine = line,
                 Length = length,
-                Outline = merged,
-                Slots = slots,
+                Outline = loop,
+                Scrap = scrap,
+                Cuts = cuts,
                 TabCenters = centers,
                 TabWidth = tabWidth,
                 ReplacedEntities = replaced,
@@ -202,9 +190,9 @@ namespace OpenNest.Breakoffs
         }
 
         /// <summary>
-        /// The open chain of visible lines and arcs through <paramref name="picked"/>, grown until it
-        /// reaches a point where it does not continue as a single path (such as where it meets an
-        /// outline). Empty when <paramref name="picked"/> cannot be a breakoff edge.
+        /// The chain of visible lines and arcs through <paramref name="picked"/>, grown until it
+        /// reaches a point where it does not continue as a single path (such as where the joining
+        /// line meets the outline). Empty when <paramref name="picked"/> cannot be a joining line.
         /// </summary>
         public static List<Entity> FindEdgeChain(IReadOnlyList<Entity> entities, Entity picked)
         {
@@ -236,36 +224,149 @@ namespace OpenNest.Breakoffs
             }
         }
 
-        private static BreakoffLayout Fail(string error) => new(error);
-
-        private static List<Entity> SnapEnds(List<Entity> edges, Vector start, Vector end)
+        /// <summary>
+        /// Splits each visible line or arc of <paramref name="entities"/> where another one ends on
+        /// its interior (a T-junction), so a joining line can end exactly where it meets other
+        /// geometry. The first piece keeps the entity's ID. Returns the IDs of every split entity's
+        /// pieces, keyed by its original ID.
+        /// </summary>
+        public static Dictionary<Guid, List<Guid>> SplitAtJunctions(List<Entity> entities)
         {
-            var result = new List<Entity>(edges);
-            var first = result[0];
-            if (BreakoffPath.Start(first).DistanceTo(start) > 0)
+            var pool = entities.Where(e => e is Line or Arc && e.IsVisible && e.Layer?.IsVisible != false && !IsMark(e))
+                .ToList();
+            var ends = pool.SelectMany(e => new[] { BreakoffPath.Start(e), BreakoffPath.End(e) }).ToList();
+            var split = new Dictionary<Guid, List<Guid>>();
+            foreach (var host in pool)
             {
-                if (first is Line line)
-                    line.StartPoint = start;
-                else
-                    result.Insert(0, Joint(first, start, BreakoffPath.Start(first)));
+                var box = host.BoundingBox;
+                var cuts = new List<double>();
+                foreach (var point in ends)
+                {
+                    if (point.X < box.Left - JoinTolerance || point.X > box.Right + JoinTolerance
+                        || point.Y < box.Bottom - JoinTolerance || point.Y > box.Top + JoinTolerance)
+                        continue;
+                    if (point.DistanceTo(BreakoffPath.Start(host)) <= JoinTolerance
+                        || point.DistanceTo(BreakoffPath.End(host)) <= JoinTolerance
+                        || host.ClosestPointTo(point).DistanceTo(point) > JoinTolerance)
+                        continue;
+                    var at = BreakoffPath.DistanceOf(new[] { host }, point);
+                    if (cuts.All(c => System.Math.Abs(c - at) > JoinTolerance))
+                        cuts.Add(at);
+                }
+                if (cuts.Count == 0)
+                    continue;
+
+                cuts.Sort();
+                var bounds = new List<double> { 0 };
+                bounds.AddRange(cuts);
+                bounds.Add(host.Length);
+                var pieces = new List<Entity>();
+                for (var i = 0; i + 1 < bounds.Count; i++)
+                    pieces.AddRange(BreakoffPath.Sub(new[] { host }, bounds[i], bounds[i + 1]));
+                pieces[0].Id = host.Id;
+                foreach (var piece in pieces)
+                    piece.IsVisible = host.IsVisible;
+                var index = entities.IndexOf(host);
+                entities.RemoveAt(index);
+                entities.InsertRange(index, pieces);
+                split[host.Id] = pieces.Select(p => p.Id).ToList();
             }
-            var last = result[^1];
-            if (BreakoffPath.End(last).DistanceTo(end) > 0)
-            {
-                if (last is Line line)
-                    line.EndPoint = end;
-                else
-                    result.Add(Joint(last, BreakoffPath.End(last), end));
-            }
-            return result;
+            return split;
         }
 
-        private static Line Joint(Entity style, Vector from, Vector to) =>
-            new(from, to) { Layer = style.Layer, Color = style.Color, LineTypeName = style.LineTypeName };
+        private static BreakoffLayout Fail(string error) => new(error);
+
+        // A stray open line ending on the outline (an unmarked etch line, say) would otherwise be
+        // chained into it and keep the loop from closing. Nothing with a free end can be part of a
+        // closed outline, so such entities are dropped, repeatedly, before chaining.
+        private static List<Entity> WithoutDanglingEnds(List<Entity> entities)
+        {
+            // Cluster endpoints that meet within the chain tolerance, using a grid of that size.
+            const double cell = Tolerance.ChainTolerance;
+            var grid = new Dictionary<(long, long), List<(Vector Point, int Cluster)>>();
+            var clusterOf = new int[entities.Count, 2];
+            var sizes = new List<int>();
+            for (var i = 0; i < entities.Count; i++)
+                for (var side = 0; side < 2; side++)
+                {
+                    var point = side == 0 ? BreakoffPath.Start(entities[i]) : BreakoffPath.End(entities[i]);
+                    var gx = (long)System.Math.Floor(point.X / cell);
+                    var gy = (long)System.Math.Floor(point.Y / cell);
+                    var cluster = -1;
+                    for (var dx = -1; dx <= 1 && cluster < 0; dx++)
+                        for (var dy = -1; dy <= 1 && cluster < 0; dy++)
+                            if (grid.TryGetValue((gx + dx, gy + dy), out var near))
+                                foreach (var (other, id) in near)
+                                    if (other.DistanceTo(point) <= cell)
+                                    {
+                                        cluster = id;
+                                        break;
+                                    }
+                    if (cluster < 0)
+                    {
+                        cluster = sizes.Count;
+                        sizes.Add(0);
+                    }
+                    if (!grid.TryGetValue((gx, gy), out var bucket))
+                        grid[(gx, gy)] = bucket = new List<(Vector, int)>();
+                    bucket.Add((point, cluster));
+                    sizes[cluster]++;
+                    clusterOf[i, side] = cluster;
+                }
+
+            // Peel entities with a free end until none is left; closed loops never peel.
+            var members = new List<int>[sizes.Count];
+            for (var i = 0; i < entities.Count; i++)
+                for (var side = 0; side < 2; side++)
+                    (members[clusterOf[i, side]] ??= new List<int>()).Add(i);
+            var removed = new bool[entities.Count];
+            var queue = new Queue<int>(Enumerable.Range(0, entities.Count)
+                .Where(i => sizes[clusterOf[i, 0]] < 2 || sizes[clusterOf[i, 1]] < 2));
+            while (queue.Count > 0)
+            {
+                var i = queue.Dequeue();
+                if (removed[i])
+                    continue;
+                removed[i] = true;
+                for (var side = 0; side < 2; side++)
+                {
+                    var cluster = clusterOf[i, side];
+                    if (--sizes[cluster] == 1)
+                        foreach (var other in members[cluster])
+                            if (!removed[other])
+                                queue.Enqueue(other);
+                }
+            }
+            return entities.Where((_, i) => !removed[i]).ToList();
+        }
 
         private static bool IsMark(Entity e) =>
             string.Equals(e.Layer?.Name, "ETCH", StringComparison.OrdinalIgnoreCase)
             || string.Equals(e.Layer?.Name, SpecialLayers.Scribe.Name, StringComparison.OrdinalIgnoreCase);
+
+        // The planner closes contours far tighter than the import chain tolerance, and the outline
+        // is re-chained from any entity when the program is built, so every joint must be exact.
+        private static List<Entity> CloseExactly(IReadOnlyList<Entity> loop)
+        {
+            var result = new List<Entity>();
+            for (var i = 0; i < loop.Count; i++)
+            {
+                var current = loop[i];
+                var next = loop[(i + 1) % loop.Count];
+                result.Add(current);
+                var end = BreakoffPath.End(current);
+                var start = BreakoffPath.Start(next);
+                if (end.DistanceTo(start) == 0)
+                    continue;
+                if (next is Line nextLine)
+                    nextLine.StartPoint = end;
+                else if (current is Line currentLine)
+                    currentLine.EndPoint = start;
+                else if (end.DistanceTo(start) > 1e-8)
+                    result.Add(new Line(end, start) { Layer = current.Layer, Color = current.Color, LineTypeName = current.LineTypeName });
+            }
+            return result;
+        }
 
         private static Vector Normal(IReadOnlyList<Entity> path, double length, double distance)
         {
@@ -274,134 +375,26 @@ namespace OpenNest.Breakoffs
             var after = BreakoffPath.TangentAt(path, System.Math.Min(distance + nudge, length));
             var t = new Vector(before.X + after.X, before.Y + after.Y);
             var size = System.Math.Sqrt(t.X * t.X + t.Y * t.Y);
-            if (size <= Tolerance.Epsilon)
-                t = after;
-            else
-                t = new Vector(t.X / size, t.Y / size);
+            t = size <= Tolerance.Epsilon ? after : new Vector(t.X / size, t.Y / size);
             return new Vector(-t.Y, t.X);
         }
 
-        // +1 when the breakoff lies left of the break line's travel, -1 when right, 0 when unclear.
-        private static int SideOf(IReadOnlyList<Entity> breakLine, double length, IReadOnlyList<Vector> region, double probe)
+        // +1 when the scrap lies left of the line's travel, -1 when right, 0 when unclear.
+        private static int SideOf(IReadOnlyList<Entity> line, double length, IReadOnlyList<Vector> scrap)
         {
+            var probe = System.Math.Min(0.01, length * 0.01);
             var votes = 0;
             foreach (var fraction in new[] { 0.25, 0.5, 0.75 })
             {
                 var d = length * fraction;
-                var p = BreakoffPath.PointAt(breakLine, d);
-                var n = Normal(breakLine, length, d);
-                var left = BreakoffPath.Contains(region, p + n * probe);
-                var right = BreakoffPath.Contains(region, p - n * probe);
+                var p = BreakoffPath.PointAt(line, d);
+                var n = Normal(line, length, d);
+                var left = BreakoffPath.Contains(scrap, p + n * probe);
+                var right = BreakoffPath.Contains(scrap, p - n * probe);
                 if (left != right)
                     votes += left ? 1 : -1;
             }
             return System.Math.Sign(votes);
-        }
-
-        // The slot's part side is the exact break line from 'from' to 'to'; its scrap side follows
-        // the break line 'depth' into the breakoff, pulled back near the breakoff's edges so at least
-        // 'clearance' of breakoff remains beyond it. Its ends move inward where there is no room.
-        private static List<Entity> BuildSlot(IReadOnlyList<Entity> breakLine, double from, double to, int side,
-            double depth, double clearance, IReadOnlyList<Entity> edges, IReadOnlyList<Vector> region)
-        {
-            var length = BreakoffPath.Length(breakLine);
-            var minDepth = depth / 4;
-            var step = System.Math.Max(depth / 8, (to - from) / 400);
-
-            double Room(double d)
-            {
-                var p = BreakoffPath.PointAt(breakLine, d);
-                var dir = Normal(breakLine, length, d) * side;
-                var reach = depth + clearance;
-                var ray = new Line(p, p + dir * reach);
-                var nearest = reach;
-                foreach (var edge in edges)
-                {
-                    if (!edge.Intersects(ray, out var hits))
-                        continue;
-                    foreach (var hit in hits)
-                    {
-                        var gap = hit.DistanceTo(p);
-                        if (gap > Tolerance.Epsilon)
-                            nearest = System.Math.Min(nearest, gap);
-                    }
-                }
-                return System.Math.Min(depth, nearest - clearance);
-            }
-
-            var start = from;
-            while (start < to && Room(start) < minDepth)
-                start += step;
-            var end = to;
-            while (end > start && Room(end) < minDepth)
-                end -= step;
-            if (end - start < minDepth)
-                return null;
-
-            var stations = new SortedSet<double> { start, end };
-            for (var d = start + depth / 4; d < end; d += depth / 4)
-                stations.Add(d);
-            var walked = 0.0;
-            foreach (var e in breakLine)
-            {
-                walked += e.Length;
-                if (walked > start && walked < end)
-                    stations.Add(walked);
-            }
-
-            var far = new List<Vector>();
-            foreach (var d in stations)
-            {
-                var room = Room(d);
-                if (room < minDepth / 2)
-                    return null;
-                var point = BreakoffPath.PointAt(breakLine, d) + Normal(breakLine, length, d) * side * room;
-                if (!BreakoffPath.Contains(region, point))
-                    return null;
-                far.Add(point);
-            }
-            far = DropCollinear(far);
-
-            var near = BreakoffPath.Sub(breakLine, start, end);
-            var style = near[0];
-            var slot = new List<Entity>(near);
-            var path = new List<Vector> { BreakoffPath.End(near[^1]) };
-            for (var i = far.Count - 1; i >= 0; i--)
-                path.Add(far[i]);
-            path.Add(BreakoffPath.Start(near[0]));
-            for (var i = 1; i < path.Count; i++)
-            {
-                if (path[i].DistanceTo(path[i - 1]) <= Tolerance.Epsilon)
-                    continue;
-                slot.Add(new Line(path[i - 1], path[i])
-                {
-                    Layer = style.Layer,
-                    Color = style.Color,
-                    LineTypeName = style.LineTypeName,
-                });
-            }
-            return slot;
-        }
-
-        private static List<Vector> DropCollinear(List<Vector> points)
-        {
-            if (points.Count < 3)
-                return points;
-            var result = new List<Vector> { points[0] };
-            for (var i = 1; i < points.Count - 1; i++)
-            {
-                var prev = result[^1];
-                var u = points[i] - prev;
-                var v = points[i + 1] - points[i];
-                var cross = u.X * v.Y - u.Y * v.X;
-                var scale = System.Math.Sqrt((u.X * u.X + u.Y * u.Y) * (v.X * v.X + v.Y * v.Y));
-                var dot = u.X * v.X + u.Y * v.Y;
-                if (System.Math.Abs(cross) <= 1e-9 * scale && dot > 0)
-                    continue;
-                result.Add(points[i]);
-            }
-            result.Add(points[^1]);
-            return result;
         }
     }
 }

@@ -23,23 +23,27 @@ public sealed class PreparedContours
     private readonly Shape[] shapes;
     private readonly CuttingParameters parameters;
     private readonly List<Entity> scribes;
+    // Open break cuts in program order, each travel-ordered with its scrap on the left. They are
+    // not contours: no choices, no material; every full or prefix emission cuts them first.
+    private readonly List<Shape> breakCuts;
     // By contour ordinal; all null without pins. A pinned contour has exactly one entry and
     // its own owned settings (the pin's lead-in, lead-out and tab).
     private readonly ContourChoice[] pinned;
     private readonly CuttingParameters[] contourParameters;
     private readonly int[] pinNumbers;
 
-    private PreparedContours(Shape[] shapes, List<Entity> scribes, CuttingParameters parameters)
+    private PreparedContours(Shape[] shapes, List<Entity> scribes, List<Shape> breakCuts, CuttingParameters parameters)
     {
         this.shapes = shapes;
         this.scribes = scribes;
+        this.breakCuts = breakCuts;
         this.parameters = parameters;
         pinned = new ContourChoice[shapes.Length];
         pinNumbers = new int[shapes.Length];
     }
 
     private PreparedContours(PreparedContours unpinned, IReadOnlyList<CutPinResolution> pins, CancellationToken token)
-        : this(unpinned.shapes, unpinned.scribes, unpinned.parameters)
+        : this(unpinned.shapes, unpinned.scribes, unpinned.breakCuts, unpinned.parameters)
     {
         contourParameters = new CuttingParameters[shapes.Length];
         var rejected = new List<CutPinResolution>();
@@ -134,12 +138,29 @@ public sealed class PreparedContours
         var geometryProgram = CopyForGeometry(program, token);
         var contours = new List<Shape>();
         var scribes = new List<Entity>();
+        var breakCuts = new List<Shape>();
+        Shape breakCut = null;
         var current = new Shape();
         foreach (var entity in geometryProgram.ToGeometry())
         {
             token.ThrowIfCancellationRequested();
             if (entity.GetType() != typeof(Line) && entity.GetType() != typeof(Arc) && entity.GetType() != typeof(Circle))
                 throw new NotSupportedException("Unsupported native geometry.");
+            if (entity.Layer == SpecialLayers.Break)
+            {
+                if (current.Entities.Count != 0)
+                    throw new ArgumentException("Preparation requires closed execution contours.");
+                if (entity is Circle || entity.Length <= PostVerificationGeometry.Epsilon || !double.IsFinite(entity.Length))
+                    throw new ArgumentException("Degenerate break cut entity.");
+                if (breakCut == null || End(breakCut.Entities[^1]).DistanceTo(Start(entity)) > PostVerificationGeometry.Epsilon)
+                {
+                    breakCut = new Shape();
+                    breakCuts.Add(breakCut);
+                }
+                breakCut.Entities.Add(entity);
+                continue;
+            }
+            breakCut = null;
             if (entity.Layer == SpecialLayers.Rapid || entity.Layer == SpecialLayers.Scribe)
             {
                 if (current.Entities.Count != 0)
@@ -179,7 +200,9 @@ public sealed class PreparedContours
         var outer = contours[perimeter];
         contours.RemoveAt(perimeter);
         contours.Add(outer);
-        return new(contours.ToArray(), scribes, ownedParameters);
+        foreach (var cut in breakCuts)
+            cut.UpdateBounds();
+        return new(contours.ToArray(), scribes, breakCuts, ownedParameters);
 
         void FinishContour()
         {
@@ -565,14 +588,17 @@ public sealed class PreparedContours
             contourParameters);
     }
 
-    // Each prefix is a standalone owned program, including the same scribes once.
+    // Each prefix is a standalone owned program, including the same scribes and break cuts once.
     internal Program EmitPrefix(IReadOnlyList<ContourChoice> choices)
     {
         Validate(choices, false);
         return new ContourCuttingStrategy { Parameters = parameters }.EmitPrepared(
             shapes.Select(s => (Shape)s.Clone()).ToArray(), scribes.Select(e => e.Clone()).ToList(), choices,
-            contourParameters);
+            contourParameters, breakCuts.Select(s => (Shape)s.Clone()).ToList());
     }
+
+    /// <summary>Open break cuts this preparation cuts before its contours.</summary>
+    public int BreakCutCount => breakCuts.Count;
 
     internal void ValidateCompleteChoices(IReadOnlyList<ContourChoice> choices) => Validate(choices, true);
 

@@ -14,7 +14,7 @@ public class BreakoffPersistenceTests
         {
             EdgeIds = [Guid.NewGuid(), Guid.NewGuid()],
             TabWidth = 0.05,
-            SlotWidth = 0.3,
+            Flip = true,
             TabCenters = [0.025, 1.5, 3.2],
         });
         return drawing;
@@ -31,8 +31,24 @@ public class BreakoffPersistenceTests
         Assert.Empty(warnings);
         var breakoff = Assert.Single(Assert.Single(restored.Drawings).Breakoffs);
         Assert.Equal(original.EdgeIds, breakoff.EdgeIds);
-        Assert.Equal((0.05, 0.3), (breakoff.TabWidth, breakoff.SlotWidth));
+        Assert.Equal((0.05, true), (breakoff.TabWidth, breakoff.Flip));
         Assert.Equal(original.TabCenters, breakoff.TabCenters);
+    }
+
+    [Fact]
+    public void BreakCutMoves_KeepTheirLayer()
+    {
+        var drawing = DrawingPackageFixture.Build();
+        drawing.Program.MoveTo(4, 5);
+        drawing.Program.Codes.Add(new OpenNest.CNC.LinearMove(1, 0) { Layer = OpenNest.CNC.LayerType.Break });
+        drawing.Program.Codes.Add(new OpenNest.CNC.ArcMove(1, 1, 0, 1) { Layer = OpenNest.CNC.LayerType.Break });
+
+        var (restored, _) = RoundTrip(Write(drawing));
+
+        var moves = Assert.Single(restored.Drawings).Program.Codes.OfType<OpenNest.CNC.Motion>()
+            .Where(m => m is OpenNest.CNC.LinearMove { Layer: OpenNest.CNC.LayerType.Break }
+                or OpenNest.CNC.ArcMove { Layer: OpenNest.CNC.LayerType.Break });
+        Assert.Equal(2, moves.Count());
     }
 
     [Fact]

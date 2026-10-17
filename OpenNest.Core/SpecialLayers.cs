@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using OpenNest.Geometry;
 
 namespace OpenNest
@@ -19,11 +19,14 @@ namespace OpenNest
 
         public static readonly Layer Scribe = new Layer("SCRIBE") { Color = Color.Magenta };
 
+        public static readonly Layer Break = new Layer("BREAK") { Color = Color.Orange };
+
         /// <summary>
         /// True when an entity converted from a part program describes part material. Rapids
         /// and scribe/etch marks are excluded: marks are only on the surface, so they never
-        /// bound material and must not affect nesting, collision, area, or validation.
+        /// bound material and must not affect nesting, collision, area, or validation. Break
+        /// cuts are excluded too: they run through material that stays attached at tabs.
         /// </summary>
-        public static bool IsMaterial(Layer layer) => layer != Rapid && layer != Scribe;
+        public static bool IsMaterial(Layer layer) => layer != Rapid && layer != Scribe && layer != Break;
     }
 }

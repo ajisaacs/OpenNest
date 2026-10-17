@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace OpenNest.Geometry
@@ -76,8 +76,15 @@ namespace OpenNest.Geometry
         public static List<Entity> NormalizeEntities(IEnumerable<Entity> entities)
         {
             var cloned = entities.CloneAll();
+            // Break cuts are open and their direction says which side is scrap: never re-chain or
+            // re-wind them. They follow the contours, in their original order.
+            var breakCuts = cloned.Where(e => e.Layer == SpecialLayers.Break).ToList();
+            if (breakCuts.Count > 0)
+                cloned.RemoveAll(e => e.Layer == SpecialLayers.Break);
             var profile = new ShapeProfile(cloned);
-            return profile.ToNormalizedEntities();
+            var result = profile.ToNormalizedEntities();
+            result.AddRange(breakCuts);
+            return result;
         }
 
         private static void EnsureWinding(Shape shape, RotationType desired)

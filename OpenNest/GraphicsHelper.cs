@@ -54,6 +54,14 @@ namespace OpenNest
             etchPath = GetLayerPath(pgm, origin, layer => layer == LayerType.Scribe);
         }
 
+        /// <summary>
+        /// The closed material outlines to fill. Break cuts are open lines through material: a
+        /// fill would close each one with a chord and leave the sliver between them unfilled.
+        /// </summary>
+        public static GraphicsPath GetFillPath(this Program pgm, Vector origin) =>
+            GetLayerPath(pgm, origin, layer => layer is not (LayerType.Scribe or LayerType.Leadin
+                or LayerType.Leadout or LayerType.Break));
+
         private static GraphicsPath GetLayerPath(Program pgm, Vector origin, System.Func<LayerType, bool> includeLayer)
         {
             var path = new GraphicsPath();
@@ -115,7 +123,11 @@ namespace OpenNest
             graphics.TranslateTransform(offset.X, offset.Y);
 
             if (brush != null)
-                graphics.FillPath(brush, path);
+            {
+                using var fill = pgm.GetFillPath(Vector.Zero);
+                fill.Transform(matrix);
+                graphics.FillPath(brush, fill);
+            }
 
             if (pen == null)
                 pen = Pens.Black;

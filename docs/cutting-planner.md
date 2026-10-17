@@ -104,6 +104,12 @@ the final replay enforce them:
   Being continuous, a separating line passes through no part. A kept order that cuts
   it earlier is a constraint conflict naming the separating cutoff (user decision,
   2026-10-13).
+- A drawing's break cuts (`LayerType.Break`, see [breakoffs](breakoffs.md)) are open
+  cuts inside its material. Preparation keeps them apart from contours (no choices,
+  no material); every full and prefix emission cuts them after scribes and before any
+  contour, entered from the scrap with the internal lead-in. Their leads may run
+  through the part's own material but not touch its boundaries; they are never rapid
+  obstacles or unexplained open fragments.
 - A part whose perimeter lies strictly inside a cutout of another part precedes
   that host. Material bounds (never rapids or scribe marks) only select candidate
   pairs; containment is proven on native clean material. Touching or crossing boundaries, or material that cannot be

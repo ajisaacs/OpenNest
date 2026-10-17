@@ -99,7 +99,8 @@ namespace OpenNest
             RefreshColors();
             using var schemeSelectionBrush = IsSelected && !colorScheme.SelectedPartColor.IsEmpty
                 ? new SolidBrush(colorScheme.SelectedPartColor) : null;
-            g.FillPath(muted ? Brushes.Gainsboro : schemeSelectionBrush ?? (IsSelected ? selectedBrush : brush), Path);
+            g.FillPath(muted ? Brushes.Gainsboro : schemeSelectionBrush ?? (IsSelected ? selectedBrush : brush),
+                FillPath ?? Path);
             DrawEtch(g, muted);
             // Keep real cuts visible even where an etch overlaps them.
             g.DrawPath(muted ? Pens.Gray : IsSelected && colorScheme.PartOutlineColor.IsEmpty ? selectedPen : pen, Path);
@@ -137,6 +138,8 @@ namespace OpenNest
             pen = null;
             Path?.Dispose();
             Path = null;
+            FillPath?.Dispose();
+            FillPath = null;
             LeadInPath?.Dispose();
             LeadInPath = null;
             EtchPath?.Dispose();
@@ -146,6 +149,14 @@ namespace OpenNest
         }
 
         public GraphicsPath OffsetPath { get; private set; }
+
+        /// <summary>The material fill when it differs from <c>Path</c> (break cuts are drawn, not filled).</summary>
+        private GraphicsPath FillPath { get; set; }
+
+        private static bool HasBreakCuts(CNC.Program program) =>
+            program.Codes.Any(code => code is CNC.LinearMove { Layer: CNC.LayerType.Break }
+                    or CNC.ArcMove { Layer: CNC.LayerType.Break }
+                || code is CNC.SubProgramCall { Program: { } sub } && HasBreakCuts(sub));
 
         internal void DrawEtch(Graphics g, bool muted = false)
         {
@@ -198,6 +209,14 @@ namespace OpenNest
             Path?.Dispose();
             LeadInPath?.Dispose();
             EtchPath?.Dispose();
+            FillPath?.Dispose();
+            FillPath = null;
+            // Only programs with break cuts need a fill apart from the outline path.
+            if (HasBreakCuts(BasePart.Program))
+            {
+                FillPath = BasePart.Program.GetFillPath(BasePart.Location);
+                FillPath.Transform(plateView.Matrix);
+            }
             Path = cutPath;
             EtchPath = etchPath;
             LeadInPath = BasePart.HasManualLeadIns ? leadPath : null;

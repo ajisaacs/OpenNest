@@ -36,6 +36,7 @@ namespace OpenNest.Controls
         public event EventHandler<int> BreakoffSelected;
         public event EventHandler<int> BreakoffEdited;
         public event EventHandler<int> BreakoffRemoved;
+        public event EventHandler<int> BreakoffFlipped;
         public event EventHandler AddBreakoffClicked;
 
         public FilterPanel()
@@ -76,6 +77,12 @@ namespace OpenNest.Controls
                 if (breakoffsList.SelectedIndex >= 0)
                     BreakoffEdited?.Invoke(this, breakoffsList.SelectedIndex);
             };
+            var breakoffFlipLink = new LinkLabel { Text = "Flip", AutoSize = true, Font = new Font("Segoe UI", 8f) };
+            breakoffFlipLink.LinkClicked += (s, e) =>
+            {
+                if (breakoffsList.SelectedIndex >= 0)
+                    BreakoffFlipped?.Invoke(this, breakoffsList.SelectedIndex);
+            };
             var breakoffRemoveLink = new LinkLabel { Text = "Remove", AutoSize = true, Font = new Font("Segoe UI", 8f) };
             breakoffRemoveLink.LinkClicked += (s, e) =>
             {
@@ -92,6 +99,7 @@ namespace OpenNest.Controls
             };
             breakoffLinksPanel.Controls.Add(breakoffAddLink);
             breakoffLinksPanel.Controls.Add(breakoffEditLink);
+            breakoffLinksPanel.Controls.Add(breakoffFlipLink);
             breakoffLinksPanel.Controls.Add(breakoffRemoveLink);
 
             breakoffsPanel.ContentPanel.Controls.Add(breakoffsList);

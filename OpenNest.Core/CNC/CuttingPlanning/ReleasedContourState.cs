@@ -71,11 +71,29 @@ public sealed class ReleasedContourState
         var unfinished = new List<(PostVerificationGeometry.Curve[] Curves, bool Fixed)>();
         var hasLead = false;
         var contourNumber = 0;
+        var inBreakCut = false;
         for (var index = 0; index < moves.Count; index++)
         {
             token.ThrowIfCancellationRequested();
             var move = moves[index];
             var owned = isFixed?.Invoke(index) == true;
+            if (!move.Rapid && move.Layer == LayerType.Break)
+            {
+                // A break cut is intentionally open and retained by its uncut tabs: it is never a
+                // rapid obstacle and never an unexplained fragment, but it is still pierced.
+                if (!inBreakCut)
+                {
+                    Finish();
+                    if (reportMissingLeadIns && !cutoff && !hasLead)
+                        Add(new(PostVerificationKind.MissingLeadIn, plate, part, null,
+                            "A break cut has no nonzero placed lead-in motion.")
+                        { Location = move.Curve.Start }, owned);
+                    inBreakCut = true;
+                    hasLead = false;
+                }
+                continue;
+            }
+            inBreakCut = false;
             if (move.Rapid)
             {
                 Finish();

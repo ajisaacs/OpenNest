@@ -214,8 +214,11 @@ namespace OpenNest.IO
         public record BreakoffDto
         {
             public List<Guid> EdgeIds { get; init; } = new();
+
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+            public bool Flip { get; init; }
+
             public double TabWidth { get; init; }
-            public double SlotWidth { get; init; }
             public List<double> TabCenters { get; init; } = new();
         }
 
