@@ -48,6 +48,9 @@ public class SavedNestsFormTests
                     "the second nest's plates");
                 Assert.Equal(1, drawings.Rows[0].Cells["Nested"].Value);
 
+                // Selecting a row does not guarantee keyboard focus after pumping UI events.
+                Assert.True(nests.Focus());
+                Assert.True(nests.Focused);
                 Assert.True(ProcessKey(form, Keys.Enter));
                 Assert.Equal(DialogResult.OK, form.DialogResult);
                 Assert.Equal(second.Id, form.SelectedId);
