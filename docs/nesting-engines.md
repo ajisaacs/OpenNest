@@ -137,8 +137,8 @@ representation; repeating does not bypass whole-job validation or change cutting
 
 Placing parts inside another part's enclosed cutout is being built as a step that runs before any
 engine, so every engine benefits. Only an internal test-only pipeline preview calls it: a part
-inside a cutout must be cut before the cutout's contour, and the cutting/post safety gates are
-not complete. Ordinary whole-job calls do not enable this path.
+inside a cutout must be cut before the cutout's contour. Ordinary whole-job calls do not enable
+this path.
 
 `CutoutLatticeFill` (`OpenNest.Engine/Jobs/Cutouts/`) fills one closed cutout with copies of one
 part. It runs Fill over the cutout's bounds plus one part step on every side, then shifts
@@ -182,7 +182,13 @@ and 16 base sweep-angle samples per frame (automatic quarter-turns are all retai
 remaining copies stay ordinary requirements. Fixed legal proxy orientations are a
 conservative search choice, not full engine choice among all legal orientations; unsupported
 bundles remain ordinary independent requirements. This is an internal pipeline path, not a
-production setting or cut-ready nest. Cutting/post safety remains pending before enablement.
+production setting or cut-ready nest.
+
+Committed preview parts keep the frame before its inserts, so they are not cut-ready as placed.
+Pre-post verification warns on a nested part cut after its host and on host/insert leads that
+meet the other part (see [pre-post verification](post-verification.md)); Plan Cutting on those
+parts cuts each insert before its frame and refuses a kept order that does not. Enabling the
+pre-pass for ordinary whole-job calls is still pending (Windows acceptance and front-end wiring).
 
 ## Renamed engines
 

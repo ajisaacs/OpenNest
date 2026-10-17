@@ -17,8 +17,11 @@ namespace OpenNest.CNC.CuttingPlanning;
 /// </summary>
 internal static class FixedLeadReview
 {
+    /// <param name="fixedMotions">Receives, per reviewed part index, which of its placed program's
+    /// motions this review owns, so other lead checks do not report them twice.</param>
     internal static void Add(Plate plate, int plateNumber, List<PostVerificationFinding> findings,
-        IReadOnlyList<ClampZone> clamps, CancellationToken token)
+        IReadOnlyList<ClampZone> clamps, CancellationToken token,
+        IDictionary<int, Func<int, bool>> fixedMotions = null)
     {
         var parts = plate.Parts;
         var reviewed = Enumerable.Range(0, parts.Count)
@@ -84,6 +87,8 @@ internal static class FixedLeadReview
                     continue;
             }
             bool IsFixed(int motion) => pins == null || pins[motion] != null;
+            if (fixedMotions != null)
+                fixedMotions[index] = IsFixed;
             if (materials[index] is { IsComplete: true } own)
             {
                 var failures = new List<FixedLeadFailure>();
@@ -204,7 +209,7 @@ internal static class FixedLeadReview
     }
 
     // The same clean, rotation-baked, seam-trimmed program that planning captures.
-    private static Program Clean(Part part)
+    internal static Program Clean(Part part)
     {
         var clean = (Program)part.BaseDrawing.Program.Clone();
         clean.Rotate(part.Rotation - part.BaseDrawing.Program.Rotation);

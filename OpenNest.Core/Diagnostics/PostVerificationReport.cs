@@ -17,7 +17,16 @@ public enum PostVerificationKind
     /// A violation inside a fixed emission (a locked program, or a contour cut exactly as its
     /// drawing pins it): accepted as given, never repaired, always reported for review.
     /// </summary>
-    FixedLead
+    FixedLead,
+
+    /// <summary>A part inside another part's cutout is cut after that host, whose cutout releases it.</summary>
+    NestedCutOrder,
+
+    /// <summary>
+    /// A lead of a nested part or of its host contacts or enters the other's material; for a host
+    /// this is typically an enclosing-hole lead crossing the insert.
+    /// </summary>
+    NestedLead
 }
 
 /// <summary>Plate and part numbers are one-based; plate zero denotes a whole-post limitation.</summary>
@@ -59,6 +68,10 @@ public sealed class PostVerificationReport
         // Only nests with fixed-lead findings gain the line, so other reports read as before.
         if (Findings.Any(finding => finding.Kind == PostVerificationKind.FixedLead))
             Summary(PostVerificationKind.FixedLead, "Fixed leads");
+        if (Findings.Any(finding => finding.Kind == PostVerificationKind.NestedCutOrder))
+            Summary(PostVerificationKind.NestedCutOrder, "Nested part order");
+        if (Findings.Any(finding => finding.Kind == PostVerificationKind.NestedLead))
+            Summary(PostVerificationKind.NestedLead, "Nested part leads");
         foreach (var finding in Findings)
         {
             text.Append(finding.PlateNumber == 0 ? "Post processor" : $"Plate {finding.PlateNumber}");

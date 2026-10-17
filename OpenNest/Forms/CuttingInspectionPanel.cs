@@ -476,6 +476,8 @@ internal sealed class CuttingInspectionPanel : UserControl
         PostVerificationKind.RapidCrossing => "Rapid crossing",
         PostVerificationKind.Incomplete => "Not checked",
         PostVerificationKind.FixedLead => "Fixed lead",
+        PostVerificationKind.NestedCutOrder => "Nested part order",
+        PostVerificationKind.NestedLead => "Nested part lead",
         _ => kind.ToString(),
     };
 
@@ -537,6 +539,8 @@ internal sealed class CuttingInspectionPanel : UserControl
             ? "Orange dashes show the rapid; crosshairs mark where it crosses a cut contour."
             : "Orange dashes show the rapid running inside a cut contour.",
         PostVerificationKind.MissingLeadIn => "The ring marks the contour start that has no lead-in.",
+        PostVerificationKind.NestedCutOrder => "The ring marks the nested part that is cut after its host.",
+        PostVerificationKind.NestedLead => "The ring marks the middle of the lead that meets the other part.",
         _ => "The ring marks the affected part; the exact spot is not known."
     };
 

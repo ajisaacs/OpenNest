@@ -16,7 +16,6 @@ namespace OpenNest.Engine.CuttingPlanning;
 /// </summary>
 internal sealed class CuttingDependencyGraph
 {
-    private const int ContactBudget = 1000000;
     private readonly int[][] prerequisites;
 
     private CuttingDependencyGraph(int[][] prerequisites) => this.prerequisites = prerequisites;
@@ -108,7 +107,7 @@ internal sealed class CuttingDependencyGraph
                 token.ThrowIfCancellationRequested();
                 // Bounds only select candidates; containment itself is proven on native material.
                 if (inner != host && !nodes[inner].IsCutOff && !nodes[host].IsCutOff
-                    && Within(nodes[inner].CleanBounds, nodes[host].HostBounds))
+                    && NestedPartContainment.Within(nodes[inner].CleanBounds, nodes[host].HostBounds))
                 {
                     try
                     {
@@ -160,34 +159,13 @@ internal sealed class CuttingDependencyGraph
     // True when the inner part's perimeter lies strictly inside one cutout of the host. Any
     // boundary contact or crossing between them, or incomplete material, is ambiguous.
     private static bool InsideCutout(IReadOnlyList<DependencyNode> nodes, int inner, int host,
-        CancellationToken token)
-    {
-        var part = nodes[inner].Material;
-        var enclosing = nodes[host].Material;
-        if (!part.IsComplete || !enclosing.IsComplete)
-            throw Ambiguous(inner, host, part.Reason ?? enclosing.Reason);
-        var budget = ContactBudget;
-        foreach (var curve in part.Rings[0])
-            foreach (var ring in enclosing.Rings)
-                foreach (var boundary in ring)
-                {
-                    token.ThrowIfCancellationRequested();
-                    if (--budget < 0)
-                        throw Ambiguous(inner, host, "the containment check exceeds the native query limit");
-                    if (curve.Contacts(boundary, out var overlap).Count != 0 || overlap)
-                        throw Ambiguous(inner, host, "their boundaries touch or cross");
-                }
-        var probe = part.Rings[0][0].Start;
-        return enclosing.Rings.Skip(1).Any(hole => LeadMaterialSnapshot.Inside(probe, hole, token));
-    }
+        CancellationToken token) =>
+        NestedPartContainment.InsideCutout(nodes[inner].Material, nodes[host].Material, token, out var ambiguity)
+            ?? throw Ambiguous(inner, host, ambiguity);
 
     private static CuttingDependencyException Ambiguous(int inner, int host, string reason) =>
         new(CuttingPlanStatus.UnsupportedGeometry, inner, host,
             $"Containment of part {inner + 1} relative to part {host + 1} cannot be established: {reason}.");
-
-    private static bool Within(Box inner, Box outer) =>
-        inner.Left >= outer.Left - Tolerance.Epsilon && inner.Right <= outer.Right + Tolerance.Epsilon
-        && inner.Bottom >= outer.Bottom - Tolerance.Epsilon && inner.Top <= outer.Top + Tolerance.Epsilon;
 }
 
 /// <summary>Owned copy of a cutoff definition's nominal line.</summary>
@@ -207,7 +185,7 @@ internal sealed class DependencyNode
         CutOff = cutOff;
         PlacedBounds = Copy(placedBounds);
         CleanBounds = cleanBounds == null ? null : Copy(cleanBounds);
-        HostBounds = cleanBounds == null ? PlacedBounds : Union(PlacedBounds, CleanBounds);
+        HostBounds = cleanBounds == null ? PlacedBounds : NestedPartContainment.Union(PlacedBounds, CleanBounds);
         this.materialFactory = materialFactory;
     }
 
@@ -221,13 +199,6 @@ internal sealed class DependencyNode
     internal LeadMaterialSnapshot Material => material ??= materialFactory();
 
     private static Box Copy(Box box) => new(box.X, box.Y, box.Length, box.Width);
-
-    private static Box Union(Box a, Box b)
-    {
-        var left = System.Math.Min(a.Left, b.Left);
-        var bottom = System.Math.Min(a.Bottom, b.Bottom);
-        return new(left, bottom, System.Math.Max(a.Right, b.Right) - left, System.Math.Max(a.Top, b.Top) - bottom);
-    }
 }
 
 /// <summary>A dependency refusal naming the part and, when relevant, the other part.</summary>

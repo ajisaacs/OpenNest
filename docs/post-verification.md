@@ -92,6 +92,18 @@ shows the first three check categories, even when there are no findings:
   are not reported. A part whose clean material cannot be captured makes the check
   incomplete for leads near it. This line appears in the summary only when there is such
   a finding.
+- **Nested parts:** a part whose perimeter lies strictly inside a cutout of another part (its
+  host), proven on clean material exactly as Plan Cutting proves its inner-before-host
+  prerequisite. **Nested part order** warns when the nested part comes after its host in the
+  placed order, because cutting the host's cutout releases the slug it is cut from.
+  **Nested part leads** warns when an actual lead-in or lead-out of the host (typically its
+  enclosing hole's lead, including a hole cut through a subprogram call at its placed pose)
+  contacts or enters the nested part's material, or a lead of the nested part enters the host's
+  material. Leads already reported as fixed leads are not reported again. A pair whose
+  containment cannot be established (touching or crossing boundaries, uncapturable material)
+  is incomplete, never clear. Each line appears in the summary only when there is such a
+  finding. Plan Cutting's Ready result for the plate cuts nested parts first with leads that
+  clear them; this review checks the live programs again before posting.
 
 Findings identify the plate and part's position in the cutting sequence. Read the
 scrollable report, cancel to fix the nest, then post again to rerun verification.

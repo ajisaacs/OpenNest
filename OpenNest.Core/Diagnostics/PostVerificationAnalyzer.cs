@@ -195,7 +195,10 @@ public static class PostVerificationAnalyzer
             }
             cancellationToken.ThrowIfCancellationRequested();
             // Leads Plan Cutting accepted as given (locked and drawing-pinned) are checked again here.
-            FixedLeadReview.Add(plate, plateNumber, findings, clamps, cancellationToken);
+            var fixedMotions = new Dictionary<int, Func<int, bool>>();
+            FixedLeadReview.Add(plate, plateNumber, findings, clamps, cancellationToken, fixedMotions);
+            // Parts nested in cutouts: inner-before-host order and leads across the pair.
+            NestedPartReview.Add(plate, plateNumber, findings, fixedMotions, cancellationToken);
             var overlap = PlateOverlapAnalyzer.Analyze(
                 PlateOverlapAnalyzer.Capture(materialParts, (clamps ?? Array.Empty<ClampZone>()).ToArray(),
                     cancellationToken),

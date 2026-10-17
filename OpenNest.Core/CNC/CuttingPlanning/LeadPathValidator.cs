@@ -128,28 +128,36 @@ public static class LeadPathValidator
                 }
                 return (null, null);
 
-                string CheckMaterial(LeadMaterialSnapshot material, Vector? permittedJoint)
-                {
-                    foreach (var boundary in material.Rings.SelectMany(r => r))
-                    {
-                        token.ThrowIfCancellationRequested();
-                        if (--budget < 0)
-                            throw new NotSupportedException("Lead validation exceeds the native query limit.");
-                        var contacts = move.Curve.Contacts(boundary, out var overlap);
-                        if (overlap || contacts.Any(p => permittedJoint is not { } joint
-                            || p.DistanceTo(joint) > PostVerificationGeometry.Epsilon))
-                            return $"boundary; allowed={permittedJoint}; contacts={string.Join(";", contacts)}; overlap={overlap}";
-                    }
-                    // With all other boundary contacts excluded, the connected open path
-                    // has constant material membership. Use the native arc midpoint, not
-                    // the chord midpoint or endpoints (which can both lie in scrap).
-                    return material.ContainsMaterial(move.Curve.Midpoint, token) ? "interior" : null;
-                }
+                string CheckMaterial(LeadMaterialSnapshot material, Vector? permittedJoint) =>
+                    MaterialContact(move.Curve, material, permittedJoint, ref budget, token);
             }
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
         {
             return new(false, false, ex.Message);
         }
+    }
+
+    /// <summary>
+    /// How a native lead curve contacts or enters complete material, or null when it stays clear.
+    /// A contact at <paramref name="permittedJoint"/> is allowed. Exceeding the budget throws.
+    /// </summary>
+    internal static string MaterialContact(PostVerificationGeometry.Curve curve, LeadMaterialSnapshot material,
+        Vector? permittedJoint, ref int budget, CancellationToken token)
+    {
+        foreach (var boundary in material.Rings.SelectMany(r => r))
+        {
+            token.ThrowIfCancellationRequested();
+            if (--budget < 0)
+                throw new NotSupportedException("Lead validation exceeds the native query limit.");
+            var contacts = curve.Contacts(boundary, out var overlap);
+            if (overlap || contacts.Any(p => permittedJoint is not { } joint
+                || p.DistanceTo(joint) > PostVerificationGeometry.Epsilon))
+                return $"boundary; allowed={permittedJoint}; contacts={string.Join(";", contacts)}; overlap={overlap}";
+        }
+        // With all other boundary contacts excluded, the connected open path
+        // has constant material membership. Use the native arc midpoint, not
+        // the chord midpoint or endpoints (which can both lie in scrap).
+        return material.ContainsMaterial(curve.Midpoint, token) ? "interior" : null;
     }
 }

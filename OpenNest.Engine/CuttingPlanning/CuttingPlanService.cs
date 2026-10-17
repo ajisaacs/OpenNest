@@ -108,9 +108,7 @@ public static class CuttingPlanService
                 SeamOvercut.Trim(ownedClean);
                 // Material extent only: remote rapids and scribe marks must not widen it, or a
                 // genuine insert could fail the containment prefilter.
-                var cleanBounds = ExecutionMotionReader.ReadSupported(ownedClean, source.Location, null, token).Motions
-                    .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display && m.Curve != null)
-                    .Select(m => m.Curve.ToEntity().BoundingBox).ToList().GetBoundingBox();
+                var cleanBounds = NestedPartContainment.CleanBounds(ownedClean, source.Location, token);
                 var location = source.Location;
                 if (request.ConfirmedParameters != null)
                 {
