@@ -91,14 +91,13 @@ static class NestConsole
         }
         else
         {
-            try
-            {
-                PlateFillService.ResolveStrategy(options.Engine);
-            }
-            catch (NotSupportedException)
+            var engine = EngineNameResolver.Classify(options.Engine);
+            if (!engine.IsFillStrategy)
             {
                 Console.Error.WriteLine(
-                    $"Error: unknown engine '{options.Engine}'. Fill strategies: {string.Join(", ", PlateFillService.BuiltInStrategies)} (jobs engines such as StockLadder require --autonest)"
+                    engine.IsJobEngine
+                        ? $"Error: engine '{engine.Name}' is a whole-job engine; single-plate fill supports: {string.Join(", ", PlateFillService.BuiltInStrategies)}. Use --autonest for whole-job engines."
+                        : $"Error: unknown engine '{engine.Name}'. Fill strategies: {string.Join(", ", PlateFillService.BuiltInStrategies)} (jobs engines such as StockLadder require --autonest)"
                 );
                 return 1;
             }
@@ -486,7 +485,7 @@ static class NestConsole
         {
             // Single-plate fill: explicit placement strategy through the public service;
             // the process-global engine registry is never consulted.
-            var strategy = ResolveFillStrategy(options.Engine);
+            var strategy = EngineNameResolver.Classify(options.Engine).FillStrategy;
             var item = new NestItem { Drawing = drawing, Quantity = options.Quantity };
             var parts = PlateFillService.FillItem(
                 strategy,
@@ -543,27 +542,6 @@ static class NestConsole
         plate.Parts.AddRange(proposed.Parts);
         Console.WriteLine($"Engine: {engineName} — committed {committed} placements");
         return (true, committed);
-    }
-
-    static string ResolveFillStrategy(string engineName)
-    {
-        try
-        {
-            return PlateFillService.ResolveStrategy(engineName);
-        }
-        catch (NotSupportedException)
-        {
-            var isJobEngine = NestingEngineRegistry.AvailableEngines.Any(e =>
-                e.Name.Equals(engineName, StringComparison.OrdinalIgnoreCase)
-            );
-            Console.Error.WriteLine(
-                isJobEngine
-                    ? $"Error: engine '{engineName}' is a whole-job engine; single-plate fill supports: {string.Join(", ", PlateFillService.BuiltInStrategies)}. Use --autonest for whole-job engines."
-                    : $"Error: unknown engine '{engineName}'. Engines: {string.Join(", ", NestingEngineRegistry.AvailableEngines.Select(e => e.Name))}"
-            );
-            Environment.Exit(1);
-            throw; // unreachable
-        }
     }
 
     static int CheckOverlaps(Plate plate, Options options)

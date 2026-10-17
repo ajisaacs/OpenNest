@@ -598,29 +598,18 @@ namespace OpenNest.Mcp.Tools
         /// Resolves the requested fill strategy; an omitted name means Fill. Returns null when the
         /// name is not a single-plate placement strategy.
         /// </summary>
-        private static string ResolveStrategy(string engine)
+        private static string ResolveStrategy(string engine) => EngineNameResolver.Classify(engine).FillStrategy;
+
+        private static string EngineError(string engine)
         {
-            try
-            {
-                return PlateFillService.ResolveStrategy(engine?.Trim());
-            }
-            catch (NotSupportedException)
-            {
-                return null;
-            }
+            var classified = EngineNameResolver.Classify(engine);
+            return classified.IsJobEngine
+                ? $"Error: engine '{classified.Name}' is a whole-job engine; this tool supports: {string.Join(", ", PlateFillService.BuiltInStrategies)}. Use autonest_plate for whole-job engines."
+                : UnknownEngineMessage(classified.Name);
         }
 
-        private static string EngineError(string engine) => UnknownEngineMessage(engine.Trim());
-
-        private static string UnknownEngineMessage(string engineName)
-        {
-            var isJobEngine = NestingEngineRegistry.AvailableEngines.Any(e =>
-                e.Name.Equals(engineName, StringComparison.OrdinalIgnoreCase)
-            );
-            return isJobEngine
-                ? $"Error: engine '{engineName}' is a whole-job engine; this tool supports: {string.Join(", ", PlateFillService.BuiltInStrategies)}. Use autonest_plate for whole-job engines."
-                : $"Error: unknown engine '{engineName}'. Fill strategies: {string.Join(", ", PlateFillService.BuiltInStrategies)}; jobs engines: {string.Join(", ", NestingEngineRegistry.AvailableEngines.Select(e => e.Name))}";
-        }
+        private static string UnknownEngineMessage(string engineName) =>
+            $"Error: unknown engine '{engineName}'. Fill strategies: {string.Join(", ", PlateFillService.BuiltInStrategies)}; jobs engines: {string.Join(", ", NestingEngineRegistry.AvailableEngines.Select(e => e.Name))}";
 
         private (List<NestItem> items, string error) ParseItems(string drawingNames, string quantities)
         {
