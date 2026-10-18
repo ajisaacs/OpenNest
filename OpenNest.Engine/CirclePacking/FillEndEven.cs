@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -18,6 +18,9 @@ namespace OpenNest.Engine.CirclePacking
 
             var rows = System.Math.Floor((Bin.Length + Tolerance.Epsilon) / (item.Diameter));
 
+            if (rows == 0)
+                return;
+
             var diameter = item.Diameter;
             var remaining = Bin.Length - diameter * rows;
             var radius = diameter * 0.5;
@@ -35,7 +38,9 @@ namespace OpenNest.Engine.CirclePacking
 
                     for (; y <= max.Y; y += yoffset)
                     {
-                        Bin.Items.Add(new Item { Center = new Vector(x, y) });
+                        var addedItem = item.Clone();
+                        addedItem.Center = new Vector(x, y);
+                        Bin.Items.Add(addedItem);
                     }
 
                     column++;
@@ -44,7 +49,9 @@ namespace OpenNest.Engine.CirclePacking
             else
             {
                 var yoffset = (Bin.Length - diameter) / (2 * rows - 1);
-                var xoffset = Trigonometry.Base(yoffset, diameter);
+                // Adjacent columns touch diagonally, but columns two apart sit directly beside
+                // each other, so the column spacing can never drop below a radius.
+                var xoffset = System.Math.Max(Trigonometry.Base(yoffset, diameter), radius);
 
                 var yodd = Bin.Y + yoffset;
 
@@ -58,7 +65,9 @@ namespace OpenNest.Engine.CirclePacking
 
                     for (; y <= max.Y; y += yoffset)
                     {
-                        Bin.Items.Add(new Item { Center = new Vector(x, y) });
+                        var addedItem = item.Clone();
+                        addedItem.Center = new Vector(x, y);
+                        Bin.Items.Add(addedItem);
                     }
 
                     column++;
