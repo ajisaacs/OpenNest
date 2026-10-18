@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Actions;
-using OpenNest.Controls;
 
 namespace OpenNest.Forms
 {
@@ -119,12 +118,8 @@ namespace OpenNest.Forms
                 return;
 
             var nest = editForm.Nest;
-            var views = MdiChildren.OfType<EditNestForm>()
-                .Where(form => ReferenceEquals(form.Nest, nest))
-                .Select(form => form.PlateView).ToArray();
-            // A closed progress window can still have a fill awaiting completion/commit.
-            bool IsBusy() => nestingInProgress || Application.OpenForms.OfType<NestProgressForm>().Any()
-                || views.Any(v => v.IsFillInProgress || v.Actions.CurrentAction?.IsBusy() == true);
+            var views = ViewsOf(nest);
+            bool IsBusy() => IsPlateWorkBusy(views);
             if (IsBusy())
             {
                 MessageBox.Show(this, "Finish or cancel the current nesting or plate action first.",
@@ -157,10 +152,6 @@ namespace OpenNest.Forms
 
         private void NestPlanCutting_Click(object sender, EventArgs e) => ShowCuttingPlan(allPlates: true);
 
-        internal bool IsCuttingPlanBusy(PlateView[] views) => nestingInProgress
-            || Application.OpenForms.OfType<NestProgressForm>().Any()
-            || views.Any(v => v.IsFillInProgress || v.Actions.CurrentAction?.IsBusy() == true);
-
         // Native tests capture this notice without opening a modal dialog in session zero.
         internal System.Action<string, string> CuttingPlanNotice { get; set; }
 
@@ -181,10 +172,7 @@ namespace OpenNest.Forms
                 return;
 
             var nest = editForm.Nest;
-            var views = MdiChildren.OfType<EditNestForm>()
-                .Where(form => ReferenceEquals(form.Nest, nest))
-                .Select(form => form.PlateView).ToArray();
-            // A closed progress window can still have a fill awaiting completion/commit.
+            var views = ViewsOf(nest);
             if (IsCuttingPlanBusy(views))
             {
                 ShowCuttingPlanNotice("Finish or cancel the current nesting or plate action first.", "Plan Cutting");

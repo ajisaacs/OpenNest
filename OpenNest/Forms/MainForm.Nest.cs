@@ -6,9 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using OpenNest.Actions;
 using OpenNest.Collections;
-using OpenNest.Controls;
 using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.Fill;
@@ -64,22 +62,6 @@ namespace OpenNest.Forms
             activeForm.ShowNestInfoEditor();
         }
 
-        private PlateView[] ViewsOf(Nest nest) =>
-            MdiChildren
-                .OfType<EditNestForm>()
-                .Where(form => ReferenceEquals(form.Nest, nest))
-                .Select(form => form.PlateView)
-                .ToArray();
-
-        /// <summary>
-        /// True while a nest run or fill may be reading <paramref name="nest"/>'s clamps.
-        /// Clamps feed nesting and validation: never change them under a running operation.
-        /// </summary>
-        private bool ClampsInUse(Nest nest) =>
-            nestingInProgress
-            || Application.OpenForms.OfType<NestProgressForm>().Any()
-            || ViewsOf(nest).Any(v => v.IsFillInProgress);
-
         private void Clamps_Click(object sender, EventArgs e)
         {
             var editForm = activeForm;
@@ -88,7 +70,7 @@ namespace OpenNest.Forms
 
             var nest = editForm.Nest;
             var views = ViewsOf(nest);
-            if (ClampsInUse(nest) || views.Any(v => v.Actions.CurrentAction?.IsBusy() == true))
+            if (IsPlateWorkBusy(views))
             {
                 MessageBox.Show(
                     this,
@@ -193,17 +175,9 @@ namespace OpenNest.Forms
             var target = activeForm;
             if (target == null || target.IsDisposed || target.PlateView.Plate == null)
                 return;
-            var views = MdiChildren.OfType<EditNestForm>()
-                .Where(f => ReferenceEquals(f.Nest, target.Nest)).Select(f => f.PlateView).ToArray();
-            if (nestingInProgress || Application.OpenForms.OfType<NestProgressForm>().Any()
-                || views.Any(v => v.IsFillInProgress || v.Actions.CurrentAction?.IsBusy() == true))
-            {
-                MessageBox.Show(this, "Finish or cancel the current plate operation before Auto Nest.",
-                    "Auto Nest", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (!TryBeginPlateCommand(target.Nest,
+                    "Finish or cancel the current plate operation before Auto Nest.", "Auto Nest"))
                 return;
-            }
-            foreach (var view in views)
-                view.SetAction(typeof(ActionSelect));
 
             using var form = new AutoNestForm(target.Nest);
             if (target.Nest.PlateOptions.Count > 0)
@@ -356,19 +330,10 @@ namespace OpenNest.Forms
             if (editForm == null)
                 return;
 
-            var views = MdiChildren.OfType<EditNestForm>()
-                .Where(form => ReferenceEquals(form.Nest, editForm.Nest))
-                .Select(form => form.PlateView).ToArray();
-            if (nestingInProgress || Application.OpenForms.OfType<NestProgressForm>().Any()
-                || views.Any(view => view.IsFillInProgress || view.Actions.CurrentAction?.IsBusy() == true))
-            {
-                MessageBox.Show(this, "Finish or cancel the current nesting or plate action before validating.",
-                    "Validate Nest", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (!TryBeginPlateCommand(editForm.Nest,
+                    "Finish or cancel the current nesting or plate action before validating.", "Validate Nest"))
                 return;
-            }
 
-            foreach (var view in views)
-                view.SetAction(typeof(ActionSelect));
             editForm.OpenValidationInspection();
         }
 
@@ -389,19 +354,11 @@ namespace OpenNest.Forms
                     "Verify Nest Before Posting", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-            var views = MdiChildren.OfType<EditNestForm>()
-                .Where(form => ReferenceEquals(form.Nest, editForm.Nest))
-                .Select(form => form.PlateView).ToArray();
-            if (nestingInProgress || Application.OpenForms.OfType<NestProgressForm>().Any()
-                || views.Any(view => view.IsFillInProgress || view.Actions.CurrentAction?.IsBusy() == true))
-            {
-                MessageBox.Show(this, "Finish or cancel the current nesting or plate action before posting.",
-                    "Verify Nest Before Posting", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (!TryBeginPlateCommand(editForm.Nest,
+                    "Finish or cancel the current nesting or plate action before posting.",
+                    "Verify Nest Before Posting"))
                 return;
-            }
 
-            foreach (var view in views)
-                view.SetAction(typeof(ActionSelect));
             var nest = editForm.Nest;
 
             if (postProcessor is IPostProcessorNestAware nestAware)

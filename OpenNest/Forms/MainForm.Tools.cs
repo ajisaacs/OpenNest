@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Data;
@@ -80,20 +79,6 @@ namespace OpenNest.Forms
             if (!expanded)
                 ShowExpandSpacingNotice("Select at least two parts on the plate to expand.");
         }
-
-        /// <summary>
-        /// True while whole-job nesting or a fill on any view of the nest can still
-        /// change its plates. Unlike the other plate commands' guard, a busy current
-        /// action does not count: ActionSelect reports busy whenever parts are
-        /// selected, and Expand Spacing needs a selection.
-        /// </summary>
-        internal bool IsExpandSpacingBusy(EditNestForm editForm) =>
-            nestingInProgress
-            || Application.OpenForms.OfType<NestProgressForm>().Any()
-            || MdiChildren
-                .OfType<EditNestForm>()
-                .Where(form => ReferenceEquals(form.Nest, editForm.Nest))
-                .Any(form => form.PlateView.IsFillInProgress);
 
         // Native tests capture this notice without opening a modal dialog in session zero.
         internal System.Action<string> ExpandSpacingNotice { get; set; }

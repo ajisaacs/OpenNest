@@ -413,16 +413,6 @@ namespace OpenNest.Forms
             ReportSuccess(destination);
         }
 
-        /// <summary>
-        /// True while any operation could mutate nests or hold their plate views: whole-job
-        /// nesting, an open progress window (a closed one can still await its commit), or a
-        /// background database save serializing the live nest.
-        /// </summary>
-        private bool IsNestJobBusy() =>
-            nestingInProgress
-            || Application.OpenForms.OfType<NestProgressForm>().Any()
-            || databaseSaveInProgress;
-
         /// <summary>Returns the chosen path, or null on cancel. Overwrite consent is the dialog prompt.</summary>
         internal virtual string ShowReportSaveDialog(string suggestedFileName)
         {

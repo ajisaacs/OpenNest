@@ -37,49 +37,25 @@ namespace OpenNest.Forms
             toolStripMenuItem15.Visible = hasValue;
         }
 
-        private void NavigationEnableCheck()
+        private void NavigationEnableCheck(bool locked = false)
         {
-            if (activeForm == null)
-            {
-                mnuNestPreviousPlate.Enabled = false;
-                mnuNestNextPlate.Enabled = false;
-                mnuNestFirstPlate.Enabled = false;
-                mnuNestLastPlate.Enabled = false;
-            }
-            else
-            {
-                mnuNestPreviousPlate.Enabled = !activeForm.PlateManager.IsFirst;
-                mnuNestNextPlate.Enabled = !activeForm.PlateManager.IsLast;
-                mnuNestFirstPlate.Enabled =
-                    activeForm.PlateManager.Count > 0 && !activeForm.PlateManager.IsFirst;
-                mnuNestLastPlate.Enabled =
-                    activeForm.PlateManager.Count > 0 && !activeForm.PlateManager.IsLast;
-            }
+            var plates = locked ? null : activeForm?.PlateManager;
+            var hasPlates = plates != null && plates.Count > 0;
+
+            mnuNestPreviousPlate.Enabled = plates != null && !plates.IsFirst;
+            mnuNestNextPlate.Enabled = plates != null && !plates.IsLast;
+            mnuNestFirstPlate.Enabled = hasPlates && !plates.IsFirst;
+            mnuNestLastPlate.Enabled = hasPlates && !plates.IsLast;
         }
 
         private void SetNestingLockout(bool locked)
         {
             nestingInProgress = locked;
 
-            // Disable nesting-related menus while running
+            // Disable nesting-related menus and plate navigation while running
             mnuNest.Enabled = !locked;
             mnuPlate.Enabled = !locked;
-
-            // Lock plate navigation
-            mnuNestPreviousPlate.Enabled =
-                !locked && activeForm != null && !activeForm.PlateManager.IsFirst;
-            mnuNestNextPlate.Enabled =
-                !locked && activeForm != null && !activeForm.PlateManager.IsLast;
-            mnuNestFirstPlate.Enabled =
-                !locked
-                && activeForm != null
-                && activeForm.PlateManager.Count > 0
-                && !activeForm.PlateManager.IsFirst;
-            mnuNestLastPlate.Enabled =
-                !locked
-                && activeForm != null
-                && activeForm.PlateManager.Count > 0
-                && !activeForm.PlateManager.IsLast;
+            NavigationEnableCheck(locked);
         }
 
         private void UpdateLocationStatus()

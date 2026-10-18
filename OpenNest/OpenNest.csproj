@@ -44,7 +44,7 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
-    <Compile Update="Forms\MainForm.File.cs;Forms\MainForm.Nest.cs;Forms\MainForm.Plate.cs;Forms\MainForm.Status.cs;Forms\MainForm.Tools.cs;Forms\MainForm.View.cs">
+    <Compile Update="Forms\MainForm.File.cs;Forms\MainForm.Guards.cs;Forms\MainForm.Nest.cs;Forms\MainForm.Plate.cs;Forms\MainForm.Status.cs;Forms\MainForm.Tools.cs;Forms\MainForm.View.cs">
       <DependentUpon>MainForm.cs</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
