@@ -14,7 +14,7 @@ namespace OpenNest.Engine.BestFit
         {
             var entities = ConvertProgram
                 .ToGeometry(drawing.Program)
-                .Where(e => SpecialLayers.IsMaterial(e.Layer))
+                .ForNesting()
                 .ToList();
 
             if (entities.Count == 0)

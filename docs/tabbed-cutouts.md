@@ -29,9 +29,17 @@ the cut pieces and tabs, and marks where each piece is pierced.
 ## Tabs are material, never cut
 
 Tab spans bound material like `Cut` motions: `SpecialLayers.IsMaterial` keeps them, so
-area, nesting, material capture (`LeadMaterialSnapshot`) and the material-overlap check
-all see a closed hole. They are never cut. The plate view fills them but does not draw
-them as cuts.
+area, material capture (`LeadMaterialSnapshot`) and the material-overlap check all see a
+closed hole. They are never cut. The plate view fills them but does not draw them as cuts.
+
+Nesting is the exception: the slug stays attached while the sheet is cut, so nothing may
+be placed in the hole. Nesting and layout paths read material through
+`NestingMaterial.ForNesting`, which drops any closed contour with tab spans so the slug
+counts as part: part outlines and collision lines (`PartGeometry`, `Part`), the cutout
+router (`JobPartGeometry`, whose material area then includes the slug), fill expansion,
+best-fit, `NestLayoutCheck` and the GPU bitmaps. Programs without tab spans read exactly as
+before. A planned program has open pieces instead of a closed hole, so it bounds no hole
+either way.
 
 Both Plan Cutting (`PreparedContours`) and Assign Lead-ins
 (`ContourCuttingStrategy.Apply`/`ApplySingle`) take a closed contour with tab spans out of

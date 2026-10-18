@@ -66,10 +66,8 @@ public sealed class JobPartGeometry
             || !double.IsFinite(m.CenterX) || !double.IsFinite(m.CenterY)))
             throw new ArgumentException("Geometry must contain finite motions.", nameof(geometry));
         var entities = ConvertProgram.ToGeometry(DrawingJobMapper.ToProgram(geometry));
-        var cutEntities = new List<Entity>();
-        foreach (var entity in entities)
-            if (SpecialLayers.IsMaterial(entity.Layer))
-                cutEntities.Add(entity);
+        // A tabbed cutout's slug stays attached, so its hole is no room for other parts.
+        var cutEntities = entities.ForNesting();
 
         var contours = ShapeBuilder.GetShapes(cutEntities);
         if (contours.Count == 0)

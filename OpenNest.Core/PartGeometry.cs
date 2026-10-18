@@ -11,7 +11,7 @@ namespace OpenNest
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
             var shapes = ShapeBuilder.GetShapes(
-                entities.Where(e => SpecialLayers.IsMaterial(e.Layer))
+                entities.ForNesting()
             );
             var lines = new List<Line>();
 
@@ -57,7 +57,7 @@ namespace OpenNest
             PerfCounters.CountOffsetPerimeterEntities();
             var geoEntities = ConvertProgram.ToGeometry(program);
             var profile = new ShapeProfile(
-                geoEntities.Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList()
+                geoEntities.ForNesting().ToList()
             );
 
             var offsetShape = profile.Perimeter.OffsetOutward(spacing);
@@ -75,7 +75,7 @@ namespace OpenNest
         {
             var geoEntities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
-                geoEntities.Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList()
+                geoEntities.ForNesting().ToList()
             );
             var entities = new List<Entity>();
 
@@ -108,7 +108,7 @@ namespace OpenNest
         {
             var geoEntities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
-                geoEntities.Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList()
+                geoEntities.ForNesting().ToList()
             );
 
             return CopyEntitiesAtLocation(profile.Perimeter.Entities, part.Location);
@@ -122,7 +122,7 @@ namespace OpenNest
         {
             var geoEntities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
-                geoEntities.Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList()
+                geoEntities.ForNesting().ToList()
             );
             var entities = CopyEntitiesAtLocation(profile.Perimeter.Entities, part.Location);
 
@@ -167,7 +167,7 @@ namespace OpenNest
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
             var shapes = ShapeBuilder.GetShapes(
-                entities.Where(e => SpecialLayers.IsMaterial(e.Layer))
+                entities.ForNesting()
             );
             var lines = new List<Line>();
 

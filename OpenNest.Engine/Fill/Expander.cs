@@ -662,7 +662,7 @@ namespace OpenNest.Engine.Fill
                 var prepared = new RingSet();
                 var entities = ConvertProgram
                     .ToGeometry(program)
-                    .Where(e => SpecialLayers.IsMaterial(e.Layer))
+                    .ForNesting()
                     .ToList();
 
                 if (entities.Count > 0)

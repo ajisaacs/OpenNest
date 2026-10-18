@@ -352,7 +352,7 @@ namespace OpenNest
             PerfCounters.CountOverlapPolygonPreparation();
             return ConvertProgram
                 .ToGeometry(program)
-                .Where(e => SpecialLayers.IsMaterial(e.Layer))
+                .ForNesting()
                 .ToList();
         }
 

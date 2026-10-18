@@ -101,7 +101,7 @@ namespace OpenNest.Engine.BestFit
             {
                 var partEntities = ConvertProgram
                     .ToGeometry(part.Program)
-                    .Where(e => SpecialLayers.IsMaterial(e.Layer))
+                    .ForNesting()
                     .ToList();
 
                 foreach (var entity in partEntities)

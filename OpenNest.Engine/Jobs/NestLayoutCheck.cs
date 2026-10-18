@@ -577,7 +577,7 @@ public static class NestLayoutCheck
     {
         var entities = ConvertProgram
             .ToGeometry(part.Program)
-            .Where(e => SpecialLayers.IsMaterial(e.Layer))
+            .ForNesting()
             .ToList();
 
         if (entities.Count == 0)
