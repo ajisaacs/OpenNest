@@ -32,6 +32,9 @@ public sealed class DrawingLibraryQuery
 
     public CutType? CutType { get; init; }
 
+    /// <summary>Only drawings whose Cut first setting equals this; null means any.</summary>
+    public bool? CutFirst { get; init; }
+
     public bool IncludeArchived { get; init; }
 
     /// <summary>Column to order by; ties are broken by id in the same direction.</summary>

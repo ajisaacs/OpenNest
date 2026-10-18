@@ -15,12 +15,23 @@ namespace OpenNest.IO
     /// Packages are canonical, so the same drawing content always has the same bytes and
     /// SHA-256: archive timestamps and nest dates are fixed, the nest-specific required
     /// quantity is zero, and derived best-fit caches and library links are left out.
+    /// <para>
+    /// A package holds geometry and geometry-bound data only (program, source entities,
+    /// suppressed IDs, bends, cut pins, breakoffs, material density). Fields the library
+    /// record owns are written as their defaults: the nest and drawing names, customer,
+    /// material name and grade, color, priority, cut first and rotation constraints.
+    /// Renaming a library drawing or changing its nesting settings therefore never changes
+    /// its package hash; adding it to a nest applies the record's values instead.
+    /// </para>
     /// </summary>
     public static class DrawingPackage
     {
         // The earliest time a ZIP entry can record.
         private static readonly DateTimeOffset EntryTimestamp = new(1980, 1, 1, 0, 0, 0, TimeSpan.Zero);
         private const string FixedDate = "2000-01-01T00:00:00.0000000";
+
+        // Removed so readers fall back to their defaults; the library record owns these values.
+        private static readonly string[] RecordOwnedDrawingFields = { "customer", "color", "priority", "cutFirst", "constraints" };
 
         /// <summary>Packages <paramref name="drawing"/> without changing it.</summary>
         public static byte[] Write(Drawing drawing, Units units)
@@ -120,6 +131,7 @@ namespace OpenNest.IO
             var root = JsonNode.Parse(json)!.AsObject();
             root["dateCreated"] = FixedDate;
             root["dateLastModified"] = FixedDate;
+            root["name"] = "";
             if (root["drawings"] is JsonArray drawings)
             {
                 foreach (var drawing in drawings.OfType<JsonObject>())
@@ -128,6 +140,15 @@ namespace OpenNest.IO
                         quantity["required"] = 0;
                     // A library link is nest-side provenance; the server's record describes the package.
                     drawing.Remove("library");
+                    // Record-owned fields: the library record supplies them on insert.
+                    drawing["name"] = "";
+                    foreach (var field in RecordOwnedDrawingFields)
+                        drawing.Remove(field);
+                    if (drawing["material"] is JsonObject material)
+                    {
+                        material["name"] = "";
+                        material["grade"] = "";
+                    }
                 }
             }
 

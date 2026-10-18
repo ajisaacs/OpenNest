@@ -137,8 +137,9 @@ public sealed class DrawingLibrarySaveSession
     /// <summary>
     /// Library details to start from: the drawing's name, its customer (or the nest's), the
     /// nest's material and grade (or the drawing's when the nest has none), the nest's
-    /// thickness and units, and the linked revision's cut type and notes when the drawing
-    /// came from this server's library, otherwise <paramref name="lastCutType"/>.
+    /// thickness and units, the linked revision's cut type and notes when the drawing
+    /// came from this server's library, otherwise <paramref name="lastCutType"/>, and the
+    /// drawing's own nesting settings.
     /// </summary>
     public DrawingLibraryRecord Prefill(CutType lastCutType, string savedBy)
     {
@@ -154,6 +155,7 @@ public sealed class DrawingLibrarySaveSession
             Units = Nest.Units,
             CutType = link?.CutType ?? (Enum.IsDefined(lastCutType) ? lastCutType : CutType.Laser),
             Notes = link?.Notes ?? "",
+            Settings = DrawingNestingSettings.FromDrawing(Drawing),
             SavedBy = savedBy ?? "",
         };
     }
@@ -351,6 +353,7 @@ public sealed class DrawingLibrarySaveSession
         Units = record.Units,
         CutType = record.CutType,
         Notes = record.Notes,
+        Settings = record.Settings,
         Archived = record.Archived,
         PackageSha256 = record.PackageSha256,
         PackageSize = record.PackageSize,
@@ -391,7 +394,8 @@ public sealed class DrawingLibrarySaveSession
             && record.Name == Metadata.Name && record.Customer == Metadata.Customer
             && record.MaterialName == Metadata.MaterialName && record.MaterialGrade == Metadata.MaterialGrade
             && record.Thickness == DrawingLibraryRules.NormalizeThickness(Metadata.Thickness)
-            && record.Units == Metadata.Units && record.CutType == Metadata.CutType && record.Notes == Metadata.Notes;
+            && record.Units == Metadata.Units && record.CutType == Metadata.CutType && record.Notes == Metadata.Notes
+            && Equals(record.Settings, Metadata.Settings);
 
         /// <summary>True when a new request asks for exactly this save again.</summary>
         public bool Matches(DrawingLibraryRecord metadata, byte[] package, DrawingLibraryRecord? revise) =>
@@ -400,6 +404,7 @@ public sealed class DrawingLibrarySaveSession
             && metadata.Name == Metadata.Name && metadata.Customer == Metadata.Customer
             && metadata.MaterialName == Metadata.MaterialName && metadata.MaterialGrade == Metadata.MaterialGrade
             && DrawingLibraryRules.NormalizeThickness(metadata.Thickness) == DrawingLibraryRules.NormalizeThickness(Metadata.Thickness)
-            && metadata.Units == Metadata.Units && metadata.CutType == Metadata.CutType && metadata.Notes == Metadata.Notes;
+            && metadata.Units == Metadata.Units && metadata.CutType == Metadata.CutType && metadata.Notes == Metadata.Notes
+            && Equals(metadata.Settings, Metadata.Settings);
     }
 }

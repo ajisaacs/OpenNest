@@ -43,7 +43,8 @@ public static class DrawingLibraryRules
                 ? "thickness must be a finite number, zero or greater."
                 : null)
             ?? (!Enum.IsDefined(record.Units) ? "units must be a supported unit name." : null)
-            ?? (!Enum.IsDefined(record.CutType) ? "cutType must be Laser, Waterjet or Plasma." : null);
+            ?? (!Enum.IsDefined(record.CutType) ? "cutType must be Laser, Waterjet or Plasma." : null)
+            ?? (record.Settings is null ? "settings is required." : record.Settings.GetValidationError());
     }
 
     /// <summary>The first package rule <paramref name="package"/> breaks, or null when it may be stored.</summary>

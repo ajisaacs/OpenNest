@@ -143,7 +143,7 @@ only the requested page of metadata (never archive bytes):
 
 ## Drawing library endpoints
 
-The server also keeps a shared library of drawings (schema v4). The desktop
+The server also keeps a shared library of drawings (schema v5). The desktop
 adds library drawings to a nest and saves nest drawings to the library (below).
 A drawing's geometry travels as an opaque
 **drawing package**: a `.nest` archive holding exactly one drawing and no plates,
@@ -153,18 +153,28 @@ parses it.
 `OpenNest.Data.DrawingLibraryRecord` fields: `id` (client-allocated before the
 first upload), `revision`, `name`, `customer`, `materialName`, `materialGrade`,
 `thickness` (stored rounded to 4 decimals), `units` (`inches` | `millimeters`),
-`cutType` (`laser` | `waterjet` | `plasma`), `notes`, `archived`, `savedBy`, and
-the server-computed `packageSha256` (lower-case hex), `packageSize` and `savedAt`.
+`cutType` (`laser` | `waterjet` | `plasma`), `notes`, `settings`, `archived`,
+`savedBy`, and the server-computed `packageSha256` (lower-case hex), `packageSize`
+and `savedAt`.
+
+`settings` holds the drawing's nesting settings, applied when it is added to a
+nest: `cutFirst` (sequence its parts first, for example test squares), `priority`,
+`stepAngle`, `startAngle`, `endAngle` (radians), `allow180Equivalent` and
+`colorArgb` (32-bit ARGB; alpha 0 means no stored color, so the nest assigns one).
+They are record fields, not package content (see
+[drawing packages](nest-file-format.md#drawing-packages)), so changing them adds a
+revision without new geometry. Default quantity is not stored: quantity belongs to
+each nest.
 
 | Method | Path | Body | Response |
 |---|---|---|---|
 | POST | `/api/drawings` | multipart: `metadata` (JSON record with a nonempty `id`) + `package` | Revision 1; 409 with the current record when the id exists |
-| GET | `/api/drawings/query?search=&customer=&materialName=&materialGrade=&thickness=&cutType=&includeArchived=&sort=&order=&offset=&limit=` | — | `{ items, total, offset, limit }` |
+| GET | `/api/drawings/query?search=&customer=&materialName=&materialGrade=&thickness=&cutType=&cutFirst=&includeArchived=&sort=&order=&offset=&limit=` | — | `{ items, total, offset, limit }` |
 | GET | `/api/drawings/{id}` / `/{id}/file` | — | Current record / package bytes (archived drawings included), or 404 |
 | GET | `/api/drawings/{id}/revisions?offset=0&limit=100` | — | Revision page, newest first; limit 1–200 |
 | GET | `/api/drawings/{id}/revisions/{revision}/file` | — | Exact immutable package bytes |
 | PUT | `/api/drawings/{id}/file` | multipart: `metadata` + `package` | New revision |
-| PUT | `/api/drawings/{id}/metadata` | JSON record | New revision with the same package |
+| PUT | `/api/drawings/{id}/metadata` | JSON record (all details and `settings`; an omitted `settings` means defaults) | New revision with the same package |
 | POST | `/api/drawings/{id}/archive` / `/restore` | — | New revision with `archived` changed |
 
 - Existing-drawing writes require `If-Match` exactly as for nests: 428 missing,
@@ -174,11 +184,16 @@ the server-computed `packageSha256` (lower-case hex), `packageSize` and `savedAt
   the query unless `includeArchived=true`.
 - Every change appends an immutable revision in the same transaction that
   updates the current row, including metadata-only edits and archive/restore.
-  An identical save at the current revision is a no-op.
+  An identical save (details, settings and package hash) at the current
+  revision is a no-op.
+- Packages are content-addressed: each distinct package is stored once, keyed by
+  its SHA-256, and revisions point at it. Only a new package adds a blob;
+  details, settings, archive and restore revisions add none.
 - Validation (400, no state change): `cutType` and `units` must be single enum
   names (no numbers or combinations); `thickness` finite and at least 0; `name`
   nonblank; name, customer, material, grade and savedBy at most 200 characters,
-  notes at most 4000; no NUL characters; package nonempty, at most 16 MiB and
+  notes at most 4000; no NUL characters; `settings` not null, angles finite
+  and `stepAngle` at least 0; package nonempty, at most 16 MiB and
   starting with a ZIP signature. Metadata `id` on a PUT must be empty or match
   the route.
 - Query: `search` is a literal, case-insensitive (ASCII) substring of name,
@@ -187,14 +202,19 @@ the server-computed `packageSha256` (lower-case hex), `packageSize` and `savedAt
   (trimmed, collapsed spaces, case-insensitive); blank means any. `thickness`
   matches exactly after rounding to 4 decimals. `sort` is one of `savedAt`
   (default), `name`, `customer`, `materialName`, `materialGrade`, `thickness`,
-  `cutType`, `revision`; ties break by `id`. Paging, `order` and the refusal of
+  `cutType`, `revision`; ties break by `id`. `cutFirst=true|false` keeps only
+  drawings with that setting. Paging, `order` and the refusal of
   unknown, repeated or out-of-range parameters follow the nest query.
 - An older server answers 404 on these routes; the client reports that the
   server must be updated and never falls back to another store.
 
-Schema v4 adds the `drawings` and `drawing_revisions` tables to the same file
-and leaves the nest tables untouched. A server older than v4 refuses to open a
-v4 database, so rolling back after the upgrade needs the pre-upgrade backup (see
+Schema v5 keeps three drawing tables in the same file: `drawing_packages`
+(`sha256`, `size`, `package`), `drawing_revisions` (every immutable revision's
+details, settings, archived flag and package hash) and `drawings` (each
+drawing's current revision, indexed for browsing). Upgrading replaces the v4
+drawing tables outright, discarding any v4 library data (no production library
+existed), and leaves the nest tables untouched. A server older than v5 refuses
+to open a v5 database, so rolling back after the upgrade needs the pre-upgrade backup (see
 [Backup, restore, and upgrade](#backup-restore-and-upgrade)). The stopped-volume
 `tar` backup includes the drawing tables, but `nest_manifest.py` and
 `restore_check` do not verify drawings yet.
@@ -221,7 +241,16 @@ plans the insert (`OpenNest.Data.LibraryDrawingInsert`) before changing anything
 The added drawing is an independent copy carrying a library link (server key,
 id, revision and a snapshot of the library details) that is saved with the nest
 (see [the nest file format](nest-file-format.md#drawing-library-links)). Editing it
-in the nest never changes the library.
+in the nest never changes the library. The copy takes its name, customer,
+material and nesting settings from the library record, not from the package.
+
+The browser's **Cut first** column shows the setting. **Edit Settings...**
+(`OpenNest.Data.DrawingLibraryEditSession`) edits the selected active drawing's
+Cut first flag, priority, rotation step/start/end (degrees), 180° equivalent,
+color and notes, and saves them through the metadata endpoint guarded by the
+listed revision: a new revision with the same package. A 409 is shown and the
+operator reloads. Nests that already hold the drawing keep their copy and
+revision.
 
 ### Save to Drawing Library (desktop)
 
@@ -232,7 +261,9 @@ from the drawing (the nest's customer when the drawing has none), material,
 grade, thickness and units from the nest (the drawing's material when the nest
 has none), and the cut type and notes of the linked revision when the drawing
 came from this server's library, otherwise the cut type last saved on this PC.
-Units follow the nest and cannot be changed.
+Units follow the nest and cannot be changed. The drawing's own nesting
+settings (Cut first, priority, rotation, color) are saved in the record and
+summarized read-only in the dialog; change them later with Edit Settings.
 
 Whenever the details change, the dialog looks up active library drawings with
 the same normalized customer, name, material and grade and the exact thickness,

@@ -59,6 +59,44 @@ public class DrawingLibrarySaveSessionTests
     }
 
     [Fact]
+    public void Prefill_TakesTheDrawingsNestingSettings()
+    {
+        var drawing = SyntheticDrawing();
+        drawing.CutFirst = true;
+        drawing.Priority = 3;
+        drawing.Constraints = new NestConstraints { StepAngle = 0.5, StartAngle = 0, EndAngle = System.Math.PI, Allow180Equivalent = true };
+        drawing.Color = System.Drawing.Color.FromArgb(255, 10, 20, 30);
+
+        var metadata = Session(new FakeStore(), drawing).Prefill(CutType.Laser, "");
+
+        Assert.Equal(new DrawingNestingSettings
+        {
+            CutFirst = true,
+            Priority = 3,
+            StepAngle = 0.5,
+            EndAngle = System.Math.PI,
+            Allow180Equivalent = true,
+            ColorArgb = System.Drawing.Color.FromArgb(255, 10, 20, 30).ToArgb(),
+        }, metadata.Settings);
+    }
+
+    [Fact]
+    public async Task SaveAsync_SettingsOnlyChange_RevisesWithTheSamePackage()
+    {
+        var store = new FakeStore();
+        var existing = store.Seed(Metadata(), PackageA);
+        var session = Session(store);
+
+        var result = await session.SaveAsync(Edit(Metadata(), r => { r.Settings = new DrawingNestingSettings { CutFirst = true }; }),
+            PackageA, existing);
+
+        Assert.Equal(DrawingLibrarySaveOutcome.Revised, result.Outcome);
+        Assert.Equal(2, result.Saved.Revision);
+        Assert.True(result.Saved.Settings.CutFirst);
+        Assert.Equal(existing.PackageSha256, result.Saved.PackageSha256);
+    }
+
+    [Fact]
     public void Prefill_FallsBackToTheNestCustomerAndDrawingMaterial_AndUsesALinkOnThisServer()
     {
         var nest = new Nest("Synthetic job") { Units = Units.Millimeters, Customer = "Nest customer", Material = new Material() };
@@ -363,6 +401,7 @@ public class DrawingLibrarySaveSessionTests
             Units = source.Units,
             CutType = source.CutType,
             Notes = source.Notes,
+            Settings = source.Settings,
             Archived = source.Archived,
             PackageSha256 = source.PackageSha256,
             PackageSize = source.PackageSize,
@@ -484,6 +523,10 @@ public class DrawingLibrarySaveSessionTests
             return Reply(next);
         }
 
+        public Task<DrawingLibraryRecord> UpdateMetadataAsync(Guid id, DrawingLibraryRecord record, int expectedRevision,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         private void FailBeforeStoring()
         {
             if (!FailNextRequest)
@@ -519,7 +562,7 @@ public class DrawingLibrarySaveSessionTests
         private static bool SameDetails(DrawingLibraryRecord a, DrawingLibraryRecord b) =>
             a.Name == b.Name && a.Customer == b.Customer && a.MaterialName == b.MaterialName
             && a.MaterialGrade == b.MaterialGrade && a.Thickness == b.Thickness && a.Units == b.Units
-            && a.CutType == b.CutType && a.Notes == b.Notes;
+            && a.CutType == b.CutType && a.Notes == b.Notes && Equals(a.Settings, b.Settings);
 
         private static bool Filter(string filter, string value) =>
             string.IsNullOrWhiteSpace(filter) || SharedListNames.Key(filter) == SharedListNames.Key(value);

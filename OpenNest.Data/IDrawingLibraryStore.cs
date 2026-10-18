@@ -20,4 +20,11 @@ public interface IDrawingLibraryStore : IDrawingLibrary
     /// <summary>Saves the next revision when <paramref name="expectedRevision"/> is current.</summary>
     Task<DrawingLibraryRecord> UpdatePackageAsync(Guid id, DrawingLibraryRecord record, byte[] package,
         int expectedRevision, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Saves new details and nesting settings, keeping the package, as the next revision
+    /// when <paramref name="expectedRevision"/> is current.
+    /// </summary>
+    Task<DrawingLibraryRecord> UpdateMetadataAsync(Guid id, DrawingLibraryRecord record, int expectedRevision,
+        CancellationToken cancellationToken = default);
 }

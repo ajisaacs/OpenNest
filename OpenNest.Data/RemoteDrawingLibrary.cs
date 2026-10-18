@@ -272,6 +272,8 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
             text.Append("&thickness=").Append(DrawingLibraryRules.NormalizeThickness(thickness).ToString("0.####", CultureInfo.InvariantCulture));
         if (query.CutType is { } cutType)
             text.Append("&cutType=").Append(cutType.ToString());
+        if (query.CutFirst is { } cutFirst)
+            text.Append("&cutFirst=").Append(cutFirst ? "true" : "false");
         if (query.IncludeArchived)
             text.Append("&includeArchived=true");
         return text.ToString();

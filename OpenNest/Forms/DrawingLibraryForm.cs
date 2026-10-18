@@ -17,13 +17,15 @@ namespace OpenNest.Forms
     /// one bounded page at a time through <see cref="DrawingLibraryBrowseSession"/>, filtered
     /// to the nest's material and thickness unless Show all is ticked. Add downloads the
     /// listed revision's exact package, plans it with <see cref="LibraryDrawingInsert"/>,
-    /// shows any warning or refusal first and only then changes the nest.
+    /// shows any warning or refusal first and only then changes the nest. Edit Settings
+    /// changes the selected drawing's notes and nesting settings (Cut first, priority,
+    /// rotation, color) on the server as a new revision with the same package.
     /// </summary>
     public partial class DrawingLibraryForm : Form
     {
         private const string LoadingText = "Loading...";
 
-        private readonly IDrawingLibrary library;
+        private readonly IDrawingLibraryStore library;
         private readonly string serverUrl;
         private readonly Nest nest;
         private readonly DrawingLibraryBrowseSession session;
@@ -32,13 +34,16 @@ namespace OpenNest.Forms
         /// <summary>Shows a message and returns the operator's answer; replaced by tests.</summary>
         internal Func<string, MessageBoxButtons, MessageBoxIcon, DialogResult> ShowMessage { get; set; }
 
+        /// <summary>Shows the settings editor and returns the saved record, or null; replaced by tests.</summary>
+        internal Func<DrawingLibraryEditSession, DrawingLibraryRecord> EditDrawing { get; set; }
+
         /// <summary>
         /// The library drawings this dialog added or raised the quantity of, in order. The
         /// dialog stays open after each add, so callers check this rather than the dialog result.
         /// </summary>
         public List<Drawing> AddedDrawings { get; } = new();
 
-        public DrawingLibraryForm(IDrawingLibrary library, string serverUrl, Nest nest)
+        public DrawingLibraryForm(IDrawingLibraryStore library, string serverUrl, Nest nest)
         {
             InitializeComponent();
             this.library = library ?? throw new ArgumentNullException(nameof(library));
@@ -46,6 +51,11 @@ namespace OpenNest.Forms
             this.nest = nest ?? throw new ArgumentNullException(nameof(nest));
             session = new DrawingLibraryBrowseSession(library, nest);
             ShowMessage = (text, buttons, icon) => MessageBox.Show(this, text, Text, buttons, icon);
+            EditDrawing = edit =>
+            {
+                using var form = new EditLibraryDrawingForm(edit);
+                return form.ShowDialog(this) == DialogResult.OK ? form.Saved : null;
+            };
 
             GridStyle.Apply(drawingGrid);
             nameColumn.Tag = DrawingSortField.Name;
@@ -111,6 +121,26 @@ namespace OpenNest.Forms
         }
 
         private async void AddButton_Click(object sender, EventArgs e) => await AddSelectedAsync();
+
+        private async void EditButton_Click(object sender, EventArgs e) => await EditSelectedAsync();
+
+        /// <summary>
+        /// Edits the selected drawing's notes and nesting settings as a new library revision,
+        /// then reloads the page so the list shows the saved revision.
+        /// </summary>
+        internal async Task EditSelectedAsync()
+        {
+            var record = SelectedRecord();
+            if (record == null || adding || record.Archived)
+                return;
+
+            var saved = EditDrawing(new DrawingLibraryEditSession(library, record, Environment.UserName));
+            if (saved == null || IsDisposed)
+                return;
+            await RunAsync(session.RefreshAsync);
+            if (!IsDisposed)
+                statusLabel.Text = $"Saved '{saved.Name}' revision {saved.Revision}.";
+        }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
@@ -251,6 +281,7 @@ namespace OpenNest.Forms
                     record.MaterialGrade,
                     FormatThickness(record.Thickness),
                     record.CutType.ToString(),
+                    record.Settings?.CutFirst == true ? "Yes" : "",
                     record.Revision,
                     record.SavedAt == default ? "" : record.SavedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture));
                 drawingGrid.Rows[index].Tag = record;
@@ -275,8 +306,11 @@ namespace OpenNest.Forms
             nextButton.Enabled = !session.IsLoading && session.CanGoNext;
         }
 
-        private void UpdateCommands() =>
+        private void UpdateCommands()
+        {
             addButton.Enabled = !adding && SelectedRecord() != null;
+            editButton.Enabled = !adding && SelectedRecord() is { Archived: false };
+        }
 
         private void UpdateFilterLabel(bool showAll = false)
         {

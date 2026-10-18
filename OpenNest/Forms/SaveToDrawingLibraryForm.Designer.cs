@@ -33,6 +33,8 @@ namespace OpenNest.Forms
             cutTypeBox = new System.Windows.Forms.ComboBox();
             notesLabel = new System.Windows.Forms.Label();
             notesBox = new System.Windows.Forms.TextBox();
+            settingsTitleLabel = new System.Windows.Forms.Label();
+            settingsLabel = new System.Windows.Forms.Label();
             saveAsLabel = new System.Windows.Forms.Label();
             saveAsBox = new System.Windows.Forms.ComboBox();
             duplicateLabel = new System.Windows.Forms.Label();
@@ -65,11 +67,13 @@ namespace OpenNest.Forms
             layoutTable.Controls.Add(cutTypeBox, 1, 5);
             layoutTable.Controls.Add(notesLabel, 0, 6);
             layoutTable.Controls.Add(notesBox, 1, 6);
-            layoutTable.Controls.Add(saveAsLabel, 0, 7);
-            layoutTable.Controls.Add(saveAsBox, 1, 7);
-            layoutTable.Controls.Add(duplicateLabel, 0, 8);
-            layoutTable.Controls.Add(statusLabel, 0, 9);
-            layoutTable.Controls.Add(buttonPanel, 0, 10);
+            layoutTable.Controls.Add(settingsTitleLabel, 0, 7);
+            layoutTable.Controls.Add(settingsLabel, 1, 7);
+            layoutTable.Controls.Add(saveAsLabel, 0, 8);
+            layoutTable.Controls.Add(saveAsBox, 1, 8);
+            layoutTable.Controls.Add(duplicateLabel, 0, 9);
+            layoutTable.Controls.Add(statusLabel, 0, 10);
+            layoutTable.Controls.Add(buttonPanel, 0, 11);
             layoutTable.SetColumnSpan(duplicateLabel, 2);
             layoutTable.SetColumnSpan(statusLabel, 2);
             layoutTable.SetColumnSpan(buttonPanel, 2);
@@ -77,7 +81,8 @@ namespace OpenNest.Forms
             layoutTable.Location = new System.Drawing.Point(0, 0);
             layoutTable.Name = "layoutTable";
             layoutTable.Padding = new System.Windows.Forms.Padding(8);
-            layoutTable.RowCount = 11;
+            layoutTable.RowCount = 12;
+            layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
@@ -212,6 +217,21 @@ namespace OpenNest.Forms
             notesBox.TabIndex = 13;
             notesBox.TextChanged += Notes_Changed;
             //
+            // settingsTitleLabel
+            //
+            settingsTitleLabel.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            settingsTitleLabel.AutoSize = true;
+            settingsTitleLabel.Name = "settingsTitleLabel";
+            settingsTitleLabel.Text = "Nesting:";
+            //
+            // settingsLabel
+            //
+            settingsLabel.AutoEllipsis = true;
+            settingsLabel.Dock = System.Windows.Forms.DockStyle.Fill;
+            settingsLabel.Name = "settingsLabel";
+            settingsLabel.Size = new System.Drawing.Size(100, 24);
+            settingsLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
             // saveAsLabel
             //
             saveAsLabel.Anchor = System.Windows.Forms.AnchorStyles.Left;
@@ -324,6 +344,8 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ComboBox cutTypeBox;
         private System.Windows.Forms.Label notesLabel;
         private System.Windows.Forms.TextBox notesBox;
+        private System.Windows.Forms.Label settingsTitleLabel;
+        private System.Windows.Forms.Label settingsLabel;
         private System.Windows.Forms.Label saveAsLabel;
         private System.Windows.Forms.ComboBox saveAsBox;
         private System.Windows.Forms.Label duplicateLabel;

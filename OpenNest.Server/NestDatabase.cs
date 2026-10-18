@@ -316,7 +316,7 @@ public sealed partial class NestDatabase : IDisposable
             command.Transaction = transaction;
             command.CommandText = "PRAGMA user_version";
             var version = (long)command.ExecuteScalar()!;
-            if (version > 4) throw new InvalidOperationException("Database schema is newer than this server.");
+            if (version > 5) throw new InvalidOperationException("Database schema is newer than this server.");
             if (version == 0)
             {
                 command.CommandText = """
@@ -346,8 +346,10 @@ public sealed partial class NestDatabase : IDisposable
                     """;
                 command.ExecuteNonQuery();
             }
-            if (version < 4)
+            if (version < 5)
             {
+                // v5 replaces the v4 drawing tables outright (no production library data
+                // existed); the nest tables are untouched.
                 command.CommandText = DrawingLibrarySchema;
                 command.ExecuteNonQuery();
             }

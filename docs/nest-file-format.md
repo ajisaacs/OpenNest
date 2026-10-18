@@ -157,6 +157,25 @@ thickness loads the drawing without a link and adds a reader warning. Converter
 edits keep the link as provenance; split pieces get none. Drawing packages leave
 the link out, so linking a drawing does not change its package bytes.
 
+### Drawing packages
+
+A library drawing's geometry travels as a canonical drawing package
+(`OpenNest.IO.DrawingPackage`): a `.nest` archive with one drawing and no plates,
+fixed archive timestamps and dates, and no best-fit entries, so equal content has
+equal bytes and SHA-256. The server stores each distinct package once by that hash.
+
+A package holds geometry and geometry-bound data only: program, source entities and
+offset, suppressed entity IDs, bends, cut pins, breakoffs and material density. Fields
+the server's library record owns are written as their defaults, so editing them never
+changes the hash:
+
+- nest and drawing `name` (blank), drawing `customer`, material `name` and `grade` (blank);
+- `color`, `priority`, `cutFirst` and `constraints` (omitted);
+- `quantity.required` (zero) and `library` (omitted).
+
+Adding a library drawing to a nest ignores whatever a package holds for these fields
+and applies the record's values.
+
 ## Drawing cut-first flag
 
 A drawing may write `cutFirst: true` to have automatic part sequencing cut its parts

@@ -72,6 +72,41 @@ public class LibraryDrawingInsertTests
     }
 
     [Fact]
+    public void RecordSettings_ApplyOverWhateverThePackageHolds()
+    {
+        var nest = MatchingNest();
+        var package = Package();
+        package.Drawing.CutFirst = false;
+        package.Drawing.Priority = 7;
+        package.Drawing.Constraints = new NestConstraints { StepAngle = 1, StartAngle = 1, EndAngle = 2 };
+        var record = Record();
+        record.Settings = new DrawingNestingSettings
+        {
+            CutFirst = true,
+            Priority = 1,
+            StepAngle = System.Math.PI / 2,
+            EndAngle = System.Math.PI,
+            Allow180Equivalent = true,
+            ColorArgb = System.Drawing.Color.FromArgb(255, 40, 50, 60).ToArgb(),
+        };
+
+        LibraryDrawingInsert.Plan(nest, Server, record, package, 1).Apply();
+
+        var drawing = Assert.Single(nest.Drawings);
+        Assert.Equal(record.Settings, DrawingNestingSettings.FromDrawing(drawing));
+    }
+
+    [Fact]
+    public void RecordWithoutAColor_GetsAVisiblePartColor()
+    {
+        var nest = MatchingNest();
+
+        LibraryDrawingInsert.Plan(nest, Server, Record(), Package(), 1).Apply();
+
+        Assert.Equal(255, Assert.Single(nest.Drawings).Color.A);
+    }
+
+    [Fact]
     public void SpacingCaseAndThicknessRounding_StillMatch()
     {
         var nest = MatchingNest();

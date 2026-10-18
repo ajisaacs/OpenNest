@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Net.Http;
@@ -6,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.IO;
+using OpenNest.Math;
 
 namespace OpenNest.Forms
 {
@@ -20,6 +22,7 @@ namespace OpenNest.Forms
     {
         private readonly DrawingLibrarySaveSession session;
         private readonly string savedBy;
+        private readonly DrawingNestingSettings settings;
         private DrawingLibraryDuplicates duplicates;
         private int lookupGeneration;
         private bool loading;
@@ -54,6 +57,8 @@ namespace OpenNest.Forms
             thicknessLabel.Text = $"Thickness ({UnitsHelper.GetShortString(metadata.Units)}):";
             cutTypeBox.SelectedItem = metadata.CutType;
             notesBox.Text = metadata.Notes;
+            settings = metadata.Settings;
+            settingsLabel.Text = DescribeSettings(settings);
             loading = false;
 
             Text = $"Save '{drawing.Name}' to Drawing Library — {serverUrl}";
@@ -240,8 +245,26 @@ namespace OpenNest.Forms
             Units = session.Nest.Units,
             CutType = cutTypeBox.SelectedItem is CutType cutType ? cutType : CutType.Laser,
             Notes = notesBox.Text,
+            Settings = settings,
             SavedBy = savedBy,
         };
+
+        /// <summary>A one-line summary of the drawing's nesting settings, which are saved with it.</summary>
+        internal static string DescribeSettings(DrawingNestingSettings settings)
+        {
+            var parts = new List<string>();
+            if (settings.CutFirst)
+                parts.Add("Cut first");
+            parts.Add($"priority {settings.Priority.ToString(CultureInfo.CurrentCulture)}");
+            var start = Angle.ToDegrees(settings.StartAngle);
+            var end = Angle.ToDegrees(settings.EndAngle);
+            parts.Add($"rotation {start.ToString("0.##", CultureInfo.CurrentCulture)}°–{end.ToString("0.##", CultureInfo.CurrentCulture)}°");
+            if (settings.StepAngle > 0)
+                parts.Add($"step {Angle.ToDegrees(settings.StepAngle).ToString("0.##", CultureInfo.CurrentCulture)}°");
+            if (settings.Allow180Equivalent)
+                parts.Add("180° equivalent");
+            return string.Join(", ", parts) + " (from the drawing; edit later in the library)";
+        }
 
         private bool CanSave()
         {

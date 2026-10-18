@@ -121,7 +121,50 @@ public class DrawingLibraryFormTests
             "The drawing library refusal test did not complete.");
     }
 
+    [Fact]
+    public void EditSettings_SavesCutFirstAsANewRevision_AndTheAddAppliesIt()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var record = library.Add("SYN-404", "Synthetic Steel", "Grade A", 0.25, Units.Inches, "Test square");
+                var nest = MatchingNest();
 
+                using var form = new DrawingLibraryForm(library, Server, nest);
+                form.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                form.EditDrawing = edit =>
+                {
+                    using var editor = new EditLibraryDrawingForm(edit);
+                    editor.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                    editor.Show();
+                    var save = Field<Button>(editor, "saveButton");
+                    Assert.False(save.Enabled);
+                    Field<CheckBox>(editor, "cutFirstCheckBox").Checked = true;
+                    Assert.True(save.Enabled);
+                    Run(editor.SaveAsync());
+                    return editor.Saved;
+                };
+                form.Show();
+                var grid = Field<DataGridView>(form, "drawingGrid");
+                PumpUntil(() => grid.Rows.Count == 1, "the library page");
+                Assert.Equal("", grid.Rows[0].Cells["cutFirstColumn"].Value);
+
+                Run(form.EditSelectedAsync());
+                PumpUntil(() => Equals(grid.Rows[0].Cells["revisionColumn"].Value, record.Revision + 1), "the reloaded page");
+
+                var update = Assert.Single(library.MetadataUpdates);
+                Assert.Equal((record.Id, record.Revision), (update.Id, update.ExpectedRevision));
+                Assert.True(update.Record.Settings.CutFirst);
+                Assert.Equal("Test square", update.Record.Notes);
+                Assert.Equal("Yes", grid.Rows[0].Cells["cutFirstColumn"].Value);
+
+                Run(form.AddSelectedAsync());
+                Assert.True(Assert.Single(nest.Drawings).CutFirst);
+            },
+            TestTimeout,
+            "The drawing library edit test did not complete.");
+    }
 
     private static Nest MatchingNest() => new("Synthetic job")
     {
@@ -148,7 +191,7 @@ public class DrawingLibraryFormTests
         (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
 
     /// <summary>Serves every record (ignoring filters) and real packages by revision.</summary>
-    private sealed class FakeLibrary : IDrawingLibrary
+    private sealed class FakeLibrary : IDrawingLibraryStore
     {
         private readonly List<DrawingLibraryRecord> _records = new();
         private readonly Dictionary<(Guid, int), byte[]> _packages = new();
@@ -198,5 +241,52 @@ public class DrawingLibraryFormTests
             Downloads.Add((id, revision));
             return Task.FromResult(_packages.TryGetValue((id, revision), out var package) ? package : null);
         }
+
+        public List<(Guid Id, int ExpectedRevision, DrawingLibraryRecord Record)> MetadataUpdates { get; } = new();
+
+        /// <summary>Replaces the listed record with the next revision, keeping its package.</summary>
+        public Task<DrawingLibraryRecord> UpdateMetadataAsync(Guid id, DrawingLibraryRecord record, int expectedRevision,
+            CancellationToken cancellationToken = default)
+        {
+            MetadataUpdates.Add((id, expectedRevision, record));
+            var index = _records.FindIndex(r => r.Id == id);
+            var current = _records[index];
+            if (current.Revision != expectedRevision)
+                throw new DrawingLibraryConflictException(current);
+            var saved = new DrawingLibraryRecord
+            {
+                Id = id,
+                Revision = current.Revision + 1,
+                Name = current.Name,
+                Customer = current.Customer,
+                MaterialName = current.MaterialName,
+                MaterialGrade = current.MaterialGrade,
+                Thickness = current.Thickness,
+                Units = current.Units,
+                CutType = current.CutType,
+                Notes = record.Notes,
+                Settings = record.Settings,
+                PackageSha256 = current.PackageSha256,
+                SavedAt = current.SavedAt.AddMinutes(1),
+            };
+            _records[index] = saved;
+            _packages[(id, saved.Revision)] = _packages[(id, current.Revision)];
+            return Task.FromResult(saved);
+        }
+
+        public Task<DrawingLibraryRecord?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<DrawingLibraryPage?> GetRevisionsAsync(Guid id, int offset = 0,
+            int limit = DrawingLibraryRules.DefaultRevisionLimit, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<DrawingLibraryRecord> UploadAsync(DrawingLibraryRecord record, byte[] package,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<DrawingLibraryRecord> UpdatePackageAsync(Guid id, DrawingLibraryRecord record, byte[] package,
+            int expectedRevision, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

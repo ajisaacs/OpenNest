@@ -79,7 +79,9 @@ public sealed class DrawingLibraryEndToEndTests
         Assert.Empty(contents.Warnings);
         Assert.Equal(NestWriter.GetProgramText(drawing.Program), NestWriter.GetProgramText(contents.Drawing.Program));
         Assert.Equal(NestWriter.GetSubProgramsText(drawing.Program), NestWriter.GetSubProgramsText(contents.Drawing.Program));
-        Assert.Equal("Synthetic bracket", contents.Drawing.Name);
+        // The record owns the name; the canonical package leaves it blank.
+        Assert.Equal("Synthetic bracket", found.Name);
+        Assert.Equal("", contents.Drawing.Name);
     }
 
     [Fact]

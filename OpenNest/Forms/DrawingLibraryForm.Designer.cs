@@ -34,6 +34,7 @@ namespace OpenNest.Forms
             gradeColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             thicknessColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             cutTypeColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            cutFirstColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             revisionColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             savedColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             notesGroup = new System.Windows.Forms.GroupBox();
@@ -44,6 +45,7 @@ namespace OpenNest.Forms
             summaryLabel = new System.Windows.Forms.Label();
             quantityLabel = new System.Windows.Forms.Label();
             quantityBox = new System.Windows.Forms.NumericUpDown();
+            editButton = new System.Windows.Forms.Button();
             addButton = new System.Windows.Forms.Button();
             closeButton = new System.Windows.Forms.Button();
             statusLabel = new System.Windows.Forms.Label();
@@ -136,7 +138,7 @@ namespace OpenNest.Forms
             //
             drawingGrid.AllowUserToAddRows = false;
             drawingGrid.AllowUserToDeleteRows = false;
-            drawingGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { nameColumn, customerColumn, materialColumn, gradeColumn, thicknessColumn, cutTypeColumn, revisionColumn, savedColumn });
+            drawingGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { nameColumn, customerColumn, materialColumn, gradeColumn, thicknessColumn, cutTypeColumn, cutFirstColumn, revisionColumn, savedColumn });
             drawingGrid.Dock = System.Windows.Forms.DockStyle.Fill;
             drawingGrid.MultiSelect = false;
             drawingGrid.Name = "drawingGrid";
@@ -193,6 +195,13 @@ namespace OpenNest.Forms
             cutTypeColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.Programmatic;
             cutTypeColumn.Width = 80;
             //
+            // cutFirstColumn
+            //
+            cutFirstColumn.HeaderText = "Cut first";
+            cutFirstColumn.Name = "cutFirstColumn";
+            cutFirstColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            cutFirstColumn.Width = 70;
+            //
             // revisionColumn
             //
             revisionColumn.DefaultCellStyle = rightAligned;
@@ -231,10 +240,11 @@ namespace OpenNest.Forms
             // bottomTable
             //
             bottomTable.AutoSize = true;
-            bottomTable.ColumnCount = 7;
+            bottomTable.ColumnCount = 8;
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
@@ -244,8 +254,9 @@ namespace OpenNest.Forms
             bottomTable.Controls.Add(summaryLabel, 2, 0);
             bottomTable.Controls.Add(quantityLabel, 3, 0);
             bottomTable.Controls.Add(quantityBox, 4, 0);
-            bottomTable.Controls.Add(addButton, 5, 0);
-            bottomTable.Controls.Add(closeButton, 6, 0);
+            bottomTable.Controls.Add(editButton, 5, 0);
+            bottomTable.Controls.Add(addButton, 6, 0);
+            bottomTable.Controls.Add(closeButton, 7, 0);
             bottomTable.Dock = System.Windows.Forms.DockStyle.Fill;
             bottomTable.Margin = new System.Windows.Forms.Padding(0, 6, 0, 0);
             bottomTable.Name = "bottomTable";
@@ -297,13 +308,23 @@ namespace OpenNest.Forms
             quantityBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             quantityBox.Value = new decimal(new int[] { 1, 0, 0, 0 });
             //
+            // editButton
+            //
+            editButton.AutoSize = true;
+            editButton.Enabled = false;
+            editButton.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
+            editButton.Name = "editButton";
+            editButton.TabIndex = 5;
+            editButton.Text = "Edit Settings...";
+            editButton.UseVisualStyleBackColor = true;
+            editButton.Click += EditButton_Click;
+            //
             // addButton
             //
             addButton.AutoSize = true;
             addButton.Enabled = false;
-            addButton.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
             addButton.Name = "addButton";
-            addButton.TabIndex = 5;
+            addButton.TabIndex = 6;
             addButton.Text = "Add to Nest";
             addButton.UseVisualStyleBackColor = true;
             addButton.Click += AddButton_Click;
@@ -313,7 +334,7 @@ namespace OpenNest.Forms
             closeButton.AutoSize = true;
             closeButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             closeButton.Name = "closeButton";
-            closeButton.TabIndex = 6;
+            closeButton.TabIndex = 7;
             closeButton.Text = "Close";
             closeButton.UseVisualStyleBackColor = true;
             //
@@ -374,6 +395,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.DataGridViewTextBoxColumn gradeColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn thicknessColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn cutTypeColumn;
+        private System.Windows.Forms.DataGridViewTextBoxColumn cutFirstColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn revisionColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn savedColumn;
         private System.Windows.Forms.GroupBox notesGroup;
@@ -384,6 +406,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Label summaryLabel;
         private System.Windows.Forms.Label quantityLabel;
         private System.Windows.Forms.NumericUpDown quantityBox;
+        private System.Windows.Forms.Button editButton;
         private System.Windows.Forms.Button addButton;
         private System.Windows.Forms.Button closeButton;
         private System.Windows.Forms.Label statusLabel;

@@ -1227,7 +1227,7 @@ namespace OpenNest.Forms
             if (!NestStorage.Settings.IsDatabaseMode)
                 return;
 
-            IDrawingLibrary library;
+            IDrawingLibraryStore library;
             try
             {
                 library = NestStorage.CreateDrawingLibrary();

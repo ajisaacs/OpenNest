@@ -136,10 +136,12 @@ public sealed class LibraryDrawingInsert
             warnings.Add($"{label} differs from this nest: {string.Join("; ", differences)}. The drawing is "
                 + "added, but its drawing cut pins are dropped and the nest's cutting settings apply.");
 
+        // The record owns these fields; whatever the package holds for them is ignored.
         var drawing = package.Drawing;
         drawing.Name = record.Name;
         drawing.Customer = record.Customer;
         drawing.Material = new Material(record.MaterialName, record.MaterialGrade, drawing.Material?.Density ?? 0);
+        (record.Settings ?? new DrawingNestingSettings()).ApplyTo(drawing);
         drawing.Quantity.Required = quantity;
         drawing.Library = link;
         // Pins were authored for the library material and thickness; elsewhere the nest's

@@ -21,7 +21,7 @@ public sealed class DrawingLibraryDatabaseTests
             using (var database = new NestDatabase(factory.DatabasePath, pooling: false))
                 Assert.Empty(database.QueryDrawings(new DrawingLibraryQuery { IncludeArchived = true }).Items);
             Assert.Equal(before, NestDigest(factory.DatabasePath));
-            Assert.Equal(4L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+            Assert.Equal(5L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
         }
 
         using var upgraded = new NestDatabase(factory.DatabasePath, pooling: false);
@@ -32,29 +32,55 @@ public sealed class DrawingLibraryDatabaseTests
     }
 
     [Fact]
+    public void V4Upgrade_ReplacesTheDrawingTablesAndKeepsNests()
+    {
+        using var factory = new ServerFactory();
+        CreateVersion3Database(factory.DatabasePath);
+        // The v4 layout: one column set with the package blob copied into every revision.
+        Execute(factory.DatabasePath, """
+            CREATE TABLE drawings (id TEXT NOT NULL, revision INTEGER NOT NULL, name TEXT NOT NULL, package BLOB NOT NULL, PRIMARY KEY (id));
+            CREATE TABLE drawing_revisions (id TEXT NOT NULL, revision INTEGER NOT NULL, name TEXT NOT NULL, package BLOB NOT NULL);
+            INSERT INTO drawings VALUES ('00000000-0000-0000-0000-000000000001', 1, 'Old', x'504B');
+            INSERT INTO drawing_revisions SELECT * FROM drawings;
+            PRAGMA user_version=4;
+            """);
+        var before = NestDigest(factory.DatabasePath);
+
+        using var database = new NestDatabase(factory.DatabasePath, pooling: false);
+
+        Assert.Equal(5L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+        Assert.Equal(before, NestDigest(factory.DatabasePath));
+        Assert.Empty(database.QueryDrawings(new DrawingLibraryQuery { IncludeArchived = true }).Items);
+        var record = Record();
+        database.InsertDrawing(record.Id, record, Package());
+        Assert.Equal(1L, Scalar(factory.DatabasePath, "SELECT COUNT(*) FROM drawing_packages"));
+    }
+
+    [Fact]
     public void NewerSchema_IsRefused()
     {
         using var factory = new ServerFactory();
         using (new NestDatabase(factory.DatabasePath, pooling: false)) { }
-        Execute(factory.DatabasePath, "PRAGMA user_version=5");
+        Execute(factory.DatabasePath, "PRAGMA user_version=6");
 
         Assert.Throws<InvalidOperationException>(() => new NestDatabase(factory.DatabasePath, pooling: false));
     }
 
     [Fact]
-    public void FailedV4Migration_RollsBackAndCanRestart()
+    public void FailedDrawingMigration_RollsBackAndCanRestart()
     {
         using var factory = new ServerFactory();
         CreateVersion3Database(factory.DatabasePath);
         var before = NestDigest(factory.DatabasePath);
-        Execute(factory.DatabasePath, "CREATE TABLE drawing_revisions (fixture TEXT)");
+        // A table holding an index's name makes the drawing schema fail part-way through.
+        Execute(factory.DatabasePath, "CREATE TABLE ix_drawings_savedAt (fixture TEXT)");
 
         Assert.Throws<SqliteException>(() => new NestDatabase(factory.DatabasePath, pooling: false));
 
         Assert.Equal(3L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
         Assert.Equal(0L, Scalar(factory.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE name='drawings'"));
         Assert.Equal(before, NestDigest(factory.DatabasePath));
-        Execute(factory.DatabasePath, "DROP TABLE drawing_revisions");
+        Execute(factory.DatabasePath, "DROP TABLE ix_drawings_savedAt");
         using var database = new NestDatabase(factory.DatabasePath, pooling: false);
         Assert.Equal(2, database.List().Count);
     }
@@ -176,7 +202,7 @@ public sealed class DrawingLibraryDatabaseTests
         }
     }
 
-    /// <summary>A real schema-v3 file: v4 is additive, so dropping its tables restores v3 exactly.</summary>
+    /// <summary>A real schema-v3 file: the drawing tables are additive, so dropping them restores v3 exactly.</summary>
     private static void CreateVersion3Database(string path)
     {
         using (var database = new NestDatabase(path, pooling: false))
@@ -191,7 +217,7 @@ public sealed class DrawingLibraryDatabaseTests
             database.SetDeleted(a.Id, false, 3);
         }
 
-        Execute(path, "DROP TABLE drawing_revisions; DROP TABLE drawings; PRAGMA user_version=3;");
+        Execute(path, "DROP TABLE drawing_revisions; DROP TABLE drawings; DROP TABLE drawing_packages; PRAGMA user_version=3;");
     }
 
     private static string NestDigest(string path)

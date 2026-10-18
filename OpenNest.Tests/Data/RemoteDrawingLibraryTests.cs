@@ -166,6 +166,33 @@ public class RemoteDrawingLibraryTests
     }
 
     [Fact]
+    public async Task UpdateMetadataAsync_SendsAndReadsNestingSettings()
+    {
+        var record = SampleRecord(revision: 2);
+        record.Settings = new DrawingNestingSettings { CutFirst = true, Priority = 2, EndAngle = 1.5, ColorArgb = -16776961 };
+        var handler = new StubHandler(_ => StubHandler.Json(record));
+        using var library = Library(handler);
+
+        var saved = await library.UpdateMetadataAsync(record.Id, record, 1);
+
+        Assert.Equal(HttpMethod.Put, handler.Requests[0].Method);
+        Assert.EndsWith($"/api/drawings/{record.Id}/metadata", handler.Requests[0].RequestUri!.AbsoluteUri);
+        Assert.Contains("\"settings\":{\"cutFirst\":true,\"priority\":2", handler.RequestBodies[0]);
+        Assert.Equal(record.Settings, saved.Settings);
+    }
+
+    [Fact]
+    public async Task QueryAsync_SendsTheCutFirstFilter()
+    {
+        var handler = new StubHandler(_ => StubHandler.Json(new { items = Array.Empty<DrawingLibraryRecord>(), total = 0 }));
+        using var library = Library(handler);
+
+        await library.QueryAsync(new DrawingLibraryQuery { CutFirst = true });
+
+        Assert.Contains("&cutFirst=true", handler.Requests[0].RequestUri!.Query);
+    }
+
+    [Fact]
     public async Task UploadAsync_DifferentStoredPackageOrId_IsRefused()
     {
         var record = SampleRecord();

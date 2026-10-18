@@ -33,6 +33,12 @@ public sealed class DrawingLibraryRecord
 
     public string Notes { get; set; } = "";
 
+    /// <summary>
+    /// Nesting settings applied when the drawing is added to a nest. Not part of the
+    /// package, so changing them adds a revision that reuses the same package.
+    /// </summary>
+    public DrawingNestingSettings Settings { get; set; } = new();
+
     /// <summary>Hidden from browsing by default; still readable by id.</summary>
     public bool Archived { get; set; }
 

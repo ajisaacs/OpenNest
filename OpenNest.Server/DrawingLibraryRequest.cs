@@ -14,7 +14,7 @@ internal static class DrawingLibraryRequest
 {
     private static readonly string[] QueryKeys =
     {
-        "search", "customer", "materialName", "materialGrade", "thickness", "cutType",
+        "search", "customer", "materialName", "materialGrade", "thickness", "cutType", "cutFirst",
         "includeArchived", "sort", "order", "offset", "limit",
     };
 
@@ -96,6 +96,18 @@ internal static class DrawingLibraryRequest
             return false;
         }
 
+        bool? cutFirst = null;
+        if (values.TryGetValue("cutFirst", out var cutFirstText))
+        {
+            if (!bool.TryParse(cutFirstText.ToString(), out var parsed))
+            {
+                error = "cutFirst must be true or false.";
+                return false;
+            }
+
+            cutFirst = parsed;
+        }
+
         var offset = 0;
         var limit = DrawingLibraryQuery.DefaultLimit;
         if (!TryInteger(values, "offset", ref offset, out error) || !TryInteger(values, "limit", ref limit, out error))
@@ -109,6 +121,7 @@ internal static class DrawingLibraryRequest
             MaterialGrade = values["materialGrade"].ToString(),
             Thickness = thickness,
             CutType = cutType,
+            CutFirst = cutFirst,
             IncludeArchived = includeArchived,
             Sort = sort,
             Descending = descending,

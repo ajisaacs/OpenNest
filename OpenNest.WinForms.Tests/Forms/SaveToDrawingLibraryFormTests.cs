@@ -250,6 +250,10 @@ public class SaveToDrawingLibraryFormTests
             return Task.FromResult(_revisions[id][^1]);
         }
 
+        public Task<DrawingLibraryRecord> UpdateMetadataAsync(Guid id, DrawingLibraryRecord record, int expectedRevision,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         private DrawingLibraryRecord Stored(DrawingLibraryRecord metadata, Guid id, int revision, byte[] package)
         {
             _clock = _clock.AddMinutes(1);
@@ -265,6 +269,7 @@ public class SaveToDrawingLibraryFormTests
                 Units = metadata.Units,
                 CutType = metadata.CutType,
                 Notes = metadata.Notes,
+                Settings = metadata.Settings,
                 SavedBy = metadata.SavedBy,
                 PackageSha256 = Convert.ToHexString(SHA256.HashData(package)).ToLowerInvariant(),
                 SavedAt = _clock,

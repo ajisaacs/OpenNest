@@ -21,10 +21,10 @@ public class DrawingPackageTests
         Assert.NotSame(drawing, copy);
         Assert.Equal(NestWriter.GetProgramText(drawing.Program), NestWriter.GetProgramText(copy.Program));
         Assert.Equal(NestWriter.GetSubProgramsText(drawing.Program), NestWriter.GetSubProgramsText(copy.Program));
-        Assert.Equal(drawing.Name, copy.Name);
-        Assert.Equal(drawing.Customer, copy.Customer);
-        Assert.Equal((drawing.Material.Name, drawing.Material.Grade, drawing.Material.Density),
-            (copy.Material.Name, copy.Material.Grade, copy.Material.Density));
+        // Record-owned fields are left at their defaults; the library record supplies them.
+        Assert.Equal(("", ""), (copy.Name, copy.Customer));
+        Assert.Equal(("", "", drawing.Material.Density), (copy.Material.Name, copy.Material.Grade, copy.Material.Density));
+        Assert.Equal((0, false), (copy.Priority, copy.CutFirst));
         Assert.Equal(drawing.Source.Offset, copy.Source.Offset);
         Assert.Equal(drawing.SourceEntities.Select(e => (e.Id, e.Type, e.Layer?.Name)),
             copy.SourceEntities.Select(e => (e.Id, e.Type, e.Layer?.Name)));
@@ -73,11 +73,25 @@ public class DrawingPackageTests
         var baseline = Sha(DrawingPackage.Write(drawing, Units.Inches));
 
         Assert.NotEqual(baseline, Sha(DrawingPackage.Write(drawing, Units.Millimeters)));
-        drawing.Customer = "Other customer";
-        var renamed = Sha(DrawingPackage.Write(drawing, Units.Inches));
-        Assert.NotEqual(baseline, renamed);
         drawing.Bends[0].EndPoint = new Vector(10, 3.5);
-        Assert.NotEqual(renamed, Sha(DrawingPackage.Write(drawing, Units.Inches)));
+        Assert.NotEqual(baseline, Sha(DrawingPackage.Write(drawing, Units.Inches)));
+    }
+
+    [Fact]
+    public void Package_RecordOwnedFields_DoNotChangeTheHash()
+    {
+        var drawing = DrawingPackageFixture.Build();
+        var baseline = Sha(DrawingPackage.Write(drawing, Units.Inches));
+
+        drawing.Name = "Renamed bracket";
+        drawing.Customer = "Other customer";
+        drawing.Material = new Material("Other Steel") { Grade = "Grade B", Density = drawing.Material.Density };
+        drawing.Color = System.Drawing.Color.FromArgb(255, 1, 2, 3);
+        drawing.Priority = 9;
+        drawing.CutFirst = true;
+        drawing.Constraints = new NestConstraints { StepAngle = 0.5, StartAngle = 0.25, EndAngle = 3, Allow180Equivalent = true };
+
+        Assert.Equal(baseline, Sha(DrawingPackage.Write(drawing, Units.Inches)));
     }
 
     [Fact]
