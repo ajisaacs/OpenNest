@@ -14,6 +14,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 | Default | Any job; used when no engine is named | Runs Irregular, then Rectangles, checks both layouts with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost; ties keep Irregular |
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; stock chosen sheet by sheet by salvage-credited look-ahead cost |
 | Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan |
+| FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
 | StockLadder | Caller-supplied stock ladders | Constrained-first fill with equivalent-demand area repacking |
 | Fill, Strip, Vertical Remnant, Horizontal Remnant | Single-strategy fills | The fixed placement strategies behind interactive fill; Fill is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder) |
 
@@ -66,6 +67,38 @@ member free regions and subtracts each placed member separately, preserving usab
 or invalid Fill proposal leaves singles and pairs available. Large enclosed-pocket blocks remain
 pending the hole-geometry integration; containment cutting order and shop-use safety acceptance
 remain separate sequencer/verification work.
+
+## Flat bar
+
+FlatBar treats each stock's long work-area axis as the bar's length and lays parts in a single
+row along it, so it is a one-dimensional cut list. Each part's length is its material extent at
+the shortest rotation whose cross extent fits the bar's width; a part that fits no bar is
+unplaced. Lengths carry one part spacing each, like a saw kerf.
+
+Parts with shaped ends nest into their neighbours. FlatBar measures each part's self-nesting
+gain once per stock by laying three copies the way the layout pass will and averaging the two
+joints (so a part that only nests every other copy is not over-credited), and packs each copy at
+its length less that gain; the first copy of each run pays the gain back.
+
+Bar by bar, every available stock offers two candidate bars: the fullest bar of the CutList packer
+(first-fit decreasing plus its swap optimization, or an exhaustive fewest-bars search for 25 items
+or fewer) and the fullest single bar a bounded subset-sum search can fill from the remaining
+demand. Lower priority numbers pack first in both. Each candidate is laid out, then the rest of
+the demand is priced at the cheaper of each stock's cut-list plan and its repeated best fills. The
+winner has the fewest unplaced parts of the most urgent tier, then the fewest unplaced parts, then
+the lowest salvage-credited cost. Searches stop at counted node budgets, so results are
+deterministic.
+
+The layout pass starts each part box-to-box after the previous one and slides it back with the
+Compactor push, trying each of its shortest rotations (so mitred ends nest by turning alternate
+parts). Every slid pose is confirmed with `NestLayoutCheck.Clears` and backed off until it passes;
+box-to-box always passes. Parts whose outline fills their box skip the slide. A packed part that
+does not fit after all returns to the demand, and length freed at the end of a run is refilled
+from it.
+
+Limits: one part per position across the width, so narrow parts waste the rest of it; clamp zones
+that reach the row block their whole clearance-expanded length; FlatBar is not a Default
+candidate and must be selected by name.
 
 ## Rectangular clamp zones
 

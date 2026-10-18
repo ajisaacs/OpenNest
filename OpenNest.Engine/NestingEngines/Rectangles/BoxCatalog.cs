@@ -96,7 +96,7 @@ internal static class BoxCatalog
     /// same local frame), and any side where the outline sticks out gets one more grid unit.
     /// Straight edges are unchanged, so rectangles still pack at exactly the part spacing.
     /// </summary>
-    private static (double Left, double Bottom, double Width, double Height)? RotatedMaterialBounds(
+    internal static (double Left, double Bottom, double Width, double Height)? RotatedMaterialBounds(
         PartGeometrySnapshot snapshot, double angle)
     {
         var entities = ConvertProgram.ToGeometry(DrawingJobMapper.ToProgram(snapshot))

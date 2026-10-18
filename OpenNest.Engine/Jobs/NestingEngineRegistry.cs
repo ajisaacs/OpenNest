@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using OpenNest.Engine.NestingEngines.Default;
+using OpenNest.Engine.NestingEngines.FlatBar;
 using OpenNest.Engine.NestingEngines.Irregular;
 using OpenNest.Engine.NestingEngines.Rectangles;
 
@@ -51,6 +52,12 @@ public static class NestingEngineRegistry
             "Irregular",
             "Irregular parts: no-fit-polygon frontier packing with look-ahead stock selection",
             () => new IrregularNestingEngine()
+        );
+
+        Register(
+            "FlatBar",
+            "Flat bar: parts cut in one row along each bar with the saw cut-list packer",
+            () => new FlatBarNestingEngine()
         );
 
         Register(
