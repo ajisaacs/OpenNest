@@ -44,9 +44,24 @@ public static class PlateFillService
         var filler = RequireFiller(strategy, plate);
         if (!InteractiveClamps.HasZones(plate))
             return filler.Fill(item, workArea, progress, token);
-        var result = FillClearAreas(plate, workArea, item, token,
-            (area, demand) => filler.Fill(demand, area, null, token));
-        ReportSafe(progress, result, workArea);
+
+        // Fill as if the clamps were absent, then drop the parts that hit one: a layout
+        // packed around the clamps is usually worse. Ask for the dropped copies again,
+        // within a bounded number of tries, when a quantity is requested.
+        var demand = new List<NestItem> { item };
+        var clearProgress = ClearProgress(progress, plate, workArea, demand, 1);
+        var result = new List<Part>();
+        var request = item.Quantity;
+        for (var attempt = 0; attempt <= MaxClampRefills; attempt++)
+        {
+            var proposed = filler.Fill(CopyDemand(item, request), workArea, clearProgress, token);
+            result = new List<Part>();
+            AddClear(result, proposed, plate, workArea, demand);
+            if (item.Quantity <= 0 || result.Count >= item.Quantity
+                || proposed.Count < request || token.IsCancellationRequested)
+                break;
+            request += item.Quantity - result.Count;
+        }
         return result;
     }
 
@@ -62,9 +77,13 @@ public static class PlateFillService
         var filler = RequireFiller(strategy, plate);
         if (!InteractiveClamps.HasZones(plate))
             return filler.Fill(groupParts, workArea, progress, token);
-        var result = ClearAreas(plate, workArea, token, (area, _) =>
-            filler.Fill(groupParts, area, null, token), 0, groupSize: groupParts.Count);
-        ReportSafe(progress, result, workArea);
+
+        // As FillItem: fill ignoring the clamps, then drop every copy that hits one.
+        var groupSize = groupParts.Count;
+        var proposed = filler.Fill(groupParts, workArea,
+            ClearProgress(progress, plate, workArea, null, groupSize), token);
+        var result = new List<Part>();
+        AddClear(result, proposed, plate, workArea, groupSize: groupSize);
         return result;
     }
 
@@ -144,6 +163,39 @@ public static class PlateFillService
         }
         ReportSafe(progress, result, plate.WorkArea(), plateNumber);
         return result;
+    }
+
+    /// <summary>Extra fills a quantity request may run to replace copies dropped at clamps.</summary>
+    private const int MaxClampRefills = 2;
+
+    /// <summary>
+    /// Forwards a clamp-blind fill's progress with the parts that hit a clamp or an occupant
+    /// removed by the same check as the returned proposal, so an accepted preview is never
+    /// an unverified placement.
+    /// </summary>
+    private static IProgress<NestProgress> ClearProgress(IProgress<NestProgress> progress,
+        Plate plate, Box area, List<NestItem> demand, int groupSize) =>
+        progress == null ? null : new ClearPartsProgress(progress, plate, area, demand, groupSize);
+
+    private sealed class ClearPartsProgress(IProgress<NestProgress> inner, Plate plate, Box area,
+        List<NestItem> demand, int groupSize) : IProgress<NestProgress>
+    {
+        public void Report(NestProgress value)
+        {
+            var clear = new List<Part>();
+            AddClear(clear, value.BestParts, plate, area, demand, groupSize: groupSize);
+            if (clear.Count == 0)
+                return;
+            inner.Report(new NestProgress
+            {
+                Phase = value.Phase,
+                PlateNumber = value.PlateNumber,
+                BestParts = clear,
+                Description = value.Description,
+                ActiveWorkArea = value.ActiveWorkArea,
+                IsOverallBest = value.IsOverallBest,
+            });
+        }
     }
 
     // Do not expose a strategy's unverified intermediate placements: the UI can

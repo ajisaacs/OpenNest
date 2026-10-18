@@ -232,6 +232,48 @@ public class ClampZoneInteractiveFillTests
         Assert.All(updates, update => AssertClearOfClamps(update.BestParts, ZoneA));
     }
 
+    [Fact]
+    public void ClampedFillIsTheUnclampedFillLessThePartsThatHitAClamp()
+    {
+        var item = new NestItem { Drawing = RectDrawing(4, 4) };
+        var unclamped = PlateFillService.FillItem("Fill", MakePlate(), item, MakePlate().WorkArea(),
+            null, CancellationToken.None);
+        var plate = MakePlate(new ClampZone("front-1", ZoneA), new ClampZone("front-2", ZoneB));
+
+        var clamped = PlateFillService.FillItem("Fill", plate, item, plate.WorkArea(),
+            null, CancellationToken.None);
+
+        var hits = unclamped.Count(part =>
+            Overlaps(part.BoundingBox, Inflated(ZoneA, Edge)) || Overlaps(part.BoundingBox, Inflated(ZoneB, Edge)));
+        Assert.True(hits > 0, "fixture should put parts on the clamps");
+        Assert.Equal(unclamped.Count - hits, clamped.Count);
+        Assert.All(clamped, part => Assert.Contains(unclamped, other => other.Location == part.Location));
+        AssertClearOfClamps(clamped, ZoneA, ZoneB);
+    }
+
+    [Fact]
+    public void ClampedFillShowsPreviewsThatCanBeAcceptedEarly()
+    {
+        var plate = MakePlate(new ClampZone("front-1", ZoneA), new ClampZone("front-2", ZoneB));
+        var item = new NestItem { Drawing = RectDrawing(4, 4) };
+        using var cts = new CancellationTokenSource();
+        NestProgress first = null;
+
+        var parts = PlateFillService.FillItem("Fill", plate, item, plate.WorkArea(),
+            new InlineProgress(update =>
+            {
+                first ??= update;
+                cts.Cancel();
+            }),
+            cts.Token);
+
+        Assert.NotNull(first);
+        Assert.True(first.IsOverallBest);
+        AssertClearOfClamps(first.BestParts, ZoneA, ZoneB);
+        Assert.Equal(first.BestParts.Count, parts.Count);
+        AssertClearOfClamps(parts, ZoneA, ZoneB);
+    }
+
     private sealed class InlineProgress(System.Action<NestProgress> report) : System.IProgress<NestProgress>
     {
         public void Report(NestProgress value) => report(value);

@@ -80,7 +80,8 @@ offers each stock size with the rail resolved for that size, and every committed
 sheet keeps exactly the clamps its layout was validated against. Clamps are
 drawn as hatched amber rectangles over the sheet; they cannot be selected,
 moved or sequenced and never count as parts. Interactive fill, pack and push
-keep parts clear of clamps, Check Overlaps reports parts on a clamp and manual
+keep parts clear of clamps (fill drops the parts that land on one; see
+[nesting engines](nesting-engines.md)), Check Overlaps reports parts on a clamp and manual
 cut-offs crossing one, automatic cutoffs never place a cut through a clamp, and
 pre-post verification warns (with per-attempt consent) about parts, cut-offs
 and direct rapids crossing an active clamp - including the first rapid when a

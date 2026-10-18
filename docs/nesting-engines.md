@@ -34,10 +34,17 @@ Interactive Fill shows its rectangle best-fit (box packing) layout before the be
 phase, whose first computation for a drawing can take a minute, so **Accept** is available at
 once. The box layout is only a fallback: the strategies still run in their usual order and a
 completed fill picks the same winner as without it. While the pairs are computed the progress
-detail reads "Computing best-fit pairs (may take a minute)...". Accepting or stopping stops waiting for the
-pair computation, which finishes in the background and is cached for the next fill. Fills
-inside clamp-free areas of a clamped plate report only their final certified proposal, so this
-early layout is not shown there.
+detail reads "Computing best-fit pairs (may take a minute)...". Accepting or stopping stops
+waiting for the pair computation, which finishes in the background and is cached for the next
+fill.
+
+On a plate with clamps, interactive Fill (Fill Area and filling from a part) fills as if the
+clamps were absent, then drops every part that enters a clamp keep-out or sits too close to an
+existing part, and a whole copy of a multi-part group when any member does. Packing around
+the clamps usually gives a worse layout than losing the few parts on them. Progress previews
+are filtered by the same check, so a preview accepted early is clamp-clear. When a quantity is
+requested and copies were dropped, the fill asks for that many more, up to two more times.
+Pack and whole-plate Nest still pack only into the clamp-free areas.
 
 Interactive/full-area box packing uses the same 90% work-area slack allowance as Rectangles.
 A free box may absorb a slightly oversized side only at its right/top edge when that edge
