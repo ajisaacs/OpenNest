@@ -519,7 +519,9 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   plan keeps locked lead-ins and existing cut-offs unchanged. `Clear Lead-ins &
   Cut-offs...` asks first, then removes every applied lead-in (locked and hand-placed
   ones too), every cut-off and the plates' recorded cutting settings, keeping part
-  poses, order and quantities, and replans from scratch. There is no undo.
+  poses, order and quantities, and replans from scratch. There is no undo. The button stays
+  enabled while a plan runs: confirming cancels that run, then clears once the cancellation
+  lands (so the plates never change under the planner) and replans.
 - `Add scrap cut-offs` runs the automatic cut-off planner (defaults 35 in /
   889 mm strips, half-strip minimum, 12 in / 304.8 mm tail) on every plate in scope
   *before* capture, so the cutting plan sequences the new lines like any

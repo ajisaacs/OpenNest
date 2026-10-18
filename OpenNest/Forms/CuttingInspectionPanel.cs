@@ -39,6 +39,7 @@ internal sealed class CuttingInspectionPanel : UserControl
     private CuttingInspectionMode? pendingMode;
     private bool configuringMode;
     private bool pendingReplan;
+    private bool pendingClear;
     internal CuttingInspectionMode Mode { get; private set; }
     internal PostVerificationReport ValidationReport { get; private set; }
     internal Func<Nest, CancellationToken, Task<PostVerificationReport>> Analyze { get; set; }
@@ -647,7 +648,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             inspection.CompletePlanning(work);
             if (closeRequested || pendingMode != null)
             {
-                pendingReplan = false;
+                pendingReplan = pendingClear = false;
                 FinishTransition();
                 return;
             }
@@ -656,6 +657,15 @@ internal sealed class CuttingInspectionPanel : UserControl
                 pendingReplan = false;
                 if (closed) return;
                 inspection = new CuttingProposalInspection();
+                if (pendingClear)
+                {
+                    pendingClear = false; // The cancelled run no longer reads the plates.
+                    if (!ClearAppliedWork())
+                    {
+                        SetPlanning(false);
+                        return;
+                    }
+                }
                 StartPlanning();
                 return;
             }
@@ -799,7 +809,8 @@ internal sealed class CuttingInspectionPanel : UserControl
     {
         settingsButton.Enabled = keepOrderCheckBox.Enabled = planButton.Enabled = !running;
         cutOffSettingsButton.Enabled = !running;
-        clearExistingButton.Enabled = !running;
+        // Clearing mid-plan cancels the run and replans, so it stays enabled unless closing or switching.
+        clearExistingButton.Enabled = !running || Mode == CuttingInspectionMode.Plan && !closeRequested && pendingMode == null;
         previousButton.Enabled = !running && selectedPlate > 0;
         nextButton.Enabled = !running && selectedPlate < plates.Length - 1;
         acceptWarningsCheckBox.Enabled = !running;
@@ -1149,9 +1160,13 @@ internal sealed class CuttingInspectionPanel : UserControl
         existingWorkBanner.Visible = Mode == CuttingInspectionMode.Plan && summary.HasExistingWork;
     }
 
+    /// <summary>
+    /// Asks, then clears the applied lead-ins and cut-offs and replans. While a plan is running the
+    /// clear waits for that run's cancellation to land, so the live plates never change under it.
+    /// </summary>
     private void ClearExistingWork()
     {
-        if (closed || closeRequested || IsPlanning || Mode != CuttingInspectionMode.Plan)
+        if (closed || closeRequested || pendingMode != null || pendingClear || Mode != CuttingInspectionMode.Plan)
             return;
         var summary = AppliedCuttingWork.Summarize(plates, plateNumbers, stagedCutOffs?.Definitions);
         if (!summary.HasExistingWork)
@@ -1163,8 +1178,26 @@ internal sealed class CuttingInspectionPanel : UserControl
         var confirmed = ConfirmClearExisting?.Invoke(message)
             ?? MessageBox.Show(editor, message, "Clear Lead-ins and Cut-offs", MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes;
-        if (!confirmed || closed || closeRequested || IsPlanning)
+        if (!confirmed || closed || closeRequested || pendingMode != null || pendingClear)
             return;
+        if (IsPlanning)
+        {
+            pendingClear = true;
+            pendingReplan = true;
+            ClearResult();
+            SetPlanning(true);
+            SetStatus(Tone.Neutral, "Cancelling the plan to clear lead-ins and cut-offs…");
+            if (!inspection.CloseRequested)
+                inspection.RequestClose();
+            return;
+        }
+        if (ClearAppliedWork())
+            StartPlanning();
+    }
+
+    /// <summary>Removes the applied lead-ins and cut-offs from the plates in scope; false when it stopped part-way.</summary>
+    private bool ClearAppliedWork()
+    {
         ClearResult();
         try
         {
@@ -1175,7 +1208,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         {
             RefreshExistingWork();
             SetStatus(Tone.Bad, "Clearing stopped part-way. Review the plates before planning or posting.", ex.Message);
-            return;
+            return false;
         }
         finally
         {
@@ -1187,7 +1220,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             view.Invalidate();
             editor.UpdatePlateList();
         }
-        StartPlanning();
+        return true;
     }
 
     internal void RequestClose()

@@ -676,6 +676,58 @@ public class CuttingInspectionPanelTests
     });
 
     [Fact]
+    public void ClearingWhilePlanningCancelsTheRunThenClearsAndReplans() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        var plate = editor.PlateView.Plate;
+        editor.OpenCuttingInspection();
+        var first = editor.CuttingInspection!;
+        PumpUntil(() => first.Proposal != null && !first.IsPlanning);
+        Field<Button>(first, "applyButton").PerformClick();
+        Assert.All(plate.Parts, part => Assert.True(part.HasManualLeadIns));
+
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var runs = 0;
+        var leadsDuringRuns = new List<bool>();
+        editor.CuttingBeforePlan = _ =>
+        {
+            leadsDuringRuns.Add(plate.Parts.Any(part => part.HasManualLeadIns));
+            if (Interlocked.Increment(ref runs) > 1) return;
+            entered.Set();
+            release.Wait(TimeSpan.FromSeconds(30));
+        };
+        try
+        {
+            editor.OpenCuttingInspection();
+            var panel = editor.CuttingInspection!;
+            PumpUntil(() => entered.IsSet);
+            Assert.True(panel.IsPlanning);
+            var button = Field<Button>(panel, "clearExistingButton");
+            Assert.True(button.Enabled);
+
+            panel.ConfirmClearExisting = _ => true;
+            button.PerformClick();
+            // The clear waits for the running plan to cancel; the plates are untouched until then.
+            Assert.All(plate.Parts, part => Assert.True(part.HasManualLeadIns));
+            release.Set();
+
+            PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+            Assert.Equal([true, false], leadsDuringRuns);
+            Assert.All(plate.Parts, part => Assert.False(part.HasManualLeadIns));
+            Assert.False(Field<Control>(panel, "existingWorkBanner").Visible);
+            Assert.True(panel.Proposal.CanApply);
+            panel.RequestClose();
+        }
+        finally
+        {
+            release.Set();
+        }
+    });
+
+    [Fact]
     public void CutOffSettingsOpensTheAutomaticCutOffDialogAndReplansWithItsChoice() => RunSta(() =>
     {
         var remembered = (System.Collections.IDictionary)typeof(CuttingInspectionPanel)
