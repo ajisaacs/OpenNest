@@ -83,6 +83,7 @@ public class DrawingSplitterTests
         }.GetDrawing();
         drawing.Color = System.Drawing.Color.Red;
         drawing.Priority = 5;
+        drawing.CutFirst = true;
 
         var results = DrawingSplitter.Split(
             drawing,
@@ -96,6 +97,7 @@ public class DrawingSplitterTests
             {
                 Assert.Equal(System.Drawing.Color.Red, d.Color);
                 Assert.Equal(5, d.Priority);
+                Assert.True(d.CutFirst);
             }
         );
     }
@@ -427,7 +429,7 @@ public class DrawingSplitterTests
             .Where(e => e.Layer != SpecialLayers.Rapid)
             .ToList();
         var rightArcs = rightEntities.OfType<Arc>().ToList();
-        Assert.Equal(0, rightArcs.Count);
+        Assert.Empty(rightArcs);
     }
 
     [Fact]
@@ -607,8 +609,8 @@ public class DrawingSplitterTests
         foreach (var e in profile.Perimeter.Entities)
             e.Offset(offsetX, offsetY);
         foreach (var cutout in profile.Cutouts)
-        foreach (var e in cutout.Entities)
-            e.Offset(offsetX, offsetY);
+            foreach (var e in cutout.Entities)
+                e.Offset(offsetX, offsetY);
 
         var allEntities = new List<Entity>();
         allEntities.AddRange(profile.Perimeter.Entities);

@@ -106,6 +106,12 @@ namespace OpenNest
 
         public bool IsCutOff { get; set; }
 
+        /// <summary>
+        /// Cut this drawing's parts before every other part when automatic sequencing runs,
+        /// e.g. a test coupon checked before the rest of the sheet is cut.
+        /// </summary>
+        public bool CutFirst { get; set; }
+
         public NestConstraints Constraints { get; set; }
 
         public SourceInfo Source { get; set; }

@@ -157,6 +157,12 @@ thickness loads the drawing without a link and adds a reader warning. Converter
 edits keep the link as provenance; split pieces get none. Drawing packages leave
 the link out, so linking a drawing does not change its package bytes.
 
+## Drawing cut-first flag
+
+A drawing may write `cutFirst: true` to have automatic part sequencing cut its parts
+before every other part (see [part sequencing](automatic-scrap-cutoffs.md#part-sequencing));
+it is omitted when false, so older readers ignore it. Split pieces keep the flag.
+
 ## Drawing cut pins
 
 A drawing may carry a `cutPins` array, omitted when empty. Each pin has `x`/`y`

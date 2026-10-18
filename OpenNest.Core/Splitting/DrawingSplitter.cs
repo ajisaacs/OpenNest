@@ -129,6 +129,7 @@ public static class DrawingSplitter
         var piece = new Drawing($"{source.Name}-{pieceIndex}", pgm);
         piece.Color = source.Color;
         piece.Priority = source.Priority;
+        piece.CutFirst = source.CutFirst;
         piece.Material = source.Material;
         piece.Constraints = source.Constraints;
         piece.Customer = source.Customer;

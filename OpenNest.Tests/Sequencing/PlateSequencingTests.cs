@@ -355,6 +355,52 @@ public class PlateSequencingTests
         Assert.Equal(before, plate.Parts);
     }
 
+    [Theory]
+    [InlineData(SequenceMethod.RightSide)]
+    [InlineData(SequenceMethod.LeftSide)]
+    [InlineData(SequenceMethod.BottomSide)]
+    [InlineData(SequenceMethod.EdgeStart)]
+    [InlineData(SequenceMethod.LeastCode)]
+    [InlineData(SequenceMethod.Advanced)]
+    public void Apply_CutFirstDrawing_SequencesItsPartsBeforeEveryOtherPart(SequenceMethod method)
+    {
+        var squares = TestHelpers.MakeSquareDrawing(1.5);
+        squares.CutFirst = true;
+        var parts = TestHelpers.MakeSquareDrawing();
+        var plate = new Plate(60, 120);
+        for (var i = 0; i < 10; i++)
+            plate.Parts.Add(new Part(squares, new Vector(2 + i * 5, 50 + (i % 2) * 4)));
+        for (var i = 0; i < 6; i++)
+            plate.Parts.Add(new Part(parts, new Vector(5 + (i % 3) * 15, 5 + (i / 3) * 15)));
+        var parameters = new SequenceParameters { Method = method };
+        var others = plate.Parts.Where(p => !p.BaseDrawing.CutFirst).ToList();
+        var expectedRest = PartSequencerFactory.Create(parameters).Sequence(others, plate)
+            .Select(p => p.Part).Reverse().ToArray();
+
+        PlateSequencing.Apply(plate, parameters);
+
+        Assert.All(plate.Parts.Take(10), p => Assert.Same(squares, p.BaseDrawing));
+        Assert.Equal(expectedRest, plate.Parts.Skip(10));
+    }
+
+    [Fact]
+    public void Apply_CutFirstDrawing_StillFollowsCutOffsThatCrossIt()
+    {
+        var square = TestHelpers.MakePartAt(10, 10, 1.5);
+        square.BaseDrawing.CutFirst = true;
+        var other = TestHelpers.MakePartAt(30, 30, 10);
+        var plate = TestHelpers.MakePlate(60, 120, other, square);
+        var crossing = new CutOff(square.BoundingBox.Center, CutOffAxis.Vertical)
+        { StartLimit = 0, EndLimit = 20 };
+        plate.CutOffs.Add(crossing);
+        plate.RegenerateCutOffs(new CutOffSettings());
+
+        PlateSequencing.Apply(plate, new SequenceParameters { Method = SequenceMethod.LeftSide });
+
+        AssertPrecedes(plate, crossing, square);
+        Assert.Same(square, plate.Parts.First(p => !p.BaseDrawing.IsCutOff));
+    }
+
     private static Part[] Baseline(Plate plate, SequenceParameters parameters) =>
         PartSequencerFactory.Create(parameters).Sequence(plate.Parts.ToList(), plate)
             .Select(p => p.Part).Reverse().ToArray();

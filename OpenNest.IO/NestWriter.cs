@@ -166,6 +166,7 @@ namespace OpenNest.IO
                         },
                         Quantity = new QuantityDto { Required = d.Quantity.Required },
                         Priority = d.Priority,
+                        CutFirst = d.CutFirst,
                         Constraints = new ConstraintsDto
                         {
                             StepAngle = d.Constraints.StepAngle,

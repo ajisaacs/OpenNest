@@ -38,6 +38,7 @@
             this.label4 = new System.Windows.Forms.Label();
             this.customerBox = new System.Windows.Forms.TextBox();
             this.priorityBox = new OpenNest.Controls.NumericUpDown();
+            this.cutFirstBox = new System.Windows.Forms.CheckBox();
             this.applyButton = new System.Windows.Forms.Button();
             this.cancelButton = new System.Windows.Forms.Button();
             this.bottomPanel1 = new OpenNest.Controls.BottomPanel();
@@ -94,14 +95,16 @@
             this.tableLayoutPanel1.Controls.Add(this.label4, 0, 3);
             this.tableLayoutPanel1.Controls.Add(this.customerBox, 1, 2);
             this.tableLayoutPanel1.Controls.Add(this.priorityBox, 1, 3);
+            this.tableLayoutPanel1.Controls.Add(this.cutFirstBox, 1, 4);
             this.tableLayoutPanel1.Location = new System.Drawing.Point(12, 12);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
-            this.tableLayoutPanel1.RowCount = 4;
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.tableLayoutPanel1.Size = new System.Drawing.Size(394, 160);
+            this.tableLayoutPanel1.RowCount = 5;
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
+            this.tableLayoutPanel1.Size = new System.Drawing.Size(394, 200);
             this.tableLayoutPanel1.TabIndex = 4;
             // 
             // label2
@@ -169,6 +172,15 @@
             this.priorityBox.Size = new System.Drawing.Size(311, 22);
             this.priorityBox.Suffix = "";
             this.priorityBox.TabIndex = 4;
+            // 
+            // cutFirstBox
+            // 
+            this.cutFirstBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.cutFirstBox.AutoSize = true;
+            this.cutFirstBox.Name = "cutFirstBox";
+            this.cutFirstBox.TabIndex = 5;
+            this.cutFirstBox.Text = "Cut first (sequence before other parts)";
+            this.cutFirstBox.UseVisualStyleBackColor = true;
             // 
             // applyButton
             // 
@@ -260,6 +272,7 @@
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.TextBox customerBox;
         private Controls.NumericUpDown priorityBox;
+        private System.Windows.Forms.CheckBox cutFirstBox;
         private System.Windows.Forms.Button applyButton;
         private System.Windows.Forms.Button cancelButton;
         private System.Windows.Forms.ColorDialog colorDialog1;

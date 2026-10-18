@@ -180,6 +180,11 @@ namespace OpenNest.IO
             public ColorDto Color { get; init; } = new();
             public QuantityDto Quantity { get; init; } = new();
             public int Priority { get; init; }
+
+            /// <summary>Sequence this drawing's parts first. Omitted when false.</summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+            public bool CutFirst { get; init; }
+
             public ConstraintsDto Constraints { get; init; } = new();
             public MaterialDto Material { get; init; } = new();
             public SourceDto Source { get; init; } = new();

@@ -36,6 +36,12 @@ namespace OpenNest.Forms
             set { priorityBox.Value = value; }
         }
 
+        private bool CutFirst
+        {
+            get { return cutFirstBox.Checked; }
+            set { cutFirstBox.Checked = value; }
+        }
+
         private Image DrawingImage
         {
             get { return pictureBox1.Image; }
@@ -62,6 +68,7 @@ namespace OpenNest.Forms
             Customer = drawing.Customer;
             Quantity = drawing.Quantity.Required;
             Priority = drawing.Priority;
+            CutFirst = drawing.CutFirst;
             UpdateImage();
         }
 
@@ -71,6 +78,7 @@ namespace OpenNest.Forms
             drawing.Customer = Customer;
             drawing.Quantity.Required = Quantity;
             drawing.Priority = Priority;
+            drawing.CutFirst = CutFirst;
             drawing.Color = colorDialog1.Color;
         }
 

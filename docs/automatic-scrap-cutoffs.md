@@ -49,6 +49,8 @@ After adding cutoffs, apply **Part Sequencing** to the current plate or all plat
 
 The dependency check uses the nominal horizontal/vertical line and its start/end limits, not the trimmed cutting segments, which intentionally skip the parts. It conservatively checks placed part bounds (including edge contacts), so a cutoff through a concave recess can also move ahead of that part. Definitions are matched by drawing identity, not their displayed names. A cutoff part with no matching definition is conservatively ordered before all ordinary parts.
 
+Drawings marked **Cut first** in the drawing editor (for example test squares) are sequenced ahead of every other part: their parts get their own route with the chosen method, then the remaining parts follow on theirs. A cutoff that crosses a cut-first part is still cut before it.
+
 This rule runs when applying automatic sequencing, after reversing the exit-first sequencer route into cutting order. Manual sequence edits are still manual; adding or moving cutoffs does not automatically reapply this rule. Reapply Part Sequencing after layout changes and review the resulting rapids before posting. Regeneration and saving/reloading retain the applied mixed sequence.
 
 The all-plates command uses `PlateSequencing.ApplyAll`, which snapshots the target plate references before sequencing. Reordering parts raises collection events that can replace the nest's trailing empty plate; those events must not invalidate the batch's iteration or skip any original plate. This snapshot is not a transaction or a concurrency guard: sequencing still runs synchronously on the owning thread, using the same per-plate cutoff rules.

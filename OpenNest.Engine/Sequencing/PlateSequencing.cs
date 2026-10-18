@@ -21,8 +21,12 @@ namespace OpenNest.Engine.Sequencing
         public static void Apply(Plate plate, SequenceParameters parameters)
         {
             var sequencer = PartSequencerFactory.Create(parameters);
-            var ordered = sequencer.Sequence(plate.Parts.ToList(), plate)
-                .Select(p => p.Part).Reverse().ToList();
+
+            // Cut-first parts (test coupons) get their own route ahead of the rest,
+            // so they stay grouped instead of interleaving with the main route.
+            var first = plate.Parts.Where(p => p.BaseDrawing.CutFirst).ToList();
+            var rest = plate.Parts.Where(p => !p.BaseDrawing.CutFirst).ToList();
+            var ordered = CutOrder(sequencer, first, plate).Concat(CutOrder(sequencer, rest, plate)).ToList();
 
             // Enforce dependencies AFTER reversing the exit-first route. Checking
             // the sequencer's output itself would invert the safety rule on apply.
@@ -30,6 +34,13 @@ namespace OpenNest.Engine.Sequencing
             plate.Parts.Clear();
             foreach (var part in cutOrder)
                 plate.Parts.Add(part);
+        }
+
+        private static IEnumerable<Part> CutOrder(IPartSequencer sequencer, List<Part> parts, Plate plate)
+        {
+            if (parts.Count == 0)
+                return Enumerable.Empty<Part>();
+            return sequencer.Sequence(parts, plate).Select(p => p.Part).Reverse();
         }
 
         private static List<Part> OrderCutOffsFirst(List<Part> ordered, Plate plate)
