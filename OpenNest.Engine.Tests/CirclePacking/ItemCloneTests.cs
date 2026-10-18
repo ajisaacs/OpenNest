@@ -54,6 +54,19 @@ public class ItemCloneTests
     }
 
     [Fact]
+    public void Clone_PreservesPackingGeometry()
+    {
+        var item = CreateItem();
+
+        var clone = Assert.IsType<Item>(item.Clone());
+
+        Assert.Equal(item.FillRatio, clone.FillRatio);
+        Assert.Equal(item.PartOffset, clone.PartOffset);
+        Assert.Equal(item.HoleOffset, clone.HoleOffset);
+        Assert.Equal(item.HoleRadius, clone.HoleRadius);
+    }
+
+    [Fact]
     public void Clone_PreservesRotation()
     {
         var item = CreateItem();
@@ -135,6 +148,10 @@ public class ItemCloneTests
     private static Item CreateItem() => new Item
     {
         PackingId = 42,
+        FillRatio = 0.85,
+        PartOffset = new Vector(-10, -20),
+        HoleOffset = new Vector(1, 0),
+        HoleRadius = 2,
         Radius = 5,
         Center = new Vector(10, 20),
         Rotation = RotationType.CCW,
