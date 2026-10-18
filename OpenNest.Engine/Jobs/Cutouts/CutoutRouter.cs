@@ -9,7 +9,9 @@ namespace OpenNest.Engine.Jobs.Cutouts;
 /// <summary>Internal frame-local cutout proposal. Never changes demand, stock or a live plate.</summary>
 /// <remarks>Area ratio selects search order, not placement permission. The small-insert path
 /// prefers a shifted partial lattice; the middle compares it with occupied-aware NFP search;
-/// the large-insert path tries NFP first. All accepted poses are clearance-checked.
+/// the large-insert path tries NFP first. A round hole whose inserts are all round also gets a
+/// circle-in-circle proposal for the whole list, kept only when it places more copies.
+/// All accepted poses are clearance-checked.
 /// Fill's equal-score pose nondeterminism remains PM c98c21bd.</remarks>
 internal static class CutoutRouter
 {
@@ -23,7 +25,7 @@ internal static class CutoutRouter
         Fill(frame, cutoutIndex, inserts, spacing, null, token);
 
     /// <summary>Optional internal diagnostic receives only poses from the chosen proposal,
-    /// after indexing; true marks a retained lattice seed, false a residual NFP pose.</summary>
+    /// after indexing; true marks a retained lattice seed, false a residual NFP or circle-packer pose.</summary>
     internal static IReadOnlyList<NestJobPlacement> Fill(NestJobPart frame, int cutoutIndex,
         IReadOnlyList<NestJobPart> inserts, double spacing,
         Action<NestJobPlacement, bool>? observeAccepted, CancellationToken token = default)
@@ -48,7 +50,16 @@ internal static class CutoutRouter
             throw new ArgumentException("Requirement IDs must be distinct from the frame and each other.",
                 nameof(inserts));
 
+        // Nothing can place more than all demand, so a complete circle packing skips the
+        // lattice and NFP searches, which are slow on many round inserts.
+        var circles = CutoutCirclePacker.Applies(hole, inserts)
+            ? CutoutCirclePacker.Fill(frame, cutoutIndex, inserts, spacing, token)
+            : null;
+        if (circles != null && circles.Count == inserts.Sum(p => (long)System.Math.Max(0, p.Quantity)))
+            return Circles(circles);
+
         var accepted = new List<NestJobPlacement>();
+        var observed = new List<(NestJobPlacement Pose, bool Lattice)>();
         var occupied = new List<(JobPartGeometry Geometry, NestJobPlacement Pose)>();
         var holeArea = System.Math.Abs(hole.Area());
         // Preserve caller requirement order: priorities are a whole-job concern, not inferred here.
@@ -97,7 +108,7 @@ internal static class CutoutRouter
                 var indexed = pose with { InstanceIndex = accepted.Count(p => p.PartId == part.Id) };
                 accepted.Add(indexed);
                 occupied.Add((geometry, indexed));
-                observeAccepted?.Invoke(indexed, localIndex++ < retainedLattice);
+                observed.Add((indexed, localIndex++ < retainedLattice));
             }
 
             IReadOnlyList<NestJobPlacement> Complete(IReadOnlyList<NestJobPlacement> seed)
@@ -127,7 +138,18 @@ internal static class CutoutRouter
             }
         }
         token.ThrowIfCancellationRequested();
+        if (circles != null && circles.Count > accepted.Count)
+            return Circles(circles);
+        foreach (var (pose, lattice) in observed)
+            observeAccepted?.Invoke(pose, lattice);
         return accepted.ToArray();
+
+        IReadOnlyList<NestJobPlacement> Circles(IReadOnlyList<NestJobPlacement> poses)
+        {
+            foreach (var pose in poses)
+                observeAccepted?.Invoke(pose, false);
+            return poses;
+        }
     }
 
     private static bool SupportedGeometry(NestJobPart part)

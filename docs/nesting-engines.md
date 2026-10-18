@@ -196,6 +196,16 @@ NFP first, then Fill if demand remains, taking the higher-count valid proposal.
 An 0.20 NFP-only rule would lose a second 4-inch square in a 10-inch round hole.
 Six geometry-only, anonymized real-job probes and neutral ring fixtures informed
 the search-order hints; these limited cases are not a global density guarantee.
+
+When the cutout is one circle and every insert fills at least 0.8 of its enclosing circle
+(discs, washers, gears by their tip circle), `CutoutCirclePacker` first packs the whole insert
+list as discs: largest first, at centers tangent to two of the hole wall and the placed discs,
+or at the hole's center. It tries a center-out pass, so a single insert sits concentric, and a
+wall-first pass, which reaches the optimal counts for up to nine equal discs. Each gap is the
+spacing plus twice `NestTolerances.ValidationOutline`, and every pose passes `NestLayoutCheck`.
+If it places all demand, the router skips the lattice and NFP searches, which are slow on many
+round inserts. Otherwise it keeps whichever proposal places more copies, and the existing
+proposals win ties.
 `CutoutPipelinePrepass` builds quantity-one proxy instances for eligible
 closed-cutout frames. It considers legal frame rotations without outer-perimeter symmetry
 reduction, shifts insert rotation policies into the local frame, and reserves certified router
