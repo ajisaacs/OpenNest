@@ -229,10 +229,7 @@ namespace OpenNest.Forms
             if (view?.Plate == null || view.Parts.Count == 0)
                 return;
 
-            var plateCenter = view.Plate.BoundingBox(false).Center;
-            var partsCenter = view.Parts.GetBoundingBox().Center;
-
-            var offset = plateCenter - partsCenter;
+            var offset = view.Plate.OffsetToCenterPartsInWorkArea();
 
             foreach (var part in view.Parts)
                 part.Offset(offset);

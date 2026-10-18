@@ -711,6 +711,14 @@ namespace OpenNest
         }
 
         /// <summary>
+        /// The offset that centers the parts' combined bounds in the <see cref="WorkArea"/>,
+        /// so uneven edge spacing (such as a wider clamp-side margin) shifts them with it.
+        /// Zero when the plate has no parts.
+        /// </summary>
+        public Vector OffsetToCenterPartsInWorkArea() =>
+            Parts.Count == 0 ? new Vector() : WorkArea().Center - Parts.GetBoundingBox().Center;
+
+        /// <summary>
         /// Automatically sizes the plate to fit the parts.
         /// </summary>
         /// <param name="roundingFactor">The factor to round the actual size up to.</param>
