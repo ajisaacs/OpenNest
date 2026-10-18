@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
-using OpenNest.Data;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Jobs;
 using OpenNest.Forms.Commands;
@@ -110,7 +108,7 @@ namespace OpenNest.Forms
             mnuFile.DropDownItems.Insert(mnuFile.DropDownItems.IndexOf(mnuFileExport), exportNestMenu);
             mnuFile.DropDownItems.Insert(mnuFile.DropDownItems.IndexOf(mnuFileExit), storageModeMenu);
             UpdateOverlapMenu();
-            LoadSettings();
+            MainWindowSettings.Load(this);
 
             var renderer = new ToolStripRenderer(ToolbarTheme.Toolbar);
             menuStrip1.Renderer = renderer;
@@ -124,7 +122,7 @@ namespace OpenNest.Forms
             this.SetBevel(false);
             AllowDrop = true;
 
-            LoadPosts();
+            LoadPosts(PostProcessorLoader.Load(PostProcessorLoader.DefaultDirectory));
             EnableCheck();
             UpdateStatus();
 
@@ -146,84 +144,11 @@ namespace OpenNest.Forms
             engineComboBox.SelectedItem = EngineSelection.EngineName;
             engineComboBox.SelectedIndexChanged += EngineComboBox_SelectedIndexChanged;
 
-            InitializeUpdater();
+            updaterStatus = new UpdaterStatus(this, statusStrip1, statusLabel1.Font);
+            updaterStatus.Start();
         }
 
-        private global::OpenNest.UpdaterService updater;
-        private ToolStripStatusLabel updateStatusLabel;
-
-        /// <summary>
-        /// Starts background update checks against the per-machine feed URL
-        /// (Options dialog; blank disables checks). Never restarts on its
-        /// own -- shows a clickable status item once an update is ready and
-        /// restarts only when the user clicks it.
-        /// </summary>
-        private void InitializeUpdater()
-        {
-            updateStatusLabel = new ToolStripStatusLabel
-            {
-                Visible = false,
-                ForeColor = Color.DarkGreen,
-                Font = new Font(statusLabel1.Font, FontStyle.Bold),
-            };
-            updateStatusLabel.Click += (_, _) =>
-            {
-                if (!updater.HasPendingUpdate)
-                    return;
-
-                var result = MessageBox.Show(
-                    this,
-                    "An OpenNest update has been downloaded. Restart now to apply it? Any unsaved nest will be lost.",
-                    "Update ready",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question
-                );
-                if (result == DialogResult.Yes)
-                    updater.ApplyAndRestart();
-            };
-            statusStrip1.Items.Add(updateStatusLabel);
-
-            updater = new global::OpenNest.UpdaterService();
-            updater.UpdateReady += version =>
-            {
-                if (IsHandleCreated)
-                    BeginInvoke(new System.Action(() => ShowUpdateReady(version)));
-            };
-            updater.Start();
-        }
-
-        private void ShowUpdateReady(string version)
-        {
-            updateStatusLabel.Text = $"Update {version} ready - click to restart";
-            updateStatusLabel.Visible = true;
-        }
-
-
-        private void LoadSettings()
-        {
-            var screen = Screen.PrimaryScreen.Bounds;
-
-            if (screen.Contains(Settings.Default.MainWindowLocation))
-                Location = Settings.Default.MainWindowLocation;
-
-            if (
-                Settings.Default.MainWindowSize.Width <= screen.Width
-                && Settings.Default.MainWindowSize.Height <= screen.Height
-            )
-            {
-                Size = Settings.Default.MainWindowSize;
-            }
-
-            WindowState = Settings.Default.MainWindowState;
-        }
-
-        private void SaveSettings()
-        {
-            Settings.Default.MainWindowLocation = Location;
-            Settings.Default.MainWindowSize = Size;
-            Settings.Default.MainWindowState = WindowState;
-            Settings.Default.Save();
-        }
+        private UpdaterStatus updaterStatus;
 
         private static ToolStripButton CreateActionButton(string name, string text, Image image,
             EventHandler click)
@@ -242,40 +167,27 @@ namespace OpenNest.Forms
             return button;
         }
 
-        private void LoadPosts()
+        private void LoadPosts(PostProcessorLoader.Result posts)
         {
-            var exepath = Assembly.GetEntryAssembly().Location;
-            var postprocessordir = Path.Combine(Path.GetDirectoryName(exepath), "Posts");
-
-            if (Directory.Exists(postprocessordir))
+            foreach (var postProcessor in posts.PostProcessors)
             {
-                foreach (var file in Directory.GetFiles(postprocessordir, "*.dll"))
-                {
-                    var types = Assembly.LoadFile(file).GetTypes();
+                var postProcessorMenuItem = new ToolStripMenuItem(postProcessor.Name);
+                postProcessorMenuItem.Tag = postProcessor;
+                postProcessorMenuItem.Click += PostProcessor_Click;
+                mnuNestPost.DropDownItems.Add(postProcessorMenuItem);
 
-                    foreach (var type in types)
-                    {
-                        if (type.GetInterfaces().Contains(typeof(IPostProcessor)) == false)
-                            continue;
-
-                        var postProcessor = Activator.CreateInstance(type) as IPostProcessor;
-                        var postProcessorMenuItem = new ToolStripMenuItem(postProcessor.Name);
-                        postProcessorMenuItem.Tag = postProcessor;
-                        postProcessorMenuItem.Click += PostProcessor_Click;
-                        mnuNestPost.DropDownItems.Add(postProcessorMenuItem);
-
-                        var toolbarPost = new ToolStripMenuItem(postProcessor.Name) { Tag = postProcessor };
-                        toolbarPost.Click += PostProcessor_Click;
-                        postButton.DropDownItems.Add(toolbarPost);
-
-                        if (postProcessor is IMaterialProvidingPostProcessor materialProvider)
-                            PostProcessorMaterials.AddFrom(materialProvider);
-                    }
-                }
+                var toolbarPost = new ToolStripMenuItem(postProcessor.Name) { Tag = postProcessor };
+                toolbarPost.Click += PostProcessor_Click;
+                postButton.DropDownItems.Add(toolbarPost);
             }
 
             mnuNestPost.Visible = mnuNestPost.DropDownItems.Count > 0;
             postButton.Visible = postButton.DropDownItems.Count > 0;
+
+            if (posts.Failures.Count > 0)
+                Shown += (_, _) => MessageBox.Show(this,
+                    "These post processors could not be loaded:\n\n" + string.Join("\n", posts.Failures),
+                    "Post Processors", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
         #region Overrides
@@ -344,50 +256,10 @@ namespace OpenNest.Forms
         {
             base.OnLoad(e);
 
-            MigrateNestTemplate();
+            MainWindowSettings.MigrateNestTemplate();
 
             if (Settings.Default.CreateNewNestOnOpen)
                 New_Click(this, new EventArgs());
-        }
-
-        /// <summary>
-        /// One-time upgrade: converts a legacy .nstdot nest template
-        /// (NestTemplatePath setting) into defaults.json, then clears the
-        /// setting so the template mechanism is never consulted again.
-        /// </summary>
-        private void MigrateNestTemplate()
-        {
-            var templatePath = Settings.Default.NestTemplatePath;
-            if (string.IsNullOrWhiteSpace(templatePath))
-                return;
-
-            // A failed conversion keeps the setting populated so the user
-            // can still find their template file.
-            var converted = true;
-            if (File.Exists(templatePath) && !File.Exists(NestDefaults.DefaultPath))
-            {
-                try
-                {
-                    var nest = new NestReader(templatePath) { BestFitStore = BestFitCacheStore.Shared }.Read();
-                    NestDefaults.FromNest(nest).Save(NestDefaults.DefaultPath);
-                }
-                catch (Exception ex)
-                {
-                    converted = false;
-                    MessageBox.Show(
-                        $"The nest template could not be converted to the new defaults file:\n{templatePath}\n\n{ex.Message}\n\nIt will no longer be loaded automatically. Set defaults under Tools > Nest Defaults.",
-                        "Nest Template",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning
-                    );
-                }
-            }
-
-            if (!converted)
-                return;
-
-            Settings.Default.NestTemplatePath = "";
-            Settings.Default.Save();
         }
 
         protected override void OnDragEnter(DragEventArgs e)
@@ -430,7 +302,7 @@ namespace OpenNest.Forms
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             base.OnClosing(e);
-            SaveSettings();
+            MainWindowSettings.Save(this);
         }
 
         #endregion

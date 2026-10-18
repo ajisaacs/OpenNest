@@ -21,7 +21,7 @@ namespace OpenNest.Forms
                 components.Dispose();
             }
             if (disposing)
-                updater?.Dispose();
+                updaterStatus?.Dispose();
             base.Dispose(disposing);
         }
 

@@ -18,15 +18,7 @@ public class MainFormCharacterizationTests
     [InlineData(900, "N26-322")]
     [InlineData(27000, "N26-3222")]
     public void NestNamesUseTwoDigitYearAndPaddedBase30Sequence(int id, string expected) =>
-        StaTestThread.Run(() =>
-        {
-            using var host = new Host();
-            var name = (string)typeof(MainForm)
-                .GetMethod("GetNestName", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(host, [new DateTime(2026, 10, 17), id])!;
-
-            Assert.Equal(expected, name);
-        }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
+        Assert.Equal(expected, NewNestFactory.GetNestName(new DateTime(2026, 10, 17), id));
 
     [Fact]
     public void BusyGuardsDifferInWhichOperationsTheyCount() => StaTestThread.Run(() =>

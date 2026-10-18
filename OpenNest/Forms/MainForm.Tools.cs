@@ -177,7 +177,7 @@ namespace OpenNest.Forms
 
         private void NestDefaults_Click(object sender, EventArgs e)
         {
-            using (var form = new NestDefaultsForm(LoadSavedNestDefaults(out _)))
+            using (var form = new NestDefaultsForm(MachineSettings.LoadSavedNestDefaults(out _)))
             {
                 if (form.ShowDialog(this) == DialogResult.OK)
                     form.GetDefaults().Save(NestDefaults.DefaultPath);

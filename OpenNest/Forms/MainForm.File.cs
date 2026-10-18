@@ -6,116 +6,11 @@ using OpenNest.Data;
 using OpenNest.Engine.BestFit;
 using OpenNest.Forms.Commands;
 using OpenNest.IO;
-using OpenNest.Properties;
 
 namespace OpenNest.Forms
 {
     public partial class MainForm
     {
-        private Nest CreateDefaultNest()
-        {
-            var nest = new Nest();
-            LoadNestDefaults().ApplyTo(nest);
-            // After the defaults so the rail is converted to the new nest's units.
-            LoadClampSettings(this).ApplyToNewNest(nest);
-            return nest;
-        }
-
-        /// <summary>
-        /// Loads the machine clamp settings for creating new nests (New, BOM import); an
-        /// unreadable or partly invalid file warns once per session, because the new nest's
-        /// clamps may not match the machine.
-        /// </summary>
-        internal static ClampSettings LoadClampSettings(IWin32Window owner)
-        {
-            var settings = LoadSavedClampSettings(out var status);
-
-            if (
-                status is ClampSettingsStatus.Invalid or ClampSettingsStatus.Partial
-                && !clampSettingsWarned
-            )
-            {
-                clampSettingsWarned = true;
-                var problem =
-                    status == ClampSettingsStatus.Invalid
-                        ? "could not be read, so new nests have no clamps"
-                        : "has invalid values that were ignored, so new nests may be missing clamps";
-                MessageBox.Show(
-                    owner,
-                    $"The clamp settings file {problem}:\n{ClampSettings.DefaultPath}\n\nCheck the clamps in Nest > Clamps and use Save as Machine Defaults to rewrite the file.",
-                    "Clamps",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
-            }
-            return settings;
-        }
-
-        private static bool clampSettingsWarned;
-
-        /// <summary>The single desktop entry point for the persisted machine clamp settings.</summary>
-        internal static ClampSettings LoadSavedClampSettings(out ClampSettingsStatus status) =>
-            ClampSettings.Load(ClampSettings.DefaultPath, out status);
-
-        /// <summary>
-        /// Loads the persisted nest defaults (see <see cref="LoadSavedNestDefaults"/>);
-        /// a corrupt or unreadable file warns once per session.
-        /// </summary>
-        private NestDefaults LoadNestDefaults()
-        {
-            var defaults = LoadSavedNestDefaults(out var status);
-
-            if (status == NestDefaultsStatus.Invalid && !defaultsWarned)
-            {
-                defaultsWarned = true;
-                MessageBox.Show(
-                    $"The nest defaults file could not be read:\n{NestDefaults.DefaultPath}\n\nBuilt-in defaults will be used. Re-save your defaults from Tools > Nest Defaults.",
-                    "Nest Defaults",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
-            }
-            return defaults;
-        }
-
-        private bool defaultsWarned;
-
-        /// <summary>
-        /// The single desktop entry point for persisted nest defaults. Units
-        /// fall back to the legacy DefaultUnit setting whenever the file is
-        /// missing or unusable or has no valid unit, so New, BOM import and
-        /// the defaults dialog always agree.
-        /// </summary>
-        internal static NestDefaults LoadSavedNestDefaults(out NestDefaultsStatus status) =>
-            NestDefaults.Load(
-                NestDefaults.DefaultPath,
-                Properties.Settings.Default.DefaultUnit,
-                out status
-            );
-
-        private string GetNestName(DateTime date, int id)
-        {
-            var year = (date.Year % 100).ToString("D2");
-            var seq = ToBase36(id).PadLeft(3, '2');
-
-            return $"N{year}-{seq}";
-        }
-
-        private static string ToBase36(int value)
-        {
-            const string chars = "2345679ACDEFGHJKLMNPQRSTUVWXYZ";
-            if (value == 0)
-                return chars[0].ToString();
-
-            var result = "";
-            while (value > 0)
-            {
-                result = chars[value % chars.Length] + result;
-                value /= chars.Length;
-            }
-            return result;
-        }
-
         private void LoadNest(Nest nest, FormWindowState windowState = FormWindowState.Maximized,
             Guid remoteId = default, string serverUrl = null, int remoteRevision = 0)
         {
@@ -142,19 +37,7 @@ namespace OpenNest.Forms
             var windowState =
                 ActiveMdiChild != null ? ActiveMdiChild.WindowState : FormWindowState.Maximized;
 
-            var nest = CreateDefaultNest();
-
-            nest.DateCreated = DateTime.Now;
-            nest.DateLastModified = DateTime.Now;
-
-            if (DateTime.Now.Date != Settings.Default.LastNestCreatedDate.Date)
-            {
-                Settings.Default.NestNumber = 1;
-                Settings.Default.LastNestCreatedDate = DateTime.Now.Date;
-            }
-
-            nest.Name = GetNestName(DateTime.Now, Settings.Default.NestNumber++);
-            LoadNest(nest, windowState);
+            LoadNest(NewNestFactory.Create(this), windowState);
         }
 
         private async void Open_Click(object sender, EventArgs e)

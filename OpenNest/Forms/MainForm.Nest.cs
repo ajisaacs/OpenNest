@@ -77,7 +77,7 @@ namespace OpenNest.Forms
                 return;
             }
 
-            var defaults = LoadSavedClampSettings(out _);
+            var defaults = MachineSettings.LoadSavedClampSettings(out _);
             using var form = new ClampsForm(nest.PlateDefaults.ClampRail, nest.Units, defaults);
             if (form.ShowDialog(this) != DialogResult.OK)
                 return;

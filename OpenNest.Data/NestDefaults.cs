@@ -49,7 +49,7 @@ public sealed class NestDefaults
     /// <summary>
     /// The built-in defaults used when no file exists and for every field
     /// that is missing or invalid. Matches the historical
-    /// MainForm.CreateDefaultNest values (units default to Inches; callers
+    /// File > New values (units default to Inches; callers
     /// may override from their own settings).
     /// </summary>
     public static NestDefaults Fallback => new();

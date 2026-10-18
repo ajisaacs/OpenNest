@@ -32,7 +32,7 @@ namespace OpenNest.Forms
             dgvParts.AutoGenerateColumns = false;
             dgvParts.DataSource = _parts;
             _groupSettings = new Dictionary<string, BomGroupPlateSettings>();
-            _defaults = MainForm.LoadSavedNestDefaults(out _);
+            _defaults = MachineSettings.LoadSavedNestDefaults(out _);
             ApplyDefaults();
         }
 
@@ -414,7 +414,7 @@ namespace OpenNest.Forms
             var nestsCreated = 0;
             var importErrors = new List<string>();
             // Read when the nests are created, warning (once per session) like New does.
-            var clamps = MainForm.LoadClampSettings(this);
+            var clamps = MachineSettings.LoadClampSettings(this);
 
             foreach (var group in groups)
             {
