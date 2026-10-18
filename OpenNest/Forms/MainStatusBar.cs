@@ -10,10 +10,13 @@ namespace OpenNest.Forms
     /// <summary>
     /// The main window's status labels for the active nest document: status text, cursor
     /// location, selection bounds and plate index/size/quantity/utilization. The location
-    /// follows the mouse, or only left clicks while click mode is on (the default).
+    /// follows the mouse (the default, throttled), or only left clicks while click mode is on.
     /// </summary>
     internal sealed class MainStatusBar
     {
+        // Mouse-follow mode refreshes at most this often; each text change relayouts the strip.
+        private const int LocationRefreshIntervalMs = 100;
+
         private readonly ToolStripStatusLabel status;
         private readonly ToolStripStatusLabel location;
         private readonly ToolStripStatusLabel selection;
@@ -21,9 +24,11 @@ namespace OpenNest.Forms
         private readonly ToolStripStatusLabel plateSize;
         private readonly ToolStripStatusLabel plateQty;
         private readonly ToolStripStatusLabel plateUtil;
+        private readonly Timer locationTimer;
 
         private EditNestForm form;
-        private bool clickUpdatesLocation = true;
+        private bool clickUpdatesLocation;
+        private bool locationPending;
 
         public MainStatusBar(ToolStripStatusLabel status, ToolStripStatusLabel location,
             ToolStripStatusLabel selection, ToolStripStatusLabel plateIndex, ToolStripStatusLabel plateSize,
@@ -36,6 +41,9 @@ namespace OpenNest.Forms
             this.plateSize = plateSize;
             this.plateQty = plateQty;
             this.plateUtil = plateUtil;
+
+            locationTimer = new Timer { Interval = LocationRefreshIntervalMs };
+            locationTimer.Tick += LocationTimer_Tick;
         }
 
         /// <summary>
@@ -68,6 +76,7 @@ namespace OpenNest.Forms
 
         public void Unbind()
         {
+            StopLocationThrottle();
             if (form == null)
                 return;
 
@@ -179,6 +188,7 @@ namespace OpenNest.Forms
             if (form == null)
                 return;
 
+            StopLocationThrottle();
             var view = form.PlateView;
             // Detach both first so repeated calls never stack handlers.
             view.MouseMove -= PlateView_MouseMove;
@@ -199,7 +209,39 @@ namespace OpenNest.Forms
 
         private void PlateView_PartRemoved(object sender, ItemRemovedEventArgs<Part> e) => UpdatePlate();
 
-        private void PlateView_MouseMove(object sender, MouseEventArgs e) => UpdateLocation();
+        /// <summary>
+        /// Throttles mouse-follow updates: the first move shows at once, later moves inside
+        /// the interval collapse into one trailing update so the label settles on the last point.
+        /// </summary>
+        private void PlateView_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (locationTimer.Enabled)
+            {
+                locationPending = true;
+                return;
+            }
+
+            UpdateLocation();
+            locationTimer.Start();
+        }
+
+        private void LocationTimer_Tick(object sender, EventArgs e)
+        {
+            if (!locationPending)
+            {
+                locationTimer.Stop();
+                return;
+            }
+
+            locationPending = false;
+            UpdateLocation();
+        }
+
+        private void StopLocationThrottle()
+        {
+            locationTimer.Stop();
+            locationPending = false;
+        }
 
         private void PlateView_MouseClick(object sender, MouseEventArgs e)
         {
