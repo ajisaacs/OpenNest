@@ -22,7 +22,7 @@ namespace OpenNest.Forms
             editForm.PlateChanged += (sender, e) =>
             {
                 NavigationEnableCheck();
-                UpdatePlateStatus();
+                statusBar.UpdatePlate();
                 mnuPlateRemove.Enabled = activeForm?.PlateManager.CanRemoveCurrent ?? false;
             };
             editForm.WindowState = windowState;

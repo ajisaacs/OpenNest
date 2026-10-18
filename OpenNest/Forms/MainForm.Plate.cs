@@ -43,7 +43,7 @@ namespace OpenNest.Forms
             if (activeForm == null)
                 return;
             activeForm.ResizePlateToFitParts();
-            UpdatePlateStatus();
+            statusBar.UpdatePlate();
         }
 
         private void RotateCw_Click(object sender, EventArgs e)

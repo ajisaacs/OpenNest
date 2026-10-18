@@ -17,7 +17,7 @@ namespace OpenNest.Forms
     {
         private EditNestForm activeForm;
 
-        private bool clickUpdateLocation;
+        private readonly MainStatusBar statusBar;
         private bool nestingInProgress;
         private CancellationTokenSource nestingCts;
         private readonly NestStorageController storage;
@@ -98,6 +98,8 @@ namespace OpenNest.Forms
             storage = new NestStorageController(this, text => statusLabel1.Text = text);
             storage.StateChanged += Storage_StateChanged;
             InitializeComponent();
+            statusBar = new MainStatusBar(statusLabel1, locationStatusLabel, selectionStatusLabel,
+                plateIndexStatusLabel, plateSizeStatusLabel, plateQtyStatusLabel, plateUtilStatusLabel);
             toolStrip1.Items.Add(CreateActionButton("btnCutPlanner", "Plan Cutting",
                 Resources.cut_planner, PlatePlanCutting_Click));
             toolStrip1.Items.Add(CreateActionButton("btnManualSequence", "Manual Sequence",
@@ -117,14 +119,12 @@ namespace OpenNest.Forms
             mnuViewZoomIn.ShortcutKeyDisplayString = "Ctrl+Plus";
             mnuViewZoomOut.ShortcutKeyDisplayString = "Ctrl+Minus";
 
-            clickUpdateLocation = true;
-
             this.SetBevel(false);
             AllowDrop = true;
 
             LoadPosts(PostProcessorLoader.Load(PostProcessorLoader.DefaultDirectory));
             EnableCheck();
-            UpdateStatus();
+            statusBar.UpdateAll();
 
             // Jobs-side plug-in discovery: INestingEngine implementations are registered per
             // assembly/type with per-DLL isolation. Existing plug-ins must implement the jobs
@@ -205,16 +205,9 @@ namespace OpenNest.Forms
                 editor.CuttingInspection.RequestClose();
             base.OnMdiChildActivate(e);
 
+            statusBar.Unbind();
             if (activeForm != null)
-            {
-                activeForm.PlateView.MouseMove -= PlateView_MouseMove;
-                activeForm.PlateView.MouseClick -= PlateView_MouseClick;
-                activeForm.PlateView.StatusChanged -= PlateView_StatusChanged;
                 activeForm.PlateView.OverlapStateChanged -= OverlapStateChanged;
-                activeForm.PlateView.SelectionChanged -= PlateView_SelectionChanged;
-                activeForm.PlateView.PartAdded -= PlateView_PartAdded;
-                activeForm.PlateView.PartRemoved -= PlateView_PartRemoved;
-            }
 
             // If nesting is in progress and the active form changed, cancel nesting
             if (nestingInProgress && nestingCts != null)
@@ -226,30 +219,18 @@ namespace OpenNest.Forms
             UpdateOverlapMenu();
 
             EnableCheck();
-            UpdatePlateStatus();
-            UpdateLocationStatus();
+            statusBar.Bind(activeForm);
 
             if (activeForm == null)
-            {
-                statusLabel1.Text = "";
-                selectionStatusLabel.Text = "";
                 return;
-            }
 
-            UpdateLocationMode();
-            UpdateSelectionStatus();
-            activeForm.PlateView.StatusChanged += PlateView_StatusChanged;
             activeForm.PlateView.OverlapStateChanged += OverlapStateChanged;
-            activeForm.PlateView.SelectionChanged += PlateView_SelectionChanged;
-            activeForm.PlateView.PartAdded += PlateView_PartAdded;
-            activeForm.PlateView.PartRemoved += PlateView_PartRemoved;
             var activeNest = activeForm.Nest;
             activeForm.PlateView.CanEditClamps = () => !ClampsInUse(activeNest);
             mnuViewDrawRapids.Checked = activeForm.PlateView.DrawRapid;
             mnuViewDrawPiercePoints.Checked = activeForm.PlateView.DrawPiercePoints;
             mnuViewDrawBounds.Checked = activeForm.PlateView.DrawBounds;
             mnuViewDrawCutDirection.Checked = activeForm.PlateView.DrawCutDirection;
-            statusLabel1.Text = activeForm.PlateView.Status;
         }
 
         protected override void OnLoad(EventArgs e)
