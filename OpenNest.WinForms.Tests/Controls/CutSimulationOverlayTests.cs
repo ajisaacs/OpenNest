@@ -75,6 +75,30 @@ public class CutSimulationOverlayTests
     });
 
     [Fact]
+    public void ZoomedInTrailIsDrawnWherePannedTo() => RunSta(() =>
+    {
+        using var view = new PlateView { Plate = TwoSquares() };
+        var sim = CutSimulation.Build(view.Plate, Parameters);
+        view.CutSimulation.Load(sim);
+        view.CutSimulation.Time = sim.TotalTime;
+        view.ZoomToPoint(new Vector(10, 5), 100 / view.ViewScale, false); // trail far larger than the screen
+
+        using var bitmap = new Bitmap(400, 400);
+        using var graphics = Graphics.FromImage(bitmap);
+        foreach (var target in new[] { new Vector(10, 5), new Vector(35, 15) })
+        {
+            var point = view.PointWorldToGraph(target);
+            graphics.ResetTransform();
+            graphics.Clear(Color.Black);
+            graphics.TranslateTransform(200 - point.X, 200 - point.Y);
+            view.CutSimulation.Draw(graphics);
+
+            var pixel = bitmap.GetPixel(200, 200);
+            Assert.True(pixel.R > 200 && pixel.G < 160, $"trail missing at {target}: {pixel}");
+        }
+    });
+
+    [Fact]
     public void PlateSwitchClearsTheSimulation() => RunSta(() =>
     {
         using var view = new PlateView { Plate = TwoSquares() };
