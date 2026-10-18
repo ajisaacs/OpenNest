@@ -13,20 +13,15 @@ namespace OpenNest.Forms
     {
         #region Nest Menu Events
 
-        private void Import_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.Import();
-        }
+        private void Import_Click(object sender, EventArgs e) => WithActive(f => f.Import());
 
         private void ShapeLibrary_Click(object sender, EventArgs e)
         {
             if (activeForm == null)
                 return;
 
-            var form = new ShapeLibraryForm(activeForm.Nest.Drawings.Select(d => d.Name));
-            form.ShowDialog();
+            using var form = new ShapeLibraryForm(activeForm.Nest.Drawings.Select(d => d.Name));
+            form.ShowDialog(this);
 
             var drawings = form.GetDrawings();
             if (drawings.Count == 0)
@@ -50,12 +45,7 @@ namespace OpenNest.Forms
             mnuNestDrawingLibrary.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
         }
 
-        private void EditNest_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.ShowNestInfoEditor();
-        }
+        private void EditNest_Click(object sender, EventArgs e) => WithActive(f => f.ShowNestInfoEditor());
 
         private void Clamps_Click(object sender, EventArgs e)
         {
@@ -87,40 +77,15 @@ namespace OpenNest.Forms
                 view.Invalidate();
         }
 
-        private void RemoveEmptyPlates_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.Nest.Plates.RemoveEmptyPlates();
-        }
+        private void RemoveEmptyPlates_Click(object sender, EventArgs e) => WithActive(f => f.Nest.Plates.RemoveEmptyPlates());
 
-        private void LoadFirstPlate_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlateManager.LoadFirst();
-        }
+        private void LoadFirstPlate_Click(object sender, EventArgs e) => WithActive(f => f.PlateManager.LoadFirst());
 
-        private void LoadLastPlate_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlateManager.LoadLast();
-        }
+        private void LoadLastPlate_Click(object sender, EventArgs e) => WithActive(f => f.PlateManager.LoadLast());
 
-        private void LoadPreviousPlate_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlateManager.LoadPrevious();
-        }
+        private void LoadPreviousPlate_Click(object sender, EventArgs e) => WithActive(f => f.PlateManager.LoadPrevious());
 
-        private void LoadNextPlate_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlateManager.LoadNext();
-        }
+        private void LoadNextPlate_Click(object sender, EventArgs e) => WithActive(f => f.PlateManager.LoadNext());
 
         private RemnantViewerForm remnantViewer;
 
@@ -193,13 +158,7 @@ namespace OpenNest.Forms
             }
         }
 
-        private void SequenceAllPlates_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-
-            activeForm.AutoSequenceAllPlates();
-        }
+        private void SequenceAllPlates_Click(object sender, EventArgs e) => WithActive(f => f.AutoSequenceAllPlates());
 
         private void ValidateNest_Click(object sender, EventArgs e)
         {
@@ -239,27 +198,11 @@ namespace OpenNest.Forms
             new PostCommand(this, editForm.Nest, postProcessor).Run();
         }
 
-        private void CalculateNestCutTime_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
+        private void CalculateNestCutTime_Click(object sender, EventArgs e) => WithActive(f => f.CalculateNestCutTime());
 
-            activeForm.CalculateNestCutTime();
-        }
+        private void NestAssignLeadIns_Click(object sender, EventArgs e) => WithActive(f => f.AssignLeadInsAllPlates());
 
-        private void NestAssignLeadIns_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.AssignLeadInsAllPlates();
-        }
-
-        private void NestRemoveLeadIns_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.RemoveLeadInsAllPlates();
-        }
+        private void NestRemoveLeadIns_Click(object sender, EventArgs e) => WithActive(f => f.RemoveLeadInsAllPlates());
 
         #endregion Nest Menu Events
     }

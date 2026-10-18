@@ -326,7 +326,6 @@ namespace OpenNest.Forms
             mnuEditPaste.Size = new System.Drawing.Size(164, 22);
             mnuEditPaste.Text = "Paste";
             mnuEditPaste.Visible = false;
-            mnuEditPaste.Click += EditPaste_Click;
             // 
             // toolStripMenuItem4
             // 
@@ -865,28 +864,28 @@ namespace OpenNest.Forms
             mnuPlateAlignLeft.Name = "mnuPlateAlignLeft";
             mnuPlateAlignLeft.Size = new System.Drawing.Size(209, 22);
             mnuPlateAlignLeft.Text = "Left";
-            mnuPlateAlignLeft.Click += AlignLeft_Click;
+            mnuPlateAlignLeft.Click += Align_Click;
             //
             // mnuPlateAlignRight
             //
             mnuPlateAlignRight.Name = "mnuPlateAlignRight";
             mnuPlateAlignRight.Size = new System.Drawing.Size(209, 22);
             mnuPlateAlignRight.Text = "Right";
-            mnuPlateAlignRight.Click += AlignRight_Click;
+            mnuPlateAlignRight.Click += Align_Click;
             //
             // mnuPlateAlignTop
             //
             mnuPlateAlignTop.Name = "mnuPlateAlignTop";
             mnuPlateAlignTop.Size = new System.Drawing.Size(209, 22);
             mnuPlateAlignTop.Text = "Top";
-            mnuPlateAlignTop.Click += AlignTop_Click;
+            mnuPlateAlignTop.Click += Align_Click;
             //
             // mnuPlateAlignBottom
             //
             mnuPlateAlignBottom.Name = "mnuPlateAlignBottom";
             mnuPlateAlignBottom.Size = new System.Drawing.Size(209, 22);
             mnuPlateAlignBottom.Text = "Bottom";
-            mnuPlateAlignBottom.Click += AlignBottom_Click;
+            mnuPlateAlignBottom.Click += Align_Click;
             //
             // toolStripMenuItem11
             //
@@ -898,14 +897,14 @@ namespace OpenNest.Forms
             mnuPlateAlignHorizontal.Name = "mnuPlateAlignHorizontal";
             mnuPlateAlignHorizontal.Size = new System.Drawing.Size(209, 22);
             mnuPlateAlignHorizontal.Text = "Horizontally";
-            mnuPlateAlignHorizontal.Click += AlignHorizontal_Click;
+            mnuPlateAlignHorizontal.Click += Align_Click;
             //
             // mnuPlateAlignVertically
             //
             mnuPlateAlignVertically.Name = "mnuPlateAlignVertically";
             mnuPlateAlignVertically.Size = new System.Drawing.Size(209, 22);
             mnuPlateAlignVertically.Text = "Vertically";
-            mnuPlateAlignVertically.Click += AlignVertical_Click;
+            mnuPlateAlignVertically.Click += Align_Click;
             //
             // toolStripMenuItem8
             //
@@ -917,14 +916,14 @@ namespace OpenNest.Forms
             mnuPlateEvenlySpaceHorizontal.Name = "mnuPlateEvenlySpaceHorizontal";
             mnuPlateEvenlySpaceHorizontal.Size = new System.Drawing.Size(209, 22);
             mnuPlateEvenlySpaceHorizontal.Text = "Evenly Space Horizontally";
-            mnuPlateEvenlySpaceHorizontal.Click += EvenlySpaceHorizontally_Click;
+            mnuPlateEvenlySpaceHorizontal.Click += Align_Click;
             //
             // mnuPlateEvenlySpaceVertical
             //
             mnuPlateEvenlySpaceVertical.Name = "mnuPlateEvenlySpaceVertical";
             mnuPlateEvenlySpaceVertical.Size = new System.Drawing.Size(209, 22);
             mnuPlateEvenlySpaceVertical.Text = "Evenly Space Vertically";
-            mnuPlateEvenlySpaceVertical.Click += EvenlySpaceVertically_Click;
+            mnuPlateEvenlySpaceVertical.Click += Align_Click;
             //
             // toolStripMenuItem23
             //
@@ -936,7 +935,7 @@ namespace OpenNest.Forms
             centerPartsToolStripMenuItem.Name = "centerPartsToolStripMenuItem";
             centerPartsToolStripMenuItem.Size = new System.Drawing.Size(209, 22);
             centerPartsToolStripMenuItem.Text = "Center Parts";
-            centerPartsToolStripMenuItem.Click += centerPartsToolStripMenuItem_Click;
+            centerPartsToolStripMenuItem.Click += CenterParts_Click;
             //
             // toolStripMenuItem24
             //

@@ -27,8 +27,6 @@ namespace OpenNest.Forms
             }
         }
 
-        private void EditPaste_Click(object sender, EventArgs e) { }
-
         private void EditCopy_Click(object sender, EventArgs e)
         {
             if (activeForm == null)
@@ -43,12 +41,7 @@ namespace OpenNest.Forms
             }
         }
 
-        private void EditSelectAll_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.SelectAllParts();
-        }
+        private void EditSelectAll_Click(object sender, EventArgs e) => WithActive(f => f.SelectAllParts());
 
         #endregion Edit Menu Events
 
@@ -147,33 +140,13 @@ namespace OpenNest.Forms
             mnuViewDrawCutDirection.Checked = activeForm.PlateView.DrawCutDirection;
         }
 
-        private void ZoomToArea_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlateView.SetAction(typeof(ActionZoomWindow));
-        }
+        private void ZoomToArea_Click(object sender, EventArgs e) => WithActive(f => f.PlateView.SetAction(typeof(ActionZoomWindow)));
 
-        private void ZoomToFit_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlateView.ZoomToFit();
-        }
+        private void ZoomToFit_Click(object sender, EventArgs e) => WithActive(f => f.PlateView.ZoomToFit());
 
-        private void ZoomToPlate_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlateView.ZoomToPlate();
-        }
+        private void ZoomToPlate_Click(object sender, EventArgs e) => WithActive(f => f.PlateView.ZoomToPlate());
 
-        private void ZoomToSelected_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlateView.ZoomToSelected();
-        }
+        private void ZoomToSelected_Click(object sender, EventArgs e) => WithActive(f => f.PlateView.ZoomToSelected());
 
         private void ZoomIn_Click(object sender, EventArgs e)
         {

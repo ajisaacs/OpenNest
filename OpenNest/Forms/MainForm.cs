@@ -64,6 +64,13 @@ namespace OpenNest.Forms
                 Dispose();
         }
 
+        /// <summary>Runs <paramref name="action"/> on the active nest document, if there is one.</summary>
+        private void WithActive(Action<EditNestForm> action)
+        {
+            if (activeForm != null)
+                action(activeForm);
+        }
+
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             var inspection = MdiChildren.OfType<EditNestForm>()
@@ -109,6 +116,7 @@ namespace OpenNest.Forms
             exportNestMenu.Click += ExportNest_Click;
             mnuFile.DropDownItems.Insert(mnuFile.DropDownItems.IndexOf(mnuFileExport), exportNestMenu);
             mnuFile.DropDownItems.Insert(mnuFile.DropDownItems.IndexOf(mnuFileExit), storageModeMenu);
+            InitializeAlignMenu();
             UpdateOverlapMenu();
             MainWindowSettings.Load(this);
 

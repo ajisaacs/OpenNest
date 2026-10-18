@@ -144,19 +144,9 @@ namespace OpenNest.Forms
             }
         }
 
-        private void Export_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.Export();
-        }
+        private void Export_Click(object sender, EventArgs e) => WithActive(f => f.Export());
 
-        private void ExportAll_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.ExportAll();
-        }
+        private void ExportAll_Click(object sender, EventArgs e) => WithActive(f => f.ExportAll());
 
         private void ExportNestReport_Click(object sender, EventArgs e)
         {

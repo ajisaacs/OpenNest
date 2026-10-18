@@ -11,13 +11,7 @@ namespace OpenNest.Forms
     {
         #region Tools Menu Events
 
-        private void MeasureArea_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-
-            activeForm.PlateView.SetAction(typeof(ActionSelectArea));
-        }
+        private void MeasureArea_Click(object sender, EventArgs e) => WithActive(f => f.PlateView.SetAction(typeof(ActionSelectArea)));
 
         private void BestFitViewer_Click(object sender, EventArgs e)
         {
@@ -148,11 +142,11 @@ namespace OpenNest.Forms
         {
             if (activeForm == null)
                 return;
-            var form = new SetValueForm();
+            using var form = new SetValueForm();
             form.Text = "Set Offset Increment";
             form.Value = activeForm.PlateView.OffsetIncrementDistance;
 
-            if (form.ShowDialog() == DialogResult.OK)
+            if (form.ShowDialog(this) == DialogResult.OK)
                 activeForm.PlateView.OffsetIncrementDistance = form.Value;
         }
 
@@ -160,19 +154,19 @@ namespace OpenNest.Forms
         {
             if (activeForm == null)
                 return;
-            var form = new SetValueForm();
+            using var form = new SetValueForm();
             form.Text = "Set Rotation Increment";
             form.Value = activeForm.PlateView.RotateIncrementAngle;
             form.Maximum = 360;
 
-            if (form.ShowDialog() == DialogResult.OK)
+            if (form.ShowDialog(this) == DialogResult.OK)
                 activeForm.PlateView.RotateIncrementAngle = form.Value;
         }
 
         private void Options_Click(object sender, EventArgs e)
         {
-            var form = new OptionsForm();
-            form.ShowDialog();
+            using var form = new OptionsForm();
+            form.ShowDialog(this);
         }
 
         private void NestDefaults_Click(object sender, EventArgs e)
@@ -209,77 +203,41 @@ namespace OpenNest.Forms
             }
         }
 
-        private void AlignLeft_Click(object sender, EventArgs e)
+        private void InitializeAlignMenu()
         {
-            if (activeForm == null)
-                return;
-            activeForm.PlateView.AlignSelected(AlignType.Left);
+            mnuPlateAlignLeft.Tag = AlignType.Left;
+            mnuPlateAlignRight.Tag = AlignType.Right;
+            mnuPlateAlignTop.Tag = AlignType.Top;
+            mnuPlateAlignBottom.Tag = AlignType.Bottom;
+            mnuPlateAlignHorizontal.Tag = AlignType.Horizontally;
+            mnuPlateAlignVertically.Tag = AlignType.Vertically;
+            mnuPlateEvenlySpaceHorizontal.Tag = AlignType.EvenlySpaceHorizontally;
+            mnuPlateEvenlySpaceVertical.Tag = AlignType.EvenlySpaceVertically;
         }
 
-        private void AlignRight_Click(object sender, EventArgs e)
+        private void Align_Click(object sender, EventArgs e)
         {
-            if (activeForm == null)
-                return;
-            activeForm.PlateView.AlignSelected(AlignType.Right);
-        }
-
-        private void AlignTop_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlateView.AlignSelected(AlignType.Top);
-        }
-
-        private void AlignBottom_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlateView.AlignSelected(AlignType.Bottom);
-        }
-
-        private void AlignVertical_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlateView.AlignSelected(AlignType.Vertically);
-        }
-
-        private void AlignHorizontal_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlateView.AlignSelected(AlignType.Horizontally);
-        }
-
-        private void EvenlySpaceHorizontally_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlateView.AlignSelected(AlignType.EvenlySpaceHorizontally);
-        }
-
-        private void EvenlySpaceVertically_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlateView.AlignSelected(AlignType.EvenlySpaceVertically);
+            if (((ToolStripItem)sender).Tag is AlignType type)
+                WithActive(f => f.PlateView.AlignSelected(type));
         }
 
         #endregion Tools Menu Events
 
-        private void centerPartsToolStripMenuItem_Click(object sender, EventArgs e)
+        private void CenterParts_Click(object sender, EventArgs e)
         {
-            var plateCenter = this.activeForm.PlateView.Plate.BoundingBox(false).Center;
-            var partsCenter = this.activeForm.PlateView.Parts.GetBoundingBox().Center;
+            var view = activeForm?.PlateView;
+            if (view?.Plate == null || view.Parts.Count == 0)
+                return;
+
+            var plateCenter = view.Plate.BoundingBox(false).Center;
+            var partsCenter = view.Parts.GetBoundingBox().Center;
 
             var offset = plateCenter - partsCenter;
 
-            foreach (var part in this.activeForm.PlateView.Parts)
-            {
+            foreach (var part in view.Parts)
                 part.Offset(offset);
-            }
 
-            activeForm.PlateView.Invalidate();
+            view.Invalidate();
         }
     }
 }

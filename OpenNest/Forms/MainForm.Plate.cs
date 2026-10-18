@@ -9,12 +9,7 @@ namespace OpenNest.Forms
     {
         #region Plate Menu Events
 
-        private void SetAsNestDefault_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.SetCurrentPlateAsNestDefault();
-        }
+        private void SetAsNestDefault_Click(object sender, EventArgs e) => WithActive(f => f.SetCurrentPlateAsNestDefault());
 
         private void AddPlate_Click(object sender, EventArgs e)
         {
@@ -24,19 +19,9 @@ namespace OpenNest.Forms
             NavigationEnableCheck();
         }
 
-        private void EditPlate_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.EditPlate();
-        }
+        private void EditPlate_Click(object sender, EventArgs e) => WithActive(f => f.EditPlate());
 
-        private void RemovePlate_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.RemoveCurrentPlate();
-        }
+        private void RemovePlate_Click(object sender, EventArgs e) => WithActive(f => f.RemoveCurrentPlate());
 
         private void ResizeToFitParts_Click(object sender, EventArgs e)
         {
@@ -46,49 +31,17 @@ namespace OpenNest.Forms
             statusBar.UpdatePlate();
         }
 
-        private void RotateCw_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.RotateCw();
-        }
+        private void RotateCw_Click(object sender, EventArgs e) => WithActive(f => f.RotateCw());
 
-        private void RotateCcw_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.RotateCcw();
-        }
+        private void RotateCcw_Click(object sender, EventArgs e) => WithActive(f => f.RotateCcw());
 
-        private void Rotate180_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.Rotate180();
-        }
+        private void Rotate180_Click(object sender, EventArgs e) => WithActive(f => f.Rotate180());
 
-        private void OpenInExternalCad_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.OpenCurrentPlate();
-        }
+        private void OpenInExternalCad_Click(object sender, EventArgs e) => WithActive(f => f.OpenCurrentPlate());
 
-        private void CalculatePlateCutTime_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
+        private void CalculatePlateCutTime_Click(object sender, EventArgs e) => WithActive(f => f.CalculateCurrentPlateCutTime());
 
-            activeForm.CalculateCurrentPlateCutTime();
-        }
-
-        private void AutoSequenceCurrentPlate_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-
-            activeForm.AutoSequenceCurrentPlate();
-        }
+        private void AutoSequenceCurrentPlate_Click(object sender, EventArgs e) => WithActive(f => f.AutoSequenceCurrentPlate());
 
         private void ManualSequenceParts_Click(object sender, EventArgs e)
         {
@@ -98,13 +51,7 @@ namespace OpenNest.Forms
             activeForm.PlateView.SetAction(typeof(ActionSetSequence));
         }
 
-        private void CutOff_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-
-            activeForm.PlateView.SetAction(typeof(ActionCutOff));
-        }
+        private void CutOff_Click(object sender, EventArgs e) => WithActive(f => f.PlateView.SetAction(typeof(ActionCutOff)));
 
         private void AutomaticCutOff_Click(object sender, EventArgs e) => ShowAutomaticCutOff(allPlates: false);
 
@@ -191,26 +138,11 @@ namespace OpenNest.Forms
             }
         }
 
-        private void PlateAssignLeadIns_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.AssignLeadIns_Click(sender, e);
-        }
+        private void PlateAssignLeadIns_Click(object sender, EventArgs e) => WithActive(f => f.AssignLeadIns_Click(sender, e));
 
-        private void PlatePlaceLeadIn_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.PlaceLeadIn_Click(sender, e);
-        }
+        private void PlatePlaceLeadIn_Click(object sender, EventArgs e) => WithActive(f => f.PlaceLeadIn_Click(sender, e));
 
-        private void PlateRemoveLeadIns_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.RemoveLeadIns_Click(sender, e);
-        }
+        private void PlateRemoveLeadIns_Click(object sender, EventArgs e) => WithActive(f => f.RemoveLeadIns_Click(sender, e));
 
         #endregion Plate Menu Events
     }
