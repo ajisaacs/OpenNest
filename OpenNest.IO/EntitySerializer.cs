@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Converters;
 using OpenNest.Geometry;
 using static OpenNest.IO.NestFormat;
 
@@ -8,12 +9,19 @@ namespace OpenNest.IO
 {
     public static class EntitySerializer
     {
-        public static EntitySetDto ToDto(List<Entity> entities, HashSet<Guid> suppressed)
+        public static EntitySetDto ToDto(
+            List<Entity> entities,
+            HashSet<Guid> suppressed,
+            IReadOnlyDictionary<Guid, EntityRole> roles = null
+        )
         {
             return new EntitySetDto
             {
                 Entities = entities.Select(ToEntityDto).ToList(),
                 Suppressed = suppressed.Select(id => id.ToString()).ToList(),
+                Roles = roles is { Count: > 0 }
+                    ? roles.OrderBy(r => r.Key).ToDictionary(r => r.Key.ToString(), r => RoleName(r.Value))
+                    : null,
             };
         }
 
@@ -22,6 +30,50 @@ namespace OpenNest.IO
             var entities = dto.Entities.Select(FromEntityDto).ToList();
             var suppressed = new HashSet<Guid>(dto.Suppressed.Select(Guid.Parse));
             return (entities, suppressed);
+        }
+
+        /// <summary>
+        /// Role overrides of <paramref name="dto"/>. Unknown role names and malformed IDs are
+        /// skipped, so those entities keep their layer's role.
+        /// </summary>
+        public static Dictionary<Guid, EntityRole> RolesFromDto(EntitySetDto dto)
+        {
+            var roles = new Dictionary<Guid, EntityRole>();
+            if (dto.Roles == null)
+                return roles;
+            foreach (var (id, name) in dto.Roles)
+            {
+                if (Guid.TryParse(id, out var guid) && TryParseRole(name, out var role))
+                    roles[guid] = role;
+            }
+            return roles;
+        }
+
+        private static string RoleName(EntityRole role) =>
+            role switch
+            {
+                EntityRole.Etch => "etch",
+                EntityRole.Display => "display",
+                _ => "cut",
+            };
+
+        private static bool TryParseRole(string name, out EntityRole role)
+        {
+            switch (name?.ToLowerInvariant())
+            {
+                case "cut":
+                    role = EntityRole.Cut;
+                    return true;
+                case "etch":
+                    role = EntityRole.Etch;
+                    return true;
+                case "display":
+                    role = EntityRole.Display;
+                    return true;
+                default:
+                    role = EntityRole.Cut;
+                    return false;
+            }
         }
 
         private static EntityDto ToEntityDto(Entity entity)

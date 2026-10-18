@@ -67,6 +67,7 @@ namespace OpenNest.Forms
             entityView1.LinePicked += OnLinePicked;
             entityView1.PickCancelled += OnPickCancelled;
             entityView1.TextConvertRequested += OnTextConvertRequested;
+            entityView1.EntityActionRequested += OnEntityActionRequested;
             btnSplit.Click += OnSplitClicked;
             numQuantity.ValueChanged += OnQuantityChanged;
             txtCustomer.TextChanged += OnCustomerChanged;
@@ -204,6 +205,10 @@ namespace OpenNest.Forms
                 item.Entities.ForEach(e => e.Layer.IsVisible = true);
             ReHidePromotedEntities(item.Bends);
             ReHideSuppressedEntities(item);
+            ReHideExcludedEntities(item);
+            entityView1.ClearSelection();
+            entityView1.EntityRoles = item.EntityRoles;
+            entityView1.ExcludedIds = item.ExcludedEntityIds;
 
             filterPanel.LoadItem(item.Entities, item.Bends);
             RefreshBreakoffs(item);
@@ -286,6 +291,7 @@ namespace OpenNest.Forms
                 return;
 
             filterPanel.ApplyFilters(item.Entities);
+            ReHideExcludedEntities(item);
             ReHidePromotedEntities(item.Bends);
             SyncSuppressedState(item);
             RefreshBreakoffs(item);
@@ -309,7 +315,7 @@ namespace OpenNest.Forms
                 return;
             }
 
-            var entities = item.Entities.Where(en => en.Layer.IsVisible && en.IsVisible).ToList();
+            var entities = VisibleEntities(item);
             if (entities.Count == 0)
             {
                 programEditor.Clear();
@@ -404,7 +410,7 @@ namespace OpenNest.Forms
             if (item == null)
                 return;
 
-            var entities = item.Entities.Where(en => en.Layer.IsVisible && en.IsVisible).ToList();
+            var entities = VisibleEntities(item);
             if (entities.Count == 0)
                 return;
 
@@ -545,8 +551,10 @@ namespace OpenNest.Forms
             filterPanel.SetTabbedCutoutPickMode(false);
         }
 
+        // The entities the program is built from: shown, with role overrides applied and
+        // display-only entities left out.
         private static List<Entity> VisibleEntities(FileListItem item) =>
-            item.Entities.Where(en => en.Layer.IsVisible && en.IsVisible).ToList();
+            EntityRoles.ForProgram(item.Entities.Where(en => en.Layer.IsVisible && en.IsVisible), item.EntityRoles);
 
         private void RefreshBreakoffs(FileListItem item)
         {
@@ -657,6 +665,16 @@ namespace OpenNest.Forms
                 foreach (var id in cutout.EdgeIds.ToList())
                     if (split.TryGetValue(id, out var pieces))
                         cutout.EdgeIds.AddRange(pieces.Where(p => p != id));
+            foreach (var (id, pieces) in split)
+            {
+                foreach (var piece in pieces.Where(p => p != id))
+                {
+                    if (item.ExcludedEntityIds.Contains(id))
+                        item.ExcludedEntityIds.Add(piece);
+                    if (item.EntityRoles.TryGetValue(id, out var role))
+                        item.EntityRoles[piece] = role;
+                }
+            }
 
             item.EntityCount = item.Entities.Count;
             entityView1.Entities.Clear();
@@ -1249,6 +1267,8 @@ namespace OpenNest.Forms
                         drawing.SuppressedEntityIds.Count > 0
                             ? new HashSet<Guid>(drawing.SuppressedEntityIds)
                             : null,
+                    ExcludedEntityIds = IndividuallySuppressed(entities, drawing.SuppressedEntityIds),
+                    EntityRoles = new Dictionary<Guid, EntityRole>(drawing.EntityRoles),
                     Bounds = bounds,
                     EntityCount = entities.Count,
                 };
@@ -1269,7 +1289,7 @@ namespace OpenNest.Forms
             {
                 var visible = item.Entities.Where(e => e.Layer.IsVisible && e.IsVisible).ToList();
 
-                if (visible.Count == 0)
+                if (EntityRoles.ForProgram(visible, item.EntityRoles).Count == 0)
                     continue;
 
                 // Rebuild a CadImportResult from the FileListItem's current state so
@@ -1296,7 +1316,8 @@ namespace OpenNest.Forms
                     item.Customer,
                     editedProgram,
                     item.Breakoffs,
-                    item.TabbedCutouts
+                    item.TabbedCutouts,
+                    item.EntityRoles
                 );
 
                 drawings.Add(drawing);
@@ -1341,6 +1362,73 @@ namespace OpenNest.Forms
                 if (group.All(e => !e.IsVisible))
                     group.Key.IsVisible = false;
             }
+        }
+
+        private static void ReHideExcludedEntities(FileListItem item)
+        {
+            foreach (var entity in item.Entities)
+            {
+                if (item.ExcludedEntityIds.Contains(entity.Id))
+                    entity.IsVisible = false;
+            }
+        }
+
+        // Suppressed entities that are not explained by a wholly hidden layer were excluded one by
+        // one (or by a color/line type filter, which is not restored); keep them excluded so a
+        // filter change does not bring them back.
+        private static HashSet<Guid> IndividuallySuppressed(List<Entity> entities, HashSet<Guid> suppressed)
+        {
+            var result = new HashSet<Guid>();
+            if (suppressed.Count == 0)
+                return result;
+            foreach (var layer in entities.GroupBy(e => e.Layer?.Name))
+            {
+                if (layer.All(e => suppressed.Contains(e.Id)))
+                    continue;
+                result.UnionWith(layer.Where(e => suppressed.Contains(e.Id)).Select(e => e.Id));
+            }
+            return result;
+        }
+
+        private void OnEntityActionRequested(object sender, EntityActionEventArgs e)
+        {
+            var item = CurrentItem;
+            if (item == null || e.Entities.Count == 0)
+                return;
+
+            switch (e.Action)
+            {
+                case EntityAction.Exclude:
+                    foreach (var entity in e.Entities)
+                        item.ExcludedEntityIds.Add(entity.Id);
+                    entityView1.ClearSelection();
+                    break;
+
+                case EntityAction.Include:
+                    foreach (var entity in e.Entities)
+                        item.ExcludedEntityIds.Remove(entity.Id);
+                    break;
+
+                default:
+                    var role = e.Action switch
+                    {
+                        EntityAction.Etch => EntityRole.Etch,
+                        EntityAction.Display => EntityRole.Display,
+                        _ => EntityRole.Cut,
+                    };
+                    foreach (var entity in e.Entities)
+                    {
+                        item.ExcludedEntityIds.Remove(entity.Id);
+                        if (role == EntityRoles.Default(entity))
+                            item.EntityRoles.Remove(entity.Id);
+                        else
+                            item.EntityRoles[entity.Id] = role;
+                    }
+                    break;
+            }
+
+            OnFilterChanged(this, EventArgs.Empty);
+            entityView1.Invalidate();
         }
 
         private static void SyncSuppressedState(FileListItem item)

@@ -513,7 +513,8 @@ namespace OpenNest.IO
 
                 var dto = EntitySerializer.ToDto(
                     drawing.SourceEntities,
-                    drawing.SuppressedEntityIds
+                    drawing.SuppressedEntityIds,
+                    drawing.EntityRoles
                 );
                 var json = JsonSerializer.Serialize(dto, JsonOptions);
 

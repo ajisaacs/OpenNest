@@ -156,6 +156,14 @@ namespace OpenNest
         /// </summary>
         public HashSet<Guid> SuppressedEntityIds { get; set; } = new HashSet<Guid>();
 
+        /// <summary>
+        /// Role overrides for entities in <see cref="SourceEntities"/>; entities not listed keep the
+        /// role their layer implies (see <see cref="Converters.EntityRoles"/>). <see cref="Program"/> already has
+        /// them applied; display-only entities are not in it and come from
+        /// <see cref="Converters.EntityRoles.DisplayGeometry"/>.
+        /// </summary>
+        public Dictionary<Guid, EntityRole> EntityRoles { get; set; } = new Dictionary<Guid, EntityRole>();
+
         public double Area { get; protected set; }
 
         public void UpdateArea()

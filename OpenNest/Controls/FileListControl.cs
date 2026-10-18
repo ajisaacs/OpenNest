@@ -22,6 +22,12 @@ namespace OpenNest.Controls
         public List<Breakoffs.Breakoff> Breakoffs { get; set; } = new();
         public List<TabbedCutouts.TabbedCutout> TabbedCutouts { get; set; } = new();
         public HashSet<Guid> SuppressedEntityIds { get; set; }
+
+        /// <summary>Entities the user excluded one by one; they stay excluded whatever the filters show.</summary>
+        public HashSet<Guid> ExcludedEntityIds { get; set; } = new();
+
+        /// <summary>Role overrides by entity ID; entities not listed keep their layer's role.</summary>
+        public Dictionary<Guid, Converters.EntityRole> EntityRoles { get; set; } = new();
         public Box Bounds { get; set; }
         public int EntityCount { get; set; }
         public List<CadText> Texts { get; set; } = new();

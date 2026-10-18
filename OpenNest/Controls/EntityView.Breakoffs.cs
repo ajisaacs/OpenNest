@@ -65,6 +65,10 @@ namespace OpenNest.Controls
             draggedTab = HitTestTab(e.Location);
             if (draggedTab == null)
                 draggedCutoutTab = HitTestCutoutTab(e.Location);
+            if (draggedTab == null && draggedCutoutTab == null)
+                BeginWindowSelect(e);
+            else
+                suppressNextClick = true; // A tab press or drag does not change the selection.
         }
 
         protected override void OnMouseUp(MouseEventArgs e)
@@ -72,6 +76,7 @@ namespace OpenNest.Controls
             base.OnMouseUp(e);
             if (e.Button != MouseButtons.Left)
                 return;
+            EndWindowSelect(e);
             if (draggedCutoutTab is { } cutoutTab)
             {
                 draggedCutoutTab = null;

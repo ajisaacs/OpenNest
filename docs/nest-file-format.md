@@ -165,7 +165,7 @@ fixed archive timestamps and dates, and no best-fit entries, so equal content ha
 equal bytes and SHA-256. The server stores each distinct package once by that hash.
 
 A package holds geometry and geometry-bound data only: program, source entities and
-offset, suppressed entity IDs, bends, cut pins, breakoffs, tabbed cutouts and material
+offset, suppressed entity IDs, entity roles, bends, cut pins, breakoffs, tabbed cutouts and material
 density. Fields
 the server's library record owns are written as their defaults, so editing them never
 changes the hash:
@@ -230,6 +230,22 @@ warning; the drawing and its program load unchanged, only the cutout stops being
 
 Tab spans are saved as motions tagged `:TAB`. They bound material but are never cut;
 versions without tabbed cutout support read them as ordinary cut motions.
+
+## Drawing entity roles
+
+`entities/entities-N` holds drawing N's source entities, the IDs of suppressed
+(excluded) ones in `suppressed`, and an optional `roles` object, omitted when empty,
+mapping source entity IDs to `"cut"`, `"etch"` or `"display"`. An entity without an
+entry keeps the role its layer implies: `ETCH`, `SCRIBE` and `ENGRAVE` etch, every
+other layer cuts. The stored program already has the roles applied: etched entities
+are `:SCRIBE` motions and display-only entities are not in the program at all, so
+posts, nesting, area and verification never see them; the desktop draws them with
+each placed part. Roles are geometry-bound data, so drawing packages carry them and
+they change the package hash. Unknown role names and malformed IDs are skipped (that
+entity keeps its layer role). Load-time etch repair only uses entities whose role is
+etch, so an etch-layer entity set to cut stays cut. Split pieces get no roles.
+Versions without role support ignore `roles`; they keep the program as saved but
+lose the overrides, and display-only geometry, on the next converter edit.
 
 ## Verification and limits
 

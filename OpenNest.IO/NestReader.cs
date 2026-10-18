@@ -186,11 +186,11 @@ namespace OpenNest.IO
             return reader.Read();
         }
 
-        private Dictionary<int, (List<Entity> entities, HashSet<Guid> suppressed)> ReadEntitySets(
+        private Dictionary<int, (List<Entity> entities, HashSet<Guid> suppressed, Dictionary<Guid, EntityRole> roles)> ReadEntitySets(
             int count
         )
         {
-            var result = new Dictionary<int, (List<Entity>, HashSet<Guid>)>();
+            var result = new Dictionary<int, (List<Entity>, HashSet<Guid>, Dictionary<Guid, EntityRole>)>();
             for (var i = 1; i <= count; i++)
             {
                 var entry = zipArchive.GetEntry($"entities/entities-{i}");
@@ -201,7 +201,8 @@ namespace OpenNest.IO
                 using var reader = new StreamReader(entryStream);
                 var json = reader.ReadToEnd();
                 var dto = JsonSerializer.Deserialize<EntitySetDto>(json, JsonOptions);
-                result[i] = EntitySerializer.FromDto(dto);
+                var (entities, suppressed) = EntitySerializer.FromDto(dto);
+                result[i] = (entities, suppressed, EntitySerializer.RolesFromDto(dto));
             }
             return result;
         }
@@ -209,7 +210,7 @@ namespace OpenNest.IO
         private Dictionary<int, Drawing> BuildDrawings(
             NestDto dto,
             Dictionary<int, Program> programs,
-            Dictionary<int, (List<Entity> entities, HashSet<Guid> suppressed)> entitySets
+            Dictionary<int, (List<Entity> entities, HashSet<Guid> suppressed, Dictionary<Guid, EntityRole> roles)> entitySets
         )
         {
             var map = new Dictionary<int, Drawing>();
@@ -264,12 +265,16 @@ namespace OpenNest.IO
                 {
                     drawing.SourceEntities = entitySet.entities;
                     drawing.SuppressedEntityIds = entitySet.suppressed;
+                    drawing.EntityRoles = entitySet.roles;
 
                     // Older files saved etch marks as cut moves; restore their Scribe layer so
-                    // nesting ignores them. The program was mutated in place, so refresh.
+                    // nesting ignores them. The program was mutated in place, so refresh. Marks
+                    // the user set to cut or display were not etched, so they are not repair sources.
+                    var marks = drawing.SourceEntities.Where(e =>
+                        EntityRoles.Of(e, drawing.EntityRoles) == EntityRole.Etch);
                     if (
                         drawing.Program != null
-                        && ScribeLayerRepair.Apply(drawing.Program, drawing.SourceEntities, drawing.Source.Offset) > 0
+                        && ScribeLayerRepair.Apply(drawing.Program, marks, drawing.Source.Offset) > 0
                     )
                     {
                         drawing.UpdateArea();

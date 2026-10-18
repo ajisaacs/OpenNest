@@ -88,8 +88,13 @@ namespace OpenNest.Controls
             {
                 var text = HitTestText(e.Location);
                 if (text != null)
+                {
                     ShowTextContextMenu(text, e.Location);
+                    return;
+                }
             }
+
+            HandleSelectionClick(e);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -113,10 +118,26 @@ namespace OpenNest.Controls
                 }
             }
 
+            using (var excludedPen = new Pen(Color.FromArgb(90, 150, 150, 150)) { DashPattern = new float[] { 2, 4 } })
+            {
+                foreach (var entity in Entities)
+                {
+                    if (IsExcluded(entity) && !entity.IsVisible && entity.Layer.IsVisible)
+                        DrawEntityShape(e.Graphics, entity, excludedPen);
+                }
+            }
+
+            using var displayPen = new Pen(DisplayRoleColor) { DashPattern = new float[] { 6, 3 } };
             foreach (var entity in Entities)
             {
-                if (IsEtchLayer(entity.Layer))
+                var role = RoleOf(entity);
+                if (role == Converters.EntityRole.Etch)
                     continue;
+                if (role == Converters.EntityRole.Display)
+                {
+                    DrawEntity(e.Graphics, entity, displayPen);
+                    continue;
+                }
                 var isHighlighted =
                     simplifierHighlightSet != null && simplifierHighlightSet.Contains(entity);
                 var pen = isHighlighted
@@ -129,14 +150,19 @@ namespace OpenNest.Controls
             DrawBreakoffs(e.Graphics);
             DrawTabbedCutouts(e.Graphics);
 
+            // Etch on top. Entities etched by override rather than by their layer take the etch
+            // color so the change shows.
             foreach (var entity in Entities)
             {
-                if (!IsEtchLayer(entity.Layer))
+                if (RoleOf(entity) != Converters.EntityRole.Etch)
                     continue;
-                var pen = GetEntityPen(entity.Color);
+                var pen = Converters.EntityRoles.Default(entity) == Converters.EntityRole.Etch
+                    ? GetEntityPen(entity.Color)
+                    : GetEntityPen(EtchRoleColor);
                 DrawEntity(e.Graphics, entity, pen);
             }
 
+            DrawSelection(e.Graphics);
             DrawTexts(e.Graphics);
 
             if (ShowEntityLabels)
@@ -206,6 +232,7 @@ namespace OpenNest.Controls
                 LastPoint = CurrentPoint;
                 CurrentPoint = PointControlToWorld(e.Location);
                 HandleBreakoffMouseMove(e);
+                HandleSelectionMouseMove(e);
             }
 
             lastPoint = e.Location;
@@ -227,6 +254,9 @@ namespace OpenNest.Controls
 
             if (e.KeyCode == Keys.F)
                 ZoomToFit();
+
+            if (HandleSelectionKey(e))
+                return;
 
             if (IsPicking && e.KeyCode == Keys.Escape)
             {
@@ -267,6 +297,9 @@ namespace OpenNest.Controls
                 pen.Dispose();
             penCache.Clear();
         }
+
+        private static readonly Color EtchRoleColor = Color.Magenta;
+        private static readonly Color DisplayRoleColor = Color.FromArgb(120, 200, 220);
 
         private static bool IsEtchLayer(Layer layer) =>
             string.Equals(layer?.Name, "ETCH", System.StringComparison.OrdinalIgnoreCase);
@@ -494,6 +527,11 @@ namespace OpenNest.Controls
             if (!e.Layer.IsVisible || !e.IsVisible)
                 return;
 
+            DrawEntityShape(g, e, pen);
+        }
+
+        private void DrawEntityShape(Graphics g, Entity e, Pen pen)
+        {
             switch (e.Type)
             {
                 case EntityType.Arc:

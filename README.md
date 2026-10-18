@@ -39,7 +39,7 @@ dotnet run --project OpenNest/OpenNest.csproj                   # desktop app (W
 ### Quick start
 
 1. File > New Nest
-2. Import DXFs via the CAD Converter (layer/color filtering, bend detection, G-code preview) or create built-in shapes
+2. Import DXFs via the CAD Converter (layer/color filtering, per-entity exclude and cut/etch/display-only roles, bend detection, G-code preview) or create built-in shapes
 3. Define plate size, material, quadrant, spacing
 4. Fill — the engine arranges parts
 5. Optionally add cut-off lines, apply Part Sequencing to order crossing cut-offs before their parts, then save `.nest`, export DXF, or post-process to G-code

@@ -60,6 +60,9 @@ namespace OpenNest
 
         public GraphicsPath EtchPath { get; private set; }
 
+        /// <summary>The drawing's display-only geometry; null when it has none. Never material or cut.</summary>
+        public GraphicsPath DisplayPath { get; private set; }
+
         // Etch-only parts have no material path, but their visible closed mark must
         // remain hit-testable without treating scribe geometry as a cut or fill.
         internal GraphicsPath SelectionPath => Path?.PointCount > 0 ? MaterialPath : EtchPath;
@@ -104,6 +107,7 @@ namespace OpenNest
                 ? new SolidBrush(colorScheme.SelectedPartColor) : null;
             g.FillPath(muted ? Brushes.Gainsboro : schemeSelectionBrush ?? (IsSelected ? selectedBrush : brush),
                 MaterialPath);
+            DrawDisplay(g, muted);
             DrawEtch(g, muted);
             // Keep real cuts visible even where an etch overlaps them.
             g.DrawPath(muted ? Pens.Gray : IsSelected && colorScheme.PartOutlineColor.IsEmpty ? selectedPen : pen, Path);
@@ -147,6 +151,8 @@ namespace OpenNest
             LeadInPath = null;
             EtchPath?.Dispose();
             EtchPath = null;
+            DisplayPath?.Dispose();
+            DisplayPath = null;
             OffsetPath?.Dispose();
             OffsetPath = null;
         }
@@ -170,6 +176,37 @@ namespace OpenNest
                 return;
             using var etchPen = new Pen(muted ? Color.Gray : colorScheme.EtchColor, 1.5f);
             g.DrawPath(etchPen, EtchPath);
+        }
+
+        private void DrawDisplay(Graphics g, bool muted)
+        {
+            if (DisplayPath == null)
+                return;
+            using var displayPen = new Pen(muted ? Color.Gray : Color.FromArgb(70, 110, 140))
+            {
+                DashPattern = new float[] { 6, 3 },
+            };
+            g.DrawPath(displayPen, DisplayPath);
+        }
+
+        // Display-only entities are kept in the drawing's program frame before rotation, so they
+        // follow the part by its cumulative rotation about the program origin, then its location.
+        private GraphicsPath BuildDisplayPath(Matrix matrix)
+        {
+            var entities = EntityRoles.DisplayGeometry(BasePart.BaseDrawing);
+            if (entities.Count == 0)
+                return null;
+
+            var path = new GraphicsPath();
+            foreach (var entity in entities)
+            {
+                entity.Rotate(BasePart.Rotation);
+                entity.Offset(BasePart.Location);
+                using var figure = new Shape { Entities = new List<Entity> { entity } }.GetGraphicsPath();
+                path.AddPath(figure, false);
+            }
+            path.Transform(matrix);
+            return path;
         }
 
         private Vector ComputeLabelPoint()
@@ -225,6 +262,8 @@ namespace OpenNest
             }
             Path = cutPath;
             EtchPath = etchPath;
+            DisplayPath?.Dispose();
+            DisplayPath = BuildDisplayPath(plateView.Matrix);
             LeadInPath = BasePart.HasManualLeadIns ? leadPath : null;
             if (!BasePart.HasManualLeadIns)
                 leadPath.Dispose();
@@ -235,6 +274,9 @@ namespace OpenNest
             if (LeadInPath?.PointCount > 0)
                 bounds = cutPath.PointCount > 0 || etchPath.PointCount > 0
                     ? RectangleF.Union(bounds, LeadInPath.GetBounds()) : LeadInPath.GetBounds();
+            if (DisplayPath != null)
+                bounds = cutPath.PointCount > 0 || etchPath.PointCount > 0
+                    ? RectangleF.Union(bounds, DisplayPath.GetBounds()) : DisplayPath.GetBounds();
             // Include screen-space stroke width, even for a horizontal or vertical mark.
             bounds.Inflate(1, 1);
             DisplayBounds = bounds;

@@ -552,6 +552,10 @@ namespace OpenNest.IO
         {
             public List<EntityDto> Entities { get; init; } = new();
             public List<string> Suppressed { get; init; } = new();
+
+            /// <summary>Role overrides by entity ID ("cut", "etch" or "display"); omitted when none.</summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public Dictionary<string, string> Roles { get; init; }
         }
 
         public record EntityDto

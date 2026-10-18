@@ -140,6 +140,10 @@ namespace OpenNest.IO
         /// Tabbed cutouts to merge into the program (after breakoffs) and keep on the drawing;
         /// ones that cannot be resolved are kept but not applied.
         /// </param>
+        /// <param name="entityRoles">
+        /// Per-entity role overrides keyed by source entity ID, applied before breakoffs and kept
+        /// on the drawing; display-only entities stay out of the program.
+        /// </param>
         public static Drawing BuildDrawing(
             CadImportResult result,
             IEnumerable<Entity> entities,
@@ -148,10 +152,13 @@ namespace OpenNest.IO
             string customer,
             OpenNest.CNC.Program editedProgram,
             IReadOnlyList<Breakoff> breakoffs = null,
-            IReadOnlyList<TabbedCutout> tabbedCutouts = null
+            IReadOnlyList<TabbedCutout> tabbedCutouts = null,
+            IReadOnlyDictionary<System.Guid, EntityRole> entityRoles = null
         )
         {
-            var visible = entities as IList<Entity> ?? new List<Entity>(entities);
+            var visible = entityRoles is { Count: > 0 }
+                ? EntityRoles.ForProgram(entities, entityRoles)
+                : entities as IList<Entity> ?? new List<Entity>(entities);
             var bendList = bends as IList<Bend> ?? new List<Bend>(bends);
 
             var cut = breakoffs is { Count: > 0 }
@@ -201,6 +208,11 @@ namespace OpenNest.IO
                     .Select(e => e.Id)
             );
 
+            var sourceIds = new HashSet<System.Guid>(drawing.SourceEntities.Select(e => e.Id));
+            drawing.EntityRoles = entityRoles?
+                .Where(r => sourceIds.Contains(r.Key))
+                .ToDictionary(r => r.Key, r => r.Value) ?? new Dictionary<System.Guid, EntityRole>();
+
             return drawing;
         }
 
@@ -248,6 +260,7 @@ namespace OpenNest.IO
             existing.Program = edited.Program;
             existing.SourceEntities = edited.SourceEntities;
             existing.SuppressedEntityIds = edited.SuppressedEntityIds;
+            existing.EntityRoles = edited.EntityRoles;
             existing.Source = edited.Source;
             existing.Customer = edited.Customer;
             existing.Quantity.Required = edited.Quantity.Required;
