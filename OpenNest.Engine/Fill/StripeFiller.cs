@@ -214,7 +214,8 @@ public class StripeFiller
                 _context.Item.Drawing,
                 _context.Plate.Size.Length,
                 _context.Plate.Size.Width,
-                _context.Plate.PartSpacing
+                _context.Plate.PartSpacing,
+                _context.Token
             );
 
         return bestFits.Where(r => r.Keep).Take(MaxPairCandidates).ToList();

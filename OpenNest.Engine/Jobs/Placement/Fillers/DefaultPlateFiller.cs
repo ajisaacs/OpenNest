@@ -419,6 +419,8 @@ internal class DefaultPlateFiller : PlateFillerBase
         var angles = BuildAngles(context.Item, classification, context.WorkArea);
         context.SharedState["AngleCandidates"] = angles;
 
+        ReportProvisional(context);
+
         try
         {
             foreach (var strategy in FillStrategyRegistry.Strategies)
@@ -456,7 +458,12 @@ internal class DefaultPlateFiller : PlateFillerBase
                     context.WinnerPhase = strategy.Phase;
                 }
 
-                if (improved && context.CurrentBest != null && context.CurrentBest.Count > 0)
+                if (
+                    improved
+                    && context.CurrentBest != null
+                    && context.CurrentBest.Count > 0
+                    && !context.ProvisionalLeads(context.CurrentBest)
+                )
                 {
                     NestProgressReporter.Report(
                         context.Progress,
@@ -476,8 +483,46 @@ internal class DefaultPlateFiller : PlateFillerBase
         catch (OperationCanceledException)
         {
             Debug.WriteLine("[RunPipeline] Cancelled, returning current best");
+            if (context.ProvisionalLeads(context.CurrentBest))
+            {
+                context.CurrentBest = context.Provisional;
+                context.CurrentBestScore = FillScore.Compute(context.Provisional, context.WorkArea);
+                context.WinnerPhase = NestPhase.RectBestFit;
+            }
         }
 
         RecordProductiveAngles(context.AngleResults);
+    }
+
+    /// <summary>
+    /// Shows the box-packing layout before best-fit pairs, whose first computation for a drawing
+    /// can take a long time, so the user can accept a usable layout at once. Only offered when the
+    /// RectBestFit strategy is active, so the pipeline still computes it and a completed fill
+    /// returns exactly what it would without the preview.
+    /// </summary>
+    private void ReportProvisional(FillContext context)
+    {
+        if (context.Token.IsCancellationRequested)
+            return;
+        if (!FillStrategyRegistry.Strategies.Any(s => s is RectBestFitStrategy))
+            return;
+
+        var parts = RectBestFitStrategy.GetOrCompute(context);
+        if (parts == null || parts.Count == 0)
+            return;
+
+        context.Provisional = parts;
+        NestProgressReporter.Report(
+            context.Progress,
+            new ProgressReport
+            {
+                Phase = NestPhase.RectBestFit,
+                PlateNumber = PlateNumber,
+                Parts = context.ToOriginalFrame(parts),
+                WorkArea = context.WorkArea,
+                Description = $"Quick box layout: {parts.Count} parts",
+                IsOverallBest = true,
+            }
+        );
     }
 }

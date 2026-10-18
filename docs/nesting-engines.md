@@ -30,6 +30,15 @@ Rectangles places irregular parts validly, but only as their bounding boxes; it 
 notch or hole. Box sides account for how the layout check flattens arcs, so round-edged parts stay
 valid at box contact.
 
+Interactive Fill shows its rectangle best-fit (box packing) layout before the best-fit pair
+phase, whose first computation for a drawing can take a minute, so **Accept** is available at
+once. The box layout is only a fallback: the strategies still run in their usual order and a
+completed fill picks the same winner as without it. While the pairs are computed the progress
+detail reads "Computing best-fit pairs (may take a minute)...". Accepting or stopping stops waiting for the
+pair computation, which finishes in the background and is cached for the next fill. Fills
+inside clamp-free areas of a clamped plate report only their final certified proposal, so this
+early layout is not shown there.
+
 Interactive/full-area box packing uses the same 90% work-area slack allowance as Rectangles.
 A free box may absorb a slightly oversized side only at its right/top edge when that edge
 coincides with the plate work-area boundary. Internal leftover edges keep the strict packing

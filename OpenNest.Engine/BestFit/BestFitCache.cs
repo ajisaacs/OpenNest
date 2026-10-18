@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace OpenNest.Engine.BestFit
 {
@@ -38,6 +39,38 @@ namespace OpenNest.Engine.BestFit
 
             var candidates = GetCandidates(entry, drawing, spacing);
             return entry.Filtered.GetOrAdd(key, _ => FilterForSize(candidates, plateWidth, plateHeight));
+        }
+
+        /// <summary>
+        /// Like <see cref="GetOrCompute(Drawing, double, double, double)"/>, but cancelling stops
+        /// the wait, not the computation: it finishes in the background and caches its result.
+        /// Callers must pass a drawing nothing else mutates, such as a canonical copy.
+        /// </summary>
+        public static List<BestFitResult> GetOrCompute(
+            Drawing drawing,
+            double plateWidth,
+            double plateHeight,
+            double spacing,
+            CancellationToken token
+        )
+        {
+            if (!token.CanBeCanceled)
+                return GetOrCompute(drawing, plateWidth, plateHeight, spacing);
+
+            token.ThrowIfCancellationRequested();
+            return Task.Run(() => GetOrCompute(drawing, plateWidth, plateHeight, spacing))
+                .WaitAsync(token)
+                .GetAwaiter()
+                .GetResult();
+        }
+
+        /// <summary>True when <see cref="GetOrCompute(Drawing, double, double, double)"/> would return at once.</summary>
+        public static bool IsCached(Drawing drawing, double plateWidth, double plateHeight, double spacing)
+        {
+            var source = CanonicalFrame.SourceOf(drawing);
+            return _entries.TryGetValue(source, out var entry)
+                && entry.IsCurrentFor(source)
+                && entry.Filtered.ContainsKey((plateWidth, plateHeight, spacing));
         }
 
         public static void ComputeForSizes(

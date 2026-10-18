@@ -54,6 +54,45 @@ public class BestFitCacheTests
     }
 
     [Fact]
+    public async Task GetOrCompute_Cancelled_StopsWaitingAndCachesBackgroundResult()
+    {
+        var drawing = MakeRotatedTShape();
+        var canonical = CanonicalFrame.AsCanonicalCopy(drawing);
+        var previous = BestFitCache.CreateEvaluator;
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var count = 0;
+        BestFitCache.CreateEvaluator = (candidate, _) =>
+        {
+            if (!ReferenceEquals(CanonicalFrame.SourceOf(candidate), drawing))
+                return new PairEvaluator();
+            Interlocked.Increment(ref count);
+            entered.Set();
+            release.Wait();
+            return new PairEvaluator();
+        };
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            var waiting = Task.Run(() => BestFitCache.GetOrCompute(canonical, 60, 120, Spacing, cts.Token));
+            Assert.True(entered.Wait(TimeSpan.FromSeconds(10)));
+
+            cts.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => waiting);
+
+            release.Set();
+            var results = BestFitCache.GetOrCompute(canonical, 60, 120, Spacing);
+            Assert.NotEmpty(results);
+            Assert.Equal(1, Volatile.Read(ref count));
+        }
+        finally
+        {
+            release.Set();
+            BestFitCache.CreateEvaluator = previous;
+        }
+    }
+
+    [Fact]
     public void GetOrCompute_CanonicalCopiesOfOneDrawing_ShareOneComputation()
     {
         var drawing = MakeRotatedTShape();

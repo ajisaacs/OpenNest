@@ -36,6 +36,17 @@ namespace OpenNest.Engine.Strategies
 
         public List<Part> CurrentBest { get; set; }
 
+        /// <summary>
+        /// A cheap layout shown before the slow strategies run, so it can be accepted early. It
+        /// never becomes <see cref="CurrentBest"/> while strategies run, so they pick the same
+        /// winner as without it; the pipeline returns it only when cancelled while it still leads.
+        /// </summary>
+        public List<Part> Provisional { get; set; }
+
+        /// <summary>True when <see cref="Provisional"/> beats <paramref name="parts"/>.</summary>
+        internal bool ProvisionalLeads(List<Part> parts) =>
+            Provisional != null && Policy.Comparer.IsBetter(Provisional, parts, WorkArea);
+
         /// <summary>For progress reporting only; comparisons use Policy.Comparer.</summary>
         public FillScore CurrentBestScore { get; set; }
         public NestPhase WinnerPhase { get; set; }
@@ -65,16 +76,18 @@ namespace OpenNest.Engine.Strategies
                 WinnerPhase = ActivePhase;
             }
 
+            // The shown layout never regresses below the provisional one.
+            var shown = ProvisionalLeads(CurrentBest) ? Provisional : CurrentBest;
             NestProgressReporter.Report(
                 Progress,
                 new ProgressReport
                 {
                     Phase = ActivePhase,
                     PlateNumber = PlateNumber,
-                    Parts = ToOriginalFrame(isNewBest ? parts : CurrentBest),
+                    Parts = ToOriginalFrame(shown),
                     WorkArea = WorkArea,
                     Description = description,
-                    IsOverallBest = isNewBest,
+                    IsOverallBest = isNewBest && ReferenceEquals(shown, parts),
                 }
             );
         }

@@ -110,12 +110,26 @@ namespace OpenNest.Engine.Fill
             Action<List<Part>, string> reportProgress = null
         )
         {
-            var bestFits = BestFitCache.GetOrCompute(
-                item.Drawing,
-                plateSize.Length,
-                plateSize.Width,
-                partSpacing
-            );
+            // The first computation for a drawing can take a minute; say so rather than look stuck.
+            if (!BestFitCache.IsCached(item.Drawing, plateSize.Length, plateSize.Width, partSpacing))
+                reportProgress?.Invoke(null, "Computing best-fit pairs (may take a minute)...");
+
+            List<BestFitResult> bestFits;
+            try
+            {
+                bestFits = BestFitCache.GetOrCompute(
+                    item.Drawing,
+                    plateSize.Length,
+                    plateSize.Width,
+                    partSpacing,
+                    token
+                );
+            }
+            catch (OperationCanceledException)
+            {
+                // The pairs finish computing in the background and are cached for the next fill.
+                return new PairFillResult();
+            }
 
             var candidates = candidateSelector.Select(bestFits, workArea);
             Debug.WriteLine(

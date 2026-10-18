@@ -36,7 +36,8 @@ namespace OpenNest.Engine.Strategies
                     context.ReportProgress
                 );
 
-                context.SharedState["BestFits"] = result.BestFits;
+                if (result.BestFits != null)
+                    context.SharedState["BestFits"] = result.BestFits;
 
                 return result.Parts;
             }
