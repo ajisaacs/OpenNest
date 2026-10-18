@@ -216,6 +216,38 @@ public class CuttingInspectionPanelTests
     });
 
     [Fact]
+    public void PartsTabListsEveryPartAndFlagsOnlyThoseWithIssues() => RunSta(() =>
+    {
+        using var editor = Editor();
+        var plate = editor.Nest.Plates[0];
+        plate.Parts.Add(Square("overlapping", 5));
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        var issues = Field<DataGridView>(panel, "warningGrid");
+        var parts = Field<DataGridView>(panel, "partsGrid");
+        Assert.Equal(plate.Parts.Count, parts.Rows.Count);
+        var flaggedPartNumbers = issues.Rows.Cast<DataGridViewRow>()
+            .SelectMany(r => r.Tag is OpenNest.Engine.CuttingPlanning.CuttingPlanDiagnosticRow d
+                ? new[] { d.PartNumber, d.OtherPartNumber }.OfType<int>() : [])
+            .ToHashSet();
+        Assert.NotEmpty(flaggedPartNumbers);
+        foreach (DataGridViewRow row in parts.Rows)
+        {
+            var partNumber = (int)row.Cells[1].Value!;
+            var status = (string)row.Cells[2].Value!;
+            Assert.Equal(!flaggedPartNumbers.Contains(partNumber), status == "Passed");
+        }
+        var flaggedRow = parts.Rows.Cast<DataGridViewRow>().First(r => flaggedPartNumbers.Contains((int)r.Cells[1].Value!));
+        parts.ClearSelection();
+        flaggedRow.Selected = true; // Cross-selects the matching Issues row and its marker.
+        Assert.NotNull(editor.PlateView.ValidationOverlay.Finding?.Overlap);
+        panel.RequestClose();
+    });
+
+    [Fact]
     public void PlannedCutOffsKeepTheCutOffLineStyleOnTheProposal() => RunSta(() =>
     {
         using var editor = Editor();

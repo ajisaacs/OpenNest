@@ -70,6 +70,28 @@ public class CuttingValidationPanelTests
         Assert.Equal(programs, editor.Nest.Plates.SelectMany(p => p.Parts).Select(p => p.Program));
     });
 
+    [Fact]
+    public void PartsTabCoversWholeNestAndSelectionCrossesToItsIssue() => RunSta(() =>
+    {
+        using var editor = RapidEditor();
+        editor.Show();
+        editor.OpenValidationInspection();
+        var panel = editor.CuttingInspection!;
+        Pump(() => panel.ValidationReport != null && !panel.IsPlanning);
+        var issues = Field<DataGridView>(panel, "warningGrid");
+        var parts = Field<DataGridView>(panel, "partsGrid");
+        Assert.Equal(editor.Nest.Plates.Sum(p => p.Parts.Count), parts.Rows.Count);
+        var flaggedRow = parts.Rows.Cast<DataGridViewRow>()
+            .Single(r => (int)r.Cells[0].Value! == 2 && (int)r.Cells[1].Value! == 3);
+        Assert.NotEqual("Passed", (string)flaggedRow.Cells[2].Value!);
+        parts.ClearSelection();
+        flaggedRow.Selected = true; // Real SelectionChanged precedes CurrentCell assignment.
+        var selected = Assert.Single(issues.SelectedRows.Cast<DataGridViewRow>());
+        Assert.True(selected.Tag is PostVerificationFinding
+        { Kind: PostVerificationKind.RapidCrossing, PlateNumber: 2, PartNumber: 3 });
+        panel.RequestClose();
+    });
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

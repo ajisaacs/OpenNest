@@ -120,6 +120,19 @@ internal sealed class CuttingInspectionPanel : UserControl
         RowHeadersVisible = false,
         AutoGenerateColumns = false
     });
+    // Every part in scope, including ones with no finding, so "no rows" never reads as "all clear".
+    private readonly DataGridView partsGrid = GridStyle.Apply(new DataGridView
+    {
+        Dock = DockStyle.Fill,
+        ReadOnly = true,
+        AllowUserToAddRows = false,
+        AllowUserToDeleteRows = false,
+        MultiSelect = false,
+        SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+        RowHeadersVisible = false,
+        AutoGenerateColumns = false
+    });
+    private readonly TabControl resultTabs = new() { Dock = DockStyle.Fill };
     private ValidationInspectionScope scope;
     private bool closed;
     private int generation;
@@ -181,7 +194,12 @@ internal sealed class CuttingInspectionPanel : UserControl
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.Controls.Add(statusBanner, 0, 0);
         layout.Controls.Add(header, 0, 1);
-        layout.Controls.Add(warningGrid, 0, 2);
+        var issuesTab = new TabPage("Issues");
+        issuesTab.Controls.Add(warningGrid);
+        var partsTab = new TabPage("Parts");
+        partsTab.Controls.Add(partsGrid);
+        resultTabs.TabPages.AddRange([issuesTab, partsTab]);
+        layout.Controls.Add(resultTabs, 0, 2);
         Controls.Add(layout);
         foreach (var name in new[] { "Plate", "Part", "With", "Issue" })
             warningGrid.Columns.Add(new DataGridViewTextBoxColumn
@@ -190,6 +208,14 @@ internal sealed class CuttingInspectionPanel : UserControl
                 Width = 48,
                 SortMode = DataGridViewColumnSortMode.NotSortable,
                 AutoSizeMode = name == "Issue" ? DataGridViewAutoSizeColumnMode.Fill : DataGridViewAutoSizeColumnMode.None
+            });
+        foreach (var name in new[] { "Plate", "Part", "Status" })
+            partsGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = name,
+                Width = 48,
+                SortMode = DataGridViewColumnSortMode.NotSortable,
+                AutoSizeMode = name == "Status" ? DataGridViewAutoSizeColumnMode.Fill : DataGridViewAutoSizeColumnMode.None
             });
         Padding = new Padding(10);
         planButton.Click += (_, _) => StartCurrentMode();
@@ -204,6 +230,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         previousButton.Click += (_, _) => ShowPlate(selectedPlate - 1);
         nextButton.Click += (_, _) => ShowPlate(selectedPlate + 1);
         warningGrid.SelectionChanged += (_, _) => NavigateFinding();
+        partsGrid.SelectionChanged += (_, _) => NavigatePart();
         ShowSettings();
     }
 
@@ -440,6 +467,7 @@ internal sealed class CuttingInspectionPanel : UserControl
                         warningGrid.Rows[index].Tag = finding;
                     }
                     warningGrid.ClearSelection();
+                    PopulatePartsGrid();
                 }
                 finally { populatingWarnings = false; }
             }
@@ -654,6 +682,7 @@ internal sealed class CuttingInspectionPanel : UserControl
                     warningGrid.Rows[index].Tag = row;
                 }
                 warningGrid.ClearSelection();
+                PopulatePartsGrid();
             }
             finally { populatingWarnings = false; }
             ShowPlanStatus();
@@ -762,7 +791,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         previewLabel.Text = "No current preview.";
         SetStatus(Tone.Neutral, string.Empty);
         populatingWarnings = true;
-        try { warningGrid.Rows.Clear(); }
+        try { warningGrid.Rows.Clear(); partsGrid.Rows.Clear(); }
         finally { populatingWarnings = false; }
     }
 
@@ -891,6 +920,113 @@ internal sealed class CuttingInspectionPanel : UserControl
             view.ZoomToArea(bounds.X - pad, bounds.Y - pad, bounds.Length + 2 * pad, bounds.Width + 2 * pad);
         }
         SetDetail("Zoomed to the affected part; this issue has no exact location.");
+    }
+
+    /// <summary>
+    /// Every part in scope, so a part with nothing wrong still shows as Passed instead of
+    /// simply not appearing. Validate always covers the whole nest (matching the Issues tab);
+    /// Plan covers only the plates this instance planned.
+    /// </summary>
+    private void PopulatePartsGrid()
+    {
+        partsGrid.Rows.Clear();
+        if (Mode == CuttingInspectionMode.Validate)
+        {
+            var all = editor.Nest.Plates;
+            for (var i = 0; i < all.Count; i++)
+                AddPartRows(i + 1, all[i].Parts.Count);
+        }
+        else
+            for (var i = 0; i < plates.Length; i++)
+                AddPartRows(plateNumbers[i], plates[i].Parts.Count);
+    }
+
+    private void AddPartRows(int plateNumber, int partCount)
+    {
+        for (var partIndex = 0; partIndex < partCount; partIndex++)
+        {
+            var partNumber = partIndex + 1;
+            var tone = Tone.Good;
+            var matches = 0;
+            foreach (DataGridViewRow row in warningGrid.Rows)
+            {
+                if (!Refers(row.Tag, plateNumber, partNumber)) continue;
+                matches++;
+                if (KindOf(row.Tag) == PostVerificationKind.Incomplete) tone = Tone.Bad;
+                else if (tone != Tone.Bad) tone = Tone.Warning;
+            }
+            var status = tone switch
+            {
+                Tone.Bad => "Not checked",
+                Tone.Warning => Count(matches, "issue"),
+                _ => "Passed",
+            };
+            var addedRow = partsGrid.Rows[partsGrid.Rows.Add(plateNumber, partNumber, status)];
+            addedRow.Tag = (plateNumber, partNumber);
+            addedRow.DefaultCellStyle.ForeColor = StatusInk(tone);
+        }
+    }
+
+    private static Color StatusInk(Tone tone) => tone switch
+    {
+        Tone.Good => Color.FromArgb(28, 88, 28),
+        Tone.Warning => Color.FromArgb(118, 78, 0),
+        Tone.Bad => Color.FromArgb(132, 20, 20),
+        _ => SystemColors.ControlText,
+    };
+
+    /// <summary>Whether a warning/issue row's tag names this plate and part, either as the subject or the other part.</summary>
+    private static bool Refers(object tag, int plateNumber, int partNumber) => tag switch
+    {
+        PostVerificationFinding f => f.PlateNumber == plateNumber && (f.PartNumber == partNumber || f.OtherPartNumber == partNumber),
+        CuttingPlanDiagnosticRow r => r.PlateNumber == plateNumber && (r.PartNumber == partNumber || r.OtherPartNumber == partNumber),
+        _ => false,
+    };
+
+    private static PostVerificationKind? KindOf(object tag) => tag switch
+    {
+        PostVerificationFinding f => f.Kind,
+        CuttingPlanDiagnosticRow { Witness: { } witness } => witness.Kind,
+        _ => null,
+    };
+
+    /// <summary>Selecting a part jumps to its first issue (reusing that marker) or just zooms to it when clear.</summary>
+    private void NavigatePart()
+    {
+        if (closed || closeRequested || pendingMode != null || populatingWarnings || IsPlanning || editor.IsDisposed
+            || partsGrid.SelectedRows.Count == 0 || partsGrid.SelectedRows[0].Tag is not ValueTuple<int, int> target)
+            return;
+        var (plateNumber, partNumber) = target;
+        foreach (DataGridViewRow row in warningGrid.Rows)
+            if (Refers(row.Tag, plateNumber, partNumber))
+            {
+                warningGrid.ClearSelection();
+                row.Selected = true;
+                warningGrid.CurrentCell = row.Cells[0];
+                return; // warningGrid.SelectionChanged reuses NavigateFinding/NavigateValidationFinding.
+            }
+        view.ClearValidationFinding();
+        if (Mode == CuttingInspectionMode.Validate)
+        {
+            if (plateNumber < 1 || plateNumber > editor.Nest.Plates.Count) return;
+            if (editor.PlateManager.CurrentIndex != plateNumber - 1)
+                editor.PlateManager.LoadAt(plateNumber - 1);
+            if (partNumber > 0 && partNumber <= view.Plate.Parts.Count
+                && view.Plate.Parts[partNumber - 1]?.BoundingBox is { } box
+                && double.IsFinite(box.X) && double.IsFinite(box.Y) && double.IsFinite(box.Length) && double.IsFinite(box.Width))
+            {
+                var pad = System.Math.Max(0.5, System.Math.Max(box.Length, box.Width) * 0.12);
+                view.ZoomToArea(box.X - pad, box.Y - pad, box.Length + 2 * pad, box.Width + 2 * pad);
+            }
+            else
+                view.ZoomToFit();
+            SetDetail("No issue found for this part.");
+        }
+        else
+        {
+            var index = Array.IndexOf(plateNumbers, plateNumber);
+            if (index >= 0) ShowPlate(index);
+        }
     }
 
     internal CuttingCommitResult CommitResult { get; private set; }
