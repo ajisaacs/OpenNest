@@ -1,3 +1,4 @@
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -5,11 +6,14 @@ namespace OpenNest.Forms
 {
     public partial class EditDrawingForm : Form
     {
+        private const int PreviewInset = 24;
+
         private Drawing drawing;
 
         public EditDrawingForm()
         {
             InitializeComponent();
+            pictureBox1.SizeChanged += (_, _) => UpdateImage();
         }
 
         private string DrawingName
@@ -50,13 +54,57 @@ namespace OpenNest.Forms
 
         private void UpdateImage()
         {
+            if (drawing == null)
+                return;
+
+            var size = pictureBox1.ClientSize;
+            if (size.Width <= PreviewInset || size.Height <= PreviewInset)
+                return;
+
             var brush = new SolidBrush(colorDialog1.Color);
             var pen = new Pen(ColorScheme.Default.GetPartOutlineColor(colorDialog1.Color));
-            DrawingImage?.Dispose();
-            DrawingImage = drawing.Program.GetImage(pictureBox1.Size, pen, brush);
+            var previous = DrawingImage;
+            DrawingImage = drawing.Program.GetImage(
+                new Size(size.Width - PreviewInset, size.Height - PreviewInset), pen, brush);
+            previous?.Dispose();
 
             pen.Dispose();
             brush.Dispose();
+        }
+
+        private void UpdateColor()
+        {
+            colorSwatch.BackColor = colorDialog1.Color;
+            UpdateImage();
+        }
+
+        private void UpdateNestedLabel()
+        {
+            if (drawing == null)
+                return;
+
+            var nested = drawing.Quantity.Nested;
+            var remaining = System.Math.Max(Quantity - nested, 0);
+            nestedLabel.Text = $"{nested} nested, {remaining} remaining";
+        }
+
+        private void LoadDetails()
+        {
+            var box = drawing.Program.BoundingBox();
+            sizeLabel.Text = $"{box.Length:0.###} x {box.Width:0.###}";
+            areaLabel.Text = $"{drawing.Area:0.###}";
+
+            var path = drawing.Source?.Path;
+            if (string.IsNullOrEmpty(path))
+            {
+                sourceLabel.Text = "-";
+                toolTip.SetToolTip(sourceLabel, null);
+            }
+            else
+            {
+                sourceLabel.Text = System.IO.Path.GetFileName(path);
+                toolTip.SetToolTip(sourceLabel, path);
+            }
         }
 
         public void LoadDrawing(Drawing drawing)
@@ -69,7 +117,12 @@ namespace OpenNest.Forms
             Quantity = drawing.Quantity.Required;
             Priority = drawing.Priority;
             CutFirst = drawing.CutFirst;
-            UpdateImage();
+            Text = string.IsNullOrEmpty(drawing.Name)
+                ? "Drawing Properties"
+                : $"Drawing Properties - {drawing.Name}";
+            LoadDetails();
+            UpdateNestedLabel();
+            UpdateColor();
         }
 
         public void SaveDrawing(Drawing drawing)
@@ -82,12 +135,19 @@ namespace OpenNest.Forms
             drawing.Color = colorDialog1.Color;
         }
 
-        private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        protected override void OnShown(EventArgs e)
         {
-            var result = colorDialog1.ShowDialog();
+            base.OnShown(e);
+            nameBox.SelectAll();
+            nameBox.Focus();
+        }
 
-            if (result == System.Windows.Forms.DialogResult.OK)
-                UpdateImage();
+        private void QtyBox_ValueChanged(object sender, EventArgs e) => UpdateNestedLabel();
+
+        private void ChangeColor_Click(object sender, EventArgs e)
+        {
+            if (colorDialog1.ShowDialog(this) == DialogResult.OK)
+                UpdateColor();
         }
     }
 }
