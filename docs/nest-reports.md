@@ -95,8 +95,19 @@ calling the library. PDFsharp/MigraDoc layout and font state is process-wide;
 `NestPdfWriter.Write` serializes every export behind one static lock so
 concurrent calls cannot lay out text differently from a sequential export.
 
-Advanced timing, cutting distances, pierce counts, weights, costs, gas use, and
-machine/NC identity are intentionally omitted until their semantics are verified.
+## Estimated cut time
+
+When the caller passes `CutParameters` (the desktop export always does, from the
+settings last used in Calculate Cut Time or the simulator), each plate gets an
+estimated time per copy from `CutSimulation`, plus clamp-removal minutes, the same
+as Calculate Cut Time (see [cut-time estimates](cut-time-estimates.md)). The summary
+shows the job total over all sheets, and the plates table gains an "Est. cut time"
+column. Each plate page shows the time per plate and for all its copies. The report
+does not state the settings behind the estimate. These are estimates, not
+machine-reported times. Without `CutParameters` the report has no timing rows or column.
+
+Cutting distances, pierce counts, weights, costs, gas use, and machine/NC identity
+are intentionally omitted until their semantics are verified.
 The PDF can be opened or printed through a normal PDF viewer.
 
 ## Backend, fonts and redistribution

@@ -207,6 +207,24 @@ public sealed class NestPdfWriterTests : IDisposable
 
     public void Dispose() => Directory.Delete(directory, true);
 
+    [Fact]
+    public void Write_CutTimeEstimateAppearsOnSummaryAndPlatePages()
+    {
+        var path = Path.Combine(directory, "timed.report.pdf");
+        var parameters = new CutParameters { Feedrate = 100, RapidTravelRate = 600, Units = Units.Inches };
+        NestPdfWriter.Write(NestReportBuilder.Capture(NestReportTestData.CreateNest(), NestReportTestData.GeneratedAt,
+            parameters), path);
+
+        var summary = ReportPdf.Text(path, 1);
+        var plate = ReportPdf.Text(path, 2);
+
+        Assert.Contains("Estimated cut time:", summary);
+        Assert.DoesNotContain("basis", summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Est. cut time", summary);
+        Assert.Contains("per plate", plate);
+        Assert.Contains("Total cut time:", plate);
+    }
+
     private string WriteReport(Nest nest, string name = "test.report.pdf")
     {
         var path = Path.Combine(directory, name);

@@ -9,6 +9,45 @@ namespace OpenNest.Tests.Reporting;
 public class NestReportBuilderTests
 {
     [Fact]
+    public void Capture_WithoutCutTimeLeavesEstimatesOut()
+    {
+        var snapshot = NestReportBuilder.Capture(NestReportTestData.CreateNest(), NestReportTestData.GeneratedAt);
+
+        Assert.False(snapshot.HasCutTimes);
+        Assert.Null(snapshot.TotalCutTime);
+        Assert.All(snapshot.Plates, plate => Assert.Null(plate.CutTime));
+    }
+
+    [Fact]
+    public void Capture_WithCutTimeEstimatesEachPlateLikeCalculateCutTime()
+    {
+        var nest = NestReportTestData.CreateMultiPlateNest();
+        var parameters = new CutParameters
+        {
+            Feedrate = 100,
+            HoleFeedrate = 60,
+            RapidTravelRate = 600,
+            PierceTime = TimeSpan.FromSeconds(1),
+            Units = Units.Inches,
+            Motion = new MotionProfile { CutAcceleration = 100, RapidAcceleration = 200, CornerDeviation = 0.001 },
+        };
+
+        var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt, parameters);
+
+        Assert.True(snapshot.HasCutTimes);
+        var expectedTotal = TimeSpan.Zero;
+        foreach (var plate in snapshot.Plates)
+        {
+            var source = nest.Plates[plate.Number - 1];
+            Assert.Equal(CutSimulation.Build(source, parameters).TotalTime, plate.CutTime);
+            Assert.True(plate.CutTime > TimeSpan.Zero);
+            expectedTotal += plate.CutTime!.Value * plate.Copies;
+        }
+        Assert.Equal(expectedTotal, snapshot.TotalCutTime);
+        Assert.Equal(Timing.CalculateTime(nest, parameters), snapshot.TotalCutTime);
+    }
+
+    [Fact]
     public void Capture_ReconcilesOrderedReferenceUnionWithoutCountingCutoffs()
     {
         var nest = NestReportTestData.CreateNest();

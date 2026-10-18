@@ -117,6 +117,8 @@ public static class NestPdfWriter
         AddInfoRow(info, "Generated:", snapshot.GeneratedAt.ToString("yyyy-MM-dd HH:mm zzz", Invariant));
         AddInfoRow(info, "Distinct layouts:", snapshot.Plates.Length.ToString(Invariant));
         AddInfoRow(info, "Total physical sheets:", snapshot.TotalSheets.ToString(Invariant));
+        if (snapshot.TotalCutTime is { } total)
+            AddInfoRow(info, "Estimated cut time:", Duration(total) + " (all sheets)");
         if (snapshot.Notes.Length > 0)
         {
             // Free paragraphs split across pages; a table row taller than a page would be clipped.
@@ -127,13 +129,22 @@ public static class NestPdfWriter
         AddHeading(section, "Plates");
         if (snapshot.Plates.Length == 0)
             section.AddParagraph("No plates in this job.");
-        else
+        else if (!snapshot.HasCutTimes)
         {
             var plates = AddTable(section, 60, 200, 80, 100, 100);
             AddHeader(plates, "Plate", "Stock size", "Quantity", "Parts per plate", "Utilization");
             foreach (var plate in snapshot.Plates)
                 AddRow(plates, $"Plate {plate.Number}", false, plate.Number.ToString(Invariant), SheetSize(snapshot, plate),
                     plate.Copies.ToString(Invariant), plate.Parts.Length.ToString(Invariant), Percent(plate.Utilization));
+        }
+        else
+        {
+            var plates = AddTable(section, 44, 150, 60, 96, 74, 116);
+            AddHeader(plates, "Plate", "Stock size", "Quantity", "Parts per plate", "Utilization", "Est. cut time");
+            foreach (var plate in snapshot.Plates)
+                AddRow(plates, $"Plate {plate.Number}", false, plate.Number.ToString(Invariant), SheetSize(snapshot, plate),
+                    plate.Copies.ToString(Invariant), plate.Parts.Length.ToString(Invariant), Percent(plate.Utilization),
+                    PlateCutTime(plate));
         }
 
         AddHeading(section, "Parts");
@@ -179,6 +190,9 @@ public static class NestPdfWriter
             $"{Number(plate.PartSpacing)} {snapshot.Units}");
         AddInfoRow(info, "Parts per plate:", plate.Parts.Length.ToString(Invariant), "Utilization:",
             Percent(plate.Utilization) + " (net part area / full sheet)");
+        if (plate.CutTime is { } cutTime)
+            AddInfoRow(info, "Est. cut time:", Duration(cutTime) + " per plate", "Total cut time:",
+                Duration(cutTime * plate.Copies) + (plate.Copies == 1 ? " (1 plate)" : $" ({plate.Copies} plates)"));
 
         var overview = AddReservedArea(section, plan.Size.Height);
         areas.Add((overview, (gfx, _) => DrawView(gfx, plate, plan)));
@@ -466,6 +480,23 @@ public static class NestPdfWriter
         $"{Number(plate.Bounds.Width)} x {Number(plate.Bounds.Length)} {snapshot.Units}";
 
     private static string Number(double value) => value.ToString("0.####", Invariant);
+
+    private static string PlateCutTime(ReportPlate plate) =>
+        plate.CutTime is not { } time ? ""
+        : plate.Copies == 1 ? Duration(time)
+        : $"{Duration(time)} each, {Duration(time * plate.Copies)} total";
+
+    /// <summary>Whole seconds as "1h 02m 03s", "4m 05s" or "45s".</summary>
+    private static string Duration(TimeSpan time)
+    {
+        var seconds = (long)System.Math.Round(time.TotalSeconds);
+        var hours = seconds / 3600;
+        var minutes = seconds / 60 % 60;
+        var rest = seconds % 60;
+        return hours > 0 ? $"{hours}h {minutes:00}m {rest:00}s"
+            : minutes > 0 ? $"{minutes}m {rest:00}s"
+            : $"{rest}s";
+    }
 
     private static string Percent(double value) => (value * 100).ToString("0.0", Invariant) + "%";
 }

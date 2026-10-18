@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using OpenNest.CNC;
 using OpenNest.Geometry;
 
 namespace OpenNest.Reporting;
@@ -8,9 +9,10 @@ public static class NestReportBuilder
 {
     /// <summary>
     /// Capture synchronously while the caller keeps the nest stable. No quantity refresh,
-    /// domain cloning, or event-wired temporary plates are used.
+    /// domain cloning, or event-wired temporary plates are used. With <paramref name="cutParameters"/>,
+    /// each plate also gets an estimated cut time from <see cref="CutSimulation"/>.
     /// </summary>
-    public static NestReportSnapshot Capture(Nest nest, DateTimeOffset generatedAt)
+    public static NestReportSnapshot Capture(Nest nest, DateTimeOffset generatedAt, CutParameters? cutParameters = null)
     {
         ArgumentNullException.ThrowIfNull(nest);
         var ordered = new List<DrawingCount>();
@@ -88,7 +90,10 @@ public static class NestReportBuilder
             if (!double.IsFinite(utilization))
                 throw new InvalidOperationException($"Plate {number}: utilization is not finite.");
             plates.Add(new ReportPlate(number, bounds, plate.Quantity, plate.PartSpacing,
-                utilization, parts.ToImmutable(), cutoffs.ToImmutable()));
+                utilization, parts.ToImmutable(), cutoffs.ToImmutable())
+            {
+                CutTime = cutParameters == null ? null : EstimateCutTime(plate, cutParameters, number),
+            });
         }
 
         // OrderBy is stable, so the original enumeration breaks equal name/path ties.
@@ -122,7 +127,19 @@ public static class NestReportBuilder
             throw new InvalidOperationException("Nest: thickness must be finite and nonnegative.");
         return new NestReportSnapshot(nest.Name ?? "", nest.Customer ?? "", nest.Notes ?? "",
             nest.Material?.Name ?? "", nest.Material?.Grade ?? "", nest.Thickness, units, generatedAt,
-            drawings.ToImmutable(), plates.ToImmutable());
+            drawings.ToImmutable(), plates.ToImmutable())
+        {
+            HasCutTimes = cutParameters != null,
+        };
+    }
+
+    /// <summary>One copy of the plate: its cutting timeline plus clamp removal, as Calculate Cut Time.</summary>
+    private static TimeSpan EstimateCutTime(Plate plate, CutParameters parameters, int number)
+    {
+        var time = CutSimulation.Build(plate, parameters).TotalTime + TimeSpan.FromMinutes(plate.ClampRemovalMinutes);
+        if (time < TimeSpan.Zero)
+            throw new InvalidOperationException($"Plate {number}: estimated cut time is invalid.");
+        return time;
     }
 
     private static bool PositiveFinite(double value) => double.IsFinite(value) && value > 0;

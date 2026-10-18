@@ -1,8 +1,8 @@
 # Cut-time estimates
 
-Calculate Cut Time and Plate > Simulate Cutting share one timing model
-(`OpenNest.Core/CNC/CutSimulation.cs`, `ContourTiming.cs`, `MotionPlanner.cs`), and the
-last-used settings are shared through `SavedCutParameters`.
+Calculate Cut Time, Plate > Simulate Cutting and the [nest report](nest-reports.md) share one
+timing model (`OpenNest.Core/CNC/CutSimulation.cs`, `ContourTiming.cs`, `MotionPlanner.cs`),
+and the last-used settings are shared through `SavedCutParameters`.
 
 ## Inputs
 

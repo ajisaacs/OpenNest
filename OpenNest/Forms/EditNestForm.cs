@@ -714,7 +714,11 @@ namespace OpenNest.Forms
 
             // Reporting must have no accounting side effects: no quantity refresh, no
             // selection or dirty-state change. Only the detached snapshot reaches the writer.
-            var snapshot = NestReportBuilder.Capture(targets.Nest, DateTimeOffset.Now);
+            var snapshot = NestReportBuilder.Capture(
+                targets.Nest,
+                DateTimeOffset.Now,
+                SavedCutParameters.Load(targets.Nest.Units)
+            );
             NestPdfWriter.Write(snapshot, destination);
         }
 

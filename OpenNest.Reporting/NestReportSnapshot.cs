@@ -27,7 +27,11 @@ public sealed record ReportDrawing(string Id, string Name, long Required, long N
 public sealed record ReportPlacement(string ReportId, ReportGeometry Geometry);
 
 public sealed record ReportPlate(int Number, ReportBounds Bounds, int Copies, double PartSpacing,
-    double Utilization, ImmutableArray<ReportPlacement> Parts, ImmutableArray<ReportGeometry> Cutoffs);
+    double Utilization, ImmutableArray<ReportPlacement> Parts, ImmutableArray<ReportGeometry> Cutoffs)
+{
+    /// <summary>Estimated time to cut one copy of this plate; null when no estimate was requested.</summary>
+    public TimeSpan? CutTime { get; init; }
+}
 
 /// <summary>A detached value snapshot. No domain objects or mutable geometry are retained.</summary>
 public sealed record NestReportSnapshot(string Name, string Customer, string Notes, string Material,
@@ -35,4 +39,12 @@ public sealed record NestReportSnapshot(string Name, string Customer, string Not
     ImmutableArray<ReportDrawing> Drawings, ImmutableArray<ReportPlate> Plates)
 {
     public long TotalSheets => Plates.Aggregate(0L, (total, plate) => checked(total + plate.Copies));
+
+    /// <summary>True when the report carries estimated cut times.</summary>
+    public bool HasCutTimes { get; init; }
+
+    /// <summary>Every plate's estimate times its copies; null when the report has no estimates.</summary>
+    public TimeSpan? TotalCutTime => !HasCutTimes
+        ? null
+        : Plates.Aggregate(TimeSpan.Zero, (total, plate) => total + (plate.CutTime ?? TimeSpan.Zero) * plate.Copies);
 }
