@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using OpenNest.Engine.NestingEngines.Circles;
 using OpenNest.Engine.NestingEngines.Default;
 using OpenNest.Engine.NestingEngines.FlatBar;
 using OpenNest.Engine.NestingEngines.Irregular;
@@ -38,7 +39,7 @@ public static class NestingEngineRegistry
         // Listed first: the engine front ends use when the caller names none.
         Register(
             "Default",
-            "Any job: runs Irregular and Rectangles and keeps the cheapest valid layout",
+            "Any job: runs Irregular, Rectangles and Circles and keeps the cheapest valid layout",
             () => new DefaultNestingEngine()
         );
 
@@ -52,6 +53,12 @@ public static class NestingEngineRegistry
             "Irregular",
             "Irregular parts: no-fit-polygon frontier packing with look-ahead stock selection",
             () => new IrregularNestingEngine()
+        );
+
+        Register(
+            "Circles",
+            "Round parts (blanks, washers, flanges): disc packing by enclosing circle",
+            () => new CirclesNestingEngine()
         );
 
         Register(

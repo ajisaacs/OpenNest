@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using OpenNest.Engine.Jobs;
+using OpenNest.Engine.NestingEngines.Circles;
 using OpenNest.Engine.NestingEngines.Irregular;
 using OpenNest.Engine.NestingEngines.Rectangles;
 
@@ -16,8 +17,10 @@ namespace OpenNest.Engine.NestingEngines.Default;
 /// layout before an invalid one, then the fewest unplaced parts, then the lowest
 /// <see cref="NestJobCost"/>; remaining ties keep candidate order.
 ///
-/// Candidates are Irregular, then Rectangles. Neither wins every job: Rectangles packs each part
-/// as its box, which is often best for plain plates and is a cheap, valid fallback for the rest.
+/// Candidates are Irregular, then Rectangles, then Circles. Neither of the first two wins every
+/// job: Rectangles packs each part as its box, which is often best for plain plates and is a
+/// cheap, valid fallback for the rest. Circles bids only when every part is round, and otherwise
+/// returns everything unplaced at once.
 /// A candidate that throws or returns no result is skipped; when every candidate throws, the
 /// first exception is rethrown. Cancellation stops the search. Candidates' plate commits are not forwarded; the chosen
 /// result's commits are reported once it is selected.
@@ -29,7 +32,10 @@ public sealed class DefaultNestingEngine : INestingEngine
     private readonly IReadOnlyList<Func<INestingEngine>> candidates;
 
     public DefaultNestingEngine()
-        : this(new Func<INestingEngine>[] { () => new IrregularNestingEngine(), () => new RectanglesNestingEngine() })
+        : this(new Func<INestingEngine>[]
+        {
+            () => new IrregularNestingEngine(), () => new RectanglesNestingEngine(), () => new CirclesNestingEngine(),
+        })
     {
     }
 
@@ -51,7 +57,7 @@ public sealed class DefaultNestingEngine : INestingEngine
         ArgumentNullException.ThrowIfNull(job);
         token.ThrowIfCancellationRequested();
         var forward = progress == null ? null : new CandidateProgress(progress);
-        Scored? best = null;
+        CandidateScore? best = null;
         ExceptionDispatchInfo? firstFailure = null;
 
         for (var order = 0; order < candidates.Count; order++)
@@ -71,7 +77,7 @@ public sealed class DefaultNestingEngine : INestingEngine
             if (result == null)
                 continue;
 
-            var scored = Scored.Of(job, result, order);
+            var scored = CandidateScore.Of(job, result, order);
             if (best == null || scored.IsBetterThan(best))
                 best = scored;
         }
@@ -83,57 +89,7 @@ public sealed class DefaultNestingEngine : INestingEngine
             throw new InvalidOperationException("No candidate engine returned a result.");
         }
 
-        ReportCommits(best.Result, progress);
+        CandidateProgress.ReportCommits(best.Result, progress);
         return best.Result;
-    }
-
-    private static void ReportCommits(NestJobResult result, IProgress<NestJobProgress>? progress)
-    {
-        if (progress == null)
-            return;
-        var parts = 0;
-        for (var i = 0; i < result.Plates.Count; i++)
-        {
-            var plate = result.Plates[i];
-            parts += plate.Placements.Count;
-            progress.Report(new NestJobProgress(NestJobStage.PlateCommitted, plate.StockId, plate.PlateIndex, i + 1, parts));
-        }
-    }
-
-    private sealed record Scored(NestJobResult Result, bool Valid, int Unplaced, double Cost, int Order, bool Priced)
-    {
-        public static Scored Of(NestJob job, NestJobResult result, int order)
-        {
-            var valid = NestLayoutCheck.Violations(job, result).Count == 0;
-            var placed = result.Plates.Sum(p => p.Placements.Count);
-            var unplaced = System.Math.Max(0, job.Parts.Sum(p => p.Quantity) - placed);
-            // Cost needs every placement to name a known part, which only a valid result guarantees.
-            var cost = valid ? NestJobCost.Evaluate(job, result) : double.PositiveInfinity;
-            return new Scored(result, valid, unplaced, cost, order, NestJobCost.UsesExplicitCosts(job));
-        }
-
-        public bool IsBetterThan(Scored other)
-        {
-            if (Valid != other.Valid)
-                return Valid;
-            if (Unplaced != other.Unplaced)
-                return Unplaced < other.Unplaced;
-            if (Priced && Cost != other.Cost)
-                return Cost < other.Cost;
-            var scale = System.Math.Max(1, System.Math.Max(System.Math.Abs(Cost), System.Math.Abs(other.Cost)));
-            if (double.IsFinite(Cost) && double.IsFinite(other.Cost) && System.Math.Abs(Cost - other.Cost) > 1e-9 * scale)
-                return Cost < other.Cost;
-            return Order < other.Order;
-        }
-    }
-
-    /// <summary>Forwards a candidate's progress except plate commits, which belong to the chosen result.</summary>
-    private sealed class CandidateProgress(IProgress<NestJobProgress> inner) : IProgress<NestJobProgress>
-    {
-        public void Report(NestJobProgress value)
-        {
-            if (value != null && value.Stage != NestJobStage.PlateCommitted)
-                inner.Report(value);
-        }
     }
 }

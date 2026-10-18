@@ -88,7 +88,7 @@ Run `dotnet run --project OpenNest.Console -- --help` for the complete options a
 
 ## Nesting Engines
 
-Default compares the built-in Irregular and Rectangles engines and keeps the best valid whole-job layout. Other engines and plug-ins suit particular jobs; see [which engine to use](docs/nesting-engines.md). Desktop Auto Nest, console autonest, MCP autonest, and the API share an independent validation pipeline, including for plug-ins. [Automatic nesting and validation](docs/automatic-nesting.md) explains how callers handle invalid results.
+Default compares the built-in Irregular, Rectangles and Circles engines and keeps the best valid whole-job layout. Other engines and plug-ins suit particular jobs; see [which engine to use](docs/nesting-engines.md). Desktop Auto Nest, console autonest, MCP autonest, and the API share an independent validation pipeline, including for plug-ins. [Automatic nesting and validation](docs/automatic-nesting.md) explains how callers handle invalid results.
 
 ## File Format
 

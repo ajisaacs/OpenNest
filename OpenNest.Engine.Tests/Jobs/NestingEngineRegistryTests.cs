@@ -1,4 +1,5 @@
 using OpenNest.Engine.Jobs;
+using OpenNest.Geometry;
 using Xunit;
 
 namespace OpenNest.Engine.Tests.Jobs;
@@ -12,6 +13,7 @@ public class NestingEngineRegistryTests
 
         Assert.Contains("Rectangles", names);
         Assert.Contains("Irregular", names);
+        Assert.Contains("Circles", names);
         Assert.Contains("Fill", names);
         Assert.Contains("Strip", names);
         Assert.Contains("Vertical Remnant", names);
@@ -55,7 +57,13 @@ public class NestingEngineRegistryTests
         foreach (var info in NestingEngineRegistry.AvailableEngines)
         {
             var engine = info.Factory();
-            var result = engine.Solve(FiniteStockJobTests.Job(1));
+            // Circles bids only on round parts.
+            var job = info.Name == "Circles"
+                ? new NestJob(new[] { new NestJobPart("p",
+                        PartGeometrySnapshot.FromProgram(NestingEngines.Shapes.Disc(5)), 3) },
+                    new[] { new NestPlateStock("s", new Size(100, 200), 1) })
+                : FiniteStockJobTests.Job(1);
+            var result = engine.Solve(job);
 
             Assert.Equal(NestJobStatus.Complete, result.Status);
         }

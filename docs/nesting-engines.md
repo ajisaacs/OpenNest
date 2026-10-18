@@ -11,8 +11,9 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 
 | Engine | Best for | Method |
 |---|---|---|
-| Default | Any job; used when no engine is named | Runs Irregular, then Rectangles, checks both layouts with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost; ties keep Irregular |
+| Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost; ties keep the earlier engine |
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; stock chosen sheet by sheet by salvage-credited look-ahead cost |
+| Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock |
 | Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
 | StockLadder | Caller-supplied stock ladders | Constrained-first fill with equivalent-demand area repacking |
@@ -22,7 +23,8 @@ Neither Irregular nor Rectangles wins every job, even within its own lane, so De
 rather than choosing by part shape; Rectangles adds little time and is also the fallback when an
 Irregular layout fails the check. A candidate that throws is skipped. Default routes the whole job:
 engines cannot share a sheet, so a job mixing plain and irregular parts goes to both engines whole.
-A future circle/ring engine joins Default as another candidate.
+Circles is a third candidate that bids only on round jobs (see below), so a job mixing round and
+other parts goes to Irregular and Rectangles.
 
 Rectangles places irregular parts validly, but only as their bounding boxes; it never nests into a
 notch or hole. Box sides account for how the layout check flattens arcs, so round-edged parts stay
@@ -165,6 +167,28 @@ tail's finite stock, repack that demand, and replace just those copies while kee
 Default inherits these fast paths by running the two engines; other engines and external plug-ins
 keep their existing search behavior. Quantity-bearing presentation is a separate validated-pipeline
 representation; repeating does not bypass whole-job validation or change cutting programs.
+
+## Circles
+
+Circles (`OpenNest.Engine/NestingEngines/Circles/`) packs every part as its minimum enclosing
+circle (`CirclePacking/Item`): the circle covers the layout check's outward-flattened perimeter,
+so packing is never more lenient than the check. When any readable part fills less than 0.8 of
+that circle (a square fills 0.64, a gear about 0.85), it returns everything unplaced without
+reporting progress, and Default discards it at almost no cost. Holes are not used here; rings in
+rings come from the cutout pre-pass, which hands the engine each nested chain as its outer frame.
+
+Each disc goes, lower priority number first and then largest first, to the best feasible center
+tangent to two of: the work-area walls, placed discs, and clamp zones grown by the bottom-edge
+clearance (square-cornered, as the layout check grows them). Discs keep the part spacing plus
+twice `NestTolerances.ValidationOutline` between them. Bottom-left fills rows and left-bottom
+fills columns; each also runs seeded with a hexagonal lattice of the type with the most remaining
+area, and bottom-left runs over a square lattice too, which wins when only a few discs span the
+sheet. A disc with no feasible tangent center for one radius is skipped for that radius and larger
+ones. Sheets and stock are chosen by the loop Rectangles uses (`NestingEngines/SheetByStock`):
+salvage-credited look-ahead cost, priority first, and repeated completed layouts. That per-sheet
+estimate can take a large sheet first and still need a second, so Circles runs the whole job once
+with a free stock choice and once preferring each offered stock, and keeps the best result as
+Default ranks candidates (valid, fewest unplaced, lowest cost).
 
 ## Filling cutouts
 

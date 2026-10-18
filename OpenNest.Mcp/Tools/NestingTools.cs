@@ -25,10 +25,11 @@ namespace OpenNest.Mcp.Tools
 
         /// <summary>Built-in engines with what each suits; a test keeps this in step with the registry.</summary>
         private const string JobEngines =
-            "Whole-job engine. Default (used when omitted): suits any job; runs Irregular and Rectangles "
+            "Whole-job engine. Default (used when omitted): suits any job; runs Irregular, Rectangles and Circles "
             + "and keeps the cheapest valid layout. "
             + "Irregular: irregular profiles; no-fit-polygon packing into notches and gaps, best-fit pairs. "
             + "Rectangles: plain and near-rectangular parts; packs each part as its bounding box, fastest. "
+            + "Circles: round parts (blanks, washers, flanges); packs each part as its enclosing circle; places nothing when any part is not round. "
             + "Fill: many copies of few drawings; lattice fill with pairs and rectangle best-fit. "
             + "Strip: Fill variant laying mixed drawings in strips. "
             + "Vertical Remnant, Horizontal Remnant: Fill variants keeping a right-side or top-side drop. "
