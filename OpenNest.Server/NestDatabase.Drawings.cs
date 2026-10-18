@@ -43,11 +43,8 @@ public sealed partial class NestDatabase
             savedBy            TEXT NOT NULL DEFAULT ''
         """;
 
-    // Schema v5 replaces the v4 drawing tables (which copied the blob into every revision).
-    private const string DrawingLibrarySchema = $"""
-        DROP TABLE IF EXISTS drawings;
-        DROP TABLE IF EXISTS drawing_revisions;
-        DROP TABLE IF EXISTS drawing_packages;
+    // The v5 drawing tables: created directly on a pre-v4 database and by the v4 upgrade.
+    private const string DrawingLibraryTables = $"""
         CREATE TABLE drawing_packages (
             sha256  TEXT NOT NULL PRIMARY KEY,
             size    INTEGER NOT NULL,
@@ -59,6 +56,34 @@ public sealed partial class NestDatabase
         CREATE INDEX ix_drawings_thickness ON drawings(thickness);
         CREATE INDEX ix_drawings_cutFirst ON drawings(cutFirst);
         CREATE INDEX ix_drawings_savedAt ON drawings(savedAt DESC);
+        """;
+
+    private const string DrawingLibrarySchema = DrawingLibraryTables + "PRAGMA user_version=5;";
+
+    // v4 kept one column set in both tables plus a package blob copied into every
+    // revision. The upgrade stores each distinct blob once and copies every revision
+    // and current row as it was; nesting settings take their defaults (v4 had none).
+    private const string V4CopiedColumns = """
+        id, revision, name, customer, nameKey, customerKey, materialName, materialKey,
+        materialGrade, gradeKey, thickness, units, cutType, notes, archived,
+        packageSha256, packageSize, savedAt, savedBy
+        """;
+
+    private const string DrawingLibraryUpgradeFromV4 = $"""
+        DROP INDEX ix_drawing_revisions_key;
+        DROP INDEX ix_drawings_customer_name;
+        DROP INDEX ix_drawings_material;
+        DROP INDEX ix_drawings_thickness;
+        DROP INDEX ix_drawings_savedAt;
+        ALTER TABLE drawings RENAME TO drawings_v4;
+        ALTER TABLE drawing_revisions RENAME TO drawing_revisions_v4;
+        {DrawingLibraryTables}
+        INSERT OR IGNORE INTO drawing_packages (sha256, size, package)
+            SELECT packageSha256, packageSize, package FROM drawing_revisions_v4;
+        INSERT INTO drawing_revisions ({V4CopiedColumns}) SELECT {V4CopiedColumns} FROM drawing_revisions_v4;
+        INSERT INTO drawings ({V4CopiedColumns}) SELECT {V4CopiedColumns} FROM drawings_v4;
+        DROP TABLE drawings_v4;
+        DROP TABLE drawing_revisions_v4;
         PRAGMA user_version=5;
         """;
 

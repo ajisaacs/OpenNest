@@ -32,28 +32,46 @@ public sealed class DrawingLibraryDatabaseTests
     }
 
     [Fact]
-    public void V4Upgrade_ReplacesTheDrawingTablesAndKeepsNests()
+    public void V4Upgrade_KeepsEveryRevisionAndStoresEachPackageOnce()
     {
         using var factory = new ServerFactory();
-        CreateVersion3Database(factory.DatabasePath);
-        // The v4 layout: one column set with the package blob copied into every revision.
-        Execute(factory.DatabasePath, """
-            CREATE TABLE drawings (id TEXT NOT NULL, revision INTEGER NOT NULL, name TEXT NOT NULL, package BLOB NOT NULL, PRIMARY KEY (id));
-            CREATE TABLE drawing_revisions (id TEXT NOT NULL, revision INTEGER NOT NULL, name TEXT NOT NULL, package BLOB NOT NULL);
-            INSERT INTO drawings VALUES ('00000000-0000-0000-0000-000000000001', 1, 'Old', x'504B');
-            INSERT INTO drawing_revisions SELECT * FROM drawings;
-            PRAGMA user_version=4;
-            """);
+        CreateVersion4Database(factory.DatabasePath);
         var before = NestDigest(factory.DatabasePath);
+        var bracket = Guid.Parse("00000000-0000-0000-0000-00000000000a");
+        var plate = Guid.Parse("00000000-0000-0000-0000-00000000000b");
 
-        using var database = new NestDatabase(factory.DatabasePath, pooling: false);
+        using (var database = new NestDatabase(factory.DatabasePath, pooling: false))
+        {
+            Assert.Equal(5L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+            Assert.Equal(before, NestDigest(factory.DatabasePath));
+            // Two distinct blobs across four revisions: the bracket's notes edit and the
+            // plate both reuse the bracket's first package.
+            Assert.Equal(2L, Scalar(factory.DatabasePath, "SELECT COUNT(*) FROM drawing_packages"));
+            Assert.Equal(0L, Scalar(factory.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE name LIKE '%_v4'"));
 
-        Assert.Equal(5L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
-        Assert.Equal(before, NestDigest(factory.DatabasePath));
-        Assert.Empty(database.QueryDrawings(new DrawingLibraryQuery { IncludeArchived = true }).Items);
-        var record = Record();
-        database.InsertDrawing(record.Id, record, Package());
-        Assert.Equal(1L, Scalar(factory.DatabasePath, "SELECT COUNT(*) FROM drawing_packages"));
+            var current = database.GetDrawing(bracket)!;
+            Assert.Equal((3, "Synthetic bracket", "Edited", Sha256(V4PackageB)),
+                (current.Revision, current.Name, current.Notes, current.PackageSha256));
+            Assert.Equal(new DrawingNestingSettings(), current.Settings);
+            var history = database.DrawingHistory(bracket, 0, 100)!;
+            Assert.Equal(new[] { 3, 2, 1 }, history.Items.Select(r => r.Revision));
+            Assert.Equal(new[] { "Edited", "Edited", "Original" }, history.Items.Select(r => r.Notes));
+            Assert.Equal(V4PackageA, database.GetDrawingRevisionPackage(bracket, 1));
+            Assert.Equal(V4PackageA, database.GetDrawingRevisionPackage(bracket, 2));
+            Assert.Equal(V4PackageB, database.GetDrawingPackage(bracket));
+            Assert.True(database.GetDrawing(plate)!.Archived);
+            Assert.Equal(V4PackageA, database.GetDrawingPackage(plate));
+            Assert.Single(database.QueryDrawings(new DrawingLibraryQuery { Customer = " synthetic  customer " }).Items);
+
+            // The upgraded drawing keeps working: a settings-only revision adds no blob.
+            var edit = database.GetDrawing(bracket)!;
+            edit.Settings = new DrawingNestingSettings { CutFirst = true };
+            Assert.Equal(4, database.UpdateDrawing(bracket, edit, null, 3)!.Revision);
+            Assert.Equal(2L, Scalar(factory.DatabasePath, "SELECT COUNT(*) FROM drawing_packages"));
+        }
+
+        using var reopened = new NestDatabase(factory.DatabasePath, pooling: false);
+        Assert.True(reopened.GetDrawing(bracket)!.Settings.CutFirst);
     }
 
     [Fact]
@@ -218,6 +236,65 @@ public sealed class DrawingLibraryDatabaseTests
         }
 
         Execute(path, "DROP TABLE drawing_revisions; DROP TABLE drawings; DROP TABLE drawing_packages; PRAGMA user_version=3;");
+    }
+
+    private static readonly byte[] V4PackageA = Package("v4 original");
+    private static readonly byte[] V4PackageB = Package("v4 changed");
+
+    /// <summary>
+    /// A schema-v4 file in the v4 layout: the same columns in both drawing tables and the
+    /// package blob copied into every revision. The bracket has a package, a notes edit
+    /// and a new package; the archived plate shares the bracket's first package.
+    /// </summary>
+    private static void CreateVersion4Database(string path)
+    {
+        CreateVersion3Database(path);
+        const string columns = """
+            id TEXT NOT NULL, revision INTEGER NOT NULL, name TEXT NOT NULL, customer TEXT NOT NULL DEFAULT '',
+            nameKey TEXT NOT NULL, customerKey TEXT NOT NULL DEFAULT '', materialName TEXT NOT NULL DEFAULT '',
+            materialKey TEXT NOT NULL DEFAULT '', materialGrade TEXT NOT NULL DEFAULT '', gradeKey TEXT NOT NULL DEFAULT '',
+            thickness REAL NOT NULL, units TEXT NOT NULL, cutType TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '',
+            archived INTEGER NOT NULL DEFAULT 0, packageSha256 TEXT NOT NULL, packageSize INTEGER NOT NULL,
+            savedAt TEXT NOT NULL, savedBy TEXT NOT NULL DEFAULT '', package BLOB NOT NULL
+            """;
+        Execute(path, $"""
+            CREATE TABLE drawings ({columns}, PRIMARY KEY (id));
+            CREATE TABLE drawing_revisions ({columns});
+            CREATE UNIQUE INDEX ix_drawing_revisions_key ON drawing_revisions(id, revision);
+            CREATE INDEX ix_drawings_customer_name ON drawings(customerKey, nameKey);
+            CREATE INDEX ix_drawings_material ON drawings(materialKey);
+            CREATE INDEX ix_drawings_thickness ON drawings(thickness);
+            CREATE INDEX ix_drawings_savedAt ON drawings(savedAt DESC);
+            PRAGMA user_version=4;
+            """);
+
+        using var connection = new SqliteConnection($"Data Source={path};Pooling=False");
+        connection.Open();
+        void Revision(string id, int revision, string name, string notes, bool archived, byte[] package)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO drawing_revisions VALUES ($id, $revision, $name, 'Synthetic customer', $nameKey,
+                    'SYNTHETIC CUSTOMER', 'Synthetic Steel', 'SYNTHETIC STEEL', 'Grade A', 'GRADE A', 0.25, 'Inches',
+                    'Laser', $notes, $archived, $sha, $size, '2026-01-01T00:00:00.0000000', 'Synthetic operator', $package);
+                INSERT OR REPLACE INTO drawings SELECT * FROM drawing_revisions WHERE id=$id AND revision=$revision;
+                """;
+            command.Parameters.AddWithValue("$id", id);
+            command.Parameters.AddWithValue("$revision", revision);
+            command.Parameters.AddWithValue("$name", name);
+            command.Parameters.AddWithValue("$nameKey", SharedListNames.Key(name));
+            command.Parameters.AddWithValue("$notes", notes);
+            command.Parameters.AddWithValue("$archived", archived ? 1 : 0);
+            command.Parameters.AddWithValue("$sha", Sha256(package));
+            command.Parameters.AddWithValue("$size", package.LongLength);
+            command.Parameters.AddWithValue("$package", package);
+            command.ExecuteNonQuery();
+        }
+
+        Revision("00000000-0000-0000-0000-00000000000a", 1, "Synthetic bracket", "Original", false, V4PackageA);
+        Revision("00000000-0000-0000-0000-00000000000a", 2, "Synthetic bracket", "Edited", false, V4PackageA);
+        Revision("00000000-0000-0000-0000-00000000000a", 3, "Synthetic bracket", "Edited", false, V4PackageB);
+        Revision("00000000-0000-0000-0000-00000000000b", 1, "Synthetic plate", "", true, V4PackageA);
     }
 
     private static string NestDigest(string path)

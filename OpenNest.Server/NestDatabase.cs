@@ -346,11 +346,16 @@ public sealed partial class NestDatabase : IDisposable
                     """;
                 command.ExecuteNonQuery();
             }
-            if (version < 5)
+            if (version < 4)
             {
-                // v5 replaces the v4 drawing tables outright (no production library data
-                // existed); the nest tables are untouched.
+                // No drawing tables yet: create the current (v5) layout directly.
                 command.CommandText = DrawingLibrarySchema;
+                command.ExecuteNonQuery();
+            }
+            else if (version == 4)
+            {
+                // Packages become content-addressed; the nest tables are untouched.
+                command.CommandText = DrawingLibraryUpgradeFromV4;
                 command.ExecuteNonQuery();
             }
             transaction.Commit();

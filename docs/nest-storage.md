@@ -211,9 +211,11 @@ each nest.
 Schema v5 keeps three drawing tables in the same file: `drawing_packages`
 (`sha256`, `size`, `package`), `drawing_revisions` (every immutable revision's
 details, settings, archived flag and package hash) and `drawings` (each
-drawing's current revision, indexed for browsing). Upgrading replaces the v4
-drawing tables outright, discarding any v4 library data (no production library
-existed), and leaves the nest tables untouched. A server older than v5 refuses
+drawing's current revision, indexed for browsing). Upgrading from v4 runs in
+one transaction: each distinct v4 blob is stored once by its hash, every
+revision and current row is copied as it was with default nesting settings
+(v4 had none), and the v4 drawing tables are dropped. A pre-v4 database gets
+the v5 tables directly. The nest tables are untouched. A server older than v5 refuses
 to open a v5 database, so rolling back after the upgrade needs the pre-upgrade backup (see
 [Backup, restore, and upgrade](#backup-restore-and-upgrade)). The stopped-volume
 `tar` backup includes the drawing tables, but `nest_manifest.py` and
