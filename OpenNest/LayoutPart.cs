@@ -35,7 +35,7 @@ namespace OpenNest
 
         static LayoutPart()
         {
-            programIdFont = new Font(SystemFonts.DefaultFont, FontStyle.Bold | FontStyle.Underline);
+            programIdFont = new Font(SystemFonts.DefaultFont, FontStyle.Bold);
             SelectedColor = Color.FromArgb(90, 150, 200, 255);
             leadInPen = new Pen(Color.OrangeRed, 1.5f);
         }
@@ -110,10 +110,10 @@ namespace OpenNest
             DrawDisplay(g, muted);
             DrawEtch(g, muted);
             // Keep real cuts visible even where an etch overlaps them.
-            g.DrawPath(muted ? Pens.Gray : IsSelected && colorScheme.PartOutlineColor.IsEmpty ? selectedPen : pen, Path);
+            g.DrawPath(muted ? Pens.DimGray : IsSelected && colorScheme.PartOutlineColor.IsEmpty ? selectedPen : pen, Path);
 
             if (LeadInPath != null)
-                g.DrawPath(muted ? Pens.Gray : leadInPen, LeadInPath);
+                g.DrawPath(muted ? Pens.DimGray : leadInPen, LeadInPath);
         }
 
         public void Draw(Graphics g, string id) => Draw(g, id, false);
@@ -130,11 +130,27 @@ namespace OpenNest
             g.DrawString(
                 id,
                 programIdFont,
-                muted ? Brushes.DimGray : Brushes.Black,
+                muted ? Brushes.DimGray : LabelBrushFor(color),
                 _labelScreenPoint.X,
                 _labelScreenPoint.Y,
                 sf
             );
+        }
+
+        /// <summary>
+        /// Black or white, whichever contrasts more with <paramref name="fill"/> (WCAG relative
+        /// luminance; the two are equal at a luminance of about 0.179).
+        /// </summary>
+        internal static Brush LabelBrushFor(Color fill)
+        {
+            static double Linear(byte channel)
+            {
+                var value = channel / 255.0;
+                return value <= 0.04045 ? value / 12.92 : System.Math.Pow((value + 0.055) / 1.055, 2.4);
+            }
+
+            var luminance = 0.2126 * Linear(fill.R) + 0.7152 * Linear(fill.G) + 0.0722 * Linear(fill.B);
+            return luminance > 0.179 ? Brushes.Black : Brushes.White;
         }
 
         internal void ReleaseDisplayResources()

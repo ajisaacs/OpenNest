@@ -133,11 +133,12 @@ namespace OpenNest.Forms
                 return;
             }
 
-            plateIndex.Text = string.Format(
-                "Plate: {0} of {1}",
-                form.PlateManager.CurrentIndex + 1,
-                form.PlateManager.Count
-            );
+            // Same numbering as the plate header: the trailing empty "new plate" workspace isn't counted.
+            var plates = form.Nest.Plates;
+            var shown = PlateDisplayNumbering.DisplayedPlateNumber(plates, form.PlateManager.CurrentIndex);
+            plateIndex.Text = shown == null
+                ? "Plate: new"
+                : string.Format("Plate: {0} of {1}", shown.Value, PlateDisplayNumbering.DisplayedPlateCount(plates));
 
             plateSize.Text = string.Format("Size: {0}", form.PlateView.Plate.Size);
 

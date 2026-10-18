@@ -231,7 +231,7 @@ namespace OpenNest
             new ColorScheme
             {
                 Name = "Classic",
-                BackgroundColor = Color.DarkGray,
+                BackgroundColor = Color.FromArgb(104, 108, 114),
                 LayoutOutlineColor = Color.Gray,
                 LayoutFillColor = Color.WhiteSmoke,
                 BoundingBoxColor = Color.FromArgb(128, 128, 255),
@@ -239,20 +239,23 @@ namespace OpenNest
                 OriginColor = Color.Gray,
                 EdgeSpacingColor = Color.FromArgb(180, 180, 180),
                 PreviewPartColor = Color.FromArgb(255, 140, 0),
+                // Twelve fills at least ~35 CIE76 apart from each other (the old set had near-duplicate
+                // teals and purples under 10), each readable with black part IDs and clear of etch green.
+                // Ordered so neighboring drawings contrast.
                 PartColors = new[]
                 {
-                    Color.FromArgb(205, 92, 92),
-                    Color.FromArgb(148, 103, 189),
-                    Color.FromArgb(75, 180, 175),
-                    Color.FromArgb(210, 190, 75),
-                    Color.FromArgb(190, 85, 175),
-                    Color.FromArgb(185, 115, 85),
-                    Color.FromArgb(120, 100, 190),
-                    Color.FromArgb(200, 100, 140),
-                    Color.FromArgb(80, 175, 155),
-                    Color.FromArgb(195, 160, 85),
-                    Color.FromArgb(175, 95, 160),
-                    Color.FromArgb(215, 130, 130),
+                    Color.FromArgb(206, 153, 85),
+                    Color.FromArgb(196, 66, 221),
+                    Color.FromArgb(196, 220, 67),
+                    Color.FromArgb(104, 113, 230),
+                    Color.FromArgb(62, 223, 145),
+                    Color.FromArgb(223, 67, 118),
+                    Color.FromArgb(135, 231, 224),
+                    Color.FromArgb(219, 91, 64),
+                    Color.FromArgb(82, 166, 223),
+                    Color.FromArgb(194, 217, 148),
+                    Color.FromArgb(212, 147, 220),
+                    Color.FromArgb(204, 132, 135),
                 },
             };
 

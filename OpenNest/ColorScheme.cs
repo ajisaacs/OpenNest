@@ -33,7 +33,7 @@ namespace OpenNest
         public static readonly ColorScheme Default = new ColorScheme
         {
             Name = "Classic",
-            BackgroundColor = Color.DarkGray,
+            BackgroundColor = Color.FromArgb(104, 108, 114),
             LayoutOutlineColor = Color.Gray,
             LayoutFillColor = Color.WhiteSmoke,
             BoundingBoxColor = Color.FromArgb(128, 128, 255),
