@@ -70,14 +70,21 @@ internal static class CutoutCirclePacker
     /// <summary>Frame-local poses inside one round cutout, or none when the cutout is not round
     /// or nothing fits. Instance indices count per requirement from zero.</summary>
     internal static IReadOnlyList<NestJobPlacement> Fill(NestJobPart frame, int cutoutIndex,
-        IReadOnlyList<NestJobPart> inserts, double spacing, CancellationToken token = default)
+        IReadOnlyList<NestJobPart> inserts, double spacing, CancellationToken token = default) =>
+        Fill(frame, cutoutIndex, inserts, spacing, null, token);
+
+    /// <summary>Same proposal; a pre-pass passes its <paramref name="memo"/> to replay geometry
+    /// reads and clearance checks it has already made.</summary>
+    internal static IReadOnlyList<NestJobPlacement> Fill(NestJobPart frame, int cutoutIndex,
+        IReadOnlyList<NestJobPart> inserts, double spacing, CutoutMemo? memo,
+        CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(inserts);
         token.ThrowIfCancellationRequested();
         if (!double.IsFinite(spacing) || spacing < 0)
             return Array.Empty<NestJobPlacement>();
-        var frameGeometry = JobPartGeometry.TryRead(frame.Geometry);
+        var frameGeometry = Read(frame.Geometry);
         if (frameGeometry == null)
             return Array.Empty<NestJobPlacement>();
         ArgumentOutOfRangeException.ThrowIfNegative(cutoutIndex);
@@ -93,10 +100,10 @@ internal static class CutoutCirclePacker
         foreach (var part in inserts)
         {
             token.ThrowIfCancellationRequested();
-            var geometry = JobPartGeometry.TryRead(part.Geometry);
+            var geometry = Read(part.Geometry);
             if (geometry == null || part.Quantity <= 0)
                 continue;
-            var item = Item.Create(geometry);
+            var item = memo?.ItemOf(geometry) ?? Item.Create(geometry);
             var rotations = part.Rotation.EnumerateAngles(maxSamples: 1);
             if (rotations.Count == 0 || item.Radius > wall)
                 continue;
@@ -127,18 +134,24 @@ internal static class CutoutCirclePacker
             var pose = new NestJobPlacement(disc.Part.Id,
                 accepted.Count(p => p.Pose.PartId == disc.Part.Id), origin.X, origin.Y, disc.Rotation);
             var geometry = geometries[disc.Part.Id];
-            if (!NestLayoutCheck.Clears(frameGeometry, framePose, geometry, pose, spacing))
+            if (!Clears(frameGeometry, framePose, geometry, pose))
                 continue;
             // Discs farther apart than their radii plus twice the spacing cannot touch the
             // check's inflated outlines; the analytic gap already proves them clear.
             if (accepted.Any(other => other.Center.DistanceTo(center)
                     < other.Disc.Radius + disc.Radius + 2 * spacing + Margin
-                && !NestLayoutCheck.Clears(geometries[other.Disc.Part.Id], other.Pose, geometry, pose, spacing)))
+                && !Clears(geometries[other.Disc.Part.Id], other.Pose, geometry, pose)))
                 continue;
             accepted.Add((disc, center, pose));
         }
         token.ThrowIfCancellationRequested();
         return accepted.Select(p => p.Pose).ToArray();
+
+        JobPartGeometry? Read(PartGeometrySnapshot snapshot) =>
+            memo != null ? memo.Read(snapshot) : JobPartGeometry.TryRead(snapshot);
+
+        bool Clears(JobPartGeometry a, NestJobPlacement pa, JobPartGeometry b, NestJobPlacement pb) =>
+            memo?.Clears(a, pa, b, pb, spacing) ?? NestLayoutCheck.Clears(a, pa, b, pb, spacing);
     }
 
     /// <summary>Places each disc in order at its best feasible candidate; a disc with no

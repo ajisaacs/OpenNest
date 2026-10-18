@@ -264,6 +264,9 @@ namespace OpenNest.Geometry
         [ThreadStatic]
         private static double[]? s_tmpB;
 
+        [ThreadStatic]
+        private static double[]? s_tmpC;
+
         private static double[] AcquireBuffer()
         {
             var pool = s_pool ??= new List<double[]>();
@@ -282,11 +285,12 @@ namespace OpenNest.Geometry
                 pool.Add(buf);
         }
 
-        private static (double[] Tmp, double[] Inside) ScratchPair()
+        private static (double[] Tmp, double[] Inside, double[] Spare) Scratch()
         {
             s_tmpA ??= new double[MaxClipVertices * 2];
             s_tmpB ??= new double[MaxClipVertices * 2];
-            return (s_tmpA, s_tmpB);
+            s_tmpC ??= new double[MaxClipVertices * 2];
+            return (s_tmpA, s_tmpB, s_tmpC);
         }
 
         private (bool hasHoles, bool undecided, bool survived) SubtractAllHoles(
@@ -309,8 +313,20 @@ namespace OpenNest.Geometry
                 return (false, false, false);
 
             // pieces[0] is the caller's own buffer - never release it back to the pool.
-            var pieces = new List<(double[] Buf, int Count)> { (piece, count) };
+            // A piece's buffer never changes once listed, so its bbox is measured once.
+            var pieces = new List<Piece> { Measure(piece, count) };
+            var spareList = new List<Piece>();
             var owned = new HashSet<double[]>();
+
+            // Built-in uses <=: touching skips subtraction, and a hole triangle no piece
+            // reaches passes every piece on unchanged, so it is skipped without rebuilding.
+            bool AnyReaches(double hMinX, double hMinY, double hMaxX, double hMaxY)
+            {
+                foreach (var p in pieces)
+                    if (!(p.MaxX <= hMinX || hMaxX <= p.MinX || p.MaxY <= hMinY || hMaxY <= p.MinY))
+                        return true;
+                return false;
+            }
 
             bool SubtractOwner(TriangulatedRegion owner, double odx, double ody)
             {
@@ -321,41 +337,32 @@ namespace OpenNest.Geometry
                     var hole = owner.Holes[h];
                     if (hole == null)
                         continue; // untriangulatable hole: nothing to subtract
+                    // Every triangle's bbox lies within the hole's, translated alike.
+                    if (!AnyReaches(hole.MinX + odx, hole.MinY + ody, hole.MaxX + odx, hole.MaxY + ody))
+                        continue;
                     for (var t = 0; t < hole._ia.Length && pieces.Count > 0; t++)
                     {
                         var hMinX = hole._tMinX[t] + odx;
                         var hMaxX = hole._tMaxX[t] + odx;
                         var hMinY = hole._tMinY[t] + ody;
                         var hMaxY = hole._tMaxY[t] + ody;
+                        if (!AnyReaches(hMinX, hMinY, hMaxX, hMaxY))
+                            continue;
 
-                        var next = new List<(double[], int)>();
+                        var next = spareList;
+                        next.Clear();
                         for (var p = 0; p < pieces.Count; p++)
                         {
-                            var (buf, pc) = pieces[p];
+                            var current = pieces[p];
+                            var buf = current.Buf;
+                            var pc = current.Count;
 
-                            // Piece bbox (built-in uses <=: touching skips subtraction).
-                            var pMinX = double.MaxValue;
-                            var pMinY = double.MaxValue;
-                            var pMaxX = double.MinValue;
-                            var pMaxY = double.MinValue;
-                            for (var v = 0; v < pc; v++)
-                            {
-                                var px = buf[v * 2];
-                                var py = buf[v * 2 + 1];
-                                if (px < pMinX)
-                                    pMinX = px;
-                                if (px > pMaxX)
-                                    pMaxX = px;
-                                if (py < pMinY)
-                                    pMinY = py;
-                                if (py > pMaxY)
-                                    pMaxY = py;
-                            }
-                            if (pMaxX <= hMinX || hMaxX <= pMinX || pMaxY <= hMinY || hMaxY <= pMinY)
+                            if (current.MaxX <= hMinX || hMaxX <= current.MinX
+                                || current.MaxY <= hMinY || hMaxY <= current.MinY)
                             {
                                 if (next.Count >= MaxPieces)
                                     return false;
-                                next.Add((buf, pc));
+                                next.Add(current);
                                 continue;
                             }
 
@@ -363,11 +370,11 @@ namespace OpenNest.Geometry
                             // outside of each edge survives as its own piece; the inside
                             // remainder continues into the next edge. The remainder inside
                             // all three edges is consumed (the hole ate it).
-                            var rem = AcquireBuffer();
-                            owned.Add(rem);
-                            Array.Copy(buf, rem, pc * 2);
+                            // The remainder reads the piece itself first, then alternates
+                            // between two scratch buffers; it is never kept.
+                            var rem = buf;
                             var remCount = pc;
-                            var (tmp, insideBuf) = ScratchPair();
+                            var (tmp, insideBuf, spareBuf) = Scratch();
                             for (var e = 0; e < 3 && remCount >= 3; e++)
                             {
                                 var ei = e == 0 ? hole._ia[t] : e == 1 ? hole._ib[t] : hole._ic[t];
@@ -388,20 +395,20 @@ namespace OpenNest.Geometry
                                     var keep = AcquireBuffer();
                                     owned.Add(keep);
                                     Array.Copy(tmp, keep, outCount * 2);
-                                    next.Add((keep, outCount));
+                                    next.Add(Measure(keep, outCount));
                                 }
                                 remCount =
                                     ClipHalfSpace(rem, remCount, sx, sy, ex, ey, true, insideBuf);
                                 if (remCount >= MaxClipVertices)
                                     return false; // undecided
-                                Array.Copy(insideBuf, rem, remCount * 2);
+                                rem = insideBuf;
+                                (insideBuf, spareBuf) = (spareBuf, insideBuf);
                             }
                             // The inside-all-edges remainder is consumed by the hole: drop it.
-                            owned.Remove(rem);
-                            ReleaseBuffer(rem);
                             if (owned.Remove(buf))
                                 ReleaseBuffer(buf);
                         }
+                        spareList = pieces;
                         pieces = next;
                     }
                 }
@@ -413,8 +420,8 @@ namespace OpenNest.Geometry
                 if (!SubtractOwner(this, adx, ady) || !SubtractOwner(other, bdx, bdy))
                     return (true, true, false);
 
-                foreach (var (buf, pc) in pieces)
-                    if (pc >= 3 && TwiceArea(buf, pc) > areaFloor)
+                foreach (var p in pieces)
+                    if (p.Count >= 3 && TwiceArea(p.Buf, p.Count) > areaFloor)
                         return (true, false, true);
                 return (true, false, false);
             }
@@ -423,6 +430,31 @@ namespace OpenNest.Geometry
                 foreach (var buffer in owned)
                     ReleaseBuffer(buffer);
             }
+        }
+
+        private readonly record struct Piece(double[] Buf, int Count, double MinX, double MinY,
+            double MaxX, double MaxY);
+
+        private static Piece Measure(double[] buf, int count)
+        {
+            var minX = double.MaxValue;
+            var minY = double.MaxValue;
+            var maxX = double.MinValue;
+            var maxY = double.MinValue;
+            for (var v = 0; v < count; v++)
+            {
+                var px = buf[v * 2];
+                var py = buf[v * 2 + 1];
+                if (px < minX)
+                    minX = px;
+                if (px > maxX)
+                    maxX = px;
+                if (py < minY)
+                    minY = py;
+                if (py > maxY)
+                    maxY = py;
+            }
+            return new Piece(buf, count, minX, minY, maxX, maxY);
         }
 
         /// <summary>Clip this' triangle against other's triangle; returns count into piece.</summary>

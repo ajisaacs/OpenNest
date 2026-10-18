@@ -46,13 +46,14 @@ internal sealed class CutoutPipelinePrepass
         // One reservation vector works for every offered stock. Current jobs cannot
         // represent stock-conditional insert quantities; use the largest spacing.
         var spacing = original.Plates.Max(p => p.PartSpacing);
+        var memo = new CutoutMemo();
         var remaining = original.Parts.ToDictionary(p => p.Id, p => p.Quantity);
-        var geometry = original.Parts.ToDictionary(p => p.Id, p => JobPartGeometry.TryRead(p.Geometry));
+        var geometry = original.Parts.ToDictionary(p => p.Id, p => memo.Read(p.Geometry));
         // Proxies join these as they are built, so a larger frame can take one as an insert.
         var offers = original.Parts.ToList();
         var requirements = original.Parts.ToDictionary(p => p.Id);
         var round = original.Parts.ToDictionary(p => p.Id, p => geometry[p.Id] is { } g
-            && Item.Create(g).FillRatio >= CutoutCirclePacker.MinFillRatio);
+            && memo.ItemOf(g).FillRatio >= CutoutCirclePacker.MinFillRatio);
         // An insert's outline cannot fit a hole of smaller area; bolt holes skip the searches.
         var outline = original.Parts.ToDictionary(p => p.Id, p => geometry[p.Id] is { } g
             ? System.Math.Abs(g.Perimeter.Area()) : double.PositiveInfinity);
@@ -109,7 +110,7 @@ internal sealed class CutoutPipelinePrepass
                             token.ThrowIfCancellationRequested();
                             var source = geometry[pose.PartId]!;
                             if (!requirements[pose.PartId].Rotation.Allows(angle + pose.Rotation)
-                                || local.Any(other => !NestLayoutCheck.Clears(
+                                || local.Any(other => !memo.Clears(
                                     geometry[other.PartId]!, other, source, pose, spacing)))
                                 continue;
                             local.Add(pose);
@@ -164,13 +165,13 @@ internal sealed class CutoutPipelinePrepass
             IReadOnlyList<NestJobPlacement> poses = Array.Empty<NestJobPlacement>();
             if (nested.Length > 0)
                 poses = CutoutCirclePacker.Fill(frame, hole,
-                    flat.Where(p => round[p.Id]).Concat(nested).ToArray(), spacing, token);
+                    flat.Where(p => round[p.Id]).Concat(nested).ToArray(), spacing, memo, token);
             // Seating every flat copy as a disc leaves the slower proposals nothing to beat.
             var flatIds = flat.Select(p => p.Id).ToHashSet(StringComparer.Ordinal);
             if (flat.Length == 0
                 || poses.Count(p => flatIds.Contains(p.PartId)) == flat.Sum(p => (long)p.Quantity))
                 return poses;
-            var router = CutoutRouter.Fill(frame, hole, flat, spacing, token);
+            var router = CutoutRouter.Fill(frame, hole, flat, spacing, memo, token);
             return Weight(router) >= Weight(poses) ? router : poses;
         }
 

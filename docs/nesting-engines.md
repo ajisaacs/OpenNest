@@ -276,7 +276,10 @@ plates even with invalid-result consent. Candidate evaluation progress is forwar
 with unverified proxy commitment counts zeroed; transformed proxy commits are hidden. Physical
 commits are reported only after physical validation. Preparation is bounded to 32 bundles
 and 16 base sweep-angle samples per frame (automatic quarter-turns are all retained);
-remaining copies stay ordinary requirements. Fixed legal proxy orientations are a
+remaining copies stay ordinary requirements. Within one preparation, geometry reads and
+`NestLayoutCheck.Clears` answers are replayed (`CutoutMemo`: same geometry, bit-identical poses),
+so repeated frame instances and frame angles do not repeat that check, its main cost; layouts are
+the same as without the replay. Fixed legal proxy orientations are a
 conservative search choice, not full engine choice among all legal orientations; unsupported
 bundles remain ordinary independent requirements.
 

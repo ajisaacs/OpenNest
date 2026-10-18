@@ -22,13 +22,25 @@ internal static class CutoutRouter
 
     internal static IReadOnlyList<NestJobPlacement> Fill(NestJobPart frame, int cutoutIndex,
         IReadOnlyList<NestJobPart> inserts, double spacing, CancellationToken token = default) =>
-        Fill(frame, cutoutIndex, inserts, spacing, null, token);
+        Fill(frame, cutoutIndex, inserts, spacing, null, null, token);
+
+    /// <summary>Same proposal; a pre-pass passes its <paramref name="memo"/> so circle-packed
+    /// holes replay geometry reads and clearance checks it has already made.</summary>
+    internal static IReadOnlyList<NestJobPlacement> Fill(NestJobPart frame, int cutoutIndex,
+        IReadOnlyList<NestJobPart> inserts, double spacing, CutoutMemo memo,
+        CancellationToken token = default) =>
+        Fill(frame, cutoutIndex, inserts, spacing, null, memo, token);
 
     /// <summary>Optional internal diagnostic receives only poses from the chosen proposal,
     /// after indexing; true marks a retained lattice seed, false a residual NFP or circle-packer pose.</summary>
     internal static IReadOnlyList<NestJobPlacement> Fill(NestJobPart frame, int cutoutIndex,
         IReadOnlyList<NestJobPart> inserts, double spacing,
-        Action<NestJobPlacement, bool>? observeAccepted, CancellationToken token = default)
+        Action<NestJobPlacement, bool>? observeAccepted, CancellationToken token = default) =>
+        Fill(frame, cutoutIndex, inserts, spacing, observeAccepted, null, token);
+
+    private static IReadOnlyList<NestJobPlacement> Fill(NestJobPart frame, int cutoutIndex,
+        IReadOnlyList<NestJobPart> inserts, double spacing,
+        Action<NestJobPlacement, bool>? observeAccepted, CutoutMemo? memo, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(inserts);
@@ -54,7 +66,7 @@ internal static class CutoutRouter
         // NFP searches never placed more there, and they are slow on round inserts, most of all
         // when demand exceeds what fits (every surplus copy is searched for and not found).
         if (CutoutCirclePacker.Applies(hole, inserts))
-            return Circles(CutoutCirclePacker.Fill(frame, cutoutIndex, inserts, spacing, token));
+            return Circles(CutoutCirclePacker.Fill(frame, cutoutIndex, inserts, spacing, memo, token));
 
         var accepted = new List<NestJobPlacement>();
         var observed = new List<(NestJobPlacement Pose, bool Lattice)>();
