@@ -13,7 +13,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 |---|---|---|
 | Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost; ties keep the earlier engine |
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; stock chosen sheet by sheet by salvage-credited look-ahead cost |
-| Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock |
+| Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
 | Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
 | StockLadder | Caller-supplied stock ladders | Constrained-first fill with equivalent-demand area repacking |
@@ -209,7 +209,9 @@ ones. Sheets and stock are chosen by the loop Rectangles uses (`NestingEngines/S
 salvage-credited look-ahead cost, priority first, and repeated completed layouts. That per-sheet
 estimate can take a large sheet first and still need a second, so Circles runs the whole job once
 with a free stock choice and once preferring each offered stock, and keeps the best result as
-Default ranks candidates (valid, fewest unplaced, lowest cost).
+Default ranks candidates (valid, fewest unplaced, lowest cost). The last sheet, and the last two
+sheets together, are then re-packed onto each single stock and replaced when that lowers the
+whole job's cost, so a small remainder does not finish on a large sheet.
 
 ## Filling cutouts
 
@@ -248,14 +250,14 @@ list as discs: largest first, at centers tangent to two of the hole wall and the
 or at the hole's center. It tries a center-out pass, so a single insert sits concentric, and a
 wall-first pass, which reaches the optimal counts for up to nine equal discs. Each gap is the
 spacing plus twice `NestTolerances.ValidationOutline`, and every pose passes `NestLayoutCheck`.
-If it places all demand, the router skips the lattice and NFP searches, which are slow on many
-round inserts. Otherwise it keeps whichever proposal places more copies, and the existing
-proposals win ties.
+Its result is the router's proposal for that hole: the lattice and NFP searches never placed
+more there and were slow on round inserts, most of all when demand exceeds what fits.
 `CutoutPipelinePrepass` builds quantity-one proxy instances for eligible
 closed-cutout frames. It considers legal frame rotations without outer-perimeter symmetry
 reduction, shifts insert rotation policies into the local frame, and reserves certified router
 poses by original requirement ID. It can fill multiple holes and repeated/different frame
-requirements; inserts with a different priority stay independent. Frames are bundled smallest
+requirements; inserts with a different priority stay independent, and a hole smaller in area than
+an insert's outline (a bolt hole) is not searched for it. Frames are bundled smallest
 first, so a larger frame's round cutout can take, through `CutoutCirclePacker` only, a round part
 with its own cutouts (a washer with an empty bore) or an earlier bundle as one insert: a flange
 holds a washer that holds a smaller washer that holds a slug. Chains stop at four parts deep

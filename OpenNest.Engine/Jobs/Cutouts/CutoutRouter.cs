@@ -9,8 +9,8 @@ namespace OpenNest.Engine.Jobs.Cutouts;
 /// <summary>Internal frame-local cutout proposal. Never changes demand, stock or a live plate.</summary>
 /// <remarks>Area ratio selects search order, not placement permission. The small-insert path
 /// prefers a shifted partial lattice; the middle compares it with occupied-aware NFP search;
-/// the large-insert path tries NFP first. A round hole whose inserts are all round also gets a
-/// circle-in-circle proposal for the whole list, kept only when it places more copies.
+/// the large-insert path tries NFP first. A round hole whose inserts are all round gets only the
+/// circle-in-circle proposal for the whole list.
 /// All accepted poses are clearance-checked.
 /// Fill's equal-score pose nondeterminism remains PM c98c21bd.</remarks>
 internal static class CutoutRouter
@@ -50,13 +50,11 @@ internal static class CutoutRouter
             throw new ArgumentException("Requirement IDs must be distinct from the frame and each other.",
                 nameof(inserts));
 
-        // Nothing can place more than all demand, so a complete circle packing skips the
-        // lattice and NFP searches, which are slow on many round inserts.
-        var circles = CutoutCirclePacker.Applies(hole, inserts)
-            ? CutoutCirclePacker.Fill(frame, cutoutIndex, inserts, spacing, token)
-            : null;
-        if (circles != null && circles.Count == inserts.Sum(p => (long)System.Math.Max(0, p.Quantity)))
-            return Circles(circles);
+        // A round hole holding only round inserts is a circle packing problem: the lattice and
+        // NFP searches never placed more there, and they are slow on round inserts, most of all
+        // when demand exceeds what fits (every surplus copy is searched for and not found).
+        if (CutoutCirclePacker.Applies(hole, inserts))
+            return Circles(CutoutCirclePacker.Fill(frame, cutoutIndex, inserts, spacing, token));
 
         var accepted = new List<NestJobPlacement>();
         var observed = new List<(NestJobPlacement Pose, bool Lattice)>();
@@ -138,8 +136,6 @@ internal static class CutoutRouter
             }
         }
         token.ThrowIfCancellationRequested();
-        if (circles != null && circles.Count > accepted.Count)
-            return Circles(circles);
         foreach (var (pose, lattice) in observed)
             observeAccepted?.Invoke(pose, lattice);
         return accepted.ToArray();

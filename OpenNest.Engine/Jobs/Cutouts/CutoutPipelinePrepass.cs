@@ -53,6 +53,9 @@ internal sealed class CutoutPipelinePrepass
         var requirements = original.Parts.ToDictionary(p => p.Id);
         var round = original.Parts.ToDictionary(p => p.Id, p => geometry[p.Id] is { } g
             && Item.Create(g).FillRatio >= CutoutCirclePacker.MinFillRatio);
+        // An insert's outline cannot fit a hole of smaller area; bolt holes skip the searches.
+        var outline = original.Parts.ToDictionary(p => p.Id, p => geometry[p.Id] is { } g
+            ? System.Math.Abs(g.Perimeter.Area()) : double.PositiveInfinity);
         var bundles = new Dictionary<string, Bundle>(StringComparer.Ordinal);
         var byFrame = new Dictionary<string, List<NestJobPart>>(StringComparer.Ordinal);
         // Smallest first: a frame can only hold smaller parts, so its candidate inner bundles
@@ -86,9 +89,10 @@ internal sealed class CutoutPipelinePrepass
                     for (var hole = 0; hole < profile.Cutouts.Count; hole++)
                     {
                         token.ThrowIfCancellationRequested();
+                        var holeArea = System.Math.Abs(profile.Cutouts[hole].Area());
                         var eligible = offers
                             .Where(p => p.Id != frame.Id && available[p.Id] > 0
-                                && p.Priority == frame.Priority
+                                && p.Priority == frame.Priority && outline[p.Id] <= holeArea
                                 && (!bundles.TryGetValue(p.Id, out var b)
                                     || (b.FrameId != frame.Id && b.Levels < MaxLevels)))
                             .Select(p => new NestJobPart(p.Id, p.Geometry, available[p.Id],
@@ -99,7 +103,7 @@ internal sealed class CutoutPipelinePrepass
                             ? Array.Empty<NestJobPart>()
                             : eligible.Where(p => round[p.Id] && geometry[p.Id]!.Cutouts.Count > 0).ToArray();
                         if (flat.Length == 0 && nested.Length == 0)
-                            break;
+                            continue;
                         foreach (var pose in Propose(frame, hole, flat, nested))
                         {
                             token.ThrowIfCancellationRequested();
@@ -133,6 +137,7 @@ internal sealed class CutoutPipelinePrepass
                 offers.Add(proxy);
                 requirements.Add(proxyId, proxy);
                 geometry.Add(proxyId, profile);
+                outline.Add(proxyId, outline[frame.Id]);
                 round.Add(proxyId, round[frame.Id]);
                 remaining.Add(proxyId, 1);
             }
