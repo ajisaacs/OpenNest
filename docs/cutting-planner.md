@@ -110,6 +110,11 @@ the final replay enforce them:
   contour, entered from the scrap with the internal lead-in. Their leads may run
   through the part's own material but not touch its boundaries; they are never rapid
   obstacles or unexplained open fragments.
+- A drawing's tabbed cutouts (closed holes with `LayerType.Tab` spans, see
+  [tabbed cutouts](tabbed-cutouts.md)) are material but not contour choices. Every full
+  and prefix emission cuts their pieces after the break cuts and before any contour,
+  entered from the slug without lead-outs; accounting requires each span between tabs cut
+  whole, once.
 - A part whose perimeter lies strictly inside a cutout of another part precedes
   that host. Material bounds (never rapids or scribe marks) only select candidate
   pairs; containment is proven on native clean material. Touching or crossing boundaries, or material that cannot be

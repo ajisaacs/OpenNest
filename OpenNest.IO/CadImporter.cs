@@ -7,6 +7,7 @@ using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO.Bending;
 using OpenNest.Math;
+using OpenNest.TabbedCutouts;
 
 namespace OpenNest.IO
 {
@@ -135,6 +136,10 @@ namespace OpenNest.IO
         /// Breakoffs to merge into the program and keep on the drawing; ones that cannot be
         /// resolved against <paramref name="entities"/> are kept but not applied.
         /// </param>
+        /// <param name="tabbedCutouts">
+        /// Tabbed cutouts to merge into the program (after breakoffs) and keep on the drawing;
+        /// ones that cannot be resolved are kept but not applied.
+        /// </param>
         public static Drawing BuildDrawing(
             CadImportResult result,
             IEnumerable<Entity> entities,
@@ -142,7 +147,8 @@ namespace OpenNest.IO
             int quantity,
             string customer,
             OpenNest.CNC.Program editedProgram,
-            IReadOnlyList<Breakoff> breakoffs = null
+            IReadOnlyList<Breakoff> breakoffs = null,
+            IReadOnlyList<TabbedCutout> tabbedCutouts = null
         )
         {
             var visible = entities as IList<Entity> ?? new List<Entity>(entities);
@@ -151,6 +157,8 @@ namespace OpenNest.IO
             var cut = breakoffs is { Count: > 0 }
                 ? BreakoffBuilder.Apply(visible.ToList(), breakoffs, out _)
                 : visible;
+            if (tabbedCutouts is { Count: > 0 })
+                cut = TabbedCutoutBuilder.Apply(cut.ToList(), tabbedCutouts, out _);
             var normalized = ShapeProfile.NormalizeEntities(cut);
             var pgm = ConvertGeometry.ToProgram(normalized);
 
@@ -176,6 +184,7 @@ namespace OpenNest.IO
             drawing.Quantity.Required = quantity;
             drawing.Bends.AddRange(bendList);
             drawing.Breakoffs = breakoffs?.Select(b => b.Clone()).ToList() ?? new List<Breakoff>();
+            drawing.TabbedCutouts = tabbedCutouts?.Select(c => c.Clone()).ToList() ?? new List<TabbedCutout>();
             drawing.Program = editedProgram ?? pgm;
 
             var bendSources = new HashSet<Entity>(
@@ -245,6 +254,7 @@ namespace OpenNest.IO
             existing.Bends.Clear();
             existing.Bends.AddRange(edited.Bends);
             existing.Breakoffs = edited.Breakoffs;
+            existing.TabbedCutouts = edited.TabbedCutouts;
         }
 
         private static bool IsRepairMark(Entity e) =>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -82,7 +83,9 @@ namespace OpenNest.CNC.CuttingStrategy
 
             foreach (var entry in cutoutEntries)
             {
-                if (!entry.Shape.IsClosed())
+                if (IsTabbedCutout(entry.Shape))
+                    EmitTabbedCutout(result, entry.Shape);
+                else if (!entry.Shape.IsClosed())
                     EmitRawContour(result, entry.Shape);
                 else
                     EmitContour(result, entry.Shape, entry.Point, entry.Entity);
@@ -131,7 +134,12 @@ namespace OpenNest.CNC.CuttingStrategy
             // Emit cutouts â€” only the target gets lead-in/out (skip open contours)
             foreach (var cutout in profile.Cutouts)
             {
-                if (!cutout.IsClosed())
+                // A tabbed cutout's pieces are always entered from its slug, like break cuts.
+                if (IsTabbedCutout(cutout))
+                {
+                    EmitTabbedCutout(result, cutout);
+                }
+                else if (!cutout.IsClosed())
                 {
                     EmitRawContour(result, cutout);
                 }
@@ -242,11 +250,14 @@ namespace OpenNest.CNC.CuttingStrategy
         /// own lead-in, lead-out and tab); a null list or entry uses <see cref="Parameters"/>.</param>
         internal Program EmitPrepared(Shape[] shapes, List<Entity> scribes,
             IReadOnlyList<CuttingPlanning.ContourChoice> choices,
-            IReadOnlyList<CuttingParameters> contourParameters = null, IReadOnlyList<Shape> breakCuts = null)
+            IReadOnlyList<CuttingParameters> contourParameters = null, IReadOnlyList<Shape> breakCuts = null,
+            IReadOnlyList<Shape> tabbedCutouts = null)
         {
             var result = new Program(Mode.Absolute);
             EmitScribeContours(result, scribes);
             EmitBreakCuts(result, breakCuts, shapes);
+            foreach (var cutout in tabbedCutouts ?? Array.Empty<Shape>())
+                EmitTabbedCutout(result, cutout);
             EmitChosenContours(result, shapes, choices, contourParameters);
             result.Mode = Mode.Incremental;
             return result;
@@ -1154,6 +1165,146 @@ namespace OpenNest.CNC.CuttingStrategy
             return Room(end, endScrap, contours) > Room(start, startScrap, contours)
                 ? (end, endScrap, true)
                 : (start, startScrap, false);
+        }
+
+        /// <summary>Whether <paramref name="shape"/> has <see cref="SpecialLayers.Tab"/> spans: a tabbed cutout.</summary>
+        internal static bool IsTabbedCutout(Shape shape) => shape.Entities.Exists(e => e.Layer == SpecialLayers.Tab);
+
+        /// <summary>
+        /// The cut pieces of a closed tabbed cutout in its own travel order, starting after a tab:
+        /// each maximal run of entities that are not on the tab layer.
+        /// </summary>
+        internal static List<Shape> TabbedCutoutPieces(Shape cutout)
+        {
+            var entities = cutout.Entities;
+            var count = entities.Count;
+            var first = -1;
+            for (var i = 0; i < count && first < 0; i++)
+                if (entities[i].Layer != SpecialLayers.Tab && entities[(i + count - 1) % count].Layer == SpecialLayers.Tab)
+                    first = i;
+            var pieces = new List<Shape>();
+            if (first < 0)
+                return pieces;
+            Shape current = null;
+            for (var k = 0; k < count; k++)
+            {
+                var entity = entities[(first + k) % count];
+                if (entity.Layer == SpecialLayers.Tab)
+                {
+                    current = null;
+                    continue;
+                }
+                if (current == null)
+                {
+                    current = new Shape();
+                    pieces.Add(current);
+                }
+                current.Entities.Add(entity);
+            }
+            foreach (var piece in pieces)
+                piece.UpdateBounds();
+            return pieces;
+        }
+
+        // A tabbed cutout is cut as open pieces between its tabs, in the cutout's own direction.
+        // Each piece is entered from the slug with the internal lead-in (NoLeadIn pierces on the
+        // contour) and has no lead-out, since it ends at a tab a run-out would cut into. A lead-in
+        // that would reach back over the tab behind its piece is mirrored about the entry normal,
+        // so it approaches from the piece's side instead. On an arc, a lead ending in an arc would
+        // meet the cut tangentially (a contact verification cannot resolve), so it pierces straight
+        // in from the same distance.
+        private void EmitTabbedCutout(Program program, Shape cutout)
+        {
+            var winding = DetermineWinding(cutout);
+            var leadIn = Parameters?.InternalLeadIn ?? new NoLeadIn();
+            foreach (var piece in TabbedCutoutPieces(cutout))
+            {
+                var first = piece.Entities[0];
+                var entry = EntityStartPoint(first);
+                var normal = ComputeNormal(entry, first, ContourType.Internal, winding);
+                var tangent = TravelTangent(first, entry);
+                program.Codes.AddRange(TabbedLeadIn(leadIn, entry, normal, tangent, winding, first is Arc));
+                program.Codes.AddRange(ConvertShapeToMoves(piece, entry));
+            }
+        }
+
+        private static List<ICode> TabbedLeadIn(LeadIn leadIn, Vector entry, double normal, Vector tangent,
+            RotationType winding, bool onArc)
+        {
+            var codes = leadIn.Generate(entry, normal, winding);
+            if (!(onArc && codes.Count > 0 && codes[^1] is ArcMove))
+            {
+                if (ReachBehind(codes, entry, tangent) <= Tolerance.Epsilon)
+                    return codes;
+                var mirrored = codes.Select(code => Mirror(code, entry, tangent)).ToList();
+                if (ReachBehind(mirrored, entry, tangent) <= Tolerance.Epsilon)
+                    return mirrored;
+            }
+            // Reaching both ways, or tangent to an arc: pierce straight in from the same distance.
+            var pierce = leadIn.GetPiercePoint(entry, normal);
+            return new LineLeadIn { Length = pierce.DistanceTo(entry), ApproachAngle = 90 }.Generate(entry, normal, winding);
+        }
+
+        // How far the lead motions of `codes` (absolute, after their first rapid) reach behind
+        // `entry`, against the unit travel `tangent`.
+        private static double ReachBehind(List<ICode> codes, Vector entry, Vector tangent)
+        {
+            var behind = new Vector(-tangent.X, -tangent.Y);
+            double Along(Vector p) => (p.X - entry.X) * behind.X + (p.Y - entry.Y) * behind.Y;
+            var reach = double.NegativeInfinity;
+            Vector? position = null;
+            foreach (var code in codes)
+            {
+                if (code is not Motion motion)
+                    continue;
+                var end = motion.EndPoint;
+                if (position is { } start && code is not RapidMove)
+                {
+                    reach = System.Math.Max(reach, System.Math.Max(Along(start), Along(end)));
+                    if (code is ArcMove arc)
+                    {
+                        var center = arc.CenterPoint;
+                        var radius = center.DistanceTo(end);
+                        var extreme = new Vector(center.X + behind.X * radius, center.Y + behind.Y * radius);
+                        if (OnArc(center, start, end, extreme, arc.Rotation))
+                            reach = System.Math.Max(reach, Along(extreme));
+                    }
+                }
+                position = end;
+            }
+            return reach;
+        }
+
+        private static bool OnArc(Vector center, Vector start, Vector end, Vector point, RotationType rotation)
+        {
+            var a0 = System.Math.Atan2(start.Y - center.Y, start.X - center.X);
+            var a1 = System.Math.Atan2(end.Y - center.Y, end.X - center.X);
+            var ap = System.Math.Atan2(point.Y - center.Y, point.X - center.X);
+            var sign = rotation == RotationType.CCW ? 1 : -1;
+            var sweep = Angle.NormalizeRad(sign * (a1 - a0));
+            if (sweep <= Tolerance.Epsilon)
+                sweep = Angle.TwoPI;
+            return Angle.NormalizeRad(sign * (ap - a0)) <= sweep;
+        }
+
+        // `code` reflected across the line through `entry` along its normal (negating the
+        // tangent component), with arc directions swapped.
+        private static ICode Mirror(ICode code, Vector entry, Vector tangent)
+        {
+            Vector Reflect(Vector p)
+            {
+                var along = (p.X - entry.X) * tangent.X + (p.Y - entry.Y) * tangent.Y;
+                return new Vector(p.X - 2 * along * tangent.X, p.Y - 2 * along * tangent.Y);
+            }
+            return code switch
+            {
+                RapidMove rapid => new RapidMove(Reflect(rapid.EndPoint)),
+                LinearMove line => new LinearMove(Reflect(line.EndPoint)) { Layer = line.Layer },
+                ArcMove arc => new ArcMove(Reflect(arc.EndPoint), Reflect(arc.CenterPoint),
+                    arc.Rotation == RotationType.CW ? RotationType.CCW : RotationType.CW)
+                { Layer = arc.Layer },
+                _ => code,
+            };
         }
 
         private static List<Shape> BreakCutContours(ShapeProfile profile) =>

@@ -59,6 +59,7 @@ Read the relevant contract before changing its behavior:
 - [Directional slides](docs/geometry/directional-slides.md) and [pair-spacing limits](docs/geometry/pair-spacing.md)
 - [Lead-in placement](docs/geometry/lead-in-placement.md)
 - [Breakoffs](docs/breakoffs.md): tabbed scrap; `Break`-layer open cuts that are cut but are not material
+- [Tabbed cutouts](docs/tabbed-cutouts.md): holes cut in pieces around `Tab`-layer spans that are material but never cut
 - [Material-overlap diagnostics](docs/geometry/visual-overlap-check.md)
 - [Automatic cutoffs and sequencing](docs/automatic-scrap-cutoffs.md)
 - [Pre-post verification](docs/post-verification.md)

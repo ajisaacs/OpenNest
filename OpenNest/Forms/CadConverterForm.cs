@@ -15,6 +15,7 @@ using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.IO.Bending;
+using OpenNest.TabbedCutouts;
 
 namespace OpenNest.Forms
 {
@@ -57,6 +58,12 @@ namespace OpenNest.Forms
             filterPanel.BreakoffFlipped += OnBreakoffFlipped;
             entityView1.BreakoffEdgePicked += OnBreakoffEdgePicked;
             entityView1.TabDragged += OnTabDragged;
+            filterPanel.AddTabbedCutoutClicked += OnAddTabbedCutoutClicked;
+            filterPanel.TabbedCutoutSelected += OnTabbedCutoutSelected;
+            filterPanel.TabbedCutoutEdited += OnTabbedCutoutEdited;
+            filterPanel.TabbedCutoutRemoved += OnTabbedCutoutRemoved;
+            entityView1.TabbedCutoutPicked += OnTabbedCutoutPicked;
+            entityView1.CutoutTabDragged += OnCutoutTabDragged;
             entityView1.LinePicked += OnLinePicked;
             entityView1.PickCancelled += OnPickCancelled;
             entityView1.TextConvertRequested += OnTextConvertRequested;
@@ -179,7 +186,13 @@ namespace OpenNest.Forms
                 entityView1.IsPickingBreakoff = false;
                 filterPanel.SetBreakoffPickMode(false);
             }
+            if (entityView1.IsPickingTabbedCutout)
+            {
+                entityView1.IsPickingTabbedCutout = false;
+                filterPanel.SetTabbedCutoutPickMode(false);
+            }
             entityView1.SelectedBreakoffIndex = -1;
+            entityView1.SelectedTabbedCutoutIndex = -1;
             entityView1.OriginalEntities = chkShowOriginal.Checked ? item.OriginalEntities : null;
             entityView1.Entities.Clear();
             entityView1.Entities.AddRange(item.Entities);
@@ -194,6 +207,7 @@ namespace OpenNest.Forms
 
             filterPanel.LoadItem(item.Entities, item.Bends);
             RefreshBreakoffs(item);
+            RefreshTabbedCutouts(item);
 
             numQuantity.Value = item.Quantity;
             txtCustomer.Text = item.Customer ?? "";
@@ -275,6 +289,7 @@ namespace OpenNest.Forms
             ReHidePromotedEntities(item.Bends);
             SyncSuppressedState(item);
             RefreshBreakoffs(item);
+            RefreshTabbedCutouts(item);
             staleProgram = true;
         }
 
@@ -302,7 +317,8 @@ namespace OpenNest.Forms
                 return;
             }
 
-            var cut = BreakoffBuilder.Apply(entities, item.Breakoffs, out _);
+            var cut = TabbedCutoutBuilder.Apply(BreakoffBuilder.Apply(entities, item.Breakoffs, out _),
+                item.TabbedCutouts, out _);
             var normalized = ShapeProfile.NormalizeEntities(cut);
             programEditor.LoadEntities(normalized);
             staleProgram = false;
@@ -482,6 +498,8 @@ namespace OpenNest.Forms
         {
             entityView1.IsPickingBreakoff = false;
             filterPanel.SetBreakoffPickMode(false);
+            entityView1.IsPickingTabbedCutout = false;
+            filterPanel.SetTabbedCutoutPickMode(false);
             var active = !entityView1.IsPickingBendLine;
             entityView1.IsPickingBendLine = active;
             filterPanel.SetPickMode(active);
@@ -523,6 +541,8 @@ namespace OpenNest.Forms
             filterPanel.SetPickMode(false);
             entityView1.IsPickingBreakoff = false;
             filterPanel.SetBreakoffPickMode(false);
+            entityView1.IsPickingTabbedCutout = false;
+            filterPanel.SetTabbedCutoutPickMode(false);
         }
 
         private static List<Entity> VisibleEntities(FileListItem item) =>
@@ -570,6 +590,8 @@ namespace OpenNest.Forms
         {
             entityView1.IsPickingBendLine = false;
             filterPanel.SetPickMode(false);
+            entityView1.IsPickingTabbedCutout = false;
+            filterPanel.SetTabbedCutoutPickMode(false);
             var active = !entityView1.IsPickingBreakoff;
             entityView1.IsPickingBreakoff = active;
             filterPanel.SetBreakoffPickMode(active);
@@ -631,6 +653,10 @@ namespace OpenNest.Forms
                 foreach (var id in breakoff.EdgeIds.ToList())
                     if (split.TryGetValue(id, out var pieces))
                         breakoff.EdgeIds.AddRange(pieces.Where(p => p != id));
+            foreach (var cutout in item.TabbedCutouts)
+                foreach (var id in cutout.EdgeIds.ToList())
+                    if (split.TryGetValue(id, out var pieces))
+                        cutout.EdgeIds.AddRange(pieces.Where(p => p != id));
 
             item.EntityCount = item.Entities.Count;
             entityView1.Entities.Clear();
@@ -740,6 +766,166 @@ namespace OpenNest.Forms
             RefreshBreakoffs(item);
             staleProgram = true;
         }
+
+        // Tabbed cutouts resolve against the entities that will be cut: breakoffs come first.
+        private static List<Entity> CutoutEntities(FileListItem item) =>
+            BreakoffBuilder.Apply(VisibleEntities(item), item.Breakoffs, out _);
+
+        private void RefreshTabbedCutouts(FileListItem item)
+        {
+            var entities = CutoutEntities(item);
+            var layouts = item.TabbedCutouts.Select(c => TabbedCutoutBuilder.Layout(entities, c)).ToList();
+            entityView1.TabbedCutoutLayouts = layouts;
+            filterPanel.LoadTabbedCutouts(layouts
+                .Select((l, i) => l.IsValid
+                    ? $"Cutout {i + 1}: {l.TabCenters.Count} tab{(l.TabCenters.Count == 1 ? "" : "s")}"
+                    : $"Cutout {i + 1} (not applied): {l.Error}")
+                .ToList(), entityView1.SelectedTabbedCutoutIndex);
+            entityView1.Invalidate();
+        }
+
+        private void OnAddTabbedCutoutClicked(object sender, EventArgs e)
+        {
+            entityView1.IsPickingBendLine = false;
+            filterPanel.SetPickMode(false);
+            entityView1.IsPickingBreakoff = false;
+            filterPanel.SetBreakoffPickMode(false);
+            var active = !entityView1.IsPickingTabbedCutout;
+            entityView1.IsPickingTabbedCutout = active;
+            filterPanel.SetTabbedCutoutPickMode(active);
+        }
+
+        private void OnTabbedCutoutPicked(object sender, (Entity Entity, Vector Point) pick)
+        {
+            entityView1.IsPickingTabbedCutout = false;
+            filterPanel.SetTabbedCutoutPickMode(false);
+            var item = CurrentItem;
+            if (item == null)
+                return;
+
+            var visible = VisibleEntities(item);
+            var entity = visible.Where(en => en is Geometry.Line or Arc or Circle)
+                .OrderBy(en => en.ClosestPointTo(pick.Point).DistanceTo(pick.Point)).FirstOrDefault();
+            if (entity == null)
+                return;
+            var hole = TabbedCutoutBuilder.FindHole(visible, entity);
+            if (hole.Count == 0)
+            {
+                ShowTabbedCutoutMessage("That is not a closed hole. Click a circle, or a line or arc of a "
+                    + "cutout that closes on itself.");
+                return;
+            }
+            var used = item.TabbedCutouts.SelectMany(c => c.EdgeIds).ToHashSet();
+            if (hole.Any(en => used.Contains(en.Id)))
+            {
+                ShowTabbedCutoutMessage("That hole is already a tabbed cutout.");
+                return;
+            }
+
+            var cutout = new TabbedCutout { EdgeIds = hole.Select(en => en.Id).ToList() };
+            var layout = TabbedCutoutBuilder.Layout(CutoutEntities(item), cutout);
+            if (!layout.IsValid)
+            {
+                ShowTabbedCutoutMessage("Could not make a tabbed cutout from that hole: " + layout.Error);
+                return;
+            }
+
+            using var dialog = new TabbedCutoutDialog();
+            if (!AskTabbedCutoutSettings(dialog))
+                return;
+            if (!TryConfigure(item, cutout, dialog, keepTabs: false))
+                return;
+
+            item.TabbedCutouts.Add(cutout);
+            entityView1.SelectedTabbedCutoutIndex = item.TabbedCutouts.Count - 1;
+            RefreshTabbedCutouts(item);
+            staleProgram = true;
+        }
+
+        private void OnTabbedCutoutEdited(object sender, int index)
+        {
+            var item = CurrentItem;
+            if (item == null || index < 0 || index >= item.TabbedCutouts.Count)
+                return;
+
+            var current = item.TabbedCutouts[index];
+            using var dialog = new TabbedCutoutDialog();
+            dialog.LoadCutout(current);
+            if (!AskTabbedCutoutSettings(dialog))
+                return;
+
+            var edited = current.Clone();
+            var keepTabs = dialog.TabCount == current.TabCenters.Count
+                && Math.Tolerance.IsEqualTo(dialog.TabWidth, current.TabWidth);
+            if (!TryConfigure(item, edited, dialog, keepTabs))
+                return;
+
+            item.TabbedCutouts[index] = edited;
+            RefreshTabbedCutouts(item);
+            staleProgram = true;
+        }
+
+        // Applies the dialog's settings, spacing the tabs evenly unless asked to keep them, and
+        // refuses settings that do not resolve.
+        private bool TryConfigure(FileListItem item, TabbedCutout cutout, TabbedCutoutDialog dialog, bool keepTabs)
+        {
+            var entities = CutoutEntities(item);
+            cutout.TabWidth = dialog.TabWidth;
+            if (!keepTabs)
+            {
+                var probe = cutout.Clone();
+                probe.TabCenters.Clear();
+                probe.TabWidth = TabbedCutout.DefaultTabWidth;
+                var even = TabbedCutoutBuilder.Layout(entities, probe);
+                if (even.IsValid)
+                    cutout.TabCenters = even.EvenTabCenters(dialog.TabCount);
+            }
+
+            var layout = TabbedCutoutBuilder.Layout(entities, cutout);
+            if (layout.IsValid)
+                return true;
+            ShowTabbedCutoutMessage("Those settings do not fit this cutout: " + layout.Error);
+            return false;
+        }
+
+        private void OnTabbedCutoutRemoved(object sender, int index)
+        {
+            var item = CurrentItem;
+            if (item == null || index < 0 || index >= item.TabbedCutouts.Count)
+                return;
+
+            item.TabbedCutouts.RemoveAt(index);
+            entityView1.SelectedTabbedCutoutIndex = -1;
+            RefreshTabbedCutouts(item);
+            staleProgram = true;
+        }
+
+        private void OnTabbedCutoutSelected(object sender, int index)
+        {
+            entityView1.SelectedTabbedCutoutIndex = index;
+            entityView1.Invalidate();
+        }
+
+        private void OnCutoutTabDragged(object sender, CutoutTabDragEventArgs e)
+        {
+            var item = CurrentItem;
+            if (item == null || e.Cutout >= item.TabbedCutouts.Count)
+                return;
+
+            var cutout = item.TabbedCutouts[e.Cutout];
+            if (e.Tab >= cutout.TabCenters.Count)
+                return;
+            cutout.TabCenters[e.Tab] = e.Center;
+            entityView1.SelectedTabbedCutoutIndex = e.Cutout;
+            RefreshTabbedCutouts(item);
+            staleProgram = true;
+        }
+
+        internal virtual bool AskTabbedCutoutSettings(TabbedCutoutDialog dialog) =>
+            dialog.ShowDialog(this) == DialogResult.OK;
+
+        internal virtual void ShowTabbedCutoutMessage(string message) =>
+            MessageBox.Show(this, message, "Tabbed Cutout", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
         internal virtual bool AskBreakoffSettings(BreakoffDialog dialog) =>
             dialog.ShowDialog(this) == DialogResult.OK;
@@ -1058,6 +1244,7 @@ namespace OpenNest.Forms
                     Customer = drawing.Customer ?? string.Empty,
                     Bends = drawing.Bends?.ToList() ?? new List<Bend>(),
                     Breakoffs = drawing.Breakoffs?.Select(b => b.Clone()).ToList() ?? new List<Breakoff>(),
+                    TabbedCutouts = drawing.TabbedCutouts?.Select(c => c.Clone()).ToList() ?? new List<TabbedCutout>(),
                     SuppressedEntityIds =
                         drawing.SuppressedEntityIds.Count > 0
                             ? new HashSet<Guid>(drawing.SuppressedEntityIds)
@@ -1108,7 +1295,8 @@ namespace OpenNest.Forms
                     item.Quantity,
                     item.Customer,
                     editedProgram,
-                    item.Breakoffs
+                    item.Breakoffs,
+                    item.TabbedCutouts
                 );
 
                 drawings.Add(drawing);

@@ -12,6 +12,7 @@ using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using OpenNest.TabbedCutouts;
 using static OpenNest.IO.NestFormat;
 
 namespace OpenNest.IO
@@ -279,6 +280,7 @@ namespace OpenNest.IO
                 drawing.Library = ReadLibraryLink(d);
                 drawing.CutPins = ReadCutPins(d);
                 drawing.Breakoffs = ReadBreakoffs(d);
+                drawing.TabbedCutouts = ReadTabbedCutouts(d);
                 map[d.Id] = drawing;
             }
             return map;
@@ -358,6 +360,37 @@ namespace OpenNest.IO
                 }
             }
             return breakoffs;
+        }
+
+        // Like breakoffs: the program already has the tabs applied, so a dropped definition only
+        // loses editability.
+        private List<TabbedCutout> ReadTabbedCutouts(DrawingDto d)
+        {
+            var cutouts = new List<TabbedCutout>();
+            if (d.TabbedCutouts == null)
+                return cutouts;
+
+            for (var i = 0; i < d.TabbedCutouts.Count; i++)
+            {
+                var dto = d.TabbedCutouts[i];
+                if (dto?.EdgeIds is { Count: > 0 } && dto.TabCenters != null
+                    && dto.TabWidth > 0 && double.IsFinite(dto.TabWidth)
+                    && dto.TabCenters.All(double.IsFinite))
+                {
+                    cutouts.Add(new TabbedCutout
+                    {
+                        EdgeIds = dto.EdgeIds.ToList(),
+                        TabWidth = dto.TabWidth,
+                        TabCenters = dto.TabCenters.ToList(),
+                    });
+                }
+                else
+                {
+                    warnings.Add($"Drawing '{d.Name}': tabbed cutout {i + 1} could not be read; its cut "
+                        + "geometry is kept, but it can no longer be edited as a tabbed cutout.");
+                }
+            }
+            return cutouts;
         }
 
         private bool ReadPinsOff(PartDto dto, int plateId, int partIndex, Part part)

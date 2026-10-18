@@ -340,13 +340,13 @@ namespace OpenNest.Breakoffs
             return entities.Where((_, i) => !removed[i]).ToList();
         }
 
-        private static bool IsMark(Entity e) =>
+        internal static bool IsMark(Entity e) =>
             string.Equals(e.Layer?.Name, "ETCH", StringComparison.OrdinalIgnoreCase)
             || string.Equals(e.Layer?.Name, SpecialLayers.Scribe.Name, StringComparison.OrdinalIgnoreCase);
 
         // The planner closes contours far tighter than the import chain tolerance, and the outline
         // is re-chained from any entity when the program is built, so every joint must be exact.
-        private static List<Entity> CloseExactly(IReadOnlyList<Entity> loop)
+        internal static List<Entity> CloseExactly(IReadOnlyList<Entity> loop)
         {
             var result = new List<Entity>();
             for (var i = 0; i < loop.Count; i++)

@@ -138,6 +138,13 @@ namespace OpenNest
         public List<Breakoffs.Breakoff> Breakoffs { get; set; } = new List<Breakoffs.Breakoff>();
 
         /// <summary>
+        /// Holes whose slugs stay attached by tabs, in the source frame. <see cref="Program"/> already
+        /// has them applied (cut pieces plus <see cref="CNC.LayerType.Tab"/> spans); they are kept so
+        /// an editor can change them from <see cref="SourceEntities"/>.
+        /// </summary>
+        public List<TabbedCutouts.TabbedCutout> TabbedCutouts { get; set; } = new List<TabbedCutouts.TabbedCutout>();
+
+        /// <summary>
         /// Complete set of source entities with stable GUIDs.
         /// Null when the drawing was created from G-code or an older nest file.
         /// </summary>

@@ -20,6 +20,7 @@ namespace OpenNest.Controls
         public List<Entity> OriginalEntities { get; set; }
         public List<Bend> Bends { get; set; } = new();
         public List<Breakoffs.Breakoff> Breakoffs { get; set; } = new();
+        public List<TabbedCutouts.TabbedCutout> TabbedCutouts { get; set; } = new();
         public HashSet<Guid> SuppressedEntityIds { get; set; }
         public Box Bounds { get; set; }
         public int EntityCount { get; set; }

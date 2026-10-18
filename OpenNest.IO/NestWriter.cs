@@ -210,6 +210,14 @@ namespace OpenNest.IO
                                 TabCenters = b.TabCenters.ToList(),
                             }).ToList()
                             : null,
+                        TabbedCutouts = d.TabbedCutouts?.Count > 0
+                            ? d.TabbedCutouts.Select(c => new TabbedCutoutDto
+                            {
+                                EdgeIds = c.EdgeIds.ToList(),
+                                TabWidth = c.TabWidth,
+                                TabCenters = c.TabCenters.ToList(),
+                            }).ToList()
+                            : null,
                     }
                 );
             }
@@ -677,6 +685,9 @@ namespace OpenNest.IO
 
                 case LayerType.Break:
                     return ":BREAK";
+
+                case LayerType.Tab:
+                    return ":TAB";
 
                 default:
                     return string.Empty;

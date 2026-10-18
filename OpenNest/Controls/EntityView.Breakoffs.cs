@@ -60,14 +60,24 @@ namespace OpenNest.Controls
         protected override void OnMouseDown(MouseEventArgs e)
         {
             base.OnMouseDown(e);
-            if (e.Button == MouseButtons.Left && !IsPickingBendLine && !IsPickingBreakoff)
-                draggedTab = HitTestTab(e.Location);
+            if (e.Button != MouseButtons.Left || IsPicking)
+                return;
+            draggedTab = HitTestTab(e.Location);
+            if (draggedTab == null)
+                draggedCutoutTab = HitTestCutoutTab(e.Location);
         }
 
         protected override void OnMouseUp(MouseEventArgs e)
         {
             base.OnMouseUp(e);
-            if (draggedTab is not { } tab || e.Button != MouseButtons.Left)
+            if (e.Button != MouseButtons.Left)
+                return;
+            if (draggedCutoutTab is { } cutoutTab)
+            {
+                draggedCutoutTab = null;
+                RaiseCutoutTabDragged(cutoutTab, e.Location, finished: true);
+            }
+            if (draggedTab is not { } tab)
                 return;
             draggedTab = null;
             RaiseTabDragged(tab, e.Location, finished: true);
@@ -77,8 +87,12 @@ namespace OpenNest.Controls
         {
             if (draggedTab is { } tab)
                 RaiseTabDragged(tab, e.Location, finished: false);
-            else if (e.Button == MouseButtons.None && !IsPickingBendLine && !IsPickingBreakoff)
-                Cursor = HitTestTab(e.Location) != null ? Cursors.SizeAll : Cursors.Cross;
+            else if (draggedCutoutTab is { } cutoutTab)
+                RaiseCutoutTabDragged(cutoutTab, e.Location, finished: false);
+            else if (e.Button == MouseButtons.None && !IsPicking)
+                Cursor = HitTestTab(e.Location) != null || HitTestCutoutTab(e.Location) != null
+                    ? Cursors.SizeAll
+                    : Cursors.Cross;
         }
 
         private bool HandleBreakoffClick(MouseEventArgs e)

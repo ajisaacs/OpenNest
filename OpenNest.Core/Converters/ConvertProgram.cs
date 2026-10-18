@@ -210,6 +210,9 @@ namespace OpenNest.Converters
                 case LayerType.Break:
                     return SpecialLayers.Break;
 
+                case LayerType.Tab:
+                    return SpecialLayers.Tab;
+
                 default:
                     return new Layer(layer.ToString());
             }

@@ -14,5 +14,12 @@ namespace OpenNest.CNC
         /// it may be pierced from lies to the left of travel.
         /// </summary>
         Break,
+
+        /// <summary>
+        /// An uncut span of a material boundary (a tabbed cutout's tab). It bounds material like
+        /// <see cref="Cut"/> so the cutout stays a closed hole, but it is never cut: emission
+        /// leaves it out, cutting the rest of the contour as open pieces.
+        /// </summary>
+        Tab,
     }
 }

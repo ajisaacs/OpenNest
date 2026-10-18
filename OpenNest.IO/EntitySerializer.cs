@@ -137,6 +137,8 @@ namespace OpenNest.IO
                 return SpecialLayers.Scribe;
             if (string.Equals(name, SpecialLayers.Break.Name, StringComparison.OrdinalIgnoreCase))
                 return SpecialLayers.Break;
+            if (string.Equals(name, SpecialLayers.Tab.Name, StringComparison.OrdinalIgnoreCase))
+                return SpecialLayers.Tab;
 
             return new Layer(name);
         }

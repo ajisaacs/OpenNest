@@ -284,6 +284,10 @@ namespace OpenNest.IO
                                         layer = LayerType.Break;
                                         break;
 
+                                    case "TAB":
+                                        layer = LayerType.Tab;
+                                        break;
+
                                     case "SUPPRESSED":
                                         suppressed = true;
                                         break;
@@ -384,6 +388,10 @@ namespace OpenNest.IO
 
                                     case "BREAK":
                                         layer = LayerType.Break;
+                                        break;
+
+                                    case "TAB":
+                                        layer = LayerType.Tab;
                                         break;
 
                                     case "SUPPRESSED":

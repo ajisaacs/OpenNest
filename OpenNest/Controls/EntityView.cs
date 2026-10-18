@@ -74,7 +74,7 @@ namespace OpenNest.Controls
             if (!Focused)
                 Focus();
 
-            if (HandleBreakoffClick(e))
+            if (HandleBreakoffClick(e) || HandleTabbedCutoutClick(e))
                 return;
 
             if (IsPickingBendLine && e.Button == MouseButtons.Left)
@@ -127,6 +127,7 @@ namespace OpenNest.Controls
 
             DrawBendLines(e.Graphics);
             DrawBreakoffs(e.Graphics);
+            DrawTabbedCutouts(e.Graphics);
 
             foreach (var entity in Entities)
             {
@@ -227,10 +228,11 @@ namespace OpenNest.Controls
             if (e.KeyCode == Keys.F)
                 ZoomToFit();
 
-            if ((IsPickingBendLine || IsPickingBreakoff) && e.KeyCode == Keys.Escape)
+            if (IsPicking && e.KeyCode == Keys.Escape)
             {
                 IsPickingBendLine = false;
                 IsPickingBreakoff = false;
+                IsPickingTabbedCutout = false;
                 PickCancelled?.Invoke(this, EventArgs.Empty);
             }
         }

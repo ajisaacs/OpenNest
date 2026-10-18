@@ -61,8 +61,9 @@ namespace OpenNest
             out bool hasOpenCuts
         )
         {
+            // A tabbed cutout's tabs are never cut, so they are filled but not drawn as cuts.
             cutPath = GetLayerPath(pgm, origin,
-                layer => layer != LayerType.Scribe && layer != LayerType.Leadin && layer != LayerType.Leadout,
+                layer => layer is not (LayerType.Scribe or LayerType.Leadin or LayerType.Leadout or LayerType.Tab),
                 bridgeTabs: false, out hasOpenCuts);
             leadPath = GetLayerPath(pgm, origin,
                 layer => layer == LayerType.Leadin || layer == LayerType.Leadout, bridgeTabs: false, out _);

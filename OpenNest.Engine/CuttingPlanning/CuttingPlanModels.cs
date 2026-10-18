@@ -167,6 +167,7 @@ public sealed class FixedProgramPlacement
             return null;
         var pins = new int?[execution.Motions.Count];
         var breakCuts = BreakCutMotions.Mask(execution.Motions);
+        var tabbedPieces = Prepared.TabbedPieceCount;
         var group = -1;
         var opening = true; // Inside the rapids that open a group.
         int? pin = null;
@@ -196,6 +197,15 @@ public sealed class FixedProgramPlacement
                     pin = null;
                     if (group >= 0)
                         return null;
+                    continue;
+                }
+                // Then the tabbed cutouts' pieces, one lead-in and cut group each.
+                if (tabbedPieces > 0)
+                {
+                    pin = null;
+                    if (group >= 0)
+                        return null;
+                    tabbedPieces--;
                     continue;
                 }
                 if (++group >= choices.Count)

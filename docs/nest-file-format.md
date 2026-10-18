@@ -165,7 +165,8 @@ fixed archive timestamps and dates, and no best-fit entries, so equal content ha
 equal bytes and SHA-256. The server stores each distinct package once by that hash.
 
 A package holds geometry and geometry-bound data only: program, source entities and
-offset, suppressed entity IDs, bends, cut pins, breakoffs and material density. Fields
+offset, suppressed entity IDs, bends, cut pins, breakoffs, tabbed cutouts and material
+density. Fields
 the server's library record owns are written as their defaults, so editing them never
 changes the hash:
 
@@ -216,6 +217,19 @@ editable.
 Break cuts are saved as motions tagged `:BREAK`. In a drawing program each break cut
 travels with its scrap on the left; placed programs may cut it either way. Versions
 without breakoff support cannot read the tag.
+
+## Drawing tabbed cutouts
+
+A drawing may carry a `tabbedCutouts` array, omitted when empty. Each entry has
+`edgeIds` (source entity IDs of the hole's contour), `tabWidth` and `tabCenters`
+(distances counterclockwise around the hole from its lowest-left vertex), all in the
+source frame; see [tabbed cutouts](tabbed-cutouts.md). The stored program already has
+them applied, so readers never rebuild geometry from them. An entry with no edges, a tab
+width that is not positive and finite, or a nonfinite tab center is dropped with a reader
+warning; the drawing and its program load unchanged, only the cutout stops being editable.
+
+Tab spans are saved as motions tagged `:TAB`. They bound material but are never cut;
+versions without tabbed cutout support read them as ordinary cut motions.
 
 ## Verification and limits
 

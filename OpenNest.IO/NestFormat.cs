@@ -214,6 +214,20 @@ namespace OpenNest.IO
             /// </summary>
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             public List<BreakoffDto> Breakoffs { get; init; }
+
+            /// <summary>
+            /// Tabbed cutouts in the source frame, already applied to the stored program. Omitted
+            /// when there are none.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public List<TabbedCutoutDto> TabbedCutouts { get; init; }
+        }
+
+        public record TabbedCutoutDto
+        {
+            public List<Guid> EdgeIds { get; init; } = new();
+            public double TabWidth { get; init; }
+            public List<double> TabCenters { get; init; } = new();
         }
 
         public record BreakoffDto

@@ -26,24 +26,29 @@ public sealed class PreparedContours
     // Open break cuts in program order, each travel-ordered with its scrap on the left. They are
     // not contours: no choices, no material; every full or prefix emission cuts them first.
     private readonly List<Shape> breakCuts;
+    // Closed cutouts with tab spans, in program order. Like break cuts they are not choices:
+    // every full or prefix emission cuts their pieces after the break cuts.
+    private readonly List<Shape> tabbedCutouts;
     // By contour ordinal; all null without pins. A pinned contour has exactly one entry and
     // its own owned settings (the pin's lead-in, lead-out and tab).
     private readonly ContourChoice[] pinned;
     private readonly CuttingParameters[] contourParameters;
     private readonly int[] pinNumbers;
 
-    private PreparedContours(Shape[] shapes, List<Entity> scribes, List<Shape> breakCuts, CuttingParameters parameters)
+    private PreparedContours(Shape[] shapes, List<Entity> scribes, List<Shape> breakCuts, List<Shape> tabbedCutouts,
+        CuttingParameters parameters)
     {
         this.shapes = shapes;
         this.scribes = scribes;
         this.breakCuts = breakCuts;
+        this.tabbedCutouts = tabbedCutouts;
         this.parameters = parameters;
         pinned = new ContourChoice[shapes.Length];
         pinNumbers = new int[shapes.Length];
     }
 
     private PreparedContours(PreparedContours unpinned, IReadOnlyList<CutPinResolution> pins, CancellationToken token)
-        : this(unpinned.shapes, unpinned.scribes, unpinned.breakCuts, unpinned.parameters)
+        : this(unpinned.shapes, unpinned.scribes, unpinned.breakCuts, unpinned.tabbedCutouts, unpinned.parameters)
     {
         contourParameters = new CuttingParameters[shapes.Length];
         var rejected = new List<CutPinResolution>();
@@ -139,6 +144,7 @@ public sealed class PreparedContours
         var contours = new List<Shape>();
         var scribes = new List<Entity>();
         var breakCuts = new List<Shape>();
+        var tabbedCutouts = new List<Shape>();
         Shape breakCut = null;
         var current = new Shape();
         foreach (var entity in geometryProgram.ToGeometry())
@@ -169,13 +175,13 @@ public sealed class PreparedContours
                     scribes.Add(entity);
                 continue;
             }
-            if (entity.Layer != SpecialLayers.Cut && entity.Layer != SpecialLayers.Display)
+            if (entity.Layer != SpecialLayers.Cut && entity.Layer != SpecialLayers.Display && entity.Layer != SpecialLayers.Tab)
                 throw new ArgumentException("Preparation requires clean cut/display contours.");
             if (entity.Length <= PostVerificationGeometry.Epsilon || !double.IsFinite(entity.Length))
                 throw new ArgumentException("Degenerate contour entity.");
             if (entity is Circle)
             {
-                if (current.Entities.Count != 0)
+                if (current.Entities.Count != 0 || entity.Layer == SpecialLayers.Tab)
                     throw new ArgumentException("Circle interrupts an open contour.");
                 current.Entities.Add(entity);
                 FinishContour();
@@ -202,12 +208,19 @@ public sealed class PreparedContours
         contours.Add(outer);
         foreach (var cut in breakCuts)
             cut.UpdateBounds();
-        return new(contours.ToArray(), scribes, breakCuts, ownedParameters);
+        return new(contours.ToArray(), scribes, breakCuts, tabbedCutouts, ownedParameters);
 
         void FinishContour()
         {
             current.UpdateBounds();
-            contours.Add(current);
+            if (ContourCuttingStrategy.IsTabbedCutout(current))
+            {
+                if (current.Entities.TrueForAll(e => e.Layer == SpecialLayers.Tab))
+                    throw new ArgumentException("A tabbed cutout has nothing to cut.");
+                tabbedCutouts.Add(current);
+            }
+            else
+                contours.Add(current);
             current = new Shape();
         }
     }
@@ -594,11 +607,18 @@ public sealed class PreparedContours
         Validate(choices, false);
         return new ContourCuttingStrategy { Parameters = parameters }.EmitPrepared(
             shapes.Select(s => (Shape)s.Clone()).ToArray(), scribes.Select(e => e.Clone()).ToList(), choices,
-            contourParameters, breakCuts.Select(s => (Shape)s.Clone()).ToList());
+            contourParameters, breakCuts.Select(s => (Shape)s.Clone()).ToList(),
+            tabbedCutouts.Select(s => (Shape)s.Clone()).ToList());
     }
 
     /// <summary>Open break cuts this preparation cuts before its contours.</summary>
     public int BreakCutCount => breakCuts.Count;
+
+    /// <summary>Tabbed cutouts this preparation cuts, as pieces, after its break cuts and before its contours.</summary>
+    public int TabbedCutoutCount => tabbedCutouts.Count;
+
+    /// <summary>Open pieces the tabbed cutouts are cut in, each a lead-in and cut group of its own.</summary>
+    public int TabbedPieceCount => tabbedCutouts.Sum(c => ContourCuttingStrategy.TabbedCutoutPieces(c).Count);
 
     internal void ValidateCompleteChoices(IReadOnlyList<ContourChoice> choices) => Validate(choices, true);
 

@@ -11,15 +11,23 @@ namespace OpenNest.CNC.CuttingPlanning;
 /// <summary>Owned nominal material: one simple perimeter minus disjoint simple holes.</summary>
 public sealed class LeadMaterialSnapshot
 {
-    private LeadMaterialSnapshot(IReadOnlyList<PostVerificationGeometry.Curve[]> rings, string reason)
+    private LeadMaterialSnapshot(IReadOnlyList<PostVerificationGeometry.Curve[]> rings, IReadOnlyList<bool[]> tabs,
+        string reason)
     {
         Rings = rings;
+        Tabs = tabs;
         Reason = reason;
     }
 
     public bool IsComplete => Reason == null;
     public string Reason { get; }
     internal IReadOnlyList<PostVerificationGeometry.Curve[]> Rings { get; }
+
+    /// <summary>
+    /// Per ring curve, whether it is a tabbed cutout's tab: material boundary that the
+    /// program never cuts. Aligned with <see cref="Rings"/>.
+    /// </summary>
+    internal IReadOnlyList<bool[]> Tabs { get; }
 
     /// <summary>Capture a stable, clean, rotation-baked program, applying location once.
     /// Unsupported or malformed geometry produces an incomplete snapshot; cancellation throws.</summary>
@@ -30,7 +38,9 @@ public sealed class LeadMaterialSnapshot
         {
             var execution = ExecutionMotionReader.ReadSupported(cleanProgram, location, null, token);
             var rings = new List<PostVerificationGeometry.Curve[]>();
+            var ringTabs = new List<bool[]>();
             var chain = new List<PostVerificationGeometry.Curve>();
+            var chainTabs = new List<bool>();
             foreach (var motion in execution.Motions)
             {
                 token.ThrowIfCancellationRequested();
@@ -40,7 +50,8 @@ public sealed class LeadMaterialSnapshot
                     Finish();
                     continue;
                 }
-                if (motion.Layer is not (LayerType.Cut or LayerType.Display))
+                // A tabbed cutout's tabs are never cut but still close its hole.
+                if (motion.Layer is not (LayerType.Cut or LayerType.Display or LayerType.Tab))
                     throw new ArgumentException("Material capture contains an unsupported layer.");
                 var curve = motion.Curve;
                 if (curve == null || !double.IsFinite(curve.Length) || curve.Length <= PostVerificationGeometry.Epsilon)
@@ -48,6 +59,7 @@ public sealed class LeadMaterialSnapshot
                 if (chain.Count > 0 && chain[^1].End.DistanceTo(curve.Start) > PostVerificationGeometry.Epsilon)
                     throw new ArgumentException("Material contour is discontinuous.");
                 chain.Add(curve);
+                chainTabs.Add(motion.Layer == LayerType.Tab);
                 if (NominalContourClosure.IsClosed(chain[0].Start, chain[^1].End))
                     Finish();
             }
@@ -100,12 +112,15 @@ public sealed class LeadMaterialSnapshot
             }
             if (outer < 0)
                 throw new ArgumentException("Material must have exactly one enclosing perimeter.");
+            if (ringTabs[outer].Any(tab => tab))
+                throw new ArgumentException("A perimeter cannot have tabs.");
             var holes = rings.Where((_, i) => i != outer).ToArray();
             for (var i = 0; i < holes.Length; i++)
                 for (var j = i + 1; j < holes.Length; j++)
                     if (Inside(holes[i][0].Start, holes[j], token) || Inside(holes[j][0].Start, holes[i], token))
                         throw new ArgumentException("Nested cutouts are not supported material.");
-            return new LeadMaterialSnapshot(new[] { rings[outer] }.Concat(holes).ToArray(), null);
+            return new LeadMaterialSnapshot(new[] { rings[outer] }.Concat(holes).ToArray(),
+                new[] { ringTabs[outer] }.Concat(ringTabs.Where((_, i) => i != outer)).ToArray(), null);
 
             void Finish()
             {
@@ -119,12 +134,14 @@ public sealed class LeadMaterialSnapshot
                         + " Review the source contour in the drawing editor; gaps cannot be filled implicitly.");
                 }
                 rings.Add(chain.ToArray());
+                ringTabs.Add(chainTabs.ToArray());
                 chain.Clear();
+                chainTabs.Clear();
             }
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
         {
-            return new LeadMaterialSnapshot(Array.Empty<PostVerificationGeometry.Curve[]>(), ex.Message);
+            return new LeadMaterialSnapshot(Array.Empty<PostVerificationGeometry.Curve[]>(), Array.Empty<bool[]>(), ex.Message);
         }
     }
 

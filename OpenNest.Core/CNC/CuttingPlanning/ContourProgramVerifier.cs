@@ -47,6 +47,7 @@ internal static class ContourProgramVerifier
         if (material == null || !material.IsComplete) return false;
         if (selected != null && !SameEmission(actual, selected.Expected, token, ref budget)) return false;
         var visited = new HashSet<int>();
+        var piecesCut = new Dictionary<int, HashSet<int>>();
         foreach (var run in Runs(actual).Where(r => !r.Rapid && r.Kind == LayerType.Cut))
         {
             token.ThrowIfCancellationRequested();
@@ -70,7 +71,19 @@ internal static class ContourProgramVerifier
                     }
                 }
             }
-            if (ringIndex < 0 || !visited.Add(ringIndex)) return false;
+            if (ringIndex < 0) return false;
+            var tabs = material.Tabs[ringIndex];
+            if (tabs.Any(tab => tab))
+            {
+                // A tabbed cutout: each run cuts exactly one span between tabs, whole and once.
+                if (!CutsTabbedSpan(run.Curves, material.Rings[ringIndex], tabs, entityIndex, token, ref budget)
+                    || !(piecesCut.TryGetValue(ringIndex, out var cut) ? cut : piecesCut[ringIndex] = new()).Add(entityIndex))
+                    return false;
+                if (piecesCut[ringIndex].Count == SpanStarts(tabs).Count)
+                    visited.Add(ringIndex);
+                continue;
+            }
+            if (!visited.Add(ringIndex)) return false;
             var ring = material.Rings[ringIndex];
             // Capture admits a nominal ring that closes within NominalContourClosure.Tolerance, and
             // preparation agrees at that inclusive boundary. A rotated tool path bridges that one
@@ -96,6 +109,25 @@ internal static class ContourProgramVerifier
                 true, tolerance, token, ref budget)) return false;
         }
         return visited.Count == material.Rings.Count;
+    }
+
+    // Indexes of the curves that start a span between tabs: uncut-to-cut transitions.
+    private static List<int> SpanStarts(bool[] tabs) => Enumerable.Range(0, tabs.Length)
+        .Where(i => !tabs[i] && tabs[(i + tabs.Length - 1) % tabs.Length]).ToList();
+
+    // A run that starts exactly where a span between tabs starts and covers that span exactly,
+    // stopping at the next tab.
+    private static bool CutsTabbedSpan(IReadOnlyList<Curve> run, IReadOnlyList<Curve> ring, bool[] tabs,
+        int entityIndex, CancellationToken token, ref int budget)
+    {
+        var tolerance = AdmittedClosureSlack(ring);
+        if (!SpanStarts(tabs).Contains(entityIndex) || ring[entityIndex].DistanceAlong(run[0].Start) > tolerance)
+            return false;
+        var span = new List<Curve>();
+        for (var e = entityIndex; !tabs[e % tabs.Length]; e++)
+            span.Add(ring[e % tabs.Length]);
+        return System.Math.Abs(run.Sum(c => c.Length) - span.Sum(c => c.Length)) <= tolerance
+            && Follows(run, span, 0, 0, false, tolerance, token, ref budget);
     }
 
     // Zero for an exactly closed ring: a ring may lawfully close within the nominal closure

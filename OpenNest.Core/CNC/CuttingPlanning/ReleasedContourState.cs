@@ -80,6 +80,7 @@ public sealed class ReleasedContourState
         var hasLead = false;
         var contourNumber = 0;
         var inBreakCut = false;
+        var reportedTab = false;
         for (var index = 0; index < moves.Count; index++)
         {
             token.ThrowIfCancellationRequested();
@@ -164,6 +165,15 @@ public sealed class ReleasedContourState
             }
             else if (move.Curve.Length > PostVerificationGeometry.Epsilon)
             {
+                // A clean program's tab spans close their cutout but are not meant to be cut.
+                if (move.Layer == LayerType.Tab && !reportedTab)
+                {
+                    reportedTab = true;
+                    Add(new(PostVerificationKind.Incomplete, plate, part, null,
+                        "A tabbed cutout still has its tabs as motions, so it may be cut free. " +
+                        "Assign lead-ins or plan cutting to cut it in pieces around its tabs.")
+                    { Location = move.Curve.Start }, owned);
+                }
                 if (current.Curves.Count == 0)
                 {
                     contourNumber++;
@@ -196,12 +206,14 @@ public sealed class ReleasedContourState
         Finish();
         loose.Leads.AddRange(leadIns);
         // Open cuts that provably enclose nothing retain all their material, however many
-        // pieces a tabbed cutout was cut in. Otherwise they need manual review. Only pre-post
-        // review asks: planning keeps refusing to certify its own tabs followed by a lead-out.
-        var retained = proveOpenCuts && !cutoff && (unfinished.Count > 1 || deferred.Count > 0)
+        // pieces a tabbed cutout was cut in. Otherwise they need manual review. Planning proves
+        // them too (its own tabbed cutouts are cut in pieces without lead-outs), but only
+        // pre-post review lets the proof clear a lead-out: planning keeps refusing to certify
+        // its own tabs followed by a lead-out.
+        var retained = !cutoff && (unfinished.Count > 1 || deferred.Count > 0)
             && unfinished.All(LeadsClearOpenEnds)
             && OpenCutsEncloseNothing(closed, unfinished.Concat(otherOpen).Append(loose).ToList(), token);
-        for (var i = deferred.Count - 1; i >= 0 && !retained; i--)
+        for (var i = deferred.Count - 1; i >= 0 && !(retained && proveOpenCuts); i--)
             deferred[i].Target.Insert(deferred[i].Index, deferred[i].Finding);
         // Only one open fragment per part can be the planner's own certified tab, so a
         // further fragment that a fixed emission cut makes this uncertainty that emission's.

@@ -24,6 +24,10 @@ namespace OpenNest.Controls
         private readonly ListBox breakoffsList;
         private readonly LinkLabel breakoffAddLink;
         private bool loadingBreakoffs;
+        private readonly CollapsiblePanel cutoutsPanel;
+        private readonly ListBox cutoutsList;
+        private readonly LinkLabel cutoutAddLink;
+        private bool loadingCutouts;
 
         private List<Entity> currentEntities;
         private List<Bend> currentBends;
@@ -38,6 +42,10 @@ namespace OpenNest.Controls
         public event EventHandler<int> BreakoffRemoved;
         public event EventHandler<int> BreakoffFlipped;
         public event EventHandler AddBreakoffClicked;
+        public event EventHandler<int> TabbedCutoutSelected;
+        public event EventHandler<int> TabbedCutoutEdited;
+        public event EventHandler<int> TabbedCutoutRemoved;
+        public event EventHandler AddTabbedCutoutClicked;
 
         public FilterPanel()
         {
@@ -104,6 +112,60 @@ namespace OpenNest.Controls
 
             breakoffsPanel.ContentPanel.Controls.Add(breakoffsList);
             breakoffsPanel.ContentPanel.Controls.Add(breakoffLinksPanel);
+
+            // Tabbed cutouts
+            cutoutsPanel = new CollapsiblePanel
+            {
+                HeaderText = "Tabbed Cutouts (0)",
+                Dock = DockStyle.Top,
+                ExpandedHeight = 110,
+                IsExpanded = false,
+            };
+            cutoutsList = new ListBox
+            {
+                Dock = DockStyle.Fill,
+                BorderStyle = BorderStyle.None,
+                Font = new Font("Segoe UI", 9f),
+            };
+            cutoutsList.SelectedIndexChanged += (s, e) =>
+            {
+                if (!loadingCutouts)
+                    TabbedCutoutSelected?.Invoke(this, cutoutsList.SelectedIndex);
+            };
+            cutoutsList.DoubleClick += (s, e) =>
+            {
+                if (cutoutsList.SelectedIndex >= 0)
+                    TabbedCutoutEdited?.Invoke(this, cutoutsList.SelectedIndex);
+            };
+
+            cutoutAddLink = new LinkLabel { Text = "Add Tabbed Cutout", AutoSize = true, Font = new Font("Segoe UI", 8f) };
+            cutoutAddLink.LinkClicked += (s, e) => AddTabbedCutoutClicked?.Invoke(this, EventArgs.Empty);
+            var cutoutEditLink = new LinkLabel { Text = "Edit", AutoSize = true, Font = new Font("Segoe UI", 8f) };
+            cutoutEditLink.LinkClicked += (s, e) =>
+            {
+                if (cutoutsList.SelectedIndex >= 0)
+                    TabbedCutoutEdited?.Invoke(this, cutoutsList.SelectedIndex);
+            };
+            var cutoutRemoveLink = new LinkLabel { Text = "Remove", AutoSize = true, Font = new Font("Segoe UI", 8f) };
+            cutoutRemoveLink.LinkClicked += (s, e) =>
+            {
+                if (cutoutsList.SelectedIndex >= 0)
+                    TabbedCutoutRemoved?.Invoke(this, cutoutsList.SelectedIndex);
+            };
+
+            var cutoutLinksPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 20,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+            };
+            cutoutLinksPanel.Controls.Add(cutoutAddLink);
+            cutoutLinksPanel.Controls.Add(cutoutEditLink);
+            cutoutLinksPanel.Controls.Add(cutoutRemoveLink);
+
+            cutoutsPanel.ContentPanel.Controls.Add(cutoutsList);
+            cutoutsPanel.ContentPanel.Controls.Add(cutoutLinksPanel);
 
             // Bend Lines
             bendLinesPanel = new CollapsiblePanel
@@ -239,6 +301,7 @@ namespace OpenNest.Controls
             layersPanel.ContentPanel.Controls.Add(checkAllPanel);
 
             // Add panels in reverse order (Dock.Top stacks top-down)
+            Controls.Add(cutoutsPanel);
             Controls.Add(breakoffsPanel);
             Controls.Add(bendLinesPanel);
             Controls.Add(lineTypesPanel);
@@ -438,6 +501,35 @@ namespace OpenNest.Controls
             breakoffsPanel.HeaderText = $"Breakoffs ({labels.Count})";
             if (added)
                 breakoffsPanel.IsExpanded = true;
+        }
+
+        public void SetTabbedCutoutPickMode(bool active)
+        {
+            cutoutAddLink.Text = active ? "Cancel (Esc)" : "Add Tabbed Cutout";
+            cutoutAddLink.LinkColor = active ? Color.OrangeRed : Color.Empty;
+        }
+
+        /// <summary>Shows one line per tabbed cutout with <paramref name="selected"/> selected, without raising selection events.</summary>
+        public void LoadTabbedCutouts(IReadOnlyList<string> labels, int selected)
+        {
+            var added = labels.Count > cutoutsList.Items.Count;
+            loadingCutouts = true;
+            try
+            {
+                cutoutsList.BeginUpdate();
+                cutoutsList.Items.Clear();
+                foreach (var label in labels)
+                    cutoutsList.Items.Add(label);
+                cutoutsList.SelectedIndex = selected >= 0 && selected < labels.Count ? selected : -1;
+                cutoutsList.EndUpdate();
+            }
+            finally
+            {
+                loadingCutouts = false;
+            }
+            cutoutsPanel.HeaderText = $"Tabbed Cutouts ({labels.Count})";
+            if (added)
+                cutoutsPanel.IsExpanded = true;
         }
     }
 
