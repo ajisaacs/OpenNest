@@ -45,24 +45,91 @@ public static class PlateFillService
         if (!InteractiveClamps.HasZones(plate))
             return filler.Fill(item, workArea, progress, token);
 
-        // Fill as if the clamps were absent, then drop the parts that hit one: a layout
-        // packed around the clamps is usually worse. Ask for the dropped copies again,
-        // within a bounded number of tries, when a quantity is requested.
+        // Two clamp-clear layouts compete: the area filled as if the clamps were absent less
+        // the parts that hit one, and the area trimmed past the clamps' edge strip.
         var demand = new List<NestItem> { item };
-        var clearProgress = ClearProgress(progress, plate, workArea, demand, 1);
+        return FillBesideClamps(filler, plate, workArea, progress, token,
+            (area, sink) => FillDroppingClampHits(filler, plate, item, demand, area, sink, token),
+            demand, 1);
+    }
+
+    private static List<Part> FillDroppingClampHits(PlateFillerBase filler, Plate plate,
+        NestItem item, List<NestItem> demand, Box area, IProgress<NestProgress> progress,
+        CancellationToken token)
+    {
+        // Ask for dropped copies again, within a bounded number of tries, when a quantity
+        // is requested.
         var result = new List<Part>();
         var request = item.Quantity;
         for (var attempt = 0; attempt <= MaxClampRefills; attempt++)
         {
-            var proposed = filler.Fill(CopyDemand(item, request), workArea, clearProgress, token);
+            var proposed = filler.Fill(CopyDemand(item, request), area, progress, token);
             result = new List<Part>();
-            AddClear(result, proposed, plate, workArea, demand);
+            AddClear(result, proposed, plate, area, demand);
             if (item.Quantity <= 0 || result.Count >= item.Quantity
                 || proposed.Count < request || token.IsCancellationRequested)
                 break;
             request += item.Quantity - result.Count;
         }
         return result;
+    }
+
+    /// <summary>
+    /// Fills <paramref name="workArea"/> ignoring the clamps and drops the parts that hit one
+    /// (a layout packed around the clamps is usually worse). When every clamp in the area lies
+    /// on one edge, also fills the area with that edge moved past them, as a larger edge
+    /// spacing would, and keeps the better layout by the filler's own ranking; a tie keeps the
+    /// first. Previews never fall below the layout already found.
+    /// </summary>
+    private static List<Part> FillBesideClamps(PlateFillerBase filler, Plate plate, Box workArea,
+        IProgress<NestProgress> progress, CancellationToken token,
+        Func<Box, IProgress<NestProgress>, List<Part>> fill, List<NestItem> demand, int groupSize)
+    {
+        var dropped = fill(workArea, ClearProgress(progress, plate, workArea, demand, groupSize, null, null));
+        var strip = ClampFreeArea(plate, workArea);
+        if (strip == null || token.IsCancellationRequested)
+            return dropped;
+
+        var beside = fill(strip, ClearProgress(progress, plate, strip, demand, groupSize,
+            dropped, (candidate, current) => filler.IsBetterFill(candidate, current, workArea)));
+        return filler.IsBetterFill(beside, dropped, workArea) ? beside : dropped;
+    }
+
+    /// <summary>
+    /// <paramref name="area"/> with one edge moved past every clamp keep-out it meets, or null
+    /// when it meets none or they do not all lie on one of its edges.
+    /// </summary>
+    internal static Box ClampFreeArea(Plate plate, Box area)
+    {
+        var keepOuts = InteractiveClamps.ClearanceRectangles(plate)
+            .Where(k => k.Left < area.Right && k.Right > area.Left
+                && k.Bottom < area.Top && k.Top > area.Bottom)
+            .ToList();
+        if (keepOuts.Count == 0)
+            return null;
+
+        Box result = null;
+        if (keepOuts.All(k => k.Bottom <= area.Bottom))
+        {
+            var bottom = keepOuts.Max(k => k.Top);
+            result = new Box(area.Left, bottom, area.Length, area.Top - bottom);
+        }
+        else if (keepOuts.All(k => k.Top >= area.Top))
+        {
+            var top = keepOuts.Min(k => k.Bottom);
+            result = new Box(area.Left, area.Bottom, area.Length, top - area.Bottom);
+        }
+        else if (keepOuts.All(k => k.Left <= area.Left))
+        {
+            var left = keepOuts.Max(k => k.Right);
+            result = new Box(left, area.Bottom, area.Right - left, area.Width);
+        }
+        else if (keepOuts.All(k => k.Right >= area.Right))
+        {
+            var right = keepOuts.Min(k => k.Left);
+            result = new Box(area.Left, area.Bottom, right - area.Left, area.Width);
+        }
+        return result != null && result.Length > 0 && result.Width > 0 ? result : null;
     }
 
     public static List<Part> FillGroup(
@@ -78,13 +145,15 @@ public static class PlateFillService
         if (!InteractiveClamps.HasZones(plate))
             return filler.Fill(groupParts, workArea, progress, token);
 
-        // As FillItem: fill ignoring the clamps, then drop every copy that hits one.
+        // As FillItem; a copy is dropped whole when any member hits a clamp.
         var groupSize = groupParts.Count;
-        var proposed = filler.Fill(groupParts, workArea,
-            ClearProgress(progress, plate, workArea, null, groupSize), token);
-        var result = new List<Part>();
-        AddClear(result, proposed, plate, workArea, groupSize: groupSize);
-        return result;
+        return FillBesideClamps(filler, plate, workArea, progress, token, (area, sink) =>
+        {
+            var result = new List<Part>();
+            AddClear(result, filler.Fill(groupParts, area, sink, token), plate, area,
+                groupSize: groupSize);
+            return result;
+        }, null, groupSize);
     }
 
     public static List<Part> PackArea(
@@ -173,12 +242,17 @@ public static class PlateFillService
     /// removed by the same check as the returned proposal, so an accepted preview is never
     /// an unverified placement.
     /// </summary>
+    /// <remarks>A preview is promoted only when it beats <paramref name="floor"/>, the
+    /// layout an earlier competing fill already returned.</remarks>
     private static IProgress<NestProgress> ClearProgress(IProgress<NestProgress> progress,
-        Plate plate, Box area, List<NestItem> demand, int groupSize) =>
-        progress == null ? null : new ClearPartsProgress(progress, plate, area, demand, groupSize);
+        Plate plate, Box area, List<NestItem> demand, int groupSize, List<Part> floor,
+        Func<List<Part>, List<Part>, bool> isBetter) =>
+        progress == null ? null
+            : new ClearPartsProgress(progress, plate, area, demand, groupSize, floor, isBetter);
 
     private sealed class ClearPartsProgress(IProgress<NestProgress> inner, Plate plate, Box area,
-        List<NestItem> demand, int groupSize) : IProgress<NestProgress>
+        List<NestItem> demand, int groupSize, List<Part> floor,
+        Func<List<Part>, List<Part>, bool> isBetter) : IProgress<NestProgress>
     {
         public void Report(NestProgress value)
         {
@@ -193,7 +267,7 @@ public static class PlateFillService
                 BestParts = clear,
                 Description = value.Description,
                 ActiveWorkArea = value.ActiveWorkArea,
-                IsOverallBest = value.IsOverallBest,
+                IsOverallBest = value.IsOverallBest && (floor == null || isBetter(clear, floor)),
             });
         }
     }

@@ -68,7 +68,7 @@ internal abstract class PlateFillerBase
         return string.Join(" | ", parts);
     }
 
-    protected bool IsBetterFill(List<Part> candidate, List<Part> current, Box workArea) =>
+    internal bool IsBetterFill(List<Part> candidate, List<Part> current, Box workArea) =>
         Comparer.IsBetter(candidate, current, workArea);
 
     public virtual List<Part> Fill(

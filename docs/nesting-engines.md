@@ -41,8 +41,13 @@ fill.
 On a plate with clamps, interactive Fill (Fill Area and filling from a part) fills as if the
 clamps were absent, then drops every part that enters a clamp keep-out or sits too close to an
 existing part, and a whole copy of a multi-part group when any member does. Packing around
-the clamps usually gives a worse layout than losing the few parts on them. Progress previews
-are filtered by the same check, so a preview accepted early is clamp-clear. When a quantity is
+the clamps usually gives a worse layout than losing the few parts on them. When every clamp
+in the fill area lies on one edge, Fill also fills the area with that edge moved just past the
+clamp keep-outs, as a larger edge spacing would, and keeps whichever layout the strategy ranks
+better (a tie keeps the dropped-parts layout). Small parts usually win by dropping, large
+parts by moving past the strip. The second fill reuses the cached best-fit pairs. Progress
+previews are filtered by the same check and never fall below the first layout, so a preview
+accepted early is clamp-clear. When a quantity is
 requested and copies were dropped, the fill asks for that many more, up to two more times.
 Pack and whole-plate Nest still pack only into the clamp-free areas.
 

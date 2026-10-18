@@ -25,6 +25,7 @@ public class ClampZoneInteractiveFillTests
 
     private static readonly Box ZoneA = new(10, 0, 1.5, 0.625);
     private static readonly Box ZoneB = new(20, 0, 1.5, 0.625);
+    private static readonly Box BackZone = new(20, 24 - 0.625, 1.5, 0.625);
 
     private static Plate MakePlate(params ClampZone[] zones)
     {
@@ -233,22 +234,24 @@ public class ClampZoneInteractiveFillTests
     }
 
     [Fact]
-    public void ClampedFillIsTheUnclampedFillLessThePartsThatHitAClamp()
+    public void ClampsOnTwoEdgesFillTheUnclampedLayoutLessThePartsThatHitAClamp()
     {
+        // ZoneB moved to the back edge, so no single edge can be moved past the clamps.
         var item = new NestItem { Drawing = RectDrawing(4, 4) };
         var unclamped = PlateFillService.FillItem("Fill", MakePlate(), item, MakePlate().WorkArea(),
             null, CancellationToken.None);
-        var plate = MakePlate(new ClampZone("front-1", ZoneA), new ClampZone("front-2", ZoneB));
+        var plate = MakePlate(new ClampZone("front-1", ZoneA), new ClampZone("back-1", BackZone));
+        Assert.Null(PlateFillService.ClampFreeArea(plate, plate.WorkArea()));
 
         var clamped = PlateFillService.FillItem("Fill", plate, item, plate.WorkArea(),
             null, CancellationToken.None);
 
         var hits = unclamped.Count(part =>
-            Overlaps(part.BoundingBox, Inflated(ZoneA, Edge)) || Overlaps(part.BoundingBox, Inflated(ZoneB, Edge)));
+            Overlaps(part.BoundingBox, Inflated(ZoneA, Edge)) || Overlaps(part.BoundingBox, Inflated(BackZone, Edge)));
         Assert.True(hits > 0, "fixture should put parts on the clamps");
         Assert.Equal(unclamped.Count - hits, clamped.Count);
         Assert.All(clamped, part => Assert.Contains(unclamped, other => other.Location == part.Location));
-        AssertClearOfClamps(clamped, ZoneA, ZoneB);
+        AssertClearOfClamps(clamped, ZoneA, BackZone);
     }
 
     [Fact]
@@ -271,6 +274,56 @@ public class ClampZoneInteractiveFillTests
         Assert.True(first.IsOverallBest);
         AssertClearOfClamps(first.BestParts, ZoneA, ZoneB);
         Assert.Equal(first.BestParts.Count, parts.Count);
+        AssertClearOfClamps(parts, ZoneA, ZoneB);
+    }
+
+    [Fact]
+    public void ClampFreeAreaMovesTheClampedEdgePastTheKeepOuts()
+    {
+        var plate = MakePlate(new ClampZone("front-1", ZoneA), new ClampZone("front-2", ZoneB));
+        var work = plate.WorkArea();
+
+        var area = PlateFillService.ClampFreeArea(plate, work);
+
+        Assert.NotNull(area);
+        Assert.Equal(ZoneA.Top + Edge, area.Bottom, 9);
+        Assert.Equal(work.Top, area.Top, 9);
+        Assert.Equal(work.Left, area.Left, 9);
+        Assert.Equal(work.Right, area.Right, 9);
+        Assert.Null(PlateFillService.ClampFreeArea(plate, new Box(30, 5, 10, 10)));
+    }
+
+    [Fact]
+    public void SmallPartsKeepTheMaterialBetweenTheClamps()
+    {
+        // Losing a whole edge strip costs a row of small parts; dropping the few on the
+        // clamps costs less, so that layout wins.
+        var plate = MakePlate(new ClampZone("front-1", ZoneA), new ClampZone("front-2", ZoneB));
+        var item = new NestItem { Drawing = RectDrawing(1, 1) };
+
+        var parts = PlateFillService.FillItem("Fill", plate, item, plate.WorkArea(),
+            null, CancellationToken.None);
+
+        Assert.Contains(parts, part => part.BoundingBox.Bottom < ZoneA.Top + Edge);
+        AssertClearOfClamps(parts, ZoneA, ZoneB);
+    }
+
+    [Fact]
+    public void LargePartsMovePastTheClampStripInsteadOfLosingParts()
+    {
+        // Three 7-high rows still fit above the clamp strip, while the same rows on the
+        // edge would lose the parts on both clamps.
+        var plate = MakePlate(new ClampZone("front-1", ZoneA), new ClampZone("front-2", ZoneB));
+        var item = new NestItem { Drawing = RectDrawing(10, 7) };
+        var strip = PlateFillService.ClampFreeArea(plate, plate.WorkArea());
+        var unclampedInStrip = PlateFillService.FillItem("Fill", MakePlate(), item, strip,
+            null, CancellationToken.None);
+
+        var parts = PlateFillService.FillItem("Fill", plate, item, plate.WorkArea(),
+            null, CancellationToken.None);
+
+        Assert.Equal(unclampedInStrip.Count, parts.Count);
+        Assert.All(parts, part => Assert.True(part.BoundingBox.Bottom >= strip.Bottom - 1e-9));
         AssertClearOfClamps(parts, ZoneA, ZoneB);
     }
 
