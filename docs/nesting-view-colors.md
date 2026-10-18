@@ -36,6 +36,14 @@ classified as `Cut` remains a cut line. Drawing geometry, layer classifications,
 cutting plans and post-processor output are not changed by the renderer. The CAD
 conversion/program-editing views retain their own source/classification colors.
 
+## Festive schemes
+
+**Halloween**, **Christmas** and **4th of July** are built-in schemes chosen like
+any other; OpenNest never switches to them automatically. Their background,
+sheet and accent colors carry the theme, while each 12-color part palette stays
+varied, light enough for black part IDs and clear of the green etch stroke.
+Etch, cut-outline and selection behavior match Classic.
+
 ## Custom scheme files
 
 Scheme JSON files in `Schemes/` beside the application may specify `etchColor`

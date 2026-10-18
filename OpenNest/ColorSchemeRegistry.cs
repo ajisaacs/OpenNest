@@ -19,6 +19,9 @@ namespace OpenNest
             ["Pastel"] = BuildPastel(),
             ["Dark"] = BuildDark(),
             ["Workshop"] = BuildWorkshop(),
+            ["Halloween"] = BuildHalloween(),
+            ["Christmas"] = BuildChristmas(),
+            ["4th of July"] = BuildFourthOfJuly(),
         };
 
         private static List<ColorScheme> diskCache;
@@ -133,6 +136,95 @@ namespace OpenNest
                 UseGoldenAngleColors = true,
                 // Samples for previews/legacy consumers; assignment uses the full index.
                 PartColors = Enumerable.Range(0, 12).Select(PartColorPalette.GoldenAngle).ToArray(),
+            };
+
+        // Festive schemes theme the background, sheet and accents; their part palettes
+        // stay varied and light enough for black part IDs, and avoid the etch green.
+        private static ColorScheme BuildHalloween() =>
+            new ColorScheme
+            {
+                Name = "Halloween",
+                BackgroundColor = Color.FromArgb(28, 18, 36),
+                LayoutOutlineColor = Color.FromArgb(110, 80, 130),
+                LayoutFillColor = Color.FromArgb(52, 48, 58),
+                BoundingBoxColor = Color.FromArgb(170, 120, 230),
+                RapidColor = Color.FromArgb(255, 140, 0),
+                OriginColor = Color.FromArgb(130, 110, 140),
+                EdgeSpacingColor = Color.FromArgb(80, 70, 92),
+                PreviewPartColor = Color.FromArgb(160, 255, 80),
+                PartColors = new[]
+                {
+                    Color.FromArgb(255, 130, 30), // Pumpkin
+                    Color.FromArgb(170, 110, 230), // Witch Purple
+                    Color.FromArgb(255, 205, 60), // Candy Corn
+                    Color.FromArgb(235, 235, 245), // Ghost
+                    Color.FromArgb(220, 60, 60), // Blood Red
+                    Color.FromArgb(130, 170, 230), // Moonlight
+                    Color.FromArgb(225, 210, 170), // Bone
+                    Color.FromArgb(230, 90, 200), // Potion
+                    Color.FromArgb(60, 200, 180), // Cauldron Teal
+                    Color.FromArgb(200, 120, 60), // Caramel Apple
+                    Color.FromArgb(200, 170, 240), // Phantom Lavender
+                    Color.FromArgb(255, 90, 40), // Ember
+                },
+            };
+
+        private static ColorScheme BuildChristmas() =>
+            new ColorScheme
+            {
+                Name = "Christmas",
+                BackgroundColor = Color.FromArgb(18, 58, 38),
+                LayoutOutlineColor = Color.FromArgb(190, 160, 80),
+                LayoutFillColor = Color.FromArgb(248, 248, 244),
+                BoundingBoxColor = Color.FromArgb(200, 40, 50),
+                RapidColor = Color.FromArgb(200, 150, 30),
+                OriginColor = Color.FromArgb(150, 130, 90),
+                EdgeSpacingColor = Color.FromArgb(215, 220, 215),
+                PreviewPartColor = Color.FromArgb(230, 60, 60),
+                PartColors = new[]
+                {
+                    Color.FromArgb(215, 60, 60), // Holly Red
+                    Color.FromArgb(80, 160, 90), // Pine
+                    Color.FromArgb(230, 190, 70), // Gold
+                    Color.FromArgb(150, 200, 235), // Ice
+                    Color.FromArgb(190, 195, 205), // Silver
+                    Color.FromArgb(240, 150, 160), // Candy Cane
+                    Color.FromArgb(175, 120, 200), // Sugarplum
+                    Color.FromArgb(150, 215, 170), // Mint
+                    Color.FromArgb(190, 110, 70), // Cinnamon
+                    Color.FromArgb(180, 50, 80), // Cranberry
+                    Color.FromArgb(245, 225, 160), // Eggnog
+                    Color.FromArgb(100, 150, 200), // Winter Sky
+                },
+            };
+
+        private static ColorScheme BuildFourthOfJuly() =>
+            new ColorScheme
+            {
+                Name = "4th of July",
+                BackgroundColor = Color.FromArgb(18, 28, 60),
+                LayoutOutlineColor = Color.FromArgb(110, 120, 150),
+                LayoutFillColor = Color.FromArgb(250, 250, 252),
+                BoundingBoxColor = Color.FromArgb(120, 150, 230),
+                RapidColor = Color.FromArgb(210, 40, 50),
+                OriginColor = Color.FromArgb(120, 130, 160),
+                EdgeSpacingColor = Color.FromArgb(205, 210, 225),
+                PreviewPartColor = Color.FromArgb(255, 190, 40),
+                PartColors = new[]
+                {
+                    Color.FromArgb(220, 60, 60), // Old Glory Red
+                    Color.FromArgb(110, 160, 230), // Liberty Blue
+                    Color.FromArgb(250, 195, 60), // Firework Gold
+                    Color.FromArgb(200, 205, 215), // Star Silver
+                    Color.FromArgb(220, 90, 180), // Magenta Burst
+                    Color.FromArgb(70, 190, 180), // Teal Burst
+                    Color.FromArgb(240, 120, 110), // Coral
+                    Color.FromArgb(150, 200, 240), // Sky
+                    Color.FromArgb(250, 150, 60), // Sparkler
+                    Color.FromArgb(170, 150, 230), // Twilight
+                    Color.FromArgb(235, 150, 170), // Rose
+                    Color.FromArgb(90, 120, 210), // Royal Blue
+                },
             };
 
         private static ColorScheme BuildClassic() =>
