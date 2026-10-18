@@ -15,14 +15,14 @@ namespace OpenNest.Forms
 
             var hasValue = activeForm != null;
 
-            mnuFileSave.Enabled = hasValue && !databaseSaveInProgress;
-            btnSave.Enabled = hasValue && !databaseSaveInProgress;
-            btnSaveAs.Enabled = hasValue && !databaseSaveInProgress;
-            mnuFileSaveAs.Enabled = hasValue && !databaseSaveInProgress;
+            mnuFileSave.Enabled = hasValue && !storage.IsSaving;
+            btnSave.Enabled = hasValue && !storage.IsSaving;
+            btnSaveAs.Enabled = hasValue && !storage.IsSaving;
+            mnuFileSaveAs.Enabled = hasValue && !storage.IsSaving;
             exportNestMenu.Enabled = hasValue;
             mnuFileExport.Enabled = hasValue;
             mnuFileExportAll.Enabled = hasValue;
-            mnuFileExportNestReport.Enabled = hasValue && !databaseSaveInProgress;
+            mnuFileExportNestReport.Enabled = hasValue && !storage.IsSaving;
             mnuEdit.Visible = hasValue;
             mnuView.Visible = hasValue;
             mnuNest.Visible = hasValue;

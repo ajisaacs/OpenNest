@@ -9,6 +9,7 @@ using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Jobs;
+using OpenNest.Forms.Commands;
 using OpenNest.IO;
 using OpenNest.Properties;
 
@@ -21,8 +22,7 @@ namespace OpenNest.Forms
         private bool clickUpdateLocation;
         private bool nestingInProgress;
         private CancellationTokenSource nestingCts;
-        private bool databaseSaveInProgress;
-        private bool databaseOpenInProgress;
+        private readonly NestStorageController storage;
         private readonly ToolStripMenuItem storageModeMenu = new("Storage Mode...");
         private readonly ToolStripMenuItem exportNestMenu = new("Export .nest...");
         private readonly ToolStripDropDownButton postButton = new()
@@ -97,6 +97,8 @@ namespace OpenNest.Forms
 
         public MainForm()
         {
+            storage = new NestStorageController(this, text => statusLabel1.Text = text);
+            storage.StateChanged += Storage_StateChanged;
             InitializeComponent();
             toolStrip1.Items.Add(CreateActionButton("btnCutPlanner", "Plan Cutting",
                 Resources.cut_planner, PlatePlanCutting_Click));

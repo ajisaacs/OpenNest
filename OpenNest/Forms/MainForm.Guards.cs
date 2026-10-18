@@ -57,7 +57,7 @@ namespace OpenNest.Forms
         /// nesting, an open progress window (a closed one can still await its commit), or a
         /// background database save serializing the live nest.
         /// </summary>
-        private bool IsNestJobBusy() => IsJobRunning || databaseSaveInProgress;
+        private bool IsNestJobBusy() => IsJobRunning || storage.IsSaving;
 
         /// <summary>
         /// Refuses with <paramref name="message"/> while plate work on <paramref name="nest"/>

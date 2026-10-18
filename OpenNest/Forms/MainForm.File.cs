@@ -1,10 +1,10 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Engine.BestFit;
+using OpenNest.Forms.Commands;
 using OpenNest.IO;
 using OpenNest.Properties;
 
@@ -172,46 +172,12 @@ namespace OpenNest.Forms
                 return;
             }
 
-            try
+            await storage.OpenAsync((nest, reader, snapshot) =>
             {
-                var repository = NestStorage.CreateRepository();
-                var serverUrl = NestStorage.Settings.ServerUrl;
-                using var dlg = new SavedNestsForm(repository, serverUrl);
-                if (dlg.ShowDialog(this) != DialogResult.OK)
-                    return;
-
-                databaseOpenInProgress = true;
-                storageModeMenu.Enabled = false;
-                mnuToolsOptions.Enabled = false;
-                var snapshot = await NestHistorySession.ReadCurrentAsync(repository, dlg.SelectedId, serverUrl);
-                using var stream = new MemoryStream(snapshot.Archive);
-                var reader = new NestReader(stream) { BestFitStore = BestFitCacheStore.Shared };
-                var nest = reader.Read();
-                // Metadata edits create revisions without rewriting the archive. Use their
-                // current editable fields rather than silently reverting them on the next save.
-                nest.Name = snapshot.Metadata.Name;
-                nest.Customer = snapshot.Metadata.Customer;
-                nest.Notes = snapshot.Metadata.Comments;
-                nest.Status = snapshot.Metadata.Status;
-                nest.MadeBy = snapshot.Metadata.MadeBy;
-                nest.DateLastModified = snapshot.Metadata.DateModified;
                 LoadNest(nest, remoteId: snapshot.Metadata.Id, serverUrl: snapshot.ServerUrl,
                     remoteRevision: snapshot.Metadata.Revision);
                 ShowNestWarnings(reader);
-            }
-            catch (Exception ex)
-            {
-                ShowStorageError("open", ex);
-            }
-            finally
-            {
-                databaseOpenInProgress = false;
-                if (!IsDisposed)
-                {
-                    storageModeMenu.Enabled = !databaseSaveInProgress;
-                    mnuToolsOptions.Enabled = !databaseSaveInProgress;
-                }
-            }
+            });
         }
 
         private void ShowNestWarnings(NestReader reader)
@@ -231,86 +197,30 @@ namespace OpenNest.Forms
         private async void Save_Click(object sender, EventArgs e)
         {
             var form = activeForm;
-            if (form == null || databaseSaveInProgress)
+            if (form == null || storage.IsSaving)
                 return;
             if (NestStorage.Settings.Mode == NestStorageMode.File)
                 form.Save();
             else
-                await SaveDatabaseAsync(form, saveCopy: false);
+                await storage.SaveAsync(form);
         }
 
         private async void SaveAs_Click(object sender, EventArgs e)
         {
             var form = activeForm;
-            if (form == null || databaseSaveInProgress)
+            if (form == null || storage.IsSaving)
                 return;
             if (NestStorage.Settings.Mode == NestStorageMode.File)
-            {
                 form.SaveAs();
-                return;
-            }
-
-            // A pending upload is reconciled without writing, so only ask for a name
-            // when this click will actually create the copy.
-            string copyName = null;
-            if (!form.Document.PendingCreateRequiresReconciliation)
-            {
-                using var dlg = new NestNameForm(form.Nest.Name);
-                if (dlg.ShowDialog(this) != DialogResult.OK)
-                    return;
-                copyName = dlg.NestName;
-            }
-            await SaveDatabaseAsync(form, saveCopy: true, copyName);
+            else
+                await storage.SaveAsAsync(form);
         }
 
-        private async Task SaveDatabaseAsync(EditNestForm form, bool saveCopy, string copyName = null)
+        private void Storage_StateChanged(object sender, EventArgs e)
         {
-            var originalName = form.Nest.Name;
-            databaseSaveInProgress = true;
-            storageModeMenu.Enabled = false;
-            mnuToolsOptions.Enabled = false;
+            storageModeMenu.Enabled = !storage.IsBusy;
+            mnuToolsOptions.Enabled = !storage.IsBusy;
             EnableCheck();
-            try
-            {
-                var serverUrl = NestStorage.Settings.ServerUrl;
-                var repository = NestStorage.CreateRepository();
-                if (form.Document.PendingCreateRequiresReconciliation)
-                {
-                    var reconciled = await form.Document.ReconcilePendingCreateAsync(repository, serverUrl);
-                    if (!IsDisposed)
-                        statusLabel1.Text = reconciled is null
-                            ? $"No pending nest was found. Review your work, then {(form.Document.PendingCreateWasCopy ? "Save As" : "Save")} again to retry the same ID."
-                            : $"Found saved version {reconciled.Revision}. Review the current nest before saving again.";
-                    return; // Never combine reconciliation with a write in the same click.
-                }
-                if (copyName != null)
-                    form.Nest.Name = copyName;
-                var saved = await form.Document.SaveToDatabaseAsync(
-                    repository, serverUrl, saveCopy);
-                if (!form.IsDisposed)
-                    form.Text = form.Document.Name;
-                if (!IsDisposed)
-                    statusLabel1.Text = $"Saved {saved.Name} to nest database";
-            }
-            catch (Exception ex)
-            {
-                // Keep the new name only while its copy may still be pending on the server;
-                // otherwise a later Save would rename the original nest.
-                if (copyName != null && !form.Document.PendingCreateWasCopy)
-                    form.Nest.Name = originalName;
-                if (!IsDisposed)
-                    ShowStorageError("save", ex);
-            }
-            finally
-            {
-                databaseSaveInProgress = false;
-                if (!IsDisposed)
-                {
-                    storageModeMenu.Enabled = !databaseOpenInProgress;
-                    mnuToolsOptions.Enabled = !databaseOpenInProgress;
-                    EnableCheck();
-                }
-            }
         }
 
         private void StorageMode_Click(object sender, EventArgs e)
@@ -327,7 +237,7 @@ namespace OpenNest.Forms
             }
             catch (Exception ex)
             {
-                ShowStorageError("change storage mode", ex);
+                storage.ShowError("change storage mode", ex);
             }
         }
 
@@ -347,13 +257,9 @@ namespace OpenNest.Forms
             }
             catch (Exception ex)
             {
-                ShowStorageError("export", ex);
+                storage.ShowError("export", ex);
             }
         }
-
-        private void ShowStorageError(string action, Exception ex) =>
-            MessageBox.Show(this, $"Could not {action} nest: {ex.Message}",
-                "Nest Storage", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
         private void Export_Click(object sender, EventArgs e)
         {

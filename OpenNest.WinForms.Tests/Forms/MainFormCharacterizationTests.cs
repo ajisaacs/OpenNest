@@ -59,9 +59,10 @@ public class MainFormCharacterizationTests
         SetField(host, "nestingInProgress", false);
 
         // A database save only blocks the report snapshot.
-        SetField(host, "databaseSaveInProgress", true);
+        var storage = GetField(host, "storage");
+        SetBackingField(storage, "IsSaving", true);
         Assert.Equal(new Guards(false, false, false, true), Read(host, editor, views));
-        SetField(host, "databaseSaveInProgress", false);
+        SetBackingField(storage, "IsSaving", false);
 
         // A fill on a view of the nest blocks the plate guards but not the report.
         SetBackingField(editor.PlateView, "IsFillInProgress", true);
@@ -101,6 +102,9 @@ public class MainFormCharacterizationTests
 
     private static object Invoke(MainForm host, string name, params object[] args) =>
         typeof(MainForm).GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(host, args)!;
+
+    private static object GetField(MainForm host, string name) =>
+        typeof(MainForm).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host)!;
 
     private static void SetField(MainForm host, string name, object value) =>
         typeof(MainForm).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(host, value);
