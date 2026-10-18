@@ -205,6 +205,25 @@ internal static class PostVerificationGeometry
                 : Travel(System.Math.Atan2(point.Y - center.Y, point.X - center.X)) * Radius
             : Dot(point - Start, (End - Start) * (1 / Length));
 
+        /// <summary>Unit direction of travel at the curve's start or end.</summary>
+        internal Vector Tangent(bool atEnd)
+        {
+            if (Center is not { } center)
+                return (End - Start) * (1 / Length);
+            var radial = (atEnd ? End : Start) - center;
+            var turn = System.Math.Sign(Sweep);
+            return new Vector(-radial.Y * turn, radial.X * turn) * (1 / Radius);
+        }
+
+        /// <summary>How far the curve reaches from <paramref name="origin"/> along unit <paramref name="direction"/>.</summary>
+        internal double Reach(Vector origin, Vector direction)
+        {
+            var reach = System.Math.Max(Dot(Start - origin, direction), Dot(End - origin, direction));
+            if (Center is { } center && OnArc(center + direction * Radius))
+                reach = System.Math.Max(reach, Dot(center - origin, direction) + Radius);
+            return reach;
+        }
+
         internal Vector PointAtLength(double distance)
         {
             if (distance <= 0) return Start;

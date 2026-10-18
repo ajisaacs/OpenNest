@@ -426,6 +426,42 @@ public class PostVerificationAnalyzerTests
             || Find(report, PostVerificationKind.Incomplete).Any());
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Rapid_CutoutCutInPiecesAroundTabsIsRetained(bool leads)
+    {
+        var report = Analyze(TabbedCutout(leads), Scribe(-2, 5), Scribe(12, 5));
+        Assert.Empty(Find(report, PostVerificationKind.Incomplete));
+    }
+
+    [Fact]
+    public void Rapid_LeadOutBridgingATabGapIsIncomplete()
+    {
+        var part = TabbedCutout(true);
+        var codes = part.Program.Codes;
+        // The second piece's lead-out runs across its tab to the first piece's start.
+        codes[codes.FindLastIndex(code => code is LinearMove { Layer: LayerType.Leadout })] = new LinearMove(3, 5.1) { Layer = LayerType.Leadout };
+        var report = Analyze(part, Scribe(-2, 5), Scribe(12, 5));
+        Assert.NotEmpty(Find(report, PostVerificationKind.Incomplete));
+    }
+
+    [Fact]
+    public void Rapid_OpenCutsAcrossAClosedContourAreIncomplete()
+    {
+        var part = Rectangle(0, 0, 10);
+        var placed = Square(0, 0, 10);
+        // Two cuts from edge to edge release the strip between them.
+        placed.MoveTo(0, 3);
+        placed.LineTo(10, 3);
+        placed.MoveTo(10, 6);
+        placed.LineTo(0, 6);
+        part.RestoreLeadInProgram(placed, false);
+        var report = Analyze(part, Scribe(-2, 5), Scribe(12, 5));
+        Assert.Contains(Find(report, PostVerificationKind.Incomplete),
+            finding => finding.Message.Contains("Multiple interrupted/open"));
+    }
+
     [Fact]
     public void Cancellation_ThrowsWithoutChangingInputs()
     {
@@ -504,6 +540,42 @@ public class PostVerificationAnalyzerTests
         program.LineTo(x, y + size);
         program.LineTo(x, y);
         return program;
+    }
+
+    // A 10x10 part whose 4x4 cutout is cut in two pieces, leaving 0.2 tabs on its left and
+    // right edges; leads enter and leave each piece from inside the slug.
+    private static Part TabbedCutout(bool leads)
+    {
+        var clean = Square(3, 3, 4);
+        clean.Codes.AddRange(Square(0, 0, 10).Codes);
+        var part = new Part(new Drawing("tabbed", clean));
+        var program = new Program();
+        if (leads)
+        {
+            program.MoveTo(3.2, 5.3);
+            program.Codes.Add(new LinearMove(3, 5.1) { Layer = LayerType.Leadin });
+        }
+        else
+            program.MoveTo(3, 5.1);
+        program.LineTo(3, 7);
+        program.LineTo(7, 7);
+        program.LineTo(7, 5.1);
+        if (leads)
+        {
+            program.Codes.Add(new LinearMove(6.8, 5.3) { Layer = LayerType.Leadout });
+            program.MoveTo(6.8, 4.7);
+            program.Codes.Add(new LinearMove(7, 4.9) { Layer = LayerType.Leadin });
+        }
+        else
+            program.MoveTo(7, 4.9);
+        program.LineTo(7, 3);
+        program.LineTo(3, 3);
+        program.LineTo(3, 4.9);
+        if (leads)
+            program.Codes.Add(new LinearMove(3.2, 4.7) { Layer = LayerType.Leadout });
+        program.Codes.AddRange(Square(0, 0, 10).Codes);
+        part.RestoreLeadInProgram(program, false);
+        return part;
     }
 
     private static Part Scribe(double x, double y)

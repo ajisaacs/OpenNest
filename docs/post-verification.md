@@ -112,9 +112,17 @@ scrollable report, cancel to fix the nest, then post again to rerun verification
 Uncheckable geometry is reported as incomplete, not passed. The overlap check reads
 clean drawing programs made of the built-in instructions only; a missing instruction
 list, any other instruction type, or a hole stored as an absolute-mode subprogram
-(OpenNest writes them incremental) makes that part's check incomplete. Multiple interrupted
-cut fragments, or a lead-out after an open contour that might cut through a tab,
-also require manual review rather than being assumed retained.
+(OpenNest writes them incremental) makes that part's check incomplete.
+
+Open cuts, such as a cutout cut in several pieces around tabs (with or without leads, as
+PEP programs often are), pass only when they provably release nothing. Within the part,
+each open piece and its leads may touch another cut only at their own ends, and together
+they may form no loop, counting each closed contour with its leads as one point. A lead at
+an open end must also stay out of the gap beyond it: a lead-out never reaches ahead of the
+end it leaves, and a lead-in never behind the start it enters. Anything else (pieces that
+meet exactly, a lead that bridges or curls into a tab, cuts from edge to edge) is reported
+as incomplete, needing manual review. Kerf, tab strength and other parts' cuts are not modelled. Plan
+Cutting keeps its stricter rule and does not certify its own tabs followed by a lead-out.
 
 ## Explicit override
 
