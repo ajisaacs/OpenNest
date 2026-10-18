@@ -283,5 +283,18 @@ namespace OpenNest.Properties {
                 this["DrawingLibraryCutType"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        // Status-bar location follows the mouse; false updates it only on left clicks.
+        public bool StatusBarLocationFollowsMouse {
+            get {
+                return ((bool)(this["StatusBarLocationFollowsMouse"]));
+            }
+            set {
+                this["StatusBarLocationFollowsMouse"] = value;
+            }
+        }
     }
 }

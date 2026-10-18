@@ -4,13 +4,15 @@ using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Collections;
 using OpenNest.Geometry;
+using OpenNest.Properties;
 
 namespace OpenNest.Forms
 {
     /// <summary>
     /// The main window's status labels for the active nest document: status text, cursor
     /// location, selection bounds and plate index/size/quantity/utilization. The location
-    /// follows the mouse (the default, throttled), or only left clicks while click mode is on.
+    /// follows the mouse (the default, throttled), or only left clicks while click mode is on;
+    /// the mode persists as a user setting.
     /// </summary>
     internal sealed class MainStatusBar
     {
@@ -27,7 +29,7 @@ namespace OpenNest.Forms
         private readonly Timer locationTimer;
 
         private EditNestForm form;
-        private bool clickUpdatesLocation;
+        private bool clickUpdatesLocation = !Settings.Default.StatusBarLocationFollowsMouse;
         private bool locationPending;
 
         public MainStatusBar(ToolStripStatusLabel status, ToolStripStatusLabel location,
@@ -93,6 +95,8 @@ namespace OpenNest.Forms
         public void ToggleLocationMode()
         {
             clickUpdatesLocation = !clickUpdatesLocation;
+            Settings.Default.StatusBarLocationFollowsMouse = !clickUpdatesLocation;
+            Settings.Default.Save();
             ApplyLocationMode();
         }
 
