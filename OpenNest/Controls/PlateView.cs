@@ -26,6 +26,7 @@ namespace OpenNest.Controls
         private readonly Timer redrawTimer;
         private readonly OverlapOverlayController overlapOverlay;
         private readonly ValidationOverlay validationOverlay;
+        private readonly CutSimulationOverlay cutSimulation;
 
         private string status;
         private Plate plate;
@@ -106,6 +107,7 @@ namespace OpenNest.Controls
         {
             overlapOverlay = new OverlapOverlayController(this);
             validationOverlay = new ValidationOverlay(this);
+            cutSimulation = new CutSimulationOverlay(this);
             Plate = new Plate(60, 120);
             origin = new PointF();
             parts = new List<LayoutPart>();
@@ -283,6 +285,7 @@ namespace OpenNest.Controls
             }
 
             validationOverlay.Clear();
+            cutSimulation.Clear();
             plate = p;
             plate.PartAdded += plate_PartAdded;
             plate.PartRemoved += plate_PartRemoved;
@@ -298,6 +301,7 @@ namespace OpenNest.Controls
 
         internal OverlapOverlayController OverlapOverlay => overlapOverlay;
         internal ValidationOverlay ValidationOverlay => validationOverlay;
+        internal CutSimulationOverlay CutSimulation => cutSimulation;
         internal (float Scale, PointF Origin) CaptureViewport() => (ViewScale, origin);
         internal void RestoreViewport((float Scale, PointF Origin) viewport)
         {
@@ -737,6 +741,8 @@ namespace OpenNest.Controls
             }
             // Plan Cutting marks findings on its proposal as well as on the live plate.
             validationOverlay.Draw(e.Graphics);
+            if (!HasProposalDisplay)
+                cutSimulation.Draw(e.Graphics);
 
             base.OnPaint(e);
 
@@ -790,6 +796,7 @@ namespace OpenNest.Controls
                 CanEditClamps = null;
                 overlapOverlay?.Dispose();
                 validationOverlay?.Dispose();
+                cutSimulation?.Dispose();
                 hoverTimer?.Dispose();
                 hoverTimer = null;
                 redrawTimer?.Dispose();

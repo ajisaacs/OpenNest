@@ -44,6 +44,7 @@ namespace OpenNest.Forms
 
         private readonly Timer updateDrawingListTimer;
         private bool updatingPlateList;
+        private CutSimulatorForm cutSimulatorForm;
 
         private Panel plateHeaderPanel;
         private Label plateInfoLabel;
@@ -902,6 +903,24 @@ namespace OpenNest.Forms
 
                 timingForm.ShowDialog();
             }
+        }
+
+        public void SimulateCutting()
+        {
+            if (cutSimulatorForm is { IsDisposed: false })
+            {
+                cutSimulatorForm.Activate();
+                return;
+            }
+
+            cutSimulatorForm = new CutSimulatorForm(this);
+            cutSimulatorForm.FormClosed += (_, _) => cutSimulatorForm = null;
+            var owner = MdiParent ?? (Form)this;
+            var corner = owner.PointToScreen(new Point(owner.ClientSize.Width, owner.ClientSize.Height));
+            cutSimulatorForm.Show(owner);
+            cutSimulatorForm.Location = new Point(
+                System.Math.Max(owner.Left, corner.X - cutSimulatorForm.Width - 24),
+                System.Math.Max(owner.Top, corner.Y - cutSimulatorForm.Height - 48));
         }
 
         public void CalculateNestCutTime()

@@ -145,6 +145,7 @@ namespace OpenNest.Forms
             autoSequenceCurrentPlateToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             manualSequenceToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             calculateCutTimeToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateSimulateCutting = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem21 = new System.Windows.Forms.ToolStripSeparator();
             mnuPlatePlanCutting = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateAssignLeadIns = new System.Windows.Forms.ToolStripMenuItem();
@@ -745,7 +746,7 @@ namespace OpenNest.Forms
             //
             // mnuPlate
             //
-            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateCutOff, mnuPlateAutomaticCutOff, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateArrange, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, toolStripMenuItem21, mnuPlatePlanCutting, mnuPlateAssignLeadIns, mnuPlatePlaceLeadIn, mnuPlateRemoveLeadIns, toolStripMenuItem20, mnuPlateViewInCad });
+            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateCutOff, mnuPlateAutomaticCutOff, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateArrange, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, mnuPlateSimulateCutting, toolStripMenuItem21, mnuPlatePlanCutting, mnuPlateAssignLeadIns, mnuPlatePlaceLeadIn, mnuPlateRemoveLeadIns, toolStripMenuItem20, mnuPlateViewInCad });
             mnuPlate.Name = "mnuPlate";
             mnuPlate.Size = new System.Drawing.Size(45, 20);
             mnuPlate.Text = "&Plate";
@@ -983,6 +984,13 @@ namespace OpenNest.Forms
             calculateCutTimeToolStripMenuItem1.Size = new System.Drawing.Size(177, 22);
             calculateCutTimeToolStripMenuItem1.Text = "Calculate Cut Time";
             calculateCutTimeToolStripMenuItem1.Click += CalculatePlateCutTime_Click;
+            //
+            // mnuPlateSimulateCutting
+            //
+            mnuPlateSimulateCutting.Name = "mnuPlateSimulateCutting";
+            mnuPlateSimulateCutting.Size = new System.Drawing.Size(177, 22);
+            mnuPlateSimulateCutting.Text = "Simulate Cutting";
+            mnuPlateSimulateCutting.Click += SimulateCutting_Click;
             //
             // toolStripMenuItem21
             //
@@ -1419,6 +1427,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem calculateCutTimeToolStripMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem20;
         private System.Windows.Forms.ToolStripMenuItem calculateCutTimeToolStripMenuItem1;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateSimulateCutting;
         private System.Windows.Forms.ToolStripMenuItem mnuSequenceParts;
         private System.Windows.Forms.ToolStripMenuItem closeToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem runAutoNestToolStripMenuItem;

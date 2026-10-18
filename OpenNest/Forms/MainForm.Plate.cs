@@ -41,6 +41,8 @@ namespace OpenNest.Forms
 
         private void CalculatePlateCutTime_Click(object sender, EventArgs e) => WithActive(f => f.CalculateCurrentPlateCutTime());
 
+        private void SimulateCutting_Click(object sender, EventArgs e) => WithActive(f => f.SimulateCutting());
+
         private void AutoSequenceCurrentPlate_Click(object sender, EventArgs e) => WithActive(f => f.AutoSequenceCurrentPlate());
 
         private void ManualSequenceParts_Click(object sender, EventArgs e)
