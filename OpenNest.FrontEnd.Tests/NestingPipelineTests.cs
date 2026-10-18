@@ -166,6 +166,80 @@ public class NestingPipelineTests : IDisposable
         Assert.Equal(new Spacing(0.5, 0.5, 0.5, 0.5), plate.EdgeSpacing);
     }
 
+    [Fact]
+    public void Console_MaxSheetsCommitsEveryLayoutAfterTheTarget()
+    {
+        var input = Path.Combine(directory, "input.nest");
+        var output = Path.Combine(directory, "output.nest");
+        var session = Session(true);
+        // Empty plates are not persisted; an occupied one shows later plates are untouched.
+        var later = session.Nest.CreatePlate();
+        later.Size = new Size(40, 40);
+        later.Parts.Add(new Part(session.Nest.Drawings.Single()));
+        Assert.True(new NestWriter(session.Nest).Write(input));
+        var engine = Engine((job, _) =>
+        {
+            var stock = Assert.Single(job.Plates);
+            Assert.Null(stock.Quantity);
+            Assert.Equal(3, job.Options.MaxPlates);
+            var poses = new[] { new NestJobPlacement(job.Parts[0].Id, 0, 1, 1, 0) };
+            var other = new[] { new NestJobPlacement(job.Parts[0].Id, 0, 5, 5, 0) };
+            return new NestJobResult(NestJobStatus.Complete, NestJobStopReason.Completed,
+                new[] { new NestJobPlateResult(0, stock, poses), new NestJobPlateResult(1, stock, other) },
+                job.Parts.Select(p => new PartFulfillment(p.Id, p.Quantity, 2, 0)),
+                new[] { new StockUsage(stock.Id, 2, 0) });
+        });
+        Assert.Equal(0, RunConsole(input, "--autonest", "--engine", engine, "--quantity", "2",
+            "--max-sheets", "3", "--check-overlaps", "--output", output));
+        var nest = new NestReader(output).Read();
+        Assert.Equal(3, nest.Plates.Count);
+        Assert.All(nest.Plates.Take(2), plate =>
+        {
+            Assert.Single(plate.Parts);
+            Assert.Equal(1, plate.Quantity);
+            Assert.Equal(new Size(20, 30), plate.Size);
+            Assert.Equal(0.2, plate.PartSpacing);
+            Assert.Equal(new Spacing(0.5, 0.5, 0.5, 0.5), plate.EdgeSpacing);
+        });
+        Assert.Single(nest.Plates[2].Parts);
+        Assert.Equal(new Size(40, 40), nest.Plates[2].Size);
+    }
+
+    [Fact]
+    public void Console_StockOffersEachSizeFromTheTargetTemplate()
+    {
+        var input = Path.Combine(directory, "input.nest");
+        var output = Path.Combine(directory, "output.nest");
+        Assert.True(new NestWriter(Session(true).Nest).Write(input));
+        var engine = Engine((job, _) =>
+        {
+            Assert.Equal(new[] { new Size(10, 12), new Size(20, 30) }, job.Plates.Select(p => p.Size));
+            Assert.Equal(new double?[] { 5, 9 }, job.Plates.Select(p => p.Cost));
+            Assert.All(job.Plates, p => Assert.Equal(0.2, p.PartSpacing));
+            return Result(job, "valid");
+        });
+        Assert.Equal(0, RunConsole(input, "--autonest", "--engine", engine,
+            "--stock", "10x12:5, 20x30:9", "--output", output));
+        var plate = Assert.Single(new NestReader(output).Read().Plates);
+        Assert.Equal(new Size(10, 12), plate.Size);
+        Assert.Single(plate.Parts);
+    }
+
+    [Theory]
+    [InlineData("--max-sheets", "0", true)]
+    [InlineData("--stock", "10x", true)]
+    [InlineData("--stock", "10x12:-1", true)]
+    [InlineData("--max-sheets", "2", false)]
+    public void Console_RejectsBadSheetOptionsBeforeSolve(string option, string value, bool autonest)
+    {
+        var input = Path.Combine(directory, "input.nest");
+        Assert.True(new NestWriter(Session(true).Nest).Write(input));
+        var engine = Engine((_, _) => throw new Xunit.Sdk.XunitException("must not solve"));
+        var args = new List<string> { input, option, value, "--engine", autonest ? engine : "Fill", "--no-save" };
+        if (autonest) args.Add("--autonest");
+        Assert.Equal(1, RunConsole(args.ToArray()));
+    }
+
     [Theory]
     [InlineData("overlap", false, false)]
     [InlineData("overlap", true, true)]

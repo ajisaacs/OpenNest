@@ -16,8 +16,42 @@ public static class NestPipelineCommit
         CancellationToken token = default
     )
     {
-        ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(manager);
+        EnsureCommittable(result, allowInvalid, token);
+        // Commit is synchronous on the caller's owning thread. Cancellation is checked
+        // before mutation, not partway through attachment (which would leave half a job).
+        manager.BeginBatch();
+        try
+        {
+            return Attach(result, manager.GetOrCreateEmpty);
+        }
+        finally
+        {
+            manager.EndBatch();
+        }
+    }
+
+    /// <summary>
+    /// Same checks and commit as <see cref="ApplyToEmptyPlates"/> for callers without a
+    /// <see cref="PlateManager"/> (no trailing empty sheet). <paramref name="nextPlate"/> is
+    /// called once per non-empty proposed layout, after every check has passed, and must
+    /// return a plate without parts that already belongs to the nest.
+    /// </summary>
+    public static IReadOnlyList<Plate> ApplyToPlates(
+        NestPipelineResult result,
+        Func<Plate> nextPlate,
+        bool allowInvalid = false,
+        CancellationToken token = default
+    )
+    {
+        ArgumentNullException.ThrowIfNull(nextPlate);
+        EnsureCommittable(result, allowInvalid, token);
+        return Attach(result, nextPlate);
+    }
+
+    private static void EnsureCommittable(NestPipelineResult result, bool allowInvalid, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(result);
         token.ThrowIfCancellationRequested();
         if (!result.CanKeep || (!result.IsValid && !allowInvalid))
             throw new InvalidOperationException("The nesting result cannot be committed without a keepable layout and explicit consent to its violations.");
@@ -26,31 +60,24 @@ public static class NestPipelineCommit
                 result.Plates, result.DrawingsByPartId, result.IsValid, token).Count > 0)
             throw new InvalidOperationException("A drawing or proposed part changed after the nesting proposal was validated; run Auto Nest again.");
         token.ThrowIfCancellationRequested();
+    }
 
+    private static IReadOnlyList<Plate> Attach(NestPipelineResult result, Func<Plate> nextPlate)
+    {
         var applied = new List<Plate>();
-        // Commit is synchronous on the caller's owning thread. Cancellation is checked
-        // before mutation, not partway through attachment (which would leave half a job).
-        manager.BeginBatch();
-        try
+        foreach (var proposed in result.Plates)
         {
-            foreach (var proposed in result.Plates)
-            {
-                if (proposed.Parts.Count == 0)
-                    continue;
-                var plate = manager.GetOrCreateEmpty();
-                plate.Size = proposed.Stock.Size;
-                plate.PartSpacing = proposed.Stock.PartSpacing;
-                plate.EdgeSpacing = proposed.Stock.EdgeSpacing;
-                plate.Quadrant = proposed.Stock.Quadrant;
-                plate.Quantity = proposed.Quantity;
-                SyncClampZones(plate, proposed.Stock);
-                plate.Parts.AddRange(proposed.Parts);
-                applied.Add(plate);
-            }
-        }
-        finally
-        {
-            manager.EndBatch();
+            if (proposed.Parts.Count == 0)
+                continue;
+            var plate = nextPlate();
+            plate.Size = proposed.Stock.Size;
+            plate.PartSpacing = proposed.Stock.PartSpacing;
+            plate.EdgeSpacing = proposed.Stock.EdgeSpacing;
+            plate.Quadrant = proposed.Stock.Quadrant;
+            plate.Quantity = proposed.Quantity;
+            SyncClampZones(plate, proposed.Stock);
+            plate.Parts.AddRange(proposed.Parts);
+            applied.Add(plate);
         }
         return applied.AsReadOnly();
     }

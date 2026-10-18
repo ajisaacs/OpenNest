@@ -76,6 +76,20 @@ static class NestConsole
             return 0;
         }
 
+        if (!options.AutoNest && (options.MaxSheets != 1 || options.Stock != null))
+        {
+            Console.Error.WriteLine("Error: --max-sheets and --stock require --autonest.");
+            return 1;
+        }
+
+        if (options.MaxSheets < 1 || options.Stock is { Count: 0 })
+        {
+            Console.Error.WriteLine(
+                "Error: --max-sheets needs a whole number >= 1 and --stock needs WxL[:cost] sizes separated by commas (for example 60x120,48x96:85)."
+            );
+            return 1;
+        }
+
         // Validate --engine up front: autonest names a jobs engine, plain fill names a
         // single-plate placement strategy. Unknown names exit with the valid choices.
         if (options.AutoNest)
@@ -146,13 +160,13 @@ static class NestConsole
 
         PrintHeader(nest, plate, drawing, existingCount, options);
 
-        var (success, elapsed, accepted) = Fill(nest, plate, drawing, options, token);
+        var (success, elapsed, accepted, plates) = Fill(nest, plate, drawing, options, token);
         if (!accepted)
             return 2; // No save or post may run after a rejected proposal.
 
-        var overlapCount = CheckOverlaps(plate, options);
+        var overlapCount = CheckOverlaps(nest, plates, options);
 
-        PrintResults(success, plate, elapsed);
+        PrintResults(success, nest, plates, elapsed);
         token.ThrowIfCancellationRequested();
         if (!SaveAndPost(nest, options))
             return 1;
@@ -225,6 +239,14 @@ static class NestConsole
                 case "--autonest":
                     o.AutoNest = true;
                     break;
+                case "--max-sheets" when i + 1 < args.Length:
+                    o.MaxSheets = int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var sheets)
+                        ? sheets
+                        : 0;
+                    break;
+                case "--stock" when i + 1 < args.Length:
+                    o.Stock = ParseStock(args[++i]);
+                    break;
                 case "--engine" when i + 1 < args.Length:
                     o.Engine = args[++i];
                     break;
@@ -255,6 +277,38 @@ static class NestConsole
         }
 
         return o;
+    }
+
+    /// <summary>Parses "WxL[:cost],..."; any malformed entry returns an empty list, which validation rejects.</summary>
+    static List<PlateOption> ParseStock(string value)
+    {
+        var stock = new List<PlateOption>();
+        foreach (var entry in value.Split(',', StringSplitOptions.TrimEntries))
+        {
+            var parts = entry.Split(':', StringSplitOptions.TrimEntries);
+            var cost = 0.0;
+            if (
+                parts.Length > 2
+                || !Size.TryParse(parts[0], out var size)
+                || !double.IsFinite(size.Width)
+                || !double.IsFinite(size.Length)
+                || size.Width <= 0
+                || size.Length <= 0
+                || (
+                    parts.Length == 2
+                    && (
+                        !double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out cost)
+                        || !double.IsFinite(cost)
+                        || cost <= 0
+                    )
+                )
+            )
+                return new List<PlateOption>();
+
+            stock.Add(new PlateOption { Width = size.Width, Length = size.Length, Cost = cost });
+        }
+
+        return stock;
     }
 
     static Nest LoadOrCreateNest(Options options)
@@ -446,7 +500,7 @@ static class NestConsole
         );
     }
 
-    static (bool success, long elapsedMs, bool accepted) Fill(
+    static (bool success, long elapsedMs, bool accepted, IReadOnlyList<Plate> plates) Fill(
         Nest nest,
         Plate plate,
         Drawing drawing,
@@ -457,6 +511,7 @@ static class NestConsole
         var sw = Stopwatch.StartNew();
         bool success;
         var accepted = true;
+        IReadOnlyList<Plate> plates = new[] { plate };
 
         if (options.AutoNest)
         {
@@ -477,9 +532,11 @@ static class NestConsole
                 $"AutoNest: {nestItems.Count} drawing(s), {nestItems.Sum(i => i.Quantity)} total parts"
             );
 
-            var outcome = AutoNestJob(plate, nestItems, options.Engine, options.AllowInvalid, token);
+            var outcome = AutoNestJob(nest, plate, nestItems, options, token);
             accepted = outcome.accepted;
             success = outcome.committed > 0;
+            if (accepted)
+                plates = outcome.plates;
         }
         else
         {
@@ -503,71 +560,117 @@ static class NestConsole
         }
 
         sw.Stop();
-        return (success, sw.ElapsedMilliseconds, accepted);
+        return (success, sw.ElapsedMilliseconds, accepted, plates);
     }
 
-    static (bool accepted, int committed) AutoNestJob(
-        Plate plate, List<NestItem> nestItems, string engineName, bool allowInvalid, CancellationToken token)
+    static (bool accepted, int committed, IReadOnlyList<Plate> plates) AutoNestJob(
+        Nest nest, Plate plate, List<NestItem> nestItems, Options options, CancellationToken token)
     {
+        var rejected = (false, 0, (IReadOnlyList<Plate>)Array.Empty<Plate>());
+        // One sheet of the target's size keeps the original single-sheet stock exactly;
+        // otherwise the target is the template for every offered size, unlimited per size
+        // and capped by --max-sheets physical sheets in total.
+        var singleSheet = options.MaxSheets == 1 && options.Stock == null;
+        var stock = singleSheet
+            ? NestStockBuilder.SinglePlate(plate)
+            : NestStockBuilder.FromTemplate(plate, options.Stock);
         var result = NestPipeline.Run(new NestPipelineRequest(
-            engineName, nestItems, NestStockBuilder.SinglePlate(plate)), token: token);
+            options.Engine, nestItems, stock,
+            singleSheet ? null : new NestJobOptions(maxPlates: options.MaxSheets)), token: token);
         foreach (var violation in result.Violations)
             Console.Error.WriteLine($"Violation: {violation}");
         foreach (var unplaced in result.Unplaced)
             Console.Error.WriteLine($"Unplaced: {unplaced.Describe()}");
 
-        if (!result.CanKeep || result.Raw.Plates.Count > 1 || (!result.IsValid && !allowInvalid))
+        var tooManySheets = result.Raw.Plates.Count > options.MaxSheets;
+        if (!result.CanKeep || tooManySheets || (!result.IsValid && !options.AllowInvalid))
         {
-            Console.Error.WriteLine(result.Raw.Plates.Count > 1
-                ? "Error: multiple result sheets cannot be merged onto one target, even with --allow-invalid. Nothing saved."
+            Console.Error.WriteLine(tooManySheets
+                ? $"Error: result uses {result.Raw.Plates.Count} sheets, more than --max-sheets {options.MaxSheets}, even with --allow-invalid. Nothing saved."
                 : !result.CanKeep
                     ? "Error: result cannot be represented faithfully, even with --allow-invalid. Nothing saved."
                     : "Error: invalid result discarded. Use --allow-invalid to explicitly keep its violations. Nothing saved.");
-            return (false, 0);
+            return rejected;
         }
 
         token.ThrowIfCancellationRequested();
-        var proposed = result.Plates.SingleOrDefault();
-        var committed = proposed?.Parts.Count ?? 0;
+        var committed = result.Plates.Sum(p => p.Parts.Count * p.Quantity);
         if (committed == 0)
         {
             Console.Error.WriteLine("Error: no placements returned. Existing layout and output left unchanged.");
-            return (false, 0);
+            return rejected;
         }
 
-        plate.Parts.Clear();
-        plate.Size = proposed.Stock.Size;
-        plate.PartSpacing = proposed.Stock.PartSpacing;
-        plate.EdgeSpacing = proposed.Stock.EdgeSpacing;
-        plate.Quadrant = proposed.Stock.Quadrant;
-        plate.Quantity = 1;
-        plate.Parts.AddRange(proposed.Parts);
-        Console.WriteLine($"Engine: {engineName} — committed {committed} placements");
-        return (true, committed);
+        var costs = result.IsValid && options.Stock != null ? NestCostSummary.FromAccepted(result) : null;
+
+        // The first layout replaces the target's parts; further layouts become new sheets
+        // right after it, carrying the target's cutting settings. Other plates are unchanged.
+        var insertAt = nest.Plates.IndexOf(plate) + 1;
+        var targetUsed = false;
+        var applied = NestPipelineCommit.ApplyToPlates(result, () =>
+        {
+            if (!targetUsed)
+            {
+                targetUsed = true;
+                plate.Parts.Clear();
+                return plate;
+            }
+
+            var created = new Plate(plate.Size)
+            {
+                GrainAngle = plate.GrainAngle,
+                CuttingParameters = plate.CuttingParameters,
+            };
+            nest.Plates.Insert(insertAt++, created);
+            return created;
+        }, options.AllowInvalid, token);
+
+        Console.WriteLine($"Engine: {options.Engine} — committed {committed} placements on {applied.Sum(p => p.Quantity)} sheet(s)");
+        if (costs != null)
+            Console.WriteLine($"Cost ({costs.Basis}): gross {costs.GrossTotal:F2}, salvage credit {costs.SalvageCredit:F2}, net {costs.NetScore:F2}");
+        return (true, committed, applied);
     }
 
-    static int CheckOverlaps(Plate plate, Options options)
+    static int CheckOverlaps(Nest nest, IReadOnlyList<Plate> plates, Options options)
     {
-        if (!options.CheckOverlaps || plate.Parts.Count == 0)
+        if (!options.CheckOverlaps)
             return 0;
 
-        var hasOverlaps = plate.HasOverlappingParts(out var overlapPts);
-        Console.WriteLine(
-            hasOverlaps
-                ? $"OVERLAPS DETECTED: {overlapPts.Count} intersection points"
-                : "Overlap check: PASS"
-        );
+        var total = 0;
+        foreach (var plate in plates.Where(p => p.Parts.Count > 0))
+        {
+            var hasOverlaps = plate.HasOverlappingParts(out var overlapPts);
+            var label = plates.Count > 1 ? $"Plate {nest.Plates.IndexOf(plate)}: " : "";
+            Console.WriteLine(
+                hasOverlaps
+                    ? $"{label}OVERLAPS DETECTED: {overlapPts.Count} intersection points"
+                    : $"{label}Overlap check: PASS"
+            );
+            total += overlapPts.Count;
+        }
 
-        return overlapPts.Count;
+        return total;
     }
 
-    static void PrintResults(bool success, Plate plate, long elapsedMs)
+    static void PrintResults(bool success, Nest nest, IReadOnlyList<Plate> plates, long elapsedMs)
     {
+        if (plates.Count > 1)
+        {
+            foreach (var plate in plates)
+                Console.WriteLine(
+                    $"Plate {nest.Plates.IndexOf(plate)}: {plate.Size.Width:F1} x {plate.Size.Length:F1} x{plate.Quantity}, {plate.Parts.Count} parts, utilization {plate.Utilization():P1}"
+                );
+        }
+
+        var area = plates.Sum(p => p.Size.Width * p.Size.Length * p.Quantity);
+        var utilization = area > 0
+            ? plates.Sum(p => p.Utilization() * p.Size.Width * p.Size.Length * p.Quantity) / area
+            : 0;
         Console.WriteLine(
             $"""
             Result: {(success ? "success" : "failed")}
-            Parts placed: {plate.Parts.Count}
-            Utilization: {plate.Utilization():P1}
+            Parts placed: {plates.Sum(p => p.Parts.Count * p.Quantity)}
+            Utilization: {utilization:P1}
             Time: {elapsedMs}ms
             """
         );
@@ -741,7 +844,11 @@ static class NestConsole
               --size <WxL>           Override plate size (e.g. 60x120); required for DXF-only mode
               --output <path>        Output nest file path (default: <input>-result.nest)
               --template <path>      Nest template for plate defaults (thickness, quadrant, material, spacing)
-              --autonest             Validated whole-job nesting onto one sheet; replaces only after acceptance
+              --autonest             Validated whole-job nesting (one sheet unless --max-sheets); replaces only after acceptance
+              --max-sheets <n>       With --autonest: physical sheets the job may use (default: 1); extra
+                                     layouts are inserted as new plates after the target plate
+              --stock <WxL[:cost],...>  With --autonest: sheet sizes to offer, each unlimited (default: the
+                                     target plate's size); spacing, quadrant and clamps follow the target
               --allow-invalid        Explicitly keep representable invalid autonest layouts (default: reject, exit 2)
               --engine <name>        With --autonest: jobs engine (default: Default; also Irregular, Rectangles, Fill, ...).
                                      Without --autonest: fill strategy (Fill (default), Strip, Vertical Remnant, Horizontal Remnant)
@@ -772,6 +879,8 @@ static class NestConsole
         public bool KeepParts;
         public bool AutoNest;
         public bool AllowInvalid;
+        public int MaxSheets = 1;
+        public List<PlateOption> Stock;
         public string Engine = "Default";
         public string TemplateFile;
         public string PostName;
