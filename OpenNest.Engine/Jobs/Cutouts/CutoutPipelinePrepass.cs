@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using OpenNest.Engine.CirclePacking;
 using OpenNest.Engine.Jobs.Adapters;
 
 namespace OpenNest.Engine.Jobs.Cutouts;
@@ -10,12 +11,23 @@ namespace OpenNest.Engine.Jobs.Cutouts;
 /// <summary>Frame bundles prepared by <see cref="NestPipeline"/> before every whole-job solve:
 /// engines place a frame proxy and never see its reserved inserts. Only actually placed
 /// proxies expand, and the expanded physical layout is validated again.</summary>
+/// <remarks>Bundles may nest: smaller frames are bundled first, so a larger round cutout can
+/// take a ring part or an earlier bundle (a ring holding its own inserts) as one round insert.
+/// Those go only through <see cref="CutoutCirclePacker"/>, which keeps every disc clear of the
+/// others' whole enclosing circles; lattice and NFP placement could seat a part in a ring's
+/// empty bore, or over a nested bundle's reserved inserts.</remarks>
 internal sealed class CutoutPipelinePrepass
 {
     // A job with thousands of repeats still offers the residual as ordinary demand;
     // do not multiply expensive Clipper/Fill preparation by every physical instance.
     private const int MaxBundlesPerJob = 32;
-    private sealed record Bundle(string FrameId, IReadOnlyList<NestJobPlacement> LocalInserts);
+
+    /// <summary>Most parts on one frame-in-frame chain: flange, washer, smaller washer, slug.</summary>
+    internal const int MaxLevels = 4;
+
+    // Levels: parts on the deepest chain through the frame; Parts: every physical part.
+    private sealed record Bundle(string FrameId, IReadOnlyList<NestJobPlacement> LocalInserts,
+        int Levels, int Parts);
     private readonly IReadOnlyDictionary<string, Bundle> bundles;
 
     private CutoutPipelinePrepass(NestJob engineJob, IReadOnlyDictionary<string, Bundle> bundles)
@@ -36,16 +48,24 @@ internal sealed class CutoutPipelinePrepass
         var spacing = original.Plates.Max(p => p.PartSpacing);
         var remaining = original.Parts.ToDictionary(p => p.Id, p => p.Quantity);
         var geometry = original.Parts.ToDictionary(p => p.Id, p => JobPartGeometry.TryRead(p.Geometry));
+        // Proxies join these as they are built, so a larger frame can take one as an insert.
+        var offers = original.Parts.ToList();
+        var requirements = original.Parts.ToDictionary(p => p.Id);
+        var round = original.Parts.ToDictionary(p => p.Id, p => geometry[p.Id] is { } g
+            && Item.Create(g).FillRatio >= CutoutCirclePacker.MinFillRatio);
         var bundles = new Dictionary<string, Bundle>(StringComparer.Ordinal);
         var byFrame = new Dictionary<string, List<NestJobPart>>(StringComparer.Ordinal);
-        foreach (var frame in original.Parts)
+        // Smallest first: a frame can only hold smaller parts, so its candidate inner bundles
+        // already exist, and small holes take small inserts before large holes are tried.
+        var frames = original.Parts.Where(p => geometry[p.Id] is { Cutouts.Count: > 0 })
+            .OrderBy(p => System.Math.Abs(geometry[p.Id]!.Perimeter.Area()))
+            .ToArray();
+        foreach (var frame in frames)
         {
             token.ThrowIfCancellationRequested();
             if (bundles.Count >= MaxBundlesPerJob)
                 break;
-            var profile = geometry[frame.Id];
-            if (profile == null || profile.Cutouts.Count == 0)
-                continue;
+            var profile = geometry[frame.Id]!;
             var proxies = new List<NestJobPart>();
             byFrame[frame.Id] = proxies;
             for (var instance = 0; instance < frame.Quantity; instance++)
@@ -66,22 +86,25 @@ internal sealed class CutoutPipelinePrepass
                     for (var hole = 0; hole < profile.Cutouts.Count; hole++)
                     {
                         token.ThrowIfCancellationRequested();
-                        // Flat bundles: frames cannot simultaneously be inserts in another bundle.
-                        var candidates = original.Parts
+                        var eligible = offers
                             .Where(p => p.Id != frame.Id && available[p.Id] > 0
                                 && p.Priority == frame.Priority
-                                && geometry[p.Id] is { Cutouts.Count: 0 })
+                                && (!bundles.TryGetValue(p.Id, out var b)
+                                    || (b.FrameId != frame.Id && b.Levels < MaxLevels)))
                             .Select(p => new NestJobPart(p.Id, p.Geometry, available[p.Id],
                                 p.Priority, LocalRotation(p.Rotation, angle)))
                             .ToArray();
-                        if (candidates.Length == 0)
+                        var flat = eligible.Where(p => geometry[p.Id] is { Cutouts.Count: 0 }).ToArray();
+                        var nested = CutoutCirclePacker.RoundHole(profile.Cutouts[hole]) == null
+                            ? Array.Empty<NestJobPart>()
+                            : eligible.Where(p => round[p.Id] && geometry[p.Id]!.Cutouts.Count > 0).ToArray();
+                        if (flat.Length == 0 && nested.Length == 0)
                             break;
-                        foreach (var pose in CutoutRouter.Fill(frame, hole, candidates, spacing, token))
+                        foreach (var pose in Propose(frame, hole, flat, nested))
                         {
                             token.ThrowIfCancellationRequested();
                             var source = geometry[pose.PartId]!;
-                            var policy = original.Parts.Single(p => p.Id == pose.PartId).Rotation;
-                            if (!policy.Allows(angle + pose.Rotation)
+                            if (!requirements[pose.PartId].Rotation.Allows(angle + pose.Rotation)
                                 || local.Any(other => !NestLayoutCheck.Clears(
                                     geometry[other.PartId]!, other, source, pose, spacing)))
                                 continue;
@@ -89,7 +112,7 @@ internal sealed class CutoutPipelinePrepass
                             available[pose.PartId]--;
                         }
                     }
-                    if (local.Count <= (chosen?.Count ?? 0))
+                    if (Weight(local) <= Weight(chosen ?? Array.Empty<NestJobPlacement>()))
                         continue;
                     chosen = local.ToArray();
                     frameAngle = angle;
@@ -97,14 +120,21 @@ internal sealed class CutoutPipelinePrepass
                 if (chosen == null || chosen.Count == 0)
                     break;
                 var proxyId = $"__cutout-proxy-{frame.Id}-{instance}";
-                if (remaining.ContainsKey(proxyId) || bundles.ContainsKey(proxyId))
+                if (requirements.ContainsKey(proxyId))
                     throw new InvalidOperationException("Cutout proxy ID collides with a requirement.");
-                bundles.Add(proxyId, new Bundle(frame.Id, chosen));
-                proxies.Add(new NestJobPart(proxyId, frame.Geometry, 1, frame.Priority,
-                    RotationPolicy.Fixed(frameAngle)));
+                var levels = 1 + chosen.Max(p => bundles.TryGetValue(p.PartId, out var b) ? b.Levels : 1);
+                bundles.Add(proxyId, new Bundle(frame.Id, chosen, levels, 1 + Weight(chosen)));
+                var proxy = new NestJobPart(proxyId, frame.Geometry, 1, frame.Priority,
+                    RotationPolicy.Fixed(frameAngle));
+                proxies.Add(proxy);
                 remaining[frame.Id]--;
                 foreach (var pose in chosen)
                     remaining[pose.PartId]--;
+                offers.Add(proxy);
+                requirements.Add(proxyId, proxy);
+                geometry.Add(proxyId, profile);
+                round.Add(proxyId, round[frame.Id]);
+                remaining.Add(proxyId, 1);
             }
         }
         if (bundles.Count == 0)
@@ -112,14 +142,36 @@ internal sealed class CutoutPipelinePrepass
         var transformed = new List<NestJobPart>();
         foreach (var part in original.Parts)
         {
+            // A proxy another frame took as an insert is reserved inside that frame's bundle.
             if (byFrame.TryGetValue(part.Id, out var proxies))
-                transformed.AddRange(proxies);
+                transformed.AddRange(proxies.Where(p => remaining[p.Id] > 0));
             if (remaining[part.Id] > 0)
                 transformed.Add(new NestJobPart(part.Id, part.Geometry, remaining[part.Id],
                     part.Priority, part.Rotation));
         }
         return new CutoutPipelinePrepass(new NestJob(transformed, original.Plates,
             original.Options), bundles);
+
+        // Ties keep the flat router's proposal, which predates nesting.
+        IReadOnlyList<NestJobPlacement> Propose(NestJobPart frame, int hole,
+            NestJobPart[] flat, NestJobPart[] nested)
+        {
+            IReadOnlyList<NestJobPlacement> poses = Array.Empty<NestJobPlacement>();
+            if (nested.Length > 0)
+                poses = CutoutCirclePacker.Fill(frame, hole,
+                    flat.Where(p => round[p.Id]).Concat(nested).ToArray(), spacing, token);
+            // Seating every flat copy as a disc leaves the slower proposals nothing to beat.
+            var flatIds = flat.Select(p => p.Id).ToHashSet(StringComparer.Ordinal);
+            if (flat.Length == 0
+                || poses.Count(p => flatIds.Contains(p.PartId)) == flat.Sum(p => (long)p.Quantity))
+                return poses;
+            var router = CutoutRouter.Fill(frame, hole, flat, spacing, token);
+            return Weight(router) >= Weight(poses) ? router : poses;
+        }
+
+        // Physical parts a proposal places: a nested bundle counts its frame and contents.
+        int Weight(IReadOnlyList<NestJobPlacement> poses) =>
+            poses.Sum(p => bundles.TryGetValue(p.PartId, out var b) ? b.Parts : 1);
     }
 
     private static RotationPolicy LocalRotation(RotationPolicy original, double frameAngle) =>
@@ -139,11 +191,25 @@ internal sealed class CutoutPipelinePrepass
         var placed = engineResult.Plates.SelectMany(p => p.Placements)
             .Select(p => p.PartId).ToHashSet(StringComparer.Ordinal);
         var released = new Dictionary<string, int>(StringComparer.Ordinal);
-        foreach (var (proxyId, bundle) in bundles)
-            if (!placed.Contains(proxyId))
-                foreach (var insert in bundle.LocalInserts)
-                    released[insert.PartId] = released.GetValueOrDefault(insert.PartId) + 1;
+        // Nested proxies are never offered to the engine; their outermost frame releases them.
+        foreach (var part in EngineJob.Parts)
+            if (bundles.TryGetValue(part.Id, out var bundle) && !placed.Contains(part.Id))
+                Release(bundle);
         return released;
+
+        void Release(Bundle bundle)
+        {
+            foreach (var insert in bundle.LocalInserts)
+            {
+                if (bundles.TryGetValue(insert.PartId, out var nested))
+                {
+                    released[nested.FrameId] = released.GetValueOrDefault(nested.FrameId) + 1;
+                    Release(nested);
+                }
+                else
+                    released[insert.PartId] = released.GetValueOrDefault(insert.PartId) + 1;
+            }
+        }
     }
 
     /// <summary>Reject untrusted accounting before expansion. A failed trial is never bindable,
@@ -222,16 +288,7 @@ internal sealed class CutoutPipelinePrepass
                     poses.Add((pose.PartId, pose.X, pose.Y, pose.Rotation));
                     continue;
                 }
-                // Inserts precede their frame: cutting the frame's cutout releases the slug
-                // each insert is cut from, so placed order is the safe cutting order.
-                var sine = System.Math.Sin(pose.Rotation);
-                var cosine = System.Math.Cos(pose.Rotation);
-                foreach (var local in bundle.LocalInserts)
-                    poses.Add((local.PartId,
-                        pose.X + local.X * cosine - local.Y * sine,
-                        pose.Y + local.X * sine + local.Y * cosine,
-                        pose.Rotation + local.Rotation));
-                poses.Add((bundle.FrameId, pose.X, pose.Y, pose.Rotation));
+                Expand(bundle, pose.X, pose.Y, pose.Rotation, poses);
             }
             // Canonical stock reference, not an engine-supplied object with altered settings.
             var stock = original.Plates.Single(s => s.Id == sheet.StockId);
@@ -247,5 +304,24 @@ internal sealed class CutoutPipelinePrepass
         token.ThrowIfCancellationRequested();
         expanded = builder.Build(result.StopReason);
         return true;
+    }
+
+    // Inserts precede their frame at every level: cutting a frame's cutout releases the slug
+    // each insert is cut from, so placed order (innermost first) is the safe cutting order.
+    private void Expand(Bundle bundle, double x, double y, double rotation,
+        List<(string PartId, double X, double Y, double Rotation)> poses)
+    {
+        var sine = System.Math.Sin(rotation);
+        var cosine = System.Math.Cos(rotation);
+        foreach (var local in bundle.LocalInserts)
+        {
+            var insertX = x + local.X * cosine - local.Y * sine;
+            var insertY = y + local.X * sine + local.Y * cosine;
+            if (bundles.TryGetValue(local.PartId, out var nested))
+                Expand(nested, insertX, insertY, rotation + local.Rotation, poses);
+            else
+                poses.Add((local.PartId, insertX, insertY, rotation + local.Rotation));
+        }
+        poses.Add((bundle.FrameId, x, y, rotation));
     }
 }

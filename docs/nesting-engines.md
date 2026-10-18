@@ -210,11 +210,18 @@ proposals win ties.
 closed-cutout frames. It considers legal frame rotations without outer-perimeter symmetry
 reduction, shifts insert rotation policies into the local frame, and reserves certified router
 poses by original requirement ID. It can fill multiple holes and repeated/different frame
-requirements; inserts with a different priority or their own cutouts stay independent, so
-bundles remain flat. It uses the largest offered spacing for every bundle because the current
+requirements; inserts with a different priority stay independent. Frames are bundled smallest
+first, so a larger frame's round cutout can take, through `CutoutCirclePacker` only, a round part
+with its own cutouts (a washer with an empty bore) or an earlier bundle as one insert: a flange
+holds a washer that holds a smaller washer that holds a slug. Chains stop at four parts deep
+(`CutoutPipelinePrepass.MaxLevels`). Lattice and NFP proposals never take such inserts, since they
+could seat a part in a ring's bore or over a nested bundle's reserved inserts; non-round frames
+with cutouts stay independent. A frame's proposals are compared by physical parts placed, a nested
+bundle counting its frame and contents, and ties keep the flat router's proposal. It uses the largest offered spacing for every bundle because the current
 job contract cannot condition insert demand on the stock selected later. Remaining demand is
-offered to the selected engine once. Only actually placed proxies expand to original frame and
-insert identities. An unplaced proxy's reservations return to the original unplaced demand;
+offered to the selected engine once. Only actually placed proxies expand, recursively, to original frame and
+insert identities. An unplaced proxy's reservations, including every nested frame and insert,
+return to the original unplaced demand;
 they cannot be packed retroactively in that same solve. Engine indices and metadata are checked,
 then every physical pose, stock, rotation, quantity and fulfillment is independently validated
 before binding caller drawings. Forged or geometrically invalid composites return no bindable
@@ -239,7 +246,8 @@ offer) and returns:
 
 So a job with cutouts may take up to two engine solves; a job without eligible frames takes
 one, exactly as before. Expanded sheets list each frame's inserts immediately before the frame,
-so the committed part order cuts every insert before the cutout that would release its slug.
+at every level (innermost first), so the committed part order cuts every insert before the cutout
+that would release its slug.
 Leads are not changed: pre-post verification still warns when a host's hole lead or an insert's
 lead meets the other part, or when a later reorder (by hand or Auto Sequence) puts the host
 first (see [pre-post verification](post-verification.md)); Plan Cutting cuts each insert before
