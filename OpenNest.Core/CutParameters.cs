@@ -17,6 +17,12 @@ public class CutParameters
     /// </summary>
     public MotionProfile Motion { get; set; }
 
+    /// <summary>Feed for interior contours (holes); null or zero uses <see cref="Feedrate"/>.</summary>
+    public double? HoleFeedrate { get; set; }
+
+    /// <summary>Leave out contours that only scribe/etch, as the CI Fiber post does by default.</summary>
+    public bool SkipScribe { get; set; }
+
     public static CutParameters Default =>
         new()
         {

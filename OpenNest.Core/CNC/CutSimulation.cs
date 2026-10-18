@@ -36,6 +36,24 @@ namespace OpenNest.CNC
         public double StartAngle { get; init; }
         public double Sweep { get; init; }
         public double Length { get; init; }
+
+        /// <summary>The program layer of a cutting or scribing move.</summary>
+        public LayerType Layer { get; init; }
+
+        /// <summary>
+        /// The contour this move or pierce belongs to, numbered in cutting order; -1 for travel.
+        /// </summary>
+        public int ContourIndex { get; internal set; } = -1;
+
+        /// <summary>
+        /// True when the move is part of an interior contour, timed at the hole feed. Follows the
+        /// CI Fiber post's rule: only a closed clockwise contour (or a cut-off) is exterior.
+        /// </summary>
+        public bool IsHole { get; internal set; }
+
+        /// <summary>Programmed speed in units per second, before acceleration.</summary>
+        public double NominalSpeed { get; internal set; }
+
         public TimeSpan StartTime { get; internal set; }
         public TimeSpan Duration { get; internal set; }
         public TimeSpan EndTime => StartTime + Duration;
@@ -130,10 +148,11 @@ namespace OpenNest.CNC
     }
 
     /// <summary>
-    /// A replayable timeline of a plate's tool motion in cutting order, timed with the
-    /// same feed, rapid and pierce rules as <see cref="Timing.CalculateTime(TimingInfo, CutParameters)"/>,
-    /// plus <see cref="CutParameters.Motion"/> acceleration when set (see <see cref="MotionPlanner"/>).
-    /// It does not model jerk, per-motion feed overrides or clamp removal.
+    /// A replayable timeline of a plate's tool motion in cutting order. Cut and display-layer
+    /// moves cut (as the posts emit them), at the hole or outside feed. Suppressed moves and,
+    /// with <see cref="CutParameters.SkipScribe"/>, etch-only contours are left out. Adds
+    /// <see cref="CutParameters.Motion"/> acceleration when set (see <see cref="MotionPlanner"/>).
+    /// It does not model jerk, controller feed tables or clamp removal. See docs/cut-time-estimates.md.
     /// </summary>
     public sealed class CutSimulation
     {
@@ -149,14 +168,12 @@ namespace OpenNest.CNC
 
             // A contour (a cutout or a part's perimeter) begins where the torch goes down after travel.
             var lastPart = -1;
-            for (var i = 0; i < steps.Count; i++)
+            var lastContour = -1;
+            foreach (var step in steps)
             {
-                var step = steps[i];
-                if (step.Kind == CutSimulationStepKind.Rapid)
+                if (step.ContourIndex < 0 || step.ContourIndex == lastContour)
                     continue;
-                var previous = i > 0 ? steps[i - 1] : null;
-                if (previous is { Kind: not CutSimulationStepKind.Rapid } && previous.PartIndex == step.PartIndex)
-                    continue;
+                lastContour = step.ContourIndex;
 
                 contourStarts.Add(step.StartTime);
                 if (step.PartIndex != lastPart)
@@ -210,7 +227,7 @@ namespace OpenNest.CNC
             ArgumentNullException.ThrowIfNull(plate);
             ArgumentNullException.ThrowIfNull(parameters);
 
-            var builder = new Builder(parameters);
+            var builder = new Builder();
 
             for (var i = 0; i < plate.Parts.Count; i++)
             {
@@ -224,10 +241,8 @@ namespace OpenNest.CNC
                 builder.AddProgram(part.Program, part.Location, ref mode, ref pos);
             }
 
-            if (parameters.Motion != null)
-                MotionPlanner.Plan(builder.Steps, parameters);
-
-            return new CutSimulation(builder.Steps, plate.Parts.Count);
+            var steps = ContourTiming.Finish(builder.Steps, plate, parameters);
+            return new CutSimulation(steps, plate.Parts.Count);
         }
 
         /// <summary>
@@ -279,12 +294,9 @@ namespace OpenNest.CNC
 
         private sealed class Builder
         {
-            private readonly CutParameters parameters;
-            private TimeSpan clock;
             private Vector tool = Vector.Zero;
             private bool torchOn;
 
-            public Builder(CutParameters parameters) => this.parameters = parameters;
 
             public List<CutSimulationStep> Steps { get; } = new();
             public int PartIndex { get; set; }
@@ -313,6 +325,11 @@ namespace OpenNest.CNC
                             pos = rapidEnd;
                             break;
 
+                        case Motion { Suppressed: true } suppressed:
+                            // Posts leave suppressed moves out; the next move starts from here.
+                            pos = Resolve(suppressed.EndPoint, mode, pos, frameOrigin);
+                            break;
+
                         case LinearMove linear:
                             var lineEnd = Resolve(linear.EndPoint, mode, pos, frameOrigin);
                             AddMotion(linear.Layer, pos, lineEnd, isArc: false, default, default);
@@ -335,9 +352,11 @@ namespace OpenNest.CNC
             private static CutSimulationStepKind? KindOf(LayerType layer) =>
                 layer switch
                 {
-                    LayerType.Cut or LayerType.Leadin or LayerType.Leadout or LayerType.Break => CutSimulationStepKind.Cut,
+                    // Cutting strategies emit contour moves on Display; the posts cut them.
+                    LayerType.Cut or LayerType.Display or LayerType.Leadin or LayerType.Leadout or LayerType.Break
+                        => CutSimulationStepKind.Cut,
                     LayerType.Scribe => CutSimulationStepKind.Scribe,
-                    _ => null, // Display and Tab motion is not emitted as cutting.
+                    _ => null, // Tab spans are never cut.
                 };
 
             private void AddMotion(LayerType layer, Vector start, Vector end, bool isArc, Vector center, RotationType rotation)
@@ -359,27 +378,26 @@ namespace OpenNest.CNC
                         PartIndex = PartIndex,
                         Start = start,
                         End = start,
-                        Duration = parameters.PierceTime,
                     });
                 }
 
                 torchOn = kind == CutSimulationStepKind.Cut;
 
                 if (isArc)
-                    AddArc(kind, start, end, center, rotation);
+                    AddArc(kind, layer, start, end, center, rotation);
                 else
                     Add(new CutSimulationStep
                     {
                         Kind = kind,
+                        Layer = layer,
                         PartIndex = PartIndex,
                         Start = start,
                         End = end,
                         Length = start.DistanceTo(end),
-                        Duration = TravelTime(start.DistanceTo(end), parameters.Feedrate),
                     });
             }
 
-            private void AddArc(CutSimulationStepKind kind, Vector start, Vector end, Vector center, RotationType rotation)
+            private void AddArc(CutSimulationStepKind kind, LayerType layer, Vector start, Vector end, Vector center, RotationType rotation)
             {
                 var radius = center.DistanceTo(start);
                 var startAngle = center.AngleTo(start);
@@ -397,6 +415,7 @@ namespace OpenNest.CNC
                 Add(new CutSimulationStep
                 {
                     Kind = kind,
+                    Layer = layer,
                     PartIndex = PartIndex,
                     Start = start,
                     End = end,
@@ -406,7 +425,6 @@ namespace OpenNest.CNC
                     StartAngle = startAngle,
                     Sweep = sweep,
                     Length = length,
-                    Duration = TravelTime(length, parameters.Feedrate),
                 });
             }
 
@@ -428,27 +446,13 @@ namespace OpenNest.CNC
                     Start = start,
                     End = end,
                     Length = distance,
-                    Duration = TravelTime(distance, parameters.RapidTravelRate),
                 });
             }
 
             private void Add(CutSimulationStep step)
             {
-                step.StartTime = clock;
-                clock += step.Duration;
                 tool = step.End;
                 Steps.Add(step);
-            }
-
-            // Matches Timing.CalculateTime: inch rates are per minute, millimeter rates per second.
-            private TimeSpan TravelTime(double distance, double rate)
-            {
-                if (rate <= 0 || distance <= 0)
-                    return TimeSpan.Zero;
-
-                return parameters.Units == Units.Millimeters
-                    ? TimeSpan.FromSeconds(distance / rate)
-                    : TimeSpan.FromMinutes(distance / rate);
             }
         }
     }

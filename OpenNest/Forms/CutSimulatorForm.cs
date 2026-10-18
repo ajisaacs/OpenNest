@@ -23,7 +23,8 @@ namespace OpenNest.Forms
         private readonly ComboBox speedBox;
         private readonly TrackBar trackBar;
         private readonly Label timeLabel, partLabel, stateLabel;
-        private readonly NumericUpDown feedBox, rapidBox, pierceBox;
+        private readonly NumericUpDown feedBox, holeFeedBox, rapidBox, pierceBox;
+        private readonly CheckBox skipEtchBox;
         private readonly CutTimeMachineBox machineBox;
         private Plate plate;
         private bool updatingTrack;
@@ -86,24 +87,30 @@ namespace OpenNest.Forms
 
             var units = nestForm.Nest.Units;
             var rateSuffix = " " + UnitsHelper.GetShortTimeUnitPair(units);
-            // Settings that were never saved (1, 1, 0) would crawl; start from the timing defaults instead.
-            var settings = Properties.Settings.Default;
-            var unset = settings.LastFeedrate == 1 && settings.LastRapidFeedrate == 1 && settings.LastPierceTime == 0;
-            var defaults = CutParameters.Default;
-            feedBox = NewNumber(unset ? (decimal)defaults.Feedrate : settings.LastFeedrate, 1, 9999, 0, rateSuffix);
-            rapidBox = NewNumber(unset ? (decimal)defaults.RapidTravelRate : settings.LastRapidFeedrate, 1, 9999, 0, rateSuffix);
-            pierceBox = NewNumber(unset ? (decimal)defaults.PierceTime.TotalSeconds : settings.LastPierceTime, 0, 999, 1, " s");
-            var rates = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = true };
+            var saved = SavedCutParameters.Load(units);
+            feedBox = NewNumber((decimal)saved.Feedrate, 1, 9999, 0, rateSuffix);
+            holeFeedBox = NewNumber((decimal)(saved.HoleFeedrate ?? saved.Feedrate), 1, 9999, 0, rateSuffix);
+            rapidBox = NewNumber((decimal)saved.RapidTravelRate, 1, 9999, 0, rateSuffix);
+            pierceBox = NewNumber((decimal)saved.PierceTime.TotalSeconds, 0, 999, 1, " s");
+            var rates = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, ColumnCount = 4 };
             rates.Controls.AddRange(new Control[]
             {
-                RateLabel("Feed"), feedBox,
+                RateLabel("Outside feed"), feedBox,
+                RateLabel("Hole feed"), holeFeedBox,
                 RateLabel("Rapid"), rapidBox,
                 RateLabel("Pierce"), pierceBox,
             });
 
             machineBox = new CutTimeMachineBox();
-            var motion = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
-            motion.Controls.AddRange(new Control[] { RateLabel("Acceleration"), machineBox });
+            skipEtchBox = new CheckBox
+            {
+                Text = "Skip etch-only contours",
+                Checked = saved.SkipScribe,
+                AutoSize = true,
+                Margin = new Padding(12, 6, 3, 3),
+            };
+            var motion = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = true };
+            motion.Controls.AddRange(new Control[] { RateLabel("Acceleration"), machineBox, skipEtchBox });
 
             var layout = new TableLayoutPanel
             {
@@ -134,6 +141,8 @@ namespace OpenNest.Forms
             speedBox.SelectedIndexChanged += (_, _) => overlay.Speed = Speeds[speedBox.SelectedIndex];
             trackBar.Scroll += (_, _) => Seek();
             feedBox.ValueChanged += (_, _) => Rebuild();
+            holeFeedBox.ValueChanged += (_, _) => Rebuild();
+            skipEtchBox.CheckedChanged += (_, _) => Rebuild();
             rapidBox.ValueChanged += (_, _) => Rebuild();
             pierceBox.ValueChanged += (_, _) => Rebuild();
             machineBox.SelectedIndexChanged += (_, _) => Rebuild();
@@ -146,6 +155,9 @@ namespace OpenNest.Forms
             tips.SetToolTip(previousContourButton, "Back to the start of this cutout or perimeter, or the one before (Ctrl+Left)");
             tips.SetToolTip(nextContourButton, "Next cutout or perimeter (Ctrl+Right)");
             tips.SetToolTip(nextPartButton, "Next part (Page Down)");
+            tips.SetToolTip(feedBox, "Feed for outside contours and cut-offs (the CI Fiber post's exterior, L4)");
+            tips.SetToolTip(holeFeedBox, "Feed for holes and other interior contours (the CI Fiber post's interior, L2)");
+            tips.SetToolTip(skipEtchBox, "Leave out contours that only etch, as the CI Fiber post does by default");
             tips.SetToolTip(machineBox, "Machine whose acceleration limits time the moves (Tools > Machine Configuration)");
             tips.SetToolTip(trackBar, "Drag to scrub through the cut (Left/Right step one move)");
 
@@ -182,12 +194,14 @@ namespace OpenNest.Forms
         }
 
         private static Label RateLabel(string text) =>
-            new() { Text = text, AutoSize = true, Margin = new Padding(3, 7, 0, 0) };
+            new() { Text = text, AutoSize = true, Margin = new Padding(3, 7, 0, 0), Anchor = AnchorStyles.Left };
 
         private CutParameters GetCutParameters() =>
             new()
             {
                 Feedrate = (double)feedBox.Value,
+                HoleFeedrate = (double)holeFeedBox.Value,
+                SkipScribe = skipEtchBox.Checked,
                 RapidTravelRate = (double)rapidBox.Value,
                 PierceTime = TimeSpan.FromSeconds((double)pierceBox.Value),
                 Units = nestForm.Nest.Units,
@@ -381,9 +395,7 @@ namespace OpenNest.Forms
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
-            Properties.Settings.Default.LastFeedrate = feedBox.Value;
-            Properties.Settings.Default.LastRapidFeedrate = rapidBox.Value;
-            Properties.Settings.Default.LastPierceTime = pierceBox.Value;
+            SavedCutParameters.Save(GetCutParameters());
             machineBox.SaveChoice();
 
             overlay.Changed -= Overlay_Changed;

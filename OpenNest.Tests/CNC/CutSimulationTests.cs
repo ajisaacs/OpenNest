@@ -205,6 +205,90 @@ public class CutSimulationTests
         Assert.Equal(sim.PartStarts[1], sim.PreviousPart(sim.TotalTime));
     }
 
+    // Clockwise outside (exterior for the CI Fiber post) around a counterclockwise hole.
+    private static Program PlateWithHole(LayerType layer = LayerType.Cut)
+    {
+        var program = new Program();
+        program.Codes.Add(new RapidMove(4, 5));
+        program.Codes.Add(new LinearMove(6, 5) { Layer = layer });
+        program.Codes.Add(new LinearMove(6, 7) { Layer = layer });
+        program.Codes.Add(new LinearMove(4, 7) { Layer = layer });
+        program.Codes.Add(new LinearMove(4, 5) { Layer = layer });
+        program.Codes.Add(new RapidMove(0, 0));
+        program.Codes.Add(new LinearMove(0, 10) { Layer = layer });
+        program.Codes.Add(new LinearMove(10, 10) { Layer = layer });
+        program.Codes.Add(new LinearMove(10, 0) { Layer = layer });
+        program.Codes.Add(new LinearMove(0, 0) { Layer = layer });
+        return program;
+    }
+
+    [Fact]
+    public void DisplayLayerContourMovesAreCut()
+    {
+        // Cutting strategies emit contour moves on the Display layer; the posts cut them.
+        var sim = CutSimulation.Build(PlateWith((PlateWithHole(LayerType.Display), Vector.Zero)), Parameters);
+
+        Assert.Equal(8, sim.Steps.Count(s => s.Kind == CutSimulationStepKind.Cut));
+        Assert.Equal(2, sim.Steps.Count(s => s.Kind == CutSimulationStepKind.Pierce));
+    }
+
+    [Fact]
+    public void SuppressedMovesAreLeftOut()
+    {
+        var program = new Program();
+        program.Codes.Add(new RapidMove(0, 0));
+        program.Codes.Add(new LinearMove(5, 0));
+        program.Codes.Add(new LinearMove(10, 0) { Suppressed = true });
+        program.Codes.Add(new LinearMove(10, 5));
+
+        var sim = CutSimulation.Build(PlateWith((program, Vector.Zero)), Parameters);
+
+        Assert.Equal(10, sim.Steps.Where(s => s.Kind == CutSimulationStepKind.Cut).Sum(s => s.Length), 9);
+        Assert.Single(sim.Steps, s => s.Kind == CutSimulationStepKind.Rapid && s.Start == new Vector(5, 0));
+    }
+
+    [Fact]
+    public void HolesUseTheHoleFeedAndOutsidesTheFeed()
+    {
+        var parameters = new CutParameters
+        {
+            Feedrate = 100,
+            HoleFeedrate = 50,
+            RapidTravelRate = 600,
+            Units = Units.Inches,
+        };
+
+        var sim = CutSimulation.Build(PlateWith((PlateWithHole(), Vector.Zero)), parameters);
+
+        var cuts = sim.Steps.Where(s => s.Kind == CutSimulationStepKind.Cut).ToList();
+        Assert.All(cuts.Take(4), s => Assert.True(s.IsHole));
+        Assert.All(cuts.Skip(4), s => Assert.False(s.IsHole));
+        Assert.Equal(TimeSpan.FromMinutes(8.0 / 50).TotalSeconds, cuts.Take(4).Sum(s => s.Duration.TotalSeconds), 6);
+        Assert.Equal(TimeSpan.FromMinutes(40.0 / 100).TotalSeconds, cuts.Skip(4).Sum(s => s.Duration.TotalSeconds), 6);
+    }
+
+    [Fact]
+    public void SkippedEtchContoursLeaveNoTimeAndRejoinTravel()
+    {
+        var program = new Program();
+        program.Codes.Add(new RapidMove(20, 0));
+        program.Codes.Add(new LinearMove(25, 0) { Layer = LayerType.Scribe });
+        program.Codes.Add(new RapidMove(0, 0));
+        program.Codes.Add(new LinearMove(10, 0));
+        var plate = PlateWith((program, Vector.Zero));
+        var parameters = new CutParameters { Feedrate = 100, RapidTravelRate = 600, Units = Units.Inches };
+
+        var kept = CutSimulation.Build(plate, parameters);
+        parameters.SkipScribe = true;
+        var skipped = CutSimulation.Build(plate, parameters);
+
+        Assert.Contains(kept.Steps, s => s.Kind == CutSimulationStepKind.Scribe);
+        Assert.DoesNotContain(skipped.Steps, s => s.Kind == CutSimulationStepKind.Scribe);
+        Assert.DoesNotContain(skipped.Steps, s => s.Kind == CutSimulationStepKind.Rapid); // straight from the origin to the cut
+        Assert.Single(skipped.ContourStarts);
+        Assert.Equal(TimeSpan.FromMinutes(10.0 / 100).TotalSeconds, skipped.TotalTime.TotalSeconds, 6);
+    }
+
     [Fact]
     public void EmptyPlateHasNoTimeline()
     {

@@ -56,6 +56,12 @@
     <Setting Name="CutTimeMachine" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="LastHoleFeedrate" Type="System.Decimal" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="CutTimeSkipEtch" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
     <Setting Name="DisabledStrategies" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>

@@ -235,6 +235,30 @@ namespace OpenNest.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public decimal LastHoleFeedrate {
+            get {
+                return ((decimal)(this["LastHoleFeedrate"]));
+            }
+            set {
+                this["LastHoleFeedrate"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool CutTimeSkipEtch {
+            get {
+                return ((bool)(this["CutTimeSkipEtch"]));
+            }
+            set {
+                this["CutTimeSkipEtch"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string DisabledStrategies {
             get {

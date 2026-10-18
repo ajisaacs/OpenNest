@@ -14,11 +14,14 @@ namespace OpenNest.CNC
     {
         private const double Straight = 0.999999;
 
-        public static void Plan(List<CutSimulationStep> steps, CutParameters parameters)
+        /// <summary>
+        /// Replaces each step's <see cref="CutSimulationStep.Duration"/> with its accelerated time,
+        /// from its <see cref="CutSimulationStep.NominalSpeed"/>. Pierces keep their dwell.
+        /// </summary>
+        public static void Plan(List<CutSimulationStep> steps, MotionProfile motion)
         {
             ArgumentNullException.ThrowIfNull(steps);
-            ArgumentNullException.ThrowIfNull(parameters);
-            var motion = parameters.Motion ?? throw new ArgumentException("No motion profile.", nameof(parameters));
+            ArgumentNullException.ThrowIfNull(motion);
 
             var start = 0;
             while (start < steps.Count)
@@ -28,33 +31,22 @@ namespace OpenNest.CNC
                 {
                     while (end < steps.Count && IsCutting(steps[end]) && steps[end].Kind == steps[start].Kind)
                         end++;
-                    PlanRun(steps, start, end, NominalSpeed(parameters.Feedrate, parameters.Units), motion.CutAcceleration, motion.CornerDeviation);
+                    PlanRun(steps, start, end, motion.CutAcceleration, motion.CornerDeviation);
                 }
                 else if (steps[start].Kind == CutSimulationStepKind.Rapid)
                 {
-                    PlanRun(steps, start, end, NominalSpeed(parameters.RapidTravelRate, parameters.Units), motion.RapidAcceleration, 0);
+                    PlanRun(steps, start, end, motion.RapidAcceleration, 0);
                 }
                 start = end;
-            }
-
-            var clock = TimeSpan.Zero;
-            foreach (var step in steps)
-            {
-                step.StartTime = clock;
-                clock += step.Duration;
             }
         }
 
         private static bool IsCutting(CutSimulationStep step) =>
             step.Kind is CutSimulationStepKind.Cut or CutSimulationStepKind.Scribe;
 
-        // Feed rates follow Timing.CalculateTime: inch rates are per minute, millimeter rates per second.
-        private static double NominalSpeed(double rate, Units units) =>
-            units == Units.Millimeters ? rate : rate / 60;
-
-        private static void PlanRun(List<CutSimulationStep> steps, int start, int end, double nominal, double acceleration, double deviation)
+        private static void PlanRun(List<CutSimulationStep> steps, int start, int end, double acceleration, double deviation)
         {
-            if (acceleration <= 0 || nominal <= 0)
+            if (acceleration <= 0)
                 return; // Keep the constant-speed timing.
 
             var count = end - start;
@@ -64,6 +56,7 @@ namespace OpenNest.CNC
             for (var i = 0; i < count; i++)
             {
                 var step = steps[start + i];
+                var nominal = step.NominalSpeed;
                 maxSpeed[i] = step.IsArc && step.Radius > 0
                     ? System.Math.Min(nominal, System.Math.Sqrt(acceleration * step.Radius))
                     : nominal;
@@ -108,11 +101,8 @@ namespace OpenNest.CNC
         private static void Profile(CutSimulationStep step, double entry, double exit, double maxSpeed, double acceleration)
         {
             var length = step.Length;
-            if (length <= 0)
-            {
-                step.Duration = TimeSpan.Zero;
-                return;
-            }
+            if (length <= 0 || maxSpeed <= 0)
+                return; // Nothing to accelerate: keep the constant-speed timing.
 
             var cruise = maxSpeed;
             var accelDistance = (cruise * cruise - entry * entry) / (2 * acceleration);
