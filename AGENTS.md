@@ -63,6 +63,7 @@ Read the relevant contract before changing its behavior:
 - [Material-overlap diagnostics](docs/geometry/visual-overlap-check.md)
 - [Automatic cutoffs and sequencing](docs/automatic-scrap-cutoffs.md)
 - [Pre-post verification](docs/post-verification.md)
+- [Cut-time estimates](docs/cut-time-estimates.md): simulator/Calculate Cut Time acceleration planner and placeholder machine limits
 - [Cincinnati CL](docs/cincinnati-post-output.md) and [CI Fiber](docs/cincinnati-ci-fiber-post-output.md)
 - [Fill verification](docs/performance/fill-verification.md): opt-in benchmarks, frozen oracles, Debug-only counters and predictor initialization. Zero Release counters do not prove work removal.
 - [Desktop auto-update](docs/auto-update.md): Velopack feed, `UpdateFeedUrl` setting and `Deploy-OpenNest.ps1`.

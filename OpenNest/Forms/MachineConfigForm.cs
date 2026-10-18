@@ -250,8 +250,8 @@ namespace OpenNest.Forms
                     return;
 
                 var confirm = MessageBox.Show(
-                    "Changing units does not convert existing thickness, kerf and lead "
-                        + "values — they will keep their current numbers. Continue?",
+                    "Changing units does not convert existing thickness, kerf, lead and "
+                        + "motion values — they will keep their current numbers. Continue?",
                     "Change Units",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning
@@ -267,7 +267,60 @@ namespace OpenNest.Forms
             AddField(layout, ref row, "Units:", unitsCombo);
 
             group.Controls.Add(layout);
+            // Docked to the top, so the last added sits first.
+            _detailPanel.Controls.Add(BuildMotionGroup(machine));
             _detailPanel.Controls.Add(group);
+        }
+
+        private GroupBox BuildMotionGroup(MachineConfig machine)
+        {
+            var group = CreateGroup("Motion (cut time estimates)");
+            var layout = CreateDetailLayout();
+            var row = 0;
+            var shown = machine.GetMotionOrPlaceholder();
+            var note = new Label
+            {
+                AutoSize = true,
+                MaximumSize = new Size(420, 0),
+                ForeColor = SystemColors.GrayText,
+            };
+
+            void UpdateNote() =>
+                note.Text = machine.Motion == null
+                    ? "Placeholder values. Enter the controller's acceleration and corner settings."
+                    : "Used by Simulate Cutting and Calculate Cut Time.";
+
+            // The first edit stores the placeholder values along with the change.
+            void Set(Action<MotionConfig> apply)
+            {
+                machine.Motion ??= new MotionConfig
+                {
+                    CutAcceleration = shown.CutAcceleration,
+                    RapidAcceleration = shown.RapidAcceleration,
+                    CornerDeviation = shown.CornerDeviation,
+                };
+                apply(machine.Motion);
+                UpdateNote();
+                MarkDirty();
+            }
+
+            string AccelerationSuffix(object _) => LengthUnitSuffix(null) + "/s²";
+
+            AddField(layout, ref row, "Cut acceleration:",
+                CreateLabeledNumeric(shown.CutAcceleration, v => Set(m => m.CutAcceleration = v), 0, AccelerationSuffix, 100000, 10));
+            AddField(layout, ref row, "Rapid acceleration:",
+                CreateLabeledNumeric(shown.RapidAcceleration, v => Set(m => m.RapidAcceleration = v), 0, AccelerationSuffix, 100000, 10));
+            AddField(layout, ref row, "Corner deviation:",
+                CreateLabeledNumeric(shown.CornerDeviation, v => Set(m => m.CornerDeviation = v), 4, LengthUnitSuffix, 10, 0.0005m));
+
+            UpdateNote();
+            layout.RowCount = row + 1;
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.Controls.Add(note, 0, row);
+            layout.SetColumnSpan(note, 2);
+
+            group.Controls.Add(layout);
+            return group;
         }
 
         private void ShowMaterialGroupDetails(string groupName)

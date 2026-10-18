@@ -11,6 +11,11 @@ public class MachineConfig
     public UnitSystem Units { get; set; } = UnitSystem.Inches;
     public List<MaterialConfig> Materials { get; set; } = new();
 
+    /// <summary>Acceleration limits; null until entered, when <see cref="GetMotionOrPlaceholder"/> stands in.</summary>
+    public MotionConfig? Motion { get; set; }
+
+    public MotionConfig GetMotionOrPlaceholder() => Motion ?? MotionConfig.Placeholder(Units);
+
     public ThicknessConfig? GetParameters(string material, double thickness) =>
         GetParameters(material, null, thickness);
 

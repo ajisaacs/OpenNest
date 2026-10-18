@@ -220,6 +220,18 @@ namespace OpenNest.Properties {
                 this["LastPierceTime"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CutTimeMachine {
+            get {
+                return ((string)(this["CutTimeMachine"]));
+            }
+            set {
+                this["CutTimeMachine"] = value;
+            }
+        }
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

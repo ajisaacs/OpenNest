@@ -11,6 +11,12 @@ public class CutParameters
     public string PostProcessor { get; set; }
     public Units Units { get; set; }
 
+    /// <summary>
+    /// Acceleration limits; null estimates every move at full speed. Applied by
+    /// <see cref="CNC.CutSimulation"/> and the plate/nest overloads of <see cref="Timing.CalculateTime(Plate, CutParameters)"/>.
+    /// </summary>
+    public MotionProfile Motion { get; set; }
+
     public static CutParameters Default =>
         new()
         {

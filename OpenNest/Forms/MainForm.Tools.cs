@@ -190,13 +190,7 @@ namespace OpenNest.Forms
 
         private void MachineConfig_Click(object sender, EventArgs e)
         {
-            var appDataPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "OpenNest",
-                "Machines"
-            );
-            var provider = new LocalJsonProvider(appDataPath);
-            provider.EnsureDefaults();
+            var provider = MachineSettings.CreateMachineProvider();
             using (var form = new MachineConfigForm(provider))
             {
                 form.ShowDialog(this);

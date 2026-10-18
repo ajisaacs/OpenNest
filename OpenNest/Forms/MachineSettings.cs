@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Windows.Forms;
 using OpenNest.Data;
 
@@ -10,6 +13,35 @@ namespace OpenNest.Forms
     internal static class MachineSettings
     {
         private static bool clampSettingsWarned;
+
+        /// <summary>The machine configurations edited in Tools > Machine Configuration.</summary>
+        public static LocalJsonProvider CreateMachineProvider()
+        {
+            var provider = new LocalJsonProvider(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "OpenNest",
+                "Machines"));
+            provider.EnsureDefaults();
+            return provider;
+        }
+
+        /// <summary>Every readable machine configuration, for choosing acceleration limits.</summary>
+        public static List<MachineConfig> LoadMachines()
+        {
+            var machines = new List<MachineConfig>();
+            try
+            {
+                var provider = CreateMachineProvider();
+                foreach (var summary in provider.GetMachines())
+                {
+                    if (provider.GetMachine(summary.Id) is { } machine)
+                        machines.Add(machine);
+                }
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            return machines;
+        }
         private static bool defaultsWarned;
 
         /// <summary>

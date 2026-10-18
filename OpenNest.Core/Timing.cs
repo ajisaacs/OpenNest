@@ -75,6 +75,23 @@ namespace OpenNest
                 info.TravelDistance += entity.Length;
         }
 
+        /// <summary>
+        /// A plate's cut time over its quantity. With <see cref="CutParameters.Motion"/> it is the
+        /// accelerated <see cref="CutSimulation"/> timeline; otherwise every move runs at full speed.
+        /// </summary>
+        public static TimeSpan CalculateTime(Plate plate, CutParameters cutParams)
+        {
+            if (cutParams.Motion == null)
+                return CalculateTime(GetTimingInfo(plate), cutParams);
+
+            var sheet = CutSimulation.Build(plate, cutParams).TotalTime
+                + TimeSpan.FromMinutes(plate.ClampRemovalMinutes);
+            return sheet * plate.Quantity;
+        }
+
+        public static TimeSpan CalculateTime(Nest nest, CutParameters cutParams) =>
+            nest.Plates.Aggregate(TimeSpan.Zero, (total, plate) => total + CalculateTime(plate, cutParams));
+
         public static TimeSpan CalculateTime(TimingInfo info, CutParameters cutParams)
         {
             var time = new TimeSpan();

@@ -24,6 +24,7 @@ namespace OpenNest.Forms
         private readonly TrackBar trackBar;
         private readonly Label timeLabel, partLabel, stateLabel;
         private readonly NumericUpDown feedBox, rapidBox, pierceBox;
+        private readonly CutTimeMachineBox machineBox;
         private Plate plate;
         private bool updatingTrack;
         private bool rebuildQueued;
@@ -100,6 +101,10 @@ namespace OpenNest.Forms
                 RateLabel("Pierce"), pierceBox,
             });
 
+            machineBox = new CutTimeMachineBox();
+            var motion = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
+            motion.Controls.AddRange(new Control[] { RateLabel("Acceleration"), machineBox });
+
             var layout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -112,6 +117,7 @@ namespace OpenNest.Forms
             layout.Controls.Add(trackBar);
             layout.Controls.Add(status);
             layout.Controls.Add(rates);
+            layout.Controls.Add(motion);
             Controls.Add(layout);
 
             restartButton.Click += (_, _) => overlay.Time = TimeSpan.Zero;
@@ -130,6 +136,7 @@ namespace OpenNest.Forms
             feedBox.ValueChanged += (_, _) => Rebuild();
             rapidBox.ValueChanged += (_, _) => Rebuild();
             pierceBox.ValueChanged += (_, _) => Rebuild();
+            machineBox.SelectedIndexChanged += (_, _) => Rebuild();
 
             var tips = new ToolTip();
             tips.SetToolTip(restartButton, "Restart");
@@ -139,6 +146,7 @@ namespace OpenNest.Forms
             tips.SetToolTip(previousContourButton, "Back to the start of this cutout or perimeter, or the one before (Ctrl+Left)");
             tips.SetToolTip(nextContourButton, "Next cutout or perimeter (Ctrl+Right)");
             tips.SetToolTip(nextPartButton, "Next part (Page Down)");
+            tips.SetToolTip(machineBox, "Machine whose acceleration limits time the moves (Tools > Machine Configuration)");
             tips.SetToolTip(trackBar, "Drag to scrub through the cut (Left/Right step one move)");
 
             overlay.Speed = Speeds[speedBox.SelectedIndex];
@@ -183,6 +191,7 @@ namespace OpenNest.Forms
                 RapidTravelRate = (double)rapidBox.Value,
                 PierceTime = TimeSpan.FromSeconds((double)pierceBox.Value),
                 Units = nestForm.Nest.Units,
+                Motion = machineBox.GetMotion(nestForm.Nest.Units),
             };
 
         private void Rebuild()
@@ -343,13 +352,24 @@ namespace OpenNest.Forms
             var step = sim.Steps[index];
             var drawing = plate != null && step.PartIndex < plate.Parts.Count ? plate.Parts[step.PartIndex].BaseDrawing?.Name : null;
             partLabel.Text = $"Part {step.PartIndex + 1} of {sim.PartCount}" + (string.IsNullOrEmpty(drawing) ? "" : $" ({drawing})");
-            stateLabel.Text = step.Kind switch
+            var state = step.Kind switch
             {
                 CutSimulationStepKind.Rapid => "Rapid",
                 CutSimulationStepKind.Pierce => "Piercing",
                 CutSimulationStepKind.Scribe => "Scribing",
                 _ => "Cutting",
             };
+            if (step.Kind != CutSimulationStepKind.Pierce)
+                state += $" · {FeedText(step.SpeedAt(time - step.StartTime))}";
+            stateLabel.Text = state;
+        }
+
+        // Speeds are per second; inch feeds read per minute, as Timing uses them.
+        private string FeedText(double unitsPerSecond)
+        {
+            var units = nestForm.Nest.Units;
+            var rate = units == Units.Millimeters ? unitsPerSecond : unitsPerSecond * 60;
+            return $"{rate:n0} {UnitsHelper.GetShortTimeUnitPair(units)}";
         }
 
         private void SetTrack(int value)
@@ -364,7 +384,7 @@ namespace OpenNest.Forms
             Properties.Settings.Default.LastFeedrate = feedBox.Value;
             Properties.Settings.Default.LastRapidFeedrate = rapidBox.Value;
             Properties.Settings.Default.LastPierceTime = pierceBox.Value;
-            Properties.Settings.Default.Save();
+            machineBox.SaveChoice();
 
             overlay.Changed -= Overlay_Changed;
             nestForm.PlateChanged -= NestForm_PlateChanged;

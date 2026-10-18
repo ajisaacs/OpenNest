@@ -890,7 +890,7 @@ namespace OpenNest.Forms
             {
                 var cutparams = cutParamsForm.GetCutParameters();
                 var info = Timing.GetTimingInfo(PlateView.Plate);
-                var time = Timing.CalculateTime(info, cutparams);
+                var time = Timing.CalculateTime(PlateView.Plate, cutparams);
 
                 var timingForm = new TimingForm();
                 timingForm.Units = Nest.Units;
@@ -932,7 +932,7 @@ namespace OpenNest.Forms
             {
                 var cutparams = cutParamsForm.GetCutParameters();
                 var info = Timing.GetTimingInfo(Nest);
-                var time = Timing.CalculateTime(info, cutparams);
+                var time = Timing.CalculateTime(Nest, cutparams);
 
                 var timingForm = new TimingForm();
                 timingForm.Units = Nest.Units;

@@ -37,8 +37,78 @@ namespace OpenNest.CNC
         public double Sweep { get; init; }
         public double Length { get; init; }
         public TimeSpan StartTime { get; internal set; }
-        public TimeSpan Duration { get; init; }
+        public TimeSpan Duration { get; internal set; }
         public TimeSpan EndTime => StartTime + Duration;
+
+        /// <summary>
+        /// Planned speed profile in units per second: accelerate from <see cref="EntrySpeed"/>
+        /// to <see cref="CruiseSpeed"/>, then decelerate to <see cref="ExitSpeed"/>. A zero
+        /// <see cref="Acceleration"/> moves at constant speed for the whole step.
+        /// </summary>
+        public double EntrySpeed { get; internal set; }
+        public double CruiseSpeed { get; internal set; }
+        public double ExitSpeed { get; internal set; }
+        public double Acceleration { get; internal set; }
+
+        /// <summary>Fraction (0..1) of this step's distance covered <paramref name="elapsed"/> into it.</summary>
+        public double ProgressAt(TimeSpan elapsed)
+        {
+            if (Duration <= TimeSpan.Zero)
+                return elapsed >= TimeSpan.Zero ? 1 : 0;
+            if (Acceleration <= 0 || Length <= 0)
+                return System.Math.Clamp(elapsed / Duration, 0, 1);
+            return System.Math.Clamp(DistanceAt(elapsed.TotalSeconds) / Length, 0, 1);
+        }
+
+        /// <summary>Head speed in units per second <paramref name="elapsed"/> into this step.</summary>
+        public double SpeedAt(TimeSpan elapsed)
+        {
+            if (Kind == CutSimulationStepKind.Pierce || Duration <= TimeSpan.Zero)
+                return 0;
+            if (Acceleration <= 0)
+                return Length / Duration.TotalSeconds;
+
+            var t = System.Math.Clamp(elapsed.TotalSeconds, 0, Duration.TotalSeconds);
+            var (accelEnd, cruiseEnd) = PhaseEnds();
+            if (t < accelEnd)
+                return EntrySpeed + Acceleration * t;
+            if (t < cruiseEnd)
+                return CruiseSpeed;
+            return System.Math.Max(0, CruiseSpeed - Acceleration * (t - cruiseEnd));
+        }
+
+        private (double AccelEnd, double CruiseEnd) PhaseEnds()
+        {
+            var accelTime = (CruiseSpeed - EntrySpeed) / Acceleration;
+            var accelDistance = (CruiseSpeed * CruiseSpeed - EntrySpeed * EntrySpeed) / (2 * Acceleration);
+            var decelDistance = (CruiseSpeed * CruiseSpeed - ExitSpeed * ExitSpeed) / (2 * Acceleration);
+            var cruise = CruiseSpeed > 0 ? System.Math.Max(0, Length - accelDistance - decelDistance) / CruiseSpeed : 0;
+            return (accelTime, accelTime + cruise);
+        }
+
+        private double DistanceAt(double t)
+        {
+            var (accelEnd, cruiseEnd) = PhaseEnds();
+            var accelDistance = EntrySpeed * accelEnd + Acceleration * accelEnd * accelEnd / 2;
+            if (t < accelEnd)
+                return EntrySpeed * t + Acceleration * t * t / 2;
+            if (t < cruiseEnd)
+                return accelDistance + CruiseSpeed * (t - accelEnd);
+            var decel = t - cruiseEnd;
+            return accelDistance + CruiseSpeed * (cruiseEnd - accelEnd) + CruiseSpeed * decel - Acceleration * decel * decel / 2;
+        }
+
+        /// <summary>Unit direction of travel at the start (0) or end (1) of the step.</summary>
+        internal Vector TangentAt(double fraction)
+        {
+            if (IsArc)
+            {
+                var angle = StartAngle + Sweep * fraction;
+                var sign = System.Math.Sign(Sweep);
+                return new Vector(-System.Math.Sin(angle) * sign, System.Math.Cos(angle) * sign);
+            }
+            return Length > 0 ? new Vector((End.X - Start.X) / Length, (End.Y - Start.Y) / Length) : Vector.Zero;
+        }
 
         /// <summary>The tool position after <paramref name="fraction"/> (0..1) of this step.</summary>
         public Vector PointAt(double fraction)
@@ -61,8 +131,9 @@ namespace OpenNest.CNC
 
     /// <summary>
     /// A replayable timeline of a plate's tool motion in cutting order, timed with the
-    /// same feed, rapid and pierce rules as <see cref="Timing.CalculateTime"/>. Display only:
-    /// it does not model acceleration, per-motion feed overrides or clamp removal.
+    /// same feed, rapid and pierce rules as <see cref="Timing.CalculateTime(TimingInfo, CutParameters)"/>,
+    /// plus <see cref="CutParameters.Motion"/> acceleration when set (see <see cref="MotionPlanner"/>).
+    /// It does not model jerk, per-motion feed overrides or clamp removal.
     /// </summary>
     public sealed class CutSimulation
     {
@@ -153,6 +224,9 @@ namespace OpenNest.CNC
                 builder.AddProgram(part.Program, part.Location, ref mode, ref pos);
             }
 
+            if (parameters.Motion != null)
+                MotionPlanner.Plan(builder.Steps, parameters);
+
             return new CutSimulation(builder.Steps, plate.Parts.Count);
         }
 
@@ -179,13 +253,18 @@ namespace OpenNest.CNC
             return lo;
         }
 
-        /// <summary>Fraction (0..1) of step <paramref name="index"/> completed at <paramref name="time"/>.</summary>
+        /// <summary>
+        /// Fraction (0..1) of step <paramref name="index"/> completed at <paramref name="time"/>:
+        /// distance for motion, elapsed time for a pierce.
+        /// </summary>
         public double FractionAt(int index, TimeSpan time)
         {
             var step = steps[index];
-            if (step.Duration <= TimeSpan.Zero)
-                return time >= step.StartTime ? 1 : 0;
-            return System.Math.Clamp((time - step.StartTime) / step.Duration, 0, 1);
+            if (step.Kind == CutSimulationStepKind.Pierce)
+                return step.Duration <= TimeSpan.Zero
+                    ? time >= step.StartTime ? 1 : 0
+                    : System.Math.Clamp((time - step.StartTime) / step.Duration, 0, 1);
+            return step.ProgressAt(time - step.StartTime);
         }
 
         public Vector ToolPositionAt(TimeSpan time)
