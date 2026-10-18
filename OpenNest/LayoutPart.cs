@@ -62,7 +62,10 @@ namespace OpenNest
 
         // Etch-only parts have no material path, but their visible closed mark must
         // remain hit-testable without treating scribe geometry as a cut or fill.
-        internal GraphicsPath SelectionPath => Path?.PointCount > 0 ? Path : EtchPath;
+        internal GraphicsPath SelectionPath => Path?.PointCount > 0 ? MaterialPath : EtchPath;
+
+        /// <summary>The filled material region: the cut outline unless break cuts or tabs make it differ.</summary>
+        internal GraphicsPath MaterialPath => FillPath ?? Path;
 
         internal RectangleF DisplayBounds { get; private set; }
 
@@ -100,7 +103,7 @@ namespace OpenNest
             using var schemeSelectionBrush = IsSelected && !colorScheme.SelectedPartColor.IsEmpty
                 ? new SolidBrush(colorScheme.SelectedPartColor) : null;
             g.FillPath(muted ? Brushes.Gainsboro : schemeSelectionBrush ?? (IsSelected ? selectedBrush : brush),
-                FillPath ?? Path);
+                MaterialPath);
             DrawEtch(g, muted);
             // Keep real cuts visible even where an etch overlaps them.
             g.DrawPath(muted ? Pens.Gray : IsSelected && colorScheme.PartOutlineColor.IsEmpty ? selectedPen : pen, Path);
@@ -150,7 +153,10 @@ namespace OpenNest
 
         public GraphicsPath OffsetPath { get; private set; }
 
-        /// <summary>The material fill when it differs from <c>Path</c> (break cuts are drawn, not filled).</summary>
+        /// <summary>
+        /// The material fill when it differs from <c>Path</c>: break cuts are drawn, not filled, and a
+        /// cutout cut in pieces around tabs fills as one hole rather than as chord-closed pieces.
+        /// </summary>
         private GraphicsPath FillPath { get; set; }
 
         private static bool HasBreakCuts(CNC.Program program) =>
@@ -202,7 +208,7 @@ namespace OpenNest
             colorScheme = (plateView as PlateView)?.ColorScheme ?? ColorScheme.Default;
             RefreshColors();
             BasePart.Program.GetDisplayPaths(BasePart.Location,
-                out var cutPath, out var leadPath, out var etchPath);
+                out var cutPath, out var leadPath, out var etchPath, out var hasOpenCuts);
             cutPath.Transform(plateView.Matrix);
             leadPath.Transform(plateView.Matrix);
             etchPath.Transform(plateView.Matrix);
@@ -211,8 +217,8 @@ namespace OpenNest
             EtchPath?.Dispose();
             FillPath?.Dispose();
             FillPath = null;
-            // Only programs with break cuts need a fill apart from the outline path.
-            if (HasBreakCuts(BasePart.Program))
+            // Only programs with break cuts or open (tabbed) cuts need a fill apart from the outline path.
+            if (hasOpenCuts || HasBreakCuts(BasePart.Program))
             {
                 FillPath = BasePart.Program.GetFillPath(BasePart.Location);
                 FillPath.Transform(plateView.Matrix);

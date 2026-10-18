@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using OpenNest.CNC;
@@ -10,12 +11,12 @@ namespace OpenNest
     {
         public static GraphicsPath GetGraphicsPath(this Program pgm)
         {
-            var path = new GraphicsPath();
+            var figures = new List<Figure>();
             var curpos = Vector.Zero;
 
-            AddProgram(path, pgm, pgm.Mode, ref curpos);
+            AddProgram(figures, pgm, pgm.Mode, ref curpos);
 
-            return path;
+            return Combine(figures, bridgeTabs: false);
         }
 
         public static GraphicsPath GetGraphicsPath(this Program pgm, Vector origin)
@@ -45,28 +46,46 @@ namespace OpenNest
             out GraphicsPath cutPath,
             out GraphicsPath leadPath,
             out GraphicsPath etchPath
+        ) => pgm.GetDisplayPaths(origin, out cutPath, out leadPath, out etchPath, out _);
+
+        /// <param name="hasOpenCuts">
+        /// Whether a cut contour is open, such as a cutout left attached by tabs. Filling
+        /// <paramref name="cutPath"/> would close it with a chord; fill <see cref="GetFillPath"/> instead.
+        /// </param>
+        public static void GetDisplayPaths(
+            this Program pgm,
+            Vector origin,
+            out GraphicsPath cutPath,
+            out GraphicsPath leadPath,
+            out GraphicsPath etchPath,
+            out bool hasOpenCuts
         )
         {
             cutPath = GetLayerPath(pgm, origin,
-                layer => layer != LayerType.Scribe && layer != LayerType.Leadin && layer != LayerType.Leadout);
+                layer => layer != LayerType.Scribe && layer != LayerType.Leadin && layer != LayerType.Leadout,
+                bridgeTabs: false, out hasOpenCuts);
             leadPath = GetLayerPath(pgm, origin,
-                layer => layer == LayerType.Leadin || layer == LayerType.Leadout);
-            etchPath = GetLayerPath(pgm, origin, layer => layer == LayerType.Scribe);
+                layer => layer == LayerType.Leadin || layer == LayerType.Leadout, bridgeTabs: false, out _);
+            etchPath = GetLayerPath(pgm, origin, layer => layer == LayerType.Scribe, bridgeTabs: false, out _);
         }
 
         /// <summary>
         /// The closed material outlines to fill. Break cuts are open lines through material: a
         /// fill would close each one with a chord and leave the sliver between them unfilled.
+        /// A contour cut in pieces around tabs is rejoined across its tab gaps for the same reason.
         /// </summary>
         public static GraphicsPath GetFillPath(this Program pgm, Vector origin) =>
             GetLayerPath(pgm, origin, layer => layer is not (LayerType.Scribe or LayerType.Leadin
-                or LayerType.Leadout or LayerType.Break));
+                or LayerType.Leadout or LayerType.Break), bridgeTabs: true, out _);
 
-        private static GraphicsPath GetLayerPath(Program pgm, Vector origin, System.Func<LayerType, bool> includeLayer)
+        private static GraphicsPath GetLayerPath(Program pgm, Vector origin,
+            System.Func<LayerType, bool> includeLayer, bool bridgeTabs, out bool hasOpenFigures)
         {
-            var path = new GraphicsPath();
+            var figures = new List<Figure>();
             var position = Vector.Zero;
-            AddProgram(path, pgm, pgm.Mode, ref position, includeLayer);
+            AddProgram(figures, pgm, pgm.Mode, ref position, includeLayer);
+            hasOpenFigures = figures.Exists(figure => !figure.IsClosed);
+            var path = Combine(figures, bridgeTabs);
             // Place the completed local path; absolute moves must not discard placement.
             using var translation = new Matrix();
             translation.Translate((float)origin.X, (float)origin.Y);
@@ -329,7 +348,72 @@ namespace OpenNest
             curpos = pt;
         }
 
-        private static void AddProgram(GraphicsPath path, Program pgm, Mode mode, ref Vector curpos,
+        /// <summary>One continuous run of drawn moves, with its program-space ends.</summary>
+        private sealed record Figure(GraphicsPath Path, Vector Start, Vector End)
+        {
+            public bool IsClosed => Start.DistanceTo(End) <= Tolerance.Epsilon;
+        }
+
+        /// <summary>
+        /// Adds every figure to one path. With <paramref name="bridgeTabs"/>, an open figure is
+        /// joined end-to-start with the open figure starting nearest its end, until its own start
+        /// is nearer, so the tab-separated pieces of one contour fill as a single region.
+        /// </summary>
+        private static GraphicsPath Combine(List<Figure> figures, bool bridgeTabs)
+        {
+            var path = new GraphicsPath();
+            var pending = new List<Figure>(figures);
+
+            while (pending.Count > 0)
+            {
+                var figure = pending[0];
+                pending.RemoveAt(0);
+
+                if (!bridgeTabs || figure.IsClosed)
+                {
+                    path.AddPath(figure.Path, false);
+                    figure.Path.Dispose();
+                    continue;
+                }
+
+                using var chain = new GraphicsPath();
+                chain.AddPath(figure.Path, false);
+                figure.Path.Dispose();
+                var end = figure.End;
+
+                while (true)
+                {
+                    Figure next = null;
+                    var nextGap = end.DistanceTo(figure.Start);
+
+                    foreach (var candidate in pending)
+                    {
+                        if (candidate.IsClosed)
+                            continue;
+                        var gap = end.DistanceTo(candidate.Start);
+                        if (gap < nextGap)
+                        {
+                            next = candidate;
+                            nextGap = gap;
+                        }
+                    }
+
+                    if (next == null)
+                        break;
+
+                    pending.Remove(next);
+                    chain.AddPath(next.Path, true);
+                    next.Path.Dispose();
+                    end = next.End;
+                }
+
+                path.AddPath(chain, false);
+            }
+
+            return path;
+        }
+
+        private static void AddProgram(List<Figure> figures, Program pgm, Mode mode, ref Vector curpos,
             System.Func<LayerType, bool> includeLayer = null)
         {
             // Capture the frame origin at entry. Sub-program Offsets are relative
@@ -337,14 +421,24 @@ namespace OpenNest
             var frameOrigin = curpos;
             mode = pgm.Mode;
             GraphicsPath currentFigure = null;
+            var figureStart = curpos;
 
-            void Flush()
+            // Call before moving past a skipped code so the figure records where its cut ended.
+            void Flush(Vector end)
             {
                 if (currentFigure != null)
                 {
-                    path.AddPath(currentFigure, false);
-                    currentFigure.Dispose();
+                    figures.Add(new Figure(currentFigure, figureStart, end));
                     currentFigure = null;
+                }
+            }
+
+            void BeginFigure(Vector start)
+            {
+                if (currentFigure == null)
+                {
+                    currentFigure = new GraphicsPath();
+                    figureStart = start;
                 }
             }
 
@@ -361,13 +455,12 @@ namespace OpenNest
                                 ? arc.Layer != LayerType.Leadin && arc.Layer != LayerType.Leadout
                                 : !arc.Suppressed && includeLayer(arc.Layer))
                             {
-                                if (currentFigure == null)
-                                    currentFigure = new GraphicsPath();
+                                BeginFigure(curpos);
                                 AddArc(currentFigure, arc, mode, ref curpos);
                             }
                             else
                             {
-                                Flush();
+                                Flush(curpos);
                                 var endpt = arc.EndPoint;
                                 if (mode == Mode.Incremental)
                                     endpt += curpos;
@@ -383,13 +476,12 @@ namespace OpenNest
                                 ? line.Layer != LayerType.Leadin && line.Layer != LayerType.Leadout
                                 : !line.Suppressed && includeLayer(line.Layer))
                             {
-                                if (currentFigure == null)
-                                    currentFigure = new GraphicsPath();
+                                BeginFigure(curpos);
                                 AddLine(currentFigure, line, mode, ref curpos);
                             }
                             else
                             {
-                                Flush();
+                                Flush(curpos);
                                 var endpt = line.EndPoint;
                                 if (mode == Mode.Incremental)
                                     endpt += curpos;
@@ -407,14 +499,14 @@ namespace OpenNest
                             var dx = endpt.X - curpos.X;
                             var dy = endpt.Y - curpos.Y;
                             if (dx * dx + dy * dy > 0.001 * 0.001)
-                                Flush();
+                                Flush(curpos);
                             curpos = endpt;
                         }
                         break;
 
                     case CodeType.SubProgramCall:
                         {
-                            Flush();
+                            Flush(curpos);
                             var tmpmode = mode;
                             var subpgm = (SubProgramCall)code;
 
@@ -424,7 +516,7 @@ namespace OpenNest
                                     frameOrigin.X + subpgm.Offset.X,
                                     frameOrigin.Y + subpgm.Offset.Y
                                 );
-                                AddProgram(path, subpgm.Program, mode, ref curpos, includeLayer);
+                                AddProgram(figures, subpgm.Program, mode, ref curpos, includeLayer);
                             }
 
                             mode = tmpmode;
@@ -433,7 +525,7 @@ namespace OpenNest
                 }
             }
 
-            Flush();
+            Flush(curpos);
         }
 
         private static void AddArc(GraphicsPath path, Arc arc)

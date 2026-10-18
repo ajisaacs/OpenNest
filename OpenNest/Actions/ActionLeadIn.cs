@@ -279,8 +279,8 @@ namespace OpenNest.Actions
         {
             foreach (var lp in plateView.LayoutParts)
             {
-                if (lp != selectedLayoutPart && lp.Path != null)
-                    g.FillPath(grayOverlay, lp.Path);
+                if (lp != selectedLayoutPart && lp.MaterialPath != null)
+                    g.FillPath(grayOverlay, lp.MaterialPath);
             }
         }
 
