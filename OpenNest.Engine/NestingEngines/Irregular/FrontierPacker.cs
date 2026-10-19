@@ -64,6 +64,9 @@ internal sealed class FrontierPacker
     private readonly BlockCatalog? blocks;
     private readonly ClampObstacles? clamps;
 
+    /// <summary>Observer of the placements so far (live preview); read-only, it never steers packing.</summary>
+    private readonly Action<IReadOnlyList<Placed>>? placedChanged;
+
     public FrontierPacker(
         IReadOnlyList<PartType> types,
         NoFitCache nfps,
@@ -73,9 +76,11 @@ internal sealed class FrontierPacker
         double beta,
         WorkCounter counter,
         BlockCatalog? blocks = null,
-        ClampObstacles? clamps = null
+        ClampObstacles? clamps = null,
+        Action<IReadOnlyList<Placed>>? placedChanged = null
     )
     {
+        this.placedChanged = placedChanged;
         this.blocks = blocks;
         this.clamps = stock.ClampZones.Count == 0 ? null : clamps ?? new ClampObstacles(stock);
         this.counter = counter;
@@ -182,6 +187,7 @@ internal sealed class FrontierPacker
                 partArea += types[typeIndex].Area;
                 front = System.Math.Max(front, axis == PackAxis.X ? part.Right : part.Top);
             }
+            placedChanged?.Invoke(placed);
 
             left[typeIndex] -= choice.Count;
             blockStates.RemoveAll(b => b.Members.Count > left[b.Members[0].Orientation.TypeIndex]);
