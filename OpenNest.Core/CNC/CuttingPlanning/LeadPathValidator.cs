@@ -158,13 +158,14 @@ public static class LeadPathValidator
                     return (new(true, false, breakLead
                         ? $"Break cut lead motion {i} contacts its part's boundary ({failure}). Try a shorter lead-in or move the tabs."
                         : $"Lead motion {i} contacts or enters target material outside its adjacent contour joint ({failure})."), null);
+                var reach = move.Curve.Extent;
                 for (var other = 0; other < otherMaterials.Count; other++)
                 {
                     token.ThrowIfCancellationRequested();
                     var material = otherMaterials[other];
                     if (ReferenceEquals(material, target))
                         continue;
-                    if (OtherContact(material))
+                    if (reach.IsClearOfQueriesFrom(material.Extent) ? FarInside(material) : OtherContact(material))
                         return (new(true, false, "Lead contacts or enters another placed material. "
                             + "Try spacing the parts farther apart or reducing the lead-in/lead-out length, then replan. "
                             + "For locked parts, edit the leads or unlock the part before replanning."), other);
@@ -183,8 +184,17 @@ public static class LeadPathValidator
                     for (var other = 0; other < otherMaterials.Count; other++)
                     {
                         token.ThrowIfCancellationRequested();
-                        if (!ReferenceEquals(otherMaterials[other], target)
-                            && Clearance(otherMaterials[other]) is { } distance)
+                        var material = otherMaterials[other];
+                        if (ReferenceEquals(material, target))
+                            continue;
+                        // Every boundary of material this far away is farther than the zone.
+                        if (new PostVerificationGeometry.Extent(start.X, start.Y, start.X, start.Y)
+                            .IsClearOfQueriesFrom(material.Extent, pierceRadius))
+                        {
+                            Charge(material.BoundaryCount);
+                            continue;
+                        }
+                        if (Clearance(material) is { } distance)
                             return (Short(distance, "another placed part"), other);
                     }
                     return (null, null);
@@ -212,15 +222,30 @@ public static class LeadPathValidator
                         return CheckMaterial(material, null) != null;
                     if (memo.TryGet(move.Curve, material, out var scan))
                     {
-                        if (budget - scan.Queries < 0)
-                            throw new NotSupportedException("Lead validation exceeds the native query limit.");
-                        budget -= scan.Queries;
+                        Charge(scan.Queries);
                         return scan.Contact;
                     }
                     var before = budget;
                     var contact = CheckMaterial(material, null) != null;
                     memo.Add(move.Curve, material, new(contact, before - budget));
                     return contact;
+                }
+
+                // Material too far from the lead for any native boundary query to report a contact
+                // (see IsClearOfQueriesFrom): the result the full scan gives, charged as if it ran.
+                // Ray parity is still asked natively unless the lead lies beside the material's rows.
+                bool FarInside(LeadMaterialSnapshot material)
+                {
+                    Charge(material.BoundaryCount);
+                    var midpoint = move.Curve.Midpoint;
+                    return !material.Extent.IsClearOfRow(midpoint.Y) && material.ContainsMaterial(midpoint, token);
+                }
+
+                void Charge(int queries)
+                {
+                    if (budget - queries < 0)
+                        throw new NotSupportedException("Lead validation exceeds the native query limit.");
+                    budget -= queries;
                 }
             }
         }

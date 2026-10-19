@@ -44,9 +44,37 @@ internal static class PostVerificationGeometry
         /// are more than <see cref="ClearMargin"/> apart on some axis, so no native query can count
         /// anything in one as touching or entering the other. Everything else must be checked.
         /// </summary>
-        internal bool IsClearOf(Extent other) => IsWellConditioned && other.IsWellConditioned
-            && (MaxX + ClearMargin < other.MinX || other.MaxX + ClearMargin < MinX
-                || MaxY + ClearMargin < other.MinY || other.MaxY + ClearMargin < MinY);
+        internal bool IsClearOf(Extent other) => IsClearOf(other, ClearMargin);
+
+        /// <summary>
+        /// The relative rounding allowance of native line/circle intersections. Their discriminant
+        /// b^2 - 4ac cancels: its absolute error stays below about 30 units of roundoff times
+        /// |d1|^2 (|d2|^2 + r^2) (d1 the line, d2 from the circle's centre to the line's start), so a
+        /// spurious root can lie at most about 1e-7 times the span of both extents beyond the true
+        /// distance between line and circle (about 2e-9 is seen in practice). A long lead beside a
+        /// small circle needs the full check; a short lead beside a nearby part does not.
+        /// </summary>
+        internal const double SpanRounding = 1e-6;
+
+        /// <summary>
+        /// As <see cref="IsClearOf(Extent)"/>, with a gap that also covers the rounding of native
+        /// line/circle queries over the span of both extents (<see cref="SpanRounding"/>), plus
+        /// <paramref name="reach"/>. Lead checks skip a material only on this test.
+        /// </summary>
+        internal bool IsClearOfQueriesFrom(Extent other, double reach = 0)
+        {
+            var union = Union(other);
+            var span = System.Math.Max(union.MaxX - union.MinX, union.MaxY - union.MinY);
+            return IsClearOf(other, ClearMargin + reach + SpanRounding * span);
+        }
+
+        /// <summary>True when <paramref name="y"/> lies more than <see cref="ClearMargin"/> outside the Y range.</summary>
+        internal bool IsClearOfRow(double y) => IsWellConditioned && System.Math.Abs(y) <= WellConditionedLimit
+            && (y > MaxY + ClearMargin || y < MinY - ClearMargin);
+
+        private bool IsClearOf(Extent other, double margin) => IsWellConditioned && other.IsWellConditioned
+            && (MaxX + margin < other.MinX || other.MaxX + margin < MinX
+                || MaxY + margin < other.MinY || other.MaxY + margin < MinY);
 
         // Math.Max propagates NaN and no comparison with NaN holds, so NaN and infinite bounds
         // (including the empty extent's) fail this test too.

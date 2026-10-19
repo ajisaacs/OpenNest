@@ -6,9 +6,10 @@ using OpenNest.Geometry;
 namespace OpenNest.Tests.CuttingPlanning;
 
 /// <summary>
-/// Rapid checks skip completed contours whose extents are well clear of the motion; lead checks
-/// examine every other part's material. These cases sit just inside the skip, or show that lead
-/// checks are never filtered, and must keep the native result.
+/// Rapid checks skip completed contours whose extents are well clear of the motion. Lead checks
+/// skip other material only when the gap also covers native line/circle rounding over the span
+/// of both extents, so a long lead beside a small circle is still checked. These cases sit just
+/// inside the skips and must keep the native result.
 /// </summary>
 public class NearbyMaterialCheckTests
 {
@@ -133,6 +134,61 @@ public class NearbyMaterialCheckTests
             }
         }
         Assert.True(memo.Hits > 0);
+    }
+
+    [Fact]
+    public void LeadCheck_SkipsOnlyMaterialWithNoNativeContact()
+    {
+        // Leads from 0.01 to 900000 long, lines and arcs, beside circles and rectangles placed just
+        // beyond the skip gap, often near the lead's own line where the native line/circle
+        // discriminant cancels. Whatever is skipped must be clear by the full native scan too.
+        var random = new Random(11);
+        var skipped = 0;
+        for (var i = 0; i < 4000; i++)
+        {
+            var length = System.Math.Pow(10, random.NextDouble() * 7.95 - 2);
+            // Only a nearly axis-aligned lead has an extent thin enough to pass beside material.
+            var angle = random.Next(4) * System.Math.PI / 2
+                + (random.Next(2) == 0 ? 0 : (random.NextDouble() - 0.5) * 1e-6);
+            var direction = new Vector(System.Math.Cos(angle), System.Math.Sin(angle));
+            var start = new Vector(random.NextDouble() * 200 - 100, random.NextDouble() * 200 - 100);
+            var end = start + direction * length;
+            var lead = random.Next(3) == 0
+                ? PostVerificationGeometry.Curve.Create(start, end, (start + end) * 0.5
+                    + new Vector(-direction.Y, direction.X) * (length * random.NextDouble()), random.Next(2) == 0)
+                : PostVerificationGeometry.Curve.Create(start, end, null, false);
+            var size = System.Math.Pow(10, random.NextDouble() * 5 - 4);
+            var normal = new Vector(-direction.Y, direction.X) * (random.Next(2) == 0 ? 1 : -1);
+            // Beside the lead, just past either end, or anywhere along its line.
+            var along = random.Next(3) switch
+            {
+                0 => -random.NextDouble() * length * 0.1,
+                1 => length * (1 + random.NextDouble() * 0.1),
+                _ => random.NextDouble() * length,
+            };
+            var span = length + 2 * size;
+            var gap = (PostVerificationGeometry.Extent.ClearMargin + PostVerificationGeometry.Extent.SpanRounding * span)
+                * (1 + random.NextDouble()) + size;
+            var centre = start + direction * along + normal * (random.Next(4) == 0 ? 0 : gap);
+            var program = random.Next(2) == 0
+                ? Circle(centre, size)
+                : LeadPathValidationTests.Rectangle(centre.X - size, centre.Y - size, centre.X + size, centre.Y + size);
+            var material = LeadMaterialSnapshot.Capture(program, Vector.Zero);
+            if (!material.IsComplete || !lead.Extent.IsClearOfQueriesFrom(material.Extent))
+                continue;
+            skipped++;
+            var budget = int.MaxValue;
+            Assert.Null(LeadPathValidator.MaterialContact(lead, material, null, ref budget, default));
+        }
+        Assert.True(skipped > 1000, $"Only {skipped} cases were skipped.");
+
+        static Program Circle(Vector centre, double radius)
+        {
+            var p = new Program();
+            p.MoveTo(centre.X + radius, centre.Y);
+            p.Codes.Add(new ArcMove(new Vector(centre.X + radius, centre.Y), centre, RotationType.CCW));
+            return p;
+        }
     }
 
     [Fact]

@@ -17,11 +17,23 @@ public sealed class LeadMaterialSnapshot
         Rings = rings;
         Tabs = tabs;
         Reason = reason;
+        var extent = PostVerificationGeometry.Extent.None;
+        foreach (var ring in rings)
+            foreach (var curve in ring)
+                extent = extent.Union(curve.Extent);
+        Extent = extent;
+        BoundaryCount = rings.Sum(ring => ring.Length);
     }
 
     public bool IsComplete => Reason == null;
     public string Reason { get; }
     internal IReadOnlyList<PostVerificationGeometry.Curve[]> Rings { get; }
+
+    /// <summary>A conservative extent of every boundary's native contact reach; material lies within it.</summary>
+    internal PostVerificationGeometry.Extent Extent { get; }
+
+    /// <summary>The boundary curves of all rings: the native queries one full scan charges.</summary>
+    internal int BoundaryCount { get; }
 
     /// <summary>
     /// Per ring curve, whether it is a tabbed cutout's tab: material boundary that the

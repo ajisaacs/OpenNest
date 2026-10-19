@@ -225,10 +225,16 @@ Every candidate rapid is checked against contours already completed, including
 earlier holes in the same part. Future contours are not yet obstacles. Rapid
 checks skip completed contours whose extents are more than 0.001 clear of the
 rapid, ten times the widest band any native contact query allows beyond an
-extent; anything closer, touching included, gets the full native check. Lead
-checks examine every other part's material: native line/circle queries can report
-rounding contacts for long leads far from small circles, and leads keep those
-results. Every prefix of a part repeats its earlier contours' leads, so one search
+extent; anything closer, touching included, gets the full native check. Native
+line/circle queries can report rounding contacts for long leads far from small
+circles, and leads keep those results: a lead check skips another part's material
+only when their extents are clear by that 0.001 plus 1e-6 times the span of both
+extents. The discriminant's rounding error is bounded by about 1e-7 times that span
+(about 2e-9 is seen), so a skipped material has no native contact; a 900000-long lead
+beside a small circle is still checked. A skipped scan is charged to the native query
+budget as if it ran, and ray parity is still asked natively unless the lead's midpoint
+lies outside the material's Y range. A pierce zone skips material farther than its
+radius by the same gap. Every prefix of a part repeats its earlier contours' leads, so one search
 remembers each other-material verdict by the lead curve's exact bits and the material's
 reference, and charges the native query budget the scan ran; replay never uses it. An arc's
 extent is its whole supporting circle widened to the distance at which the native
