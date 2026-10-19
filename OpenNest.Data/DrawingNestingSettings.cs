@@ -46,7 +46,8 @@ public sealed record DrawingNestingSettings
             StartAngle = constraints.StartAngle,
             EndAngle = constraints.EndAngle,
             Allow180Equivalent = constraints.Allow180Equivalent,
-            ColorArgb = drawing.Color.ToArgb(),
+            // Zero means "use the palette", so only a custom color is carried into the library.
+            ColorArgb = drawing.HasCustomColor ? drawing.Color.ToArgb() : 0,
         };
     }
 
@@ -64,7 +65,8 @@ public sealed record DrawingNestingSettings
             Allow180Equivalent = Allow180Equivalent,
         };
         var color = Color.FromArgb(ColorArgb);
-        drawing.Color = color.A == 0 ? Drawing.GetNextColor() : color;
+        drawing.HasCustomColor = color.A != 0;
+        drawing.Color = drawing.HasCustomColor ? color : Drawing.GetNextColor();
     }
 
     /// <summary>The first rule these settings break, or null when they may be saved.</summary>

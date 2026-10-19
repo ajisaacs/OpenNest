@@ -87,6 +87,7 @@ public class DrawingPackageTests
         drawing.Customer = "Other customer";
         drawing.Material = new Material("Other Steel") { Grade = "Grade B", Density = drawing.Material.Density };
         drawing.Color = System.Drawing.Color.FromArgb(255, 1, 2, 3);
+        drawing.HasCustomColor = true;
         drawing.Priority = 9;
         drawing.CutFirst = true;
         drawing.Constraints = new NestConstraints { StepAngle = 0.5, StartAngle = 0.25, EndAngle = 3, Allow180Equivalent = true };

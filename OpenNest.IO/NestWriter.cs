@@ -164,6 +164,7 @@ namespace OpenNest.IO
                             G = d.Color.G,
                             B = d.Color.B,
                         },
+                        CustomColor = d.HasCustomColor,
                         Quantity = new QuantityDto { Required = d.Quantity.Required },
                         Priority = d.Priority,
                         CutFirst = d.CutFirst,

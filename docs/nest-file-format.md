@@ -171,11 +171,21 @@ the server's library record owns are written as their defaults, so editing them 
 changes the hash:
 
 - nest and drawing `name` (blank), drawing `customer`, material `name` and `grade` (blank);
-- `color`, `priority`, `cutFirst` and `constraints` (omitted);
+- `color`, `customColor`, `priority`, `cutFirst` and `constraints` (omitted);
 - `quantity.required` (zero) and `library` (omitted).
 
 Adding a library drawing to a nest ignores whatever a package holds for these fields
 and applies the record's values.
+
+## Drawing colors
+
+`color` is the drawing's display fill. A drawing writes `customColor: true` when
+someone picked that color on purpose (Drawing Properties, or a library record with a
+stored color); it is omitted when false. Opening a nest in the desktop app, or
+changing the color scheme, reassigns every non-custom, non-cutoff drawing a color
+from the active scheme's palette, so the view follows the application's scheme
+rather than whichever scheme the file was saved under. Files written before this
+flag have no custom colors and are recolored on open. Split pieces keep the flag.
 
 ## Drawing cut-first flag
 

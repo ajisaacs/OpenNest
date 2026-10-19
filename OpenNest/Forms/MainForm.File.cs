@@ -14,6 +14,8 @@ namespace OpenNest.Forms
         private void LoadNest(Nest nest, FormWindowState windowState = FormWindowState.Maximized,
             Guid remoteId = default, string serverUrl = null, int remoteRevision = 0)
         {
+            // The view follows the application's scheme, not the one the file was saved under.
+            ColorSchemeRegistry.RecolorDrawings(nest);
             var editForm = new EditNestForm(nest);
             if (remoteId != Guid.Empty)
                 editForm.Document.BindRemote(remoteId, serverUrl, remoteRevision);

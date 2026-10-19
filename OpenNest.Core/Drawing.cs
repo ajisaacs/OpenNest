@@ -104,6 +104,13 @@ namespace OpenNest
 
         public Color Color { get; set; }
 
+        /// <summary>
+        /// True when someone chose <see cref="Color"/> on purpose. Otherwise the color comes
+        /// from the active scheme's palette and is reassigned when the scheme changes or the
+        /// nest is opened.
+        /// </summary>
+        public bool HasCustomColor { get; set; }
+
         public bool IsCutOff { get; set; }
 
         /// <summary>

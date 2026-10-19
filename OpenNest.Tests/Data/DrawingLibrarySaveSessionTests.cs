@@ -66,6 +66,7 @@ public class DrawingLibrarySaveSessionTests
         drawing.Priority = 3;
         drawing.Constraints = new NestConstraints { StepAngle = 0.5, StartAngle = 0, EndAngle = System.Math.PI, Allow180Equivalent = true };
         drawing.Color = System.Drawing.Color.FromArgb(255, 10, 20, 30);
+        drawing.HasCustomColor = true;
 
         var metadata = Session(new FakeStore(), drawing).Prefill(CutType.Laser, "");
 

@@ -83,17 +83,25 @@ namespace OpenNest
         {
             foreach (Form f in Application.OpenForms)
             {
-                if (f is not EditNestForm enf)
-                    continue;
+                if (f is EditNestForm enf)
+                    RecolorDrawings(enf.Nest);
+            }
+        }
 
-                var i = 0;
-                foreach (var drawing in enf.Nest.Drawings)
-                {
-                    if (drawing.IsCutOff)
-                        continue;
+        /// <summary>
+        /// Gives each non-cutoff drawing its palette color by position. Custom colors are kept,
+        /// but still take their slot so the other drawings' colors don't shift around them.
+        /// </summary>
+        public static void RecolorDrawings(Nest nest)
+        {
+            var i = 0;
+            foreach (var drawing in nest.Drawings)
+            {
+                if (drawing.IsCutOff)
+                    continue;
+                if (!drawing.HasCustomColor)
                     drawing.Color = Drawing.GetPartColor(i);
-                    i++;
-                }
+                i++;
             }
         }
 

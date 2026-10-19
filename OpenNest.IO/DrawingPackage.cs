@@ -31,7 +31,7 @@ namespace OpenNest.IO
         private const string FixedDate = "2000-01-01T00:00:00.0000000";
 
         // Removed so readers fall back to their defaults; the library record owns these values.
-        private static readonly string[] RecordOwnedDrawingFields = { "customer", "color", "priority", "cutFirst", "constraints" };
+        private static readonly string[] RecordOwnedDrawingFields = { "customer", "color", "customColor", "priority", "cutFirst", "constraints" };
 
         /// <summary>Packages <paramref name="drawing"/> without changing it.</summary>
         public static byte[] Write(Drawing drawing, Units units)

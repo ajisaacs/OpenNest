@@ -18,8 +18,10 @@ indices, not spatial neighbors; very large jobs can still place similar colors
 side by side. This is not a colorblind-safe or perceptually uniform palette. Selected parts retain the
 standard translucent blue highlight; etch and cut colors stay unchanged.
 Classic, Pastel and Dark remain available; saved scheme choices are not changed.
-Applying a scheme recolors drawings in currently open nests. Drawings may retain
-custom or saved fill colors; open a saved nest before applying Workshop to recolor it.
+The scheme is an application setting, not part of a nest. Applying a scheme
+recolors drawings in open nests, and opening a nest recolors its drawings from the
+active scheme. Only a color picked on purpose in Drawing Properties (or stored on a
+library record) is kept; see [drawing colors](nest-file-format.md#drawing-colors).
 
 In plate views and drawing thumbnails, scribe/etch motions have a separate stroke
 from material cuts. A closed etched circle or lettering does not make a hole in
@@ -56,8 +58,7 @@ or false keeps the explicit `partColors` palette and its legacy cycling behavior
 Workshop tests check the first 1,000 generated fills stay far in RGB distance
 from both the dark cut outline and the bright green etch stroke, and that no
 fill hue falls in the etch green band. Selected rendering has separate bitmap tests.
-Custom or previously saved fills are not automatically contrast-corrected;
-apply Workshop after loading the nest to recolor its drawings. Existing scheme
+Custom drawing colors are not automatically contrast-corrected. Existing scheme
 names, saved choices, custom palettes and geometry remain unchanged.
 
 ## Verification

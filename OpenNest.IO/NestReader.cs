@@ -219,6 +219,7 @@ namespace OpenNest.IO
                 var drawing = new Drawing(d.Name);
                 drawing.Customer = d.Customer;
                 drawing.Color = Color.FromArgb(d.Color.A, d.Color.R, d.Color.G, d.Color.B);
+                drawing.HasCustomColor = d.CustomColor;
                 drawing.Quantity.Required = d.Quantity.Required;
                 drawing.Priority = d.Priority;
                 drawing.CutFirst = d.CutFirst;

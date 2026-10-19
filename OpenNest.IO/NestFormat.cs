@@ -178,6 +178,14 @@ namespace OpenNest.IO
             public string Name { get; init; } = "";
             public string Customer { get; init; } = "";
             public ColorDto Color { get; init; } = new();
+
+            /// <summary>
+            /// The color was chosen on purpose and survives scheme changes. Omitted when false;
+            /// readers recolor such drawings from the active palette.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+            public bool CustomColor { get; init; }
+
             public QuantityDto Quantity { get; init; } = new();
             public int Priority { get; init; }
 

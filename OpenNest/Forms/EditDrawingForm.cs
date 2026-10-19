@@ -132,7 +132,12 @@ namespace OpenNest.Forms
             drawing.Quantity.Required = Quantity;
             drawing.Priority = Priority;
             drawing.CutFirst = CutFirst;
-            drawing.Color = colorDialog1.Color;
+            // Only a color actually picked here becomes custom; reopening and saving keeps the palette color.
+            if (colorDialog1.Color.ToArgb() != drawing.Color.ToArgb())
+            {
+                drawing.Color = colorDialog1.Color;
+                drawing.HasCustomColor = true;
+            }
         }
 
         protected override void OnShown(EventArgs e)

@@ -28,6 +28,27 @@ public class CutFirstPersistenceTests
         Assert.Equal(cutFirst, json.ContainsKey("cutFirst"));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CustomColor_RoundTrips_AndIsOmittedWhenFalse(bool custom)
+    {
+        var drawing = DrawingPackageFixture.Build();
+        drawing.Color = System.Drawing.Color.FromArgb(255, 10, 20, 30);
+        drawing.HasCustomColor = custom;
+        var nest = new Nest(drawing.Name);
+        nest.Drawings.Add(drawing);
+        using var stream = new MemoryStream();
+
+        Assert.True(new NestWriter(nest).Write(stream));
+        var bytes = stream.ToArray();
+        var copy = Assert.Single(new NestReader(new MemoryStream(bytes)).Read().Drawings);
+
+        Assert.Equal(custom, copy.HasCustomColor);
+        Assert.Equal(drawing.Color.ToArgb(), copy.Color.ToArgb());
+        Assert.Equal(custom, DrawingJson(bytes).ContainsKey("customColor"));
+    }
+
     private static JsonObject DrawingJson(byte[] archive)
     {
         using var zip = new ZipArchive(new MemoryStream(archive), ZipArchiveMode.Read);

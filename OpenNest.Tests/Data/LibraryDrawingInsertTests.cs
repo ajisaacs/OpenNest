@@ -93,6 +93,7 @@ public class LibraryDrawingInsertTests
         LibraryDrawingInsert.Plan(nest, Server, record, package, 1).Apply();
 
         var drawing = Assert.Single(nest.Drawings);
+        Assert.True(drawing.HasCustomColor);
         Assert.Equal(record.Settings, DrawingNestingSettings.FromDrawing(drawing));
     }
 
@@ -103,7 +104,11 @@ public class LibraryDrawingInsertTests
 
         LibraryDrawingInsert.Plan(nest, Server, Record(), Package(), 1).Apply();
 
-        Assert.Equal(255, Assert.Single(nest.Drawings).Color.A);
+        var drawing = Assert.Single(nest.Drawings);
+        Assert.Equal(255, drawing.Color.A);
+        // A palette color stays a palette color: it follows the scheme and isn't stored back.
+        Assert.False(drawing.HasCustomColor);
+        Assert.Equal(0, DrawingNestingSettings.FromDrawing(drawing).ColorArgb);
     }
 
     [Fact]

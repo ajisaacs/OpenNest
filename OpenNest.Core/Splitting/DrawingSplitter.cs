@@ -128,6 +128,7 @@ public static class DrawingSplitter
         var pgm = ConvertGeometry.ToProgram(entities);
         var piece = new Drawing($"{source.Name}-{pieceIndex}", pgm);
         piece.Color = source.Color;
+        piece.HasCustomColor = source.HasCustomColor;
         piece.Priority = source.Priority;
         piece.CutFirst = source.CutFirst;
         piece.Material = source.Material;
