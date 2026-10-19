@@ -135,6 +135,8 @@ public class NestRunnerTests
 
             Assert.Equal(NestJobStatus.Complete, response.Status);
             Assert.Equal(2, response.SheetCount);
+            // Quantity-weighted: 5 placed 4x4 parts over 25 + 81 physical sheet area.
+            Assert.Equal(80d / 106d, response.Utilization, precision: 6);
             Assert.Equal(5, Assert.Single(response.Fulfillment).Placed);
             Assert.Equal(0, response.Fulfillment[0].Unplaced);
             Assert.Equal(
@@ -191,7 +193,7 @@ public class NestRunnerTests
     }
 
     [Fact]
-    public async Task RunAsync_FiniteStockExhaustion_PreservesUnplacedRequirementAndLockedRotation()
+    public async Task RunAsync_FiniteStockExhaustion_PreservesUnplacedRequirement()
     {
         var dxfPath = CreateTempSquareDxf(4, 4);
 
@@ -204,10 +206,9 @@ public class NestRunnerTests
                     [
                         new NestRequestPart
                         {
-                            Id = "locked-square",
+                            Id = "square",
                             DxfPath = dxfPath,
                             Quantity = 2,
-                            AllowRotation = false,
                         },
                     ],
                     Plates =
@@ -232,8 +233,7 @@ public class NestRunnerTests
             Assert.Equal(1, stock.Used);
             Assert.Equal(0, stock.Remaining);
             var drawing = Assert.Single(response.Nest.Drawings);
-            Assert.Equal("locked-square", drawing.Name);
-            Assert.Equal(OpenNest.Math.Angle.TwoPI, drawing.Constraints.StepAngle);
+            Assert.Equal("square", drawing.Name);
         }
         finally
         {
@@ -242,44 +242,92 @@ public class NestRunnerTests
     }
 
     [Fact]
-    public async Task RunAsync_MixedPhysicalSheets_CalculatesWeightedUtilization()
+    public async Task RunAsync_AllowRotationFalse_KeepsOnlyRotatedFitsUnplaced()
     {
-        var dxfPath = CreateTempSquareDxf(4, 4);
+        // A 5x2 bar on a sheet 4 long in X and 6 wide in Y fits only rotated 90 degrees,
+        // so a run that ignored AllowRotation would place it instead of reporting it unplaced.
+        // Size is (width = Y, length = X).
+        var dxfPath = CreateTempSquareDxf(5, 2);
 
         try
         {
-            var response = await NestRunner.RunAsync(
-                new NestRequest
+            NestRequest Request(bool allowRotation) =>
+                new()
                 {
                     Parts =
                     [
                         new NestRequestPart
                         {
-                            Id = "square",
+                            Id = "bar",
                             DxfPath = dxfPath,
-                            Quantity = 5,
+                            Quantity = 1,
+                            AllowRotation = allowRotation,
                         },
                     ],
                     Plates =
                     [
                         new NestRequestPlate
                         {
-                            Id = "small",
-                            Size = new Size(5, 5),
+                            Id = "tall-sheet",
+                            Size = new Size(6, 4),
                             Quantity = 1,
                         },
+                    ],
+                };
+
+            var control = await NestRunner.RunAsync(Request(true));
+            Assert.Equal(1, Assert.Single(control.Fulfillment).Placed);
+
+            var locked = await NestRunner.RunAsync(Request(false));
+            Assert.Equal(NestJobStatus.Incomplete, locked.Status);
+            Assert.Equal(NestJobStopReason.NoPlacementFound, locked.StopReason);
+            var fulfillment = Assert.Single(locked.Fulfillment);
+            Assert.Equal(1, fulfillment.Requested);
+            Assert.Equal(0, fulfillment.Placed);
+            Assert.Equal(1, fulfillment.Unplaced);
+            Assert.Equal(0, locked.SheetCount);
+            var drawing = Assert.Single(locked.Nest.Drawings);
+            Assert.Equal(OpenNest.Math.Angle.TwoPI, drawing.Constraints.StepAngle);
+            Assert.Equal(0, drawing.Constraints.StartAngle);
+            Assert.Equal(0, drawing.Constraints.EndAngle);
+        }
+        finally
+        {
+            File.Delete(dxfPath);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_ExplicitPlates_FlowStockSettingsToPlacedPlates()
+    {
+        var dxfPath = CreateTempSquareDxf(2, 2);
+
+        try
+        {
+            var response = await NestRunner.RunAsync(
+                new NestRequest
+                {
+                    Parts = [new NestRequestPart { Id = "square", DxfPath = dxfPath, Quantity = 1 }],
+                    Plates =
+                    [
                         new NestRequestPlate
                         {
-                            Id = "large",
-                            Size = new Size(9, 9),
+                            Id = "remnant",
+                            Size = new Size(10, 10),
                             Quantity = 1,
+                            PartSpacing = 0.2,
+                            EdgeSpacing = new Spacing(1, 2, 3, 4),
+                            Quadrant = 3,
                         },
                     ],
                 }
             );
 
-            Assert.Equal(2, response.SheetCount);
-            Assert.Equal(80d / 106d, response.Utilization, precision: 6);
+            Assert.Equal(1, Assert.Single(response.Fulfillment).Placed);
+            var plate = Assert.Single(response.Nest.Plates);
+            Assert.Equal(0.2, plate.PartSpacing);
+            Assert.Equal(new Spacing(1, 2, 3, 4), plate.EdgeSpacing);
+            Assert.Equal(3, plate.Quadrant);
         }
         finally
         {
@@ -290,25 +338,19 @@ public class NestRunnerTests
     [Fact]
     public async Task RunAsync_DuplicatePartIds_ThrowsBeforeNesting()
     {
-        var dxfPath = CreateTempSquareDxf(2, 2);
-
-        try
+        // Missing DXFs: if the duplicate check ever runs after import, these surface
+        // FileNotFoundException instead, turning this red.
+        var request = new NestRequest
         {
-            var request = new NestRequest
-            {
-                Parts =
-                [
-                    new NestRequestPart { Id = "duplicate", DxfPath = dxfPath },
-                    new NestRequestPart { Id = "duplicate", DxfPath = dxfPath },
-                ],
-            };
+            Parts =
+            [
+                new NestRequestPart { Id = "duplicate", DxfPath = "missing-a.dxf" },
+                new NestRequestPart { Id = "duplicate", DxfPath = "missing-b.dxf" },
+            ],
+        };
 
-            await Assert.ThrowsAsync<ArgumentException>(() => NestRunner.RunAsync(request));
-        }
-        finally
-        {
-            File.Delete(dxfPath);
-        }
+        var error = await Assert.ThrowsAsync<ArgumentException>(() => NestRunner.RunAsync(request));
+        Assert.Contains("unique", error.Message);
     }
 
     [Fact]
