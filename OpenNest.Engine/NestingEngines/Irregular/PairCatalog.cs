@@ -58,12 +58,15 @@ internal static class PairCatalog
     /// </summary>
     /// <param name="sheetLength">Largest sheet X extent offered at this spacing.</param>
     /// <param name="sheetWidth">Largest sheet Y extent offered at this spacing.</param>
+    /// <param name="drawingFor">Private drawing whose best-fit cache entry the caller owns and
+    /// shares across catalogs and solves; null builds and releases one per type here.</param>
     public static IReadOnlyDictionary<int, IReadOnlyList<PairPose>> Build(
         IReadOnlyList<PartType> types,
         double spacing,
         double sheetLength,
         double sheetWidth,
-        CancellationToken token
+        CancellationToken token,
+        Func<NestJobPart, Drawing>? drawingFor = null
     )
     {
         var result = new Dictionary<int, IReadOnlyList<PairPose>>();
@@ -75,7 +78,7 @@ internal static class PairCatalog
             var geometry = JobPartGeometry.TryRead(type.Part.Geometry);
             if (geometry == null)
                 continue;
-            var pairs = BuildForType(type, geometry, spacing, sheetLength, sheetWidth, token);
+            var pairs = BuildForType(type, geometry, spacing, sheetLength, sheetWidth, token, drawingFor);
             if (pairs.Count > 0)
                 result[type.Index] = pairs;
         }
@@ -88,10 +91,12 @@ internal static class PairCatalog
         double spacing,
         double sheetLength,
         double sheetWidth,
-        CancellationToken token
+        CancellationToken token,
+        Func<NestJobPart, Drawing>? drawingFor
     )
     {
-        var drawing = new Drawing(type.Part.Id, DrawingJobMapper.ToProgram(type.Part.Geometry));
+        var drawing = drawingFor?.Invoke(type.Part)
+            ?? new Drawing(type.Part.Id, DrawingJobMapper.ToProgram(type.Part.Geometry));
         List<BestFitResult> fits;
         try
         {
@@ -104,8 +109,9 @@ internal static class PairCatalog
         }
         finally
         {
-            // The drawing exists only for this call; release its cache entry now.
-            BestFitCache.Invalidate(drawing);
+            // A drawing made for this call alone releases its cache entry now.
+            if (drawingFor == null)
+                BestFitCache.Invalidate(drawing);
         }
 
         // Best-fit evaluates in parallel, so equal-area results arrive in any order. Sort on

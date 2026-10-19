@@ -51,7 +51,16 @@ internal static class CutoutNfpProposal
             new Vector()));
         if (hole.Count < 3)
             return null;
+        // The frame and the occupants keep their poses for the whole search; outline and
+        // triangulate each once rather than at every candidate.
         var framePose = new NestJobPlacement(frame.Id, 0, 0, 0, 0);
+        var preparedFrame = NestLayoutCheck.Prepare(frameGeometry, framePose, spacing);
+        var preparedOccupied = new NestLayoutCheck.PreparedPlacement[occupied.Count];
+        for (var i = 0; i < occupied.Count; i++)
+        {
+            token.ThrowIfCancellationRequested();
+            preparedOccupied[i] = NestLayoutCheck.Prepare(occupied[i].Geometry, occupied[i].Pose, spacing);
+        }
         foreach (var rotation in insert.Rotation.EnumerateAngles())
         {
             token.ThrowIfCancellationRequested();
@@ -63,19 +72,19 @@ internal static class CutoutNfpProposal
                 if (!CutoutLatticeFill.Inside(region, x, y))
                     continue;
                 var pose = new NestJobPlacement(insert.Id, 0, x, y, rotation);
-                if (!NestLayoutCheck.Clears(frameGeometry, framePose, insertGeometry, pose, spacing))
-                    continue;
+                // A pose must clear every occupant and the frame; the occupants are small and
+                // reject a crowded candidate early, so they go first and the frame last.
                 var clears = true;
-                foreach (var other in occupied)
+                foreach (var other in preparedOccupied)
                 {
                     token.ThrowIfCancellationRequested();
-                    if (NestLayoutCheck.Clears(other.Geometry, other.Pose, insertGeometry, pose, spacing))
+                    if (NestLayoutCheck.Clears(other, insertGeometry, pose))
                         continue;
                     clears = false;
                     break;
                 }
                 token.ThrowIfCancellationRequested();
-                if (clears)
+                if (clears && NestLayoutCheck.Clears(preparedFrame, insertGeometry, pose))
                     return pose;
             }
         }

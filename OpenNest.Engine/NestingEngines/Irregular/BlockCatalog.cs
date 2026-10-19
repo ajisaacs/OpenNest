@@ -20,17 +20,22 @@ internal sealed class BlockCatalog : IDisposable
     private readonly WorkCounter counter;
     private readonly long budget;
     private readonly Dictionary<int, Drawing> drawings = new();
+    private readonly Func<NestJobPart, Drawing>? drawingFor;
     private readonly Dictionary<int, List<Orientation>> orientations = new();
     private readonly Dictionary<int, int> attempts = new();
     internal int PreparationCount => attempts.Values.Sum();
     private readonly Dictionary<(int Type, int Quantity, double Length, double Width), IReadOnlyList<Placed>> cache = new();
 
+    /// <param name="drawingFor">Shared private drawings whose best-fit entries the caller owns;
+    /// null makes the catalog own one per type and release it on dispose.</param>
     public BlockCatalog(double spacing, IReadOnlyList<PartType> types,
-        IReadOnlyDictionary<int, IReadOnlyList<PairPose>> pairs, WorkCounter counter, long budget)
+        IReadOnlyDictionary<int, IReadOnlyList<PairPose>> pairs, WorkCounter counter, long budget,
+        Func<NestJobPart, Drawing>? drawingFor = null)
     {
         this.spacing = spacing;
         this.counter = counter;
         this.budget = budget;
+        this.drawingFor = drawingFor;
         foreach (var type in types)
         {
             var poses = type.Orientations.ToList();
@@ -84,8 +89,7 @@ internal sealed class BlockCatalog : IDisposable
         // and outline complexity - that drive its real cost, so the shared budget actually sees it.
         var vertices = type.Orientations.Count > 0 ? type.Orientations[0].Outline.Count : 1;
         counter.Add((long)quantity * quantity * System.Math.Max(1, vertices));
-        if (!drawings.TryGetValue(type.Index, out var drawing))
-            drawings[type.Index] = drawing = DrawingJobMapper.CreateDrawing(type.Part);
+        var drawing = drawingFor?.Invoke(type.Part) ?? OwnDrawing(type);
         try
         {
             var members = PrivatePlateFill.Run(drawing, type.Part.Rotation, spacing,
@@ -98,6 +102,13 @@ internal sealed class BlockCatalog : IDisposable
         {
             return Array.Empty<Placed>();
         }
+    }
+
+    private Drawing OwnDrawing(PartType type)
+    {
+        if (!drawings.TryGetValue(type.Index, out var drawing))
+            drawings[type.Index] = drawing = DrawingJobMapper.CreateDrawing(type.Part);
+        return drawing;
     }
 
     public void Dispose()

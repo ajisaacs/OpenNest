@@ -116,6 +116,61 @@ public static class NestLayoutCheck
             || !Overlaps(inflated, br);
     }
 
+    /// <summary>
+    /// Prepares one part at one pose for repeated clearance tests against other parts: its
+    /// validation outline and, on first need, its spacing-inflated outline, each triangulated
+    /// once. <see cref="Clears(PreparedPlacement, JobPartGeometry, NestJobPlacement)"/> gives
+    /// the pairwise overload's answers, including its leftmost-is-inflated tie rule, without
+    /// outlining and triangulating this part again per test. Not thread-safe.
+    /// </summary>
+    public static PreparedPlacement Prepare(JobPartGeometry a, NestJobPlacement pa, double spacing)
+    {
+        var ap = Transform(a, pa.Rotation);
+        var al = new Vector(pa.X, pa.Y);
+        return new PreparedPlacement(ap, al, Outline(ap, al, 0), InflationFor(spacing));
+    }
+
+    /// <summary>Same answer as <c>Clears(a, pa, b, pb, spacing)</c> for the part and spacing
+    /// <paramref name="a"/> was prepared with.</summary>
+    public static bool Clears(PreparedPlacement a, JobPartGeometry b, NestJobPlacement pb)
+    {
+        var bp = Transform(b, pb.Rotation);
+        var bl = new Vector(pb.X, pb.Y);
+        var br = Outline(bp, bl, 0);
+        if (a.Raw.Perimeter.BoundingBox.Left > br.Perimeter.BoundingBox.Left)
+        {
+            // The other part is leftmost, so it is the one inflated, against this raw outline.
+            var inflated = a.InflateBy > Tolerance.Epsilon ? Outline(bp, bl, a.InflateBy) : br;
+            return !BoxesTouch(inflated.Perimeter.BoundingBox, a.Raw.Perimeter.BoundingBox)
+                || !Overlaps(inflated, a.Raw);
+        }
+        return !BoxesTouch(a.Inflated.Perimeter.BoundingBox, br.Perimeter.BoundingBox)
+            || !Overlaps(a.Inflated, br);
+    }
+
+    /// <summary>A part at a pose with its outlines prepared once; see
+    /// <see cref="Prepare(JobPartGeometry, NestJobPlacement, double)"/>.</summary>
+    public sealed class PreparedPlacement
+    {
+        private readonly ShapeProfile profile;
+        private readonly Vector location;
+        private PartOutline inflated;
+
+        internal PreparedPlacement(ShapeProfile profile, Vector location, PartOutline raw, double inflateBy)
+        {
+            this.profile = profile;
+            this.location = location;
+            Raw = raw;
+            InflateBy = inflateBy;
+        }
+
+        internal PartOutline Raw { get; }
+        internal double InflateBy { get; }
+
+        internal PartOutline Inflated =>
+            inflated ??= InflateBy > Tolerance.Epsilon ? Outline(profile, location, InflateBy) : Raw;
+    }
+
     private static ShapeProfile Transform(JobPartGeometry geometry, double rotation)
     {
         var shapes = new[] { geometry.Perimeter }.Concat(geometry.Cutouts);
@@ -537,7 +592,7 @@ public static class NestLayoutCheck
             ?? Collision.HasOverlap(a.Perimeter, b.Perimeter, a.Holes, b.Holes);
     }
 
-    private sealed class PartOutline
+    internal sealed class PartOutline
     {
         public Polygon Perimeter { get; init; }
         public List<Polygon> Holes { get; init; }

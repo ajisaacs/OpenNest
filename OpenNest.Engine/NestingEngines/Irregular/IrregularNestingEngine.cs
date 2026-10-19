@@ -2,8 +2,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Adapters;
 
 namespace OpenNest.Engine.NestingEngines.Irregular;
 
@@ -39,6 +41,17 @@ public sealed class IrregularNestingEngine : INestingEngine
     /// </summary>
     internal long WorkBudget { get; init; } = 1_500_000;
 
+    /// <summary>
+    /// One private drawing per part geometry, shared by the best-fit pair and Fill block
+    /// catalogs and by every solve of this instance (a pipeline's cutout trial and its ordinary
+    /// solve see the same geometry), so each part's best-fit search runs once. Entries live as
+    /// long as the job geometry they describe.
+    /// </summary>
+    private readonly ConditionalWeakTable<PartGeometrySnapshot, Drawing> drawings = new();
+
+    private Drawing DrawingFor(NestJobPart part) =>
+        drawings.GetValue(part.Geometry, _ => DrawingJobMapper.CreateDrawing(part));
+
     // Instance-owned diagnostics; no process-global counters or mutable solver state.
     internal Action? SheetPacked { get; init; }
     internal Action<RepeatBatch>? BatchSelected { get; init; }
@@ -53,7 +66,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         ArgumentNullException.ThrowIfNull(job);
         token.ThrowIfCancellationRequested();
         var types = PartCatalog.Build(job);
-        using var solver = new Solver(job, types, progress, token, WorkBudget, SheetPacked, BatchSelected, TailReplaced);
+        using var solver = new Solver(job, types, progress, token, WorkBudget, DrawingFor, SheetPacked, BatchSelected, TailReplaced);
 
         // Pair-only orientations may fit stock even when the sampled single poses do not.
         // Demand that neither a single nor a pair can fit is reported unplaced.
@@ -91,7 +104,7 @@ public sealed class IrregularNestingEngine : INestingEngine
     internal NestJobResult ImproveTailForTesting(NestJob job, IReadOnlyList<SheetFill> physicalPlan)
     {
         var types = PartCatalog.Build(job);
-        using var solver = new Solver(job, types, null, default, WorkBudget, SheetPacked, BatchSelected, TailReplaced);
+        using var solver = new Solver(job, types, null, default, WorkBudget, DrawingFor, SheetPacked, BatchSelected, TailReplaced);
         var unplaced = job.Parts.Sum(p => p.Quantity) - physicalPlan.Sum(s => s.Parts.Count);
         var plan = new Plan(physicalPlan, physicalPlan.Sum(s => NetCost(job.Options, s)), unplaced,
             unplaced == 0 ? NestJobStopReason.Completed : NestJobStopReason.NoPlacementFound, NestJobCost.UsesExplicitCosts(job));
@@ -105,6 +118,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         IProgress<NestJobProgress>? progress,
         CancellationToken token,
         long workBudget,
+        Func<NestJobPart, Drawing> drawingFor,
         Action? sheetPacked,
         Action<RepeatBatch>? batchSelected,
         Action<int>? tailReplaced
@@ -127,7 +141,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         {
             var spacing = System.Math.Max(0, stock.PartSpacing);
             if (!blocks.TryGetValue(spacing, out var found))
-                blocks[spacing] = found = new BlockCatalog(spacing, types, PairsFor(stock), Work, workBudget);
+                blocks[spacing] = found = new BlockCatalog(spacing, types, PairsFor(stock), Work, workBudget, drawingFor);
             return found;
         }
 
@@ -227,7 +241,7 @@ public sealed class IrregularNestingEngine : INestingEngine
                 // each packer still checks the pair against its own work area.
                 var sheets = job.Plates.Where(p => System.Math.Max(0, p.PartSpacing) == clearance).ToList();
                 pairs[clearance] = found = PairCatalog.Build(types, clearance,
-                    sheets.Max(p => p.Size.Length), sheets.Max(p => p.Size.Width), token);
+                    sheets.Max(p => p.Size.Length), sheets.Max(p => p.Size.Width), token, drawingFor);
             }
             return found;
         }

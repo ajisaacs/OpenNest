@@ -59,6 +59,11 @@ internal sealed class CutoutPipelinePrepass
             ? System.Math.Abs(g.Perimeter.Area()) : double.PositiveInfinity);
         var bundles = new Dictionary<string, Bundle>(StringComparer.Ordinal);
         var byFrame = new Dictionary<string, List<NestJobPart>>(StringComparer.Ordinal);
+        // A proposal depends on the frame, the hole and the offered inserts with their local
+        // rotation policies, not on the frame angle itself: automatic-rotation inserts ask the
+        // same question at every angle, and so does every instance of the same frame while the
+        // remaining demand is unchanged. Replay those answers.
+        var proposals = new Dictionary<string, IReadOnlyList<NestJobPlacement>>(StringComparer.Ordinal);
         // Smallest first: a frame can only hold smaller parts, so its candidate inner bundles
         // already exist, and small holes take small inserts before large holes are tried.
         var frames = original.Parts.Where(p => geometry[p.Id] is { Cutouts.Count: > 0 })
@@ -162,6 +167,17 @@ internal sealed class CutoutPipelinePrepass
         IReadOnlyList<NestJobPlacement> Propose(NestJobPart frame, int hole,
             NestJobPart[] flat, NestJobPart[] nested)
         {
+            var key = ProposalKey(frame, hole, flat, nested);
+            if (proposals.TryGetValue(key, out var replay))
+                return replay;
+            var proposed = ProposeCore(frame, hole, flat, nested);
+            proposals[key] = proposed;
+            return proposed;
+        }
+
+        IReadOnlyList<NestJobPlacement> ProposeCore(NestJobPart frame, int hole,
+            NestJobPart[] flat, NestJobPart[] nested)
+        {
             IReadOnlyList<NestJobPlacement> poses = Array.Empty<NestJobPlacement>();
             if (nested.Length > 0)
                 poses = CutoutCirclePacker.Fill(frame, hole,
@@ -178,6 +194,26 @@ internal sealed class CutoutPipelinePrepass
         // Physical parts a proposal places: a nested bundle counts its frame and contents.
         int Weight(IReadOnlyList<NestJobPlacement> poses) =>
             poses.Sum(p => bundles.TryGetValue(p.PartId, out var b) ? b.Parts : 1);
+    }
+
+    private static string ProposalKey(NestJobPart frame, int hole, NestJobPart[] flat, NestJobPart[] nested)
+    {
+        var key = new System.Text.StringBuilder();
+        key.Append(frame.Id).Append('|').Append(hole);
+        foreach (var part in flat)
+            Append(part, 'f');
+        foreach (var part in nested)
+            Append(part, 'n');
+        return key.ToString();
+
+        void Append(NestJobPart part, char kind)
+        {
+            var policy = part.Rotation;
+            key.Append('|').Append(kind).Append(part.Id).Append(':').Append(part.Quantity).Append(':')
+                .Append((int)policy.Kind).Append(':').Append(policy.Start.ToString("R")).Append(':')
+                .Append(policy.End.ToString("R")).Append(':').Append(policy.Step.ToString("R")).Append(':')
+                .Append(policy.Allow180Equivalent ? 1 : 0);
+        }
     }
 
     private static RotationPolicy LocalRotation(RotationPolicy original, double frameAngle) =>

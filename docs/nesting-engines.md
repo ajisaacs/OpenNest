@@ -70,10 +70,19 @@ where both members' free regions allow it. Each pair's internal spacing is re-ch
 layout check before it is offered, and only rotations the part's policy allows are used. A pair
 may introduce legal rotations beyond the sampled single poses; these remain eligible even when
 none of the sampled singles fits the stock. Both members block space separately, leaving their
-notches and intervening gaps available for later parts. Concave no-fit polygons are prepared
-with a single boundary/containment union.
+notches and intervening gaps available for later parts. A concave footprint is split once into
+convex pieces (ear clipping, then merging across every diagonal whose removal keeps both ends
+convex, all decided with exact integer cross products on the Clipper lattice); each concave
+no-fit polygon is the union of the pairwise convex sums of the two footprints' pieces, which is
+the same filled Minkowski sum the edge-pair sweep gives, at a fraction of the union's cost for
+outlines with many vertices. A footprint the clipper cannot decompose (self-touching, zero-area
+runs) keeps the single boundary/containment union.
 Any remaining numerical hole is filled only when its entire ring is certified to lie in forbidden
 space, preserving genuine enclosed placement pockets without changing spacing tolerances.
+
+The pairs and the Fill blocks below read each part through one private drawing per part
+geometry, owned by the engine instance, so a part's best-fit search runs once per instance:
+pairs and blocks share it, and so do a pipeline's cutout trial and its ordinary solve.
 
 When remaining demand exceeds two, Irregular also offers Fill patterns as optional
 multi-member candidates, not as solid bounding boxes or a whole-job Fill fallback. It searches
@@ -279,7 +288,14 @@ and 16 base sweep-angle samples per frame (automatic quarter-turns are all retai
 remaining copies stay ordinary requirements. Within one preparation, geometry reads and
 `NestLayoutCheck.Clears` answers are replayed (`CutoutMemo`: same geometry, bit-identical poses),
 so repeated frame instances and frame angles do not repeat that check, its main cost; layouts are
-the same as without the replay. Fixed legal proxy orientations are a
+the same as without the replay. A hole's proposal is also replayed whenever the same frame, hole
+and offered inserts (ids, remaining quantities and frame-local rotation policies) come up again:
+automatic-rotation inserts ask the same question at every frame angle, and a second instance of
+the frame asks it again until the first instance's inserts change the remaining demand. The
+lattice and NFP searches prepare the frame's and the occupants' validation outlines once per
+search (`NestLayoutCheck.Prepare`) and test each candidate against the small occupants before
+the frame, so a crowded window no longer re-outlines and re-triangulates the frame at every
+candidate; the answers are those of the pairwise check. Fixed legal proxy orientations are a
 conservative search choice, not full engine choice among all legal orientations; unsupported
 bundles remain ordinary independent requirements.
 

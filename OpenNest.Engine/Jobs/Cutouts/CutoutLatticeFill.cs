@@ -89,6 +89,7 @@ internal static class CutoutLatticeFill
         var lattice = Lattice(insert, bounds, step, spacing, token);
         if (lattice.Count == 0)
             return Array.Empty<NestJobPlacement>();
+        NestLayoutCheck.PreparedPlacement[]? preparedOccupied = null;
         var regions = new Dictionary<double, PathsD>();
         foreach (var rotation in lattice.Select(p => p.Rotation).Distinct())
             regions[rotation] = InnerFit(insertGeometry, rotation, hole, spacing);
@@ -122,15 +123,19 @@ internal static class CutoutLatticeFill
             token.ThrowIfCancellationRequested();
             if (occupied.Count == 0)
                 return true;
+            // Occupants keep their poses for the whole fill; outline each once.
+            preparedOccupied ??= occupied
+                .Select(other => NestLayoutCheck.Prepare(other.Geometry, other.Pose, spacing))
+                .ToArray();
             var moved = pose with
             {
                 X = System.Math.Round(pose.X + dx, 8),
                 Y = System.Math.Round(pose.Y + dy, 8)
             };
-            foreach (var other in occupied)
+            foreach (var other in preparedOccupied)
             {
                 token.ThrowIfCancellationRequested();
-                if (!NestLayoutCheck.Clears(other.Geometry, other.Pose, insertGeometry, moved, spacing))
+                if (!NestLayoutCheck.Clears(other, insertGeometry, moved))
                     return false;
             }
             return true;
@@ -199,11 +204,12 @@ internal static class CutoutLatticeFill
         JobPartGeometry insertGeometry, List<NestJobPlacement> poses, double spacing, CancellationToken token)
     {
         var framePose = new NestJobPlacement(frameId, 0, 0, 0, 0);
+        var preparedFrame = NestLayoutCheck.Prepare(frame, framePose, spacing);
         var clear = new List<NestJobPlacement>();
         foreach (var pose in poses)
         {
             token.ThrowIfCancellationRequested();
-            if (NestLayoutCheck.Clears(frame, framePose, insertGeometry, pose, spacing))
+            if (NestLayoutCheck.Clears(preparedFrame, insertGeometry, pose))
                 clear.Add(pose);
         }
         // Rotation is about the reference point, so every copy's material lies within this

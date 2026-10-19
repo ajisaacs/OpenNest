@@ -25,6 +25,7 @@ internal sealed class NoFitCache
 
     private readonly double halfClearance;
     private readonly ConcurrentDictionary<(int, int), PathD> footprints = new();
+    private readonly ConcurrentDictionary<(int, int), Lazy<IReadOnlyList<PathD>?>> pieces = new();
     private readonly ConcurrentDictionary<(int, int, int, int), Lazy<Nfp>> nfps = new();
 
     public NoFitCache(double clearance)
@@ -34,6 +35,15 @@ internal sealed class NoFitCache
 
     public PathD Footprint(Orientation o) =>
         footprints.GetOrAdd((o.TypeIndex, o.Index), _ => BuildFootprint(o));
+
+    /// <summary>Convex pieces tiling the footprint, or null when it cannot be decomposed.</summary>
+    private IReadOnlyList<PathD>? Pieces(Orientation o) =>
+        pieces.GetOrAdd(
+                (o.TypeIndex, o.Index),
+                _ => new Lazy<IReadOnlyList<PathD>?>(() => ConvexPieces.Decompose(Footprint(o), Precision),
+                    LazyThreadSafetyMode.ExecutionAndPublication)
+            )
+            .Value;
 
     /// <summary>NFP of <paramref name="moving"/> around <paramref name="fixedPart"/> placed at the origin.</summary>
     public Nfp Get(Orientation fixedPart, Orientation moving) =>
@@ -80,10 +90,32 @@ internal sealed class NoFitCache
         }
         else
         {
-            region = ConcaveSum(a, negB);
+            var piecesA = Pieces(fixedPart);
+            var piecesB = Pieces(moving);
+            region = piecesA != null && piecesB != null ? PiecewiseSum(piecesA, piecesB) : ConcaveSum(a, negB);
             NfpHoleFilter.RemoveCoveredHoles(region, a, negB);
         }
         return new Nfp(region, Clipper.GetBounds(region));
+    }
+
+    /// <summary>
+    /// Filled Minkowski sum of A and -B as the union of the convex sums of their pieces:
+    /// (A1 u A2 ...) + (-B1 u -B2 ...) = u (Ai + -Bj). Point reflection keeps each piece
+    /// convex and CCW. Far fewer, larger parts than the edge-pair parallelograms, so the
+    /// union is much cheaper for outlines with many vertices.
+    /// </summary>
+    private static PathsD PiecewiseSum(IReadOnlyList<PathD> piecesA, IReadOnlyList<PathD> piecesB)
+    {
+        var sums = new PathsD(piecesA.Count * piecesB.Count);
+        foreach (var pieceB in piecesB)
+        {
+            var negated = new PathD(pieceB.Count);
+            foreach (var p in pieceB)
+                negated.Add(new PointD(-p.x, -p.y));
+            foreach (var pieceA in piecesA)
+                sums.Add(ConvexSum(pieceA, negated));
+        }
+        return Clipper.Union(sums, new PathsD(), FillRule.NonZero, Precision);
     }
 
     /// <summary>Filled Minkowski sum, with boundary sweeps and containment unioned together.</summary>
