@@ -41,7 +41,7 @@ internal static class DrawingPinCapture
     /// </summary>
     internal static CuttingPlanFinding NotApplied(Part source, int ordinal) =>
         new(ordinal, source, null, null, PostVerificationKind.FixedLead, source.LeadInsLocked
-            ? $"Locked lead-ins override drawing pins on part {ordinal + 1}; Clear Lead-ins to apply the pins."
+            ? $"Locked lead-ins override drawing pins on part {ordinal + 1}; use Plate > Remove Lead-ins, then Plan Cutting, to apply the pins."
             : $"Drawing pins on part {ordinal + 1} are not applied: the part is not regenerated.")
         { FixedLead = new(null, null, null) };
 

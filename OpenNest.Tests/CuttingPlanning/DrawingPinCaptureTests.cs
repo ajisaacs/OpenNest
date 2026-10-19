@@ -48,7 +48,7 @@ public class DrawingPinCaptureTests
         Assert.True(planned.HasOnlyFixedLeadWarnings);
         var warning = Assert.Single(planned.Result.Findings);
         Assert.Equal(PostVerificationKind.FixedLead, warning.Kind);
-        Assert.Equal("Locked lead-ins override drawing pins on part 1; Clear Lead-ins to apply the pins.", warning.Message);
+        Assert.Equal("Locked lead-ins override drawing pins on part 1; use Plate > Remove Lead-ins, then Plan Cutting, to apply the pins.", warning.Message);
         Assert.False(Assert.Single(planned.Result.ProposedOrder).IsRegenerated);
         Assert.Equal(CuttingCommitStatus.Applied, proposal.Apply(acceptWarnings: true).Status);
         Assert.Same(program, part.Program);

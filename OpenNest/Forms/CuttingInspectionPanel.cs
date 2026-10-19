@@ -1248,7 +1248,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         ClearResult();
         SetPlanning(true);
         cancelButton.Enabled = false;
-        SetStatus(Tone.Neutral, "Closing… nothing has changed.");
+        SetStatus(Tone.Neutral, "Closing… the preview was not applied.");
         validationCancellation?.Cancel();
         inspection.RequestClose();
         if (!IsPlanning)

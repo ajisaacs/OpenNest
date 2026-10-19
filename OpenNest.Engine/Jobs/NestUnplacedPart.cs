@@ -36,7 +36,7 @@ public sealed record NestUnplacedPart(string PartId, Drawing Drawing, int Count,
     public static string Describe(NestUnplacedReason reason) => reason switch
     {
         NestUnplacedReason.ProposalNotKeepable => "the proposal cannot be kept",
-        NestUnplacedReason.NoStockFits => "larger than every offered sheet",
+        NestUnplacedReason.NoStockFits => "does not fit the usable area of any offered sheet at the rotations checked",
         NestUnplacedReason.FrameUnplaced => "reserved inside a cutout of a frame that was not placed",
         NestUnplacedReason.StockExhausted => "no sheets left",
         NestUnplacedReason.PlateLimitReached => "sheet limit reached",

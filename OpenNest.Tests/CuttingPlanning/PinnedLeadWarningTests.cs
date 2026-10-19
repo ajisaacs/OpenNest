@@ -28,8 +28,8 @@ public class PinnedLeadWarningTests
         Assert.Same(neighbour, warning.OtherSourcePart);
         Assert.Equal(new FixedLeadWarning(1, 1, 1), warning.FixedLead);
         Assert.Equal("Drawing pin 1 lead on cutting contour 1 contacts or enters another part's material. "
-            + "The pinned contour is cut exactly as its drawing says. Increase spacing or switch off drawing pins "
-            + "for this part (right-click > Drawing Pins Off).", warning.Message);
+            + "The pinned contour is cut exactly as its drawing says. Increase spacing or move this part away "
+            + "from the part it meets, then replan.", warning.Message);
         // The search never relocates the pinned entry, and the neighbour is planned normally.
         var proposed = planned.Result.ProposedOrder;
         var placement = Assert.Single(proposed, p => ReferenceEquals(p.SourcePart, pinned));

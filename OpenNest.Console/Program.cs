@@ -111,7 +111,7 @@ static class NestConsole
                 Console.Error.WriteLine(
                     engine.IsJobEngine
                         ? $"Error: engine '{engine.Name}' is a whole-job engine; single-plate fill supports: {string.Join(", ", PlateFillService.BuiltInStrategies)}. Use --autonest for whole-job engines."
-                        : $"Error: unknown engine '{engine.Name}'. Fill strategies: {string.Join(", ", PlateFillService.BuiltInStrategies)} (jobs engines such as StockLadder require --autonest)"
+                        : $"Error: unknown engine '{engine.Name}'. Fill strategies: {string.Join(", ", PlateFillService.BuiltInStrategies)} (whole-job engines such as StockLadder require --autonest)"
                 );
                 return 1;
             }

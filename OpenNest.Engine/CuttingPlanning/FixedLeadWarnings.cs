@@ -16,7 +16,7 @@ internal static class FixedLeadWarnings
         + "unlock this part's lead-ins and replan.";
 
     private const string PinnedAdvice = "The pinned contour is cut exactly as its drawing says. Increase spacing "
-        + "or switch off drawing pins for this part (right-click > Drawing Pins Off).";
+        + "or move this part away from the part it meets, then replan.";
 
     /// <summary>A replay-checker finding (rapid crossing or retention) inside the fixed emission.</summary>
     internal static CuttingPlanFinding FromChecker(CuttingPlanSnapshot snapshot, FixedProgramPlacement source,

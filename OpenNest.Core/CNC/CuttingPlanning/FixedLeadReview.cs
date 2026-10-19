@@ -77,8 +77,8 @@ internal static class FixedLeadReview
             if (part.LeadInsLocked)
             {
                 if (part.HasActiveDrawingPins)
-                    NotApplied(index, "the part's locked lead-ins override them. Clear Lead-ins and plan cutting "
-                        + "to apply the pins.");
+                    NotApplied(index, "the part's locked lead-ins override them. Use Plate > Remove Lead-ins, "
+                        + "then Plan Cutting, to apply the pins.");
             }
             else
             {

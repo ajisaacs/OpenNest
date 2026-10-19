@@ -425,8 +425,8 @@ clean contours with `CutPinResolver` and prepares them with
 - A pinned contour's lead-in, cut, lead-out and tab are a fixed emission like a locked program
   (see [fixed emissions](#fixed-emissions-warn)): a pinned lead that meets another part's
   material or its own part's (an already-cut hole included) is a `FixedLead` warning naming
-  the part, cutting contour, pin and the part hit, with the advice "Increase spacing or switch
-  off drawing pins for this part (right-click > Drawing Pins Off)". The entry is never moved
+  the part, cutting contour, pin and the part hit, with the advice "Increase spacing or move
+  this part away from the part it meets, then replan". The entry is never moved
   and the lead never shortened to fit; the feasibility precheck accepts it as given. The
   rapids between contours, including the one into a pinned contour, stay strict. Plan
   Cutting does not model clamps, for pinned leads or any other.
@@ -435,7 +435,8 @@ clean contours with `CutPinResolver` and prepares them with
   is the shared test for "pins apply here".
 - A pinned part is regenerated like any unlocked part, whatever lead-ins or settings it
   carried before. A locked part keeps its exact locked program and warns "Locked lead-ins
-  override drawing pins on part N; Clear Lead-ins to apply the pins." It is not refused. An
+  override drawing pins on part N; use Plate > Remove Lead-ins, then Plan Cutting, to apply the
+  pins." It is not refused. An
   unlocked part a caller left ineligible warns that its pins are not applied.
 - The plate state compared by `Apply` includes each drawing's pin list (reference and exact
   content, `StateFingerprint.Of(pins)`) and each part's pins-off flag, so changing either
