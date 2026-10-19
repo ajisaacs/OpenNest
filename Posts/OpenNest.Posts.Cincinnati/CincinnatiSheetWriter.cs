@@ -210,9 +210,8 @@ public sealed class CincinnatiSheetWriter
             var next = i + 1 < items.Count ? items[i + 1] : null;
             var isLastFeature = next == null;
 
-            // A head raise belongs before the rapid that leaves this item, so the safety
-            // raise goes on a part's last item when a different part follows.
-            var isSafetyHeadraise = next != null && next.Part.BaseDrawing.Name != partName;
+            // A head raise belongs before the rapid that leaves this item; its travel
+            // decides whether that raise is the safety raise.
             double? rapidDistance =
                 next == null
                     ? null
@@ -228,7 +227,6 @@ public sealed class CincinnatiSheetWriter
                     item,
                     i,
                     partName,
-                    isSafetyHeadraise,
                     rapidDistance,
                     isLastFeature
                 );
@@ -250,7 +248,7 @@ public sealed class CincinnatiSheetWriter
                     _fmt,
                     _holeSubprograms,
                     isFirstFeatureOfPart ? partName : null,
-                    isSafetyHeadraise
+                    rapidDistance
                 );
                 continue;
             }
@@ -262,7 +260,6 @@ public sealed class CincinnatiSheetWriter
                 PartName = partName,
                 IsFirstFeatureOfPart = isFirstFeatureOfPart,
                 IsLastFeatureOnSheet = isLastFeature,
-                IsSafetyHeadraise = isSafetyHeadraise,
                 IsExteriorFeature = item.IsExterior,
                 IsEtch = item.IsEtch,
                 LibraryFile = item.IsEtch ? etchLibrary : cutLibrary,
@@ -296,7 +293,6 @@ public sealed class CincinnatiSheetWriter
         SheetItem item,
         int index,
         string partName,
-        bool isSafetyHeadraise,
         double? rapidDistance,
         bool isLastPart
     )
@@ -325,7 +321,7 @@ public sealed class CincinnatiSheetWriter
 
         // One head raise covers the rapid back and the rapid on. The part is complete,
         // so the raise follows the exterior M47 mode.
-        var raise = CincinnatiHeadRaise.Line(_config, isSafetyHeadraise, true, rapidDistance);
+        var raise = CincinnatiHeadRaise.Line(_config, true, rapidDistance);
         if (raise != null)
             w.WriteLine(raise);
 

@@ -180,9 +180,16 @@ namespace OpenNest.Posts.Cincinnati
         [Category("7. Safety")]
         [DisplayName("Safety Headraise Distance")]
         [Description(
-            "Safety head raise distance in machine units, posted as M47 P<distance> before the rapid to a different part. Null = disabled."
+            "Safety head raise distance in machine units, posted as M47 P<distance> before rapids longer than the safety headraise rapid distance. Null = disabled."
         )]
         public int? SafetyHeadraiseDistance { get; set; } = 2000;
+
+        [Category("7. Safety")]
+        [DisplayName("Safety Headraise Rapid Distance")]
+        [Description(
+            "Rapids to the next pierce longer than this get the safety head raise instead of the M47 mode's raise, so the head clears warped plate. Program units. Null = disabled."
+        )]
+        public double? SafetyHeadraiseRapidDistance { get; set; } = 12.0;
 
         [Category("8. Pallet")]
         [DisplayName("Pallet Exchange")]

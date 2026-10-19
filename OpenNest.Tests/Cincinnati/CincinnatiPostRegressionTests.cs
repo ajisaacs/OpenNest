@@ -81,17 +81,22 @@ public class CincinnatiPostRegressionTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void SafetyHeadraise_IsTheOneRaiseBeforeTheRapidToADifferentPart(bool partSubprograms)
+    public void SafetyHeadraise_IsTheOneRaiseBeforeEachLongRapid(bool partSubprograms)
     {
+        // The second A is a long rapid from the first despite sharing its drawing.
         var nest = SquaresNest(("A", new Vector(5, 5)), ("A", new Vector(20, 5)), ("B", new Vector(40, 30)));
-        var b = nest.Plates[0].Parts[2];
+        var parts = nest.Plates[0].Parts;
+        var config = Config(partSubprograms);
+        config.SafetyHeadraiseRapidDistance = 6;
 
-        var run = Run(Post(nest, partSubprograms));
+        var run = Run(Post(nest, config));
 
         Assert.Equal(0, run.DoubleRaises);
         Assert.Equal(0, run.HeadDownRapids);
-        var safety = Assert.Single(run.PierceLog, p => p.Raise == "M47 P2000");
-        Assert.True(Near(safety.Point, b.Location + new Vector(2, 2)), $"Safety raise before {safety.Point}");
+        var safety = run.PierceLog.Where(p => p.Raise == "M47 P2000").ToList();
+        Assert.Equal(2, safety.Count);
+        Assert.True(Near(safety[0].Point, parts[1].Location + new Vector(2, 2)), $"Safety raise before {safety[0].Point}");
+        Assert.True(Near(safety[1].Point, parts[2].Location + new Vector(2, 2)), $"Safety raise before {safety[1].Point}");
         Assert.All(run.PierceLog.Where(p => p.Raise != "M47 P2000"), p => Assert.Equal("M47", p.Raise));
     }
 

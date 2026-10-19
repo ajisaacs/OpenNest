@@ -18,12 +18,6 @@ public sealed class FeatureContext
     public bool IsFirstFeatureOfPart { get; set; }
     public bool IsLastFeatureOnSheet { get; set; }
 
-    /// <summary>
-    /// True when the rapid after this feature goes to a different part, so its head
-    /// raise is the safety head raise.
-    /// </summary>
-    public bool IsSafetyHeadraise { get; set; }
-
     /// <summary>True when this feature cuts the part's exterior (selects ExteriorM47).</summary>
     public bool IsExteriorFeature { get; set; }
     public bool IsEtch { get; set; }
@@ -32,8 +26,8 @@ public sealed class FeatureContext
     public double SheetDiagonal { get; set; }
 
     /// <summary>
-    /// Rapid travel from this feature's end to the next pierce, used by
-    /// <see cref="M47Mode.Auto"/>. Null when unknown.
+    /// Rapid travel from this feature's end to the next pierce, used by the safety
+    /// head raise and <see cref="M47Mode.Auto"/>. Null when unknown.
     /// </summary>
     public double? RapidDistance { get; set; }
 
@@ -332,12 +326,7 @@ public sealed class CincinnatiFeatureWriter
 
     private void WriteM47(TextWriter writer, FeatureContext ctx)
     {
-        var line = CincinnatiHeadRaise.Line(
-            _config,
-            ctx.IsSafetyHeadraise,
-            ctx.IsExteriorFeature,
-            ctx.RapidDistance
-        );
+        var line = CincinnatiHeadRaise.Line(_config, ctx.IsExteriorFeature, ctx.RapidDistance);
         if (line != null)
             writer.WriteLine(line);
     }

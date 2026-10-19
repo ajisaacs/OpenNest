@@ -89,7 +89,6 @@ public sealed class CincinnatiPartSubprogramWriter
                 PartName = drawingName,
                 IsFirstFeatureOfPart = false,
                 IsLastFeatureOnSheet = isLastFeature,
-                IsSafetyHeadraise = false,
                 IsExteriorFeature = exterior[i],
                 IsEtch = isEtch,
                 LibraryFile = isEtch ? etchLibrary : cutLibrary,

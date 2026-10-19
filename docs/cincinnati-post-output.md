@@ -115,8 +115,11 @@ Every raise is written at the end of the feature it follows, before the rapid
 that leaves it, and there is exactly one raise per rapid. The block is chosen
 in this order (`CincinnatiHeadRaise`):
 
-1. `M47 P<SafetyHeadraiseDistance> (Safety Headraise)` when the next feature
-   belongs to a part with a different drawing name and the distance is set.
+1. `M47 P<SafetyHeadraiseDistance> (Safety Headraise)` when the rapid travel to
+   the next pierce exceeds `SafetyHeadraiseRapidDistance` (program units, default
+   12) and both settings are set. Long rapids cross more of a warped sheet, so
+   the head goes higher; which part or drawing comes next does not matter.
+   Unknown travel (a hole call's rapid inside a part sub-program) never takes it.
 2. Otherwise the M47 mode for the feature just cut: `ExteriorM47` after a
    part's exterior, `InteriorM47` after anything else.
    - `Always`: `M47`.
@@ -187,9 +190,9 @@ M47                           ; head raise unless this is the last feature (§3.
 
 `<hole>` is the hole center in the calling program's frame: the part location
 plus the call offset in a sheet sub-program, or the call offset alone inside a
-part sub-program (whose frame is already the part's). A part that opens with a
-hole call takes its safety head raise on that call's `M47`, as an ordinary
-first feature would.
+part sub-program (whose frame is already the part's). A hole call followed by
+a long rapid takes the safety head raise on that call's `M47`, as an ordinary
+feature would.
 
 G52 specifies the new origin in the current work coordinate system and — per
 §1.52 — "does not move the cutting nozzle". The hole sub-program is written

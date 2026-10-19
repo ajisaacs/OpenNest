@@ -165,6 +165,8 @@ public class HoleCallOutputCharacterizationTests
         PalletExchange = PalletMode.None,
         KerfCompensation = KerfMode.PreApplied,
         UseAntiDive = false,
+        // Pins plain raises; the safety raise has its own tests.
+        SafetyHeadraiseRapidDistance = null,
     };
 
     /// <param name="mapping">

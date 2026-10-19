@@ -36,7 +36,6 @@ public class CincinnatiFeatureWriterTests
             PartName = "BRACKET",
             IsFirstFeatureOfPart = true,
             IsLastFeatureOnSheet = false,
-            IsSafetyHeadraise = false,
             IsExteriorFeature = false,
             LibraryFile = "MILD10",
             CutDistance = 18.0,
@@ -433,12 +432,30 @@ public class CincinnatiFeatureWriterTests
     {
         var config = DefaultConfig();
         config.SafetyHeadraiseDistance = 2000;
+        config.SafetyHeadraiseRapidDistance = 6;
         var ctx = SimpleContext();
-        ctx.IsSafetyHeadraise = true;
+        ctx.RapidDistance = 6.5;
         ctx.IsLastFeatureOnSheet = false;
         var output = WriteFeature(config, ctx);
 
         Assert.Contains("M47 P2000 (Safety Headraise)", output);
+    }
+
+    [Theory]
+    [InlineData(6.0)]
+    [InlineData(null)]
+    public void SafetyHeadraise_SkipsRapidsNotLongerThanThreshold(double? rapidDistance)
+    {
+        var config = DefaultConfig();
+        config.SafetyHeadraiseDistance = 2000;
+        config.SafetyHeadraiseRapidDistance = 6;
+        var ctx = SimpleContext();
+        ctx.RapidDistance = rapidDistance;
+        ctx.IsLastFeatureOnSheet = false;
+        var output = WriteFeature(config, ctx);
+
+        Assert.DoesNotContain("Safety Headraise", output);
+        Assert.Contains("M47", output);
     }
 
     [Fact]

@@ -17,9 +17,9 @@ internal static class CincinnatiHoleCallWriter
     /// Unmapped calls fall back to the call's own id.
     /// </param>
     /// <param name="partName">Part-name comment to emit when the call opens a part, else null.</param>
-    /// <param name="isSafetyHeadraise">
-    /// True when the call is a part's first feature after another part, matching the
-    /// feature writer's safety head raise.
+    /// <param name="rapidDistance">
+    /// Travel from the call to the next pierce, which selects the safety head raise;
+    /// null when unknown.
     /// </param>
     internal static void Write(
         TextWriter w,
@@ -31,7 +31,7 @@ internal static class CincinnatiHoleCallWriter
         CoordinateFormatter fmt,
         IReadOnlyDictionary<Program, int> holeSubprograms,
         string partName = null,
-        bool isSafetyHeadraise = false
+        double? rapidDistance = null
     )
     {
         var postSubNum =
@@ -66,8 +66,8 @@ internal static class CincinnatiHoleCallWriter
         if (isLastFeature)
             return;
 
-        if (isSafetyHeadraise && config.SafetyHeadraiseDistance.HasValue)
-            w.WriteLine($"M47 P{config.SafetyHeadraiseDistance.Value} (Safety Headraise)");
+        if (CincinnatiHeadRaise.IsSafetyRapid(config, rapidDistance))
+            w.WriteLine(CincinnatiHeadRaise.SafetyLine(config));
         else
             w.WriteLine("M47");
     }

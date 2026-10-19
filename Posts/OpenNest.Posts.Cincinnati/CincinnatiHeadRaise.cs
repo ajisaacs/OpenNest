@@ -5,19 +5,13 @@ namespace OpenNest.Posts.Cincinnati;
 /// </summary>
 internal static class CincinnatiHeadRaise
 {
-    /// <param name="isSafetyHeadraise">True when the rapid goes to a different part.</param>
     /// <param name="isExterior">True when the feature just cut is a part exterior.</param>
     /// <param name="rapidDistance">Travel to the next pierce; null when unknown.</param>
     /// <returns>The block to write, or null for no head raise.</returns>
-    internal static string Line(
-        CincinnatiPostConfig config,
-        bool isSafetyHeadraise,
-        bool isExterior,
-        double? rapidDistance
-    )
+    internal static string Line(CincinnatiPostConfig config, bool isExterior, double? rapidDistance)
     {
-        if (isSafetyHeadraise && config.SafetyHeadraiseDistance.HasValue)
-            return $"M47 P{config.SafetyHeadraiseDistance.Value} (Safety Headraise)";
+        if (IsSafetyRapid(config, rapidDistance))
+            return SafetyLine(config);
 
         var mode = isExterior ? config.ExteriorM47 : config.InteriorM47;
         return mode switch
@@ -28,6 +22,19 @@ internal static class CincinnatiHeadRaise
             _ => null,
         };
     }
+
+    /// <summary>
+    /// True when the rapid is long enough to cross warped plate, so it takes the
+    /// safety head raise. Unknown travel never does.
+    /// </summary>
+    internal static bool IsSafetyRapid(CincinnatiPostConfig config, double? rapidDistance) =>
+        config.SafetyHeadraiseDistance.HasValue
+        && config.SafetyHeadraiseRapidDistance is { } threshold
+        && rapidDistance is { } distance
+        && distance > threshold;
+
+    internal static string SafetyLine(CincinnatiPostConfig config) =>
+        $"M47 P{config.SafetyHeadraiseDistance.Value} (Safety Headraise)";
 
     // Unknown travel, or no threshold configured, always gets the full raise.
     private static bool IsLongRapid(CincinnatiPostConfig config, double? rapidDistance) =>
