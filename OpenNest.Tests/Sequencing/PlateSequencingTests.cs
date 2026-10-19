@@ -401,6 +401,37 @@ public class PlateSequencingTests
         Assert.Same(square, plate.Parts.First(p => !p.BaseDrawing.IsCutOff));
     }
 
+    [Fact]
+    public void PlaceCutOffs_MovesOnlyTheGivenCutOffsWhereTheRulesNeedThem()
+    {
+        var a = TestHelpers.MakePartAt(10, 10, 10);
+        var b = TestHelpers.MakePartAt(40, 10, 10);
+        var c = TestHelpers.MakePartAt(70, 10, 10);
+        var plate = TestHelpers.MakePlate(60, 120, a, b, c);
+        var settings = new CutOffSettings();
+        var existingSeparator = new CutOff(new Vector(110, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(existingSeparator);
+        plate.RegenerateCutOffs(settings);
+        var crossing = new CutOff(new Vector(45, 0), CutOffAxis.Vertical);
+        var limited = new CutOff(new Vector(60, 0), CutOffAxis.Vertical) { EndLimit = 30 };
+        var separator = new CutOff(new Vector(100, 0), CutOffAxis.Vertical);
+        // As staging adds them: appended after everything, the existing separator included.
+        plate.CutOffs.AddRange([crossing, limited, separator]);
+        plate.RegenerateCutOffs(settings);
+        Part Cut(CutOff cutOff) => plate.Parts.Single(p => ReferenceEquals(p.BaseDrawing, cutOff.Drawing));
+        Assert.Equal(new[] { a, b, c, Cut(existingSeparator), Cut(crossing), Cut(limited), Cut(separator) },
+            plate.Parts);
+        var removed = 0;
+        plate.PartRemoved += (_, e) => Assert.True(e.Item.BaseDrawing.IsCutOff, "Only cut-off parts move.");
+        plate.PartRemoved += (_, _) => removed++;
+
+        PlateSequencing.PlaceCutOffs(plate, [crossing, limited, separator]);
+
+        Assert.Equal(new[] { a, Cut(crossing), b, c, Cut(limited), Cut(existingSeparator), Cut(separator) },
+            plate.Parts);
+        Assert.Equal(3, removed);
+    }
+
     private static Part[] Baseline(Plate plate, SequenceParameters parameters) =>
         PartSequencerFactory.Create(parameters).Sequence(plate.Parts.ToList(), plate)
             .Select(p => p.Part).Reverse().ToArray();

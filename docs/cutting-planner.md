@@ -176,7 +176,9 @@ along an order that teaches such a rule ends the round; the directed-recovery an
 full passes run only when the lighter pass taught nothing. An attempt
 stops backtracking after a stall of 8 x entries x contours expansions without
 getting further, so it learns instead of retrying every entry combination of the
-parts before it. A rule that would contradict an order already required is skipped.
+parts before it. A cutoff is the exception: it is a fixed program and cutting it earlier never
+makes its own cut harder, so an approach into a non-separating cutoff that crosses parts already
+cut teaches "cut the cutoff before them" at once, without that stall. A rule that would contradict an order already required is skipped.
 "Cut before" rules are a heuristic (a part blocked straight after another may be
 reachable via a third), so once nothing new can be learned the remaining budget
 first tries sequence-free recovery, visiting dependency-ready parts lazily by
@@ -531,7 +533,11 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
 - `Add scrap cut-offs` runs the automatic cut-off planner (defaults 35 in /
   889 mm strips, half-strip minimum, 12 in / 304.8 mm tail) on every plate in scope
   *before* capture, so the cutting plan sequences the new lines like any
-  other cut-off. These are the only live changes made before Apply: Apply keeps them,
+  other cut-off. Each added cut-off is moved in the part list to just before the first part
+  its nominal line crosses (a sheet-separating one last, one that crosses nothing ahead of any
+  existing separator), so a kept order, including the fallback after a free search runs out of
+  budget, satisfies the cut-off rules; other parts and cut-offs keep their positions.
+  These are the only live changes made before Apply: Apply keeps them,
   while unticking the box, Close or switching to Validate removes them and
   restores the earlier cut-offs and sequence. The proposal preview draws planned cut-offs
   with the same orange-red dashed line as the editor. A blocked cut-off plan adds nothing and

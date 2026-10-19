@@ -76,6 +76,40 @@ public class CuttingDependencyTests
             && f.Message.Contains("before the sheet is separated"));
     }
 
+    // The tour cuts B, then the locked rectangle A (leaving right), then the cutoff pierced at
+    // (10, 0) below-left of A: that approach crosses A. Replanning B's entries can never fix it,
+    // so the search learns "cutoff first" at once instead of retrying each of B's entries.
+    [Fact]
+    public void Plan_ApproachIntoACutOffCrossingCutParts_LearnsToCutItFirstWithoutRetrying()
+    {
+        var parameters = ExplicitContourTests.Parameters();
+        var nest = new Nest();
+        var plate = nest.CreatePlate();
+        plate.Size = new Size(100, 100);
+        var b = Emitted(parameters, new Vector(20, 60));
+        var a = Rectangle(20, 40, 10, 10);
+        a.LeadInsLocked = true;
+        var cutOff = new CutOff(new Vector(10, 0), CutOffAxis.Vertical) { StartLimit = 0, EndLimit = 40 };
+        var program = new Program();
+        program.Codes.Add(new RapidMove(10, 0));
+        program.Codes.Add(new LinearMove(10, 40) { Layer = LayerType.Cut });
+        cutOff.Drawing.Program = program;
+        plate.CutOffs.Add(cutOff);
+        var cut = new Part(cutOff.Drawing);
+        plate.Parts.Add(b);
+        plate.Parts.Add(a);
+        plate.Parts.Add(cut);
+
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(21, 70),
+            confirmedParameters: parameters));
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        var order = result.ProposedOrder.Select(o => o.SourcePart).ToList();
+        Assert.True(order.IndexOf(cut) < order.IndexOf(a), string.Join(",", result.ProposedOrder.Select(o => o.SourceOrdinal)));
+        // Learning at once took 22 expansions; retrying every entry of B first took 60.
+        Assert.True(result.Expansions < 40, Describe(result));
+    }
+
     // 100 x 100 sheet: squares at X 1-11 and 60-70; a cutoff at X 5 is trimmed around the left
     // square, while a continuous line at X 40 splits the sheet. Both cutoffs start the sequence.
     private static (Plate, Part Separator, Part Crossing, Part Left, Part Right) SeparatedPlate()

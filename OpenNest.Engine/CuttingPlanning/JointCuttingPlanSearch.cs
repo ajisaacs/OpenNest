@@ -70,7 +70,7 @@ internal static class JointCuttingPlanSearch
                 foreach (var (preferredOnly, contourRecovery) in preferEndpoints
                     ? new[] { (true, false), (false, true), (false, false) } : [(false, false)])
                 {
-                    var pass = walk.Follow(sequence, stall, resume, preferredOnly, contourRecovery);
+                    var pass = walk.Follow(sequence, stall, resume, preferredOnly, contourRecovery, prerequisites);
                     if (pass.Order != null)
                         return walk.Ready(pass.Order);
                     if (Learn(pass, prerequisites))
@@ -143,6 +143,11 @@ internal static class JointCuttingPlanSearch
         }
         return learned;
     }
+
+    // True when a crossing of the blocked part's approach would teach a new order rule.
+    private static bool CanLearn(Attempt attempt, HashSet<int>[] prerequisites) =>
+        attempt.Blocked is int blocked && attempt.Crossed.Any(crossed => crossed != blocked
+            && !prerequisites[crossed].Contains(blocked) && !Precedes(crossed, blocked, prerequisites));
 
     // True when 'first' must already come before 'second' through the prerequisite chain.
     private static bool Precedes(int first, int second, HashSet<int>[] prerequisites)
@@ -226,8 +231,11 @@ internal static class JointCuttingPlanSearch
         /// a null sequence tries every dependency-ready part, nearest first.
         /// With a stall limit the attempt ends once that many expansions pass without getting
         /// further along the order; it never backtracks behind its starting node.
+        /// With <paramref name="prerequisites"/>, an approach into a cutoff that crosses parts
+        /// already cut ends the attempt at once when that teaches "cut it before them".
         /// </summary>
-        internal Attempt Follow(int[] sequence, int? stall, Node resume, bool preferredOnly = false, bool contourRecovery = false)
+        internal Attempt Follow(int[] sequence, int? stall, Node resume, bool preferredOnly = false, bool contourRecovery = false,
+            HashSet<int>[] prerequisites = null)
         {
             var root = resume ?? new Node([], snapshot.StartPoint, new ReleasedContourState(reportMissingLeadIns: false), null, null);
             var attempt = new Attempt(sequence);
@@ -246,6 +254,13 @@ internal static class JointCuttingPlanSearch
                         attempt.Order = node.Order;
                         return attempt;
                     }
+                    // A cutoff is a fixed program cut the same way wherever it goes, so replanning
+                    // the parts before it can only change where its approach starts. Cutting it
+                    // earlier never makes its own cut harder; learn that rather than stall here.
+                    if (prerequisites != null && sequence != null && attempt.Blocked is int blocked
+                        && snapshot.Placements[blocked] is { IsCutOff: true, SeparatesSheet: false }
+                        && CanLearn(attempt, prerequisites))
+                        return attempt;
                     if (attempt.Advance(node))
                         progressExpansions = Expansions;
                     else if (stall is int limit && Expansions - progressExpansions > limit)

@@ -36,6 +36,58 @@ namespace OpenNest.Engine.Sequencing
                 plate.Parts.Add(part);
         }
 
+        /// <summary>
+        /// Moves the given cutoffs' parts to where the cutoff rules need them while every other
+        /// part and cutoff keeps its position: just before the first part each nominal line
+        /// crosses, or last when it splits the whole sheet. One that crosses nothing stays put,
+        /// unless it would follow a sheet-separating cutoff.
+        /// </summary>
+        public static void PlaceCutOffs(Plate plate, IEnumerable<CutOff> definitions)
+        {
+            var bounds = plate.BoundingBox(includeParts: false);
+            var moving = definitions
+                .Select(definition => (Definition: definition, Part: plate.Parts.FirstOrDefault(part =>
+                    ReferenceEquals(part.BaseDrawing, definition.Drawing))))
+                .Where(item => item.Part != null).ToList();
+            if (moving.Count == 0)
+                return;
+
+            var existing = new Dictionary<Drawing, CutOff>(ReferenceEqualityComparer.Instance);
+            foreach (var cutOff in plate.CutOffs)
+                existing[cutOff.Drawing] = cutOff;
+            var order = plate.Parts.ToList();
+            var separating = new List<Part>();
+            foreach (var (definition, part) in moving)
+            {
+                if (CutOff.SeparatesSheet(part, definition, bounds))
+                {
+                    order.Remove(part);
+                    separating.Add(part);
+                    continue;
+                }
+                var target = order.FindIndex(other => !other.BaseDrawing.IsCutOff
+                    && CuttingDependencyGraph.CutOffCrosses(definition.Axis, definition.Position,
+                        definition.StartLimit, definition.EndLimit, other.BoundingBox, bounds));
+                if (target < 0)
+                    target = order.FindIndex(other => other.BaseDrawing.IsCutOff && !moving.Any(m => ReferenceEquals(m.Part, other))
+                        && existing.TryGetValue(other.BaseDrawing, out var cut) && CutOff.SeparatesSheet(other, cut, bounds));
+                if (target < 0 || target > order.IndexOf(part))
+                    continue;
+                order.Remove(part);
+                order.Insert(target, part);
+            }
+            order.AddRange(separating);
+
+            // Touch only the moved cutoff parts; real parts never leave the plate.
+            foreach (var (_, part) in moving)
+                plate.Parts.Remove(part);
+            for (var index = 0; index < order.Count; index++)
+            {
+                if (moving.Any(item => ReferenceEquals(item.Part, order[index])))
+                    plate.Parts.Insert(index, order[index]);
+            }
+        }
+
         private static IEnumerable<Part> CutOrder(IPartSequencer sequencer, List<Part> parts, Plate plate)
         {
             if (parts.Count == 0)

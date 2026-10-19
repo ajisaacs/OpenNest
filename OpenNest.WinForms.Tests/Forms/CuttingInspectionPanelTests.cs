@@ -632,6 +632,47 @@ public class CuttingInspectionPanelTests
     });
 
     [Fact]
+    public void KeptOrderPlansWithStagedCutOffsPlacedBeforeThePartsTheyCross() => RunSta(() =>
+    {
+        // A 50 in wide part: every 35 in strip line crosses it, so a strip appended after it
+        // would conflict with the kept order.
+        var nest = new Nest();
+        var plate = nest.CreatePlate();
+        plate.Size = new OpenNest.Geometry.Size(100, 100);
+        plate.CuttingParameters = Parameters();
+        var program = new OpenNest.CNC.Program();
+        program.MoveTo(0, 0);
+        program.LineTo(0, 10);
+        program.LineTo(50, 10);
+        program.LineTo(50, 0);
+        program.LineTo(0, 0);
+        var wide = new Part(new Drawing("wide", program), new Vector(1, 1));
+        var small = Square("small", 60);
+        plate.Parts.Add(wide);
+        plate.Parts.Add(small);
+        using var editor = new EditNestForm(nest);
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Field<CheckBox>(panel, "keepOrderCheckBox").Checked = true;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+
+        Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked = true;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+
+        var strip = plate.Parts.First(p => p.BaseDrawing.IsCutOff);
+        Assert.True(plate.Parts.IndexOf(strip) < plate.Parts.IndexOf(wide));
+        Assert.True(plate.Parts.IndexOf(wide) < plate.Parts.IndexOf(small));
+        var planned = Assert.Single(panel.Proposal.Plates);
+        Assert.True(planned.IsReady, string.Join("\n", panel.Proposal.Describe("in")));
+        Assert.True(Field<Button>(panel, "applyButton").Enabled);
+        panel.RequestClose();
+        Assert.Equal(new[] { wide, small }, plate.Parts);
+    });
+
+    [Fact]
     public void ExistingLeadInsShowTheRedBannerAndClearRecalculatesFromScratch() => RunSta(() =>
     {
         using var editor = Editor();

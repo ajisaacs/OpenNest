@@ -11,6 +11,7 @@ using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Controls;
 using OpenNest.Diagnostics;
 using OpenNest.Engine.CuttingPlanning;
+using OpenNest.Engine.Sequencing;
 
 namespace OpenNest.Forms;
 
@@ -1130,6 +1131,17 @@ internal sealed class CuttingInspectionPanel : UserControl
                     string.Join(Environment.NewLine, reasons) + Environment.NewLine
                     + "Untick scrap cut-offs to plan without them, or clear the existing cut-offs.");
                 return false;
+            }
+            try
+            {
+                // Appended last, a crossing cut-off breaks any kept order; move it ahead of what it crosses.
+                for (var index = 0; index < plates.Length; index++)
+                    PlateSequencing.PlaceCutOffs(plates[index], staging.Plans[index].Definitions);
+            }
+            catch
+            {
+                staging.Revert();
+                throw;
             }
             stagedCutOffs = staging.CanRevert ? staging : null;
             view.Invalidate();
