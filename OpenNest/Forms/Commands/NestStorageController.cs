@@ -1,10 +1,12 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Engine.BestFit;
 using OpenNest.IO;
+using OpenNest.Properties;
 
 namespace OpenNest.Forms.Commands
 {
@@ -15,6 +17,8 @@ namespace OpenNest.Forms.Commands
     /// </summary>
     internal sealed class NestStorageController
     {
+        private static readonly TimeSpan NameCheckTimeout = TimeSpan.FromSeconds(3);
+
         private readonly Form owner;
         private readonly Action<string> showStatus;
 
@@ -93,6 +97,7 @@ namespace OpenNest.Forms.Commands
         private async Task SaveAsync(EditNestForm form, bool saveCopy, string copyName = null)
         {
             var originalName = form.Nest.Name;
+            var renamed = false;
             SetSaving(true);
             try
             {
@@ -109,6 +114,18 @@ namespace OpenNest.Forms.Commands
                 }
                 if (copyName != null)
                     form.Nest.Name = copyName;
+                else if (!saveCopy && form.Document.IsFirstDatabaseSave(serverUrl))
+                {
+                    var chosen = await ChooseFirstSaveNameAsync(repository, form.Nest.Name);
+                    if (chosen is null)
+                    {
+                        if (!owner.IsDisposed)
+                            showStatus("Save cancelled");
+                        return;
+                    }
+                    renamed = chosen != originalName;
+                    form.Nest.Name = chosen;
+                }
                 var saved = await form.Document.SaveToDatabaseAsync(
                     repository, serverUrl, saveCopy);
                 if (!form.IsDisposed)
@@ -122,6 +139,9 @@ namespace OpenNest.Forms.Commands
                 // otherwise a later Save would rename the original nest.
                 if (copyName != null && !form.Document.PendingCreateWasCopy)
                     form.Nest.Name = originalName;
+                // Likewise a duplicate-name rename only sticks once its upload may exist.
+                if (renamed && form.Document.PendingCreateId == Guid.Empty)
+                    form.Nest.Name = originalName;
                 if (!owner.IsDisposed)
                     ShowError("save", ex);
             }
@@ -129,6 +149,27 @@ namespace OpenNest.Forms.Commands
             {
                 SetSaving(false);
             }
+        }
+
+        /// <summary>
+        /// The name for a nest's first upload: its own name unless another server nest
+        /// already has it, in which case the user confirms or edits a newly allocated name.
+        /// Null when the user cancels. A failed check keeps the current name.
+        /// </summary>
+        private async Task<string> ChooseFirstSaveNameAsync(INestRepository repository, string name)
+        {
+            var year = DateTime.Now.Year;
+            NestNameAllocation replacement;
+            using (var timeout = new CancellationTokenSource(NameCheckTimeout))
+                replacement = await NestNameConflicts.FindReplacementAsync(repository, name, year, timeout.Token);
+            if (replacement is null)
+                return name;
+
+            if (year == Settings.Default.LastNestCreatedDate.Year)
+                Settings.Default.NestNumber = System.Math.Max(Settings.Default.NestNumber, replacement.Number + 1);
+            using var dlg = new NestNameForm(replacement.Name, "Save",
+                $"A nest named \"{name}\" is already on the server. Save this nest as:");
+            return dlg.ShowDialog(owner) == DialogResult.OK ? dlg.NestName : null;
         }
 
         public void ShowError(string action, Exception ex) =>

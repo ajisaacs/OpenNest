@@ -22,6 +22,7 @@ namespace OpenNest
         public Guid PendingCreateId => remoteSession.PendingCreateId;
         public bool PendingCreateRequiresReconciliation => remoteSession.PendingCreateId != Guid.Empty && remoteSession.RequiresReload;
         public bool PendingCreateWasCopy => remoteSession.PendingCreateWasCopy;
+        public bool IsFirstDatabaseSave(string serverUrl) => remoteSession.IsFirstSave(serverUrl);
         public void BindRemote(Guid id, string serverUrl) => remoteSession.Bind(id, serverUrl);
 
         public void BindRemote(Guid id, string serverUrl, int revision) => remoteSession.Bind(id, serverUrl, revision);

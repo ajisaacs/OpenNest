@@ -133,6 +133,15 @@ the nest. It resets when the year changes and is raised past each number the
 server hands out. Two PCs naming nests offline at the same time can still pick
 the same name; a nest's identity on the server is its `id`, never its name.
 
+A nest's name may already be on posted CNC programs or labels, so it is never
+renamed silently. When **Save** (not Save As, and not the reconciliation of a
+pending upload) creates a nest's first record on the current server, it first
+searches active nests for one with exactly the same name (case-sensitive;
+deleted nests do not count, `NestNameConflicts`). Only on a match does it
+allocate the year's next name and show it in an editable dialog: OK uploads
+under the chosen name, Cancel saves nothing. If the check or the allocation
+fails or takes longer than 3 seconds, the nest uploads under its current name.
+
 There is no authentication; this is a LAN-only service. Do not expose it
 outside the shop network without adding one.
 

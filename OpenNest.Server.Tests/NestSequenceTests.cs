@@ -54,6 +54,26 @@ public sealed class NestSequenceTests
     }
 
     [Fact]
+    public async Task DuplicateFirstSaveName_GetsAFreshNameOnlyForActiveExactMatches()
+    {
+        using var factory = new ServerFactory();
+        using (var database = new NestDatabase(factory.DatabasePath, pooling: false))
+        {
+            database.Insert(Guid.NewGuid(), new NestRecord { Name = NestNames.Format(2026, 40) }, [1]);
+            var deleted = database.Insert(Guid.NewGuid(), new NestRecord { Name = "Old job" }, [2]);
+            database.SetDeleted(deleted.Id, true, deleted.Revision);
+        }
+        using var client = factory.CreateClient();
+        var repository = new RemoteNestRepository(client, client.BaseAddress!.ToString());
+
+        var replacement = await NestNameConflicts.FindReplacementAsync(repository, NestNames.Format(2026, 40), 2026);
+        Assert.Equal(NestNames.Format(2026, 41), replacement?.Name);
+
+        Assert.Null(await NestNameConflicts.FindReplacementAsync(repository, "Old job", 2026));
+        Assert.Null(await NestNameConflicts.FindReplacementAsync(repository, NestNames.Format(2026, 40).ToLowerInvariant(), 2026));
+    }
+
+    [Fact]
     public async Task Endpoint_RejectsYearsOutsideTheNameRange()
     {
         using var factory = new ServerFactory();

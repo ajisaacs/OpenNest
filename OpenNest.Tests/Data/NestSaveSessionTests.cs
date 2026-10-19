@@ -31,6 +31,23 @@ public class NestSaveSessionTests
     }
 
     [Fact]
+    public async Task IsFirstSave_OnlyWhenNothingIsBoundOrPendingOnThatServer()
+    {
+        var repository = new FakeRepository();
+        var session = new NestSaveSession();
+        Assert.True(session.IsFirstSave("http://shop:8090"));
+
+        await session.SaveAsync(repository, "http://shop:8090", new Nest("Job"), [1]);
+        Assert.False(session.IsFirstSave("http://shop:8090/"));
+        Assert.True(session.IsFirstSave("http://other:8090"));
+
+        repository.Fail = true;
+        await Assert.ThrowsAsync<IOException>(() =>
+            session.SaveAsync(repository, "http://other:8090", new Nest("Job"), [1]));
+        Assert.False(session.IsFirstSave("http://other:8090"));
+    }
+
+    [Fact]
     public async Task FailedSaveAndServerSwitch_NeverOverwritePriorIdentity()
     {
         var repository = new FakeRepository();

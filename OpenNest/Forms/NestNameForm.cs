@@ -6,15 +6,16 @@ namespace OpenNest.Forms;
 
 /// <summary>
 /// Database-mode Save As: asks for the name of the new nest copy, since there is no
-/// file dialog to supply one.
+/// file dialog to supply one. Save also uses it to rename a first upload whose name
+/// another server nest already has.
 /// </summary>
 public sealed class NestNameForm : Form
 {
     private readonly TextBox nameBox;
 
-    public NestNameForm(string currentName)
+    public NestNameForm(string currentName, string title = "Save As", string prompt = "New nest name:")
     {
-        Text = "Save As";
+        Text = title;
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(380, 110);
         MinimizeBox = false;
@@ -24,8 +25,9 @@ public sealed class NestNameForm : Form
 
         var label = new Label
         {
-            Text = "New nest name:",
+            Text = prompt,
             AutoSize = true,
+            MaximumSize = new Size(356, 0),
             Location = new Point(12, 16),
         };
         nameBox = new TextBox
@@ -47,6 +49,10 @@ public sealed class NestNameForm : Form
         ok.Click += Ok_Click;
         buttons.Controls.Add(cancel);
         buttons.Controls.Add(ok);
+
+        // A long prompt wraps; keep the name box below it.
+        nameBox.Top = System.Math.Max(36, label.Top + label.PreferredHeight + 4);
+        ClientSize = new Size(ClientSize.Width, nameBox.Bottom + 51);
 
         Controls.Add(nameBox);
         Controls.Add(label);

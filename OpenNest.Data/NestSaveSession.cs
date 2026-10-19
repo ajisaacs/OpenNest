@@ -18,6 +18,13 @@ public sealed class NestSaveSession
     private NestRecord? pendingCreateMetadata;
     private bool pendingCreateWasCopy;
 
+    /// <summary>
+    /// True when a plain Save to <paramref name="serverUrl"/> would create a new record:
+    /// nothing is bound on that server and no earlier upload is pending.
+    /// </summary>
+    public bool IsFirstSave(string? serverUrl) =>
+        PendingCreateId == Guid.Empty && (RemoteId == Guid.Empty || ServerUrl != Normalize(serverUrl));
+
     public void Bind(Guid id, string serverUrl, int revision)
     {
         if (revision < 0) throw new ArgumentOutOfRangeException(nameof(revision));
