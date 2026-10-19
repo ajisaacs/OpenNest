@@ -61,17 +61,8 @@ windings and a rotation, auto and manual placement from either edge, preview
 agreement, approach-angle handling, the flat-corner clearance fallback, reflex
 notches, and straight lead-outs.
 
-A headless before/after import of `4980 A01 PT07.dxf` (SHA-256
-`1535D77BC1EEEDD21A27E7CE91EA4C51055118D019C5A09C144F1F41740895B6`)
-reproduced the issue on all five 0.282 × 0.532 rectangular cutouts. At the default
-0.125 lead-in length, all five corrected pierce points are approximately 0.08838835
-inside both adjacent edges. The straight segments stay inside the rectangles
-except for their contour endpoints; the other two generated lead-ins remain
-unchanged. Coordinates were compared with a 1e-8 tolerance to allow incremental
-program round-trip floating-point noise. The source drawing is not bundled.
-
-Windows manual acceptance: import the part and use Plate > Assign Lead-ins.
-Confirm diagonal lead-ins at all five small rectangular cutouts. Under Plate >
+Windows manual check: import a part with small rectangular cutouts and use Plate >
+Assign Lead-ins. Confirm diagonal lead-ins at the cutout corners. Under Plate >
 Place Lead-in, select the part, lock a cutout, and hover a corner: the preview
 should point into the cutout and the committed lead-in should match. Hover a
 mid-edge point and confirm perpendicular placement is unchanged. Windows visual

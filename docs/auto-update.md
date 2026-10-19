@@ -9,16 +9,18 @@ unsaved nest is never discarded automatically.
 
 ## Configuring the feed
 
-The feed URL is a per-machine setting
-(`OpenNest.Properties.Settings.UpdateFeedUrl`), set from **File > Options >
+The feed URL is saved for the current Windows user
+(`OpenNest.Properties.Settings.UpdateFeedUrl`), set from **Tools > Options >
 Auto-update feed URL**. It is blank by default, which disables update checks
 entirely — this is intentional: the feed URL is operator infrastructure, not
 something that belongs in source control, so no default ships in the repo.
 Enter a feed's base URL (`http://host:port`) and restart the app to pick it
 up.
 
-Velopack only applies updates to an installed copy (`UpdateManager.IsInstalled`);
-running from a build output directory never attempts an update.
+Velopack only applies updates to an installed copy (`UpdateManager.IsInstalled`):
+one installed with the `Setup.exe` that `Deploy-OpenNest.ps1` produces. The ZIPs on
+GitHub Releases and ordinary build output are not Velopack installations and never
+auto-update, even with a feed URL configured.
 
 ## Hosting a feed
 

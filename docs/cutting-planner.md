@@ -106,8 +106,7 @@ the final replay enforce them:
   limited short of an edge, on the sheet edge, stale after a move or in an
   unrecognised program form does not qualify and keeps the crossing rule above.
   Being continuous, a separating line passes through no part. A kept order that cuts
-  it earlier is a constraint conflict naming the separating cutoff (user decision,
-  2026-10-13).
+  it earlier is a constraint conflict naming the separating cutoff.
 - A drawing's break cuts (`LayerType.Break`, see [breakoffs](breakoffs.md)) are open
   cuts inside its material. Preparation keeps them apart from contours (no choices,
   no material); every full and prefix emission cuts them after scribes and before any
@@ -378,7 +377,7 @@ its retention gap, so confirmed-parameters planning refuses it in a planned cont
 
 With confirmed parameters, a locked program (Place Lead-in locks, PEP-imported locked
 parts) is a fixed emission: everything it does after the planner's rapid into it is
-accepted as given (user decision D1a, 2026-10-14). So is each drawing-pinned contour of a
+accepted as given. So is each drawing-pinned contour of a
 regenerated part (see [drawing pins](#drawing-pins)). Their violations are not refusals:
 
 - Its lead-ins and lead-outs meeting another part's material or its own, a rapid inside
@@ -404,8 +403,8 @@ regenerated part (see [drawing pins](#drawing-pins)). Their violations are not r
 ### Drawing pins
 
 A drawing's cut pins (`Drawing.CutPins`, from the drawing library) fix how named contours are
-cut: the entry point, lead-in, lead-out and tab (user decision D1: the drawing wins over the
-plate's settings). Capture resolves each regenerated part's pins against its own rotated
+cut: the entry point, lead-in, lead-out and tab; the drawing's pins take precedence over the
+plate's settings. Capture resolves each regenerated part's pins against its own rotated
 clean contours with `CutPinResolver` and prepares them with
 `PreparedContours.Capture(program, parameters, pins)`:
 
@@ -417,7 +416,7 @@ clean contours with `CutPinResolver` and prepares them with
   The certified tab gap is the pinned outside's own.
 - Unpinned contours on the same part, and every other part, keep the plate's automatic
   selection; a plate without pins plans exactly as before.
-- A pin is never guessed (invariant 5). One that lies on no contour, on several, shares a
+- A pin is never guessed. One that lies on no contour, on several, shares a
   contour with another pin, or cannot be placed on the program leaves its contour automatic
   and adds a `FixedLead` warning naming the pin (`FixedLeadWarning.PinNumber`), for example
   "Drawing pin 2 no longer matches the geometry; planned with nest settings.", which makes the
@@ -432,7 +431,7 @@ clean contours with `CutPinResolver` and prepares them with
   rapids between contours, including the one into a pinned contour, stay strict. Plan
   Cutting does not model clamps, for pinned leads or any other.
 - A placement with `Part.DrawingPinsOff` ignores its drawing's pins and plans entirely from
-  the plate settings, with no warning (D1's per-part escape hatch). `Part.HasActiveDrawingPins`
+  the plate settings, with no warning. `Part.HasActiveDrawingPins`
   is the shared test for "pins apply here".
 - A pinned part is regenerated like any unlocked part, whatever lead-ins or settings it
   carried before. A locked part keeps its exact locked program and warns "Locked lead-ins
@@ -653,9 +652,8 @@ The service does not establish clean-material non-overlap, scrap release by open
 cutoff cuts or sheet edges, or physical retention strength. It does not write CNC
 or set posting consent. A `Ready` proposal can still be unsuitable for cutting.
 
-Later slices route the lead-in side panel's automatic assignment through the planner
-and retire the legacy automatic paths. Windows interaction,
-supplied-job coverage and actual posted order remain separate acceptance gates.
+The lead-in side panel's Auto-Assign Lead-ins remains separate from Plan Cutting.
+Review the desktop preview and the generated CNC output before cutting.
 Fresh [pre-post verification](post-verification.md) is still required; it is not a
 physical safety qualification.
 

@@ -34,8 +34,9 @@ findings without a usable location do not invent a marker. Closing the inspector
 clears the highlight and restores the original plate, zoom, and overlap display mode.
 
 Validation does not change placements, programs, lead-ins, or cutting order, save
-the nest, or write CNC output. Spacing to the plate edge and to clamps, and plate
-boundaries, are not checked.
+the nest, or write CNC output. It includes material overlaps with active clamps and
+cut-off or rapid crossings of their footprints, but does not check minimum spacing
+to clamps or plate edges, or whether parts lie within the plate boundaries.
 It does not verify a post processor's final output. Posting still runs its own
 fresh verification and consent flow.
 
@@ -82,7 +83,7 @@ shows the first three check categories, even when there are no findings:
   height/retracts are not modeled, so inspect the emitted route and machine setup.
   A clamp whose footprint covers the program start point warns on every posting
   attempt by design; there is no exemption for the first rapid and no persisted
-  bypass (settled decision D10).
+  bypass.
 - **Fixed leads:** Plan Cutting accepts fixed emissions as given and only warns (see
   [cutting planner](cutting-planner.md#fixed-emissions-warn)), so posting checks them
   again: every lead-in and lead-out of a locked program, and of each contour a part's
@@ -181,7 +182,8 @@ the gate is installed at OpenNest's desktop and console posting entry points.
 ## Selected post and cut order
 
 Cincinnati CI Fiber preserves the placed part/contour order and pierce positions
-used by this check. The older Cincinnati CL post sorts parts and moves cutoffs;
+used by this check. Cincinnati CL keeps placed part order, including cut-offs, but
+puts etch features before cut features and can add subprogram routing moves;
 Gravograph builds and optimizes separate tool passes. Those two posts, and unknown
 plugins, therefore show an additional **incomplete final rapid sequence** warning
 requiring acknowledgment even if the nest-level checks have no findings. This
@@ -209,9 +211,9 @@ The overlap diagnostic's documented numeric/tessellation limits also apply.
 
 Future hardening should inspect a shared post-specific emitted motion stream,
 including controller retracts and final parking, rather than pretending direct XY
-geometry proves physical head clearance. The [fixed-program route foundation](cutting-planner.md)
-reuses these motion/completion checks but is not yet a desktop planner or an Apply
-API; its route-only `Ready` result does not replace fresh posting review.
+geometry proves physical head clearance. The [cutting planner](cutting-planner.md)
+reuses these motion/completion checks and provides the desktop preview and Apply
+workflow; applying a plan does not replace fresh posting review.
 
 ## Verification on Windows
 

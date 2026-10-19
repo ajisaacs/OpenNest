@@ -21,7 +21,7 @@ A Windows desktop application for CNC nesting — imports DXF drawings, arranges
 - Windows 10+ for the desktop app; the console, API, and most test projects build on Linux/macOS too.
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) to build from source.
 
-Windows release ZIPs are self-contained: extract the entire archive into a new folder and run `OpenNest.exe`; no separate .NET installation is needed. The Rectangles and Irregular nesting engines are built in; see [nesting engines](docs/nesting-engines.md). Use the ZIP and SHA-256 checksum from [GitHub Releases](https://github.com/ajisaacs/OpenNest/releases), not the source-code archives.
+Windows release ZIPs are self-contained: extract the entire archive into a new folder and run `OpenNest.exe`; no separate .NET installation is needed. To update, close OpenNest and extract the new release into a new folder; ZIP releases do not auto-update (optional installer-based updates need a separately hosted [Velopack feed](docs/auto-update.md)). All nesting engines (Default, Rectangles, Irregular, Circles, FlatBar and the fill strategies) are built in; see [nesting engines](docs/nesting-engines.md). Use the ZIP and SHA-256 checksum from [GitHub Releases](https://github.com/ajisaacs/OpenNest/releases), not the source-code archives.
 
 ## Build, Test, Run
 
@@ -39,7 +39,7 @@ dotnet run --project OpenNest/OpenNest.csproj                   # desktop app (W
 
 ### Quick start
 
-1. File > New Nest
+1. File > New
 2. Import DXFs via the CAD Converter (layer/color filtering, per-entity exclude and cut/etch/display-only roles, bend detection, G-code preview) or create built-in shapes
 3. Define plate size, material, quadrant, spacing
 4. Fill — the engine arranges parts
@@ -58,7 +58,7 @@ dotnet run --project OpenNest.Console -- project.zip                          # 
 | Option | What it does |
 |--------|--------------|
 | `--size WxL` | Set the plate size; required for DXF-only input. |
-| `--autonest` | Run validated whole-job nesting on one sheet. |
+| `--autonest` | Run validated whole-job nesting; one sheet unless `--max-sheets <n>` allows more. |
 | `--engine <name>` | Choose a whole-job engine with `--autonest`, or a fill strategy without it. |
 | `--quantity <n>` | Limit parts placed (0 means unlimited). |
 | `--spacing <value>` | Override part spacing. |
