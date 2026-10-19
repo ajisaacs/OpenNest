@@ -627,7 +627,9 @@ automatically attempts a bounded, deterministic best-effort proposal. Touching, 
 or numerically uncertain material boundaries need not prevent lead-in generation when their
 closed executable contours are readable. The fallback reuses the existing contour emitter:
 internal contours first, the largest bounding perimeter last, nearest entry from the preceding
-departure, with the confirmed lead styles. It retains source part order except to satisfy
+departure, with the confirmed lead styles. The internal contours follow the same open
+nearest-neighbour + 2-opt/Or-opt tour over hole centres that the strict search proposes, not
+source order, so their rapids do not cross each other. It retains source part order except to satisfy
 proven cutoff and nested-part prerequisites. `Keep the current part order` still refuses an
 order that contradicts a proven prerequisite. Uncertain containment is named as a warning.
 

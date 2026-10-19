@@ -770,15 +770,9 @@ internal static class JointCuttingPlanSearch
         {
             var source = active.Source;
             var prepared = source.Prepared;
-            var centres = prepared.HoleCentres(token).Select(c => c ?? Vector.Zero).ToArray();
             var holes = Enumerable.Range(0, prepared.PerimeterOrdinal).ToArray();
             var localArrival = active.Arrival - source.Location;
-            // The tool arrives inside a cutout from a part nested there. That cutout's centre
-            // says nothing about where its cut can be reached: route it from where the tool is,
-            // before a later hop to it has to cross the other parts nested in it.
-            foreach (var hole in holes)
-                if (prepared.HoleContains(hole, localArrival))
-                    centres[hole] = localArrival;
+            var centres = CuttingHoleOrder.Centres(prepared, localArrival, token);
             var endpoint = perimeter.Point;
             var entries = new Dictionary<int, ContourChoice>();
             var pierces = holes.ToDictionary(h => h, h => centres[h]);

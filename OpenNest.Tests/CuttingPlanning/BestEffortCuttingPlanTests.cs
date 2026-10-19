@@ -237,6 +237,45 @@ public class BestEffortCuttingPlanTests
         Assert.All(parts, p => Assert.False(p.HasManualLeadIns));
     }
 
+    [Fact]
+    public void Holes_FollowARouteWhoseRapidsDoNotCross()
+    {
+        var program = new Program();
+        program.MoveTo(0, 0); program.LineTo(0, 20); program.LineTo(40, 20);
+        program.LineTo(40, 0); program.LineTo(0, 0);
+        // Touching holes force the best-effort plan; the others zig-zag in source order.
+        program.MoveTo(2, 2); program.LineTo(4, 2); program.LineTo(4, 4);
+        program.LineTo(2, 4); program.LineTo(2, 2);
+        program.MoveTo(4, 2); program.LineTo(6, 2); program.LineTo(6, 4);
+        program.LineTo(4, 4); program.LineTo(4, 2);
+        foreach (var (x, y) in new[] { (10, 5), (30, 15), (30, 5), (10, 15), (20, 5), (20, 15) })
+        {
+            program.MoveTo(x - 0.5, y - 0.5); program.LineTo(x + 0.5, y - 0.5); program.LineTo(x + 0.5, y + 0.5);
+            program.LineTo(x - 0.5, y + 0.5); program.LineTo(x - 0.5, y - 0.5);
+        }
+        var part = new Part(new Drawing("zig-zag holes", program), new Vector(1, 1));
+
+        var proposal = CuttingPlanBatch.Capture([Plate(part)], ExplicitContourTests.Parameters(), false).Plan();
+
+        var result = Assert.Single(proposal.Plates).Result;
+        Assert.Equal(CuttingPlanStatus.BestEffort, result.Status);
+        var generated = Assert.Single(result.ProposedOrder);
+        Assert.Equal(9, generated.ContourChoices.Count);
+        var rapids = ExecutionMotionReader.ReadSupported(generated.CopyProgram(), part.Location, null).Motions
+            .Where(m => m.Rapid && m.Start != null).Select(m => (Start: m.Start!.Value, m.End)).ToArray();
+        Assert.Equal(8, rapids.Length);
+        for (var i = 0; i < rapids.Length; i++)
+            for (var j = i + 1; j < rapids.Length; j++)
+                Assert.False(Cross(rapids[i].Start, rapids[i].End, rapids[j].Start, rapids[j].End),
+                    $"Rapid {i + 1} crosses rapid {j + 1}.");
+
+        static bool Cross(Vector a, Vector b, Vector c, Vector d)
+        {
+            static double Side(Vector p, Vector q, Vector r) => (q.X - p.X) * (r.Y - p.Y) - (q.Y - p.Y) * (r.X - p.X);
+            return Side(c, d, a) * Side(c, d, b) < 0 && Side(a, b, c) * Side(a, b, d) < 0;
+        }
+    }
+
     [SkippableTheory]
     [InlineData(0)]
     [InlineData(45)]

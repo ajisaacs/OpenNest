@@ -9,7 +9,8 @@ namespace OpenNest.Engine.CuttingPlanning;
 
 /// <summary>
 /// A deliberately uncertified fallback, not a relaxed safety checker. Reuses closed native
-/// contour preparation and emission, retaining source order except for proven prerequisites.
+/// contour preparation and emission, retaining source part order except for proven
+/// prerequisites; each part's holes follow a proposed tour, its perimeter last.
 /// Unknown program semantics, invalid motions and unrepresentable contours still refuse.
 /// </summary>
 internal static class BestEffortCuttingPlan
@@ -44,7 +45,13 @@ internal static class BestEffortCuttingPlan
                 {
                     var choices = new List<ContourChoice>();
                     var approach = position - source.Location;
-                    for (var contour = 0; contour < prepared.Count; contour++)
+                    // Source order is not a route: tour the holes from the arrival (the same
+                    // nearest-neighbour + 2-opt proposal the search uses) so the rapids between
+                    // them do not double back across each other. The perimeter is still last.
+                    var holes = Enumerable.Range(0, prepared.PerimeterOrdinal).ToArray();
+                    var route = CuttingHoleOrder.Plan(holes, CuttingHoleOrder.Centres(prepared, approach, token),
+                        approach, null, token);
+                    foreach (var contour in route.Append(prepared.PerimeterOrdinal))
                     {
                         token.ThrowIfCancellationRequested();
                         choices.Add(prepared.ClosestEntry(contour, approach));
