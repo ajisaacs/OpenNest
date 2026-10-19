@@ -10,11 +10,14 @@ public class ContourRecoveryFileTests
     // Optional private inputs: never embed customer geometry or names in the repository.
     // RecoveryCuttingNestPath: scribed parts with aligned slot pairs, and a bolted frame boxed
     // in by parts cut before it, that the free search only finishes through contour recovery.
+    // One of its plates also holds a many-holed part that once set every stall, so the plan
+    // must finish with most of the budget to spare, not just within it.
     [SkippableTheory]
-    [InlineData("InterlockedCuttingNestPath", false)]
-    [InlineData("InterlockedCuttingNestPath", true)]
-    [InlineData("RecoveryCuttingNestPath", true)]
-    public void PlateFinishesThroughDesktopBatchWithoutChangingInput(string key, bool lineLeads)
+    [InlineData("InterlockedCuttingNestPath", false, 100)]
+    [InlineData("InterlockedCuttingNestPath", true, 100)]
+    [InlineData("RecoveryCuttingNestPath", false, 60)]
+    [InlineData("RecoveryCuttingNestPath", true, 60)]
+    public void PlateFinishesThroughDesktopBatchWithoutChangingInput(string key, bool lineLeads, int budgetPercent)
     {
         var path = TestConfig.GetExistingPath(key);
         Skip.If(path == null, $"Configure {key} in ignored test-config.json.");
@@ -37,7 +40,8 @@ public class ContourRecoveryFileTests
             Assert.True(planned.IsOverlapClear);
             Assert.True(planned.Result.IndependentlyReplayed);
             Assert.Equal(CuttingPlanStatus.Ready, planned.Result.Status);
-            Assert.InRange(planned.Result.Expansions, 1, CuttingPlanBatch.PlateBudget(planned.Plate.Parts.Count));
+            Assert.InRange(planned.Result.Expansions, 1,
+                CuttingPlanBatch.PlateBudget(planned.Plate.Parts.Count) * budgetPercent / 100);
             Assert.Equal(planned.Plate.Parts.Count, planned.PartCount);
             var snapshot = planned.Result.Snapshot;
             foreach (var part in planned.Result.ProposedOrder)

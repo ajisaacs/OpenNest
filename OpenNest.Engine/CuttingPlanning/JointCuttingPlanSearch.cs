@@ -21,7 +21,8 @@ internal static class JointCuttingPlanSearch
 {
     /// <summary>
     /// Expansions per entry and contour that a reordering attempt may spend without getting further
-    /// along its order before it gives up and learns from the part that blocked it.
+    /// along its order before it gives up and learns from the part that blocked it. Along an order
+    /// the contours are those of the blocked part and of the part cut just before it.
     /// </summary>
     internal const int StallExpansionsPerEntry = 8;
     private const int MaximumRecoveryHoles = 16;
@@ -276,7 +277,7 @@ internal static class JointCuttingPlanSearch
                         return attempt;
                     if (attempt.Advance(node))
                         progressExpansions = Expansions;
-                    else if (stall is int limit && Expansions - progressExpansions > limit)
+                    else if (stall is int limit && Expansions - progressExpansions > StallLimit(limit, attempt))
                     {
                         if (sequence != null || !contourRecovery)
                             return attempt;
@@ -305,6 +306,19 @@ internal static class JointCuttingPlanSearch
                 foreach (var frame in stack)
                     frame.Children?.Dispose();
             }
+        }
+
+        // Along an order, the stall scales with the part the attempt cannot get past and the part
+        // cut just before it, whose departure a retry changes: one many-holed part elsewhere on the
+        // plate must not let every blocked part replay its predecessors' entries for that long.
+        private int StallLimit(int limit, Attempt attempt)
+        {
+            if (attempt.Blocked is not int blocked)
+                return limit;
+            var contours = snapshot.Placements[blocked].Prepared?.Count ?? 1;
+            if (attempt.LastCut is { } last)
+                contours = System.Math.Max(contours, last.Prepared?.Count ?? 1);
+            return (int)System.Math.Min(limit, (long)StallExpansionsPerEntry * snapshot.MaxEntries * contours);
         }
 
         /// <summary>
@@ -917,6 +931,9 @@ internal static class JointCuttingPlanSearch
 
         /// <summary>The deepest whole-part boundary reached; its Previous chain leads back to the root.</summary>
         private Node Deepest { get; set; }
+
+        /// <summary>The part cut last before the deepest boundary, or null at the start point.</summary>
+        internal FixedProgramPlacement LastCut => Deepest?.Order is { Length: > 0 } order ? order[^1] : null;
 
         /// <summary>The ordinal of the part the attempt could not get past, or null.</summary>
         internal int? Blocked => sequence == null || Deepest == null || Deepest.Order.Length >= sequence.Length ? null

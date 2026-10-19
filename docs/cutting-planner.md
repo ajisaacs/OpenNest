@@ -196,7 +196,9 @@ along an order that teaches such a rule ends the round; the directed-recovery an
 full passes run only when the lighter pass taught nothing. An attempt
 stops backtracking after a stall of 8 x entries x contours expansions without
 getting further, so it learns instead of retrying every entry combination of the
-parts before it. A cutoff is the exception: it is a fixed program and cutting it earlier never
+parts before it. The contours are the larger count of the blocked part and the part
+cut just before it, whose departure a retry changes, so one many-holed part elsewhere
+on the plate does not lengthen every stall. A cutoff is the exception: it is a fixed program and cutting it earlier never
 makes its own cut harder, so an approach into a non-separating cutoff that crosses parts already
 cut teaches "cut the cutoff before them" at once, without that stall. A rule that would contradict an order already required is skipped.
 "Cut before" rules are a heuristic (a part blocked straight after another may be
