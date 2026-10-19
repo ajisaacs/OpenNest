@@ -142,17 +142,109 @@ public class PierceZoneTests
     }
 
     [Fact]
-    public void Planner_PerimeterLeadShorterThanTheZoneIsAConflictNotAPlan()
+    public void Planner_PerimeterLeadShorterThanTheZonePiercesInOpenScrap()
     {
         var part = new Part(new Drawing("plain", Rectangle(0, 0, 10, 10)));
         var parameters = Parameters(1);
         parameters.ExternalLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 90 };
 
-        var result = CuttingPlanService.Plan(CuttingPlanService.Capture(new CuttingPlanRequest([part], Start,
-            confirmedParameters: parameters, preservePartOrder: true)));
+        var (snapshot, result) = Plan(parameters, part);
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        var proposal = Assert.Single(result.ProposedOrder);
+        var choice = Assert.Single(proposal.ContourChoices);
+        Assert.NotNull(choice.Pierce);
+        var pierce = Assert.Single(Pierces(proposal.Execution));
+        // Just outside the zone and leading straight to the part's nearest point.
+        Assert.InRange(SquareDistance(pierce, 0, 0, 10, 10), 0.5, 0.6);
+        Assert.Equal(pierce.DistanceTo(choice.Point), SquareDistance(pierce, 0, 0, 10, 10), 6);
+        AssertEveryPierceClear(snapshot, result, 0.5);
+    }
+
+    [Fact]
+    public void Planner_TightlySpacedPairPiercesClearOfBothParts()
+    {
+        // 0.4 apart, so no pierce between them keeps 0.5 from both.
+        var left = new Part(new Drawing("left", Rectangle(0, 0, 10, 10)));
+        var right = new Part(new Drawing("right", Rectangle(0, 0, 10, 10)), new Vector(10.4, 0));
+        var parameters = Parameters(1);
+        parameters.ExternalLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 90 };
+
+        var (snapshot, result) = Plan(parameters, left, right);
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.Equal(2, result.ProposedOrder.Count);
+        Assert.All(result.ProposedOrder, p => Assert.NotNull(Assert.Single(p.ContourChoices).Pierce));
+        foreach (var pierce in result.ProposedOrder.SelectMany(p => Pierces(p.Execution)))
+        {
+            Assert.False(pierce.X > 10 && pierce.X < 10.4 && pierce.Y > 0 && pierce.Y < 10);
+            Assert.True(SquareDistance(pierce, 0, 0, 10, 10) >= 0.5 - 1e-9);
+            Assert.True(SquareDistance(pierce, 10.4, 0, 20.4, 10) >= 0.5 - 1e-9);
+        }
+        AssertEveryPierceClear(snapshot, result, 0.5);
+    }
+
+    [Fact]
+    public void Planner_ConfiguredLeadThatKeepsTheZoneIsNotMoved()
+    {
+        var part = new Part(new Drawing("plain", Rectangle(0, 0, 10, 10)));
+
+        var (_, result) = Plan(Parameters(1), part);
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.Null(Assert.Single(Assert.Single(result.ProposedOrder).ContourChoices).Pierce);
+    }
+
+    [Fact]
+    public void Planner_PinnedPerimeterKeepsItsPinAndWarns()
+    {
+        var drawing = new Drawing("pinned", Rectangle(0, 0, 10, 10));
+        drawing.CutPins.Add(new ContourCutPin(new Vector(0, 5), new LineLeadIn { Length = 0.3, ApproachAngle = 90 },
+            new NoLeadOut()));
+        var part = new Part(drawing);
+
+        var (_, result) = Plan(Parameters(1), part);
+
+        Assert.Equal(CuttingPlanStatus.BestEffort, result.Status);
+        var choice = Assert.Single(Assert.Single(result.ProposedOrder).ContourChoices);
+        Assert.Null(choice.Pierce);
+        Assert.Equal(new Vector(0, 5), choice.Point);
+        Assert.Contains(result.Findings, f => f.Kind == PostVerificationKind.FixedLead);
+    }
+
+    [Fact]
+    public void Planner_NoScrapKeepsTheZone_ReportsTheClearestPierce()
+    {
+        // A part nested 0.2 inside a host's cutout: nowhere near it keeps 0.5 from material.
+        var host = Rectangle(0, 0, 20, 20);
+        host.Codes.AddRange(Rectangle(5, 5, 15, 15).Codes);
+        var nested = new Part(new Drawing("nested", Rectangle(0, 0, 9.6, 9.6)), new Vector(5.2, 5.2));
+        var parameters = Parameters(1);
+        parameters.ExternalLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 90 };
+
+        var (_, result) = Plan(parameters, nested, new Part(new Drawing("host", host)));
 
         Assert.NotEqual(CuttingPlanStatus.Ready, result.Status);
-        Assert.Contains(result.Findings, f => f.Message.Contains("pierce diameter"));
+        var finding = Assert.Single(result.Findings, f => f.Message.StartsWith("No open scrap"));
+        Assert.Contains("1 pierce diameter", finding.Message);
+        // Its gap's corners keep the most: about 0.117 from the nested part's corner.
+        Assert.Matches(@"keeps 0\.11\d* of the 0\.5 needed", finding.Message);
+    }
+
+    [Fact]
+    public void ScrapPierceEntry_LeadsStraightFromThePierceToTheNearestPoint()
+    {
+        var prepared = PreparedContours.Capture(Rectangle(0, 0, 10, 10), Parameters(1));
+
+        var choice = prepared.ScrapPierceEntry(new Vector(-0.6, 4));
+        var execution = Read(prepared.Emit([choice]));
+
+        Assert.Equal(new Vector(0, 4), choice.Point);
+        var lead = Assert.Single(execution.Motions, m => m.Layer == LayerType.Leadin);
+        Assert.Equal(-0.6, lead.Start!.Value.X, 9);
+        Assert.Equal(4, lead.Start!.Value.Y, 9);
+        Assert.Equal(0.6, lead.Length, 9);
+        Assert.Throws<ArgumentException>(() => prepared.ScrapPierceEntry(new Vector(0, 4)));
     }
 
     [Fact]
@@ -189,6 +281,29 @@ public class PierceZoneTests
 
         Assert.Null(finding.OtherPartNumber);
         Assert.Contains("its own part's material", finding.Message);
+    }
+
+    private static (CuttingPlanSnapshot, CuttingPlanResult) Plan(CuttingParameters parameters, params Part[] parts)
+    {
+        var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest(parts, Start,
+            confirmedParameters: parameters, preservePartOrder: true));
+        return (snapshot, CuttingPlanService.Plan(snapshot));
+    }
+
+    private static void AssertEveryPierceClear(CuttingPlanSnapshot snapshot, CuttingPlanResult result, double radius)
+    {
+        var materials = snapshot.Placements.Select(p => p.Material).ToArray();
+        foreach (var proposal in result.ProposedOrder)
+            AssertClear(LeadPathValidator.Check(proposal.Execution,
+                snapshot.Placements[proposal.SourceOrdinal].Material, materials, radius));
+    }
+
+    // Distance from a point outside an axis-aligned rectangle to it.
+    private static double SquareDistance(Vector p, double x1, double y1, double x2, double y2)
+    {
+        var dx = System.Math.Max(System.Math.Max(x1 - p.X, 0), p.X - x2);
+        var dy = System.Math.Max(System.Math.Max(y1 - p.Y, 0), p.Y - y2);
+        return System.Math.Sqrt(dx * dx + dy * dy);
     }
 
     // A 10x10 part whose placed program pierces at leadStart and leads in to (0, 5).

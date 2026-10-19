@@ -35,6 +35,38 @@ emitter cuts, and for the manual lead-in preview:
 The fallback reads only the hole's own geometry, so it does not know about a part nested
 inside the hole. Such a part is still checked as other material.
 
+## Perimeter fallback
+
+A perimeter's fallback needs the parts around it, which the emitter never reads (it emits each
+contour from its own geometry and the planner's choice alone). So the cutting planner owns it:
+`JointCuttingPlanSearch` runs `ScrapPierceSearch` (OpenNest.Engine) when Plan Cutting finds no
+configured lead-in that fits a perimeter, and a pierce diameter is set.
+
+1. The planner first tries every configured entry as before. Any entry whose lead fits, pierce
+   zone included, is used and nothing moves.
+2. Otherwise it looks for a pierce in the open scrap around the part: a window reaching four zone
+   radii past the part's extent, minus the clean material of the part and of every part near it,
+   grown by the zone radius and a margin (`ClipperBridge`, flattened conservatively). The margin,
+   a hundredth of the radius (at least 0.001), covers flattening and rounding. Holes of other
+   parts count as scrap, so a part nested in a cutout pierces in that cutout. The part's own holes
+   do not.
+3. For each of the perimeter's ranked entries, in planner order, the clear point nearest it is a
+   candidate pierce. Its entry is the perimeter's nearest point, and the lead runs straight from
+   the pierce to it. The candidate is a `ContourChoice` whose `Pierce` is set
+   (`PreparedContours.ScrapPierceEntry`). The emitter emits that straight lead in place of the
+   configured lead-in and keeps the configured lead-out.
+4. `LeadPathValidator` checks each candidate exactly like any planner-chosen entry: lead paths,
+   lead-out and pierce zone. Only clear candidates are used, and the rest of the search (rapids,
+   holes, final replay) treats them like any other entry.
+5. When the window has no clear scrap, the best effort is the pole of inaccessibility
+   (`PolyLabel`) of the scrap in the window, with the parts as holes, keeping the most clearance.
+   It is tried like any other candidate. If it does not keep the zone, Plan Cutting reports
+   **No open scrap ... keeps the pierce diameter clear**, with that point and its clearance. The
+   pierce is never accepted inside the zone.
+
+A drawing-pinned perimeter keeps its pin's entry and lead. A pin whose pierce is inside the zone
+is a fixed-emission warning. With no pierce diameter none of this runs, and plans are unchanged.
+
 ## Where it is checked
 
 - **Plan Cutting:** each candidate entry's emitted leads, and the final replay, check the
@@ -50,12 +82,14 @@ inside the hole. Such a part is still checked as other material.
 
 ## Not yet covered
 
-- Perimeters have no fallback: an outside lead-in whose pierce is inside the zone (a lead
-  shorter than the zone radius, or parts closer than it) is rejected or reported, never moved
-  to open scrap. A free-space search for perimeter pierces is planned work.
+- The perimeter fallback runs only in strict Plan Cutting. A best-effort plan (made when strict
+  planning fails on regeneration) keeps the configured perimeter lead-ins, so pre-post review
+  reports their pierce zones.
+- The scrap window is not clipped to the plate. A pierce near the plate edge can lie off the
+  plate.
 - Cutoff pierces are not checked.
-- Nesting does not know about the zone, so part spacing smaller than the zone radius can leave
-  perimeters with no clear pierce.
+- Nesting does not know about the zone. Parts packed closer than the pierce diameter on every
+  side can leave a perimeter with no clear scrap nearby; Plan Cutting reports it, as above.
 
 ## Regression checks
 

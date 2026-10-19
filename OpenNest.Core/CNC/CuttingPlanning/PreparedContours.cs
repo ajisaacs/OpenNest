@@ -12,6 +12,13 @@ namespace OpenNest.CNC.CuttingPlanning;
 public sealed record ContourChoice(int ContourOrdinal, int EntityOrdinal, Vector Point)
 {
     internal PreparedContours Owner { get; init; }
+
+    /// <summary>
+    /// A perimeter pierce the planner placed in open scrap for the pierce zone (see
+    /// <see cref="PreparedContours.ScrapPierceEntry"/>): the lead-in runs straight from here to
+    /// <see cref="Point"/> instead of the configured lead-in. Null for every other choice.
+    /// </summary>
+    public Vector? Pierce { get; internal init; }
 }
 
 /// <summary>
@@ -305,6 +312,27 @@ public sealed class PreparedContours
     public ContourChoice Entry(int contourOrdinal, int entityOrdinal, Vector point)
     {
         var choice = new ContourChoice(contourOrdinal, entityOrdinal, point) { Owner = this };
+        ValidateChoice(choice);
+        return choice;
+    }
+
+    /// <summary>
+    /// An automatic perimeter entry pierced at <paramref name="pierce"/> (local coordinates),
+    /// entering at the closest native point of the perimeter along a straight lead-in. The
+    /// planner's pierce-zone fallback chooses the pierce from the free scrap around the part;
+    /// emission reads only this choice and the perimeter, and the lead validator checks the
+    /// lead as usual. A pinned perimeter keeps its pin's entry.
+    /// </summary>
+    internal ContourChoice ScrapPierceEntry(Vector pierce)
+    {
+        PostVerificationGeometry.Validate(pierce);
+        var shape = GetShape(PerimeterOrdinal);
+        var point = shape.ClosestPointTo(pierce, out var entity);
+        var choice = new ContourChoice(PerimeterOrdinal, shape.Entities.IndexOf(entity), point)
+        {
+            Owner = this,
+            Pierce = pierce,
+        };
         ValidateChoice(choice);
         return choice;
     }
@@ -664,6 +692,14 @@ public sealed class PreparedContours
         // A pinned contour is cut exactly as pinned: no other entry may be emitted for it.
         if (pinned[choice.ContourOrdinal] is { } pin && pin != choice)
             throw new ArgumentException("A pinned contour keeps its drawing pin's entry.");
+        if (choice.Pierce is { } pierce)
+        {
+            PostVerificationGeometry.Validate(pierce);
+            if (choice.ContourOrdinal != PerimeterOrdinal)
+                throw new ArgumentException("Only a perimeter entry can be pierced in scrap.");
+            if (pierce.DistanceTo(choice.Point) <= PostVerificationGeometry.Epsilon)
+                throw new ArgumentException("A scrap pierce must lie off its contour.");
+        }
     }
 
     private Shape GetShape(int ordinal) => ordinal < 0 || ordinal >= Count

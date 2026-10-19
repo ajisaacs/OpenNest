@@ -105,7 +105,7 @@ public sealed class ContourEntryFeasibility
             && prepared.PinnedEntry(choice.ContourOrdinal) == choice)
             return new(ContourFeasibilityStatus.Clear, null);
         var key = new Key(choice.ContourOrdinal, choice.EntityOrdinal,
-            choice.Point.X, choice.Point.Y, nodeContext ?? string.Empty);
+            choice.Point.X, choice.Point.Y, choice.Pierce?.X, choice.Pierce?.Y, nodeContext ?? string.Empty);
         if (cache.TryGetValue(key, out var known))
             return known;
         var verdict = Probe(choice, token);
@@ -137,5 +137,6 @@ public sealed class ContourEntryFeasibility
         }
     }
 
-    private readonly record struct Key(int ContourOrdinal, int EntityOrdinal, double X, double Y, string NodeContext);
+    private readonly record struct Key(int ContourOrdinal, int EntityOrdinal, double X, double Y,
+        double? PierceX, double? PierceY, string NodeContext);
 }

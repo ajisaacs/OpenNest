@@ -204,6 +204,9 @@ internal static class JointCuttingPlanSearch
         // walk: each prefix repeats its earlier contours' leads. Replay never uses it.
         private readonly LeadContactMemo leadContacts = new();
         private readonly HashSet<int> reportedNoFit = [];
+        private readonly HashSet<int> reportedNoScrap = [];
+        // The perimeter pierce-zone fallback's scrap geometry, built on first use.
+        private ScrapPierceSearch scrapPierces;
         private readonly Dictionary<int, Entity[]> hostContours = [];
 
         internal int Expansions { get; private set; }
@@ -545,9 +548,12 @@ internal static class JointCuttingPlanSearch
             var target = LookAheadCentre(node, sequence, source) - source.Location;
             // Placement origins are authored program coordinates, not a downstream cut.
             // Use the same material-centre look-ahead as the retained entry search.
-            var perimeters = prepared.AutomaticEntryCandidatesWithFallbacks(prepared.PerimeterOrdinal, token: token)
-                .OrderBy(c => c.Choice.Point.DistanceTo(target ?? node.Position - source.Location))
-                .Where(c => Evaluate(source, c).Status == ContourFeasibilityStatus.Clear).Select(c => c.Choice).ToArray();
+            var ranked = prepared.AutomaticEntryCandidatesWithFallbacks(prepared.PerimeterOrdinal, token: token)
+                .OrderBy(c => c.Choice.Point.DistanceTo(target ?? node.Position - source.Location)).ToArray();
+            var perimeters = ranked.Where(c => Evaluate(source, c).Status == ContourFeasibilityStatus.Clear)
+                .Select(c => c.Choice).ToArray();
+            if (perimeters.Length == 0)
+                perimeters = [.. ScrapPierceEntries(source, ranked, out _)];
             var holes = Enumerable.Range(0, prepared.PerimeterOrdinal)
                 .Select(c => prepared.AutomaticEntryCandidatesWithFallbacks(c, token: token)
                     .Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear).Select(e => e.Choice).ToArray()).ToArray();
@@ -650,14 +656,69 @@ internal static class JointCuttingPlanSearch
                 + FormattableString.Invariant($"from all part material for the {snapshot.PierceZoneRadius * 2:0.####} ")
                 + "pierce diameter: lengthen the lead-in or reduce the pierce diameter.";
 
-        private ContourFeasibilityVerdict Evaluate(FixedProgramPlacement source, ContourEntryCandidate candidate)
+        private ContourFeasibilityVerdict Evaluate(FixedProgramPlacement source, ContourEntryCandidate candidate) =>
+            Evaluate(source, candidate.Choice);
+
+        private ContourFeasibilityVerdict Evaluate(FixedProgramPlacement source, ContourChoice choice)
         {
             CountExpansion(source);
             var adapter = Adapter(source);
             var before = adapter.EvaluationCount;
-            var verdict = adapter.Check(candidate.Choice, token: token);
+            var verdict = adapter.Check(choice, token: token);
             LeadPrechecks += adapter.EvaluationCount - before;
             return verdict;
+        }
+
+        /// <summary>
+        /// The pierce-zone fallback for a perimeter none of whose configured lead-ins fits: clear
+        /// entries pierced in open scrap near the part's ranked entries (see
+        /// <see cref="ScrapPierceSearch"/>), each checked by the lead validator like any other
+        /// planner-chosen entry. Nothing without a pierce diameter or for a pinned perimeter.
+        /// When no scrap near the part keeps the zone, the shortfall is reported once, with the
+        /// clearest point found. <paramref name="reason"/> is the first refusal of a tried pierce.
+        /// </summary>
+        private IReadOnlyList<ContourChoice> ScrapPierceEntries(FixedProgramPlacement source,
+            IReadOnlyList<ContourEntryCandidate> ranked, out string reason)
+        {
+            reason = null;
+            var prepared = source.Prepared;
+            if (snapshot.PierceZoneRadius <= 0 || prepared.IsPinned(prepared.PerimeterOrdinal)
+                || source.Material is not { IsComplete: true })
+                return [];
+            CountExpansion(source);
+            scrapPierces ??= new ScrapPierceSearch(materials, snapshot.PierceZoneRadius);
+            var targets = ranked.Take(snapshot.MaxEntries).Select(c => c.Choice.Point + source.Location).ToArray();
+            var found = scrapPierces.Find(source.Material, targets, snapshot.MaxEntries, token);
+            var entries = new List<ContourChoice>();
+            foreach (var pierce in found.BestEffort is { } best ? [best] : found.Pierces)
+            {
+                ContourChoice choice;
+                try
+                {
+                    choice = prepared.ScrapPierceEntry(pierce - source.Location);
+                }
+                catch (ArgumentException ex)
+                {
+                    reason ??= ex.Message;
+                    continue;
+                }
+                var verdict = Evaluate(source, choice);
+                if (verdict.IsClear)
+                    entries.Add(choice);
+                else
+                    reason ??= verdict.Reason;
+            }
+            if (entries.Count == 0 && found.BestEffort is { } shortfall
+                && reportedNoScrap.Add(source.SourceOrdinal))
+                rejected.Add(Finding(source, null, FormattableString.Invariant(
+                        $"No open scrap within {ScrapPierceSearch.WindowMargin * snapshot.PierceZoneRadius:0.####} of the part ")
+                    + FormattableString.Invariant(
+                        $"keeps the {snapshot.PierceZoneRadius * 2:0.####} pierce diameter clear of part material: ")
+                    + FormattableString.Invariant(
+                        $"the clearest pierce, at ({shortfall.X:0.####}, {shortfall.Y:0.####}), keeps {found.Clearance:0.####} ")
+                    + FormattableString.Invariant($"of the {snapshot.PierceZoneRadius:0.####} needed. ")
+                    + "Space the parts farther apart or reduce the pierce diameter, then replan."));
+            return entries;
         }
 
         private IReadOnlyList<ContourChoice> SelectEntries(FixedProgramPlacement source, int contour,
@@ -680,6 +741,15 @@ internal static class JointCuttingPlanSearch
             }
             var selection = ContourEntrySelection.Select(ordered,
                 candidate => Evaluate(source, candidate), snapshot.MaxEntries, token);
+            // No configured lead-in fits the perimeter: with a pierce diameter, try open scrap.
+            string scrapReason = null;
+            if (contour == source.Prepared.PerimeterOrdinal && selection.Choices.Count == 0
+                && selection.UncertainChoices.Count == 0 && selection.Shortfall == ContourSelectionShortfall.Exhausted)
+            {
+                var scrap = ScrapPierceEntries(source, ordered, out scrapReason);
+                if (scrap.Count != 0)
+                    return scrap;
+            }
             if (selection.Shortfall == ContourSelectionShortfall.Incomplete && selection.UncertainChoices.Count == 0)
                 rejected.Add(Finding(source, PostVerificationKind.Incomplete,
                     $"Contour {contour}: {selection.Reason}"));
@@ -688,7 +758,9 @@ internal static class JointCuttingPlanSearch
                 rejected.Add(Finding(source, null,
                     $"No tested lead-in fits on cutting contour {contour + 1}: {selection.Reason} "
                     + "Try reducing the lead-in length in Cutting Settings...; if nearby parts obstruct the lead-in, "
-                    + "space the parts farther apart." + PierceZoneHint() + " Replan to check the changes."));
+                    + "space the parts farther apart." + PierceZoneHint()
+                    + (scrapReason == null ? "" : $" A pierce in open scrap was also tried: {scrapReason}")
+                    + " Replan to check the changes."));
             // Uncertain candidates are NOT refused by the precheck: they reach the emitted-
             // prefix Check and complete replay, which remain the authority on them.
             return selection.Choices.Concat(selection.UncertainChoices).Take(snapshot.MaxEntries).ToArray();

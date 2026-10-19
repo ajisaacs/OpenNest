@@ -295,7 +295,7 @@ namespace OpenNest.CNC.CuttingStrategy
                     var shape = shapes[choice.ContourOrdinal];
                     EmitContour(result, shape, choice.Point, shape.Entities[choice.EntityOrdinal],
                         choice.ContourOrdinal == shapes.Length - 1 ? ContourType.External : null,
-                        exactCirclePrograms: true);
+                        exactCirclePrograms: true, scrapPierce: choice.Pierce);
                 }
             }
             finally
@@ -420,7 +420,8 @@ namespace OpenNest.CNC.CuttingStrategy
             Vector point,
             Entity entity,
             ContourType? forceType = null,
-            bool exactCirclePrograms = false
+            bool exactCirclePrograms = false,
+            Vector? scrapPierce = null
         )
         {
             var contourType = forceType ?? DetectContourType(shape);
@@ -486,10 +487,17 @@ namespace OpenNest.CNC.CuttingStrategy
                 return;
             }
 
-            leadIn = ResolveLeadIn(shape, point, entity, contourType, leadIn, winding,
-                Parameters.GetEffectivePierceClearance(), out var leadInNormal);
-            if (contourType == ContourType.Internal)
-                leadIn = ResolvePierceZone(shape, point, leadIn, leadInNormal, Parameters.GetPierceZoneRadius());
+            double leadInNormal;
+            // A planner-placed scrap pierce replaces the configured lead-in with a straight one.
+            if (scrapPierce is { } pierce)
+                leadIn = StraightLeadIn(point, pierce, out leadInNormal);
+            else
+            {
+                leadIn = ResolveLeadIn(shape, point, entity, contourType, leadIn, winding,
+                    Parameters.GetEffectivePierceClearance(), out leadInNormal);
+                if (contourType == ContourType.Internal)
+                    leadIn = ResolvePierceZone(shape, point, leadIn, leadInNormal, Parameters.GetPierceZoneRadius());
+            }
             program.Codes.AddRange(leadIn.Generate(point, leadInNormal, winding));
 
             var reindexedShape = shape.ReindexAt(point, entity);
@@ -1040,6 +1048,16 @@ namespace OpenNest.CNC.CuttingStrategy
 
             bool Clear(Vector p) => double.IsFinite(p.X) && double.IsFinite(p.Y) && Inside(p)
                 && hole.ClosestPointTo(p, out _).DistanceTo(p) >= pierceRadius;
+        }
+
+        /// <summary>
+        /// A straight lead-in from <paramref name="pierce"/> to <paramref name="point"/>, with the
+        /// normal to generate it with.
+        /// </summary>
+        private static LeadIn StraightLeadIn(Vector point, Vector pierce, out double normal)
+        {
+            normal = System.Math.Atan2(pierce.Y - point.Y, pierce.X - point.X);
+            return new LineLeadIn { Length = pierce.DistanceTo(point), ApproachAngle = 90 };
         }
 
         // Bounds the pole search on long, thin holes; the result is checked before use.
