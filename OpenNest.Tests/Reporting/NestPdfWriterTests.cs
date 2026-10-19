@@ -207,7 +207,7 @@ public sealed class NestPdfWriterTests : IDisposable
 
     public void Dispose() => Directory.Delete(directory, true);
 
-    [Fact]
+    [SkippableFact]
     public void Write_CutTimeEstimateAppearsOnSummaryAndPlatePages()
     {
         var path = Path.Combine(directory, "timed.report.pdf");
