@@ -5,6 +5,8 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.CNC.CuttingStrategy;
@@ -751,17 +753,42 @@ namespace OpenNest.Forms
             PlateView.ZoomToFit();
         }
 
-        public void ShowNestInfoEditor()
+        public async Task ShowNestInfoEditorAsync()
         {
-            var form = new EditNestInfoForm();
+            var form = new EditNestInfoForm { AllowRename = NestStorage.Settings.IsDatabaseMode };
             form.LoadNestInfo(Nest);
 
-            if (form.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            while (form.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
+                // A declined duplicate name reopens the editor with the user's edits intact.
+                if (form.NestName != Nest.Name && !await ConfirmRenameAsync(form.NestName))
+                    continue;
+
                 PlateManager.ChangePlateDefaults(() => form.SaveNestInfo(Nest));
+                Text = Nest.Name;
                 drawingListBox1.Units = Nest.Units;
                 drawingListBox1.Invalidate();
+                return;
             }
+        }
+
+        /// <summary>Renames go up with the next Save; warn now about a duplicate name.</summary>
+        private async Task<bool> ConfirmRenameAsync(string name)
+        {
+            INestRepository repository;
+            try
+            {
+                repository = NestStorage.CreateRepository();
+            }
+            catch (Exception ex) when (ex is ArgumentException or FormatException or InvalidOperationException)
+            {
+                return true; // No usable server address; Save reports that itself.
+            }
+
+            var duplicateAccepted = await NestRenameConfirmation.ConfirmAsync(this, repository, name, Document.RemoteId);
+            if (duplicateAccepted == true)
+                Document.AcceptedDuplicateName = name; // So the first Save does not ask again.
+            return duplicateAccepted != false;
         }
 
         public void ResizePlateToFitParts()

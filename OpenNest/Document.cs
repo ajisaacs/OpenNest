@@ -23,6 +23,13 @@ namespace OpenNest
         public bool PendingCreateRequiresReconciliation => remoteSession.PendingCreateId != Guid.Empty && remoteSession.RequiresReload;
         public bool PendingCreateWasCopy => remoteSession.PendingCreateWasCopy;
         public bool IsFirstDatabaseSave(string serverUrl) => remoteSession.IsFirstSave(serverUrl);
+
+        /// <summary>
+        /// A duplicate name the user already accepted in Nest Info, so the first Save
+        /// does not ask about it again.
+        /// </summary>
+        public string AcceptedDuplicateName { get; set; }
+
         public void BindRemote(Guid id, string serverUrl) => remoteSession.Bind(id, serverUrl);
 
         public void BindRemote(Guid id, string serverUrl, int revision) => remoteSession.Bind(id, serverUrl, revision);

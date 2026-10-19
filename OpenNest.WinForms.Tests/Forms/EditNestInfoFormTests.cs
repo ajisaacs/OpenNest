@@ -107,7 +107,8 @@ public class EditNestInfoFormTests
             accept.Start();
             // This is the live Nest Info entry point; it owns LoadNestInfo,
             // ShowDialog and SaveNestInfo after the actual OK button accepts.
-            editor.ShowNestInfoEditor();
+            // An unchanged name never checks the server, so this completes without awaiting.
+            editor.ShowNestInfoEditorAsync().GetAwaiter().GetResult();
             accept.Stop();
             if (failure != null)
                 ExceptionDispatchInfo.Capture(failure).Throw();
@@ -120,6 +121,45 @@ public class EditNestInfoFormTests
             accept.Stop();
             info?.Dispose();
         }
+    }
+
+    [Fact]
+    public void Name_IsReadOnlyUnlessRenameIsAllowed()
+    {
+        RunSta(() =>
+        {
+            var nest = AcceptanceNest();
+            using var form = new EditNestInfoForm();
+            form.LoadNestInfo(nest);
+            var nameBox = Assert.IsType<TextBox>(form.Controls.Find("nameBox", true).Single());
+            Assert.True(nameBox.ReadOnly);
+
+            form.AllowRename = true;
+            Assert.False(nameBox.ReadOnly);
+            nameBox.Text = "  Renamed job  ";
+            form.SaveNestInfo(nest);
+
+            Assert.Equal("Renamed job", nest.Name);
+        });
+    }
+
+    [Fact]
+    public void BlankName_DisablesOk()
+    {
+        RunSta(() =>
+        {
+            using var form = new EditNestInfoForm { AllowRename = true };
+            form.LoadNestInfo(AcceptanceNest());
+            form.EnableCheck(); // The size box re-checks on a debounce timer.
+            var nameBox = Assert.IsType<TextBox>(form.Controls.Find("nameBox", true).Single());
+            var ok = Assert.IsType<Button>(form.Controls.Find("applyButton", true).Single());
+            Assert.True(ok.Enabled);
+
+            nameBox.Text = "   ";
+            Assert.False(ok.Enabled);
+            nameBox.Text = "Job";
+            Assert.True(ok.Enabled);
+        });
     }
 
     [Fact]

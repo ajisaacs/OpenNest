@@ -45,7 +45,11 @@ namespace OpenNest.Forms
             mnuNestDrawingLibrary.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
         }
 
-        private void EditNest_Click(object sender, EventArgs e) => WithActive(f => f.ShowNestInfoEditor());
+        private async void EditNest_Click(object sender, EventArgs e)
+        {
+            if (activeForm != null)
+                await activeForm.ShowNestInfoEditorAsync();
+        }
 
         private void Clamps_Click(object sender, EventArgs e)
         {

@@ -46,6 +46,26 @@ public class NestNameConflictsTests
     }
 
     [Fact]
+    public async Task Rename_IgnoresTheNestsOwnRecord()
+    {
+        var repository = new NamedRepository("Job");
+        var own = repository.Records[0].Id;
+
+        Assert.False(await NestNameConflicts.IsNameTakenAsync(repository, "Job", own));
+        Assert.True(await NestNameConflicts.IsNameTakenAsync(repository, "Job", Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task TryIsNameTaken_IsUnknownWhenTheServerCannotAnswer()
+    {
+        var repository = new NamedRepository("Job") { QueryFailure = new HttpRequestException("offline") };
+
+        Assert.Null(await NestNameConflicts.TryIsNameTakenAsync(repository, "Job"));
+        repository.QueryFailure = null;
+        Assert.True(await NestNameConflicts.TryIsNameTakenAsync(repository, "Job"));
+    }
+
+    [Fact]
     public async Task DuplicateBeyondTheFirstPage_IsFound()
     {
         var names = Enumerable.Range(0, NestQuery.MaxLimit + 5).Select(i => $"{i:D4} Job").Append("Job");

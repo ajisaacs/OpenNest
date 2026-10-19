@@ -187,6 +187,9 @@ public class SavedNestsFormTests
                 dialog.Notes = "Updated notes";
                 dialog.Status = NestStatus.HasBeenCut;
                 dialog.MadeBy = "Operator";
+                var nameBox = Assert.IsType<TextBox>(dialog.Controls.Find("nameBox", true).Single());
+                Assert.False(nameBox.ReadOnly);
+                nameBox.Text = "Renamed job";
                 return accept ? DialogResult.OK : DialogResult.Cancel;
             };
             var button = Field<Button>(form, "infoButton");
@@ -206,6 +209,7 @@ public class SavedNestsFormTests
                 Assert.Equal(4, record.Revision);
                 Assert.Equal("Updated customer", record.Customer);
                 Assert.Equal("Updated notes", record.Comments);
+                Assert.Equal("Renamed job", record.Name);
                 using var stream = new MemoryStream(repository.Files[record.Id]);
                 var nest = new NestReader(stream).Read();
                 Assert.Equal("Updated customer", nest.Customer);

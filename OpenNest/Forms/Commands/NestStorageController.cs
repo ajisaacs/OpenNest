@@ -114,7 +114,8 @@ namespace OpenNest.Forms.Commands
                 }
                 if (copyName != null)
                     form.Nest.Name = copyName;
-                else if (!saveCopy && form.Document.IsFirstDatabaseSave(serverUrl))
+                else if (!saveCopy && form.Document.IsFirstDatabaseSave(serverUrl)
+                    && form.Nest.Name != form.Document.AcceptedDuplicateName)
                 {
                     var chosen = await ChooseFirstSaveNameAsync(repository, form.Nest.Name);
                     if (chosen is null)

@@ -74,6 +74,23 @@ public sealed class NestSequenceTests
     }
 
     [Fact]
+    public async Task Rename_WarnsOnlyAboutOtherActiveNests()
+    {
+        using var factory = new ServerFactory();
+        Guid own;
+        using (var database = new NestDatabase(factory.DatabasePath, pooling: false))
+        {
+            own = database.Insert(Guid.NewGuid(), new NestRecord { Name = "Bracket job" }, [1]).Id;
+            database.Insert(Guid.NewGuid(), new NestRecord { Name = "Gusset job" }, [2]);
+        }
+        using var client = factory.CreateClient();
+        var repository = new RemoteNestRepository(client, client.BaseAddress!.ToString());
+
+        Assert.False(await NestNameConflicts.TryIsNameTakenAsync(repository, "Bracket job", own));
+        Assert.True(await NestNameConflicts.TryIsNameTakenAsync(repository, "Gusset job", own));
+    }
+
+    [Fact]
     public async Task Endpoint_RejectsYearsOutsideTheNameRange()
     {
         using var factory = new ServerFactory();

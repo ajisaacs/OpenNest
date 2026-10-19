@@ -821,10 +821,17 @@ public sealed class SavedNestsForm : Form
                 return loaded;
             });
             if (IsDisposed) return;
-            using var dialog = new EditNestInfoForm();
+            using var dialog = new EditNestInfoForm { AllowRename = true };
             dialog.LoadNestInfo(nest);
-            if (ShowNestInfoDialog(dialog) != DialogResult.OK)
-                return;
+            while (true)
+            {
+                if (ShowNestInfoDialog(dialog) != DialogResult.OK)
+                    return;
+                // A declined duplicate name reopens the dialog with the user's edits intact.
+                if (dialog.NestName == nest.Name
+                    || await NestRenameConfirmation.ConfirmAsync(this, repository, dialog.NestName, id) != false)
+                    break;
+            }
             // Same default propagation as Nest > Nest Info in the open editor.
             using var manager = new PlateManager(nest);
             manager.ChangePlateDefaults(() => dialog.SaveNestInfo(nest));

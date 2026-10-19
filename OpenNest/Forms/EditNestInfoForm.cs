@@ -31,13 +31,23 @@ namespace OpenNest.Forms
                 Interval = SystemInformation.KeyboardDelay + 1,
             };
             timer.Elapsed += (sender, e) => EnableCheck();
+            nameBox.TextChanged += (sender, e) => EnableCheck();
             EnableCheck();
         }
 
         public string NestName
         {
-            get { return nameBox.Text; }
+            get { return nameBox.Text.Trim(); }
             private set { nameBox.Text = value; }
+        }
+
+        /// <summary>
+        /// Database mode only: in File mode the name is the file name, set by Save As.
+        /// </summary>
+        public bool AllowRename
+        {
+            get { return !nameBox.ReadOnly; }
+            set { nameBox.ReadOnly = !value; }
         }
 
         public string Customer
@@ -186,6 +196,12 @@ namespace OpenNest.Forms
         public void EnableCheck()
         {
             Size size;
+
+            if (NestName.Length == 0)
+            {
+                applyButton.Enabled = false;
+                return;
+            }
 
             if (!OpenNest.Geometry.Size.TryParse(sizeBox.Text, out size))
             {

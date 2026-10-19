@@ -29,8 +29,8 @@ The desktop app can save nests two ways:
   without binding an editable document, and **Download selected version...** saves
   its exact archived bytes.
   Select a nest and click **Nest Information...** above the list (or use the
-  row's right-click menu) to edit the same information as **Nest > Nest Info**
-  without opening the nest in the main editor. **OK** saves immediately to the
+  row's right-click menu) to edit the same information as **Nest > Nest Info**,
+  including the name, without opening the nest in the main editor. **OK** saves immediately to the
   same database ID as a new version, then refreshes the list, preview and history;
   **Cancel** makes no change. The dialog starts with the latest saved metadata.
   Plate defaults follow the same rules as the open editor: populated sheets are
@@ -141,6 +141,14 @@ deleted nests do not count, `NestNameConflicts`). Only on a match does it
 allocate the year's next name and show it in an editable dialog: OK uploads
 under the chosen name, Cancel saves nothing. If the check or the allocation
 fails or takes longer than 3 seconds, the nest uploads under its current name.
+
+In Database mode the name can be edited in **Nest > Nest Info** (it uploads with
+the next Save) and in the saved-nest browser's **Nest Information...** (saved
+immediately). In File mode it stays read-only, since the file name is the nest
+name. If another active nest already has the exact new name, a warning asks
+before using it; **No** reopens the dialog with the edits kept. A name accepted
+this way is not asked about again by the nest's first Save. A rename that the
+server cannot check within 3 seconds goes ahead without a warning.
 
 There is no authentication; this is a LAN-only service. Do not expose it
 outside the shop network without adding one.
