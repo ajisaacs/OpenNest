@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.Jobs;
+using OpenNest.Geometry;
 
 namespace OpenNest.Forms.Commands
 {
@@ -79,13 +80,26 @@ namespace OpenNest.Forms.Commands
                 HoldOpenUntilCompleted = true,
             };
             var receivingProgress = true;
+            // Everything shown so far; the view zooms out only when a trial sheet falls outside it.
+            var shown = target.PlateView.Plate.BoundingBox(false);
             var progress = new Progress<NestProgress>(p =>
             {
                 if (!receivingProgress || target.IsDisposed || cts.IsCancellationRequested)
                     return;
                 progressForm.UpdateProgress(p);
                 if (p.IsOverallBest)
-                    target.PlateView.SetActiveParts(p.BestParts);
+                {
+                    target.PlateView.SetActiveParts(p.BestParts, p.PreviewSheet);
+                    var sheet = p.PreviewSheet?.BoundingBox(false);
+                    if (sheet != null && !shown.Contains(sheet))
+                    {
+                        var left = System.Math.Min(shown.Left, sheet.Left);
+                        var bottom = System.Math.Min(shown.Bottom, sheet.Bottom);
+                        shown = new Box(left, bottom, System.Math.Max(shown.Right, sheet.Right) - left,
+                            System.Math.Max(shown.Top, sheet.Top) - bottom);
+                        target.PlateView.ZoomToArea(shown);
+                    }
+                }
                 target.PlateView.ActiveWorkArea = p.ActiveWorkArea;
             });
             var jobProgress = JobEngineNest.CreateProgress(EngineName, progress);

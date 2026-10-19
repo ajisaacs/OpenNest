@@ -112,6 +112,13 @@ namespace OpenNest.Engine
 
         public string Description { get; set; }
         public Box ActiveWorkArea { get; set; }
+
+        /// <summary>
+        /// The sheet <see cref="BestParts"/> lie on when it is not the caller's plate (a whole-job
+        /// engine's trial stock); null means the caller's own plate. Detached and never mutated.
+        /// </summary>
+        public Plate PreviewSheet { get; set; }
+
         public bool IsOverallBest { get; set; }
 
         public int BestPartCount => BestParts?.Count ?? 0;

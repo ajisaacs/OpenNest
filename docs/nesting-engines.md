@@ -65,7 +65,10 @@ work-area bounds remains invalid.
 
 While it runs with a progress sink, Irregular previews the sheet it is packing: at most four
 times a second it reports the placements so far as `NestProgress.BestParts` with the stock's
-work area, and desktop Auto Nest draws them on the plate view. The preview follows every trial
+work area and a detached `PreviewSheet` built from the stock. Desktop Auto Nest draws the parts
+on that sheet (its size, edge spacing and clamps) in place of the current plate's, zooms out when
+a trial sheet falls outside what it has shown, and returns to the plate when the run ends. The
+preview follows every trial
 (each stock, sheet, strategy variant and tail re-plan), so it shows the search at work, not the
 layout that will be kept. Reporting only reads finished placements, so layouts are identical
 with or without a sink.

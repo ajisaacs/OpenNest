@@ -15,13 +15,17 @@ namespace OpenNest.Controls
 
         public IReadOnlyList<LayoutPart> PreviewParts => activeParts;
 
+        /// <summary>The sheet the preview parts lie on when it is not the view's plate; null otherwise.</summary>
+        public Plate Sheet { get; private set; }
+
         public Brush PreviewBrush => view.ColorScheme.ActivePreviewPartBrush;
 
         public Pen PreviewPen => view.ColorScheme.ActivePreviewPartPen;
 
-        public void SetActiveParts(List<Part> parts)
+        public void SetActiveParts(List<Part> parts, Plate sheet = null)
         {
             activeParts.Clear();
+            Sheet = sheet;
 
             if (parts != null)
             {
@@ -35,6 +39,7 @@ namespace OpenNest.Controls
         public void ClearPreviewParts()
         {
             activeParts.Clear();
+            Sheet = null;
             view.Invalidate();
         }
 
@@ -47,6 +52,7 @@ namespace OpenNest.Controls
             }
 
             activeParts.Clear();
+            Sheet = null;
         }
 
         public void Update()
@@ -57,6 +63,7 @@ namespace OpenNest.Controls
         public void Clear()
         {
             activeParts.Clear();
+            Sheet = null;
         }
     }
 }

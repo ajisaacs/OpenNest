@@ -197,6 +197,9 @@ namespace OpenNest.Controls
         private List<LayoutPart> displayParts;
         private Func<bool> displayIsCurrent;
         internal Plate DisplayPlate => displayPlate ?? plate;
+
+        /// <summary>The sheet drawn under everything: a proposal's, a preview's trial sheet, or the plate's.</summary>
+        internal Plate SheetPlate => displayPlate ?? previewManager.Sheet ?? plate;
         internal List<LayoutPart> DisplayLayoutParts => displayParts ?? parts;
         internal bool HasProposalDisplay => displayPlate != null;
 
@@ -845,7 +848,10 @@ namespace OpenNest.Controls
             Plate.Parts.Add(part);
         }
 
-        public void SetActiveParts(List<Part> parts) => previewManager.SetActiveParts(parts);
+        /// <summary>Shows preview parts; <paramref name="sheet"/>, when given, is drawn in place of
+        /// the plate's sheet until the preview is cleared (a whole-job engine's trial stock).</summary>
+        public void SetActiveParts(List<Part> parts, Plate sheet = null) =>
+            previewManager.SetActiveParts(parts, sheet);
 
         public void ClearPreviewParts() => previewManager.ClearPreviewParts();
 
