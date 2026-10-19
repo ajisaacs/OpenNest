@@ -59,6 +59,8 @@ namespace OpenNest.Controls
                 removed ? $"Put {clamp.Id} Back on This Sheet" : $"Remove {clamp.Id} from This Sheet"
             );
             item.Click += (_, _) => Apply(plate, clamp.Id, !removed);
+            if (view.ClampNest != null)
+                menu.Items.Add("Edit Clamps", null, (_, _) => view.SetAction(typeof(ActionClampEdit)));
             return menu;
         }
 

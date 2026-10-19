@@ -474,7 +474,14 @@ namespace OpenNest.IO
         /// </summary>
         private static ClampRail ReadClampRail(ClampRailDto dto)
         {
-            if (dto?.Centers == null || dto.Centers.Count == 0)
+            if (dto == null)
+                return null;
+            var clamps = Edge(dto.Centers, ClampEdge.OriginSide)
+                .Concat(Edge(dto.FarSideCenters, ClampEdge.FarSide))
+                .Concat(Edge(dto.OriginEndCenters, ClampEdge.OriginEnd))
+                .Concat(Edge(dto.FarEndCenters, ClampEdge.FarEnd))
+                .ToList();
+            if (clamps.Count == 0)
                 return null;
             try
             {
@@ -484,12 +491,15 @@ namespace OpenNest.IO
                 var minutes = dto.RemovalMinutes is double m && double.IsFinite(m) && m >= 0
                     ? m
                     : ClampRail.DefaultRemovalMinutes;
-                return new ClampRail(dto.Width, dto.Depth, dto.Centers, minutes);
+                return new ClampRail(dto.Width, dto.Depth, clamps, minutes);
             }
             catch (ArgumentException)
             {
                 return null;
             }
+
+            static IEnumerable<RailClamp> Edge(List<double> centers, ClampEdge edge) =>
+                centers?.Select(c => new RailClamp(edge, c)) ?? Enumerable.Empty<RailClamp>();
         }
 
         private Nest BuildNest(NestDto dto, Dictionary<int, Drawing> drawingMap)

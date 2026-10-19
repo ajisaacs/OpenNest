@@ -78,6 +78,50 @@ namespace OpenNest.IO
                 )
                     return null;
 
+                var list = ReadCenters(centers);
+                if (list == null)
+                    return null;
+                // Clamps on the other edges arrived later: a missing key means none there.
+                var others = new List<double>[OtherEdgeKeys.Length];
+                for (var i = 0; i < others.Length; i++)
+                {
+                    others[i] = new List<double>();
+                    if (!rail.TryGetProperty(OtherEdgeKeys[i], out var edge))
+                        continue;
+                    others[i] = edge.ValueKind == JsonValueKind.Array ? ReadCenters(edge) : null;
+                    if (others[i] == null)
+                        return null;
+                }
+                // Missing or unreadable -> null; the reader then falls back to the default.
+                double? removalMinutes = TryNumber(rail, "removalMinutes", out var minutes)
+                    ? minutes
+                    : null;
+                return new ClampRailDto
+                {
+                    Width = width,
+                    Depth = depth,
+                    Centers = list,
+                    FarSideCenters = others[0],
+                    OriginEndCenters = others[1],
+                    FarEndCenters = others[2],
+                    RemovalMinutes = removalMinutes,
+                };
+            }
+
+            private static readonly string[] OtherEdgeKeys = { "farSideCenters", "originEndCenters", "farEndCenters" };
+
+            private static void WriteCenters(Utf8JsonWriter writer, string key, List<double> centers)
+            {
+                if (centers == null || centers.Count == 0)
+                    return;
+                writer.WriteStartArray(key);
+                foreach (var center in centers)
+                    writer.WriteNumberValue(center);
+                writer.WriteEndArray();
+            }
+
+            private static List<double> ReadCenters(JsonElement centers)
+            {
                 var list = new List<double>();
                 foreach (var center in centers.EnumerateArray())
                 {
@@ -85,11 +129,7 @@ namespace OpenNest.IO
                         return null;
                     list.Add(x);
                 }
-                // Missing or unreadable -> null; the reader then falls back to the default.
-                double? removalMinutes = TryNumber(rail, "removalMinutes", out var minutes)
-                    ? minutes
-                    : null;
-                return new ClampRailDto { Width = width, Depth = depth, Centers = list, RemovalMinutes = removalMinutes };
+                return list;
             }
 
             public override void Write(
@@ -105,6 +145,10 @@ namespace OpenNest.IO
                 foreach (var center in value.Centers ?? new List<double>())
                     writer.WriteNumberValue(center);
                 writer.WriteEndArray();
+                // Omitted when empty so origin-side-only rails write exactly as before.
+                WriteCenters(writer, OtherEdgeKeys[0], value.FarSideCenters);
+                WriteCenters(writer, OtherEdgeKeys[1], value.OriginEndCenters);
+                WriteCenters(writer, OtherEdgeKeys[2], value.FarEndCenters);
                 if (value.RemovalMinutes is double removalMinutes)
                     writer.WriteNumber("removalMinutes", removalMinutes);
                 writer.WriteEndObject();
@@ -156,14 +200,23 @@ namespace OpenNest.IO
 
         public record ClampRailDto
         {
-            /// <summary>Clamp extent along the origin-side edge (X).</summary>
+            /// <summary>Clamp extent along its edge.</summary>
             public double Width { get; init; }
 
-            /// <summary>Clamp intrusion into the sheet from that edge (Y).</summary>
+            /// <summary>Clamp intrusion into the sheet from its edge.</summary>
             public double Depth { get; init; }
 
-            /// <summary>Clamp centers along X, measured from the plate origin.</summary>
+            /// <summary>Origin-side clamp centers along X, measured from the plate origin.</summary>
             public List<double> Centers { get; init; } = new();
+
+            /// <summary>Far-side clamp centers along X from the origin; omitted when none.</summary>
+            public List<double> FarSideCenters { get; init; } = new();
+
+            /// <summary>Origin-end clamp centers along Y from the origin; omitted when none.</summary>
+            public List<double> OriginEndCenters { get; init; } = new();
+
+            /// <summary>Far-end clamp centers along Y from the origin; omitted when none.</summary>
+            public List<double> FarEndCenters { get; init; } = new();
 
             /// <summary>
             /// Minutes to remove one clamp and put it back after cutting (D9). Null in older

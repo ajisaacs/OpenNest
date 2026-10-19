@@ -37,7 +37,7 @@ public class ClampRailTests
     public void CentersMustBeFiniteAndFromTheOrigin(double center)
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new ClampRail(1.5, 0.625, new[] { 6, center }));
-        Assert.Throws<ArgumentNullException>(() => new ClampRail(1.5, 0.625, null!));
+        Assert.Throws<ArgumentNullException>(() => new ClampRail(1.5, 0.625, (IEnumerable<double>)null!));
     }
 
     [Fact]

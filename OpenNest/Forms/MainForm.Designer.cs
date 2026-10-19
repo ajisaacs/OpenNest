@@ -154,6 +154,7 @@ namespace OpenNest.Forms
             toolStripMenuItem20 = new System.Windows.Forms.ToolStripSeparator();
             mnuPlateViewInCad = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateCutOff = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateEditClamps = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateAutomaticCutOff = new System.Windows.Forms.ToolStripMenuItem();
             mnuWindow = new System.Windows.Forms.ToolStripMenuItem();
             mnuWindowCascade = new System.Windows.Forms.ToolStripMenuItem();
@@ -746,7 +747,7 @@ namespace OpenNest.Forms
             //
             // mnuPlate
             //
-            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateCutOff, mnuPlateAutomaticCutOff, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateArrange, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, mnuPlateSimulateCutting, toolStripMenuItem21, mnuPlatePlanCutting, mnuPlateAssignLeadIns, mnuPlatePlaceLeadIn, mnuPlateRemoveLeadIns, toolStripMenuItem20, mnuPlateViewInCad });
+            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateCutOff, mnuPlateAutomaticCutOff, mnuPlateEditClamps, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateArrange, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, mnuPlateSimulateCutting, toolStripMenuItem21, mnuPlatePlanCutting, mnuPlateAssignLeadIns, mnuPlatePlaceLeadIn, mnuPlateRemoveLeadIns, toolStripMenuItem20, mnuPlateViewInCad });
             mnuPlate.Name = "mnuPlate";
             mnuPlate.Size = new System.Drawing.Size(45, 20);
             mnuPlate.Text = "&Plate";
@@ -797,6 +798,13 @@ namespace OpenNest.Forms
             mnuPlateCutOff.Size = new System.Drawing.Size(177, 22);
             mnuPlateCutOff.Text = "Sheet Cut-Off";
             mnuPlateCutOff.Click += CutOff_Click;
+            //
+            // mnuPlateEditClamps
+            //
+            mnuPlateEditClamps.Name = "mnuPlateEditClamps";
+            mnuPlateEditClamps.Size = new System.Drawing.Size(177, 22);
+            mnuPlateEditClamps.Text = "Edit Clamps";
+            mnuPlateEditClamps.Click += EditClamps_Click;
             //
             // mnuPlateAutomaticCutOff
             //
@@ -1348,6 +1356,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuNest;
         private System.Windows.Forms.ToolStripMenuItem mnuNestEdit;
         private System.Windows.Forms.ToolStripMenuItem mnuNestClamps;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateEditClamps;
         private System.Windows.Forms.ToolStripMenuItem mnuNestImportDrawing;
         private System.Windows.Forms.ToolStripMenuItem mnuNestShapeLibrary;
         private System.Windows.Forms.ToolStripMenuItem mnuNestDrawingLibrary;

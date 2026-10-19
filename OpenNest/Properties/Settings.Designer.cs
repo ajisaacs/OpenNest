@@ -332,5 +332,18 @@ namespace OpenNest.Properties {
                 this["StatusBarLocationFollowsMouse"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        // Edit Clamps dimensions locate clamp centers; false locates the edge nearer the origin.
+        public bool ClampDimensionToCenter {
+            get {
+                return ((bool)(this["ClampDimensionToCenter"]));
+            }
+            set {
+                this["ClampDimensionToCenter"] = value;
+            }
+        }
     }
 }

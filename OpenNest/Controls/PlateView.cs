@@ -167,6 +167,12 @@ namespace OpenNest.Controls
         /// </summary>
         internal Func<bool> CanEditClamps { get; set; }
 
+        /// <summary>
+        /// The nest whose clamp rail Plate &gt; Edit Clamps changes; null when this view has
+        /// no nest to edit (clamp edit mode then does nothing).
+        /// </summary>
+        internal Func<Nest> ClampNest { get; set; }
+
         public bool AllowZoom { get; set; }
 
         public bool AllowSelect { get; set; }
@@ -630,7 +636,11 @@ namespace OpenNest.Controls
             switch (e.KeyCode)
             {
                 case Keys.Delete:
-                    selection.DeleteSelected();
+                    // Clamp edit mode deletes its selected clamp, never parts.
+                    if (actionManager.CurrentAction is ActionClampEdit)
+                        base.OnKeyDown(e);
+                    else
+                        selection.DeleteSelected();
                     break;
 
                 case Keys.F:
@@ -794,6 +804,7 @@ namespace OpenNest.Controls
                 }
                 clampMenu?.Dispose();
                 CanEditClamps = null;
+                ClampNest = null;
                 overlapOverlay?.Dispose();
                 validationOverlay?.Dispose();
                 cutSimulation?.Dispose();

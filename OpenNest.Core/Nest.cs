@@ -73,7 +73,7 @@ namespace OpenNest
         /// </summary>
         public void SetClampRail(ClampRail rail)
         {
-            if (rail != null && rail.Centers.Count == 0)
+            if (rail != null && rail.Clamps.Count == 0)
                 rail = null;
             PlateDefaults.ClampRail = rail;
             foreach (var plate in Plates)

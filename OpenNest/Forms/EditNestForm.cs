@@ -73,6 +73,7 @@ namespace OpenNest.Forms
             PlateView.PartRemoved += PlateView_PartRemoved;
             PlateView.PartsReordered += PlateView_PartsReordered;
             PlateView.Dock = DockStyle.Fill;
+            PlateView.ClampNest = () => Nest;
 
             InitializeComponent();
             CreatePlateHeader();

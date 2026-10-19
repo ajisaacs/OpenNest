@@ -63,8 +63,49 @@ public sealed class ClampSettings
     /// </summary>
     public double RemovalMinutes { get; set; } = ClampRail.DefaultRemovalMinutes;
 
-    /// <summary>Clamp centers along X, measured from the plate origin.</summary>
+    /// <summary>Origin-side clamp centers along X, measured from the plate origin.</summary>
     public IReadOnlyList<double> Centers { get; set; } = Array.Empty<double>();
+
+    /// <summary>Far-side clamp centers along X, measured from the plate origin.</summary>
+    public IReadOnlyList<double> FarSideCenters { get; set; } = Array.Empty<double>();
+
+    /// <summary>Origin-end clamp centers along Y, measured from the plate origin.</summary>
+    public IReadOnlyList<double> OriginEndCenters { get; set; } = Array.Empty<double>();
+
+    /// <summary>Far-end clamp centers along Y, measured from the plate origin.</summary>
+    public IReadOnlyList<double> FarEndCenters { get; set; } = Array.Empty<double>();
+
+    /// <summary>Every configured clamp, by edge then center as listed.</summary>
+    public IEnumerable<RailClamp> Clamps =>
+        Centers.Select(c => new RailClamp(ClampEdge.OriginSide, c))
+            .Concat(FarSideCenters.Select(c => new RailClamp(ClampEdge.FarSide, c)))
+            .Concat(OriginEndCenters.Select(c => new RailClamp(ClampEdge.OriginEnd, c)))
+            .Concat(FarEndCenters.Select(c => new RailClamp(ClampEdge.FarEnd, c)));
+
+    /// <summary>The number of configured clamps on every edge.</summary>
+    public int ClampCount =>
+        Centers.Count + FarSideCenters.Count + OriginEndCenters.Count + FarEndCenters.Count;
+
+    /// <summary>The centers listed for <paramref name="edge"/>.</summary>
+    public IReadOnlyList<double> CentersOn(ClampEdge edge) =>
+        edge switch
+        {
+            ClampEdge.FarSide => FarSideCenters,
+            ClampEdge.OriginEnd => OriginEndCenters,
+            ClampEdge.FarEnd => FarEndCenters,
+            _ => Centers,
+        };
+
+    /// <summary>Lists <paramref name="clamps"/> under their edges, replacing every edge's centers.</summary>
+    public void SetClamps(IEnumerable<RailClamp> clamps)
+    {
+        var list = clamps.ToList();
+        double[] On(ClampEdge edge) => list.Where(c => c.Edge == edge).Select(c => c.Center).ToArray();
+        Centers = On(ClampEdge.OriginSide);
+        FarSideCenters = On(ClampEdge.FarSide);
+        OriginEndCenters = On(ClampEdge.OriginEnd);
+        FarEndCenters = On(ClampEdge.FarEnd);
+    }
 
     /// <summary>The built-in settings used for a missing or unreadable file: clamps off.</summary>
     public static ClampSettings Fallback => new();
@@ -81,16 +122,20 @@ public sealed class ClampSettings
     /// Captures a nest's rail (or the default clamp size and no centers when it has none)
     /// in that nest's units, e.g. for "save as machine defaults".
     /// </summary>
-    public static ClampSettings FromRail(ClampRail? rail, Units units, bool enabled) =>
-        new()
+    public static ClampSettings FromRail(ClampRail? rail, Units units, bool enabled)
+    {
+        var settings = new ClampSettings
         {
             Enabled = enabled,
             Units = units,
             Width = rail?.Width ?? ConvertDefault(DefaultWidth, units),
             Depth = rail?.Depth ?? ConvertDefault(DefaultDepth, units),
             RemovalMinutes = rail?.RemovalMinutes ?? ClampRail.DefaultRemovalMinutes,
-            Centers = rail?.Centers.ToArray() ?? Array.Empty<double>(),
         };
+        if (rail != null)
+            settings.SetClamps(rail.Clamps);
+        return settings;
+    }
 
     /// <summary>
     /// The rail a new nest in <paramref name="units"/> receives, or null when clamps are
@@ -99,11 +144,11 @@ public sealed class ClampSettings
     /// </summary>
     public ClampRail? RailFor(Units units)
     {
-        if (!Enabled || Centers.Count == 0)
+        if (!Enabled || ClampCount == 0)
             return null;
 
         var converted = ConvertedTo(units);
-        return new ClampRail(converted.Width, converted.Depth, converted.Centers, converted.RemovalMinutes);
+        return new ClampRail(converted.Width, converted.Depth, converted.Clamps, converted.RemovalMinutes);
     }
 
     /// <summary>
@@ -122,6 +167,9 @@ public sealed class ClampSettings
             Depth = Depth * scale,
             RemovalMinutes = RemovalMinutes,
             Centers = Centers.Select(c => c * scale).ToArray(),
+            FarSideCenters = FarSideCenters.Select(c => c * scale).ToArray(),
+            OriginEndCenters = OriginEndCenters.Select(c => c * scale).ToArray(),
+            FarEndCenters = FarEndCenters.Select(c => c * scale).ToArray(),
         };
     }
 
@@ -221,27 +269,36 @@ public sealed class ClampSettings
         }
 
         if (values.TryGetValue("centers", out var centers))
-        {
-            if (centers.ValueKind == JsonValueKind.Array)
-            {
-                var valid = new List<double>();
-                foreach (var center in centers.EnumerateArray())
-                {
-                    if (TryLength(center, out var x) && x >= 0)
-                        valid.Add(x);
-                    else
-                        ignored = true;
-                }
-                settings.Centers = valid.Distinct().OrderBy(x => x).ToArray();
-            }
-            else
-            {
-                ignored = true;
-            }
-        }
+            settings.Centers = ReadCenters(centers, ref ignored);
+        if (values.TryGetValue("farSideCenters", out var farSide))
+            settings.FarSideCenters = ReadCenters(farSide, ref ignored);
+        if (values.TryGetValue("originEndCenters", out var originEnd))
+            settings.OriginEndCenters = ReadCenters(originEnd, ref ignored);
+        if (values.TryGetValue("farEndCenters", out var farEnd))
+            settings.FarEndCenters = ReadCenters(farEnd, ref ignored);
 
         status = ignored ? ClampSettingsStatus.Partial : ClampSettingsStatus.Ok;
         return settings;
+    }
+
+    /// <summary>Valid centers of a JSON array, distinct and ascending; flags anything dropped.</summary>
+    private static double[] ReadCenters(JsonElement centers, ref bool ignored)
+    {
+        if (centers.ValueKind != JsonValueKind.Array)
+        {
+            ignored = true;
+            return Array.Empty<double>();
+        }
+
+        var valid = new List<double>();
+        foreach (var center in centers.EnumerateArray())
+        {
+            if (TryLength(center, out var x) && x >= 0)
+                valid.Add(x);
+            else
+                ignored = true;
+        }
+        return valid.Distinct().OrderBy(x => x).ToArray();
     }
 
     /// <summary>
@@ -250,16 +307,23 @@ public sealed class ClampSettings
     /// </summary>
     public void Save(string path, int maxRetries = 3)
     {
-        var dto = new
+        var dto = new Dictionary<string, object>
         {
-            version = CurrentVersion,
-            enabled = Enabled,
-            units = Units.ToString().ToLowerInvariant(),
-            width = Width,
-            depth = Depth,
-            removalMinutes = RemovalMinutes,
-            centers = Centers,
+            ["version"] = CurrentVersion,
+            ["enabled"] = Enabled,
+            ["units"] = Units.ToString().ToLowerInvariant(),
+            ["width"] = Width,
+            ["depth"] = Depth,
+            ["removalMinutes"] = RemovalMinutes,
+            ["centers"] = Centers,
         };
+        // Other edges are written only when used, so origin-side-only files stay unchanged.
+        if (FarSideCenters.Count > 0)
+            dto["farSideCenters"] = FarSideCenters;
+        if (OriginEndCenters.Count > 0)
+            dto["originEndCenters"] = OriginEndCenters;
+        if (FarEndCenters.Count > 0)
+            dto["farEndCenters"] = FarEndCenters;
         var json = JsonSerializer.Serialize(dto, JsonOptions);
 
         var directory = Path.GetDirectoryName(Path.GetFullPath(path));

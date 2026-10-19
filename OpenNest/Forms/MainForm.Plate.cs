@@ -55,6 +55,8 @@ namespace OpenNest.Forms
 
         private void CutOff_Click(object sender, EventArgs e) => WithActive(f => f.PlateView.SetAction(typeof(ActionCutOff)));
 
+        private void EditClamps_Click(object sender, EventArgs e) => WithActive(f => f.PlateView.SetAction(typeof(ActionClampEdit)));
+
         private void AutomaticCutOff_Click(object sender, EventArgs e) => ShowAutomaticCutOff(allPlates: false);
 
         private void NestAutomaticCutOff_Click(object sender, EventArgs e) => ShowAutomaticCutOff(allPlates: true);

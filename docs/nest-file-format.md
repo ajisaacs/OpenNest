@@ -82,7 +82,15 @@ dropped while the rest of the nest loads.
 
 `plateDefaults.clampRail` optionally stores the nest's machine clamp rail:
 `width` (along the edge), `depth` (into the sheet) and `centers` (X positions
-measured from the plate origin along the origin-side edge). New plates follow
+measured from the plate origin along the origin-side edge). Clamps on the other
+edges are listed in optional `farSideCenters` (X, along the edge across the
+sheet's width from the origin), `originEndCenters` (Y, along the edge through
+the origin) and `farEndCenters` (Y, along the edge across the sheet's length);
+each is omitted when empty, so origin-side-only rails are written exactly as
+before. Rail clamp ids (`clamp-N`) number the origin-side clamps first, then
+far side, origin end and far end, each by ascending center. Older readers
+ignore the extra arrays; a plate's saved `clamps` then no longer match their
+rail and load as explicit zones. New plates follow
 the rail and resolve it for their own size and quadrant; clamps wholly beyond a
 sheet are skipped and one still reaching onto it keeps its whole footprint, so
 a zone may extend past the sheet edge. The key is omitted

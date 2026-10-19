@@ -274,8 +274,14 @@ namespace OpenNest.IO
                     Width = rail.Width,
                     Depth = rail.Depth,
                     Centers = rail.Centers.ToList(),
+                    FarSideCenters = CentersOn(rail, ClampEdge.FarSide),
+                    OriginEndCenters = CentersOn(rail, ClampEdge.OriginEnd),
+                    FarEndCenters = CentersOn(rail, ClampEdge.FarEnd),
                     RemovalMinutes = rail.RemovalMinutes,
                 };
+
+        private static List<double> CentersOn(ClampRail rail, ClampEdge edge) =>
+            rail.Clamps.Where(c => c.Edge == edge).Select(c => c.Center).ToList();
 
         /// <summary>Numeric suffix of a rail clamp id ("clamp-3" -&gt; 3), for a natural sort of
         /// <see cref="PlateDto.RemovedClamps"/> instead of lexical ("clamp-10" before "clamp-2").

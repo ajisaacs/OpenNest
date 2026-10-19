@@ -6,12 +6,12 @@ using OpenNest.Geometry;
 namespace OpenNest
 {
     /// <summary>
-    /// The machine's fixed clamp rail: identical rectangular clamps whose X centers are
-    /// measured from the plate origin along the origin-side (operator) edge. Plates always
-    /// start at the origin, so the same rail resolves onto every sheet size without
-    /// re-scaling. A clamp whose footprint lies wholly beyond a sheet is skipped; one that
-    /// still reaches onto it is kept whole: the zone is an avoidance area, so its full
-    /// footprint applies even where it hangs past the sheet.
+    /// The machine's fixed clamp rail: identical rectangular clamps, each on one sheet edge
+    /// (<see cref="ClampEdge"/>) with its center measured from the plate origin along that
+    /// edge. Plates always start at the origin, so the same rail resolves onto every sheet
+    /// size without re-scaling. A clamp whose footprint lies wholly beyond a sheet is skipped;
+    /// one that still reaches onto it is kept whole: the zone is an avoidance area, so its
+    /// full footprint applies even where it hangs past the sheet.
     /// </summary>
     public sealed class ClampRail : IEquatable<ClampRail>
     {
@@ -21,14 +21,30 @@ namespace OpenNest
         /// </summary>
         public const double DefaultRemovalMinutes = 5.0;
 
+        /// <summary>A rail whose clamps all sit on the origin-side edge.</summary>
         public ClampRail(
             double width,
             double depth,
             IEnumerable<double> centers,
             double removalMinutes = DefaultRemovalMinutes
         )
+            : this(
+                width,
+                depth,
+                (centers ?? throw new ArgumentNullException(nameof(centers)))
+                    .Select(c => new RailClamp(ClampEdge.OriginSide, c)),
+                removalMinutes
+            )
+        { }
+
+        public ClampRail(
+            double width,
+            double depth,
+            IEnumerable<RailClamp> clamps,
+            double removalMinutes = DefaultRemovalMinutes
+        )
         {
-            ArgumentNullException.ThrowIfNull(centers);
+            ArgumentNullException.ThrowIfNull(clamps);
             if (!double.IsFinite(width) || width <= 0)
                 throw new ArgumentOutOfRangeException(
                     nameof(width),
@@ -45,27 +61,30 @@ namespace OpenNest
                     "Clamp removal time must be finite and zero or more."
                 );
 
-            var sorted = new SortedSet<double>();
-            foreach (var center in centers)
+            var sorted = new SortedSet<RailClamp>();
+            foreach (var clamp in clamps)
             {
-                if (!double.IsFinite(center) || center < 0)
+                if (!double.IsFinite(clamp.Center) || clamp.Center < 0)
                     throw new ArgumentOutOfRangeException(
-                        nameof(centers),
+                        "centers",
                         "Clamp centers must be finite and measured from the origin (zero or more)."
                     );
-                sorted.Add(center);
+                if (!ClampEdges.IsDefined(clamp.Edge))
+                    throw new ArgumentOutOfRangeException(nameof(clamps), "Unknown clamp edge.");
+                sorted.Add(clamp);
             }
 
             Width = width;
             Depth = depth;
             RemovalMinutes = removalMinutes;
-            Centers = sorted.ToArray();
+            Clamps = sorted.ToArray();
+            Centers = Clamps.Where(c => c.Edge == ClampEdge.OriginSide).Select(c => c.Center).ToArray();
         }
 
-        /// <summary>Clamp extent along the edge (X).</summary>
+        /// <summary>Clamp extent along its edge.</summary>
         public double Width { get; }
 
-        /// <summary>Clamp intrusion into the sheet from the origin-side edge (Y).</summary>
+        /// <summary>Clamp intrusion into the sheet from its edge.</summary>
         public double Depth { get; }
 
         /// <summary>
@@ -74,8 +93,67 @@ namespace OpenNest
         /// </summary>
         public double RemovalMinutes { get; }
 
-        /// <summary>Distinct clamp centers along X from the origin, ascending.</summary>
+        /// <summary>
+        /// Distinct clamps ordered by edge, then center. A clamp's position in this list
+        /// gives its <c>clamp-N</c> id, so a rail with only origin-side clamps keeps the ids
+        /// it had before clamps could sit on other edges.
+        /// </summary>
+        public IReadOnlyList<RailClamp> Clamps { get; }
+
+        /// <summary>Centers of the origin-side clamps, ascending; see <see cref="Clamps"/> for all.</summary>
         public IReadOnlyList<double> Centers { get; }
+
+        /// <summary>A copy with the same size and removal time and these clamps.</summary>
+        public ClampRail WithClamps(IEnumerable<RailClamp> clamps) =>
+            new(Width, Depth, clamps, RemovalMinutes);
+
+        /// <summary>The <c>clamp-N</c> id of the clamp at <paramref name="index"/> in <see cref="Clamps"/>.</summary>
+        public static string IdOf(int index) => $"clamp-{index + 1}";
+
+        /// <summary>
+        /// The footprint <paramref name="clamp"/> would have on a sheet, in plate coordinates
+        /// (lower-left corner origin), or null when it lies wholly beyond the sheet. The clamp
+        /// need not belong to this rail; it takes this rail's width and depth.
+        /// </summary>
+        public Box Footprint(RailClamp clamp, Size size, int quadrant) =>
+            Footprint(clamp, Width, Depth, size, quadrant);
+
+        /// <summary>
+        /// The footprint of a <paramref name="width"/> by <paramref name="depth"/> clamp at
+        /// <paramref name="clamp"/>; see <see cref="Footprint(RailClamp, Size, int)"/>.
+        /// </summary>
+        public static Box Footprint(RailClamp clamp, double width, double depth, Size size, int quadrant)
+        {
+            var length = size.Length;
+            var sheetWidth = size.Width;
+            if (!(length > 0) || !(sheetWidth > 0) || !double.IsFinite(length) || !double.IsFinite(sheetWidth))
+                return null;
+
+            var extendsLeft = quadrant is 2 or 3;
+            var extendsDown = quadrant is 3 or 4;
+            var half = width / 2;
+            // Distances from the origin along the edge.
+            var near = clamp.Center - half;
+            var far = clamp.Center + half;
+
+            if (clamp.Edge.RunsAlongX())
+            {
+                if (near >= length)
+                    return null; // wholly beyond this sheet
+                // The origin-side edge is y = 0 of the sheet, or its top when it extends to -Y.
+                var atTop = (clamp.Edge == ClampEdge.FarSide) != extendsDown;
+                // Plate coordinates are measured from the lower-left corner; a sheet extending
+                // to -X from the origin has its origin edge at x = length.
+                var x = extendsLeft ? length - far : near;
+                return new Box(x, atTop ? sheetWidth - depth : 0, width, depth);
+            }
+
+            if (near >= sheetWidth)
+                return null;
+            var atRight = (clamp.Edge == ClampEdge.FarEnd) != extendsLeft;
+            var y = extendsDown ? sheetWidth - far : near;
+            return new Box(atRight ? length - depth : 0, y, depth, width);
+        }
 
         /// <summary>
         /// The zones this rail places on a sheet, in plate coordinates (the frame of
@@ -88,30 +166,12 @@ namespace OpenNest
         /// </summary>
         public IReadOnlyList<ClampZone> ResolveFor(Size size, int quadrant)
         {
-            var length = size.Length;
-            var sheetWidth = size.Width;
-            if (!(length > 0) || !(sheetWidth > 0) || !double.IsFinite(length) || !double.IsFinite(sheetWidth))
-                return Array.Empty<ClampZone>();
-
-            var extendsLeft = quadrant is 2 or 3;
-            var extendsDown = quadrant is 3 or 4;
-            // The origin-side edge is y = 0 of the sheet, or its top when it extends to -Y.
-            var y = extendsDown ? sheetWidth - Depth : 0;
-            var half = Width / 2;
-
-            var zones = new List<ClampZone>(Centers.Count);
-            for (var i = 0; i < Centers.Count; i++)
+            var zones = new List<ClampZone>(Clamps.Count);
+            for (var i = 0; i < Clamps.Count; i++)
             {
-                // Distances from the origin along the edge.
-                var near = Centers[i] - half;
-                var far = Centers[i] + half;
-                if (near >= length)
-                    continue; // wholly beyond this sheet
-
-                // Plate coordinates are measured from the lower-left corner; a sheet extending
-                // to -X from the origin has its origin edge at x = length.
-                var x = extendsLeft ? length - far : near;
-                zones.Add(new ClampZone($"clamp-{i + 1}", new Box(x, y, Width, Depth)));
+                var box = Footprint(Clamps[i], size, quadrant);
+                if (box != null)
+                    zones.Add(new ClampZone(IdOf(i), box));
             }
 
             return zones;
@@ -165,19 +225,24 @@ namespace OpenNest
             && Width.Equals(other.Width)
             && Depth.Equals(other.Depth)
             && RemovalMinutes.Equals(other.RemovalMinutes)
-            && Centers.SequenceEqual(other.Centers);
+            && Clamps.SequenceEqual(other.Clamps);
 
         public override bool Equals(object obj) => Equals(obj as ClampRail);
 
         public override int GetHashCode()
         {
-            var hash = HashCode.Combine(Width, Depth, RemovalMinutes, Centers.Count);
-            foreach (var center in Centers)
-                hash = HashCode.Combine(hash, center);
+            var hash = HashCode.Combine(Width, Depth, RemovalMinutes, Clamps.Count);
+            foreach (var clamp in Clamps)
+                hash = HashCode.Combine(hash, clamp);
             return hash;
         }
 
         public override string ToString() =>
-            $"ClampRail {Width:R} x {Depth:R} at [{string.Join(", ", Centers.Select(c => c.ToString("R")))}]";
+            $"ClampRail {Width:R} x {Depth:R} at [{string.Join(", ", Clamps.Select(Describe))}]";
+
+        private static string Describe(RailClamp clamp) =>
+            clamp.Edge == ClampEdge.OriginSide
+                ? clamp.Center.ToString("R")
+                : $"{clamp.Edge} {clamp.Center:R}";
     }
 }

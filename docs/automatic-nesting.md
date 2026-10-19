@@ -60,9 +60,11 @@ reports the fallback; startup does not replace the saved missing-engine preferen
 ## Machine edge clamps
 
 A nest can carry the machine's fixed clamp rail: identical rectangular clamps
-(width along the edge, depth into the sheet) at X centers measured from the
-plate origin along the origin-side edge. **Nest > Clamps...** edits the current
-nest's rail. **OK** applies it to every plate of the nest (**Cancel** discards
+(width along the edge, depth into the sheet), each on one sheet edge with its
+center measured from the plate origin along that edge. The edges are named from
+the origin: the origin side and far side run along X, the origin end and far
+end along Y. **Nest > Clamps...** edits the current nest's rail as a list, and
+**Plate > Edit Clamps** edits it on the plate view (below). **OK** applies it to every plate of the nest (**Cancel** discards
 the edits); removing every center removes the clamps. **Load Machine Defaults**
 only fills the dialog. **Save as Machine Defaults** writes
 `%APPDATA%\OpenNest\clamps.json` immediately, with the clamps, their units and
@@ -90,6 +92,30 @@ cut-offs crossing one, automatic cutoffs never place a cut through a clamp, and
 pre-post verification warns (with per-attempt consent) about parts, cut-offs
 and direct rapids crossing an active clamp - including the first rapid when a
 clamp covers the program start point.
+
+### Editing clamps on the plate view
+
+**Plate > Edit Clamps** (or **Edit Clamps** on a clamp's right-click menu)
+switches the plate view to clamp edit mode. Each clamp shows a locating
+dimension: a line out across the sheet edge to its distance from the plate
+origin. Right-click the sheet to choose **Dimension to Clamp Center** or
+**Dimension to Near Edge** (the clamp edge nearer the origin, the default); the
+choice is remembered.
+
+- Drag a clamp to move it along its edge, or onto another edge. Positions snap
+  to 1/8" (1 mm in metric nests) on the dimension's value; hold Shift to move
+  freely.
+- Point near an edge where there is no clamp: a dashed clamp previews the
+  position, and a click adds it. A nest with no clamps takes the clamp size and
+  removal time from the machine defaults.
+- Click a dimension to type its value, then Enter (Escape cancels).
+- Select a clamp and press Delete, or right-click it, to remove it.
+- Escape or **Finish Editing Clamps** returns to Select mode.
+
+Every change is applied at once to the nest's rail, so every plate follows it,
+as with **OK** in **Nest > Clamps...**: removed clamps are put back on every
+sheet, and changes are refused while nesting or a fill is running. Clamps
+beyond the current sheet are not shown.
 
 ### Removing a clamp by hand
 

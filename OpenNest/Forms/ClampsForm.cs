@@ -8,8 +8,8 @@ using OpenNest.Data;
 namespace OpenNest.Forms;
 
 /// <summary>
-/// Nest &gt; Clamps...: edits the current nest's machine clamp rail (identical clamps at X
-/// centers measured from the plate origin along the origin-side edge). OK applies the rail
+/// Nest &gt; Clamps...: edits the current nest's machine clamp rail (identical clamps, each on
+/// one sheet edge with its center measured from the plate origin along it). OK applies the rail
 /// to every plate of this nest; Cancel discards those edits. Save as Machine Defaults writes
 /// clamps.json immediately and is not undone by Cancel. All decisions live in
 /// <see cref="ClampRailEditor"/>; this form only renders and forwards input.
@@ -22,6 +22,7 @@ public sealed class ClampsForm : Form
     private readonly NumericUpDown depthBox;
     private readonly NumericUpDown removalMinutesBox;
     private readonly NumericUpDown centerBox;
+    private readonly ComboBox edgeBox;
     private readonly ListBox centersList;
     private readonly Button addButton;
     private readonly Button removeButton;
@@ -64,10 +65,10 @@ public sealed class ClampsForm : Form
                 MaximumSize = new Size(450, 0),
                 Padding = new Padding(0, 0, 0, 8),
                 Text =
-                    "Fixed clamps along the plate edge through the origin. Auto Nest keeps parts "
-                    + "clear of each clamp by the plate's bottom edge spacing; clamps that do not "
-                    + "reach a shorter plate are left off it. Interactive fill and push, the "
-                    + "overlap check and cutoffs do not avoid clamps yet.",
+                    "Fixed clamps on the plate edges, each centered a distance from the origin "
+                    + "along its edge. Auto Nest keeps parts clear of each clamp by the plate's "
+                    + "bottom edge spacing; clamps that do not reach a smaller plate are left off "
+                    + "it. Plate > Edit Clamps moves and adds clamps on the plate view.",
             }
         );
 
@@ -94,8 +95,13 @@ public sealed class ClampsForm : Form
             WrapContents = false,
         };
         centerBox = NewLengthBox(0, minimum: 0m);
+        edgeBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 120 };
+        foreach (var edge in ClampEdgeText.All)
+            edgeBox.Items.Add(ClampEdgeText.Name(edge));
+        edgeBox.SelectedIndex = 0;
         addButton = new Button { Text = "Add", AutoSize = true };
         removeButton = new Button { Text = "Remove", AutoSize = true, Enabled = false };
+        centerEntry.Controls.Add(edgeBox);
         centerEntry.Controls.Add(new Label { Text = "Center:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) });
         centerEntry.Controls.Add(centerBox);
         centerEntry.Controls.Add(addButton);
@@ -215,7 +221,8 @@ public sealed class ClampsForm : Form
 
     private void AddCenter()
     {
-        if (!Editor.TryAddCenter((double)centerBox.Value, out var error))
+        var clamp = new RailClamp(ClampEdgeText.All[edgeBox.SelectedIndex], (double)centerBox.Value);
+        if (!Editor.TryAddClamp(clamp, out var error))
         {
             MessageBox.Show(this, error, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
@@ -237,8 +244,10 @@ public sealed class ClampsForm : Form
     {
         centersList.BeginUpdate();
         centersList.Items.Clear();
-        foreach (var center in Editor.Centers)
-            centersList.Items.Add(center.ToString("0.####", CultureInfo.CurrentCulture));
+        foreach (var clamp in Editor.Clamps)
+            centersList.Items.Add(
+                $"{ClampEdgeText.Name(clamp.Edge)}:  {clamp.Center.ToString("0.####", CultureInfo.CurrentCulture)}"
+            );
         centersList.EndUpdate();
         removeButton.Enabled = centersList.SelectedIndex >= 0;
     }
@@ -261,7 +270,7 @@ public sealed class ClampsForm : Form
             var settings = Editor.ToMachineDefaults();
             settings.Save(settingsPath);
             savedLabel.Text = settings.Enabled
-                ? $"Saved {DateTime.Now:t}: new nests get these {settings.Centers.Count} clamps. Cancel does not undo this."
+                ? $"Saved {DateTime.Now:t}: new nests get these {settings.ClampCount} clamps. Cancel does not undo this."
                 : $"Saved {DateTime.Now:t}: new nests get no clamps. Cancel does not undo this.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)

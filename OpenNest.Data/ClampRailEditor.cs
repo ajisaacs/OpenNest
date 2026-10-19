@@ -8,7 +8,7 @@ namespace OpenNest.Data;
 /// </summary>
 public sealed class ClampRailEditor
 {
-    private readonly List<double> _centers = new();
+    private readonly List<RailClamp> _clamps = new();
 
     /// <summary>Starts from the nest's rail, or the default clamp size with no clamps.</summary>
     public ClampRailEditor(ClampRail? rail, Units units, bool applyToNewNests)
@@ -19,16 +19,16 @@ public sealed class ClampRailEditor
         Width = initial.Width;
         Depth = initial.Depth;
         RemovalMinutes = initial.RemovalMinutes;
-        _centers.AddRange(initial.Centers);
+        _clamps.AddRange(initial.Clamps.Order());
     }
 
     /// <summary>The nest's units; every value is in these units.</summary>
     public Units Units { get; }
 
-    /// <summary>Clamp extent along the edge (X).</summary>
+    /// <summary>Clamp extent along its edge.</summary>
     public double Width { get; set; }
 
-    /// <summary>Clamp intrusion into the sheet (Y).</summary>
+    /// <summary>Clamp intrusion into the sheet from its edge.</summary>
     public double Depth { get; set; }
 
     /// <summary>Minutes to remove one clamp and put it back after cutting (D9); not a
@@ -38,37 +38,46 @@ public sealed class ClampRailEditor
     /// <summary>Whether saved machine defaults give new nests these clamps.</summary>
     public bool ApplyToNewNests { get; set; }
 
-    /// <summary>Clamp centers along X from the plate origin, ascending and distinct.</summary>
-    public IReadOnlyList<double> Centers => _centers;
+    /// <summary>Clamps ordered by edge, then center from the plate origin; distinct.</summary>
+    public IReadOnlyList<RailClamp> Clamps => _clamps;
+
+    /// <summary>Origin-side clamp centers along X from the plate origin, ascending.</summary>
+    public IReadOnlyList<double> Centers =>
+        _clamps.Where(c => c.Edge == ClampEdge.OriginSide).Select(c => c.Center).ToList();
+
+    /// <summary>Adds an origin-side clamp; see <see cref="TryAddClamp"/>.</summary>
+    public bool TryAddCenter(double center, out string? error) =>
+        TryAddClamp(new RailClamp(ClampEdge.OriginSide, center), out error);
 
     /// <summary>
-    /// Adds a clamp center, keeping the list sorted. Refuses (with an operator-facing
-    /// reason) values that are not finite, negative, or already listed.
+    /// Adds a clamp, keeping the list sorted. Refuses (with an operator-facing reason)
+    /// centers that are not finite, negative, or already listed on that edge.
     /// </summary>
-    public bool TryAddCenter(double center, out string? error)
+    public bool TryAddClamp(RailClamp clamp, out string? error)
     {
-        if (!double.IsFinite(center) || center < 0)
+        if (!double.IsFinite(clamp.Center) || clamp.Center < 0)
         {
             error = "Enter a clamp center measured from the plate origin (zero or more).";
             return false;
         }
 
-        var index = _centers.BinarySearch(center);
+        var index = _clamps.BinarySearch(clamp);
         if (index >= 0)
         {
-            error = $"A clamp is already centered at {center:0.####}.";
+            error = $"A clamp is already centered at {clamp.Center:0.####} on that edge.";
             return false;
         }
 
-        _centers.Insert(~index, center);
+        _clamps.Insert(~index, clamp);
         error = null;
         return true;
     }
 
+    /// <summary>Removes the clamp at <paramref name="index"/> in <see cref="Clamps"/>.</summary>
     public void RemoveCenterAt(int index)
     {
-        if (index >= 0 && index < _centers.Count)
-            _centers.RemoveAt(index);
+        if (index >= 0 && index < _clamps.Count)
+            _clamps.RemoveAt(index);
     }
 
     /// <summary>
@@ -83,8 +92,8 @@ public sealed class ClampRailEditor
         Depth = converted.Depth;
         RemovalMinutes = converted.RemovalMinutes;
         ApplyToNewNests = settings.Enabled;
-        _centers.Clear();
-        _centers.AddRange(converted.Centers.Distinct().OrderBy(c => c));
+        _clamps.Clear();
+        _clamps.AddRange(converted.Clamps.Distinct().Order());
     }
 
     /// <summary>
@@ -93,7 +102,7 @@ public sealed class ClampRailEditor
     /// negative/non-finite removal time.
     /// </summary>
     public ClampRail? BuildRail() =>
-        _centers.Count == 0 ? null : new ClampRail(Width, Depth, _centers, RemovalMinutes);
+        _clamps.Count == 0 ? null : new ClampRail(Width, Depth, _clamps, RemovalMinutes);
 
     /// <summary>The dialog's OK: makes the edited rail the nest's, re-resolving every plate.</summary>
     public void ApplyTo(Nest nest)
@@ -119,14 +128,15 @@ public sealed class ClampRailEditor
                 nameof(RemovalMinutes),
                 "Clamp removal time must be finite and zero or more."
             );
-        return new ClampSettings
+        var settings = new ClampSettings
         {
-            Enabled = ApplyToNewNests && _centers.Count > 0,
+            Enabled = ApplyToNewNests && _clamps.Count > 0,
             Units = Units,
             Width = Width,
             Depth = Depth,
             RemovalMinutes = RemovalMinutes,
-            Centers = _centers.ToArray(),
         };
+        settings.SetClamps(_clamps);
+        return settings;
     }
 }
