@@ -21,7 +21,7 @@ namespace OpenNest.Controls
 
         public void DrawPlate(Graphics g)
         {
-            var plate = view.SheetPlate;
+            var plate = view.DisplayPlate;
             var plateRect = new RectangleF
             {
                 Width = view.LengthWorldToGui(plate.Size.Length),
@@ -178,7 +178,7 @@ namespace OpenNest.Controls
 
         public void DrawClampZones(Graphics g)
         {
-            var plate = view.SheetPlate;
+            var plate = view.DisplayPlate;
             if (plate == null || plate.ClampZones.Count == 0)
                 return;
 
@@ -214,7 +214,7 @@ namespace OpenNest.Controls
 
         public void DrawRemovedClamps(Graphics g)
         {
-            var plate = view.SheetPlate;
+            var plate = view.DisplayPlate;
             if (plate?.ClampRail == null || plate.RemovedClamps.Count == 0)
                 return;
 

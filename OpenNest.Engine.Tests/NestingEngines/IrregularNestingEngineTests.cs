@@ -227,8 +227,6 @@ public class IrregularNestingEngineTests
         foreach (var preview in previews.Select(r => r.LegacyProgress))
         {
             Assert.True(preview.IsOverallBest);
-            Assert.Equal(job.Plates[0].Size, preview.PreviewSheet.Size);
-            Assert.Equal(job.Plates[0].Quadrant, preview.PreviewSheet.Quadrant);
             Assert.Equal((work.Left, work.Bottom, work.Right, work.Top), (preview.ActiveWorkArea.Left,
                 preview.ActiveWorkArea.Bottom, preview.ActiveWorkArea.Right, preview.ActiveWorkArea.Top));
             foreach (var part in preview.BestParts)

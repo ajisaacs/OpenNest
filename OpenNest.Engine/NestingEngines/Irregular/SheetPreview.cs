@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using OpenNest.Engine.Jobs;
-using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.NestingEngines.Irregular;
@@ -23,7 +22,6 @@ internal sealed class SheetPreview(
     internal static readonly TimeSpan Interval = TimeSpan.FromMilliseconds(250);
 
     private readonly Stopwatch clock = Stopwatch.StartNew();
-    private readonly Dictionary<NestPlateStock, Plate> sheets = new(ReferenceEqualityComparer.Instance);
     private TimeSpan? last;
 
     /// <summary>Called after each placement on a sheet trial; reports when the interval has passed.</summary>
@@ -44,9 +42,6 @@ internal sealed class SheetPreview(
             part.UpdateBounds();
             parts.Add(part);
         }
-        // One detached sheet per stock, shared by its reports; front ends only read it.
-        if (!sheets.TryGetValue(stock, out var sheet))
-            sheets[stock] = sheet = DrawingJobMapper.CreatePlate(stock);
 
         progress.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stock.Id, plateIndex, 0, 0,
             new NestProgress
@@ -55,7 +50,6 @@ internal sealed class SheetPreview(
                 PlateNumber = plateIndex + 1,
                 BestParts = parts,
                 ActiveWorkArea = stock.WorkArea,
-                PreviewSheet = sheet,
                 IsOverallBest = true,
                 Description = $"Irregular: packing plate {plateIndex + 1} on stock {stock.Id} ({parts.Count} parts)",
             }));
