@@ -29,7 +29,12 @@ public enum PostVerificationKind
     NestedLead,
 
     /// <summary>A lead-in pierce is closer to part material than half the pierce diameter.</summary>
-    PierceZone
+    PierceZone,
+    /// <summary>
+    /// Two parts are closer than the plate's part spacing without sharing material, judged as
+    /// Auto Nest's layout check judges them.
+    /// </summary>
+    PartSpacing
 }
 
 /// <summary>Plate and part numbers are one-based; plate zero denotes a whole-post limitation.</summary>
@@ -77,6 +82,8 @@ public sealed class PostVerificationReport
             Summary(PostVerificationKind.NestedLead, "Nested part leads");
         if (Findings.Any(finding => finding.Kind == PostVerificationKind.PierceZone))
             Summary(PostVerificationKind.PierceZone, "Pierce zones");
+        if (Findings.Any(finding => finding.Kind == PostVerificationKind.PartSpacing))
+            Summary(PostVerificationKind.PartSpacing, "Part spacing");
         foreach (var finding in Findings)
         {
             text.Append(finding.PlateNumber == 0 ? "Post processor" : $"Plate {finding.PlateNumber}");

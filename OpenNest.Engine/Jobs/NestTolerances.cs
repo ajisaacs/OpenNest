@@ -11,13 +11,11 @@ public static class NestTolerances
 {
     /// <summary>Arc chord tolerance used by both validators. The layout check circumscribes
     /// perimeter arcs and inscribes cutouts; the placement validator uses inscribed arcs.</summary>
-    public const double ValidationOutline = 0.001;
+    public const double ValidationOutline = SpacingOutline.ChordTolerance;
 
-    /// <summary>How far under the part spacing a gap may fall and still pass both validators.
-    /// Layouts placed exactly at the spacing land up to ~1e-4 short once rotated, rounded
-    /// coordinates (e.g. PEP's 4-decimal exports) meet the Clipper grid; 0.0005 covers that
-    /// with margin and is far below anything a cutting machine can resolve.</summary>
-    public const double SpacingSlack = 0.0005;
+    /// <summary>How far under the part spacing a gap may fall and still pass both validators
+    /// and the pre-post spacing review; see <see cref="SpacingOutline.SpacingSlack"/>.</summary>
+    public const double SpacingSlack = SpacingOutline.SpacingSlack;
 
     /// <summary>How far material may extend past the work area and still pass the layout check's
     /// bounds test. Matches the general geometry tolerance, so a part drawn a few millionths

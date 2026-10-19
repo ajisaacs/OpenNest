@@ -97,9 +97,43 @@ namespace OpenNest.Geometry
         /// </summary>
         private static ClearanceResult Separation(List<Line> linesA, List<Line> linesB)
         {
+            var minDist = ClosestPoints(linesA, linesB, out var pa, out var pb);
+
+            var dir = pa - pb;
+            var len = Magnitude(dir);
+
+            if (len <= Tolerance.Epsilon)
+                dir = CentroidAway(linesA, linesB);
+            else
+                dir = dir / len;
+
+            return new ClearanceResult(minDist, dir);
+        }
+
+        /// <summary>
+        /// Minimum boundary (edge-to-edge) distance between two rings and the point on each
+        /// boundary where it occurs. Like <see cref="BoundaryDistance(Polygon, Polygon)"/>, never
+        /// tests overlap. Infinity, with zero points, when either ring has no edges.
+        /// </summary>
+        public static double ClosestPoints(Polygon a, Polygon b, out Vector onA, out Vector onB)
+        {
+            var linesA = a.ToLines();
+            var linesB = b.ToLines();
+
+            if (linesA.Count == 0 || linesB.Count == 0)
+            {
+                onA = onB = Vector.Zero;
+                return double.PositiveInfinity;
+            }
+
+            return ClosestPoints(linesA, linesB, out onA, out onB);
+        }
+
+        internal static double ClosestPoints(List<Line> linesA, List<Line> linesB, out Vector pa, out Vector pb)
+        {
             var minDist = double.MaxValue;
-            var pa = Vector.Zero;
-            var pb = Vector.Zero;
+            pa = Vector.Zero;
+            pb = Vector.Zero;
 
             var boxes = new Box[linesB.Count];
             for (var i = 0; i < linesB.Count; i++)
@@ -124,15 +158,7 @@ namespace OpenNest.Geometry
                 }
             }
 
-            var dir = pa - pb;
-            var len = Magnitude(dir);
-
-            if (len <= Tolerance.Epsilon)
-                dir = CentroidAway(linesA, linesB);
-            else
-                dir = dir / len;
-
-            return new ClearanceResult(minDist, dir);
+            return minDist;
         }
 
         /// <summary>

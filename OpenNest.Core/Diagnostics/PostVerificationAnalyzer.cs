@@ -217,6 +217,8 @@ public static class PostVerificationAnalyzer
             foreach (var issue in overlap.Issues)
                 findings.Add(new(PostVerificationKind.Incomplete, plateNumber, indices[issue.PartAId],
                     issue.PartBId is { } other ? indices[other] : null, "Overlap check: " + issue.Message));
+            // Parts that do not overlap may still be closer than the plate's part spacing.
+            PartSpacingReview.Add(plate, plateNumber, materialParts, indices, overlap, findings, cancellationToken);
         }
         cancellationToken.ThrowIfCancellationRequested();
         return new PostVerificationReport(findings);

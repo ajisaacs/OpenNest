@@ -154,9 +154,9 @@ public static class NestLayoutCheck
     {
         private readonly ShapeProfile profile;
         private readonly Vector location;
-        private PartOutline inflated;
+        private SpacingOutline inflated;
 
-        internal PreparedPlacement(ShapeProfile profile, Vector location, PartOutline raw, double inflateBy)
+        internal PreparedPlacement(ShapeProfile profile, Vector location, SpacingOutline raw, double inflateBy)
         {
             this.profile = profile;
             this.location = location;
@@ -164,10 +164,10 @@ public static class NestLayoutCheck
             InflateBy = inflateBy;
         }
 
-        internal PartOutline Raw { get; }
+        internal SpacingOutline Raw { get; }
         internal double InflateBy { get; }
 
-        internal PartOutline Inflated =>
+        internal SpacingOutline Inflated =>
             inflated ??= InflateBy > Tolerance.Epsilon ? Outline(profile, location, InflateBy) : Raw;
     }
 
@@ -257,7 +257,7 @@ public static class NestLayoutCheck
     /// tolerance-based validation offset collapses a zone smaller than that tolerance to
     /// nothing (PM 6859db53), so the rectangle is never offset or flattened here.
     /// </summary>
-    private static PartOutline RectangleOutline(Box box)
+    private static SpacingOutline RectangleOutline(Box box)
     {
         var perimeter = new Polygon();
         perimeter.Vertices.Add(new Vector(box.Left, box.Bottom));
@@ -266,7 +266,7 @@ public static class NestLayoutCheck
         perimeter.Vertices.Add(new Vector(box.Left, box.Top));
         perimeter.Vertices.Add(new Vector(box.Left, box.Bottom));
         perimeter.UpdateBounds();
-        return new PartOutline { Perimeter = perimeter, Holes = new List<Polygon>() };
+        return new SpacingOutline(perimeter, new List<Polygon>());
     }
 
     /// <summary>
@@ -275,7 +275,7 @@ public static class NestLayoutCheck
     /// on the part's native contours (not the grid-rounded validation outline): the
     /// tolerant path would call real overlap clear. A part without material is skipped.
     /// </summary>
-    private static bool OverlapsKeepOut(Part part, PartOutline keepOutOutline, Box keepOut)
+    private static bool OverlapsKeepOut(Part part, SpacingOutline keepOutOutline, Box keepOut)
     {
         if (KeepOutOverlap.NeedsToleranceFreeTest(keepOut) || keepOutOutline.Triangles == null)
         {
@@ -506,8 +506,8 @@ public static class NestLayoutCheck
         List<string> result
     )
     {
-        var raw = new PartOutline[parts.Count];
-        var inflated = new PartOutline[parts.Count];
+        var raw = new SpacingOutline[parts.Count];
+        var inflated = new SpacingOutline[parts.Count];
         var inflateBy = InflationFor(spacing);
 
         for (var i = 0; i < parts.Count; i++)
@@ -560,8 +560,7 @@ public static class NestLayoutCheck
             .Translate(part.Location);
 
     /// <summary>Inflation that enforces <paramref name="spacing"/> less the shared slack.</summary>
-    private static double InflationFor(double spacing) =>
-        System.Math.Max(0, spacing - NestTolerances.SpacingSlack);
+    private static double InflationFor(double spacing) => SpacingOutline.InflationFor(spacing);
 
     private static bool BoxesTouch(Box a, Box b) =>
         a.Left <= b.Right + Tolerance.Epsilon
@@ -580,40 +579,7 @@ public static class NestLayoutCheck
             ? requirement.Name
             : part.BaseDrawing.Name;
 
-    private const double OutlineTolerance = NestTolerances.ValidationOutline;
-
-    private static bool Overlaps(PartOutline a, PartOutline b)
-    {
-        var at = a.Triangles;
-        var bt = b.Triangles;
-        // Cache the same world-space triangulation the reference would build. Keeping
-        // translations at zero also preserves its floating-point operation order.
-        return (at != null && bt != null ? at.Overlaps(bt, 0, 0, 0, 0) : null)
-            ?? Collision.HasOverlap(a.Perimeter, b.Perimeter, a.Holes, b.Holes);
-    }
-
-    internal sealed class PartOutline
-    {
-        public Polygon Perimeter { get; init; }
-        public List<Polygon> Holes { get; init; }
-
-        private bool prepared;
-        private TriangulatedRegion triangles;
-
-        /// <summary>Prepared on the first candidate pair; null preparation is cached too.</summary>
-        public TriangulatedRegion Triangles
-        {
-            get
-            {
-                if (!prepared)
-                {
-                    triangles = TriangulatedRegion.Build(Perimeter, Holes);
-                    prepared = true;
-                }
-                return triangles;
-            }
-        }
-    }
+    private static bool Overlaps(SpacingOutline a, SpacingOutline b) => a.Overlaps(b);
 
     /// <summary>
     /// Extracts a part's material as world-space polygons - the perimeter and
@@ -625,10 +591,10 @@ public static class NestLayoutCheck
     /// circumscribed, cutout arcs inscribed) but nothing is padded. Callers inflate
     /// by the spacing less NestTolerances.SpacingSlack, so a layout exactly at the
     /// spacing passes despite rounding; the only other leniency is the round-join
-    /// chord error at convex corners (OutlineTolerance / 10).
+    /// chord error at convex corners (SpacingOutline.ChordTolerance / 10).
     /// part.Program is already rotated; only a Location offset is needed.
     /// </summary>
-    private static PartOutline Outline(Part part, double inflateBy)
+    private static SpacingOutline Outline(Part part, double inflateBy)
     {
         var entities = ConvertProgram
             .ToGeometry(part.Program)
@@ -646,33 +612,6 @@ public static class NestLayoutCheck
         return Outline(profile, part.Location, inflateBy);
     }
 
-    private static PartOutline Outline(ShapeProfile profile, Vector location, double inflateBy)
-    {
-        // Adaptive tolerance instead of Shape.ToPolygon()'s default (up to 1000
-        // segments per arc) - arc-heavy real parts otherwise produce thousands
-        // of vertices, which is needlessly slow for a spacing check.
-        var region = ClipperBridge.OffsetForValidation(
-            profile,
-            inflateBy > Tolerance.Epsilon ? inflateBy : 0,
-            OutlineTolerance
-        );
-
-        var perimeter = region.LargestOuter();
-
-        if (perimeter == null)
-            return null;
-
-        ToWorld(perimeter, location);
-
-        foreach (var hole in region.Holes)
-            ToWorld(hole, location);
-
-        return new PartOutline { Perimeter = perimeter, Holes = region.Holes };
-    }
-
-    private static void ToWorld(Polygon polygon, Vector location)
-    {
-        polygon.Offset(location);
-        polygon.UpdateBounds();
-    }
+    private static SpacingOutline Outline(ShapeProfile profile, Vector location, double inflateBy) =>
+        SpacingOutline.Build(profile, location, inflateBy);
 }

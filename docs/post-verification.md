@@ -6,8 +6,9 @@ Choose **Nest > Validate Nest...** to inspect all plates without running the cut
 planner or selecting a post processor. It opens the editor's read-only side panel
 in **Validate Nest (live programs)** mode, distinct from the panel's unapplied
 **Plan Cutting** proposal. The validation panel checks overlapping material,
-missing lead-ins, and rapid crossings in the existing placed programs and cutting
-order. Findings identify plate and part sequence numbers in a read-only grid;
+missing lead-ins, rapid crossings in the existing placed programs and cutting
+order, and parts closer than the plate's part spacing. Findings identify plate and part
+sequence numbers in a read-only grid;
 incomplete or failed checks are never reported as clear. Select a row to switch
 the main plate view to that plate and focus the finding. A colored headline gives
 the warning count by kind (or says the check is incomplete or clear), a single line
@@ -21,7 +22,8 @@ restores normal rendering without changing drawing colors or selection.
 Overlaps use the same magenta material shading as **View > Overlap Check**. A
 DPI-scaled ring expands and fades continuously while the finding is selected;
 both its color and contrasting halo fade as it grows. For overlaps the ring marks a point inside the largest
-shared patch; for missing lead-ins it marks the contour start. Rapid warnings
+shared patch; for missing lead-ins it marks the contour start; for part spacing it marks
+the middle of the closest gap. Rapid warnings
 pulse the offending orange dashed segment continuously and mark its contacts with
 the completed contour using fixed-screen-size magenta crosshairs with white halos.
 Contacts use native lines/arcs and the rapid check's existing numerical tolerances;
@@ -32,7 +34,8 @@ findings without a usable location do not invent a marker. Closing the inspector
 clears the highlight and restores the original plate, zoom, and overlap display mode.
 
 Validation does not change placements, programs, lead-ins, or cutting order, save
-the nest, or write CNC output. Minimum spacing and plate boundaries are not checked.
+the nest, or write CNC output. Spacing to the plate edge and to clamps, and plate
+boundaries, are not checked.
 It does not verify a post processor's final output. Posting still runs its own
 fresh verification and consent flow.
 
@@ -92,6 +95,18 @@ shows the first three check categories, even when there are no findings:
   are not reported. A part whose clean material cannot be captured makes the check
   incomplete for leads near it. This line appears in the summary only when there is such
   a finding.
+- **Part spacing:** two parts closer than the plate's part spacing without sharing material
+  (overlapping pairs are reported only as overlaps). Candidate pairs come from each part's
+  clean nesting material (leads excluded) tested exactly as Auto Nest's layout check tests
+  it, with the shared `SpacingOutline` and `SpacingSlack`, so a layout Auto Nest accepted
+  stays clear. That outline circumscribes arcs by more than the slack, so each candidate is
+  confirmed on its native contours flattened 20 times finer than the slack. The review warns
+  only when that gap falls short of the spacing by more than `SpacingSlack`, which lets
+  interactive fills that place arcs exactly at the spacing pass. On curves it is therefore
+  slightly more lenient than Auto Nest's check, never stricter. Zero spacing allows contact.
+  A part inside another's cutout is held to the spacing from the hole edge. Cut-offs, the
+  plate edge and clamps are not spacing-checked. The finding gives the measured gap; this
+  line appears in the summary only when there is such a finding.
 - **Nested parts:** a part whose perimeter lies strictly inside a cutout of another part (its
   host), proven on clean material exactly as Plan Cutting proves its inner-before-host
   prerequisite. **Nested part order** warns when the nested part comes after its host in the
