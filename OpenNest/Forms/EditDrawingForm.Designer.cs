@@ -39,6 +39,8 @@ namespace OpenNest.Forms
             colorPanel = new TableLayoutPanel();
             colorSwatch = new Panel();
             colorButton = new Button();
+            automaticColorButton = new Button();
+            colorModeLabel = new Label();
             infoPanel = new TableLayoutPanel();
             sizeCaption = new Label();
             sizeLabel = new Label();
@@ -128,15 +130,20 @@ namespace OpenNest.Forms
             // colorPanel
             //
             colorPanel.AutoSize = true;
-            colorPanel.ColumnCount = 2;
+            colorPanel.ColumnCount = 3;
+            colorPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             colorPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             colorPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             colorPanel.Controls.Add(colorSwatch, 0, 0);
             colorPanel.Controls.Add(colorButton, 1, 0);
+            colorPanel.Controls.Add(automaticColorButton, 2, 0);
+            colorPanel.Controls.Add(colorModeLabel, 1, 1);
+            colorPanel.SetColumnSpan(colorModeLabel, 2);
             colorPanel.Dock = DockStyle.Fill;
             colorPanel.Margin = new Padding(0, 8, 0, 8);
             colorPanel.Name = "colorPanel";
-            colorPanel.RowCount = 1;
+            colorPanel.RowCount = 2;
+            colorPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             colorPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             colorPanel.TabIndex = 0;
             //
@@ -161,6 +168,26 @@ namespace OpenNest.Forms
             colorButton.Text = "C&hange Color...";
             colorButton.UseVisualStyleBackColor = true;
             colorButton.Click += ChangeColor_Click;
+            //
+            // automaticColorButton
+            //
+            automaticColorButton.Anchor = AnchorStyles.Left;
+            automaticColorButton.AutoSize = true;
+            automaticColorButton.Margin = new Padding(6, 0, 0, 0);
+            automaticColorButton.Name = "automaticColorButton";
+            automaticColorButton.Size = new Size(80, 27);
+            automaticColorButton.TabIndex = 1;
+            automaticColorButton.Text = "A&utomatic";
+            automaticColorButton.UseVisualStyleBackColor = true;
+            automaticColorButton.Click += AutomaticColor_Click;
+            //
+            // colorModeLabel
+            //
+            colorModeLabel.AutoSize = true;
+            colorModeLabel.ForeColor = SystemColors.GrayText;
+            colorModeLabel.Margin = new Padding(0, 4, 0, 0);
+            colorModeLabel.Name = "colorModeLabel";
+            colorModeLabel.Size = new Size(0, 15);
             //
             // infoPanel
             //
@@ -504,6 +531,8 @@ namespace OpenNest.Forms
         private TableLayoutPanel colorPanel;
         private Panel colorSwatch;
         private Button colorButton;
+        private Button automaticColorButton;
+        private Label colorModeLabel;
         private TableLayoutPanel infoPanel;
         private Label sizeCaption;
         private Label sizeLabel;

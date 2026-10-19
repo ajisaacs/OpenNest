@@ -9,6 +9,8 @@ namespace OpenNest.Forms
         private const int PreviewInset = 24;
 
         private Drawing drawing;
+        private Nest nest;
+        private Color? automaticColor;
 
         public EditDrawingForm()
         {
@@ -75,6 +77,9 @@ namespace OpenNest.Forms
         private void UpdateColor()
         {
             colorSwatch.BackColor = colorDialog1.Color;
+            var customColor = IsCustomColor;
+            colorModeLabel.Text = customColor ? "Custom color" : "Automatic color from the color scheme";
+            automaticColorButton.Enabled = customColor;
             UpdateImage();
         }
 
@@ -107,9 +112,38 @@ namespace OpenNest.Forms
             }
         }
 
-        public void LoadDrawing(Drawing drawing)
+        /// <summary>
+        /// The palette color for the drawing's slot among the nest's non-cutoff drawings.
+        /// </summary>
+        private Color AutomaticColor()
+        {
+            var index = 0;
+            if (nest != null)
+            {
+                foreach (var d in nest.Drawings)
+                {
+                    if (ReferenceEquals(d, drawing))
+                        break;
+                    if (!d.IsCutOff)
+                        index++;
+                }
+            }
+            return Drawing.GetPartColor(index);
+        }
+
+        private bool IsAutomaticColorRequested =>
+            automaticColor?.ToArgb() == colorDialog1.Color.ToArgb();
+
+        // Only a color actually picked here becomes custom; reopening and saving keeps the palette color.
+        private bool IsCustomColor =>
+            !IsAutomaticColorRequested
+            && (drawing.HasCustomColor || colorDialog1.Color.ToArgb() != drawing.Color.ToArgb());
+
+        public void LoadDrawing(Drawing drawing, Nest nest = null)
         {
             this.drawing = drawing;
+            this.nest = nest;
+            automaticColor = null;
 
             colorDialog1.Color = drawing.Color;
             DrawingName = drawing.Name;
@@ -132,8 +166,18 @@ namespace OpenNest.Forms
             drawing.Quantity.Required = Quantity;
             drawing.Priority = Priority;
             drawing.CutFirst = CutFirst;
-            // Only a color actually picked here becomes custom; reopening and saving keeps the palette color.
-            if (colorDialog1.Color.ToArgb() != drawing.Color.ToArgb())
+            if (IsAutomaticColorRequested)
+            {
+                if (!drawing.HasCustomColor)
+                    return;
+
+                drawing.HasCustomColor = false;
+                if (nest != null && nest.Drawings.Contains(drawing))
+                    ColorSchemeRegistry.RecolorDrawings(nest);
+                else
+                    drawing.Color = AutomaticColor();
+            }
+            else if (IsCustomColor)
             {
                 drawing.Color = colorDialog1.Color;
                 drawing.HasCustomColor = true;
@@ -151,8 +195,19 @@ namespace OpenNest.Forms
 
         private void ChangeColor_Click(object sender, EventArgs e)
         {
-            if (colorDialog1.ShowDialog(this) == DialogResult.OK)
-                UpdateColor();
+            if (colorDialog1.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            // A picked color cancels a pending Automatic.
+            automaticColor = null;
+            UpdateColor();
+        }
+
+        private void AutomaticColor_Click(object sender, EventArgs e)
+        {
+            automaticColor = AutomaticColor();
+            colorDialog1.Color = automaticColor.Value;
+            UpdateColor();
         }
     }
 }

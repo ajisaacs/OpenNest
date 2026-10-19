@@ -22,6 +22,8 @@ The scheme is an application setting, not part of a nest. Applying a scheme
 recolors drawings in open nests, and opening a nest recolors its drawings from the
 active scheme. Only a color picked on purpose in Drawing Properties (or stored on a
 library record) is kept; see [drawing colors](nest-file-format.md#drawing-colors).
+Drawing Properties shows whether the color is custom or automatic, and its
+**Automatic** button returns a custom color to the drawing's scheme color.
 
 In plate views and drawing thumbnails, scribe/etch motions have a separate stroke
 from material cuts. A closed etched circle or lettering does not make a hole in

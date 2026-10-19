@@ -1504,7 +1504,7 @@ namespace OpenNest.Forms
                 return;
 
             var form = new EditDrawingForm();
-            form.LoadDrawing(drawing);
+            form.LoadDrawing(drawing, Nest);
 
             if (form.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
