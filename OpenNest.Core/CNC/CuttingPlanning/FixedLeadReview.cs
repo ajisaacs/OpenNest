@@ -208,11 +208,12 @@ internal static class FixedLeadReview
         static LayerType Kind(LayerType layer) => layer == LayerType.Display ? LayerType.Cut : layer;
     }
 
-    // The same clean, rotation-baked, seam-trimmed program that planning captures.
+    // The same clean, rotation-baked, drift-closed, seam-trimmed program that planning captures.
     internal static Program Clean(Part part)
     {
         var clean = (Program)part.BaseDrawing.Program.Clone();
         clean.Rotate(part.Rotation - part.BaseDrawing.Program.Rotation);
+        IncrementalClosureDrift.Close(clean);
         SeamOvercut.Trim(clean);
         return clean;
     }

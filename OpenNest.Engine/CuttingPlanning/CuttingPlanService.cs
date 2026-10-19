@@ -104,6 +104,8 @@ public static class CuttingPlanService
                 // Exact placed/proposed payloads still use lossless OwnedProgramCopy.
                 var ownedClean = (Program)source.BaseDrawing.Program.Clone();
                 ownedClean.Rotate(source.Rotation - source.BaseDrawing.Program.Rotation);
+                // Incremental rounding can leave a converted contour just short of its seam.
+                IncrementalClosureDrift.Close(ownedClean);
                 // A baked-in seam overcut encloses no area; left in, the ring touches itself.
                 SeamOvercut.Trim(ownedClean);
                 // Material extent only: remote rapids and scribe marks must not widen it, or a

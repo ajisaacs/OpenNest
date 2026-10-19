@@ -66,7 +66,16 @@ inside both spans. Lead and rapid checks keep their conservative contact queries
 Source contour closure
 in material capture and emitter preparation accepts endpoint gaps up to 0.000001
 model units (inches for an inch nest), with a floating-point roundoff allowance
-capped at 1e-12. It does not rewrite source endpoints. A contour entered away from its
+capped at 1e-12. It does not rewrite source endpoints. The one exception is rounding drift
+in an incremental program (converted nests): each move is rounded at the source CAM's
+precision, so a contour's end is a sum of rounded moves and can miss its start by more
+than that tolerance. On the owned clean copy that planning and its lead reviews capture
+(never the drawing), a contour that misses by more than
+1e-8 but no more than its moves could accumulate (half of 0.000001 per axis per move, and
+never more than `Tolerance.Epsilon`) ends its last cut on its start, and the next motion
+absorbs the correction so nothing after it moves. Gaps inside the closure tolerance are
+closed too, so material capture and preparation cannot disagree at that boundary. Absolute
+programs and larger gaps are left alone and still refuse. A contour entered away from its
 seam crosses that gap mid-cut; when an arc follows it, emission bridges the gap with a
 straight move and cuts the arc as drawn, rather than starting the arc off its own circle
 (which every check refuses as an inconsistent radius). An entry on the seam vertex has no
