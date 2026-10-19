@@ -45,6 +45,18 @@ public class PlateDisplayNumberingTests
     }
 
     [Fact]
+    public void Header_ShowsSizeAndQuantityAboveOne()
+    {
+        var nest = CreateNest();
+        nest.Plates.Add(WithPart());
+
+        Assert.Equal("Plate 1 of 1  |  60 x 120", PlateDisplayNumbering.FormatHeader(nest.Plates, 0, "60 x 120"));
+        Assert.Equal("Plate 1 of 1  |  60 x 120", PlateDisplayNumbering.FormatHeader(nest.Plates, 0, "60 x 120", 1));
+        Assert.Equal("Plate 1 of 1  |  60 x 120  |  ×4", PlateDisplayNumbering.FormatHeader(nest.Plates, 0, "60 x 120", 4));
+        Assert.Equal("Plate 1 of 1  |  ×2", PlateDisplayNumbering.FormatHeader(nest.Plates, 0, null, 2));
+    }
+
+    [Fact]
     public void TwoRealPlatesThenSentinel_TotalIsTwo()
     {
         var nest = CreateNest();

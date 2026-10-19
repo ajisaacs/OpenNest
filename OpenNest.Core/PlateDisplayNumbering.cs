@@ -48,17 +48,24 @@ namespace OpenNest
             return plate != null && plate.Parts.Count == 0;
         }
 
-        /// <summary>Header text for the plate at <paramref name="storageIndex"/>.</summary>
-        public static string FormatHeader(IList<Plate> plates, int storageIndex, string plateSizeText)
+        /// <summary>
+        /// Header text for the plate at <paramref name="storageIndex"/>. A quantity above one is
+        /// appended as "×N"; a single sheet shows no quantity.
+        /// </summary>
+        public static string FormatHeader(IList<Plate> plates, int storageIndex, string plateSizeText, int quantity = 1)
         {
             var displayed = DisplayedPlateNumber(plates, storageIndex);
             if (displayed == null)
                 return IsTrailingSentinel(plates, storageIndex)
                     ? "New plate (empty)"
                     : "No plates";
-            return string.IsNullOrEmpty(plateSizeText)
-                ? string.Format("Plate {0} of {1}", displayed.Value, DisplayedPlateCount(plates))
-                : string.Format("Plate {0} of {1}  |  {2}", displayed.Value, DisplayedPlateCount(plates), plateSizeText);
+
+            var text = string.Format("Plate {0} of {1}", displayed.Value, DisplayedPlateCount(plates));
+            if (!string.IsNullOrEmpty(plateSizeText))
+                text += "  |  " + plateSizeText;
+            if (quantity > 1)
+                text += "  |  ×" + quantity;
+            return text;
         }
     }
 }

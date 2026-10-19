@@ -995,7 +995,7 @@ namespace OpenNest.Forms
             // Display-only numbering: the trailing empty new-plate sentinel is excluded from the
             // total (and labeled as such); navigation and storage indexes are untouched.
             plateInfoLabel.Text = PlateDisplayNumbering.FormatHeader(
-                Nest.Plates, PlateManager.CurrentIndex, plate.Size.ToString());
+                Nest.Plates, PlateManager.CurrentIndex, plate.Size.ToString(), plate.Quantity);
 
             btnFirstPlate.Enabled = !PlateManager.IsFirst;
             btnPreviousPlate.Enabled = !PlateManager.IsFirst;

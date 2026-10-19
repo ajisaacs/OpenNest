@@ -47,8 +47,10 @@ namespace OpenNest.Forms
 
         private async void EditNest_Click(object sender, EventArgs e)
         {
-            if (activeForm != null)
-                await activeForm.ShowNestInfoEditorAsync();
+            if (activeForm == null)
+                return;
+            await activeForm.ShowNestInfoEditorAsync();
+            statusBar.UpdatePlate(); // Material and thickness may have changed.
         }
 
         private void Clamps_Click(object sender, EventArgs e)

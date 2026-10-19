@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Collections;
@@ -10,7 +12,8 @@ namespace OpenNest.Forms
 {
     /// <summary>
     /// The main window's status labels for the active nest document: status text, cursor
-    /// location, selection bounds and plate index/size/quantity/utilization. The location
+    /// location, selection bounds, nest material and plate utilization. Plate number, size and
+    /// quantity live in the plate view header instead. The location
     /// follows the mouse (the default, throttled), or only left clicks while click mode is on;
     /// the mode persists as a user setting.
     /// </summary>
@@ -22,9 +25,7 @@ namespace OpenNest.Forms
         private readonly ToolStripStatusLabel status;
         private readonly ToolStripStatusLabel location;
         private readonly ToolStripStatusLabel selection;
-        private readonly ToolStripStatusLabel plateIndex;
-        private readonly ToolStripStatusLabel plateSize;
-        private readonly ToolStripStatusLabel plateQty;
+        private readonly ToolStripStatusLabel material;
         private readonly ToolStripStatusLabel plateUtil;
         private readonly Timer locationTimer;
 
@@ -33,15 +34,12 @@ namespace OpenNest.Forms
         private bool locationPending;
 
         public MainStatusBar(ToolStripStatusLabel status, ToolStripStatusLabel location,
-            ToolStripStatusLabel selection, ToolStripStatusLabel plateIndex, ToolStripStatusLabel plateSize,
-            ToolStripStatusLabel plateQty, ToolStripStatusLabel plateUtil)
+            ToolStripStatusLabel selection, ToolStripStatusLabel material, ToolStripStatusLabel plateUtil)
         {
             this.status = status;
             this.location = location;
             this.selection = selection;
-            this.plateIndex = plateIndex;
-            this.plateSize = plateSize;
-            this.plateQty = plateQty;
+            this.material = material;
             this.plateUtil = plateUtil;
 
             locationTimer = new Timer { Interval = LocationRefreshIntervalMs };
@@ -126,30 +124,30 @@ namespace OpenNest.Forms
         {
             if (form == null)
             {
-                plateIndex.Text = string.Empty;
-                plateSize.Text = string.Empty;
-                plateQty.Text = string.Empty;
+                material.Text = string.Empty;
                 plateUtil.Text = string.Empty;
                 return;
             }
 
-            plateIndex.Text = string.Format(
-                "Plate: {0} of {1}",
-                form.PlateManager.CurrentIndex + 1,
-                form.PlateManager.Count
-            );
-
-            plateSize.Text = string.Format("Size: {0}", form.PlateView.Plate.Size);
-
-            plateQty.Text = string.Format(
-                "Qty: {0}",
-                form.PlateView.Plate.Quantity
-            );
+            var nest = form.Nest;
+            material.Text = FormatMaterial(nest.Material?.Name, nest.Thickness, nest.Units);
 
             plateUtil.Text = string.Format(
                 "Util: {0:P1}",
                 form.PlateView.Plate.Utilization()
             );
+        }
+
+        /// <summary>Status text for the nest's material and thickness, e.g. "Material: A36 · 0.25 in".</summary>
+        internal static string FormatMaterial(string name, double thickness, Units units)
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(name))
+                parts.Add(name.Trim());
+            if (thickness > 0)
+                parts.Add(thickness.ToString("0.####", CultureInfo.CurrentCulture) + " " + UnitsHelper.GetShortString(units));
+
+            return "Material: " + (parts.Count == 0 ? "(none)" : string.Join(" · ", parts));
         }
 
         public void UpdateSelection()

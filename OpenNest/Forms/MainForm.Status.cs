@@ -65,6 +65,9 @@ namespace OpenNest.Forms
         private void LocationStatusLabel_Click(object sender, EventArgs e) =>
             statusBar.ToggleLocationMode();
 
+        private void MaterialStatusLabel_Click(object sender, EventArgs e) =>
+            EditNest_Click(sender, e);
+
         #endregion Statusbar Events
     }
 }

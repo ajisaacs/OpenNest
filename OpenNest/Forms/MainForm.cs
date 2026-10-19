@@ -106,7 +106,7 @@ namespace OpenNest.Forms
             storage.StateChanged += Storage_StateChanged;
             InitializeComponent();
             statusBar = new MainStatusBar(statusLabel1, locationStatusLabel, selectionStatusLabel,
-                plateIndexStatusLabel, plateSizeStatusLabel, plateQtyStatusLabel, plateUtilStatusLabel);
+                materialStatusLabel, plateUtilStatusLabel);
             toolStrip1.Items.Add(CreateActionButton("btnCutPlanner", "Plan Cutting",
                 Resources.cut_planner, PlatePlanCutting_Click));
             toolStrip1.Items.Add(CreateActionButton("btnSimulateCutting", "Simulate Cutting",

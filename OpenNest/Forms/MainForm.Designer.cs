@@ -167,9 +167,7 @@ namespace OpenNest.Forms
             statusLabel1 = new System.Windows.Forms.ToolStripStatusLabel();
             locationStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             spacerLabel = new System.Windows.Forms.ToolStripStatusLabel();
-            plateIndexStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
-            plateSizeStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
-            plateQtyStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
+            materialStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             plateUtilStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             selectionStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             toolStrip1 = new System.Windows.Forms.ToolStrip();
@@ -1094,7 +1092,7 @@ namespace OpenNest.Forms
             // 
             // statusStrip1
             // 
-            statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { statusLabel1, locationStatusLabel, selectionStatusLabel, spacerLabel, plateIndexStatusLabel, plateSizeStatusLabel, plateQtyStatusLabel, plateUtilStatusLabel });
+            statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { statusLabel1, locationStatusLabel, selectionStatusLabel, spacerLabel, materialStatusLabel, plateUtilStatusLabel });
             statusStrip1.Location = new System.Drawing.Point(0, 630);
             statusStrip1.Name = "statusStrip1";
             statusStrip1.Padding = new System.Windows.Forms.Padding(1, 0, 16, 0);
@@ -1130,30 +1128,16 @@ namespace OpenNest.Forms
             spacerLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
             spacerLabel.Size = new System.Drawing.Size(931, 19);
             spacerLabel.Spring = true;
-            // 
-            // plateIndexStatusLabel
-            // 
-            plateIndexStatusLabel.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
-            plateIndexStatusLabel.Name = "plateIndexStatusLabel";
-            plateIndexStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            plateIndexStatusLabel.Size = new System.Drawing.Size(85, 19);
-            plateIndexStatusLabel.Text = "Plate : 0 of 0";
-            // 
-            // plateSizeStatusLabel
-            // 
-            plateSizeStatusLabel.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
-            plateSizeStatusLabel.Name = "plateSizeStatusLabel";
-            plateSizeStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            plateSizeStatusLabel.Size = new System.Drawing.Size(67, 19);
-            plateSizeStatusLabel.Text = "Size : 0x0";
-            // 
-            // plateQtyStatusLabel
-            // 
-            plateQtyStatusLabel.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
-            plateQtyStatusLabel.Name = "plateQtyStatusLabel";
-            plateQtyStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            plateQtyStatusLabel.Size = new System.Drawing.Size(55, 19);
-            plateQtyStatusLabel.Text = "Qty : 0";
+            //
+            // materialStatusLabel
+            //
+            materialStatusLabel.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
+            materialStatusLabel.Name = "materialStatusLabel";
+            materialStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
+            materialStatusLabel.Size = new System.Drawing.Size(85, 19);
+            materialStatusLabel.Text = "Material: (none)";
+            materialStatusLabel.ToolTipText = "Click to edit nest info";
+            materialStatusLabel.Click += MaterialStatusLabel_Click;
             //
             // plateUtilStatusLabel
             //
@@ -1374,11 +1358,10 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateRotate180;
         private System.Windows.Forms.StatusStrip statusStrip1;
-        private System.Windows.Forms.ToolStripStatusLabel plateSizeStatusLabel;
         private System.Windows.Forms.ToolStripStatusLabel locationStatusLabel;
         private System.Windows.Forms.ToolStrip toolStrip1;
         private System.Windows.Forms.ToolStripButton btnOpen;
-        private System.Windows.Forms.ToolStripStatusLabel plateIndexStatusLabel;
+        private System.Windows.Forms.ToolStripStatusLabel materialStatusLabel;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripMenuItem mnuWindow;
         private System.Windows.Forms.ToolStripMenuItem mnuWindowCascade;
@@ -1386,7 +1369,6 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuWindowTileHorizontal;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem10;
         private System.Windows.Forms.ToolStripMenuItem mnuCloseAll;
-        private System.Windows.Forms.ToolStripStatusLabel plateQtyStatusLabel;
         private System.Windows.Forms.ToolStripStatusLabel plateUtilStatusLabel;
         private System.Windows.Forms.ToolStripMenuItem mnuFileExportAll;
         private System.Windows.Forms.ToolStripMenuItem mnuFileExportNestReport;
