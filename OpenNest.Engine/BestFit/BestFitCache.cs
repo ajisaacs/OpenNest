@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenNest.Engine.Jobs;
 
 namespace OpenNest.Engine.BestFit
 {
@@ -13,6 +14,14 @@ namespace OpenNest.Engine.BestFit
     /// shares them and closed nests or finished solves release theirs. Candidates are computed once
     /// per spacing and filtered per plate size. An entry is dropped when the drawing's
     /// <see cref="Drawing.Program"/> instance or canonical angle changes.
+    /// <para>
+    /// A drawing reconstructed from job geometry (<see cref="ShareByGeometry"/>) draws its
+    /// candidates from a process-wide pool keyed by the geometry's exact content and the spacing,
+    /// so every later job of the same geometry, in any engine instance or Auto Nest run, skips the
+    /// search. Candidates depend on the program geometry and spacing alone, so a pooled set is
+    /// the set the search would produce. The pool keeps the <see cref="SharedCapacity"/> most
+    /// recently used sets and outlives the drawings; <see cref="Invalidate"/> never touches it.
+    /// </para>
     /// </summary>
     public static class BestFitCache
     {
@@ -21,8 +30,60 @@ namespace OpenNest.Engine.BestFit
         private static readonly ConditionalWeakTable<Drawing, Entry> _entries = new();
         private static readonly object _entriesLock = new();
 
+        private static readonly ConditionalWeakTable<Drawing, SharedGeometry> _geometry = new();
+        private static readonly object _poolLock = new();
+        private static readonly LinkedList<PoolEntry> _poolOrder = new();
+        private static readonly Dictionary<(PartGeometrySnapshot Geometry, double Spacing), LinkedListNode<PoolEntry>>
+            _pool = new(new PoolKeyComparer());
+        private static int _sharedCapacity = 512;
+
         public static Func<Drawing, double, IPairEvaluator> CreateEvaluator { get; set; }
         public static Func<ISlideComputer> CreateSlideComputer { get; set; }
+
+        /// <summary>
+        /// Candidate sets (one per geometry and spacing) the process-wide pool keeps; the least
+        /// recently used set is dropped first. Zero disables pooling for later computations.
+        /// </summary>
+        public static int SharedCapacity
+        {
+            get => Volatile.Read(ref _sharedCapacity);
+            set
+            {
+                if (value < 0)
+                    throw new ArgumentOutOfRangeException(nameof(value));
+                lock (_poolLock)
+                {
+                    _sharedCapacity = value;
+                    Trim();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Declares <paramref name="drawing"/> an exact reconstruction of <paramref name="geometry"/>
+        /// (its program unrotated, as <c>DrawingJobMapper.ToProgram</c> builds it). Its unfiltered
+        /// candidates then come from, and go to, the process-wide pool for that geometry content
+        /// and spacing. The declaration lapses if the drawing's <see cref="Drawing.Program"/>
+        /// instance is replaced.
+        /// </summary>
+        public static void ShareByGeometry(Drawing drawing, PartGeometrySnapshot geometry)
+        {
+            ArgumentNullException.ThrowIfNull(drawing);
+            ArgumentNullException.ThrowIfNull(geometry);
+            _geometry.AddOrUpdate(drawing, new SharedGeometry(geometry, drawing.Program));
+        }
+
+        /// <summary>
+        /// True when the pool holds computed candidates for this geometry content and spacing, so
+        /// a drawing sharing it would skip the search.
+        /// </summary>
+        public static bool IsShared(PartGeometrySnapshot geometry, double spacing)
+        {
+            ArgumentNullException.ThrowIfNull(geometry);
+            lock (_poolLock)
+                return _pool.TryGetValue((geometry, spacing), out var node)
+                    && node.Value.Candidates.IsValueCreated;
+        }
 
         public static List<BestFitResult> GetOrCompute(
             Drawing drawing,
@@ -120,10 +181,16 @@ namespace OpenNest.Engine.BestFit
             return result;
         }
 
+        /// <summary>Drops every drawing's entry and the shared pool.</summary>
         public static void Clear()
         {
             lock (_entriesLock)
                 _entries.Clear();
+            lock (_poolLock)
+            {
+                _pool.Clear();
+                _poolOrder.Clear();
+            }
         }
 
         private static Entry GetEntry(Drawing drawing)
@@ -146,12 +213,17 @@ namespace OpenNest.Engine.BestFit
 
         private static List<BestFitResult> GetCandidates(Entry entry, Drawing drawing, double spacing)
         {
+            var shared = SharedGeometryOf(CanonicalFrame.SourceOf(drawing));
             var lazy = entry.Unfiltered.GetOrAdd(
                 spacing,
-                _ => new Lazy<List<BestFitResult>>(
-                    () => ComputeCandidates(drawing, spacing),
-                    LazyThreadSafetyMode.ExecutionAndPublication
-                )
+                _ =>
+                {
+                    var computation = new Lazy<List<BestFitResult>>(
+                        () => ComputeCandidates(drawing, spacing),
+                        LazyThreadSafetyMode.ExecutionAndPublication
+                    );
+                    return shared == null ? computation : PoolGetOrAdd(shared, spacing, computation);
+                }
             );
 
             try
@@ -162,7 +234,69 @@ namespace OpenNest.Engine.BestFit
             {
                 // Don't cache the failure; the next caller retries.
                 entry.Unfiltered.TryRemove(new KeyValuePair<double, Lazy<List<BestFitResult>>>(spacing, lazy));
+                if (shared != null)
+                    PoolRemove(shared, spacing, lazy);
                 throw;
+            }
+        }
+
+        private static PartGeometrySnapshot SharedGeometryOf(Drawing source)
+        {
+            if (source == null || !_geometry.TryGetValue(source, out var shared))
+                return null;
+            // A replaced program no longer matches the declared geometry.
+            return ReferenceEquals(shared.Program, source.Program) ? shared.Geometry : null;
+        }
+
+        /// <summary>The pooled computation for this geometry and spacing, adding
+        /// <paramref name="computation"/> when there is none; a hit becomes most recently used.</summary>
+        private static Lazy<List<BestFitResult>> PoolGetOrAdd(
+            PartGeometrySnapshot geometry,
+            double spacing,
+            Lazy<List<BestFitResult>> computation
+        )
+        {
+            lock (_poolLock)
+            {
+                var key = (geometry, spacing);
+                if (_pool.TryGetValue(key, out var node))
+                {
+                    _poolOrder.Remove(node);
+                    _poolOrder.AddFirst(node);
+                    return node.Value.Candidates;
+                }
+
+                if (_sharedCapacity == 0)
+                    return computation;
+
+                node = _poolOrder.AddFirst(new PoolEntry(geometry, spacing, computation));
+                _pool[key] = node;
+                Trim();
+                return computation;
+            }
+        }
+
+        private static void PoolRemove(PartGeometrySnapshot geometry, double spacing, Lazy<List<BestFitResult>> computation)
+        {
+            lock (_poolLock)
+            {
+                var key = (geometry, spacing);
+                if (_pool.TryGetValue(key, out var node) && ReferenceEquals(node.Value.Candidates, computation))
+                {
+                    _pool.Remove(key);
+                    _poolOrder.Remove(node);
+                }
+            }
+        }
+
+        // Caller holds _poolLock.
+        private static void Trim()
+        {
+            while (_poolOrder.Count > _sharedCapacity)
+            {
+                var last = _poolOrder.Last;
+                _pool.Remove((last.Value.Geometry, last.Value.Spacing));
+                _poolOrder.RemoveLast();
             }
         }
 
@@ -260,6 +394,29 @@ namespace OpenNest.Engine.BestFit
             public bool IsCurrentFor(Drawing source) =>
                 ReferenceEquals(_program, source.Program)
                 && _sourceAngle == (source.Source?.Angle ?? 0.0);
+        }
+
+        /// <summary>The geometry a drawing was reconstructed from, and the program built then.</summary>
+        private sealed record SharedGeometry(PartGeometrySnapshot Geometry, CNC.Program Program);
+
+        private sealed record PoolEntry(
+            PartGeometrySnapshot Geometry,
+            double Spacing,
+            Lazy<List<BestFitResult>> Candidates
+        );
+
+        private sealed class PoolKeyComparer
+            : IEqualityComparer<(PartGeometrySnapshot Geometry, double Spacing)>
+        {
+            public bool Equals(
+                (PartGeometrySnapshot Geometry, double Spacing) x,
+                (PartGeometrySnapshot Geometry, double Spacing) y
+            ) =>
+                x.Spacing.Equals(y.Spacing)
+                && PartGeometrySnapshot.ContentComparer.Equals(x.Geometry, y.Geometry);
+
+            public int GetHashCode((PartGeometrySnapshot Geometry, double Spacing) key) =>
+                HashCode.Combine(PartGeometrySnapshot.ContentComparer.GetHashCode(key.Geometry), key.Spacing);
         }
     }
 }

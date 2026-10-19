@@ -30,8 +30,72 @@ public sealed class PartGeometrySnapshot
         Motions = NestJob.Own(motions);
     }
 
+    private int? contentHash;
+
     public Mode Mode { get; }
     public IReadOnlyList<PartGeometryMotion> Motions { get; }
+
+    /// <summary>
+    /// Equality by exact content: the same mode and the same motions in the same order, every
+    /// value bit for bit (so 0.0 and -0.0 differ), whatever the instances. Snapshots themselves
+    /// still compare by reference, as job identity does; this comparer is for caches whose
+    /// results depend on the geometry alone, such as best-fit candidates.
+    /// </summary>
+    public static IEqualityComparer<PartGeometrySnapshot> ContentComparer { get; } = new ContentEquality();
+
+    private int ContentHash
+    {
+        get
+        {
+            if (contentHash is int cached)
+                return cached;
+            var hash = new HashCode();
+            hash.Add(Mode);
+            foreach (var motion in Motions)
+            {
+                hash.Add(motion.Type);
+                hash.Add(Bits(motion.X));
+                hash.Add(Bits(motion.Y));
+                hash.Add(Bits(motion.CenterX));
+                hash.Add(Bits(motion.CenterY));
+                hash.Add(motion.Rotation);
+                hash.Add(motion.Layer);
+                hash.Add(motion.Suppressed);
+            }
+            var value = hash.ToHashCode();
+            contentHash = value;
+            return value;
+        }
+    }
+
+    private static long Bits(double value) => BitConverter.DoubleToInt64Bits(value);
+
+    private static bool SameMotion(PartGeometryMotion a, PartGeometryMotion b) =>
+        a.Type == b.Type
+        && Bits(a.X) == Bits(b.X)
+        && Bits(a.Y) == Bits(b.Y)
+        && Bits(a.CenterX) == Bits(b.CenterX)
+        && Bits(a.CenterY) == Bits(b.CenterY)
+        && a.Rotation == b.Rotation
+        && a.Layer == b.Layer
+        && a.Suppressed == b.Suppressed;
+
+    private sealed class ContentEquality : IEqualityComparer<PartGeometrySnapshot>
+    {
+        public bool Equals(PartGeometrySnapshot x, PartGeometrySnapshot y)
+        {
+            if (ReferenceEquals(x, y))
+                return true;
+            if (x is null || y is null || x.Mode != y.Mode || x.Motions.Count != y.Motions.Count)
+                return false;
+            for (var i = 0; i < x.Motions.Count; i++)
+                if (!SameMotion(x.Motions[i], y.Motions[i]))
+                    return false;
+            return true;
+        }
+
+        public int GetHashCode(PartGeometrySnapshot snapshot) => snapshot.ContentHash;
+    }
 
     /// <summary>Copies supported motion geometry immediately; later program edits cannot affect this snapshot.</summary>
     public static PartGeometrySnapshot FromProgram(Program program)

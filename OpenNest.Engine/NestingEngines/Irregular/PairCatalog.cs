@@ -95,8 +95,9 @@ internal static class PairCatalog
         Func<NestJobPart, Drawing>? drawingFor
     )
     {
-        var drawing = drawingFor?.Invoke(type.Part)
-            ?? new Drawing(type.Part.Id, DrawingJobMapper.ToProgram(type.Part.Geometry));
+        // Either drawing reads its candidates from the geometry-content pool, so a repeated
+        // or re-tuned job of the same parts skips the best-fit search.
+        var drawing = drawingFor?.Invoke(type.Part) ?? DrawingJobMapper.CreateDrawing(type.Part);
         List<BestFitResult> fits;
         try
         {

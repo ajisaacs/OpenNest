@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using OpenNest.CNC;
+using OpenNest.Engine.BestFit;
 
 namespace OpenNest.Engine.Jobs.Adapters;
 
@@ -90,6 +91,9 @@ public static class DrawingJobMapper
         return program;
     }
 
+    /// <summary>A private drawing of the part for placement code. Its best-fit candidates are
+    /// pooled by geometry content (<see cref="BestFitCache.ShareByGeometry"/>), so the same part
+    /// geometry in a later job, engine instance or Auto Nest run does not search again.</summary>
     internal static Drawing CreateDrawing(NestJobPart part)
     {
         var drawing = new Drawing(part.Id, ToProgram(part.Geometry)) { Priority = part.Priority };
@@ -101,6 +105,7 @@ public static class DrawingJobMapper
             EndAngle = part.Rotation.End,
             Allow180Equivalent = part.Rotation.Allow180Equivalent,
         };
+        BestFitCache.ShareByGeometry(drawing, part.Geometry);
         return drawing;
     }
 

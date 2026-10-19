@@ -81,8 +81,17 @@ Any remaining numerical hole is filled only when its entire ring is certified to
 space, preserving genuine enclosed placement pockets without changing spacing tolerances.
 
 The pairs and the Fill blocks below read each part through one private drawing per part
-geometry, owned by the engine instance, so a part's best-fit search runs once per instance:
-pairs and blocks share it, and so do a pipeline's cutout trial and its ordinary solve.
+geometry, owned by the engine instance: pairs and blocks share it, and so do a pipeline's cutout
+trial and its ordinary solve. The best-fit search itself runs once per part geometry and spacing
+in the whole process: every drawing reconstructed from job geometry
+(`DrawingJobMapper.CreateDrawing`) takes its unfiltered candidates from a pool in `BestFitCache`
+keyed by the snapshot's exact content (mode and every motion value, bit for bit) and the spacing,
+so a repeated or re-tuned Auto Nest of the same drawings, a fresh engine instance, another engine
+or the cutout pre-pass skips the search and offers the same pairs. Candidates depend on the program
+geometry and spacing alone, so a pooled set is the set the search would produce and placements are
+unchanged. The pool keeps the 512 most recently used sets (`BestFitCache.SharedCapacity`), outlives
+the private drawings (`Invalidate` releases a drawing's entry, not the pool) and is in-memory only:
+the sets saved in a `.nest` file belong to the caller's drawings and are not consulted here.
 
 When remaining demand exceeds two, Irregular also offers Fill patterns as optional
 multi-member candidates, not as solid bounding boxes or a whole-job Fill fallback. It searches
