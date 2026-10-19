@@ -75,16 +75,30 @@ internal sealed class CutSimulationOverlay : IDisposable
         }
     }
 
-    /// <summary>Shows <paramref name="value"/>, keeping the playhead where it was when possible.</summary>
+    /// <summary>
+    /// Shows <paramref name="value"/>, keeping the torch where it was when the moves are the same
+    /// (new rates or acceleration only retime them), else keeping the playhead's time.
+    /// </summary>
     public void Load(CutSimulation value)
     {
+        var anchored = Anchor(simulation, value, time);
         simulation = value;
         ResetTrail();
-        Time = time;
+        Time = anchored;
         if (simulation == null)
             Pause();
         view.Invalidate();
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static TimeSpan Anchor(CutSimulation old, CutSimulation next, TimeSpan time)
+    {
+        if (old == null || next == null || old.Steps.Count == 0 || old.Steps.Count != next.Steps.Count)
+            return time;
+        var index = old.IndexAt(time);
+        if (index >= old.Steps.Count)
+            return next.TotalTime;
+        return next.TimeAt(index, old.FractionAt(index, time));
     }
 
     public void Play()
@@ -182,6 +196,9 @@ internal sealed class CutSimulationOverlay : IDisposable
             {
                 switch (step.Kind)
                 {
+                    case CutSimulationStepKind.Rapid when !step.IsArc:
+                        DrawRapid(graphics, pens.Rapid, partial[0], partial[^1], graphics.VisibleClipBounds);
+                        break;
                     case CutSimulationStepKind.Rapid:
                         graphics.DrawLines(pens.Rapid, partial);
                         break;
@@ -305,14 +322,7 @@ internal sealed class CutSimulationOverlay : IDisposable
 
             if (step.Kind == CutSimulationStepKind.Rapid && !step.IsArc)
             {
-                var a = view.PointWorldToGraph(step.Start);
-                var b = view.PointWorldToGraph(step.End);
-                var skipped = 0f;
-                if (clip is { } rect && !ClipLine(ref a, ref b, rect, out skipped))
-                    continue;
-                // Keep the dash pattern fixed to the line while it pans; DashStyle.Dash repeats every 4 widths.
-                pens.Rapid.DashOffset = skipped / pens.Rapid.Width % 4;
-                graphics.DrawLine(pens.Rapid, a, b);
+                DrawRapid(graphics, pens.Rapid, view.PointWorldToGraph(step.Start), view.PointWorldToGraph(step.End), clip);
                 continue;
             }
 
@@ -333,7 +343,6 @@ internal sealed class CutSimulationOverlay : IDisposable
             }
         }
 
-        pens.Rapid.DashOffset = 0;
         graphics.SmoothingMode = smoothing;
         if (travel.PointCount > 0)
             graphics.DrawPath(pens.Rapid, travel);
@@ -344,6 +353,19 @@ internal sealed class CutSimulationOverlay : IDisposable
         }
         if (scribes.PointCount > 0)
             graphics.DrawPath(pens.Scribe, scribes);
+    }
+
+    // A dashed pen's cost grows with the length it strokes, so a rapid is trimmed to the clip:
+    // zoomed in, a whole one can be millions of pixels long and stall the paint.
+    private static void DrawRapid(Graphics graphics, Pen pen, PointF a, PointF b, RectangleF? clip)
+    {
+        var skipped = 0f;
+        if (clip is { } rect && !ClipLine(ref a, ref b, rect, out skipped))
+            return;
+        // Keep the dash pattern fixed to the line while it pans; DashStyle.Dash repeats every 4 widths.
+        pen.DashOffset = skipped / pen.Width % 4;
+        graphics.DrawLine(pen, a, b);
+        pen.DashOffset = 0;
     }
 
     // Consecutive moves join into one figure; arcs go in as GDI+ arcs, which flatten to the size

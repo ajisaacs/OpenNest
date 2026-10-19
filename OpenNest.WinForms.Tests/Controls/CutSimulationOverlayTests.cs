@@ -99,6 +99,32 @@ public class CutSimulationOverlayTests
     });
 
     [Fact]
+    public void RetimingKeepsTheTorchWhereItWas() => RunSta(() =>
+    {
+        using var view = new PlateView { Plate = TwoSquares() };
+        var overlay = view.CutSimulation;
+        var slow = CutSimulation.Build(view.Plate, Parameters);
+        overlay.Load(slow);
+        var cut = slow.Steps.Last(s => s.Kind == CutSimulationStepKind.Cut);
+        overlay.Time = cut.StartTime + cut.Duration * 0.4;
+        var before = slow.ToolPositionAt(overlay.Time);
+
+        var fast = CutSimulation.Build(view.Plate, new CutParameters
+        {
+            Feedrate = 100,
+            RapidTravelRate = 6000,
+            PierceTime = TimeSpan.FromSeconds(1),
+            Units = Units.Inches,
+        });
+        overlay.Load(fast);
+
+        Assert.True(overlay.Time < cut.StartTime); // faster rapids moved it earlier
+        var after = fast.ToolPositionAt(overlay.Time);
+        Assert.Equal(before.X, after.X, 6);
+        Assert.Equal(before.Y, after.Y, 6);
+    });
+
+    [Fact]
     public void PlateSwitchClearsTheSimulation() => RunSta(() =>
     {
         using var view = new PlateView { Plate = TwoSquares() };

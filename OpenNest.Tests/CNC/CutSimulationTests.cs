@@ -33,6 +33,31 @@ public class CutSimulationTests
     }
 
     [Fact]
+    public void TimeAtInvertsFractionAtUnderAcceleration()
+    {
+        var plate = PlateWith((Square(10), new Vector(30, 40)));
+        var sim = CutSimulation.Build(plate, new CutParameters
+        {
+            Feedrate = 100,
+            RapidTravelRate = 600,
+            PierceTime = TimeSpan.FromSeconds(1),
+            Units = Units.Inches,
+            Motion = new MotionProfile { CutAcceleration = 2, RapidAcceleration = 4, CornerDeviation = 0.001 },
+        });
+
+        for (var index = 0; index < sim.Steps.Count; index++)
+        {
+            foreach (var fraction in new[] { 0, 0.1, 0.5, 0.93, 1 })
+            {
+                var time = sim.TimeAt(index, fraction);
+                Assert.InRange(time, sim.Steps[index].StartTime, sim.Steps[index].EndTime);
+                if (time < sim.Steps[index].EndTime)
+                    Assert.Equal(fraction, sim.FractionAt(index, time), 6);
+            }
+        }
+    }
+
+    [Fact]
     public void SquareIsRapidPierceThenFourTimedCuts()
     {
         var plate = PlateWith((Square(10), new Vector(30, 40)));

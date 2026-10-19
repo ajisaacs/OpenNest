@@ -282,6 +282,31 @@ namespace OpenNest.CNC
             return step.ProgressAt(time - step.StartTime);
         }
 
+        /// <summary>
+        /// When step <paramref name="index"/> is <paramref name="fraction"/> complete: the inverse
+        /// of <see cref="FractionAt"/>, so a retimed timeline can find the same tool position.
+        /// </summary>
+        public TimeSpan TimeAt(int index, double fraction)
+        {
+            var step = steps[index];
+            if (step.Duration <= TimeSpan.Zero || fraction <= 0)
+                return step.StartTime;
+            if (fraction >= 1)
+                return step.EndTime;
+
+            // Progress never decreases through a step, so bisect its duration.
+            long lo = 0, hi = step.Duration.Ticks;
+            while (lo < hi)
+            {
+                var mid = lo + (hi - lo) / 2;
+                if (step.ProgressAt(TimeSpan.FromTicks(mid)) < fraction)
+                    lo = mid + 1;
+                else
+                    hi = mid;
+            }
+            return step.StartTime + TimeSpan.FromTicks(lo);
+        }
+
         public Vector ToolPositionAt(TimeSpan time)
         {
             var index = IndexAt(time);
