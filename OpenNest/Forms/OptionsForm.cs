@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Data;
+using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Engine.Strategies;
 using OpenNest.Properties;
 
@@ -14,6 +15,8 @@ namespace OpenNest.Forms
         public OptionsForm()
         {
             InitializeComponent();
+            planningEffortBox.Minimum = (decimal)CuttingPlanBatch.MinimumBudgetMultiplier;
+            planningEffortBox.Maximum = (decimal)CuttingPlanBatch.MaximumBudgetMultiplier;
             GridStyle.Apply(strategyGrid);
             BuildStrategyGrid();
         }
@@ -79,6 +82,7 @@ namespace OpenNest.Forms
             updateFeedUrlBox.Text = Settings.Default.UpdateFeedUrl;
             checkBox1.Checked = Settings.Default.CreateNewNestOnOpen;
             numericUpDown1.Value = (decimal)Settings.Default.AutoSizePlateFactor;
+            planningEffortBox.Value = (decimal)CuttingPlanBatch.ClampBudgetMultiplier(Settings.Default.CuttingPlanEffort);
 
             colorSchemeCombo.Items.Clear();
             foreach (var scheme in ColorSchemeRegistry.AllSchemes)
@@ -98,6 +102,7 @@ namespace OpenNest.Forms
         {
             Settings.Default.CreateNewNestOnOpen = checkBox1.Checked;
             Settings.Default.AutoSizePlateFactor = (double)numericUpDown1.Value;
+            Settings.Default.CuttingPlanEffort = (double)planningEffortBox.Value;
             Settings.Default.ActiveColorScheme =
                 colorSchemeCombo.SelectedItem as string ?? "Classic";
 

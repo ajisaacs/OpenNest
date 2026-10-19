@@ -161,8 +161,24 @@ public class CuttingPlanMessageTests
         Assert.Contains("Plate 7: no complete plan was found within the search limit.", text);
         Assert.Contains("planning with the current order was refused:", text);
         Assert.Contains(finding.Message, text);
+        Assert.Contains(CuttingPlanProposal.SearchLimitHint, text);
+        Assert.Contains("it may still find no plan", CuttingPlanProposal.SearchLimitHint);
+        Assert.True(proposal.Plates[0].SearchLimitReached);
         Assert.DoesNotContain("Open Cutting Settings...", text);
         Assert.DoesNotContain("missing or zero-length lead-in", text);
         Assert.False(proposal.CanApply);
+    }
+
+    [Theory]
+    [InlineData(CuttingPlanStatus.UnsupportedGeometry)]
+    [InlineData(CuttingPlanStatus.Cancelled)]
+    public void Describe_KeptOrderRefusalAMoreEffortCannotFix_OmitsTheSearchLimitHint(CuttingPlanStatus status)
+    {
+        var attempt = new CuttingPlanResult(CuttingPlanStatus.NoSolutionWithinBudget);
+        var proposal = new CuttingPlanProposal([new(new Nest().CreatePlate(), 1, new(status), attempt, null)],
+            ExplicitContourTests.Parameters());
+
+        Assert.False(proposal.Plates[0].SearchLimitReached);
+        Assert.DoesNotContain(CuttingPlanProposal.SearchLimitHint, string.Join("\n", proposal.Describe("in")));
     }
 }

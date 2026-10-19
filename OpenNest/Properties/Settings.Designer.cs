@@ -345,5 +345,18 @@ namespace OpenNest.Properties {
                 this["ClampDimensionToCenter"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1")]
+        // Cut planner budget multiplier; 1 keeps the built-in budgets.
+        public double CuttingPlanEffort {
+            get {
+                return ((double)(this["CuttingPlanEffort"]));
+            }
+            set {
+                this["CuttingPlanEffort"] = value;
+            }
+        }
     }
 }

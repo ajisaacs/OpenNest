@@ -222,6 +222,8 @@ public class CuttingPlanBatchTests
         Assert.False(planned.OrderChanged);
         Assert.Equal(order, planned.Result.ProposedOrder.Select(p => p.SourcePart));
         Assert.Contains("the current order is kept", string.Join("\n", proposal.Describe("in")));
+        Assert.False(planned.SearchLimitReached); // A ready plate is not a refusal.
+        Assert.DoesNotContain(CuttingPlanProposal.SearchLimitHint, string.Join("\n", proposal.Describe("in")));
         Assert.True(proposal.CanApply);
     }
 
@@ -334,6 +336,54 @@ public class CuttingPlanBatchTests
     [InlineData(6_000_000, int.MaxValue)]
     public void PlateBudget_ScalesWithPartCountFromTheDefault(int parts, int expected) =>
         Assert.Equal(expected, CuttingPlanBatch.PlateBudget(parts));
+
+    [Theory]
+    [InlineData(0, 1.0, 20000)]
+    [InlineData(100, 1.0, 40000)]
+    [InlineData(10, 0.5, 10000)]
+    [InlineData(10, 2.5, 50000)]
+    [InlineData(100, 10.0, 400000)]
+    [InlineData(6_000_000, 10.0, int.MaxValue)]
+    public void PlateBudget_ScalesWithTheMultiplier(int parts, double multiplier, int expected) =>
+        Assert.Equal(expected, CuttingPlanBatch.PlateBudget(parts, multiplier));
+
+    [Theory]
+    [InlineData(1.0, 20000)]
+    [InlineData(2.5, 50000)]
+    public void Capture_BudgetMultiplier_ScalesTheSearchBudgetItPlansWith(double multiplier, int expected)
+    {
+        var plate = Plate(new Nest(), Clean("a", 1, 1), Clean("b", 12, 1));
+
+        var proposal = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), preservePartOrder: true,
+            budgetMultiplier: multiplier).Plan();
+
+        var planned = Assert.Single(proposal.Plates);
+        Assert.True(planned.IsReady);
+        Assert.Equal(expected, planned.Result.Snapshot.ExpansionBudget);
+    }
+
+    [Theory]
+    [InlineData(0.4)]
+    [InlineData(10.1)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void Capture_BudgetMultiplierOutOfRange_Throws(double multiplier)
+    {
+        var plate = Plate(new Nest(), Clean("a", 1, 1));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false, budgetMultiplier: multiplier));
+    }
+
+    [Theory]
+    [InlineData(1.0, 1.0)]
+    [InlineData(3.5, 3.5)]
+    [InlineData(0.0, 0.5)]
+    [InlineData(50.0, 10.0)]
+    [InlineData(double.NaN, 1.0)]
+    [InlineData(double.NegativeInfinity, 1.0)]
+    public void ClampBudgetMultiplier_KeepsStoredValuesInRange(double stored, double expected) =>
+        Assert.Equal(expected, CuttingPlanBatch.ClampBudgetMultiplier(stored));
 
     [Fact]
     public void Plan_LargeGrid_FindsANewOrderWithinThePlateBudget()

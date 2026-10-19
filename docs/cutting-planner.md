@@ -615,6 +615,19 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   `NoSolutionWithinBudget` is retried once with the current part order, and the summary
   says the order was kept. Both are allowed 400 expansions per part (at least the
   default 20000), because both still plan contour order and entries for every part.
+- **Tools > Options > Cut planning effort** (`Settings.CuttingPlanEffort`, default 1.0,
+  0.5–10) multiplies both of those budgets. The panel reads it when planning starts and
+  passes it to `CuttingPlanBatch.Capture(..., budgetMultiplier)`; the worker never reads
+  settings, and out-of-range stored values are clamped. The budget counts expansions, not
+  time, so a given effort gives the same plan on every computer; faster hardware only
+  finishes it sooner, and raising the effort is how to spend that speed on hard plates.
+  The eight-entry, 1,000-expansion first pass is not scaled: it is a cheap probe for easy
+  plates, so a higher effort spends more only where the full search runs and leaves easy
+  plates' plans unchanged. A plate refused because a search reached its limit (its own
+  plan, or the free-order attempt before the current order was kept) says the effort can
+  be raised; a longer search may still find no plan. Only the desktop plans cuts: the
+  console, MCP server and API create plates but do not call the planner, so they have no
+  budget to configure. Direct `CuttingPlanRequest` callers set `expansionBudget` themselves.
 - The docked panel keeps text short: one colored outcome line for the batch, one line for the
   shown plate, and one detail line (a remedy for a blocked plate, or what the selected marker
   shows). Below them is a read-only, unsorted issue grid with Plate, source Part, With, and full

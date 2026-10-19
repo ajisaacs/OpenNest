@@ -43,7 +43,18 @@ public sealed class CuttingPlanBatch
     /// </summary>
     public const int ExpansionsPerPart = 400;
 
+    /// <summary>The planning-effort multiplier that gives today's budgets.</summary>
+    public const double DefaultBudgetMultiplier = 1.0;
+
+    /// <summary>The smallest planning-effort multiplier; it still leaves the first pass room to run.</summary>
+    public const double MinimumBudgetMultiplier = 0.5;
+
+    /// <summary>The largest planning-effort multiplier, a bound on one plate's planning time.</summary>
+    public const double MaximumBudgetMultiplier = 10.0;
+
     // Extra bounded work on hard/refused plates; the full-cap search still gets its whole budget.
+    // Not scaled by the multiplier: it is a fixed-cost probe for easy plates, so raising the
+    // effort spends more only where the full search runs and leaves easy plates' plans unchanged.
     internal const int FirstPassBudget = 1000;
     internal const int FirstPassEntries = 8;
 
@@ -64,16 +75,26 @@ public sealed class CuttingPlanBatch
     /// current-order request is captured too, so a free search that runs out of budget can be
     /// retried on the worker without reading live plates again.
     /// </summary>
+    /// <param name="budgetMultiplier">
+    /// Scales both searches' <see cref="PlateBudget"/>, between <see cref="MinimumBudgetMultiplier"/>
+    /// and <see cref="MaximumBudgetMultiplier"/>. The caller passes the operator's setting; the
+    /// worker never reads it.
+    /// </param>
     public static CuttingPlanBatch Capture(IReadOnlyList<Plate> plates, CuttingParameters confirmedParameters,
-        bool preservePartOrder, IReadOnlyList<int> plateNumbers = null, CancellationToken token = default) =>
-        Capture(plates, confirmedParameters, preservePartOrder, plateNumbers, null, token);
+        bool preservePartOrder, IReadOnlyList<int> plateNumbers = null, CancellationToken token = default,
+        double budgetMultiplier = DefaultBudgetMultiplier) =>
+        Capture(plates, confirmedParameters, preservePartOrder, plateNumbers, null, token, budgetMultiplier);
 
     /// <param name="reorderBudget">Overrides the new-order budget (tests); null gives <see cref="PlateBudget"/>.</param>
     internal static CuttingPlanBatch Capture(IReadOnlyList<Plate> plates, CuttingParameters confirmedParameters,
-        bool preservePartOrder, IReadOnlyList<int> plateNumbers, int? reorderBudget, CancellationToken token)
+        bool preservePartOrder, IReadOnlyList<int> plateNumbers, int? reorderBudget, CancellationToken token,
+        double budgetMultiplier = DefaultBudgetMultiplier)
     {
         ArgumentNullException.ThrowIfNull(plates);
         ArgumentNullException.ThrowIfNull(confirmedParameters);
+        if (!(budgetMultiplier >= MinimumBudgetMultiplier && budgetMultiplier <= MaximumBudgetMultiplier))
+            throw new ArgumentOutOfRangeException(nameof(budgetMultiplier), budgetMultiplier,
+                $"The budget multiplier must be between {MinimumBudgetMultiplier} and {MaximumBudgetMultiplier}.");
         if (plates.Count == 0)
             throw new ArgumentException("At least one plate is required.", nameof(plates));
         if (plates.Any(plate => plate == null)
@@ -96,7 +117,7 @@ public sealed class CuttingPlanBatch
         for (var index = 0; index < plates.Count; index++)
         {
             var plate = plates[index];
-            var budget = PlateBudget(plate.Parts.Count);
+            var budget = PlateBudget(plate.Parts.Count, budgetMultiplier);
             var keepOrder = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
                 expansionBudget: budget, confirmedParameters: confirmedParameters,
                 preservePartOrder: true), token);
@@ -112,9 +133,21 @@ public sealed class CuttingPlanBatch
         return new(entries, owned);
     }
 
-    internal static int PlateBudget(int partCount) =>
-        (int)System.Math.Min(int.MaxValue,
-            System.Math.Max((long)MinimumExpansionBudget, (long)partCount * ExpansionsPerPart));
+    /// <summary>A plate's expansion budget: <see cref="ExpansionsPerPart"/> per part, at least
+    /// <see cref="MinimumExpansionBudget"/>, times the multiplier.</summary>
+    internal static int PlateBudget(int partCount, double multiplier = DefaultBudgetMultiplier)
+    {
+        var budget = System.Math.Max((double)MinimumExpansionBudget, (double)partCount * ExpansionsPerPart);
+        return (int)System.Math.Min(int.MaxValue, System.Math.Round(budget * multiplier));
+    }
+
+    /// <summary>
+    /// Brings a stored planning-effort value inside the supported range; a non-finite value gives
+    /// <see cref="DefaultBudgetMultiplier"/>.
+    /// </summary>
+    public static double ClampBudgetMultiplier(double multiplier) => double.IsFinite(multiplier)
+        ? System.Math.Clamp(multiplier, MinimumBudgetMultiplier, MaximumBudgetMultiplier)
+        : DefaultBudgetMultiplier;
 
     /// <summary>
     /// Checks and plans every plate from its captured snapshots. Safe on a worker: live plates are
@@ -231,6 +264,15 @@ public sealed class CuttingPlanPlateResult
     /// <summary>Owned readable output is available, but not all geometric checks passed.</summary>
     public bool CanApplyWithWarnings => Overlap != null && Overlap.Pairs.Count == 0
         && (IsRouteReady || Result.Status == CuttingPlanStatus.BestEffort);
+
+    /// <summary>
+    /// Refused after a search ran out of its expansion budget: this plan, or the free-order attempt
+    /// before the current order was kept. A higher planning effort searches further, without a promise.
+    /// </summary>
+    public bool SearchLimitReached => !CanApplyWithWarnings && !IsRouteReady
+        && (Result.Status == CuttingPlanStatus.NoSolutionWithinBudget || KeptCurrentOrder
+            && Result.Status is not (CuttingPlanStatus.Cancelled or CuttingPlanStatus.UnsupportedGeometry
+                or CuttingPlanStatus.InvalidInput));
 
     /// <summary>
     /// The route was replayed and passed every strict check; only fixed emissions (locked or
@@ -455,7 +497,13 @@ public sealed class CuttingPlanProposal
                 + "current order was refused:";
         foreach (var line in Limit(result.Findings.Select(DescribeFinding)))
             yield return line;
+        if (!missingLead && plate.SearchLimitReached)
+            yield return "  " + SearchLimitHint;
     }
+
+    /// <summary>Operator hint for a plate refused at the search limit; raising the effort is not a promise.</summary>
+    public const string SearchLimitHint = "Raising Cut planning effort in Tools > Options lets the planner search "
+        + "further before it stops; it may still find no plan.";
 
     private static IEnumerable<string> Limit(IEnumerable<string> lines)
     {

@@ -617,7 +617,8 @@ internal sealed class CuttingInspectionPanel : UserControl
         try
         {
             // Capture on the owner thread; no worker recapture of the live plate or settings.
-            var batch = CuttingPlanBatch.Capture(plates, parameters, keepOrderCheckBox.Checked, plateNumbers);
+            var batch = CuttingPlanBatch.Capture(plates, parameters, keepOrderCheckBox.Checked, plateNumbers,
+                budgetMultiplier: CuttingPlanBatch.ClampBudgetMultiplier(Properties.Settings.Default.CuttingPlanEffort));
             var run = ++generation;
             var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             PlanningTask = completion.Task;
@@ -790,6 +791,8 @@ internal sealed class CuttingInspectionPanel : UserControl
             return "Move the overlapping parts apart, then Replan.";
         if (!plate.IsRouteReady && plate.Result.Findings.Any(f => f.Kind == PostVerificationKind.MissingLeadIn))
             return "In Cutting Settings, choose a lead-in with a nonzero length (or unlock the part), then Replan.";
+        if (plate.SearchLimitReached)
+            return "Raise Cut planning effort in Tools > Options to search further, then Replan; it may still find no plan.";
         return null;
     }
 

@@ -33,6 +33,8 @@
             this.label1 = new System.Windows.Forms.Label();
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
             this.numericUpDown1 = new OpenNest.Controls.NumericUpDown();
+            this.planningEffortLabel = new System.Windows.Forms.Label();
+            this.planningEffortBox = new OpenNest.Controls.NumericUpDown();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.saveButton = new System.Windows.Forms.Button();
             this.cancelButton = new System.Windows.Forms.Button();
@@ -48,6 +50,7 @@
             this.updateFeedUrlBox = new System.Windows.Forms.TextBox();
             this.setUpdateFeedButton = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.planningEffortBox)).BeginInit();
             this.tableLayoutPanel1.SuspendLayout();
             this.bottomPanel1.SuspendLayout();
             this.serverGroupBox.SuspendLayout();
@@ -59,7 +62,7 @@
             this.checkBox1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this.checkBox1.AutoSize = true;
             this.tableLayoutPanel1.SetColumnSpan(this.checkBox1, 2);
-            this.checkBox1.Location = new System.Drawing.Point(3, 130);
+            this.checkBox1.Location = new System.Drawing.Point(3, 165);
             this.checkBox1.Name = "checkBox1";
             this.checkBox1.Size = new System.Drawing.Size(281, 20);
             this.checkBox1.TabIndex = 7;
@@ -92,6 +95,33 @@
             this.numericUpDown1.TabIndex = 4;
             this.toolTip1.SetToolTip(this.numericUpDown1, "The amount to round the plate size up.");
             //
+            // planningEffortLabel
+            //
+            this.planningEffortLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.planningEffortLabel.AutoSize = true;
+            this.planningEffortLabel.Location = new System.Drawing.Point(3, 117);
+            this.planningEffortLabel.Name = "planningEffortLabel";
+            this.planningEffortLabel.Size = new System.Drawing.Size(145, 16);
+            this.planningEffortLabel.TabIndex = 12;
+            this.planningEffortLabel.Text = "Cut planning effort:";
+            //
+            // planningEffortBox
+            //
+            this.planningEffortBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.planningEffortBox.DecimalPlaces = 1;
+            this.planningEffortBox.Increment = new decimal(new int[] {
+            5,
+            0,
+            0,
+            65536});
+            this.planningEffortBox.Location = new System.Drawing.Point(154, 114);
+            this.planningEffortBox.Name = "planningEffortBox";
+            this.planningEffortBox.Size = new System.Drawing.Size(130, 22);
+            this.planningEffortBox.Suffix = "";
+            this.planningEffortBox.TabIndex = 13;
+            this.toolTip1.SetToolTip(this.planningEffortBox, "Multiplies the cut planner's search limit (1 = standard). "
+                + "Higher values search longer on hard plates; results are the same on every computer.");
+            //
             // tableLayoutPanel1
             //
             this.tableLayoutPanel1.ColumnCount = 4;
@@ -102,15 +132,18 @@
             this.tableLayoutPanel1.Controls.Add(this.label1, 0, 0);
             this.tableLayoutPanel1.Controls.Add(this.colorSchemeLabel, 0, 1);
             this.tableLayoutPanel1.Controls.Add(this.colorSchemeCombo, 1, 1);
-            this.tableLayoutPanel1.Controls.Add(this.checkBox1, 0, 2);
+            this.tableLayoutPanel1.Controls.Add(this.planningEffortLabel, 0, 2);
+            this.tableLayoutPanel1.Controls.Add(this.planningEffortBox, 1, 2);
+            this.tableLayoutPanel1.Controls.Add(this.checkBox1, 0, 3);
             this.tableLayoutPanel1.Controls.Add(this.numericUpDown1, 1, 0);
             this.tableLayoutPanel1.Location = new System.Drawing.Point(12, 12);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
-            this.tableLayoutPanel1.RowCount = 3;
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 33.33333F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 33.33333F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 33.33333F));
-            this.tableLayoutPanel1.Size = new System.Drawing.Size(684, 160);
+            this.tableLayoutPanel1.RowCount = 4;
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
+            this.tableLayoutPanel1.Size = new System.Drawing.Size(684, 200);
             this.tableLayoutPanel1.TabIndex = 0;
             // 
             // saveButton
@@ -143,7 +176,7 @@
             this.bottomPanel1.Controls.Add(this.cancelButton);
             this.bottomPanel1.Controls.Add(this.saveButton);
             this.bottomPanel1.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.bottomPanel1.Location = new System.Drawing.Point(0, 509);
+            this.bottomPanel1.Location = new System.Drawing.Point(0, 549);
             this.bottomPanel1.Name = "bottomPanel1";
             this.bottomPanel1.Size = new System.Drawing.Size(708, 50);
             this.bottomPanel1.TabIndex = 1;
@@ -162,7 +195,7 @@
             // strategyGroupBox
             //
             this.strategyGroupBox.Controls.Add(this.strategyGrid);
-            this.strategyGroupBox.Location = new System.Drawing.Point(12, 319);
+            this.strategyGroupBox.Location = new System.Drawing.Point(12, 359);
             this.strategyGroupBox.Name = "strategyGroupBox";
             this.strategyGroupBox.Size = new System.Drawing.Size(684, 180);
             this.strategyGroupBox.TabIndex = 2;
@@ -192,7 +225,7 @@
             //
             this.serverGroupBox.Controls.Add(this.serverUrlBox);
             this.serverGroupBox.Controls.Add(this.setServerButton);
-            this.serverGroupBox.Location = new System.Drawing.Point(12, 178);
+            this.serverGroupBox.Location = new System.Drawing.Point(12, 218);
             this.serverGroupBox.Name = "serverGroupBox";
             this.serverGroupBox.Size = new System.Drawing.Size(684, 69);
             this.serverGroupBox.TabIndex = 1;
@@ -221,7 +254,7 @@
             //
             this.updateGroupBox.Controls.Add(this.updateFeedUrlBox);
             this.updateGroupBox.Controls.Add(this.setUpdateFeedButton);
-            this.updateGroupBox.Location = new System.Drawing.Point(12, 253);
+            this.updateGroupBox.Location = new System.Drawing.Point(12, 293);
             this.updateGroupBox.Name = "updateGroupBox";
             this.updateGroupBox.Size = new System.Drawing.Size(684, 60);
             this.updateGroupBox.TabIndex = 3;
@@ -251,7 +284,7 @@
             this.AcceptButton = this.saveButton;
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.CancelButton = this.cancelButton;
-            this.ClientSize = new System.Drawing.Size(708, 559);
+            this.ClientSize = new System.Drawing.Size(708, 599);
             this.Controls.Add(this.strategyGroupBox);
             this.Controls.Add(this.updateGroupBox);
             this.Controls.Add(this.serverGroupBox);
@@ -267,6 +300,7 @@
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "Options";
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.planningEffortBox)).EndInit();
             this.tableLayoutPanel1.ResumeLayout(false);
             this.tableLayoutPanel1.PerformLayout();
             this.bottomPanel1.ResumeLayout(false);
@@ -285,6 +319,8 @@
         private System.Windows.Forms.Button saveButton;
         private System.Windows.Forms.Label label1;
         private Controls.NumericUpDown numericUpDown1;
+        private System.Windows.Forms.Label planningEffortLabel;
+        private Controls.NumericUpDown planningEffortBox;
         private System.Windows.Forms.ToolTip toolTip1;
         private Controls.BottomPanel bottomPanel1;
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
