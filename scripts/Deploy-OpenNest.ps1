@@ -1,7 +1,7 @@
 <#
 Package a Velopack release of the desktop app and push it to a self-hosted
 update feed (a static file server serving the `vpk pack` output). Installed
-clients configured with that feed URL (Options > Auto-update feed URL) pull
+clients configured with that feed URL (Tools > Options > Auto-update feed URL) pull
 and apply updates themselves.
 
 This is separate from scripts/Publish-Windows.ps1 and the GitHub release
@@ -67,6 +67,6 @@ Write-Host "Deployment complete. Machines already configured with this feed URL 
 Write-Host ""
 Write-Host "First-time setup on a machine (one-time per machine):"
 Write-Host "  1. Copy $ReleasesDir\OpenNest-win-Setup.exe to the machine and run it."
-Write-Host "  2. In OpenNest, open File > Options and set 'Auto-update feed URL' to"
+Write-Host "  2. In OpenNest, open Tools > Options and set 'Auto-update feed URL' to"
 Write-Host "     your feed's base URL (e.g. http://${FeedHost}:<port>), then restart OpenNest."
 Write-Host "     This value is per-machine and never stored in source control."
