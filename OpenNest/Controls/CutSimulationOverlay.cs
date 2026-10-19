@@ -484,8 +484,7 @@ internal sealed class CutSimulationOverlay : IDisposable
     private sealed class TrailPens(float dpi) : IDisposable
     {
         public Pen Rapid { get; } = new(Color.FromArgb(150, 70, 150, 255), 1 * dpi) { DashStyle = DashStyle.Dash };
-        // A pale casing under the orange core keeps the trail visible on red, orange and brown parts.
-        public Pen Glow { get; } = new(Color.FromArgb(210, 255, 255, 255), 5 * dpi) { LineJoin = LineJoin.Round };
+        public Pen Glow { get; } = new(Color.FromArgb(70, 255, 140, 0), 6 * dpi) { LineJoin = LineJoin.Round };
         public Pen Cut { get; } = new(Color.OrangeRed, 2 * dpi) { LineJoin = LineJoin.Round };
         public Pen Scribe { get; } = new(Color.MediumOrchid, 1.5f * dpi);
 
