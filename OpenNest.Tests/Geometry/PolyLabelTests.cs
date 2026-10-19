@@ -116,6 +116,44 @@ public class PolyLabelTests
     }
 
     [Fact]
+    public void ThicknessPrecision_FindsThickBarOfSmallPart()
+    {
+        // 1.5-unit C-shape: left bar 0.6 wide, arms 0.15 tall. A fixed 0.5 precision is a
+        // third of the part and stops on the first interior cell.
+        var p = new Polygon();
+        p.Vertices.Add(new Vector(0, 0));
+        p.Vertices.Add(new Vector(1.5, 0));
+        p.Vertices.Add(new Vector(1.5, 0.15));
+        p.Vertices.Add(new Vector(0.6, 0.15));
+        p.Vertices.Add(new Vector(0.6, 1.35));
+        p.Vertices.Add(new Vector(1.5, 1.35));
+        p.Vertices.Add(new Vector(1.5, 1.5));
+        p.Vertices.Add(new Vector(0, 1.5));
+
+        var result = PolyLabel.Find(p, null, PolyLabel.ThicknessPrecision(p));
+
+        // Any height along the bar is equally clear; its centreline is not.
+        Assert.Equal(0.3, result.X, 0.02);
+        Assert.InRange(result.Y, 0.3, 1.2);
+    }
+
+    [Fact]
+    public void ThicknessPrecision_ScalesWithMaterialWidth()
+    {
+        var hole = new Polygon();
+        hole.Vertices.Add(new Vector(20, 20));
+        hole.Vertices.Add(new Vector(80, 20));
+        hole.Vertices.Add(new Vector(80, 80));
+        hole.Vertices.Add(new Vector(20, 80));
+
+        // Square side s: 2 * s^2 / 4s = s / 2.
+        Assert.Equal(0.05 * 50, PolyLabel.ThicknessPrecision(Square(100)), 9);
+        Assert.Equal(0.05 * 0.5, PolyLabel.ThicknessPrecision(Square(1)), 9);
+        // A 20-wide frame is thinner than the solid square, so it refines further.
+        Assert.True(PolyLabel.ThicknessPrecision(Square(100), new[] { hole }) < PolyLabel.ThicknessPrecision(Square(100)));
+    }
+
+    [Fact]
     public void DegeneratePolygon_ReturnsFallback()
     {
         var p = new Polygon();

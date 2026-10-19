@@ -24,6 +24,43 @@ namespace OpenNest.Geometry
         public static Vector Find(Polygon outer, IList<Polygon> holes, double precision, int maxCells) =>
             Find(outer, holes, precision, maxCells, out _);
 
+        /// <summary>
+        /// A precision proportional to the shape's mean material width (twice the net area over
+        /// the total outline length, holes included), so small or slender shapes refine further
+        /// than large solid ones. A fixed precision near the shape's size stops at the first
+        /// interior cell.
+        /// </summary>
+        public static double ThicknessPrecision(Polygon outer, IList<Polygon> holes = null, double fraction = 0.05)
+        {
+            var area = outer.Area();
+            var length = ClosedLength(outer);
+
+            if (holes != null)
+            {
+                for (var i = 0; i < holes.Count; i++)
+                {
+                    area -= holes[i].Area();
+                    length += ClosedLength(holes[i]);
+                }
+            }
+
+            if (!(area > 0) || !(length > 0))
+                return 1e-9;
+
+            return System.Math.Max(fraction * 2 * area / length, 1e-9);
+        }
+
+        private static double ClosedLength(Polygon polygon)
+        {
+            var verts = polygon.Vertices;
+            var sum = 0.0;
+
+            for (int i = 0, j = verts.Count - 1; i < verts.Count; j = i++)
+                sum += verts[j].DistanceTo(verts[i]);
+
+            return sum;
+        }
+
         internal static Vector Find(
             Polygon outer,
             IList<Polygon> holes,

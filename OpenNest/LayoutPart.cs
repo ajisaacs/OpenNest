@@ -237,7 +237,7 @@ namespace OpenNest
                     holes.Add(cutout.ToPolygonWithTolerance(0.1));
             }
 
-            return PolyLabel.Find(outer, holes);
+            return PolyLabel.Find(outer, holes, PolyLabel.ThicknessPrecision(outer, holes));
         }
 
         public void Update(DrawControl plateView)
