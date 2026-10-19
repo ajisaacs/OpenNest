@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
+using OpenNest.Diagnostics;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.CuttingPlanning;
@@ -70,7 +71,7 @@ internal static class PreferredContourEntries
             // The S04 merged catalogue: preferred kinds when present, fallback kinds
             // (compass points, arc midpoints, ...) otherwise — pure circles included.
             var catalogue = prepared.AutomaticEntryCandidatesWithFallbacks(contour, target, token);
-            var ranked = catalogue.RankTowardNextCut(target, arrivalProxy);
+            var ranked = catalogue.RankTowardNextCut(target, arrivalProxy).DepartingClear(prepared, target, token);
             var selection = ContourEntrySelection.Select(ranked, evaluate, 1, token);
             if (selection.Choices.Count == 0)
                 return new(Array.Empty<ContourChoice>(), selection.Shortfall, contour,
@@ -82,6 +83,36 @@ internal static class PreferredContourEntries
         if (choices.Any(c => c == null!))
             throw new InvalidOperationException("Preferred hole resolution left a gap.");
         return new(choices, ContourSelectionShortfall.None, null, null);
+    }
+
+    /// <summary>
+    /// Stable reordering of one hole's ranked entries: those whose straight rapid to
+    /// <paramref name="target"/> (the next cut's pierce, local) clears the hole itself come
+    /// first. With no lead-out the tool leaves a hole where it entered it, so from an entry
+    /// whose way out turns back into the hole (a tiny corner arc's midpoint, whose tangent
+    /// leaves at 45 degrees, ranks as a two-side corner) the rapid onward re-enters the hole
+    /// just cut and is refused. Order only: every entry stays and every rapid is still checked.
+    /// </summary>
+    internal static IReadOnlyList<ContourEntryCandidate> DepartingClear(this IReadOnlyList<ContourEntryCandidate> ranked,
+        PreparedContours prepared, Vector target, CancellationToken token)
+    {
+        if (ranked.Count < 2)
+            return ranked;
+        IReadOnlyList<PostVerificationGeometry.Curve> contour;
+        try
+        {
+            // Any entry's probe cuts the same contour (a tab gap aside); scribes and leads are not part of it.
+            var execution = ExecutionMotionReader.Read(prepared.EmitCandidateForValidation(ranked[0].Choice),
+                Vector.Zero, null, token);
+            contour = execution.Motions
+                .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display && m.Curve != null)
+                .Select(m => m.Curve).ToArray();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or ArithmeticException or NotSupportedException)
+        {
+            return ranked; // An unemittable probe is the lead checks' finding, not the ranker's.
+        }
+        return ranked.OrderBy(c => PostVerificationGeometry.Crosses(c.Choice.Point, target, contour, token) ? 1 : 0).ToList();
     }
 
     /// <summary>

@@ -739,6 +739,10 @@ internal static class JointCuttingPlanSearch
                 ordered = ordered.OrderBy(c => sightTargets.Count(sight => PostVerificationGeometry.Crosses(
                     c.Choice.Point + source.Location, sight, perimeter, token))).ToList();
             }
+            // A hole is left where it was entered too: entries whose rapid to the next
+            // pierce clears the hole itself lead.
+            if (target is { } next && contour != source.Prepared.PerimeterOrdinal)
+                ordered = ordered.DepartingClear(source.Prepared, next, token);
             var selection = ContourEntrySelection.Select(ordered,
                 candidate => Evaluate(source, candidate), snapshot.MaxEntries, token);
             // No configured lead-in fits the perimeter: with a pierce diameter, try open scrap.

@@ -64,6 +64,34 @@ public class ContourRecoveryFileTests
         Assert.Equal(bytes, SHA256.HashData(File.ReadAllBytes(path)));
     }
 
+    // Optional private input: a plate of holed parts whose preferred hole chains used to fail on
+    // cutouts left back across themselves, spending the whole default budget before a new order.
+    [SkippableFact]
+    public void HoledPlatesFindANewOrderWithinTheDefaultBudget()
+    {
+        var path = TestConfig.GetExistingPath("HoledReorderNestPath");
+        Skip.If(path == null, "Configure HoledReorderNestPath in ignored test-config.json.");
+        var bytes = SHA256.HashData(File.ReadAllBytes(path!));
+        var nest = new NestReader(path).Read();
+        // Locked programs are fixed emissions: those plates yield unverified proposals by design.
+        var plates = nest.Plates.Where(p => p.Parts.Count > 0 && p.Parts.All(part => !part.LeadInsLocked)).ToArray();
+        Skip.If(plates.Length == 0, "The configured nest has no plate of unlocked parts.");
+        var parts = plates.SelectMany(p => p.Parts).ToArray();
+        var programs = parts.Select(p => ExplicitContourTests.Fingerprint(p.Program)).ToArray();
+
+        var proposal = CuttingPlanBatch.Capture(plates, Parameters(lineLeads: true), preservePartOrder: false).Plan();
+
+        Assert.True(proposal.CanApply, string.Join(Environment.NewLine, proposal.Describe("in")));
+        foreach (var planned in proposal.Plates)
+        {
+            Assert.False(planned.KeptCurrentOrder);
+            Assert.True(planned.IsReady);
+            Assert.InRange(planned.Result.Expansions, 1, CuttingPlanBatch.PlateBudget(planned.Plate.Parts.Count));
+        }
+        Assert.Equal(programs, parts.Select(p => ExplicitContourTests.Fingerprint(p.Program)));
+        Assert.Equal(bytes, SHA256.HashData(File.ReadAllBytes(path)));
+    }
+
     private static CuttingParameters Parameters(bool lineLeads)
     {
         var parameters = new CuttingParameters();

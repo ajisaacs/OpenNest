@@ -320,6 +320,16 @@ pierce, ignoring scribe marks: each hole faces the following contour's actual pi
 Convex corners lead the preference tiers, then straight midpoints/tangent joints,
 then native fallbacks. Reflex/cusp corners remain manual-only.
 
+A hole is left where it was entered too, so ahead of those tiers its entries are ordered
+by whether the straight rapid from the entry to the following contour's pierce clears the
+hole itself. Without this, the midpoint of a tiny corner arc (it lies on both facing sides
+of the hole, so it ranks as an ideal corner) is left along its 45° tangent, and a shallow
+rapid to a nearby next hole re-enters the corner and crosses the hole just cut; every
+outside endpoint's preferred chain then fails the same way. The full search orders its
+hole entries the same way toward its route's next pierce. This is a stable reordering
+measured from the nominal entry, which is the departure when there is no lead-out; no
+entry is dropped and every emitted rapid is still checked.
+
 This preference orders the search; it never certifies a rapid or prunes alternate
 retained entries or hole orders. A different outside endpoint recomputes its hole
 preference. Every standalone emitted prefix is replayed from the original part
