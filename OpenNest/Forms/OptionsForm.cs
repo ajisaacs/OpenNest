@@ -99,7 +99,7 @@ namespace OpenNest.Forms
             Settings.Default.CreateNewNestOnOpen = checkBox1.Checked;
             Settings.Default.AutoSizePlateFactor = (double)numericUpDown1.Value;
             Settings.Default.ActiveColorScheme =
-                colorSchemeCombo.SelectedItem as string ?? ColorSchemeRegistry.DefaultSchemeName;
+                colorSchemeCombo.SelectedItem as string ?? "Classic";
 
             var disabledNames = new List<string>();
             foreach (DataGridViewRow row in strategyGrid.Rows)

@@ -15,7 +15,6 @@ namespace OpenNest
             StringComparer.OrdinalIgnoreCase
         )
         {
-            ["Blueprint"] = BuildBlueprint(),
             ["Classic"] = BuildClassic(),
             ["Pastel"] = BuildPastel(),
             ["Dark"] = BuildDark(),
@@ -24,8 +23,6 @@ namespace OpenNest
             ["Christmas"] = BuildChristmas(),
             ["4th of July"] = BuildFourthOfJuly(),
         };
-
-        public const string DefaultSchemeName = "Blueprint";
 
         private static List<ColorScheme> diskCache;
 
@@ -43,12 +40,12 @@ namespace OpenNest
         public static ColorScheme Get(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
-                return builtIns[DefaultSchemeName];
+                return builtIns["Classic"];
 
             var hit = AllSchemes.FirstOrDefault(s =>
                 string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)
             );
-            return hit ?? builtIns[DefaultSchemeName];
+            return hit ?? builtIns["Classic"];
         }
 
         public static void ApplyActiveFromSettings()
@@ -227,39 +224,6 @@ namespace OpenNest
                     Color.FromArgb(170, 150, 230), // Twilight
                     Color.FromArgb(235, 150, 170), // Rose
                     Color.FromArgb(90, 120, 210), // Royal Blue
-                },
-            };
-
-        // The default scheme. Its twelve fills were picked farthest-first in Lab (at least
-        // ~30 CIE76 apart), readable with black part IDs and clear of etch green, the sheet
-        // and the canvas.
-        private static ColorScheme BuildBlueprint() =>
-            new ColorScheme
-            {
-                Name = "Blueprint",
-                BackgroundColor = Color.FromArgb(24, 52, 92),
-                LayoutOutlineColor = Color.FromArgb(120, 150, 190),
-                LayoutFillColor = Color.FromArgb(226, 236, 246),
-                BoundingBoxColor = Color.FromArgb(140, 200, 255),
-                RapidColor = Color.FromArgb(230, 90, 40),
-                OriginColor = Color.FromArgb(150, 175, 205),
-                EdgeSpacingColor = Color.FromArgb(160, 185, 215),
-                PreviewPartColor = Color.FromArgb(255, 200, 40),
-                PartOutlineColor = Color.FromArgb(20, 40, 70),
-                PartColors = new[]
-                {
-                    Color.FromArgb(232, 136, 79),
-                    Color.FromArgb(32, 168, 253),
-                    Color.FromArgb(116, 242, 171),
-                    Color.FromArgb(252, 138, 213),
-                    Color.FromArgb(198, 198, 88),
-                    Color.FromArgb(28, 231, 250),
-                    Color.FromArgb(248, 186, 187),
-                    Color.FromArgb(137, 169, 132),
-                    Color.FromArgb(169, 152, 202),
-                    Color.FromArgb(253, 116, 137),
-                    Color.FromArgb(238, 216, 165),
-                    Color.FromArgb(104, 169, 195),
                 },
             };
 

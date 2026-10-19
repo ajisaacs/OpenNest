@@ -69,7 +69,7 @@
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="ActiveColorScheme" Type="System.String" Scope="User">
-      <Value Profile="(Default)">Blueprint</Value>
+      <Value Profile="(Default)">Classic</Value>
     </Setting>
     <Setting Name="UpdateFeedUrl" Type="System.String" Scope="User">
       <Value Profile="(Default)" />

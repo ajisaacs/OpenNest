@@ -1,16 +1,5 @@
 # Nesting-view colors
 
-## Default scheme
-
-**Blueprint** is the default for new installs and the fallback for missing or
-unknown scheme names: deep navy canvas, pale blue sheet, dark navy part
-outlines, orange-red rapids and twelve part fills at least ~30 CIE76 apart that
-stay readable with black part IDs and clear of the etch green, the sheet and the
-canvas. A scheme already saved in **Tools > Options** is kept; choose Blueprint
-there to switch an existing install. Classic remains available.
-
-## Workshop
-
 Choose **Tools > Options > Color scheme > Workshop**, then **Save** for a
 high-contrast per-drawing view:
 
