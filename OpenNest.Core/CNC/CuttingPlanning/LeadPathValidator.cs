@@ -24,6 +24,11 @@ public static class LeadPathValidator
         IReadOnlyList<LeadMaterialSnapshot> otherMaterials, CancellationToken token = default) =>
         Check(execution, target, otherMaterials, null, null, token);
 
+    /// <summary>As the public check, remembering other-material results in <paramref name="memo"/>.</summary>
+    internal static LeadPathValidationResult Check(OwnedExecution execution, LeadMaterialSnapshot target,
+        IReadOnlyList<LeadMaterialSnapshot> otherMaterials, LeadContactMemo memo, CancellationToken token) =>
+        Check(execution, target, otherMaterials, null, null, token, memo);
+
     /// <summary>
     /// As the public check, but a lead motion that <paramref name="isFixed"/> owns (by motion
     /// index) is part of a fixed emission: its failure is added to <paramref name="fixedFailures"/>
@@ -31,7 +36,7 @@ public static class LeadPathValidator
     /// </summary>
     internal static LeadPathValidationResult Check(OwnedExecution execution, LeadMaterialSnapshot target,
         IReadOnlyList<LeadMaterialSnapshot> otherMaterials, Func<int, bool> isFixed,
-        List<FixedLeadFailure> fixedFailures, CancellationToken token)
+        List<FixedLeadFailure> fixedFailures, CancellationToken token, LeadContactMemo memo = null)
     {
         token.ThrowIfCancellationRequested();
         if (execution == null || target == null || otherMaterials == null)
@@ -144,7 +149,7 @@ public static class LeadPathValidator
                     var material = otherMaterials[other];
                     if (ReferenceEquals(material, target))
                         continue;
-                    if (CheckMaterial(material, null) != null)
+                    if (OtherContact(material))
                         return (new(true, false, "Lead contacts or enters another placed material. "
                             + "Try spacing the parts farther apart or reducing the lead-in/lead-out length, then replan. "
                             + "For locked parts, edit the leads or unlock the part before replanning."), other);
@@ -153,6 +158,25 @@ public static class LeadPathValidator
 
                 string CheckMaterial(LeadMaterialSnapshot material, Vector? permittedJoint) =>
                     MaterialContact(move.Curve, material, permittedJoint, ref budget, token);
+
+                // Exactly the unmemoized check: a remembered scan charges the queries it ran
+                // and throws where running it again would exhaust the budget.
+                bool OtherContact(LeadMaterialSnapshot material)
+                {
+                    if (memo == null)
+                        return CheckMaterial(material, null) != null;
+                    if (memo.TryGet(move.Curve, material, out var scan))
+                    {
+                        if (budget - scan.Queries < 0)
+                            throw new NotSupportedException("Lead validation exceeds the native query limit.");
+                        budget -= scan.Queries;
+                        return scan.Contact;
+                    }
+                    var before = budget;
+                    var contact = CheckMaterial(material, null) != null;
+                    memo.Add(move.Curve, material, new(contact, before - budget));
+                    return contact;
+                }
             }
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException)

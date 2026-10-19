@@ -195,6 +195,9 @@ internal static class JointCuttingPlanSearch
         // One feasibility adapter per source part per captured planning attempt: verdicts
         // memoize per owned choice for the attempt, never statically or across attempts.
         private readonly Dictionary<int, ContourEntryFeasibility> feasibility = [];
+        // Lead/material verdicts for exact curves, shared by prechecks and prefix checks of this
+        // walk: each prefix repeats its earlier contours' leads. Replay never uses it.
+        private readonly LeadContactMemo leadContacts = new();
         private readonly HashSet<int> reportedNoFit = [];
         private readonly Dictionary<int, Entity[]> hostContours = [];
 
@@ -624,7 +627,7 @@ internal static class JointCuttingPlanSearch
         private ContourEntryFeasibility Adapter(FixedProgramPlacement source) =>
             feasibility.TryGetValue(source.SourceOrdinal, out var known) ? known
                 : feasibility[source.SourceOrdinal] = new ContourEntryFeasibility(
-                    source.Prepared, source.Location, source.Material, materials);
+                    source.Prepared, source.Location, source.Material, materials, leadContacts);
 
         private ContourFeasibilityVerdict Evaluate(FixedProgramPlacement source, ContourEntryCandidate candidate)
         {
@@ -741,7 +744,7 @@ internal static class JointCuttingPlanSearch
             attempt.NoteCrossings(source.SourceOrdinal, findings);
             // A fixed cutoff has no material or leads to certify; its rapids are still checked.
             var lead = source.IsCutOff ? new LeadPathValidationResult(true, true, null)
-                : LeadPathValidator.Check(execution, source.Material, materials, isFixed, [], token);
+                : LeadPathValidator.Check(execution, source.Material, materials, isFixed, [], token, leadContacts);
             if (!lead.IsComplete || !lead.IsClear)
                 rejected.Add(Finding(source, lead.IsComplete ? null : PostVerificationKind.Incomplete, lead.Reason));
             return findings.Count == 0 && lead.IsComplete && lead.IsClear;

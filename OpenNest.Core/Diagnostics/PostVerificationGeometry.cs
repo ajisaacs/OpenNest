@@ -125,6 +125,10 @@ internal static class PostVerificationGeometry
         return angle < 0 ? angle + TwoPi : angle;
     }
 
+    /// <summary>Exact identity of a <see cref="Curve"/>'s defining values (see <see cref="Curve.Key"/>).</summary>
+    internal readonly record struct CurveKey(long StartX, long StartY, long EndX, long EndY,
+        bool HasCenter, long CenterX, long CenterY, long Radius, long Sweep);
+
     internal sealed class Curve
     {
         private Curve(Vector start, Vector end, Vector? center, double radius, double sweep)
@@ -171,6 +175,16 @@ internal static class PostVerificationGeometry
             ? new Vector(center.X + Radius * System.Math.Cos(StartAngle + Sweep / 2),
                 center.Y + Radius * System.Math.Sin(StartAngle + Sweep / 2))
             : (Start + End) * 0.5;
+
+        /// <summary>
+        /// The exact bits of every value a native query reads, so two curves with equal keys
+        /// give identical query results. Not a geometric tolerance: equal shapes built from
+        /// different roundoff get different keys.
+        /// </summary>
+        internal CurveKey Key => new(Bits(Start.X), Bits(Start.Y), Bits(End.X), Bits(End.Y),
+            Center.HasValue, Bits(Center?.X ?? 0), Bits(Center?.Y ?? 0), Bits(Radius), Bits(Sweep));
+
+        private static long Bits(double value) => BitConverter.DoubleToInt64Bits(value);
 
         internal bool SameSupport(Curve other) => SameSupport(other, Epsilon);
 

@@ -48,10 +48,20 @@ public sealed class ContourEntryFeasibility
     private readonly LeadMaterialSnapshot ownMaterial;
     private readonly LeadMaterialSnapshot[] materials;
     private readonly Dictionary<Key, ContourFeasibilityVerdict> cache = new();
+    private readonly LeadContactMemo? leadContacts;
 
     public ContourEntryFeasibility(PreparedContours prepared, Vector location,
         LeadMaterialSnapshot ownMaterial, IReadOnlyList<LeadMaterialSnapshot> otherMaterials)
+        : this(prepared, location, ownMaterial, otherMaterials, null)
     {
+    }
+
+    /// <param name="leadContacts">Shares exact lead/material results with the caller's search.</param>
+    internal ContourEntryFeasibility(PreparedContours prepared, Vector location,
+        LeadMaterialSnapshot ownMaterial, IReadOnlyList<LeadMaterialSnapshot> otherMaterials,
+        LeadContactMemo? leadContacts)
+    {
+        this.leadContacts = leadContacts;
         this.prepared = prepared ?? throw new ArgumentException("Prepared contours are required.", nameof(prepared));
         this.ownMaterial = ownMaterial ?? throw new ArgumentException("Own material snapshot is required.", nameof(ownMaterial));
         if (otherMaterials == null)
@@ -110,7 +120,9 @@ public sealed class ContourEntryFeasibility
         {
             var program = prepared.EmitCandidateForValidation(choice);
             var execution = ExecutionMotionReader.Read(program, location, null, token);
-            var result = LeadPathValidator.Check(execution, ownMaterial, materials, token);
+            var result = leadContacts == null
+                ? LeadPathValidator.Check(execution, ownMaterial, materials, token)
+                : LeadPathValidator.Check(execution, ownMaterial, materials, leadContacts, token);
             if (!result.IsComplete)
                 return new(ContourFeasibilityStatus.Incomplete, result.Reason);
             return result.IsClear

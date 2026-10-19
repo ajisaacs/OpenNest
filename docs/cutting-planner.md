@@ -66,7 +66,11 @@ inside both spans. Lead and rapid checks keep their conservative contact queries
 Source contour closure
 in material capture and emitter preparation accepts endpoint gaps up to 0.000001
 model units (inches for an inch nest), with a floating-point roundoff allowance
-capped at 1e-12. It does not rewrite source endpoints. Native intersections,
+capped at 1e-12. It does not rewrite source endpoints. A contour entered away from its
+seam crosses that gap mid-cut; when an arc follows it, emission bridges the gap with a
+straight move and cuts the arc as drawn, rather than starting the arc off its own circle
+(which every check refuses as an inconsistent radius). An entry on the seam vertex has no
+such bridge, since a lead-in must join the contour itself. Native intersections,
 executed-motion checks and pre-post verification retain their existing tolerances.
 
 Arcs of one circle whose centres were each derived from their own endpoints agree only
@@ -214,7 +218,9 @@ rapid, ten times the widest band any native contact query allows beyond an
 extent; anything closer, touching included, gets the full native check. Lead
 checks examine every other part's material: native line/circle queries can report
 rounding contacts for long leads far from small circles, and leads keep those
-results. An arc's
+results. Every prefix of a part repeats its earlier contours' leads, so one search
+remembers each other-material verdict by the lead curve's exact bits and the material's
+reference, and charges the native query budget the scan ran; replay never uses it. An arc's
 extent is its whole supporting circle widened to the distance at which the native
 contact query still counts it as touched (for a very small arc up to 0.0001 beyond
 its radius). Nothing is skipped when either extent has a nonfinite bound or reaches

@@ -149,6 +149,42 @@ public class SeamClosureReplayTests
         Assert.False(result.IndependentlyReplayed);
     }
 
+    [Theory]
+    [InlineData(5e-7)]
+    [InlineData(1e-6)]
+    public void AdmittedClosureSeam_BeforeAnArc_EmitsFromEveryEntry(double seam)
+    {
+        // The ring's first entity is an arc and the last edge stops short of its start. Entered
+        // anywhere but the seam, the path reaches that arc off its circle; bridging the gap with a
+        // straight move keeps the arc exact instead of refusing it as an inconsistent radius,
+        // which left a converted outline with only one usable entry.
+        var program = new Program();
+        program.MoveTo(0, 0);
+        program.ArcTo(new Vector(10, 0), new Vector(5, 5), RotationType.CCW);
+        program.LineTo(10, 10);
+        program.LineTo(0, 10);
+        program.LineTo(0, seam);
+        var settings = ExplicitContourTests.Parameters();
+        var snapshot = Capture(new Part(new Drawing("seam", program)), settings);
+        var source = snapshot.Placements[0];
+        Assert.True(source.Material!.IsComplete, source.Material.Reason);
+
+        // An entry on the seam vertex itself puts the gap before the first cut, where no lead-in
+        // can join it; that one stays refused as before.
+        var entries = source.Prepared!.Entries(0, new Vector(-5, 5), 64)
+            .Where(c => c.Point.DistanceTo(new Vector(0, seam)) > 1e-9).ToArray();
+        Assert.True(entries.Length > 1);
+        foreach (var choice in entries)
+        {
+            var emitted = source.Prepared.Emit([choice]);
+            var result = CuttingPlanService.ReplayPrograms(snapshot,
+                [source.Propose(emitted, Read(emitted), [choice])], 0, default);
+
+            Assert.Equal(CuttingPlanStatus.Ready, result.Status);
+            Assert.True(result.IndependentlyReplayed);
+        }
+    }
+
     [Fact]
     public void GapBeyondAdmittedClosure_StillRefusesAtCapture()
     {

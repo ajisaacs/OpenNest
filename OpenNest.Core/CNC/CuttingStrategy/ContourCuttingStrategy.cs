@@ -1059,15 +1059,27 @@ namespace OpenNest.CNC.CuttingStrategy
         )
         {
             var moves = new List<ICode>();
+            var position = startPoint;
 
             foreach (var entity in shape.Entities)
             {
                 if (entity is Line line)
                 {
                     moves.Add(new LinearMove(line.EndPoint) { Layer = layer });
+                    position = line.EndPoint;
                 }
                 else if (entity is Arc arc)
                 {
+                    // A contour entered away from its seam crosses the seam's admitted closure gap
+                    // mid-cut. Starting the arc there would move its start off its own circle, so
+                    // bridge the gap with a straight move and cut the arc exactly as drawn. A lead-in
+                    // must join the contour itself, so an entry on the seam is left as it was.
+                    var arcStart = arc.StartPoint();
+                    var gap = position.DistanceTo(arcStart);
+                    if (moves.Count > 0 && gap > Diagnostics.PostVerificationGeometry.Epsilon
+                        && CuttingPlanning.NominalContourClosure.IsClosed(position, arcStart))
+                        moves.Add(new LinearMove(arcStart) { Layer = layer });
+                    position = arc.EndPoint();
                     moves.Add(
                         new ArcMove(
                             arc.EndPoint(),
@@ -1084,6 +1096,7 @@ namespace OpenNest.CNC.CuttingStrategy
                     moves.Add(
                         new ArcMove(startPoint, circle.Center, circle.Rotation) { Layer = layer }
                     );
+                    position = startPoint;
                 }
                 else
                 {

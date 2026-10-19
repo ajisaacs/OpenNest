@@ -107,6 +107,35 @@ public class NearbyMaterialCheckTests
     }
 
     [Fact]
+    public void MemoizedLeadCheck_ReturnsTheNativeResultOnEveryCall()
+    {
+        // The search re-checks the same emitted leads on every prefix of a part. Remembered
+        // answers must be the native ones, the rounding contact far from a small circle included.
+        var target = LeadMaterialSnapshot.Capture(LeadPathValidationTests.Rectangle(0, -2, 2, 0.0021), Vector.Zero);
+        var circle = new Program();
+        circle.MoveTo(-1 + 0.0001, 0);
+        circle.Codes.Add(new ArcMove(new Vector(-1 + 0.0001, 0), new Vector(-1, 0), RotationType.CCW));
+        var far = LeadMaterialSnapshot.Capture(circle, Vector.Zero);
+        var clear = LeadMaterialSnapshot.Capture(LeadPathValidationTests.Rectangle(5, 5, 6, 6), Vector.Zero);
+        var lead = new Program();
+        lead.MoveTo(-900000, 0.0021);
+        lead.Codes.Add(new LinearMove(0, 0.0021) { Layer = LayerType.Leadin });
+        lead.LineTo(0, -2);
+        var memo = new LeadContactMemo();
+
+        foreach (var others in new[] { new[] { target, clear }, [target, clear, far], [far, target] })
+        {
+            var expected = LeadPathValidator.Check(Read(lead), target, others);
+            for (var call = 0; call < 2; call++)
+            {
+                var actual = LeadPathValidator.Check(Read(lead), target, others, memo, default);
+                Assert.Equal(expected, actual);
+            }
+        }
+        Assert.True(memo.Hits > 0);
+    }
+
+    [Fact]
     public void RapidJustOutsideASmallCompletedCircle_IsStillACrossing()
     {
         // A circle of radius 0.001 counts as touched up to sqrt(r^2 + 1e-8) from its centre, beyond
