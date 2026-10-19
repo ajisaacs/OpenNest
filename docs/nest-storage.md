@@ -106,6 +106,7 @@ existing callers its integer value 0–2; an undefined value is 400 and stores n
 | GET | `/api/nests/deleted/query` | — | Bounded deleted-record page; same query parameters as ordinary browsing |
 | GET | `/api/nests/deleted/{id}` / `/{id}/file` / `/{id}/revisions` / `/{id}/revisions/{revision}/file` | — | Recovery equivalents of current/history reads |
 | POST | `/api/nests/deleted/{id}/recover` | — | New nondeleted revision of the same ID |
+| POST | `/api/nest-names/next?year=` | — | `{ "year", "number", "name" }`: the year's next generated nest number (see below); 400 outside 2000–2099 |
 
 All existing-record mutations require `If-Match: "<current revision>"`.
 Missing precondition returns 428 (upgrade/reload), malformed precondition 400,
@@ -113,6 +114,24 @@ stale precondition 409 with current metadata; none mutate data. Ordinary reads
 of hidden records return 404. Changed file/metadata saves and visibility changes
 append snapshots atomically; an identical save at the current revision is a no-op.
 Restore appends a new snapshot, never rewrites its source or intervening history.
+
+### Generated nest names
+
+**File > New** names a nest `N<yy>-<seq>` (`OpenNest.Data.NestNames`): the
+two-digit year and the year's sequence number in a base-30 alphabet without
+look-alike characters, padded to three digits (27,000 a year before a fourth
+appears). The sequence runs for the whole year. In Database mode the desktop
+asks `POST /api/nest-names/next` for the number, so every PC shares one
+counter per year (`nest_sequences`, schema version 6). The server also keeps
+the number above every stored generated name for that year, active or
+deleted, so names created offline or before the server counted are not
+reissued; renamed nests and other years' names do not move it.
+
+When the server is unreachable within 3 seconds, has no such endpoint, or the
+app is in File mode, the PC's own counter (`NestNumber` user setting) names
+the nest. It resets when the year changes and is raised past each number the
+server hands out. Two PCs naming nests offline at the same time can still pick
+the same name; a nest's identity on the server is its `id`, never its name.
 
 There is no authentication; this is a LAN-only service. Do not expose it
 outside the shop network without adding one.

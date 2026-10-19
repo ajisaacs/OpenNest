@@ -34,12 +34,12 @@ namespace OpenNest.Forms
 
         #region File Menu Events
 
-        private void New_Click(object sender, EventArgs e)
+        private async void New_Click(object sender, EventArgs e)
         {
             var windowState =
                 ActiveMdiChild != null ? ActiveMdiChild.WindowState : FormWindowState.Maximized;
 
-            LoadNest(NewNestFactory.Create(this), windowState);
+            LoadNest(await NewNestFactory.CreateAsync(this), windowState);
         }
 
         private async void Open_Click(object sender, EventArgs e)

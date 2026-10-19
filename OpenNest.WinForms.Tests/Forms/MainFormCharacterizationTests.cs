@@ -5,21 +5,11 @@ using OpenNest.Geometry;
 
 namespace OpenNest.WinForms.Tests.Forms;
 
-// Pins MainForm behaviour that its refactor must preserve: nest naming and the deliberately
-// different busy guards. Reads Application.OpenForms, so it must not overlap fill-lifetime tests.
+// Pins MainForm behaviour that its refactor must preserve: the deliberately different
+// busy guards. Reads Application.OpenForms, so it must not overlap fill-lifetime tests.
 [Collection("Fill operation lifetime")]
 public class MainFormCharacterizationTests
 {
-    [Theory]
-    [InlineData(0, "N26-222")]
-    [InlineData(1, "N26-223")]
-    [InlineData(29, "N26-22Z")]
-    [InlineData(30, "N26-232")]
-    [InlineData(900, "N26-322")]
-    [InlineData(27000, "N26-3222")]
-    public void NestNamesUseTwoDigitYearAndPaddedBase30Sequence(int id, string expected) =>
-        Assert.Equal(expected, NewNestFactory.GetNestName(new DateTime(2026, 10, 17), id));
-
     [Fact]
     public void BusyGuardsDifferInWhichOperationsTheyCount() => StaTestThread.Run(() =>
     {

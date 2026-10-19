@@ -1,32 +1,32 @@
 using System;
+using System.IO;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
+using OpenNest.Data;
 using OpenNest.Properties;
 
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// Creates File > New nests: machine defaults and clamps, then the next name in the
-    /// day's sequence (<see cref="Settings.NestNumber"/> restarts at 1 each day).
+    /// Creates File > New nests: machine defaults and clamps, then the year's next name
+    /// (<see cref="NestNames"/>). In Database mode the nest server allocates the number so
+    /// every PC shares one sequence; when it cannot, <see cref="Settings.NestNumber"/> is the
+    /// local fallback, kept above every number the server handed out and reset each year.
     /// </summary>
     internal static class NewNestFactory
     {
-        private const string Base30Digits = "2345679ACDEFGHJKLMNPQRSTUVWXYZ";
+        private static readonly TimeSpan ServerTimeout = TimeSpan.FromSeconds(3);
 
-        public static Nest Create(IWin32Window owner)
+        public static async Task<Nest> CreateAsync(IWin32Window owner)
         {
             var nest = CreateDefaultNest(owner);
             var now = DateTime.Now;
 
             nest.DateCreated = now;
             nest.DateLastModified = now;
-
-            if (now.Date != Settings.Default.LastNestCreatedDate.Date)
-            {
-                Settings.Default.NestNumber = 1;
-                Settings.Default.LastNestCreatedDate = now.Date;
-            }
-
-            nest.Name = GetNestName(now, Settings.Default.NestNumber++);
+            nest.Name = NestNames.Format(now.Year, await AllocateNumberAsync(now));
             return nest;
         }
 
@@ -39,30 +39,30 @@ namespace OpenNest.Forms
             return nest;
         }
 
-        /// <summary>
-        /// "N" + two-digit year + the sequence in an unambiguous base-30 alphabet, padded to
-        /// three digits with its zero digit ('2').
-        /// </summary>
-        public static string GetNestName(DateTime date, int id)
+        private static async Task<int> AllocateNumberAsync(DateTime now)
         {
-            var year = (date.Year % 100).ToString("D2");
-            var seq = ToBase30(id).PadLeft(3, Base30Digits[0]);
+            if (now.Year != Settings.Default.LastNestCreatedDate.Year)
+                Settings.Default.NestNumber = 1;
+            Settings.Default.LastNestCreatedDate = now.Date;
 
-            return $"N{year}-{seq}";
-        }
-
-        private static string ToBase30(int value)
-        {
-            if (value == 0)
-                return Base30Digits[0].ToString();
-
-            var result = "";
-            while (value > 0)
+            if (NestStorage.Settings.IsDatabaseMode)
             {
-                result = Base30Digits[value % Base30Digits.Length] + result;
-                value /= Base30Digits.Length;
+                try
+                {
+                    using var timeout = new CancellationTokenSource(ServerTimeout);
+                    var number = await NestStorage.CreateRepository()
+                        .AllocateNestNumberAsync(now.Year, timeout.Token);
+                    Settings.Default.NestNumber = System.Math.Max(Settings.Default.NestNumber, number + 1);
+                    return number;
+                }
+                catch (Exception ex) when (ex is HttpRequestException or IOException
+                    or OperationCanceledException or NotSupportedException or ArgumentException)
+                {
+                    // Offline or an older server: fall back to this PC's counter.
+                }
             }
-            return result;
+
+            return Settings.Default.NestNumber++;
         }
     }
 }

@@ -49,6 +49,15 @@ app.MapGet("/api/nests/{id:guid}", (Guid id, NestDatabase db) =>
 app.MapGet("/api/nests/{id:guid}/file", (Guid id, NestDatabase db) =>
     db.GetFile(id) is { } file ? Results.File(file, "application/zip", $"{id}.nest") : Results.NotFound());
 
+// Next generated nest name for a year; one counter per year shared by every client.
+app.MapPost("/api/nest-names/next", (int year, NestDatabase db) =>
+{
+    if (year is < NestNames.MinYear or > NestNames.MaxYear)
+        return Results.BadRequest($"year must be between {NestNames.MinYear} and {NestNames.MaxYear}.");
+    var number = db.AllocateNestNumber(year);
+    return Results.Ok(new NestNameAllocation { Year = year, Number = number, Name = NestNames.Format(year, number) });
+});
+
 // POST/PUT multipart: "metadata" JSON part + "file" part (the .nest archive).
 app.MapPost("/api/nests", async (HttpContext http, NestDatabase db) =>
 {

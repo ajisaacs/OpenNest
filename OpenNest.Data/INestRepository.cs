@@ -75,6 +75,10 @@ public interface INestRepository
     Task<NestRecord> RecoverAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("This repository does not support guarded recovery.");
 
+    /// <summary>Allocates the year's next generated nest number, unique across every client.</summary>
+    Task<int> AllocateNestNumberAsync(int year, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This repository does not allocate nest names.");
+
     /// <summary>Atomically replaces the current archive only at the expected revision.</summary>
     Task<NestRecord> UpdateFileAsync(Guid id, byte[] nestFile, NestRecord record, int expectedRevision,
         CancellationToken cancellationToken = default) =>

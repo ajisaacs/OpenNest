@@ -131,6 +131,21 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         return await ReadRecord(response, cancellationToken);
     }
 
+    public async Task<int> AllocateNestNumberAsync(int year, CancellationToken cancellationToken = default)
+    {
+        if (year is < NestNames.MinYear or > NestNames.MaxYear)
+            throw new ArgumentOutOfRangeException(nameof(year));
+        using var response = await _httpClient.PostAsync(
+            Url("api/nest-names/next?year=" + year.ToString(CultureInfo.InvariantCulture)), null, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            throw new NotSupportedException("This nest server does not allocate nest names (HTTP 404).");
+        await EnsureSuccess(response, "allocate a nest name", cancellationToken);
+        var allocation = await response.Content.ReadFromJsonAsync<NestNameAllocation>(JsonOptions, cancellationToken);
+        if (allocation is null || allocation.Year != year || allocation.Number < 1)
+            throw new IOException("Nest server returned an invalid nest name allocation.");
+        return allocation.Number;
+    }
+
     public async Task<NestRecord> UpdateFileAsync(
         Guid id, byte[] nestFile, NestRecord record, CancellationToken cancellationToken = default)
     {
