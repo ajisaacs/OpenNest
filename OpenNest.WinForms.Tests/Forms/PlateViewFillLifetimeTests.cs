@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Windows.Forms;
+using OpenNest.Actions;
 using OpenNest.CNC;
 using OpenNest.Controls;
 using OpenNest.Engine;
@@ -59,6 +60,39 @@ public class PlateViewFillLifetimeTests
             Assert.Null(run.View.ActiveWorkArea);
             Assert.Empty(PreviewParts(run.View));
             Assert.Empty(Application.OpenForms.OfType<NestProgressForm>());
+        });
+    }
+
+    [Fact]
+    public void StoppedFillStillRefusesPlateEditsUntilItReturns()
+    {
+        RunSta(() =>
+        {
+            using var run = new FillRun();
+            var existing = run.View.Plate.Parts[0];
+            var location = existing.Location;
+            run.View.SetAction(typeof(ActionClone), run.Group[0].BaseDrawing);
+            run.Start();
+            // Stopping only requests cancellation; the worker reads Plate.Parts until it returns.
+            Assert.Single(Application.OpenForms.OfType<NestProgressForm>()).Close();
+
+            var click = new MouseEventArgs(MouseButtons.Left, 1, 10, 10, 0);
+            Raise(run.View, "OnMouseDown", click);
+            Raise(run.View, "OnKeyDown", new KeyEventArgs(Keys.Enter));
+            run.View.SetAction(typeof(ActionSelect));
+            run.View.LayoutParts.Single(p => p.BasePart == existing).IsSelected = true;
+            run.View.SelectedParts.Add(run.View.LayoutParts.Single(p => p.BasePart == existing));
+            Raise(run.View, "OnKeyDown", new KeyEventArgs(Keys.Delete));
+            Raise(run.View, "ProcessDialogKey", Keys.Left);
+
+            Assert.Same(existing, Assert.Single(run.View.Plate.Parts));
+            Assert.Equal(location, existing.Location);
+
+            run.Complete();
+            Assert.False(run.View.IsFillInProgress);
+            run.View.SetAction(typeof(ActionClone), run.Group[0].BaseDrawing);
+            Raise(run.View, "OnMouseDown", click);
+            Assert.Equal(2, run.View.Plate.Parts.Count);
         });
     }
 
@@ -277,6 +311,10 @@ public class PlateViewFillLifetimeTests
     private static IReadOnlyList<LayoutPart> PreviewParts(PlateView view) =>
         (IReadOnlyList<LayoutPart>)typeof(PlateView)
             .GetProperty("PreviewParts", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(view)!;
+
+    private static void Raise(PlateView view, string method, object argument) =>
+        typeof(PlateView).GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic,
+            [argument.GetType()])!.Invoke(view, [argument]);
 
     private static void Invoke(Form form, string method, params object?[] arguments) =>
         form.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)!

@@ -412,7 +412,7 @@ namespace OpenNest.Controls
 
         protected override void OnDragEnter(DragEventArgs drgevent)
         {
-            if (InspectionOnly)
+            if (EditsLocked)
                 return;
             if (drgevent.Data.GetData(typeof(Drawing)) != null)
                 drgevent.Effect = DragDropEffects.Copy;
@@ -422,7 +422,7 @@ namespace OpenNest.Controls
 
         protected override void OnDragDrop(DragEventArgs drgevent)
         {
-            if (InspectionOnly)
+            if (EditsLocked)
                 return;
             if (drgevent.Data.GetDataPresent(DataFormats.FileDrop))
             {
@@ -450,7 +450,7 @@ namespace OpenNest.Controls
             if (e.Button == MouseButtons.Middle)
                 middleMouseDownPoint = e.Location;
 
-            if (InspectionOnly)
+            if (EditsLocked)
                 return;
 
             if (e.Button == MouseButtons.Left && actionManager.CurrentAction is ActionSelect)
@@ -475,7 +475,7 @@ namespace OpenNest.Controls
 
         protected override void OnMouseUp(MouseEventArgs e)
         {
-            if (InspectionOnly)
+            if (EditsLocked)
                 return;
             if (e.Button == MouseButtons.Middle && SelectedParts.Count > 0)
             {
@@ -508,7 +508,7 @@ namespace OpenNest.Controls
 
             var multiplier = System.Math.Abs(e.Delta / 120);
 
-            if (!InspectionOnly && SelectedParts.Count > 0 && ((ModifierKeys & Keys.Shift) == Keys.Shift))
+            if (!EditsLocked && SelectedParts.Count > 0 && ((ModifierKeys & Keys.Shift) == Keys.Shift))
             {
                 var increment =
                     (ModifierKeys & Keys.Control) == Keys.Control
@@ -564,7 +564,7 @@ namespace OpenNest.Controls
 
             lastPoint = e.Location;
 
-            if (InspectionOnly)
+            if (EditsLocked)
                 return;
 
             if (cutOffHandler.IsDragging && e.Button == MouseButtons.Left
@@ -596,10 +596,10 @@ namespace OpenNest.Controls
 
         protected override void OnMouseDoubleClick(MouseEventArgs e)
         {
-            if (!InspectionOnly)
+            if (!EditsLocked)
                 base.OnMouseDoubleClick(e);
 
-            if (e.Button == MouseButtons.Middle && (InspectionOnly || SelectedParts.Count == 0))
+            if (e.Button == MouseButtons.Middle && (EditsLocked || SelectedParts.Count == 0))
                 ZoomToFit();
         }
 
@@ -627,7 +627,7 @@ namespace OpenNest.Controls
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
-            if (InspectionOnly)
+            if (EditsLocked)
             {
                 if (e.KeyData == Keys.F)
                     ZoomToFit();
@@ -668,6 +668,8 @@ namespace OpenNest.Controls
                     InspectionCloseRequested?.Invoke();
                 return true;
             }
+            if (IsFillInProgress)
+                return true;
             // Only handle TAB, RETURN, ESC, and ARROW KEYS here.
             // All other keys can be handled in OnKeyDown method.
 
@@ -865,6 +867,13 @@ namespace OpenNest.Controls
 
         // UI-thread state: closing the progress window only requests cancellation.
         public bool IsFillInProgress { get; private set; }
+
+        /// <summary>
+        /// True while input must not edit the plate: an inspection, or a fill whose worker
+        /// reads <see cref="Plate"/>'s parts until it returns, even after it is stopped.
+        /// Panning and zooming stay live.
+        /// </summary>
+        private bool EditsLocked => InspectionOnly || IsFillInProgress;
 
         public async void FillWithProgress(List<Part> groupParts, Box workArea)
         {
