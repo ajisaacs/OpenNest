@@ -28,7 +28,7 @@ dotnet test OpenNest.Server.Tests/OpenNest.Server.Tests.csproj -c Release
 dotnet test OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj
 ```
 
-Keep desktop-dependent tests in `OpenNest.WinForms.Tests`, never add a WinForms reference to `OpenNest.Tests`. Optional CHR fixtures use local `OpenNest.Tests/test-config.json` and skip when absent. On Linux, build Windows projects with `-p:EnableWindowsTargeting=true`; this is not Windows runtime verification. The headless console builds independently with `dotnet build OpenNest.Console/OpenNest.Console.csproj`.
+After changing planning, contour preparation or geometry checks, run the [problem-nest corpus](docs/problem-nests.md) (`Category=ProblemNests`, opt-in via `OPENNEST_PROBLEM_NESTS_SERVER`); no plate may rank below its baseline. Keep desktop-dependent tests in `OpenNest.WinForms.Tests`, never add a WinForms reference to `OpenNest.Tests`. Optional CHR fixtures use local `OpenNest.Tests/test-config.json` and skip when absent. On Linux, build Windows projects with `-p:EnableWindowsTargeting=true`; this is not Windows runtime verification. The headless console builds independently with `dotnet build OpenNest.Console/OpenNest.Console.csproj`.
 
 Releases: follow [the release procedure](docs/releasing.md) and `scripts/Publish-Windows.ps1`; workflow artifacts are candidates, not published releases. GitHub (`ajisaacs/OpenNest`) is the primary repository; Gitea is a read-only backup mirror.
 
