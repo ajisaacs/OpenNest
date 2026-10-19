@@ -131,7 +131,6 @@ public sealed class IrregularNestingEngine : INestingEngine
         }
 
         private const int MaxTail = 3;
-        private readonly SheetPreview? preview = progress == null ? null : new SheetPreview(progress, types, drawingFor);
         private readonly Dictionary<double, NoFitCache> caches = new();
         private readonly Dictionary<NestPlateStock, ClampObstacles> clamps = new();
         private readonly Dictionary<double, IReadOnlyDictionary<int, IReadOnlyList<PairPose>>> pairs = new();
@@ -290,10 +289,8 @@ public sealed class IrregularNestingEngine : INestingEngine
                     if (stock.Quantity is int available && used[stock.Id] >= available)
                         continue;
                     progress?.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stock.Id, sheets.Count, 0, 0));
-                    var plateIndex = sheets.Count;
                     var packer = new FrontierPacker(types, CacheFor(stock), PairsFor(stock), stock, axis, beta, Work,
-                        BlocksFor(stock), ClampsFor(stock),
-                        preview == null ? null : placed => preview.Report(stock, plateIndex, placed));
+                        BlocksFor(stock), ClampsFor(stock));
                     var fill = packer.Fill(remaining, token);
                     sheetPacked?.Invoke();
                     if (fill.Parts.Count > 0)

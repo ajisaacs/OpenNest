@@ -1,13 +1,13 @@
+using OpenNest.Engine.NestingEngines.Irregular;
+using static OpenNest.Engine.Tests.NestingEngines.JobBuilder;
+using static OpenNest.Engine.Tests.NestingEngines.Shapes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.CNC;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
-using OpenNest.Engine.NestingEngines.Irregular;
 using OpenNest.Geometry;
-using static OpenNest.Engine.Tests.NestingEngines.JobBuilder;
-using static OpenNest.Engine.Tests.NestingEngines.Shapes;
 
 namespace OpenNest.Engine.Tests.NestingEngines;
 
@@ -209,42 +209,6 @@ public class IrregularNestingEngineTests
         LayoutAssert.Valid(job, result);
         Assert.Equal(NestJobStatus.Complete, result.Status);
         Assert.Equal(2, Assert.Single(result.Plates).Placements.Count);
-    }
-
-    [Fact]
-    public void ReportsLiveSheetPreviewWithoutChangingTheLayout()
-    {
-        var job = Job(new[] { Part("disc", Disc(3), 10), Part("ell", LShape(12, 8, 4), 10) },
-            new[] { Stock("sheet", 40, 60, spacing: 0.5) });
-        var reports = new List<NestJobProgress>();
-
-        var withPreview = new IrregularNestingEngine().Solve(job, new SyncProgress(reports.Add));
-        var without = new IrregularNestingEngine().Solve(job);
-
-        var previews = reports.Where(r => r.LegacyProgress?.BestParts is { Count: > 0 }).ToList();
-        Assert.NotEmpty(previews);
-        var work = job.Plates[0].WorkArea;
-        foreach (var preview in previews.Select(r => r.LegacyProgress))
-        {
-            Assert.True(preview.IsOverallBest);
-            Assert.Equal((work.Left, work.Bottom, work.Right, work.Top), (preview.ActiveWorkArea.Left,
-                preview.ActiveWorkArea.Bottom, preview.ActiveWorkArea.Right, preview.ActiveWorkArea.Top));
-            foreach (var part in preview.BestParts)
-            {
-                Assert.InRange(part.BoundingBox.Left, work.Left - 1e-6, work.Right);
-                Assert.InRange(part.BoundingBox.Right, work.Left, work.Right + 1e-6);
-                Assert.InRange(part.BoundingBox.Bottom, work.Bottom - 1e-6, work.Top);
-                Assert.InRange(part.BoundingBox.Top, work.Bottom, work.Top + 1e-6);
-            }
-        }
-        Assert.Equal(
-            without.Plates.SelectMany(p => p.Placements),
-            withPreview.Plates.SelectMany(p => p.Placements));
-    }
-
-    private sealed class SyncProgress(Action<NestJobProgress> report) : IProgress<NestJobProgress>
-    {
-        public void Report(NestJobProgress value) => report(value);
     }
 
     [Fact]

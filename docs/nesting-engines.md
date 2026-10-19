@@ -63,13 +63,6 @@ Curved outlines retain conservative flattening-error padding. This does not rela
 footprints, no-fit polygons or layout validation tolerances; a part extending beyond the accepted
 work-area bounds remains invalid.
 
-While it runs with a progress sink, Irregular previews the sheet it is packing: at most four
-times a second it reports the placements so far as `NestProgress.BestParts` with the stock's
-work area, and desktop Auto Nest draws them on the plate view. The preview follows every trial
-(each stock, sheet, strategy variant and tail re-plan), so it shows the search at work, not the
-layout that will be kept. Reporting only reads finished placements, so layouts are identical
-with or without a sink.
-
 Irregular fills gaps and open notches using outer profiles; it does not yet place parts inside
 enclosed cutouts. For a part with two or more copies it also offers its best-fit pairs (two copies
 interlocked, as the Best Fit viewer shows them) alongside the single copies, and places a pair
