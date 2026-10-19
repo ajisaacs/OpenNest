@@ -157,7 +157,12 @@ preferred tour first gets a directed-contour recovery pass for parts with at mos
 16 holes. It
 tries native outside entries beyond the ranked shortlist, then builds a hole route
 from actual emitted pierces, checking each transition against already released
-contours. This reaches inner edges of interlocking concave parts which can be
+contours. The part's scribes and other open cuts are checked once from the arrival,
+as emitted, and each hole as a direct hop from the one before it. The nearest hole
+is tried first, with its entries that leave toward the holes still to cut first, so
+a hop does not run back across the hole just cut. Each outside entry gets a share of
+the remaining recovery allowance, so one that no hole tour can reach does not starve
+the entries after it. This reaches inner edges of interlocking concave parts which can be
 missing from the facing-side shortlist. A failed released-hole-subset/departure
 state is memoized only in recovery; it never prunes the retained full search.
 Recovered whole programs are checked again and independently replayed. Single-part

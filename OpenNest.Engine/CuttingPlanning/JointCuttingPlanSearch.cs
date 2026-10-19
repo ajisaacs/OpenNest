@@ -569,23 +569,51 @@ internal static class JointCuttingPlanSearch
                     .Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear).Select(e => e.Choice).ToArray()).ToArray();
             var motions = new Dictionary<ContourChoice, OwnedExecution>();
             var stop = Expansions + (long)StallExpansionsPerEntry * snapshot.MaxEntries * prepared.Count;
+            // The part's scribes and other open cuts come once, before every contour; check
+            // them from the arrival, then each contour from where the one before it left off.
+            var openingProgram = prepared.EmitPrefix([]);
+            var start = node.Position;
+            var released = node.Checker;
+            if (openingProgram.Length != 0)
+            {
+                CountExpansion(source);
+                var opening = ExecutionMotionReader.Read(openingProgram, source.Location, node.Position, token);
+                released = node.Checker.Copy();
+                var findings = released.Check(opening, node.Position, source.SourceOrdinal + 1, token);
+                rejected.AddRange(Map(snapshot, findings));
+                attempt.NoteCrossings(source.SourceOrdinal, findings);
+                if (findings.Count != 0) yield break;
+                start = opening.DeparturePoint;
+            }
             OwnedExecution Motion(ContourChoice choice)
             {
                 if (motions.TryGetValue(choice, out var known)) return known;
                 CountExpansion(source);
-                return motions[choice] = ExecutionMotionReader.Read(
-                    prepared.EmitCandidateForValidation(choice), source.Location, null, token);
+                return motions[choice] = WithoutScribes(ExecutionMotionReader.Read(
+                    prepared.EmitCandidateForValidation(choice), source.Location, null, token));
+            }
+            var centres = prepared.HoleCentres(token);
+            // Ranking hops reads every hole entry's motion: build them before the outside
+            // entries share what is left of the allowance.
+            foreach (var entry in holes.SelectMany(entries => entries))
+            {
+                if (Expansions >= stop) yield break;
+                Motion(entry);
             }
             for (var endpoint = 0; endpoint < perimeters.Length; endpoint++)
             {
                 token.ThrowIfCancellationRequested();
                 if (Expansions >= stop) yield break;
                 var outside = perimeters[endpoint];
+                // Share what is left between the outside entries still to try: one that no hole
+                // tour can reach must not spend the allowance of the entries after it.
+                var limit = System.Math.Min(stop, Expansions + System.Math.Max(
+                    (stop - Expansions) / (perimeters.Length - endpoint), (long)StallExpansionsPerEntry * prepared.Count));
                 var chain = new List<ContourChoice>();
                 // This dominance heuristic is confined to recovery: emitted
                 // seams can differ for the same released subset. Never prune full DFS.
                 var failed = new HashSet<(int Mask, long X, long Y)>();
-                if (!Solve(0, node.Position, node.Checker)) continue;
+                if (!Solve(0, start, released)) continue;
                 var program = prepared.Emit(chain);
                 var execution = ExecutionMotionReader.Read(program, source.Location, node.Position, token);
                 var checker = node.Checker.Copy();
@@ -598,7 +626,7 @@ internal static class JointCuttingPlanSearch
                 bool Solve(int mask, Vector position, ReleasedContourState before)
                 {
                     token.ThrowIfCancellationRequested();
-                    if (Expansions >= stop) return false;
+                    if (Expansions >= limit) return false;
                     var key = (mask, BitConverter.DoubleToInt64Bits(position.X),
                         BitConverter.DoubleToInt64Bits(position.Y));
                     if (failed.Contains(key)) return false;
@@ -612,13 +640,20 @@ internal static class JointCuttingPlanSearch
                         chain.Add(outside);
                         return true;
                     }
-                    var candidates = Enumerable.Range(0, holes.Length).Where(c => (mask & (1 << c)) == 0)
-                        .SelectMany(c => holes[c])
-                        .OrderBy(c => Motion(c).Motions[0].End.DistanceTo(position));
+                    var remaining = Enumerable.Range(0, holes.Length).Where(c => (mask & (1 << c)) == 0).ToArray();
+                    // Nearest hole first, and its entries that leave toward the holes still to
+                    // cut first: a hop must not run back across the hole just cut.
+                    var candidates = remaining
+                        .Where(c => holes[c].Length != 0)
+                        .OrderBy(c => holes[c].Min(e => Motion(e).Motions[0].End.DistanceTo(position)))
+                        .ThenBy(c => c)
+                        .SelectMany(c => holes[c]
+                            .OrderBy(e => Onward(Motion(e).DeparturePoint, c, remaining))
+                            .ThenBy(e => Motion(e).Motions[0].End.DistanceTo(position)));
                     foreach (var choice in candidates)
                     {
                         token.ThrowIfCancellationRequested();
-                        if (Expansions >= stop) return false;
+                        if (Expansions >= limit) return false;
                         CountExpansion(source);
                         var execution = Motion(choice);
                         var after = before.Copy();
@@ -633,7 +668,27 @@ internal static class JointCuttingPlanSearch
                     failed.Add(key);
                     return false;
                 }
+
+                // How far a departure is from the nearest hole still to cut, or else the outside entry.
+                double Onward(Vector departure, int hole, int[] remaining)
+                {
+                    var onward = double.PositiveInfinity;
+                    foreach (var other in remaining)
+                        if (other != hole && centres[other] is { } centre)
+                            onward = System.Math.Min(onward, departure.DistanceTo(centre + source.Location));
+                    return double.IsPositiveInfinity(onward) ? departure.DistanceTo(Motion(outside).Motions[0].End) : onward;
+                }
             }
+        }
+
+        // An isolated contour probe repeats the part's scribes first; keep the contour alone.
+        private static OwnedExecution WithoutScribes(OwnedExecution execution)
+        {
+            var last = -1;
+            for (var index = 0; index < execution.Motions.Count; index++)
+                if (execution.Motions[index].Layer == LayerType.Scribe)
+                    last = index;
+            return last < 0 ? execution : new(execution.Motions.Skip(last + 1));
         }
 
 

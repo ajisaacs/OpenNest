@@ -7,14 +7,17 @@ namespace OpenNest.Tests.CuttingPlanning;
 
 public class ContourRecoveryFileTests
 {
-    // Optional private input: never embed customer geometry or names in the repository.
+    // Optional private inputs: never embed customer geometry or names in the repository.
+    // RecoveryCuttingNestPath: scribed parts with aligned slot pairs, and a bolted frame boxed
+    // in by parts cut before it, that the free search only finishes through contour recovery.
     [SkippableTheory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void InterlockedPlateFinishesThroughDesktopBatchWithoutChangingInput(bool lineLeads)
+    [InlineData("InterlockedCuttingNestPath", false)]
+    [InlineData("InterlockedCuttingNestPath", true)]
+    [InlineData("RecoveryCuttingNestPath", true)]
+    public void PlateFinishesThroughDesktopBatchWithoutChangingInput(string key, bool lineLeads)
     {
-        var path = TestConfig.GetExistingPath("InterlockedCuttingNestPath");
-        Skip.If(path == null, "Configure InterlockedCuttingNestPath in ignored test-config.json.");
+        var path = TestConfig.GetExistingPath(key);
+        Skip.If(path == null, $"Configure {key} in ignored test-config.json.");
         var bytes = SHA256.HashData(File.ReadAllBytes(path!));
         var nest = new NestReader(path).Read();
         var plates = nest.Plates.Where(p => p.Parts.Count > 0).ToArray();
