@@ -176,6 +176,89 @@ public class DefaultNestingEngineTests
         Assert.Equal(best, NestJobCost.Evaluate(job, result), 9);
     }
 
+    /// <summary>A candidate that reports each given plan, then returns its layout.</summary>
+    private static Func<INestingEngine> Plans(Func<NestJob, NestJobResult> layout, params Func<NestJob, NestJobResult>[] plans) =>
+        () => new Stub((j, progress, _) =>
+        {
+            foreach (var plan in plans)
+                progress?.Report(new NestJobProgress(NestJobStage.PlanImproved, string.Empty, -1, 0, 0, Plan: plan(j)));
+            return layout(j);
+        });
+
+    private static List<NestJobResult> ReportedPlans(NestJob job, out NestJobResult result, params Func<INestingEngine>[] candidates)
+    {
+        var reports = new List<NestJobProgress>();
+        result = new DefaultNestingEngine(candidates).Solve(job, new Capture(reports.Add));
+        return reports.Where(r => r.Stage == NestJobStage.PlanImproved).Select(r => r.Plan).ToList();
+    }
+
+    [Fact]
+    public void ALaterCandidatesWorsePlanIsNotShownAfterABetterOne()
+    {
+        var job = SquaresJob();
+        var cheap = OneSheet(job);
+        var dear = TwoSheets(job);
+
+        var plans = ReportedPlans(job, out var result, Plans(_ => cheap, _ => cheap), Plans(_ => dear, _ => dear));
+
+        Assert.Same(cheap, result);
+        Assert.Same(cheap, Assert.Single(plans));
+    }
+
+    [Fact]
+    public void ABetterPlanFromALaterCandidateReplacesTheShownOne()
+    {
+        var job = SquaresJob();
+        var cheap = OneSheet(job);
+        var dear = TwoSheets(job);
+        var partial = OnePlaced(job);
+
+        var plans = ReportedPlans(job, out var result,
+            Plans(_ => dear, _ => partial, _ => dear), Plans(_ => cheap, _ => dear, _ => cheap), Plans(_ => dear, _ => dear));
+
+        Assert.Same(cheap, result);
+        // Fewest unplaced first, then cost: a plan equal to the shown one is not shown again.
+        Assert.Equal(new[] { partial, dear, cheap }, plans);
+    }
+
+    [Fact]
+    public void TheChosenResultIsTheLastPlanEvenWhenAnUnreturnedPlanScoredBetter()
+    {
+        var job = SquaresJob();
+        var cheap = OneSheet(job);
+        var invalid = Overlapping(job);
+        var dear = TwoSheets(job);
+
+        // The first candidate shows a cheap valid plan but returns an invalid layout; the second
+        // reports no plans, and its valid result is chosen.
+        var plans = ReportedPlans(job, out var result, Plans(_ => invalid, _ => cheap), Returns(_ => dear));
+
+        Assert.Same(dear, result);
+        Assert.Equal(new[] { cheap, dear }, plans);
+    }
+
+    [Fact]
+    public void ResultsOfCandidatesWithoutPlansAreShownWhenBetter()
+    {
+        var job = SquaresJob();
+        var cheap = OneSheet(job);
+        var dear = TwoSheets(job);
+
+        var plans = ReportedPlans(job, out var result, Returns(_ => dear), Returns(_ => cheap), Returns(_ => dear));
+
+        Assert.Same(cheap, result);
+        Assert.Equal(new[] { dear, cheap }, plans);
+    }
+
+    [Fact]
+    public void BuiltInCandidatesReportTheirBestPlanEndingWithTheReturnedLayout()
+    {
+        var job = Job([Part("disc", Disc(2), 6), Part("ell", LShape(9, 7, 3), 4), Part("plate", Rectangle(12, 5), 3)],
+            [Stock("a", 24, 30, 0.25), Stock("b", 30, 40, 0.25)]);
+
+        PlanAssert.ReportedAndEndWithTheResult(() => new DefaultNestingEngine(), job);
+    }
+
     private sealed class Capture(Action<NestJobProgress> action) : IProgress<NestJobProgress>
     {
         public void Report(NestJobProgress value) => action(value);

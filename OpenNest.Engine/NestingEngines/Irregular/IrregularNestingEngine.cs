@@ -110,8 +110,7 @@ public sealed class IrregularNestingEngine : INestingEngine
     {
         if (progress == null)
             return;
-        var result = BuildResult(job, types, plan, null, token);
-        progress.Report(new NestJobProgress(NestJobStage.PlanImproved, string.Empty, -1, 0, 0, Plan: result));
+        CandidateProgress.ReportPlan(BuildResult(job, types, plan, null, token), progress);
     }
 
     /// <summary>Exercises the production physical-tail lifecycle from a test-owned incumbent.

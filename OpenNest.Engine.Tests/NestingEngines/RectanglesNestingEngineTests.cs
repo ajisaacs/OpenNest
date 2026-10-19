@@ -182,6 +182,18 @@ public class RectanglesNestingEngineTests
         Assert.Empty(result.Plates);
         Assert.Equal(1, Assert.Single(result.Fulfillment).Unplaced);
     }
+
+    [Fact]
+    public void ReportsTheFinishedJobAsItsPlanBeforeCommitting()
+    {
+        var job = Job(new[] { Part("rect", Rectangle(10, 5), 30), Part("ell", LShape(12, 8, 4), 6) },
+            new[] { Stock("small", 30, 30, spacing: 0.25), Stock("large", 48, 60, spacing: 0.25) });
+
+        var plans = PlanAssert.ReportedAndEndWithTheResult(() => new RectanglesNestingEngine(), job);
+
+        // One sheet-by-sheet run makes one whole-job plan.
+        Assert.Single(plans);
+    }
 }
 
 public sealed class RectanglesContractTests : EngineContractTests<RectanglesNestingEngine> { }

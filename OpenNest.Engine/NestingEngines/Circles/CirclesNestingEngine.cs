@@ -25,7 +25,8 @@ namespace OpenNest.Engine.NestingEngines.Circles;
 /// estimated whole-job cost wins. The whole job runs once with that free choice and once
 /// preferring each offered stock, and the best result by <see cref="CandidateScore"/> is kept;
 /// its last sheet, and its last two sheets together, are then re-packed onto each single stock
-/// and replaced when that lowers the whole job's cost.
+/// and replaced when that lowers the whole job's cost. Each run or tail that beats the best so
+/// far is reported as a whole-job plan (<see cref="NestJobStage.PlanImproved"/>).
 /// Deterministic: no clocks or randomness; the only stop besides completion is the host token.
 /// </summary>
 public sealed class CirclesNestingEngine : INestingEngine
@@ -81,7 +82,10 @@ public sealed class CirclesNestingEngine : INestingEngine
                 preferred: preferred);
             var scored = CandidateScore.Of(job, result, run++);
             if (best == null || scored.IsBetterThan(best))
+            {
                 best = scored;
+                CandidateProgress.ReportPlan(best.Result, progress);
+            }
         }
         best = ReplanTail(best!);
         CandidateProgress.ReportCommits(best.Result, progress);
@@ -120,7 +124,10 @@ public sealed class CirclesNestingEngine : INestingEngine
                         builder.AddSheet(stock, layout.Poses);
                         var scored = CandidateScore.Of(job, builder.Build(chosen.Result.StopReason), run++);
                         if (scored.IsBetterThan(chosen))
+                        {
                             chosen = scored;
+                            CandidateProgress.ReportPlan(chosen.Result, progress);
+                        }
                     }
                 }
             }

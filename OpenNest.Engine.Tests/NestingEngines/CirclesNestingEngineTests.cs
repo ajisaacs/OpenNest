@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using OpenNest.CNC;
 using OpenNest.Engine.Jobs;
+using OpenNest.Engine.NestingEngines;
 using OpenNest.Engine.NestingEngines.Circles;
 using OpenNest.Geometry;
 using static OpenNest.Engine.Tests.NestingEngines.JobBuilder;
@@ -101,6 +102,19 @@ public class CirclesNestingEngineTests
         LayoutAssert.Valid(job, result);
         Assert.Equal(NestJobStatus.Complete, result.Status);
         Assert.All(result.Plates.SelectMany(p => p.Placements), p => Assert.Equal(0.3, p.Rotation, 12));
+    }
+
+    [Fact]
+    public void ReportsEachBetterRunOrTailEndingWithTheReturnedLayout()
+    {
+        var job = Job([Part("large", Disc(4), 7), Part("small", Disc(1.5), 25)],
+            [Stock("a", 24, 30, spacing: 0.25), Stock("b", 40, 40, spacing: 0.25)]);
+
+        var plans = PlanAssert.ReportedAndEndWithTheResult(() => new CirclesNestingEngine(), job);
+
+        // Only improvements are reported: each plan beats the one before it.
+        var scores = plans.Select(p => CandidateScore.Of(job, p, 0)).ToList();
+        Assert.All(scores.Zip(scores.Skip(1)), s => Assert.True(s.Second.IsBetterThan(s.First)));
     }
 
     /// <summary>A polygonal gear: alternating tip and root radii.</summary>

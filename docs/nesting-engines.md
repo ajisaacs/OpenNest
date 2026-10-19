@@ -30,6 +30,26 @@ Rectangles places irregular parts validly, but only as their bounding boxes; it 
 notch or hole. Box sides account for how the layout check flattens arcs, so round-edged parts stay
 valid at box contact.
 
+### Best plan so far
+
+Whole-job engines report each better whole-job plan as `NestJobStage.PlanImproved` with the plan
+in `NestJobProgress.Plan`, built without plate commits; desktop Auto Nest shows it as its "Best
+plan so far" sheet strip (see [automatic nesting](automatic-nesting.md)). Plans are unvalidated
+proposals with no committed counts, all come before the plate commits, and the last one is the
+returned layout. Reporting never changes the search: layouts are identical with or without a
+progress sink.
+
+- Irregular reports when a strategy variant or the tail re-plan beats its best plan so far.
+- Rectangles makes one sheet-by-sheet run, so it reports the finished job as its one plan.
+- Circles reports when a stock-preference run or a tail re-plan beats its best result so far.
+- Default scores each candidate plan as it ranks results (valid, fewest unplaced, lowest cost,
+  then candidate order) and reports it only when it beats every plan Default has reported, so a
+  later candidate never shows a worse plan after a better one. A candidate result that reports no
+  plans is offered the same way. When the chosen result is not the last plan reported (a
+  candidate's plan can outscore every returned result), Default reports it last.
+
+Plug-ins may report plans the same way; FlatBar, StockLadder and the fixed-strategy engines do not.
+
 Interactive Fill shows its rectangle best-fit (box packing) layout before the best-fit pair
 phase, whose first computation for a drawing can take a minute, so **Accept** is available at
 once. The box layout is only a fallback: the strategies still run in their usual order and a
@@ -62,11 +82,6 @@ endpoints, retaining material extents even when polygon cleanup discards short-e
 Curved outlines retain conservative flattening-error padding. This does not relax part-spacing
 footprints, no-fit polygons or layout validation tolerances; a part extending beyond the accepted
 work-area bounds remains invalid.
-
-Each time a strategy variant or the tail re-plan beats the best whole-job plan so far,
-Irregular reports it as `NestJobStage.PlanImproved`, which desktop Auto Nest shows as its
-"Best plan so far" sheet strip (see [automatic nesting](automatic-nesting.md)). The last
-report is the returned layout; reporting never changes the search.
 
 Irregular fills gaps and open notches using outer profiles; it does not yet place parts inside
 enclosed cutouts. For a part with two or more copies it also offers its best-fit pairs (two copies

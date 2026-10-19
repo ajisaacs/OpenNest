@@ -25,6 +25,11 @@ namespace OpenNest.Engine.NestingEngines.Default;
 /// first exception is rethrown. Cancellation stops the search. Candidates' plate commits are not forwarded; the chosen
 /// result's commits are reported once it is selected.
 ///
+/// Candidates' whole-job plans (<see cref="NestJobStage.PlanImproved"/>) are scored the same way
+/// and reported only when one beats every plan reported so far, so a later candidate never shows a
+/// worse plan after a better one. A candidate result that beats them is reported too, and the
+/// chosen result is always the last plan reported.
+///
 /// Deterministic: candidates run one after another and the choice uses no clock.
 /// </summary>
 public sealed class DefaultNestingEngine : INestingEngine
@@ -56,7 +61,7 @@ public sealed class DefaultNestingEngine : INestingEngine
     {
         ArgumentNullException.ThrowIfNull(job);
         token.ThrowIfCancellationRequested();
-        var forward = progress == null ? null : new CandidateProgress(progress);
+        var forward = progress == null ? null : new PlanFilter(job, progress, token);
         CandidateScore? best = null;
         ExceptionDispatchInfo? firstFailure = null;
 
@@ -64,6 +69,8 @@ public sealed class DefaultNestingEngine : INestingEngine
         {
             token.ThrowIfCancellationRequested();
             NestJobResult? result;
+            if (forward != null)
+                forward.Order = order;
             try
             {
                 result = candidates[order]().Solve(job, forward, token);
@@ -80,6 +87,7 @@ public sealed class DefaultNestingEngine : INestingEngine
             var scored = CandidateScore.Of(job, result, order);
             if (best == null || scored.IsBetterThan(best))
                 best = scored;
+            forward?.Offer(scored);
         }
 
         token.ThrowIfCancellationRequested();
@@ -89,7 +97,64 @@ public sealed class DefaultNestingEngine : INestingEngine
             throw new InvalidOperationException("No candidate engine returned a result.");
         }
 
+        forward?.Finish(best);
         CandidateProgress.ReportCommits(best.Result, progress);
         return best.Result;
+    }
+
+    /// <summary>
+    /// Forwards candidate progress except plate commits, and replaces candidates' raw plan reports
+    /// with Default's own best plan so far by <see cref="CandidateScore"/>.
+    /// </summary>
+    private sealed class PlanFilter(NestJob job, IProgress<NestJobProgress> inner, CancellationToken token)
+        : IProgress<NestJobProgress>
+    {
+        private CandidateScore? shown;
+
+        /// <summary>Candidate order of the plans now arriving, for score ties.</summary>
+        public int Order { get; set; }
+
+        public void Report(NestJobProgress value)
+        {
+            if (value == null || value.Stage == NestJobStage.PlateCommitted)
+                return;
+            if (value.Stage != NestJobStage.PlanImproved)
+            {
+                inner.Report(value);
+                return;
+            }
+            if (value.Plan == null)
+                return;
+            CandidateScore plan;
+            try
+            {
+                plan = CandidateScore.Of(job, value.Plan, Order);
+            }
+            catch (Exception) when (!token.IsCancellationRequested)
+            {
+                // A plan that cannot be scored is not shown; throwing would fail the candidate.
+                return;
+            }
+            Offer(plan);
+        }
+
+        /// <summary>Reports the plan when it beats every plan reported so far.</summary>
+        public void Offer(CandidateScore plan)
+        {
+            if (shown != null && !plan.IsBetterThan(shown))
+                return;
+            shown = plan;
+            CandidateProgress.ReportPlan(plan.Result, inner);
+        }
+
+        /// <summary>Makes the chosen result the last plan reported. A candidate's plan can outscore
+        /// every returned result (its engine judged a later plan better), so this may follow it.</summary>
+        public void Finish(CandidateScore chosen)
+        {
+            if (shown != null && CandidateProgress.SameLayout(shown.Result, chosen.Result))
+                return;
+            shown = chosen;
+            CandidateProgress.ReportPlan(chosen.Result, inner);
+        }
     }
 }

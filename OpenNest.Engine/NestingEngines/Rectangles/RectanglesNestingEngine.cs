@@ -18,7 +18,8 @@ namespace OpenNest.Engine.NestingEngines.Rectangles;
 ///
 /// Sheet by sheet (<see cref="SheetByStock"/>), each available stock is packed under several
 /// free-space scoring rules and two pick modes (best-fitting box anywhere, or largest type first),
-/// and the candidate with the lowest estimated whole-job cost wins.
+/// and the candidate with the lowest estimated whole-job cost wins. The finished job is reported as
+/// its one whole-job plan (<see cref="NestJobStage.PlanImproved"/>) before its plate commits.
 /// Deterministic: no clocks or randomness; the only stop besides completion is the host token.
 /// </summary>
 public sealed class RectanglesNestingEngine : INestingEngine
@@ -52,7 +53,12 @@ public sealed class RectanglesNestingEngine : INestingEngine
                 remaining[t.Index] = 0;
 
         var demand = types.Select(t => new SheetDemand(t.Index, t.Id, t.Priority, t.MaterialArea)).ToArray();
-        return SheetByStock.Run(job, demand, remaining, Pack, progress, token, BatchSelected);
+        // One run makes one whole-job plan: report it, then its commits, as the other engines do.
+        var forward = progress == null ? null : new CandidateProgress(progress);
+        var result = SheetByStock.Run(job, demand, remaining, Pack, forward, token, BatchSelected);
+        CandidateProgress.ReportPlan(result, progress);
+        CandidateProgress.ReportCommits(result, progress, token);
+        return result;
 
         IEnumerable<SheetLayout> Pack(NestPlateStock stock, IReadOnlyList<int> left)
         {
