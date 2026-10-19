@@ -283,7 +283,7 @@ namespace OpenNest.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("Classic")]
+        [global::System.Configuration.DefaultSettingValueAttribute("Blueprint")]
         public string ActiveColorScheme {
             get {
                 return ((string)(this["ActiveColorScheme"]));

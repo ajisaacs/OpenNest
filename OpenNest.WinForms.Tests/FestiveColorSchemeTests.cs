@@ -30,7 +30,7 @@ public class FestiveColorSchemeTests
     }
 
     [Fact]
-    public void FestiveSchemesRoundTripAndLeaveClassicAsDefault()
+    public void FestiveSchemesRoundTripAndLeaveBlueprintAsDefault()
     {
         foreach (var name in new[] { "Halloween", "Christmas", "4th of July" })
         {
@@ -41,7 +41,7 @@ public class FestiveColorSchemeTests
             Assert.Equal(scheme.PartColors.Select(c => c.ToArgb()), restored.PartColors.Select(c => c.ToArgb()));
         }
 
-        Assert.Equal("Classic", ColorSchemeRegistry.Get(null).Name);
+        Assert.Equal("Blueprint", ColorSchemeRegistry.Get(null).Name);
     }
 
     private static double Distance(Color a, Color b)

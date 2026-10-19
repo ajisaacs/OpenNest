@@ -38,23 +38,28 @@ public class ClassicPaletteTests
         return System.Math.Sqrt((l1 - l2) * (l1 - l2) + (a1 - a2) * (a1 - a2) + (b1 - b2) * (b1 - b2));
     }
 
-    [Fact]
-    public void ClassicFillsAreClearlyDistinctFromEachOther()
+    public static TheoryData<string> ListedPalettes => new() { "Blueprint", "Classic" };
+
+    [Theory]
+    [MemberData(nameof(ListedPalettes))]
+    public void FillsAreClearlyDistinctFromEachOther(string name)
     {
-        var colors = ColorSchemeRegistry.Get("Classic").PartColors;
+        var colors = ColorSchemeRegistry.Get(name).PartColors;
         Assert.Equal(12, colors.Length);
         for (var i = 0; i < colors.Length; i++)
         {
             for (var j = i + 1; j < colors.Length; j++)
                 Assert.True(DeltaE(colors[i], colors[j]) >= 30,
-                    $"Classic colors {i} and {j} are too similar ({DeltaE(colors[i], colors[j]):F1}).");
+                    $"{name} colors {i} and {j} are too similar ({DeltaE(colors[i], colors[j]):F1}).");
         }
     }
 
-    [Fact]
-    public void ClassicFillsStayReadableAndClearOfEtchGreenAndTheSheet()
+    [Theory]
+    [MemberData(nameof(ListedPalettes))]
+    public void FillsStayReadableAndClearOfEtchGreenAndTheSheet(string name)
     {
-        var scheme = ColorSchemeRegistry.Get("Classic");
+        var scheme = ColorSchemeRegistry.Get(name);
+        Assert.Equal(name, scheme.Name);
         Assert.All(scheme.PartColors, color =>
         {
             Assert.True(Contrast(color, Color.Black) >= 4.5, $"{color} is too dark for black part IDs.");
