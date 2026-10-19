@@ -66,6 +66,69 @@ public class CutOffRoundoffTests
         Assert.Empty(AutomaticCutOffPlanner.Create(loadedPlate, options, settings).Definitions);
     }
 
+    // A pie slice whose arc ends 2d further from its centre than it starts. ConvertProgram
+    // only refits centres beyond Tolerance.Epsilon, so it rebuilds the start point ~2d past
+    // the cached bounds, as rotated imported arcs do at d = 2.5e-11.
+    private static Plate MakeSlicePlate(double d)
+    {
+        var start = 10 * System.Math.PI / 180;
+        var end = 60 * System.Math.PI / 180;
+        var program = new Program();
+        program.Codes.Add(new RapidMove(0, 0));
+        program.Codes.Add(new LinearMove(10 * System.Math.Cos(start), 10 * System.Math.Sin(start)));
+        program.Codes.Add(new ArcMove((10 + 2 * d) * System.Math.Cos(end), (10 + 2 * d) * System.Math.Sin(end),
+            0, 0, RotationType.CCW));
+        program.Codes.Add(new LinearMove(0, 0));
+        var plate = new Plate(60, 120) { PartSpacing = 0 };
+        plate.Parts.Add(new Part(new Drawing("slice", program), new Vector(10, 10)));
+        return plate;
+    }
+
+    private static double Protrusion(Part part) => ConvertProgram.ToGeometry(part.Program)
+        .Where(e => SpecialLayers.IsMaterial(e.Layer))
+        .Max(e => e.BoundingBox.Translate(part.Location).Right) - part.BoundingBox.Right;
+
+    [Fact]
+    public void ArcRadiusRoundoff_PlansAndAppliesWithoutChangingThePart()
+    {
+        var plate = MakeSlicePlate(2.5e-11);
+        var part = Assert.Single(plate.Parts);
+        var program = part.Program;
+        var text = NestWriter.GetProgramText(program);
+        var right = part.BoundingBox.Right;
+        var step = System.Math.BitIncrement(right) - right;
+        // Above the old magnitude-scaled allowance (4096 steps), below the absolute one.
+        Assert.InRange(Protrusion(part), 4096 * step, CutOff.GetBoundsRoundoff(part));
+        var options = new AutomaticCutOffOptions { Spacing = 5 };
+        var settings = new CutOffSettings();
+
+        var plan = AutomaticCutOffPlanner.Create(plate, options, settings);
+
+        Assert.False(plan.HasBlockingDiagnostics);
+        Assert.NotEmpty(plan.Definitions);
+        plate.CutOffs.AddRange(plan.Definitions);
+        plate.RegenerateCutOffs(settings);
+        Assert.Same(program, part.Program);
+        Assert.Equal(text, NestWriter.GetProgramText(part.Program));
+        var arc = Assert.Single(ConvertProgram.ToGeometry(part.Program).OfType<Arc>());
+        arc.Offset(part.Location);
+        foreach (var cut in plate.Parts.Where(p => p.BaseDrawing.IsCutOff))
+            foreach (var line in ConvertProgram.ToGeometry(cut.Program).OfType<Line>()
+                .Where(e => SpecialLayers.IsMaterial(e.Layer)))
+                Assert.False(arc.Intersects(line, out _), line.ToString());
+    }
+
+    [Fact]
+    public void ArcRadiusMismatchBeyondRoundoff_StillPreventsPlanning()
+    {
+        var plate = MakeSlicePlate(1e-9);
+        var part = Assert.Single(plate.Parts);
+        Assert.True(Protrusion(part) > CutOff.GetBoundsRoundoff(part));
+
+        Assert.ThrowsAny<ArgumentException>(() =>
+            AutomaticCutOffPlanner.Create(plate, new AutomaticCutOffOptions { Spacing = 5 }, new CutOffSettings()));
+    }
+
     [SkippableFact]
     public void RoundedImportedArcs_PlanAllPlatesWithoutEditingSource()
     {

@@ -278,8 +278,10 @@ namespace OpenNest
             // Imported, nearly tangent arcs can amplify endpoint rounding when
             // ConvertProgram fits their centers to a chord. Keep that allowance
             // tiny and apply it to both pruning and fallback exclusions above;
-            // larger refits still require an explicit geometry repair.
-            var arcFitRoundoff = System.Math.Min(4096 * step, Math.Tolerance.Epsilon / 100000);
+            // larger refits still require an explicit geometry repair. The allowance is
+            // absolute: rotated small arcs on ordinary sheets refit by ~5e-11, which a
+            // magnitude-scaled step count would reject.
+            var arcFitRoundoff = Math.Tolerance.Epsilon / 100000;
             return double.IsFinite(step)
                 ? System.Math.Min(System.Math.Max(8 * step, arcFitRoundoff), Math.Tolerance.Epsilon / 4)
                 : 0;
