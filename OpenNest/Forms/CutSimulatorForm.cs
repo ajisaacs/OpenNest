@@ -22,7 +22,7 @@ namespace OpenNest.Forms
         private readonly Button previousPartButton, previousContourButton, nextContourButton, nextPartButton;
         private readonly ComboBox speedBox;
         private readonly TrackBar trackBar;
-        private readonly Label timeLabel, partLabel, stateLabel;
+        private readonly Label timeLabel, partLabel, drawingLabel, stateLabel;
         private readonly NumericUpDown feedBox, holeFeedBox, rapidBox, pierceBox;
         private readonly CheckBox skipEtchBox;
         private readonly CutTimeMachineBox machineBox;
@@ -36,22 +36,24 @@ namespace OpenNest.Forms
             overlay = nestForm.PlateView.CutSimulation;
 
             Text = "Cut Simulator";
-            FormBorderStyle = FormBorderStyle.SizableToolWindow;
+            // Fixed size: the window fits its controls once and never follows the status text.
+            FormBorderStyle = FormBorderStyle.FixedToolWindow;
+            MaximizeBox = MinimizeBox = false;
             StartPosition = FormStartPosition.Manual;
             ShowInTaskbar = false;
             KeyPreview = true;
             MinimumSize = new Size(420, 0);
             AutoScaleMode = AutoScaleMode.Dpi;
             AutoSize = true;
-            AutoSizeMode = AutoSizeMode.GrowOnly;
+            AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
-            restartButton = new Button { Text = "⏮", Width = 40, AutoSize = false };
-            playButton = new Button { Text = "▶", Width = 56, AutoSize = false };
-            endButton = new Button { Text = "⏭", Width = 40, AutoSize = false };
-            speedBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 70 };
+            restartButton = TransportButton("⏮", 44, 12f);
+            playButton = TransportButton("▶", 80, 18f);
+            endButton = TransportButton("⏭", 44, 12f);
+            speedBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 70, Anchor = AnchorStyles.Left };
             foreach (var speed in Speeds)
                 speedBox.Items.Add($"{speed:g}×");
-            speedBox.SelectedIndex = Array.IndexOf(Speeds, 10.0);
+            speedBox.SelectedIndex = Array.IndexOf(Speeds, 5.0);
 
             previousPartButton = JumpButton("◀◀ Part");
             previousContourButton = JumpButton("◀ Cutout");
@@ -66,24 +68,38 @@ namespace OpenNest.Forms
                 restartButton,
                 playButton,
                 endButton,
-                new Label { Text = "Speed", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(12, 8, 0, 0) },
+                new Label { Text = "Speed", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(12, 0, 0, 0) },
                 speedBox,
             });
 
             trackBar = new TrackBar
             {
                 Dock = DockStyle.Fill,
+                AutoSize = false,
+                Height = 30,
                 Maximum = TrackResolution,
                 TickStyle = TickStyle.None,
                 LargeChange = TrackResolution / 20,
                 SmallChange = 1,
             };
 
-            timeLabel = new Label { AutoSize = true, Font = new Font(Font, FontStyle.Bold) };
-            partLabel = new Label { AutoSize = true, Margin = new Padding(16, 3, 3, 3) };
-            stateLabel = new Label { AutoSize = true, Margin = new Padding(16, 3, 3, 3) };
-            var status = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
-            status.Controls.AddRange(new Control[] { timeLabel, partLabel, stateLabel });
+            // One labeled row per value, each spanning the window, so the status never widens
+            // it. Drawing names get two lines; longer ones trim and show in full on hover.
+            timeLabel = StatusValue(1);
+            timeLabel.Font = new Font(Font, FontStyle.Bold);
+            partLabel = StatusValue(1);
+            drawingLabel = StatusValue(2);
+            stateLabel = StatusValue(1);
+            var status = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, ColumnCount = 2 };
+            status.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            status.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            status.Controls.AddRange(new Control[]
+            {
+                StatusCaption("Time"), timeLabel,
+                StatusCaption("Part"), partLabel,
+                StatusCaption("Drawing"), drawingLabel,
+                StatusCaption("Motion"), stateLabel,
+            });
 
             var units = nestForm.Nest.Units;
             var rateSuffix = " " + UnitsHelper.GetShortTimeUnitPair(units);
@@ -119,6 +135,7 @@ namespace OpenNest.Forms
                 ColumnCount = 1,
                 Padding = new Padding(6),
             };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             layout.Controls.Add(transport);
             layout.Controls.Add(jumps);
             layout.Controls.Add(trackBar);
@@ -181,6 +198,16 @@ namespace OpenNest.Forms
                 Width = 110,
             };
 
+        private static Button TransportButton(string glyph, int width, float fontSize) =>
+            new()
+            {
+                Text = glyph,
+                AutoSize = false,
+                Size = new Size(width, 40),
+                Font = new Font("Segoe UI Symbol", fontSize),
+                Anchor = AnchorStyles.Left,
+            };
+
         private static Button JumpButton(string text) =>
             new() { Text = text, AutoSize = true, MinimumSize = new Size(80, 0) };
 
@@ -192,6 +219,21 @@ namespace OpenNest.Forms
             overlay.Pause();
             overlay.Time = target(sim);
         }
+
+        private static Label StatusCaption(string text) =>
+            new() { Text = text, AutoSize = true, ForeColor = SystemColors.GrayText, Margin = new Padding(3, 2, 8, 2) };
+
+        // Fixed height so changing text never resizes the window.
+        private Label StatusValue(int lines) =>
+            new()
+            {
+                AutoSize = false,
+                AutoEllipsis = true,
+                Dock = DockStyle.Fill,
+                Width = 40,
+                Height = Font.Height * lines + 2,
+                Margin = new Padding(3, 2, 3, 2),
+            };
 
         private static Label RateLabel(string text) =>
             new() { Text = text, AutoSize = true, Margin = new Padding(3, 7, 0, 0), Anchor = AnchorStyles.Left };
@@ -346,7 +388,7 @@ namespace OpenNest.Forms
             if (sim == null || sim.Steps.Count == 0)
             {
                 timeLabel.Text = "Nothing to cut";
-                partLabel.Text = stateLabel.Text = string.Empty;
+                partLabel.Text = drawingLabel.Text = stateLabel.Text = string.Empty;
                 SetTrack(0);
                 return;
             }
@@ -358,14 +400,16 @@ namespace OpenNest.Forms
             var index = sim.IndexAt(time);
             if (index >= sim.Steps.Count)
             {
-                partLabel.Text = $"{sim.PartCount} of {sim.PartCount} parts";
+                partLabel.Text = $"{sim.PartCount} of {sim.PartCount}";
+                drawingLabel.Text = string.Empty;
                 stateLabel.Text = "Done";
                 return;
             }
 
             var step = sim.Steps[index];
             var drawing = plate != null && step.PartIndex < plate.Parts.Count ? plate.Parts[step.PartIndex].BaseDrawing?.Name : null;
-            partLabel.Text = $"Part {step.PartIndex + 1} of {sim.PartCount}" + (string.IsNullOrEmpty(drawing) ? "" : $" ({drawing})");
+            partLabel.Text = $"{step.PartIndex + 1} of {sim.PartCount}";
+            drawingLabel.Text = drawing ?? string.Empty;
             var state = step.Kind switch
             {
                 CutSimulationStepKind.Rapid => "Rapid",
