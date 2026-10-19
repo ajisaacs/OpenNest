@@ -116,6 +116,21 @@ public class NestRecordFactoryTests
     }
 
     [Fact]
+    public void FromNest_TrailingEmptyPlate_NotCounted()
+    {
+        var nest = new Nest("Sentinel");
+        var drawing = new Drawing("A");
+        nest.Drawings.Add(drawing);
+        nest.CreatePlate().Parts.Add(new Part(drawing));
+        nest.CreatePlate();
+
+        var record = NestRecordFactory.FromNest(nest, Guid.NewGuid(), fileSize: 0);
+
+        Assert.Equal(1, record.PlateCount);
+        Assert.Equal(1, record.PartCount);
+    }
+
+    [Fact]
     public void FromNest_PreservesGivenId()
     {
         var id = Guid.NewGuid();

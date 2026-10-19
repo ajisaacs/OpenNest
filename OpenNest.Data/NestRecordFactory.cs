@@ -46,7 +46,8 @@ public static class NestRecordFactory
             Material = nest.Material?.Name ?? "",
             Thickness = nest.Thickness,
             Status = nest.Status,
-            PlateCount = nest.Plates.Count,
+            // The trailing empty plate is the editor's new-plate slot, not a plate of the nest.
+            PlateCount = PlateDisplayNumbering.DisplayedPlateCount(nest.Plates),
             PartCount = nest.Plates.Sum(CountNonCutoffParts),
             // Nest has no separate "comments" field; Notes is the closest analog
             // shown in the nest info dialog, so it round-trips as Comments here.
