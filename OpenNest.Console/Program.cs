@@ -372,9 +372,11 @@ static class NestConsole
             return null;
         }
 
+        // Build the plate as the desktop does: Quantity = 1 so part counts and the
+        // drawings' nested quantities include it.
         var newNest = new Nest { Name = "DXF Import" };
-        var plate = new Plate { Size = options.PlateSize.Value };
-        newNest.Plates.Add(plate);
+        newNest.PlateDefaults.Size = options.PlateSize.Value;
+        newNest.CreatePlate();
 
         foreach (var dxf in dxfFiles)
         {

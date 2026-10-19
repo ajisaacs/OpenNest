@@ -326,6 +326,20 @@ public class NestingPipelineTests : IDisposable
         Assert.False(File.Exists(output));
     }
 
+    [Fact]
+    public void Console_DxfOnlyFillCountsPlacedPartsOnASingleSheet()
+    {
+        var input = Path.Combine(directory, "square.dxf");
+        var output = Path.Combine(directory, "output.nest");
+        Dxf.ExportProgram(Square().Program, input);
+        Assert.Equal(0, RunConsole(input, "--size", "20x30", "--quantity", "6", "--output", output));
+        var nest = new NestReader(output).Read();
+        var plate = nest.Plates.Single();
+        Assert.Equal(1, plate.Quantity);
+        Assert.Equal(6, plate.Parts.Count);
+        Assert.Equal(plate.Parts.Count, nest.Drawings.Single().Quantity.Nested);
+    }
+
     private NestRequest Request(string engine)
     {
         var path = Path.Combine(directory, "square.dxf");
