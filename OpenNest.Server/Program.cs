@@ -20,11 +20,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
         options.SerializerOptions.Converters.Add(converter);
 });
 
-// Storage path: --database <path> or OPENNEST_DB, default ./data/nests.db (a Docker volume).
-var databasePath =
-    args.FirstOrDefault(a => a.StartsWith("--database=", StringComparison.Ordinal))?.Split('=', 2)[1]
-    ?? Environment.GetEnvironmentVariable("OPENNEST_DB")
-    ?? Path.Combine("data", "nests.db");
+// Storage path: --database=<path> or --database <path>, then OPENNEST_DB, default ./data/nests.db (a Docker volume).
+var databasePath = ServerOptions.DatabasePath(args, Environment.GetEnvironmentVariable(ServerOptions.DatabaseVariable));
 builder.Services.AddSingleton(_ => new NestDatabase(databasePath));
 
 // Listen port: --urls or ASPNETCORE_URLS; Dockerfile defaults to 8090.
@@ -60,7 +57,8 @@ app.MapPost("/api/nests", async (HttpContext http, NestDatabase db) =>
         return error;
 
     var id = record!.Id == Guid.Empty ? Guid.NewGuid() : record.Id;
-    return Results.Ok(db.Insert(id, record, file!));
+    try { return Results.Ok(db.Insert(id, record, file!)); }
+    catch (RevisionConflictException conflict) { return Results.Json(conflict.Current, statusCode: 409); }
 });
 app.MapGet("/api/nests/{id:guid}/revisions", (Guid id, HttpRequest request, NestDatabase db) =>
     ReadHistory(id, request, db));
@@ -90,10 +88,11 @@ app.MapPut("/api/nests/{id:guid}/metadata", async (Guid id, HttpRequest request,
     var error = IfMatch.Read(request, out var expected);
     if (error is not null) return error;
     NestRecord? record;
-    try { record = await request.ReadFromJsonAsync<NestRecord>(); }
+    try { record = await request.ReadFromJsonAsync<NestRecord>(NestMetadata.Options); }
     catch (Exception ex) when (ex is JsonException or InvalidOperationException or BadHttpRequestException)
     { return Results.BadRequest("Invalid metadata JSON."); }
     if (record is null) return Results.BadRequest("Missing metadata.");
+    if (NestMetadata.GetError(record) is { } invalid) return Results.BadRequest(invalid);
     try
     {
         var updated = db.UpdateMetadata(id, record, expected);
@@ -184,22 +183,8 @@ static async Task<(NestRecord? Record, byte[]? File, IResult? Error)> ReadMultip
         return (null, null, Results.BadRequest("Malformed multipart body."));
     }
 
-    var metadataPart = form["metadata"].FirstOrDefault();
-    if (string.IsNullOrWhiteSpace(metadataPart))
-        return (null, null, Results.BadRequest("Missing 'metadata' part."));
-
-    NestRecord? record;
-    try
-    {
-        record = JsonSerializer.Deserialize<NestRecord>(metadataPart, MultipartJson.Options);
-    }
-    catch (JsonException)
-    {
-        return (null, null, Results.BadRequest("Invalid metadata JSON."));
-    }
-
-    if (record is null)
-        return (null, null, Results.BadRequest("Missing metadata."));
+    if (!NestMetadata.TryRead(form["metadata"].FirstOrDefault(), out var record, out var metadataError))
+        return (null, null, Results.BadRequest(metadataError));
 
     var filePart = form.Files["file"];
     if (filePart is null || filePart.Length == 0)
@@ -209,15 +194,6 @@ static async Task<(NestRecord? Record, byte[]? File, IResult? Error)> ReadMultip
     using var buffer = new MemoryStream((int)filePart.Length);
     await stream.CopyToAsync(buffer);
     return (record, buffer.ToArray(), null);
-}
-
-internal static class MultipartJson
-{
-    public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
-    {
-        PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
-    };
 }
 
 // Entry-point type for in-memory integration tests (WebApplicationFactory<Program>).

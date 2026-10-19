@@ -142,6 +142,9 @@ public sealed partial class NestDatabase : IDisposable
         lock (_sync)
         {
             using var transaction = _connection.BeginTransaction();
+            // Ids are client-allocated: an existing id, active or deleted, is a conflict, not a replacement.
+            if ((Get(id) ?? Get(id, deleted: true)) is { } existing)
+                throw new RevisionConflictException(existing, "A nest with this id already exists.");
             using var command = _connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = """
@@ -488,7 +491,8 @@ public sealed partial class NestDatabase : IDisposable
     }
 }
 
-public sealed class RevisionConflictException(NestRecord current) : Exception("The nest has changed. Reload or Save As.")
+public sealed class RevisionConflictException(NestRecord current, string message = "The nest has changed. Reload or Save As.")
+    : Exception(message)
 {
     public NestRecord Current { get; } = current;
 }

@@ -65,7 +65,9 @@ installs are unaffected until an operator opts in via **File > Storage Mode...**
 (`RemoteNestRepository`) and the server (`OpenNest.Server`). JSON is camelCase
 with enums serialized as strings (`JsonSerializerDefaults.Web` +
 `JsonStringEnumConverter(JsonNamingPolicy.CamelCase)`), matching the rest of
-`OpenNest.Data`'s local JSON stores.
+`OpenNest.Data`'s local JSON stores. Uploaded metadata (POST and both PUTs) must
+carry string text fields (`null` is 400) and a defined `status`: a name, or for
+existing callers its integer value 0–2; an undefined value is 400 and stores nothing.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -94,7 +96,7 @@ with enums serialized as strings (`JsonSerializerDefaults.Web` +
 | GET | `/api/nests/query?search=&sort=&order=&offset=&limit=` | — | `{ "items": NestRecord[], "total", "offset", "limit" }`: one bounded page filtered in SQL (see below), or 400 for an invalid parameter |
 | GET | `/api/nests/{id}` | — | `NestRecord` or 404 |
 | GET | `/api/nests/{id}/file` | — | `.nest` archive bytes (`application/zip`) or 404 |
-| POST | `/api/nests` | multipart: `metadata` (JSON `NestRecord`) + `file` (`.nest` bytes) | `NestRecord` with server-assigned `id` when the client sends an empty guid |
+| POST | `/api/nests` | multipart: `metadata` (JSON `NestRecord`) + `file` (`.nest` bytes) | `NestRecord` with server-assigned `id` when the client sends an empty guid; 409 with the current record (active or deleted) when the `id` already exists, storing nothing |
 | PUT | `/api/nests/{id}/file` | multipart: `metadata` + `file` | Updated `NestRecord`, or 404 if `id` is unknown |
 | PUT | `/api/nests/{id}/metadata` | JSON `NestRecord` | Updated `NestRecord` (archive untouched), or 404 |
 | DELETE | `/api/nests/{id}` | — | Updated hidden `NestRecord`, or 404 |
@@ -291,8 +293,9 @@ revision; save the nest to keep it.
 
 `OpenNest.Server.NestDatabase` uses SQLite (`Microsoft.Data.Sqlite`) with
 `journal_mode=WAL`. Each row holds the metadata columns plus the `.nest`
-archive as a `BLOB`. The database file path comes from `--database=<path>`,
-then `OPENNEST_DB`, defaulting to `./data/nests.db`. The server opens the
+archive as a `BLOB`. The database file path comes from `--database=<path>` or
+`--database <path>`, then `OPENNEST_DB`, defaulting to `./data/nests.db`; a
+`--database` without a path, or given twice, fails startup. The server opens the
 database at startup, so an unusable path fails startup rather than the first request.
 
 Run **one service instance with its database on a local filesystem**. Multiple PCs
