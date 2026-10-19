@@ -1,9 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using OpenNest.CNC;
+using OpenNest.Geometry;
 
 namespace OpenNest.Posts.Cincinnati;
 
@@ -38,8 +38,8 @@ public sealed class CincinnatiSheetWriter
     /// <param name="cutLibrary">Resolved G89 library file for cut operations.</param>
     /// <param name="etchLibrary">Resolved G89 library file for etch operations.</param>
     /// <param name="partSubprograms">
-    /// Optional mapping of (drawingId, rotationKey) to sub-program number.
-    /// When provided, non-cutoff parts are emitted as M98 calls instead of inline features.
+    /// Optional mapping of parts (by reference) to their posted part sub-programs.
+    /// When provided, mapped non-cutoff parts are emitted as M98 calls instead of inline features.
     /// </param>
     public void Write(
         TextWriter w,
@@ -49,7 +49,7 @@ public sealed class CincinnatiSheetWriter
         int subNumber,
         string cutLibrary,
         string etchLibrary,
-        Dictionary<(int, long), int> partSubprograms = null,
+        IReadOnlyDictionary<Part, PartSubprogram> partSubprograms = null,
         Dictionary<(int drawingId, string varName), int> userVarMapping = null
     )
     {
@@ -87,36 +87,18 @@ public sealed class CincinnatiSheetWriter
         w.WriteLine("M47");
         if (!string.IsNullOrEmpty(cutLibrary))
             w.WriteLine($"G89 P{cutLibrary}");
-        w.WriteLine("GOTO1( Goto Feature )");
+
+        // The operator edits this target to restart at a feature. It names the first
+        // feature's line number, which exists only when line numbers are posted.
+        if (_config.UseLineNumbers)
+            w.WriteLine($"GOTO{_config.FeatureLineNumberStart}( Goto Feature )");
 
         // 3. Plate order is the cut sequence, cut-offs included: manual, cut-first
         //    and automatic sequencing all set it, so the post must not reorder.
-        var allParts = plate.Parts.ToList();
+        var items = BuildItems(plate.Parts, partSubprograms);
 
         // 4. Emit parts
-        if (partSubprograms != null)
-            WritePartsWithSubprograms(
-                w,
-                allParts,
-                cutLibrary,
-                etchLibrary,
-                sheetDiagonal,
-                width,
-                length,
-                partSubprograms,
-                userVarMapping
-            );
-        else
-            WritePartsInline(
-                w,
-                allParts,
-                cutLibrary,
-                etchLibrary,
-                sheetDiagonal,
-                width,
-                length,
-                userVarMapping
-            );
+        WriteItems(w, items, cutLibrary, etchLibrary, sheetDiagonal, width, length, userVarMapping);
 
         // 5. Footer
         w.WriteLine("M42");
@@ -125,182 +107,135 @@ public sealed class CincinnatiSheetWriter
         w.WriteLine($"M99 (END OF {nestName}.{layoutIndex:D3})");
     }
 
-    private void WritePartsWithSubprograms(
+    /// <summary>
+    /// One posted step of the sheet: a part feature, a hole call or a part sub-program
+    /// call. Points are in sheet coordinates.
+    /// </summary>
+    private sealed class SheetItem
+    {
+        public Part Part { get; init; }
+        public List<ICode> Codes { get; init; }
+        public bool IsEtch { get; init; }
+        public bool IsExterior { get; init; }
+        public PartSubprogram Subprogram { get; init; }
+
+        /// <summary>First rapid target: the sub-program corner, else the first pierce.</summary>
+        public Vector Entry { get; init; }
+
+        public Vector Start { get; init; }
+        public Vector End { get; init; }
+
+        /// <summary>Where the tool leaves from: back at the corner after a sub-program call.</summary>
+        public Vector Exit { get; init; }
+    }
+
+    private static List<SheetItem> BuildItems(
+        IEnumerable<Part> parts,
+        IReadOnlyDictionary<Part, PartSubprogram> partSubprograms
+    )
+    {
+        var items = new List<SheetItem>();
+        foreach (var part in parts)
+        {
+            if (
+                partSubprograms != null
+                && !part.BaseDrawing.IsCutOff
+                && partSubprograms.TryGetValue(part, out var sub)
+            )
+            {
+                var subFeatures = FeatureUtils.ClassifyAndOrder(
+                    FeatureUtils.SplitByRapids(sub.Program.Codes)
+                );
+                if (subFeatures.Count == 0)
+                    continue;
+
+                var corner = part.Location + sub.Corner;
+                items.Add(
+                    new SheetItem
+                    {
+                        Part = part,
+                        Subprogram = sub,
+                        Entry = corner,
+                        Start = corner + FeatureUtils.StartPoint(subFeatures[0].codes),
+                        End = corner + FeatureUtils.EndPoint(subFeatures[^1].codes),
+                        Exit = corner,
+                    }
+                );
+                continue;
+            }
+
+            var features = FeatureUtils.SplitAndClassify(part);
+            var exterior = FeatureUtils.FindExterior(features);
+            for (var f = 0; f < features.Count; f++)
+            {
+                var (codes, isEtch) = features[f];
+                var start = part.Location + FeatureUtils.StartPoint(codes);
+                var end = part.Location + FeatureUtils.EndPoint(codes);
+                items.Add(
+                    new SheetItem
+                    {
+                        Part = part,
+                        Codes = codes,
+                        IsEtch = isEtch,
+                        IsExterior = exterior[f],
+                        Entry = start,
+                        Start = start,
+                        End = end,
+                        Exit = end,
+                    }
+                );
+            }
+        }
+        return items;
+    }
+
+    private void WriteItems(
         TextWriter w,
-        List<Part> allParts,
+        List<SheetItem> items,
         string cutLibrary,
         string etchLibrary,
         double sheetDiagonal,
         double plateWidth,
         double plateLength,
-        Dictionary<(int, long), int> partSubprograms,
         Dictionary<(int drawingId, string varName), int> userVarMapping
     )
     {
         var lastPartName = "";
-        var featureIndex = 0;
-
-        for (var p = 0; p < allParts.Count; p++)
+        for (var i = 0; i < items.Count; i++)
         {
-            var part = allParts[p];
+            var item = items[i];
+            var part = item.Part;
             var partName = part.BaseDrawing.Name;
-            var isNewPart = partName != lastPartName;
-            var isSafetyHeadraise = isNewPart && lastPartName != "";
-            var isLastPart = p == allParts.Count - 1;
+            var isFirstFeatureOfPart = partName != lastPartName;
+            var next = i + 1 < items.Count ? items[i + 1] : null;
+            var isLastFeature = next == null;
 
-            var key = CincinnatiPartSubprogramWriter.SubprogramKey(part);
-            partSubprograms.TryGetValue(key, out var subNum);
-            var hasSubprogram = !part.BaseDrawing.IsCutOff && subNum != 0;
+            // A head raise belongs before the rapid that leaves this item, so the safety
+            // raise goes on a part's last item when a different part follows.
+            var isSafetyHeadraise = next != null && next.Part.BaseDrawing.Name != partName;
+            double? rapidDistance =
+                next == null
+                    ? null
+                    : item.End.DistanceTo(item.Exit)
+                        + item.Exit.DistanceTo(next.Entry)
+                        + next.Entry.DistanceTo(next.Start);
+            lastPartName = partName;
 
-            if (hasSubprogram)
+            if (item.Subprogram != null)
             {
                 WriteSubprogramCall(
                     w,
-                    part,
-                    subNum,
-                    featureIndex,
+                    item,
+                    i,
                     partName,
                     isSafetyHeadraise,
-                    isLastPart
+                    rapidDistance,
+                    isLastFeature
                 );
-                featureIndex++;
-            }
-            else
-            {
-                // Inline features for cutoffs or parts without sub-programs
-                var features = FeatureUtils.SplitAndClassify(part);
-                for (var f = 0; f < features.Count; f++)
-                {
-                    var (codes, isEtch) = features[f];
-                    var isLastFeature = isLastPart && f == features.Count - 1;
-
-                    // SubProgramCall features are emitted as M98 hole calls
-                    if (codes.Count == 1 && codes[0] is SubProgramCall holeCall)
-                    {
-                        CincinnatiHoleCallWriter.Write(
-                            w,
-                            holeCall,
-                            part.Location,
-                            featureIndex,
-                            isLastFeature,
-                            _config,
-                            _fmt,
-                            _holeSubprograms,
-                            isNewPart && f == 0 ? partName : null,
-                            isSafetyHeadraise && f == 0
-                        );
-                        featureIndex++;
-                        lastPartName = partName;
-                        continue;
-                    }
-
-                    var featureNumber =
-                        featureIndex == 0
-                            ? _config.FeatureLineNumberStart
-                            : 1000 + featureIndex + 1;
-
-                    var cutDistance = FeatureUtils.ComputeCutDistance(codes);
-
-                    var ctx = new FeatureContext
-                    {
-                        Codes = codes,
-                        FeatureNumber = featureNumber,
-                        PartName = partName,
-                        IsFirstFeatureOfPart = isNewPart && f == 0,
-                        IsLastFeatureOnSheet = isLastFeature,
-                        IsSafetyHeadraise = isSafetyHeadraise && f == 0,
-                        IsExteriorFeature = false,
-                        IsEtch = isEtch,
-                        LibraryFile = isEtch ? etchLibrary : cutLibrary,
-                        CutDistance = cutDistance,
-                        SheetDiagonal = sheetDiagonal,
-                        PartLocation = part.Location,
-                        UserVariableMapping = userVarMapping,
-                        DrawingId = part.BaseDrawing.Id,
-                        IsCutOff = part.BaseDrawing.IsCutOff,
-                        PlateWidth = plateWidth,
-                        PlateLength = plateLength,
-                    };
-
-                    _featureWriter.Write(w, ctx);
-                    featureIndex++;
-                }
+                continue;
             }
 
-            lastPartName = partName;
-        }
-    }
-
-    private void WriteSubprogramCall(
-        TextWriter w,
-        Part part,
-        int subNum,
-        int featureIndex,
-        string partName,
-        bool isSafetyHeadraise,
-        bool isLastPart
-    )
-    {
-        // Safety headraise before rapid to new part
-        if (isSafetyHeadraise && _config.SafetyHeadraiseDistance.HasValue)
-            w.WriteLine($"M47 P{_config.SafetyHeadraiseDistance.Value} (Safety Headraise)");
-
-        // Rapid to part position (bounding box lower-left)
-        var featureNumber =
-            featureIndex == 0 ? _config.FeatureLineNumberStart : 1000 + featureIndex + 1;
-
-        var sb = new StringBuilder();
-        if (_config.UseLineNumbers)
-            sb.Append($"N{featureNumber} ");
-        sb.Append($"G0 X{_fmt.FormatCoord(part.Left)} Y{_fmt.FormatCoord(part.Bottom)}");
-        w.WriteLine(sb.ToString());
-
-        // Part name comment
-        w.WriteLine(CoordinateFormatter.Comment($"PART: {partName}"));
-
-        // Set local coordinate system at part position
-        w.WriteLine("G92 X0 Y0");
-
-        // Call part sub-program
-        w.WriteLine($"M98 P{subNum} ({partName})");
-
-        // Restore sheet coordinate system
-        w.WriteLine($"G92 X{_fmt.FormatCoord(part.Left)} Y{_fmt.FormatCoord(part.Bottom)}");
-
-        // Head raise (unless last part on sheet)
-        if (!isLastPart)
-            w.WriteLine("M47");
-    }
-
-    private void WritePartsInline(
-        TextWriter w,
-        List<Part> allParts,
-        string cutLibrary,
-        string etchLibrary,
-        double sheetDiagonal,
-        double plateWidth,
-        double plateLength,
-        Dictionary<(int drawingId, string varName), int> userVarMapping
-    )
-    {
-        // Split and classify features, ordering etch before cut per part
-        var features = new List<(Part part, List<ICode> codes, bool isEtch)>();
-        foreach (var part in allParts)
-        {
-            var partFeatures = FeatureUtils.SplitAndClassify(part);
-            foreach (var (codes, isEtch) in partFeatures)
-                features.Add((part, codes, isEtch));
-        }
-
-        // Emit features
-        var lastPartName = "";
-        for (var i = 0; i < features.Count; i++)
-        {
-            var (part, codes, isEtch) = features[i];
-            var partName = part.BaseDrawing.Name;
-            var isFirstFeatureOfPart = partName != lastPartName;
-            var isSafetyHeadraise = partName != lastPartName && lastPartName != "";
-            var isLastFeature = i == features.Count - 1;
+            var codes = item.Codes;
 
             // SubProgramCall features are emitted as M98 hole calls
             if (codes.Count == 1 && codes[0] is SubProgramCall holeCall)
@@ -317,27 +252,23 @@ public sealed class CincinnatiSheetWriter
                     isFirstFeatureOfPart ? partName : null,
                     isSafetyHeadraise
                 );
-                lastPartName = partName;
                 continue;
             }
-
-            var featureNumber = i == 0 ? _config.FeatureLineNumberStart : 1000 + i + 1;
-
-            var cutDistance = FeatureUtils.ComputeCutDistance(codes);
 
             var ctx = new FeatureContext
             {
                 Codes = codes,
-                FeatureNumber = featureNumber,
+                FeatureNumber = FeatureNumber(i),
                 PartName = partName,
                 IsFirstFeatureOfPart = isFirstFeatureOfPart,
                 IsLastFeatureOnSheet = isLastFeature,
                 IsSafetyHeadraise = isSafetyHeadraise,
-                IsExteriorFeature = false,
-                IsEtch = isEtch,
-                LibraryFile = isEtch ? etchLibrary : cutLibrary,
-                CutDistance = cutDistance,
+                IsExteriorFeature = item.IsExterior,
+                IsEtch = item.IsEtch,
+                LibraryFile = item.IsEtch ? etchLibrary : cutLibrary,
+                CutDistance = FeatureUtils.ComputeCutDistance(codes),
                 SheetDiagonal = sheetDiagonal,
+                RapidDistance = rapidDistance,
                 PartLocation = part.Location,
                 UserVariableMapping = userVarMapping,
                 DrawingId = part.BaseDrawing.Id,
@@ -347,7 +278,59 @@ public sealed class CincinnatiSheetWriter
             };
 
             _featureWriter.Write(w, ctx);
-            lastPartName = partName;
         }
+    }
+
+    private int FeatureNumber(int index) =>
+        index == 0 ? _config.FeatureLineNumberStart : 1000 + index + 1;
+
+    /// <summary>
+    /// Calls a part sub-program in a G92 frame at the part corner (§1.92). After the
+    /// call the head is raised, the tool rapids back to local 0,0 and G92 gives that
+    /// point its sheet coordinates again, so the frame is restored where the tool really
+    /// is. The last part skips the restore: nothing moves before the next sheet
+    /// re-anchors with G92 X#5021 Y#5022.
+    /// </summary>
+    private void WriteSubprogramCall(
+        TextWriter w,
+        SheetItem item,
+        int index,
+        string partName,
+        bool isSafetyHeadraise,
+        double? rapidDistance,
+        bool isLastPart
+    )
+    {
+        var x = _fmt.FormatCoord(item.Entry.X);
+        var y = _fmt.FormatCoord(item.Entry.Y);
+
+        // Rapid to the sub-program origin (the part's toolpath corner)
+        var sb = new StringBuilder();
+        if (_config.UseLineNumbers)
+            sb.Append($"N{FeatureNumber(index)} ");
+        sb.Append($"G0 X{x} Y{y}");
+        w.WriteLine(sb.ToString());
+
+        // Part name comment
+        w.WriteLine(CoordinateFormatter.Comment($"PART: {partName}"));
+
+        // Set local coordinate system at part position
+        w.WriteLine("G92 X0 Y0");
+
+        // Call part sub-program
+        w.WriteLine($"M98 P{item.Subprogram.Number} ({partName})");
+
+        if (isLastPart)
+            return;
+
+        // One head raise covers the rapid back and the rapid on. The part is complete,
+        // so the raise follows the exterior M47 mode.
+        var raise = CincinnatiHeadRaise.Line(_config, isSafetyHeadraise, true, rapidDistance);
+        if (raise != null)
+            w.WriteLine(raise);
+
+        // Restore the sheet coordinate system at the corner
+        w.WriteLine("G0 X0 Y0");
+        w.WriteLine($"G92 X{x} Y{y}");
     }
 }

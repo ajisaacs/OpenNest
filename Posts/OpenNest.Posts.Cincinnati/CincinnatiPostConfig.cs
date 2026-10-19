@@ -6,33 +6,6 @@ using System.Linq;
 namespace OpenNest.Posts.Cincinnati
 {
     /// <summary>
-    /// Specifies how coordinate positioning is handled between parts.
-    /// </summary>
-    public enum CoordinateMode
-    {
-        /// <summary>Set absolute position.</summary>
-        G92,
-
-        /// <summary>Use relative/incremental positioning.</summary>
-        G91,
-
-        /// <summary>Use machine coordinate system.</summary>
-        G53,
-    }
-
-    /// <summary>
-    /// Specifies how G89 (hole drilling/tapping parameters) are provided.
-    /// </summary>
-    public enum G89Mode
-    {
-        /// <summary>Use external library file for G89 parameters.</summary>
-        LibraryFile,
-
-        /// <summary>Explicitly define G89 parameters in the program.</summary>
-        Explicit,
-    }
-
-    /// <summary>
     /// Specifies where kerf compensation is applied.
     /// </summary>
     public enum KerfMode
@@ -57,17 +30,20 @@ namespace OpenNest.Posts.Cincinnati
     }
 
     /// <summary>
-    /// Specifies how M47 (optional stop) commands are used.
+    /// Specifies how the M47 head raise before each rapid is posted.
     /// </summary>
     public enum M47Mode
     {
         /// <summary>Always include M47.</summary>
         Always,
 
-        /// <summary>Include M47 with block delete functionality.</summary>
+        /// <summary>Post /M47, which the operator can skip with block delete.</summary>
         BlockDelete,
 
-        /// <summary>Automatically determine M47 placement.</summary>
+        /// <summary>
+        /// M47 before rapids longer than the M47 override distance threshold, /M47 before
+        /// shorter ones. Without a threshold every raise is M47.
+        /// </summary>
         Auto,
 
         /// <summary>Do not use M47.</summary>
@@ -121,11 +97,6 @@ namespace OpenNest.Posts.Cincinnati
         public int FeatureLineNumberStart { get; set; } = 1;
 
         [Category("2. Subprograms")]
-        [DisplayName("Use Sheet Subprograms")]
-        [Description("Use subprograms for sheet operations.")]
-        public bool UseSheetSubprograms { get; set; } = true;
-
-        [Category("2. Subprograms")]
         [DisplayName("Sheet Subprogram Start")]
         [Description("Starting subprogram number for sheet operations.")]
         public int SheetSubprogramStart { get; set; } = 101;
@@ -146,16 +117,6 @@ namespace OpenNest.Posts.Cincinnati
         [DisplayName("Variable Declaration Subprogram")]
         [Description("Subprogram number for variable declarations.")]
         public int VariableDeclarationSubprogram { get; set; } = 100;
-
-        [Category("3. Positioning")]
-        [DisplayName("Coordinate Mode Between Parts")]
-        [Description("How coordinate positioning is handled between parts (G92, G91, or G53).")]
-        public CoordinateMode CoordModeBetweenParts { get; set; } = CoordinateMode.G92;
-
-        [Category("4. Process")]
-        [DisplayName("Process Parameter Mode")]
-        [Description("How G89 parameters are provided (LibraryFile or Explicit).")]
-        public G89Mode ProcessParameterMode { get; set; } = G89Mode.LibraryFile;
 
         [Category("4. Process")]
         [DisplayName("Default Assist Gas")]
@@ -199,22 +160,28 @@ namespace OpenNest.Posts.Cincinnati
 
         [Category("6. M47 (Optional Stop)")]
         [DisplayName("Interior M47")]
-        [Description("How M47 is used in interior cuts.")]
+        [Description("How M47 is posted after features other than a part's exterior, such as cutouts and etch.")]
         public M47Mode InteriorM47 { get; set; } = M47Mode.Always;
 
         [Category("6. M47 (Optional Stop)")]
         [DisplayName("Exterior M47")]
-        [Description("How M47 is used in exterior cuts.")]
+        [Description(
+            "How M47 is posted after a part's exterior: the cut contour spanning the part's cut extents, or a part sub-program call."
+        )]
         public M47Mode ExteriorM47 { get; set; } = M47Mode.Always;
 
         [Category("6. M47 (Optional Stop)")]
         [DisplayName("M47 Override Distance Threshold")]
-        [Description("Distance threshold for M47 override. Null = no override.")]
+        [Description(
+            "Auto M47 mode: rapids to the next pierce longer than this get M47, shorter ones /M47. Program units. Null = Auto always posts M47."
+        )]
         public double? M47OverrideDistanceThreshold { get; set; } = null;
 
         [Category("7. Safety")]
         [DisplayName("Safety Headraise Distance")]
-        [Description("Safety head raise distance in machine units. Null = disabled.")]
+        [Description(
+            "Safety head raise distance in machine units, posted as M47 P<distance> before the rapid to a different part. Null = disabled."
+        )]
         public int? SafetyHeadraiseDistance { get; set; } = 2000;
 
         [Category("8. Pallet")]
@@ -309,21 +276,6 @@ namespace OpenNest.Posts.Cincinnati
         )]
         [TypeConverter(typeof(MaterialLibraryNameConverter))]
         public string SelectedLibrary { get; set; } = "";
-
-        public string FindBestLibrary(string materialName, double thickness)
-        {
-            if (MaterialLibraries == null || string.IsNullOrEmpty(materialName))
-                return "";
-
-            return MaterialLibraries
-                    .Where(e =>
-                        string.Equals(e.Material, materialName, StringComparison.OrdinalIgnoreCase)
-                    )
-                    .OrderBy(e => System.Math.Abs(e.Thickness - thickness))
-                    .Select(e => e.Library)
-                    .FirstOrDefault()
-                ?? "";
-        }
     }
 
     public class MaterialLibraryEntry

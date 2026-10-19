@@ -38,11 +38,24 @@ namespace OpenNest.Posts.Cincinnati
                 .Where(s => !string.IsNullOrWhiteSpace(s));
         }
 
+        /// <summary>
+        /// Pre-selects the library auto-resolution would post for this nest (material,
+        /// thickness within tolerance and assist gas), so the configuration dialog shows
+        /// it. With no matching entry the selection is cleared rather than guessed.
+        /// </summary>
         public void PrepareForNest(Nest nest)
         {
-            var materialName = nest?.Material?.Name ?? "";
-            var thickness = nest?.Thickness ?? 0.0;
-            Config.SelectedLibrary = Config.FindBestLibrary(materialName, thickness);
+            Config.SelectedLibrary = "";
+            if (nest == null)
+                return;
+
+            var entry = MaterialLibraryResolver.FindCutEntry(
+                Config.MaterialLibraries,
+                nest.Material?.Name ?? "",
+                nest.Thickness,
+                MaterialLibraryResolver.ResolveGas(nest, Config)
+            );
+            Config.SelectedLibrary = entry?.Library ?? "";
         }
 
         public CincinnatiPostProcessor()
@@ -105,7 +118,7 @@ namespace OpenNest.Posts.Cincinnati
             );
 
             // 5. Build part sub-program registry (if enabled)
-            Dictionary<(int, long), int> partSubprograms = null;
+            Dictionary<Part, PartSubprogram> partSubprograms = null;
             List<(int subNum, string name, Program program)> subprogramEntries = null;
 
             if (Config.UsePartSubprograms)

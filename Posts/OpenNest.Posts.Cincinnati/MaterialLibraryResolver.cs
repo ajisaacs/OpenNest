@@ -24,13 +24,26 @@ public sealed class MaterialLibraryResolver
         if (!string.IsNullOrEmpty(_selectedLibrary))
             return EnsureLibExtension(_selectedLibrary);
 
-        var entry = _materialLibraries.FirstOrDefault(e =>
+        var entry = FindCutEntry(_materialLibraries, materialName, thickness, gas);
+        return EnsureLibExtension(entry?.Library ?? "");
+    }
+
+    /// <summary>
+    /// The first cut library entry for this material, thickness (within tolerance) and
+    /// assist gas, or null when none matches.
+    /// </summary>
+    public static MaterialLibraryEntry FindCutEntry(
+        IEnumerable<MaterialLibraryEntry> entries,
+        string materialName,
+        double thickness,
+        string gas
+    )
+    {
+        return entries?.FirstOrDefault(e =>
             string.Equals(e.Material, materialName, StringComparison.OrdinalIgnoreCase)
             && System.Math.Abs(e.Thickness - thickness) <= ThicknessTolerance
             && string.Equals(e.Gas, gas, StringComparison.OrdinalIgnoreCase)
         );
-
-        return EnsureLibExtension(entry?.Library ?? "");
     }
 
     public string ResolveEtchLibrary(string gas)

@@ -24,7 +24,7 @@ public class HoleCallOutputCharacterizationTests
 
         var body = FirstHole(route, lineNumbers ? "N73 G52 X-12.35 Y6.79" : "G52 X-12.35 Y6.79")
             + Lines("M98 P7", "G52 X0 Y0");
-        Assert.Equal(WrapOutput(route, body), output.ToString());
+        Assert.Equal(WrapOutput(route, body, lineNumbers ? 73 : null), output.ToString());
     }
 
     [Theory]
@@ -61,7 +61,7 @@ public class HoleCallOutputCharacterizationTests
             "M98 P0",
             "G52 X0 Y0"
         );
-        Assert.Equal(WrapOutput(route, body), output.ToString());
+        Assert.Equal(WrapOutput(route, body, lineNumbers ? 73 : null), output.ToString());
     }
 
     [Theory]
@@ -92,6 +92,7 @@ public class HoleCallOutputCharacterizationTests
         if (route != "part")
             body += Lines("( PART: Sample )");
         body += Lines(
+            "(WARNING: No library found)",
             "G84",
             "G1 X2 Y1 F#148",
             "G1 X1 Y1",
@@ -102,12 +103,13 @@ public class HoleCallOutputCharacterizationTests
             "G52 X0 Y0",
             "M47",
             lineNumbers ? "N1003 G0 X3 Y3" : "G0 X3 Y3",
+            "(WARNING: No library found)",
             "G84",
             "G1 X4 Y3 F#148",
             "G1 X3 Y3",
             "M35"
         );
-        Assert.Equal(WrapOutput(route, body), output.ToString());
+        Assert.Equal(WrapOutput(route, body, lineNumbers ? 73 : null), output.ToString());
     }
 
     [Theory]
@@ -127,14 +129,14 @@ public class HoleCallOutputCharacterizationTests
         write(first, program);
 
         Assert.Equal(
-            WrapOutput(route, FirstHole(route, "N87 G52 X-12.35 Y6.79") + Lines("M98 P7", "G52 X0 Y0")),
+            WrapOutput(route, FirstHole(route, "N87 G52 X-12.35 Y6.79") + Lines("M98 P7", "G52 X0 Y0"), 87),
             first.ToString()
         );
         config.UseLineNumbers = false;
         using var second = new StringWriter { NewLine = "\n" };
         write(second, program);
         Assert.Equal(
-            WrapOutput(route, FirstHole(route, "G52 X-12.35 Y6.79") + Lines("M98 P7", "G52 X0 Y0")),
+            WrapOutput(route, FirstHole(route, "G52 X-12.35 Y6.79") + Lines("M98 P7", "G52 X0 Y0"), null),
             second.ToString()
         );
     }
@@ -152,7 +154,7 @@ public class HoleCallOutputCharacterizationTests
         var error = Assert.Throws<IOException>(() => write(output, program));
 
         Assert.Same(output.Failure, error);
-        Assert.Equal(Header(route) + FirstHole(route, "N73 G52 X-12.35 Y6.79"), output.ToString());
+        Assert.Equal(Header(route, 73) + FirstHole(route, "N73 G52 X-12.35 Y6.79"), output.ToString());
     }
 
     private static CincinnatiPostConfig CreateConfig(bool lineNumbers) => new()
@@ -161,7 +163,6 @@ public class HoleCallOutputCharacterizationTests
         FeatureLineNumberStart = 73,
         UseLineNumbers = lineNumbers,
         PalletExchange = PalletMode.None,
-        ProcessParameterMode = G89Mode.Explicit,
         KerfCompensation = KerfMode.PreApplied,
         UseAntiDive = false,
     };
@@ -204,7 +205,7 @@ public class HoleCallOutputCharacterizationTests
         }
 
         var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager(), byProgram);
-        Dictionary<(int, long), int>? partMapping = route == "grouped-sheet" ? new() : null;
+        Dictionary<Part, PartSubprogram>? partMapping = route == "grouped-sheet" ? new() : null;
         return (output, program) =>
         {
             var plate = new Plate(48, 96);
@@ -234,15 +235,17 @@ public class HoleCallOutputCharacterizationTests
     }
 
     // Literal snapshots deliberately do not call the production emitter/formatter.
-    private static string WrapOutput(string route, string body) => Header(route) + body +
+    private static string WrapOutput(string route, string body, int? gotoTarget) => Header(route, gotoTarget) + body +
         (route == "part" ? Lines("M99 (END OF Sample)") : Lines("M42", "M99 (END OF Nest.001)"));
 
-    private static string Header(string route)
+    // The sheet's GOTO names the first feature's line number, posted only with line numbers.
+    private static string Header(string route, int? gotoTarget)
     {
         if (route == "part")
             return Lines("(*****************************************************)", ":201", "( PART: Sample )");
 
-        return Lines(
+        var lines = new List<string>
+        {
             "(*****************************************************)",
             "( START OF Nest.001 )",
             ":101",
@@ -257,8 +260,10 @@ public class HoleCallOutputCharacterizationTests
             "M98 P100 (Variable Declaration)",
             "G90",
             "M47",
-            "GOTO1( Goto Feature )"
-        );
+        };
+        if (gotoTarget != null)
+            lines.Add($"GOTO{gotoTarget}( Goto Feature )");
+        return Lines(lines.ToArray());
     }
 
     // A sheet part that opens with a hole call names the part after the call's G52 line.

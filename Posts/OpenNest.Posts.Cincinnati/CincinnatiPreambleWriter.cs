@@ -57,10 +57,7 @@ public sealed class CincinnatiPreambleWriter
 
         w.WriteLine("M42");
 
-        if (
-            _config.ProcessParameterMode == G89Mode.LibraryFile
-            && !string.IsNullOrEmpty(initialLibrary)
-        )
+        if (!string.IsNullOrEmpty(initialLibrary))
             w.WriteLine($"G89 P{initialLibrary}");
 
         w.WriteLine($"M98 P{_config.VariableDeclarationSubprogram} (Variable Declaration)");

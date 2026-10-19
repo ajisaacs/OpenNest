@@ -14,7 +14,6 @@ public class CincinnatiFeatureWriterTests
             UseAntiDive = true,
             KerfCompensation = KerfMode.ControllerSide,
             DefaultKerfSide = KerfSide.Left,
-            ProcessParameterMode = G89Mode.LibraryFile,
             InteriorM47 = M47Mode.Always,
             ExteriorM47 = M47Mode.Always,
             UseSpeedGas = false,
@@ -303,7 +302,6 @@ public class CincinnatiFeatureWriterTests
     public void G89_EmittedWithLibraryFile()
     {
         var config = DefaultConfig();
-        config.ProcessParameterMode = G89Mode.LibraryFile;
         var ctx = SimpleContext();
         ctx.LibraryFile = "MILD10";
         ctx.CutDistance = 18.0;
@@ -317,7 +315,6 @@ public class CincinnatiFeatureWriterTests
     public void G89_WarningEmittedWhenNoLibrary()
     {
         var config = DefaultConfig();
-        config.ProcessParameterMode = G89Mode.LibraryFile;
         var ctx = SimpleContext();
         ctx.LibraryFile = "";
         var output = WriteFeature(config, ctx);

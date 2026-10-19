@@ -37,8 +37,11 @@ A generated file contains, in order:
    never reorders them.
 
 4. **Part sub-programs** (`CincinnatiPartSubprogramWriter.Write`), one per
-   unique `(drawing, rotation)` pair, only emitted when
-   `Config.UsePartSubprograms` is enabled.
+   unique posted part toolpath, only emitted when `Config.UsePartSubprograms`
+   is enabled. Parts share a sub-program only when they have the same drawing
+   name and their normalized programs (lead-ins, hole calls and suppression
+   included) post identically, so parts of one drawing and rotation with
+   different lead-ins get their own sub-programs.
 
 5. **Hole sub-programs** (`CincinnatiPartSubprogramWriter.Write` reused with a
    `"HOLE"` label), one per unique posted hole toolpath. Calls are matched to
@@ -49,6 +52,36 @@ A generated file contains, in order:
 
 Sub-program bodies start with a `:<subNum>` label and end with `M99`.
 
+The post reads part programs through absolute-mode copies and never changes the
+nest: an incremental part program stays incremental after posting.
+
+### Sheet header
+
+Each sheet sub-program re-anchors the work frame with `G92 X#5021 Y#5022`
+(§1.92; `#5021`/`#5022` are the machine X/Y system variables), loads the cut
+library with `G89 P<library>` (§2.89) when one resolved, and raises the head
+with `M47`. When `Config.UseLineNumbers` is on it then posts
+`GOTO<FeatureLineNumberStart>( Goto Feature )` (§5.5), which targets the
+sheet's first feature line; the operator edits it to restart at another
+feature. Without line numbers there is no target, so no `GOTO` is posted.
+
+### Suppressed moves
+
+Moves with `Motion.Suppressed` set are not cut, as in the CI Fiber post and the
+cut simulation. When cutting resumes after a suppressed run, the post ends the
+feature and starts a new one with a rapid to the run's end point, so the gap is
+crossed with the beam off. Rapids left with nothing to cut, and hole calls whose
+moves are all suppressed, are dropped.
+
+### Cut library selection
+
+`MaterialLibraryResolver` picks the first `MaterialLibraries` entry matching the
+nest material, thickness within 0.001 and assist gas (`Nest.AssistGas`, else
+`Config.DefaultAssistGas`). Before the configuration dialog opens,
+`PrepareForNest` pre-selects that same entry as `SelectedLibrary`, or clears the
+selection when nothing matches; it never substitutes another gas or thickness.
+A `SelectedLibrary` the operator then picks overrides auto-resolution.
+
 ## Feature blocks
 
 A "feature" is a single contour: lead-in → cut moves → lead-out. Each feature
@@ -58,7 +91,8 @@ block in a sheet or sub-program output follows this order
 1. `G0 X_ Y_` — rapid to the pierce point (§1.00).
 2. Optional part-name comment, only on the first feature of each part.
 3. `G89 P<library>` — load process parameters (§2.89). `P` is a library file
-   name; the `(...)` trailing comment carries speed-class info.
+   name; the `(...)` trailing comment carries speed-class info. With no
+   resolved library the post writes `(WARNING: No library found)` instead.
 4. `G84` (cut) or `G85` (etch / no-pierce) — pierce and start cut, or start
    cut without pierce (§2.84 / §2.85).
 5. `M130 (ANTI DIVE OFF)` — disable anti-dive, only if configured (§3.130).
@@ -72,13 +106,35 @@ block in a sheet or sub-program output follows this order
 7. `G40` — cancel kerf compensation (§1.40), only if it was applied.
 8. `M35` (or `M135` if SpeedGas is enabled) — beam off (§3.35 / §3.135).
 9. `M131 (ANTI DIVE ON)` — re-enable anti-dive (§3.131).
-10. `M47` or `M47 P<distance>` — raise Z-axis, unless this is the last feature
-    on the sheet (§3.47). A leading `/` (block delete, §5.6) is prepended when
-    the configured override distance exceeds the default.
+10. Head raise before the rapid to the next feature, unless this is the last
+    feature on the sheet (§3.47). See [Head raises](#head-raises-m47).
 
-Sheet sub-program and sheet-level feature calls add `G92 X#5021 Y#5022`
-(§1.92) at the top so the local origin is anchored to the machine's current
-absolute position (`#5021`/`#5022` are the machine X/Y system variables).
+## Head raises (M47)
+
+Every raise is written at the end of the feature it follows, before the rapid
+that leaves it, and there is exactly one raise per rapid. The block is chosen
+in this order (`CincinnatiHeadRaise`):
+
+1. `M47 P<SafetyHeadraiseDistance> (Safety Headraise)` when the next feature
+   belongs to a part with a different drawing name and the distance is set.
+2. Otherwise the M47 mode for the feature just cut: `ExteriorM47` after a
+   part's exterior, `InteriorM47` after anything else.
+   - `Always`: `M47`.
+   - `BlockDelete`: `/M47`; the operator can skip it with block delete (§5.6).
+   - `Auto`: `M47` when the rapid travel to the next pierce exceeds
+     `M47OverrideDistanceThreshold` (program units), `/M47` when it does not.
+     With no threshold, `Auto` always posts `M47`.
+   - `None`: no raise.
+
+The exterior is the cut feature whose cut moves (lead-in and lead-out moves
+excluded) span the extents of all of the part's cut moves; etch features and
+hole calls are never exterior, and a part whose outline is cut in several
+features has no exterior. The raise after a part sub-program call follows
+`ExteriorM47`. These rules are this project's interpretation of the settings,
+not vendor-documented behavior.
+
+Hole calls (see below) write `M47`, or the safety raise, after `G52 X0 Y0`
+regardless of the M47 mode.
 
 ## Sub-program call patterns
 
@@ -88,24 +144,32 @@ targets a whole-part sub-program or a hole sub-program.
 ### Part sub-program call (`WriteSubprogramCall`)
 
 Used when `Config.UsePartSubprograms` is enabled. The tool physically rapids
-to the part corner, then G92 sets the current position as the local origin,
-the sub-program executes in its own local coordinate frame, and G92 restores
-the original absolute position after return.
+to the corner of the part's toolpath, G92 sets that position as the local
+origin, and the sub-program executes in its own local coordinate frame. After
+it returns, the tool is wherever the sub-program's last feature ended, so the
+head is raised, the tool rapids back to local `0,0` (the corner) and G92 gives
+that point its sheet coordinates again.
 
 ```
-G0 X<left> Y<bottom>          ; rapid to part bounding box corner (§1.00)
-(PART: <name>)
+G0 X<left> Y<bottom>          ; rapid to the toolpath corner (§1.00)
+( PART: <name> )
 G92 X0 Y0                     ; set local origin at current position (§1.92)
 M98 P<partSubNum> (<name>)    ; call the part sub-program (§3.98)
+M47                           ; head raise for the rapids that follow (§3.47)
+G0 X0 Y0                      ; back to the corner (§1.00)
 G92 X<left> Y<bottom>         ; restore the sheet coordinate system (§1.92)
-M47                           ; head raise unless this is the last part (§3.47)
 ```
 
-This pattern uses G92 because the tool is physically positioned at the part
-corner first. The sub-program's coordinates are part-local, so they are
-interpreted against the new origin until G92 restores the sheet frame.
+The last part on a sheet stops after `M98`: nothing moves before the next
+sheet re-anchors with `G92 X#5021 Y#5022`. The sub-program's last feature
+posts no raise, so the raise after the call is the only one before the rapids,
+chosen by the [head raise](#head-raises-m47) rules.
 
-### Hole sub-program call (`WriteHoleSubprogramCall`)
+This pattern uses G92 rather than G52 because hole calls inside a part
+sub-program use G52 themselves, and a nested G52 would replace the part shift
+instead of adding to it.
+
+### Hole sub-program call (`CincinnatiHoleCallWriter.Write`)
 
 Used for the `SubProgramCall` codes that a `ContourCuttingStrategy` emits for
 each circular hole. Unlike parts, we do **not** want a physical rapid to the

@@ -8,9 +8,17 @@ using OpenNest.Geometry;
 namespace OpenNest.Posts.Cincinnati;
 
 /// <summary>
+/// A posted part sub-program and where one part's program frame puts its origin.
+/// </summary>
+/// <param name="Number">Posted sub-program number.</param>
+/// <param name="Program">The normalized, absolute program the sub-program is written from.</param>
+/// <param name="Corner">The sub-program origin in the part's program frame.</param>
+public sealed record PartSubprogram(int Number, Program Program, Vector Corner);
+
+/// <summary>
 /// Writes a Cincinnati-format part sub-program definition.
-/// Each sub-program contains the complete cutting sequence for one unique part geometry
-/// (drawing + rotation), with coordinates normalized to origin (0,0).
+/// Each sub-program contains the complete cutting sequence for one unique posted part
+/// toolpath, with coordinates normalized to origin (0,0).
 /// Called via M98 from sheet sub-programs.
 /// </summary>
 public sealed class CincinnatiPartSubprogramWriter
@@ -51,6 +59,7 @@ public sealed class CincinnatiPartSubprogramWriter
 
         // Classify and order: etch features first, then cut features
         var ordered = FeatureUtils.ClassifyAndOrder(allFeatures);
+        var exterior = FeatureUtils.FindExterior(ordered);
 
         w.WriteLine("(*****************************************************)");
         w.WriteLine($":{subNumber}");
@@ -81,11 +90,14 @@ public sealed class CincinnatiPartSubprogramWriter
                 IsFirstFeatureOfPart = false,
                 IsLastFeatureOnSheet = isLastFeature,
                 IsSafetyHeadraise = false,
-                IsExteriorFeature = false,
+                IsExteriorFeature = exterior[i],
                 IsEtch = isEtch,
                 LibraryFile = isEtch ? etchLibrary : cutLibrary,
                 CutDistance = cutDistance,
                 SheetDiagonal = sheetDiagonal,
+                RapidDistance = isLastFeature
+                    ? null
+                    : FeatureUtils.EndPoint(codes).DistanceTo(FeatureUtils.StartPoint(ordered[i + 1].codes)),
             };
 
             _featureWriter.Write(w, ctx);
@@ -102,22 +114,19 @@ public sealed class CincinnatiPartSubprogramWriter
     internal static void EnsureLeadingRapid(Program pgm) => FeatureUtils.InsertLeadingRapid(pgm.Codes);
 
     /// <summary>
-    /// Creates a sub-program key for matching parts to their sub-programs.
-    /// </summary>
-    internal static (int drawingId, long rotationKey) SubprogramKey(Part part) =>
-        (part.BaseDrawing.Id, (long)System.Math.Round(part.Rotation * 1e6));
-
-    /// <summary>
-    /// Scans all plates and builds a mapping of unique part geometries to sub-program numbers,
-    /// along with their normalized programs for writing.
+    /// Scans all plates and assigns each non-cutoff part the sub-program for its posted
+    /// toolpath: parts share a sub-program only when their normalized programs, lead-ins
+    /// included, post identically under the same drawing name. Part programs are copied,
+    /// never modified.
     /// </summary>
     internal static (
-        Dictionary<(int, long), int> mapping,
+        Dictionary<Part, PartSubprogram> mapping,
         List<(int subNum, string name, Program program)> entries
     ) BuildRegistry(IEnumerable<Plate> plates, int startNumber)
     {
-        var mapping = new Dictionary<(int, long), int>();
+        var mapping = new Dictionary<Part, PartSubprogram>(ReferenceEqualityComparer.Instance);
         var entries = new List<(int, string, Program)>();
+        var contentIndex = new Dictionary<string, (int subNum, Program program)>();
         var nextSubNum = startNumber;
 
         foreach (var plate in plates)
@@ -126,30 +135,42 @@ public sealed class CincinnatiPartSubprogramWriter
             {
                 if (part.BaseDrawing.IsCutOff)
                     continue;
-                var key = SubprogramKey(part);
-                if (!mapping.ContainsKey(key))
+
+                var pgm = PostedCopy(part.Program);
+                var bbox = pgm.BoundingBox();
+                pgm.Offset(-bbox.Location.X, -bbox.Location.Y);
+
+                // If the program has no leading rapid, the feature writer
+                // will use the first motion endpoint as the pierce point,
+                // losing the first contour segment. Insert a synthetic rapid
+                // at the contour's return point (last motion endpoint) so
+                // the full contour is preserved.
+                EnsureLeadingRapid(pgm);
+
+                var name = part.BaseDrawing.Name;
+                var key = name + "\n" + ProgramToCanonical(pgm);
+                if (!contentIndex.TryGetValue(key, out var entry))
                 {
-                    var subNum = nextSubNum++;
-                    mapping[key] = subNum;
-
-                    var pgm = part.Program.Clone() as Program;
-                    pgm.Mode = Mode.Absolute;
-                    var bbox = pgm.BoundingBox();
-                    pgm.Offset(-bbox.Location.X, -bbox.Location.Y);
-
-                    // If the program has no leading rapid, the feature writer
-                    // will use the first motion endpoint as the pierce point,
-                    // losing the first contour segment. Insert a synthetic rapid
-                    // at the contour's return point (last motion endpoint) so
-                    // the full contour is preserved.
-                    EnsureLeadingRapid(pgm);
-
-                    entries.Add((subNum, part.BaseDrawing.Name, pgm));
+                    entry = (nextSubNum++, pgm);
+                    contentIndex[key] = entry;
+                    entries.Add((entry.subNum, name, pgm));
                 }
+
+                mapping[part] = new PartSubprogram(entry.subNum, entry.program, bbox.Location);
             }
         }
 
         return (mapping, entries);
+    }
+
+    // An absolute copy with suppressed moves left uncut, as the post writes it.
+    private static Program PostedCopy(Program program)
+    {
+        var copy = FeatureUtils.ToAbsoluteCopy(program);
+        var codes = FeatureUtils.RemoveSuppressed(copy.Codes);
+        copy.Codes.Clear();
+        copy.Codes.AddRange(codes);
+        return copy;
     }
 
     /// <summary>
@@ -179,10 +200,10 @@ public sealed class CincinnatiPartSubprogramWriter
             {
                 if (code is not SubProgramCall { Program: not null } call)
                     continue;
-                if (mapping.ContainsKey(call.Program))
+                if (mapping.ContainsKey(call.Program) || !FeatureUtils.HasCut(call.Program))
                     continue;
 
-                var absolute = FeatureUtils.ToAbsoluteCopy(call.Program);
+                var absolute = PostedCopy(call.Program);
                 EnsureLeadingRapid(absolute);
 
                 var canonical = ProgramToCanonical(absolute);
@@ -232,6 +253,11 @@ public sealed class CincinnatiPartSubprogramWriter
                 );
             else if (code is RapidMove rm)
                 sb.Append(CultureInfo.InvariantCulture, $"R{rm.EndPoint.X:F6},{rm.EndPoint.Y:F6}");
+            else if (code is SubProgramCall { Program: not null } call)
+                sb.Append(
+                    CultureInfo.InvariantCulture,
+                    $"S{call.Offset.X:F6},{call.Offset.Y:F6}[{ProgramToCanonical(PostedCopy(call.Program))}]"
+                );
         }
         return sb.ToString();
     }

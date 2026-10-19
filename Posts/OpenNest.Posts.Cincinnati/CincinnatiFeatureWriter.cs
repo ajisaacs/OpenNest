@@ -17,12 +17,25 @@ public sealed class FeatureContext
     public string PartName { get; set; } = "";
     public bool IsFirstFeatureOfPart { get; set; }
     public bool IsLastFeatureOnSheet { get; set; }
+
+    /// <summary>
+    /// True when the rapid after this feature goes to a different part, so its head
+    /// raise is the safety head raise.
+    /// </summary>
     public bool IsSafetyHeadraise { get; set; }
+
+    /// <summary>True when this feature cuts the part's exterior (selects ExteriorM47).</summary>
     public bool IsExteriorFeature { get; set; }
     public bool IsEtch { get; set; }
     public string LibraryFile { get; set; } = "";
     public double CutDistance { get; set; }
     public double SheetDiagonal { get; set; }
+
+    /// <summary>
+    /// Rapid travel from this feature's end to the next pierce, used by
+    /// <see cref="M47Mode.Auto"/>. Null when unknown.
+    /// </summary>
+    public double? RapidDistance { get; set; }
 
     /// <summary>
     /// Part location on the plate. Added to all output X/Y coordinates
@@ -93,19 +106,16 @@ public sealed class CincinnatiFeatureWriter
             writer.WriteLine(CoordinateFormatter.Comment($"PART: {ctx.PartName}"));
 
         // 3. G89 process params
-        if (_config.ProcessParameterMode == G89Mode.LibraryFile)
+        var lib = ctx.LibraryFile;
+        if (!string.IsNullOrEmpty(lib))
         {
-            var lib = ctx.LibraryFile;
-            if (!string.IsNullOrEmpty(lib))
-            {
-                var speedClass = _speedClassifier.Classify(ctx.CutDistance, ctx.SheetDiagonal);
-                var cutDist = _speedClassifier.FormatCutDist(ctx.CutDistance, ctx.SheetDiagonal);
-                writer.WriteLine($"G89 P{lib} ({speedClass} {cutDist})");
-            }
-            else
-            {
-                writer.WriteLine("(WARNING: No library found)");
-            }
+            var speedClass = _speedClassifier.Classify(ctx.CutDistance, ctx.SheetDiagonal);
+            var cutDist = _speedClassifier.FormatCutDist(ctx.CutDistance, ctx.SheetDiagonal);
+            writer.WriteLine($"G89 P{lib} ({speedClass} {cutDist})");
+        }
+        else
+        {
+            writer.WriteLine("(WARNING: No library found)");
         }
 
         // 4. Pierce/beam on — G85 for etch (no pierce), G84 for cut
@@ -322,25 +332,14 @@ public sealed class CincinnatiFeatureWriter
 
     private void WriteM47(TextWriter writer, FeatureContext ctx)
     {
-        if (ctx.IsSafetyHeadraise && _config.SafetyHeadraiseDistance.HasValue)
-        {
-            writer.WriteLine($"M47 P{_config.SafetyHeadraiseDistance.Value} (Safety Headraise)");
-            return;
-        }
-
-        var mode = ctx.IsExteriorFeature ? _config.ExteriorM47 : _config.InteriorM47;
-
-        switch (mode)
-        {
-            case M47Mode.Always:
-                writer.WriteLine("M47");
-                break;
-            case M47Mode.BlockDelete:
-                writer.WriteLine("/M47");
-                break;
-            case M47Mode.None:
-                break;
-        }
+        var line = CincinnatiHeadRaise.Line(
+            _config,
+            ctx.IsSafetyHeadraise,
+            ctx.IsExteriorFeature,
+            ctx.RapidDistance
+        );
+        if (line != null)
+            writer.WriteLine(line);
     }
 
     private static string GetLinearFeedVariable(LayerType layer)
