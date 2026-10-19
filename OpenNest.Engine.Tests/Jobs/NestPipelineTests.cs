@@ -58,6 +58,48 @@ public class NestPipelineTests
     }
 
     [Fact]
+    public void PlanReportsBecomeDetachedSheetsThatLeaveCallerDrawingsAlone()
+    {
+        var item = Item("bracket", 2);
+        var engine = new ReportingEngine(job =>
+            OnePlate(
+                job,
+                new NestJobPlacement(job.Parts[0].Id, 0, 1, 1, 0),
+                new NestJobPlacement(job.Parts[0].Id, 1, 20, 1, 0)
+            ));
+        var reports = new List<NestJobProgress>();
+
+        var result = NestPipeline.Run(engine, "Stub", Request("Stub", item), new InlineProgress(reports.Add));
+
+        Assert.True(result.IsValid, string.Join("; ", result.Violations));
+        var plan = Assert.Single(reports, r => r.Stage == NestJobStage.PlanImproved);
+        var sheet = Assert.Single(plan.PlanSheets);
+        Assert.Same(result.Job.Plates[0], sheet.Stock);
+        Assert.Equal(new[] { 1.0, 20.0 }, sheet.Parts.Select(p => p.Location.X));
+        Assert.All(sheet.Parts, part => Assert.NotSame(item.Drawing, part.BaseDrawing));
+        Assert.Equal(0, item.Drawing.Quantity.Nested);
+    }
+
+    private sealed class ReportingEngine(Func<NestJob, NestJobResult> solve) : INestingEngine
+    {
+        public NestJobResult Solve(
+            NestJob job,
+            IProgress<NestJobProgress>? progress = null,
+            CancellationToken token = default
+        )
+        {
+            var result = solve(job);
+            progress?.Report(new NestJobProgress(NestJobStage.PlanImproved, string.Empty, -1, 0, 0, Plan: result));
+            return result;
+        }
+    }
+
+    private sealed class InlineProgress(Action<NestJobProgress> report) : IProgress<NestJobProgress>
+    {
+        public void Report(NestJobProgress value) => report(value);
+    }
+
+    [Fact]
     public void OverlappingEngineOutputIsReportedByDrawingNameWithoutThrowing()
     {
         var item = Item("bracket", 2);

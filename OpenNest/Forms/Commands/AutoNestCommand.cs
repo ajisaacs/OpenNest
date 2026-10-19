@@ -11,8 +11,11 @@ using OpenNest.Engine.Jobs;
 namespace OpenNest.Forms.Commands
 {
     /// <summary>
-    /// Auto Nest from the confirmed dialog to the committed plates: owned modal progress,
-    /// whole-job solve, validation review, commit to empty plates and the result notices.
+    /// Auto Nest from the confirmed dialog to the committed plates: owned modal progress with
+    /// the best plan so far as a sheet strip, whole-job solve, validation review, a Keep/Discard
+    /// review of the final sheets, commit to empty plates and the result notices. The plate view
+    /// never shows Auto Nest parts before they are kept: the result is a set of sheets, not
+    /// parts on the current plate.
     /// The caller owns the busy guard, the nesting lockout and the cancellation source.
     /// </summary>
     internal sealed class AutoNestCommand
@@ -78,17 +81,20 @@ namespace OpenNest.Forms.Commands
                 AllowAccept = false,
                 HoldOpenUntilCompleted = true,
             };
+            progressForm.ShowPlanStrip(target.PlateView.ColorScheme);
             var receivingProgress = true;
+            bool Receiving() => receivingProgress && !target.IsDisposed && !cts.IsCancellationRequested;
             var progress = new Progress<NestProgress>(p =>
             {
-                if (!receivingProgress || target.IsDisposed || cts.IsCancellationRequested)
-                    return;
-                progressForm.UpdateProgress(p);
-                if (p.IsOverallBest)
-                    target.PlateView.SetActiveParts(p.BestParts);
-                target.PlateView.ActiveWorkArea = p.ActiveWorkArea;
+                if (Receiving())
+                    progressForm.UpdateProgress(p);
             });
-            var jobProgress = JobEngineNest.CreateProgress(EngineName, progress);
+            var plans = new Progress<IReadOnlyList<ProposedPlate>>(sheets =>
+            {
+                if (Receiving())
+                    progressForm.UpdatePlan(sheets);
+            });
+            var jobProgress = JobEngineNest.CreateProgress(EngineName, progress, plans);
             try
             {
                 var request = new NestPipelineRequest(EngineName, items,
@@ -117,8 +123,6 @@ namespace OpenNest.Forms.Commands
                     progressForm.ShowDialog(owner);
                 var result = await solve;
                 cts.Token.ThrowIfCancellationRequested();
-                target.PlateView.ClearPreviewParts();
-                target.PlateView.ActiveWorkArea = null;
 
                 var allowInvalid = false;
                 if (!result.IsValid)
@@ -130,6 +134,15 @@ namespace OpenNest.Forms.Commands
                 }
 
                 var costs = result.IsValid && result.CanKeep ? NestCostSummary.FromAccepted(result) : null;
+                var costText = costs?.Basis == "supplied-cost"
+                    ? $"Gross sheet cost: {costs.GrossTotal:G}; estimated salvage credit: {costs.SalvageCredit:G}; net score: {costs.NetScore:G}"
+                    : null;
+                using (var review = new NestReviewForm(result, target.PlateView.ColorScheme, costText))
+                {
+                    if (review.ShowDialog(owner) != DialogResult.OK)
+                        return;
+                }
+
                 var applied = NestPipelineCommit.ApplyToEmptyPlates(result, target.PlateManager,
                     allowInvalid, cts.Token);
                 if (applied.Count > 0)
@@ -145,7 +158,7 @@ namespace OpenNest.Forms.Commands
                     target.OverlapDisplay = OverlapDisplayMode.Both;
                     await target.CheckOverlapsAsync();
                 }
-                ShowResultNotices(result, applied, costs);
+                ShowResultNotices(applied);
             }
             catch (OperationCanceledException) when (cts.IsCancellationRequested)
             {
@@ -159,16 +172,11 @@ namespace OpenNest.Forms.Commands
             finally
             {
                 receivingProgress = false;
-                if (!target.IsDisposed)
-                {
-                    target.PlateView.ClearPreviewParts();
-                    target.PlateView.ActiveWorkArea = null;
-                }
             }
         }
 
-        private void ShowResultNotices(NestPipelineResult result, IReadOnlyList<Plate> applied,
-            NestCostSummary costs)
+        // Costs and unplaced parts were shown in the review; clamp removals exist only once kept.
+        private void ShowResultNotices(IReadOnlyList<Plate> applied)
         {
             // D8/D9: name every clamp Auto Nest pulled as a last resort and its added time.
             var removalNotices = applied
@@ -181,15 +189,6 @@ namespace OpenNest.Forms.Commands
                 MessageBox.Show(owner,
                     "Auto Nest removed clamps as a last resort so a part that would not "
                         + "otherwise fit could be nested:\n\n" + string.Join("\n", removalNotices),
-                    Caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
-            if (costs?.Basis == "supplied-cost")
-                MessageBox.Show(owner, $"Gross sheet cost: {costs.GrossTotal:G}\nEstimated salvage credit: {costs.SalvageCredit:G}\nNet score: {costs.NetScore:G}",
-                    "Auto Nest Cost", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            // Never drop demand silently: name every unplaced part and why (the drawing
-            // list keeps showing the remaining quantities after this closes).
-            if (result.Unplaced.Count > 0)
-                MessageBox.Show(owner, $"{EngineName} could not place every part:\n\n"
-                        + string.Join("\n", result.Unplaced.Select(u => u.Describe())),
                     Caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
     }

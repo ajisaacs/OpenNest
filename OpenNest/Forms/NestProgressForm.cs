@@ -86,7 +86,8 @@ namespace OpenNest.Forms
             phaseStepper.ActivePhase = progress.Phase;
             SetValueWithFlash(plateValue, progress.PlateNumber.ToString());
 
-            if (progress.IsOverallBest)
+            // In plan mode the results rows describe the whole-job plan, not a part preview.
+            if (progress.IsOverallBest && planStrip == null)
             {
                 SetValueWithFlash(partsValue, progress.BestPartCount.ToString());
 
@@ -104,6 +105,56 @@ namespace OpenNest.Forms
             descriptionValue.Text = !string.IsNullOrEmpty(progress.Description)
                 ? progress.Description
                 : progress.Phase.DisplayName();
+        }
+
+        private Controls.SheetStripControl planStrip;
+
+        /// <summary>
+        /// Adds the "best plan so far" sheet strip for whole-job runs, whose result is a set of
+        /// sheets rather than parts on the current plate. The results rows then describe that plan.
+        /// </summary>
+        public void ShowPlanStrip(ColorScheme colorScheme)
+        {
+            if (planStrip != null)
+                return;
+            var header = new Label
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                Font = resultsHeader.Font,
+                ForeColor = resultsHeader.ForeColor,
+                Padding = new Padding(14, 8, 0, 4),
+                Text = "BEST PLAN SO FAR",
+            };
+            planStrip = new Controls.SheetStripControl
+            {
+                Dock = DockStyle.Fill,
+                ColorScheme = colorScheme,
+                EmptyText = "Waiting for the first complete plan…",
+            };
+            var panel = new Panel { Dock = DockStyle.Right, Width = 520 };
+            panel.Controls.Add(planStrip);
+            panel.Controls.Add(header);
+            Controls.Add(panel);
+            nestedAreaLabel.Text = "Sheets:";
+            densityLabel.Text = "Utilization:";
+            // Read the size first: raising the minimum would otherwise widen the form twice.
+            var client = ClientSize;
+            MinimumSize = new System.Drawing.Size(MinimumSize.Width + panel.Width, MinimumSize.Height);
+            ClientSize = new System.Drawing.Size(client.Width + panel.Width, client.Height);
+        }
+
+        /// <summary>Shows a whole-job plan in the strip added by <see cref="ShowPlanStrip"/>.</summary>
+        public void UpdatePlan(IReadOnlyList<Engine.Jobs.ProposedPlate> sheets)
+        {
+            if (planStrip == null || IsDisposed || !IsHandleCreated)
+                return;
+            planStrip.SetSheets(sheets);
+            SetValueWithFlash(partsValue, planStrip.PartCount.ToString());
+            var utilization = planStrip.Utilization;
+            SetValueWithFlash(densityValue, utilization.ToString("P1"), GetDensityColor(utilization));
+            densityBar.Value = utilization;
+            SetValueWithFlash(nestedAreaValue, planStrip.SheetCount.ToString());
         }
 
         public void ShowCompleted()

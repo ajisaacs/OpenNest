@@ -106,8 +106,68 @@ public static class NestPipeline
     {
         public void Report(NestJobProgress value)
         {
-            if (value != null && value.Stage == NestJobStage.EvaluatingCandidate)
+            if (value != null && value.Stage is NestJobStage.EvaluatingCandidate or NestJobStage.PlanImproved)
                 inner.Report(value with { CommittedPlates = 0, CommittedParts = 0 });
+        }
+    }
+
+    /// <summary>
+    /// Fills <see cref="NestJobProgress.PlanSheets"/> on an engine's plan reports. Parts use
+    /// detached drawings built from the solved job's geometry (bundled cutout frames included),
+    /// one per part, so a preview never touches the caller's drawings or their quantities.
+    /// </summary>
+    private sealed class PlanProgress(IProgress<NestJobProgress> inner, NestJob engineJob,
+        IReadOnlyDictionary<string, Drawing> callerDrawings, CancellationToken token)
+        : IProgress<NestJobProgress>
+    {
+        private readonly Dictionary<string, NestJobPart> parts =
+            engineJob.Parts.ToDictionary(p => p.Id, StringComparer.Ordinal);
+        private readonly Dictionary<string, Drawing> drawings = new(StringComparer.Ordinal);
+
+        public void Report(NestJobProgress value)
+        {
+            if (value?.Stage == NestJobStage.PlanImproved && value.Plan != null && value.PlanSheets == null)
+            {
+                lock (drawings)
+                {
+                    // A plan naming unknown parts has nothing to draw; validation reports it later.
+                    if (value.Plan.Plates.Any(s => s.Placements.Any(p => p.PartId == null || !parts.ContainsKey(p.PartId))))
+                        return;
+                    value = value with { PlanSheets = Sheets(value.Plan) };
+                }
+            }
+            inner.Report(value);
+        }
+
+        private IReadOnlyList<ProposedPlate> Sheets(NestJobResult plan)
+        {
+            var sheets = new List<ProposedPlate>();
+            foreach (var group in RepeatedPlateGrouping.Create(plan.Plates, true, token))
+            {
+                var placed = new List<Part>(group.Sheet.Placements.Count);
+                foreach (var pose in group.Sheet.Placements)
+                {
+                    if (!drawings.TryGetValue(pose.PartId, out var drawing))
+                    {
+                        drawing = DrawingJobMapper.CreateDrawing(parts[pose.PartId]);
+                        // Borrow the caller's name and color for display; bundled frames keep their own.
+                        if (callerDrawings.TryGetValue(pose.PartId, out var caller))
+                        {
+                            drawing.Name = caller.Name;
+                            drawing.Color = caller.Color;
+                        }
+                        drawings[pose.PartId] = drawing;
+                    }
+                    // Same pose mapping as NestResultMaterializer: rotate in the snapshot frame, then move.
+                    var part = new Part(drawing);
+                    part.Rotate(pose.Rotation);
+                    part.Location = new Geometry.Vector(pose.X, pose.Y);
+                    part.UpdateBounds();
+                    placed.Add(part);
+                }
+                sheets.Add(new ProposedPlate(group.Sheet.PlateIndex, group.Sheet.Stock, placed) { Quantity = group.Quantity });
+            }
+            return sheets;
         }
     }
 
@@ -263,9 +323,10 @@ public static class NestPipeline
             NestJobValidator.Validate(engineJob);
 
         var clock = Stopwatch.StartNew();
+        var engineProgress = progress == null ? null
+            : new PlanProgress(prepass == null ? progress : new PreviewProgress(progress), engineJob, drawingsByPartId, token);
         var raw =
-            engine.Solve(engineJob, prepass == null || progress == null
-                ? progress : new PreviewProgress(progress), token)
+            engine.Solve(engineJob, engineProgress, token)
             ?? throw new InvalidOperationException($"Engine '{engineName}' returned no result.");
         var solveTime = clock.Elapsed;
         token.ThrowIfCancellationRequested();

@@ -63,6 +63,11 @@ Curved outlines retain conservative flattening-error padding. This does not rela
 footprints, no-fit polygons or layout validation tolerances; a part extending beyond the accepted
 work-area bounds remains invalid.
 
+Each time a strategy variant or the tail re-plan beats the best whole-job plan so far,
+Irregular reports it as `NestJobStage.PlanImproved`, which desktop Auto Nest shows as its
+"Best plan so far" sheet strip (see [automatic nesting](automatic-nesting.md)). The last
+report is the returned layout; reporting never changes the search.
+
 Irregular fills gaps and open notches using outer profiles; it does not yet place parts inside
 enclosed cutouts. For a part with two or more copies it also offers its best-fit pairs (two copies
 interlocked, as the Best Fit viewer shows them) alongside the single copies, and places a pair

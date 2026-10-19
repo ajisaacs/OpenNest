@@ -22,24 +22,49 @@ namespace OpenNest.Forms
         public static IProgress<NestJobProgress> CreateProgress(
             string engineName,
             IProgress<NestProgress> progress
-        ) => new ProgressAdapter(engineName, progress);
+        ) => new ProgressAdapter(engineName, progress, null);
 
-        public static string Describe(string engineName, NestJobProgress value) =>
-            value.Stage == NestJobStage.PlateCommitted
-                ? $"{engineName}: committed plate {value.CommittedPlates} ({value.CommittedParts} parts placed)"
-                : $"{engineName}: evaluating plate {WorkingPlate(value)} on stock {value.StockId}";
+        /// <summary>
+        /// As <see cref="CreateProgress(string, IProgress{NestProgress})"/>, and also sends each
+        /// best-plan-so-far report's sheets to <paramref name="plans"/>.
+        /// </summary>
+        public static IProgress<NestJobProgress> CreateProgress(
+            string engineName,
+            IProgress<NestProgress> progress,
+            IProgress<IReadOnlyList<ProposedPlate>> plans
+        ) => new ProgressAdapter(engineName, progress, plans);
+
+        public static string Describe(string engineName, NestJobProgress value) => value.Stage switch
+        {
+            NestJobStage.PlateCommitted =>
+                $"{engineName}: committed plate {value.CommittedPlates} ({value.CommittedParts} parts placed)",
+            NestJobStage.PlanImproved =>
+                $"{engineName}: found a better plan ({value.Plan?.Plates.Count ?? 0} sheets)",
+            _ => $"{engineName}: evaluating plate {WorkingPlate(value)} on stock {value.StockId}",
+        };
 
         /// <summary>One-based plate under evaluation; nesters that do not know it report -1.</summary>
         private static int WorkingPlate(NestJobProgress value) =>
             value.PlateIndex >= 0 ? value.PlateIndex + 1 : value.CommittedPlates + 1;
 
-        private sealed class ProgressAdapter(string engineName, IProgress<NestProgress> progress)
-            : IProgress<NestJobProgress>
+        private sealed class ProgressAdapter(
+            string engineName,
+            IProgress<NestProgress> progress,
+            IProgress<IReadOnlyList<ProposedPlate>> plans
+        ) : IProgress<NestJobProgress>
         {
             public void Report(NestJobProgress value)
             {
                 if (value == null)
                     return;
+
+                // A plan sink shows plans as sheets; the plate row keeps tracking the search.
+                if (value.Stage == NestJobStage.PlanImproved && plans != null)
+                {
+                    if (value.PlanSheets != null)
+                        plans.Report(value.PlanSheets);
+                    return;
+                }
 
                 if (value.LegacyProgress != null)
                 {

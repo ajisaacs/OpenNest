@@ -1,13 +1,13 @@
-using OpenNest.Engine.NestingEngines.Irregular;
-using static OpenNest.Engine.Tests.NestingEngines.JobBuilder;
-using static OpenNest.Engine.Tests.NestingEngines.Shapes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.CNC;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.NestingEngines.Irregular;
 using OpenNest.Geometry;
+using static OpenNest.Engine.Tests.NestingEngines.JobBuilder;
+using static OpenNest.Engine.Tests.NestingEngines.Shapes;
 
 namespace OpenNest.Engine.Tests.NestingEngines;
 
@@ -209,6 +209,32 @@ public class IrregularNestingEngineTests
         LayoutAssert.Valid(job, result);
         Assert.Equal(NestJobStatus.Complete, result.Status);
         Assert.Equal(2, Assert.Single(result.Plates).Placements.Count);
+    }
+
+    [Fact]
+    public void ReportsEachBetterPlanEndingWithTheReturnedLayout()
+    {
+        var job = Job(new[] { Part("disc", Disc(3), 10), Part("ell", LShape(12, 8, 4), 10) },
+            new[] { Stock("sheet", 40, 60, spacing: 0.5) });
+        var reports = new List<NestJobProgress>();
+
+        var result = new IrregularNestingEngine().Solve(job, new SyncProgress(reports.Add));
+        var without = new IrregularNestingEngine().Solve(job);
+
+        var plans = reports.Where(r => r.Stage == NestJobStage.PlanImproved).ToList();
+        Assert.NotEmpty(plans);
+        // Plans are proposals, never commits: they carry no committed counts.
+        Assert.All(plans, p => Assert.Equal((0, 0), (p.CommittedPlates, p.CommittedParts)));
+        Assert.Equal(result.Plates.SelectMany(p => p.Placements), plans[^1].Plan.Plates.SelectMany(p => p.Placements));
+        Assert.True(reports.FindLastIndex(r => r.Stage == NestJobStage.PlanImproved)
+            < reports.FindIndex(r => r.Stage == NestJobStage.PlateCommitted));
+        // Reporting never steers the search.
+        Assert.Equal(without.Plates.SelectMany(p => p.Placements), result.Plates.SelectMany(p => p.Placements));
+    }
+
+    private sealed class SyncProgress(Action<NestJobProgress> report) : IProgress<NestJobProgress>
+    {
+        public void Report(NestJobProgress value) => report(value);
     }
 
     [Fact]

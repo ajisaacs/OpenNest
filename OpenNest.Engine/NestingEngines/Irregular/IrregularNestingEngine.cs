@@ -89,14 +89,29 @@ public sealed class IrregularNestingEngine : INestingEngine
                 break;
             var plan = solver.Plan(demand, axis, beta);
             if (best == null || plan.IsBetterThan(best))
+            {
                 best = plan;
+                ReportPlan(job, types, best, progress, token);
+            }
             if (best.Unplaced == 0 && best.Sheets.Count == 0)
                 break;
         }
 
         // The last sheets hold the leftovers, which is where waste concentrates; re-plan them.
-        best = solver.ImproveTail(best!, WorkBudget * 2);
-        return BuildResult(job, types, best, progress, token);
+        var improved = solver.ImproveTail(best!, WorkBudget * 2);
+        if (!ReferenceEquals(improved, best))
+            ReportPlan(job, types, improved, progress, token);
+        return BuildResult(job, types, improved, progress, token);
+    }
+
+    /// <summary>Reports a new best whole-job plan; reporting never changes the search.</summary>
+    private static void ReportPlan(NestJob job, IReadOnlyList<PartType> types, Plan plan,
+        IProgress<NestJobProgress>? progress, CancellationToken token)
+    {
+        if (progress == null)
+            return;
+        var result = BuildResult(job, types, plan, null, token);
+        progress.Report(new NestJobProgress(NestJobStage.PlanImproved, string.Empty, -1, 0, 0, Plan: result));
     }
 
     /// <summary>Exercises the production physical-tail lifecycle from a test-owned incumbent.

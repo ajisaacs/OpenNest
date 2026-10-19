@@ -27,6 +27,10 @@ Auto Nest starts on empty/new sheets and does not change existing populated plat
 
 Progress is owned and modal so the input drawings cannot be edited while a worker uses them. Stop or closing progress cancels and discards the whole proposal. The dialog waits for the worker to finish; no engine has an Accept-early button on this path. A plug-in that ignores the cancellation token cannot commit its late result.
 
+Auto Nest never draws its parts on the plate view before they are kept: its result is a set of sheets, possibly of several sizes, not parts on the current plate. Ghost (preview) parts on the plate view mean only "what this plate gets if you accept now", and stay with interactive Fill and the remnant tools. Instead the progress window shows **Best plan so far**: every sheet of the engine's best whole-job plan drawn side by side at one scale, identical sheets once with their count, each captioned with size, part count and utilization. An engine reports a plan with `NestJobStage.PlanImproved` and `NestJobProgress.Plan`; `NestPipeline` adds `PlanSheets`, parts on detached drawings built from the job geometry, so nothing touches the caller's drawings or quantities. The plan is unvalidated and may be replaced; only Irregular reports plans today, so other engines show the strip empty until the review.
+
+After a valid result, or an invalid one kept in the validation report, a review window shows the final sheets in the same strip with totals, the supplied-cost summary and every unplaced drawing, count and reason. **Keep** (Enter) commits the whole proposal; **Discard** (Escape) applies nothing.
+
 Every invalid result shows the validation report before any plates are changed:
 
 - **Discard** is the default button and the Escape action. No proposed parts or sheets are applied.
@@ -45,7 +49,7 @@ Unplaced demand is never dropped silently. `NestPipelineResult.Unplaced` lists e
 - `NoPlacementFound`: the engine found no position; this does not prove none exists.
 - `ProposalNotKeepable`: the proposal cannot be kept, so all demand is listed.
 
-An incomplete but valid proposal is keepable like any other; keeping it is still an explicit action. Desktop Auto Nest lists each unplaced drawing, count and reason after committing (the drawing list keeps showing remaining quantities); Console `--autonest` writes `Unplaced:` lines to standard error; MCP `autonest_plate` adds `Unplaced:` lines and `autonest_job` names the reasons when it refuses an incomplete proposal; the API returns `NestResponse.Unplaced` by request part ID. This check does not replace pre-post CNC verification.
+An incomplete but valid proposal is keepable like any other; keeping it is still an explicit action. Desktop Auto Nest lists each unplaced drawing, count and reason in its review before committing (the drawing list keeps showing remaining quantities); Console `--autonest` writes `Unplaced:` lines to standard error; MCP `autonest_plate` adds `Unplaced:` lines and `autonest_job` names the reasons when it refuses an incomplete proposal; the API returns `NestResponse.Unplaced` by request part ID. This check does not replace pre-post CNC verification.
 
 The selected engine is saved in `%APPDATA%\OpenNest\engine-selection.json`.
 Selection is restored after plug-ins load. A saved name from an earlier release
