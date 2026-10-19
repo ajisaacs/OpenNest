@@ -43,6 +43,8 @@ namespace OpenNest.Forms
             mnuNest.DropDown.ShowItemToolTips = true;
             mnuNestDrawingLibrary.Enabled = activeForm != null && databaseMode;
             mnuNestDrawingLibrary.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
+            // Parts can be added without a plate change, so refresh the clear state on open.
+            mnuNestClear.Enabled = activeForm?.PlateManager.CanClearAll ?? false;
         }
 
         private async void EditNest_Click(object sender, EventArgs e)
@@ -84,6 +86,37 @@ namespace OpenNest.Forms
         }
 
         private void RemoveEmptyPlates_Click(object sender, EventArgs e) => WithActive(f => f.Nest.Plates.RemoveEmptyPlates());
+
+        private void ClearNest_Click(object sender, EventArgs e)
+        {
+            var editForm = activeForm;
+            if (editForm == null)
+                return;
+
+            const string busy = "Finish or cancel the current nesting, save or plate action first.";
+            if (storage.IsSaving)
+            {
+                MessageBox.Show(this, busy, "Clear Nest", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (!TryBeginPlateCommand(editForm.Nest, busy, "Clear Nest"))
+                return;
+
+            var result = MessageBox.Show(
+                this,
+                "Remove all plates and parts from this nest?\nOne empty plate will remain. This cannot be undone.",
+                "Clear Nest",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2
+            );
+
+            if (result != DialogResult.Yes)
+                return;
+
+            editForm.ClearNest();
+        }
 
         private void LoadFirstPlate_Click(object sender, EventArgs e) => WithActive(f => f.PlateManager.LoadFirst());
 

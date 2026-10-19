@@ -400,6 +400,166 @@ public class PlateManagerTests
     }
 
     [Fact]
+    public void ClearAll_RemovesAllButFirstAndEmptiesRemaining()
+    {
+        var nest = CreateNest();
+        var plate1 = nest.CreatePlate();
+        plate1.Parts.Add(MakePart());
+        var plate2 = nest.CreatePlate();
+        plate2.Parts.Add(MakePart());
+        var plate3 = nest.CreatePlate();
+        plate3.Parts.Add(MakePart());
+        plate3.CutOffs.Add(new CutOff(new Vector(1, 1), CutOffAxis.Vertical));
+        plate3.Quantity = 5;
+        using var mgr = new PlateManager(nest);
+        mgr.EnsureSentinel();
+        Assert.Equal(4, nest.Plates.Count);
+        mgr.LoadAt(2);
+
+        mgr.ClearAll();
+
+        // The first plate survives, empty, with its repeat quantity reset
+        Assert.Single(nest.Plates);
+        Assert.Same(plate1, nest.Plates[0]);
+        Assert.Empty(nest.Plates[0].Parts);
+        Assert.Empty(nest.Plates[0].CutOffs);
+        Assert.Equal(1, nest.Plates[0].Quantity);
+        Assert.Equal(0, mgr.CurrentIndex);
+        Assert.Same(plate1, mgr.CurrentPlate);
+    }
+
+    [Fact]
+    public void ClearAll_NeverExposesNullCurrentPlate()
+    {
+        var nest = CreateNest();
+        for (var i = 0; i < 3; i++)
+        {
+            var plate = nest.CreatePlate();
+            plate.Parts.Add(MakePart());
+        }
+        using var mgr = new PlateManager(nest);
+        mgr.EnsureSentinel();
+
+        var currentPlates = new List<Plate>();
+        mgr.CurrentPlateChanged += (s, e) => currentPlates.Add(e.Plate);
+
+        mgr.ClearAll();
+
+        // Every event during the clear reported a live plate (the one that stays)
+        Assert.NotEmpty(currentPlates);
+        Assert.All(currentPlates, p => Assert.NotNull(p));
+        Assert.All(currentPlates, p => Assert.Same(nest.Plates[0], p));
+    }
+
+    [Fact]
+    public void ClearAll_FiresPlateListAndCurrentPlateChanged()
+    {
+        var nest = CreateNest();
+        var plate1 = nest.CreatePlate();
+        plate1.Parts.Add(MakePart());
+        nest.CreatePlate();
+        using var mgr = new PlateManager(nest);
+        mgr.EnsureSentinel();
+
+        var listChanged = 0;
+        var currentChanged = 0;
+        mgr.PlateListChanged += (s, e) => listChanged++;
+        mgr.CurrentPlateChanged += (s, e) => currentChanged++;
+
+        mgr.ClearAll();
+
+        Assert.True(listChanged > 0);
+        Assert.True(currentChanged > 0);
+    }
+
+    [Fact]
+    public void ClearAll_SinglePlateWithParts_EmptiesIt()
+    {
+        var nest = CreateNest();
+        var plate1 = nest.CreatePlate();
+        plate1.Parts.Add(MakePart());
+        plate1.CutOffs.Add(new CutOff(new Vector(2, 2), CutOffAxis.Horizontal));
+        plate1.Quantity = 3;
+        using var mgr = new PlateManager(nest);
+
+        mgr.ClearAll();
+
+        Assert.Single(nest.Plates);
+        Assert.Same(plate1, nest.Plates[0]);
+        Assert.Empty(plate1.Parts);
+        Assert.Empty(plate1.CutOffs);
+        Assert.Equal(1, plate1.Quantity);
+    }
+
+    [Fact]
+    public void ClearAll_PreservesNestMetadataAndFirstPlateConfiguration()
+    {
+        var nest = CreateNest();
+        nest.Name = "my nest";
+        nest.Thickness = 0.25;
+        var defaults = nest.PlateDefaults.Size;
+        var plate1 = nest.CreatePlate();
+        plate1.Parts.Add(MakePart());
+        // Edit the survivor away from the defaults so replacement would be visible
+        plate1.Size = new Size(99, 88);
+        plate1.PartSpacing = 0.4;
+        nest.CreatePlate();
+        using var mgr = new PlateManager(nest);
+
+        mgr.ClearAll();
+
+        Assert.Equal("my nest", nest.Name);
+        Assert.Equal(0.25, nest.Thickness);
+        // The survivor keeps its own configuration; it was not replaced by a default plate
+        Assert.Same(plate1, nest.Plates[0]);
+        Assert.Equal(new Size(99, 88), nest.Plates[0].Size);
+        Assert.Equal(0.4, nest.Plates[0].PartSpacing);
+        Assert.Equal(defaults, nest.PlateDefaults.Size);
+    }
+
+    [Fact]
+    public void ClearAll_EmptyNest_DoesNothing()
+    {
+        var nest = CreateNest();
+        using var mgr = new PlateManager(nest);
+
+        mgr.ClearAll();
+
+        Assert.Empty(nest.Plates);
+    }
+
+    [Fact]
+    public void CanClearAll_ReflectsClearableState()
+    {
+        var nest = CreateNest();
+        using var mgr = new PlateManager(nest);
+
+        Assert.False(mgr.CanClearAll);
+
+        var plate1 = nest.CreatePlate();
+        Assert.False(mgr.CanClearAll); // a single untouched empty plate has nothing to clear
+
+        plate1.Quantity = 2;
+        Assert.True(mgr.CanClearAll);
+        plate1.Quantity = 1;
+        Assert.False(mgr.CanClearAll);
+
+        plate1.CutOffs.Add(new CutOff(new Vector(0, 0), CutOffAxis.Vertical));
+        Assert.True(mgr.CanClearAll);
+        plate1.CutOffs.Clear();
+        Assert.False(mgr.CanClearAll);
+
+        plate1.Parts.Add(MakePart());
+        Assert.Equal(2, nest.Plates.Count); // trailing sentinel created reactively
+        Assert.True(mgr.CanClearAll); // multiple plates are clearable
+
+        plate1.Parts.Clear();
+        // The reactive sentinel collapses the now-trailing empty pair back to one plate
+        Assert.Single(nest.Plates);
+        Assert.False(mgr.CanClearAll);
+    }
+
+    [Fact]
     public void RemoveEmptyPlates_SentinelIsRestored()
     {
         var nest = CreateNest();

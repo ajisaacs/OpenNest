@@ -894,6 +894,11 @@ namespace OpenNest.Forms
             PlateManager.RemoveCurrent();
         }
 
+        public void ClearNest()
+        {
+            PlateManager.ClearAll();
+        }
+
         public void AutoSequenceCurrentPlate()
         {
             SequencePlate(PlateView.Plate);

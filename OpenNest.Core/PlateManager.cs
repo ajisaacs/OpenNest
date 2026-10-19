@@ -195,6 +195,54 @@ namespace OpenNest
             nest.Plates.RemoveAt(CurrentIndex);
         }
 
+        /// <summary>
+        /// Whether <see cref="ClearAll"/> would change anything: more than one plate, or the
+        /// remaining plate still holds parts or cut-off definitions.
+        /// </summary>
+        public bool CanClearAll
+        {
+            get
+            {
+                if (Count == 0)
+                    return false;
+
+                var remaining = nest.Plates[0];
+                return Count > 1
+                    || remaining.Parts.Count > 0
+                    || remaining.CutOffs.Count > 0
+                    || remaining.Quantity > 1;
+            }
+        }
+
+        /// <summary>
+        /// Clears the nest: removes every plate after the first and empties the remaining
+        /// plate (parts and cut-off definitions), resetting its repeat quantity. Nest metadata
+        /// and plate defaults are preserved; the first plate's configuration stays as the
+        /// workspace sentinel — the same result as removing every other plate one at a time.
+        /// The plate count never reaches zero, so observers never see a null current plate.
+        /// </summary>
+        public void ClearAll()
+        {
+            if (Count == 0)
+                return;
+
+            BeginBatch();
+            try
+            {
+                while (nest.Plates.Count > 1)
+                    nest.Plates.RemoveAt(nest.Plates.Count - 1);
+
+                var remaining = nest.Plates[0];
+                remaining.CutOffs.Clear();
+                remaining.Parts.Clear();
+                remaining.Quantity = 1;
+            }
+            finally
+            {
+                EndBatch();
+            }
+        }
+
         private void SubscribeToTailPlates()
         {
             UnsubscribeFromTailPlates();

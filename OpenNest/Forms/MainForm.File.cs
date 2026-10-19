@@ -26,6 +26,7 @@ namespace OpenNest.Forms
                 NavigationEnableCheck();
                 statusBar.UpdatePlate();
                 mnuPlateRemove.Enabled = activeForm?.PlateManager.CanRemoveCurrent ?? false;
+                mnuNestClear.Enabled = activeForm?.PlateManager.CanClearAll ?? false;
             };
             editForm.WindowState = windowState;
             editForm.Show();
