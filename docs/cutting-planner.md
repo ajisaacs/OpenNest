@@ -5,7 +5,8 @@ programs. It can retain fixed programs or jointly choose internal contour order,
 entries and whole-part order using explicitly confirmed cutting parameters. It
 returns an owned proposal; `Apply` installs Ready plate-scoped proposals atomically
 after an exact freshness check. The desktop opens it from `Plate > Plan Cutting...` and
-`Nest > Plan Cutting (All Plates)...` (see [Desktop workflow](#desktop-workflow)); the older
+`Nest > Plan Cutting (All Plates)...` (see [Desktop workflow](#desktop-workflow)); the console
+and MCP server expose the same batch (see [Console and MCP](#console-and-mcp)); the older
 automatic sequencing and lead-in assignment commands remain until they are retired.
 
 ## Capture before worker planning
@@ -685,6 +686,32 @@ overlap check may likewise be accepted with warnings. `CanApply` and parameterle
 `Apply()` remain strict; `CanApplyWithWarnings` and `Apply(acceptWarnings: true)` are the
 explicit review path. `CuttingPlanService.Apply` still rejects best-effort results directly.
 Acceptance never skips the separate pre-post checks or grants posting consent.
+
+## Console and MCP
+
+Both front ends run `CuttingPlanBatch` exactly as the desktop does: capture, plan, then an
+all-or-nothing Apply of the captured proposal, with the same summary text. Neither adds scrap
+cut-offs; plan those in the desktop.
+
+Settings are never invented. They come from an explicit cutting settings JSON file (the
+format `CuttingParametersSerializer` writes, as stored in `.nest` plates), or else from the
+plates' own saved settings, which must be identical across the plates in scope. A JSON
+`null` is refused rather than read as the defaults. Without either source, planning is refused.
+
+- Console: `--plan-cutting` plans the plates the run produced (the target plate, or every
+  sheet `--autonest` added) after filling and before saving or posting; `--no-fill` plans a
+  loaded `.nest` as it is, and `--all-plates` widens the scope to every occupied plate.
+  `--cutting-params <path>` supplies settings and `--keep-part-order` fixes whole-part order.
+  A blocked or cancelled plan exits 2 and saves or posts nothing. An unverified plan is
+  applied only with `--accept-unverified-plan` for that invocation; posting still runs its own
+  verification and needs `--acknowledge-post-risks` separately.
+- MCP: `plan_cutting(plateIndex = -1, keepPartOrder, cuttingParametersPath)` reports the
+  proposal without changing anything and keeps it in the session when it can be applied;
+  `-1` plans every occupied plate. `apply_cutting_plan(acceptWarnings)` applies that exact
+  proposal once. It is refused when a planned plate left the session (for example after
+  `load_nest`) or changed since planning (Stale), and an unverified plan needs
+  `acceptWarnings=true` on that call. Plate numbers in the report are session plate indices;
+  part numbers are 1-based positions in each plate's part list. Save with `save_nest`.
 
 ## Remaining integration boundaries
 

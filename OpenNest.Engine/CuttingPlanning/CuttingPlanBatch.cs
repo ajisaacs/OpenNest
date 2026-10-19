@@ -370,7 +370,9 @@ public sealed class CuttingPlanProposal
     }
 
     /// <summary>Operator-facing summary: one overall line, then each plate and its findings.</summary>
-    public IReadOnlyList<string> Describe(string unit)
+    /// <param name="changeSettings">How this front end changes the settings, completed by
+    /// "a lead-in type other than None..." in the missing lead-in advice.</param>
+    public IReadOnlyList<string> Describe(string unit, string changeSettings = "Open Cutting Settings... and select")
     {
         var lines = new List<string>();
         var blocked = Plates.Count(p => !p.CanApplyWithWarnings);
@@ -393,12 +395,12 @@ public sealed class CuttingPlanProposal
         foreach (var plate in Plates)
         {
             lines.Add(string.Empty);
-            lines.AddRange(DescribePlate(plate, unit));
+            lines.AddRange(DescribePlate(plate, unit, changeSettings));
         }
         return lines;
     }
 
-    private static IEnumerable<string> DescribePlate(CuttingPlanPlateResult plate, string unit)
+    private static IEnumerable<string> DescribePlate(CuttingPlanPlateResult plate, string unit, string changeSettings)
     {
         var heading = $"Plate {plate.PlateNumber}: ";
         var result = plate.Result;
@@ -444,7 +446,7 @@ public sealed class CuttingPlanProposal
             yield break;
         if (missingLead)
         {
-            yield return "  Open Cutting Settings... and select a lead-in type other than None with "
+            yield return $"  {changeSettings} a lead-in type other than None with "
                 + "nonzero length for the affected contour (External, Internal, or Arc / Circle), then replan.";
             yield return "  If the affected part is locked, edit its lead-ins or unlock it before replanning.";
         }

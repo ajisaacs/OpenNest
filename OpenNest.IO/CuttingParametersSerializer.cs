@@ -33,6 +33,17 @@ public static class CuttingParametersSerializer
         return parameters;
     }
 
+    /// <summary>
+    /// Reads settings a caller supplied explicitly (a file or tool argument). A JSON null is
+    /// refused rather than read as the defaults, so missing settings are never invented.
+    /// </summary>
+    public static CuttingParameters DeserializeExplicit(string json)
+    {
+        if (JsonSerializer.Deserialize<CuttingParametersDto>(json, JsonOptions) == null)
+            throw new JsonException("Cutting settings must be a JSON object.");
+        return Deserialize(json);
+    }
+
     /// <summary>Captures an owned snapshot. Null stays null for absent plate parameters.</summary>
     public static CuttingParametersDto ToDto(CuttingParameters parameters)
     {

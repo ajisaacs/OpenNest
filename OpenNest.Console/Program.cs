@@ -5,11 +5,15 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using System.Threading;
 using OpenNest;
+using OpenNest.CNC.CuttingPlanning;
+using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.BestFit;
+using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
@@ -117,6 +121,25 @@ static class NestConsole
             }
         }
 
+        if (!options.PlanCutting && (options.CuttingParamsFile != null || options.KeepPartOrder
+            || options.AcceptUnverifiedPlan || options.AllPlates))
+        {
+            Console.Error.WriteLine(
+                "Error: --cutting-params, --keep-part-order, --accept-unverified-plan and --all-plates require --plan-cutting."
+            );
+            return 1;
+        }
+
+        if (options.NoFill && (options.AutoNest || options.KeepParts || options.DrawingName != null
+            || options.Quantity != 0 || options.Spacing.HasValue || options.PlateSize.HasValue
+            || options.TemplateFile != null || options.InputFiles.Any(IsCadFile)))
+        {
+            Console.Error.WriteLine(
+                "Error: --no-fill keeps the nest as loaded; it cannot be combined with CAD inputs, --autonest, --keep-parts, --drawing, --quantity, --spacing, --size or --template."
+            );
+            return 1;
+        }
+
         if (options.InputFiles.Count == 0)
         {
             PrintUsage();
@@ -132,42 +155,74 @@ static class NestConsole
             }
         }
 
+        // Read explicit settings before nesting, so a bad file fails without wasting the fill.
+        CuttingParameters cuttingParameters = null;
+        if (options.CuttingParamsFile != null)
+        {
+            try
+            {
+                cuttingParameters = CuttingParametersSerializer.DeserializeExplicit(
+                    File.ReadAllText(options.CuttingParamsFile));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException
+                or NotSupportedException)
+            {
+                Console.Error.WriteLine($"Error: cannot read cutting settings '{options.CuttingParamsFile}': {ex.Message}");
+                return 1;
+            }
+        }
+
         var nest = LoadOrCreateNest(options);
 
         if (nest == null)
             return 1;
 
         var plate = nest.Plates[options.PlateIndex];
+        IReadOnlyList<Plate> plates = new[] { plate };
+        var overlapCount = 0;
 
-        if (options.AutoNest && options.KeepParts && plate.Parts.Count > 0)
+        if (options.NoFill)
         {
-            Console.Error.WriteLine("Error: --autonest --keep-parts cannot use an occupied plate. Use plain fill for existing obstacles.");
-            return 2;
+            Console.WriteLine($"Nest: {nest.Name}");
+            overlapCount = CheckOverlaps(nest, plates, options);
+        }
+        else
+        {
+            if (options.AutoNest && options.KeepParts && plate.Parts.Count > 0)
+            {
+                Console.Error.WriteLine("Error: --autonest --keep-parts cannot use an occupied plate. Use plain fill for existing obstacles.");
+                return 2;
+            }
+
+            ApplyTemplate(plate, options);
+            ApplyOverrides(plate, options);
+
+            var drawing = ResolveDrawing(nest, options);
+
+            if (drawing == null)
+                return 1;
+
+            var existingCount = plate.Parts.Count;
+
+            if (!options.AutoNest && !options.KeepParts)
+                plate.Parts.Clear();
+
+            PrintHeader(nest, plate, drawing, existingCount, options);
+
+            var (success, elapsed, accepted, filled) = Fill(nest, plate, drawing, options, token);
+            if (!accepted)
+                return 2; // No save or post may run after a rejected proposal.
+
+            plates = filled;
+            overlapCount = CheckOverlaps(nest, plates, options);
+
+            PrintResults(success, nest, plates, elapsed);
         }
 
-        ApplyTemplate(plate, options);
-        ApplyOverrides(plate, options);
-
-        var drawing = ResolveDrawing(nest, options);
-
-        if (drawing == null)
-            return 1;
-
-        var existingCount = plate.Parts.Count;
-
-        if (!options.AutoNest && !options.KeepParts)
-            plate.Parts.Clear();
-
-        PrintHeader(nest, plate, drawing, existingCount, options);
-
-        var (success, elapsed, accepted, plates) = Fill(nest, plate, drawing, options, token);
-        if (!accepted)
-            return 2; // No save or post may run after a rejected proposal.
-
-        var overlapCount = CheckOverlaps(nest, plates, options);
-
-        PrintResults(success, nest, plates, elapsed);
         token.ThrowIfCancellationRequested();
+        if (options.PlanCutting && !PlanCutting(nest, options.AllPlates ? nest.Plates : plates,
+            cuttingParameters, options, token))
+            return 2; // Like a rejected nest: nothing is saved or posted.
         if (!SaveAndPost(nest, options))
             return 1;
 
@@ -265,6 +320,24 @@ static class NestConsole
                 case "--list-posts":
                     o.ListPosts = true;
                     break;
+                case "--no-fill":
+                    o.NoFill = true;
+                    break;
+                case "--plan-cutting":
+                    o.PlanCutting = true;
+                    break;
+                case "--cutting-params" when i + 1 < args.Length:
+                    o.CuttingParamsFile = args[++i];
+                    break;
+                case "--keep-part-order":
+                    o.KeepPartOrder = true;
+                    break;
+                case "--accept-unverified-plan":
+                    o.AcceptUnverifiedPlan = true;
+                    break;
+                case "--all-plates":
+                    o.AllPlates = true;
+                    break;
                 case "--help":
                 case "-h":
                     PrintUsage();
@@ -311,18 +384,17 @@ static class NestConsole
         return stock;
     }
 
+    static bool IsCadFile(string path) =>
+        path.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
+        || path.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase);
+
     static Nest LoadOrCreateNest(Options options)
     {
         var nestFile = options.InputFiles.FirstOrDefault(f =>
             f.EndsWith(NestFormat.FileExtension, StringComparison.OrdinalIgnoreCase)
             || f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
         );
-        var dxfFiles = options
-            .InputFiles.Where(f =>
-                f.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
-                || f.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)
-            )
-            .ToList();
+        var dxfFiles = options.InputFiles.Where(IsCadFile).ToList();
 
         // If we have a nest file, load it and optionally add DXFs.
         if (nestFile != null)
@@ -678,6 +750,85 @@ static class NestConsole
         );
     }
 
+    /// <summary>
+    /// Plans and applies cutting (part order, contour order, entries and lead-ins) on the
+    /// occupied plates in scope, all or nothing. Settings are the explicit file or the plates'
+    /// own saved settings; none are invented. Unverified plans apply only with per-invocation
+    /// acceptance, which is never consent to post.
+    /// </summary>
+    static bool PlanCutting(Nest nest, IEnumerable<Plate> plates, CuttingParameters explicitParameters,
+        Options options, CancellationToken token)
+    {
+        var scope = plates.Where(p => p.Parts.Count > 0).ToArray();
+        if (scope.Length == 0)
+        {
+            Console.Error.WriteLine("Error: no occupied plates to plan cutting for. Nothing saved.");
+            return false;
+        }
+
+        var parameters = explicitParameters ?? SavedCuttingParameters(scope);
+        if (parameters == null)
+        {
+            Console.Error.WriteLine(
+                "Error: --plan-cutting needs confirmed cutting settings: pass --cutting-params <settings.json>, or plan plates that all carry the same saved settings. Nothing saved."
+            );
+            return false;
+        }
+
+        Console.WriteLine("---");
+        Console.WriteLine($"Cutting settings: {(explicitParameters != null ? options.CuttingParamsFile : "saved with the plates")}");
+        var batch = CuttingPlanBatch.Capture(scope, parameters, options.KeepPartOrder,
+            scope.Select(p => nest.Plates.IndexOf(p)).ToArray(), token);
+        var proposal = batch.Plan(new PlanningProgress(scope.Length), token);
+        token.ThrowIfCancellationRequested();
+
+        foreach (var line in proposal.Describe(UnitsHelper.GetShortString(nest.Units),
+            "Pass --cutting-params settings that select"))
+            Console.WriteLine(line);
+
+        if (!(proposal.CanApply || options.AcceptUnverifiedPlan && proposal.CanApplyWithWarnings))
+        {
+            Console.Error.WriteLine(proposal.RequiresWarningAcceptance
+                ? "Cutting plan not applied: it is unverified. Review the warnings above; to apply it anyway, explicitly use --accept-unverified-plan for this invocation. Nothing saved."
+                : "Cutting plan not applied: every plate must be ready. Nothing saved.");
+            return false;
+        }
+
+        var commit = proposal.Apply(options.AcceptUnverifiedPlan, token);
+        if (commit.Status != CuttingCommitStatus.Applied)
+        {
+            Console.Error.WriteLine($"Error: cutting plan not applied ({commit.Status}): {commit.Message} Nothing saved.");
+            return false;
+        }
+
+        Console.WriteLine($"Cutting plan applied to {scope.Length} plate(s).");
+        return true;
+    }
+
+    /// <summary>The plates' saved settings when every plate carries the same ones; otherwise null.</summary>
+    static CuttingParameters SavedCuttingParameters(IReadOnlyList<Plate> plates)
+    {
+        var first = plates[0].CuttingParameters;
+        if (first == null)
+            return null;
+        var json = CuttingParametersSerializer.Serialize(first);
+        return plates.All(p => p.CuttingParameters != null
+            && CuttingParametersSerializer.Serialize(p.CuttingParameters) == json) ? first : null;
+    }
+
+    /// <summary>Reports synchronously, so phase lines print in order with the summary.</summary>
+    sealed class PlanningProgress(int plateCount) : IProgress<CuttingPlanProgress>
+    {
+        public void Report(CuttingPlanProgress value) => Console.WriteLine(
+            (plateCount > 1 ? $"Planning plate {value.PlateNumber}: " : "Planning: ") + value.Phase switch
+            {
+                CuttingPlanPhase.Reordering => "finding a part order...",
+                CuttingPlanPhase.KeepingOrder => "keeping the current order...",
+                CuttingPlanPhase.CheckingOverlap => "checking for overlaps...",
+                _ => value.Phase + "...",
+            });
+    }
+
     static void Save(Nest nest, Options options)
     {
         if (options.NoSave)
@@ -855,6 +1006,14 @@ static class NestConsole
               --engine <name>        With --autonest: jobs engine (default: Default; also Irregular, Rectangles, Fill, ...).
                                      Without --autonest: fill strategy (Fill (default), Strip, Vertical Remnant, Horizontal Remnant)
               --keep-parts           Don't clear existing parts before filling
+              --no-fill              Keep the loaded .nest as it is (no fill); plan, save or post it
+              --plan-cutting         After filling, plan cutting (part order, contour order, entries,
+                                     lead-ins); applied only when every plate is ready (else exit 2)
+              --cutting-params <path>  Cutting settings JSON for --plan-cutting (default: the plates' own
+                                     saved settings, which must agree; never invented)
+              --keep-part-order      With --plan-cutting: keep the current whole-part order
+              --all-plates           With --plan-cutting: plan every occupied plate, not just the target
+              --accept-unverified-plan  Explicitly apply an unverified cutting plan for this invocation
               --check-overlaps       Run overlap detection after fill (exit code 1 if found)
               --no-save              Skip saving output file
               --post <name>          Run a post processor after nesting
@@ -890,6 +1049,12 @@ static class NestConsole
         public string PostOutput;
         public string PostsDir;
         public bool ListPosts;
+        public bool NoFill;
+        public bool PlanCutting;
+        public string CuttingParamsFile;
+        public bool KeepPartOrder;
+        public bool AcceptUnverifiedPlan;
+        public bool AllPlates;
         public double? RepairBendsMillimeters;
         public BendRepairUnits CadUnits;
     }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Engine.CuttingPlanning;
 
 namespace OpenNest.Mcp
 {
@@ -68,6 +69,12 @@ namespace OpenNest.Mcp
         /// only — the process-global legacy registry is never read or written.
         /// </summary>
         public string DefaultEngineName { get; set; } = "Default";
+
+        /// <summary>
+        /// The last applicable <c>plan_cutting</c> proposal, awaiting <c>apply_cutting_plan</c>.
+        /// Apply re-checks every plate against its captured state, so edits since planning make it stale.
+        /// </summary>
+        internal CuttingPlanProposal CuttingProposal { get; set; }
 
         public Plate GetPlate(int index)
         {

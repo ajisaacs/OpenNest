@@ -53,6 +53,7 @@ Review part spacing before cutting, especially for interlocking pairs. See [pair
 dotnet run --project OpenNest.Console -- part.dxf --size 60x120               # fill one plate
 dotnet run --project OpenNest.Console -- part1.dxf part2.dxf --size 60x120 --autonest
 dotnet run --project OpenNest.Console -- project.zip                          # re-fill a nest file
+dotnet run --project OpenNest.Console -- job.nest --no-fill --plan-cutting --all-plates
 ```
 
 | Option | What it does |
@@ -65,6 +66,9 @@ dotnet run --project OpenNest.Console -- project.zip                          # 
 | `--template <path>` | Read plate defaults from a nest file. |
 | `--output <path>` | Set the output nest path. |
 | `--check-overlaps` | Check the result for overlaps. |
+| `--no-fill` | Keep a loaded nest as it is, for example to plan cutting or post it. |
+| `--plan-cutting` | Plan and apply cutting (part order, contours, entries, lead-ins); see [cut planning](docs/cutting-planner.md#console-and-mcp). |
+| `--cutting-params <path>` | Cutting settings JSON for `--plan-cutting`; otherwise the plates' saved settings are used. |
 | `--post <name>` | Run a post-processor after nesting. |
 | `--no-save` | Skip saving the nest. |
 | `--allow-invalid` | Explicitly keep a representable invalid `--autonest` result; otherwise it is rejected. |
