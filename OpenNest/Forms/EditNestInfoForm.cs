@@ -2,7 +2,7 @@ using System;
 using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Geometry;
-using Timer = System.Timers.Timer;
+using Timer = System.Windows.Forms.Timer;
 
 namespace OpenNest.Forms
 {
@@ -23,14 +23,16 @@ namespace OpenNest.Forms
                 statusBox.Items.Add(status);
             statusBox.SelectedItem = NestStatus.Quote;
 
-            timer = new Timer
+            // A WinForms timer ticks on the UI thread. System.Timers.Timer's SynchronizingObject
+            // cannot marshal before the dialog has a handle, so a busy UI thread (e.g. an open
+            // cut simulator) let it run EnableCheck on a pool thread while the handle was created.
+            timer = new Timer { Interval = SystemInformation.KeyboardDelay + 1 };
+            timer.Tick += (sender, e) =>
             {
-                SynchronizingObject = this,
-                Enabled = true,
-                AutoReset = false,
-                Interval = SystemInformation.KeyboardDelay + 1,
+                timer.Stop();
+                EnableCheck();
             };
-            timer.Elapsed += (sender, e) => EnableCheck();
+            Disposed += (sender, e) => timer.Dispose();
             nameBox.TextChanged += (sender, e) => EnableCheck();
             EnableCheck();
         }
