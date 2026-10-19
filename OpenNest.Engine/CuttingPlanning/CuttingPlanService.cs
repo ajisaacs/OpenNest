@@ -374,7 +374,8 @@ public static class CuttingPlanService
             warnings.AddRange(fixedFindings.Select(f => FixedLeadWarnings.FromChecker(snapshot, source, f)));
             var fixedLeads = new List<FixedLeadFailure>();
             var lead = source.IsCutOff ? new LeadPathValidationResult(true, true, null)
-                : LeadPathValidator.Check(execution, source.Material, materials, isFixed, fixedLeads, token);
+                : LeadPathValidator.Check(execution, source.Material, materials, isFixed, fixedLeads, token,
+                    pierceRadius: snapshot.PierceZoneRadius);
             if (!lead.IsComplete || !lead.IsClear)
                 findings.Add(JointCuttingPlanSearch.Finding(source,
                     lead.IsComplete ? null : PostVerificationKind.Incomplete, lead.Reason));

@@ -81,6 +81,9 @@ public sealed class PreparedContours
     }
 
     public int Count => shapes.Length;
+
+    /// <summary>The pierce zone every lead-in pierce of these contours keeps; 0 when off.</summary>
+    internal double PierceZoneRadius => parameters.GetPierceZoneRadius();
     public int PerimeterOrdinal => Count - 1;
 
     /// <summary>Resolved pins this preparation could not honour: a tab on an internal contour.</summary>

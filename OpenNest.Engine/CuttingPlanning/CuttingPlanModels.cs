@@ -83,6 +83,8 @@ public sealed class CuttingPlanSnapshot
     internal PlateCuttingState PlateState { get; }
     /// <summary>Owned copy of the confirmed parameters taken at capture; never the caller's object.</summary>
     internal CuttingParameters OwnedParameters { get; }
+    /// <summary>Every lead-in pierce keeps this from all material; 0 without a pierce diameter.</summary>
+    internal double PierceZoneRadius => OwnedParameters?.GetPierceZoneRadius() ?? 0;
     internal bool BestEffort { get; }
     internal bool Regeneration { get; }
     internal bool PreservePartOrder { get; }

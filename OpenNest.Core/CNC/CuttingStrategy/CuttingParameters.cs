@@ -24,6 +24,19 @@ namespace OpenNest.CNC.CuttingStrategy
 
         public double PierceClearance { get; set; } = 0.0625;
 
+        /// <summary>
+        /// Diameter of the crater a pierce blows through this plate; 0 turns the pierce zone off.
+        /// When set, every lead-in pierce must keep half of it from all part material.
+        /// </summary>
+        public double PierceDiameter { get; set; }
+
+        /// <summary>The pierce zone's radius, or 0 when <see cref="PierceDiameter"/> is off.</summary>
+        public double GetPierceZoneRadius() =>
+            PierceDiameter > 0 && double.IsFinite(PierceDiameter) ? PierceDiameter / 2 : 0;
+
+        /// <summary>The clearance a pierce keeps from its own contour: the larger setting wins.</summary>
+        public double GetEffectivePierceClearance() => System.Math.Max(PierceClearance, GetPierceZoneRadius());
+
         public bool RoundLeadInAngles { get; set; }
         public double LeadInAngleIncrement { get; set; } = 5.0;
 

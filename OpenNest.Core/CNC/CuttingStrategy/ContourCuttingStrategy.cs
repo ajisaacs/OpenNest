@@ -445,7 +445,9 @@ namespace OpenNest.CNC.CuttingStrategy
                     );
                 }
 
-                leadIn = ClampLeadInForCircle(leadIn, circle, point, normal);
+                leadIn = ClampLeadInForCircle(leadIn, circle, point, normal,
+                    Parameters.GetEffectivePierceClearance());
+                leadIn = ResolvePierceZone(shape, point, leadIn, normal, Parameters.GetPierceZoneRadius());
 
                 // Build hole sub-program relative to (0,0)
                 var holeCenter = circle.Center;
@@ -485,7 +487,9 @@ namespace OpenNest.CNC.CuttingStrategy
             }
 
             leadIn = ResolveLeadIn(shape, point, entity, contourType, leadIn, winding,
-                Parameters.PierceClearance, out var leadInNormal);
+                Parameters.GetEffectivePierceClearance(), out var leadInNormal);
+            if (contourType == ContourType.Internal)
+                leadIn = ResolvePierceZone(shape, point, leadIn, leadInNormal, Parameters.GetPierceZoneRadius());
             program.Codes.AddRange(leadIn.Generate(point, leadInNormal, winding));
 
             var reindexedShape = shape.ReindexAt(point, entity);
@@ -513,7 +517,7 @@ namespace OpenNest.CNC.CuttingStrategy
             else
             {
                 leadOut = ResolveLeadOut(shape, point, entity, contourType, leadOut, winding,
-                    Parameters.PierceClearance, out leadOutNormal);
+                    Parameters.GetEffectivePierceClearance(), out leadOutNormal);
             }
 
             program.Codes.AddRange(ConvertShapeToMoves(reindexedShape, point));
@@ -917,18 +921,24 @@ namespace OpenNest.CNC.CuttingStrategy
             return polygon.RotationDirection();
         }
 
-        private LeadIn ClampLeadInForCircle(
+        /// <summary>
+        /// Shortens a round hole's lead-in so its pierce keeps <paramref name="clearance"/> from
+        /// the hole wall. A hole no wider than twice the clearance keeps the lead as it is.
+        /// Shared by program generation and the manual placement preview.
+        /// </summary>
+        public static LeadIn ClampLeadInForCircle(
             LeadIn leadIn,
             Circle circle,
             Vector contourPoint,
-            double normalAngle
+            double normalAngle,
+            double clearance
         )
         {
-            if (leadIn is NoLeadIn || Parameters.PierceClearance <= 0)
+            if (leadIn is NoLeadIn || clearance <= 0)
                 return leadIn;
 
             var piercePoint = leadIn.GetPiercePoint(contourPoint, normalAngle);
-            var maxRadius = circle.Radius - Parameters.PierceClearance;
+            var maxRadius = circle.Radius - clearance;
             if (maxRadius <= 0)
                 return leadIn;
 
@@ -965,6 +975,75 @@ namespace OpenNest.CNC.CuttingStrategy
 
             return leadIn.Scale(scale);
         }
+
+        /// <summary>
+        /// Keeps a hole's lead-in pierce <paramref name="pierceRadius"/> clear of the hole wall.
+        /// A lead-in whose pierce already keeps it, or that pierces on the contour itself, is
+        /// returned as given. Otherwise the pierce moves onto the line from
+        /// <paramref name="point"/> toward the hole's pole of inaccessibility (the centre of a
+        /// round hole), as close to the contour as the zone allows, and the lead becomes a
+        /// straight line from there, generated with <paramref name="normal"/>. A hole too small
+        /// for the zone is pierced at the pole itself, its best clearance; the lead validator and
+        /// pre-post review still report the shortfall. Reads only the hole's own geometry, so it
+        /// knows nothing of parts nested inside the hole. Shared by program generation and the
+        /// manual placement preview.
+        /// </summary>
+        public static LeadIn ResolvePierceZone(Shape hole, Vector point, LeadIn leadIn, double normal,
+            double pierceRadius)
+        {
+            if (pierceRadius <= 0 || !double.IsFinite(pierceRadius) || leadIn is NoLeadIn
+                || !hole.IsClosed())
+                return leadIn;
+
+            var circle = hole.Entities.Count == 1 ? hole.Entities[0] as Circle : null;
+            var polygon = circle == null
+                ? hole.ToPolygonWithTolerance(System.Math.Max(pierceRadius / 100, Math.Tolerance.ChainTolerance))
+                : null;
+            if (Clear(leadIn.GetPiercePoint(point, normal)))
+                return leadIn;
+
+            var pole = circle?.Center ?? PolyLabel.Find(polygon, null,
+                System.Math.Max(pierceRadius / 100, Math.Tolerance.ChainTolerance), PoleSearchCells);
+            if (!Inside(pole))
+                return leadIn;
+
+            // Clearance grows monotonically toward the pole of a convex hole, so the bisection
+            // finds the shortest clear lead; in other holes it still ends on a clear point.
+            var pierce = pole;
+            if (Clear(pole))
+            {
+                double low = 0, high = 1;
+                for (var i = 0; i < 40; i++)
+                {
+                    var middle = (low + high) / 2;
+                    if (Clear(point + (pole - point) * middle))
+                        high = middle;
+                    else
+                        low = middle;
+                }
+                pierce = point + (pole - point) * high;
+            }
+
+            var length = pierce.DistanceTo(point);
+            if (length <= Math.Tolerance.Epsilon)
+                return leadIn;
+            var direction = System.Math.Atan2(pierce.Y - point.Y, pierce.X - point.X);
+            return new LineLeadIn
+            {
+                Length = length,
+                ApproachAngle = Angle.ToDegrees(Angle.NormalizeRad(direction - normal + Angle.HalfPI)),
+            };
+
+            bool Inside(Vector p) => circle != null
+                ? p.DistanceTo(circle.Center) < circle.Radius
+                : polygon.ContainsPoint(p);
+
+            bool Clear(Vector p) => double.IsFinite(p.X) && double.IsFinite(p.Y) && Inside(p)
+                && hole.ClosestPointTo(p, out _).DistanceTo(p) >= pierceRadius;
+        }
+
+        // Bounds the pole search on long, thin holes; the result is checked before use.
+        private const int PoleSearchCells = 4096;
 
         private LeadIn SelectLeadIn(ContourType contourType)
         {

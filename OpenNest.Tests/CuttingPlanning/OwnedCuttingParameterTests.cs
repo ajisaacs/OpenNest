@@ -33,6 +33,7 @@ public class OwnedCuttingParameterTests
             Kerf = 0.01,
             PartSpacing = 0.1,
             PierceClearance = 0.05,
+            PierceDiameter = 0.3,
             ExternalLeadIn = leadIn,
             InternalLeadIn = leadIn,
             ArcCircleLeadIn = leadIn,

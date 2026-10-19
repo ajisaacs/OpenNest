@@ -644,6 +644,12 @@ internal static class JointCuttingPlanSearch
                 : feasibility[source.SourceOrdinal] = new ContourEntryFeasibility(
                     source.Prepared, source.Location, source.Material, materials, leadContacts);
 
+        // With a pierce diameter, a lead can also fail because its pierce is too close to material.
+        private string PierceZoneHint() => snapshot.PierceZoneRadius <= 0 ? ""
+            : FormattableString.Invariant($" Each lead-in pierce must also keep {snapshot.PierceZoneRadius:0.####} ")
+                + FormattableString.Invariant($"from all part material for the {snapshot.PierceZoneRadius * 2:0.####} ")
+                + "pierce diameter: lengthen the lead-in or reduce the pierce diameter.";
+
         private ContourFeasibilityVerdict Evaluate(FixedProgramPlacement source, ContourEntryCandidate candidate)
         {
             CountExpansion(source);
@@ -682,7 +688,7 @@ internal static class JointCuttingPlanSearch
                 rejected.Add(Finding(source, null,
                     $"No tested lead-in fits on cutting contour {contour + 1}: {selection.Reason} "
                     + "Try reducing the lead-in length in Cutting Settings...; if nearby parts obstruct the lead-in, "
-                    + "space the parts farther apart. Replan to check the changes."));
+                    + "space the parts farther apart." + PierceZoneHint() + " Replan to check the changes."));
             // Uncertain candidates are NOT refused by the precheck: they reach the emitted-
             // prefix Check and complete replay, which remain the authority on them.
             return selection.Choices.Concat(selection.UncertainChoices).Take(snapshot.MaxEntries).ToArray();
@@ -759,7 +765,8 @@ internal static class JointCuttingPlanSearch
             attempt.NoteCrossings(source.SourceOrdinal, findings);
             // A fixed cutoff has no material or leads to certify; its rapids are still checked.
             var lead = source.IsCutOff ? new LeadPathValidationResult(true, true, null)
-                : LeadPathValidator.Check(execution, source.Material, materials, isFixed, [], token, leadContacts);
+                : LeadPathValidator.Check(execution, source.Material, materials, isFixed, [], token, leadContacts,
+                    snapshot.PierceZoneRadius);
             if (!lead.IsComplete || !lead.IsClear)
                 rejected.Add(Finding(source, lead.IsComplete ? null : PostVerificationKind.Incomplete, lead.Reason));
             return findings.Count == 0 && lead.IsComplete && lead.IsClear;

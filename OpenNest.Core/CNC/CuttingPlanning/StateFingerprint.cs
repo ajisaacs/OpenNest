@@ -86,6 +86,7 @@ internal static class StateFingerprint
             Lead(p.ArcCircleLeadIn);
             Out(p.ArcCircleLeadOut);
             Number(p.PierceClearance);
+            Number(p.PierceDiameter);
             Flag(p.RoundLeadInAngles);
             Number(p.LeadInAngleIncrement);
             Number(p.AutoTabMinSize);

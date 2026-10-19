@@ -26,7 +26,10 @@ public enum PostVerificationKind
     /// A lead of a nested part or of its host contacts or enters the other's material; for a host
     /// this is typically an enclosing-hole lead crossing the insert.
     /// </summary>
-    NestedLead
+    NestedLead,
+
+    /// <summary>A lead-in pierce is closer to part material than half the pierce diameter.</summary>
+    PierceZone
 }
 
 /// <summary>Plate and part numbers are one-based; plate zero denotes a whole-post limitation.</summary>
@@ -72,6 +75,8 @@ public sealed class PostVerificationReport
             Summary(PostVerificationKind.NestedCutOrder, "Nested part order");
         if (Findings.Any(finding => finding.Kind == PostVerificationKind.NestedLead))
             Summary(PostVerificationKind.NestedLead, "Nested part leads");
+        if (Findings.Any(finding => finding.Kind == PostVerificationKind.PierceZone))
+            Summary(PostVerificationKind.PierceZone, "Pierce zones");
         foreach (var finding in Findings)
         {
             text.Append(finding.PlateNumber == 0 ? "Post processor" : $"Plate {finding.PlateNumber}");

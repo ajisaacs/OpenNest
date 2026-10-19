@@ -335,10 +335,15 @@ namespace OpenNest.Actions
                 snapContourType,
                 leadIn,
                 hoveredContour.Winding,
-                parameters.PierceClearance,
+                parameters.GetEffectivePierceClearance(),
                 out snapNormal
             );
-            leadIn = ClampLeadInForCircle(leadIn, parameters);
+            if (snapContourType == ContourType.ArcCircle && snapEntity is Circle snapCircle)
+                leadIn = ContourCuttingStrategy.ClampLeadInForCircle(leadIn, snapCircle, snapPoint, snapNormal,
+                    parameters.GetEffectivePierceClearance());
+            if (snapContourType is ContourType.Internal or ContourType.ArcCircle)
+                leadIn = ContourCuttingStrategy.ResolvePierceZone(hoveredContour.Shape, snapPoint, leadIn, snapNormal,
+                    parameters.GetPierceZoneRadius());
 
             var piercePoint = leadIn.GetPiercePoint(snapPoint, snapNormal);
             var pt1 = plateView.PointWorldToGraph(TransformToWorld(piercePoint));
@@ -359,40 +364,6 @@ namespace OpenNest.Actions
                 g.FillEllipse(Brushes.Lime, pt2.X - radius, pt2.Y - radius, radius * 2, radius * 2);
 
             g.SmoothingMode = oldSmooth;
-        }
-
-        private LeadIn ClampLeadInForCircle(LeadIn leadIn, CuttingParameters parameters)
-        {
-            if (
-                snapContourType != ContourType.ArcCircle
-                || !(snapEntity is Circle snapCircle)
-                || parameters.PierceClearance <= 0
-            )
-                return leadIn;
-
-            var pierceCheck = leadIn.GetPiercePoint(snapPoint, snapNormal);
-            var maxRadius = snapCircle.Radius - parameters.PierceClearance;
-
-            if (maxRadius <= 0 || pierceCheck.DistanceTo(snapCircle.Center) <= maxRadius)
-                return leadIn;
-
-            var currentDist = snapPoint.DistanceTo(pierceCheck);
-            if (currentDist <= Tolerance.Epsilon)
-                return leadIn;
-
-            var dx = (pierceCheck.X - snapPoint.X) / currentDist;
-            var dy = (pierceCheck.Y - snapPoint.Y) / currentDist;
-            var vx = snapPoint.X - snapCircle.Center.X;
-            var vy = snapPoint.Y - snapCircle.Center.Y;
-            var b = 2.0 * (vx * dx + vy * dy);
-            var c = vx * vx + vy * vy - maxRadius * maxRadius;
-            var disc = b * b - 4.0 * c;
-
-            if (disc < 0)
-                return leadIn;
-
-            var t = (-b + System.Math.Sqrt(disc)) / 2.0;
-            return (t > 0 && t < currentDist) ? leadIn.Scale(t / currentDist) : leadIn;
         }
 
         private void TrySnapToEntityPoints(Vector localPt)

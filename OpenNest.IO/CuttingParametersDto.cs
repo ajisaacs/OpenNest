@@ -28,6 +28,7 @@ public class CuttingParametersDto
     public double TabWidth { get; set; }
     public TabDto TabConfig { get; set; }
     public double PierceClearance { get; set; }
+    public double PierceDiameter { get; set; }
     public bool RoundLeadInAngles { get; set; }
     public double LeadInAngleIncrement { get; set; }
     public double AutoTabMinSize { get; set; }

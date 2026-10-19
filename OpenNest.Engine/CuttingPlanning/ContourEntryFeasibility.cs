@@ -121,8 +121,9 @@ public sealed class ContourEntryFeasibility
             var program = prepared.EmitCandidateForValidation(choice);
             var execution = ExecutionMotionReader.Read(program, location, null, token);
             var result = leadContacts == null
-                ? LeadPathValidator.Check(execution, ownMaterial, materials, token)
-                : LeadPathValidator.Check(execution, ownMaterial, materials, leadContacts, token);
+                ? LeadPathValidator.Check(execution, ownMaterial, materials, prepared.PierceZoneRadius, token)
+                : LeadPathValidator.Check(execution, ownMaterial, materials, leadContacts, token,
+                    prepared.PierceZoneRadius);
             if (!result.IsComplete)
                 return new(ContourFeasibilityStatus.Incomplete, result.Reason);
             return result.IsClear

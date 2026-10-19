@@ -58,6 +58,7 @@ public static class CuttingParametersSerializer
             TabWidth = parameters.TabConfig?.Size ?? 0.25,
             TabConfig = ToTabDto(parameters.TabConfig),
             PierceClearance = parameters.PierceClearance,
+            PierceDiameter = parameters.PierceDiameter,
             RoundLeadInAngles = parameters.RoundLeadInAngles,
             LeadInAngleIncrement = parameters.LeadInAngleIncrement,
             AutoTabMinSize = parameters.AutoTabMinSize,
@@ -93,6 +94,7 @@ public static class CuttingParametersSerializer
                 ? new NormalTab { Size = dto.TabWidth }
                 : FromTabDto(dto.TabConfig),
             PierceClearance = dto.PierceClearance,
+            PierceDiameter = dto.PierceDiameter,
             RoundLeadInAngles = dto.RoundLeadInAngles,
             LeadInAngleIncrement = dto.LeadInAngleIncrement,
             AutoTabMinSize = dto.AutoTabMinSize,

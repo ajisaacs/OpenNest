@@ -106,6 +106,10 @@ shows the first three check categories, even when there are no findings:
   order finding; leads keep their own checks. Plan Cutting's Ready result for the plate cuts
   nested parts first with leads that clear them; this review checks the live programs again
   before posting.
+- **Pierce zones:** with a `PierceDiameter` in the part's (or else the plate's) cutting
+  parameters, every lead-in pierce of every placed program must keep half of it from all part
+  material; see [pierce zones](geometry/pierce-zone.md). This line appears in the summary only
+  when there is such a finding.
 
 Findings identify the plate and part's position in the cutting sequence. Read the
 scrollable report, cancel to fix the nest, then post again to rerun verification.

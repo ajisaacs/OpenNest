@@ -34,7 +34,8 @@ assignment or the manual cursor) does not matter; the cut direction never change
 The approach angle is ignored at such a corner.
 
 The straight lead is used only while its pierce stays at least
-`CuttingParameters.PierceClearance` from the contour and the lead crosses the
+`CuttingParameters.PierceClearance` (or the [pierce zone](pierce-zone.md) radius, when larger)
+from the contour and the lead crosses the
 contour nowhere but at the corner. Very flat corners (about 165 degrees and over for
 a 0.25 lead with 0.0625 clearance) fall back to the normal lead-in, perpendicular to
 the first-cut edge, so tessellated curves do not get straight leads. Reflex perimeter

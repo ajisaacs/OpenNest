@@ -157,6 +157,7 @@ public class CuttingParametersSerializerTests
         Assert.IsType<NoLeadOut>(restored.ArcCircleLeadOut);
         Assert.Equal(0, Assert.IsType<NormalTab>(restored.TabConfig).Size);
         Assert.Equal(0, restored.PierceClearance);
+        Assert.Equal(0, restored.PierceDiameter);
         Assert.Equal(5, restored.LeadInAngleIncrement);
     }
 
@@ -300,6 +301,7 @@ public class CuttingParametersSerializerTests
         ArcCircleLeadIn = CreateLeadIn("LineArc"),
         ArcCircleLeadOut = CreateLeadOut("None"),
         PierceClearance = 0.17,
+        PierceDiameter = 0.41,
         RoundLeadInAngles = true,
         LeadInAngleIncrement = 13,
         AutoTabMinSize = 0.62,

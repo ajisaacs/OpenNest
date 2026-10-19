@@ -200,6 +200,8 @@ public static class PostVerificationAnalyzer
             FixedLeadReview.Add(plate, plateNumber, findings, clamps, cancellationToken, fixedMotions);
             // Parts nested in cutouts: inner-before-host order and leads across the pair.
             NestedPartReview.Add(plate, plateNumber, findings, fixedMotions, cancellationToken);
+            // Lead-in pierces from any source keep the pierce diameter's zone clear of material.
+            PierceZoneReview.Add(plate, plateNumber, findings, cancellationToken);
             var overlap = PlateOverlapAnalyzer.Analyze(
                 PlateOverlapAnalyzer.Capture(materialParts, (clamps ?? Array.Empty<ClampZone>()).ToArray(),
                     cancellationToken),

@@ -30,6 +30,7 @@ internal static class OwnedCuttingParameters
             Kerf = Dimension(source.Kerf),
             PartSpacing = Dimension(source.PartSpacing),
             PierceClearance = Dimension(source.PierceClearance),
+            PierceDiameter = Dimension(source.PierceDiameter),
             ExternalLeadIn = CopyLeadIn(source.ExternalLeadIn),
             InternalLeadIn = CopyLeadIn(source.InternalLeadIn),
             ArcCircleLeadIn = CopyLeadIn(source.ArcCircleLeadIn),

@@ -248,6 +248,9 @@ internal static class PostVerificationGeometry
                 : Start + (End - Start) * (distance / Length);
         }
 
+        /// <summary>Exact native distance from <paramref name="point"/> to this finite curve.</summary>
+        internal double DistanceTo(Vector point) => nativeEntity.Value.ClosestPointTo(point).DistanceTo(point);
+
         internal bool Contains(Vector point) => Contains(point, Epsilon);
 
         /// <summary>On-support test with an admitted positional allowance (see <see cref="SameSupport(Curve, double)"/>).</summary>

@@ -41,6 +41,7 @@ namespace OpenNest.Controls
         private readonly NumericUpDown nudAutoTabMin;
         private readonly NumericUpDown nudAutoTabMax;
         private readonly NumericUpDown nudPierceClearance;
+        private readonly NumericUpDown nudPierceDiameter;
 
         private readonly CheckBox chkRoundLeadInAngles;
         private readonly NumericUpDown nudLeadInAngleIncrement;
@@ -227,7 +228,7 @@ namespace OpenNest.Controls
             {
                 HeaderText = "Pierce",
                 Dock = DockStyle.Top,
-                ExpandedHeight = 90,
+                ExpandedHeight = 116,
                 IsExpanded = true,
             };
 
@@ -243,10 +244,24 @@ namespace OpenNest.Controls
             nudPierceClearance = CreateNumeric(130, 3, 0.0625, 0.0625);
             piercePanel.ContentPanel.Controls.Add(nudPierceClearance);
 
+            // 0 turns the pierce zone off; see docs/geometry/pierce-zone.md.
+            piercePanel.ContentPanel.Controls.Add(
+                new Label
+                {
+                    Text = "Pierce Diameter:",
+                    Location = new Point(12, 32),
+                    AutoSize = true,
+                }
+            );
+
+            nudPierceDiameter = CreateNumeric(130, 29, 0, 0.0625);
+            nudPierceDiameter.ValueChanged += (s, e) => OnParametersChanged();
+            piercePanel.ContentPanel.Controls.Add(nudPierceDiameter);
+
             chkRoundLeadInAngles = new CheckBox
             {
                 Text = "Round Lead-In Angles",
-                Location = new Point(12, 32),
+                Location = new Point(12, 58),
                 AutoSize = true,
             };
             chkRoundLeadInAngles.CheckedChanged += (s, e) =>
@@ -260,12 +275,12 @@ namespace OpenNest.Controls
                 new Label
                 {
                     Text = "Increment:",
-                    Location = new Point(175, 34),
+                    Location = new Point(175, 60),
                     AutoSize = true,
                 }
             );
 
-            nudLeadInAngleIncrement = CreateNumeric(245, 31, 5, 1);
+            nudLeadInAngleIncrement = CreateNumeric(245, 57, 5, 1);
             nudLeadInAngleIncrement.DecimalPlaces = 0;
             nudLeadInAngleIncrement.Minimum = 1;
             nudLeadInAngleIncrement.Maximum = 90;
@@ -315,6 +330,7 @@ namespace OpenNest.Controls
                 TabsEnabled = chkTabsEnabled.Checked && rbTabAll.Checked,
                 TabConfig = new NormalTab { Size = (double)nudTabWidth.Value },
                 PierceClearance = (double)nudPierceClearance.Value,
+                PierceDiameter = (double)nudPierceDiameter.Value,
                 RoundLeadInAngles = chkRoundLeadInAngles.Checked,
                 LeadInAngleIncrement = (double)nudLeadInAngleIncrement.Value,
                 AutoTabMinSize =
@@ -342,6 +358,7 @@ namespace OpenNest.Controls
             if (p.TabConfig != null)
                 nudTabWidth.Value = (decimal)p.TabConfig.Size;
             nudPierceClearance.Value = (decimal)p.PierceClearance;
+            nudPierceDiameter.Value = (decimal)p.PierceDiameter;
             chkRoundLeadInAngles.Checked = p.RoundLeadInAngles;
             nudLeadInAngleIncrement.Value = (decimal)p.LeadInAngleIncrement;
             nudLeadInAngleIncrement.Enabled = p.RoundLeadInAngles;

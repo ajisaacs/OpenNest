@@ -508,6 +508,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         PostVerificationKind.FixedLead => "Fixed lead",
         PostVerificationKind.NestedCutOrder => "Nested part order",
         PostVerificationKind.NestedLead => "Nested part lead",
+        PostVerificationKind.PierceZone => "Pierce zone",
         _ => kind.ToString(),
     };
 
@@ -571,6 +572,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         PostVerificationKind.MissingLeadIn => "The ring marks the contour start that has no lead-in.",
         PostVerificationKind.NestedCutOrder => "The ring marks the nested part that is cut after its host.",
         PostVerificationKind.NestedLead => "The ring marks the middle of the lead that meets the other part.",
+        PostVerificationKind.PierceZone => "The ring marks the pierce that is too close to part material.",
         _ => "The ring marks the affected part; the exact spot is not known."
     };
 

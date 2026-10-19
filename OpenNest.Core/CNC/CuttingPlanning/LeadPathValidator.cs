@@ -24,23 +24,38 @@ public static class LeadPathValidator
         IReadOnlyList<LeadMaterialSnapshot> otherMaterials, CancellationToken token = default) =>
         Check(execution, target, otherMaterials, null, null, token);
 
+    /// <summary>
+    /// As the public check, and every lead-in pierce must also keep <paramref name="pierceRadius"/>
+    /// from all of the materials (see <see cref="CuttingStrategy.CuttingParameters.PierceDiameter"/>).
+    /// Zero checks paths only.
+    /// </summary>
+    public static LeadPathValidationResult Check(OwnedExecution execution, LeadMaterialSnapshot target,
+        IReadOnlyList<LeadMaterialSnapshot> otherMaterials, double pierceRadius, CancellationToken token = default) =>
+        Check(execution, target, otherMaterials, null, null, token, pierceRadius: pierceRadius);
+
     /// <summary>As the public check, remembering other-material results in <paramref name="memo"/>.</summary>
     internal static LeadPathValidationResult Check(OwnedExecution execution, LeadMaterialSnapshot target,
-        IReadOnlyList<LeadMaterialSnapshot> otherMaterials, LeadContactMemo memo, CancellationToken token) =>
-        Check(execution, target, otherMaterials, null, null, token, memo);
+        IReadOnlyList<LeadMaterialSnapshot> otherMaterials, LeadContactMemo memo, CancellationToken token,
+        double pierceRadius = 0) =>
+        Check(execution, target, otherMaterials, null, null, token, memo, pierceRadius);
 
     /// <summary>
     /// As the public check, but a lead motion that <paramref name="isFixed"/> owns (by motion
     /// index) is part of a fixed emission: its failure is added to <paramref name="fixedFailures"/>
     /// and checking continues. Any other failure is returned exactly as the public check returns it.
+    /// A positive <paramref name="pierceRadius"/> also requires each lead-in pierce to keep that
+    /// distance from every material; a contour pierced directly, without a lead-in, is not checked.
     /// </summary>
     internal static LeadPathValidationResult Check(OwnedExecution execution, LeadMaterialSnapshot target,
         IReadOnlyList<LeadMaterialSnapshot> otherMaterials, Func<int, bool> isFixed,
-        List<FixedLeadFailure> fixedFailures, CancellationToken token, LeadContactMemo memo = null)
+        List<FixedLeadFailure> fixedFailures, CancellationToken token, LeadContactMemo memo = null,
+        double pierceRadius = 0)
     {
         token.ThrowIfCancellationRequested();
         if (execution == null || target == null || otherMaterials == null)
             return new(false, false, "Missing execution or material snapshots.");
+        if (!double.IsFinite(pierceRadius) || pierceRadius < 0)
+            return new(false, false, "Pierce zone radius must be finite and nonnegative.");
         if (!target.IsComplete || otherMaterials.Any(m => m == null || !m.IsComplete))
             return new(false, false, "Material snapshot is incomplete.");
         try
@@ -154,7 +169,37 @@ public static class LeadPathValidator
                             + "Try spacing the parts farther apart or reducing the lead-in/lead-out length, then replan. "
                             + "For locked parts, edit the leads or unlock the part before replanning."), other);
                 }
-                return (null, null);
+                return PierceZone();
+
+                // A lead-in reached by a rapid (or starting the program) starts at its pierce. A break
+                // cut's pierce lies in its own breakoff scrap, inside the part's material, so only
+                // others are checked.
+                (LeadPathValidationResult, int?) PierceZone()
+                {
+                    if (pierceRadius <= 0 || move.Layer != LayerType.Leadin || i > 0 && !execution.Motions[i - 1].Rapid)
+                        return (null, null);
+                    if (!breakLead && Clearance(target) is { } own)
+                        return (Short(own, "its own part's material"), null);
+                    for (var other = 0; other < otherMaterials.Count; other++)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        if (!ReferenceEquals(otherMaterials[other], target)
+                            && Clearance(otherMaterials[other]) is { } distance)
+                            return (Short(distance, "another placed part"), other);
+                    }
+                    return (null, null);
+                }
+
+                // The pierce's distance to the material when it is inside the zone, else null.
+                double? Clearance(LeadMaterialSnapshot material)
+                {
+                    var distance = MaterialDistance(start, material, ref budget, token);
+                    return IsInsideZone(distance, pierceRadius) ? distance : null;
+                }
+
+                LeadPathValidationResult Short(double distance, string what) =>
+                    new(true, false, PierceZoneMessage(start, distance, what, pierceRadius)
+                        + " Try a longer lead-in, more part spacing or a smaller pierce diameter, then replan.");
 
                 string CheckMaterial(LeadMaterialSnapshot material, Vector? permittedJoint) =>
                     MaterialContact(move.Curve, material, permittedJoint, ref budget, token);
@@ -184,6 +229,33 @@ public static class LeadPathValidator
             return new(false, false, ex.Message);
         }
     }
+
+    /// <summary>
+    /// The exact native distance from <paramref name="point"/> to the nearest boundary of complete
+    /// material. Exceeding the budget throws.
+    /// </summary>
+    internal static double MaterialDistance(Vector point, LeadMaterialSnapshot material, ref int budget,
+        CancellationToken token)
+    {
+        var nearest = double.PositiveInfinity;
+        foreach (var boundary in material.Rings.SelectMany(r => r))
+        {
+            token.ThrowIfCancellationRequested();
+            if (--budget < 0)
+                throw new NotSupportedException("Lead validation exceeds the native query limit.");
+            nearest = System.Math.Min(nearest, boundary.DistanceTo(point));
+        }
+        return nearest;
+    }
+
+    /// <summary>True when material <paramref name="distance"/> away lies inside a pierce zone.</summary>
+    internal static bool IsInsideZone(double distance, double pierceRadius) =>
+        pierceRadius > 0 && distance < pierceRadius - PostVerificationGeometry.Epsilon;
+
+    internal static string PierceZoneMessage(Vector pierce, double distance, string what, double pierceRadius) =>
+        FormattableString.Invariant(
+            $"The pierce at ({pierce.X:0.####}, {pierce.Y:0.####}) is {distance:0.####} from {what}; ")
+        + FormattableString.Invariant($"the {pierceRadius * 2:0.####} pierce diameter needs {pierceRadius:0.####}.");
 
     /// <summary>
     /// How a native lead curve contacts or enters complete material, or null when it stays clear.
