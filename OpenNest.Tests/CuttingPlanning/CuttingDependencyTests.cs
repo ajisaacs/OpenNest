@@ -232,6 +232,58 @@ public class CuttingDependencyTests
         Assert.Contains("nested in its cutout", finding.Message);
     }
 
+    // Started beside the regular parts, a nearest-first tour would cut the far coupons last;
+    // cut-first makes each coupon a prerequisite of every other part.
+    [Fact]
+    public void Plan_CutFirstParts_PrecedeEveryOtherPartHoweverFarAway()
+    {
+        var nest = new Nest();
+        var plate = nest.CreatePlate();
+        var parameters = ExplicitContourTests.Parameters();
+        var near = Emitted(parameters, new Vector(0, 0));
+        var nearer = Emitted(parameters, new Vector(4, 0));
+        var coupon = Emitted(parameters, new Vector(40, 0));
+        var other = Emitted(parameters, new Vector(44, 0));
+        coupon.BaseDrawing.CutFirst = true;
+        other.BaseDrawing.CutFirst = true;
+        foreach (var part in new[] { near, nearer, coupon, other })
+            plate.Parts.Add(part);
+        var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate, new Vector(-1, 1),
+            confirmedParameters: parameters));
+        Assert.Equal(new[] { 2, 3 }, snapshot.Dependencies.PrerequisitesOf(0));
+        Assert.Equal(new[] { 2, 3 }, snapshot.Dependencies.PrerequisitesOf(1));
+        Assert.Empty(snapshot.Dependencies.PrerequisitesOf(2));
+        Assert.Empty(snapshot.Dependencies.PrerequisitesOf(3));
+
+        var result = CuttingPlanService.Plan(snapshot);
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.Equal(new[] { coupon, other }, result.ProposedOrder.Take(2).Select(o => o.SourcePart).OrderBy(plate.Parts.IndexOf));
+
+        var preserved = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(-1, 1),
+            confirmedParameters: parameters, preservePartOrder: true));
+        Assert.Equal(CuttingPlanStatus.ConstraintConflict, preserved.Status);
+        Assert.Contains("cut-first part", preserved.Findings[0].Message);
+    }
+
+    [Fact]
+    public void Plan_PartInsideACutFirstHostCutout_StillPrecedesTheHost()
+    {
+        var (plate, host, inner) = NestedPlate(Rectangle(2.7, 2.7, 0.6, 0.6));
+        host.BaseDrawing.CutFirst = true;
+        var outside = Rectangle(20, 0, 2, 2);
+        plate.Parts.Add(outside);
+        var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate));
+        Assert.Equal(new[] { 1 }, snapshot.Dependencies.PrerequisitesOf(0));
+        Assert.Empty(snapshot.Dependencies.PrerequisitesOf(1));
+        Assert.Equal(new[] { 0 }, snapshot.Dependencies.PrerequisitesOf(2));
+
+        var result = CuttingPlanService.Plan(snapshot);
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.Equal(new[] { inner, host, outside }, result.ProposedOrder.Select(o => o.SourcePart));
+    }
+
     [Fact]
     public void Dependencies_NonmaterialMotionsCannotHideANestedPart()
     {

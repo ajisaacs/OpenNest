@@ -128,7 +128,8 @@ public static class CuttingPlanService
                 var captured = material;
                 // Fixed-route material is captured only for a pair whose bounds admit containment.
                 nodes.Add(new(false, null, source.BoundingBox, cleanBounds,
-                    () => captured ?? LeadMaterialSnapshot.Capture(ownedClean, location, token)));
+                    () => captured ?? LeadMaterialSnapshot.Capture(ownedClean, location, token),
+                    cutFirst: source.BaseDrawing.CutFirst));
                 placements.Add(new(source, index, source.Location, source.Rotation, source.LeadInsLocked,
                     execution, ownedProgram, prepared, material));
             }
@@ -417,7 +418,9 @@ public static class CuttingPlanService
             return new(part.SourceOrdinal, part.SourcePart, prerequisite.SourceOrdinal, prerequisite.SourcePart, null,
                 $"{subject} cuts the sheet-separating cutoff (part {part.SourceOrdinal + 1}) before part "
                 + $"{prerequisite.SourceOrdinal + 1}; every part and other cutoff must be cut before the sheet is separated.");
-        var reason = prerequisite.IsCutOff ? "the cutoff crossing it" : "the part nested in its cutout";
+        var reason = prerequisite.IsCutOff ? "the cutoff crossing it"
+            : prerequisite.SourcePart.BaseDrawing.CutFirst && !part.SourcePart.BaseDrawing.CutFirst
+                ? "the cut-first part" : "the part nested in its cutout";
         return new(part.SourceOrdinal, part.SourcePart, prerequisite.SourceOrdinal, prerequisite.SourcePart, null,
             $"{subject} cuts part {part.SourceOrdinal + 1} before {reason} (part {prerequisite.SourceOrdinal + 1}).");
     }

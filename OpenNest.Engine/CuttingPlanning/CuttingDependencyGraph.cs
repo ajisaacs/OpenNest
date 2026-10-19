@@ -11,7 +11,8 @@ namespace OpenNest.Engine.CuttingPlanning;
 /// <summary>
 /// Whole-part cutting prerequisites for one captured plate. A cutoff precedes every part its
 /// nominal span crosses (an orphaned cutoff, whose definition is missing, precedes every part),
-/// and a part proven to lie inside a cutout of another part precedes that host. Built on the
+/// a part proven to lie inside a cutout of another part precedes that host, and a cut-first part
+/// precedes every other part that need not precede it. Built on the
 /// caller thread from owned values; ambiguous containment refuses instead of guessing from bounds.
 /// </summary>
 internal sealed class CuttingDependencyGraph
@@ -126,11 +127,37 @@ internal sealed class CuttingDependencyGraph
                     }
                 }
             }
+        // Cut-first parts (test coupons) precede every other part, except one that must already
+        // precede the coupon (nested in its cutout): containment wins over the preference.
+        for (var first = 0; first < nodes.Count; first++)
+        {
+            if (!nodes[first].CutFirst)
+                continue;
+            var before = Ancestors(edges, first);
+            for (var part = 0; part < nodes.Count; part++)
+                if (!nodes[part].IsCutOff && !nodes[part].CutFirst && !before.Contains(part))
+                    edges[part].Add(first);
+        }
         var graph = new CuttingDependencyGraph(edges.Select(e => e.ToArray()).ToArray());
         if (graph.FindCycle() is { } cyclic)
             throw new CuttingDependencyException(CuttingPlanStatus.ConstraintConflict, cyclic, null,
                 $"Part {cyclic + 1} is on a cutting dependency cycle.");
         return graph;
+    }
+
+    // Every ordinal that must come before the given one, directly or transitively.
+    private static HashSet<int> Ancestors(IReadOnlyList<SortedSet<int>> edges, int ordinal)
+    {
+        var found = new HashSet<int>();
+        var pending = new Stack<int>(edges[ordinal]);
+        while (pending.Count != 0)
+        {
+            var next = pending.Pop();
+            if (found.Add(next))
+                foreach (var prerequisite in edges[next])
+                    pending.Push(prerequisite);
+        }
+        return found;
     }
 
     /// <summary>
@@ -178,9 +205,10 @@ internal sealed class DependencyNode
     private LeadMaterialSnapshot material;
 
     internal DependencyNode(bool isCutOff, CutOffDefinition cutOff, Box placedBounds, Box cleanBounds,
-        Func<LeadMaterialSnapshot> materialFactory, bool separatesSheet = false)
+        Func<LeadMaterialSnapshot> materialFactory, bool separatesSheet = false, bool cutFirst = false)
     {
         IsCutOff = isCutOff;
+        CutFirst = !isCutOff && cutFirst;
         SeparatesSheet = isCutOff && separatesSheet;
         CutOff = cutOff;
         PlacedBounds = Copy(placedBounds);
@@ -192,6 +220,8 @@ internal sealed class DependencyNode
     internal bool IsCutOff { get; }
     /// <summary>A cutoff whose placed program is one continuous cut across the whole sheet.</summary>
     internal bool SeparatesSheet { get; }
+    /// <summary>A part whose drawing asks to be cut before the plate's other parts.</summary>
+    internal bool CutFirst { get; }
     internal CutOffDefinition CutOff { get; }
     internal Box PlacedBounds { get; }
     internal Box CleanBounds { get; }
