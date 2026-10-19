@@ -32,15 +32,20 @@ A generated file contains, in order:
 3. **Sheet sub-programs** (`CincinnatiSheetWriter.Write`), one per unique plate
    layout. A sheet sub-program contains the cutting sequence for a whole
    plate, either with features inlined or with `M98` calls into part
-   sub-programs.
+   sub-programs. Parts, cut-offs included, post in plate order, which is the
+   cut sequence set by manual, cut-first or automatic sequencing; the post
+   never reorders them.
 
 4. **Part sub-programs** (`CincinnatiPartSubprogramWriter.Write`), one per
    unique `(drawing, rotation)` pair, only emitted when
    `Config.UsePartSubprograms` is enabled.
 
 5. **Hole sub-programs** (`CincinnatiPartSubprogramWriter.Write` reused with a
-   `"HOLE"` label), one per unique hole geometry keyed by radius and lead-in
-   normal angle.
+   `"HOLE"` label), one per unique posted hole toolpath. Calls are matched to
+   sub-programs by their program reference, never by call id: lead-in planning
+   numbers holes 1, 2, ... within each drawing, so ids collide across drawings.
+   Hole programs are stored incremental; the post writes absolute-mode copies
+   (everything posts under `G90`) and leaves the nest's programs unchanged.
 
 Sub-program bodies start with a `:<subNum>` label and end with `M99`.
 
@@ -110,10 +115,17 @@ feature's end to that pierce.
 
 ```
 G52 X<hole.x> Y<hole.y>       ; shift local origin to hole center (§1.52)
+( PART: <name> )              ; only when the hole is the part's first feature
 M98 P<holeSubNum>             ; call the shared hole sub-program (§3.98)
 G52 X0 Y0                     ; restore the original coordinate system (§1.52)
 M47                           ; head raise unless this is the last feature (§3.47)
 ```
+
+`<hole>` is the hole center in the calling program's frame: the part location
+plus the call offset in a sheet sub-program, or the call offset alone inside a
+part sub-program (whose frame is already the part's). A part that opens with a
+hole call takes its safety head raise on that call's `M47`, as an ordinary
+first feature would.
 
 G52 specifies the new origin in the current work coordinate system and — per
 §1.52 — "does not move the cutting nozzle". The hole sub-program is written

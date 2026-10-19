@@ -118,6 +118,7 @@ namespace OpenNest.Posts.Cincinnati
             var holeStartNumber = Config.PartSubprogramStart + (subprogramEntries?.Count ?? 0);
             var (holeMapping, holeEntries) = CincinnatiPartSubprogramWriter.BuildHoleRegistry(
                 plates,
+                subprogramEntries?.Select(e => e.program),
                 holeStartNumber
             );
 
@@ -216,9 +217,9 @@ namespace OpenNest.Posts.Cincinnati
                         )
                         : 100.0;
 
+                // Entries are absolute-mode copies with a leading rapid already ensured.
                 foreach (var (subNum, pgm) in holeEntries)
                 {
-                    CincinnatiPartSubprogramWriter.EnsureLeadingRapid(pgm);
                     holeSubWriter.Write(
                         writer,
                         pgm,

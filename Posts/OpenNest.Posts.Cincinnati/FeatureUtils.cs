@@ -83,27 +83,39 @@ public static class FeatureUtils
     public static List<(List<ICode> codes, bool isEtch)> SplitAndClassify(Part part)
     {
         part.Program.Mode = Mode.Absolute;
-        var codes = part.Program.Codes;
-
-        // If no leading rapid, the first contour segment would be lost because
-        // the feature writer pierces at the first motion endpoint. Insert a
-        // synthetic rapid at the contour's return point to preserve closure.
-        if (codes.Count > 0 && codes[0] is not RapidMove)
-        {
-            for (var i = codes.Count - 1; i >= 0; i--)
-            {
-                if (codes[i] is Motion lastMotion)
-                {
-                    var withRapid = new List<ICode>(codes.Count + 1);
-                    withRapid.Add(new RapidMove(lastMotion.EndPoint));
-                    withRapid.AddRange(codes);
-                    codes = withRapid;
-                    break;
-                }
-            }
-        }
+        var codes = new List<ICode>(part.Program.Codes);
+        InsertLeadingRapid(codes);
 
         return ClassifyAndOrder(SplitByRapids(codes));
+    }
+
+    /// <summary>
+    /// If the first contour motion has no rapid before it, the feature writer would
+    /// pierce at that motion's endpoint and lose the first segment. Inserts a synthetic
+    /// rapid at the contour's return point (the last motion endpoint) just before it.
+    /// Hole calls ahead of it are self-contained features and stay in place: a program
+    /// that opens with a hole call followed by a rapid needs no synthetic rapid, which
+    /// would otherwise post an empty pierce.
+    /// </summary>
+    public static void InsertLeadingRapid(List<ICode> codes)
+    {
+        var firstMotion = codes.FindIndex(code => code is Motion);
+        if (firstMotion < 0 || codes[firstMotion] is RapidMove)
+            return;
+
+        var lastMotion = (Motion)codes.FindLast(code => code is Motion);
+        codes.Insert(firstMotion, new RapidMove(lastMotion.EndPoint));
+    }
+
+    /// <summary>
+    /// Returns an absolute-mode copy of <paramref name="program"/>, leaving the
+    /// caller's program (and its mode) untouched.
+    /// </summary>
+    public static Program ToAbsoluteCopy(Program program)
+    {
+        var copy = (Program)program.Clone();
+        copy.Mode = Mode.Absolute;
+        return copy;
     }
 
     /// <summary>

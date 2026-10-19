@@ -22,11 +22,8 @@ public class HoleCallOutputCharacterizationTests
 
         write(output, program);
 
-        var body = Lines(
-            lineNumbers ? "N73 G52 X-12.35 Y6.79" : "G52 X-12.35 Y6.79",
-            "M98 P7",
-            "G52 X0 Y0"
-        );
+        var body = FirstHole(route, lineNumbers ? "N73 G52 X-12.35 Y6.79" : "G52 X-12.35 Y6.79")
+            + Lines("M98 P7", "G52 X0 Y0");
         Assert.Equal(WrapOutput(route, body), output.ToString());
     }
 
@@ -37,15 +34,12 @@ public class HoleCallOutputCharacterizationTests
     [InlineData("inline-sheet", false)]
     [InlineData("grouped-sheet", true)]
     [InlineData("grouped-sheet", false)]
-    public void MultipleHoles_LiveMap_FirstAndLaterIndices_HaveExactOutput(string route, bool lineNumbers)
+    public void MultipleHoles_MappedAndUnmapped_FirstAndLaterIndices_HaveExactOutput(string route, bool lineNumbers)
     {
         var config = CreateConfig(lineNumbers);
         config.InteriorM47 = M47Mode.None;
-        var mapping = new Dictionary<int, int> { [7] = 900 };
-        var write = CreateWriter(route, config, mapping);
-        // The caller-owned map is consulted when writing, not copied at construction.
-        mapping[7] = 901;
-        mapping[9] = 0;
+        // Hole 8 is unmapped and falls back to its call id.
+        var write = CreateWriter(route, config, new Dictionary<int, int> { [7] = 901, [9] = 0 });
         var program = CreateProgram(
             CreateCall(7, -12.34567, 6.78901),
             CreateCall(8, 0.00499, -0.006),
@@ -55,8 +49,7 @@ public class HoleCallOutputCharacterizationTests
 
         write(output, program);
 
-        var body = Lines(
-            lineNumbers ? "N73 G52 X-12.35 Y6.79" : "G52 X-12.35 Y6.79",
+        var body = FirstHole(route, lineNumbers ? "N73 G52 X-12.35 Y6.79" : "G52 X-12.35 Y6.79") + Lines(
             "M98 P901",
             "G52 X0 Y0",
             "M47",
@@ -134,14 +127,14 @@ public class HoleCallOutputCharacterizationTests
         write(first, program);
 
         Assert.Equal(
-            WrapOutput(route, Lines("N87 G52 X-12.35 Y6.79", "M98 P7", "G52 X0 Y0")),
+            WrapOutput(route, FirstHole(route, "N87 G52 X-12.35 Y6.79") + Lines("M98 P7", "G52 X0 Y0")),
             first.ToString()
         );
         config.UseLineNumbers = false;
         using var second = new StringWriter { NewLine = "\n" };
         write(second, program);
         Assert.Equal(
-            WrapOutput(route, Lines("G52 X-12.35 Y6.79", "M98 P7", "G52 X0 Y0")),
+            WrapOutput(route, FirstHole(route, "G52 X-12.35 Y6.79") + Lines("M98 P7", "G52 X0 Y0")),
             second.ToString()
         );
     }
@@ -159,7 +152,7 @@ public class HoleCallOutputCharacterizationTests
         var error = Assert.Throws<IOException>(() => write(output, program));
 
         Assert.Same(output.Failure, error);
-        Assert.Equal(Header(route) + Lines("N73 G52 X-12.35 Y6.79"), output.ToString());
+        Assert.Equal(Header(route) + FirstHole(route, "N73 G52 X-12.35 Y6.79"), output.ToString());
     }
 
     private static CincinnatiPostConfig CreateConfig(bool lineNumbers) => new()
@@ -173,24 +166,51 @@ public class HoleCallOutputCharacterizationTests
         UseAntiDive = false,
     };
 
+    /// <param name="mapping">
+    /// Posted sub-program numbers by call id, resolved at write time to the hole programs
+    /// the writer actually sees (a part owns copies of its drawing's hole programs).
+    /// Writers are still constructed here, so construction-time settings stay fixed.
+    /// </param>
     private static Action<TextWriter, Program> CreateWriter(
         string route,
         CincinnatiPostConfig config,
         Dictionary<int, int>? mapping
     )
     {
-        if (route == "part")
+        var byProgram = mapping == null
+            ? null
+            : new Dictionary<Program, int>(ReferenceEqualityComparer.Instance);
+
+        void Resolve(Program owner)
         {
-            var writer = new CincinnatiPartSubprogramWriter(config, mapping);
-            return (output, program) => writer.Write(output, program, "Sample", 201, "", "", 10);
+            if (byProgram == null)
+                return;
+            byProgram.Clear();
+            foreach (var call in owner.Codes.OfType<SubProgramCall>())
+            {
+                if (mapping!.TryGetValue(call.Id, out var number))
+                    byProgram[call.Program] = number;
+            }
         }
 
-        var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager(), mapping);
+        if (route == "part")
+        {
+            var writer = new CincinnatiPartSubprogramWriter(config, byProgram);
+            return (output, program) =>
+            {
+                Resolve(program);
+                writer.Write(output, program, "Sample", 201, "", "", 10);
+            };
+        }
+
+        var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager(), byProgram);
         Dictionary<(int, long), int>? partMapping = route == "grouped-sheet" ? new() : null;
         return (output, program) =>
         {
             var plate = new Plate(48, 96);
-            plate.Parts.Add(new Part(new Drawing("Sample", program)));
+            var part = new Part(new Drawing("Sample", program));
+            plate.Parts.Add(part);
+            Resolve(part.Program);
             sheetWriter.Write(output, plate, "Nest", 1, 101, "", "", partMapping);
         };
     }
@@ -240,6 +260,10 @@ public class HoleCallOutputCharacterizationTests
             "GOTO1( Goto Feature )"
         );
     }
+
+    // A sheet part that opens with a hole call names the part after the call's G52 line.
+    private static string FirstHole(string route, string g52Line) =>
+        route == "part" ? Lines(g52Line) : Lines(g52Line, "( PART: Sample )");
 
     private static string Lines(params string[] lines) => string.Join("\n", lines) + "\n";
 

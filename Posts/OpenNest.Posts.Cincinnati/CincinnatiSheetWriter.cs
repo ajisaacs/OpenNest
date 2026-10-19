@@ -17,12 +17,12 @@ public sealed class CincinnatiSheetWriter
     private readonly ProgramVariableManager _vars;
     private readonly CoordinateFormatter _fmt;
     private readonly CincinnatiFeatureWriter _featureWriter;
-    private readonly Dictionary<int, int> _holeSubprograms;
+    private readonly IReadOnlyDictionary<Program, int> _holeSubprograms;
 
     public CincinnatiSheetWriter(
         CincinnatiPostConfig config,
         ProgramVariableManager vars,
-        Dictionary<int, int> holeSubprograms = null
+        IReadOnlyDictionary<Program, int> holeSubprograms = null
     )
     {
         _config = config;
@@ -89,16 +89,9 @@ public sealed class CincinnatiSheetWriter
             w.WriteLine($"G89 P{cutLibrary}");
         w.WriteLine("GOTO1( Goto Feature )");
 
-        // 3. Order parts: non-cutoff sorted by Bottom then Left, cutoffs last
-        var nonCutoffParts = plate
-            .Parts.Where(p => !p.BaseDrawing.IsCutOff)
-            .OrderBy(p => p.Bottom)
-            .ThenBy(p => p.Left)
-            .ToList();
-
-        var cutoffParts = plate.Parts.Where(p => p.BaseDrawing.IsCutOff).ToList();
-
-        var allParts = nonCutoffParts.Concat(cutoffParts).ToList();
+        // 3. Plate order is the cut sequence, cut-offs included: manual, cut-first
+        //    and automatic sequencing all set it, so the post must not reorder.
+        var allParts = plate.Parts.ToList();
 
         // 4. Emit parts
         if (partSubprograms != null)
@@ -185,7 +178,16 @@ public sealed class CincinnatiSheetWriter
                     if (codes.Count == 1 && codes[0] is SubProgramCall holeCall)
                     {
                         CincinnatiHoleCallWriter.Write(
-                            w, holeCall, featureIndex, isLastFeature, _config, _fmt, _holeSubprograms
+                            w,
+                            holeCall,
+                            part.Location,
+                            featureIndex,
+                            isLastFeature,
+                            _config,
+                            _fmt,
+                            _holeSubprograms,
+                            isNewPart && f == 0 ? partName : null,
+                            isSafetyHeadraise && f == 0
                         );
                         featureIndex++;
                         lastPartName = partName;
@@ -304,7 +306,16 @@ public sealed class CincinnatiSheetWriter
             if (codes.Count == 1 && codes[0] is SubProgramCall holeCall)
             {
                 CincinnatiHoleCallWriter.Write(
-                    w, holeCall, i, isLastFeature, _config, _fmt, _holeSubprograms
+                    w,
+                    holeCall,
+                    part.Location,
+                    i,
+                    isLastFeature,
+                    _config,
+                    _fmt,
+                    _holeSubprograms,
+                    isFirstFeatureOfPart ? partName : null,
+                    isSafetyHeadraise
                 );
                 lastPartName = partName;
                 continue;

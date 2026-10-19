@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using OpenNest.CNC;
@@ -17,11 +18,11 @@ public sealed class CincinnatiPartSubprogramWriter
     private readonly CincinnatiPostConfig _config;
     private readonly CincinnatiFeatureWriter _featureWriter;
     private readonly CoordinateFormatter _fmt;
-    private readonly Dictionary<int, int> _holeSubprograms;
+    private readonly IReadOnlyDictionary<Program, int> _holeSubprograms;
 
     public CincinnatiPartSubprogramWriter(
         CincinnatiPostConfig config,
-        Dictionary<int, int> holeSubprograms = null
+        IReadOnlyDictionary<Program, int> holeSubprograms = null
     )
     {
         _config = config;
@@ -32,7 +33,7 @@ public sealed class CincinnatiPartSubprogramWriter
 
     /// <summary>
     /// Writes a complete part sub-program for the given normalized program.
-    /// The program coordinates must already be normalized to origin (0,0).
+    /// The program must be in absolute mode with coordinates normalized to origin (0,0).
     /// </summary>
     public void Write(
         TextWriter w,
@@ -64,7 +65,7 @@ public sealed class CincinnatiPartSubprogramWriter
             if (codes.Count == 1 && codes[0] is SubProgramCall holeCall)
             {
                 CincinnatiHoleCallWriter.Write(
-                    w, holeCall, i, isLastFeature, _config, _fmt, _holeSubprograms
+                    w, holeCall, Vector.Zero, i, isLastFeature, _config, _fmt, _holeSubprograms
                 );
                 continue;
             }
@@ -98,20 +99,7 @@ public sealed class CincinnatiPartSubprogramWriter
     /// last motion endpoint (the contour return point). This ensures the feature
     /// writer knows the true pierce location and preserves the first contour segment.
     /// </summary>
-    internal static void EnsureLeadingRapid(Program pgm)
-    {
-        if (pgm.Codes.Count == 0 || pgm.Codes[0] is RapidMove)
-            return;
-
-        for (var i = pgm.Codes.Count - 1; i >= 0; i--)
-        {
-            if (pgm.Codes[i] is Motion lastMotion)
-            {
-                pgm.Codes.Insert(0, new RapidMove(lastMotion.EndPoint));
-                return;
-            }
-        }
-    }
+    internal static void EnsureLeadingRapid(Program pgm) => FeatureUtils.InsertLeadingRapid(pgm.Codes);
 
     /// <summary>
     /// Creates a sub-program key for matching parts to their sub-programs.
@@ -165,46 +153,63 @@ public sealed class CincinnatiPartSubprogramWriter
     }
 
     /// <summary>
-    /// Scans all parts across all plates and builds a nest-level registry of unique
-    /// hole sub-programs. Deduplicates by comparing sub-program code content.
+    /// Builds a nest-level registry of unique hole sub-programs from every hole call in
+    /// the plates' parts and in the part sub-program copies. Calls are keyed by their
+    /// program reference, because hole call ids are only unique within one drawing's
+    /// program; identical hole geometry shares one sub-program. Entries are absolute-mode
+    /// copies, so the caller's (incremental) hole programs are never modified.
     /// </summary>
     internal static (
-        Dictionary<int, int> modelToPostMapping,
+        Dictionary<Program, int> mapping,
         List<(int subNum, Program program)> entries
-    ) BuildHoleRegistry(IEnumerable<Plate> plates, int startNumber)
+    ) BuildHoleRegistry(
+        IEnumerable<Plate> plates,
+        IEnumerable<Program> partSubprograms,
+        int startNumber
+    )
     {
-        var mapping = new Dictionary<int, int>();
+        var mapping = new Dictionary<Program, int>(ReferenceEqualityComparer.Instance);
         var entries = new List<(int, Program)>();
         var contentIndex = new Dictionary<string, int>();
         var nextSubNum = startNumber;
+
+        void Register(Program owner)
+        {
+            foreach (var code in owner.Codes)
+            {
+                if (code is not SubProgramCall { Program: not null } call)
+                    continue;
+                if (mapping.ContainsKey(call.Program))
+                    continue;
+
+                var absolute = FeatureUtils.ToAbsoluteCopy(call.Program);
+                EnsureLeadingRapid(absolute);
+
+                var canonical = ProgramToCanonical(absolute);
+                if (!contentIndex.TryGetValue(canonical, out var subNum))
+                {
+                    subNum = nextSubNum++;
+                    contentIndex[canonical] = subNum;
+                    entries.Add((subNum, absolute));
+                }
+
+                mapping[call.Program] = subNum;
+            }
+        }
 
         foreach (var plate in plates)
         {
             foreach (var part in plate.Parts)
             {
-                if (part.BaseDrawing.IsCutOff)
-                    continue;
-                foreach (var code in part.Program.Codes)
-                {
-                    if (code is not SubProgramCall call)
-                        continue;
-                    if (mapping.ContainsKey(call.Id))
-                        continue;
-
-                    var canonical = ProgramToCanonical(call.Program);
-                    if (contentIndex.TryGetValue(canonical, out var existingNum))
-                    {
-                        mapping[call.Id] = existingNum;
-                    }
-                    else
-                    {
-                        var subNum = nextSubNum++;
-                        mapping[call.Id] = subNum;
-                        contentIndex[canonical] = subNum;
-                        entries.Add((subNum, call.Program));
-                    }
-                }
+                if (!part.BaseDrawing.IsCutOff)
+                    Register(part.Program);
             }
+        }
+
+        if (partSubprograms != null)
+        {
+            foreach (var program in partSubprograms)
+                Register(program);
         }
 
         return (mapping, entries);
@@ -213,17 +218,20 @@ public sealed class CincinnatiPartSubprogramWriter
     private static string ProgramToCanonical(Program pgm)
     {
         var sb = new StringBuilder();
-        sb.Append(pgm.Mode == Mode.Absolute ? "A" : "I");
         foreach (var code in pgm.Codes)
         {
             if (code is LinearMove lm)
-                sb.Append($"L{lm.EndPoint.X:F6},{lm.EndPoint.Y:F6},{(int)lm.Layer}");
+                sb.Append(
+                    CultureInfo.InvariantCulture,
+                    $"L{lm.EndPoint.X:F6},{lm.EndPoint.Y:F6},{(int)lm.Layer}"
+                );
             else if (code is ArcMove am)
                 sb.Append(
+                    CultureInfo.InvariantCulture,
                     $"A{am.EndPoint.X:F6},{am.EndPoint.Y:F6},{am.CenterPoint.X:F6},{am.CenterPoint.Y:F6},{(int)am.Rotation},{(int)am.Layer}"
                 );
             else if (code is RapidMove rm)
-                sb.Append($"R{rm.EndPoint.X:F6},{rm.EndPoint.Y:F6}");
+                sb.Append(CultureInfo.InvariantCulture, $"R{rm.EndPoint.X:F6},{rm.EndPoint.Y:F6}");
         }
         return sb.ToString();
     }
