@@ -60,7 +60,13 @@ internal static class JointCuttingPlanSearch
                 .Select(i => new HashSet<int>(snapshot.Dependencies.PrerequisitesOf(i))).ToArray();
 
             var nesting = NestedOrder(snapshot, centres, prerequisites, token);
-            var sequence = CuttingNestedOrder.Plan(Enumerable.Range(0, count).ToArray(), snapshot.StartPoint, nesting);
+            // A large aligned grid with no required order is toured row by row; anything else,
+            // and every replan after a learned rule, gets the general order.
+            var extents = snapshot.Placements.Select(CutExtent).ToArray();
+            var sequence = (prerequisites.All(p => p.Count == 0) && extents.All(e => e != null)
+                    && !snapshot.Placements.Any(p => p.IsCutOff)
+                    ? CuttingGridOrder.Plan(extents, snapshot.StartPoint, token) : null)
+                ?? CuttingNestedOrder.Plan(Enumerable.Range(0, count).ToArray(), snapshot.StartPoint, nesting);
             Node resume = null;
             while (true)
             {
@@ -167,12 +173,16 @@ internal static class JointCuttingPlanSearch
     }
 
     // The centre of the part's placed cut material, for ordering only.
-    private static Vector Centre(FixedProgramPlacement placement)
+    private static Vector Centre(FixedProgramPlacement placement) =>
+        CutExtent(placement)?.Center ?? placement.Execution.DeparturePoint;
+
+    // The extent of the part's placed cut material, or null when it has none.
+    private static Box CutExtent(FixedProgramPlacement placement)
     {
         var cuts = placement.Execution.Motions
             .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display && m.Curve != null)
             .Select(m => m.Curve.ToEntity().BoundingBox).ToList();
-        return cuts.Count == 0 ? placement.Execution.DeparturePoint : cuts.GetBoundingBox().Center;
+        return cuts.Count == 0 ? null : cuts.GetBoundingBox();
     }
 
     internal static CuttingPlanFinding Finding(FixedProgramPlacement source, PostVerificationKind? kind, string message) =>

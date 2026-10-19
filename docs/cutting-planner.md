@@ -176,7 +176,14 @@ the run. Host groups follow the parts beside them, because a finished host is a 
 obstacle that can only be left across its own outside edge. Learned rules win over
 both: a rule between parts of two groups orders the groups, and rules that cannot
 keep a group whole fall back to the plain tour. Plates without nested parts get the
-plain tour unchanged. If a part on that order cannot be
+plain tour unchanged, except a large grid: a plate of at least 200 parts with no
+cutoffs or prerequisites, whose part centres bin into rows by Y and columns by X
+within a quarter of the smallest part extent (every gap between neighbouring bins
+wider than that, no two parts in one cell, at least a quarter of the cells filled,
+as interleaved rows fill half), is toured as a serpentine: line by line, alternating
+direction, along whichever axis and from whichever corner gives the shortest route
+from the start point. Its 2-opt and Or-opt passes would grow with the square of the
+part count. Replans after a learned rule use the plain tour. If a part on that order cannot be
 reached without crossing parts already cut, the search learns "cut this part
 before those", backs up to just before the earliest of them and re-plans the rest
 from the tool position there; parts cut before that point are kept. The first pass
