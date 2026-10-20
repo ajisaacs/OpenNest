@@ -20,6 +20,11 @@ namespace OpenNest.Tests.CincinnatiCIFiber;
 /// 12992-4SS nest (same part + layout as the sample NC) and compares contour
 /// counts, macro counts and perimeter geometry with 12992-4SS_NEST.nc.
 ///
+/// Each placed part in the fixture carries the sample's own pierce, lead-in
+/// and cut moves as its saved cutting program (not locked). Posting those
+/// saved programs must reproduce the sample move for move; the other tests
+/// replace them with OpenNest's own lead-ins first.
+///
 /// The fixture lives outside the repository (/srv/shared). Configure it in
 /// OpenNest.Tests/test-config.json:
 ///   { "CIFiberSampleNcPath": "/srv/shared/.../12992-4SS_NEST.nc",
@@ -48,10 +53,11 @@ public class CIFiberSampleRegressionTests
         var plate = nest.Plates[0];
         plate.CuttingParameters = new CuttingParameters
         {
-            // The sample cuts clean holes with a short perpendicular linear
-            // lead (pierce ~0.079 outside the contour), including the circles
-            // (ArcCircleLeadIn). TF5200 13.2.4.1 requires a LINEAR first
-            // motion block after G41/G42, so holes must have linear leads.
+            // OpenNest's own short perpendicular linear leads, including the
+            // circles (ArcCircleLeadIn). TF5200 13.2.4.1 requires a LINEAR
+            // first motion block after G41/G42, so holes must have linear
+            // leads. (The sample itself pierces holes at their centre and
+            // uses 0.125 in perimeter leads; see the saved-lead-in test.)
             InternalLeadIn = new LineLeadIn { Length = 0.075, ApproachAngle = 90 },
             ExternalLeadIn = new LineLeadIn { Length = 0.075, ApproachAngle = 90 },
             ArcCircleLeadIn = new LineLeadIn { Length = 0.075, ApproachAngle = 90 },
@@ -94,6 +100,49 @@ public class CIFiberSampleRegressionTests
             );
         }
         return result;
+    }
+
+    /// <summary>
+    /// The program body from the restart label through the last part: every
+    /// line except the per-part source-path comment, which names the
+    /// original CAM part file.
+    /// </summary>
+    private static List<string> ProgramBody(string nc)
+    {
+        var lines = nc.Replace("\r\n", "\n").Split('\n').ToList();
+        var start = lines.IndexOf("N0:");
+        var end = lines.LastIndexOf("( PART END )");
+        Assert.True(start >= 0 && end > start, "No N0: ... ( PART END ) body found");
+        return lines
+            .Skip(start)
+            .Take(end - start + 1)
+            .Where(line => !line.StartsWith("( PART:", StringComparison.Ordinal))
+            .ToList();
+    }
+
+    [SkippableFact]
+    public void Post_ReconstructedNest_SavedSampleLeadIns_ReproduceSampleProgram()
+    {
+        var fixture = ResolveFixture();
+        Skip.If(fixture == null, "CI Fiber fixtures not configured in test-config.json");
+
+        // Post the saved programs as they are: no lead-in assignment.
+        var reader = new NestReader(fixture.Value.Nest);
+        var nest = reader.Read();
+        Assert.Empty(reader.Warnings);
+        Assert.All(nest.Plates.SelectMany(plate => plate.Parts), part => Assert.True(part.HasManualLeadIns));
+
+        var expected = ProgramBody(File.ReadAllText(fixture.Value.Nc));
+        var actual = ProgramBody(PostNest(nest));
+
+        // Pierce points, L2/L4 macro, G41/G42 side, lead-ins and every cut
+        // move line up with the machine program exactly.
+        Assert.Equal(expected.Count, actual.Count);
+        for (var i = 0; i < expected.Count; i++)
+            Assert.True(
+                expected[i] == actual[i],
+                $"Line {i} after N0: differs: sample '{expected[i]}', posted '{actual[i]}'"
+            );
     }
 
     [SkippableFact]
