@@ -30,6 +30,13 @@ namespace OpenNest.IO
         /// </summary>
         public IBestFitStore BestFitStore { get; init; }
 
+        /// <summary>
+        /// Writes the nest's own <see cref="Nest.DateLastModified"/> instead of stamping the save
+        /// time. For converters and importers carrying another system's date; an ordinary save
+        /// leaves this false so the file records when it was saved.
+        /// </summary>
+        public bool PreserveDateLastModified { get; init; }
+
         public NestWriter(Nest nest)
         {
             this.drawingDict = new Dictionary<int, Drawing>();
@@ -44,7 +51,8 @@ namespace OpenNest.IO
 
         public bool Write(Stream stream)
         {
-            nest.DateLastModified = DateTime.Now;
+            if (!PreserveDateLastModified)
+                nest.DateLastModified = DateTime.Now;
             SetDrawingIds();
 
             using var zipArchive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
