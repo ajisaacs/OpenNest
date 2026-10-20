@@ -519,16 +519,33 @@ namespace OpenNest.Geometry
             get { return EntityType.Polygon; }
         }
 
+        /// <summary>
+        /// Drops each vertex equal to the one before it in the original sequence. Compacts in
+        /// place in one pass: removing duplicates one at a time from the middle of the list was
+        /// O(duplicates x vertices), which dominated loading large drawings whose arcs are
+        /// flattened to many points.
+        /// </summary>
         internal void Cleanup()
         {
-            for (int i = Vertices.Count - 1; i > 0; i--)
+            if (Vertices.Count < 2)
+                return;
+
+            // Compare against the original predecessor, not the last kept vertex, so a run of
+            // tolerance-equal points collapses exactly as the old back-to-front RemoveAt loop did.
+            var previous = Vertices[0];
+            var kept = 1;
+
+            for (int i = 1; i < Vertices.Count; i++)
             {
                 var vertex = Vertices[i];
-                var nextVertex = Vertices[i - 1];
 
-                if (vertex == nextVertex)
-                    Vertices.RemoveAt(i);
+                if (vertex != previous)
+                    Vertices[kept++] = vertex;
+
+                previous = vertex;
             }
+
+            Vertices.RemoveRange(kept, Vertices.Count - kept);
         }
 
         public BoundingRectangleResult FindBestRotation()
