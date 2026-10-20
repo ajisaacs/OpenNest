@@ -29,7 +29,8 @@ namespace OpenNest.Posts.CincinnatiCIFiber
     ///   ... (single-program mode only: /L "L0", pallet change, next sheet)
     ///   ( Part #k ) ( PART:... ) V.E.R4=k
     ///     N&lt;n&gt;: /L "L0" V.E.R3=&lt;n&gt; G0X..Y..
-    ///          /L "L2" + G41 | /L "L4" + G42
+    ///          /L "L2" (hole) | /L "L4" (perimeter), then G41 | G42
+    ///                            (whichever puts the kerf in the scrap)
     ///          G1X..Y..          (linear lead-in)
     ///          /L "L6"           (cut layer on)
     ///          G1/G2/G3 ...
@@ -222,23 +223,22 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                 contours = contours.Where(c => !IsScribeContour(c)).ToList();
 
             var isCutOff = part.BaseDrawing.IsCutOff;
-            foreach (var contour in contours)
+            var perimeter = CIFiberWinding.PerimeterIndex(contours);
+            for (var i = 0; i < contours.Count; i++)
             {
                 contourNumber++;
                 if (isCutOff)
-                    WriteCutOffContour(contour, contourNumber, w);
+                    WriteCutOffContour(contours[i], contourNumber, w);
                 else
-                    WriteContour(contour, contourNumber, w);
+                    WriteContour(contours[i], contours[i].IsExterior || i == perimeter, contourNumber, w);
             }
 
             CIFiberFormatter.Line(w, "( PART END )");
             return contourNumber;
         }
 
-        private void WriteContour(CIFiberContour contour, int contourNumber, TextWriter w)
+        private void WriteContour(CIFiberContour contour, bool isExterior, int contourNumber, TextWriter w)
         {
-            var isExterior = contour.IsExterior || CIFiberWinding.IsExterior(contour);
-
             CIFiberFormatter.Line(w, $"N{contourNumber}:");
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerCancel));
             CIFiberFormatter.Line(w, $"V.E.R3={contourNumber}");
@@ -264,9 +264,12 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                     isExterior ? _config.LayerExteriorLeadin : _config.LayerInteriorLeadin
                 )
             );
+            // G41 leaves the product right of travel, G42 left (Cincinnati CNC
+            // handbook). Pick the side that puts the kerf in the scrap for the
+            // way this contour actually runs.
             CIFiberFormatter.Line(
                 w,
-                isExterior ? "G42" : "G41"
+                CIFiberWinding.CompensatesLeft(contour, isExterior) ? "G41" : "G42"
             );
 
             var prev = contour.LeadIn.EndPoint;

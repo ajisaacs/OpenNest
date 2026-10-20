@@ -6,7 +6,9 @@ manual or a machine-operation guide. For the separate CL-series post, see
 
 Controller reference used during development: Beckhoff *TF5200 | TwinCAT 3 CNC
 Programming manual*, version 1.33, May 19, 2026
-(`TF5200_programming_manual_en.pdf`). Obtain the applicable documentation from
+(`TF5200_programming_manual_en.pdf`), and Cincinnati's *CNC Codes Handbook*
+(Programming Manual, rev 1.0, January 12, 2023) with LaserNST CI FIBER 8K sample
+programs, supplied by Cincinnati on October 19, 2026. Obtain the applicable documentation from
 Beckhoff and Cincinnati. Vendor PDFs and full-text extracts stay outside source
 control; redistribution permission has not been established.
 
@@ -21,9 +23,18 @@ uses the Cincinnati machine-sample convention, not a generic TF5200 laser API:
 - Parts follow plate order. `V.E.R4` identifies the part within its sheet;
   numbered contour labels and `V.E.R3` count up through the program for restart
   lookup (they restart at 1 in each per-sheet program).
-- Each contour: `/L "L0"`, restart number, rapid to pierce, then interior
-  `/L "L2"` with `G41` or exterior `/L "L4"` with `G42`; linear lead-in,
+- Each contour: `/L "L0"`, restart number, rapid to pierce, then `/L "L2"`
+  for a hole or `/L "L4"` for the perimeter, `G41` or `G42`, linear lead-in,
   `/L "L6"`, cutting moves, and `/L "ZHSOFF"`.
+- The perimeter is the part's contour with the largest bounding box, as
+  `ShapeProfile` picks it; the others are holes. Compensation follows the
+  Cincinnati CNC Codes Handbook (rev 1.0, G-codes): `G41` leaves the product
+  right of travel and `G42` leaves it left. The post picks whichever puts the
+  kerf in the scrap for the way each contour runs: imported drawings (perimeter
+  CW, holes CCW) get `G41` throughout, and a contour wound the other way gets
+  `G42`. Cincinnati's LaserNST samples cut both perimeter and holes CCW, so they
+  use `G42` on the perimeter and `G41` on holes, the same kerf sides. Paths that
+  enclose no area count as holes with `G41`.
 - Tail: `/L "L0"`, `L PROGRAMEND.NC`, the pallet-change code (`M50`), `M30`,
   and `%`.
 - Motion endpoints are sheet-absolute XY. Arc `I`/`J` are offsets from the arc
@@ -86,7 +97,8 @@ validated and saved only when OK is pressed.
 ## Verification
 
 [Output-contract tests](../OpenNest.Tests/CincinnatiCIFiber/CIFiberPostProcessorTests.cs)
-cover a square with a hole, coordinate transforms/formatting, lead-in rejection,
+cover a square with a hole, kerf side for either winding, coordinate
+transforms/formatting, lead-in rejection,
 cut-off sequencing and output, table bounds, suppression/scribe handling, and
 multi-sheet output in both modes. Run:
 
