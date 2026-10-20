@@ -262,6 +262,7 @@ namespace OpenNest.Controls
                 return;
 
             using var pen = new Pen(CutOffLineColor, 2.0f) { DashStyle = DashStyle.Dash };
+            using var mutedPen = new Pen(Color.Gray, 2.0f) { DashStyle = DashStyle.Dash };
             using var selectedPen = new Pen(Color.FromArgb(0, 120, 255), 3.5f);
 
             foreach (var cutoff in plate.CutOffs)
@@ -270,7 +271,9 @@ namespace OpenNest.Controls
                 if (program == null || program.Codes.Count == 0)
                     continue;
 
-                var activePen = view.Selection.SelectedCutOffs.Contains(cutoff) ? selectedPen : pen;
+                var activePen = view.Selection.SelectedCutOffs.Contains(cutoff) ? selectedPen
+                    : IsCutOffPending(plate, cutoff) ? mutedPen
+                    : pen;
 
                 for (var i = 0; i < program.Codes.Count - 1; i += 2)
                 {
@@ -283,6 +286,20 @@ namespace OpenNest.Controls
                     }
                 }
             }
+        }
+
+        // The simulator mutes parts the torch has not reached yet; a cut-off line is its
+        // part's cutting path, found by its drawing's reference.
+        private bool IsCutOffPending(Plate plate, CutOff cutoff)
+        {
+            if (!view.CutSimulation.IsActive)
+                return false;
+            for (var i = 0; i < plate.Parts.Count; i++)
+            {
+                if (ReferenceEquals(plate.Parts[i].BaseDrawing, cutoff.Drawing))
+                    return view.CutSimulation.IsPartPending(i);
+            }
+            return false;
         }
 
         /// <summary>
