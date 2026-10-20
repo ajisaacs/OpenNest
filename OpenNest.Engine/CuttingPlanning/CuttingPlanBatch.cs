@@ -460,6 +460,9 @@ public sealed class CuttingPlanProposal
             yield return heading + $"ready. {Count(plate.PartCount, "part")}, {plate.RegeneratedCount} "
                 + $"regenerated, {kept} kept as is; rapid travel "
                 + $"{result.RapidDistance.ToString("0.##", CultureInfo.CurrentCulture)} {unit}. {order}";
+            // A ready plan's findings are advisory notes (support tabs that may not hold a part level).
+            foreach (var line in Limit(result.Findings.Select(DescribeFinding)))
+                yield return line;
             yield break;
         }
 

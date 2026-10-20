@@ -37,8 +37,9 @@ var result = CuttingPlanService.Plan(snapshot, cancellationToken);
 - `preservePartOrder` fixes whole-part order, not eligible internal contour choices.
 - With `CuttingParameters.SupportTabs` and a support bed (`CuttingPlanRequest.SupportBed`,
   the plate's own under `ForPlate`), each regenerated part the bed cannot hold level gets a
-  tabbed perimeter whose automatic entries keep to points where the tab steadies it; see
-  [support tabs](support-tabs.md).
+  tabbed perimeter whose automatic entries keep to points where the tab steadies it. A tab
+  that still cannot hold its part level, or sits in an inside corner, is noted on the plan
+  without changing its status; see [support tabs](support-tabs.md).
 - Parameters are caller-confirmed inputs. The service does not recover missing
   operator settings or silently change lead styles to find a solution.
 

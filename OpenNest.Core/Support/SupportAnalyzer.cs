@@ -14,19 +14,38 @@ namespace OpenNest.Support
     /// most zero. With a <see cref="SupportBed.RegistrationTolerance"/>, the bed is also
     /// checked shifted by that much along each axis and diagonally, keeping the worst margin.
     /// A perimeter tab holds the part at the tab, so a tab point counts as one more contact.
+    /// A tab never sits in an inside corner, where the operator cannot grind its nub flush.
     /// </summary>
     public static class SupportAnalyzer
     {
         /// <summary>Points sampled along the outline, besides its vertices, to find the best tab point.</summary>
         public const int TabSamples = 256;
 
-        public static PartSupport Analyze(SupportBed bed, int quadrant, Part part) =>
-            Analyze(bed, quadrant, SupportMaterial.FromPart(part));
+        /// <summary>
+        /// The least the outline must turn inward, in radians, for an inside corner; a run of
+        /// inward-turning vertices (a chorded fillet) counts as one corner by its whole turn.
+        /// </summary>
+        public const double InsideCornerAngle = System.Math.PI / 6;
 
-        public static PartSupport Analyze(SupportBed bed, int quadrant, SupportMaterial material)
+        /// <summary>How far a tab of size <paramref name="tabSize"/> keeps from an inside corner: its uncut span and as much again.</summary>
+        public static double InsideCornerClearance(double tabSize) => tabSize > 0 ? 2 * tabSize : 0;
+
+        /// <param name="insideCornerClearance">
+        /// How far a tab point keeps from an inside corner; 0 keeps it off the corner only.
+        /// </param>
+        public static PartSupport Analyze(SupportBed bed, int quadrant, Part part, double insideCornerClearance = 0) =>
+            Analyze(bed, quadrant, SupportMaterial.FromPart(part), insideCornerClearance);
+
+        /// <param name="insideCornerClearance">
+        /// How far a tab point keeps from an inside corner; 0 keeps it off the corner only.
+        /// </param>
+        public static PartSupport Analyze(SupportBed bed, int quadrant, SupportMaterial material,
+            double insideCornerClearance = 0)
         {
             ArgumentNullException.ThrowIfNull(bed);
             ArgumentNullException.ThrowIfNull(material);
+            if (!(insideCornerClearance >= 0) || double.IsInfinity(insideCornerClearance))
+                throw new ArgumentOutOfRangeException(nameof(insideCornerClearance));
             if (!material.IsComplete)
                 return new PartSupport(material.Reason);
             if (!material.TryGetCenterOfGravity(out var center, out _))
@@ -38,19 +57,99 @@ namespace OpenNest.Support
             var margin = hulls.Min(hull => Margin(center, hull));
             var contacts = bed.Contacts(material, quadrant, Vector.Zero);
 
+            var corners = InsideCorners(material.Outline);
+            var samples = OutlineSamples(material.Outline)
+                .Select(point => (Point: point, Clear: Clearance(corners, point)))
+                .ToList();
+            // Clear of every inside corner where the outline allows it.
+            var allowed = samples.Where(s => IsClear(s.Clear, insideCornerClearance)).ToList();
+            if (allowed.Count > 0)
+                samples = allowed;
+            var scored = samples.Select(s => (s.Point, s.Clear, Margin: MarginWith(center, hulls, s.Point))).ToList();
+
+            // Equally good points run along a straight edge; of those, the one farthest from an
+            // inside corner, or the first.
+            var bestMargin = scored.Count == 0 ? double.NegativeInfinity : scored.Max(s => s.Margin);
             Vector? best = null;
-            var bestMargin = double.NegativeInfinity;
-            foreach (var point in OutlineSamples(material.Outline))
+            var bestClear = double.NegativeInfinity;
+            foreach (var sample in scored)
             {
-                var withTab = MarginWith(center, hulls, point);
-                if (withTab > bestMargin)
+                if (sample.Margin >= bestMargin - Math.Tolerance.Epsilon && sample.Clear > bestClear)
                 {
-                    best = point;
-                    bestMargin = withTab;
+                    best = sample.Point;
+                    bestClear = sample.Clear;
                 }
             }
 
-            return new PartSupport(center, contacts, margin, bed.StabilityMargin, hulls, best, bestMargin);
+            return new PartSupport(center, contacts, margin, bed.StabilityMargin, hulls, best, bestMargin,
+                corners, insideCornerClearance);
+        }
+
+        // A point `clear` from the nearest inside corner keeps `clearance` from it; with no
+        // clearance it must still not be the corner.
+        internal static bool IsClear(double clear, double clearance) =>
+            clearance > 0 ? clear >= clearance : clear > Math.Tolerance.Epsilon;
+
+        internal static double Clearance(IReadOnlyList<Vector> corners, Vector point)
+        {
+            var clear = double.PositiveInfinity;
+            foreach (var corner in corners)
+                clear = System.Math.Min(clear, corner.DistanceTo(point));
+            return clear;
+        }
+
+        /// <summary>
+        /// The outline vertices that lie in an inside corner: each run of consecutive vertices
+        /// turning inward whose turns add up to at least <see cref="InsideCornerAngle"/>.
+        /// </summary>
+        internal static Vector[] InsideCorners(IReadOnlyList<Vector> outline)
+        {
+            var count = outline.Count;
+            if (count < 3)
+                return Array.Empty<Vector>();
+            var area = 0.0;
+            for (var i = 0; i < count; i++)
+            {
+                var a = outline[i];
+                var b = outline[(i + 1) % count];
+                area += a.X * b.Y - b.X * a.Y;
+            }
+            if (area == 0)
+                return Array.Empty<Vector>();
+
+            // Signed turn at each vertex: negative turns inward, whatever the outline's winding.
+            var turns = new double[count];
+            for (var i = 0; i < count; i++)
+            {
+                var into = outline[i] - outline[(i + count - 1) % count];
+                var outOf = outline[(i + 1) % count] - outline[i];
+                var cross = into.X * outOf.Y - into.Y * outOf.X;
+                var dot = into.X * outOf.X + into.Y * outOf.Y;
+                turns[i] = System.Math.Atan2(cross, dot) * System.Math.Sign(area);
+            }
+
+            // Start after a vertex that does not turn inward so no run is split by the wrap.
+            var start = Array.FindIndex(turns, turn => turn >= 0);
+            if (start < 0)
+                return Array.Empty<Vector>();
+            var corners = new List<Vector>();
+            var run = new List<Vector>();
+            var turned = 0.0;
+            for (var step = 1; step <= count; step++)
+            {
+                var i = (start + step) % count;
+                if (turns[i] < 0)
+                {
+                    run.Add(outline[i]);
+                    turned -= turns[i];
+                    continue;
+                }
+                if (turned >= InsideCornerAngle - Math.Tolerance.Epsilon)
+                    corners.AddRange(run);
+                run.Clear();
+                turned = 0;
+            }
+            return corners.ToArray();
         }
 
         /// <summary>The worst margin of <paramref name="center"/> over every shifted hull, each with <paramref name="tab"/> added.</summary>
@@ -194,7 +293,8 @@ namespace OpenNest.Support
         }
 
         internal PartSupport(Vector centerOfGravity, IReadOnlyList<Vector> contacts, double margin,
-            double requiredMargin, IReadOnlyList<Vector[]> hulls, Vector? bestTabPoint, double bestTabMargin)
+            double requiredMargin, IReadOnlyList<Vector[]> hulls, Vector? bestTabPoint, double bestTabMargin,
+            IReadOnlyList<Vector> insideCorners, double insideCornerClearance)
         {
             CenterOfGravity = centerOfGravity;
             Contacts = contacts;
@@ -203,6 +303,8 @@ namespace OpenNest.Support
             this.hulls = hulls;
             BestTabPoint = bestTabPoint;
             BestTabMargin = bestTabMargin;
+            InsideCorners = insideCorners;
+            InsideCornerClearance = insideCornerClearance;
         }
 
         /// <summary>True when the part was analyzed; otherwise <see cref="Reason"/> says why not.</summary>
@@ -215,6 +317,12 @@ namespace OpenNest.Support
         /// <summary>Every bed contact under the part at the bed's nominal position.</summary>
         public IReadOnlyList<Vector> Contacts { get; }
 
+        /// <summary>The outline vertices in an inside corner (see <see cref="SupportAnalyzer.InsideCorners"/>).</summary>
+        public IReadOnlyList<Vector> InsideCorners { get; } = Array.Empty<Vector>();
+
+        /// <summary>How far an accepted tab point keeps from an inside corner.</summary>
+        public double InsideCornerClearance { get; }
+
         /// <summary>The worst signed distance of the center of gravity inside the contacts' hull.</summary>
         public double Margin { get; } = double.NegativeInfinity;
 
@@ -224,7 +332,10 @@ namespace OpenNest.Support
         /// <summary>True when the bed alone holds the part level by at least the required margin.</summary>
         public bool IsSupported => IsComplete && Meets(Margin);
 
-        /// <summary>The outline point where one tab steadies the part most, or null when not analyzed.</summary>
+        /// <summary>
+        /// The outline point clear of inside corners where one tab steadies the part most, or
+        /// null when not analyzed. Of equally good points, the one farthest from an inside corner.
+        /// </summary>
         public Vector? BestTabPoint { get; }
 
         /// <summary>The margin with a tab at <see cref="BestTabPoint"/>.</summary>
@@ -238,16 +349,24 @@ namespace OpenNest.Support
             IsComplete ? SupportAnalyzer.MarginWith(CenterOfGravity, hulls, tab) : double.NegativeInfinity;
 
         /// <summary>
-        /// Whether a tab at <paramref name="tab"/> is good enough: it holds the part level by the
-        /// required margin, or, where no single tab can, it is as good as the best one found.
+        /// Whether a tab at <paramref name="tab"/> is good enough: it keeps clear of inside corners,
+        /// and it holds the part level by the required margin or, where no single tab can, it is
+        /// as good as the best one found.
         /// </summary>
         public bool AcceptsTabAt(Vector tab)
         {
-            if (!IsComplete)
+            if (!IsComplete || !IsClearOfInsideCorners(tab))
                 return false;
             var margin = MarginWith(tab);
             return TabCanSupport ? Meets(margin) : margin >= BestTabMargin - Math.Tolerance.Epsilon;
         }
+
+        /// <summary>Whether a tab at <paramref name="tab"/> holds the part level by the required margin.</summary>
+        public bool HoldsLevelWithTabAt(Vector tab) => IsComplete && Meets(MarginWith(tab));
+
+        /// <summary>Whether <paramref name="point"/> keeps <see cref="InsideCornerClearance"/> from every inside corner.</summary>
+        public bool IsClearOfInsideCorners(Vector point) =>
+            SupportAnalyzer.IsClear(SupportAnalyzer.Clearance(InsideCorners, point), InsideCornerClearance);
 
         private bool Meets(double margin) => margin > 0 && margin >= RequiredMargin;
     }

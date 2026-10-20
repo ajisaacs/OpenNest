@@ -75,6 +75,7 @@ internal static class BestEffortCuttingPlan
                         f.OtherPartNumber is int otherOrdinal ? snapshot.Placements[otherOrdinal - 1].SourcePart : null,
                         f.Kind, f.Message)
                     { Witness = f }));
+                findings.AddRange(SupportTabCapture.Notes(proposal));
                 distance += execution.RapidDistanceFrom(position);
                 if (!double.IsFinite(distance))
                     throw new ArgumentException("Best-effort travel is not finite.");

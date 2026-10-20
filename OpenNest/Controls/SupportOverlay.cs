@@ -27,7 +27,7 @@ namespace OpenNest.Controls
         private readonly ConditionalWeakTable<Part, Entry> cache = new();
 
         private sealed record Entry(CNC.Program Program, Vector Location, double Rotation, SupportBed Bed, int Quadrant,
-            PartSupport Support);
+            double Clearance, PartSupport Support);
 
         public void Draw(Graphics g, PlateView view)
         {
@@ -42,11 +42,13 @@ namespace OpenNest.Controls
             using var supportedPen = new Pen(SupportedColor, 2f);
             using var tippingPen = new Pen(TippingColor, 2f);
             using var tabBrush = new SolidBrush(TabColor);
+            // Tab points keep clear of inside corners as Plan Cutting's do.
+            var clearance = SupportAnalyzer.InsideCornerClearance(plate.CuttingParameters?.TabConfig?.Size ?? 0);
             foreach (var part in plate.Parts)
             {
                 if (part?.BaseDrawing == null || part.BaseDrawing.IsCutOff)
                     continue;
-                var support = Analyze(part, bed, plate.Quadrant);
+                var support = Analyze(part, bed, plate.Quadrant, clearance);
                 if (!support.IsComplete)
                     continue;
 
@@ -58,14 +60,15 @@ namespace OpenNest.Controls
             }
         }
 
-        private PartSupport Analyze(Part part, SupportBed bed, int quadrant)
+        private PartSupport Analyze(Part part, SupportBed bed, int quadrant, double clearance)
         {
             if (cache.TryGetValue(part, out var entry) && ReferenceEquals(entry.Program, part.Program)
                 && entry.Location == part.Location && entry.Rotation == part.Rotation && Equals(entry.Bed, bed)
-                && entry.Quadrant == quadrant)
+                && entry.Quadrant == quadrant && entry.Clearance == clearance)
                 return entry.Support;
-            var support = SupportAnalyzer.Analyze(bed, quadrant, part);
-            cache.AddOrUpdate(part, new Entry(part.Program, part.Location, part.Rotation, bed, quadrant, support));
+            var support = SupportAnalyzer.Analyze(bed, quadrant, part, clearance);
+            cache.AddOrUpdate(part, new Entry(part.Program, part.Location, part.Rotation, bed, quadrant, clearance,
+                support));
             return support;
         }
 

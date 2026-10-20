@@ -89,6 +89,54 @@ public class SupportAnalyzerTests
         Assert.False(support.AcceptsTabAt(new Vector(0, 0)));
     }
 
+    // The 10 x 1 strip with a 2 x 0.2 bump on its top edge: inside corners at (4, 1) and (6, 1).
+    private static SupportMaterial BumpedStrip() =>
+        SupportMaterial.FromPolygons(new[]
+        {
+            new Vector(0, 0), new Vector(0, 1), new Vector(4, 1), new Vector(4, 1.2),
+            new Vector(6, 1.2), new Vector(6, 1), new Vector(10, 1), new Vector(10, 0),
+        });
+
+    [Fact]
+    public void BumpedStrip_EquallyGoodTabPoints_KeepTheTabOutOfTheInsideCorners()
+    {
+        // Along the top edge the margin is held by the contact row, so the inside corners tie
+        // with the edge around them and, as vertices, used to be found first.
+        var grid = new SupportGrid(2, 4, 0, 0.25, stabilityMargin: 0.1);
+
+        var support = SupportAnalyzer.Analyze(grid, 1, BumpedStrip(), insideCornerClearance: 0.25);
+
+        Assert.Equal(new[] { new Vector(4, 1), new Vector(6, 1) }, support.InsideCorners.OrderBy(c => c.X));
+        Assert.True(support.TabCanSupport);
+        Assert.Equal(support.MarginWith(new Vector(4, 1)), support.BestTabMargin, 9);
+        var best = support.BestTabPoint!.Value;
+        Assert.True(best.DistanceTo(new Vector(4, 1)) > 0.5 && best.DistanceTo(new Vector(6, 1)) > 0.5, best.ToString());
+        Assert.False(support.AcceptsTabAt(new Vector(4, 1)));
+        Assert.False(support.AcceptsTabAt(new Vector(6.2, 1)));
+        Assert.True(support.AcceptsTabAt(new Vector(6.3, 1)));
+    }
+
+    [Fact]
+    public void InsideCorners_CountAChordedFilletByItsWholeTurnAndIgnoreShallowBends()
+    {
+        // An L whose inside corner is a quarter-round fillet chorded into 6 small turns, and a
+        // 10 degree inward bend along its bottom edge.
+        var outline = new List<Vector> { new(0, 0), new(5, 0.4), new(10, 0), new(10, 2) };
+        for (var i = 0; i <= 6; i++)
+        {
+            var angle = -System.Math.PI / 2 - i * System.Math.PI / 12;
+            outline.Add(new Vector(3 + System.Math.Cos(angle), 3 + System.Math.Sin(angle)));
+        }
+        outline.Add(new Vector(2, 10));
+        outline.Add(new Vector(0, 10));
+
+        var corners = SupportAnalyzer.InsideCorners(outline);
+
+        Assert.Equal(7, corners.Length);
+        Assert.All(corners, c => Assert.Equal(1, c.DistanceTo(new Vector(3, 3)), 9));
+        Assert.Equal(corners, SupportAnalyzer.InsideCorners(Enumerable.Reverse(outline).ToList()).OrderBy(outline.IndexOf));
+    }
+
     [Theory]
     [InlineData(1, 1, 1)]
     [InlineData(2, -1, 1)]

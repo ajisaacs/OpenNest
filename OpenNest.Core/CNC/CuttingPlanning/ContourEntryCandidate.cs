@@ -45,6 +45,22 @@ internal enum AutomaticEntryKind
 }
 
 /// <summary>
+/// Which automatic entries a perimeter tabbed for support offers (see
+/// <see cref="PreparedContours.WithSupportTab"/>); every other contour offers its whole catalogue.
+/// </summary>
+internal enum SupportEntries
+{
+    /// <summary>Entries whose tab steadies the part, clear of inside corners, plus its best tab point.</summary>
+    Steadying,
+
+    /// <summary>Every entry clear of inside corners: the fallback when no steadying entry fits.</summary>
+    ClearOfInsideCorners,
+
+    /// <summary>Every entry: the last fallback, when nothing clear of inside corners fits.</summary>
+    Any,
+}
+
+/// <summary>
 /// One automatic start candidate: the owned contour choice plus its preference kind and a
 /// stable geometry tie key for deterministic ranking. The choice keeps this preparation as
 /// owner; nothing here exposes or mutates the underlying shape.

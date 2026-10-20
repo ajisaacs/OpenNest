@@ -405,12 +405,14 @@ public static class CuttingPlanService
             return new(findings.Any(f => f.Kind == PostVerificationKind.Incomplete)
                 ? CuttingPlanStatus.UnsupportedGeometry : CuttingPlanStatus.ConstraintConflict,
                 findings: findings, expansions: expansions);
+        // Support tabs that cannot hold their part level are noted, never refused.
+        var notes = order.SelectMany(SupportTabCapture.Notes).ToList();
         // Every planner-chosen motion passed. Fixed-emission warnings make the proposal
         // UNVERIFIED: never Ready, applicable only through explicit warning acceptance.
         if (warnings.Count != 0)
-            return new(CuttingPlanStatus.BestEffort, order, warnings.Distinct(), expansions,
+            return new(CuttingPlanStatus.BestEffort, order, warnings.Concat(notes).Distinct(), expansions,
                 distance, independentlyReplayed: true);
-        return new(CuttingPlanStatus.Ready, order, expansions: expansions,
+        return new(CuttingPlanStatus.Ready, order, notes, expansions: expansions,
             rapidDistance: distance, independentlyReplayed: true);
     }
 

@@ -803,18 +803,21 @@ internal static class JointCuttingPlanSearch
         private IReadOnlyList<ContourChoice> SelectEntries(FixedProgramPlacement source, int contour,
             Vector? target, Vector arrival, Vector[] sightTargets = null)
         {
-            var ordered = RankedEntries(source, contour, target, arrival, sightTargets, ignoreSupport: false);
+            var ordered = RankedEntries(source, contour, target, arrival, sightTargets, SupportEntries.Steadying);
             var selection = ContourEntrySelection.Select(ordered,
                 candidate => Evaluate(source, candidate), snapshot.MaxEntries, token);
             // No steadying point of a support-tabbed perimeter has a lead-in that fits: it is
-            // still tabbed, wherever its configured lead-ins fit.
-            if (contour == source.Prepared.PerimeterOrdinal && source.Prepared.HasSupportTab
-                && selection.Choices.Count == 0 && selection.UncertainChoices.Count == 0)
-            {
-                ordered = RankedEntries(source, contour, target, arrival, sightTargets, ignoreSupport: true);
-                selection = ContourEntrySelection.Select(ordered,
-                    candidate => Evaluate(source, candidate), snapshot.MaxEntries, token);
-            }
+            // still tabbed, where a lead-in fits and the tab steadies it most, clear of inside
+            // corners unless no entry clear of them fits.
+            if (contour == source.Prepared.PerimeterOrdinal && source.Prepared.HasSupportTab)
+                foreach (var fallback in new[] { SupportEntries.ClearOfInsideCorners, SupportEntries.Any })
+                {
+                    if (selection.Choices.Count != 0 || selection.UncertainChoices.Count != 0)
+                        break;
+                    ordered = RankedEntries(source, contour, target, arrival, sightTargets, fallback);
+                    selection = Steadiest(source.Prepared, ContourEntrySelection.Select(ordered,
+                        candidate => Evaluate(source, candidate), snapshot.MaxEntries, token));
+                }
             // No configured lead-in fits the perimeter: with a pierce diameter, try open scrap.
             string scrapReason = null;
             if (contour == source.Prepared.PerimeterOrdinal && selection.Choices.Count == 0
@@ -840,15 +843,33 @@ internal static class JointCuttingPlanSearch
             return selection.Choices.Concat(selection.UncertainChoices).Take(snapshot.MaxEntries).ToArray();
         }
 
-        // One contour's automatic catalogue ranked toward the next cut, before lead checks.
+        // A support fallback's selection keeps only the fitting entries whose tab steadies the
+        // part most: every one that holds it level, or else those as good as the best.
+        private static ContourSelectionResult Steadiest(PreparedContours prepared, ContourSelectionResult selection)
+        {
+            var fitting = selection.Choices.Concat(selection.UncertainChoices).ToArray();
+            if (fitting.Length == 0)
+                return selection;
+            var best = fitting.Max(prepared.SupportMarginAt);
+            bool Keep(ContourChoice choice) => prepared.HoldsLevelAt(choice)
+                || prepared.SupportMarginAt(choice) >= best - OpenNest.Math.Tolerance.Epsilon && !fitting.Any(prepared.HoldsLevelAt);
+            return selection with
+            {
+                Choices = selection.Choices.Where(Keep).ToArray(),
+                UncertainChoices = selection.UncertainChoices.Where(Keep).ToArray(),
+            };
+        }
+
+        // One contour's automatic catalogue ranked toward the next cut, before lead checks. A
+        // support fallback leads with the entries whose tab steadies the part most.
         private IReadOnlyList<ContourEntryCandidate> RankedEntries(FixedProgramPlacement source, int contour,
-            Vector? target, Vector arrival, Vector[] sightTargets, bool ignoreSupport)
+            Vector? target, Vector arrival, Vector[] sightTargets, SupportEntries supportEntries)
         {
             // Last contour has no downstream target, but still needs its exact native
             // closest-arrival fallback. Keep target null in the ranker: arrival is not
             // a next cut and must not acquire facing-side priority.
             var catalogue = source.Prepared.AutomaticEntryCandidatesWithFallbacks(contour, target ?? arrival, token,
-                ignoreSupport);
+                supportEntries);
             var ordered = catalogue.RankTowardNextCut(target, arrival);
             // With no lead-out the tool leaves the part from its outside entry. From inside a
             // slot or pocket the straight way to the next cut runs back over the part just
@@ -864,6 +885,8 @@ internal static class JointCuttingPlanSearch
             // pierce clears the hole itself lead.
             if (target is { } next && contour != source.Prepared.PerimeterOrdinal)
                 ordered = ordered.DepartingClear(source.Prepared, next, token);
+            if (supportEntries != SupportEntries.Steadying && contour == source.Prepared.PerimeterOrdinal)
+                ordered = ordered.OrderByDescending(c => source.Prepared.SupportMarginAt(c.Choice)).ToList();
             return ordered;
         }
 

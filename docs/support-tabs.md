@@ -44,9 +44,17 @@ outline point (vertices plus 256 even samples) that maximizes it. `AcceptsTabAt(
 any point that reaches the stability margin, or, when no single tab can, only points as good as
 the best one found. A tab's bending strength is ignored: it is a support point, not a cantilever.
 
+A tab never goes in an inside corner, where its nub cannot be ground flush. An inside corner is
+a run of consecutive inward-turning outline vertices that turn at least 30 degrees together, so a
+chorded fillet counts while a shallow bend does not. Tab points keep the analysis's inside-corner
+clearance from those vertices (Plan Cutting and the overlay use twice the tab size; 0 keeps a tab
+off the corner only), and `AcceptsTabAt` rejects closer points. Equally good points usually run
+along a straight edge; of those, `BestTabPoint` is the one farthest from an inside corner. Only
+when every outline point is too close does the clearance give way.
+
 View > Draw Support shows the grid (while its points are at least 6 pixels apart), each part's
 contacts, and its center of gravity: green when supported, red when it can tip, with an orange
-diamond on a red part's best tab point.
+diamond on a red part's best tab point (keeping the plate's tab-size clearance).
 
 ## Support tabs in Plan Cutting
 
@@ -59,9 +67,18 @@ other parts keep the plate settings, so supported parts are not tabbed.
 The emitter tabs a perimeter at its entry: the cut stops short of the entry by the tab size.
 A support-tabbed perimeter's automatic entries are therefore limited to catalogue points the
 analysis accepts, plus the closest native point to its best tab point (`AutomaticEntryKind.SupportTab`,
-never on a reflex or cusp vertex). Ranking, lead checks and replay are unchanged. If none of
-those entries has a lead-in that fits, the search falls back to the full catalogue and the part
-is still tabbed, wherever a lead-in fits; this fallback is not reported yet.
+never on a reflex or cusp vertex). Ranking, lead checks and replay are unchanged.
+
+If none of those entries has a lead-in that fits, the part is still tabbed. The search falls
+back first to every catalogue entry clear of inside corners, then to every entry
+(`SupportEntries`), each ordered by how well the tab steadies the part; of the entries whose
+lead-in fits, it keeps every one that holds the part level, or else only the steadiest. The
+open-scrap pierce fallback then tries the last of those catalogues.
+
+Replay notes each planned part whose tab, at its perimeter entry, cannot hold it level (no single
+tab can, or no lead-in fits where one would) or sits in an inside corner
+(`SupportTabCapture.Notes`). The notes are advisory: a Ready plan keeps its status and lists them
+in Plan Cutting's warnings, and the console and MCP summaries print them under the plate.
 
 Not covered yet:
 
@@ -69,5 +86,5 @@ Not covered yet:
 - Locked or ineligible parts keep their programs; the older Assign Lead-ins command and
   Auto Tab sizes ignore the bed.
 - Only one perimeter tab per part. A part that needs more (one tab cannot reach the stability
-  margin) gets the best single tab.
+  margin) gets the best single tab and a note.
 - Pre-post verification does not yet warn about unsupported, untabbed parts.

@@ -401,7 +401,7 @@ public sealed class PreparedContours
             return new[] { new ContourEntryCandidate(pin, AutomaticEntryKind.Pinned) };
         if (IsSingleCircle(shape))
             throw new ArgumentException("Circles have no preferred corners or joints; use the fallback catalogue.");
-        return SupportFiltered(contourOrdinal, PreferredCandidates(shape, contourOrdinal, token), false);
+        return SupportFiltered(contourOrdinal, PreferredCandidates(shape, contourOrdinal, token), SupportEntries.Steadying);
     }
 
     /// <summary>
@@ -419,7 +419,7 @@ public sealed class PreparedContours
         int contourOrdinal,
         Vector? lookAhead = null,
         CancellationToken token = default,
-        bool ignoreSupport = false)
+        SupportEntries supportEntries = SupportEntries.Steadying)
     {
         token.ThrowIfCancellationRequested();
         var shape = GetShape(contourOrdinal);
@@ -429,23 +429,40 @@ public sealed class PreparedContours
             ? new List<ContourEntryCandidate>()
             : PreferredCandidates(shape, contourOrdinal, token);
         all.AddRange(FallbackCandidates(shape, contourOrdinal, lookAhead, token));
-        return SupportFiltered(contourOrdinal, all, ignoreSupport);
+        return SupportFiltered(contourOrdinal, all, supportEntries);
     }
 
     /// <summary>
     /// Whether this preparation tabs its perimeter for support (see <see cref="WithSupportTab"/>):
-    /// its automatic catalogue then keeps to steadying points unless asked to ignore support.
+    /// its automatic catalogue then keeps to steadying points unless asked for a fallback.
     /// </summary>
     internal bool HasSupportTab => support != null;
 
+    /// <summary>
+    /// The support margin with this perimeter's tab at <paramref name="choice"/> (see
+    /// <see cref="PartSupport.MarginWith"/>); negative infinity when it is not tabbed for support.
+    /// </summary>
+    internal double SupportMarginAt(ContourChoice choice) =>
+        support?.MarginWith(choice.Point + supportOrigin) ?? double.NegativeInfinity;
+
+    /// <summary>Whether a support tab at <paramref name="choice"/> holds the part level (see <see cref="PartSupport.HoldsLevelWithTabAt"/>).</summary>
+    internal bool HoldsLevelAt(ContourChoice choice) =>
+        support != null && support.HoldsLevelWithTabAt(choice.Point + supportOrigin);
+
+    /// <summary>Whether a support tab at <paramref name="choice"/> keeps the inside-corner clearance.</summary>
+    internal bool IsClearOfInsideCorners(ContourChoice choice) =>
+        support == null || support.IsClearOfInsideCorners(choice.Point + supportOrigin);
+
     // A perimeter tabbed for support keeps the candidates whose tab steadies the part, and gains
-    // the outline's best tab point; with ignoreSupport (the search's fallback when none of them
-    // has a lead-in that fits) every candidate stays, still tabbed.
+    // the outline's best tab point. The search's fallbacks, when none of them has a lead-in that
+    // fits, keep every candidate clear of inside corners and then every candidate, still tabbed.
     private IReadOnlyList<ContourEntryCandidate> SupportFiltered(int contourOrdinal,
-        List<ContourEntryCandidate> candidates, bool ignoreSupport)
+        List<ContourEntryCandidate> candidates, SupportEntries entries)
     {
-        if (support == null || contourOrdinal != PerimeterOrdinal || ignoreSupport)
+        if (support == null || contourOrdinal != PerimeterOrdinal || entries == SupportEntries.Any)
             return MergeByGeometry(candidates);
+        if (entries == SupportEntries.ClearOfInsideCorners)
+            return MergeByGeometry(candidates.Where(c => IsClearOfInsideCorners(c.Choice)).ToList());
         var kept = candidates.Where(c => support.AcceptsTabAt(c.Choice.Point + supportOrigin)).ToList();
         var best = ClosestEntry(PerimeterOrdinal, support.BestTabPoint!.Value - supportOrigin);
         if (!IsForbiddenVertex(GetShape(PerimeterOrdinal), best.Point))
