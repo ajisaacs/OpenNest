@@ -140,6 +140,7 @@ app.MapPost("/api/nests/{id:guid}/revisions/{revision:int}/restore", (Guid id, i
 });
 
 app.MapDrawingLibrary();
+app.MapDrawingSets();
 
 app.Run();
 

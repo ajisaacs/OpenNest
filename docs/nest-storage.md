@@ -327,6 +327,61 @@ its client-allocated id. Saving identical content at the current revision is a
 no-op. On success only the nest drawing's library link changes, to the saved
 revision; save the nest to keep it.
 
+## Drawing set endpoints
+
+A **drawing set** (schema v7) is a named, versioned list of library drawings
+with a quantity each: a kit, an assembly or a recurring order. Members name
+drawings by id and always mean each drawing's **current** revision; there is no
+per-member revision pin. Sets travel as JSON (`application/json`, at most 1 MiB).
+The desktop does not use these routes yet.
+
+`OpenNest.Data.DrawingSetRecord` fields: `id` (client-allocated before the
+first save), `revision`, `name`, `customer`, `notes`, `archived`, `savedBy`,
+the server-computed `savedAt` and `memberCount`, and `members`, in order, each
+`{ drawingId, quantity, drawing }`. `drawing` is the member drawing's current
+library record (archived or not), joined by the server on every read so a client
+can group members by material without one request per drawing; it is ignored on
+save, so a record read from the server may be sent back as it is.
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| POST | `/api/sets` | JSON set with a nonempty `id` and `members` | Revision 1; 409 with the current record when the id exists |
+| GET | `/api/sets/query?search=&customer=&includeArchived=&sort=&order=&offset=&limit=` | — | `{ items, total, offset, limit }`; items have `memberCount` and no `members` |
+| GET | `/api/sets/{id}` | — | Current record with joined members (archived sets included), or 404 |
+| GET | `/api/sets/{id}/revisions?offset=0&limit=100` | — | Revision page without members, newest first; limit 1–200 |
+| GET | `/api/sets/{id}/revisions/{revision}` | — | That revision's details and members, each joined to the drawing's current record |
+| PUT | `/api/sets/{id}` | JSON set (`id` empty or matching the route) | New revision |
+| POST | `/api/sets/{id}/archive` / `/restore` | — | New revision with `archived` changed and the same members |
+| GET | `/api/drawings/{id}/sets?offset=0&limit=100` | — | Sets, archived included, whose current revision contains the drawing, by name; 404 for an unknown drawing |
+
+- Existing-set writes follow the drawing contract: `If-Match` 428 missing, 400
+  malformed, 409 stale with the current record; writing to an archived set,
+  archiving an archived one or restoring an active one is also 409. There is no
+  delete.
+- Every change appends an immutable revision, with its own copy of the members,
+  in the transaction that updates the current row. An identical save (name,
+  customer, notes and members in order) at the current revision is a no-op;
+  reordering members is a change.
+- Validation (400, no state change): `name` nonblank; name, customer and savedBy
+  at most 200 characters, notes at most 4000, no NUL characters; `members`
+  present and not null, at most 500, each with a nonempty `drawingId` that is in
+  the library (archived drawings allowed), an integer `quantity` from 1 to
+  100000, and no drawing listed twice (one member carries the whole quantity). An
+  empty set is allowed.
+- Query: `search` matches name, customer or notes and `customer` matches by
+  `SharedListNames.Key`, exactly as for drawings. `sort` is one of `savedAt`
+  (default), `name`, `customer`, `revision`; ties break by `id`. Paging, `order`
+  and the refusal of unknown, repeated or out-of-range parameters follow the
+  drawing query.
+
+Schema v7 adds `drawing_set_revisions` (every revision's details and archived
+flag), `drawing_set_members` (each revision's members by position, unique per
+drawing) and `drawing_sets` (each set's current revision). Upgrading from v6
+only creates these tables; every other table is untouched. A server older than
+v7 refuses to open a v7 database, so rolling back needs the pre-upgrade backup.
+The stopped-volume `tar` backup includes the set tables; `nest_manifest.py` and
+`restore_check` do not verify them yet.
+
 ## Storage
 
 `OpenNest.Server.NestDatabase` uses SQLite (`Microsoft.Data.Sqlite`) with

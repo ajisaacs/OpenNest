@@ -108,22 +108,8 @@ internal static class DrawingLibraryRoutes
 
     private static IResult ReadHistory(Guid id, HttpRequest request, NestDatabase db)
     {
-        var offset = 0;
-        var limit = DrawingLibraryRules.DefaultRevisionLimit;
-        foreach (var parameter in request.Query)
-        {
-            if (parameter.Value.Count != 1
-                || !int.TryParse(parameter.Value[0], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value))
-                return Results.BadRequest("Invalid history pagination.");
-            switch (parameter.Key)
-            {
-                case "offset": offset = value; break;
-                case "limit": limit = value; break;
-                default: return Results.BadRequest("Unknown history parameter.");
-            }
-        }
-        if (offset < 0 || limit < 1 || limit > DrawingLibraryRules.MaxRevisionLimit)
-            return Results.BadRequest("Invalid history pagination.");
+        if (!DrawingLibraryRequest.TryReadPaging(request.Query, out var offset, out var limit, out var error))
+            return Results.BadRequest(error);
         return db.DrawingHistory(id, offset, limit) is { } page ? Results.Ok(page) : Results.NotFound();
     }
 

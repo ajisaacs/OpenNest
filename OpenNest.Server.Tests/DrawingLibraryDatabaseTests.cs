@@ -21,7 +21,7 @@ public sealed class DrawingLibraryDatabaseTests
             using (var database = new NestDatabase(factory.DatabasePath, pooling: false))
                 Assert.Empty(database.QueryDrawings(new DrawingLibraryQuery { IncludeArchived = true }).Items);
             Assert.Equal(before, NestDigest(factory.DatabasePath));
-            Assert.Equal(6L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+            Assert.Equal(7L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
         }
 
         using var upgraded = new NestDatabase(factory.DatabasePath, pooling: false);
@@ -42,7 +42,7 @@ public sealed class DrawingLibraryDatabaseTests
 
         using (var database = new NestDatabase(factory.DatabasePath, pooling: false))
         {
-            Assert.Equal(6L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+            Assert.Equal(7L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
             Assert.Equal(before, NestDigest(factory.DatabasePath));
             // Two distinct blobs across four revisions: the bracket's notes edit and the
             // plate both reuse the bracket's first package.
@@ -79,7 +79,7 @@ public sealed class DrawingLibraryDatabaseTests
     {
         using var factory = new ServerFactory();
         using (new NestDatabase(factory.DatabasePath, pooling: false)) { }
-        Execute(factory.DatabasePath, "PRAGMA user_version=7");
+        Execute(factory.DatabasePath, "PRAGMA user_version=8");
 
         Assert.Throws<InvalidOperationException>(() => new NestDatabase(factory.DatabasePath, pooling: false));
     }
@@ -220,7 +220,7 @@ public sealed class DrawingLibraryDatabaseTests
         }
     }
 
-    /// <summary>A real schema-v3 file: the drawing tables are additive, so dropping them restores v3 exactly.</summary>
+    /// <summary>A real schema-v3 file: the drawing and set tables are additive, so dropping them restores v3 exactly.</summary>
     private static void CreateVersion3Database(string path)
     {
         using (var database = new NestDatabase(path, pooling: false))
@@ -235,7 +235,10 @@ public sealed class DrawingLibraryDatabaseTests
             database.SetDeleted(a.Id, false, 3);
         }
 
-        Execute(path, "DROP TABLE drawing_revisions; DROP TABLE drawings; DROP TABLE drawing_packages; PRAGMA user_version=3;");
+        Execute(path, """
+            DROP TABLE drawing_set_members; DROP TABLE drawing_sets; DROP TABLE drawing_set_revisions;
+            DROP TABLE drawing_revisions; DROP TABLE drawings; DROP TABLE drawing_packages; PRAGMA user_version=3;
+            """);
     }
 
     private static readonly byte[] V4PackageA = Package("v4 original");

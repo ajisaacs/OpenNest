@@ -389,32 +389,33 @@ public sealed partial class NestDatabase
         _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Unsupported sort column."),
     };
 
-    private static DrawingLibraryRecord ReadDrawing(SqliteDataReader reader) => new()
+    // Reads DrawingColumns in order from column `first` on; a join may put other columns before them.
+    private static DrawingLibraryRecord ReadDrawing(SqliteDataReader reader, int first = 0) => new()
     {
-        Id = Guid.Parse(reader.GetString(0)),
-        Revision = reader.GetInt32(1),
-        Name = reader.GetString(2),
-        Customer = reader.GetString(3),
-        MaterialName = reader.GetString(4),
-        MaterialGrade = reader.GetString(5),
-        Thickness = reader.GetDouble(6),
-        Units = Enum.Parse<Units>(reader.GetString(7)),
-        CutType = Enum.Parse<CutType>(reader.GetString(8)),
-        Notes = reader.GetString(9),
-        Archived = reader.GetInt32(10) != 0,
-        PackageSha256 = reader.GetString(11),
-        PackageSize = reader.GetInt64(12),
-        SavedAt = DateTime.Parse(reader.GetString(13)),
-        SavedBy = reader.GetString(14),
+        Id = Guid.Parse(reader.GetString(first)),
+        Revision = reader.GetInt32(first + 1),
+        Name = reader.GetString(first + 2),
+        Customer = reader.GetString(first + 3),
+        MaterialName = reader.GetString(first + 4),
+        MaterialGrade = reader.GetString(first + 5),
+        Thickness = reader.GetDouble(first + 6),
+        Units = Enum.Parse<Units>(reader.GetString(first + 7)),
+        CutType = Enum.Parse<CutType>(reader.GetString(first + 8)),
+        Notes = reader.GetString(first + 9),
+        Archived = reader.GetInt32(first + 10) != 0,
+        PackageSha256 = reader.GetString(first + 11),
+        PackageSize = reader.GetInt64(first + 12),
+        SavedAt = DateTime.Parse(reader.GetString(first + 13)),
+        SavedBy = reader.GetString(first + 14),
         Settings = new DrawingNestingSettings
         {
-            CutFirst = reader.GetInt32(15) != 0,
-            Priority = reader.GetInt32(16),
-            StepAngle = reader.GetDouble(17),
-            StartAngle = reader.GetDouble(18),
-            EndAngle = reader.GetDouble(19),
-            Allow180Equivalent = reader.GetInt32(20) != 0,
-            ColorArgb = reader.GetInt32(21),
+            CutFirst = reader.GetInt32(first + 15) != 0,
+            Priority = reader.GetInt32(first + 16),
+            StepAngle = reader.GetDouble(first + 17),
+            StartAngle = reader.GetDouble(first + 18),
+            EndAngle = reader.GetDouble(first + 19),
+            Allow180Equivalent = reader.GetInt32(first + 20) != 0,
+            ColorArgb = reader.GetInt32(first + 21),
         },
     };
 }

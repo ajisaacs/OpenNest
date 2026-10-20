@@ -184,8 +184,45 @@ internal static class DrawingLibraryRequest
         return error.Length == 0;
     }
 
+    /// <summary>
+    /// Reads history-style paging: only <c>offset</c> (zero or greater) and <c>limit</c>
+    /// (1 to <see cref="DrawingLibraryRules.MaxRevisionLimit"/>), each at most once.
+    /// </summary>
+    public static bool TryReadPaging(IQueryCollection values, out int offset, out int limit, out string error)
+    {
+        offset = 0;
+        limit = DrawingLibraryRules.DefaultRevisionLimit;
+        error = "";
+        foreach (var parameter in values)
+        {
+            if (parameter.Value.Count != 1
+                || !int.TryParse(parameter.Value[0], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value))
+            {
+                error = "Invalid history pagination.";
+                return false;
+            }
+
+            switch (parameter.Key)
+            {
+                case "offset": offset = value; break;
+                case "limit": limit = value; break;
+                default:
+                    error = "Unknown history parameter.";
+                    return false;
+            }
+        }
+
+        if (offset < 0 || limit < 1 || limit > DrawingLibraryRules.MaxRevisionLimit)
+        {
+            error = "Invalid history pagination.";
+            return false;
+        }
+
+        return true;
+    }
+
     // Names only: Enum.TryParse would also accept numbers, combinations and undefined values.
-    private static bool TryEnumName<TEnum>(string text, out TEnum value)
+    internal static bool TryEnumName<TEnum>(string text, out TEnum value)
         where TEnum : struct, Enum
     {
         value = default;
@@ -195,9 +232,9 @@ internal static class DrawingLibraryRequest
             && Enum.IsDefined(value);
     }
 
-    private static string CamelCase(string name) => char.ToLowerInvariant(name[0]) + name[1..];
+    internal static string CamelCase(string name) => char.ToLowerInvariant(name[0]) + name[1..];
 
-    private static bool TryInteger(IQueryCollection values, string key, ref int value, out string error)
+    internal static bool TryInteger(IQueryCollection values, string key, ref int value, out string error)
     {
         error = "";
         if (!values.TryGetValue(key, out var text))
