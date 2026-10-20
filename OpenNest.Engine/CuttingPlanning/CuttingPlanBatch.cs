@@ -501,9 +501,9 @@ public sealed class CuttingPlanProposal
             yield return "  " + SearchLimitHint;
     }
 
-    /// <summary>Operator hint for a plate refused at the search limit; raising the effort is not a promise.</summary>
-    public const string SearchLimitHint = "Raising Cut planning effort in Tools > Options lets the planner search "
-        + "further before it stops; it may still find no plan.";
+    /// <summary>Hint for a plate refused at the search limit (console and MCP; the desktop panel names its effort setting).</summary>
+    public const string SearchLimitHint = "The planner stopped at its search limit; a longer search might help, "
+        + "but it may still find no plan.";
 
     private static IEnumerable<string> Limit(IEnumerable<string> lines)
     {
