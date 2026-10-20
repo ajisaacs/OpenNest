@@ -40,7 +40,11 @@ supported when its worst margin is positive and at least the stability margin.
 
 A perimeter tab holds the part at the tab, so a tab point counts as one more contact.
 `PartSupport.MarginWith(point)` is the worst margin with a tab there, and `BestTabPoint` the
-outline point (vertices plus 256 even samples) that maximizes it. `AcceptsTabAt(point)` accepts
+outline point (vertices plus 256 even samples) that maximizes it. A tab cannot lift the margin
+past the contacts' own hull edges, so a whole stretch of outline often ties; among samples
+within `Tolerance.Epsilon` of the best, the one nearest the line through the center of gravity
+across the long side of the outline's minimum-area bounding rectangle wins. The search itself
+is not narrowed, so a part held only near one end is still tabbed at the far end. `AcceptsTabAt(point)` accepts
 any point that reaches the stability margin, or, when no single tab can, only points as good as
 the best one found. A tab's bending strength is ignored: it is a support point, not a cantilever.
 
@@ -48,9 +52,9 @@ A tab never goes in an inside corner, where its nub cannot be ground flush. An i
 a run of consecutive inward-turning outline vertices that turn at least 30 degrees together, so a
 chorded fillet counts while a shallow bend does not. Tab points keep the analysis's inside-corner
 clearance from those vertices (Plan Cutting and the overlay use twice the tab size; 0 keeps a tab
-off the corner only), and `AcceptsTabAt` rejects closer points. Equally good points usually run
-along a straight edge; of those, `BestTabPoint` is the one farthest from an inside corner. Only
-when every outline point is too close does the clearance give way.
+off the corner only), and `AcceptsTabAt` rejects closer points. The tie-break above runs over
+the clear points only; points equally near the center line go to the one farthest from an
+inside corner. Only when every outline point is too close does the clearance give way.
 
 View > Draw Support shows the grid (while its points are at least 6 pixels apart), each part's
 contacts, and its center of gravity: green when supported, red when it can tip, with an orange

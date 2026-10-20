@@ -74,6 +74,39 @@ public class SupportAnalyzerTests
     }
 
     [Fact]
+    public void Strip_WhoseTabsTieAlongTheFarEdge_IsTabbedAcrossItsCenterOfGravity()
+    {
+        // The row's own edge caps the margin at 0.25, so tabs from about x = 2.5 to 7.5 on the
+        // far edge tie; the one across the center of gravity is chosen.
+        var grid = new SupportGrid(2, 4, 0, 0.25, stabilityMargin: 0.1);
+
+        var support = SupportAnalyzer.Analyze(grid, 1, Rectangle(0, 0, 10, 1));
+
+        Assert.Equal(0.25, support.MarginWith(new Vector(3, 1)), 9);
+        Assert.Equal(0.25, support.MarginWith(new Vector(7, 1)), 9);
+        Assert.Equal(0.25, support.BestTabMargin, 9);
+        Assert.Equal(1, support.BestTabPoint!.Value.Y, 9);
+        Assert.InRange(support.BestTabPoint!.Value.X, 4.95, 5.05);
+    }
+
+    [Fact]
+    public void Strip_RestingOnlyNearOneEnd_IsTabbedAtTheFarEndNotAcrossItsCenter()
+    {
+        // Two contacts at x = 1 hold a 10 x 2 strip whose center of gravity is at (5, 1); only a
+        // tab at the far end reaches past it, so the tie-break does not pull it to mid-side.
+        var grid = new SupportGrid(20, 1, 1, 0.5, stabilityMargin: 0.1);
+
+        var support = SupportAnalyzer.Analyze(grid, 1, Rectangle(0, 0, 10, 2));
+
+        Assert.Equal(-4, support.Margin, 9);
+        Assert.True(support.TabCanSupport);
+        Assert.Equal(10, support.BestTabPoint!.Value.X, 9);
+        Assert.InRange(support.BestTabPoint!.Value.Y, 0.9, 1.1);
+        Assert.True(support.MarginWith(new Vector(5, 2)) < 0);
+        Assert.False(support.AcceptsTabAt(new Vector(5, 2)));
+    }
+
+    [Fact]
     public void Strip_BetweenRows_FallsThroughAndOnlyTheNearestTabIsAccepted()
     {
         var grid = new SupportGrid(1, 1, 0, 0.9, stabilityMargin: 0.1);

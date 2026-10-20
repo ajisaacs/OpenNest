@@ -67,22 +67,39 @@ namespace OpenNest.Support
                 samples = allowed;
             var scored = samples.Select(s => (s.Point, s.Clear, Margin: MarginWith(center, hulls, s.Point))).ToList();
 
-            // Equally good points run along a straight edge; of those, the one farthest from an
-            // inside corner, or the first.
+            // A tab cannot lift the margin past the contacts' own hull edges, so a whole stretch
+            // of outline often ties; of those, the one nearest the line through the center across
+            // the outline's long side, then the one farthest from an inside corner, or the first.
             var bestMargin = scored.Count == 0 ? double.NegativeInfinity : scored.Max(s => s.Margin);
+            var along = scored.Count == 0 ? Vector.Zero : LongSide(material.Outline);
             Vector? best = null;
+            var bestOffset = double.PositiveInfinity;
             var bestClear = double.NegativeInfinity;
             foreach (var sample in scored)
             {
-                if (sample.Margin >= bestMargin - Math.Tolerance.Epsilon && sample.Clear > bestClear)
+                if (sample.Margin < bestMargin - Math.Tolerance.Epsilon)
+                    continue;
+                var offset = System.Math.Abs((sample.Point - center).DotProduct(along));
+                if (offset < bestOffset - Math.Tolerance.Epsilon
+                    || (offset <= bestOffset + Math.Tolerance.Epsilon && sample.Clear > bestClear))
                 {
                     best = sample.Point;
+                    bestOffset = offset;
                     bestClear = sample.Clear;
                 }
             }
 
             return new PartSupport(center, contacts, margin, bed.StabilityMargin, hulls, best, bestMargin,
                 corners, insideCornerClearance);
+        }
+
+        /// <summary>The unit direction of the longer side of the outline's minimum-area bounding rectangle.</summary>
+        private static Vector LongSide(IReadOnlyList<Vector> outline)
+        {
+            // The full angle range checks every hull edge.
+            var box = RotatingCalipers.MinimumBoundingRectangle(ConvexHull.Compute(outline.ToList()), 0, Math.Angle.TwoPI);
+            var angle = box.Width >= box.Height ? box.Angle : box.Angle + Math.Angle.HalfPI;
+            return new Vector(System.Math.Cos(angle), System.Math.Sin(angle));
         }
 
         // A point `clear` from the nearest inside corner keeps `clearance` from it; with no
