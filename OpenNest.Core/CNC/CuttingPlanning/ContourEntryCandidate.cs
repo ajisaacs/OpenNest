@@ -36,6 +36,12 @@ internal enum AutomaticEntryKind
 
     /// <summary>A drawing pin's own entry: the one and only candidate of a pinned contour.</summary>
     Pinned = 7,
+
+    /// <summary>
+    /// The perimeter point where a tab best keeps the part level on its support bed; only a
+    /// perimeter tabbed for support has it (see <see cref="PreparedContours.WithSupportTab"/>).
+    /// </summary>
+    SupportTab = 8,
 }
 
 /// <summary>

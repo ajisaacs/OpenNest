@@ -122,8 +122,11 @@ public static class CuttingPlanService
                         warnings.Add(new(index, source, null, null, PostVerificationKind.Incomplete, material.Reason));
                     }
                     if (!source.LeadInsLocked && (request.EligibleParts == null || eligible.Contains(source)))
+                    {
                         prepared = DrawingPinCapture.Prepare(source, index, ownedClean, request.ConfirmedParameters,
                             warnings, token);
+                        prepared = SupportTabCapture.Prepare(prepared, ownedClean, location, request, token);
+                    }
                     else if (source.HasActiveDrawingPins)
                         warnings.Add(DrawingPinCapture.NotApplied(source, index));
                 }

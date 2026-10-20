@@ -241,6 +241,7 @@ namespace OpenNest.Forms
             mnuViewDrawPiercePoints.Checked = activeForm.PlateView.DrawPiercePoints;
             mnuViewDrawBounds.Checked = activeForm.PlateView.DrawBounds;
             mnuViewDrawCutDirection.Checked = activeForm.PlateView.DrawCutDirection;
+            mnuViewDrawSupport.Checked = activeForm.PlateView.DrawSupport;
         }
 
         protected override void OnLoad(EventArgs e)

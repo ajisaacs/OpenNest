@@ -5,6 +5,7 @@ using System.Threading;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
+using OpenNest.Support;
 
 namespace OpenNest.CNC.CuttingPlanning;
 
@@ -41,6 +42,10 @@ public sealed class PreparedContours
     private readonly ContourChoice[] pinned;
     private readonly CuttingParameters[] contourParameters;
     private readonly int[] pinNumbers;
+    // Set when the support bed cannot hold the part level: the perimeter is tabbed and its
+    // automatic entries keep to points where the tab steadies the part. World = local + origin.
+    private readonly PartSupport support;
+    private readonly Vector supportOrigin;
 
     private PreparedContours(Shape[] shapes, List<Entity> scribes, List<Shape> breakCuts, List<Shape> tabbedCutouts,
         CuttingParameters parameters)
@@ -86,6 +91,47 @@ public sealed class PreparedContours
         }
         RejectedPins = rejected.AsReadOnly();
     }
+
+    // A copy that tabs the perimeter for support; every pin keeps its entry, now owned here.
+    private PreparedContours(PreparedContours source, PartSupport support, Vector location, Tab tab)
+        : this(source.shapes, source.scribes, source.breakCuts, source.tabbedCutouts, source.parameters)
+    {
+        for (var contour = 0; contour < Count; contour++)
+        {
+            pinned[contour] = source.pinned[contour] is { } pin ? pin with { Owner = this } : null;
+            pinNumbers[contour] = source.pinNumbers[contour];
+        }
+        contourParameters = source.contourParameters == null
+            ? new CuttingParameters[Count]
+            : (CuttingParameters[])source.contourParameters.Clone();
+        var perimeter = OwnedCuttingParameters.Copy(source.ParametersFor(PerimeterOrdinal));
+        perimeter.TabsEnabled = true;
+        perimeter.TabConfig = OwnedCuttingParameters.CopyTab(tab);
+        contourParameters[PerimeterOrdinal] = perimeter;
+        RejectedPins = source.RejectedPins;
+        this.support = support;
+        supportOrigin = location;
+    }
+
+    /// <summary>
+    /// A copy whose perimeter is tabbed with <paramref name="tab"/> where it steadies the part
+    /// on its support bed: <paramref name="support"/> analyzed this part's material placed at
+    /// <paramref name="location"/>, and the perimeter's automatic entries keep to points it
+    /// accepts (<see cref="PartSupport.AcceptsTabAt"/>) plus its best tab point. A pinned
+    /// perimeter is returned unchanged: the drawing wins.
+    /// </summary>
+    public PreparedContours WithSupportTab(PartSupport support, Vector location, Tab tab)
+    {
+        ArgumentNullException.ThrowIfNull(support);
+        ArgumentNullException.ThrowIfNull(tab);
+        PostVerificationGeometry.Validate(location);
+        if (!support.IsComplete || support.BestTabPoint == null)
+            throw new ArgumentException("Support tabs need a complete analysis with a tab point.", nameof(support));
+        return IsPinned(PerimeterOrdinal) ? this : new PreparedContours(this, support, location, tab);
+    }
+
+    /// <summary>The support analysis that tabs this perimeter, or null when it is not tabbed for support.</summary>
+    public PartSupport Support => support;
 
     public int Count => shapes.Length;
 
@@ -355,7 +401,7 @@ public sealed class PreparedContours
             return new[] { new ContourEntryCandidate(pin, AutomaticEntryKind.Pinned) };
         if (IsSingleCircle(shape))
             throw new ArgumentException("Circles have no preferred corners or joints; use the fallback catalogue.");
-        return MergeByGeometry(PreferredCandidates(shape, contourOrdinal, token));
+        return SupportFiltered(contourOrdinal, PreferredCandidates(shape, contourOrdinal, token), false);
     }
 
     /// <summary>
@@ -372,7 +418,8 @@ public sealed class PreparedContours
     internal IReadOnlyList<ContourEntryCandidate> AutomaticEntryCandidatesWithFallbacks(
         int contourOrdinal,
         Vector? lookAhead = null,
-        CancellationToken token = default)
+        CancellationToken token = default,
+        bool ignoreSupport = false)
     {
         token.ThrowIfCancellationRequested();
         var shape = GetShape(contourOrdinal);
@@ -382,7 +429,28 @@ public sealed class PreparedContours
             ? new List<ContourEntryCandidate>()
             : PreferredCandidates(shape, contourOrdinal, token);
         all.AddRange(FallbackCandidates(shape, contourOrdinal, lookAhead, token));
-        return MergeByGeometry(all);
+        return SupportFiltered(contourOrdinal, all, ignoreSupport);
+    }
+
+    /// <summary>
+    /// Whether this preparation tabs its perimeter for support (see <see cref="WithSupportTab"/>):
+    /// its automatic catalogue then keeps to steadying points unless asked to ignore support.
+    /// </summary>
+    internal bool HasSupportTab => support != null;
+
+    // A perimeter tabbed for support keeps the candidates whose tab steadies the part, and gains
+    // the outline's best tab point; with ignoreSupport (the search's fallback when none of them
+    // has a lead-in that fits) every candidate stays, still tabbed.
+    private IReadOnlyList<ContourEntryCandidate> SupportFiltered(int contourOrdinal,
+        List<ContourEntryCandidate> candidates, bool ignoreSupport)
+    {
+        if (support == null || contourOrdinal != PerimeterOrdinal || ignoreSupport)
+            return MergeByGeometry(candidates);
+        var kept = candidates.Where(c => support.AcceptsTabAt(c.Choice.Point + supportOrigin)).ToList();
+        var best = ClosestEntry(PerimeterOrdinal, support.BestTabPoint!.Value - supportOrigin);
+        if (!IsForbiddenVertex(GetShape(PerimeterOrdinal), best.Point))
+            kept.Add(new ContourEntryCandidate(best, AutomaticEntryKind.SupportTab));
+        return MergeByGeometry(kept);
     }
 
     private static bool IsSingleCircle(Shape shape) =>

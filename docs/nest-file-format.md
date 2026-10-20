@@ -123,6 +123,17 @@ and sheets with parts, cut-offs, removed clamps or explicit zones are not change
 An empty plate with other zones, or a rail-following one whose size, quadrant or
 spacing differs from the saved defaults, is still written.
 
+## Support grid
+
+`plateDefaults.supportBed` optionally stores the machine support bed every sheet of
+the nest rests on (see [support tabs](support-tabs.md)): `type` (`grid`, the only
+layout so far), `pitchX`, `pitchY`, `offsetX`, `offsetY` (the first grid point,
+measured from the plate origin into the sheet), `registrationTolerance` and
+`stabilityMargin`, all in the nest's units. The key is omitted when the nest has
+none, so such files are unchanged. A missing pitch, a non-numeric value, an unknown
+`type` or an invalid value (a non-positive pitch, a negative tolerance or margin)
+loads as no bed; the rest of the nest loads. Every plate follows the nest's bed.
+
 ## Drawing edits
 
 `DrawingProgramSnapshot` captures serialized main and hole-program text before

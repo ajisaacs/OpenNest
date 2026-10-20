@@ -45,6 +45,7 @@ internal static class OwnedCuttingParameters
                 ? source.TabsEnabled ? throw new ArgumentException("Enabled tabs require a configuration.") : null
                 : CopyTab(source.TabConfig),
             TabsEnabled = source.TabsEnabled,
+            SupportTabs = source.SupportTabs,
             Sequencing = new SequenceParameters
             {
                 Method = sequence.Method,

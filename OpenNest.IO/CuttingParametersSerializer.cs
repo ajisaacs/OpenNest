@@ -74,6 +74,7 @@ public static class CuttingParametersSerializer
             LeadInAngleIncrement = parameters.LeadInAngleIncrement,
             AutoTabMinSize = parameters.AutoTabMinSize,
             AutoTabMaxSize = parameters.AutoTabMaxSize,
+            SupportTabs = parameters.SupportTabs,
             Sequencing = ToSequenceDto(parameters.Sequencing),
             Assignment = ToAssignmentDto(parameters.Assignment),
         };
@@ -110,6 +111,7 @@ public static class CuttingParametersSerializer
             LeadInAngleIncrement = dto.LeadInAngleIncrement,
             AutoTabMinSize = dto.AutoTabMinSize,
             AutoTabMaxSize = dto.AutoTabMaxSize,
+            SupportTabs = dto.SupportTabs,
             Sequencing = FromSequenceDto(dto.Sequencing),
             Assignment = FromAssignmentDto(dto.Assignment),
         };

@@ -46,6 +46,13 @@ namespace OpenNest.CNC.CuttingStrategy
         public Tab TabConfig { get; set; }
         public bool TabsEnabled { get; set; }
 
+        /// <summary>
+        /// Tabs each part its plate's support bed cannot hold level once it is cut free, at the
+        /// perimeter point that best keeps its center of gravity over the bed's contacts (see
+        /// docs/support-tabs.md). Needs <see cref="TabConfig"/> for the tab size.
+        /// </summary>
+        public bool SupportTabs { get; set; }
+
         public SequenceParameters Sequencing { get; set; } = new SequenceParameters();
         public AssignmentParameters Assignment { get; set; } = new AssignmentParameters();
     }

@@ -140,6 +140,14 @@ namespace OpenNest.Forms
             mnuViewDrawCutDirection.Checked = activeForm.PlateView.DrawCutDirection;
         }
 
+        private void ToggleDrawSupport_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null)
+                return;
+            activeForm.ToggleSupport();
+            mnuViewDrawSupport.Checked = activeForm.PlateView.DrawSupport;
+        }
+
         private void ZoomToArea_Click(object sender, EventArgs e) => WithActive(f => f.PlateView.SetAction(typeof(ActionZoomWindow)));
 
         private void ZoomToFit_Click(object sender, EventArgs e) => WithActive(f => f.PlateView.ZoomToFit());

@@ -6,6 +6,7 @@ using OpenNest.CNC.CuttingPlanning;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
+using OpenNest.Support;
 
 namespace OpenNest.Engine.CuttingPlanning;
 
@@ -39,10 +40,20 @@ public sealed class CuttingPlanRequest
         bool preservePartOrder = false, int maxEntries = 16) =>
         new(plate?.Parts, startPoint, expansionBudget, confirmedParameters, eligibleParts,
             preservePartOrder, maxEntries)
-        { Plate = plate };
+        { Plate = plate, SupportBed = plate?.SupportBed, SupportQuadrant = plate?.Quadrant ?? 1 };
 
     /// <summary>The plate scope, or null for a detached part list that cannot be applied.</summary>
     public Plate Plate { get; private init; }
+
+    /// <summary>
+    /// The bed the parts rest on once cut free (the plate's own for <see cref="ForPlate"/>), or
+    /// null. With it and <see cref="CuttingParameters.SupportTabs"/>, each regenerated part the
+    /// bed cannot hold level is tabbed where the tab steadies it (docs/support-tabs.md).
+    /// </summary>
+    public SupportBed SupportBed { get; init; }
+
+    /// <summary>The sheet quadrant that places <see cref="SupportBed"/> on the parts' coordinates.</summary>
+    public int SupportQuadrant { get; init; } = 1;
     public CuttingParameters ConfirmedParameters { get; }
     public IReadOnlyList<Part> EligibleParts { get; }
     public bool PreservePartOrder { get; }

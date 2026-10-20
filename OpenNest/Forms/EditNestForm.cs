@@ -873,6 +873,12 @@ namespace OpenNest.Forms
             PlateView.Invalidate();
         }
 
+        public void ToggleSupport()
+        {
+            PlateView.DrawSupport = !PlateView.DrawSupport;
+            PlateView.Invalidate();
+        }
+
         public void ToggleFillParts()
         {
             PlateView.FillParts = !PlateView.FillParts;

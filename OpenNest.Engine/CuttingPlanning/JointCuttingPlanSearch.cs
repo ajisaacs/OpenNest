@@ -803,27 +803,18 @@ internal static class JointCuttingPlanSearch
         private IReadOnlyList<ContourChoice> SelectEntries(FixedProgramPlacement source, int contour,
             Vector? target, Vector arrival, Vector[] sightTargets = null)
         {
-            // Last contour has no downstream target, but still needs its exact native
-            // closest-arrival fallback. Keep target null in the ranker: arrival is not
-            // a next cut and must not acquire facing-side priority.
-            var catalogue = source.Prepared.AutomaticEntryCandidatesWithFallbacks(contour, target ?? arrival, token);
-            var ordered = catalogue.RankTowardNextCut(target, arrival);
-            // With no lead-out the tool leaves the part from its outside entry. From inside a
-            // slot or pocket the straight way to the next cut runs back over the part just
-            // cut, so entries with the clearest way out lead. Order only: every entry stays.
-            if (sightTargets is { Length: > 0 } && contour == source.Prepared.PerimeterOrdinal
-                && source.Material is { IsComplete: true } material)
-            {
-                var perimeter = material.Rings[0];
-                ordered = ordered.OrderBy(c => sightTargets.Count(sight => PostVerificationGeometry.Crosses(
-                    c.Choice.Point + source.Location, sight, perimeter, token))).ToList();
-            }
-            // A hole is left where it was entered too: entries whose rapid to the next
-            // pierce clears the hole itself lead.
-            if (target is { } next && contour != source.Prepared.PerimeterOrdinal)
-                ordered = ordered.DepartingClear(source.Prepared, next, token);
+            var ordered = RankedEntries(source, contour, target, arrival, sightTargets, ignoreSupport: false);
             var selection = ContourEntrySelection.Select(ordered,
                 candidate => Evaluate(source, candidate), snapshot.MaxEntries, token);
+            // No steadying point of a support-tabbed perimeter has a lead-in that fits: it is
+            // still tabbed, wherever its configured lead-ins fit.
+            if (contour == source.Prepared.PerimeterOrdinal && source.Prepared.HasSupportTab
+                && selection.Choices.Count == 0 && selection.UncertainChoices.Count == 0)
+            {
+                ordered = RankedEntries(source, contour, target, arrival, sightTargets, ignoreSupport: true);
+                selection = ContourEntrySelection.Select(ordered,
+                    candidate => Evaluate(source, candidate), snapshot.MaxEntries, token);
+            }
             // No configured lead-in fits the perimeter: with a pierce diameter, try open scrap.
             string scrapReason = null;
             if (contour == source.Prepared.PerimeterOrdinal && selection.Choices.Count == 0
@@ -847,6 +838,33 @@ internal static class JointCuttingPlanSearch
             // Uncertain candidates are NOT refused by the precheck: they reach the emitted-
             // prefix Check and complete replay, which remain the authority on them.
             return selection.Choices.Concat(selection.UncertainChoices).Take(snapshot.MaxEntries).ToArray();
+        }
+
+        // One contour's automatic catalogue ranked toward the next cut, before lead checks.
+        private IReadOnlyList<ContourEntryCandidate> RankedEntries(FixedProgramPlacement source, int contour,
+            Vector? target, Vector arrival, Vector[] sightTargets, bool ignoreSupport)
+        {
+            // Last contour has no downstream target, but still needs its exact native
+            // closest-arrival fallback. Keep target null in the ranker: arrival is not
+            // a next cut and must not acquire facing-side priority.
+            var catalogue = source.Prepared.AutomaticEntryCandidatesWithFallbacks(contour, target ?? arrival, token,
+                ignoreSupport);
+            var ordered = catalogue.RankTowardNextCut(target, arrival);
+            // With no lead-out the tool leaves the part from its outside entry. From inside a
+            // slot or pocket the straight way to the next cut runs back over the part just
+            // cut, so entries with the clearest way out lead. Order only: every entry stays.
+            if (sightTargets is { Length: > 0 } && contour == source.Prepared.PerimeterOrdinal
+                && source.Material is { IsComplete: true } material)
+            {
+                var perimeter = material.Rings[0];
+                ordered = ordered.OrderBy(c => sightTargets.Count(sight => PostVerificationGeometry.Crosses(
+                    c.Choice.Point + source.Location, sight, perimeter, token))).ToList();
+            }
+            // A hole is left where it was entered too: entries whose rapid to the next
+            // pierce clears the hole itself lead.
+            if (target is { } next && contour != source.Prepared.PerimeterOrdinal)
+                ordered = ordered.DepartingClear(source.Prepared, next, token);
+            return ordered;
         }
 
         private HolePreference PlanHoles(ActivePart active, ContourChoice perimeter)

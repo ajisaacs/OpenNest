@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using OpenNest.Collections;
 using OpenNest.Geometry;
+using OpenNest.Support;
 
 namespace OpenNest
 {
@@ -18,6 +19,7 @@ namespace OpenNest
             Name = name;
             Plates = new ObservableList<Plate>();
             Plates.ItemRemoved += Plates_PlateRemoved;
+            Plates.ItemAdded += Plates_PlateAdded;
             Drawings = new DrawingCollection();
             PlateDefaults = new PlateSettings();
             Material = new Material();
@@ -28,6 +30,13 @@ namespace OpenNest
         private static void Plates_PlateRemoved(object sender, ItemRemovedEventArgs<Plate> e)
         {
             e.Item.Parts.Clear();
+        }
+
+        // Every sheet of the nest rests on the same machine bed.
+        private void Plates_PlateAdded(object sender, ItemAddedEventArgs<Plate> e)
+        {
+            if (e.Item != null)
+                e.Item.SupportBed = SupportBed;
         }
 
         public string Name { get; set; }
@@ -78,6 +87,20 @@ namespace OpenNest
             PlateDefaults.ClampRail = rail;
             foreach (var plate in Plates)
                 plate.SetClampRail(rail);
+        }
+
+        /// <summary>
+        /// The machine support bed every sheet of this nest rests on, or null for none. Set
+        /// through <see cref="SetSupportBed"/>; plates added later follow it too.
+        /// </summary>
+        public SupportBed SupportBed { get; private set; }
+
+        /// <summary>Makes <paramref name="bed"/> this nest's support bed and every plate's.</summary>
+        public void SetSupportBed(SupportBed bed)
+        {
+            SupportBed = bed;
+            foreach (var plate in Plates)
+                plate.SupportBed = bed;
         }
 
         public void UpdateDrawingQuantities()

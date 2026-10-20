@@ -38,6 +38,7 @@ namespace OpenNest.Controls
         private readonly NumericUpDown nudTabWidth;
         private readonly RadioButton rbTabAll;
         private readonly RadioButton rbAutoTab;
+        private readonly RadioButton rbSupportTab;
         private readonly NumericUpDown nudAutoTabMin;
         private readonly NumericUpDown nudAutoTabMax;
         private readonly NumericUpDown nudPierceClearance;
@@ -205,18 +206,37 @@ namespace OpenNest.Controls
             nudAutoTabMax.Enabled = false;
             tabsPanel.ContentPanel.Controls.Add(nudAutoTabMax);
 
+            // Plan Cutting tabs only the parts the plate's support grid cannot hold level.
+            rbSupportTab = new RadioButton
+            {
+                Text = "Tab parts the support grid cannot hold level",
+                Location = new Point(28, 102),
+                AutoSize = true,
+                Enabled = false,
+            };
+            tabsPanel.ContentPanel.Controls.Add(rbSupportTab);
+
             chkTabsEnabled.CheckedChanged += (s, e) =>
             {
                 var enabled = chkTabsEnabled.Checked;
                 nudTabWidth.Enabled = enabled;
                 rbTabAll.Enabled = enabled;
                 rbAutoTab.Enabled = enabled;
+                rbSupportTab.Enabled = enabled;
                 nudAutoTabMin.Enabled = enabled && rbAutoTab.Checked;
                 nudAutoTabMax.Enabled = enabled && rbAutoTab.Checked;
                 OnParametersChanged();
             };
 
             rbTabAll.CheckedChanged += (s, e) =>
+            {
+                nudAutoTabMin.Enabled = chkTabsEnabled.Checked && rbAutoTab.Checked;
+                nudAutoTabMax.Enabled = chkTabsEnabled.Checked && rbAutoTab.Checked;
+                OnParametersChanged();
+            };
+
+            // Switching between auto and support tabs does not pass through Tab all parts.
+            rbSupportTab.CheckedChanged += (s, e) =>
             {
                 nudAutoTabMin.Enabled = chkTabsEnabled.Checked && rbAutoTab.Checked;
                 nudAutoTabMax.Enabled = chkTabsEnabled.Checked && rbAutoTab.Checked;
@@ -337,6 +357,7 @@ namespace OpenNest.Controls
                     chkTabsEnabled.Checked && rbAutoTab.Checked ? (double)nudAutoTabMin.Value : 0,
                 AutoTabMaxSize =
                     chkTabsEnabled.Checked && rbAutoTab.Checked ? (double)nudAutoTabMax.Value : 0,
+                SupportTabs = chkTabsEnabled.Checked && rbSupportTab.Checked,
             };
         }
 
@@ -352,9 +373,10 @@ namespace OpenNest.Controls
             LoadLeadOut(cboArcCircleLeadOut, pnlArcCircleLeadOut, p.ArcCircleLeadOut);
 
             var hasAutoTab = p.AutoTabMinSize > 0 || p.AutoTabMaxSize > 0;
-            chkTabsEnabled.Checked = p.TabsEnabled || hasAutoTab;
-            rbAutoTab.Checked = hasAutoTab;
-            rbTabAll.Checked = !hasAutoTab;
+            chkTabsEnabled.Checked = p.TabsEnabled || hasAutoTab || p.SupportTabs;
+            rbAutoTab.Checked = hasAutoTab && !p.SupportTabs;
+            rbSupportTab.Checked = p.SupportTabs;
+            rbTabAll.Checked = !hasAutoTab && !p.SupportTabs;
             if (p.TabConfig != null)
                 nudTabWidth.Value = (decimal)p.TabConfig.Size;
             nudPierceClearance.Value = (decimal)p.PierceClearance;

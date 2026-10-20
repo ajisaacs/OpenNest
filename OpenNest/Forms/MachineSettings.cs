@@ -74,6 +74,10 @@ namespace OpenNest.Forms
             return settings;
         }
 
+        /// <summary>The persisted machine support grid; never throws, and loads as off when unreadable.</summary>
+        public static SupportGridSettings LoadSupportGridSettings() =>
+            SupportGridSettings.Load(SupportGridSettings.DefaultPath);
+
         /// <summary>The single desktop entry point for the persisted machine clamp settings.</summary>
         public static ClampSettings LoadSavedClampSettings(out ClampSettingsStatus status) =>
             ClampSettings.Load(ClampSettings.DefaultPath, out status);

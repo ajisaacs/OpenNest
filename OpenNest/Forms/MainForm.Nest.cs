@@ -85,6 +85,30 @@ namespace OpenNest.Forms
                 view.Invalidate();
         }
 
+        private void SupportGrid_Click(object sender, EventArgs e)
+        {
+            var editForm = activeForm;
+            if (editForm == null)
+                return;
+
+            var nest = editForm.Nest;
+            var views = ViewsOf(nest);
+            if (IsPlateWorkBusy(views))
+            {
+                MessageBox.Show(this, "Finish or cancel the current nesting or plate action first.",
+                    "Support Grid", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using var form = new SupportGridForm(nest.SupportBed, nest.Units, MachineSettings.LoadSupportGridSettings());
+            if (form.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            nest.SetSupportBed(form.Grid);
+            foreach (var view in views)
+                view.Invalidate();
+        }
+
         private void RemoveEmptyPlates_Click(object sender, EventArgs e) => WithActive(f => f.Nest.Plates.RemoveEmptyPlates());
 
         private void ClearNest_Click(object sender, EventArgs e)

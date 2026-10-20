@@ -6,6 +6,7 @@ using OpenNest.Collections;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using OpenNest.Shapes;
+using OpenNest.Support;
 
 namespace OpenNest
 {
@@ -141,6 +142,13 @@ namespace OpenNest
         /// <see cref="Quadrant"/> changes, because the clamps are fixed to the machine.
         /// </summary>
         public ClampRail ClampRail { get; private set; }
+
+        /// <summary>
+        /// The machine support bed this sheet rests on (its nest's, see
+        /// <see cref="Nest.SetSupportBed"/>), or null for none. Display, analysis and support
+        /// tabs only: never material, spacing or a keep-out.
+        /// </summary>
+        public SupportBed SupportBed { get; set; }
 
         private static readonly IReadOnlySet<string> NoRemovedClamps = ImmutableHashSet<string>.Empty;
 

@@ -41,6 +41,7 @@ namespace OpenNest.Forms
             (units is { } converted ? defaults.ConvertedTo(converted) : defaults).ApplyTo(nest);
             // After the defaults so the rail is converted to the new nest's units.
             MachineSettings.LoadClampSettings(owner).ApplyToNewNest(nest);
+            MachineSettings.LoadSupportGridSettings().ApplyToNewNest(nest);
             return nest;
         }
 

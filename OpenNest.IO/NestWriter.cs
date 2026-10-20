@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using OpenNest.BestFit;
 using OpenNest.CNC;
+using OpenNest.Support;
 using static OpenNest.IO.NestFormat;
 
 namespace OpenNest.IO
@@ -142,8 +143,22 @@ namespace OpenNest.IO
                     Bottom = pd.EdgeSpacing.Bottom,
                 },
                 ClampRail = ToDto(pd.ClampRail),
+                SupportBed = ToDto(nest.SupportBed),
             };
         }
+
+        private static SupportBedDto ToDto(SupportBed bed) =>
+            bed is SupportGrid grid
+                ? new SupportBedDto
+                {
+                    PitchX = grid.PitchX,
+                    PitchY = grid.PitchY,
+                    OffsetX = grid.OffsetX,
+                    OffsetY = grid.OffsetY,
+                    RegistrationTolerance = grid.RegistrationTolerance,
+                    StabilityMargin = grid.StabilityMargin,
+                }
+                : null;
 
         private List<DrawingDto> BuildDrawingDtos()
         {

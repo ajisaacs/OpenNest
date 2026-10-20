@@ -12,6 +12,7 @@ using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using OpenNest.Support;
 using OpenNest.TabbedCutouts;
 using static OpenNest.IO.NestFormat;
 
@@ -472,6 +473,22 @@ namespace OpenNest.IO
         /// is ignored rather than failing the nest; each plate's saved zones still load). A
         /// missing or invalid removal-minutes value falls back to <see cref="ClampRail.DefaultRemovalMinutes"/>.
         /// </summary>
+        /// <summary>The saved support bed, or null when absent or invalid (a bad bed never fails the nest).</summary>
+        private static SupportBed ReadSupportBed(SupportBedDto dto)
+        {
+            if (dto == null)
+                return null;
+            try
+            {
+                return new SupportGrid(dto.PitchX, dto.PitchY, dto.OffsetX, dto.OffsetY,
+                    dto.RegistrationTolerance, dto.StabilityMargin);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return null;
+            }
+        }
+
         private static ClampRail ReadClampRail(ClampRailDto dto)
         {
             if (dto == null)
@@ -540,6 +557,8 @@ namespace OpenNest.IO
             );
             var clampRail = ReadClampRail(pd.ClampRail);
             nest.PlateDefaults.ClampRail = clampRail;
+            // Plates read below follow the nest's bed as they are added.
+            nest.SetSupportBed(ReadSupportBed(pd.SupportBed));
 
             // Stock options: sheet sizes and salvage rate
             nest.SalvageRate = dto.SalvageRate;

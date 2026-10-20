@@ -27,6 +27,7 @@ namespace OpenNest.Controls
         private readonly OverlapOverlayController overlapOverlay;
         private readonly ValidationOverlay validationOverlay;
         private readonly CutSimulationOverlay cutSimulation;
+        private readonly SupportOverlay supportOverlay = new();
 
         private string status;
         private Plate plate;
@@ -184,6 +185,9 @@ namespace OpenNest.Controls
         public bool DrawRapid { get; set; }
 
         public bool DrawPiercePoints { get; set; }
+
+        /// <summary>Draws the plate's support grid, each part's contacts and center of gravity.</summary>
+        public bool DrawSupport { get; set; }
 
         public bool DrawBounds { get; set; }
 
@@ -749,6 +753,8 @@ namespace OpenNest.Controls
             {
                 renderer.DrawActiveWorkArea(e.Graphics);
                 renderer.DrawDebugRemnants(e.Graphics);
+                if (DrawSupport)
+                    supportOverlay.Draw(e.Graphics, this);
                 DrawOverlapOverlay(e.Graphics);
             }
             // Plan Cutting marks findings on its proposal as well as on the live plate.
