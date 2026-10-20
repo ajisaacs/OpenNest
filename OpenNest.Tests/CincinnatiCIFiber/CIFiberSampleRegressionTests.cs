@@ -16,19 +16,20 @@ using OpenNest.Posts.CincinnatiCIFiber;
 namespace OpenNest.Tests.CincinnatiCIFiber;
 
 /// <summary>
-/// Regression against the real machine program: posts the reconstructed
-/// 12992-4SS nest (same part + layout as the sample NC) and compares contour
-/// counts, macro counts and perimeter geometry with 12992-4SS_NEST.nc.
+/// Regression against a real machine program: posts a nest reconstructed from
+/// a Cincinnati sample NC (same part and layout) and compares contour counts,
+/// macro counts and perimeter geometry with that NC. The sample is a customer
+/// production part, so the fixture stays outside the repository and is not
+/// named here.
 ///
 /// Each placed part in the fixture carries the sample's own pierce, lead-in
 /// and cut moves as its saved cutting program (not locked). Posting those
 /// saved programs must reproduce the sample move for move; the other tests
 /// replace them with OpenNest's own lead-ins first.
 ///
-/// The fixture lives outside the repository (/srv/shared). Configure it in
-/// OpenNest.Tests/test-config.json:
-///   { "CIFiberSampleNcPath": "/srv/shared/.../12992-4SS_NEST.nc",
-///     "CIFiberReconstructedNestPath": "/srv/shared/.../12992-4SS_NEST_reconstructed.nest" }
+/// Configure the fixture in OpenNest.Tests/test-config.json (gitignored):
+///   { "CIFiberSampleNcPath": "<path to the sample>.nc",
+///     "CIFiberReconstructedNestPath": "<path to the reconstructed>.nest" }
 /// Both must exist for the test to run; otherwise it skips.
 /// </summary>
 public class CIFiberSampleRegressionTests
