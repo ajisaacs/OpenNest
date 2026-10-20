@@ -1,9 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using OpenNest.CNC;
+using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Engine;
+using OpenNest.Engine.Sequencing;
 using OpenNest.Geometry;
 using OpenNest.Posts.CincinnatiCIFiber;
 
@@ -12,7 +17,7 @@ namespace OpenNest.Tests.CincinnatiCIFiber;
 /// <summary>
 /// Output-contract tests for the Cincinnati CI Fiber post, checked against the
 /// structure of the machine sample NC (12992-4SS_NEST.nc): header block,
-/// restart jump, N-labelled contour blocks with /L macro lines, G41/G42
+/// restart jump, N-labelled contour blocks with /L macro lines, G41
 /// selection, trimmed coordinate format and the M50/M30/% tail.
 /// </summary>
 public class CIFiberPostProcessorTests
@@ -131,7 +136,8 @@ public class CIFiberPostProcessorTests
         Assert.Equal("V.E.R3=2", lines[30]);
         Assert.Equal("G0X1Y1.5", lines[31]);
         Assert.Equal("/L \"L4\"", lines[32]);
-        Assert.Equal("G42", lines[33]);
+        // CW perimeter: the part is right of travel, so the kerf goes left.
+        Assert.Equal("G41", lines[33]);
         Assert.Equal("G1X1Y2", lines[34]);
         Assert.Equal("/L \"L6\"", lines[35]);
         Assert.Equal("G1X1Y12", lines[36]);
@@ -147,6 +153,101 @@ public class CIFiberPostProcessorTests
         Assert.Equal("M50", lines[44]);
         Assert.Equal("M30", lines[45]);
         Assert.Equal("%", lines[46]);
+    }
+
+    /// <summary>
+    /// End to end through the real cutting strategy, with a drawing wound
+    /// against OpenNest's convention (perimeter CCW, hole CW, as a drawing built
+    /// in code may be): the compensation must still keep the product on the side
+    /// the controller leaves it (G41 right of travel, G42 left), for the
+    /// perimeter and the hole alike, and each must get its own lead-in macro.
+    /// The wrong side under- or oversizes the cut by a kerf width.
+    /// </summary>
+    [Fact]
+    public void Post_Compensation_KeepsPartOnProductSide_ForPerimeterAndHole()
+    {
+        var pgm = new Program(Mode.Absolute);
+        // Square drawn CCW, the opposite of OpenNest's CW perimeter convention.
+        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(10, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(10, 10)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 10)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
+        // Hole r=1 at (5,5), drawn CW, the opposite of OpenNest's CCW hole convention.
+        pgm.Codes.Add(new RapidMove(new Vector(6, 5)));
+        pgm.Codes.Add(new ArcMove(new Vector(6, 5), new Vector(5, 5), RotationType.CW));
+
+        var location = new Vector(3, 4);
+        var plate = new Plate(60, 120);
+        plate.Parts.Add(new Part(new Drawing("rect-hole", pgm), location));
+        plate.CuttingParameters = new CuttingParameters
+        {
+            InternalLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
+            ExternalLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
+            ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
+        };
+        new LeadInAssigner { Sequencer = new LeftSideSequencer() }.Assign(plate);
+
+        var nest = new Nest("kerf") { Thickness = 0.06, Material = new Material("Mild Steel") };
+        nest.Plates.Add(plate);
+        var lines = Lines(Post(nest));
+
+        var holeCenter = location + new Vector(5, 5);
+        bool InMaterial(Vector p) =>
+            p.X > location.X && p.X < location.X + 10
+            && p.Y > location.Y && p.Y < location.Y + 10
+            && p.DistanceTo(holeCenter) > 1.0;
+
+        var checkedContours = 0;
+        for (var i = 0; i < lines.Count; i++)
+        {
+            if (lines[i] != "G41" && lines[i] != "G42")
+                continue;
+
+            // The lead-in ends on the contour; the first cut after /L "L6" sets
+            // the direction of travel there.
+            var start = ParseXY(lines[i + 1]);
+            var onPerimeter = start.DistanceTo(holeCenter) > 1.5;
+            Assert.Equal(onPerimeter ? "/L \"L4\"" : "/L \"L2\"", lines[i - 1]);
+            Assert.Equal("/L \"L6\"", lines[i + 2]);
+            var cut = lines[i + 3];
+            Vector travel;
+            if (cut.StartsWith("G1"))
+            {
+                travel = ParseXY(cut) - start;
+            }
+            else
+            {
+                var m = Regex.Match(cut, @"I(-?[\d.]+)J(-?[\d.]+)");
+                var radial = new Vector(
+                    -double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture),
+                    -double.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture)
+                ); // centre -> start
+                travel = cut.StartsWith("G3")
+                    ? new Vector(-radial.Y, radial.X)
+                    : new Vector(radial.Y, -radial.X);
+            }
+
+            var length = System.Math.Sqrt(travel.X * travel.X + travel.Y * travel.Y);
+            var right = new Vector(travel.Y / length, -travel.X / length);
+            if (lines[i] == "G42")
+                right = new Vector(-right.X, -right.Y); // G42 keeps the product on the left
+            Assert.True(InMaterial(start + right * 0.01), $"Part is not right of travel at {lines[i + 1]}");
+            Assert.False(InMaterial(start - right * 0.01), $"Kerf side is not scrap at {lines[i + 1]}");
+            checkedContours++;
+        }
+
+        Assert.Equal(2, checkedContours);
+    }
+
+    private static Vector ParseXY(string line)
+    {
+        var m = Regex.Match(line, @"X(-?[\d.]+)Y(-?[\d.]+)");
+        Assert.True(m.Success, line);
+        return new Vector(
+            double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture),
+            double.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture)
+        );
     }
 
     [Fact]

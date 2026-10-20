@@ -6,17 +6,16 @@ using OpenNest.Geometry;
 namespace OpenNest.Posts.CincinnatiCIFiber
 {
     /// <summary>
-    /// Classifies a flattened contour as interior or exterior from the
-    /// material side of its cut path, so the post picks the G41 (inside, kerf
-    /// left of travel) vs G42 (outside, kerf right of travel) lead-in macro to
-    /// keep the kerf on the scrap side, matching the machine sample (holes cut
-    /// CCW + G41, perimeter cut CCW + G42).
+    /// Works out, from a part's flattened contours, which one is the perimeter
+    /// (L4 lead-in macro, the rest are holes on L2) and which compensation
+    /// side keeps the kerf in the scrap.
     ///
-    /// OpenNest contours all keep material on the left of travel (see
-    /// OffsetSide / ContourCuttingStrategy): the perimeter runs clockwise
-    /// (negative shoelace area) and holes run counter-clockwise (positive).
-    /// A contour path that is not closed classifies as interior — a defensive
-    /// default; open paths should not reach the post.
+    /// G41 leaves the product right of travel. Imported drawings are wound
+    /// perimeter CW and holes CCW (ShapeProfile.NormalizeWinding), which puts
+    /// the part on the right and gives G41 throughout; a drawing that reaches
+    /// the post wound the other way (built in code or edited by hand) needs G42.
+    /// Paths that enclose no area (open break cuts) count as holes with G41,
+    /// a defensive default.
     /// </summary>
     public static class CIFiberWinding
     {
@@ -42,15 +41,59 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         }
 
         /// <summary>
-        /// True when the contour is a closed CW path — an external perimeter
-        /// under the OpenNest material-left convention.
+        /// Index of the part's perimeter: the contour enclosing the largest
+        /// bounding box, as ShapeProfile picks it. -1 when no contour encloses
+        /// any area.
         /// </summary>
-        public static bool IsExterior(CIFiberContour contour)
+        public static int PerimeterIndex(IReadOnlyList<CIFiberContour> contours)
         {
-            if (!IsClosed(contour))
-                return false;
+            var best = -1;
+            var bestArea = 0.0;
+            for (var i = 0; i < contours.Count; i++)
+            {
+                if (!EnclosesArea(contours[i]))
+                    continue;
 
-            return SignedArea(contour) < 0.0;
+                var area = BoundingBoxArea(SamplePoints(contours[i]));
+                if (best < 0 || area > bestArea)
+                {
+                    best = i;
+                    bestArea = area;
+                }
+            }
+
+            return best;
+        }
+
+        /// <summary>
+        /// True when G41 (product right of travel) keeps the kerf in the scrap:
+        /// a CW perimeter or a CCW hole. False calls for G42.
+        /// </summary>
+        public static bool CompensatesLeft(CIFiberContour contour, bool isPerimeter)
+        {
+            if (!EnclosesArea(contour))
+                return true;
+
+            var clockwise = SignedArea(contour) < 0.0;
+            return clockwise == isPerimeter;
+        }
+
+        private static bool EnclosesArea(CIFiberContour contour) =>
+            System.Math.Abs(SignedArea(contour)) > 1e-9;
+
+        private static double BoundingBoxArea(List<Vector> pts)
+        {
+            double minX = double.MaxValue, minY = double.MaxValue;
+            double maxX = double.MinValue, maxY = double.MinValue;
+            foreach (var p in pts)
+            {
+                minX = System.Math.Min(minX, p.X);
+                minY = System.Math.Min(minY, p.Y);
+                maxX = System.Math.Max(maxX, p.X);
+                maxY = System.Math.Max(maxY, p.Y);
+            }
+
+            return (maxX - minX) * (maxY - minY);
         }
 
         /// <summary>True when the cut path returns to its start point.</summary>
