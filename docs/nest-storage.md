@@ -70,6 +70,9 @@ carry string text fields (`null` is 400) and a defined `status`: a name, or for
 existing callers its integer value (0 quote, 1 toBeCut, 2 hasBeenCut, 3 draft); an
 undefined value is 400 and stores nothing. A server older than `draft` refuses it,
 so upgrade the server before desktops that can set it.
+An uploaded `file` (POST and PUT `/file`) must be a `.nest` archive with a readable
+`nest.json`, or the request is 400 and stores nothing. The server reads only that
+entry, never programs or geometry, and takes the archive-derived fields below from it.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -77,11 +80,11 @@ so upgrade the server before desktops that can set it.
 | `name` | string | |
 | `customer` | string | |
 | `dateCreated` / `dateModified` | datetime | Set by the client from the nest's own metadata. |
-| `material` | string | Material name (type), e.g. `Stainless`. |
+| `material` | string | Material name (type), e.g. `Stainless`. Read from the uploaded archive (nest material, else plate defaults' on an explicit null); a metadata-only PUT may change it, and the desktop applies the record's value when opening the nest. |
 | `materialGrade` | string | Optional; default blank. Older servers drop it. A blank grade on a record saved before schema v8 is treated as unrecorded: opening keeps the archive's grade while the material name matches. |
-| `thickness` | number | |
+| `thickness` | number | Read from the uploaded archive (nest thickness, else plate defaults' when not positive); editable like `material`. |
 | `status` | `"draft"` \| `"quote"` \| `"toBeCut"` \| `"hasBeenCut"` | Default `quote`. |
-| `plateCount` / `partCount` | integer | Computed client-side at save time (non-cutoff parts only). |
+| `plateCount` / `partCount` | integer | Server-computed from the uploaded archive (non-cutoff parts only; a trailing plate with no parts or cut-offs is not counted); ignored on upload and kept by a metadata-only PUT. |
 | `comments` | string | |
 | `madeBy` | string | |
 | `fileSize` | integer | Server-computed; ignored on upload. |

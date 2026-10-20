@@ -216,7 +216,7 @@ public sealed class NestApiTests
             () => new HttpRequestMessage(HttpMethod.Get, $"/api/nests/{unknown}/file"),
             () => new HttpRequestMessage(HttpMethod.Put, $"/api/nests/{unknown}/file")
             {
-                Content = Multipart(JsonSerializer.Serialize(record, JsonOptions), new byte[] { 1, 2, 3 }),
+                Content = Multipart(JsonSerializer.Serialize(record, JsonOptions), TestNests.Archive(1, 2, 3)),
             },
             () => new HttpRequestMessage(HttpMethod.Put, $"/api/nests/{unknown}/metadata")
             {
@@ -287,15 +287,15 @@ public sealed class NestApiTests
                 content.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data; boundary=expected-boundary");
                 return content;
             case "missing boundary":
-                var unbounded = Multipart(metadata, new byte[] { 1 });
+                var unbounded = Multipart(metadata, TestNests.Archive(1));
                 unbounded.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data");
                 return unbounded;
             case "missing metadata":
-                return Multipart(null, new byte[] { 1 });
+                return Multipart(null, TestNests.Archive(1));
             case "invalid metadata JSON":
-                return Multipart("{not-json", new byte[] { 1 });
+                return Multipart("{not-json", TestNests.Archive(1));
             case "null metadata":
-                return Multipart("null", new byte[] { 1 });
+                return Multipart("null", TestNests.Archive(1));
             case "missing file":
                 return Multipart(metadata, null);
             case "empty file":

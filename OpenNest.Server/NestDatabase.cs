@@ -179,6 +179,12 @@ public sealed partial class NestDatabase : IDisposable
             var current = Get(id);
             if (current is null) return null;
             if (current.Revision != expectedRevision) throw new RevisionConflictException(current);
+            if (file is null)
+            {
+                // The counts describe the archive, which a metadata-only save leaves unchanged.
+                record.PlateCount = current.PlateCount;
+                record.PartCount = current.PartCount;
+            }
             file ??= GetFile(id)!;
             if (SameMetadata(current, record) && GetFile(id)!.AsSpan().SequenceEqual(file)) return current;
 

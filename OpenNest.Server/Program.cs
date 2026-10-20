@@ -203,7 +203,12 @@ static async Task<(NestRecord? Record, byte[]? File, IResult? Error)> ReadMultip
     using var stream = filePart.OpenReadStream();
     using var buffer = new MemoryStream((int)filePart.Length);
     await stream.CopyToAsync(buffer);
-    return (record, buffer.ToArray(), null);
+    var file = buffer.ToArray();
+
+    // Counts, material and thickness come from the archive itself, not the client's claim.
+    if (NestArchive.Apply(record, file) is { } archiveError)
+        return (null, null, Results.BadRequest(archiveError));
+    return (record, file, null);
 }
 
 // Entry-point type for in-memory integration tests (WebApplicationFactory<Program>).

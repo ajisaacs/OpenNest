@@ -135,8 +135,8 @@ public sealed class NestHistoryClientTests
         using var http = factory.CreateClient();
         using var repository = new RemoteNestRepository(http, http.BaseAddress!.ToString());
         var id = Guid.NewGuid();
-        var first = new byte[] { 80, 75, 0, 1, 255 };
-        var second = new byte[] { 80, 75, 0, 2, 254 };
+        var first = TestNests.Archive(80, 75, 0, 1, 255);
+        var second = TestNests.Archive(80, 75, 0, 2, 254);
         var created = await repository.UploadAsync(first, new NestRecord { Id = id, Name = "Synthetic" });
         Assert.Equal(1, created.Revision);
 
@@ -163,9 +163,9 @@ public sealed class NestHistoryClientTests
         using var factory = new ServerFactory();
         using var http = factory.CreateClient();
         using var repository = new RemoteNestRepository(http, http.BaseAddress!.ToString());
-        var created = await repository.UploadAsync([1, 2, 3], new NestRecord { Name = "Synthetic" });
+        var created = await repository.UploadAsync(TestNests.Archive(1, 2, 3), new NestRecord { Name = "Synthetic" });
         using var response = await http.DeleteAsync($"/api/nests/{created.Id}");
         Assert.Equal((HttpStatusCode)428, response.StatusCode);
-        Assert.Equal(new byte[] { 1, 2, 3 }, await repository.GetRevisionFileAsync(created.Id, 1));
+        Assert.Equal(TestNests.Archive(1, 2, 3), await repository.GetRevisionFileAsync(created.Id, 1));
     }
 }

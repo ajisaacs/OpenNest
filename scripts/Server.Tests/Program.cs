@@ -191,14 +191,14 @@ internal static class Program
         var before = await Snapshot(repository, ct);
         Check(before.Count > 0, "Limit checks require seeded records on an owned server.");
 
-        // Opaque synthetic bytes (the server does not parse archives) above the 64 KiB form
-        // memory threshold, so the non-root runtime must buffer the part to its temp directory.
-        var accepted = new byte[29_000_000];
-        RandomNumberGenerator.Fill(accepted);
+        // A readable nest archive (the server parses its nest.json) padded with incompressible
+        // bytes above the 64 KiB form memory threshold, so the non-root runtime must buffer the
+        // part to its temp directory.
+        var accepted = PaddedArchive(29_000_000);
         var created = await repository.UploadAsync(accepted, new NestRecord
         {
             Name = "Synthetic upload-limit probe",
-            Comments = "Random bytes; deleted by the same smoke stage",
+            Comments = "Random padding; deleted by the same smoke stage",
         }, ct);
         Check(created.Id != Guid.Empty && created.FileSize == accepted.LongLength,
             "A near-limit upload must be stored with its exact size.");
@@ -360,6 +360,23 @@ internal static class Program
     {
         using var stream = new MemoryStream();
         Check(new NestWriter(nest).Write(stream), "NestWriter must succeed.");
+        return stream.ToArray();
+    }
+
+    /// <summary>A minimal nest archive with a stored random entry, close to <paramref name="size"/> bytes.</summary>
+    private static byte[] PaddedArchive(int size)
+    {
+        using var stream = new MemoryStream();
+        using (var zip = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+        {
+            using (var writer = new StreamWriter(zip.CreateEntry("nest.json").Open()))
+                writer.Write("""{"version":2,"name":"Synthetic upload-limit probe","drawings":[],"plates":[]}""");
+            var padding = new byte[size - 1024];
+            RandomNumberGenerator.Fill(padding);
+            using var entry = zip.CreateEntry("padding.bin", System.IO.Compression.CompressionLevel.NoCompression).Open();
+            entry.Write(padding);
+        }
+
         return stream.ToArray();
     }
 

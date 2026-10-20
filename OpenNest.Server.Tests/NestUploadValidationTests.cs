@@ -21,16 +21,16 @@ public sealed class NestUploadValidationTests
         using var factory = new ServerFactory();
         using var client = factory.CreateClient();
         var id = Guid.NewGuid();
-        using var created = await client.PostAsync("/api/nests", NestRevisionTests.Body(new NestRecord { Id = id, Name = "Original" }, [1]));
+        using var created = await client.PostAsync("/api/nests", NestRevisionTests.Body(new NestRecord { Id = id, Name = "Original" }, TestNests.Archive(1)));
         Assert.Equal(HttpStatusCode.OK, created.StatusCode);
 
-        using var duplicate = await client.PostAsync("/api/nests", NestRevisionTests.Body(new NestRecord { Id = id, Name = "Replacement" }, [2]));
+        using var duplicate = await client.PostAsync("/api/nests", NestRevisionTests.Body(new NestRecord { Id = id, Name = "Replacement" }, TestNests.Archive(2)));
 
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
         var current = (await duplicate.Content.ReadFromJsonAsync<NestRecord>(Options))!;
         Assert.Equal(id, current.Id);
         Assert.Equal("Original", current.Name);
-        Assert.Equal(new byte[] { 1 }, await client.GetByteArrayAsync($"/api/nests/{id}/file"));
+        Assert.Equal(TestNests.Archive(1), await client.GetByteArrayAsync($"/api/nests/{id}/file"));
         using var reopened = new NestDatabase(factory.DatabasePath, pooling: false);
         Assert.Equal(1, reopened.History(id, 0, 100)!.Total);
     }
@@ -41,20 +41,20 @@ public sealed class NestUploadValidationTests
         using var factory = new ServerFactory();
         using var client = factory.CreateClient();
         var id = Guid.NewGuid();
-        using var created = await client.PostAsync("/api/nests", NestRevisionTests.Body(new NestRecord { Id = id, Name = "Original" }, [1]));
+        using var created = await client.PostAsync("/api/nests", NestRevisionTests.Body(new NestRecord { Id = id, Name = "Original" }, TestNests.Archive(1)));
         using var delete = new HttpRequestMessage(HttpMethod.Delete, $"/api/nests/{id}");
         delete.Headers.TryAddWithoutValidation("If-Match", "\"1\"");
         using var deleted = await client.SendAsync(delete);
         Assert.Equal(HttpStatusCode.OK, deleted.StatusCode);
 
-        using var duplicate = await client.PostAsync("/api/nests", NestRevisionTests.Body(new NestRecord { Id = id, Name = "Replacement" }, [2]));
+        using var duplicate = await client.PostAsync("/api/nests", NestRevisionTests.Body(new NestRecord { Id = id, Name = "Replacement" }, TestNests.Archive(2)));
 
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
         var current = (await duplicate.Content.ReadFromJsonAsync<NestRecord>(Options))!;
         Assert.True(current.Deleted);
         Assert.Equal(2, current.Revision);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/nests/{id}")).StatusCode);
-        Assert.Equal(new byte[] { 1 }, await client.GetByteArrayAsync($"/api/nests/deleted/{id}/file"));
+        Assert.Equal(TestNests.Archive(1), await client.GetByteArrayAsync($"/api/nests/deleted/{id}/file"));
     }
 
     [Theory]
@@ -71,7 +71,7 @@ public sealed class NestUploadValidationTests
         using var factory = new ServerFactory();
         using var client = factory.CreateClient();
 
-        using var response = await client.PostAsync("/api/nests", RawBody(metadata, [1]));
+        using var response = await client.PostAsync("/api/nests", RawBody(metadata, TestNests.Archive(1)));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var reopened = new NestDatabase(factory.DatabasePath, pooling: false);
@@ -88,7 +88,7 @@ public sealed class NestUploadValidationTests
         using var factory = new ServerFactory();
         using var client = factory.CreateClient();
 
-        using var response = await client.PostAsync("/api/nests", RawBody(metadata, [1]));
+        using var response = await client.PostAsync("/api/nests", RawBody(metadata, TestNests.Archive(1)));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(expected, (await response.Content.ReadFromJsonAsync<NestRecord>(Options))!.Status);
@@ -104,7 +104,7 @@ public sealed class NestUploadValidationTests
         var id = await Create(client);
         client.DefaultRequestHeaders.TryAddWithoutValidation("If-Match", "\"1\"");
 
-        using var response = await client.PutAsync($"/api/nests/{id}/file", RawBody(metadata, [2]));
+        using var response = await client.PutAsync($"/api/nests/{id}/file", RawBody(metadata, TestNests.Archive(2)));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         await AssertUnchanged(factory, client, id);
@@ -130,14 +130,14 @@ public sealed class NestUploadValidationTests
 
     private static async Task<Guid> Create(HttpClient client)
     {
-        using var created = await client.PostAsync("/api/nests", NestRevisionTests.Body(new NestRecord { Name = "Original" }, [1]));
+        using var created = await client.PostAsync("/api/nests", NestRevisionTests.Body(new NestRecord { Name = "Original" }, TestNests.Archive(1)));
         Assert.Equal(HttpStatusCode.OK, created.StatusCode);
         return (await created.Content.ReadFromJsonAsync<NestRecord>(Options))!.Id;
     }
 
     private static async Task AssertUnchanged(ServerFactory factory, HttpClient client, Guid id)
     {
-        Assert.Equal(new byte[] { 1 }, await client.GetByteArrayAsync($"/api/nests/{id}/file"));
+        Assert.Equal(TestNests.Archive(1), await client.GetByteArrayAsync($"/api/nests/{id}/file"));
         using var reopened = new NestDatabase(factory.DatabasePath, pooling: false);
         var current = reopened.Get(id)!;
         Assert.Equal("Original", current.Name);
