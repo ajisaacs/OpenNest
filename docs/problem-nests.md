@@ -34,9 +34,10 @@ Plates use their own cutting parameters. A plate without them uses line lead-ins
 
 ## Adding a nest
 
-1. In the desktop app, point **File > Storage Mode...** at the corpus server, then drag the
-   `.nest` file onto the window. Switch the server back afterwards.
-2. In **Nest > Nest Info**, name it after the problem, and in the comments describe what failed
+1. In the desktop app, choose Database mode and the corpus server in **File > Storage Mode...**,
+   then drag the `.nest` file onto the window. Keep the corpus server selected until the save in
+   step 4 succeeds, then restore your previous storage settings.
+2. In **Nest > Edit**, name it after the problem, and in the comments describe what failed
    and which commit fixed it, if any.
 3. Add a baseline line to the comments, with plate numbers counted from the first plate:
    `planning: 1=NoSolutionWithinBudget 2=BestEffort`.

@@ -625,9 +625,9 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   plates, so a higher effort spends more only where the full search runs and leaves easy
   plates' plans unchanged. A plate refused because a search reached its limit (its own
   plan, or the free-order attempt before the current order was kept) says the effort can
-  be raised; a longer search may still find no plan. Only the desktop plans cuts: the
-  console, MCP server and API create plates but do not call the planner, so they have no
-  budget to configure. Direct `CuttingPlanRequest` callers set `expansionBudget` themselves.
+  be raised; a longer search may still find no plan. The effort is a desktop setting: console
+  `--plan-cutting` and MCP `plan_cutting` run the same planner at the default effort (1.0)
+  and have no effort option, and the nesting API does not plan cuts. Direct `CuttingPlanRequest` callers set `expansionBudget` themselves.
 - The docked panel keeps text short: one colored outcome line for the batch, one line for the
   shown plate, and one detail line (a remedy for a blocked plate, or what the selected marker
   shows). Below them is a read-only, unsorted issue grid with Plate, source Part, With, and full
