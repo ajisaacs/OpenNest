@@ -1007,8 +1007,9 @@ static class NestConsole
                                      Without --autonest: fill strategy (Fill (default), Strip, Vertical Remnant, Horizontal Remnant)
               --keep-parts           Don't clear existing parts before filling
               --no-fill              Keep the loaded .nest as it is (no fill); plan, save or post it
-              --plan-cutting         After filling, plan cutting (part order, contour order, entries,
-                                     lead-ins); applied only when every plate is ready (else exit 2)
+              --plan-cutting         After filling (or loading with --no-fill), plan cutting (part order,
+                                     contour order, entries, lead-ins); applied only when every plate is
+                                     ready or --accept-unverified-plan is given (else exit 2)
               --cutting-params <path>  Cutting settings JSON for --plan-cutting (default: the plates' own
                                      saved settings, which must agree; never invented)
               --keep-part-order      With --plan-cutting: keep the current whole-part order
