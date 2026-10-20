@@ -50,4 +50,40 @@ internal static class DrawingSetFixtures
 
     public static IEnumerable<(Guid, int)> MembersOf(DrawingSetRecord record) =>
         record.Members.Select(m => (m.DrawingId, m.Quantity));
+
+    /// <summary>Stores a draft nest directly and returns its id.</summary>
+    public static Guid AddNest(NestDatabase database, string name = "Synthetic nest") =>
+        database.Insert(Guid.NewGuid(), new NestRecord { Name = name, Status = NestStatus.Draft }, new byte[] { 1, 2, 3 }).Id;
+
+    public static async Task<Guid> AddNest(HttpClient client, string name = "Synthetic nest", Guid? id = null)
+    {
+        var record = new NestRecord { Id = id ?? Guid.NewGuid(), Name = name, Status = NestStatus.Draft };
+        using var body = new MultipartFormDataContent
+        {
+            { new StringContent(JsonSerializer.Serialize(record, Options), Encoding.UTF8, "application/json"), "metadata" },
+            { new ByteArrayContent(new byte[] { 1, 2, 3 }), "file", "synthetic.nest" },
+        };
+        using var response = await client.PostAsync("/api/nests", body);
+        response.EnsureSuccessStatusCode();
+        return record.Id;
+    }
+
+    /// <summary>A release of <paramref name="setRevision"/> making one nest per id, each in its own material.</summary>
+    public static SetReleaseRecord Release(int setRevision, params Guid[] nests) => new()
+    {
+        Id = Guid.NewGuid(),
+        SetRevision = setRevision,
+        Multiplier = 2,
+        Notes = "Synthetic release",
+        ReleasedBy = "Synthetic operator",
+        Nests = nests.Select((nest, i) => new SetReleaseNest
+        {
+            NestId = nest,
+            MaterialName = "Synthetic Steel " + i,
+            MaterialGrade = "Grade A",
+            Thickness = 0.25,
+            Units = Units.Inches,
+            CutType = CutType.Laser,
+        }).ToList(),
+    };
 }

@@ -4,9 +4,10 @@ using OpenNest.Data;
 namespace OpenNest.Server;
 
 /// <summary>
-/// <c>/api/sets</c>: named, versioned lists of library drawings with quantities. Sets
-/// travel as JSON; existing-set writes follow the drawing If-Match contract (428 missing,
-/// 400 malformed, 409 stale or wrong state with the current record).
+/// <c>/api/sets</c>: named, versioned lists of library drawings with quantities, and the
+/// append-only records of their releases into nests. Both travel as JSON; existing-set
+/// writes follow the drawing If-Match contract (428 missing, 400 malformed, 409 stale or
+/// wrong state with the current record).
 /// </summary>
 internal static class DrawingSetRoutes
 {
@@ -68,6 +69,35 @@ internal static class DrawingSetRoutes
 
         app.MapPost("/api/sets/{id:guid}/restore", (Guid id, HttpRequest request, NestDatabase db) =>
             SetArchived(id, false, request, db));
+
+        // Posted after every nest is uploaded; the client allocates the release id.
+        app.MapPost("/api/sets/{id:guid}/releases", async (Guid id, HttpRequest request, NestDatabase db) =>
+        {
+            var (release, error) = await ReadRelease(request);
+            if (error is not null) return error;
+            if (release!.Id == Guid.Empty)
+                return Results.BadRequest("id is required: allocate it before posting the release.");
+            if (release.SetId != Guid.Empty && release.SetId != id)
+                return Results.BadRequest("Release setId does not match the route.");
+            try
+            {
+                var stored = db.InsertSetRelease(id, release);
+                return stored is null ? Results.NotFound() : Results.Ok(stored);
+            }
+            catch (SetReleaseConflictException conflict)
+            {
+                return Results.Json(conflict.Current, statusCode: StatusCodes.Status409Conflict);
+            }
+            catch (ArgumentException invalid) { return Results.BadRequest(invalid.Message); }
+        });
+
+        app.MapGet("/api/sets/{id:guid}/releases", (Guid id, HttpRequest request, NestDatabase db) =>
+            !DrawingLibraryRequest.TryReadPaging(request.Query, out var offset, out var limit, out var error)
+                ? Results.BadRequest(error)
+                : db.SetReleases(id, offset, limit) is { } page ? Results.Ok(page) : Results.NotFound());
+
+        app.MapGet("/api/nests/{id:guid}/release", (Guid id, NestDatabase db) =>
+            db.ReleaseForNest(id) is { } release ? Results.Ok(release) : Results.NotFound());
     }
 
     private static IResult SetArchived(Guid id, bool archived, HttpRequest request, NestDatabase db)
@@ -87,10 +117,28 @@ internal static class DrawingSetRoutes
 
     private static async Task<(DrawingSetRecord? Record, IResult? Error)> ReadSet(HttpRequest request)
     {
+        var (json, error) = await ReadJson(request, "set");
+        if (error is not null) return (null, error);
+        return DrawingSetRequest.TryReadSet(json, out var record, out var invalid)
+            ? (record, null)
+            : (null, Results.BadRequest(invalid));
+    }
+
+    private static async Task<(SetReleaseRecord? Release, IResult? Error)> ReadRelease(HttpRequest request)
+    {
+        var (json, error) = await ReadJson(request, "release");
+        if (error is not null) return (null, error);
+        return DrawingSetRequest.TryReadRelease(json, out var release, out var invalid)
+            ? (release, null)
+            : (null, Results.BadRequest(invalid));
+    }
+
+    private static async Task<(string? Json, IResult? Error)> ReadJson(HttpRequest request, string what)
+    {
         if (!request.HasJsonContentType())
-            return (null, Results.BadRequest("Expected an application/json set."));
+            return (null, Results.BadRequest($"Expected an application/json {what}."));
         if (request.ContentLength > DrawingSetRules.MaxBodyBytes)
-            return (null, Results.BadRequest("The set is too large."));
+            return (null, Results.BadRequest($"The {what} is too large."));
 
         // Bounded read: a body without a length, or longer than it claims, stops at the limit.
         using var body = new MemoryStream();
@@ -99,13 +147,10 @@ internal static class DrawingSetRoutes
         while ((read = await request.Body.ReadAsync(chunk, request.HttpContext.RequestAborted)) > 0)
         {
             if (body.Length + read > DrawingSetRules.MaxBodyBytes)
-                return (null, Results.BadRequest("The set is too large."));
+                return (null, Results.BadRequest($"The {what} is too large."));
             body.Write(chunk, 0, read);
         }
 
-        var json = Encoding.UTF8.GetString(body.GetBuffer(), 0, (int)body.Length);
-        return DrawingSetRequest.TryReadSet(json, out var record, out var error)
-            ? (record, null)
-            : (null, Results.BadRequest(error));
+        return (Encoding.UTF8.GetString(body.GetBuffer(), 0, (int)body.Length), null);
     }
 }

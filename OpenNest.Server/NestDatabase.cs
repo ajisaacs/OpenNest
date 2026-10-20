@@ -475,28 +475,29 @@ public sealed partial class NestDatabase : IDisposable
         }
     }
 
-    private static NestRecord ReadRecord(SqliteDataReader reader)
+    // Reads RecordColumns in order from column `first` on; a join may put other columns before them.
+    private static NestRecord ReadRecord(SqliteDataReader reader, int first = 0)
     {
         return new NestRecord
         {
-            Id = Guid.Parse(reader.GetString(0)),
-            Name = reader.GetString(1),
-            Customer = reader.GetString(2),
-            DateCreated = DateTime.Parse(reader.GetString(3)),
-            DateModified = DateTime.Parse(reader.GetString(4)),
-            Material = reader.GetString(5),
-            Thickness = reader.GetDouble(6),
-            Status = Enum.TryParse<NestStatus>(reader.GetString(7), true, out var s)
+            Id = Guid.Parse(reader.GetString(first)),
+            Name = reader.GetString(first + 1),
+            Customer = reader.GetString(first + 2),
+            DateCreated = DateTime.Parse(reader.GetString(first + 3)),
+            DateModified = DateTime.Parse(reader.GetString(first + 4)),
+            Material = reader.GetString(first + 5),
+            Thickness = reader.GetDouble(first + 6),
+            Status = Enum.TryParse<NestStatus>(reader.GetString(first + 7), true, out var s)
                 ? s : NestStatus.Quote,
-            PlateCount = (int)reader.GetInt64(8),
-            PartCount = (int)reader.GetInt64(9),
-            Comments = reader.GetString(10),
-            MadeBy = reader.GetString(11),
-            FileSize = reader.GetInt64(12),
-            SavedAt = DateTime.Parse(reader.GetString(13)),
-            Revision = reader.GetInt32(14),
-            Deleted = reader.GetInt32(15) != 0,
-            RestoredFromRevision = reader.IsDBNull(16) ? null : reader.GetInt32(16),
+            PlateCount = (int)reader.GetInt64(first + 8),
+            PartCount = (int)reader.GetInt64(first + 9),
+            Comments = reader.GetString(first + 10),
+            MadeBy = reader.GetString(first + 11),
+            FileSize = reader.GetInt64(first + 12),
+            SavedAt = DateTime.Parse(reader.GetString(first + 13)),
+            Revision = reader.GetInt32(first + 14),
+            Deleted = reader.GetInt32(first + 15) != 0,
+            RestoredFromRevision = reader.IsDBNull(first + 16) ? null : reader.GetInt32(first + 16),
         };
     }
 }

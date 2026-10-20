@@ -236,6 +236,7 @@ public sealed class DrawingLibraryDatabaseTests
         }
 
         Execute(path, """
+            DROP TABLE set_release_nests; DROP TABLE set_releases;
             DROP TABLE drawing_set_members; DROP TABLE drawing_sets; DROP TABLE drawing_set_revisions;
             DROP TABLE drawing_revisions; DROP TABLE drawings; DROP TABLE drawing_packages; PRAGMA user_version=3;
             """);

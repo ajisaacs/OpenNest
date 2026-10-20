@@ -374,12 +374,48 @@ save, so a record read from the server may be sent back as it is.
   and the refusal of unknown, repeated or out-of-range parameters follow the
   drawing query.
 
+### Set releases
+
+A set is never added to a nest, because a nest is one material. It is
+**released**: the client makes one nest per material group with every quantity
+multiplied, uploads each nest, and only then posts a **release record** naming
+the set revision and the nests. A failure part-way leaves ordinary nests and no
+release, and nothing is rolled back silently.
+
+`OpenNest.Data.SetReleaseRecord` fields: `id` (client-allocated, so an
+ambiguous post can be retried), `setId` (from the route; a body value must
+match it), `setRevision`, `multiplier`, `notes`, `releasedBy`, the
+server-computed `releasedAt`, `setName` (the set's name at that revision) and
+`nests`, in order, each `{ nestId, materialName, materialGrade, thickness, units,
+cutType, nest }`. The material fields are the group the nest was made for;
+`nest` is the nest's current metadata (deleted or not), joined on every read so
+status and deletion are always current, and ignored on post.
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| POST | `/api/sets/{id}/releases` | JSON release with a nonempty `id` | The stored release; 404 for an unknown set; 409 with the release that already holds the id or one of the nests |
+| GET | `/api/sets/{id}/releases?offset=0&limit=100` | — | Release page with nests, newest first; limit 1–200 |
+| GET | `/api/nests/{id}/release` | — | The release the nest (deleted or not) came from, or 404 |
+
+- Releases are append-only: there is no edit or delete. A mistaken release is
+  undone by deleting its nests, which then read as `deleted`.
+- `setRevision` must be a revision of the set but need not be the current one,
+  and the set may be archived: the nests already exist by the time the release
+  is posted, so it is never refused for a state the operator cannot fix.
+- Each nest belongs to at most one release (a unique index enforces it).
+- Validation (400, no state change): `multiplier` 1–1000; notes at most 4000
+  and releasedBy at most 200 characters; `nests` present, 1–500 entries, no
+  nest twice, each an existing, not deleted nest with material name and grade
+  at most 200 characters, `thickness` finite and at least 0 (stored rounded to 4
+  decimals), and `units` and `cutType` single enum names.
+
 Schema v7 adds `drawing_set_revisions` (every revision's details and archived
 flag), `drawing_set_members` (each revision's members by position, unique per
-drawing) and `drawing_sets` (each set's current revision). Upgrading from v6
-only creates these tables; every other table is untouched. A server older than
+drawing), `drawing_sets` (each set's current revision), `set_releases` and
+`set_release_nests`. Upgrading from v6 only creates these tables; every other
+table is untouched. A server older than
 v7 refuses to open a v7 database, so rolling back needs the pre-upgrade backup.
-The stopped-volume `tar` backup includes the set tables; `nest_manifest.py` and
+The stopped-volume `tar` backup includes the set and release tables; `nest_manifest.py` and
 `restore_check` do not verify them yet.
 
 ## Storage

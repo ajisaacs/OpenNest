@@ -43,7 +43,7 @@ public sealed class DrawingSetDatabaseTests
         Assert.Throws<SqliteException>(() => new NestDatabase(factory.DatabasePath, pooling: false));
 
         Assert.Equal(6L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
-        Assert.Equal(0L, Scalar(factory.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE name LIKE 'drawing_set%'"));
+        Assert.Equal(0L, Scalar(factory.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE name LIKE 'drawing_set%' OR name LIKE 'set_release%'"));
         Assert.Equal(before, Digest(factory.DatabasePath));
         Execute(factory.DatabasePath, "DROP TABLE ix_drawing_set_members_drawing");
         using var database = new NestDatabase(factory.DatabasePath, pooling: false);
@@ -295,7 +295,7 @@ public sealed class DrawingSetDatabaseTests
     }
 
     /// <summary>
-    /// A real schema-v6 file with nests and a library drawing: the set tables are additive,
+    /// A real schema-v6 file with nests and a library drawing: the set and release tables are additive,
     /// so dropping them restores v6 exactly. Returns the drawing's id.
     /// </summary>
     private static Guid CreateVersion6Database(string path)
@@ -314,7 +314,10 @@ public sealed class DrawingSetDatabaseTests
             database.UpdateDrawing(drawing, edit, null, 1);
         }
 
-        Execute(path, "DROP TABLE drawing_set_members; DROP TABLE drawing_sets; DROP TABLE drawing_set_revisions; PRAGMA user_version=6;");
+        Execute(path, """
+            DROP TABLE set_release_nests; DROP TABLE set_releases;
+            DROP TABLE drawing_set_members; DROP TABLE drawing_sets; DROP TABLE drawing_set_revisions; PRAGMA user_version=6;
+            """);
         return drawing;
     }
 
