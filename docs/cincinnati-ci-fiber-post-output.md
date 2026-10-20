@@ -100,7 +100,13 @@ validated and saved only when OK is pressed.
 cover a square with a hole, kerf side for either winding, coordinate
 transforms/formatting, lead-in rejection,
 cut-off sequencing and output, table bounds, suppression/scribe handling, and
-multi-sheet output in both modes. Run:
+multi-sheet output in both modes.
+[Sample regression tests](../OpenNest.Tests/CincinnatiCIFiber/CIFiberSampleRegressionTests.cs)
+post a nest rebuilt from a Cincinnati machine sample, whose parts carry the
+sample's own pierce, lead-in and cut moves. Posted unchanged, the program body
+must match the sample line for line (macro, G41/G42 side, lead-ins and cuts).
+The fixture stays outside the repository and the tests skip when
+`test-config.json` does not point at it. Run:
 
 ```sh
 dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter FullyQualifiedName~CincinnatiCIFiber
