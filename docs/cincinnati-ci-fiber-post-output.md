@@ -81,10 +81,14 @@ validated and saved only when OK is pressed.
   change separate sheets, and the header carries the first sheet's size. Sheets
   of different sizes are rejected in this mode. Posting to a stream always
   produces one program, so it rejects a multi-sheet nest in per-sheet mode.
-- `PalletChangeCode` defaults to `M50`, the Cincinnati pallet change: the machine
-  sample ends `L PROGRAMEND.NC`, `M50`, `M30`, moving the cut sheet out for
-  unloading before the program ends (CL-series manual EM-423 §3.50; confirmed by
-  the machine owner).
+- `PalletChangeCode` defaults to `M50`, as in the machine sample, which ends
+  `L PROGRAMEND.NC`, `M50`, `M30`. Cincinnati's CNC Codes Handbook calls M50
+  "Table In" and M51 "Table Out". On the CI Fiber the head stays at a fixed height
+  and the pallets shuffle and lift to swap. Table In moves the waiting pallet into
+  the laser, which sends the cut pallet out for unloading, so M50 is the swap
+  (reading confirmed by the machine owner). It expects the waiting pallet to be
+  loaded. Newer Cincinnati samples end with `M30` and no pallet code; clear
+  the setting to match.
 - **Release blocker:** the single-program sequence between sheets (`/L "L0"`, then
   `M50`, then the next sheet with no new header or start macro) is inferred, not
   observed. Confirm it against a Cincinnati multi-sheet sample before release, or

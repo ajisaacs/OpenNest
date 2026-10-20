@@ -114,15 +114,17 @@ namespace OpenNest.Posts.CincinnatiCIFiber
 
         /// <summary>
         /// Line written to swap pallets: after the last sheet, and between sheets
-        /// in a single program. M50 is the Cincinnati pallet change (machine sample
-        /// tail, CL-series manual EM-423 §3.50; confirmed by the machine owner): it
-        /// moves the cut sheet out for unloading before M30. Blank writes no pallet
-        /// change.
+        /// in a single program. Cincinnati's CNC Codes Handbook calls M50 "Table In":
+        /// the waiting pallet moves into the laser, which sends the cut pallet out
+        /// for unloading (machine sample tail; reading confirmed by the machine
+        /// owner). It expects the waiting pallet to be loaded. M51 ("Table Out")
+        /// only sends the pallet out. Blank writes no pallet change.
         /// </summary>
         [DisplayName("Pallet change code")]
         [Description(
-            "Written after each sheet to swap pallets, moving the cut sheet out for unloading. "
-                + "Cincinnati uses M50. Blank writes no pallet change."
+            "Written after each sheet to swap pallets. Cincinnati's M50 (Table In) brings the "
+                + "waiting pallet into the laser and sends the cut sheet out, so load the waiting "
+                + "pallet first. Blank writes no pallet change."
         )]
         [PostSetting(SheetsSection, 1)]
         public string PalletChangeCode { get; set; } = "M50";
