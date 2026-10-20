@@ -64,8 +64,8 @@ namespace OpenNest.Geometry
         public static SpacingOutline Build(ShapeProfile profile, Vector location, double inflateBy)
         {
             ArgumentNullException.ThrowIfNull(profile);
-            // Adaptive tolerance instead of Shape.ToPolygon()'s default (up to 1000 segments per
-            // arc): arc-heavy real parts otherwise produce thousands of vertices.
+            // Flatten by chord tolerance, not a fixed segment count: arc-heavy real parts
+            // otherwise produce thousands of vertices.
             var region = ClipperBridge.OffsetForValidation(
                 profile,
                 inflateBy > Tolerance.Epsilon ? inflateBy : 0,

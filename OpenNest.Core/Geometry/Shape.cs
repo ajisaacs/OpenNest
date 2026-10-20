@@ -264,10 +264,24 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Converts the shape to a polygon.
+        /// Maximum chord error, in drawing units, when <see cref="ToPolygon()"/> flattens arcs
+        /// and circles. Ten times tighter than the spacing/overlap checks' 0.001 because callers
+        /// use this polygon for area, and an inscribed polygon always reads low.
         /// </summary>
-        /// <returns></returns>
-        public Polygon ToPolygon(int arcSegments = 1000)
+        public const double DefaultChordTolerance = 0.0001;
+
+        /// <summary>
+        /// Converts the shape to a polygon, flattening arcs to within
+        /// <see cref="DefaultChordTolerance"/>. A fixed segment count per arc (formerly 1000)
+        /// made large arcs no more accurate and small ones needlessly dense: arc-heavy drawings
+        /// produced hundreds of thousands of vertices every time their area was computed.
+        /// </summary>
+        public Polygon ToPolygon() => ToPolygonWithTolerance(DefaultChordTolerance);
+
+        /// <summary>
+        /// Converts the shape to a polygon with a fixed number of segments per arc and circle.
+        /// </summary>
+        public Polygon ToPolygon(int arcSegments)
         {
             var polygon = new Polygon();
 
