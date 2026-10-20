@@ -1,0 +1,455 @@
+using System.Globalization;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace OpenNest.Data;
+
+/// <summary>
+/// Talks to the drawing sets on the nest server (<c>/api/sets</c>). Sets and releases
+/// travel as JSON and are checked against <see cref="DrawingSetRules"/> and
+/// <see cref="SetReleaseRules"/> before sending. A server without sets raises
+/// <see cref="ServerTooOldException"/>; other failures surface as <see cref="IOException"/>.
+/// </summary>
+public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
+{
+    private const string Feature = "drawing sets";
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
+    };
+
+    private readonly HttpClient _httpClient;
+    private readonly bool _ownsClient;
+    private readonly Uri _baseUri;
+
+    public RemoteDrawingSetStore(string baseUrl)
+        : this(new HttpClient(), baseUrl)
+    {
+        _ownsClient = true;
+    }
+
+    /// <summary>For tests and hosts that pool HttpClient instances.</summary>
+    public RemoteDrawingSetStore(HttpClient httpClient, string baseUrl)
+    {
+        _httpClient = httpClient;
+        _baseUri = ServerUrl.ParseBase(baseUrl, nameof(baseUrl));
+    }
+
+    private Uri Url(string relative) => new(_baseUri, relative);
+
+    public async Task<DrawingSetPage> QueryAsync(DrawingSetQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var error = query.GetValidationError();
+        if (error is not null)
+            throw new ArgumentException(error, nameof(query));
+
+        using var response = await _httpClient.GetAsync(Url("api/sets/query?" + BuildQueryString(query)), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            throw new ServerTooOldException(Feature);
+        await EnsureSuccess(response, "browse drawing sets", cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<DrawingSetPage>(JsonOptions, cancellationToken)
+            ?? throw new IOException("Nest server returned an empty drawing set page.");
+        if (page.Items is null || page.Items.Count > query.Limit || page.Total < 0 || page.Items.Any(item => item is null))
+            throw new IOException($"Nest server returned an invalid drawing set page for a page limited to {query.Limit}.");
+        return page;
+    }
+
+    public async Task<DrawingSetRecord?> GetAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        ValidateId(id);
+        var record = await GetRecordAsync($"api/sets/{id}", $"read drawing set {id}", cancellationToken);
+        if (record is null)
+            return null;
+        if (record.Id != id || !HasJoinedMembers(record))
+            throw new IOException("Nest server returned a different or incomplete drawing set.");
+        return record;
+    }
+
+    public async Task<DrawingSetPage?> GetRevisionsAsync(Guid id, int offset = 0,
+        int limit = DrawingLibraryRules.DefaultRevisionLimit, CancellationToken cancellationToken = default)
+    {
+        ValidateId(id);
+        var page = await GetPageAsync($"api/sets/{id}/revisions", offset, limit, $"read drawing set history {id}", cancellationToken);
+        if (page is not null && (page.Items.Any(item => item.Revision < 1 || item.Id != id)
+            || page.Items.Zip(page.Items.Skip(1)).Any(pair => pair.First.Revision <= pair.Second.Revision)))
+            throw new IOException("Nest server returned an invalid drawing set history page.");
+        return page;
+    }
+
+    public async Task<DrawingSetRecord?> GetRevisionAsync(Guid id, int revision, CancellationToken cancellationToken = default)
+    {
+        ValidateId(id);
+        ValidateRevision(revision);
+        var record = await GetRecordAsync($"api/sets/{id}/revisions/{revision.ToString(CultureInfo.InvariantCulture)}",
+            $"read drawing set {id} revision {revision}", cancellationToken);
+        if (record is null)
+            return null;
+        if (record.Id != id || record.Revision != revision || !HasJoinedMembers(record))
+            throw new IOException("Nest server returned a different or incomplete drawing set revision.");
+        return record;
+    }
+
+    public async Task<DrawingSetPage?> GetSetsContainingAsync(Guid drawingId, int offset = 0,
+        int limit = DrawingLibraryRules.DefaultRevisionLimit, CancellationToken cancellationToken = default)
+    {
+        if (drawingId == Guid.Empty) throw new ArgumentException("A library drawing id is required.", nameof(drawingId));
+        return await GetPageAsync($"api/drawings/{drawingId}/sets", offset, limit,
+            $"list the sets using library drawing {drawingId}", cancellationToken);
+    }
+
+    /// <summary>
+    /// Stores revision 1 under <c>record.Id</c>, which the caller allocates first so an
+    /// ambiguous failure can be reconciled by id. An existing id raises
+    /// <see cref="DrawingSetSaveConflictException"/> with the stored record.
+    /// </summary>
+    public async Task<DrawingSetRecord> CreateAsync(DrawingSetRecord record, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        ValidateId(record.Id);
+        ValidateSet(record);
+        using var response = await _httpClient.PostAsync(Url("api/sets"),
+            JsonContent.Create(ForSave(record), options: JsonOptions), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            throw new ServerTooOldException(Feature);
+        if (response.StatusCode == HttpStatusCode.Conflict)
+            throw new DrawingSetSaveConflictException(await ReadSet(response, cancellationToken));
+        await EnsureSuccess(response, $"save drawing set '{record.Name}'", cancellationToken);
+        var saved = await ReadSet(response, cancellationToken);
+        if (saved.Id != record.Id || saved.Revision != 1 || !SameMembers(saved, record))
+            throw new IOException("The nest server returned a different drawing set than was saved. Reload the set before saving again.");
+        return saved;
+    }
+
+    public async Task<DrawingSetRecord> UpdateAsync(Guid id, DrawingSetRecord record, int expectedRevision,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        ValidateId(id);
+        ValidateRevision(expectedRevision);
+        ValidateSet(record);
+        if (record.Id != Guid.Empty && record.Id != id)
+            throw new ArgumentException("The set id does not match the set being saved.", nameof(record));
+        using var request = Guarded(HttpMethod.Put, $"api/sets/{id}", expectedRevision);
+        request.Content = JsonContent.Create(ForSave(record), options: JsonOptions);
+        var saved = await SendGuarded(request, id, expectedRevision, $"save drawing set {id}", cancellationToken);
+        if (!SameMembers(saved, record))
+            throw new IOException("The nest server stored different set members. Reload the set before saving again.");
+        return saved;
+    }
+
+    public Task<DrawingSetRecord> ArchiveAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default) =>
+        SetArchivedAsync(id, expectedRevision, "archive", cancellationToken);
+
+    public Task<DrawingSetRecord> RestoreAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default) =>
+        SetArchivedAsync(id, expectedRevision, "restore", cancellationToken);
+
+    /// <summary>
+    /// Records a release under <c>release.Id</c>, allocated by the caller so a post whose
+    /// reply was lost can be sent again. A release already holding that id, or one of the
+    /// nests, raises <see cref="SetReleasePostConflictException"/> with that release.
+    /// </summary>
+    public async Task<SetReleaseRecord> PostReleaseAsync(Guid setId, SetReleaseRecord release,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(release);
+        ValidateId(setId);
+        if (release.Id == Guid.Empty) throw new ArgumentException("A release id is required.", nameof(release));
+        if (release.SetId != Guid.Empty && release.SetId != setId)
+            throw new ArgumentException("The release names a different set.", nameof(release));
+        var error = SetReleaseRules.GetError(release);
+        if (error is not null)
+            throw new ArgumentException(error, nameof(release));
+
+        using var response = await _httpClient.PostAsync(Url($"api/sets/{setId}/releases"),
+            JsonContent.Create(ForPost(release, setId), options: JsonOptions), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            await ThrowIfServerTooOld(cancellationToken);
+            throw new IOException($"Drawing set {setId} no longer exists on the nest server.");
+        }
+        if (response.StatusCode == HttpStatusCode.Conflict)
+            throw new SetReleasePostConflictException(await ReadRelease(response, cancellationToken));
+        await EnsureSuccess(response, $"record the release of drawing set {setId}", cancellationToken);
+        var stored = await ReadRelease(response, cancellationToken);
+        if (stored.Id != release.Id || stored.SetId != setId || stored.SetRevision != release.SetRevision
+            || !stored.Nests.Select(n => n?.NestId).SequenceEqual(release.Nests.Select(n => (Guid?)n.NestId)))
+            throw new IOException("The nest server recorded a different release than was posted.");
+        return stored;
+    }
+
+    public async Task<SetReleasePage?> GetReleasesAsync(Guid setId, int offset = 0,
+        int limit = DrawingLibraryRules.DefaultRevisionLimit, CancellationToken cancellationToken = default)
+    {
+        ValidateId(setId);
+        ValidatePaging(offset, limit);
+        using var response = await _httpClient.GetAsync(Url($"api/sets/{setId}/releases?{Paging(offset, limit)}"), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            await ThrowIfServerTooOld(cancellationToken);
+            return null;
+        }
+        await EnsureSuccess(response, $"read the releases of drawing set {setId}", cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<SetReleasePage>(JsonOptions, cancellationToken)
+            ?? throw new IOException("Nest server returned an empty release page.");
+        if (page.Items is null || !IsBoundedPage(page.Items.Count, page.Total, page.Offset, page.Limit, offset, limit)
+            || page.Items.Any(item => item is null || item.SetId != setId || item.Nests is null))
+            throw new IOException("Nest server returned an invalid or unbounded release page.");
+        return page;
+    }
+
+    public async Task<SetReleaseRecord?> GetReleaseForNestAsync(Guid nestId, CancellationToken cancellationToken = default)
+    {
+        if (nestId == Guid.Empty) throw new ArgumentException("A nest id is required.", nameof(nestId));
+        using var response = await _httpClient.GetAsync(Url($"api/nests/{nestId}/release"), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            await ThrowIfServerTooOld(cancellationToken);
+            return null;
+        }
+        await EnsureSuccess(response, $"read the release of nest {nestId}", cancellationToken);
+        var release = await ReadRelease(response, cancellationToken);
+        if (release.Nests.All(n => n?.NestId != nestId))
+            throw new IOException("Nest server returned a release that does not contain the nest.");
+        return release;
+    }
+
+    private async Task<DrawingSetRecord> SetArchivedAsync(Guid id, int expectedRevision, string action,
+        CancellationToken cancellationToken)
+    {
+        ValidateId(id);
+        ValidateRevision(expectedRevision);
+        using var request = Guarded(HttpMethod.Post, $"api/sets/{id}/{action}", expectedRevision);
+        var changed = await SendGuarded(request, id, expectedRevision, $"{action} drawing set {id}", cancellationToken);
+        if (changed.Archived != (action == "archive"))
+            throw new IOException($"Nest server did not {action} drawing set {id}. Reload the set.");
+        return changed;
+    }
+
+    private HttpRequestMessage Guarded(HttpMethod method, string relative, int expectedRevision)
+    {
+        var request = new HttpRequestMessage(method, Url(relative));
+        request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{expectedRevision.ToString(CultureInfo.InvariantCulture)}\""));
+        return request;
+    }
+
+    private async Task<DrawingSetRecord> SendGuarded(HttpRequestMessage request, Guid id, int expectedRevision,
+        string action, CancellationToken cancellationToken)
+    {
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            await ThrowIfServerTooOld(cancellationToken);
+            throw new IOException($"Drawing set {id} no longer exists on the nest server.");
+        }
+        if (response.StatusCode == HttpStatusCode.Conflict)
+            throw new DrawingSetSaveConflictException(await ReadSet(response, cancellationToken));
+        await EnsureSuccess(response, action, cancellationToken);
+        var saved = await ReadSet(response, cancellationToken);
+        if (saved.Id != id || saved.Revision < expectedRevision)
+            throw new IOException("Nest server returned an invalid drawing set revision. Reload the set before saving again.");
+        return saved;
+    }
+
+    private async Task<DrawingSetRecord?> GetRecordAsync(string relative, string action, CancellationToken cancellationToken)
+    {
+        using var response = await _httpClient.GetAsync(Url(relative), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            await ThrowIfServerTooOld(cancellationToken);
+            return null;
+        }
+        await EnsureSuccess(response, action, cancellationToken);
+        return await ReadSet(response, cancellationToken);
+    }
+
+    private async Task<DrawingSetPage?> GetPageAsync(string relative, int offset, int limit, string action,
+        CancellationToken cancellationToken)
+    {
+        ValidatePaging(offset, limit);
+        using var response = await _httpClient.GetAsync(Url($"{relative}?{Paging(offset, limit)}"), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            await ThrowIfServerTooOld(cancellationToken);
+            return null;
+        }
+        await EnsureSuccess(response, action, cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<DrawingSetPage>(JsonOptions, cancellationToken)
+            ?? throw new IOException("Nest server returned an empty drawing set page.");
+        if (page.Items is null || !IsBoundedPage(page.Items.Count, page.Total, page.Offset, page.Limit, offset, limit)
+            || page.Items.Any(item => item is null))
+            throw new IOException("Nest server returned an invalid or unbounded drawing set page.");
+        return page;
+    }
+
+    // A 404 for one set or nest is ambiguous; the query route exists on every set-aware server.
+    private async Task ThrowIfServerTooOld(CancellationToken cancellationToken)
+    {
+        using var probe = await _httpClient.GetAsync(Url("api/sets/query?limit=1"), cancellationToken);
+        if (probe.StatusCode == HttpStatusCode.NotFound)
+            throw new ServerTooOldException(Feature);
+    }
+
+    private static bool IsBoundedPage(int count, int total, int pageOffset, int pageLimit, int offset, int limit) =>
+        count <= limit && pageOffset == offset && pageLimit == limit && total >= 0
+        && count <= System.Math.Max(0L, (long)total - offset);
+
+    private static bool HasJoinedMembers(DrawingSetRecord record) =>
+        record.Members is not null
+        && record.Members.All(m => m is not null && m.Drawing is not null && m.Drawing.Id == m.DrawingId);
+
+    private static bool SameMembers(DrawingSetRecord saved, DrawingSetRecord sent) =>
+        saved.Members is not null
+        && saved.Members.Select(m => (m?.DrawingId, m?.Quantity))
+            .SequenceEqual(sent.Members.Select(m => ((Guid?)m.DrawingId, (int?)m.Quantity)));
+
+    // The joined drawings are ignored by the server; leaving them out keeps the body small.
+    private static DrawingSetRecord ForSave(DrawingSetRecord record) => new()
+    {
+        Id = record.Id,
+        Name = record.Name,
+        Customer = record.Customer,
+        Notes = record.Notes,
+        SavedBy = record.SavedBy,
+        Members = record.Members.Select(m => new DrawingSetMember { DrawingId = m.DrawingId, Quantity = m.Quantity }).ToList(),
+    };
+
+    private static SetReleaseRecord ForPost(SetReleaseRecord release, Guid setId) => new()
+    {
+        Id = release.Id,
+        SetId = setId,
+        SetRevision = release.SetRevision,
+        Multiplier = release.Multiplier,
+        Notes = release.Notes,
+        ReleasedBy = release.ReleasedBy,
+        Nests = release.Nests.Select(n => new SetReleaseNest
+        {
+            NestId = n.NestId,
+            MaterialName = n.MaterialName,
+            MaterialGrade = n.MaterialGrade,
+            Thickness = n.Thickness,
+            Units = n.Units,
+            CutType = n.CutType,
+        }).ToList(),
+    };
+
+    private static void ValidateSet(DrawingSetRecord record)
+    {
+        var error = DrawingSetRules.GetError(record);
+        if (error is not null)
+            throw new ArgumentException(error, nameof(record));
+    }
+
+    private static void ValidateId(Guid id)
+    {
+        if (id == Guid.Empty) throw new ArgumentException("A drawing set id is required.", nameof(id));
+    }
+
+    private static void ValidateRevision(int revision)
+    {
+        if (revision < 1) throw new ArgumentOutOfRangeException(nameof(revision));
+    }
+
+    private static void ValidatePaging(int offset, int limit)
+    {
+        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
+        if (limit < 1 || limit > DrawingLibraryRules.MaxRevisionLimit) throw new ArgumentOutOfRangeException(nameof(limit));
+    }
+
+    private static string Paging(int offset, int limit) =>
+        $"offset={offset.ToString(CultureInfo.InvariantCulture)}&limit={limit.ToString(CultureInfo.InvariantCulture)}";
+
+    private static string BuildQueryString(DrawingSetQuery query)
+    {
+        var text = new StringBuilder()
+            .Append("search=").Append(Uri.EscapeDataString(query.NormalizedSearch))
+            .Append("&sort=").Append(JsonNamingPolicy.CamelCase.ConvertName(query.Sort.ToString()))
+            .Append("&order=").Append(query.Descending ? "desc" : "asc")
+            .Append("&offset=").Append(query.Offset.ToString(CultureInfo.InvariantCulture))
+            .Append("&limit=").Append(query.Limit.ToString(CultureInfo.InvariantCulture));
+        if (!string.IsNullOrWhiteSpace(query.Customer))
+            text.Append("&customer=").Append(Uri.EscapeDataString(query.Customer));
+        if (query.IncludeArchived)
+            text.Append("&includeArchived=true");
+        return text.ToString();
+    }
+
+    private static async Task<DrawingSetRecord> ReadSet(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var record = await response.Content.ReadFromJsonAsync<DrawingSetRecord>(JsonOptions, cancellationToken);
+        return record ?? throw new IOException("Nest server returned an empty drawing set record.");
+    }
+
+    private static async Task<SetReleaseRecord> ReadRelease(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var release = await response.Content.ReadFromJsonAsync<SetReleaseRecord>(JsonOptions, cancellationToken);
+        if (release is null || release.Nests is null)
+            throw new IOException("Nest server returned an empty set release record.");
+        return release;
+    }
+
+    private static async Task EnsureSuccess(HttpResponseMessage response, string action, CancellationToken cancellationToken)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var detail = "";
+        try
+        {
+            detail = await response.Content.ReadAsStringAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException)
+        {
+            // The status code is the useful part; the body is best-effort.
+        }
+
+        if (detail.Length > 200)
+            detail = detail[..200] + "…";
+        throw new IOException(
+            $"Could not {action} on the nest server: HTTP {(int)response.StatusCode} {response.ReasonPhrase}. {detail}".TrimEnd());
+    }
+
+    public void Dispose()
+    {
+        if (_ownsClient)
+            _httpClient.Dispose();
+    }
+}
+
+/// <summary>A guarded set write found a newer or different current state; nothing was changed.</summary>
+public sealed class DrawingSetSaveConflictException : IOException
+{
+    public DrawingSetSaveConflictException(DrawingSetRecord current)
+        : base(current.Archived
+            ? $"Drawing set '{current.Name}' is archived or was changed (current revision {current.Revision}). Reload before saving."
+            : $"Drawing set '{current.Name}' was changed by someone else (current revision {current.Revision}). Reload before saving.")
+    {
+        Current = current;
+    }
+
+    /// <summary>The set's current server record.</summary>
+    public DrawingSetRecord Current { get; }
+}
+
+/// <summary>
+/// A release already holds the posted release id or one of its nests; nothing was recorded.
+/// When <see cref="Current"/> has the posted id, an earlier post whose reply was lost was stored.
+/// </summary>
+public sealed class SetReleasePostConflictException : IOException
+{
+    public SetReleasePostConflictException(SetReleaseRecord current)
+        : base($"Release {current.Id} of set '{current.SetName}' already records this release or one of its nests.")
+    {
+        Current = current;
+    }
+
+    /// <summary>The release that holds the id or nest.</summary>
+    public SetReleaseRecord Current { get; }
+}

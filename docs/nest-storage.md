@@ -409,6 +409,44 @@ status and deletion are always current, and ignored on post.
   at most 200 characters, `thickness` finite and at least 0 (stored rounded to 4
   decimals), and `units` and `cutType` single enum names.
 
+#### Client and release session
+
+`OpenNest.Data.RemoteDrawingSetStore` is the client for every route above. It
+checks `DrawingSetRules`/`SetReleaseRules` before sending, raises
+`ServerTooOldException` on a server without sets, `DrawingSetSaveConflictException`
+or `SetReleasePostConflictException` (carrying the current record) on 409, and
+refuses replies whose id, revision, members or nests differ from what was sent.
+
+`SetReleasePlan.Build(set, multiplier, includeArchived)` splits a set read from
+the server into groups without any I/O. A group is the members whose drawings
+share material name and grade (by `SharedListNames.Key`), thickness (rounded to
+4 decimals), units and cut type; quantities are multiplied. Archived drawings
+are skipped unless included. A group is refused when two of its drawings share a
+name (compared ordinally, as a nest keys drawings), and every drawing without a
+material or a positive thickness goes to one refused "unassigned" group, listed last.
+
+`SetReleaseSession.RunAsync` releases the chosen releasable groups in plan order:
+
+1. **Build every group first.** For each group the caller's factory makes an
+   empty nest in the group's units; the session sets material, grade,
+   thickness, the set's customer (when it has one) and `Draft`, downloads each
+   member's exact listed revision and inserts it through `LibraryDrawingInsert`.
+   A refusal (package hash no longer matching its record, a missing revision, a
+   nest in other units, an insert refusal) or a download failure stops here, so
+   nothing is uploaded. The factory may already have allocated nest numbers.
+2. **Upload in order** under client-allocated ids, never cancelling an upload in
+   flight; cancellation is checked between uploads. A failed upload is checked by
+   its id, so one stored before its reply was lost still counts as created; the
+   first real failure stops the rest.
+3. **Post the release** only when every chosen group was created, under a
+   client-allocated id. When the post fails, the nests stay and
+   `RetryReleaseAsync` posts the same id again; a 409 naming that id is adopted
+   as the stored release.
+
+The result lists each group's outcome (`Created`, `Refused`, `Failed`,
+`NotStarted`), the created nests' records and in-memory `Nest` objects (so the
+desktop can open them without downloading), and the release or why it was not recorded.
+
 Schema v7 adds `drawing_set_revisions` (every revision's details and archived
 flag), `drawing_set_members` (each revision's members by position, unique per
 drawing), `drawing_sets` (each set's current revision), `set_releases` and

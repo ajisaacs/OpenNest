@@ -329,11 +329,17 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
     }
 }
 
-/// <summary>The nest server predates the drawing library (it answered HTTP 404).</summary>
+/// <summary>The nest server predates the drawing library or another feature (it answered HTTP 404).</summary>
 public sealed class ServerTooOldException : IOException
 {
     public ServerTooOldException()
-        : base("This nest server does not support the drawing library (HTTP 404). Update the nest server to this OpenNest version.")
+        : this("the drawing library")
+    {
+    }
+
+    /// <summary><paramref name="feature"/> names what is missing, for example "drawing sets".</summary>
+    public ServerTooOldException(string feature)
+        : base($"This nest server does not support {feature} (HTTP 404). Update the nest server to this OpenNest version.")
     {
     }
 }
