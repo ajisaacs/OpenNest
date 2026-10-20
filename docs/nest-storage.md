@@ -360,6 +360,20 @@ whose current revision contains it) or **Add to Set...**: choose an active set
 or **New Set**, and the set editor opens with the drawing added at the entered
 quantity for review and Save.
 
+The nest's drawing list has **Add Library Drawings to Set...** (right-click any
+drawing; it acts on the whole nest, `OpenNest.Data.NestSetMerge`). It takes each
+drawing copied from this server's library once, in list order, with its required
+quantity (copies of one library drawing are summed). Drawings never saved to the
+library, linked to another server or with no required quantity are skipped and
+named; cutoffs are left out. If none remain it says so before anything else.
+Otherwise choose an active set or **New Set** (named after the nest, with its
+customer): the set's current library records are read, drawings the set already
+lists **keep the set's quantity** (a released nest carries its multiplier, so
+copying its quantities back would scale the kit), and members are added at the
+library's latest revision. Anything kept, skipped, archived in the library or
+newer there than in the nest is listed first, then the set editor opens for
+review and Save; nothing is stored before then.
+
 **Release...** (the Sets tab, when the dialog was opened from a nest) reads the
 selected active set with its members and opens the release dialog. It lists one
 row per material group (`OpenNest.Data.SetReleasePlan`): material, grade,

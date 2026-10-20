@@ -35,6 +35,8 @@ namespace OpenNest.Controls
                 if (SelectedItem is Drawing drawing)
                     SaveToLibraryRequested?.Invoke(this, drawing);
             };
+            var addToSetItem = new ToolStripMenuItem("Add Library Drawings to Set...");
+            addToSetItem.Click += (s, e) => AddToSetRequested?.Invoke(this, EventArgs.Empty);
             var saveToLibrarySeparator = new ToolStripSeparator();
             var openInConverterItem = new ToolStripMenuItem("Open in CAD Converter...");
             openInConverterItem.Click += (s, e) =>
@@ -56,9 +58,13 @@ namespace OpenNest.Controls
                 saveToLibraryItem.Visible = saveToLibrarySeparator.Visible = SaveToLibraryRequested != null;
                 saveToLibraryItem.Enabled = SaveToLibraryUnavailableReason == null;
                 saveToLibraryItem.ToolTipText = SaveToLibraryUnavailableReason ?? "";
+                addToSetItem.Visible = AddToSetRequested != null;
+                addToSetItem.Enabled = SaveToLibraryUnavailableReason == null;
+                addToSetItem.ToolTipText = SaveToLibraryUnavailableReason ?? "";
                 openInConverterItem.Visible = openInConverterSeparator.Visible = OpenInConverterRequested != null;
             };
             menu.Items.Add(saveToLibraryItem);
+            menu.Items.Add(addToSetItem);
             menu.Items.Add(saveToLibrarySeparator);
             menu.Items.Add(openInConverterItem);
             menu.Items.Add(openInConverterSeparator);
@@ -71,7 +77,16 @@ namespace OpenNest.Controls
         /// <summary>Raised when Save to Drawing Library is chosen for the selected drawing.</summary>
         public event EventHandler<Drawing> SaveToLibraryRequested;
 
-        /// <summary>Why Save to Drawing Library is disabled, shown as its tooltip; null enables it.</summary>
+        /// <summary>
+        /// Raised when Add Library Drawings to Set is chosen; it acts on the whole nest, not the
+        /// selected drawing.
+        /// </summary>
+        public event EventHandler AddToSetRequested;
+
+        /// <summary>
+        /// Why Save to Drawing Library and Add Library Drawings to Set are disabled, shown as their
+        /// tooltip; null enables them.
+        /// </summary>
         public string SaveToLibraryUnavailableReason { get; set; }
 
         /// <summary>Raised when Open in CAD Converter is chosen for the selected drawing.</summary>

@@ -46,6 +46,7 @@ namespace OpenNest.Forms
 
         private readonly Timer updateDrawingListTimer;
         private bool updatingPlateList;
+        private bool addingToSet;
         private CutSimulatorForm cutSimulatorForm;
 
         private Panel plateHeaderPanel;
@@ -444,6 +445,7 @@ namespace OpenNest.Forms
             drawingListBox1.Units = Nest.Units;
             drawingListBox1.DeleteRequested += drawingListBox1_DeleteRequested;
             drawingListBox1.SaveToLibraryRequested += drawingListBox1_SaveToLibraryRequested;
+            drawingListBox1.AddToSetRequested += drawingListBox1_AddToSetRequested;
             drawingListBox1.OpenInConverterRequested += drawingListBox1_OpenInConverterRequested;
             drawingListBox1.DrawingPickedUp += drawingListBox1_DrawingPickedUp;
             drawingListBox1.DrawingDropped += drawingListBox1_DrawingDropped;
@@ -1365,6 +1367,44 @@ namespace OpenNest.Forms
             Properties.Settings.Default.DrawingLibraryCutType = form.Result.Saved.CutType.ToString();
             Properties.Settings.Default.Save();
             UpdateDrawingList();
+        }
+
+        private async void drawingListBox1_AddToSetRequested(object sender, EventArgs e)
+        {
+            await AddLibraryDrawingsToSetAsync();
+        }
+
+        /// <summary>
+        /// Adds the nest's library drawings, with their required quantities, to a chosen or new
+        /// drawing set, which the operator reviews and saves in the set editor.
+        /// </summary>
+        public async Task AddLibraryDrawingsToSetAsync()
+        {
+            if (addingToSet || !NestStorage.Settings.IsDatabaseMode)
+                return;
+
+            IDrawingLibraryStore library;
+            IDrawingSetStore sets;
+            try
+            {
+                library = NestStorage.CreateDrawingLibrary();
+                sets = NestStorage.CreateDrawingSetStore();
+            }
+            catch (ArgumentException ex)
+            {
+                MessageBox.Show(this, ex.Message, "Drawing Sets", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            addingToSet = true;
+            try
+            {
+                await new NestDrawingsToSet(this, sets, library, NestStorage.Settings.ServerUrl).RunAsync(Nest);
+            }
+            finally
+            {
+                addingToSet = false;
+            }
         }
 
         private void EditDrawingsInConverter_Click(object sender, EventArgs e)

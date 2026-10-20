@@ -350,6 +350,113 @@ public class DrawingSetFormsTests
             "The set history test did not complete.");
     }
 
+    [Fact]
+    public void NestDrawingsToSet_AppendsTheNestsLibraryDrawings_KeepsSetQuantities_AndReportsSkips()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var existing = library.Add("SYN-A", "Synthetic Steel", 0.25);
+                var added = library.Add("SYN-B", "Synthetic Steel", 0.25);
+                var sets = new InMemoryDrawingSets();
+                var set = Run(sets.CreateAsync(new DrawingSetRecord
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Synthetic kit",
+                    Members = new[] { new DrawingSetMember { DrawingId = existing.Id, Quantity = 1, Drawing = existing } },
+                }));
+                var nest = MatchingNest();
+                nest.Drawings.Add(LinkedDrawing(existing, 6));
+                nest.Drawings.Add(LinkedDrawing(added, 4));
+                nest.Drawings.Add(new Drawing("SYN-LOOSE") { Quantity = { Required = 2 } });
+                var messages = new List<string>();
+
+                var command = new NestDrawingsToSet(null, sets, library, Server);
+                command.ShowMessage = (text, buttons, _) =>
+                {
+                    messages.Add(text);
+                    Assert.Equal(MessageBoxButtons.OKCancel, buttons);
+                    return DialogResult.OK;
+                };
+                command.ChooseSet = () => (true, set);
+                command.EditSet = edit => Run(edit.SaveAsync());
+                var saved = Run(command.RunAsync(nest));
+
+                Assert.Equal(2, saved.Revision);
+                Assert.Equal(new[] { (existing.Id, 1), (added.Id, 4) }, saved.Members.Select(m => (m.DrawingId, m.Quantity)));
+                var message = Assert.Single(messages);
+                Assert.StartsWith("Added 1 drawing to set 'Synthetic kit'.", message);
+                Assert.Contains("- SYN-A: set 1, nest 6", message);
+                Assert.Contains("- SYN-LOOSE: not in the drawing library", message);
+            },
+            TestTimeout,
+            "The nest drawings to set test did not complete.");
+    }
+
+    [Fact]
+    public void NestDrawingsToSet_NamesANewSetAfterTheNest_AndAsksNothingWhenEveryDrawingIsCurrent()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel", 0.25);
+                var sets = new InMemoryDrawingSets();
+                var nest = MatchingNest();
+                nest.Customer = "Synthetic customer";
+                nest.Drawings.Add(LinkedDrawing(a, 3));
+                DrawingSetEditSession edited = null;
+
+                var command = new NestDrawingsToSet(null, sets, library, Server);
+                command.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                command.ChooseSet = () => (true, null);
+                command.EditSet = edit =>
+                {
+                    edited = edit;
+                    return null;
+                };
+                Assert.Null(Run(command.RunAsync(nest)));
+
+                Assert.True(edited!.IsNew);
+                Assert.Equal(("Synthetic job", "Synthetic customer"), (edited.Name, edited.Customer));
+                Assert.Equal((a.Id, 3), edited.Members.Select(m => (m.DrawingId, m.Quantity)).Single());
+                Assert.Empty(sets.Creates);
+            },
+            TestTimeout,
+            "The nest drawings to new set test did not complete.");
+    }
+
+    [Fact]
+    public void NestDrawingsToSet_WithoutLibraryDrawings_SaysSoBeforeChoosingASet()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var nest = MatchingNest();
+                nest.Drawings.Add(new Drawing("SYN-LOOSE") { Quantity = { Required = 1 } });
+                var messages = new List<string>();
+
+                var command = new NestDrawingsToSet(null, new InMemoryDrawingSets(), new FakeLibrary(), Server);
+                command.ShowMessage = (text, _, _) => { messages.Add(text); return DialogResult.OK; };
+                command.ChooseSet = () => throw new Xunit.Sdk.XunitException("No set should be chosen.");
+                Assert.Null(Run(command.RunAsync(nest)));
+
+                var message = Assert.Single(messages);
+                Assert.Contains("Save them to the drawing library first", message);
+                Assert.Contains("- SYN-LOOSE:", message);
+            },
+            TestTimeout,
+            "The nest without library drawings test did not complete.");
+    }
+
+    private static Drawing LinkedDrawing(DrawingLibraryRecord record, int required) => new(record.Name)
+    {
+        Quantity = { Required = required },
+        Library = new DrawingLibraryLink(Server, record.Id, record.Revision, record.CutType, record.Thickness,
+            record.MaterialName, record.MaterialGrade, record.Units, record.Notes, ""),
+    };
+
     private static Nest MatchingNest() => new("Synthetic job")
     {
         Units = Units.Inches,
@@ -421,7 +528,7 @@ public class DrawingSetFormsTests
             throw new NotSupportedException();
 
         public Task<DrawingLibraryRecord?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            Task.FromResult(_records.FirstOrDefault(r => r.Id == id));
 
         public Task<DrawingLibraryPage?> GetRevisionsAsync(Guid id, int offset = 0,
             int limit = DrawingLibraryRules.DefaultRevisionLimit, CancellationToken cancellationToken = default) =>
