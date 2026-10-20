@@ -17,8 +17,10 @@ namespace OpenNest.Forms
         private static string cachedServerUrl;
         private static RemoteDrawingLibrary cachedLibrary;
         private static string cachedLibraryUrl;
+        private static RemoteDrawingSetStore cachedSets;
+        private static string cachedSetsUrl;
 
-        /// <summary>Tooltip for drawing library commands while File mode is active.</summary>
+        /// <summary>Tooltip for drawing library and set commands while File mode is active.</summary>
         public const string DatabaseModeOnly = "Database mode only";
 
         /// <summary>Current settings, loaded once at process start.</summary>
@@ -67,6 +69,22 @@ namespace OpenNest.Forms
             }
 
             return cachedLibrary;
+        }
+
+        /// <summary>
+        /// The shared drawing set client for the current server URL, recreated only when the
+        /// URL changes. Throws <see cref="ArgumentException"/> for an invalid URL.
+        /// </summary>
+        public static IDrawingSetStore CreateDrawingSetStore()
+        {
+            if (cachedSets == null || cachedSetsUrl != settings.ServerUrl)
+            {
+                cachedSets?.Dispose();
+                cachedSets = new RemoteDrawingSetStore(settings.ServerUrl);
+                cachedSetsUrl = settings.ServerUrl;
+            }
+
+            return cachedSets;
         }
     }
 }

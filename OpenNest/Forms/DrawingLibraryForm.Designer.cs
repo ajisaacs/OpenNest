@@ -21,6 +21,12 @@ namespace OpenNest.Forms
         {
             components = new System.ComponentModel.Container();
             System.Windows.Forms.DataGridViewCellStyle rightAligned = new System.Windows.Forms.DataGridViewCellStyle();
+            rootTable = new System.Windows.Forms.TableLayoutPanel();
+            tabControl = new System.Windows.Forms.TabControl();
+            drawingsTab = new System.Windows.Forms.TabPage();
+            setsTab = new System.Windows.Forms.TabPage();
+            setBrowser = new OpenNest.Controls.DrawingSetBrowser();
+            footerPanel = new System.Windows.Forms.FlowLayoutPanel();
             layoutTable = new System.Windows.Forms.TableLayoutPanel();
             filterTable = new System.Windows.Forms.TableLayoutPanel();
             searchLabel = new System.Windows.Forms.Label();
@@ -50,13 +56,80 @@ namespace OpenNest.Forms
             closeButton = new System.Windows.Forms.Button();
             statusLabel = new System.Windows.Forms.Label();
             searchTimer = new System.Windows.Forms.Timer(components);
+            drawingMenu = new System.Windows.Forms.ContextMenuStrip(components);
+            usedInSetsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            addToSetMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            rootTable.SuspendLayout();
+            tabControl.SuspendLayout();
+            drawingsTab.SuspendLayout();
+            setsTab.SuspendLayout();
+            footerPanel.SuspendLayout();
             layoutTable.SuspendLayout();
             filterTable.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)drawingGrid).BeginInit();
             notesGroup.SuspendLayout();
             bottomTable.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)quantityBox).BeginInit();
+            drawingMenu.SuspendLayout();
             SuspendLayout();
+            //
+            // rootTable
+            //
+            rootTable.ColumnCount = 1;
+            rootTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            rootTable.Controls.Add(tabControl, 0, 0);
+            rootTable.Controls.Add(footerPanel, 0, 1);
+            rootTable.Dock = System.Windows.Forms.DockStyle.Fill;
+            rootTable.Location = new System.Drawing.Point(0, 0);
+            rootTable.Name = "rootTable";
+            rootTable.Padding = new System.Windows.Forms.Padding(8);
+            rootTable.RowCount = 2;
+            rootTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            rootTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            rootTable.Size = new System.Drawing.Size(984, 641);
+            rootTable.TabIndex = 0;
+            //
+            // tabControl
+            //
+            tabControl.Controls.Add(drawingsTab);
+            tabControl.Controls.Add(setsTab);
+            tabControl.Dock = System.Windows.Forms.DockStyle.Fill;
+            tabControl.Margin = new System.Windows.Forms.Padding(0);
+            tabControl.Name = "tabControl";
+            tabControl.SelectedIndex = 0;
+            tabControl.TabIndex = 0;
+            tabControl.SelectedIndexChanged += TabControl_SelectedIndexChanged;
+            //
+            // drawingsTab
+            //
+            drawingsTab.Controls.Add(layoutTable);
+            drawingsTab.Name = "drawingsTab";
+            drawingsTab.Text = "Drawings";
+            drawingsTab.UseVisualStyleBackColor = true;
+            //
+            // setsTab
+            //
+            setsTab.Controls.Add(setBrowser);
+            setsTab.Name = "setsTab";
+            setsTab.Padding = new System.Windows.Forms.Padding(8);
+            setsTab.Text = "Sets";
+            setsTab.UseVisualStyleBackColor = true;
+            //
+            // setBrowser
+            //
+            setBrowser.Dock = System.Windows.Forms.DockStyle.Fill;
+            setBrowser.Name = "setBrowser";
+            setBrowser.TabIndex = 0;
+            //
+            // footerPanel
+            //
+            footerPanel.AutoSize = true;
+            footerPanel.Controls.Add(closeButton);
+            footerPanel.Dock = System.Windows.Forms.DockStyle.Fill;
+            footerPanel.FlowDirection = System.Windows.Forms.FlowDirection.RightToLeft;
+            footerPanel.Margin = new System.Windows.Forms.Padding(0, 6, 0, 0);
+            footerPanel.Name = "footerPanel";
+            footerPanel.TabIndex = 1;
             //
             // layoutTable
             //
@@ -148,6 +221,7 @@ namespace OpenNest.Forms
             drawingGrid.StandardTab = true;
             drawingGrid.TabIndex = 1;
             drawingGrid.CellDoubleClick += DrawingGrid_CellDoubleClick;
+            drawingGrid.CellMouseDown += DrawingGrid_CellMouseDown;
             drawingGrid.ColumnHeaderMouseClick += DrawingGrid_ColumnHeaderMouseClick;
             drawingGrid.SelectionChanged += DrawingGrid_SelectionChanged;
             //
@@ -240,8 +314,7 @@ namespace OpenNest.Forms
             // bottomTable
             //
             bottomTable.AutoSize = true;
-            bottomTable.ColumnCount = 8;
-            bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            bottomTable.ColumnCount = 7;
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
@@ -256,7 +329,6 @@ namespace OpenNest.Forms
             bottomTable.Controls.Add(quantityBox, 4, 0);
             bottomTable.Controls.Add(editButton, 5, 0);
             bottomTable.Controls.Add(addButton, 6, 0);
-            bottomTable.Controls.Add(closeButton, 7, 0);
             bottomTable.Dock = System.Windows.Forms.DockStyle.Fill;
             bottomTable.Margin = new System.Windows.Forms.Padding(0, 6, 0, 0);
             bottomTable.Name = "bottomTable";
@@ -352,12 +424,30 @@ namespace OpenNest.Forms
             searchTimer.Interval = 300;
             searchTimer.Tick += SearchTimer_Tick;
             //
+            // drawingMenu
+            //
+            drawingMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { usedInSetsMenuItem, addToSetMenuItem });
+            drawingMenu.Name = "drawingMenu";
+            drawingMenu.Opening += DrawingMenu_Opening;
+            //
+            // usedInSetsMenuItem
+            //
+            usedInSetsMenuItem.Name = "usedInSetsMenuItem";
+            usedInSetsMenuItem.Text = "Used in Sets...";
+            usedInSetsMenuItem.Click += UsedInSetsMenuItem_Click;
+            //
+            // addToSetMenuItem
+            //
+            addToSetMenuItem.Name = "addToSetMenuItem";
+            addToSetMenuItem.Text = "Add to Set...";
+            addToSetMenuItem.Click += AddToSetMenuItem_Click;
+            //
             // DrawingLibraryForm
             //
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             CancelButton = closeButton;
-            ClientSize = new System.Drawing.Size(984, 601);
-            Controls.Add(layoutTable);
+            ClientSize = new System.Drawing.Size(984, 641);
+            Controls.Add(rootTable);
             Font = new System.Drawing.Font("Segoe UI", 9.75F);
             MinimizeBox = false;
             MinimumSize = new System.Drawing.Size(720, 420);
@@ -367,6 +457,13 @@ namespace OpenNest.Forms
             StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             Text = "Add from Drawing Library";
             Shown += DrawingLibraryForm_Shown;
+            rootTable.ResumeLayout(false);
+            rootTable.PerformLayout();
+            tabControl.ResumeLayout(false);
+            drawingsTab.ResumeLayout(false);
+            setsTab.ResumeLayout(false);
+            footerPanel.ResumeLayout(false);
+            footerPanel.PerformLayout();
             layoutTable.ResumeLayout(false);
             layoutTable.PerformLayout();
             filterTable.ResumeLayout(false);
@@ -377,11 +474,18 @@ namespace OpenNest.Forms
             bottomTable.ResumeLayout(false);
             bottomTable.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)quantityBox).EndInit();
+            drawingMenu.ResumeLayout(false);
             ResumeLayout(false);
         }
 
         #endregion
 
+        private System.Windows.Forms.TableLayoutPanel rootTable;
+        private System.Windows.Forms.TabControl tabControl;
+        private System.Windows.Forms.TabPage drawingsTab;
+        private System.Windows.Forms.TabPage setsTab;
+        private OpenNest.Controls.DrawingSetBrowser setBrowser;
+        private System.Windows.Forms.FlowLayoutPanel footerPanel;
         private System.Windows.Forms.TableLayoutPanel layoutTable;
         private System.Windows.Forms.TableLayoutPanel filterTable;
         private System.Windows.Forms.Label searchLabel;
@@ -411,5 +515,8 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Button closeButton;
         private System.Windows.Forms.Label statusLabel;
         private System.Windows.Forms.Timer searchTimer;
+        private System.Windows.Forms.ContextMenuStrip drawingMenu;
+        private System.Windows.Forms.ToolStripMenuItem usedInSetsMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem addToSetMenuItem;
     }
 }

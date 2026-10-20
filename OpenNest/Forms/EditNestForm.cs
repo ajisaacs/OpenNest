@@ -1284,9 +1284,11 @@ namespace OpenNest.Forms
                 return;
 
             IDrawingLibraryStore library;
+            IDrawingSetStore sets;
             try
             {
                 library = NestStorage.CreateDrawingLibrary();
+                sets = NestStorage.CreateDrawingSetStore();
             }
             catch (ArgumentException ex)
             {
@@ -1294,7 +1296,7 @@ namespace OpenNest.Forms
                 return;
             }
 
-            using var form = new DrawingLibraryForm(library, NestStorage.Settings.ServerUrl, Nest);
+            using var form = new DrawingLibraryForm(library, NestStorage.Settings.ServerUrl, Nest, sets);
             form.ShowDialog(this);
             if (form.AddedDrawings.Count > 0)
                 UpdateDrawingList();

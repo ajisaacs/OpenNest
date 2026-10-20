@@ -327,13 +327,48 @@ its client-allocated id. Saving identical content at the current revision is a
 no-op. On success only the nest drawing's library link changes, to the saved
 revision; save the nest to keep it.
 
+### Drawing sets (desktop)
+
+The Drawing Library dialog has a **Sets** tab beside **Drawings** (Database
+mode only, like the dialog). It lists sets a page at a time
+(`OpenNest.Data.DrawingSetBrowseSession`): search by name, customer or notes,
+sort by name, customer, revision or saved time, and **Show archived**. Selecting
+a set shows its notes.
+
+- **New Set...** and **Edit...** open the set editor
+  (`OpenNest.Data.DrawingSetEditSession`): name, customer, notes and the member
+  grid (drawing, material, grade, thickness, units, cut type, quantity, note).
+  **Add Drawings...** opens the library in pick mode: every active drawing,
+  several selectable, added with the quantity entered there. A drawing already
+  in the set is skipped and named; one member per drawing. Quantities are edited
+  in the grid (1 to 100,000); **Remove**, **Move Up** and **Move Down** change
+  the list. The note column flags drawings archived in the library (skipped on
+  release unless included) and drawings with no material or thickness (cannot be
+  released until set in the library).
+- **Save** adds a revision guarded by the revision the set was read at; a 409 is
+  shown and the operator cancels and reloads. A new set's id is allocated
+  before its first save, and a save that fails without a definite answer stays
+  pending: the next Save reads that id and adopts the stored set (saving any
+  later edit as its next revision) instead of creating it twice. Closing with
+  unsaved edits asks first.
+- **Archive** (after confirming) and **Restore** add a revision; nothing is
+  deleted. **History...** lists revisions newest first with the members of the
+  selected one, shown with their drawings' current library details.
+
+On the Drawings tab, right-click a drawing for **Used in Sets...** (the sets
+whose current revision contains it) or **Add to Set...**: choose an active set
+or **New Set**, and the set editor opens with the drawing added at the entered
+quantity for review and Save.
+
 ## Drawing set endpoints
 
 A **drawing set** (schema v7) is a named, versioned list of library drawings
 with a quantity each: a kit, an assembly or a recurring order. Members name
 drawings by id and always mean each drawing's **current** revision; there is no
 per-member revision pin. Sets travel as JSON (`application/json`, at most 1 MiB).
-The desktop does not use these routes yet.
+The desktop browses and edits them on the Drawing Library dialog's Sets tab
+([Drawing sets (desktop)](#drawing-sets-desktop)); releasing a set is not in the
+desktop yet.
 
 `OpenNest.Data.DrawingSetRecord` fields: `id` (client-allocated before the
 first save), `revision`, `name`, `customer`, `notes`, `archived`, `savedBy`,
