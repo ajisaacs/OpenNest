@@ -237,11 +237,13 @@ public sealed class BenchmarkRunnerTests : IDisposable
     [Fact]
     public void Run_NeverExceedsMaxParallelism_ButReachesIt()
     {
-        var probe = new ConcurrencyProbe();
+        // Each solve waits until two solves overlap, so reaching the limit does not depend on
+        // how fast the thread pool adds a second worker. A serial runner times out and fails.
+        var probe = new ConcurrencyProbe(rendezvousAt: 2);
 
         var results = BenchmarkRunner.Run(
             LoadJob(),
-            FakeEngines(probe, 200, 200, 200, 200, 200, 200),
+            FakeEngines(probe, 50, 50, 50, 50, 50, 50),
             maxParallelism: 2
         );
 
@@ -330,8 +332,10 @@ public sealed class BenchmarkRunnerTests : IDisposable
         }
     }
 
-    private sealed class ConcurrencyProbe
+    private sealed class ConcurrencyProbe(int rendezvousAt = 0)
     {
+        private static readonly TimeSpan RendezvousTimeout = TimeSpan.FromSeconds(10);
+        private readonly ManualResetEventSlim _rendezvous = new(rendezvousAt <= 1);
         private int _current;
         private int _max;
 
@@ -346,6 +350,18 @@ public sealed class BenchmarkRunnerTests : IDisposable
                 if (Interlocked.CompareExchange(ref _max, now, seen) == seen)
                     break;
             }
+            if (now >= rendezvousAt)
+                _rendezvous.Set();
+        }
+
+        /// <summary>
+        /// Blocks until <c>rendezvousAt</c> solves have overlapped. On timeout it releases every
+        /// later waiter, so a runner that never overlaps fails once instead of once per solve.
+        /// </summary>
+        public void WaitForRendezvous()
+        {
+            if (!_rendezvous.Wait(RendezvousTimeout))
+                _rendezvous.Set();
         }
 
         public void Exit() => Interlocked.Decrement(ref _current);
@@ -363,6 +379,7 @@ public sealed class BenchmarkRunnerTests : IDisposable
             probe.Enter();
             try
             {
+                probe.WaitForRendezvous();
                 Thread.Sleep(delayMs);
                 return new NestJobResult(
                     NestJobStatus.Incomplete,
