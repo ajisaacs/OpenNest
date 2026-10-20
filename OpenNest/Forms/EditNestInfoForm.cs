@@ -19,7 +19,7 @@ namespace OpenNest.Forms
             foreach (var name in PostProcessorMaterials.Names)
                 materialBox.Items.Add(name);
 
-            foreach (var status in Enum.GetValues<NestStatus>())
+            foreach (var status in NestStatuses.WorkflowOrder)
                 statusBox.Items.Add(status);
             statusBox.SelectedItem = NestStatus.Quote;
 

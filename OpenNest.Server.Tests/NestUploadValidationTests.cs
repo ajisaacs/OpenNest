@@ -65,6 +65,7 @@ public sealed class NestUploadValidationTests
     [InlineData("""{"name":"A","madeBy":null}""")]
     [InlineData("""{"name":"A","status":99}""")]
     [InlineData("""{"name":"A","status":"cancelled"}""")]
+    [InlineData("""{"name":"A","status":4}""")]
     public async Task Create_WithInvalidMetadata_Returns400AndStoresNothing(string metadata)
     {
         using var factory = new ServerFactory();
@@ -80,6 +81,8 @@ public sealed class NestUploadValidationTests
     [Theory]
     [InlineData("""{"name":"A","status":"toBeCut"}""", NestStatus.ToBeCut)]
     [InlineData("""{"name":"A","status":2}""", NestStatus.HasBeenCut)]
+    [InlineData("""{"name":"A","status":"draft"}""", NestStatus.Draft)]
+    [InlineData("""{"name":"A","status":3}""", NestStatus.Draft)]
     public async Task Create_WithDefinedStatus_StoresIt(string metadata, NestStatus expected)
     {
         using var factory = new ServerFactory();

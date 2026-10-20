@@ -542,6 +542,7 @@ public sealed class SavedNestsForm : Form
 
     private static string FormatStatus(NestStatus status) => status switch
     {
+        NestStatus.Draft => "Draft",
         NestStatus.Quote => "Quote",
         NestStatus.ToBeCut => "To Be Cut",
         NestStatus.HasBeenCut => "Has Been Cut",

@@ -44,6 +44,41 @@ public class NestStatusSerializationTests
     }
 
     [Fact]
+    public void RoundTrip_Draft_PreservedAsName()
+    {
+        var nest = CreateMinimalNest();
+        nest.Status = NestStatus.Draft;
+
+        using var ms = new MemoryStream();
+        new NestWriter(nest).Write(ms);
+        using var doc = JsonDocument.Parse(ReadNestJson(ms));
+        ms.Position = 0;
+        var loaded = new NestReader(ms).Read();
+
+        Assert.Equal("Draft", doc.RootElement.GetProperty("status").GetString());
+        Assert.Equal(NestStatus.Draft, loaded.Status);
+    }
+
+    [Fact]
+    public void WorkflowOrder_StartsWithDraftAndListsEveryStatusOnce()
+    {
+        Assert.Equal(NestStatus.Draft, NestStatuses.WorkflowOrder[0]);
+        Assert.Equal(
+            Enum.GetValues<NestStatus>().OrderBy(s => s),
+            NestStatuses.WorkflowOrder.OrderBy(s => s));
+    }
+
+    [Fact]
+    public void ExistingStatusNumbers_AreUnchanged()
+    {
+        // The nest server still accepts integer statuses from existing callers.
+        Assert.Equal(0, (int)NestStatus.Quote);
+        Assert.Equal(1, (int)NestStatus.ToBeCut);
+        Assert.Equal(2, (int)NestStatus.HasBeenCut);
+        Assert.Equal(3, (int)NestStatus.Draft);
+    }
+
+    [Fact]
     public void Status_SerializedAsEnumString()
     {
         var nest = CreateMinimalNest();

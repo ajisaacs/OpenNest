@@ -67,7 +67,9 @@ with enums serialized as strings (`JsonSerializerDefaults.Web` +
 `JsonStringEnumConverter(JsonNamingPolicy.CamelCase)`), matching the rest of
 `OpenNest.Data`'s local JSON stores. Uploaded metadata (POST and both PUTs) must
 carry string text fields (`null` is 400) and a defined `status`: a name, or for
-existing callers its integer value 0–2; an undefined value is 400 and stores nothing.
+existing callers its integer value (0 quote, 1 toBeCut, 2 hasBeenCut, 3 draft); an
+undefined value is 400 and stores nothing. A server older than `draft` refuses it,
+so upgrade the server before desktops that can set it.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -77,7 +79,7 @@ existing callers its integer value 0–2; an undefined value is 400 and stores n
 | `dateCreated` / `dateModified` | datetime | Set by the client from the nest's own metadata. |
 | `material` | string | |
 | `thickness` | number | |
-| `status` | `"quote"` \| `"toBeCut"` \| `"hasBeenCut"` | Default `quote`. |
+| `status` | `"draft"` \| `"quote"` \| `"toBeCut"` \| `"hasBeenCut"` | Default `quote`. |
 | `plateCount` / `partCount` | integer | Computed client-side at save time (non-cutoff parts only). |
 | `comments` | string | |
 | `madeBy` | string | |

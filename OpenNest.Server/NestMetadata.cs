@@ -53,7 +53,7 @@ internal static class NestMetadata
         if (record.Material is null) return "material must be a string.";
         if (record.Comments is null) return "comments must be a string.";
         if (record.MadeBy is null) return "madeBy must be a string.";
-        if (!Enum.IsDefined(record.Status)) return "status must be quote, toBeCut or hasBeenCut.";
+        if (!Enum.IsDefined(record.Status)) return "status must be draft, quote, toBeCut or hasBeenCut.";
         if (!double.IsFinite(record.Thickness)) return "thickness must be a finite number.";
         return null;
     }

@@ -144,6 +144,25 @@ public class EditNestInfoFormTests
     }
 
     [Fact]
+    public void StatusList_FollowsWorkflowOrder_AndSavesDraft()
+    {
+        RunSta(() =>
+        {
+            var nest = AcceptanceNest();
+            using var form = new EditNestInfoForm();
+            form.LoadNestInfo(nest);
+            var statusBox = Assert.IsType<ComboBox>(form.Controls.Find("statusBox", true).Single());
+
+            Assert.Equal(NestStatuses.WorkflowOrder, statusBox.Items.Cast<NestStatus>());
+
+            form.Status = NestStatus.Draft;
+            form.SaveNestInfo(nest);
+
+            Assert.Equal(NestStatus.Draft, nest.Status);
+        });
+    }
+
+    [Fact]
     public void BlankName_DisablesOk()
     {
         RunSta(() =>

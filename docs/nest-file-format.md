@@ -8,9 +8,10 @@ opening and saving with an older application loses that state.
 
 `nest.json` carries the workflow fields shown in the nest info dialog:
 `name`, `customer`, `dateCreated`, `dateLastModified`, `notes`, `material`,
-`thickness`, plus `status` (`"Quote"`, `"ToBeCut"`, `"HasBeenCut"`) and `madeBy`.
+`thickness`, plus `status` (`"Draft"`, `"Quote"`, `"ToBeCut"`, `"HasBeenCut"`) and `madeBy`.
 Status and made-by are additive: files written before them load as Quote with an
-empty maker, and an unrecognized status value likewise falls back to Quote.
+empty maker, and an unrecognized status value likewise falls back to Quote. Builds
+before `Draft` therefore open a Draft nest as Quote, and saving it there keeps Quote.
 
 ## Programs and placements
 
