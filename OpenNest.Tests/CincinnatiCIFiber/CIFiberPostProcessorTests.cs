@@ -16,7 +16,7 @@ namespace OpenNest.Tests.CincinnatiCIFiber;
 
 /// <summary>
 /// Output-contract tests for the Cincinnati CI Fiber post, checked against the
-/// structure of the machine sample NC (12992-4SS_NEST.nc): header block,
+/// structure of a Cincinnati machine sample NC: header block,
 /// restart jump, N-labelled contour blocks with /L macro lines, G41
 /// selection, trimmed coordinate format and the M50/M30/% tail.
 /// </summary>

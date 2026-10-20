@@ -6,7 +6,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
     /// <summary>
     /// Formats numeric values for the CI Fiber machine program.
     /// Coordinates: up to <see cref="PostedAccuracy"/> decimals with trailing
-    /// zeros trimmed ("3.706", "5.01", "0"), never "-0" (sample NC format).
+    /// zeros trimmed ("1.234", "5.01", "0"), never "-0" (sample NC format).
     /// Header values (V.E.*) use fixed decimals.
     /// </summary>
     public sealed class CIFiberFormatter

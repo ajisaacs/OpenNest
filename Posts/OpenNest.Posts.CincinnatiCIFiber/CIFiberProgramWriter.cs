@@ -17,7 +17,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
     /// <code>
     /// ( &lt;nest name&gt; )
     /// ( CONFIGURATION - CI FIBER 8K )
-    /// ( August 20, 2026   01:10 PM )
+    /// ( &lt;month d, yyyy   hh:mm AM|PM&gt; )
     /// ( Material = Mild Steel .060 )
     /// V.E.MATERIAL = "MSN" ... V.E.UNIT = 1
     /// G90
@@ -43,7 +43,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
     /// %
     /// </code>
     ///
-    /// Coordinates are spaceless (G1X3.706Y47.488); arcs post I/J incremental
+    /// Coordinates are spaceless (G1X1.234Y5.678); arcs post I/J incremental
     /// from the arc start (TF5200 G162 default). The first motion block after
     /// the G41/G42 selection is always LINEAR (TF5200 §13.2.4.1): contours
     /// without a lead-in move are rejected with a clear error.
