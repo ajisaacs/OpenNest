@@ -21,6 +21,10 @@ namespace OpenNest.Controls
         private const string LoadingText = "Loading...";
 
         private IDrawingSetStore sets;
+        private IDrawingLibraryStore library;
+        private string serverUrl;
+        private INestRepository nests;
+        private Action<Nest, NestRecord> openNest;
         private DrawingSetBrowseSession session;
         private bool pick;
         private bool busy;
@@ -33,6 +37,12 @@ namespace OpenNest.Controls
 
         /// <summary>Shows a set's revision history; replaced by tests.</summary>
         internal Action<DrawingSetRecord> ShowHistory { get; set; }
+
+        /// <summary>Shows a set's releases; replaced by tests.</summary>
+        internal Action<DrawingSetRecord> ShowReleases { get; set; }
+
+        /// <summary>Shows the release dialog for a set read with its members; replaced by tests.</summary>
+        internal Action<DrawingSetRecord> ShowRelease { get; set; }
 
         /// <summary>Pick mode: an active set was double-clicked (or chosen with Enter).</summary>
         public event EventHandler SetActivated;
@@ -69,7 +79,8 @@ namespace OpenNest.Controls
             if (session != null)
                 throw new InvalidOperationException("The set browser is already initialized.");
             this.sets = sets ?? throw new ArgumentNullException(nameof(sets));
-            ArgumentNullException.ThrowIfNull(library);
+            this.library = library ?? throw new ArgumentNullException(nameof(library));
+            this.serverUrl = serverUrl ?? "";
             this.pick = pick;
             session = new DrawingSetBrowseSession(sets);
             ShowMessage = (text, buttons, icon) => MessageBox.Show(FindForm(), text, FindForm()?.Text ?? "Drawing Sets", buttons, icon);
@@ -83,6 +94,16 @@ namespace OpenNest.Controls
                 using var form = new DrawingSetHistoryForm(sets, set);
                 form.ShowDialog(FindForm());
             };
+            ShowReleases = set =>
+            {
+                using var form = new SetReleasesForm(sets, set);
+                form.ShowDialog(FindForm());
+            };
+            ShowRelease = set =>
+            {
+                using var form = new ReleaseSetForm(sets, library, nests, this.serverUrl, set, openNest);
+                form.ShowDialog(FindForm());
+            };
 
             if (pick)
             {
@@ -91,9 +112,24 @@ namespace OpenNest.Controls
                 editButton.Visible = false;
                 archiveButton.Visible = false;
                 historyButton.Visible = false;
+                releasesButton.Visible = false;
             }
 
             UpdateNavigation();
+            UpdateCommands();
+        }
+
+        /// <summary>
+        /// Shows Release, which makes nests from the selected set: uploads them through
+        /// <paramref name="nests"/> and opens each with <paramref name="openNest"/>.
+        /// </summary>
+        public void EnableRelease(INestRepository nests, Action<Nest, NestRecord> openNest)
+        {
+            if (session == null || pick)
+                throw new InvalidOperationException("Release needs an initialized set browser that is not picking.");
+            this.nests = nests ?? throw new ArgumentNullException(nameof(nests));
+            this.openNest = openNest ?? throw new ArgumentNullException(nameof(openNest));
+            releaseButton.Visible = true;
             UpdateCommands();
         }
 
@@ -177,6 +213,56 @@ namespace OpenNest.Controls
         {
             if (SelectedSet is { } set)
                 ShowHistory(set);
+        }
+
+        private void ReleasesButton_Click(object sender, EventArgs e)
+        {
+            if (SelectedSet is { } set)
+                ShowReleases(set);
+        }
+
+        private async void ReleaseButton_Click(object sender, EventArgs e) => await ReleaseSelectedAsync();
+
+        /// <summary>Reads the selected active set with its members' current drawings and opens the release dialog.</summary>
+        internal async Task ReleaseSelectedAsync()
+        {
+            var listed = SelectedSet;
+            if (session == null || nests == null || listed == null || listed.Archived || busy)
+                return;
+
+            DrawingSetRecord current;
+            busy = true;
+            UpdateCommands();
+            statusLabel.Text = $"Reading set '{listed.Name}'...";
+            try
+            {
+                current = await sets.GetAsync(listed.Id);
+            }
+            catch (Exception ex) when (ex is IOException || ex is HttpRequestException || ex is TaskCanceledException)
+            {
+                Fail($"Could not read set '{listed.Name}': {ex.Message}");
+                return;
+            }
+            finally
+            {
+                busy = false;
+                if (!IsDisposed)
+                    UpdateCommands();
+            }
+
+            if (IsDisposed)
+                return;
+            statusLabel.Text = "";
+            if (current == null || current.Archived)
+            {
+                ShowMessage(current == null
+                    ? $"Set '{listed.Name}' no longer exists on the server."
+                    : $"Set '{listed.Name}' was archived. Restore it to release it.", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                await RunAsync(session.RefreshAsync);
+                return;
+            }
+
+            ShowRelease(current);
         }
 
         private void ActivateSelected()
@@ -358,6 +444,10 @@ namespace OpenNest.Controls
                 setGrid.Rows.Add(row);
             }
 
+            // The grid only sometimes makes the first row current by itself (it depends on focus).
+            if (setGrid.CurrentCell == null && setGrid.Rows.Count > 0)
+                setGrid.CurrentCell = setGrid.Rows[0].Cells[0];
+
             foreach (DataGridViewColumn column in setGrid.Columns)
             {
                 column.HeaderCell.SortGlyphDirection = column.Tag is DrawingSetSortField field && field == session.Sort
@@ -383,6 +473,8 @@ namespace OpenNest.Controls
             archiveButton.Enabled = ready && selected != null;
             archiveButton.Text = selected is { Archived: true } ? "Restore" : "Archive";
             historyButton.Enabled = ready && selected != null;
+            releasesButton.Enabled = ready && selected != null;
+            releaseButton.Enabled = ready && nests != null && selected is { Archived: false, MemberCount: > 0 };
         }
     }
 }

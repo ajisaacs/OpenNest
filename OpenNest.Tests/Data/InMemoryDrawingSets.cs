@@ -111,14 +111,54 @@ internal sealed class InMemoryDrawingSets : IDrawingSetStore
         });
     }
 
-    public Task<SetReleaseRecord> PostReleaseAsync(Guid setId, SetReleaseRecord release, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+    /// <summary>Stored releases, oldest first; tests may add ones with joined nest metadata.</summary>
+    public List<SetReleaseRecord> Releases { get; } = new();
+    public int PostAttempts { get; private set; }
+    public bool FailNextPost { get; set; }
 
-    public Task<SetReleasePage?> GetReleasesAsync(Guid setId, int offset = 0, int limit = 100, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+    public Task<SetReleaseRecord> PostReleaseAsync(Guid setId, SetReleaseRecord release, CancellationToken cancellationToken = default)
+    {
+        PostAttempts++;
+        if (FailNextPost)
+        {
+            FailNextPost = false;
+            throw new IOException("Synthetic release post failure.");
+        }
+        if (Releases.FirstOrDefault(r => r.Id == release.Id) is { } existing)
+            throw new SetReleasePostConflictException(existing);
+
+        var stored = new SetReleaseRecord
+        {
+            Id = release.Id,
+            SetId = setId,
+            SetRevision = release.SetRevision,
+            SetName = _revisions[setId].First(r => r.Revision == release.SetRevision).Name,
+            Multiplier = release.Multiplier,
+            Notes = release.Notes,
+            ReleasedBy = release.ReleasedBy,
+            ReleasedAt = new DateTime(2026, 10, 20, 15, 0, 0, DateTimeKind.Utc),
+            Nests = release.Nests.ToList(),
+        };
+        Releases.Add(stored);
+        return Task.FromResult(stored);
+    }
+
+    public Task<SetReleasePage?> GetReleasesAsync(Guid setId, int offset = 0, int limit = 100, CancellationToken cancellationToken = default)
+    {
+        if (!_revisions.ContainsKey(setId))
+            return Task.FromResult<SetReleasePage?>(null);
+        var newest = Enumerable.Reverse(Releases.Where(r => r.SetId == setId).ToList()).ToList();
+        return Task.FromResult<SetReleasePage?>(new SetReleasePage
+        {
+            Items = newest.Skip(offset).Take(limit).ToList(),
+            Total = newest.Count,
+            Offset = offset,
+            Limit = limit,
+        });
+    }
 
     public Task<SetReleaseRecord?> GetReleaseForNestAsync(Guid nestId, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+        Task.FromResult(Releases.FirstOrDefault(r => r.Nests.Any(n => n.NestId == nestId)));
 
     private Task<DrawingSetRecord> SetArchived(Guid id, int expectedRevision, bool archived)
     {

@@ -360,6 +360,37 @@ whose current revision contains it) or **Add to Set...**: choose an active set
 or **New Set**, and the set editor opens with the drawing added at the entered
 quantity for review and Save.
 
+**Release...** (the Sets tab, when the dialog was opened from a nest) reads the
+selected active set with its members and opens the release dialog. It lists one
+row per material group (`OpenNest.Data.SetReleasePlan`): material, grade,
+thickness, units, cut type, drawings, parts and status. **Kits (multiplier)**
+multiplies every quantity (1 to 1000); **Include archived drawings** puts
+archived members back in, otherwise they are named below the grid as left out.
+Each group has a **Release** tick; refused groups (two drawings with one name,
+or drawings without material or thickness) show why and cannot be ticked, and a
+tick survives changing the multiplier or the archived toggle. **Release**
+confirms, then runs `OpenNest.Data.SetReleaseSession`: every ticked group's nest
+is made as File > New would (the server's next nest name, the saved plate
+defaults and clamps), in the group's units, with the saved plate size and
+spacings converted (25.4 mm per inch) when those differ; the nest takes the
+group's material, grade and thickness, the set's customer and the **Draft**
+status. Each created nest opens in its own tab, bound to its server record, and
+the release (with the release notes) is recorded. The grid then shows every
+group's outcome: Created with the nest name, Refused or Failed with the reason,
+or Not started. Cancel stops between uploads, never during one. When every nest
+was created but recording failed, the button becomes **Record Release** and
+posts the same release again. A dialog runs one release.
+
+**Releases...** lists the selected set's releases, newest first: when, by whom,
+the set revision, the kit multiplier, the number of nests, progress such as
+"2 of 3 cut" (deleted nests are not counted) and the notes. The selected
+release's nests show their material group and current status, or Deleted.
+
+**Nest > Edit** (Nest Info) shows, beside its buttons, the release a server nest
+came from ("Released from set 'Kit A' revision 3 ×2 on 10/20/2026 by ..."). It is
+read in the background and left blank when the nest came from none or the
+server cannot be reached.
+
 ## Drawing set endpoints
 
 A **drawing set** (schema v7) is a named, versioned list of library drawings
@@ -367,8 +398,7 @@ with a quantity each: a kit, an assembly or a recurring order. Members name
 drawings by id and always mean each drawing's **current** revision; there is no
 per-member revision pin. Sets travel as JSON (`application/json`, at most 1 MiB).
 The desktop browses and edits them on the Drawing Library dialog's Sets tab
-([Drawing sets (desktop)](#drawing-sets-desktop)); releasing a set is not in the
-desktop yet.
+([Drawing sets (desktop)](#drawing-sets-desktop)), where sets are also released.
 
 `OpenNest.Data.DrawingSetRecord` fields: `id` (client-allocated before the
 first save), `revision`, `name`, `customer`, `notes`, `archived`, `savedBy`,

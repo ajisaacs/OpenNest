@@ -19,9 +19,13 @@ namespace OpenNest.Forms
     {
         private static readonly TimeSpan ServerTimeout = TimeSpan.FromSeconds(3);
 
-        public static async Task<Nest> CreateAsync(IWin32Window owner)
+        /// <param name="units">
+        /// The new nest's units, with the saved plate defaults converted to them (a drawing set
+        /// release group drawn in other units); null uses the defaults as saved.
+        /// </param>
+        public static async Task<Nest> CreateAsync(IWin32Window owner, Units? units = null)
         {
-            var nest = CreateDefaultNest(owner);
+            var nest = CreateDefaultNest(owner, units);
             var now = DateTime.Now;
 
             nest.DateCreated = now;
@@ -30,10 +34,11 @@ namespace OpenNest.Forms
             return nest;
         }
 
-        private static Nest CreateDefaultNest(IWin32Window owner)
+        private static Nest CreateDefaultNest(IWin32Window owner, Units? units)
         {
             var nest = new Nest();
-            MachineSettings.LoadNestDefaults().ApplyTo(nest);
+            var defaults = MachineSettings.LoadNestDefaults();
+            (units is { } converted ? defaults.ConvertedTo(converted) : defaults).ApplyTo(nest);
             // After the defaults so the rail is converted to the new nest's units.
             MachineSettings.LoadClampSettings(owner).ApplyToNewNest(nest);
             return nest;

@@ -84,6 +84,10 @@ namespace OpenNest.Forms
                     revisionGrid.Rows.Add(row);
                 }
 
+                // The grid only sometimes makes the first row current by itself (it depends on focus).
+                if (revisionGrid.CurrentCell == null && revisionGrid.Rows.Count > 0)
+                    revisionGrid.CurrentCell = revisionGrid.Rows[0].Cells[0];
+
                 summaryLabel.Text = loaded.Items.Count == 0
                     ? $"No revisions on this page ({loaded.Total:N0} in total)."
                     : $"Revisions {offset + 1:N0}-{offset + loaded.Items.Count:N0} of {loaded.Total:N0}";

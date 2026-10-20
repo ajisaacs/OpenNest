@@ -108,6 +108,10 @@ public sealed class SetReleaseResult
     /// <see cref="SetReleaseSession.RetryReleaseAsync"/> posts the same release again.
     /// </summary>
     public string ReleaseError { get; }
+
+    /// <summary>This result once <see cref="SetReleaseSession.RetryReleaseAsync"/> has recorded <paramref name="release"/>.</summary>
+    public SetReleaseResult WithRelease(SetReleaseRecord release) =>
+        new(Groups, Canceled, release ?? throw new ArgumentNullException(nameof(release)), "");
 }
 
 /// <summary>

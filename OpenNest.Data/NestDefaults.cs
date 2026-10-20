@@ -186,6 +186,28 @@ public sealed class NestDefaults
         };
     }
 
+    /// <summary>
+    /// These defaults in <paramref name="units"/>: plate size and spacings are converted
+    /// (25.4 mm per inch) and rounded to four decimals; the quadrant is kept. Returns a copy
+    /// even when the units already match.
+    /// </summary>
+    public NestDefaults ConvertedTo(Units units)
+    {
+        var factor = units == Units ? 1.0 : units == Units.Millimeters ? MillimetersPerInch : 1 / MillimetersPerInch;
+        double Convert(double value) => System.Math.Round(value * factor, 4, MidpointRounding.AwayFromZero);
+        return new NestDefaults
+        {
+            Units = units,
+            Size = new Size(Convert(Size.Width), Convert(Size.Length)),
+            Quadrant = Quadrant,
+            PartSpacing = Convert(PartSpacing),
+            EdgeSpacing = new Spacing(Convert(EdgeSpacing.Left), Convert(EdgeSpacing.Bottom),
+                Convert(EdgeSpacing.Right), Convert(EdgeSpacing.Top)),
+        };
+    }
+
+    private const double MillimetersPerInch = 25.4;
+
     public void ApplyTo(Nest nest)
     {
         ArgumentNullException.ThrowIfNull(nest);

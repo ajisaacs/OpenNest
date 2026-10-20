@@ -757,6 +757,7 @@ namespace OpenNest.Forms
         {
             var form = new EditNestInfoForm { AllowRename = NestStorage.Settings.IsDatabaseMode };
             form.LoadNestInfo(Nest);
+            _ = ShowReleaseOriginAsync(form);
 
             while (form.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
@@ -769,6 +770,30 @@ namespace OpenNest.Forms
                 drawingListBox1.Units = Nest.Units;
                 drawingListBox1.Invalidate();
                 return;
+            }
+        }
+
+        /// <summary>
+        /// Shows which drawing set release made this nest, when it is a server nest that came
+        /// from one. Best effort and in the background: Nest Info never waits for the server.
+        /// </summary>
+        private async Task ShowReleaseOriginAsync(EditNestInfoForm form)
+        {
+            var serverUrl = NestStorage.Settings.ServerUrl;
+            if (!NestStorage.Settings.IsDatabaseMode || Document.RemoteId == Guid.Empty || Document.IsFirstDatabaseSave(serverUrl))
+                return;
+
+            try
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                var release = await NestStorage.CreateDrawingSetStore().GetReleaseForNestAsync(Document.RemoteId, timeout.Token);
+                if (release != null && !form.IsDisposed)
+                    form.ReleaseOrigin = SetReleaseText.Origin(release);
+            }
+            catch (Exception ex) when (ex is IOException or System.Net.Http.HttpRequestException
+                or OperationCanceledException or ArgumentException or System.Text.Json.JsonException)
+            {
+                // An older server, or none reachable: the dialog simply shows no origin.
             }
         }
 
@@ -1297,6 +1322,9 @@ namespace OpenNest.Forms
             }
 
             using var form = new DrawingLibraryForm(library, NestStorage.Settings.ServerUrl, Nest, sets);
+            // Released nests open in their own tabs beside this one.
+            if (MdiParent is MainForm main)
+                form.EnableRelease(NestStorage.CreateRepository(), main.OpenServerNest);
             form.ShowDialog(this);
             if (form.AddedDrawings.Count > 0)
                 UpdateDrawingList();

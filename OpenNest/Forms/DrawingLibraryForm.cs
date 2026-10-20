@@ -194,6 +194,16 @@ namespace OpenNest.Forms
         /// <summary>The Sets tab's browser; loaded the first time the tab is shown.</summary>
         internal OpenNest.Controls.DrawingSetBrowser SetBrowser => setBrowser;
 
+        /// <summary>
+        /// Lets the Sets tab release sets: nests are uploaded through <paramref name="nests"/>
+        /// and each is opened with <paramref name="openNest"/>.
+        /// </summary>
+        public void EnableRelease(INestRepository nests, Action<Nest, NestRecord> openNest)
+        {
+            if (setBrowser.IsInitialized)
+                setBrowser.EnableRelease(nests, openNest);
+        }
+
         private async void TabControl_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (tabControl.SelectedTab == setsTab && setBrowser.IsInitialized && !setBrowser.HasLoaded)

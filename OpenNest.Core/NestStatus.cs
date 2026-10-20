@@ -32,5 +32,15 @@ namespace OpenNest
             NestStatus.ToBeCut,
             NestStatus.HasBeenCut,
         };
+
+        /// <summary>The name shown to the operator, such as "To Be Cut".</summary>
+        public static string DisplayName(NestStatus status) => status switch
+        {
+            NestStatus.Draft => "Draft",
+            NestStatus.Quote => "Quote",
+            NestStatus.ToBeCut => "To Be Cut",
+            NestStatus.HasBeenCut => "Has Been Cut",
+            _ => status.ToString(),
+        };
     }
 }

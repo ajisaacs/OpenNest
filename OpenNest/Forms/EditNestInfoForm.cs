@@ -52,6 +52,16 @@ namespace OpenNest.Forms
             set { nameBox.ReadOnly = !value; }
         }
 
+        /// <summary>
+        /// The drawing set release this nest came from (Database mode), shown beside the
+        /// buttons; blank for none.
+        /// </summary>
+        public string ReleaseOrigin
+        {
+            get { return releaseLabel.Text; }
+            set { releaseLabel.Text = value ?? ""; }
+        }
+
         public string Customer
         {
             get { return customerBox.Text; }

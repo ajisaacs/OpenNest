@@ -44,6 +44,8 @@ namespace OpenNest.Controls
             editButton = new System.Windows.Forms.Button();
             archiveButton = new System.Windows.Forms.Button();
             historyButton = new System.Windows.Forms.Button();
+            releasesButton = new System.Windows.Forms.Button();
+            releaseButton = new System.Windows.Forms.Button();
             statusLabel = new System.Windows.Forms.Label();
             searchTimer = new System.Windows.Forms.Timer(components);
             layoutTable.SuspendLayout();
@@ -212,7 +214,9 @@ namespace OpenNest.Controls
             // bottomTable
             //
             bottomTable.AutoSize = true;
-            bottomTable.ColumnCount = 7;
+            bottomTable.ColumnCount = 9;
+            bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
@@ -227,6 +231,8 @@ namespace OpenNest.Controls
             bottomTable.Controls.Add(editButton, 4, 0);
             bottomTable.Controls.Add(archiveButton, 5, 0);
             bottomTable.Controls.Add(historyButton, 6, 0);
+            bottomTable.Controls.Add(releasesButton, 7, 0);
+            bottomTable.Controls.Add(releaseButton, 8, 0);
             bottomTable.Dock = System.Windows.Forms.DockStyle.Fill;
             bottomTable.Margin = new System.Windows.Forms.Padding(0, 6, 0, 0);
             bottomTable.Name = "bottomTable";
@@ -299,6 +305,28 @@ namespace OpenNest.Controls
             historyButton.UseVisualStyleBackColor = true;
             historyButton.Click += HistoryButton_Click;
             //
+            // releasesButton
+            //
+            releasesButton.AutoSize = true;
+            releasesButton.Enabled = false;
+            releasesButton.Name = "releasesButton";
+            releasesButton.TabIndex = 7;
+            releasesButton.Text = "Releases...";
+            releasesButton.UseVisualStyleBackColor = true;
+            releasesButton.Click += ReleasesButton_Click;
+            //
+            // releaseButton
+            //
+            releaseButton.AutoSize = true;
+            releaseButton.Enabled = false;
+            releaseButton.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
+            releaseButton.Name = "releaseButton";
+            releaseButton.TabIndex = 8;
+            releaseButton.Text = "Release...";
+            releaseButton.UseVisualStyleBackColor = true;
+            releaseButton.Visible = false;
+            releaseButton.Click += ReleaseButton_Click;
+            //
             // statusLabel
             //
             statusLabel.AutoEllipsis = true;
@@ -357,6 +385,8 @@ namespace OpenNest.Controls
         private System.Windows.Forms.Button editButton;
         private System.Windows.Forms.Button archiveButton;
         private System.Windows.Forms.Button historyButton;
+        private System.Windows.Forms.Button releasesButton;
+        private System.Windows.Forms.Button releaseButton;
         private System.Windows.Forms.Label statusLabel;
         private System.Windows.Forms.Timer searchTimer;
     }

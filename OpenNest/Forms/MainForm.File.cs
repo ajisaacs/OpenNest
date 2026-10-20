@@ -33,6 +33,18 @@ namespace OpenNest.Forms
             editForm.PlateView.ZoomToFit();
         }
 
+        /// <summary>
+        /// Opens a nest that is already on the nest server (a drawing set release made it) in
+        /// its own tab, bound to that record so the next Save updates it.
+        /// </summary>
+        internal void OpenServerNest(Nest nest, NestRecord record)
+        {
+            ArgumentNullException.ThrowIfNull(nest);
+            ArgumentNullException.ThrowIfNull(record);
+            var windowState = ActiveMdiChild?.WindowState ?? FormWindowState.Maximized;
+            LoadNest(nest, windowState, record.Id, NestStorage.Settings.ServerUrl, record.Revision);
+        }
+
         #region File Menu Events
 
         private async void New_Click(object sender, EventArgs e)

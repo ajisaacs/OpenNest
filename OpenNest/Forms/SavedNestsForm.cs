@@ -540,14 +540,7 @@ public sealed class SavedNestsForm : Form
         UpdateTitle(session.Summary);
     }
 
-    private static string FormatStatus(NestStatus status) => status switch
-    {
-        NestStatus.Draft => "Draft",
-        NestStatus.Quote => "Quote",
-        NestStatus.ToBeCut => "To Be Cut",
-        NestStatus.HasBeenCut => "Has Been Cut",
-        _ => status.ToString(),
-    };
+    private static string FormatStatus(NestStatus status) => NestStatuses.DisplayName(status);
 
     private static string FormatDate(DateTime value) =>
         value == default ? "" : value.ToString("g", CultureInfo.CurrentCulture);

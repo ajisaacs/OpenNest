@@ -74,6 +74,7 @@
             this.cancelButton = new System.Windows.Forms.Button();
             this.bottomPanel1 = new OpenNest.Controls.BottomPanel();
             this.applyButton = new System.Windows.Forms.Button();
+            this.releaseLabel = new System.Windows.Forms.Label();
             this.groupBox1.SuspendLayout();
             this.tableLayoutPanel2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.leftSpacingBox)).BeginInit();
@@ -667,6 +668,7 @@
             // 
             // bottomPanel1
             // 
+            this.bottomPanel1.Controls.Add(this.releaseLabel);
             this.bottomPanel1.Controls.Add(this.applyButton);
             this.bottomPanel1.Controls.Add(this.cancelButton);
             this.bottomPanel1.Dock = System.Windows.Forms.DockStyle.Bottom;
@@ -674,6 +676,17 @@
             this.bottomPanel1.Name = "bottomPanel1";
             this.bottomPanel1.Size = new System.Drawing.Size(659, 50);
             this.bottomPanel1.TabIndex = 1;
+            // 
+            // releaseLabel
+            // 
+            this.releaseLabel.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.releaseLabel.AutoEllipsis = true;
+            this.releaseLabel.ForeColor = System.Drawing.SystemColors.GrayText;
+            this.releaseLabel.Location = new System.Drawing.Point(12, 16);
+            this.releaseLabel.Name = "releaseLabel";
+            this.releaseLabel.Size = new System.Drawing.Size(440, 18);
+            this.releaseLabel.TabIndex = 2;
             // 
             // applyButton
             // 
@@ -753,6 +766,7 @@
         private System.Windows.Forms.GroupBox groupBox3;
         private Controls.QuadrantSelect quadrantSelect1;
         private System.Windows.Forms.Button applyButton;
+        private System.Windows.Forms.Label releaseLabel;
         private System.Windows.Forms.Button cancelButton;
         private System.Windows.Forms.TabControl tabControl1;
         private System.Windows.Forms.TabPage tabPage1;
