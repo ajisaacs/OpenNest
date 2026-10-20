@@ -95,8 +95,7 @@ namespace OpenNest.Actions
             if (form == null)
                 return;
 
-            cuttingPanel = new CuttingPanel { ShowAutoAssign = true };
-            cuttingPanel.AutoAssignClicked += OnAutoAssignClicked;
+            cuttingPanel = new CuttingPanel();
             cuttingPanel.ParametersChanged += OnToolParametersChanged;
 
             // Load current parameters or defaults
@@ -130,7 +129,6 @@ namespace OpenNest.Actions
             SaveParameters();
 
             cuttingPanel.ParametersChanged -= OnToolParametersChanged;
-            cuttingPanel.AutoAssignClicked -= OnAutoAssignClicked;
 
             var form = plateView.FindForm() as EditNestForm;
             form?.HideSidePanel();
@@ -492,51 +490,18 @@ namespace OpenNest.Actions
 
         private void CommitLeadIn()
         {
-            var parameters = GetCurrentParameters();
-
             if (selectedPart.HasManualLeadIns)
                 selectedPart.RemoveLeadIns();
 
-            ApplyAutoTab(parameters);
-
+            // A part the support grid cannot hold level is tabbed at the clicked entry.
+            var parameters = Support.SupportTabSettings.ForManualLeadIn(GetCurrentParameters(),
+                plateView.Plate, selectedPart);
             selectedPart.ApplySingleLeadIn(parameters, snapPoint, snapEntity, snapContourType);
             selectedPart.LeadInsLocked = true;
 
             selectedLayoutPart.IsDirty = true;
             UnlockContour();
             plateView.Invalidate();
-        }
-
-        private void OnAutoAssignClicked(object sender, System.EventArgs e)
-        {
-            if (selectedPart == null)
-                return;
-
-            var parameters = GetCurrentParameters();
-
-            if (selectedPart.HasManualLeadIns)
-                selectedPart.RemoveLeadIns();
-
-            ApplyAutoTab(parameters);
-
-            selectedPart.ApplyLeadIns(parameters, Vector.Zero);
-            selectedPart.LeadInsLocked = true;
-
-            selectedLayoutPart.IsDirty = true;
-            UnlockContour();
-            plateView.Invalidate();
-        }
-
-        private void ApplyAutoTab(CuttingParameters parameters)
-        {
-            if (parameters.AutoTabMinSize <= 0 && parameters.AutoTabMaxSize <= 0)
-                return;
-
-            var bbox = selectedPart.Program.BoundingBox();
-            var minDim = System.Math.Min(bbox.Width, bbox.Length);
-
-            if (minDim >= parameters.AutoTabMinSize && minDim <= parameters.AutoTabMaxSize)
-                parameters.TabsEnabled = true;
         }
 
         private void DeselectPart()

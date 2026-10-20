@@ -150,8 +150,6 @@ namespace OpenNest.Forms
             }
         }
 
-        private void PlateAssignLeadIns_Click(object sender, EventArgs e) => WithActive(f => f.AssignLeadIns_Click(sender, e));
-
         private void PlatePlaceLeadIn_Click(object sender, EventArgs e) => WithActive(f => f.PlaceLeadIn_Click(sender, e));
 
         private void PlateRemoveLeadIns_Click(object sender, EventArgs e) => WithActive(f => f.RemoveLeadIns_Click(sender, e));

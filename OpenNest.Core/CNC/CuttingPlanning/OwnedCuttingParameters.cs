@@ -39,8 +39,6 @@ internal static class OwnedCuttingParameters
             ArcCircleLeadOut = CopyLeadOut(source.ArcCircleLeadOut),
             RoundLeadInAngles = source.RoundLeadInAngles,
             LeadInAngleIncrement = source.LeadInAngleIncrement,
-            AutoTabMinSize = Dimension(source.AutoTabMinSize),
-            AutoTabMaxSize = Dimension(source.AutoTabMaxSize),
             TabConfig = source.TabConfig == null
                 ? source.TabsEnabled ? throw new ArgumentException("Enabled tabs require a configuration.") : null
                 : CopyTab(source.TabConfig),

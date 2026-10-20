@@ -220,7 +220,7 @@ public class TabbedCutoutBuilderTests
     }
 
     [Fact]
-    public void AssignLeadIns_EntersEachPieceFromTheSlug_WithNoLeadOut()
+    public void ApplyLeadIns_EntersEachPieceFromTheSlug_WithNoLeadOut()
     {
         var (entities, square, _) = Part();
         var drawing = Build(entities, On(square));

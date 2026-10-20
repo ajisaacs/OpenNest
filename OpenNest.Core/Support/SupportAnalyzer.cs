@@ -365,6 +365,9 @@ namespace OpenNest.Support
         public double MarginWith(Vector tab) =>
             IsComplete ? SupportAnalyzer.MarginWith(CenterOfGravity, hulls, tab) : double.NegativeInfinity;
 
+        /// <summary>True when a tab at <paramref name="tab"/> holds the part level by the required margin.</summary>
+        public bool IsSteadiedByTabAt(Vector tab) => IsComplete && Meets(MarginWith(tab));
+
         /// <summary>
         /// Whether a tab at <paramref name="tab"/> is good enough: it keeps clear of inside corners,
         /// and it holds the part level by the required margin or, where no single tab can, it is

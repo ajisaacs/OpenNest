@@ -37,28 +37,16 @@ namespace OpenNest.Controls
         private readonly CheckBox chkTabsEnabled;
         private readonly NumericUpDown nudTabWidth;
         private readonly RadioButton rbTabAll;
-        private readonly RadioButton rbAutoTab;
         private readonly RadioButton rbSupportTab;
-        private readonly NumericUpDown nudAutoTabMin;
-        private readonly NumericUpDown nudAutoTabMax;
         private readonly NumericUpDown nudPierceClearance;
         private readonly NumericUpDown nudPierceDiameter;
 
         private readonly CheckBox chkRoundLeadInAngles;
         private readonly NumericUpDown nudLeadInAngleIncrement;
 
-        private readonly Button btnAutoAssign;
-
         private bool suppressEvents;
 
         public event EventHandler ParametersChanged;
-        public event EventHandler AutoAssignClicked;
-
-        public bool ShowAutoAssign
-        {
-            get => btnAutoAssign.Visible;
-            set => btnAutoAssign.Visible = value;
-        }
 
         public ContourType? ActiveContourType
         {
@@ -136,7 +124,7 @@ namespace OpenNest.Controls
             {
                 HeaderText = "Tabs",
                 Dock = DockStyle.Top,
-                ExpandedHeight = 160,
+                ExpandedHeight = 106,
                 IsExpanded = false,
             };
 
@@ -171,46 +159,11 @@ namespace OpenNest.Controls
             };
             tabsPanel.ContentPanel.Controls.Add(rbTabAll);
 
-            rbAutoTab = new RadioButton
-            {
-                Text = "Auto-tab when smallest part dimension is between:",
-                Location = new Point(28, 50),
-                AutoSize = true,
-                Enabled = false,
-            };
-            tabsPanel.ContentPanel.Controls.Add(rbAutoTab);
-
-            tabsPanel.ContentPanel.Controls.Add(
-                new Label
-                {
-                    Text = "Min:",
-                    Location = new Point(44, 76),
-                    AutoSize = true,
-                }
-            );
-
-            nudAutoTabMin = CreateNumeric(77, 73, 0, 0.0625);
-            nudAutoTabMin.Enabled = false;
-            tabsPanel.ContentPanel.Controls.Add(nudAutoTabMin);
-
-            tabsPanel.ContentPanel.Controls.Add(
-                new Label
-                {
-                    Text = "Max:",
-                    Location = new Point(210, 76),
-                    AutoSize = true,
-                }
-            );
-
-            nudAutoTabMax = CreateNumeric(245, 73, 0, 0.0625);
-            nudAutoTabMax.Enabled = false;
-            tabsPanel.ContentPanel.Controls.Add(nudAutoTabMax);
-
             // Plan Cutting tabs only the parts the plate's support grid cannot hold level.
             rbSupportTab = new RadioButton
             {
                 Text = "Tab parts the support grid cannot hold level",
-                Location = new Point(28, 102),
+                Location = new Point(28, 50),
                 AutoSize = true,
                 Enabled = false,
             };
@@ -221,27 +174,12 @@ namespace OpenNest.Controls
                 var enabled = chkTabsEnabled.Checked;
                 nudTabWidth.Enabled = enabled;
                 rbTabAll.Enabled = enabled;
-                rbAutoTab.Enabled = enabled;
                 rbSupportTab.Enabled = enabled;
-                nudAutoTabMin.Enabled = enabled && rbAutoTab.Checked;
-                nudAutoTabMax.Enabled = enabled && rbAutoTab.Checked;
                 OnParametersChanged();
             };
 
-            rbTabAll.CheckedChanged += (s, e) =>
-            {
-                nudAutoTabMin.Enabled = chkTabsEnabled.Checked && rbAutoTab.Checked;
-                nudAutoTabMax.Enabled = chkTabsEnabled.Checked && rbAutoTab.Checked;
-                OnParametersChanged();
-            };
-
-            // Switching between auto and support tabs does not pass through Tab all parts.
-            rbSupportTab.CheckedChanged += (s, e) =>
-            {
-                nudAutoTabMin.Enabled = chkTabsEnabled.Checked && rbAutoTab.Checked;
-                nudAutoTabMax.Enabled = chkTabsEnabled.Checked && rbAutoTab.Checked;
-                OnParametersChanged();
-            };
+            // The two choices toggle together, so one handler sees every change.
+            rbTabAll.CheckedChanged += (s, e) => OnParametersChanged();
 
             // Pierce section
             var piercePanel = new CollapsiblePanel
@@ -308,26 +246,7 @@ namespace OpenNest.Controls
             nudLeadInAngleIncrement.ValueChanged += (s, e) => OnParametersChanged();
             piercePanel.ContentPanel.Controls.Add(nudLeadInAngleIncrement);
 
-            // Auto-Assign button — wrapped in a panel for Dock.Top with padding
-            btnAutoAssign = new Button
-            {
-                Text = "Auto-Assign Lead-ins",
-                Dock = DockStyle.Top,
-                Height = 32,
-                Visible = false,
-            };
-            btnAutoAssign.Click += (s, e) => AutoAssignClicked?.Invoke(this, EventArgs.Empty);
-
-            var btnWrapper = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 36,
-                Padding = new Padding(4, 2, 4, 2),
-            };
-            btnWrapper.Controls.Add(btnAutoAssign);
-
             // Add in reverse order — Dock.Top stacks top-down
-            Controls.Add(btnWrapper);
             Controls.Add(piercePanel);
             Controls.Add(tabsPanel);
             Controls.Add(tabWrapper);
@@ -353,10 +272,6 @@ namespace OpenNest.Controls
                 PierceDiameter = (double)nudPierceDiameter.Value,
                 RoundLeadInAngles = chkRoundLeadInAngles.Checked,
                 LeadInAngleIncrement = (double)nudLeadInAngleIncrement.Value,
-                AutoTabMinSize =
-                    chkTabsEnabled.Checked && rbAutoTab.Checked ? (double)nudAutoTabMin.Value : 0,
-                AutoTabMaxSize =
-                    chkTabsEnabled.Checked && rbAutoTab.Checked ? (double)nudAutoTabMax.Value : 0,
                 SupportTabs = chkTabsEnabled.Checked && rbSupportTab.Checked,
             };
         }
@@ -372,11 +287,9 @@ namespace OpenNest.Controls
             LoadLeadIn(cboArcCircleLeadIn, pnlArcCircleLeadIn, p.ArcCircleLeadIn);
             LoadLeadOut(cboArcCircleLeadOut, pnlArcCircleLeadOut, p.ArcCircleLeadOut);
 
-            var hasAutoTab = p.AutoTabMinSize > 0 || p.AutoTabMaxSize > 0;
-            chkTabsEnabled.Checked = p.TabsEnabled || hasAutoTab || p.SupportTabs;
-            rbAutoTab.Checked = hasAutoTab && !p.SupportTabs;
+            chkTabsEnabled.Checked = p.TabsEnabled || p.SupportTabs;
             rbSupportTab.Checked = p.SupportTabs;
-            rbTabAll.Checked = !hasAutoTab && !p.SupportTabs;
+            rbTabAll.Checked = !p.SupportTabs;
             if (p.TabConfig != null)
                 nudTabWidth.Value = (decimal)p.TabConfig.Size;
             nudPierceClearance.Value = (decimal)p.PierceClearance;
@@ -384,8 +297,6 @@ namespace OpenNest.Controls
             chkRoundLeadInAngles.Checked = p.RoundLeadInAngles;
             nudLeadInAngleIncrement.Value = (decimal)p.LeadInAngleIncrement;
             nudLeadInAngleIncrement.Enabled = p.RoundLeadInAngles;
-            nudAutoTabMin.Value = (decimal)p.AutoTabMinSize;
-            nudAutoTabMax.Value = (decimal)p.AutoTabMaxSize;
 
             suppressEvents = false;
         }

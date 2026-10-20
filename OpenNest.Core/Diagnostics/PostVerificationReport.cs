@@ -34,7 +34,13 @@ public enum PostVerificationKind
     /// Two parts are closer than the plate's part spacing without sharing material, judged as
     /// Auto Nest's layout check judges them.
     /// </summary>
-    PartSpacing
+    PartSpacing,
+
+    /// <summary>
+    /// A part its plate's support bed cannot hold level has no tab that keeps it level, so it may
+    /// tip once cut free (see docs/support-tabs.md).
+    /// </summary>
+    PartSupport
 }
 
 /// <summary>Plate and part numbers are one-based; plate zero denotes a whole-post limitation.</summary>
@@ -84,6 +90,8 @@ public sealed class PostVerificationReport
             Summary(PostVerificationKind.PierceZone, "Pierce zones");
         if (Findings.Any(finding => finding.Kind == PostVerificationKind.PartSpacing))
             Summary(PostVerificationKind.PartSpacing, "Part spacing");
+        if (Findings.Any(finding => finding.Kind == PostVerificationKind.PartSupport))
+            Summary(PostVerificationKind.PartSupport, "Part support");
         foreach (var finding in Findings)
         {
             text.Append(finding.PlateNumber == 0 ? "Post processor" : $"Plate {finding.PlateNumber}");

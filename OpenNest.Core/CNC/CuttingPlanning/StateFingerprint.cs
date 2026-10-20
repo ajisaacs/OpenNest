@@ -89,8 +89,6 @@ internal static class StateFingerprint
             Number(p.PierceDiameter);
             Flag(p.RoundLeadInAngles);
             Number(p.LeadInAngleIncrement);
-            Number(p.AutoTabMinSize);
-            Number(p.AutoTabMaxSize);
             TabSettings(p.TabConfig);
             Flag(p.TabsEnabled);
             Flag(p.SupportTabs);

@@ -34,7 +34,7 @@ public class PartLeadInSerializationTests
     }
 
     [Fact]
-    public void SingleManualLeadIn_LockedPartIsSkippedByAssignerAfterReload()
+    public void SingleManualLeadIn_StaysLockedAfterReload()
     {
         var nest = CreateNest();
         var part = nest.Plates[0].Parts[0];
@@ -46,14 +46,9 @@ public class PartLeadInSerializationTests
         var loaded = Read(Save(nest));
         var plate = loaded.Plates[0];
         var restored = plate.Parts[0];
-        var program = restored.Program;
-        plate.CuttingParameters = Parameters();
-
-        new LeadInAssigner { Sequencer = new LeftSideSequencer() }.Assign(plate);
 
         Assert.True(restored.HasManualLeadIns);
         Assert.True(restored.LeadInsLocked);
-        Assert.Same(program, restored.Program);
     }
 
     [Fact]

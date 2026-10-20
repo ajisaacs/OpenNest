@@ -263,8 +263,6 @@ namespace OpenNest.Forms
 
         private void CalculateNestCutTime_Click(object sender, EventArgs e) => WithActive(f => f.CalculateNestCutTime());
 
-        private void NestAssignLeadIns_Click(object sender, EventArgs e) => WithActive(f => f.AssignLeadInsAllPlates());
-
         private void NestRemoveLeadIns_Click(object sender, EventArgs e) => WithActive(f => f.RemoveLeadInsAllPlates());
 
         #endregion Nest Menu Events

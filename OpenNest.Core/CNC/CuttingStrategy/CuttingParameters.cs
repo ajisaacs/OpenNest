@@ -40,9 +40,6 @@ namespace OpenNest.CNC.CuttingStrategy
         public bool RoundLeadInAngles { get; set; }
         public double LeadInAngleIncrement { get; set; } = 5.0;
 
-        public double AutoTabMinSize { get; set; }
-        public double AutoTabMaxSize { get; set; }
-
         public Tab TabConfig { get; set; }
         public bool TabsEnabled { get; set; }
 

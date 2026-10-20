@@ -71,7 +71,7 @@ other parts keep the plate settings, so supported parts are not tabbed.
 The emitter tabs a perimeter at its entry: the cut stops short of the entry by the tab size.
 A support-tabbed perimeter's automatic entries are therefore limited to catalogue points the
 analysis accepts, plus the closest native point to its best tab point (`AutomaticEntryKind.SupportTab`,
-never on a reflex or cusp vertex). Ranking, lead checks and replay are unchanged.
+never on a reflex or cusp vertex). Ranking and lead checks are unchanged.
 
 If none of those entries has a lead-in that fits, the part is still tabbed. The search falls
 back first to every catalogue entry clear of inside corners, then to every entry
@@ -79,16 +79,39 @@ back first to every catalogue entry clear of inside corners, then to every entry
 lead-in fits, it keeps every one that holds the part level, or else only the steadiest. The
 open-scrap pierce fallback then tries the last of those catalogues.
 
-Replay notes each planned part whose tab, at its perimeter entry, cannot hold it level (no single
-tab can, or no lead-in fits where one would) or sits in an inside corner
-(`SupportTabCapture.Notes`). The notes are advisory: a Ready plan keeps its status and lists them
-in Plan Cutting's warnings, and the console and MCP summaries print them under the plate.
+A drawing pin on the perimeter wins: its entry, leads and tab are kept as pinned, and the
+analysis is only carried for review. Replay and best-effort plans (`SupportTabCapture.Review`)
+warn with `PostVerificationKind.PartSupport` whenever an unsupported part's emitted perimeter is
+untabbed or its entry does not steady the part: its pin has no tab or a tab elsewhere, no
+steadying entry had a lead-in that fits, or no single tab can steady it. Like every planner
+warning, this makes the proposal UNVERIFIED, so applying it needs explicit acceptance.
+
+A planned tab that sits in an inside corner, because no lead-in fits clear of one, gets an
+advisory note instead (`SupportTabCapture.Notes`; never for a pin): a Ready plan keeps its
+status and lists it in Plan Cutting's warnings, and the console and MCP summaries print it under
+the plate.
+
+## Lead-ins placed by hand
+
+Plate > Place Lead-in cuts where it is clicked. Under "Tab parts the support grid cannot hold
+level", `SupportTabSettings.ForManualLeadIn` enables tabs on a copy of the settings when the
+plate's bed cannot hold the clicked part level, so the tab sits at the clicked entry. The
+overlay's orange diamond shows where it steadies the part; the pre-post review checks the
+result. Plan Cutting is the only automatic lead-in assignment.
+
+## Pre-post review
+
+`PartSupportReview` runs in every pre-post verification and in Validate Nest. On a plate with a
+support bed, each part whose settings (its own, else the plate's) ask for support tabs and that
+the bed cannot hold level is checked, however its program was made. The tab is the gap between
+the end and the start of the program's outside cut (the chain of cutting motions with the
+largest extent). A part with no such gap, or whose gap does not steady it, gets a
+`PartSupport` warning at its center of gravity naming the best tab point; posting needs
+consent as for every warning. A part whose material cannot be read is reported as not checked.
 
 Not covered yet:
 
-- A drawing pin on the perimeter wins: its entry and tab are kept as pinned.
-- Locked or ineligible parts keep their programs; the older Assign Lead-ins command and
-  Auto Tab sizes ignore the bed.
+- Locked or ineligible parts keep their programs in Plan Cutting; the pre-post review still
+  checks them.
 - Only one perimeter tab per part. A part that needs more (one tab cannot reach the stability
-  margin) gets the best single tab and a note.
-- Pre-post verification does not yet warn about unsupported, untabbed parts.
+  margin) gets the best single tab and a warning.

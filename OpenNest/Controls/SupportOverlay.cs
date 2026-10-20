@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Runtime.CompilerServices;
 using OpenNest.Geometry;
 using OpenNest.Support;
@@ -17,6 +18,9 @@ namespace OpenNest.Controls
     {
         // Grid points are drawn only while they are at least this far apart on screen.
         private const float MinimumGridSpacing = 6f;
+
+        // Grid points are this many whole pixels square.
+        private const float GridPointSize = 3f;
 
         private static readonly Color GridColor = Color.FromArgb(110, 120, 120, 120);
         private static readonly Color ContactColor = Color.FromArgb(220, 30, 150, 60);
@@ -80,8 +84,32 @@ namespace OpenNest.Controls
             var bottom = plate.Quadrant is 3 or 4 ? -plate.Size.Width : 0;
             var sheet = new Box(left, bottom, plate.Size.Length, plate.Size.Width);
             using var brush = new SolidBrush(GridColor);
-            foreach (var point in grid.PointsIn(sheet, plate.Quadrant))
-                Dot(g, view, point, 1.5f, brush);
+            // Anti-aliased dots smear differently at each subpixel offset; whole-pixel squares
+            // drawn without smoothing are all the same size.
+            // The view is translated by a fractional origin, so snap in device pixels.
+            using var transform = g.Transform;
+            var dx = transform.OffsetX;
+            var dy = transform.OffsetY;
+            var half = (GridPointSize - 1) / 2;
+            var smoothing = g.SmoothingMode;
+            var offset = g.PixelOffsetMode;
+            g.SmoothingMode = SmoothingMode.None;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+            try
+            {
+                foreach (var point in grid.PointsIn(sheet, plate.Quadrant))
+                {
+                    var p = view.PointWorldToGraph(point);
+                    var x = (float)System.Math.Round(p.X + dx) - dx - half;
+                    var y = (float)System.Math.Round(p.Y + dy) - dy - half;
+                    g.FillRectangle(brush, x, y, GridPointSize, GridPointSize);
+                }
+            }
+            finally
+            {
+                g.SmoothingMode = smoothing;
+                g.PixelOffsetMode = offset;
+            }
         }
 
         private static void Dot(Graphics g, PlateView view, Vector point, float radius, Brush brush)

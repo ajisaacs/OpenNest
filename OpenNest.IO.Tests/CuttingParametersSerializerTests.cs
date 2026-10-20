@@ -128,8 +128,7 @@ public class CuttingParametersSerializerTests
         Assert.Equal(0.0625, restored.PierceClearance);
         Assert.False(restored.RoundLeadInAngles);
         Assert.Equal(5, restored.LeadInAngleIncrement);
-        Assert.Equal(0, restored.AutoTabMinSize);
-        Assert.Equal(0, restored.AutoTabMaxSize);
+        Assert.False(restored.SupportTabs);
         AssertEquivalent(new AssignmentParameters(), restored.Assignment);
         AssertEquivalent(new SequenceParameters(), restored.Sequencing);
     }
@@ -304,8 +303,7 @@ public class CuttingParametersSerializerTests
         PierceDiameter = 0.41,
         RoundLeadInAngles = true,
         LeadInAngleIncrement = 13,
-        AutoTabMinSize = 0.62,
-        AutoTabMaxSize = 4.7,
+        SupportTabs = true,
         TabConfig = CreateTab("Breaker"),
         TabsEnabled = true,
         Assignment = new AssignmentParameters

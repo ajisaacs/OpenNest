@@ -75,6 +75,8 @@ internal static class BestEffortCuttingPlan
                         f.OtherPartNumber is int otherOrdinal ? snapshot.Placements[otherOrdinal - 1].SourcePart : null,
                         f.Kind, f.Message)
                     { Witness = f }));
+                if (SupportTabCapture.Review(source, proposal.ContourChoices) is { } unsteady)
+                    findings.Add(unsteady);
                 findings.AddRange(SupportTabCapture.Notes(proposal));
                 distance += execution.RapidDistanceFrom(position);
                 if (!double.IsFinite(distance))

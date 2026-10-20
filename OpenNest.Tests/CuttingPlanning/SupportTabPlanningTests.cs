@@ -1,6 +1,7 @@
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Diagnostics;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Geometry;
 using OpenNest.Support;
@@ -104,7 +105,7 @@ public class SupportTabPlanningTests
         var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(7, 0),
             confirmedParameters: Parameters()));
 
-        Assert.True(result.Status == CuttingPlanStatus.Ready, string.Join("\n", result.Findings.Select(f => f.Message)));
+        Assert.True(result.Status == CuttingPlanStatus.BestEffort, string.Join("\n", result.Findings.Select(f => f.Message)));
         var proposal = result.ProposedOrder.Single(p => ReferenceEquals(p.SourcePart, strip));
         var (entry, cutEnd) = EntryAndCutEnd(proposal);
         Assert.Equal(TabSize, entry.DistanceTo(cutEnd), 6);
@@ -115,7 +116,8 @@ public class SupportTabPlanningTests
         Assert.True(support.MarginWith(entry) > support.MarginWith(new Vector(12, 2)), $"entry {entry}");
         Assert.False(support.HoldsLevelWithTabAt(entry));
         Assert.Contains(result.Findings, f => ReferenceEquals(f.SourcePart, strip)
-            && f.Message.Contains("no lead-in fits where a tab would"));
+            && f.Kind == PostVerificationKind.PartSupport
+            && f.Message.Contains("no lead-in fits at a point where its tab would steady the part"));
     }
 
     [Fact]
@@ -130,12 +132,13 @@ public class SupportTabPlanningTests
         var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(0, 0),
             confirmedParameters: Parameters()));
 
-        Assert.Equal(CuttingPlanStatus.Ready, result.Status);
+        Assert.Equal(CuttingPlanStatus.BestEffort, result.Status);
         var (entry, cutEnd) = EntryAndCutEnd(Assert.Single(result.ProposedOrder));
         Assert.Equal(TabSize, entry.DistanceTo(cutEnd), 6);
-        var note = Assert.Single(result.Findings);
-        Assert.Same(strip, note.SourcePart);
-        Assert.Contains("no single tab can", note.Message);
+        var warning = Assert.Single(result.Findings);
+        Assert.Same(strip, warning.SourcePart);
+        Assert.Equal(PostVerificationKind.PartSupport, warning.Kind);
+        Assert.Contains("no single tab can steady it", warning.Message);
     }
 
     [Fact]

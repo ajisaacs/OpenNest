@@ -397,6 +397,9 @@ public static class CuttingPlanService
                     findings: [JointCuttingPlanSearch.Finding(source, null,
                         "Selected program does not preserve complete directed contours, certified tabs or selected entry/style geometry.")],
                     expansions: expansions);
+            // A part the support bed cannot hold level must be tabbed where the tab steadies it.
+            if (SupportTabCapture.Review(source, proposal.ContourChoices) is { } unsteady)
+                warnings.Add(unsteady);
             distance += execution.RapidDistanceFrom(position);
             position = execution.DeparturePoint;
         }

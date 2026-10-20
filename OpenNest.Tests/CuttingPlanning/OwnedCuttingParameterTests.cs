@@ -42,8 +42,7 @@ public class OwnedCuttingParameterTests
             ArcCircleLeadOut = leadOut,
             TabConfig = tab,
             TabsEnabled = true,
-            AutoTabMinSize = 0.1,
-            AutoTabMaxSize = 0.5,
+            SupportTabs = true,
             RoundLeadInAngles = true,
             LeadInAngleIncrement = 30,
             Sequencing = new SequenceParameters

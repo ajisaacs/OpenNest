@@ -65,7 +65,7 @@ public class CIFiberSampleRegressionTests
             PierceClearance = 0.02,
         };
 
-        new LeadInAssigner { Sequencer = new LeftSideSequencer() }.Assign(plate);
+        TestLeadIns.Apply(plate);
         return nest;
     }
 

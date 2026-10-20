@@ -92,7 +92,8 @@ public sealed class PreparedContours
         RejectedPins = rejected.AsReadOnly();
     }
 
-    // A copy that tabs the perimeter for support; every pin keeps its entry, now owned here.
+    // A copy that tabs the perimeter for support; every pin keeps its entry, now owned here, and
+    // a pinned perimeter keeps its pin's settings: the analysis is only kept for review.
     private PreparedContours(PreparedContours source, PartSupport support, Vector location, Tab tab)
         : this(source.shapes, source.scribes, source.breakCuts, source.tabbedCutouts, source.parameters)
     {
@@ -104,10 +105,13 @@ public sealed class PreparedContours
         contourParameters = source.contourParameters == null
             ? new CuttingParameters[Count]
             : (CuttingParameters[])source.contourParameters.Clone();
-        var perimeter = OwnedCuttingParameters.Copy(source.ParametersFor(PerimeterOrdinal));
-        perimeter.TabsEnabled = true;
-        perimeter.TabConfig = OwnedCuttingParameters.CopyTab(tab);
-        contourParameters[PerimeterOrdinal] = perimeter;
+        if (pinned[PerimeterOrdinal] == null)
+        {
+            var perimeter = OwnedCuttingParameters.Copy(source.ParametersFor(PerimeterOrdinal));
+            perimeter.TabsEnabled = true;
+            perimeter.TabConfig = OwnedCuttingParameters.CopyTab(tab);
+            contourParameters[PerimeterOrdinal] = perimeter;
+        }
         RejectedPins = source.RejectedPins;
         this.support = support;
         supportOrigin = location;
@@ -118,7 +122,8 @@ public sealed class PreparedContours
     /// on its support bed: <paramref name="support"/> analyzed this part's material placed at
     /// <paramref name="location"/>, and the perimeter's automatic entries keep to points it
     /// accepts (<see cref="PartSupport.AcceptsTabAt"/>) plus its best tab point. A pinned
-    /// perimeter is returned unchanged: the drawing wins.
+    /// perimeter keeps its pin's entry, leads and tab (the drawing wins); the copy only keeps
+    /// the analysis, so replay can report a pin that leaves the part unsteady.
     /// </summary>
     public PreparedContours WithSupportTab(PartSupport support, Vector location, Tab tab)
     {
@@ -127,11 +132,20 @@ public sealed class PreparedContours
         PostVerificationGeometry.Validate(location);
         if (!support.IsComplete || support.BestTabPoint == null)
             throw new ArgumentException("Support tabs need a complete analysis with a tab point.", nameof(support));
-        return IsPinned(PerimeterOrdinal) ? this : new PreparedContours(this, support, location, tab);
+        return new PreparedContours(this, support, location, tab);
     }
 
-    /// <summary>The support analysis that tabs this perimeter, or null when it is not tabbed for support.</summary>
+    /// <summary>
+    /// The analysis of a part its support bed cannot hold level (see <see cref="WithSupportTab"/>),
+    /// or null; <see cref="SupportOrigin"/> places its local contours in its world frame.
+    /// </summary>
     public PartSupport Support => support;
+
+    /// <summary>The part's location: world = local + this, for <see cref="Support"/>.</summary>
+    public Vector SupportOrigin => supportOrigin;
+
+    /// <summary>Whether the emitted perimeter is tabbed: by the plate settings, its pin or support.</summary>
+    internal bool PerimeterTabbed => ParametersFor(PerimeterOrdinal).TabsEnabled;
 
     public int Count => shapes.Length;
 
@@ -436,7 +450,7 @@ public sealed class PreparedContours
     /// Whether this preparation tabs its perimeter for support (see <see cref="WithSupportTab"/>):
     /// its automatic catalogue then keeps to steadying points unless asked for a fallback.
     /// </summary>
-    internal bool HasSupportTab => support != null;
+    internal bool HasSupportTab => support != null && !IsPinned(PerimeterOrdinal);
 
     /// <summary>
     /// The support margin with this perimeter's tab at <paramref name="choice"/> (see

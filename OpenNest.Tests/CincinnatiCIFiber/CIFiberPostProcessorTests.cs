@@ -186,7 +186,7 @@ public class CIFiberPostProcessorTests
             ExternalLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
             ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
         };
-        new LeadInAssigner { Sequencer = new LeftSideSequencer() }.Assign(plate);
+        TestLeadIns.Apply(plate);
 
         var nest = new Nest("kerf") { Thickness = 0.06, Material = new Material("Mild Steel") };
         nest.Plates.Add(plate);

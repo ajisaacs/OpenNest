@@ -219,6 +219,8 @@ public static class PostVerificationAnalyzer
                     issue.PartBId is { } other ? indices[other] : null, "Overlap check: " + issue.Message));
             // Parts that do not overlap may still be closer than the plate's part spacing.
             PartSpacingReview.Add(plate, plateNumber, materialParts, indices, overlap, findings, cancellationToken);
+            // Parts the support bed cannot hold level need a tab that keeps them level.
+            PartSupportReview.Add(plate, plateNumber, findings, cancellationToken);
         }
         cancellationToken.ThrowIfCancellationRequested();
         return new PostVerificationReport(findings);

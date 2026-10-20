@@ -1112,35 +1112,6 @@ namespace OpenNest.Forms
             CalculateCurrentPlateCutTime();
         }
 
-        public void AssignLeadIns_Click(object sender, EventArgs e)
-        {
-            if (PlateView?.Plate == null)
-                return;
-
-            var plate = PlateView.Plate;
-
-            var parameters = LoadOrDefaultParameters(plate.CuttingParameters);
-
-            using var dlg = new CuttingParametersDialog();
-            dlg.LoadParameters(parameters);
-
-            if (dlg.ShowDialog() != DialogResult.OK)
-                return;
-
-            parameters = dlg.GetParameters();
-            plate.CuttingParameters = parameters;
-            SaveCuttingParameters(parameters);
-
-            var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
-            var kept = assigner.Assign(plate);
-
-            foreach (var lp in PlateView.Parts)
-                lp.IsDirty = true;
-
-            PlateView.Invalidate();
-            ShowKeptDrawingLeadIns([(Nest.Plates.IndexOf(plate) + 1, PartNumbers(plate, kept))]);
-        }
-
         public void RemoveLeadIns_Click(object sender, EventArgs e)
         {
             if (PlateView?.Plate == null)
@@ -1172,47 +1143,6 @@ namespace OpenNest.Forms
 
             PlateView.Invalidate();
         }
-
-        public void AssignLeadInsAllPlates()
-        {
-            if (Nest == null)
-                return;
-
-            var parameters = LoadOrDefaultParameters(PlateView?.Plate?.CuttingParameters);
-
-            using var dlg = new CuttingParametersDialog();
-            dlg.LoadParameters(parameters);
-
-            if (dlg.ShowDialog() != DialogResult.OK)
-                return;
-
-            parameters = dlg.GetParameters();
-            SaveCuttingParameters(parameters);
-
-            var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
-            var kept = new List<(int, IReadOnlyList<int>)>();
-
-            for (var index = 0; index < Nest.Plates.Count; index++)
-            {
-                var plate = Nest.Plates[index];
-                plate.CuttingParameters = parameters;
-                kept.Add((index + 1, PartNumbers(plate, assigner.Assign(plate))));
-            }
-
-            PlateView.Invalidate();
-            ShowKeptDrawingLeadIns(kept);
-        }
-
-        // Assign Lead-ins never overwrites drawing pins; say which parts it left for Plan Cutting.
-        private void ShowKeptDrawingLeadIns(IReadOnlyList<(int PlateNumber, IReadOnlyList<int> PartNumbers)> kept)
-        {
-            var message = LeadInAssigner.KeptMessage(kept);
-            if (message != null)
-                MessageBox.Show(this, message, "Assign Lead-ins", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-
-        private static IReadOnlyList<int> PartNumbers(Plate plate, IReadOnlyList<Part> parts) =>
-            parts.Select(part => plate.Parts.IndexOf(part) + 1).Order().ToList();
 
         public void RemoveLeadInsAllPlates()
         {

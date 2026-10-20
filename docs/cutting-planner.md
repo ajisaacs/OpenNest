@@ -7,7 +7,7 @@ returns an owned proposal; `Apply` installs Ready plate-scoped proposals atomica
 after an exact freshness check. The desktop opens it from `Plate > Plan Cutting...` and
 `Nest > Plan Cutting (All Plates)...` (see [Desktop workflow](#desktop-workflow)); the console
 and MCP server expose the same batch (see [Console and MCP](#console-and-mcp)); the older
-automatic sequencing and lead-in assignment commands remain until they are retired.
+automatic sequencing command remains until it is retired; the older lead-in assignment was removed.
 
 ## Capture before worker planning
 
@@ -486,10 +486,9 @@ clean contours with `CutPinResolver` and prepares them with
 - The plate state compared by `Apply` includes each drawing's pin list (reference and exact
   content, `StateFingerprint.Of(pins)`) and each part's pins-off flag, so changing either
   after capture makes the proposal `Stale`.
-- Only Plan Cutting applies pins. The legacy Assign Lead-ins (`LeadInAssigner`) leaves every
-  unlocked part with active pins unchanged and returns those parts; the desktop then says
-  "N parts kept their drawing lead-ins (plate P: parts ...); use Plan Cutting to apply their
-  drawing pins." It never overwrites a pin with the plate's settings.
+- Only Plan Cutting applies pins. Plan Cutting is the only automatic lead-in assignment: the
+  legacy Assign Lead-ins commands, the lead-in tool's Auto-Assign and the Auto Tab size
+  range were removed.
 - The [pre-post review](post-verification.md) warns "Drawing pins not applied" for a part
   with active pins whose placed program does not cut its pinned contours as pinned, and
   re-checks pinned leads like locked ones.
@@ -737,7 +736,6 @@ The service does not establish clean-material non-overlap, scrap release by open
 cutoff cuts or sheet edges, or physical retention strength. It does not write CNC
 or set posting consent. A `Ready` proposal can still be unsuitable for cutting.
 
-The lead-in side panel's Auto-Assign Lead-ins remains separate from Plan Cutting.
 Review the desktop preview and the generated CNC output before cutting.
 Fresh [pre-post verification](post-verification.md) is still required; it is not a
 physical safety qualification.

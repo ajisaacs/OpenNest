@@ -6,31 +6,31 @@ namespace OpenNest.Tests.CuttingStrategy;
 public class CuttingParametersSerializerTests
 {
     [Fact]
-    public void RoundTrip_PreservesAutoTabFields()
+    public void RoundTrip_PreservesSupportTabs()
     {
         var original = new CuttingParameters
         {
-            AutoTabMinSize = 0.5,
-            AutoTabMaxSize = 3.0,
+            SupportTabs = true,
             ExternalLeadIn = new LineLeadIn { Length = 0.25, ApproachAngle = 90 },
         };
 
         var json = CuttingParametersSerializer.Serialize(original);
         var restored = CuttingParametersSerializer.Deserialize(json);
 
-        Assert.Equal(0.5, restored.AutoTabMinSize);
-        Assert.Equal(3.0, restored.AutoTabMaxSize);
+        Assert.True(restored.SupportTabs);
     }
 
     [Fact]
-    public void Deserialize_MissingAutoTabFields_DefaultsToZero()
+    public void Deserialize_RetiredAutoTabFields_AreIgnored()
     {
+        // Settings saved before Auto Tab was removed still load; its sizes are dropped.
         var json =
-            "{\"externalLeadIn\":{\"type\":\"None\"},\"externalLeadOut\":{\"type\":\"None\"},\"internalLeadIn\":{\"type\":\"None\"},\"internalLeadOut\":{\"type\":\"None\"},\"arcCircleLeadIn\":{\"type\":\"None\"},\"arcCircleLeadOut\":{\"type\":\"None\"},\"tabsEnabled\":false,\"tabWidth\":0.25,\"pierceClearance\":0.0625}";
+            "{\"externalLeadIn\":{\"type\":\"None\"},\"externalLeadOut\":{\"type\":\"None\"},\"internalLeadIn\":{\"type\":\"None\"},\"internalLeadOut\":{\"type\":\"None\"},\"arcCircleLeadIn\":{\"type\":\"None\"},\"arcCircleLeadOut\":{\"type\":\"None\"},\"tabsEnabled\":false,\"tabWidth\":0.25,\"pierceClearance\":0.0625,\"autoTabMinSize\":0.5,\"autoTabMaxSize\":3.0}";
 
         var restored = CuttingParametersSerializer.Deserialize(json);
 
-        Assert.Equal(0.0, restored.AutoTabMinSize);
-        Assert.Equal(0.0, restored.AutoTabMaxSize);
+        Assert.False(restored.TabsEnabled);
+        Assert.False(restored.SupportTabs);
+        Assert.Equal(0.0625, restored.PierceClearance);
     }
 }

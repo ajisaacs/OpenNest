@@ -62,7 +62,7 @@ agreement, approach-angle handling, the flat-corner clearance fallback, reflex
 notches, and straight lead-outs.
 
 Windows manual check: import a part with small rectangular cutouts and use Plate >
-Assign Lead-ins. Confirm diagonal lead-ins at the cutout corners. Under Plate >
+Plan Cutting. Confirm diagonal lead-ins at the cutout corners. Under Plate >
 Place Lead-in, select the part, lock a cutout, and hover a corner: the preview
 should point into the cutout and the committed lead-in should match. Hover a
 mid-edge point and confirm perpendicular placement is unchanged. Windows visual

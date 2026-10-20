@@ -212,7 +212,7 @@ public class BreakoffBuilderTests
     }
 
     [Fact]
-    public void AssignLeadIns_LeadsBreakCutsInFromTheScrap()
+    public void ApplyLeadIns_LeadsBreakCutsInFromTheScrap()
     {
         var (entities, join) = Chord();
         var drawing = Build(entities, On(join));

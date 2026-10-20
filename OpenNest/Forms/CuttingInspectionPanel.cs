@@ -550,6 +550,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         PostVerificationKind.NestedLead => "Nested part lead",
         PostVerificationKind.PierceZone => "Pierce zone",
         PostVerificationKind.PartSpacing => "Part spacing",
+        PostVerificationKind.PartSupport => "Part support",
         _ => kind.ToString(),
     };
 
@@ -615,6 +616,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         PostVerificationKind.NestedLead => "The ring marks the middle of the lead that meets the other part.",
         PostVerificationKind.PierceZone => "The ring marks the pierce that is too close to part material.",
         PostVerificationKind.PartSpacing => "The ring marks where the two parts come closest.",
+        PostVerificationKind.PartSupport => "The ring marks the part's center of gravity.",
         _ => "The ring marks the affected part; the exact spot is not known."
     };
 

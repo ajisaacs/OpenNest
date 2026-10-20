@@ -41,7 +41,7 @@ best-fit, `NestLayoutCheck` and the GPU bitmaps. Programs without tab spans read
 before. A planned program has open pieces instead of a closed hole, so it bounds no hole
 either way.
 
-Both Plan Cutting (`PreparedContours`) and Assign Lead-ins
+Both Plan Cutting (`PreparedContours`) and the manual lead-in tool
 (`ContourCuttingStrategy.Apply`/`ApplySingle`) take a closed contour with tab spans out of
 the contour choices. Every full or prefix emission cuts its pieces after the break cuts
 and before the contours, never in single-contour probes:

@@ -10,54 +10,11 @@ using OpenNest.Geometry;
 namespace OpenNest.Tests.CuttingPlanning;
 
 /// <summary>
-/// Legacy Assign Lead-ins never overwrites drawing pins, and the pre-post review reports a part
-/// whose active pins its program does not apply, plus fixed (locked or pinned) lead violations.
+/// The pre-post review reports a part whose active pins its program does not apply, plus fixed
+/// (locked or pinned) lead violations.
 /// </summary>
 public class DrawingPinReviewTests
 {
-    [Fact]
-    public void AssignLeadIns_KeepsPinnedPartsAndReturnsThem()
-    {
-        var plate = new Plate(60, 120);
-        var pinned = new Part(PinnedContourTests.SquareWithPin(Vector.Zero, PinnedContourTests.Corner()), new Vector(10, 10));
-        var plain = new Part(new Drawing("plain", ExplicitContourTests.Square(false)), new Vector(30, 10));
-        var off = new Part(PinnedContourTests.SquareWithPin(Vector.Zero, PinnedContourTests.Corner()), new Vector(10, 30))
-        { DrawingPinsOff = true };
-        var locked = new Part(PinnedContourTests.SquareWithPin(Vector.Zero, PinnedContourTests.Corner()), new Vector(30, 30))
-        { LeadInsLocked = true };
-        foreach (var part in new[] { pinned, plain, off, locked })
-            plate.Parts.Add(part);
-        var pinnedProgram = pinned.Program;
-        var lockedProgram = locked.Program;
-        plate.CuttingParameters = new CuttingParameters { ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 } };
-
-        var kept = new LeadInAssigner { Sequencer = new LeftSideSequencer() }.Assign(plate);
-
-        Assert.Equal([pinned], kept);
-        Assert.Same(pinnedProgram, pinned.Program);
-        Assert.False(pinned.HasManualLeadIns);
-        Assert.Same(lockedProgram, locked.Program);
-        Assert.True(plain.HasManualLeadIns);
-        Assert.True(off.HasManualLeadIns);
-        Assert.Equal("1 part kept its drawing lead-ins (plate 2: part 1); use Plan Cutting to apply their drawing pins.",
-            LeadInAssigner.KeptMessage([(2, [1])]));
-        Assert.Equal("3 parts kept their drawing lead-ins (plate 1: parts 1, 4; plate 3: part 2); use Plan Cutting "
-            + "to apply their drawing pins.", LeadInAssigner.KeptMessage([(1, [1, 4]), (2, []), (3, [2])]));
-        Assert.Null(LeadInAssigner.KeptMessage([(1, [])]));
-    }
-
-    [Fact]
-    public void AssignLeadIns_WithoutPins_ReturnsNothingAndAssignsAsBefore()
-    {
-        var plate = new Plate(60, 120);
-        plate.Parts.Add(new Part(new Drawing("plain", ExplicitContourTests.Square(false)), new Vector(10, 10)));
-        plate.CuttingParameters = new CuttingParameters { ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 } };
-
-        Assert.Empty(new LeadInAssigner { Sequencer = new LeftSideSequencer() }.Assign(plate));
-        Assert.True(plate.Parts[0].HasManualLeadIns);
-        Assert.Empty(new LeadInAssigner { Sequencer = new LeftSideSequencer() }.Assign(new Plate(10, 10)));
-    }
-
     [Fact]
     public void PrePost_PinsAppliedByPlanCutting_AreNotReported()
     {

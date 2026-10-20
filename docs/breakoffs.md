@@ -40,7 +40,7 @@ material capture, overlap checks, nesting and area ignore them. `ShapeProfile` a
 `ConvertGeometry` pass them through in order without re-chaining or re-winding.
 
 Both Plan Cutting (`PreparedContours`, emitted after scribes and before contours in
-every full or prefix emission, never in single-contour probes) and Assign Lead-ins
+every full or prefix emission, never in single-contour probes) and the manual lead-in tool
 (`ContourCuttingStrategy.Apply`/`ApplySingle`) emit them through
 `ContourCuttingStrategy.EmitBreakCuts`:
 

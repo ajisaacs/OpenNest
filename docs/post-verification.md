@@ -96,6 +96,9 @@ shows the first three check categories, even when there are no findings:
   are not reported. A part whose clean material cannot be captured makes the check
   incomplete for leads near it. This line appears in the summary only when there is such
   a finding.
+- **Part support:** on a plate with a support bed, a part set for support tabs that the bed
+  cannot hold level and whose outside cut leaves no tab that keeps it level; the marker is its
+  center of gravity. See [support tabs](support-tabs.md#pre-post-review).
 - **Part spacing:** two parts closer than the plate's part spacing without sharing material
   (overlapping pairs are reported only as overlaps). Candidate pairs come from each part's
   clean nesting material (leads excluded) tested exactly as Auto Nest's layout check tests
