@@ -18,8 +18,8 @@ namespace OpenNest.Forms
         public void SetLineCount(int count)
         {
             statusLabel.Text = count == 0
-                ? "Drag a line through the parts in cut order."
-                : $"{count} line{(count == 1 ? "" : "s")}. Drag again to add the next.";
+                ? "Drag a line through the parts, or click them, in cut order."
+                : $"{count} line{(count == 1 ? "" : "s")}. Drag or click to add the next.";
             undoButton.Enabled = count > 0;
             clearButton.Enabled = count > 0;
         }

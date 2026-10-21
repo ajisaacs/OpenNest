@@ -10,13 +10,14 @@ namespace OpenNest.Engine.Sequencing
     /// Sequences a plate along lines the user draws over it, in the order they were drawn.
     /// Each part belongs to the crossing line passing closest to its center, and is cut in the
     /// order that nearest point falls along the line; where a line passes a part more than once,
-    /// the closest pass decides. Parts no line crosses are cut after the rest, ordered the same
-    /// way by their nearest line. The jump from one line to the next is a rapid and claims
+    /// the closest pass decides. A single point is a click, and crosses the parts whose boxes
+    /// hold it. Parts no line crosses are cut after the rest, ordered the same way by their
+    /// nearest line. The jump from one line to the next is a rapid and claims
     /// nothing. Cut-first parts stay ahead of the rest and the cutoff rules still apply.
     /// </summary>
     public static class DrawnPathSequencing
     {
-        /// <summary>Reorders the plate's parts; false when no line has length or nothing moves.</summary>
+        /// <summary>Reorders the plate's parts; false when no line can sequence or nothing moves.</summary>
         public static bool Apply(Plate plate, IReadOnlyList<IReadOnlyList<Vector>> lines)
         {
             var cutOrder = CutOrder(plate, lines);
@@ -29,13 +30,13 @@ namespace OpenNest.Engine.Sequencing
 
         /// <summary>
         /// The order <see cref="Apply"/> would give the plate, without changing it; null when
-        /// no line has length or there is nothing to order.
+        /// no line can sequence or there is nothing to order.
         /// </summary>
         public static List<Part> CutOrder(Plate plate, IReadOnlyList<IReadOnlyList<Vector>> lines)
         {
             ArgumentNullException.ThrowIfNull(plate);
             ArgumentNullException.ThrowIfNull(lines);
-            if (plate.Parts.Count < 2 || !lines.Any(HasLength))
+            if (plate.Parts.Count < 2 || !lines.Any(CanSequence))
                 return null;
 
             var first = plate.Parts.Where(p => p.BaseDrawing.CutFirst);
@@ -99,6 +100,16 @@ namespace OpenNest.Engine.Sequencing
             return best;
         }
 
+        /// <summary>Whether a line crosses the part, so it is cut in that line's order rather than after the rest.</summary>
+        public static bool Reaches(IReadOnlyList<IReadOnlyList<Vector>> lines, Part part)
+        {
+            var box = part.BoundingBox;
+            return lines.Any(line => CanSequence(line) && Crosses(line, box));
+        }
+
+        /// <summary>Whether the path is a click or a line long enough to sequence along.</summary>
+        public static bool CanSequence(IReadOnlyList<Vector> path) => path.Count == 1 || HasLength(path);
+
         /// <summary>Whether the line is long enough to sequence along.</summary>
         public static bool HasLength(IReadOnlyList<Vector> path)
         {
@@ -108,9 +119,11 @@ namespace OpenNest.Engine.Sequencing
             return length > Tolerance.Epsilon;
         }
 
-        /// <summary>Whether any segment of the path touches the box.</summary>
+        /// <summary>Whether any segment of the path touches the box, or a click lands in it.</summary>
         public static bool Crosses(IReadOnlyList<Vector> path, Box box)
         {
+            if (path.Count == 1)
+                return box.Contains(path[0]);
             for (var i = 1; i < path.Count; i++)
             {
                 if (SegmentTouchesBox(path[i - 1], path[i], box))
@@ -152,7 +165,7 @@ namespace OpenNest.Engine.Sequencing
             var best = (Line: int.MaxValue, Along: 0.0, Distance: double.PositiveInfinity);
             for (var i = 0; i < lines.Count; i++)
             {
-                if (!HasLength(lines[i]) || !qualifies(lines[i]))
+                if (!CanSequence(lines[i]) || !qualifies(lines[i]))
                     continue;
                 var (along, distance) = Project(point, lines[i]);
                 if (distance < best.Distance - Tolerance.Epsilon)

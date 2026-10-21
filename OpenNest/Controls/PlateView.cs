@@ -318,6 +318,9 @@ namespace OpenNest.Controls
         /// reordering the plate; null shows the plate's own order.
         /// </summary>
         internal IReadOnlyDictionary<Part, int> PreviewSequence { get; set; }
+
+        /// <summary>Parts a tool draws muted, compared by reference; null mutes none.</summary>
+        internal IReadOnlySet<Part> MutedParts { get; set; }
         internal (float Scale, PointF Origin) CaptureViewport() => (ViewScale, origin);
         internal void RestoreViewport((float Scale, PointF Origin) viewport)
         {

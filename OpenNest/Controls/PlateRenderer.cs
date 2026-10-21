@@ -123,7 +123,8 @@ namespace OpenNest.Controls
 
                 var finding = view.ValidationOverlay.Finding;
                 var muted = finding != null && finding.PartNumber != i + 1 && finding.OtherPartNumber != i + 1
-                    || !view.HasProposalDisplay && view.CutSimulation.IsPartPending(i);
+                    || !view.HasProposalDisplay && view.CutSimulation.IsPartPending(i)
+                    || view.MutedParts?.Contains(part.BasePart) == true;
                 var number = view.PreviewSequence != null
                     && view.PreviewSequence.TryGetValue(part.BasePart, out var preview) ? preview : i + 1;
                 part.Draw(g, number.ToString(), muted);

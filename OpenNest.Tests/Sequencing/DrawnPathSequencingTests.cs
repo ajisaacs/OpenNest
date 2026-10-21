@@ -64,7 +64,7 @@ public class DrawnPathSequencingTests
         Assert.Equal(new[] { a, b, c }, preview);
         Assert.Equal(new[] { c, a, b }, plate.Parts);
         Assert.Equal(0, reorders);
-        Assert.Null(DrawnPathSequencing.CutOrder(plate, Lines(new[] { new Vector(0, 0) })));
+        Assert.Null(DrawnPathSequencing.CutOrder(plate, Lines(new[] { new Vector(0, 0), new Vector(0, 0) })));
 
         Assert.True(DrawnPathSequencing.Apply(plate, lines));
         Assert.Equal(preview, plate.Parts);
@@ -101,6 +101,42 @@ public class DrawnPathSequencingTests
         Assert.True(DrawnPathSequencing.Apply(plate, Lines(new[] { new Vector(5, 20), new Vector(5, 52) })));
 
         Assert.Equal(new[] { stack[1], stack[2], stack[3], stack[0] }, plate.Parts);
+    }
+
+    [Fact]
+    public void Apply_ClickCutsThePartItLandsIn()
+    {
+        var drawing = TestHelpers.MakeSquareDrawing();
+        var a = new Part(drawing, new Vector(0, 0));
+        var b = new Part(drawing, new Vector(20, 0));
+        var c = new Part(drawing, new Vector(40, 0));
+        var plate = TestHelpers.MakePlate(60, 120, a, b, c);
+
+        // A line through 'b' and 'a', then a click on 'c'.
+        var lines = Lines(
+            new[] { new Vector(25, 5), new Vector(5, 5) },
+            new[] { new Vector(45, 5) });
+
+        Assert.True(DrawnPathSequencing.Apply(plate, lines));
+
+        Assert.Equal(new[] { b, a, c }, plate.Parts);
+    }
+
+    [Fact]
+    public void Reaches_OnlyPartsALineCrossesOrAClickLandsIn()
+    {
+        var drawing = TestHelpers.MakeSquareDrawing();
+        var crossed = new Part(drawing, new Vector(0, 0));
+        var clicked = new Part(drawing, new Vector(20, 0));
+        var missed = new Part(drawing, new Vector(40, 0));
+        var lines = Lines(
+            new[] { new Vector(5, -5), new Vector(5, 15) },
+            new[] { new Vector(25, 5) });
+
+        Assert.True(DrawnPathSequencing.Reaches(lines, crossed));
+        Assert.True(DrawnPathSequencing.Reaches(lines, clicked));
+        Assert.False(DrawnPathSequencing.Reaches(lines, missed));
+        Assert.False(DrawnPathSequencing.Reaches(Lines(), crossed));
     }
 
     [Fact]
@@ -150,13 +186,13 @@ public class DrawnPathSequencingTests
         plate.PartsReordered += (_, _) => reorders++;
 
         Assert.False(DrawnPathSequencing.Apply(plate, Lines()));
-        Assert.False(DrawnPathSequencing.Apply(plate, Lines(new[] { new Vector(0, 0) })));
+        Assert.False(DrawnPathSequencing.Apply(plate, Lines(System.Array.Empty<Vector>())));
         Assert.False(DrawnPathSequencing.Apply(plate, Lines(new[] { new Vector(3, 3), new Vector(3, 3) })));
         Assert.Equal(new[] { a, b }, plate.Parts);
         Assert.Equal(0, reorders);
 
-        // A dot drawn first does not count as line one.
-        Assert.True(DrawnPathSequencing.Apply(plate, Lines(new[] { new Vector(30, 5) }, new[] { new Vector(-5, 5), new Vector(35, 5) })));
+        // A zero-length line drawn first does not count as line one.
+        Assert.True(DrawnPathSequencing.Apply(plate, Lines(new[] { new Vector(30, 5), new Vector(30, 5) }, new[] { new Vector(-5, 5), new Vector(35, 5) })));
         Assert.Equal(new[] { b, a }, plate.Parts);
     }
 }

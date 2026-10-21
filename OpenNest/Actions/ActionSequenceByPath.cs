@@ -12,8 +12,9 @@ namespace OpenNest.Actions
 {
     /// <summary>
     /// Sequences the plate along lines dragged over it with the left button, cut in the order
-    /// they are drawn; lifting the button between lines is a rapid that claims no parts. The
-    /// plate renumbers after each line. Backspace or Ctrl+Z removes the last line, right-click
+    /// they are drawn; clicking a part adds it as a one-point line. Lifting the button between
+    /// lines is a rapid that claims no parts. The plate renumbers after each line, and parts no
+    /// line reaches yet are drawn muted. Backspace or Ctrl+Z removes the last line, right-click
     /// clears them all, and Escape or the window's Done ends the tool.
     /// </summary>
     [DisplayName("Sequence by Path")]
@@ -67,6 +68,7 @@ namespace OpenNest.Actions
             plateView.MouseUp += plateView_MouseUp;
             plateView.KeyDown += plateView_KeyDown;
             plateView.Paint += plateView_Paint;
+            UpdateMuted(lines);
         }
 
         private void plateView_MouseDown(object sender, MouseEventArgs e)
@@ -99,7 +101,9 @@ namespace OpenNest.Actions
         /// <summary>Numbers the parts as if the line being drawn were finished, without reordering the plate.</summary>
         private void UpdatePreview()
         {
-            var order = DrawnPathSequencing.CutOrder(plateView.Plate, lines.Append(drawing).ToList());
+            var previewLines = lines.Append(drawing).ToList();
+            UpdateMuted(previewLines);
+            var order = DrawnPathSequencing.CutOrder(plateView.Plate, previewLines);
             if (order == null)
             {
                 plateView.PreviewSequence = null;
@@ -124,12 +128,15 @@ namespace OpenNest.Actions
             if (point.DistanceTo(line[^1]) > 0)
                 line.Add(point);
 
-            // A click without a drag is not a line.
-            if (DrawnPathSequencing.HasLength(line))
+            // A click only counts on a part.
+            if (DrawnPathSequencing.HasLength(line)
+                || line.Count == 1 && plateView.GetPartAtPoint(line[0]) != null)
             {
                 lines.Add(line);
                 Resequence();
             }
+            else
+                UpdateMuted(lines);
             plateView.Invalidate();
         }
 
@@ -168,7 +175,20 @@ namespace OpenNest.Actions
                 plate.Parts.Reorder(originalOrder);
 
             form.SetLineCount(lines.Count);
+            UpdateMuted(lines);
             plateView.Invalidate();
+        }
+
+        /// <summary>Mutes the parts the lines do not reach, so what is left to sequence stands out.</summary>
+        private void UpdateMuted(IReadOnlyList<IReadOnlyList<Vector>> paths)
+        {
+            var muted = new HashSet<Part>(ReferenceEqualityComparer.Instance);
+            foreach (var part in plateView.Plate.Parts)
+            {
+                if (!DrawnPathSequencing.Reaches(paths, part))
+                    muted.Add(part);
+            }
+            plateView.MutedParts = muted;
         }
 
         private void plateView_Paint(object sender, PaintEventArgs e)
@@ -211,6 +231,7 @@ namespace OpenNest.Actions
             plateView.KeyDown -= plateView_KeyDown;
             plateView.Paint -= plateView_Paint;
             plateView.PreviewSequence = null;
+            plateView.MutedParts = null;
             form.Close();
             form.Dispose();
             linePen.Dispose();
@@ -226,6 +247,7 @@ namespace OpenNest.Actions
         {
             drawing = null;
             plateView.PreviewSequence = null;
+            UpdateMuted(lines);
             plateView.Invalidate();
         }
 
