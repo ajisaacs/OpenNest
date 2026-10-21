@@ -58,6 +58,15 @@ detail reads "Computing best-fit pairs (may take a minute)...". Accepting or sto
 waiting for the pair computation, which finishes in the background and is cached for the next
 fill.
 
+Fill's last strategy, TiltedRemnant, adds tilted parts beside the best layout when the room
+left past it on the right or top is too narrow for the part at 0 or 90 degrees, such as a long
+part beside a grid of the same part turned 90 degrees. It moves the layout flush to the low end
+of that axis, so leftover room on both sides becomes one remnant, and also to either end of the
+other axis, so the layout's slack forms one strip a tilted part's corner can tuck into. It tiles
+the part at the most upright angles that fit the remnant's height and keeps only copies at least
+the part spacing from the layout, tested on the outlines `NestLayoutCheck` uses. It is skipped
+for circles, for an explicit rotation range, and once the layout holds the requested quantity.
+
 On a plate with clamps, interactive Fill (Fill Area and filling from a part) fills as if the
 clamps were absent, then drops every part that enters a clamp keep-out or sits too close to an
 existing part, and a whole copy of a multi-part group when any member does. Packing around

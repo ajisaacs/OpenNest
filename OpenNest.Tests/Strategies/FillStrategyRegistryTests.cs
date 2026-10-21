@@ -35,12 +35,13 @@ public class FillStrategyRegistryTests
     }
 
     [Fact]
-    public void Registry_LinearIsLast()
+    public void Registry_LinearIsLastBeforeTiltedRemnant()
     {
+        // TiltedRemnant adds to the best layout, so it follows every strategy that builds one.
         var strategies = FillStrategyRegistry.Strategies;
-        var last = strategies[strategies.Count - 1];
 
-        Assert.Equal("Linear", last.Name);
+        Assert.Equal("TiltedRemnant", strategies[strategies.Count - 1].Name);
+        Assert.Equal("Linear", strategies[strategies.Count - 2].Name);
     }
 
     [Fact]
