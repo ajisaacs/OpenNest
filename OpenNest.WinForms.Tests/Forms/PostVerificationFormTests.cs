@@ -23,6 +23,9 @@ public class PostVerificationFormTests
             var post = Control<Button>(form, "postButton");
             Assert.False(consent.Checked);
             Assert.False(post.Enabled);
+            var list = Control<ListView>(form, "findingsList");
+            Assert.NotEmpty(list.Items);
+            Assert.All(list.Items.Cast<ListViewItem>(), item => Assert.NotNull(item.Group));
             Invoke(form, "PostButton_Click", null, EventArgs.Empty);
             Assert.NotEqual(DialogResult.OK, form.DialogResult);
             consent.Checked = true;
@@ -54,7 +57,8 @@ public class PostVerificationFormTests
             using var form = new PostVerificationForm(nest,
                 (_, _) => Task.FromResult(PostVerificationAnalyzer.Analyze(nest)));
             form.VerifyAsync().GetAwaiter().GetResult();
-            Assert.NotEmpty(Control<TextBox>(form, "reportBox").Text);
+            Assert.Equal("No warnings found", Control<Label>(form, "headlineLabel").Text);
+            Assert.Empty(Control<ListView>(form, "findingsList").Items);
             Assert.True(Control<Button>(form, "postButton").Enabled);
             Assert.False(Control<CheckBox>(form, "acknowledgeBox").Enabled);
             Assert.Equal("Continue Posting", Control<Button>(form, "postButton").Text);
@@ -73,7 +77,7 @@ public class PostVerificationFormTests
             form.VerifyAsync().GetAwaiter().GetResult();
             Control<CheckBox>(form, "acknowledgeBox").Checked = true;
             Assert.False(Control<Button>(form, "postButton").Enabled);
-            Assert.Contains("test failure", Control<TextBox>(form, "reportBox").Text);
+            Assert.Contains("test failure", Control<Label>(form, "detailLabel").Text);
             Invoke(form, "PostButton_Click", null, EventArgs.Empty);
             Assert.NotEqual(DialogResult.OK, form.DialogResult);
         });
