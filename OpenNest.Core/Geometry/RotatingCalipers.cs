@@ -47,14 +47,16 @@ namespace OpenNest.Geometry
                 return new BoundingRectangleResult(angle, length, 0);
             }
 
-            // Only need half the edges — opposite edges produce the same
-            // bounding rectangle (width/height swapped), so the minimum
-            // area repeats every 180°.
-            var edgeCount = (n + 1) / 2;
+            // Every edge is a candidate: opposite edges only give the same rectangle
+            // when the hull is centrally symmetric. For those hulls (rectangles,
+            // best-fit pairs) the second half repeats the first turned 180°, so a
+            // second-half edge wins only when smaller beyond rounding; that keeps
+            // their orientation from flipping on floating-point noise.
+            var half = (n + 1) / 2;
 
             BoundingRectangleResult best = null;
 
-            for (int i = 0; i < edgeCount; i++)
+            for (int i = 0; i < n; i++)
             {
                 int next = (i + 1) % n;
                 var edgeX = vertices[next].X - vertices[i].X;
@@ -94,8 +96,9 @@ namespace OpenNest.Geometry
                 var width = maxU - minU;
                 var height = maxV - minV;
                 var area = width * height;
+                var margin = i < half || best == null ? 0 : Tolerance.Epsilon * best.Area;
 
-                if (best == null || area < best.Area)
+                if (best == null || area < best.Area - margin)
                 {
                     var edgeAngle = System.Math.Atan2(edgeY, edgeX);
                     best = new BoundingRectangleResult(edgeAngle, width, height);
