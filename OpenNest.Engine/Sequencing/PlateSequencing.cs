@@ -95,7 +95,7 @@ namespace OpenNest.Engine.Sequencing
             return sequencer.Sequence(parts, plate).Select(p => p.Part).Reverse();
         }
 
-        private static List<Part> OrderCutOffsFirst(List<Part> ordered, Plate plate)
+        internal static List<Part> OrderCutOffsFirst(List<Part> ordered, Plate plate)
         {
             var definitions = new Dictionary<Drawing, CutOff>(ReferenceEqualityComparer.Instance);
             foreach (var cutOff in plate.CutOffs)

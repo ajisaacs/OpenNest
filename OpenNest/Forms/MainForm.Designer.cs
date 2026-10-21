@@ -147,6 +147,7 @@ namespace OpenNest.Forms
             mnuSequenceParts = new System.Windows.Forms.ToolStripMenuItem();
             autoSequenceCurrentPlateToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             manualSequenceToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            sequenceByPathToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             calculateCutTimeToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateSimulateCutting = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem21 = new System.Windows.Forms.ToolStripSeparator();
@@ -990,7 +991,7 @@ namespace OpenNest.Forms
             //
             // mnuSequenceParts
             //
-            mnuSequenceParts.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { autoSequenceCurrentPlateToolStripMenuItem, manualSequenceToolStripMenuItem });
+            mnuSequenceParts.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { autoSequenceCurrentPlateToolStripMenuItem, manualSequenceToolStripMenuItem, sequenceByPathToolStripMenuItem });
             mnuSequenceParts.Name = "mnuSequenceParts";
             mnuSequenceParts.Size = new System.Drawing.Size(177, 22);
             mnuSequenceParts.Text = "Sequence Parts";
@@ -1008,6 +1009,13 @@ namespace OpenNest.Forms
             manualSequenceToolStripMenuItem.Size = new System.Drawing.Size(168, 22);
             manualSequenceToolStripMenuItem.Text = "Manual Sequence";
             manualSequenceToolStripMenuItem.Click += ManualSequenceParts_Click;
+            //
+            // sequenceByPathToolStripMenuItem
+            //
+            sequenceByPathToolStripMenuItem.Name = "sequenceByPathToolStripMenuItem";
+            sequenceByPathToolStripMenuItem.Size = new System.Drawing.Size(168, 22);
+            sequenceByPathToolStripMenuItem.Text = "Sequence by Path";
+            sequenceByPathToolStripMenuItem.Click += SequenceByPath_Click;
             //
             // calculateCutTimeToolStripMenuItem1
             //
@@ -1452,6 +1460,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem runAutoNestToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem autoSequenceCurrentPlateToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem manualSequenceToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem sequenceByPathToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem autoSequenceAllPlatesToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsMeasureArea;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsBestFitViewer;

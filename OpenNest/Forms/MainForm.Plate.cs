@@ -53,6 +53,14 @@ namespace OpenNest.Forms
             activeForm.PlateView.SetAction(typeof(ActionSetSequence));
         }
 
+        private void SequenceByPath_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null || activeForm.PlateView.Plate.Parts.Count < 2)
+                return;
+
+            activeForm.PlateView.SetAction(typeof(ActionSequenceByPath));
+        }
+
         private void CutOff_Click(object sender, EventArgs e) => WithActive(f => f.PlateView.SetAction(typeof(ActionCutOff)));
 
         private void EditClamps_Click(object sender, EventArgs e) => WithActive(f => f.PlateView.SetAction(typeof(ActionClampEdit)));
