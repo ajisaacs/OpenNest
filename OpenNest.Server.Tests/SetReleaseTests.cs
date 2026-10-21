@@ -294,7 +294,7 @@ public sealed class SetReleaseTests
 
         using var upgraded = new NestDatabase(factory.DatabasePath, pooling: false);
 
-        Assert.Equal(9L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+        Assert.Equal(10L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
         Assert.Equal(0L, Scalar(factory.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE name LIKE 'set_release%' OR name LIKE 'ix_set_release%'"));
         var release = upgraded.GetRelease(releaseId)!;
         Assert.Equal(("Legacy notes", "Legacy operator", false), (release.Notes, release.ReleasedBy, release.IsUndone));

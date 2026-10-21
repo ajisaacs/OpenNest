@@ -346,7 +346,7 @@ public sealed partial class NestDatabase : IDisposable
             command.Transaction = transaction;
             command.CommandText = "PRAGMA user_version";
             var version = (long)command.ExecuteScalar()!;
-            if (version > 9) throw new InvalidOperationException("Database schema is newer than this server.");
+            if (version > 10) throw new InvalidOperationException("Database schema is newer than this server.");
             if (version == 0)
             {
                 command.CommandText = """
@@ -417,6 +417,12 @@ public sealed partial class NestDatabase : IDisposable
             {
                 // Releases cover several sets and may merge into existing nests.
                 command.CommandText = ReleaseUpgradeToV9;
+                command.ExecuteNonQuery();
+            }
+            if (version < 10)
+            {
+                // The company material list, empty until filled through the API.
+                command.CommandText = MaterialSchema;
                 command.ExecuteNonQuery();
             }
             transaction.Commit();

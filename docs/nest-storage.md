@@ -641,6 +641,31 @@ Schema v8 adds a `materialGrade` text column (default blank) to `nests` and
 A server older than v8 refuses to open a v8 database, so rolling back needs the
 pre-upgrade backup.
 
+## Material list endpoints
+
+The server keeps the company material list: each material with its grades. Both
+are keyed by `SharedListNames.Key`, so names that differ only in case or spacing
+are the same entry, and an entry keeps the spelling it was first added with
+(trimmed, internal spaces collapsed). Nests, drawings and releases keep their own
+free-text material and grade. The list only suggests names and records the
+company spelling; it does not check or rewrite stored records. A grade belongs to
+one material, and the same grade name may be listed under several materials.
+Wire types are `OpenNest.Data.MaterialListEntry` and `MaterialListAddition`.
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| GET | `/api/materials` | — | `[{ "name", "grades": [...] }]`, materials and grades in case-insensitive name order |
+| POST | `/api/materials` | `{ "name": "...", "grade": "..." }` (`grade` optional) | The material as listed: 201 when the material or grade was added, 200 when both were already listed |
+
+Validation (400, no state change, `MaterialListRules`): a JSON object with no
+other properties; `name` not blank; name and grade at most 200 characters with
+no NUL characters.
+
+Schema v10 adds empty `materials` and `material_grades` tables. Existing
+records are not read into the list; fill it through `POST /api/materials`. No
+other table changes. A server older than v10 refuses to open a v10 database, so
+rolling back needs the pre-upgrade backup.
+
 ## Storage
 
 `OpenNest.Server.NestDatabase` uses SQLite (`Microsoft.Data.Sqlite`) with
