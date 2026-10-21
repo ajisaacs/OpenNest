@@ -106,13 +106,22 @@ public sealed class SetReleaseEndToEndTests
         var steel = result.Groups.Single(g => g.Group.MaterialName == "Synthetic Steel");
         Assert.Equal(new[] { "SYN-A", "SYN-B" }, steel.Group.Items.Select(i => i.Drawing.Name));
 
-        var releases = await sets.GetReleasesAsync(created.Id);
-        var release = Assert.Single(releases!.Items);
+        var releases = await sets.QueryReleasesAsync(setId: created.Id);
+        var release = Assert.Single(releases.Items);
+        var line = Assert.Single(release.Sets);
         Assert.Equal((result.Release!.Id, 1, 2, "Synthetic release notes"),
-            (release.Id, release.SetRevision, release.Multiplier, release.Notes));
+            (release.Id, line.SetRevision, line.Quantity, release.Notes));
         Assert.Equal(result.Groups.Select(g => g.Record!.Id), release.Nests.Select(n => n.NestId));
-        Assert.All(release.Nests, n => Assert.Equal(NestStatus.Draft, n.Nest!.Status));
+        Assert.All(release.Nests, n => Assert.Equal((NestStatus.Draft, SetReleaseNestKind.Created, 1), (n.Nest!.Status, n.Kind, n.RevisionAfter)));
         Assert.Equal(CutType.Waterjet, release.Nests.Single(n => n.MaterialName == "Synthetic Aluminum").CutType);
-        Assert.Equal(release.Id, (await sets.GetReleaseForNestAsync(steel.Record!.Id))!.Id);
+        Assert.Equal(new[] { (a.Id, 6), (b.Id, 2) },
+            release.Nests.Single(n => n.NestId == steel.Record!.Id).Items.Select(i => (i.DrawingId, i.Quantity)));
+        Assert.Equal(release.Id, (await sets.QueryReleasesAsync(nestId: steel.Record!.Id)).Items.Single().Id);
+
+        // Undo deletes every nest the release created.
+        var undone = await sets.UndoReleaseAsync(release.Id, new SetReleaseUndoRequest { UndoneBy = "Synthetic operator" });
+        Assert.All(undone.Nests, n => Assert.Equal(SetReleaseNestUndo.Deleted, n.Undo));
+        foreach (var group in result.Groups)
+            Assert.Null(await nests.GetMetadataAsync(group.Record!.Id));
     }
 }

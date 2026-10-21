@@ -34,6 +34,36 @@ internal static class DrawingSetFixtures
         return (await Upload(client, record, Package(name))).Id;
     }
 
+    /// <summary>Drops the v9 release tables, for fixtures that rebuild a schema older than v7.</summary>
+    public const string DropReleaseTables = """
+        DROP TABLE release_nest_items; DROP TABLE release_nests; DROP TABLE release_sets; DROP TABLE releases;
+        """;
+
+    /// <summary>Puts back the v7/v8 release tables in place of the v9 ones, for fixtures that rebuild v7 or v8.</summary>
+    public const string ReleaseTablesBackToV8 = DropReleaseTables + """
+        CREATE TABLE set_releases (
+            id          TEXT NOT NULL PRIMARY KEY,
+            setId       TEXT NOT NULL,
+            setRevision INTEGER NOT NULL,
+            multiplier  INTEGER NOT NULL,
+            notes       TEXT NOT NULL DEFAULT '',
+            releasedAt  TEXT NOT NULL,
+            releasedBy  TEXT NOT NULL DEFAULT '',
+            FOREIGN KEY (setId, setRevision) REFERENCES drawing_set_revisions(id, revision));
+        CREATE TABLE set_release_nests (
+            releaseId     TEXT NOT NULL REFERENCES set_releases(id),
+            position      INTEGER NOT NULL,
+            nestId        TEXT NOT NULL REFERENCES nests(id),
+            materialName  TEXT NOT NULL DEFAULT '',
+            materialGrade TEXT NOT NULL DEFAULT '',
+            thickness     REAL NOT NULL,
+            units         TEXT NOT NULL,
+            cutType       TEXT NOT NULL,
+            PRIMARY KEY (releaseId, position));
+        CREATE INDEX ix_set_releases_set ON set_releases(setId, releasedAt DESC);
+        CREATE UNIQUE INDEX ix_set_release_nests_nest ON set_release_nests(nestId);
+        """;
+
     public static StringContent Json(string json) => new(json, Encoding.UTF8, "application/json");
 
     public static StringContent Json(DrawingSetRecord record) => Json(JsonSerializer.Serialize(record, Options));
@@ -68,17 +98,22 @@ internal static class DrawingSetFixtures
         return record.Id;
     }
 
-    /// <summary>A release of <paramref name="setRevision"/> making one nest per id, each in its own material.</summary>
-    public static SetReleaseRecord Release(int setRevision, params Guid[] nests) => new()
+    /// <summary>
+    /// Two kits of <paramref name="setRevision"/> of <paramref name="setId"/>, creating one nest
+    /// per id (each at revision 1, as <see cref="AddNest(NestDatabase, string)"/> stores it), each
+    /// in its own material.
+    /// </summary>
+    public static SetReleaseRecord Release(Guid setId, int setRevision, params Guid[] nests) => new()
     {
         Id = Guid.NewGuid(),
-        SetRevision = setRevision,
-        Multiplier = 2,
+        Sets = new[] { new SetReleaseLine { SetId = setId, SetRevision = setRevision, Quantity = 2 } },
         Notes = "Synthetic release",
         ReleasedBy = "Synthetic operator",
         Nests = nests.Select((nest, i) => new SetReleaseNest
         {
             NestId = nest,
+            Kind = SetReleaseNestKind.Created,
+            RevisionAfter = 1,
             MaterialName = "Synthetic Steel " + i,
             MaterialGrade = "Grade A",
             Thickness = 0.25,
@@ -86,4 +121,20 @@ internal static class DrawingSetFixtures
             CutType = CutType.Laser,
         }).ToList(),
     };
+
+    /// <summary>Turns nest <paramref name="index"/> of <paramref name="release"/> into a merge from one revision to another.</summary>
+    public static SetReleaseRecord Merged(this SetReleaseRecord release, int index, int before, int after)
+    {
+        release.Nests[index].Kind = SetReleaseNestKind.Merged;
+        release.Nests[index].RevisionBefore = before;
+        release.Nests[index].RevisionAfter = after;
+        return release;
+    }
+
+    /// <summary>Saves the nest again with new bytes, as an operator or a merge would, and returns the new revision.</summary>
+    public static int Resave(NestDatabase database, Guid nest, byte last = 9)
+    {
+        var current = database.Get(nest)!;
+        return database.Update(nest, current, new byte[] { 1, 2, last }, current.Revision)!.Revision;
+    }
 }

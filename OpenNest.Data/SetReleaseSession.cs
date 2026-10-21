@@ -236,14 +236,24 @@ public sealed class SetReleaseSession
         _pendingRelease = new SetReleaseRecord
         {
             Id = Guid.NewGuid(),
-            SetId = plan.Set.Id,
-            SetRevision = plan.Set.Revision,
-            Multiplier = plan.Multiplier,
+            Sets = new[]
+            {
+                new SetReleaseLine { SetId = plan.Set.Id, SetRevision = plan.Set.Revision, Quantity = plan.Multiplier },
+            },
             Notes = notes ?? "",
             ReleasedBy = releasedBy ?? "",
             Nests = results.Select(r => new SetReleaseNest
             {
                 NestId = r.Record!.Id,
+                Kind = SetReleaseNestKind.Created,
+                RevisionAfter = r.Record.Revision,
+                Items = r.Group.Items.Select(i => new SetReleaseNestItem
+                {
+                    SetId = plan.Set.Id,
+                    DrawingId = i.Drawing.Id,
+                    DrawingRevision = i.Drawing.Revision,
+                    Quantity = i.Quantity,
+                }).ToList(),
                 MaterialName = r.Group.MaterialName,
                 MaterialGrade = r.Group.MaterialGrade,
                 Thickness = r.Group.Thickness,
@@ -361,7 +371,7 @@ public sealed class SetReleaseSession
         SetReleaseRecord stored;
         try
         {
-            stored = await _sets.PostReleaseAsync(release.SetId, release, cancellationToken);
+            stored = await _sets.PostReleaseAsync(release, cancellationToken);
         }
         catch (SetReleasePostConflictException conflict) when (conflict.Current.Id == release.Id)
         {

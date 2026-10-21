@@ -39,13 +39,15 @@ public interface IDrawingSetStore
     Task<DrawingSetRecord> RestoreAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default);
 
     /// <summary>Records a release whose nests already exist, under the caller-allocated <c>release.Id</c>.</summary>
-    Task<SetReleaseRecord> PostReleaseAsync(Guid setId, SetReleaseRecord release,
-        CancellationToken cancellationToken = default);
+    Task<SetReleaseRecord> PostReleaseAsync(SetReleaseRecord release, CancellationToken cancellationToken = default);
 
-    /// <summary>One page of the set's releases with their nests, newest first, or null for an unknown set.</summary>
-    Task<SetReleasePage?> GetReleasesAsync(Guid setId, int offset = 0,
+    /// <summary>One release with its sets and nests, or null for an unknown id.</summary>
+    Task<SetReleaseRecord?> GetReleaseAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>One page of releases with their sets and nests, newest first, optionally only those including a set or a nest.</summary>
+    Task<SetReleasePage> QueryReleasesAsync(Guid? setId = null, Guid? nestId = null, int offset = 0,
         int limit = DrawingLibraryRules.DefaultRevisionLimit, CancellationToken cancellationToken = default);
 
-    /// <summary>The release a nest came from, or null when it came from none (or is unknown).</summary>
-    Task<SetReleaseRecord?> GetReleaseForNestAsync(Guid nestId, CancellationToken cancellationToken = default);
+    /// <summary>Undoes a release, all or nothing; a refusal raises <see cref="SetReleaseUndoConflictException"/>.</summary>
+    Task<SetReleaseRecord> UndoReleaseAsync(Guid id, SetReleaseUndoRequest request, CancellationToken cancellationToken = default);
 }

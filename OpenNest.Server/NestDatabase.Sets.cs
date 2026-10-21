@@ -39,7 +39,7 @@ public sealed partial class NestDatabase
         CREATE INDEX ix_drawing_sets_name ON drawing_sets(customerKey, nameKey);
         CREATE INDEX ix_drawing_sets_savedAt ON drawing_sets(savedAt DESC);
         CREATE INDEX ix_drawing_set_members_drawing ON drawing_set_members(drawingId);
-        {SetReleaseTables}
+        {SetReleaseTablesV7}
         PRAGMA user_version=7;
         """;
 

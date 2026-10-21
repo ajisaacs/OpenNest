@@ -122,9 +122,9 @@ public sealed class SetReleasePlan
     public static SetReleasePlan Build(DrawingSetRecord set, int multiplier, bool includeArchived)
     {
         ArgumentNullException.ThrowIfNull(set);
-        if (multiplier < 1 || multiplier > SetReleaseRules.MaxMultiplier)
+        if (multiplier < 1 || multiplier > SetReleaseRules.MaxQuantity)
             throw new ArgumentOutOfRangeException(nameof(multiplier), multiplier,
-                $"The multiplier must be between 1 and {SetReleaseRules.MaxMultiplier}.");
+                $"The multiplier must be between 1 and {SetReleaseRules.MaxQuantity}.");
         if (set.Id == Guid.Empty || set.Revision < 1)
             throw new ArgumentException("Only a set read from the server can be released.", nameof(set));
         var members = set.Members ?? throw new ArgumentException("The set has no member list.", nameof(set));

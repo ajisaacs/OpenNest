@@ -223,25 +223,33 @@ public sealed partial class NestDatabase : IDisposable
         lock (_sync)
         {
             using var transaction = _connection.BeginTransaction();
-            var current = Get(id);
-            if (current is null) return null;
-            if (current.Revision != expectedRevision) throw new RevisionConflictException(current);
-            NestRecord historical;
-            using (var command = _connection.CreateCommand())
-            {
-                command.Transaction = transaction;
-                command.CommandText = $"SELECT {RecordColumns} FROM nest_revisions WHERE id=$id AND revision=$revision";
-                command.Parameters.AddWithValue("$id", id.ToString());
-                command.Parameters.AddWithValue("$revision", sourceRevision);
-                using var reader = command.ExecuteReader();
-                if (!reader.Read()) return null;
-                historical = ReadRecord(reader);
-            }
-            // Restore is a deliberate new active revision, including when the bytes already match.
-            WriteRevision(id, historical, GetRevisionFile(id, sourceRevision)!, current.Revision, sourceRevision, transaction);
+            if (!RestoreRevision(id, sourceRevision, expectedRevision, transaction)) return null;
             transaction.Commit();
             return Get(id);
         }
+    }
+
+    // Called only under _sync with the caller's transaction (release undo shares one).
+    // False when the active nest or the revision is unknown.
+    private bool RestoreRevision(Guid id, int sourceRevision, int expectedRevision, SqliteTransaction transaction)
+    {
+        var current = Get(id);
+        if (current is null) return false;
+        if (current.Revision != expectedRevision) throw new RevisionConflictException(current);
+        NestRecord historical;
+        using (var command = _connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = $"SELECT {RecordColumns} FROM nest_revisions WHERE id=$id AND revision=$revision";
+            command.Parameters.AddWithValue("$id", id.ToString());
+            command.Parameters.AddWithValue("$revision", sourceRevision);
+            using var reader = command.ExecuteReader();
+            if (!reader.Read()) return false;
+            historical = ReadRecord(reader);
+        }
+        // Restore is a deliberate new active revision, including when the bytes already match.
+        WriteRevision(id, historical, GetRevisionFile(id, sourceRevision)!, current.Revision, sourceRevision, transaction);
+        return true;
     }
 
     public NestRecord? SetDeleted(Guid id, bool deleted, int expectedRevision)
@@ -249,21 +257,29 @@ public sealed partial class NestDatabase : IDisposable
         lock (_sync)
         {
             using var transaction = _connection.BeginTransaction();
-            var current = Get(id, !deleted);
-            if (current is null) return null;
-            if (current.Revision != expectedRevision) throw new RevisionConflictException(current);
-            using var command = _connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText = "UPDATE nests SET deleted=$deleted, revision=$revision, savedAt=$savedAt, restoredFromRevision=NULL WHERE id=$id";
-            command.Parameters.AddWithValue("$id", id.ToString());
-            command.Parameters.AddWithValue("$deleted", deleted ? 1 : 0);
-            command.Parameters.AddWithValue("$revision", checked(current.Revision + 1));
-            command.Parameters.AddWithValue("$savedAt", DateTime.Now.ToString("o"));
-            command.ExecuteNonQuery();
-            Snapshot(id, transaction);
+            if (!MarkDeleted(id, deleted, expectedRevision, transaction)) return null;
             transaction.Commit();
             return Get(id, deleted);
         }
+    }
+
+    // Called only under _sync with the caller's transaction (release undo shares one).
+    // False when no nest is in the opposite state.
+    private bool MarkDeleted(Guid id, bool deleted, int expectedRevision, SqliteTransaction transaction)
+    {
+        var current = Get(id, !deleted);
+        if (current is null) return false;
+        if (current.Revision != expectedRevision) throw new RevisionConflictException(current);
+        using var command = _connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "UPDATE nests SET deleted=$deleted, revision=$revision, savedAt=$savedAt, restoredFromRevision=NULL WHERE id=$id";
+        command.Parameters.AddWithValue("$id", id.ToString());
+        command.Parameters.AddWithValue("$deleted", deleted ? 1 : 0);
+        command.Parameters.AddWithValue("$revision", checked(current.Revision + 1));
+        command.Parameters.AddWithValue("$savedAt", DateTime.Now.ToString("o"));
+        command.ExecuteNonQuery();
+        Snapshot(id, transaction);
+        return true;
     }
 
     public NestPage? History(Guid id, int offset, int limit, bool deleted = false)
@@ -325,7 +341,7 @@ public sealed partial class NestDatabase : IDisposable
             command.Transaction = transaction;
             command.CommandText = "PRAGMA user_version";
             var version = (long)command.ExecuteScalar()!;
-            if (version > 8) throw new InvalidOperationException("Database schema is newer than this server.");
+            if (version > 9) throw new InvalidOperationException("Database schema is newer than this server.");
             if (version == 0)
             {
                 command.CommandText = """
@@ -390,6 +406,12 @@ public sealed partial class NestDatabase : IDisposable
                     }
                 }
                 command.CommandText = "PRAGMA user_version=8";
+                command.ExecuteNonQuery();
+            }
+            if (version < 9)
+            {
+                // Releases cover several sets and may merge into existing nests.
+                command.CommandText = ReleaseUpgradeToV9;
                 command.ExecuteNonQuery();
             }
             transaction.Commit();

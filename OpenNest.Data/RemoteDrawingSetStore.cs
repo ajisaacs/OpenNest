@@ -9,7 +9,8 @@ using System.Text.Json.Serialization;
 namespace OpenNest.Data;
 
 /// <summary>
-/// Talks to the drawing sets on the nest server (<c>/api/sets</c>). Sets and releases
+/// Talks to the drawing sets and their releases on the nest server (<c>/api/sets</c>,
+/// <c>/api/releases</c>). Sets and releases
 /// travel as JSON and are checked against <see cref="DrawingSetRules"/> and
 /// <see cref="SetReleaseRules"/> before sending. A server without sets raises
 /// <see cref="ServerTooOldException"/>; other failures surface as <see cref="IOException"/>.
@@ -17,6 +18,8 @@ namespace OpenNest.Data;
 public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
 {
     private const string Feature = "drawing sets";
+
+    private const string ReleaseFeature = "releasing several drawing sets at once";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -153,72 +156,105 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
 
     /// <summary>
     /// Records a release under <c>release.Id</c>, allocated by the caller so a post whose
-    /// reply was lost can be sent again. A release already holding that id, or one of the
-    /// nests, raises <see cref="SetReleasePostConflictException"/> with that release.
+    /// reply was lost can be sent again. A release already holding that id, or one of its
+    /// created nests, raises <see cref="SetReleasePostConflictException"/> with that release.
     /// </summary>
-    public async Task<SetReleaseRecord> PostReleaseAsync(Guid setId, SetReleaseRecord release,
-        CancellationToken cancellationToken = default)
+    public async Task<SetReleaseRecord> PostReleaseAsync(SetReleaseRecord release, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(release);
-        ValidateId(setId);
         if (release.Id == Guid.Empty) throw new ArgumentException("A release id is required.", nameof(release));
-        if (release.SetId != Guid.Empty && release.SetId != setId)
-            throw new ArgumentException("The release names a different set.", nameof(release));
         var error = SetReleaseRules.GetError(release);
         if (error is not null)
             throw new ArgumentException(error, nameof(release));
 
-        using var response = await _httpClient.PostAsync(Url($"api/sets/{setId}/releases"),
-            JsonContent.Create(ForPost(release, setId), options: JsonOptions), cancellationToken);
+        using var response = await _httpClient.PostAsync(Url("api/releases"),
+            JsonContent.Create(ForPost(release), options: JsonOptions), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
-        {
-            await ThrowIfServerTooOld(cancellationToken);
-            throw new IOException($"Drawing set {setId} no longer exists on the nest server.");
-        }
+            throw new ServerTooOldException(ReleaseFeature);
         if (response.StatusCode == HttpStatusCode.Conflict)
             throw new SetReleasePostConflictException(await ReadRelease(response, cancellationToken));
-        await EnsureSuccess(response, $"record the release of drawing set {setId}", cancellationToken);
+        await EnsureSuccess(response, "record the release", cancellationToken);
         var stored = await ReadRelease(response, cancellationToken);
-        if (stored.Id != release.Id || stored.SetId != setId || stored.SetRevision != release.SetRevision
-            || !stored.Nests.Select(n => n?.NestId).SequenceEqual(release.Nests.Select(n => (Guid?)n.NestId)))
+        if (stored.Id != release.Id
+            || !stored.Sets.Select(s => (s?.SetId, s?.SetRevision, s?.Quantity))
+                .SequenceEqual(release.Sets.Select(s => ((Guid?)s.SetId, (int?)s.SetRevision, (int?)s.Quantity)))
+            || !stored.Nests.Select(n => (n?.NestId, n?.Kind, n?.RevisionAfter))
+                .SequenceEqual(release.Nests.Select(n => ((Guid?)n.NestId, (SetReleaseNestKind?)n.Kind, (int?)n.RevisionAfter))))
             throw new IOException("The nest server recorded a different release than was posted.");
         return stored;
     }
 
-    public async Task<SetReleasePage?> GetReleasesAsync(Guid setId, int offset = 0,
-        int limit = DrawingLibraryRules.DefaultRevisionLimit, CancellationToken cancellationToken = default)
+    public async Task<SetReleaseRecord?> GetReleaseAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        ValidateId(setId);
-        ValidatePaging(offset, limit);
-        using var response = await _httpClient.GetAsync(Url($"api/sets/{setId}/releases?{Paging(offset, limit)}"), cancellationToken);
+        if (id == Guid.Empty) throw new ArgumentException("A release id is required.", nameof(id));
+        using var response = await _httpClient.GetAsync(Url($"api/releases/{id}"), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            await ThrowIfServerTooOld(cancellationToken);
+            await ThrowIfReleasesUnsupported(cancellationToken);
             return null;
         }
-        await EnsureSuccess(response, $"read the releases of drawing set {setId}", cancellationToken);
+        await EnsureSuccess(response, $"read release {id}", cancellationToken);
+        var release = await ReadRelease(response, cancellationToken);
+        if (release.Id != id)
+            throw new IOException("Nest server returned a different release.");
+        return release;
+    }
+
+    public async Task<SetReleasePage> QueryReleasesAsync(Guid? setId = null, Guid? nestId = null, int offset = 0,
+        int limit = DrawingLibraryRules.DefaultRevisionLimit, CancellationToken cancellationToken = default)
+    {
+        if (setId == Guid.Empty) throw new ArgumentException("A drawing set id is required.", nameof(setId));
+        if (nestId == Guid.Empty) throw new ArgumentException("A nest id is required.", nameof(nestId));
+        ValidatePaging(offset, limit);
+        var query = Paging(offset, limit);
+        if (setId is not null) query += $"&setId={setId}";
+        if (nestId is not null) query += $"&nestId={nestId}";
+        using var response = await _httpClient.GetAsync(Url($"api/releases/query?{query}"), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            throw new ServerTooOldException(ReleaseFeature);
+        await EnsureSuccess(response, "read releases", cancellationToken);
         var page = await response.Content.ReadFromJsonAsync<SetReleasePage>(JsonOptions, cancellationToken)
             ?? throw new IOException("Nest server returned an empty release page.");
         if (page.Items is null || !IsBoundedPage(page.Items.Count, page.Total, page.Offset, page.Limit, offset, limit)
-            || page.Items.Any(item => item is null || item.SetId != setId || item.Nests is null))
+            || page.Items.Any(item => item is null || item.Sets is null || item.Nests is null
+                || (setId is not null && item.Sets.All(s => s?.SetId != setId))
+                || (nestId is not null && item.Nests.All(n => n?.NestId != nestId))))
             throw new IOException("Nest server returned an invalid or unbounded release page.");
         return page;
     }
 
-    public async Task<SetReleaseRecord?> GetReleaseForNestAsync(Guid nestId, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Undoes a release on the server, all or nothing. A refusal raises
+    /// <see cref="SetReleaseUndoConflictException"/>: the release was undone before, or nests
+    /// not skipped have changed since it (listed, so the caller can skip them and try again).
+    /// </summary>
+    public async Task<SetReleaseRecord> UndoReleaseAsync(Guid id, SetReleaseUndoRequest request,
+        CancellationToken cancellationToken = default)
     {
-        if (nestId == Guid.Empty) throw new ArgumentException("A nest id is required.", nameof(nestId));
-        using var response = await _httpClient.GetAsync(Url($"api/nests/{nestId}/release"), cancellationToken);
+        if (id == Guid.Empty) throw new ArgumentException("A release id is required.", nameof(id));
+        var error = SetReleaseRules.GetUndoError(request);
+        if (error is not null)
+            throw new ArgumentException(error, nameof(request));
+
+        using var response = await _httpClient.PostAsync(Url($"api/releases/{id}/undo"),
+            JsonContent.Create(request, options: JsonOptions), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            await ThrowIfServerTooOld(cancellationToken);
-            return null;
+            await ThrowIfReleasesUnsupported(cancellationToken);
+            throw new IOException($"Release {id} no longer exists on the nest server.");
         }
-        await EnsureSuccess(response, $"read the release of nest {nestId}", cancellationToken);
-        var release = await ReadRelease(response, cancellationToken);
-        if (release.Nests.All(n => n?.NestId != nestId))
-            throw new IOException("Nest server returned a release that does not contain the nest.");
-        return release;
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            var conflict = await response.Content.ReadFromJsonAsync<SetReleaseUndoConflict>(JsonOptions, cancellationToken);
+            if (conflict?.Release is null || conflict.ChangedNests is null)
+                throw new IOException("Nest server refused the undo without saying why.");
+            throw new SetReleaseUndoConflictException(conflict);
+        }
+        await EnsureSuccess(response, $"undo release {id}", cancellationToken);
+        var undone = await ReadRelease(response, cancellationToken);
+        if (undone.Id != id || !undone.IsUndone)
+            throw new IOException("Nest server did not report the release as undone.");
+        return undone;
     }
 
     private async Task<DrawingSetRecord> SetArchivedAsync(Guid id, int expectedRevision, string action,
@@ -290,6 +326,14 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
     }
 
     // A 404 for one set or nest is ambiguous; the query route exists on every set-aware server.
+    // A server from before v9 has no /api/releases at all, so a 404 there is not "unknown release".
+    private async Task ThrowIfReleasesUnsupported(CancellationToken cancellationToken)
+    {
+        using var probe = await _httpClient.GetAsync(Url("api/releases/query?limit=1"), cancellationToken);
+        if (probe.StatusCode == HttpStatusCode.NotFound)
+            throw new ServerTooOldException(ReleaseFeature);
+    }
+
     private async Task ThrowIfServerTooOld(CancellationToken cancellationToken)
     {
         using var probe = await _httpClient.GetAsync(Url("api/sets/query?limit=1"), cancellationToken);
@@ -321,22 +365,30 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         Members = record.Members.Select(m => new DrawingSetMember { DrawingId = m.DrawingId, Quantity = m.Quantity }).ToList(),
     };
 
-    private static SetReleaseRecord ForPost(SetReleaseRecord release, Guid setId) => new()
+    // Joined and server-computed values are ignored by the server; leaving them out keeps the body small.
+    private static SetReleaseRecord ForPost(SetReleaseRecord release) => new()
     {
         Id = release.Id,
-        SetId = setId,
-        SetRevision = release.SetRevision,
-        Multiplier = release.Multiplier,
         Notes = release.Notes,
         ReleasedBy = release.ReleasedBy,
+        Sets = release.Sets.Select(s => new SetReleaseLine
+        {
+            SetId = s.SetId,
+            SetRevision = s.SetRevision,
+            Quantity = s.Quantity,
+        }).ToList(),
         Nests = release.Nests.Select(n => new SetReleaseNest
         {
             NestId = n.NestId,
+            Kind = n.Kind,
+            RevisionBefore = n.RevisionBefore,
+            RevisionAfter = n.RevisionAfter,
             MaterialName = n.MaterialName,
             MaterialGrade = n.MaterialGrade,
             Thickness = n.Thickness,
             Units = n.Units,
             CutType = n.CutType,
+            Items = n.Items,
         }).ToList(),
     };
 
@@ -390,7 +442,7 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
     private static async Task<SetReleaseRecord> ReadRelease(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var release = await response.Content.ReadFromJsonAsync<SetReleaseRecord>(JsonOptions, cancellationToken);
-        if (release is null || release.Nests is null)
+        if (release is null || release.Sets is null || release.Nests is null)
             throw new IOException("Nest server returned an empty set release record.");
         return release;
     }
@@ -439,17 +491,32 @@ public sealed class DrawingSetSaveConflictException : IOException
 }
 
 /// <summary>
-/// A release already holds the posted release id or one of its nests; nothing was recorded.
-/// When <see cref="Current"/> has the posted id, an earlier post whose reply was lost was stored.
+/// A release already holds the posted release id or one of its created nests; nothing was
+/// recorded. When <see cref="Current"/> has the posted id, an earlier post whose reply was
+/// lost was stored.
 /// </summary>
 public sealed class SetReleasePostConflictException : IOException
 {
     public SetReleasePostConflictException(SetReleaseRecord current)
-        : base($"Release {current.Id} of set '{current.SetName}' already records this release or one of its nests.")
+        : base($"Release {current.Id} already records this release or one of its nests.")
     {
         Current = current;
     }
 
     /// <summary>The release that holds the id or nest.</summary>
     public SetReleaseRecord Current { get; }
+}
+
+/// <summary>The server refused to undo a release; nothing was changed.</summary>
+public sealed class SetReleaseUndoConflictException : IOException
+{
+    public SetReleaseUndoConflictException(SetReleaseUndoConflict conflict)
+        : base(conflict.Reason == SetReleaseUndoRefusal.AlreadyUndone
+            ? "The release was already undone."
+            : $"{conflict.ChangedNests.Count} of the release's nests changed since it was made.")
+    {
+        Conflict = conflict;
+    }
+
+    public SetReleaseUndoConflict Conflict { get; }
 }

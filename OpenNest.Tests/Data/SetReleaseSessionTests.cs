@@ -81,9 +81,16 @@ public class SetReleaseSessionTests
 
         var release = Assert.Single(_sets.Posted);
         Assert.Same(result.Release, _sets.Stored.Single());
+        var line = Assert.Single(release.Sets);
         Assert.Equal((set.Id, 4, 2, "Synthetic operator", "Synthetic notes"),
-            (release.SetId, release.SetRevision, release.Multiplier, release.ReleasedBy, release.Notes));
+            (line.SetId, line.SetRevision, line.Quantity, release.ReleasedBy, release.Notes));
         Assert.Equal(result.Groups.Select(g => g.Record!.Id), release.Nests.Select(n => n.NestId));
+        Assert.All(release.Nests, n => Assert.Equal((SetReleaseNestKind.Created, (int?)null), (n.Kind, n.RevisionBefore)));
+        Assert.Equal(result.Groups.Select(g => g.Record!.Revision), release.Nests.Select(n => n.RevisionAfter));
+        var steelItems = release.Nests.Single(n => n.NestId == steel.Record!.Id).Items;
+        Assert.Equal(new[] { (a.Id, a.Revision, 6), (b.Id, b.Revision, 2) },
+            steelItems.OrderBy(i => i.Quantity).Reverse().Select(i => (i.DrawingId, i.DrawingRevision, i.Quantity)));
+        Assert.All(steelItems, i => Assert.Equal(set.Id, i.SetId));
         var aluminum = release.Nests.Single(n => n.MaterialName == "Synthetic Aluminum");
         Assert.Equal(("Grade A", 0.25, Units.Inches, CutType.Waterjet),
             (aluminum.MaterialGrade, aluminum.Thickness, aluminum.Units, aluminum.CutType));
@@ -389,7 +396,7 @@ public class SetReleaseSessionTests
         public Queue<Exception> Failures { get; } = new();
         public bool ConflictWithPosted { get; set; }
 
-        public Task<SetReleaseRecord> PostReleaseAsync(Guid setId, SetReleaseRecord release, CancellationToken cancellationToken = default)
+        public Task<SetReleaseRecord> PostReleaseAsync(SetReleaseRecord release, CancellationToken cancellationToken = default)
         {
             Posted.Add(release);
             if (Failures.TryDequeue(out var failure))
@@ -397,10 +404,13 @@ public class SetReleaseSessionTests
             var stored = new SetReleaseRecord
             {
                 Id = release.Id,
-                SetId = setId,
-                SetRevision = release.SetRevision,
-                Multiplier = release.Multiplier,
-                SetName = "Synthetic kit",
+                Sets = release.Sets.Select(s => new SetReleaseLine
+                {
+                    SetId = s.SetId,
+                    SetRevision = s.SetRevision,
+                    Quantity = s.Quantity,
+                    SetName = "Synthetic kit",
+                }).ToList(),
                 Nests = release.Nests,
             };
             if (ConflictWithPosted)
@@ -418,7 +428,8 @@ public class SetReleaseSessionTests
         public Task<DrawingSetRecord> UpdateAsync(Guid id, DrawingSetRecord record, int expectedRevision, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<DrawingSetRecord> ArchiveAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<DrawingSetRecord> RestoreAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<SetReleasePage?> GetReleasesAsync(Guid setId, int offset = 0, int limit = 100, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<SetReleaseRecord?> GetReleaseForNestAsync(Guid nestId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<SetReleaseRecord?> GetReleaseAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<SetReleasePage> QueryReleasesAsync(Guid? setId = null, Guid? nestId = null, int offset = 0, int limit = 100, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<SetReleaseRecord> UndoReleaseAsync(Guid id, SetReleaseUndoRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

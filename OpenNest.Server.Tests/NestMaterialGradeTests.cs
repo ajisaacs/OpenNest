@@ -61,7 +61,8 @@ public sealed class NestMaterialGradeTests
         var id = Guid.NewGuid();
         using (var database = new NestDatabase(factory.DatabasePath, pooling: false))
             database.Insert(id, Record("Legacy", "Stainless", "304"), [1]);
-        Execute(factory.DatabasePath, """
+        Execute(factory.DatabasePath, $"""
+            {DrawingSetFixtures.ReleaseTablesBackToV8}
             ALTER TABLE nests DROP COLUMN materialGrade;
             ALTER TABLE nest_revisions DROP COLUMN materialGrade;
             PRAGMA user_version=7;
@@ -73,7 +74,7 @@ public sealed class NestMaterialGradeTests
         Assert.Equal("Stainless", record.Material);
         Assert.Equal("", record.MaterialGrade);
         Assert.Equal("", Assert.Single(upgraded.History(id, 0, 10)!.Items).MaterialGrade);
-        Assert.Equal(8L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+        Assert.Equal(9L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
     }
 
     private static NestRecord Record(string name, string material, string grade) => new()

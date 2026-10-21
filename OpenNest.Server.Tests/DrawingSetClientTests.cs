@@ -74,14 +74,14 @@ public sealed class DrawingSetClientTests
         Assert.Null(await store.GetRevisionAsync(set.Id, 2));
         Assert.Null(await store.GetRevisionsAsync(Guid.NewGuid()));
         Assert.Null(await store.GetSetsContainingAsync(Guid.NewGuid()));
-        Assert.Null(await store.GetReleasesAsync(Guid.NewGuid()));
-        Assert.Null(await store.GetReleaseForNestAsync(Guid.NewGuid()));
+        Assert.Empty((await store.QueryReleasesAsync(setId: Guid.NewGuid())).Items);
+        Assert.Null(await store.GetReleaseAsync(Guid.NewGuid()));
         var unknown = Set();
         await Assert.ThrowsAsync<IOException>(() => store.UpdateAsync(unknown.Id, unknown, 1));
     }
 
     [Fact]
-    public async Task Releases_PostReadAndRefuseANestTwice()
+    public async Task Releases_PostReadUndoAndRefuseACreatedNestTwice()
     {
         using var factory = new ServerFactory();
         using var client = factory.CreateClient();
@@ -89,21 +89,39 @@ public sealed class DrawingSetClientTests
         var set = await store.CreateAsync(Set());
         var steel = await AddNest(client, "Synthetic steel nest");
         var aluminum = await AddNest(client, "Synthetic aluminum nest");
-        var release = Release(1, steel, aluminum);
+        var release = Release(set.Id, 1, steel, aluminum);
 
-        var stored = await store.PostReleaseAsync(set.Id, release);
-        var repost = await Assert.ThrowsAsync<SetReleasePostConflictException>(() => store.PostReleaseAsync(set.Id, release));
-        var reuse = await Assert.ThrowsAsync<SetReleasePostConflictException>(() => store.PostReleaseAsync(set.Id, Release(1, steel)));
+        var stored = await store.PostReleaseAsync(release);
+        var repost = await Assert.ThrowsAsync<SetReleasePostConflictException>(() => store.PostReleaseAsync(release));
+        var reuse = await Assert.ThrowsAsync<SetReleasePostConflictException>(() => store.PostReleaseAsync(Release(set.Id, 1, steel)));
 
-        Assert.Equal((release.Id, set.Id, "Synthetic kit", 2), (stored.Id, stored.SetId, stored.SetName, stored.Multiplier));
+        Assert.Equal((release.Id, set.Id, "Synthetic kit", 2), (stored.Id, stored.Sets[0].SetId, stored.Sets[0].SetName, stored.Sets[0].Quantity));
         Assert.Equal(new[] { steel, aluminum }, stored.Nests.Select(n => n.NestId));
         Assert.Equal(release.Id, repost.Current.Id);
         Assert.Equal(release.Id, reuse.Current.Id);
 
-        var page = await store.GetReleasesAsync(set.Id);
-        var listed = Assert.Single(page!.Items);
+        var page = await store.QueryReleasesAsync(setId: set.Id);
+        var listed = Assert.Single(page.Items);
         Assert.Equal(new[] { "Synthetic steel nest", "Synthetic aluminum nest" }, listed.Nests.Select(n => n.Nest!.Name));
-        Assert.Equal(release.Id, (await store.GetReleaseForNestAsync(aluminum))!.Id);
-        await Assert.ThrowsAsync<IOException>(() => store.PostReleaseAsync(Guid.NewGuid(), Release(1, Guid.NewGuid())));
+        Assert.Equal(release.Id, (await store.QueryReleasesAsync(nestId: aluminum)).Items.Single().Id);
+        Assert.Equal(release.Id, (await store.GetReleaseAsync(release.Id))!.Id);
+        await Assert.ThrowsAsync<IOException>(() => store.PostReleaseAsync(Release(Guid.NewGuid(), 1, Guid.NewGuid())));
+
+        // Someone saves the steel nest after the release: undo refuses until it is skipped.
+        using var nests = new RemoteNestRepository(client, client.BaseAddress!.ToString());
+        var record = (await nests.GetMetadataAsync(steel))!;
+        record.Comments = "Edited after the release";
+        await nests.UpdateMetadataAsync(steel, record, 1);
+        var refused = await Assert.ThrowsAsync<SetReleaseUndoConflictException>(() =>
+            store.UndoReleaseAsync(release.Id, new SetReleaseUndoRequest { UndoneBy = "Synthetic undoer" }));
+        Assert.Equal((SetReleaseUndoRefusal.NestsChanged, steel), (refused.Conflict.Reason, refused.Conflict.ChangedNests.Single().Id));
+
+        var undone = await store.UndoReleaseAsync(release.Id, new SetReleaseUndoRequest { UndoneBy = "Synthetic undoer", SkipNests = new[] { steel } });
+
+        Assert.Equal(new SetReleaseNestUndo?[] { SetReleaseNestUndo.Skipped, SetReleaseNestUndo.Deleted }, undone.Nests.Select(n => n.Undo));
+        Assert.Null(await nests.GetMetadataAsync(aluminum));
+        var again = await Assert.ThrowsAsync<SetReleaseUndoConflictException>(() => store.UndoReleaseAsync(release.Id, new SetReleaseUndoRequest()));
+        Assert.Equal(SetReleaseUndoRefusal.AlreadyUndone, again.Conflict.Reason);
+        await Assert.ThrowsAsync<IOException>(() => store.UndoReleaseAsync(Guid.NewGuid(), new SetReleaseUndoRequest()));
     }
 }

@@ -46,13 +46,33 @@ public class SetReleaseTextTests
     {
         var text = SetReleaseText.Origin(new SetReleaseRecord
         {
-            SetName = "Synthetic kit",
-            SetRevision = 3,
-            Multiplier = 2,
+            Sets = new[] { new SetReleaseLine { SetName = "Synthetic kit", SetRevision = 3, Quantity = 2 } },
             ReleasedBy = "Synthetic operator",
         });
 
         Assert.Equal("Released from set 'Synthetic kit' revision 3 ×2 by Synthetic operator", text);
+    }
+
+    [Fact]
+    public void Origin_OfAMergeOfSeveralSets_NamesThemAll_AndAnUndo()
+    {
+        var nest = Guid.NewGuid();
+        var release = new SetReleaseRecord
+        {
+            Sets = new[]
+            {
+                new SetReleaseLine { SetName = "Kit A", SetRevision = 3, Quantity = 2 },
+                new SetReleaseLine { SetName = "Kit B", SetRevision = 1, Quantity = 1 },
+                new SetReleaseLine { SetName = "Kit C", SetRevision = 5, Quantity = 4 },
+            },
+            Nests = new[] { new SetReleaseNest { NestId = nest, Kind = SetReleaseNestKind.Merged } },
+            UndoneAt = new DateTime(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc),
+        };
+
+        Assert.Equal("Merged from sets 'Kit A' revision 3 ×2, 'Kit B' revision 1 ×1 and 'Kit C' revision 5 ×4 (undone)",
+            SetReleaseText.Origin(release, nest));
+        Assert.StartsWith("Released from sets", SetReleaseText.Origin(release));
+        Assert.Equal("Undone", SetReleaseText.Progress(release));
     }
 
     [Fact]

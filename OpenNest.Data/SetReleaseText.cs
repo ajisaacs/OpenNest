@@ -6,23 +6,43 @@ namespace OpenNest.Data;
 /// <summary>Operator-facing wording for set releases, shared by the release views and Nest Info.</summary>
 public static class SetReleaseText
 {
-    /// <summary>Where a nest came from, such as "Released from set 'Kit A' revision 3 ×2 by J. Smith".</summary>
-    public static string Origin(SetReleaseRecord release)
+    /// <summary>
+    /// Where a nest came from, such as "Released from set 'Kit A' revision 3 ×2 by J. Smith",
+    /// or "Merged from sets 'Kit A' revision 3 ×2 and 'Kit B' revision 1 ×1 ..." for a release
+    /// that added to <paramref name="nestId"/> rather than creating it.
+    /// </summary>
+    public static string Origin(SetReleaseRecord release, Guid nestId = default)
     {
         ArgumentNullException.ThrowIfNull(release);
-        var text = $"Released from set '{release.SetName}' revision {release.SetRevision} ×{release.Multiplier}";
+        var merged = release.Nests?.FirstOrDefault(n => n.NestId == nestId)?.Kind == SetReleaseNestKind.Merged;
+        var sets = release.Sets ?? Array.Empty<SetReleaseLine>();
+        var text = $"{(merged ? "Merged" : "Released")} from {(sets.Count == 1 ? "set" : "sets")} {Sets(sets)}";
         if (release.ReleasedAt != default)
             text += $" on {release.ReleasedAt.ToLocalTime().ToString("d", CultureInfo.CurrentCulture)}";
-        return string.IsNullOrWhiteSpace(release.ReleasedBy) ? text : $"{text} by {release.ReleasedBy}";
+        if (!string.IsNullOrWhiteSpace(release.ReleasedBy))
+            text += $" by {release.ReleasedBy}";
+        return release.IsUndone ? $"{text} (undone)" : text;
+    }
+
+    /// <summary>The sets of a release, such as "'Kit A' revision 3 ×2 and 'Kit B' revision 1 ×1".</summary>
+    public static string Sets(IReadOnlyList<SetReleaseLine> sets)
+    {
+        ArgumentNullException.ThrowIfNull(sets);
+        var names = sets.Select(s => $"'{s.SetName}' revision {s.SetRevision} ×{s.Quantity}").ToList();
+        return names.Count <= 1
+            ? string.Concat(names)
+            : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
     }
 
     /// <summary>
-    /// How far the release's nests have got, such as "2 of 3 cut" or "1 of 2 cut, 1 deleted".
-    /// Deleted nests are left out of the count.
+    /// How far the release's nests have got, such as "2 of 3 cut" or "1 of 2 cut, 1 deleted",
+    /// or "Undone". Deleted nests are left out of the count.
     /// </summary>
     public static string Progress(SetReleaseRecord release)
     {
         ArgumentNullException.ThrowIfNull(release);
+        if (release.IsUndone)
+            return "Undone";
         var nests = release.Nests ?? Array.Empty<SetReleaseNest>();
         var deleted = nests.Count(IsDeleted);
         var active = nests.Count - deleted;

@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -52,14 +53,9 @@ namespace OpenNest.Forms
             summaryLabel.Text = "Loading...";
             try
             {
-                var loaded = await sets.GetReleasesAsync(set.Id, requestedOffset, PageSize);
+                var loaded = await sets.QueryReleasesAsync(setId: set.Id, offset: requestedOffset, limit: PageSize);
                 if (IsDisposed || request != pageRequest)
                     return;
-                if (loaded == null)
-                {
-                    summaryLabel.Text = "This set no longer exists on the server.";
-                    return;
-                }
 
                 page = loaded;
                 offset = requestedOffset;
@@ -68,12 +64,15 @@ namespace OpenNest.Forms
                 foreach (var release in loaded.Items)
                 {
                     // Tagged before it is added: adding the first row selects it, which shows its nests.
+                    // This set's line; a release of several sets says how many others it had.
+                    var line = release.Sets.First(s => s.SetId == set.Id);
+                    var others = release.Sets.Count - 1;
                     var row = new DataGridViewRow { Tag = release };
                     row.CreateCells(releaseGrid,
                         release.ReleasedAt == default ? "" : release.ReleasedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture),
                         release.ReleasedBy,
-                        release.SetRevision,
-                        $"×{release.Multiplier}",
+                        line.SetRevision,
+                        others == 0 ? $"×{line.Quantity}" : $"×{line.Quantity} (+{others} other {(others == 1 ? "set" : "sets")})",
                         release.Nests.Count,
                         SetReleaseText.Progress(release),
                         release.Notes);

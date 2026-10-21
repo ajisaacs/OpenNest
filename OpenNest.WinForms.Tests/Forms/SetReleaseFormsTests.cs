@@ -59,7 +59,7 @@ public class SetReleaseFormsTests
                 Assert.Equal(steel.Record.Id, nests.Uploaded.Single(u => u.Name == steel.Nest.Name).Id);
 
                 var release = Assert.Single(sets.Releases);
-                Assert.Equal((3, "Synthetic run", 2), (release.Multiplier, release.Notes, release.Nests.Count));
+                Assert.Equal((3, "Synthetic run", 2), (release.Sets.Single().Quantity, release.Notes, release.Nests.Count));
                 Assert.Same(release, form.Result!.Release);
                 Assert.StartsWith("Released: 2 nests", Field<Label>(form, "statusLabel").Text);
                 Assert.All(grid.Rows.Cast<DataGridViewRow>(), r => Assert.StartsWith("Created N26-", (string)r.Cells["statusColumn"].Value));
@@ -167,10 +167,7 @@ public class SetReleaseFormsTests
                 sets.Releases.Add(new SetReleaseRecord
                 {
                     Id = Guid.NewGuid(),
-                    SetId = set.Id,
-                    SetRevision = 1,
-                    SetName = set.Name,
-                    Multiplier = 2,
+                    Sets = new[] { new SetReleaseLine { SetId = set.Id, SetRevision = 1, SetName = set.Name, Quantity = 2 } },
                     ReleasedBy = "Synthetic operator",
                     ReleasedAt = new DateTime(2026, 10, 20, 12, 0, 0, DateTimeKind.Utc),
                     Nests = new[] { Nest("N1", NestStatus.HasBeenCut), Nest("N2", NestStatus.ToBeCut), Nest("N3", NestStatus.Draft, deleted: true) },

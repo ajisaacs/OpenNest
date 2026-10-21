@@ -116,7 +116,7 @@ internal sealed class InMemoryDrawingSets : IDrawingSetStore
     public int PostAttempts { get; private set; }
     public bool FailNextPost { get; set; }
 
-    public Task<SetReleaseRecord> PostReleaseAsync(Guid setId, SetReleaseRecord release, CancellationToken cancellationToken = default)
+    public Task<SetReleaseRecord> PostReleaseAsync(SetReleaseRecord release, CancellationToken cancellationToken = default)
     {
         PostAttempts++;
         if (FailNextPost)
@@ -130,10 +130,13 @@ internal sealed class InMemoryDrawingSets : IDrawingSetStore
         var stored = new SetReleaseRecord
         {
             Id = release.Id,
-            SetId = setId,
-            SetRevision = release.SetRevision,
-            SetName = _revisions[setId].First(r => r.Revision == release.SetRevision).Name,
-            Multiplier = release.Multiplier,
+            Sets = release.Sets.Select(s => new SetReleaseLine
+            {
+                SetId = s.SetId,
+                SetRevision = s.SetRevision,
+                Quantity = s.Quantity,
+                SetName = _revisions[s.SetId].First(r => r.Revision == s.SetRevision).Name,
+            }).ToList(),
             Notes = release.Notes,
             ReleasedBy = release.ReleasedBy,
             ReleasedAt = new DateTime(2026, 10, 20, 15, 0, 0, DateTimeKind.Utc),
@@ -143,12 +146,17 @@ internal sealed class InMemoryDrawingSets : IDrawingSetStore
         return Task.FromResult(stored);
     }
 
-    public Task<SetReleasePage?> GetReleasesAsync(Guid setId, int offset = 0, int limit = 100, CancellationToken cancellationToken = default)
+    public Task<SetReleaseRecord?> GetReleaseAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Releases.FirstOrDefault(r => r.Id == id));
+
+    public Task<SetReleasePage> QueryReleasesAsync(Guid? setId = null, Guid? nestId = null, int offset = 0, int limit = 100,
+        CancellationToken cancellationToken = default)
     {
-        if (!_revisions.ContainsKey(setId))
-            return Task.FromResult<SetReleasePage?>(null);
-        var newest = Enumerable.Reverse(Releases.Where(r => r.SetId == setId).ToList()).ToList();
-        return Task.FromResult<SetReleasePage?>(new SetReleasePage
+        var newest = Enumerable.Reverse(Releases
+            .Where(r => setId is null || r.Sets.Any(s => s.SetId == setId))
+            .Where(r => nestId is null || r.Nests.Any(n => n.NestId == nestId))
+            .ToList()).ToList();
+        return Task.FromResult(new SetReleasePage
         {
             Items = newest.Skip(offset).Take(limit).ToList(),
             Total = newest.Count,
@@ -157,8 +165,8 @@ internal sealed class InMemoryDrawingSets : IDrawingSetStore
         });
     }
 
-    public Task<SetReleaseRecord?> GetReleaseForNestAsync(Guid nestId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Releases.FirstOrDefault(r => r.Nests.Any(n => n.NestId == nestId)));
+    public Task<SetReleaseRecord> UndoReleaseAsync(Guid id, SetReleaseUndoRequest request, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("The in-memory store does not hold nests, so it cannot undo a release.");
 
     private Task<DrawingSetRecord> SetArchived(Guid id, int expectedRevision, bool archived)
     {

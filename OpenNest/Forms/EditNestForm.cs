@@ -777,8 +777,8 @@ namespace OpenNest.Forms
         }
 
         /// <summary>
-        /// Shows which drawing set release made this nest, when it is a server nest that came
-        /// from one. Best effort and in the background: Nest Info never waits for the server.
+        /// Shows which drawing set releases made or merged into this nest, when it is a server
+        /// nest that came from one. Best effort and in the background: Nest Info never waits for the server.
         /// </summary>
         private async Task ShowReleaseOriginAsync(EditNestInfoForm form)
         {
@@ -789,9 +789,14 @@ namespace OpenNest.Forms
             try
             {
                 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                var release = await NestStorage.CreateDrawingSetStore().GetReleaseForNestAsync(Document.RemoteId, timeout.Token);
-                if (release != null && !form.IsDisposed)
-                    form.ReleaseOrigin = SetReleaseText.Origin(release);
+                // A merged nest can be in several releases: name the newest, count the rest.
+                var releases = await NestStorage.CreateDrawingSetStore()
+                    .QueryReleasesAsync(nestId: Document.RemoteId, limit: 1, cancellationToken: timeout.Token);
+                if (releases.Items.Count > 0 && !form.IsDisposed)
+                {
+                    var origin = SetReleaseText.Origin(releases.Items[0], Document.RemoteId);
+                    form.ReleaseOrigin = releases.Total > 1 ? $"{origin} (+{releases.Total - 1} earlier)" : origin;
+                }
             }
             catch (Exception ex) when (ex is IOException or System.Net.Http.HttpRequestException
                 or OperationCanceledException or ArgumentException or System.Text.Json.JsonException)

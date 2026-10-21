@@ -402,14 +402,16 @@ or Not started. Cancel stops between uploads, never during one. When every nest
 was created but recording failed, the button becomes **Record Release** and
 posts the same release again. A dialog runs one release.
 
-**Releases...** lists the selected set's releases, newest first: when, by whom,
-the set revision, the kit multiplier, the number of nests, progress such as
-"2 of 3 cut" (deleted nests are not counted) and the notes. The selected
+**Releases...** lists the releases that include the selected set, newest first:
+when, by whom, the set revision, the kits of this set (and how many other sets
+the release had), the number of nests, progress such as "2 of 3 cut" (deleted
+nests are not counted) or "Undone", and the notes. The selected
 release's nests show their material group and current status, or Deleted.
 
-**Nest > Edit** (Nest Info) shows, beside its buttons, the release a server nest
-came from ("Released from set 'Kit A' revision 3 ×2 on 10/20/2026 by ..."). It is
-read in the background and left blank when the nest came from none or the
+**Nest > Edit** (Nest Info) shows, beside its buttons, the newest release that
+made or merged into a server nest ("Released from set 'Kit A' revision 3 ×2 on
+10/20/2026 by ...", or "Merged from sets ..."), with a count of earlier ones. It
+is read in the background and left blank when the nest came from none or the
 server cannot be reached.
 
 ## Drawing set endpoints
@@ -465,43 +467,70 @@ save, so a record read from the server may be sent back as it is.
 A set is never added to a nest, because a nest is one material. It is
 **released**: the client makes one nest per material group with every quantity
 multiplied, uploads each nest, and only then posts a **release record** naming
-the set revision and the nests. A failure part-way leaves ordinary nests and no
+the set revisions and the nests. A failure part-way leaves ordinary nests and no
 release, and nothing is rolled back silently.
 
+Since schema v9 a release covers one or more sets (`release_sets`), and a nest
+may be one the release **created** or an existing draft it **merged** into
+(`release_nests`, with the nest revision before and after). The drawing
+quantities each set added to each nest are kept in `release_nest_items`, so a
+kit can still be traced once kits share a nest. The v8 → v9 migration turns each
+v7 release into one set line (its multiplier is the quantity) and created nests
+at their first revision, with no items.
+
 `OpenNest.Data.SetReleaseRecord` fields: `id` (client-allocated, so an
-ambiguous post can be retried), `setId` (from the route; a body value must
-match it), `setRevision`, `multiplier`, `notes`, `releasedBy`, the
-server-computed `releasedAt`, `setName` (the set's name at that revision) and
-`nests`, in order, each `{ nestId, materialName, materialGrade, thickness, units,
-cutType, nest }`. The material fields are the group the nest was made for;
-`nest` is the nest's current metadata (deleted or not), joined on every read so
-status and deletion are always current, and ignored on post.
+ambiguous post can be retried), `sets` (each `{ setId, setRevision, quantity,
+setName }`; `setName` is the set's name at that revision, joined on read),
+`notes`, `releasedBy`, the server-computed `releasedAt`, `undoneAt` and
+`undoneBy`, and `nests`, in order, each `{ nestId, kind, revisionBefore,
+revisionAfter, materialName, materialGrade, thickness, units, cutType, items,
+undo, undoRevision, nest }`. `kind` is `created` (no `revisionBefore`) or
+`merged`; `revisionAfter` is the nest revision the release wrote. `items` are
+`{ setId, drawingId, drawingRevision, quantity }`. `undo` and `undoRevision`
+are server-computed. `nest` is the nest's current metadata (deleted or not),
+joined on every read so status and deletion are always current. Joined and
+server-computed values are ignored on post.
 
 | Method | Path | Body | Response |
 |---|---|---|---|
-| POST | `/api/sets/{id}/releases` | JSON release with a nonempty `id` | The stored release; 404 for an unknown set; 409 with the release that already holds the id or one of the nests |
-| GET | `/api/sets/{id}/releases?offset=0&limit=100` | — | Release page with nests, newest first; limit 1–200 |
-| GET | `/api/nests/{id}/release` | — | The release the nest (deleted or not) came from, or 404 |
+| POST | `/api/releases` | JSON release with a nonempty `id` | The stored release; 400 for an unknown set or revision; 409 with the release that already holds the id or one of the created nests |
+| GET | `/api/releases/query?setId=&nestId=&offset=0&limit=100` | — | Release page, newest first, optionally only releases including the set or the nest; limit 1–200 |
+| GET | `/api/releases/{id}` | — | The release, or 404 |
+| POST | `/api/releases/{id}/undo` | `{ "undoneBy": "...", "skipNests": [...] }` | The undone release; 404 for an unknown release; 409 with `{ reason, release, changedNests }` |
 
-- Releases are append-only: there is no edit or delete. A mistaken release is
-  undone by deleting its nests, which then read as `deleted`.
-- `setRevision` must be a revision of the set but need not be the current one,
-  and the set may be archived: the nests already exist by the time the release
-  is posted, so it is never refused for a state the operator cannot fix.
-- Each nest belongs to at most one release (a unique index enforces it).
-- Validation (400, no state change): `multiplier` 1–1000; notes at most 4000
-  and releasedBy at most 200 characters; `nests` present, 1–500 entries, no
-  nest twice, each an existing, not deleted nest with material name and grade
-  at most 200 characters, `thickness` finite and at least 0 (stored rounded to 4
-  decimals), and `units` and `cutType` single enum names.
+- Releases are append-only: there is no edit or delete. Undo marks the release
+  undone and records what it did to each nest.
+- Set revisions must exist but need not be current, and sets may be archived: the
+  nests already exist by the time the release is posted, so it is never refused
+  for a state the operator cannot fix. A merged nest need not still be at
+  `revisionAfter` when the release is posted.
+- A created nest belongs to that release only; a merged nest may be in several.
+- **Undo** runs in one transaction. Each created nest is soft-deleted and each
+  merged nest restored to `revisionBefore`, except the nests in `skipNests`
+  (recorded as `skipped`). Every other nest must still hold `revisionAfter`: be
+  at it, or have been restored to it as its latest save. Otherwise nothing
+  changes and the 409 lists the changed nests (`reason` `nestsChanged`), so the
+  caller can skip them and try again. A second undo is refused with
+  `alreadyUndone`. Because each undo writes a new nest revision, releases that
+  share a nest are undone newest first.
+- Validation (400, no state change): 1–50 `sets`, no set twice, each quantity
+  1–1000; notes at most 4000 and releasedBy at most 200 characters; `nests`
+  present, 1–500 entries, no nest twice, each an existing, not deleted nest whose
+  named revisions exist, with material name and grade at most 200 characters,
+  `thickness` finite and at least 0 (stored rounded to 4 decimals), and `kind`,
+  `units` and `cutType` single enum names; each item names one of the release's
+  sets, at most once per drawing, with a positive revision and quantity.
 
 #### Client and release session
 
 `OpenNest.Data.RemoteDrawingSetStore` is the client for every route above. It
 checks `DrawingSetRules`/`SetReleaseRules` before sending, raises
-`ServerTooOldException` on a server without sets, `DrawingSetSaveConflictException`
-or `SetReleasePostConflictException` (carrying the current record) on 409, and
-refuses replies whose id, revision, members or nests differ from what was sent.
+`ServerTooOldException` on a server without sets (or, for releases, without
+`/api/releases`), `DrawingSetSaveConflictException` or
+`SetReleasePostConflictException` (carrying the current record) on 409,
+`SetReleaseUndoConflictException` (carrying the refusal) when an undo is
+refused, and refuses replies whose id, revision, members, sets or nests differ
+from what was sent.
 
 `SetReleasePlan.Build(set, multiplier, includeArchived)` splits a set read from
 the server into groups without any I/O. A group is the members whose drawings
@@ -525,7 +554,9 @@ material or a positive thickness goes to one refused "unassigned" group, listed 
    its id, so one stored before its reply was lost still counts as created; the
    first real failure stops the rest.
 3. **Post the release** only when every chosen group was created, under a
-   client-allocated id. When the post fails, the nests stay and
+   client-allocated id. It names the set once (the multiplier is its quantity),
+   each nest as created at its uploaded revision, and the drawing revisions and
+   quantities each nest received. When the post fails, the nests stay and
    `RetryReleaseAsync` posts the same id again; a 409 naming that id is adopted
    as the stored release.
 

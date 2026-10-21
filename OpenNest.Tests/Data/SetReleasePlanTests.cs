@@ -77,7 +77,7 @@ public class SetReleasePlanTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(SetReleaseRules.MaxMultiplier + 1)]
+    [InlineData(SetReleaseRules.MaxQuantity + 1)]
     public void Build_RejectsMultiplierOutOfRange(int multiplier)
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => SetReleasePlan.Build(Set((Drawing("SYN-A"), 1)), multiplier, false));

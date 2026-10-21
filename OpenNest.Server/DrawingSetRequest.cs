@@ -1,7 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.Json.Serialization;
-using OpenNest;
 using OpenNest.Data;
 
 namespace OpenNest.Server;
@@ -21,13 +19,6 @@ internal static class DrawingSetRequest
     private static readonly JsonSerializerOptions SetOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true,
-    };
-
-    // Integer enum values are refused; names are additionally checked before deserializing.
-    private static readonly JsonSerializerOptions ReleaseOptions = new(JsonSerializerDefaults.Web)
-    {
-        PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) },
     };
 
     public static bool TryParseQuery(IQueryCollection values, out DrawingSetQuery query, out string error)
@@ -136,77 +127,16 @@ internal static class DrawingSetRequest
         return error.Length == 0;
     }
 
-    /// <summary>
-    /// Reads and validates one release JSON object. <c>nests</c> must be present, each
-    /// nest's <c>units</c> and <c>cutType</c> must be single names, and each nest's joined
-    /// <c>nest</c> is ignored.
-    /// </summary>
-    public static bool TryReadRelease(string? json, out SetReleaseRecord release, out string error)
-    {
-        release = new SetReleaseRecord();
-        if (string.IsNullOrWhiteSpace(json))
-        {
-            error = "Missing release.";
-            return false;
-        }
-
-        try
-        {
-            if (JsonNode.Parse(json) is not JsonObject root)
-            {
-                error = "The release must be a JSON object.";
-                return false;
-            }
-
-            if (!RemoveJoined(root, "nests", "nest"))
-            {
-                error = "nests is required.";
-                return false;
-            }
-
-            // Enum converters also accept comma-separated combinations; allow single names only.
-            if (Property(root, "nests") is JsonArray nests)
-            {
-                for (var i = 0; i < nests.Count; i++)
-                {
-                    if (nests[i] is not JsonObject nest)
-                        continue;
-                    if (Property(nest, "units") is { } units && !IsName<Units>(units))
-                    {
-                        error = $"nests[{i}].units must be a supported unit name.";
-                        return false;
-                    }
-
-                    if (Property(nest, "cutType") is { } cutType && !IsName<CutType>(cutType))
-                    {
-                        error = $"nests[{i}].cutType must be Laser, Waterjet or Plasma.";
-                        return false;
-                    }
-                }
-            }
-
-            release = root.Deserialize<SetReleaseRecord>(ReleaseOptions) ?? release;
-        }
-        catch (JsonException)
-        {
-            error = "Invalid release JSON.";
-            return false;
-        }
-
-        error = SetReleaseRules.GetError(release) ?? "";
-        return error.Length == 0;
-    }
-
-    private static JsonNode? Property(JsonObject node, string name) =>
+    internal static JsonNode? Property(JsonObject node, string name) =>
         node.FirstOrDefault(p => string.Equals(p.Key, name, StringComparison.OrdinalIgnoreCase)).Value;
 
-    private static bool IsName<TEnum>(JsonNode value)
+    internal static bool IsName<TEnum>(JsonNode value)
         where TEnum : struct, Enum =>
         value is JsonValue text && text.TryGetValue<string>(out var name) && DrawingLibraryRequest.TryEnumName<TEnum>(name, out _);
 
     // Drops the server-joined property from each object in the list, so a record read from
     // the server may be sent back; false when the list property is missing altogether.
-    private static bool RemoveJoined(JsonObject root, string list, string joined)
+    internal static bool RemoveJoined(JsonObject root, string list, string joined)
     {
         if (!root.Any(p => string.Equals(p.Key, list, StringComparison.OrdinalIgnoreCase)))
             return false;

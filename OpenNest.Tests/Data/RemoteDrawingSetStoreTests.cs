@@ -44,7 +44,9 @@ public class RemoteDrawingSetStoreTests
 
         var query = await Assert.ThrowsAsync<ServerTooOldException>(() => store.QueryAsync(new DrawingSetQuery()));
         await Assert.ThrowsAsync<ServerTooOldException>(() => store.GetAsync(Guid.NewGuid()));
-        await Assert.ThrowsAsync<ServerTooOldException>(() => store.GetReleaseForNestAsync(Guid.NewGuid()));
+        var releases = await Assert.ThrowsAsync<ServerTooOldException>(() => store.QueryReleasesAsync(nestId: Guid.NewGuid()));
+        await Assert.ThrowsAsync<ServerTooOldException>(() => store.GetReleaseAsync(Guid.NewGuid()));
+        Assert.Contains("several drawing sets", releases.Message);
         Assert.Contains("drawing sets", query.Message);
     }
 
@@ -69,8 +71,13 @@ public class RemoteDrawingSetStoreTests
         duplicate.Members = duplicate.Members.Concat(duplicate.Members).ToList();
 
         await Assert.ThrowsAsync<ArgumentException>(() => store.CreateAsync(duplicate));
-        await Assert.ThrowsAsync<ArgumentException>(() => store.PostReleaseAsync(Guid.NewGuid(),
-            new SetReleaseRecord { Id = Guid.NewGuid(), SetRevision = 1, Multiplier = 0 }));
+        await Assert.ThrowsAsync<ArgumentException>(() => store.PostReleaseAsync(new SetReleaseRecord
+        {
+            Id = Guid.NewGuid(),
+            Sets = new[] { new SetReleaseLine { SetId = Guid.NewGuid(), SetRevision = 1, Quantity = 0 } },
+        }));
+        await Assert.ThrowsAsync<ArgumentException>(() => store.UndoReleaseAsync(Guid.NewGuid(),
+            new SetReleaseUndoRequest { SkipNests = new[] { Guid.Empty } }));
         Assert.Empty(handler.Requests);
     }
 
@@ -100,19 +107,17 @@ public class RemoteDrawingSetStoreTests
         var release = new SetReleaseRecord
         {
             Id = Guid.NewGuid(),
-            SetRevision = 1,
-            Multiplier = 1,
-            Nests = new[] { new SetReleaseNest { NestId = Guid.NewGuid(), MaterialName = "Synthetic Steel" } },
+            Sets = new[] { new SetReleaseLine { SetId = setId, SetRevision = 1, Quantity = 1 } },
+            Nests = new[] { new SetReleaseNest { NestId = Guid.NewGuid(), RevisionAfter = 1, MaterialName = "Synthetic Steel" } },
         };
         var handler = new StubHandler(_ => StubHandler.Json(new
         {
             id = release.Id,
-            setId,
-            setRevision = 1,
-            nests = new[] { new { nestId = Guid.NewGuid() } },
+            sets = new[] { new { setId, setRevision = 1, quantity = 1 } },
+            nests = new[] { new { nestId = Guid.NewGuid(), kind = "created", revisionAfter = 1 } },
         }));
         using var store = Store(handler);
 
-        await Assert.ThrowsAsync<IOException>(() => store.PostReleaseAsync(setId, release));
+        await Assert.ThrowsAsync<IOException>(() => store.PostReleaseAsync(release));
     }
 }
