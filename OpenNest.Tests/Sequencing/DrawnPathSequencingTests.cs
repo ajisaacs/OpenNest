@@ -90,6 +90,20 @@ public class DrawnPathSequencingTests
     }
 
     [Fact]
+    public void Apply_CutsPartsNoLineCrossesLast()
+    {
+        // Four stacked squares; the line starts in the second and runs up through the
+        // fourth. The bottom square is nearest the line's start but the line never reaches it.
+        var drawing = TestHelpers.MakeSquareDrawing();
+        var stack = Enumerable.Range(0, 4).Select(i => new Part(drawing, new Vector(0, i * 15))).ToArray();
+        var plate = TestHelpers.MakePlate(60, 120, stack[3], stack[1], stack[0], stack[2]);
+
+        Assert.True(DrawnPathSequencing.Apply(plate, Lines(new[] { new Vector(5, 20), new Vector(5, 52) })));
+
+        Assert.Equal(new[] { stack[1], stack[2], stack[3], stack[0] }, plate.Parts);
+    }
+
+    [Fact]
     public void Apply_PartPassedTwiceFollowsTheNearerPass()
     {
         var drawing = TestHelpers.MakeSquareDrawing();

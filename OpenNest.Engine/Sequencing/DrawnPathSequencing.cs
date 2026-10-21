@@ -8,9 +8,10 @@ namespace OpenNest.Engine.Sequencing
 {
     /// <summary>
     /// Sequences a plate along lines the user draws over it, in the order they were drawn.
-    /// Each part belongs to the line passing closest to its center, and is cut in the order
-    /// that nearest point falls along the line; where a line passes a part more than once,
-    /// the closest pass decides. The jump from one line to the next is a rapid and claims
+    /// Each part belongs to the crossing line passing closest to its center, and is cut in the
+    /// order that nearest point falls along the line; where a line passes a part more than once,
+    /// the closest pass decides. Parts no line crosses are cut after the rest, ordered the same
+    /// way by their nearest line. The jump from one line to the next is a rapid and claims
     /// nothing. Cut-first parts stay ahead of the rest and the cutoff rules still apply.
     /// </summary>
     public static class DrawnPathSequencing
@@ -43,12 +44,22 @@ namespace OpenNest.Engine.Sequencing
             return PlateSequencing.OrderCutOffsFirst(ordered, plate);
         }
 
-        /// <summary>The parts in line order; ties keep their current order.</summary>
+        /// <summary>
+        /// The parts in line order, then the parts no line crosses, in the order they would
+        /// follow their nearest line; ties keep their current order.
+        /// </summary>
         public static List<Part> Order(IEnumerable<Part> parts, IReadOnlyList<IReadOnlyList<Vector>> lines)
         {
             return parts
-                .Select(part => (Part: part, Station: Nearest(part.BoundingBox.Center, lines)))
-                .OrderBy(item => item.Station.Line)
+                .Select(part =>
+                {
+                    var box = part.BoundingBox;
+                    var crossing = Nearest(box.Center, lines, line => Crosses(line, box));
+                    var missed = crossing.Line == int.MaxValue;
+                    return (Part: part, Missed: missed, Station: missed ? Nearest(box.Center, lines, _ => true) : crossing);
+                })
+                .OrderBy(item => item.Missed)
+                .ThenBy(item => item.Station.Line)
                 .ThenBy(item => item.Station.Along)
                 .ThenBy(item => item.Station.Distance)
                 .Select(item => item.Part)
@@ -97,13 +108,51 @@ namespace OpenNest.Engine.Sequencing
             return length > Tolerance.Epsilon;
         }
 
-        // The earliest of equally near lines wins.
-        private static (int Line, double Along, double Distance) Nearest(Vector point, IReadOnlyList<IReadOnlyList<Vector>> lines)
+        /// <summary>Whether any segment of the path touches the box.</summary>
+        public static bool Crosses(IReadOnlyList<Vector> path, Box box)
+        {
+            for (var i = 1; i < path.Count; i++)
+            {
+                if (SegmentTouchesBox(path[i - 1], path[i], box))
+                    return true;
+            }
+            return false;
+        }
+
+        // Liang-Barsky clip of the segment against the box, edges included.
+        private static bool SegmentTouchesBox(Vector start, Vector end, Box box)
+        {
+            var dx = end.X - start.X;
+            var dy = end.Y - start.Y;
+            var enter = 0.0;
+            var exit = 1.0;
+            return Clip(-dx, start.X - box.Left, ref enter, ref exit)
+                && Clip(dx, box.Right - start.X, ref enter, ref exit)
+                && Clip(-dy, start.Y - box.Bottom, ref enter, ref exit)
+                && Clip(dy, box.Top - start.Y, ref enter, ref exit);
+        }
+
+        private static bool Clip(double p, double q, ref double enter, ref double exit)
+        {
+            if (System.Math.Abs(p) <= Tolerance.Epsilon)
+                return q >= -Tolerance.Epsilon;
+
+            var t = q / p;
+            if (p < 0)
+                enter = System.Math.Max(enter, t);
+            else
+                exit = System.Math.Min(exit, t);
+            return enter <= exit;
+        }
+
+        // The earliest of equally near lines wins; int.MaxValue when no line qualifies.
+        private static (int Line, double Along, double Distance) Nearest(
+            Vector point, IReadOnlyList<IReadOnlyList<Vector>> lines, Func<IReadOnlyList<Vector>, bool> qualifies)
         {
             var best = (Line: int.MaxValue, Along: 0.0, Distance: double.PositiveInfinity);
             for (var i = 0; i < lines.Count; i++)
             {
-                if (!HasLength(lines[i]))
+                if (!HasLength(lines[i]) || !qualifies(lines[i]))
                     continue;
                 var (along, distance) = Project(point, lines[i]);
                 if (distance < best.Distance - Tolerance.Epsilon)
