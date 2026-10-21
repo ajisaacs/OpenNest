@@ -111,6 +111,7 @@ public sealed class SavedNestsForm : Form
         AddNestColumn("Customer", NestSortField.Customer, 160);
         AddNestColumn("Made by", NestSortField.MadeBy, 90);
         AddNestColumn("Material", NestSortField.Material, 150);
+        AddNestColumn("Grade", NestSortField.MaterialGrade, 80);
         AddNestColumn("Thickness", NestSortField.Thickness, 80, alignRight: true);
         AddNestColumn("Created", NestSortField.DateCreated, 140);
         AddNestColumn("Saved", NestSortField.SavedAt, 140);
@@ -515,6 +516,7 @@ public sealed class SavedNestsForm : Form
                 record.Customer,
                 record.MadeBy,
                 record.Material,
+                record.MaterialGrade,
                 record.Thickness.ToString("0.####", CultureInfo.CurrentCulture),
                 FormatDate(record.DateCreated),
                 FormatDate(record.SavedAt),
@@ -816,6 +818,7 @@ public sealed class SavedNestsForm : Form
             });
             if (IsDisposed) return;
             using var dialog = new EditNestInfoForm { AllowRename = true };
+            dialog.SetMaterialCatalog(MachineSettings.LoadMaterials());
             dialog.LoadNestInfo(nest);
             while (true)
             {

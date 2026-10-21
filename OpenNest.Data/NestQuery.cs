@@ -11,7 +11,7 @@ public sealed class NestQuery
     public const int MaxSearchLength = 200;
 
     /// <summary>
-    /// Case-insensitive substring matched against name, customer, material, made by,
+    /// Case-insensitive substring matched against name, customer, material, grade, made by,
     /// comments and status (stored and display names). Blank means no filter.
     /// </summary>
     public string Search { get; init; } = "";

@@ -758,6 +758,7 @@ namespace OpenNest.Forms
         public async Task ShowNestInfoEditorAsync()
         {
             var form = new EditNestInfoForm { AllowRename = NestStorage.Settings.IsDatabaseMode };
+            form.SetMaterialCatalog(MachineSettings.LoadMaterials());
             form.LoadNestInfo(Nest);
             _ = ShowReleaseOriginAsync(form);
 

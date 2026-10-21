@@ -16,4 +16,5 @@ public enum NestSortField
     MadeBy,
     Comments,
     FileSize,
+    MaterialGrade,
 }

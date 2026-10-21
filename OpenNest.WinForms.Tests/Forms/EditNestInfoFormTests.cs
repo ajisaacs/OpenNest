@@ -216,6 +216,56 @@ public class EditNestInfoFormTests
         });
     }
 
+    [Fact]
+    public void GradeList_FollowsMaterial_AndSavesChosenGrade()
+    {
+        RunSta(() =>
+        {
+            var nest = new Nest { Material = new Material("Stainless", "304", 0.289) };
+            using var form = new EditNestInfoForm();
+            form.SetMaterialCatalog(new[]
+            {
+                new Data.MaterialConfig { Name = "Stainless", Grade = "316" },
+                new Data.MaterialConfig { Name = "Stainless", Grade = "304" },
+                new Data.MaterialConfig { Name = "Aluminum", Grade = "5052" },
+            });
+            form.LoadNestInfo(nest);
+            var gradeBox = Assert.IsType<ComboBox>(form.Controls.Find("gradeBox", true).Single());
+
+            Assert.Equal(new[] { "304", "316" }, gradeBox.Items.Cast<string>());
+            Assert.Equal("304", form.MaterialGrade);
+
+            form.MaterialName = "aluminum";
+            Assert.Equal(new[] { "5052" }, gradeBox.Items.Cast<string>());
+            Assert.Equal("", form.MaterialGrade);
+
+            form.MaterialGrade = "5052";
+            form.SaveNestInfo(nest);
+
+            Assert.Equal("Aluminum", nest.Material.Name);
+            Assert.Equal("5052", nest.Material.Grade);
+            Assert.Equal(0, nest.Material.Density);
+        });
+    }
+
+    [Fact]
+    public void SaveWithChangedGrade_KeepsNameAndDropsDensity()
+    {
+        RunSta(() =>
+        {
+            var nest = new Nest { Material = new Material("Stainless", "304", 0.289) };
+            using var form = new EditNestInfoForm();
+            form.LoadNestInfo(nest);
+            form.MaterialGrade = "316";
+
+            form.SaveNestInfo(nest);
+
+            Assert.Equal("Stainless", nest.Material.Name);
+            Assert.Equal("316", nest.Material.Grade);
+            Assert.Equal(0, nest.Material.Density);
+        });
+    }
+
     private static void RunSta(Action action) =>
         StaTestThread.Run(action, TimeSpan.FromSeconds(15), "The STA test did not complete.");
 }

@@ -321,6 +321,7 @@ public sealed class NestQueryTests : IDisposable
                 DateCreated = new DateTime(2026, 1, 1 + index % 28, 8, 0, 0, DateTimeKind.Unspecified),
                 DateModified = new DateTime(2026, 1, 2 + index % 27, 9, 0, 0, DateTimeKind.Unspecified),
                 Material = index % 3 == 0 ? "Synthetic steel" : "Synthetic alloy",
+                MaterialGrade = index % 4 == 0 ? "" : $"Grade {index % 5}",
                 Thickness = 0.25 + index % 3 * 0.125,
                 Status = statuses[index % statuses.Length],
                 PlateCount = 1 + index % 4,
@@ -362,6 +363,7 @@ public sealed class NestQueryTests : IDisposable
             NestSortField.MadeBy => Text(r => r.MadeBy),
             NestSortField.Comments => Text(r => r.Comments),
             NestSortField.FileSize => (a, b) => a.FileSize.CompareTo(b.FileSize),
+            NestSortField.MaterialGrade => Text(r => r.MaterialGrade),
             _ => throw new ArgumentOutOfRangeException(nameof(field)),
         };
         var sorted = records.ToList();

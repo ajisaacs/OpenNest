@@ -29,6 +29,9 @@ public sealed class NestRecord
 
     public string Material { get; set; } = "";
 
+    /// <summary>Material grade; blank when none was chosen or the server predates grades.</summary>
+    public string MaterialGrade { get; set; } = "";
+
     public double Thickness { get; set; }
 
     /// <summary>quote | toBeCut | hasBeenCut (camelCase on the wire, case-insensitive readers).</summary>

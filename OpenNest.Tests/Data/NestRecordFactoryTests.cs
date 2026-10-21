@@ -34,6 +34,7 @@ public class NestRecordFactoryTests
         NestRecordFactory.ApplyMetadata(nest, current);
         var roundTrip = NestRecordFactory.FromNest(nest, Guid.Empty, 0);
         Assert.Equal(current.Material, roundTrip.Material);
+        Assert.Equal(sameMaterial ? "Test grade" : "", roundTrip.MaterialGrade);
         Assert.Equal(current.Thickness, roundTrip.Thickness);
         Assert.Equal(current.DateCreated, roundTrip.DateCreated);
         Assert.Equal(current.DateModified, roundTrip.DateModified);
@@ -58,7 +59,7 @@ public class NestRecordFactoryTests
         var nest = new Nest("Job 42")
         {
             Customer = "Cozy Cat",
-            Material = new Material("Aluminum"),
+            Material = new Material("Aluminum", "5052"),
             Thickness = 0.125,
             Status = NestStatus.ToBeCut,
             MadeBy = "AJ",
@@ -89,6 +90,7 @@ public class NestRecordFactoryTests
         Assert.Equal("Job 42", record.Name);
         Assert.Equal("Cozy Cat", record.Customer);
         Assert.Equal("Aluminum", record.Material);
+        Assert.Equal("5052", record.MaterialGrade);
         Assert.Equal(0.125, record.Thickness);
         Assert.Equal(NestStatus.ToBeCut, record.Status);
         Assert.Equal("AJ", record.MadeBy);
@@ -111,6 +113,7 @@ public class NestRecordFactoryTests
         Assert.Equal(0, record.PlateCount);
         Assert.Equal(0, record.PartCount);
         Assert.Equal("", record.Material);
+        Assert.Equal("", record.MaterialGrade);
         Assert.Equal("", record.Comments);
         Assert.Equal("", record.MadeBy);
     }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Data;
 
@@ -42,6 +43,10 @@ namespace OpenNest.Forms
             catch (UnauthorizedAccessException) { }
             return machines;
         }
+
+        /// <summary>Every material and grade on file across the readable machine configurations.</summary>
+        public static IEnumerable<MaterialConfig> LoadMaterials() =>
+            LoadMachines().SelectMany(machine => machine.Materials);
         private static bool defaultsWarned;
 
         /// <summary>

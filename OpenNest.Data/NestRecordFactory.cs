@@ -21,7 +21,7 @@ public static class NestRecordFactory
         nest.MadeBy = record.MadeBy;
         nest.DateLastModified = record.DateModified;
         nest.DateCreated = record.DateCreated;
-        nest.Material = NestMaterialSelection.Apply(nest.Material, record.Material);
+        nest.Material = NestMaterialSelection.ApplyRecorded(nest.Material, record.Material, record.MaterialGrade);
         nest.Thickness = record.Thickness;
     }
 
@@ -44,6 +44,7 @@ public static class NestRecordFactory
             DateCreated = nest.DateCreated,
             DateModified = nest.DateLastModified,
             Material = nest.Material?.Name ?? "",
+            MaterialGrade = nest.Material?.Grade ?? "",
             Thickness = nest.Thickness,
             Status = nest.Status,
             // The trailing empty plate is the editor's new-plate slot, not a plate of the nest.

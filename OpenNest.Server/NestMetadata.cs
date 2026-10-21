@@ -51,6 +51,7 @@ internal static class NestMetadata
         if (record.Name is null) return "name must be a string.";
         if (record.Customer is null) return "customer must be a string.";
         if (record.Material is null) return "material must be a string.";
+        if (record.MaterialGrade is null) return "materialGrade must be a string.";
         if (record.Comments is null) return "comments must be a string.";
         if (record.MadeBy is null) return "madeBy must be a string.";
         if (!Enum.IsDefined(record.Status)) return "status must be draft, quote, toBeCut or hasBeenCut.";

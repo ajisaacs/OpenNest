@@ -127,7 +127,7 @@ public sealed class NestSaveSession
 
     private static bool SameEditableMetadata(NestRecord a, NestRecord b) =>
         a.Name == b.Name && a.Customer == b.Customer && a.DateCreated == b.DateCreated
-        && a.DateModified == b.DateModified && a.Material == b.Material && a.Thickness == b.Thickness
-        && a.Status == b.Status && a.PlateCount == b.PlateCount && a.PartCount == b.PartCount
+        && a.DateModified == b.DateModified && a.Material == b.Material && a.MaterialGrade == b.MaterialGrade
+        && a.Thickness == b.Thickness && a.Status == b.Status && a.PlateCount == b.PlateCount && a.PartCount == b.PartCount
         && a.Comments == b.Comments && a.MadeBy == b.MadeBy;
 }

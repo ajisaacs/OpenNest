@@ -149,11 +149,11 @@ public sealed partial class NestDatabase : IDisposable
             command.Transaction = transaction;
             command.CommandText = """
                 INSERT INTO nests (id, name, customer, dateCreated, dateModified, material,
-                    thickness, status, plateCount, partCount, comments, madeBy, fileSize,
-                    savedAt, file)
+                    materialGrade, thickness, status, plateCount, partCount, comments, madeBy,
+                    fileSize, savedAt, file)
                 VALUES ($id, $name, $customer, $dateCreated, $dateModified, $material,
-                    $thickness, $status, $plateCount, $partCount, $comments, $madeBy,
-                    $fileSize, $savedAt, $file)
+                    $materialGrade, $thickness, $status, $plateCount, $partCount, $comments,
+                    $madeBy, $fileSize, $savedAt, $file)
                 """;
             AddRecordParameters(command, id, record, file, updateFile: true);
             command.ExecuteNonQuery();
@@ -199,7 +199,7 @@ public sealed partial class NestDatabase : IDisposable
                 UPDATE nests SET
                     name = $name, customer = $customer, dateCreated = $dateCreated,
                     dateModified = $dateModified, material = $material,
-                    thickness = $thickness, status = $status, plateCount = $plateCount,
+                    materialGrade = $materialGrade, thickness = $thickness, status = $status, plateCount = $plateCount,
                     partCount = $partCount, comments = $comments, madeBy = $madeBy,
                     savedAt = $savedAt, revision = $revision, restoredFromRevision=$source{fileClause}
                 WHERE id = $id
@@ -297,8 +297,8 @@ public sealed partial class NestDatabase : IDisposable
 
     private static bool SameMetadata(NestRecord a, NestRecord b) =>
         a.Name == b.Name && a.Customer == b.Customer && a.DateCreated == b.DateCreated &&
-        a.DateModified == b.DateModified && a.Material == b.Material && a.Thickness == b.Thickness &&
-        a.Status == b.Status && a.PlateCount == b.PlateCount && a.PartCount == b.PartCount &&
+        a.DateModified == b.DateModified && a.Material == b.Material && a.MaterialGrade == b.MaterialGrade &&
+        a.Thickness == b.Thickness && a.Status == b.Status && a.PlateCount == b.PlateCount && a.PartCount == b.PartCount &&
         a.Comments == b.Comments && a.MadeBy == b.MadeBy;
 
     private void Snapshot(Guid id, SqliteTransaction transaction)
@@ -319,7 +319,7 @@ public sealed partial class NestDatabase : IDisposable
             command.Transaction = transaction;
             command.CommandText = "PRAGMA user_version";
             var version = (long)command.ExecuteScalar()!;
-            if (version > 7) throw new InvalidOperationException("Database schema is newer than this server.");
+            if (version > 8) throw new InvalidOperationException("Database schema is newer than this server.");
             if (version == 0)
             {
                 command.CommandText = """
@@ -371,6 +371,21 @@ public sealed partial class NestDatabase : IDisposable
                 command.CommandText = DrawingSetSchema;
                 command.ExecuteNonQuery();
             }
+            if (version < 8)
+            {
+                // Existing records stay blank until saved again; clients keep the archive's grade meanwhile.
+                foreach (var table in new[] { "nests", "nest_revisions" })
+                {
+                    command.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name='materialGrade'";
+                    if ((long)command.ExecuteScalar()! == 0)
+                    {
+                        command.CommandText = $"ALTER TABLE {table} ADD COLUMN materialGrade TEXT NOT NULL DEFAULT ''";
+                        command.ExecuteNonQuery();
+                    }
+                }
+                command.CommandText = "PRAGMA user_version=8";
+                command.ExecuteNonQuery();
+            }
             transaction.Commit();
         }
     }
@@ -408,7 +423,8 @@ public sealed partial class NestDatabase : IDisposable
 
     private const string RecordColumns = """
         id, name, customer, dateCreated, dateModified, material, thickness,
-        status, plateCount, partCount, comments, madeBy, fileSize, savedAt, revision, deleted, restoredFromRevision
+        status, plateCount, partCount, comments, madeBy, fileSize, savedAt, revision, deleted, restoredFromRevision,
+        materialGrade
         """;
 
     // Case-insensitive (ASCII) substring over the text columns and the status's stored
@@ -417,6 +433,7 @@ public sealed partial class NestDatabase : IDisposable
         name LIKE $pattern ESCAPE '\'
             OR customer LIKE $pattern ESCAPE '\'
             OR material LIKE $pattern ESCAPE '\'
+            OR materialGrade LIKE $pattern ESCAPE '\'
             OR madeBy LIKE $pattern ESCAPE '\'
             OR comments LIKE $pattern ESCAPE '\'
             OR status LIKE $pattern ESCAPE '\'
@@ -440,6 +457,7 @@ public sealed partial class NestDatabase : IDisposable
         NestSortField.MadeBy => "madeBy COLLATE NOCASE",
         NestSortField.Comments => "comments COLLATE NOCASE",
         NestSortField.FileSize => "fileSize",
+        NestSortField.MaterialGrade => "materialGrade COLLATE NOCASE",
         _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Unsupported sort column."),
     };
 
@@ -461,6 +479,7 @@ public sealed partial class NestDatabase : IDisposable
         command.Parameters.AddWithValue("$dateCreated", record.DateCreated.ToString("o"));
         command.Parameters.AddWithValue("$dateModified", record.DateModified.ToString("o"));
         command.Parameters.AddWithValue("$material", record.Material);
+        command.Parameters.AddWithValue("$materialGrade", record.MaterialGrade);
         command.Parameters.AddWithValue("$thickness", record.Thickness);
         command.Parameters.AddWithValue("$status", record.Status.ToString());
         command.Parameters.AddWithValue("$plateCount", record.PlateCount);
@@ -498,6 +517,7 @@ public sealed partial class NestDatabase : IDisposable
             Revision = reader.GetInt32(first + 14),
             Deleted = reader.GetInt32(first + 15) != 0,
             RestoredFromRevision = reader.IsDBNull(first + 16) ? null : reader.GetInt32(first + 16),
+            MaterialGrade = reader.GetString(first + 17),
         };
     }
 }

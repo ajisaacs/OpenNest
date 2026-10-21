@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Geometry;
@@ -11,6 +13,8 @@ namespace OpenNest.Forms
         private readonly Timer timer;
         private DateTime dateCreated;
         private DateTime dateLastModified;
+        private List<MaterialConfig> materialCatalog = new();
+        private string gradeMaterialKey = "";
 
         public EditNestInfoForm()
         {
@@ -34,6 +38,7 @@ namespace OpenNest.Forms
             };
             Disposed += (sender, e) => timer.Dispose();
             nameBox.TextChanged += (sender, e) => EnableCheck();
+            materialBox.TextChanged += (sender, e) => RefreshGrades();
             EnableCheck();
         }
 
@@ -142,6 +147,57 @@ namespace OpenNest.Forms
             set { materialBox.Text = value; }
         }
 
+        public string MaterialGrade
+        {
+            get { return gradeBox.Text; }
+            set { gradeBox.Text = value; }
+        }
+
+        /// <summary>
+        /// Offers the machine configurations' materials: their names join the material
+        /// list, and the grade list shows the grades on file for the chosen material.
+        /// </summary>
+        public void SetMaterialCatalog(IEnumerable<MaterialConfig> materials)
+        {
+            materialCatalog = materials.ToList();
+
+            var text = materialBox.Text;
+            var names = materialBox.Items.Cast<string>()
+                .Concat(materialCatalog.Select(m => m.Name))
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .GroupBy(SharedListNames.Key)
+                .Select(group => group.First())
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            materialBox.Items.Clear();
+            materialBox.Items.AddRange(names);
+            materialBox.Text = text;
+            RefreshGrades();
+        }
+
+        /// <summary>
+        /// Lists the grades on file for the typed material. A grade belongs to its
+        /// material, so changing the material clears a grade the new one does not have.
+        /// </summary>
+        private void RefreshGrades()
+        {
+            var text = gradeBox.Text;
+            var key = SharedListNames.Key(materialBox.Text);
+            var grades = materialCatalog
+                .Where(m => SharedListNames.Key(m.Name) == key && !string.IsNullOrWhiteSpace(m.Grade))
+                .Select(m => m.Grade)
+                .GroupBy(SharedListNames.Key)
+                .Select(group => group.First())
+                .OrderBy(grade => grade, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (key != gradeMaterialKey && !grades.Any(grade => SharedListNames.Key(grade) == SharedListNames.Key(text)))
+                text = "";
+            gradeMaterialKey = key;
+            gradeBox.Items.Clear();
+            gradeBox.Items.AddRange(grades);
+            gradeBox.Text = text;
+        }
+
         public NestStatus Status
         {
             get { return statusBox.SelectedItem is NestStatus status ? status : NestStatus.Quote; }
@@ -245,6 +301,7 @@ namespace OpenNest.Forms
             DateLastModified = nest.DateLastModified;
             Thickness = nest.Thickness;
             MaterialName = nest.Material?.Name ?? "";
+            MaterialGrade = nest.Material?.Grade ?? "";
             Status = nest.Status;
             MadeBy = nest.MadeBy ?? "";
             SizeString = nest.PlateDefaults.Size.ToString();
@@ -267,7 +324,7 @@ namespace OpenNest.Forms
             nest.DateCreated = DateCreated;
             nest.DateLastModified = DateLastModified;
             nest.Thickness = Thickness;
-            nest.Material = NestMaterialSelection.Apply(nest.Material, MaterialName);
+            nest.Material = NestMaterialSelection.Apply(nest.Material, MaterialName, MaterialGrade);
             nest.Status = Status;
             nest.MadeBy = MadeBy;
             nest.PlateDefaults.Size = OpenNest.Geometry.Size.Parse(SizeString);

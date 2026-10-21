@@ -64,6 +64,8 @@
             this.label5 = new System.Windows.Forms.Label();
             this.labelMaterial = new System.Windows.Forms.Label();
             this.materialBox = new System.Windows.Forms.ComboBox();
+            this.labelGrade = new System.Windows.Forms.Label();
+            this.gradeBox = new System.Windows.Forms.ComboBox();
             this.labelStatus = new System.Windows.Forms.Label();
             this.statusBox = new System.Windows.Forms.ComboBox();
             this.labelMadeBy = new System.Windows.Forms.Label();
@@ -408,37 +410,40 @@
             this.tableLayoutPanel3.ColumnCount = 2;
             this.tableLayoutPanel3.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             this.tableLayoutPanel3.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this.tableLayoutPanel3.Controls.Add(this.tableLayoutPanel4, 1, 6);
+            this.tableLayoutPanel3.Controls.Add(this.tableLayoutPanel4, 1, 7);
             this.tableLayoutPanel3.Controls.Add(this.label1, 0, 0);
             this.tableLayoutPanel3.Controls.Add(this.nameBox, 1, 0);
-            this.tableLayoutPanel3.Controls.Add(this.label2, 0, 5);
+            this.tableLayoutPanel3.Controls.Add(this.label2, 0, 6);
             this.tableLayoutPanel3.Controls.Add(this.labelThk, 0, 3);
             this.tableLayoutPanel3.Controls.Add(this.thicknessBox, 1, 3);
             this.tableLayoutPanel3.Controls.Add(this.labelMaterial, 0, 4);
             this.tableLayoutPanel3.Controls.Add(this.materialBox, 1, 4);
+            this.tableLayoutPanel3.Controls.Add(this.labelGrade, 0, 5);
+            this.tableLayoutPanel3.Controls.Add(this.gradeBox, 1, 5);
             this.tableLayoutPanel3.Controls.Add(this.label3, 0, 1);
             this.tableLayoutPanel3.Controls.Add(this.label4, 0, 2);
-            this.tableLayoutPanel3.Controls.Add(this.customerBox, 1, 5);
+            this.tableLayoutPanel3.Controls.Add(this.customerBox, 1, 6);
             this.tableLayoutPanel3.Controls.Add(this.textBox1, 1, 1);
             this.tableLayoutPanel3.Controls.Add(this.textBox2, 1, 2);
-            this.tableLayoutPanel3.Controls.Add(this.label5, 0, 6);
-            this.tableLayoutPanel3.Controls.Add(this.labelStatus, 0, 7);
-            this.tableLayoutPanel3.Controls.Add(this.statusBox, 1, 7);
-            this.tableLayoutPanel3.Controls.Add(this.labelMadeBy, 0, 8);
-            this.tableLayoutPanel3.Controls.Add(this.madeByBox, 1, 8);
+            this.tableLayoutPanel3.Controls.Add(this.label5, 0, 7);
+            this.tableLayoutPanel3.Controls.Add(this.labelStatus, 0, 8);
+            this.tableLayoutPanel3.Controls.Add(this.statusBox, 1, 8);
+            this.tableLayoutPanel3.Controls.Add(this.labelMadeBy, 0, 9);
+            this.tableLayoutPanel3.Controls.Add(this.madeByBox, 1, 9);
             this.tableLayoutPanel3.Location = new System.Drawing.Point(6, 6);
             this.tableLayoutPanel3.Name = "tableLayoutPanel3";
-            this.tableLayoutPanel3.RowCount = 9;
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel3.Size = new System.Drawing.Size(362, 280);
+            this.tableLayoutPanel3.RowCount = 10;
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel3.Size = new System.Drawing.Size(362, 311);
             this.tableLayoutPanel3.TabIndex = 0;
             // 
             // tableLayoutPanel4
@@ -532,6 +537,22 @@
             this.materialBox.Name = "materialBox";
             this.materialBox.Size = new System.Drawing.Size(224, 24);
             this.materialBox.TabIndex = 11;
+            //
+            // labelGrade
+            //
+            this.labelGrade.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.labelGrade.AutoSize = true;
+            this.labelGrade.Name = "labelGrade";
+            this.labelGrade.TabIndex = 10;
+            this.labelGrade.Text = "Grade :";
+            //
+            // gradeBox
+            //
+            this.gradeBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.gradeBox.FormattingEnabled = true;
+            this.gradeBox.Name = "gradeBox";
+            this.gradeBox.Size = new System.Drawing.Size(224, 24);
+            this.gradeBox.TabIndex = 11;
             // 
             // labelStatus
             // 
@@ -786,6 +807,8 @@
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.Label labelMaterial;
         private System.Windows.Forms.ComboBox materialBox;
+        private System.Windows.Forms.Label labelGrade;
+        private System.Windows.Forms.ComboBox gradeBox;
         private System.Windows.Forms.Label labelStatus;
         private System.Windows.Forms.ComboBox statusBox;
         private System.Windows.Forms.Label labelMadeBy;

@@ -5,7 +5,7 @@ The desktop app can save nests two ways:
 - **File mode** (default, unchanged behavior): Save/Save As write a `.nest` ZIP
   archive to disk via the normal file dialog. See [nest-file-format.md](nest-file-format.md).
 - **Database mode**: Open browses server records 100 at a time. The Find box
-  searches name, customer, material, made by, comments and status on the server
+  searches name, customer, material, grade, made by, comments and status on the server
   after a short typing pause (Enter in the box searches at once); clicking a
   column header sorts every match on the server (click again to reverse); the
   arrow buttons move between pages and the title and find bar show the range and
@@ -77,7 +77,8 @@ so upgrade the server before desktops that can set it.
 | `name` | string | |
 | `customer` | string | |
 | `dateCreated` / `dateModified` | datetime | Set by the client from the nest's own metadata. |
-| `material` | string | |
+| `material` | string | Material name (type), e.g. `Stainless`. |
+| `materialGrade` | string | Optional; default blank. Older servers drop it. A blank grade on a record saved before schema v8 is treated as unrecorded: opening keeps the archive's grade while the material name matches. |
 | `thickness` | number | |
 | `status` | `"draft"` \| `"quote"` \| `"toBeCut"` \| `"hasBeenCut"` | Default `quote`. |
 | `plateCount` / `partCount` | integer | Computed client-side at save time (non-cutoff parts only). |
@@ -163,13 +164,13 @@ only the requested page of metadata (never archive bytes):
 - `search` (optional): trimmed, at most 200 characters, no NUL characters;
   blank means no filter.
   Case-insensitive substring of the whole text in `name`, `customer`, `material`,
-  `madeBy`, `comments` or the status (`ToBeCut` or the display name `To Be Cut`).
+  `materialGrade`, `madeBy`, `comments` or the status (`ToBeCut` or the display name `To Be Cut`).
   `%`, `_` and `\` are literal. Dates and numbers are not matched as text.
   Case folding is ASCII-only (SQLite `LIKE`).
 - `offset` (default 0, at least 0) and `limit` (default 100, 1 to 500).
 - `sort` (default `savedAt`): one of `savedAt`, `name`, `customer`, `status`,
   `material`, `dateCreated`, `dateModified`, `thickness`, `plateCount`,
-  `partCount`, `madeBy`, `comments`, `fileSize` (names, case-insensitive; no
+  `partCount`, `madeBy`, `comments`, `fileSize`, `materialGrade` (names, case-insensitive; no
   numbers). Text columns sort case-insensitively (ASCII); dates sort as their
   stored ISO text. `order` is `asc` or `desc` (default `desc`).
 - Ties are broken by `id` in the same direction, so pages partition the matches
@@ -534,6 +535,11 @@ table is untouched. A server older than
 v7 refuses to open a v7 database, so rolling back needs the pre-upgrade backup.
 The stopped-volume `tar` backup includes the set and release tables; `nest_manifest.py` and
 `restore_check` do not verify them yet.
+
+Schema v8 adds a `materialGrade` text column (default blank) to `nests` and
+`nest_revisions`; existing records keep a blank grade until they are next saved.
+A server older than v8 refuses to open a v8 database, so rolling back needs the
+pre-upgrade backup.
 
 ## Storage
 
