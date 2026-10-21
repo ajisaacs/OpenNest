@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -13,21 +14,24 @@ namespace OpenNest.Forms
 {
     /// <summary>
     /// Creates or edits one drawing set through <see cref="DrawingSetEditSession"/>: name,
-    /// customer, notes and the ordered members with a quantity each. Add Drawings picks from
-    /// the drawing library; a drawing already in the set is not added twice. Saving adds a
-    /// revision on the server, guarded by the revision the set was read at.
+    /// customer, notes and the ordered members with a quantity each. The drawing library is
+    /// browsed in the left pane (every active drawing, a page at a time through
+    /// <see cref="DrawingLibraryBrowseSession"/>); Add to Set, a double-click or Enter adds the
+    /// selected drawings at the entered quantity, and a drawing already in the set is greyed
+    /// and not added twice. Saving adds a revision on the server, guarded by the revision the
+    /// set was read at.
     /// </summary>
     public partial class EditDrawingSetForm : Form
     {
+        private const string LoadingText = "Loading...";
+
         private readonly DrawingSetEditSession session;
+        private readonly DrawingLibraryBrowseSession librarySession;
         private bool loading;
         private bool saving;
 
         /// <summary>Shows a message and returns the operator's answer; replaced by tests.</summary>
         internal Func<string, MessageBoxButtons, MessageBoxIcon, DialogResult> ShowMessage { get; set; }
-
-        /// <summary>Picks library drawings and the quantity to add them with (none when cancelled); replaced by tests.</summary>
-        internal Func<(IReadOnlyList<DrawingLibraryRecord> Drawings, int Quantity)> PickDrawings { get; set; }
 
         /// <summary>The saved revision once the dialog closes with OK; otherwise null.</summary>
         public DrawingSetRecord Saved { get; private set; }
@@ -37,16 +41,20 @@ namespace OpenNest.Forms
             InitializeComponent();
             this.session = session ?? throw new ArgumentNullException(nameof(session));
             ArgumentNullException.ThrowIfNull(library);
+            // A set mixes materials and thicknesses, so the library is never filtered to a nest.
+            librarySession = new DrawingLibraryBrowseSession(library, new Nest());
+            Disposed += (_, _) => librarySession.Dispose();
             ShowMessage = (text, buttons, icon) => MessageBox.Show(this, text, Text, buttons, icon);
-            PickDrawings = () =>
-            {
-                using var form = new DrawingLibraryForm(library, serverUrl);
-                return form.ShowDialog(this) == DialogResult.OK
-                    ? (form.PickedDrawings, form.PickedQuantity)
-                    : (Array.Empty<DrawingLibraryRecord>(), 0);
-            };
 
             GridStyle.Apply(memberGrid);
+            GridStyle.Apply(libraryGrid);
+            libraryNameColumn.Tag = DrawingSortField.Name;
+            libraryMaterialColumn.Tag = DrawingSortField.MaterialName;
+            libraryGradeColumn.Tag = DrawingSortField.MaterialGrade;
+            libraryThicknessColumn.Tag = DrawingSortField.Thickness;
+            libraryCustomerColumn.Tag = DrawingSortField.Customer;
+            quantityBox.Maximum = DrawingSetRules.MaxQuantity;
+            libraryGroup.Text = string.IsNullOrEmpty(serverUrl) ? "Drawing library" : $"Drawing library — {serverUrl}";
             loading = true;
             nameBox.Text = session.Name;
             customerBox.Text = session.Customer;
@@ -113,7 +121,54 @@ namespace OpenNest.Forms
         // Validation refuses bad text before it is parsed; never show the grid's own error dialog.
         private void MemberGrid_DataError(object sender, DataGridViewDataErrorEventArgs e) => e.ThrowException = false;
 
-        private void AddButton_Click(object sender, EventArgs e) => AddDrawings();
+        private async void EditDrawingSetForm_Shown(object sender, EventArgs e) =>
+            await RunLibraryAsync(librarySession.RefreshAsync);
+
+        private void SearchBox_TextChanged(object sender, EventArgs e)
+        {
+            searchTimer.Stop();
+            searchTimer.Start();
+        }
+
+        private async void SearchTimer_Tick(object sender, EventArgs e)
+        {
+            searchTimer.Stop();
+            await RunLibraryAsync(() => librarySession.SetSearchAsync(searchBox.Text));
+        }
+
+        private async void LibraryGrid_ColumnHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e)
+        {
+            // Sorting a page locally would misrepresent the library; the server sorts all matches.
+            if (e.Button == MouseButtons.Left && libraryGrid.Columns[e.ColumnIndex].Tag is DrawingSortField field)
+                await RunLibraryAsync(() => librarySession.SortByAsync(field));
+        }
+
+        private async void PreviousButton_Click(object sender, EventArgs e) =>
+            await RunLibraryAsync(librarySession.PreviousPageAsync);
+
+        private async void NextButton_Click(object sender, EventArgs e) =>
+            await RunLibraryAsync(librarySession.NextPageAsync);
+
+        private void LibraryGrid_SelectionChanged(object sender, EventArgs e) => UpdateAddCommand();
+
+        private void LibraryGrid_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0)
+                AddSelectedDrawings();
+        }
+
+        private void AddButton_Click(object sender, EventArgs e) => AddSelectedDrawings();
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.Enter && libraryGrid.ContainsFocus && SelectedLibraryDrawings().Count > 0)
+            {
+                AddSelectedDrawings();
+                return true;
+            }
+
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
 
         private void RemoveButton_Click(object sender, EventArgs e)
         {
@@ -138,23 +193,121 @@ namespace OpenNest.Forms
             UpdateCommands();
         }
 
-        /// <summary>Adds the drawings picked from the library, skipping those already in the set.</summary>
-        internal void AddDrawings()
+        /// <summary>
+        /// Adds the drawings selected in the library pane, in list order, at the entered
+        /// quantity, skipping those already in the set.
+        /// </summary>
+        internal void AddSelectedDrawings()
         {
-            if (saving || !memberGrid.EndEdit())
-                return;
-            var (drawings, quantity) = PickDrawings();
-            if (drawings == null || drawings.Count == 0 || IsDisposed)
+            var drawings = SelectedLibraryDrawings();
+            if (saving || drawings.Count == 0 || !memberGrid.EndEdit())
                 return;
 
-            var result = session.AddDrawings(drawings, quantity);
+            var result = session.AddDrawings(drawings, (int)quantityBox.Value);
             Populate(result.Added.Count > 0 ? session.Members.Count - 1 : SelectedIndex());
             UpdateCommands();
-            var added = result.Added.Count == 1 ? $"Added '{result.Added[0].Name}'." : $"Added {result.Added.Count} drawings.";
+            var added = result.Added.Count switch
+            {
+                0 => "Nothing added.",
+                1 => $"Added '{result.Added[0].Name}'.",
+                _ => $"Added {result.Added.Count} drawings.",
+            };
             statusLabel.Text = result.AlreadyMembers.Count == 0
                 ? added
                 : $"{added} Already in the set: {string.Join(", ", result.AlreadyMembers.Select(d => $"'{d.Name}'"))}.";
         }
+
+        // Every selected row in list order; the current row alone when nothing is selected.
+        private IReadOnlyList<DrawingLibraryRecord> SelectedLibraryDrawings()
+        {
+            var picked = libraryGrid.SelectedRows.Cast<DataGridViewRow>()
+                .OrderBy(row => row.Index)
+                .Select(row => row.Tag as DrawingLibraryRecord)
+                .Where(record => record != null)
+                .ToList();
+            if (picked.Count == 0 && libraryGrid.CurrentRow?.Tag is DrawingLibraryRecord current)
+                picked.Add(current);
+            return picked;
+        }
+
+        private async Task RunLibraryAsync(Func<Task<bool>> request)
+        {
+            librarySummaryLabel.Text = LoadingText;
+            try
+            {
+                var started = request();
+                UpdateLibraryNavigation();
+                if (await started && !IsDisposed)
+                    PopulateLibrary(librarySession.Page);
+            }
+            catch (Exception ex)
+            {
+                if (!IsDisposed)
+                {
+                    libraryGrid.Rows.Clear();
+                    librarySummaryLabel.Text = ex is ServerTooOldException
+                        ? ex.Message
+                        : $"Could not load the drawing library: {ex.Message}";
+                }
+            }
+            finally
+            {
+                if (!IsDisposed)
+                {
+                    UpdateLibraryNavigation();
+                    // A request that was declined or superseded renders nothing of its own.
+                    if (!librarySession.IsLoading && librarySummaryLabel.Text == LoadingText)
+                        librarySummaryLabel.Text = librarySession.Summary;
+                    UpdateAddCommand();
+                }
+            }
+        }
+
+        private void PopulateLibrary(DrawingLibraryPage page)
+        {
+            libraryGrid.Rows.Clear();
+            foreach (var record in page?.Items ?? Array.Empty<DrawingLibraryRecord>())
+            {
+                var index = libraryGrid.Rows.Add(
+                    record.Name,
+                    record.MaterialName,
+                    record.MaterialGrade,
+                    record.Thickness.ToString("0.####", CultureInfo.CurrentCulture),
+                    record.Customer);
+                libraryGrid.Rows[index].Tag = record;
+            }
+
+            foreach (DataGridViewColumn column in libraryGrid.Columns)
+            {
+                column.HeaderCell.SortGlyphDirection = column.Tag is DrawingSortField field && field == librarySession.Sort
+                    ? librarySession.Descending ? SortOrder.Descending : SortOrder.Ascending
+                    : SortOrder.None;
+            }
+
+            MarkMembersInLibrary();
+            UpdateAddCommand();
+        }
+
+        // Greys the library rows already in the set, so what is left to add stands out.
+        private void MarkMembersInLibrary()
+        {
+            var members = session.Members.Select(m => m.DrawingId).ToHashSet();
+            foreach (DataGridViewRow row in libraryGrid.Rows)
+            {
+                var inSet = row.Tag is DrawingLibraryRecord record && members.Contains(record.Id);
+                row.DefaultCellStyle.ForeColor = inSet ? SystemColors.GrayText : Color.Empty;
+                row.Cells[libraryNameColumn.Index].ToolTipText = inSet ? "Already in this set" : "";
+            }
+        }
+
+        private void UpdateLibraryNavigation()
+        {
+            previousButton.Enabled = !librarySession.IsLoading && librarySession.CanGoPrevious;
+            nextButton.Enabled = !librarySession.IsLoading && librarySession.CanGoNext;
+        }
+
+        private void UpdateAddCommand() =>
+            addButton.Enabled = !saving && SelectedLibraryDrawings().Count > 0;
 
         private async void SaveButton_Click(object sender, EventArgs e) => await SaveAsync();
 
@@ -237,9 +390,10 @@ namespace OpenNest.Forms
             else
                 memberGrid.ClearSelection();
 
+            MarkMembersInLibrary();
             var parts = session.Members.Sum(m => (long)m.Quantity);
             summaryLabel.Text = session.Members.Count == 0
-                ? "No drawings yet. Choose Add Drawings to pick them from the library."
+                ? "No drawings yet. Select drawings in the library on the left and choose Add to Set."
                 : $"{session.Members.Count:N0} drawing{(session.Members.Count == 1 ? "" : "s")}, {parts:N0} part{(parts == 1 ? "" : "s")} per kit";
         }
 
@@ -260,7 +414,7 @@ namespace OpenNest.Forms
         {
             var index = SelectedIndex();
             var error = session.GetError();
-            addButton.Enabled = !saving;
+            UpdateAddCommand();
             removeButton.Enabled = !saving && index >= 0;
             upButton.Enabled = !saving && index > 0;
             downButton.Enabled = !saving && index >= 0 && index < session.Members.Count - 1;

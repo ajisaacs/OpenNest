@@ -22,11 +22,6 @@ namespace OpenNest.Forms
     /// rotation, color) on the server as a new revision with the same package. With a set
     /// store, the Sets tab browses and edits drawing sets (<see cref="Controls.DrawingSetBrowser"/>),
     /// and the drawing grid's menu lists the sets a drawing is in and adds it to a set.
-    /// <para>
-    /// Opened without a nest it picks drawings for a drawing set instead: every active
-    /// drawing is listed, several may be selected, and Add to Set closes the dialog with
-    /// <see cref="PickedDrawings"/>.
-    /// </para>
     /// </summary>
     public partial class DrawingLibraryForm : Form
     {
@@ -54,15 +49,6 @@ namespace OpenNest.Forms
         /// <summary>Shows the set editor and returns the saved record, or null; replaced by tests.</summary>
         internal Func<DrawingSetEditSession, DrawingSetRecord> EditSet { get; set; }
 
-        /// <summary>In pick mode, the drawings chosen, in list order, once the dialog closes with OK.</summary>
-        public IReadOnlyList<DrawingLibraryRecord> PickedDrawings { get; private set; } = Array.Empty<DrawingLibraryRecord>();
-
-        /// <summary>In pick mode, the quantity entered for the picked drawings.</summary>
-        public int PickedQuantity { get; private set; }
-
-        /// <summary>True when the dialog picks drawings for a set rather than adding them to a nest.</summary>
-        public bool IsPickMode => nest == null;
-
         /// <summary>
         /// The library drawings this dialog added or raised the quantity of, in order. The
         /// dialog stays open after each add, so callers check this rather than the dialog result.
@@ -71,25 +57,13 @@ namespace OpenNest.Forms
 
         /// <param name="sets">Enables Used in Sets and Add to Set; null hides them.</param>
         public DrawingLibraryForm(IDrawingLibraryStore library, string serverUrl, Nest nest, IDrawingSetStore sets = null)
-            : this(library, serverUrl, nest ?? throw new ArgumentNullException(nameof(nest)), sets, pick: false)
-        {
-        }
-
-        /// <summary>Picks drawings for a drawing set (see <see cref="PickedDrawings"/>).</summary>
-        public DrawingLibraryForm(IDrawingLibraryStore library, string serverUrl)
-            : this(library, serverUrl, null, null, pick: true)
-        {
-        }
-
-        private DrawingLibraryForm(IDrawingLibraryStore library, string serverUrl, Nest nest, IDrawingSetStore sets, bool pick)
         {
             InitializeComponent();
             this.library = library ?? throw new ArgumentNullException(nameof(library));
             this.serverUrl = serverUrl ?? "";
-            this.nest = nest;
+            this.nest = nest ?? throw new ArgumentNullException(nameof(nest));
             this.sets = sets;
-            // Without a nest there is no material or thickness to filter by.
-            session = new DrawingLibraryBrowseSession(library, nest ?? new Nest());
+            session = new DrawingLibraryBrowseSession(library, nest);
             ShowMessage = (text, buttons, icon) => MessageBox.Show(this, text, Text, buttons, icon);
             EditDrawing = edit =>
             {
@@ -117,18 +91,9 @@ namespace OpenNest.Forms
             revisionColumn.Tag = DrawingSortField.Revision;
             savedColumn.Tag = DrawingSortField.SavedAt;
 
-            if (pick)
-            {
-                Text = $"Add Drawings to Set — {this.serverUrl}";
-                addButton.Text = "Add to Set";
-                drawingGrid.MultiSelect = true;
-            }
-            else
-            {
-                Text = $"Add from Drawing Library — {this.serverUrl}";
-            }
+            Text = $"Add from Drawing Library — {this.serverUrl}";
 
-            if (sets != null && !pick)
+            if (sets != null)
             {
                 drawingGrid.ContextMenuStrip = drawingMenu;
                 setBrowser.Initialize(sets, library, this.serverUrl);
@@ -376,12 +341,6 @@ namespace OpenNest.Forms
         /// </summary>
         internal async Task AddSelectedAsync()
         {
-            if (IsPickMode)
-            {
-                PickSelected();
-                return;
-            }
-
             var record = SelectedRecord();
             if (record == null || adding)
                 return;
@@ -448,25 +407,6 @@ namespace OpenNest.Forms
                 if (!IsDisposed)
                     UpdateCommands();
             }
-        }
-
-        // Pick mode: closes with every selected drawing, in list order.
-        private void PickSelected()
-        {
-            var picked = drawingGrid.SelectedRows.Cast<DataGridViewRow>()
-                .OrderBy(row => row.Index)
-                .Select(row => row.Tag as DrawingLibraryRecord)
-                .Where(record => record != null)
-                .ToList();
-            if (picked.Count == 0 && SelectedRecord() is { } current)
-                picked.Add(current);
-            if (picked.Count == 0)
-                return;
-
-            PickedDrawings = picked;
-            PickedQuantity = (int)quantityBox.Value;
-            DialogResult = DialogResult.OK;
-            Close();
         }
 
         private void Fail(string message)
@@ -555,12 +495,6 @@ namespace OpenNest.Forms
 
         private void UpdateFilterLabel(bool showAll = false)
         {
-            if (IsPickMode)
-            {
-                filterLabel.Text = "Showing every drawing. Select several with Ctrl or Shift.";
-                return;
-            }
-
             if (!session.IsFilteredToNest && !showAll)
             {
                 filterLabel.Text = "This nest has no material or thickness; showing every drawing.";

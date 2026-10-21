@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
 using OpenNest.Data;
@@ -31,14 +32,17 @@ public class DrawingSetFormsTests
                 {
                     using var editor = new EditDrawingSetForm(edit, library, Server);
                     editor.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
-                    editor.PickDrawings = () => (new[] { bracket, gusset }, 3);
                     editor.Show();
                     var save = Field<Button>(editor, "saveButton");
+                    var libraryGrid = Field<DataGridView>(editor, "libraryGrid");
+                    PumpUntil(() => libraryGrid.Rows.Count == 2, "the editor's library pane");
                     Assert.False(save.Enabled);
 
                     Field<TextBox>(editor, "nameBox").Text = "Synthetic kit";
                     Field<TextBox>(editor, "customerBox").Text = "Synthetic customer";
-                    editor.AddDrawings();
+                    libraryGrid.SelectAll();
+                    Field<NumericUpDown>(editor, "quantityBox").Value = 3;
+                    editor.AddSelectedDrawings();
                     Assert.True(save.Enabled);
                     Run(editor.SaveAsync());
                     return editor.Saved;
@@ -67,36 +71,58 @@ public class DrawingSetFormsTests
     }
 
     [Fact]
-    public void PickMode_HasNoSetsTab_AndReturnsEverySelectedDrawingInListOrder()
+    public void EditorLibraryPane_ListsEveryDrawing_AddsTheSelectionInListOrder_AndGreysMembers()
     {
         StaTestThread.Run(
             () =>
             {
                 var library = new FakeLibrary();
                 var a = library.Add("SYN-A", "Synthetic Steel", 0.25);
-                library.Add("SYN-B", "Synthetic Steel", 0.25);
+                var b = library.Add("SYN-B", "Synthetic Aluminum", 0.125);
                 var c = library.Add("SYN-C", "Synthetic Steel", 0.25);
+                var sets = new InMemoryDrawingSets();
+                var created = Run(sets.CreateAsync(new DrawingSetRecord
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Synthetic kit",
+                    Members = new[] { new DrawingSetMember { DrawingId = b.Id, Quantity = 2, Drawing = b } },
+                }));
 
-                using var form = new DrawingLibraryForm(library, Server);
-                form.Show();
-                var grid = Field<DataGridView>(form, "drawingGrid");
-                PumpUntil(() => grid.Rows.Count == 3, "the unfiltered library page");
+                using var editor = new EditDrawingSetForm(new DrawingSetEditSession(sets, created, "Synthetic operator"), library, Server);
+                editor.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                editor.Show();
+                var libraryGrid = Field<DataGridView>(editor, "libraryGrid");
+                var memberGrid = Field<DataGridView>(editor, "memberGrid");
+                var add = Field<Button>(editor, "addButton");
+                PumpUntil(() => libraryGrid.Rows.Count == 3, "the unfiltered library page");
 
-                Assert.True(form.IsPickMode);
-                Assert.Single(Field<TabControl>(form, "tabControl").TabPages);
                 Assert.Equal(("", "", (double?)null), (library.Queries[0].MaterialName, library.Queries[0].MaterialGrade, library.Queries[0].Thickness));
-                grid.ClearSelection();
-                grid.Rows[2].Selected = true;
-                grid.Rows[0].Selected = true;
-                Field<NumericUpDown>(form, "quantityBox").Value = 4;
-                Run(form.AddSelectedAsync());
+                Assert.Equal(SystemColors.GrayText, libraryGrid.Rows[1].DefaultCellStyle.ForeColor);
+                Assert.Equal(Color.Empty, libraryGrid.Rows[0].DefaultCellStyle.ForeColor);
 
-                Assert.Equal(DialogResult.OK, form.DialogResult);
-                Assert.Equal(new[] { a, c }, form.PickedDrawings);
-                Assert.Equal(4, form.PickedQuantity);
+                libraryGrid.ClearSelection();
+                libraryGrid.Rows[2].Selected = true;
+                libraryGrid.Rows[1].Selected = true;
+                libraryGrid.Rows[0].Selected = true;
+                Assert.True(add.Enabled);
+                Field<NumericUpDown>(editor, "quantityBox").Value = 4;
+                editor.AddSelectedDrawings();
+
+                Assert.Equal(new[] { ("SYN-B", 2), ("SYN-A", 4), ("SYN-C", 4) },
+                    memberGrid.Rows.Cast<DataGridViewRow>().Select(r => ((string)r.Cells["drawingColumn"].Value, (int)r.Cells["quantityColumn"].Value)));
+                Assert.Contains("Already in the set: 'SYN-B'", Field<Label>(editor, "statusLabel").Text);
+                Assert.All(libraryGrid.Rows.Cast<DataGridViewRow>(), r => Assert.Equal(SystemColors.GrayText, r.DefaultCellStyle.ForeColor));
+
+                memberGrid.CurrentCell = memberGrid.Rows[1].Cells["drawingColumn"];
+                Field<Button>(editor, "removeButton").PerformClick();
+                Assert.Equal(Color.Empty, libraryGrid.Rows[0].DefaultCellStyle.ForeColor);
+
+                Run(editor.SaveAsync());
+                var stored = sets.Current.Single();
+                Assert.Equal(new[] { (b.Id, 2), (c.Id, 4) }, stored.Members.Select(m => (m.DrawingId, m.Quantity)));
             },
             TestTimeout,
-            "The pick mode test did not complete.");
+            "The editor library pane test did not complete.");
     }
 
     [Fact]
