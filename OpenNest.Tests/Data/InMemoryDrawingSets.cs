@@ -165,8 +165,19 @@ internal sealed class InMemoryDrawingSets : IDrawingSetStore
         });
     }
 
-    public Task<SetReleaseRecord> UndoReleaseAsync(Guid id, SetReleaseUndoRequest request, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("The in-memory store does not hold nests, so it cannot undo a release.");
+    /// <summary>Every undo request, in order.</summary>
+    public List<(Guid Id, SetReleaseUndoRequest Request)> UndoRequests { get; } = new();
+
+    /// <summary>Answers an undo; this store holds no nests, so a test decides what the server says.</summary>
+    public Func<Guid, SetReleaseUndoRequest, SetReleaseRecord>? UndoHandler { get; set; }
+
+    public Task<SetReleaseRecord> UndoReleaseAsync(Guid id, SetReleaseUndoRequest request, CancellationToken cancellationToken = default)
+    {
+        UndoRequests.Add((id, new SetReleaseUndoRequest { UndoneBy = request.UndoneBy, SkipNests = request.SkipNests.ToList() }));
+        return UndoHandler is { } handler
+            ? Task.FromResult(handler(id, request))
+            : throw new NotSupportedException("The in-memory store does not hold nests, so it cannot undo a release.");
+    }
 
     private Task<DrawingSetRecord> SetArchived(Guid id, int expectedRevision, bool archived)
     {

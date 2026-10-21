@@ -9,6 +9,7 @@ namespace OpenNest.Forms
             if (disposing)
             {
                 cancellation?.Dispose();
+                searchCancellation?.Dispose();
                 if (components != null)
                     components.Dispose();
             }
@@ -19,12 +20,21 @@ namespace OpenNest.Forms
 
         private void InitializeComponent()
         {
+            components = new System.ComponentModel.Container();
             System.Windows.Forms.DataGridViewCellStyle rightAligned = new System.Windows.Forms.DataGridViewCellStyle();
             layoutTable = new System.Windows.Forms.TableLayoutPanel();
             setLabel = new System.Windows.Forms.Label();
+            addSetTable = new System.Windows.Forms.TableLayoutPanel();
+            addSetLabel = new System.Windows.Forms.Label();
+            addSetCombo = new System.Windows.Forms.ComboBox();
+            addSetButton = new System.Windows.Forms.Button();
+            removeSetButton = new System.Windows.Forms.Button();
+            setGrid = new System.Windows.Forms.DataGridView();
+            setNameColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            setCustomerColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            setRevisionColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            kitsColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             optionsTable = new System.Windows.Forms.TableLayoutPanel();
-            multiplierLabel = new System.Windows.Forms.Label();
-            multiplierBox = new System.Windows.Forms.NumericUpDown();
             includeArchivedCheckBox = new System.Windows.Forms.CheckBox();
             notesLabel = new System.Windows.Forms.Label();
             notesBox = new System.Windows.Forms.TextBox();
@@ -37,6 +47,7 @@ namespace OpenNest.Forms
             cutTypeColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             drawingsColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             partsColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            targetColumn = new System.Windows.Forms.DataGridViewComboBoxColumn();
             statusColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             skippedLabel = new System.Windows.Forms.Label();
             bottomTable = new System.Windows.Forms.TableLayoutPanel();
@@ -44,9 +55,11 @@ namespace OpenNest.Forms
             releaseButton = new System.Windows.Forms.Button();
             closeButton = new System.Windows.Forms.Button();
             statusLabel = new System.Windows.Forms.Label();
+            searchTimer = new System.Windows.Forms.Timer(components);
             layoutTable.SuspendLayout();
+            addSetTable.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)setGrid).BeginInit();
             optionsTable.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)multiplierBox).BeginInit();
             ((System.ComponentModel.ISupportInitialize)groupGrid).BeginInit();
             bottomTable.SuspendLayout();
             SuspendLayout();
@@ -56,23 +69,27 @@ namespace OpenNest.Forms
             layoutTable.ColumnCount = 1;
             layoutTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             layoutTable.Controls.Add(setLabel, 0, 0);
-            layoutTable.Controls.Add(optionsTable, 0, 1);
-            layoutTable.Controls.Add(groupGrid, 0, 2);
-            layoutTable.Controls.Add(skippedLabel, 0, 3);
-            layoutTable.Controls.Add(bottomTable, 0, 4);
-            layoutTable.Controls.Add(statusLabel, 0, 5);
+            layoutTable.Controls.Add(addSetTable, 0, 1);
+            layoutTable.Controls.Add(setGrid, 0, 2);
+            layoutTable.Controls.Add(optionsTable, 0, 3);
+            layoutTable.Controls.Add(groupGrid, 0, 4);
+            layoutTable.Controls.Add(skippedLabel, 0, 5);
+            layoutTable.Controls.Add(bottomTable, 0, 6);
+            layoutTable.Controls.Add(statusLabel, 0, 7);
             layoutTable.Dock = System.Windows.Forms.DockStyle.Fill;
             layoutTable.Location = new System.Drawing.Point(0, 0);
             layoutTable.Name = "layoutTable";
             layoutTable.Padding = new System.Windows.Forms.Padding(8);
-            layoutTable.RowCount = 6;
+            layoutTable.RowCount = 8;
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 130F));
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            layoutTable.Size = new System.Drawing.Size(944, 521);
+            layoutTable.Size = new System.Drawing.Size(1104, 661);
             layoutTable.TabIndex = 0;
             //
             // setLabel
@@ -84,55 +101,136 @@ namespace OpenNest.Forms
             setLabel.Name = "setLabel";
             setLabel.Size = new System.Drawing.Size(100, 20);
             setLabel.TabIndex = 0;
+            setLabel.Text = "Sets to release";
+            //
+            // addSetTable
+            //
+            addSetTable.AutoSize = true;
+            addSetTable.ColumnCount = 4;
+            addSetTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            addSetTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 360F));
+            addSetTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            addSetTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            addSetTable.Controls.Add(addSetLabel, 0, 0);
+            addSetTable.Controls.Add(addSetCombo, 1, 0);
+            addSetTable.Controls.Add(addSetButton, 2, 0);
+            addSetTable.Controls.Add(removeSetButton, 3, 0);
+            addSetTable.Dock = System.Windows.Forms.DockStyle.Fill;
+            addSetTable.Margin = new System.Windows.Forms.Padding(0, 0, 0, 3);
+            addSetTable.Name = "addSetTable";
+            addSetTable.RowCount = 1;
+            addSetTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            addSetTable.TabIndex = 1;
+            //
+            // addSetLabel
+            //
+            addSetLabel.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            addSetLabel.AutoSize = true;
+            addSetLabel.Name = "addSetLabel";
+            addSetLabel.TabIndex = 0;
+            addSetLabel.Text = "Add a set:";
+            //
+            // addSetCombo
+            //
+            addSetCombo.Dock = System.Windows.Forms.DockStyle.Fill;
+            addSetCombo.Name = "addSetCombo";
+            addSetCombo.TabIndex = 1;
+            addSetCombo.TextUpdate += AddSetCombo_TextUpdate;
+            addSetCombo.KeyDown += AddSetCombo_KeyDown;
+            //
+            // addSetButton
+            //
+            addSetButton.AutoSize = true;
+            addSetButton.Name = "addSetButton";
+            addSetButton.TabIndex = 2;
+            addSetButton.Text = "Add";
+            addSetButton.UseVisualStyleBackColor = true;
+            addSetButton.Click += AddSetButton_Click;
+            //
+            // removeSetButton
+            //
+            removeSetButton.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            removeSetButton.AutoSize = true;
+            removeSetButton.Name = "removeSetButton";
+            removeSetButton.TabIndex = 3;
+            removeSetButton.Text = "Remove Set";
+            removeSetButton.UseVisualStyleBackColor = true;
+            removeSetButton.Click += RemoveSetButton_Click;
+            //
+            // setGrid
+            //
+            setGrid.AllowUserToAddRows = false;
+            setGrid.AllowUserToDeleteRows = false;
+            setGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { setNameColumn, setCustomerColumn, setRevisionColumn, kitsColumn });
+            setGrid.Dock = System.Windows.Forms.DockStyle.Fill;
+            setGrid.Margin = new System.Windows.Forms.Padding(3, 3, 3, 6);
+            setGrid.MultiSelect = false;
+            setGrid.Name = "setGrid";
+            setGrid.RowHeadersVisible = false;
+            setGrid.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            setGrid.StandardTab = true;
+            setGrid.TabIndex = 2;
+            setGrid.CellValidating += SetGrid_CellValidating;
+            setGrid.CellValueChanged += SetGrid_CellValueChanged;
+            setGrid.SelectionChanged += SetGrid_SelectionChanged;
+            //
+            // setNameColumn
+            //
+            setNameColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            setNameColumn.HeaderText = "Set";
+            setNameColumn.Name = "setNameColumn";
+            setNameColumn.ReadOnly = true;
+            setNameColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            //
+            // setCustomerColumn
+            //
+            setCustomerColumn.HeaderText = "Customer";
+            setCustomerColumn.Name = "setCustomerColumn";
+            setCustomerColumn.ReadOnly = true;
+            setCustomerColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            setCustomerColumn.Width = 200;
+            //
+            // setRevisionColumn
+            //
+            setRevisionColumn.DefaultCellStyle = rightAligned;
+            setRevisionColumn.HeaderText = "Revision";
+            setRevisionColumn.Name = "setRevisionColumn";
+            setRevisionColumn.ReadOnly = true;
+            setRevisionColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            setRevisionColumn.Width = 75;
+            //
+            // kitsColumn
+            //
+            kitsColumn.DefaultCellStyle = rightAligned;
+            kitsColumn.HeaderText = "Kits";
+            kitsColumn.Name = "kitsColumn";
+            kitsColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            kitsColumn.ToolTipText = "How many of this set to release: every quantity in the set is multiplied by it.";
+            kitsColumn.Width = 70;
             //
             // optionsTable
             //
             optionsTable.AutoSize = true;
-            optionsTable.ColumnCount = 5;
-            optionsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
-            optionsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            optionsTable.ColumnCount = 3;
             optionsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             optionsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             optionsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            optionsTable.Controls.Add(multiplierLabel, 0, 0);
-            optionsTable.Controls.Add(multiplierBox, 1, 0);
-            optionsTable.Controls.Add(includeArchivedCheckBox, 2, 0);
-            optionsTable.Controls.Add(notesLabel, 3, 0);
-            optionsTable.Controls.Add(notesBox, 4, 0);
+            optionsTable.Controls.Add(includeArchivedCheckBox, 0, 0);
+            optionsTable.Controls.Add(notesLabel, 1, 0);
+            optionsTable.Controls.Add(notesBox, 2, 0);
             optionsTable.Dock = System.Windows.Forms.DockStyle.Fill;
             optionsTable.Margin = new System.Windows.Forms.Padding(0, 0, 0, 6);
             optionsTable.Name = "optionsTable";
             optionsTable.RowCount = 1;
             optionsTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            optionsTable.TabIndex = 1;
-            //
-            // multiplierLabel
-            //
-            multiplierLabel.Anchor = System.Windows.Forms.AnchorStyles.Left;
-            multiplierLabel.AutoSize = true;
-            multiplierLabel.Name = "multiplierLabel";
-            multiplierLabel.TabIndex = 0;
-            multiplierLabel.Text = "Kits (multiplier):";
-            //
-            // multiplierBox
-            //
-            multiplierBox.Anchor = System.Windows.Forms.AnchorStyles.Left;
-            multiplierBox.Maximum = new decimal(new int[] { 1000, 0, 0, 0 });
-            multiplierBox.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            multiplierBox.Name = "multiplierBox";
-            multiplierBox.Size = new System.Drawing.Size(70, 25);
-            multiplierBox.TabIndex = 1;
-            multiplierBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
-            multiplierBox.Value = new decimal(new int[] { 1, 0, 0, 0 });
-            multiplierBox.ValueChanged += Options_Changed;
+            optionsTable.TabIndex = 3;
             //
             // includeArchivedCheckBox
             //
             includeArchivedCheckBox.Anchor = System.Windows.Forms.AnchorStyles.Left;
             includeArchivedCheckBox.AutoSize = true;
-            includeArchivedCheckBox.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
             includeArchivedCheckBox.Name = "includeArchivedCheckBox";
-            includeArchivedCheckBox.TabIndex = 2;
+            includeArchivedCheckBox.TabIndex = 0;
             includeArchivedCheckBox.Text = "Include archived drawings";
             includeArchivedCheckBox.UseVisualStyleBackColor = true;
             includeArchivedCheckBox.CheckedChanged += Options_Changed;
@@ -143,7 +241,7 @@ namespace OpenNest.Forms
             notesLabel.AutoSize = true;
             notesLabel.Margin = new System.Windows.Forms.Padding(12, 0, 3, 0);
             notesLabel.Name = "notesLabel";
-            notesLabel.TabIndex = 3;
+            notesLabel.TabIndex = 1;
             notesLabel.Text = "Release notes:";
             //
             // notesBox
@@ -151,22 +249,24 @@ namespace OpenNest.Forms
             notesBox.Dock = System.Windows.Forms.DockStyle.Fill;
             notesBox.MaxLength = 4000;
             notesBox.Name = "notesBox";
-            notesBox.TabIndex = 4;
+            notesBox.TabIndex = 2;
             //
             // groupGrid
             //
             groupGrid.AllowUserToAddRows = false;
             groupGrid.AllowUserToDeleteRows = false;
-            groupGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { includeColumn, materialColumn, gradeColumn, thicknessColumn, unitsColumn, cutTypeColumn, drawingsColumn, partsColumn, statusColumn });
+            groupGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { includeColumn, materialColumn, gradeColumn, thicknessColumn, unitsColumn, cutTypeColumn, drawingsColumn, partsColumn, targetColumn, statusColumn });
             groupGrid.Dock = System.Windows.Forms.DockStyle.Fill;
+            groupGrid.EditMode = System.Windows.Forms.DataGridViewEditMode.EditOnEnter;
             groupGrid.MultiSelect = false;
             groupGrid.Name = "groupGrid";
             groupGrid.RowHeadersVisible = false;
             groupGrid.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             groupGrid.StandardTab = true;
-            groupGrid.TabIndex = 2;
+            groupGrid.TabIndex = 4;
             groupGrid.CellValueChanged += GroupGrid_CellValueChanged;
             groupGrid.CurrentCellDirtyStateChanged += GroupGrid_CurrentCellDirtyStateChanged;
+            groupGrid.DataError += GroupGrid_DataError;
             //
             // includeColumn
             //
@@ -234,6 +334,16 @@ namespace OpenNest.Forms
             partsColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             partsColumn.Width = 65;
             //
+            // targetColumn
+            //
+            targetColumn.DisplayStyle = System.Windows.Forms.DataGridViewComboBoxDisplayStyle.DropDownButton;
+            targetColumn.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            targetColumn.HeaderText = "Nest";
+            targetColumn.Name = "targetColumn";
+            targetColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            targetColumn.ToolTipText = "Make a new Draft nest, or merge into a Draft nest of the same material and renest it.";
+            targetColumn.Width = 260;
+            //
             // statusColumn
             //
             statusColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
@@ -247,9 +357,9 @@ namespace OpenNest.Forms
             skippedLabel.AutoSize = true;
             skippedLabel.ForeColor = System.Drawing.SystemColors.GrayText;
             skippedLabel.Margin = new System.Windows.Forms.Padding(3, 6, 3, 0);
-            skippedLabel.MaximumSize = new System.Drawing.Size(920, 0);
+            skippedLabel.MaximumSize = new System.Drawing.Size(1080, 0);
             skippedLabel.Name = "skippedLabel";
-            skippedLabel.TabIndex = 3;
+            skippedLabel.TabIndex = 5;
             skippedLabel.Visible = false;
             //
             // bottomTable
@@ -267,7 +377,7 @@ namespace OpenNest.Forms
             bottomTable.Name = "bottomTable";
             bottomTable.RowCount = 1;
             bottomTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            bottomTable.TabIndex = 4;
+            bottomTable.TabIndex = 6;
             //
             // summaryLabel
             //
@@ -302,27 +412,34 @@ namespace OpenNest.Forms
             statusLabel.Margin = new System.Windows.Forms.Padding(3, 6, 3, 0);
             statusLabel.Name = "statusLabel";
             statusLabel.Size = new System.Drawing.Size(100, 20);
-            statusLabel.TabIndex = 5;
+            statusLabel.TabIndex = 7;
+            //
+            // searchTimer
+            //
+            searchTimer.Interval = 250;
+            searchTimer.Tick += SearchTimer_Tick;
             //
             // ReleaseSetForm
             //
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-            ClientSize = new System.Drawing.Size(944, 521);
+            ClientSize = new System.Drawing.Size(1104, 661);
             Controls.Add(layoutTable);
             Font = new System.Drawing.Font("Segoe UI", 9.75F);
             MinimizeBox = false;
-            MinimumSize = new System.Drawing.Size(760, 400);
+            MinimumSize = new System.Drawing.Size(860, 520);
             Name = "ReleaseSetForm";
             ShowIcon = false;
             ShowInTaskbar = false;
             StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            Text = "Release Drawing Set";
+            Text = "Release Drawing Sets";
             FormClosing += ReleaseSetForm_FormClosing;
             layoutTable.ResumeLayout(false);
             layoutTable.PerformLayout();
+            addSetTable.ResumeLayout(false);
+            addSetTable.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)setGrid).EndInit();
             optionsTable.ResumeLayout(false);
             optionsTable.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)multiplierBox).EndInit();
             ((System.ComponentModel.ISupportInitialize)groupGrid).EndInit();
             bottomTable.ResumeLayout(false);
             bottomTable.PerformLayout();
@@ -333,9 +450,17 @@ namespace OpenNest.Forms
 
         private System.Windows.Forms.TableLayoutPanel layoutTable;
         private System.Windows.Forms.Label setLabel;
+        private System.Windows.Forms.TableLayoutPanel addSetTable;
+        private System.Windows.Forms.Label addSetLabel;
+        private System.Windows.Forms.ComboBox addSetCombo;
+        private System.Windows.Forms.Button addSetButton;
+        private System.Windows.Forms.Button removeSetButton;
+        private System.Windows.Forms.DataGridView setGrid;
+        private System.Windows.Forms.DataGridViewTextBoxColumn setNameColumn;
+        private System.Windows.Forms.DataGridViewTextBoxColumn setCustomerColumn;
+        private System.Windows.Forms.DataGridViewTextBoxColumn setRevisionColumn;
+        private System.Windows.Forms.DataGridViewTextBoxColumn kitsColumn;
         private System.Windows.Forms.TableLayoutPanel optionsTable;
-        private System.Windows.Forms.Label multiplierLabel;
-        private System.Windows.Forms.NumericUpDown multiplierBox;
         private System.Windows.Forms.CheckBox includeArchivedCheckBox;
         private System.Windows.Forms.Label notesLabel;
         private System.Windows.Forms.TextBox notesBox;
@@ -348,6 +473,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.DataGridViewTextBoxColumn cutTypeColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn drawingsColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn partsColumn;
+        private System.Windows.Forms.DataGridViewComboBoxColumn targetColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn statusColumn;
         private System.Windows.Forms.Label skippedLabel;
         private System.Windows.Forms.TableLayoutPanel bottomTable;
@@ -355,5 +481,6 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Button releaseButton;
         private System.Windows.Forms.Button closeButton;
         private System.Windows.Forms.Label statusLabel;
+        private System.Windows.Forms.Timer searchTimer;
     }
 }

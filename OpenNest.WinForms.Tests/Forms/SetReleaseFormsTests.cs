@@ -43,13 +43,13 @@ public class SetReleaseFormsTests
                 Assert.Equal(2, grid.Rows.Count);
                 Assert.True(skipped.Visible);
                 Assert.Contains("'SYN-OLD'", skipped.Text);
-                Field<NumericUpDown>(form, "multiplierBox").Value = 3;
+                Field<DataGridView>(form, "setGrid").Rows[0].Cells["kitsColumn"].Value = "3";
                 Assert.Equal(new object[] { 12, 9 }, grid.Rows.Cast<DataGridViewRow>().Select(r => r.Cells["partsColumn"].Value));
                 Field<TextBox>(form, "notesBox").Text = "Synthetic run";
 
                 Run(form.ReleaseAsync());
 
-                Assert.Contains("Create 2 Draft nests from set 'Synthetic kit' ×3", Assert.Single(questions));
+                Assert.Contains("Release set 'Synthetic kit' ×3 into 2 Draft nests", Assert.Single(questions));
                 Assert.Equal(2, nests.Uploaded.Count);
                 Assert.Equal(2, opened.Count);
                 Assert.All(opened, o => Assert.Equal(NestStatus.Draft, o.Nest.Status));
@@ -64,7 +64,8 @@ public class SetReleaseFormsTests
                 Assert.StartsWith("Released: 2 nests", Field<Label>(form, "statusLabel").Text);
                 Assert.All(grid.Rows.Cast<DataGridViewRow>(), r => Assert.StartsWith("Created N26-", (string)r.Cells["statusColumn"].Value));
                 Assert.False(Field<Button>(form, "releaseButton").Enabled);
-                Assert.False(Field<NumericUpDown>(form, "multiplierBox").Enabled);
+                Assert.True(Field<DataGridView>(form, "setGrid").ReadOnly);
+                Assert.False(Field<ComboBox>(form, "addSetCombo").Enabled);
             },
             TestTimeout,
             "The release test did not complete.");
@@ -189,6 +190,147 @@ public class SetReleaseFormsTests
     }
 
     [Fact]
+    public void Release_OfATypedInSecondSet_MergesOneGroupIntoADraft_UnlessItIsOpen()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var b = library.Add("SYN-B", "Synthetic Steel");
+                var c = library.Add("SYN-C", "Synthetic Aluminum");
+                var sets = new InMemoryDrawingSets();
+                var first = CreateSet(sets, "First kit", (a, 1), (c, 1));
+                CreateSet(sets, "Second kit", (b, 2));
+                var nests = new MemoryNests();
+                var draft = nests.AddDraft("N26-0007", "Synthetic Steel", "Grade A", 0.25);
+                var opened = new List<NestRecord>();
+                var messages = new List<string>();
+
+                using var form = new ReleaseSetForm(sets, library, nests, Server, first, (_, record) => opened.Add(record));
+                form.ShowMessage = (text, _, _) => { messages.Add(text); return DialogResult.OK; };
+                form.CreateNest = (group, _) => Task.FromResult(new Nest("N26-0100") { Units = group.Units });
+                var openTabs = new HashSet<Guid> { draft.Id };
+                form.IsNestOpen = openTabs.Contains;
+                form.Show();
+
+                Field<ComboBox>(form, "addSetCombo").Text = "second KIT";
+                Run(form.AddTypedSetAsync());
+                Assert.Equal(new[] { ("First kit", 1), ("Second kit", 1) }, form.Lines().Select(l => (l.Set.Name, l.Quantity)));
+                Assert.False(form.AddLine(first, 2));
+                Field<DataGridView>(form, "setGrid").Rows[1].Cells["kitsColumn"].Value = "2";
+
+                var grid = Field<DataGridView>(form, "groupGrid");
+                DataGridViewRow Steel() => grid.Rows.Cast<DataGridViewRow>().Single(r => ((SetReleaseGroup)r.Tag!).MaterialName == "Synthetic Steel");
+                PumpUntil(() => ((DataGridViewComboBoxCell)Steel().Cells["targetColumn"]).Items.Count == 2, "the drafts to merge into");
+                Assert.Equal(new object[] { 1, 4 }, new[] { a, b }.Select(d => (object)((SetReleaseGroup)Steel().Tag!).Items.Single(i => i.Drawing.Id == d.Id).Quantity));
+                var mergeChoice = (string)((DataGridViewComboBoxCell)Steel().Cells["targetColumn"]).Items[1]!;
+                Assert.StartsWith("Merge into N26-0007 (1 sheet", mergeChoice);
+
+                // An open draft is refused and the group stays a new nest.
+                Steel().Cells["targetColumn"].Value = mergeChoice;
+                Assert.Contains("is open in a tab here", Assert.Single(messages));
+                Assert.Equal("New Draft nest", Steel().Cells["targetColumn"].Value);
+                Assert.Empty(form.ChosenMerges());
+
+                openTabs.Clear();
+                Steel().Cells["targetColumn"].Value = mergeChoice;
+                Assert.Same(draft, form.ChosenMerges().Values.Single());
+                Assert.Contains("Merging discards the layout of 'N26-0007'", (string)Steel().Cells["statusColumn"].Value);
+                Assert.Contains("1 new Draft nest, 1 merge, 6 parts", Field<Label>(form, "summaryLabel").Text);
+
+                Run(form.ReleaseAsync());
+
+                Assert.Contains("1 new and 1 merged into existing drafts", messages[^1]);
+                var release = Assert.Single(sets.Releases);
+                Assert.Equal(new[] { ("First kit", 1), ("Second kit", 2) }, release.Sets.Select(l => (l.SetName, l.Quantity)));
+                var merged = release.Nests.Single(n => n.Kind == SetReleaseNestKind.Merged);
+                Assert.Equal((draft.Id, (int?)draft.Revision, draft.Revision + 1), (merged.NestId, merged.RevisionBefore, merged.RevisionAfter));
+                Assert.Equal(SetReleaseNestKind.Created, release.Nests.Single(n => n.NestId != draft.Id).Kind);
+                Assert.Equal(2, opened.Count);
+                Assert.StartsWith("Merged into N26-0007", (string)Steel().Cells["statusColumn"].Value);
+            },
+            TestTimeout,
+            "The multi-set merge release test did not complete.");
+    }
+
+    [Fact]
+    public void Releases_UndoOffersToLeaveChangedNests_AndShowsWhatTheReleaseDid()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var sets = new InMemoryDrawingSets();
+                var set = CreateSet(sets);
+                var created = new SetReleaseNest { NestId = Guid.NewGuid(), MaterialName = "Synthetic Steel", Thickness = 0.25, RevisionAfter = 1, Nest = new NestRecord { Name = "N1", Status = NestStatus.Draft } };
+                var merged = new SetReleaseNest
+                {
+                    NestId = Guid.NewGuid(),
+                    Kind = SetReleaseNestKind.Merged,
+                    RevisionBefore = 3,
+                    RevisionAfter = 4,
+                    MaterialName = "Synthetic Aluminum",
+                    Thickness = 0.25,
+                    Nest = new NestRecord { Name = "N2", Status = NestStatus.Draft },
+                };
+                var release = new SetReleaseRecord
+                {
+                    Id = Guid.NewGuid(),
+                    Sets = new[]
+                    {
+                        new SetReleaseLine { SetId = set.Id, SetRevision = 1, SetName = set.Name, Quantity = 2 },
+                        new SetReleaseLine { SetId = Guid.NewGuid(), SetRevision = 1, SetName = "Other kit", Quantity = 1 },
+                    },
+                    Nests = new[] { created, merged },
+                };
+                sets.Releases.Add(release);
+                sets.UndoHandler = (_, request) =>
+                {
+                    if (request.SkipNests.Count == 0)
+                        throw new SetReleaseUndoConflictException(new SetReleaseUndoConflict
+                        {
+                            Reason = SetReleaseUndoRefusal.NestsChanged,
+                            Release = release,
+                            ChangedNests = new[] { new NestRecord { Id = merged.NestId, Name = "N2", Revision = 6, Status = NestStatus.ToBeCut } },
+                        });
+                    release.UndoneAt = new DateTime(2026, 10, 21, 12, 0, 0, DateTimeKind.Utc);
+                    created.Undo = SetReleaseNestUndo.Deleted;
+                    merged.Undo = SetReleaseNestUndo.Skipped;
+                    return release;
+                };
+                var questions = new List<string>();
+
+                using var form = new SetReleasesForm(sets, set);
+                form.ShowMessage = (text, buttons, _) =>
+                {
+                    questions.Add(text);
+                    return buttons == MessageBoxButtons.YesNo ? DialogResult.Yes : DialogResult.OK;
+                };
+                form.Show();
+                var releases = Field<DataGridView>(form, "releaseGrid");
+                var nests = Field<DataGridView>(form, "nestGrid");
+                PumpUntil(() => releases.Rows.Count == 1 && nests.Rows.Count == 2, "the releases");
+                Assert.Equal("×2 (+1 other set)", releases.Rows[0].Cells["multiplierColumn"].Value);
+                Assert.Equal(new object[] { "Created", "Merged (revision 3 → 4)" }, nests.Rows.Cast<DataGridViewRow>().Select(r => r.Cells["changeColumn"].Value));
+                Assert.True(Field<Button>(form, "undoButton").Enabled);
+
+                Run(form.UndoSelectedAsync());
+
+                Assert.Contains("1 nest it created is deleted", questions[0]);
+                Assert.Contains("1 draft it merged into goes back", questions[0]);
+                Assert.Contains("- N2: saved since the release (now revision 6, To Be Cut)", questions[1]);
+                Assert.Equal(new[] { 0, 1 }, sets.UndoRequests.Select(r => r.Request.SkipNests.Count));
+                Assert.Equal(merged.NestId, sets.UndoRequests[1].Request.SkipNests.Single());
+                PumpUntil(() => (string)releases.Rows[0].Cells["progressColumn"].Value == "Undone", "the release to read as undone");
+                Assert.Equal(new object[] { "Created; undo deleted it", "Merged (revision 3 → 4); undo left it as it was" },
+                    nests.Rows.Cast<DataGridViewRow>().Select(r => r.Cells["changeColumn"].Value));
+                Assert.False(Field<Button>(form, "undoButton").Enabled);
+            },
+            TestTimeout,
+            "The release undo test did not complete.");
+    }
+
+    [Fact]
     public void Browser_Release_ReadsTheSetWithItsMembers_OnlyWhenEnabled()
     {
         StaTestThread.Run(
@@ -222,12 +364,15 @@ public class SetReleaseFormsTests
             "The browser release test did not complete.");
     }
 
-    private static DrawingSetRecord CreateSet(InMemoryDrawingSets sets, params (DrawingLibraryRecord Drawing, int Quantity)[] members)
+    private static DrawingSetRecord CreateSet(InMemoryDrawingSets sets, params (DrawingLibraryRecord Drawing, int Quantity)[] members) =>
+        CreateSet(sets, "Synthetic kit", members);
+
+    private static DrawingSetRecord CreateSet(InMemoryDrawingSets sets, string name, params (DrawingLibraryRecord Drawing, int Quantity)[] members)
     {
         var task = sets.CreateAsync(new DrawingSetRecord
         {
             Id = Guid.NewGuid(),
-            Name = "Synthetic kit",
+            Name = name,
             Customer = "Synthetic customer",
             Members = members.Select(m => new DrawingSetMember { DrawingId = m.Drawing.Id, Quantity = m.Quantity, Drawing = m.Drawing }).ToList(),
         });
@@ -301,10 +446,57 @@ public class SetReleaseFormsTests
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
-    /// <summary>Stores uploads in memory under their client-allocated ids.</summary>
+    /// <summary>Stores uploads in memory under their client-allocated ids, and drafts a release can merge into.</summary>
     private sealed class MemoryNests : INestRepository
     {
+        private readonly Dictionary<(Guid, int), byte[]> _revisions = new();
+
         public List<NestRecord> Uploaded { get; } = new();
+        public List<NestRecord> Drafts { get; } = new();
+
+        /// <summary>A Draft nest on one empty sheet, stored as a real archive at revision 3.</summary>
+        public NestRecord AddDraft(string name, string material, string grade, double thickness)
+        {
+            var nest = new Nest(name) { Units = Units.Inches, Material = new Material(material, grade), Thickness = thickness, Status = NestStatus.Draft };
+            nest.CreatePlate();
+            using var stream = new MemoryStream();
+            new NestWriter(nest).Write(stream);
+            var record = new NestRecord
+            {
+                Id = Guid.NewGuid(),
+                Revision = 3,
+                Name = name,
+                Material = material,
+                MaterialGrade = grade,
+                Thickness = thickness,
+                Status = NestStatus.Draft,
+                PlateCount = 1,
+                SavedAt = new DateTime(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc),
+            };
+            _revisions[(record.Id, record.Revision)] = stream.ToArray();
+            Drafts.Add(record);
+            return record;
+        }
+
+        public Task<NestPage> QueryAsync(NestQuery query, CancellationToken ct = default)
+        {
+            var found = Drafts.Where(d => query.Status == d.Status && query.Material == d.Material
+                && query.MaterialGrade == d.MaterialGrade && query.Thickness == d.Thickness).ToList();
+            return Task.FromResult(new NestPage { Items = found, Total = found.Count, Limit = query.Limit });
+        }
+
+        public Task<byte[]?> GetRevisionFileAsync(Guid id, int revisionNumber, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_revisions.TryGetValue((id, revisionNumber), out var bytes) ? bytes : null);
+
+        public Task<NestRecord> UpdateFileAsync(Guid id, byte[] nestFile, NestRecord record, int expectedRevision,
+            CancellationToken cancellationToken = default)
+        {
+            var current = Drafts.Single(d => d.Id == id);
+            Assert.Equal(current.Revision, expectedRevision);
+            var saved = new NestRecord { Id = id, Revision = expectedRevision + 1, Name = record.Name, Status = record.Status };
+            _revisions[(id, saved.Revision)] = nestFile;
+            return Task.FromResult(saved);
+        }
 
         public Task<NestRecord> UploadAsync(byte[] file, NestRecord record, CancellationToken ct = default)
         {
@@ -318,7 +510,6 @@ public class SetReleaseFormsTests
             Task.FromResult(Uploaded.FirstOrDefault(r => r.Id == id));
 
         public Task<IReadOnlyList<NestRecord>> ListAsync(CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<NestPage> QueryAsync(NestQuery query, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<byte[]?> GetFileAsync(Guid id, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<NestRecord> UpdateFileAsync(Guid id, byte[] file, NestRecord record, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<NestRecord> UpdateMetadataAsync(Guid id, NestRecord record, CancellationToken ct = default) => throw new NotSupportedException();

@@ -389,31 +389,49 @@ newer there than in the nest is listed first, then the set editor opens for
 review and Save; nothing is stored before then.
 
 **Release...** (the Sets tab, when the dialog was opened from a nest) reads the
-selected active set with its members and opens the release dialog. It lists one
-row per material group (`OpenNest.Data.SetReleasePlan`): material, grade,
-thickness, units, cut type, drawings, parts and status. **Kits (multiplier)**
-multiplies every quantity (1 to 1000); **Include archived drawings** puts
-archived members back in, otherwise they are named below the grid as left out.
-Each group has a **Release** tick; refused groups (two drawings with one name,
-or drawings without material or thickness) show why and cannot be ticked, and a
-tick survives changing the multiplier or the archived toggle. **Release**
-confirms, then runs `OpenNest.Data.SetReleaseSession`: every ticked group's nest
-is made as File > New would (the server's next nest name, the saved plate
-defaults and clamps), in the group's units, with the saved plate size and
-spacings converted (25.4 mm per inch) when those differ; the nest takes the
-group's material, grade and thickness, the set's customer and the **Draft**
-status. Each created nest opens in its own tab, bound to its server record, and
-the release (with the release notes) is recorded. The grid then shows every
-group's outcome: Created with the nest name, Refused or Failed with the reason,
-or Not started. Cancel stops between uploads, never during one. When every nest
-was created but recording failed, the button becomes **Record Release** and
-posts the same release again. A dialog runs one release.
+selected active set with its members and opens the release dialog with it listed.
+More sets are added by typing in **Add a set** (the list of matching active sets
+fills as you type; Enter or **Add** takes the picked set, or the one set whose
+name is exactly what was typed) and removed with **Remove Set**; each set's
+**Kits** (1 to 1000) multiplies its quantities, and a set is listed once. The
+grid below has one row per material group across all the sets
+(`OpenNest.Data.SetReleasePlan`): material, grade, thickness, units, cut type,
+drawings, parts, **Nest** and status. **Include archived drawings** puts archived
+members back in, otherwise they are named below the grid as left out. Each group
+has a **Release** tick; refused groups (two drawings with one name, or drawings
+without material or thickness) show why and cannot be ticked, and a tick
+survives changing the sets, kits or the archived toggle.
+
+**Nest** is **New Draft nest** or **Merge into** one of the Draft nests of the
+group's material, grade and thickness, listed with their sheet count and when
+they were saved. A merge discards that draft's layout and nests the whole demand
+again (the status column says so); **Undo Release** restores it. A draft open in
+a tab of this desktop is refused, since that tab could hold edits the merge would
+leave behind: close it first.
+
+**Release** confirms, then runs `OpenNest.Data.SetReleaseSession`: every ticked
+group's new nest is made as File > New would (the server's next nest name, the
+saved plate defaults and clamps), in the group's units, with the saved plate size
+and spacings converted (25.4 mm per inch) when those differ; the nest takes the
+group's material, grade and thickness, the sets' customer when they share one,
+and the **Draft** status. A merged draft is saved only while nobody else has
+saved it since it was listed. Each created or merged nest opens in its own tab,
+bound to its server record, and the release (with the release notes) is
+recorded. The grid then shows every group's outcome: Created or Merged into with
+the nest name, Refused or Failed with the reason, or Not started. Cancel stops
+between saves, never during one. When every nest was saved but recording failed,
+the button becomes **Record Release** and posts the same release again. A dialog
+runs one release.
 
 **Releases...** lists the releases that include the selected set, newest first:
 when, by whom, the set revision, the kits of this set (and how many other sets
 the release had), the number of nests, progress such as "2 of 3 cut" (deleted
-nests are not counted) or "Undone", and the notes. The selected
-release's nests show their material group and current status, or Deleted.
+nests are not counted) or "Undone", and the notes. The selected release's nests
+show their material group, what the release did ("Created", "Merged (revision
+3 → 4)", and what undo did) and current status, or Deleted. **Undo Release...**
+deletes the nests the release created (they can be recovered) and restores the
+drafts it merged into. When some nests were changed after the release, it lists
+them and offers to undo the others, leaving those as they are.
 
 **Nest > Edit** (Nest Info) shows, beside its buttons, the newest release that
 made or merged into a server nest ("Released from set 'Kit A' revision 3 ×2 on

@@ -75,6 +75,25 @@ public static class SetReleaseText
             + "\n\nUndo the rest and leave these as they are, or restore them from their history.";
     }
 
+    /// <summary>
+    /// What the release did to one of its nests, and what undoing it did: "Created",
+    /// "Merged (revision 3 → 4)", "Created; undo deleted it".
+    /// </summary>
+    public static string Change(SetReleaseNest nest)
+    {
+        ArgumentNullException.ThrowIfNull(nest);
+        var text = nest.Kind == SetReleaseNestKind.Merged
+            ? $"Merged (revision {nest.RevisionBefore} → {nest.RevisionAfter})"
+            : "Created";
+        return nest.Undo switch
+        {
+            SetReleaseNestUndo.Deleted => text + "; undo deleted it",
+            SetReleaseNestUndo.Restored => text + $"; undo restored revision {nest.RevisionBefore}",
+            SetReleaseNestUndo.Skipped => text + "; undo left it as it was",
+            _ => text,
+        };
+    }
+
     /// <summary>The state of one nest of a release: its status name, or "Deleted".</summary>
     public static string NestState(SetReleaseNest nest)
     {

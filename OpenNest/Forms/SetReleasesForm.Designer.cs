@@ -34,10 +34,12 @@ namespace OpenNest.Forms
             statusColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             nestCustomerColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             modifiedColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            changeColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             bottomTable = new System.Windows.Forms.TableLayoutPanel();
             previousButton = new System.Windows.Forms.Button();
             nextButton = new System.Windows.Forms.Button();
             summaryLabel = new System.Windows.Forms.Label();
+            undoButton = new System.Windows.Forms.Button();
             closeButton = new System.Windows.Forms.Button();
             layoutTable.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)releaseGrid).BeginInit();
@@ -146,7 +148,7 @@ namespace OpenNest.Forms
             //
             nestGrid.AllowUserToAddRows = false;
             nestGrid.AllowUserToDeleteRows = false;
-            nestGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { nestNameColumn, groupColumn, statusColumn, nestCustomerColumn, modifiedColumn });
+            nestGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { nestNameColumn, groupColumn, changeColumn, statusColumn, nestCustomerColumn, modifiedColumn });
             nestGrid.Dock = System.Windows.Forms.DockStyle.Fill;
             nestGrid.MultiSelect = false;
             nestGrid.Name = "nestGrid";
@@ -169,6 +171,14 @@ namespace OpenNest.Forms
             groupColumn.Name = "groupColumn";
             groupColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             groupColumn.Width = 260;
+            //
+            // changeColumn
+            //
+            changeColumn.HeaderText = "Release did";
+            changeColumn.Name = "changeColumn";
+            changeColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            changeColumn.ToolTipText = "Whether the release created the nest or merged into it, and what undoing it did.";
+            changeColumn.Width = 190;
             //
             // statusColumn
             //
@@ -194,15 +204,17 @@ namespace OpenNest.Forms
             // bottomTable
             //
             bottomTable.AutoSize = true;
-            bottomTable.ColumnCount = 4;
+            bottomTable.ColumnCount = 5;
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.Controls.Add(previousButton, 0, 0);
             bottomTable.Controls.Add(nextButton, 1, 0);
             bottomTable.Controls.Add(summaryLabel, 2, 0);
-            bottomTable.Controls.Add(closeButton, 3, 0);
+            bottomTable.Controls.Add(undoButton, 3, 0);
+            bottomTable.Controls.Add(closeButton, 4, 0);
             bottomTable.Dock = System.Windows.Forms.DockStyle.Fill;
             bottomTable.Margin = new System.Windows.Forms.Padding(0, 6, 0, 0);
             bottomTable.Name = "bottomTable";
@@ -237,12 +249,22 @@ namespace OpenNest.Forms
             summaryLabel.Name = "summaryLabel";
             summaryLabel.TabIndex = 2;
             //
+            // undoButton
+            //
+            undoButton.AutoSize = true;
+            undoButton.Enabled = false;
+            undoButton.Name = "undoButton";
+            undoButton.TabIndex = 3;
+            undoButton.Text = "Undo Release...";
+            undoButton.UseVisualStyleBackColor = true;
+            undoButton.Click += UndoButton_Click;
+            //
             // closeButton
             //
             closeButton.AutoSize = true;
             closeButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             closeButton.Name = "closeButton";
-            closeButton.TabIndex = 3;
+            closeButton.TabIndex = 4;
             closeButton.Text = "Close";
             closeButton.UseVisualStyleBackColor = true;
             //
@@ -250,7 +272,7 @@ namespace OpenNest.Forms
             //
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             CancelButton = closeButton;
-            ClientSize = new System.Drawing.Size(824, 541);
+            ClientSize = new System.Drawing.Size(1004, 541);
             Controls.Add(layoutTable);
             Font = new System.Drawing.Font("Segoe UI", 9.75F);
             MinimizeBox = false;
@@ -286,6 +308,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.DataGridView nestGrid;
         private System.Windows.Forms.DataGridViewTextBoxColumn nestNameColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn groupColumn;
+        private System.Windows.Forms.DataGridViewTextBoxColumn changeColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn statusColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn nestCustomerColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn modifiedColumn;
@@ -293,6 +316,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Button previousButton;
         private System.Windows.Forms.Button nextButton;
         private System.Windows.Forms.Label summaryLabel;
+        private System.Windows.Forms.Button undoButton;
         private System.Windows.Forms.Button closeButton;
     }
 }

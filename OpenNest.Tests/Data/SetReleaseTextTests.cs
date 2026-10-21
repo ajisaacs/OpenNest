@@ -53,6 +53,25 @@ public class SetReleaseTextTests
         Assert.Equal("Released from set 'Synthetic kit' revision 3 ×2 by Synthetic operator", text);
     }
 
+    [Theory]
+    [InlineData(SetReleaseNestKind.Created, null, "Created")]
+    [InlineData(SetReleaseNestKind.Created, SetReleaseNestUndo.Deleted, "Created; undo deleted it")]
+    [InlineData(SetReleaseNestKind.Merged, null, "Merged (revision 3 → 4)")]
+    [InlineData(SetReleaseNestKind.Merged, SetReleaseNestUndo.Restored, "Merged (revision 3 → 4); undo restored revision 3")]
+    [InlineData(SetReleaseNestKind.Merged, SetReleaseNestUndo.Skipped, "Merged (revision 3 → 4); undo left it as it was")]
+    public void Change_SaysWhatTheReleaseAndItsUndoDid(SetReleaseNestKind kind, SetReleaseNestUndo? undo, string expected)
+    {
+        var nest = new SetReleaseNest
+        {
+            Kind = kind,
+            RevisionBefore = kind == SetReleaseNestKind.Merged ? 3 : null,
+            RevisionAfter = kind == SetReleaseNestKind.Merged ? 4 : 1,
+            Undo = undo,
+        };
+
+        Assert.Equal(expected, SetReleaseText.Change(nest));
+    }
+
     [Fact]
     public void UndoRefusal_NamesEachChangedNest_OrSaysItWasUndoneBefore()
     {

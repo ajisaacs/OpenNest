@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -14,27 +15,36 @@ using OpenNest.IO;
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// Drawing Sets &gt; Release: previews how a set splits into one nest per material group
-    /// (<see cref="SetReleasePlan"/>), with a kit multiplier, an archived-drawing toggle and a
-    /// tick per group, then makes those nests through <see cref="SetReleaseSession"/>: each is
-    /// uploaded as a Draft and opened in its own tab, and the release is recorded once every
+    /// Drawing Sets &gt; Release: the operator lists the sets to release, typed in or added from
+    /// the browser, each with a number of kits, and the dialog previews how they split into one
+    /// nest per material group (<see cref="SetReleasePlan"/>), with an archived-drawing toggle
+    /// and a tick per group. Each group makes a new Draft nest or merges into a Draft nest of
+    /// the same material, which is renested. <see cref="SetReleaseSession"/> then builds and
+    /// saves those nests, opens each in its own tab, and records the release once every
     /// chosen nest exists. The dialog shows every group's outcome; a release runs once per
     /// dialog.
     /// </summary>
     public partial class ReleaseSetForm : Form
     {
+        private const string NewNestChoice = "New Draft nest";
+
         private readonly IDrawingSetStore sets;
         private readonly IDrawingLibrary library;
         private readonly INestRepository nests;
         private readonly string serverUrl;
-        private readonly DrawingSetRecord set;
         private readonly Action<Nest, NestRecord> openNest;
         private readonly HashSet<string> excluded = new(StringComparer.Ordinal);
+        // The draft each group merges into, by group key, so the choice survives plan rebuilds.
+        private readonly Dictionary<string, NestRecord> targets = new(StringComparer.Ordinal);
+        // The drafts each group could merge into, by group key; absent while still loading.
+        private readonly Dictionary<string, IReadOnlyList<NestRecord>> drafts = new(StringComparer.Ordinal);
         private SetReleasePlan plan;
         private SetReleaseSession session;
         private CancellationTokenSource cancellation;
+        private CancellationTokenSource searchCancellation;
         private bool populating;
         private bool running;
+        private bool loadingDrafts;
 
         /// <summary>Shows a message and returns the operator's answer; replaced by tests.</summary>
         internal Func<string, MessageBoxButtons, MessageBoxIcon, DialogResult> ShowMessage { get; set; }
@@ -42,11 +52,17 @@ namespace OpenNest.Forms
         /// <summary>Makes the empty nest for a group, as File &gt; New would in its units; replaced by tests.</summary>
         internal Func<SetReleaseGroup, CancellationToken, Task<Nest>> CreateNest { get; set; }
 
+        /// <summary>
+        /// True when a server nest is open in a tab of this desktop. Such a draft is not merged
+        /// into: the tab could hold edits the merge would leave behind.
+        /// </summary>
+        public Func<Guid, bool> IsNestOpen { get; set; } = _ => false;
+
         /// <summary>The finished release, once one has run; otherwise null.</summary>
         public SetReleaseResult Result { get; private set; }
 
-        /// <param name="set">The set read with <see cref="IDrawingSetStore.GetAsync"/>, members joined.</param>
-        /// <param name="openNest">Opens a created nest in its own tab, bound to its server record.</param>
+        /// <param name="set">The first set to release, read with <see cref="IDrawingSetStore.GetAsync"/>, members joined.</param>
+        /// <param name="openNest">Opens a created or merged nest in its own tab, bound to its server record.</param>
         public ReleaseSetForm(IDrawingSetStore sets, IDrawingLibrary library, INestRepository nests, string serverUrl,
             DrawingSetRecord set, Action<Nest, NestRecord> openNest)
         {
@@ -55,18 +71,53 @@ namespace OpenNest.Forms
             this.library = library ?? throw new ArgumentNullException(nameof(library));
             this.nests = nests ?? throw new ArgumentNullException(nameof(nests));
             this.serverUrl = serverUrl ?? "";
-            this.set = set ?? throw new ArgumentNullException(nameof(set));
             this.openNest = openNest ?? throw new ArgumentNullException(nameof(openNest));
+            ArgumentNullException.ThrowIfNull(set);
             ShowMessage = (text, buttons, icon) => MessageBox.Show(this, text, Text, buttons, icon);
             CreateNest = (group, _) => NewNestFactory.CreateAsync(this, group.Units);
 
+            GridStyle.Apply(setGrid);
             GridStyle.Apply(groupGrid);
-            Text = $"Release '{set.Name}'";
-            setLabel.Text = string.IsNullOrWhiteSpace(set.Customer)
-                ? $"{set.Name} — revision {set.Revision}"
-                : $"{set.Name} ({set.Customer}) — revision {set.Revision}";
-            BuildPlan();
+            AddLine(set, 1);
         }
+
+        /// <summary>The sets listed, in order, with their kits.</summary>
+        internal IReadOnlyList<SetReleasePlanLine> Lines() =>
+            setGrid.Rows.Cast<DataGridViewRow>()
+                .Select(r => new SetReleasePlanLine((DrawingSetRecord)r.Tag, Kits(r)))
+                .ToList();
+
+        /// <summary>
+        /// Adds a set read from the server (members joined) with <paramref name="kits"/>; false,
+        /// with the reason shown, when it is archived or already listed.
+        /// </summary>
+        internal bool AddLine(DrawingSetRecord set, int kits)
+        {
+            ArgumentNullException.ThrowIfNull(set);
+            var listed = setGrid.Rows.Cast<DataGridViewRow>().FirstOrDefault(r => ((DrawingSetRecord)r.Tag).Id == set.Id);
+            if (listed != null)
+            {
+                listed.Selected = true;
+                statusLabel.Text = $"'{set.Name}' is already listed. Change its kits instead.";
+                return false;
+            }
+            if (set.Archived)
+            {
+                statusLabel.Text = $"'{set.Name}' is archived. Restore it before releasing it.";
+                return false;
+            }
+
+            var row = new DataGridViewRow { Tag = set };
+            row.CreateCells(setGrid, set.Name, set.Customer, set.Revision, kits.ToString(CultureInfo.CurrentCulture));
+            setGrid.Rows.Add(row);
+            statusLabel.Text = "";
+            BuildPlan();
+            return true;
+        }
+
+        private static int Kits(DataGridViewRow row) =>
+            int.TryParse(Convert.ToString(row.Cells["kitsColumn"].Value, CultureInfo.CurrentCulture), NumberStyles.Integer,
+                CultureInfo.CurrentCulture, out var kits) ? kits : 1;
 
         private void Options_Changed(object sender, EventArgs e)
         {
@@ -74,26 +125,197 @@ namespace OpenNest.Forms
                 BuildPlan();
         }
 
-        // Commit a checkbox click at once so the summary follows the tick.
+        private void SetGrid_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
+        {
+            if (e.ColumnIndex != kitsColumn.Index)
+                return;
+            var valid = int.TryParse(Convert.ToString(e.FormattedValue, CultureInfo.CurrentCulture), NumberStyles.Integer,
+                CultureInfo.CurrentCulture, out var kits) && kits >= 1 && kits <= SetReleaseRules.MaxQuantity;
+            setGrid.Rows[e.RowIndex].ErrorText = valid ? "" : $"Kits must be a whole number from 1 to {SetReleaseRules.MaxQuantity}.";
+            e.Cancel = !valid;
+        }
+
+        private void SetGrid_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0 && e.ColumnIndex == kitsColumn.Index && !running && Result == null)
+                BuildPlan();
+        }
+
+        private void SetGrid_SelectionChanged(object sender, EventArgs e) => UpdateCommands();
+
+        private void RemoveSetButton_Click(object sender, EventArgs e)
+        {
+            if (setGrid.Rows.Count < 2 || setGrid.CurrentRow == null)
+                return;
+            setGrid.Rows.Remove(setGrid.CurrentRow);
+            BuildPlan();
+        }
+
+        // Type-ahead: the set list is queried once typing pauses.
+        private void AddSetCombo_TextUpdate(object sender, EventArgs e)
+        {
+            searchTimer.Stop();
+            searchTimer.Start();
+        }
+
+        private async void SearchTimer_Tick(object sender, EventArgs e)
+        {
+            searchTimer.Stop();
+            await SearchSetsAsync(addSetCombo.Text);
+        }
+
+        private async void AddSetCombo_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode != Keys.Enter)
+                return;
+            e.Handled = e.SuppressKeyPress = true;
+            await AddTypedSetAsync();
+        }
+
+        private async void AddSetButton_Click(object sender, EventArgs e) => await AddTypedSetAsync();
+
+        /// <summary>Lists active sets whose name, customer or notes contain <paramref name="text"/>.</summary>
+        internal async Task SearchSetsAsync(string text)
+        {
+            searchCancellation?.Cancel();
+            searchCancellation?.Dispose();
+            searchCancellation = new CancellationTokenSource();
+            var token = searchCancellation.Token;
+            DrawingSetPage page;
+            try
+            {
+                page = await sets.QueryAsync(new DrawingSetQuery { Search = text ?? "", Limit = 20, Sort = DrawingSetSortField.Name, Descending = false }, token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+            {
+                if (!IsDisposed)
+                    statusLabel.Text = $"Could not search the sets: {ex.Message}";
+                return;
+            }
+
+            if (IsDisposed || token.IsCancellationRequested)
+                return;
+            // Refilling the list resets the text, so the operator's typing is put back.
+            var typed = addSetCombo.Text;
+            var caret = addSetCombo.SelectionStart;
+            addSetCombo.BeginUpdate();
+            addSetCombo.Items.Clear();
+            foreach (var found in page.Items)
+                addSetCombo.Items.Add(new SetChoice(found));
+            addSetCombo.EndUpdate();
+            addSetCombo.Text = typed;
+            addSetCombo.SelectionStart = System.Math.Min(caret, typed.Length);
+            if (addSetCombo.Focused && page.Items.Count > 0)
+                addSetCombo.DroppedDown = true;
+        }
+
+        /// <summary>
+        /// Adds the set picked in the list, or the one active set whose name is exactly what was
+        /// typed, read with its members.
+        /// </summary>
+        internal async Task AddTypedSetAsync()
+        {
+            if (running || Result != null)
+                return;
+            var typed = (addSetCombo.Text ?? "").Trim();
+            try
+            {
+                Guid id;
+                if (addSetCombo.SelectedItem is SetChoice choice && choice.ToString() == addSetCombo.Text)
+                {
+                    id = choice.Set.Id;
+                }
+                else
+                {
+                    if (typed.Length == 0)
+                        return;
+                    var page = await sets.QueryAsync(new DrawingSetQuery { Search = typed, Limit = 50 });
+                    var exact = page.Items.Where(s => string.Equals(s.Name.Trim(), typed, StringComparison.OrdinalIgnoreCase)).ToList();
+                    if (exact.Count != 1)
+                    {
+                        statusLabel.Text = exact.Count == 0
+                            ? $"No active set is named '{typed}'. Pick one from the list."
+                            : $"{exact.Count} sets are named '{typed}'. Pick one from the list.";
+                        return;
+                    }
+                    id = exact[0].Id;
+                }
+
+                var read = await sets.GetAsync(id);
+                if (IsDisposed)
+                    return;
+                if (read == null)
+                {
+                    statusLabel.Text = "That set no longer exists on the server.";
+                    return;
+                }
+                if (AddLine(read, 1))
+                    addSetCombo.Text = "";
+            }
+            catch (Exception ex) when (ex is IOException or HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+            {
+                if (!IsDisposed)
+                    statusLabel.Text = $"Could not read the set: {ex.Message}";
+            }
+        }
+
+        // Commit a checkbox click or a target choice at once so the summary follows it.
         private void GroupGrid_CurrentCellDirtyStateChanged(object sender, EventArgs e)
         {
-            if (groupGrid.IsCurrentCellDirty && groupGrid.CurrentCell?.OwningColumn == includeColumn)
+            if (groupGrid.IsCurrentCellDirty
+                && (groupGrid.CurrentCell?.OwningColumn == includeColumn || groupGrid.CurrentCell?.OwningColumn == targetColumn))
                 groupGrid.CommitEdit(DataGridViewDataErrorContexts.Commit);
         }
 
         private void GroupGrid_CellValueChanged(object sender, DataGridViewCellEventArgs e)
         {
-            if (populating || e.RowIndex < 0 || e.ColumnIndex != includeColumn.Index)
+            if (populating || e.RowIndex < 0)
                 return;
             var row = groupGrid.Rows[e.RowIndex];
-            if (row.Tag is SetReleaseGroup group)
+            if (row.Tag is not SetReleaseGroup group)
+                return;
+            if (e.ColumnIndex == includeColumn.Index)
             {
                 if (row.Cells[includeColumn.Index].Value is true)
                     excluded.Remove(group.Key);
                 else
                     excluded.Add(group.Key);
             }
+            else if (e.ColumnIndex == targetColumn.Index)
+            {
+                ChooseTarget(row, group, row.Cells[targetColumn.Index].Value as string);
+            }
             UpdateCommands();
+        }
+
+        // A combo value that is not in a rebuilt list is reset rather than reported.
+        private void GroupGrid_DataError(object sender, DataGridViewDataErrorEventArgs e) => e.ThrowException = false;
+
+        /// <summary>Makes <paramref name="group"/> merge into the draft named by <paramref name="choice"/>, or a new nest.</summary>
+        internal void ChooseTarget(DataGridViewRow row, SetReleaseGroup group, string choice)
+        {
+            var draft = drafts.TryGetValue(group.Key, out var candidates)
+                ? candidates.FirstOrDefault(d => DraftChoice(d) == choice)
+                : null;
+            if (draft != null && IsNestOpen(draft.Id))
+            {
+                ShowMessage($"'{draft.Name}' is open in a tab here. Close it first, so no edits there are left behind by the merge.",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                draft = null;
+            }
+
+            if (draft == null)
+                targets.Remove(group.Key);
+            else
+                targets[group.Key] = draft;
+            populating = true;
+            row.Cells[targetColumn.Index].Value = draft == null ? NewNestChoice : DraftChoice(draft);
+            row.Cells[statusColumn.Index].Value = GroupNote(group);
+            populating = false;
         }
 
         private async void ReleaseButton_Click(object sender, EventArgs e)
@@ -109,7 +331,7 @@ namespace OpenNest.Forms
             if (running)
             {
                 cancellation?.Cancel();
-                statusLabel.Text = "Stopping after the nest being uploaded...";
+                statusLabel.Text = "Stopping after the nest being saved...";
                 closeButton.Enabled = false;
                 return;
             }
@@ -123,39 +345,57 @@ namespace OpenNest.Forms
             if (!running)
                 return;
             e.Cancel = true;
-            cancellation?.Cancel();
+            CloseButton_Click(sender, e);
         }
 
         /// <summary>The groups ticked for release, in plan order.</summary>
         internal IReadOnlyList<SetReleaseGroup> ChosenGroups() =>
             plan.Groups.Where(g => g.CanRelease && !excluded.Contains(g.Key)).ToList();
 
+        /// <summary>The chosen groups that merge into a draft, with that draft.</summary>
+        internal IReadOnlyDictionary<SetReleaseGroup, NestRecord> ChosenMerges() =>
+            ChosenGroups().Where(g => targets.ContainsKey(g.Key)).ToDictionary(g => g, g => targets[g.Key]);
+
         /// <summary>
-        /// Confirms, then makes one Draft nest per ticked group, opens each in its own tab and
-        /// records the release. Every group's outcome is shown in the grid.
+        /// Confirms, then makes or merges one Draft nest per ticked group, opens each in its own
+        /// tab and records the release. Every group's outcome is shown in the grid.
         /// </summary>
         internal async Task ReleaseAsync()
         {
-            if (running || Result != null || !groupGrid.EndEdit())
+            if (running || Result != null || !setGrid.EndEdit() || !groupGrid.EndEdit())
                 return;
             var chosen = ChosenGroups();
             if (chosen.Count == 0)
                 return;
-            var multiplier = plan.Lines[0].Quantity;
-            if (ShowMessage($"Create {chosen.Count} Draft nest{(chosen.Count == 1 ? "" : "s")} from set '{set.Name}'"
-                    + (multiplier == 1 ? "" : $" ×{multiplier}") + "? Each opens in its own tab.",
-                    MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK)
+            var merges = ChosenMerges();
+            if (merges.Values.FirstOrDefault(d => IsNestOpen(d.Id)) is { } open)
+            {
+                ShowMessage($"'{open.Name}' is open in a tab here. Close it, or choose a new nest for its group.",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var lines = plan.Lines;
+            var setsText = lines.Count == 1
+                ? $"set '{lines[0].Set.Name}'" + (lines[0].Quantity == 1 ? "" : $" ×{lines[0].Quantity}")
+                : $"{lines.Count} sets";
+            var created = chosen.Count - merges.Count;
+            var text = $"Release {setsText} into {chosen.Count} Draft nest{(chosen.Count == 1 ? "" : "s")}";
+            if (merges.Count > 0)
+                text += $": {created} new and {merges.Count} merged into existing drafts. A merged draft loses its "
+                    + "current layout and is nested again; Undo Release restores it";
+            if (ShowMessage(text + ". Each opens in its own tab.", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK)
                 return;
 
             running = true;
             cancellation = new CancellationTokenSource();
             closeButton.Text = "Cancel";
             UpdateCommands();
-            session = new SetReleaseSession(sets, library, nests, serverUrl, ReadPackage, WriteNest, CreateNest);
+            session = new SetReleaseSession(sets, library, nests, serverUrl, ReadPackage, WriteNest, CreateNest, ReadNest);
             var progress = new Progress<SetReleaseProgress>(ShowProgress);
             try
             {
-                Result = await session.RunAsync(plan, chosen, Environment.UserName, notesBox.Text, progress, cancellation.Token);
+                Result = await session.RunAsync(plan, chosen, Environment.UserName, notesBox.Text, progress, cancellation.Token, merges);
             }
             finally
             {
@@ -167,14 +407,14 @@ namespace OpenNest.Forms
                 }
             }
 
-            foreach (var created in Result.Created)
-                openNest(created.Nest, created.Record);
+            foreach (var done in Result.Created)
+                openNest(done.Nest, done.Record);
             if (IsDisposed)
                 return;
             ShowOutcome();
         }
 
-        /// <summary>Posts the release again after every nest was created but recording it failed.</summary>
+        /// <summary>Posts the release again after every nest was saved but recording it failed.</summary>
         internal async Task RetryRecordAsync()
         {
             if (running || session == null || !session.HasPendingRelease)
@@ -187,7 +427,7 @@ namespace OpenNest.Forms
                 var release = await session.RetryReleaseAsync();
                 Result = Result.WithRelease(release);
             }
-            catch (Exception ex) when (ex is IOException || ex is System.Net.Http.HttpRequestException
+            catch (Exception ex) when (ex is IOException || ex is HttpRequestException
                 || ex is TaskCanceledException || ex is System.Text.Json.JsonException)
             {
                 if (!IsDisposed)
@@ -204,7 +444,8 @@ namespace OpenNest.Forms
 
         private void BuildPlan()
         {
-            plan = SetReleasePlan.Build(set, (int)multiplierBox.Value, includeArchivedCheckBox.Checked);
+            plan = SetReleasePlan.Build(Lines(), includeArchivedCheckBox.Checked);
+            Text = plan.Lines.Count == 1 ? $"Release '{plan.Lines[0].Set.Name}'" : $"Release {plan.Lines.Count} Drawing Sets";
             populating = true;
             groupGrid.Rows.Clear();
             foreach (var group in plan.Groups)
@@ -219,10 +460,12 @@ namespace OpenNest.Forms
                     group.IsUnassigned ? "" : group.CutType.ToString(),
                     group.Items.Count,
                     group.TotalQuantity,
-                    group.CanRelease ? string.Join(" ", group.Warnings) : group.Refusal);
+                    null,
+                    GroupNote(group));
                 // A refused group cannot be ticked.
                 row.Cells[includeColumn.Index].ReadOnly = !group.CanRelease;
                 groupGrid.Rows.Add(row);
+                FillTargets(row, group);
             }
             populating = false;
 
@@ -234,7 +477,81 @@ namespace OpenNest.Forms
                 + (skipped.Count > 5 ? $" and {skipped.Count - 5} more" : "")
                 + ". Tick Include archived drawings to release them.";
             UpdateCommands();
+            _ = LoadDraftsAsync();
         }
+
+        // The target list of one group: a new nest, then each draft it could merge into.
+        private void FillTargets(DataGridViewRow row, SetReleaseGroup group)
+        {
+            var cell = (DataGridViewComboBoxCell)row.Cells[targetColumn.Index];
+            cell.Items.Clear();
+            cell.Items.Add(NewNestChoice);
+            if (group.CanRelease && drafts.TryGetValue(group.Key, out var candidates))
+            {
+                foreach (var draft in candidates)
+                    cell.Items.Add(DraftChoice(draft));
+            }
+            if (targets.TryGetValue(group.Key, out var target) && !cell.Items.Contains(DraftChoice(target)))
+                targets.Remove(group.Key);
+            cell.Value = targets.TryGetValue(group.Key, out target) ? DraftChoice(target) : NewNestChoice;
+            cell.ReadOnly = !group.CanRelease;
+        }
+
+        /// <summary>Looks up, once per group, the Draft nests it could merge into, then fills the lists.</summary>
+        internal async Task LoadDraftsAsync()
+        {
+            if (loadingDrafts || plan == null)
+                return;
+            loadingDrafts = true;
+            try
+            {
+                while (plan.Groups.FirstOrDefault(g => g.CanRelease && !drafts.ContainsKey(g.Key)) is { } group)
+                {
+                    try
+                    {
+                        drafts[group.Key] = await SetReleasePlan.FindDraftsAsync(nests, group);
+                    }
+                    catch (Exception ex) when (ex is IOException or HttpRequestException or TaskCanceledException
+                        or System.Text.Json.JsonException or NotSupportedException)
+                    {
+                        drafts[group.Key] = Array.Empty<NestRecord>();
+                        if (!IsDisposed)
+                            statusLabel.Text = $"Could not list the draft nests to merge into: {ex.Message}";
+                    }
+                    if (IsDisposed)
+                        return;
+                }
+            }
+            finally
+            {
+                loadingDrafts = false;
+            }
+
+            if (IsDisposed || running || Result != null)
+                return;
+            populating = true;
+            foreach (DataGridViewRow row in groupGrid.Rows)
+            {
+                if (row.Tag is SetReleaseGroup group)
+                    FillTargets(row, group);
+            }
+            populating = false;
+        }
+
+        private string GroupNote(SetReleaseGroup group)
+        {
+            if (!group.CanRelease)
+                return group.Refusal;
+            var notes = group.Warnings.ToList();
+            if (targets.TryGetValue(group.Key, out var draft))
+                notes.Insert(0, $"Merging discards the layout of '{draft.Name}' ({draft.PlateCount} sheet"
+                    + $"{(draft.PlateCount == 1 ? "" : "s")}) and nests everything again; Undo Release restores it.");
+            return string.Join(" ", notes);
+        }
+
+        private static string DraftChoice(NestRecord draft) =>
+            $"Merge into {draft.Name} ({draft.PlateCount} sheet{(draft.PlateCount == 1 ? "" : "s")}, saved "
+            + $"{draft.SavedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)})";
 
         private void ShowProgress(SetReleaseProgress progress)
         {
@@ -244,7 +561,7 @@ namespace OpenNest.Forms
             statusLabel.Text = progress.Stage switch
             {
                 SetReleaseStage.Preparing => $"Preparing nest {progress.Index + 1} of {progress.Count}: {Describe(progress.Group)}...",
-                SetReleaseStage.Uploading => $"Uploading nest {progress.Index + 1} of {progress.Count}: {Describe(progress.Group)}...",
+                SetReleaseStage.Uploading => $"Saving nest {progress.Index + 1} of {progress.Count}: {Describe(progress.Group)}...",
                 _ => "Recording the release...",
             };
         }
@@ -256,28 +573,29 @@ namespace OpenNest.Forms
                 var outcome = Result.Groups.FirstOrDefault(g => ReferenceEquals(g.Group, row.Tag));
                 if (outcome == null)
                     continue;
+                var notes = outcome.Warnings.Count == 0 ? "" : " — " + string.Join(" ", outcome.Warnings);
                 row.Cells[statusColumn.Index].Value = outcome.Outcome switch
                 {
-                    SetReleaseGroupOutcome.Created => $"Created {outcome.Record!.Name}"
-                        + (outcome.Warnings.Count == 0 ? "" : " — " + string.Join(" ", outcome.Warnings)),
+                    SetReleaseGroupOutcome.Created when outcome.MergedInto != null => $"Merged into {outcome.Record!.Name}" + notes,
+                    SetReleaseGroupOutcome.Created => $"Created {outcome.Record!.Name}" + notes,
                     SetReleaseGroupOutcome.Refused => "Refused: " + outcome.Error,
                     SetReleaseGroupOutcome.Failed => "Failed: " + outcome.Error,
                     _ => "Not started",
                 };
             }
 
-            var created = Result.Created.Count;
-            var nestsText = $"{created} nest{(created == 1 ? "" : "s")}";
+            var done = Result.Created.Count;
+            var nestsText = $"{done} nest{(done == 1 ? "" : "s")}";
             if (Result.Release != null)
-                statusLabel.Text = $"Released: {nestsText} created and opened, and the release recorded.";
+                statusLabel.Text = $"Released: {nestsText} saved and opened, and the release recorded.";
             else if (Result.ReleaseError.Length > 0)
                 statusLabel.Text = Result.ReleaseError + " Choose Record Release to try again.";
             else if (Result.Canceled)
-                statusLabel.Text = $"Canceled: {nestsText} created; no release recorded.";
+                statusLabel.Text = $"Canceled: {nestsText} saved; no release recorded.";
             else
-                statusLabel.Text = created == 0
-                    ? "Nothing was created. See the Status column."
-                    : $"Stopped: {nestsText} created; no release recorded. See the Status column.";
+                statusLabel.Text = done == 0
+                    ? "Nothing was saved. See the Status column."
+                    : $"Stopped: {nestsText} saved; no release recorded. See the Status column.";
             UpdateCommands();
         }
 
@@ -285,24 +603,35 @@ namespace OpenNest.Forms
         {
             var chosen = plan == null ? Array.Empty<SetReleaseGroup>() : ChosenGroups();
             var editable = !running && Result == null;
-            multiplierBox.Enabled = editable;
+            setGrid.ReadOnly = !editable;
+            addSetCombo.Enabled = editable;
+            addSetButton.Enabled = editable;
+            removeSetButton.Enabled = editable && setGrid.Rows.Count > 1 && setGrid.CurrentRow != null;
             includeArchivedCheckBox.Enabled = editable;
             notesBox.ReadOnly = !editable;
             includeColumn.ReadOnly = !editable;
+            targetColumn.ReadOnly = !editable;
             if (editable)
             {
                 foreach (DataGridViewRow row in groupGrid.Rows)
-                    row.Cells[includeColumn.Index].ReadOnly = row.Tag is SetReleaseGroup { CanRelease: false };
+                {
+                    var refused = row.Tag is SetReleaseGroup { CanRelease: false };
+                    row.Cells[includeColumn.Index].ReadOnly = refused;
+                    row.Cells[targetColumn.Index].ReadOnly = refused;
+                }
             }
 
             var retry = Result is { Release: null, ReleaseError.Length: > 0 };
             releaseButton.Text = retry ? "Record Release" : "Release";
             releaseButton.Enabled = !running && (retry || (editable && chosen.Count > 0));
             var parts = chosen.Sum(g => (long)g.TotalQuantity);
+            var merged = chosen.Count(g => targets.ContainsKey(g.Key));
             summaryLabel.Text = plan == null || plan.Groups.Count == 0
-                ? "This set has nothing to release."
+                ? "These sets have nothing to release."
                 : $"{chosen.Count} of {plan.Groups.Count} group{(plan.Groups.Count == 1 ? "" : "s")} chosen: "
-                    + $"{chosen.Count} Draft nest{(chosen.Count == 1 ? "" : "s")}, {parts:N0} part{(parts == 1 ? "" : "s")}";
+                    + $"{chosen.Count - merged} new Draft nest{(chosen.Count - merged == 1 ? "" : "s")}"
+                    + (merged == 0 ? "" : $", {merged} merge{(merged == 1 ? "" : "s")}")
+                    + $", {parts:N0} part{(parts == 1 ? "" : "s")}";
         }
 
         private static string Describe(SetReleaseGroup group) =>
@@ -319,11 +648,24 @@ namespace OpenNest.Forms
             return new LibraryPackage(bytes, contents.Drawing, contents.Units, contents.Warnings);
         }
 
+        private static Nest ReadNest(byte[] bytes)
+        {
+            using var stream = new MemoryStream(bytes, writable: false);
+            return new NestReader(stream) { BestFitStore = BestFitCacheStore.Shared }.Read();
+        }
+
         private static byte[] WriteNest(Nest nest)
         {
             using var stream = new MemoryStream();
             new NestWriter(nest) { BestFitStore = BestFitCacheStore.Shared }.Write(stream);
             return stream.ToArray();
+        }
+
+        /// <summary>A set in the type-ahead list, shown by name and customer.</summary>
+        private sealed record SetChoice(DrawingSetRecord Set)
+        {
+            public override string ToString() =>
+                string.IsNullOrWhiteSpace(Set.Customer) ? Set.Name : $"{Set.Name} ({Set.Customer})";
         }
     }
 }

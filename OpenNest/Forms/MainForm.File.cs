@@ -45,6 +45,10 @@ namespace OpenNest.Forms
             LoadNest(nest, windowState, record.Id, NestStorage.Settings.ServerUrl, record.Revision);
         }
 
+        /// <summary>True when a tab holds the server nest <paramref name="id"/>.</summary>
+        internal bool IsServerNestOpen(Guid id) =>
+            id != Guid.Empty && MdiChildren.OfType<EditNestForm>().Any(form => form.Document.RemoteId == id);
+
         #region File Menu Events
 
         private async void New_Click(object sender, EventArgs e)

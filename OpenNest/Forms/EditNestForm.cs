@@ -1268,7 +1268,7 @@ namespace OpenNest.Forms
             using var form = new DrawingLibraryForm(library, NestStorage.Settings.ServerUrl, Nest, sets);
             // Released nests open in their own tabs beside this one.
             if (MdiParent is MainForm main)
-                form.EnableRelease(NestStorage.CreateRepository(), main.OpenServerNest);
+                form.EnableRelease(NestStorage.CreateRepository(), main.OpenServerNest, main.IsServerNestOpen);
             form.ShowDialog(this);
             if (form.AddedDrawings.Count > 0)
                 UpdateDrawingList();

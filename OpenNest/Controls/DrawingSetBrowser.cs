@@ -25,6 +25,7 @@ namespace OpenNest.Controls
         private string serverUrl;
         private INestRepository nests;
         private Action<Nest, NestRecord> openNest;
+        private Func<Guid, bool> isNestOpen = _ => false;
         private DrawingSetBrowseSession session;
         private bool pick;
         private bool busy;
@@ -101,7 +102,7 @@ namespace OpenNest.Controls
             };
             ShowRelease = set =>
             {
-                using var form = new ReleaseSetForm(sets, library, nests, this.serverUrl, set, openNest);
+                using var form = new ReleaseSetForm(sets, library, nests, this.serverUrl, set, openNest) { IsNestOpen = isNestOpen };
                 form.ShowDialog(FindForm());
             };
 
@@ -120,11 +121,14 @@ namespace OpenNest.Controls
         }
 
         /// <summary>
-        /// Shows Release, which makes nests from the selected set: uploads them through
-        /// <paramref name="nests"/> and opens each with <paramref name="openNest"/>.
+        /// Shows Release, which makes nests from the selected set and any others the operator
+        /// adds: saves them through <paramref name="nests"/> and opens each with
+        /// <paramref name="openNest"/>. <paramref name="isNestOpen"/> says whether a server nest
+        /// is open in a tab, which keeps a release from merging into it.
         /// </summary>
-        public void EnableRelease(INestRepository nests, Action<Nest, NestRecord> openNest)
+        public void EnableRelease(INestRepository nests, Action<Nest, NestRecord> openNest, Func<Guid, bool> isNestOpen = null)
         {
+            this.isNestOpen = isNestOpen ?? (_ => false);
             if (session == null || pick)
                 throw new InvalidOperationException("Release needs an initialized set browser that is not picking.");
             this.nests = nests ?? throw new ArgumentNullException(nameof(nests));
