@@ -41,6 +41,11 @@ internal sealed class CuttingInspectionPanel : UserControl
     private bool configuringMode;
     private bool pendingReplan;
     private bool pendingClear;
+    private bool pendingCutOffSettings;
+    // The running plan's headline, re-shown each second with its elapsed time; null when not ticking.
+    private string planningStatus;
+    private readonly System.Diagnostics.Stopwatch planningClock = new();
+    private readonly System.Windows.Forms.Timer elapsedTimer = new() { Interval = 1000 };
     internal CuttingInspectionMode Mode { get; private set; }
     internal PostVerificationReport ValidationReport { get; private set; }
     internal Func<Nest, CancellationToken, Task<PostVerificationReport>> Analyze { get; set; }
@@ -223,7 +228,11 @@ internal sealed class CuttingInspectionPanel : UserControl
         planButton.Click += (_, _) => StartCurrentMode();
         cancelButton.Click += (_, _) => RequestClose();
         settingsButton.Click += (_, _) => EditSettings();
-        keepOrderCheckBox.CheckedChanged += (_, _) => StartPlanning();
+        keepOrderCheckBox.CheckedChanged += (_, _) => RestartPlanning();
+        elapsedTimer.Tick += (_, _) =>
+        {
+            if (planningStatus != null && !closed) ShowElapsed();
+        };
         autoCutOffsCheckBox.CheckedChanged += (_, _) => RestartPlanning();
         cutOffSettingsButton.Click += (_, _) => EditCutOffSettings();
         clearExistingButton.Click += (_, _) => ClearExistingWork();
@@ -241,11 +250,28 @@ internal sealed class CuttingInspectionPanel : UserControl
     /// <summary>Sets the headline banner and replaces the detail line (empty hides either).</summary>
     private void SetStatus(Tone tone, string text, string detail = null)
     {
+        planningStatus = null; // Any other headline stops the elapsed-time ticker.
+        elapsedTimer.Stop();
         statusLabel.Text = text;
         statusBanner.SetTone(tone);
         statusBanner.Visible = !string.IsNullOrEmpty(text);
         SetDetail(detail);
     }
+
+    /// <summary>Shows a running plan's headline with the run's elapsed time, refreshed every second.</summary>
+    private void SetPlanningStatus(string text)
+    {
+        SetStatus(Tone.Neutral, text);
+        planningStatus = text;
+        ShowElapsed();
+        elapsedTimer.Start();
+    }
+
+    private void ShowElapsed() => statusLabel.Text = $"{planningStatus} [{FormatElapsed(planningClock.Elapsed)}]";
+
+    internal static string FormatElapsed(TimeSpan elapsed) => elapsed.TotalMinutes >= 1
+        ? $"{(int)elapsed.TotalMinutes}m {elapsed.Seconds:00}s"
+        : $"{elapsed.Seconds}s";
 
     private void SetDetail(string text)
     {
@@ -294,8 +320,22 @@ internal sealed class CuttingInspectionPanel : UserControl
     /// </summary>
     private void EditCutOffSettings()
     {
-        if (closed || closeRequested || IsPlanning || Mode != CuttingInspectionMode.Plan)
+        if (closed || closeRequested || pendingMode != null || Mode != CuttingInspectionMode.Plan)
             return;
+        if (IsPlanning)
+        {
+            // The dialog changes the live plates, so it opens once the running plan has cancelled.
+            if (pendingCutOffSettings || pendingClear)
+                return;
+            pendingCutOffSettings = true;
+            pendingReplan = true;
+            ClearResult();
+            SetPlanning(true);
+            SetStatus(Tone.Neutral, "Cancelling the plan to edit the cut-off settings…");
+            if (!inspection.CloseRequested)
+                inspection.RequestClose();
+            return;
+        }
         ClearResult();
         try
         {
@@ -365,7 +405,7 @@ internal sealed class CuttingInspectionPanel : UserControl
     private void StartCurrentMode()
     {
         if (Mode == CuttingInspectionMode.Validate) StartValidation();
-        else StartPlanning();
+        else RestartPlanning();
     }
 
     private void ConfigureMode()
@@ -579,9 +619,9 @@ internal sealed class CuttingInspectionPanel : UserControl
     };
 
     /// <summary>
-    /// Starts planning with the current settings. The scrap cut-offs checkbox stays enabled while
-    /// planning runs, so toggling it mid-plan cancels the run in progress and starts a fresh one
-    /// once that cancellation lands, instead of being ignored like other, disabled, controls.
+    /// Starts planning with the current settings. The planning inputs stay enabled while planning
+    /// runs, so changing one mid-plan cancels the run in progress and starts a fresh one once that
+    /// cancellation lands.
     /// </summary>
     private void RestartPlanning()
     {
@@ -613,7 +653,8 @@ internal sealed class CuttingInspectionPanel : UserControl
         }
         RefreshExistingWork();
         SetPlanning(true);
-        SetStatus(Tone.Neutral, "Planning…");
+        planningClock.Restart();
+        SetPlanningStatus("Planning…");
         try
         {
             // Capture on the owner thread; no worker recapture of the live plate or settings.
@@ -625,7 +666,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             var progress = new PostingProgress(context, value =>
             {
                 if (!closed && !inspection.CloseRequested && inspection.IsRunning && generation == run)
-                    SetStatus(Tone.Neutral, (plates.Length > 1 ? $"Planning plate {value.PlateNumber}: " : "Planning: ")
+                    SetPlanningStatus((plates.Length > 1 ? $"Planning plate {value.PlateNumber}: " : "Planning: ")
                         + PhaseText(value.Phase) + "…");
             });
             var work = inspection.BeginPlanning(batch, BeforePlan, progress);
@@ -654,7 +695,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             inspection.CompletePlanning(work);
             if (closeRequested || pendingMode != null)
             {
-                pendingReplan = pendingClear = false;
+                pendingReplan = pendingClear = pendingCutOffSettings = false;
                 FinishTransition();
                 return;
             }
@@ -671,6 +712,13 @@ internal sealed class CuttingInspectionPanel : UserControl
                         SetPlanning(false);
                         return;
                     }
+                }
+                if (pendingCutOffSettings)
+                {
+                    pendingCutOffSettings = false; // The cancelled run no longer reads the plates.
+                    SetPlanning(false);
+                    EditCutOffSettings(); // Replans when the dialog closes.
+                    return;
                 }
                 StartPlanning();
                 return;
@@ -815,10 +863,11 @@ internal sealed class CuttingInspectionPanel : UserControl
 
     private void SetPlanning(bool running)
     {
-        settingsButton.Enabled = keepOrderCheckBox.Enabled = planButton.Enabled = !running;
-        cutOffSettingsButton.Enabled = !running;
-        // Clearing mid-plan cancels the run and replans, so it stays enabled unless closing or switching.
-        clearExistingButton.Enabled = !running || Mode == CuttingInspectionMode.Plan && !closeRequested && pendingMode == null;
+        // Planning inputs change mid-plan by cancelling the run and replanning, so they stay enabled
+        // unless closing or switching; validation still locks them while it runs.
+        var replannable = !running || Mode == CuttingInspectionMode.Plan && !closeRequested && pendingMode == null;
+        settingsButton.Enabled = keepOrderCheckBox.Enabled = planButton.Enabled = replannable;
+        cutOffSettingsButton.Enabled = clearExistingButton.Enabled = replannable;
         previousButton.Enabled = !running && selectedPlate > 0;
         nextButton.Enabled = !running && selectedPlate < plates.Length - 1;
         acceptWarningsCheckBox.Enabled = !running;
@@ -1091,13 +1140,14 @@ internal sealed class CuttingInspectionPanel : UserControl
 
     private void EditSettings()
     {
-        if (IsPlanning || closed) return;
+        // A running plan keeps going behind the dialog; OK cancels it and replans with the new settings.
+        if (closed || closeRequested || pendingMode != null || Mode != CuttingInspectionMode.Plan) return;
         using var dialog = new CuttingParametersDialog();
         dialog.LoadParameters(parameters);
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        if (dialog.ShowDialog(this) != DialogResult.OK || closed || closeRequested) return;
         parameters = dialog.GetParameters();
         ShowSettings();
-        StartPlanning();
+        RestartPlanning();
     }
 
     private void ShowSettings()
@@ -1326,7 +1376,10 @@ internal sealed class CuttingInspectionPanel : UserControl
                 return; // The worker still owns the inspection lock and controls.
         }
         if (disposing)
+        {
+            elapsedTimer.Dispose();
             toolTip.Dispose();
+        }
         base.Dispose(disposing);
     }
 

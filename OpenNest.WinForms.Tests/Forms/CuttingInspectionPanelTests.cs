@@ -608,6 +608,93 @@ public class CuttingInspectionPanelTests
     });
 
     [Fact]
+    public void PlanningInputsStayEnabledAndChangingThemMidPlanRestartsWithTheNewValue() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var runs = 0;
+        editor.CuttingBeforePlan = _ =>
+        {
+            if (Interlocked.Increment(ref runs) > 1) return;
+            entered.Set();
+            release.Wait(TimeSpan.FromSeconds(30));
+        };
+        try
+        {
+            editor.OpenCuttingInspection();
+            var panel = editor.CuttingInspection!;
+            PumpUntil(() => entered.IsSet);
+            Assert.True(panel.IsPlanning);
+            Assert.Matches(@"^Planning.*\[\d+s\]$", Field<Label>(panel, "statusLabel").Text);
+            foreach (var name in new[] { "settingsButton", "cutOffSettingsButton", "planButton" })
+                Assert.True(Field<Button>(panel, name).Enabled, name);
+            var keepOrder = Field<CheckBox>(panel, "keepOrderCheckBox");
+            Assert.True(keepOrder.Enabled);
+
+            keepOrder.Checked = true; // cancels the run in progress and restarts
+            release.Set();
+
+            PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+            Assert.Equal(2, runs);
+            Assert.True(panel.Proposal.Plates[0].KeptCurrentOrder || !panel.Proposal.Plates[0].OrderChanged);
+            panel.RequestClose();
+        }
+        finally
+        {
+            release.Set();
+        }
+    });
+
+    [Fact]
+    public void CutOffSettingsMidPlanOpenOnceTheRunCancelsThenReplan() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var runs = 0;
+        editor.CuttingBeforePlan = _ =>
+        {
+            if (Interlocked.Increment(ref runs) > 1) return;
+            entered.Set();
+            release.Wait(TimeSpan.FromSeconds(30));
+        };
+        try
+        {
+            editor.OpenCuttingInspection();
+            var panel = editor.CuttingInspection!;
+            PumpUntil(() => entered.IsSet);
+            var opened = 0;
+            panel.ShowCutOffSettings = _ => { opened++; return DialogResult.Cancel; };
+
+            Field<Button>(panel, "cutOffSettingsButton").PerformClick();
+            Assert.Equal(0, opened); // waits for the running plan to cancel first
+            release.Set();
+
+            PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+            Assert.Equal(1, opened);
+            Assert.Equal(2, runs);
+            panel.RequestClose();
+        }
+        finally
+        {
+            release.Set();
+        }
+    });
+
+    [Theory]
+    [InlineData(0, "0s")]
+    [InlineData(20, "20s")]
+    [InlineData(65, "1m 05s")]
+    [InlineData(3725, "62m 05s")]
+    public void ElapsedPlanningTimeIsShownInSecondsThenMinutes(int seconds, string expected) =>
+        Assert.Equal(expected, CuttingInspectionPanel.FormatElapsed(TimeSpan.FromSeconds(seconds)));
+
+    [Fact]
     public void ApplyKeepsTheStagedAutomaticCutOffsInThePlannedOrder() => RunSta(() =>
     {
         using var editor = Editor();
