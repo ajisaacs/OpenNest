@@ -99,7 +99,7 @@ entry, never programs or geometry, and takes the archive-derived fields below fr
 |---|---|---|---|
 | GET | `/healthz` | — | 200 `{ "status": "ok" }` after a live database query; 503 `{ "status": "unavailable" }` on storage failure (no internal details) |
 | GET | `/api/nests` | — | `NestRecord[]`, newest `savedAt` first. Full, unbounded enumeration for backup manifests, restore checks and the container smoke; browsing uses `/api/nests/query` |
-| GET | `/api/nests/query?search=&sort=&order=&offset=&limit=` | — | `{ "items": NestRecord[], "total", "offset", "limit" }`: one bounded page filtered in SQL (see below), or 400 for an invalid parameter |
+| GET | `/api/nests/query?search=&status=&material=&materialGrade=&thickness=&sort=&order=&offset=&limit=` | — | `{ "items": NestRecord[], "total", "offset", "limit" }`: one bounded page filtered in SQL (see below), or 400 for an invalid parameter |
 | GET | `/api/nests/{id}` | — | `NestRecord` or 404 |
 | GET | `/api/nests/{id}/file` | — | `.nest` archive bytes (`application/zip`) or 404 |
 | POST | `/api/nests` | multipart: `metadata` (JSON `NestRecord`) + `file` (`.nest` bytes) | `NestRecord` with server-assigned `id` when the client sends an empty guid; 409 with the current record (active or deleted) when the `id` already exists, storing nothing |
@@ -170,6 +170,13 @@ only the requested page of metadata (never archive bytes):
   `materialGrade`, `madeBy`, `comments` or the status (`ToBeCut` or the display name `To Be Cut`).
   `%`, `_` and `\` are literal. Dates and numbers are not matched as text.
   Case folding is ASCII-only (SQLite `LIKE`).
+- Exact filters (optional, all must match; used to find draft nests a release
+  can merge into): `status` (`draft`, `quote`, `toBeCut` or `hasBeenCut`),
+  `material` and `materialGrade` (compared by `SharedListNames.Key`, so case and
+  spacing are ignored; a present but blank `materialGrade` asks for nests with no
+  grade) and `thickness` (a number, zero or greater, matched at four decimals).
+  The client sends them only when set, so plain browsing still works against
+  servers without them.
 - `offset` (default 0, at least 0) and `limit` (default 100, 1 to 500).
 - `sort` (default `savedAt`): one of `savedAt`, `name`, `customer`, `status`,
   `material`, `dateCreated`, `dateModified`, `thickness`, `plateCount`,

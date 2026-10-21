@@ -29,6 +29,8 @@ public sealed partial class NestDatabase : IDisposable
             Pooling = pooling,
         }.ToString());
         _connection.Open();
+        // Nest material and grade filters compare as the shared material lists do (case and spacing ignored).
+        _connection.CreateFunction("shared_key", (string? name) => SharedListNames.Key(name), isDeterministic: true);
         try
         {
             Execute("""
@@ -97,12 +99,14 @@ public sealed partial class NestDatabase : IDisposable
             throw new ArgumentException(error, nameof(query));
 
         var search = query.NormalizedSearch;
-        var where = "WHERE deleted=" + (deleted ? "1" : "0") + (search.Length == 0 ? "" : " AND (" + SearchPredicate + ")");
+        var where = "WHERE deleted=" + (deleted ? "1" : "0") + (search.Length == 0 ? "" : " AND (" + SearchPredicate + ")")
+            + FilterPredicate(query);
         lock (_sync)
         {
             using var count = _connection.CreateCommand();
             count.CommandText = $"SELECT COUNT(*) FROM nests {where}";
             AddSearchParameter(count, search);
+            AddFilterParameters(count, query);
             var total = checked((int)(long)count.ExecuteScalar()!);
 
             using var command = _connection.CreateCommand();
@@ -113,6 +117,7 @@ public sealed partial class NestDatabase : IDisposable
                 LIMIT $limit OFFSET $offset
                 """;
             AddSearchParameter(command, search);
+            AddFilterParameters(command, query);
             command.Parameters.AddWithValue("$limit", query.Limit);
             command.Parameters.AddWithValue("$offset", query.Offset);
             var records = new List<NestRecord>();
@@ -488,6 +493,25 @@ public sealed partial class NestDatabase : IDisposable
         NestSortField.MaterialGrade => "materialGrade COLLATE NOCASE",
         _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Unsupported sort column."),
     };
+
+    // Thickness matches when both round to the same four decimals, as drawing thicknesses are stored.
+    private static string FilterPredicate(NestQuery query) =>
+        (query.Status is null ? "" : " AND status=$status")
+        + (query.Material is null ? "" : " AND shared_key(material)=$materialKey")
+        + (query.MaterialGrade is null ? "" : " AND shared_key(materialGrade)=$gradeKey")
+        + (query.Thickness is null ? "" : " AND ABS(ROUND(thickness, 4) - $thickness) < 0.000001");
+
+    private static void AddFilterParameters(SqliteCommand command, NestQuery query)
+    {
+        if (query.Status is { } status)
+            command.Parameters.AddWithValue("$status", status.ToString());
+        if (query.Material is not null)
+            command.Parameters.AddWithValue("$materialKey", SharedListNames.Key(query.Material));
+        if (query.MaterialGrade is not null)
+            command.Parameters.AddWithValue("$gradeKey", SharedListNames.Key(query.MaterialGrade));
+        if (query.Thickness is { } thickness)
+            command.Parameters.AddWithValue("$thickness", DrawingLibraryRules.NormalizeThickness(thickness));
+    }
 
     private static void AddSearchParameter(SqliteCommand command, string search)
     {

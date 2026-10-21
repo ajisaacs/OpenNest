@@ -10,7 +10,10 @@ namespace OpenNest.Server;
 /// </summary>
 internal static class NestQueryRequest
 {
-    private static readonly string[] Keys = { "search", "sort", "order", "offset", "limit" };
+    private static readonly string[] Keys =
+    {
+        "search", "sort", "order", "offset", "limit", "status", "material", "materialGrade", "thickness",
+    };
 
     public static bool TryParse(IQueryCollection values, out NestQuery query, out string error)
     {
@@ -52,6 +55,29 @@ internal static class NestQueryRequest
             }
         }
 
+        NestStatus? status = null;
+        if (values.TryGetValue("status", out var statusText))
+        {
+            if (!DrawingLibraryRequest.TryEnumName<NestStatus>(statusText.ToString(), out var parsed))
+            {
+                error = "status must be draft, quote, toBeCut or hasBeenCut.";
+                return false;
+            }
+            status = parsed;
+        }
+
+        double? thickness = null;
+        if (values.TryGetValue("thickness", out var thicknessText))
+        {
+            if (!double.TryParse(thicknessText.ToString(), NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent,
+                    CultureInfo.InvariantCulture, out var parsed))
+            {
+                error = "thickness must be a number, zero or greater.";
+                return false;
+            }
+            thickness = parsed;
+        }
+
         var offset = 0;
         var limit = NestQuery.DefaultLimit;
         if (!TryInteger(values, "offset", ref offset, out error) || !TryInteger(values, "limit", ref limit, out error))
@@ -60,6 +86,11 @@ internal static class NestQueryRequest
         query = new NestQuery
         {
             Search = values["search"].ToString(),
+            Status = status,
+            // Present but blank is a filter too: a blank grade asks for nests without one.
+            Material = values.TryGetValue("material", out var material) ? material.ToString() : null,
+            MaterialGrade = values.TryGetValue("materialGrade", out var grade) ? grade.ToString() : null,
+            Thickness = thickness,
             Sort = sort,
             Descending = descending,
             Offset = offset,

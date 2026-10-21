@@ -268,7 +268,32 @@ public class RemoteNestRepositoryTests
         new NestQuery { Search = new string('x', NestQuery.MaxSearchLength + 1) },
         new NestQuery { Sort = (NestSortField)99 },
         new NestQuery { Search = "Alpha\0not-present" },
+        new NestQuery { Status = (NestStatus)99 },
+        new NestQuery { Thickness = -0.1 },
+        new NestQuery { Thickness = double.NaN },
+        new NestQuery { Material = new string('m', 201) },
+        new NestQuery { MaterialGrade = "A\0" },
     };
+
+    [Fact]
+    public async Task QueryAsync_SendsDraftFilters_IncludingABlankGrade()
+    {
+        var handler = new StubHandler(_ => StubHandler.Json(new { items = Array.Empty<NestRecord>() }));
+        using var repo = new RemoteNestRepository(new HttpClient(handler), "http://s");
+
+        await repo.QueryAsync(new NestQuery
+        {
+            Status = NestStatus.Draft,
+            Material = "Carbon Steel",
+            MaterialGrade = "",
+            Thickness = 0.1875,
+        });
+
+        Assert.EndsWith(
+            "/api/nests/query?search=&sort=savedAt&order=desc&offset=0&limit=100"
+                + "&status=draft&material=Carbon%20Steel&materialGrade=&thickness=0.1875",
+            handler.Requests[0].RequestUri!.AbsoluteUri);
+    }
 
     [Fact]
     public async Task QueryAsync_SendsSortColumnAndDirection()

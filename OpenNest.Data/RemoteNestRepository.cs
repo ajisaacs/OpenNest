@@ -85,12 +85,24 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         return page;
     }
 
-    private static string BuildQueryString(NestQuery query) =>
-        "search=" + Uri.EscapeDataString(query.NormalizedSearch)
-        + "&sort=" + JsonNamingPolicy.CamelCase.ConvertName(query.Sort.ToString())
-        + "&order=" + (query.Descending ? "desc" : "asc")
-        + "&offset=" + query.Offset.ToString(CultureInfo.InvariantCulture)
-        + "&limit=" + query.Limit.ToString(CultureInfo.InvariantCulture);
+    // Filters are sent only when set, so plain browsing still works against servers without them.
+    private static string BuildQueryString(NestQuery query)
+    {
+        var text = "search=" + Uri.EscapeDataString(query.NormalizedSearch)
+            + "&sort=" + JsonNamingPolicy.CamelCase.ConvertName(query.Sort.ToString())
+            + "&order=" + (query.Descending ? "desc" : "asc")
+            + "&offset=" + query.Offset.ToString(CultureInfo.InvariantCulture)
+            + "&limit=" + query.Limit.ToString(CultureInfo.InvariantCulture);
+        if (query.Status is { } status)
+            text += "&status=" + JsonNamingPolicy.CamelCase.ConvertName(status.ToString());
+        if (query.Material is not null)
+            text += "&material=" + Uri.EscapeDataString(query.Material);
+        if (query.MaterialGrade is not null)
+            text += "&materialGrade=" + Uri.EscapeDataString(query.MaterialGrade);
+        if (query.Thickness is { } thickness)
+            text += "&thickness=" + thickness.ToString("R", CultureInfo.InvariantCulture);
+        return text;
+    }
 
     public Task<NestRecord?> GetMetadataAsync(Guid id, CancellationToken cancellationToken = default) =>
         GetMetadataCoreAsync(id, false, cancellationToken);

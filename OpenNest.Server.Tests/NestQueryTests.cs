@@ -178,6 +178,47 @@ public sealed class NestQueryTests : IDisposable
     }
 
     [Fact]
+    public async Task Query_FiltersByStatusMaterialGradeAndThickness_ForReleaseDraftLookup()
+    {
+        NestRecord Add(string name, NestStatus status, string material, string grade, double thickness) =>
+            _database.Insert(Guid.NewGuid(), new NestRecord
+            {
+                Name = name,
+                Status = status,
+                Material = material,
+                MaterialGrade = grade,
+                Thickness = thickness,
+            }, new byte[] { 1 });
+        var match = Add("Matching draft", NestStatus.Draft, "Synthetic  Steel", "a36", 0.25);
+        var spaced = Add("Spaced draft", NestStatus.Draft, " SYNTHETIC STEEL ", " A36 ", 0.25004);
+        Add("Quote", NestStatus.Quote, "Synthetic Steel", "A36", 0.25);
+        Add("Other grade", NestStatus.Draft, "Synthetic Steel", "A1011", 0.25);
+        Add("Thicker", NestStatus.Draft, "Synthetic Steel", "A36", 0.2501);
+        var ungraded = Add("No grade", NestStatus.Draft, "Synthetic Steel", "", 0.25);
+        _database.SetDeleted(Add("Deleted draft", NestStatus.Draft, "Synthetic Steel", "A36", 0.25).Id, true, 1);
+
+        var drafts = await _repository.QueryAsync(new NestQuery
+        {
+            Status = NestStatus.Draft,
+            Material = "synthetic steel",
+            MaterialGrade = "A36",
+            Thickness = 0.25,
+            Sort = NestSortField.Name,
+            Descending = false,
+        });
+        var blankGrade = await _repository.QueryAsync(new NestQuery { Status = NestStatus.Draft, MaterialGrade = "" });
+        var anyGrade = await _repository.QueryAsync(new NestQuery { Material = "Synthetic Steel", Thickness = 0.25 });
+
+        Assert.Equal(new[] { match.Id, spaced.Id }, drafts.Items.Select(r => r.Id));
+        Assert.Equal(2, drafts.Total);
+        Assert.Equal(ungraded.Id, Assert.Single(blankGrade.Items).Id);
+        Assert.Equal(5, anyGrade.Total);
+        var body = await _client.GetStringAsync("/api/nests/query?status=DRAFT&thickness=2.5e-1&material=synthetic%20steel&materialGrade=a36");
+        Assert.Contains("Matching draft", body);
+        Assert.DoesNotContain("Quote", body);
+    }
+
+    [Fact]
     public async Task Query_DoesNotMatchDatesOrNumbers()
     {
         Seed(12);
@@ -200,7 +241,14 @@ public sealed class NestQueryTests : IDisposable
     [InlineData("offset=99999999999")]
     [InlineData("limit=1&limit=2")]
     [InlineData("serach=beta")]
-    [InlineData("status=quote")]
+    [InlineData("status=1")]
+    [InlineData("status=cut")]
+    [InlineData("status=quote,draft")]
+    [InlineData("thickness=-1")]
+    [InlineData("thickness=abc")]
+    [InlineData("thickness=NaN")]
+    [InlineData("material=a&material=b")]
+    [InlineData("materialGrade=%00")]
     [InlineData("search=Alpha%00not-present")]
     [InlineData("search=%00")]
     public async Task Query_InvalidParameters_Return400WithoutItems(string queryString)

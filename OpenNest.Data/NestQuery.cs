@@ -16,6 +16,24 @@ public sealed class NestQuery
     /// </summary>
     public string Search { get; init; } = "";
 
+    /// <summary>Only nests in this status; null means any.</summary>
+    public NestStatus? Status { get; init; }
+
+    /// <summary>
+    /// Only nests of this material name, compared by <see cref="SharedListNames.Key"/>
+    /// (case and spacing ignored); null means any.
+    /// </summary>
+    public string? Material { get; init; }
+
+    /// <summary>
+    /// Only nests of this grade, compared like <see cref="Material"/>; null means any and
+    /// blank means nests with no grade recorded.
+    /// </summary>
+    public string? MaterialGrade { get; init; }
+
+    /// <summary>Only nests of this thickness, compared at four decimals; null means any.</summary>
+    public double? Thickness { get; init; }
+
     /// <summary>Column to order by; ties are broken by id in the same direction.</summary>
     public NestSortField Sort { get; init; } = NestSortField.SavedAt;
 
@@ -45,6 +63,11 @@ public sealed class NestQuery
         // SQLite LIKE stops at an embedded NUL, which would turn the rest of the text into a wildcard.
         if (NormalizedSearch.Contains('\0'))
             return "search must not contain NUL characters.";
-        return null;
+        if (Status is { } status && !Enum.IsDefined(status))
+            return "status must be a supported status.";
+        if (Thickness is { } thickness && (!double.IsFinite(thickness) || thickness < 0))
+            return "thickness must be a finite number, zero or greater.";
+        return (Material is null ? null : DrawingLibraryRules.TextError("material", Material, DrawingLibraryRules.MaxTextLength))
+            ?? (MaterialGrade is null ? null : DrawingLibraryRules.TextError("materialGrade", MaterialGrade, DrawingLibraryRules.MaxTextLength));
     }
 }
