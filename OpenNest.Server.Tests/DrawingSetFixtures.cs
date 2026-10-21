@@ -61,7 +61,7 @@ internal static class DrawingSetFixtures
         using var body = new MultipartFormDataContent
         {
             { new StringContent(JsonSerializer.Serialize(record, Options), Encoding.UTF8, "application/json"), "metadata" },
-            { new ByteArrayContent(new byte[] { 1, 2, 3 }), "file", "synthetic.nest" },
+            { new ByteArrayContent(TestNests.Archive(1, 2, 3)), "file", "synthetic.nest" },
         };
         using var response = await client.PostAsync("/api/nests", body);
         response.EnsureSuccessStatusCode();
