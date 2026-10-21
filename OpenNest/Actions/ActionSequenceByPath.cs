@@ -92,7 +92,24 @@ namespace OpenNest.Actions
             if (plateView.LengthWorldToGui(point.DistanceTo(drawing[^1])) < PointSpacingPixels)
                 return;
             drawing.Add(point);
+            UpdatePreview();
             plateView.Invalidate();
+        }
+
+        /// <summary>Numbers the parts as if the line being drawn were finished, without reordering the plate.</summary>
+        private void UpdatePreview()
+        {
+            var order = DrawnPathSequencing.CutOrder(plateView.Plate, lines.Append(drawing).ToList());
+            if (order == null)
+            {
+                plateView.PreviewSequence = null;
+                return;
+            }
+
+            var numbers = new Dictionary<Part, int>(order.Count, ReferenceEqualityComparer.Instance);
+            for (var i = 0; i < order.Count; i++)
+                numbers[order[i]] = i + 1;
+            plateView.PreviewSequence = numbers;
         }
 
         private void plateView_MouseUp(object sender, MouseEventArgs e)
@@ -102,6 +119,7 @@ namespace OpenNest.Actions
 
             var line = drawing;
             drawing = null;
+            plateView.PreviewSequence = null;
             var point = plateView.PointControlToWorld(e.Location);
             if (point.DistanceTo(line[^1]) > 0)
                 line.Add(point);
@@ -192,6 +210,7 @@ namespace OpenNest.Actions
             plateView.MouseUp -= plateView_MouseUp;
             plateView.KeyDown -= plateView_KeyDown;
             plateView.Paint -= plateView_Paint;
+            plateView.PreviewSequence = null;
             form.Close();
             form.Dispose();
             linePen.Dispose();
@@ -206,6 +225,7 @@ namespace OpenNest.Actions
         public override void CancelAction()
         {
             drawing = null;
+            plateView.PreviewSequence = null;
             plateView.Invalidate();
         }
 

@@ -18,20 +18,29 @@ namespace OpenNest.Engine.Sequencing
         /// <summary>Reorders the plate's parts; false when no line has length or nothing moves.</summary>
         public static bool Apply(Plate plate, IReadOnlyList<IReadOnlyList<Vector>> lines)
         {
-            ArgumentNullException.ThrowIfNull(plate);
-            ArgumentNullException.ThrowIfNull(lines);
-            if (plate.Parts.Count < 2 || !lines.Any(HasLength))
-                return false;
-
-            var first = plate.Parts.Where(p => p.BaseDrawing.CutFirst);
-            var rest = plate.Parts.Where(p => !p.BaseDrawing.CutFirst);
-            var ordered = Order(first, lines).Concat(Order(rest, lines)).ToList();
-            var cutOrder = PlateSequencing.OrderCutOffsFirst(ordered, plate);
-            if (cutOrder.SequenceEqual(plate.Parts, ReferenceEqualityComparer.Instance))
+            var cutOrder = CutOrder(plate, lines);
+            if (cutOrder == null || cutOrder.SequenceEqual(plate.Parts, ReferenceEqualityComparer.Instance))
                 return false;
 
             plate.Parts.Reorder(cutOrder);
             return true;
+        }
+
+        /// <summary>
+        /// The order <see cref="Apply"/> would give the plate, without changing it; null when
+        /// no line has length or there is nothing to order.
+        /// </summary>
+        public static List<Part> CutOrder(Plate plate, IReadOnlyList<IReadOnlyList<Vector>> lines)
+        {
+            ArgumentNullException.ThrowIfNull(plate);
+            ArgumentNullException.ThrowIfNull(lines);
+            if (plate.Parts.Count < 2 || !lines.Any(HasLength))
+                return null;
+
+            var first = plate.Parts.Where(p => p.BaseDrawing.CutFirst);
+            var rest = plate.Parts.Where(p => !p.BaseDrawing.CutFirst);
+            var ordered = Order(first, lines).Concat(Order(rest, lines)).ToList();
+            return PlateSequencing.OrderCutOffsFirst(ordered, plate);
         }
 
         /// <summary>The parts in line order; ties keep their current order.</summary>

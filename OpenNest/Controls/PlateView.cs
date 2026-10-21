@@ -312,6 +312,12 @@ namespace OpenNest.Controls
         internal OverlapOverlayController OverlapOverlay => overlapOverlay;
         internal ValidationOverlay ValidationOverlay => validationOverlay;
         internal CutSimulationOverlay CutSimulation => cutSimulation;
+
+        /// <summary>
+        /// Sequence numbers a tool previews in place of the parts' current order, without
+        /// reordering the plate; null shows the plate's own order.
+        /// </summary>
+        internal IReadOnlyDictionary<Part, int> PreviewSequence { get; set; }
         internal (float Scale, PointF Origin) CaptureViewport() => (ViewScale, origin);
         internal void RestoreViewport((float Scale, PointF Origin) viewport)
         {

@@ -124,7 +124,9 @@ namespace OpenNest.Controls
                 var finding = view.ValidationOverlay.Finding;
                 var muted = finding != null && finding.PartNumber != i + 1 && finding.OtherPartNumber != i + 1
                     || !view.HasProposalDisplay && view.CutSimulation.IsPartPending(i);
-                part.Draw(g, (i + 1).ToString(), muted);
+                var number = view.PreviewSequence != null
+                    && view.PreviewSequence.TryGetValue(part.BasePart, out var preview) ? preview : i + 1;
+                part.Draw(g, number.ToString(), muted);
                 DrawBendLines(g, part.BasePart, muted);
                 DrawEtchMarks(g, part.BasePart, muted);
                 DrawGrainWarning(g, part.BasePart, muted);

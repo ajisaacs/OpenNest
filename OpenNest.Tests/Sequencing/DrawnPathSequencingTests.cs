@@ -48,6 +48,29 @@ public class DrawnPathSequencingTests
     }
 
     [Fact]
+    public void CutOrder_PreviewsApplyWithoutReorderingThePlate()
+    {
+        var drawing = TestHelpers.MakeSquareDrawing();
+        var a = new Part(drawing, new Vector(0, 0));
+        var b = new Part(drawing, new Vector(20, 0));
+        var c = new Part(drawing, new Vector(40, 0));
+        var plate = TestHelpers.MakePlate(60, 120, c, a, b);
+        var reorders = 0;
+        plate.PartsReordered += (_, _) => reorders++;
+        var lines = Lines(new[] { new Vector(-5, 5), new Vector(55, 5) });
+
+        var preview = DrawnPathSequencing.CutOrder(plate, lines);
+
+        Assert.Equal(new[] { a, b, c }, preview);
+        Assert.Equal(new[] { c, a, b }, plate.Parts);
+        Assert.Equal(0, reorders);
+        Assert.Null(DrawnPathSequencing.CutOrder(plate, Lines(new[] { new Vector(0, 0) })));
+
+        Assert.True(DrawnPathSequencing.Apply(plate, lines));
+        Assert.Equal(preview, plate.Parts);
+    }
+
+    [Fact]
     public void Apply_PartGoesToTheNearestLineEvenWhenDrawnLater()
     {
         var drawing = TestHelpers.MakeSquareDrawing();
