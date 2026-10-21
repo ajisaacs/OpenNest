@@ -27,9 +27,37 @@ public class SetReleaseSessionTests
         return record;
     }
 
-    private SetReleaseSession Session(Func<SetReleaseGroup, CancellationToken, Task<Nest>>? createNest = null) =>
+    private SetReleaseSession Session(Func<SetReleaseGroup, CancellationToken, Task<Nest>>? createNest = null,
+        Func<Nest, CancellationToken, Task<SetReleaseRenest>>? renest = null) =>
         new(_sets, _library, _nests, Server + "/", ReadPackage, nest => Encoding.UTF8.GetBytes("nest " + nest.Name),
-            createNest ?? CreateNest);
+            createNest ?? CreateNest, bytes => _nests.Archives[Encoding.UTF8.GetString(bytes)], renest);
+
+    // A draft on the fake server holding `existing` (copied in from the library) on one placed sheet.
+    private (NestRecord Record, Nest Nest) Draft(DrawingLibraryRecord existing, int quantity = 2, int revision = 3)
+    {
+        var nest = new Nest("Draft 7")
+        {
+            Units = Units.Inches,
+            Material = new Material("Synthetic Steel", "Grade A", 0.28),
+            Thickness = 0.25,
+            Status = NestStatus.Draft,
+        };
+        var package = ReadPackage(_library.Packages[(existing.Id, existing.Revision)].Bytes);
+        LibraryDrawingInsert.Plan(nest, Server, existing, package, quantity).Apply();
+        nest.CreatePlate().Parts.Add(new Part(nest.Drawings.Single()));
+        var record = new NestRecord
+        {
+            Id = Guid.NewGuid(),
+            Revision = revision,
+            Name = nest.Name,
+            Material = "Synthetic Steel",
+            MaterialGrade = "Grade A",
+            Thickness = 0.25,
+            Status = NestStatus.Draft,
+        };
+        _nests.AddDraft(record, nest);
+        return (record, nest);
+    }
 
     private Task<Nest> CreateNest(SetReleaseGroup group, CancellationToken cancellationToken)
     {
@@ -315,6 +343,138 @@ public class SetReleaseSessionTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => session.RunAsync(plan, releasable, "", ""));
     }
 
+    [Fact]
+    public async Task Run_OfTwoSets_MergesIntoADraft_ClearsItsSheets_NestsIt_AndRecordsTheMerge()
+    {
+        var a = Stored("SYN-A");
+        var b = Stored("SYN-B");
+        var first = Set((a, 1), (b, 1));
+        var second = Set((a, 2));
+        var (draft, _) = Draft(a);
+        var plan = SetReleasePlan.Build(new[] { new SetReleasePlanLine(first, 2), new SetReleasePlanLine(second, 1) }, false);
+        var group = Assert.Single(plan.Groups);
+        var platesSeen = -1;
+        var session = Session(renest: (nest, _) =>
+        {
+            platesSeen = nest.Plates.Count;
+            nest.CreatePlate().Parts.Add(new Part(nest.Drawings.First()));
+            return Task.FromResult(new SetReleaseRenest(true, "2 copies did not fit."));
+        });
+
+        var result = await session.RunAsync(plan, plan.Groups, "Synthetic operator", "", mergeInto: new Dictionary<SetReleaseGroup, NestRecord> { [group] = draft });
+
+        Assert.Equal("", result.ReleaseError);
+        var merged = Assert.Single(result.Created);
+        Assert.Same(draft, merged.MergedInto);
+        Assert.Equal((draft.Id, 4), (merged.Record!.Id, merged.Record.Revision));
+        Assert.Empty(_created);
+        Assert.Empty(_nests.Uploaded);
+        Assert.Equal(new[] { (draft.Id, 3) }, _nests.Merges.Select(m => (m.Id, m.ExpectedRevision)));
+        Assert.Equal(0, platesSeen);
+        var nestAfter = merged.Nest!;
+        Assert.Equal(new[] { ("SYN-A", 6), ("SYN-B", 2) }, nestAfter.Drawings.OrderBy(d => d.Name).Select(d => (d.Name, d.Quantity.Required)));
+        Assert.Single(nestAfter.Plates);
+        Assert.Equal((true, "2 copies did not fit."), (merged.Renest!.Nested, merged.Renest.Note));
+        Assert.Contains("2 copies did not fit.", merged.Warnings);
+
+        var release = Assert.Single(_sets.Posted);
+        Assert.Equal(new[] { (first.Id, 2), (second.Id, 1) }, release.Sets.Select(l => (l.SetId, l.Quantity)));
+        var nestLine = Assert.Single(release.Nests);
+        Assert.Equal((SetReleaseNestKind.Merged, (int?)3, 4), (nestLine.Kind, nestLine.RevisionBefore, nestLine.RevisionAfter));
+        Assert.Equal(new[] { (first.Id, a.Id, 2), (second.Id, a.Id, 2), (first.Id, b.Id, 2) },
+            nestLine.Items.Select(i => (i.SetId, i.DrawingId, i.Quantity)));
+    }
+
+    [Fact]
+    public async Task Run_MergeIntoADraftWithAnotherRevisionOfADrawing_IsRefusedBeforeAnythingIsSaved()
+    {
+        var older = Stored("SYN-A");
+        var (draft, _) = Draft(older);
+        var newer = Stored("SYN-A");
+        newer.Id = older.Id;
+        newer.Revision = older.Revision + 1;
+        _library.Packages[(newer.Id, newer.Revision)] = (Encoding.UTF8.GetBytes($"package {newer.Id} r{newer.Revision}"), Units.Inches);
+        newer.PackageSha256 = Convert.ToHexString(SHA256.HashData(_library.Packages[(newer.Id, newer.Revision)].Bytes)).ToLowerInvariant();
+        var plan = SetReleasePlan.Build(Set((newer, 1), (Stored("SYN-NEW"), 1)), 1, false);
+
+        var result = await Session().RunAsync(plan, plan.Groups, "", "",
+            mergeInto: new Dictionary<SetReleaseGroup, NestRecord> { [plan.Groups[0]] = draft });
+
+        var group = Assert.Single(result.Groups);
+        Assert.Equal(SetReleaseGroupOutcome.Refused, group.Outcome);
+        Assert.Contains("Update Drawings", group.Error);
+        Assert.Empty(_nests.Merges);
+        Assert.Empty(_sets.Posted);
+    }
+
+    [Fact]
+    public async Task Run_MergeIntoADraftSavedMeanwhile_FailsThatGroup_AndRecordsNoRelease()
+    {
+        var a = Stored("SYN-A");
+        var (draft, nest) = Draft(a);
+        var plan = SetReleasePlan.Build(Set((a, 1)), 1, false);
+        _nests.SaveBeforeNextMerge = true;
+
+        var result = await Session().RunAsync(plan, plan.Groups, "", "",
+            mergeInto: new Dictionary<SetReleaseGroup, NestRecord> { [plan.Groups[0]] = draft });
+
+        var group = Assert.Single(result.Groups);
+        Assert.Equal(SetReleaseGroupOutcome.Failed, group.Outcome);
+        Assert.Contains("Someone saved it since you chose it (now revision 4)", group.Error);
+        Assert.Empty(_sets.Posted);
+        Assert.Null(result.Release);
+    }
+
+    [Fact]
+    public async Task Run_MergeChecks_RefuseAWrongTargetBeforeStarting()
+    {
+        var a = Stored("SYN-A");
+        var (draft, _) = Draft(a);
+        var plan = SetReleasePlan.Build(Set((a, 1), (Stored("SYN-B", material: "Synthetic Aluminum"), 1)), 1, false);
+        var noReader = new SetReleaseSession(_sets, _library, _nests, Server, ReadPackage, n => Array.Empty<byte>(), CreateNest);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => Session().RunAsync(plan, new[] { plan.Groups[0] }, "", "",
+            mergeInto: new Dictionary<SetReleaseGroup, NestRecord> { [plan.Groups[1]] = draft }));
+        await Assert.ThrowsAsync<ArgumentException>(() => Session().RunAsync(plan, plan.Groups, "", "",
+            mergeInto: new Dictionary<SetReleaseGroup, NestRecord> { [plan.Groups[0]] = draft, [plan.Groups[1]] = draft }));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => noReader.RunAsync(plan, plan.Groups, "", "",
+            mergeInto: new Dictionary<SetReleaseGroup, NestRecord> { [plan.Groups[0]] = draft }));
+        // A draft of the aluminum group's material is refused once downloaded.
+        var wrong = await Session().RunAsync(plan, plan.Groups, "", "",
+            mergeInto: new Dictionary<SetReleaseGroup, NestRecord> { [plan.Groups.Single(g => g.MaterialName == "Synthetic Aluminum")] = draft });
+        Assert.Contains(wrong.Groups, g => g.Outcome == SetReleaseGroupOutcome.Refused && g.Error.Contains("is not Synthetic Aluminum"));
+        Assert.Empty(_nests.Merges);
+    }
+
+    [Fact]
+    public async Task Run_WhenNestingAfterReleaseFails_StillReleasesTheNestUnnested()
+    {
+        var plan = SetReleasePlan.Build(Set((Stored("SYN-A"), 1)), 1, false);
+        var session = Session(renest: (nest, _) =>
+        {
+            nest.CreatePlate();
+            throw new InvalidOperationException("Synthetic engine failure.");
+        });
+
+        var result = await session.RunAsync(plan, plan.Groups, "", "");
+
+        var created = Assert.Single(result.Created);
+        Assert.Equal((false, "Auto Nest failed: Synthetic engine failure."), (created.Renest!.Nested, created.Renest.Note));
+        Assert.Empty(created.Nest!.Plates);
+        Assert.Single(_sets.Posted);
+    }
+
+    [Fact]
+    public async Task FindDrafts_AsksForDraftsOfTheGroup()
+    {
+        var plan = SetReleasePlan.Build(Set((Stored("SYN-A"), 1)), 1, false);
+
+        await SetReleasePlan.FindDraftsAsync(_nests, plan.Groups[0]);
+
+        var query = Assert.Single(_nests.Queries);
+        Assert.Equal((NestStatus.Draft, "Synthetic Steel", "Grade A", 0.25), (query.Status, query.Material, query.MaterialGrade, query.Thickness));
+    }
+
     private sealed class RecordingProgress(Action<SetReleaseProgress>? onReport = null) : IProgress<SetReleaseProgress>
     {
         public List<SetReleaseProgress> Reports { get; } = new();
@@ -381,9 +541,53 @@ public class SetReleaseSessionTests
             return Task.FromResult(_stored.TryGetValue(id, out var record) ? record : null);
         }
 
+        /// <summary>Nests a test reader returns, keyed by their (fake) archive text.</summary>
+        public Dictionary<string, Nest> Archives { get; } = new();
+        private readonly Dictionary<(Guid, int), byte[]> _revisions = new();
+        public List<(Guid Id, int ExpectedRevision)> Merges { get; } = new();
+        public List<NestQuery> Queries { get; } = new();
+        public bool SaveBeforeNextMerge { get; set; }
+
+        public void AddDraft(NestRecord record, Nest nest)
+        {
+            var key = $"draft {record.Id} r{record.Revision}";
+            Archives[key] = nest;
+            _revisions[(record.Id, record.Revision)] = Encoding.UTF8.GetBytes(key);
+            _stored[record.Id] = record;
+        }
+
+        public Task<byte[]?> GetRevisionFileAsync(Guid id, int revisionNumber, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_revisions.TryGetValue((id, revisionNumber), out var bytes) ? bytes : null);
+
+        public Task<NestRecord> UpdateFileAsync(Guid id, byte[] nestFile, NestRecord record, int expectedRevision,
+            CancellationToken cancellationToken = default)
+        {
+            var current = _stored[id];
+            if (SaveBeforeNextMerge)
+            {
+                SaveBeforeNextMerge = false;
+                current = _stored[id] = new NestRecord { Id = id, Name = current.Name, Revision = current.Revision + 1, Status = NestStatus.Draft };
+                _revisions[(id, current.Revision)] = Encoding.UTF8.GetBytes("someone else's save");
+            }
+            if (current.Revision != expectedRevision)
+                throw new IOException("Could not update the nest: HTTP 409 Conflict.");
+            Merges.Add((id, expectedRevision));
+            var saved = new NestRecord { Id = id, Name = record.Name, Revision = current.Revision + 1, Status = record.Status };
+            _stored[id] = saved;
+            _revisions[(id, saved.Revision)] = nestFile;
+            return Task.FromResult(saved);
+        }
+
+        public Task<NestPage> QueryAsync(NestQuery query, CancellationToken ct = default)
+        {
+            Queries.Add(query);
+            return Task.FromResult(new NestPage { Items = Array.Empty<NestRecord>(), Limit = query.Limit });
+        }
+
+        public Task<byte[]?> GetFileAsync(Guid id, CancellationToken ct = default) =>
+            Task.FromResult(_stored.TryGetValue(id, out var record) && _revisions.TryGetValue((id, record.Revision), out var bytes) ? bytes : null);
+
         public Task<IReadOnlyList<NestRecord>> ListAsync(CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<NestPage> QueryAsync(NestQuery query, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<byte[]?> GetFileAsync(Guid id, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<NestRecord> UpdateFileAsync(Guid id, byte[] file, NestRecord record, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<NestRecord> UpdateMetadataAsync(Guid id, NestRecord record, CancellationToken ct = default) => throw new NotSupportedException();
         public Task DeleteAsync(Guid id, CancellationToken ct = default) => throw new NotSupportedException();

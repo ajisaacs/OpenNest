@@ -72,7 +72,44 @@ public class SetReleasePlanTests
         var group = Assert.Single(plan.Groups);
         Assert.Equal(new[] { 12, 4 }, group.Items.Select(i => i.Quantity));
         Assert.Equal(16, group.TotalQuantity);
-        Assert.Equal(4, plan.Multiplier);
+        Assert.Equal(4, plan.Lines.Single().Quantity);
+    }
+
+    [Fact]
+    public void Build_OfSeveralSets_SumsASharedDrawing_KeepingEachSetsShare_AndGroupsAcrossSets()
+    {
+        var shared = Drawing("SYN-SHARED");
+        var onlyFirst = Drawing("SYN-FIRST");
+        var onlySecond = Drawing("SYN-SECOND", material: "Synthetic Aluminum");
+        var newer = Drawing("SYN-SHARED");
+        newer.Id = shared.Id;
+        newer.Revision = 3;
+        var first = Set((shared, 2), (onlyFirst, 1));
+        var second = Set((onlySecond, 5), (newer, 1));
+        second.Customer = "Another customer";
+
+        var plan = SetReleasePlan.Build(new[] { new SetReleasePlanLine(first, 3), new SetReleasePlanLine(second, 2) }, false);
+
+        Assert.Equal(new[] { first.Id, second.Id }, plan.Lines.Select(l => l.Set.Id));
+        Assert.Equal("", plan.Customer);
+        var steel = plan.Groups.Single(g => g.MaterialName == "Synthetic Steel");
+        Assert.Equal(new[] { "SYN-SHARED", "SYN-FIRST" }, steel.Items.Select(i => i.Drawing.Name));
+        var item = steel.Items[0];
+        Assert.Equal(8, item.Quantity);
+        Assert.Equal(new[] { new SetReleaseItemSource(first.Id, 6), new SetReleaseItemSource(second.Id, 2) }, item.Sources);
+        Assert.Equal(3, item.Drawing.Revision);
+        Assert.Equal(10, plan.Groups.Single(g => g.MaterialName == "Synthetic Aluminum").TotalQuantity);
+        Assert.True(steel.CanRelease);
+        Assert.Equal("Synthetic set customer", SetReleasePlan.Build(Set((shared, 1)), 1, false).Customer);
+    }
+
+    [Fact]
+    public void Build_RefusesTheSameSetTwice_AndNoSets()
+    {
+        var set = Set((Drawing("SYN-A"), 1));
+
+        Assert.Throws<ArgumentException>(() => SetReleasePlan.Build(new[] { new SetReleasePlanLine(set, 1), new SetReleasePlanLine(set, 2) }, false));
+        Assert.Throws<ArgumentException>(() => SetReleasePlan.Build(Array.Empty<SetReleasePlanLine>(), false));
     }
 
     [Theory]

@@ -141,7 +141,7 @@ namespace OpenNest.Forms
             var chosen = ChosenGroups();
             if (chosen.Count == 0)
                 return;
-            var multiplier = plan.Multiplier;
+            var multiplier = plan.Lines[0].Quantity;
             if (ShowMessage($"Create {chosen.Count} Draft nest{(chosen.Count == 1 ? "" : "s")} from set '{set.Name}'"
                     + (multiplier == 1 ? "" : $" ×{multiplier}") + "? Each opens in its own tab.",
                     MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK)

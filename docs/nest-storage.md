@@ -539,37 +539,63 @@ checks `DrawingSetRules`/`SetReleaseRules` before sending, raises
 refused, and refuses replies whose id, revision, members, sets or nests differ
 from what was sent.
 
-`SetReleasePlan.Build(set, multiplier, includeArchived)` splits a set read from
-the server into groups without any I/O. A group is the members whose drawings
-share material name and grade (by `SharedListNames.Key`), thickness (rounded to
-4 decimals), units and cut type; quantities are multiplied. Archived drawings
-are skipped unless included. A group is refused when two of its drawings share a
+`SetReleasePlan.Build(lines, includeArchived)` splits one or more sets read from
+the server, each with a number of kits (`SetReleasePlanLine`; `Build(set,
+multiplier, includeArchived)` is the one-set form), into groups without any I/O.
+A drawing listed by several sets becomes one item with the quantities summed and
+each set's share kept (`Sources`), using the newest revision the sets were read
+with. A group is the items whose drawings share material name and grade (by
+`SharedListNames.Key`), thickness (rounded to 4 decimals), units and cut type.
+The plan's customer is the one every set names, or blank. A set listed twice is
+refused (give it more kits instead). Archived drawings are skipped unless included. A group is refused when two of its drawings share a
 name (compared ordinally, as a nest keys drawings), and every drawing without a
 material or a positive thickness goes to one refused "unassigned" group, listed last.
 
-`SetReleaseSession.RunAsync` releases the chosen releasable groups in plan order:
+`SetReleasePlan.FindDraftsAsync(nests, group)` lists the Draft nests a group
+could merge into, using the nest query's status, material, grade and thickness
+filters. Units and cut type are not in nest metadata, so they are checked on the
+downloaded nest.
 
-1. **Build every group first.** For each group the caller's factory makes an
+`SetReleaseSession.RunAsync` releases the chosen releasable groups in plan order.
+A group named in its `mergeInto` map merges into that draft instead of making a
+new nest:
+
+1. **Build every group first.** For a new nest the caller's factory makes an
    empty nest in the group's units; the session sets material, grade,
-   thickness, the set's customer (when it has one) and `Draft`, downloads each
-   member's exact listed revision and inserts it through `LibraryDrawingInsert`.
-   A refusal (package hash no longer matching its record, a missing revision, a
-   nest in other units, an insert refusal) or a download failure stops here, so
-   nothing is uploaded. The factory may already have allocated nest numbers.
+   thickness, the plan's customer (when there is one) and `Draft`. For a merge
+   the session downloads the draft at the revision it was chosen at (reading it
+   with the caller's nest reader) and refuses it unless it is still a Draft of
+   the group's material, grade, thickness and units with no drawing for another
+   cut type; then it removes every plate, since a merge renests the whole
+   demand. Either way it downloads each item's exact revision and inserts it
+   through `LibraryDrawingInsert` (a drawing the draft already holds at that
+   revision gains quantity; another revision is refused, pointing at Update
+   Drawings). When the caller supplies a renest step ("Nest after release"),
+   every group is then nested from scratch; a step that throws leaves the nest
+   without plates and a note, and the release goes on. A refusal or a download
+   failure stops here, so nothing is uploaded. The factory may already have
+   allocated nest numbers.
 2. **Upload in order** under client-allocated ids, never cancelling an upload in
    flight; cancellation is checked between uploads. A failed upload is checked by
-   its id, so one stored before its reply was lost still counts as created; the
-   first real failure stops the rest.
-3. **Post the release** only when every chosen group was created, under a
-   client-allocated id. It names the set once (the multiplier is its quantity),
-   each nest as created at its uploaded revision, and the drawing revisions and
-   quantities each nest received. When the post fails, the nests stay and
+   its id, so one stored before its reply was lost still counts as created. A
+   merged draft is saved with the revision it was chosen at as `If-Match`; a
+   failed save counts only when the server holds exactly the bytes sent, and
+   otherwise says whether someone saved the draft meanwhile. The first real
+   failure stops the rest.
+3. **Post the release** only when every chosen group was created or merged,
+   under a client-allocated id. It names every set with its kits, each nest as
+   created or merged with the revisions before and after, and the drawing
+   revisions and quantities each set put in each nest. When the post fails, the nests stay and
    `RetryReleaseAsync` posts the same id again; a 409 naming that id is adopted
    as the stored release.
 
 The result lists each group's outcome (`Created`, `Refused`, `Failed`,
-`NotStarted`), the created nests' records and in-memory `Nest` objects (so the
-desktop can open them without downloading), and the release or why it was not recorded.
+`NotStarted`), the created or merged nests' records and in-memory `Nest` objects
+(so the desktop can open them without downloading), the draft each merged into,
+what nesting after release did, and the release or why it was not recorded.
+
+`RemoteDrawingSetStore.UndoReleaseAsync` undoes a release (see above);
+`SetReleaseText.UndoRefusal` words a refusal for the operator, naming each changed nest.
 
 Schema v7 adds `drawing_set_revisions` (every revision's details and archived
 flag), `drawing_set_members` (each revision's members by position, unique per

@@ -54,6 +54,27 @@ public class SetReleaseTextTests
     }
 
     [Fact]
+    public void UndoRefusal_NamesEachChangedNest_OrSaysItWasUndoneBefore()
+    {
+        var conflict = new SetReleaseUndoConflict
+        {
+            Reason = SetReleaseUndoRefusal.NestsChanged,
+            ChangedNests = new[]
+            {
+                new NestRecord { Name = "Edited nest", Revision = 5, Status = NestStatus.ToBeCut },
+                new NestRecord { Name = "Removed nest", Revision = 2, Deleted = true },
+            },
+        };
+
+        var text = SetReleaseText.UndoRefusal(conflict);
+
+        Assert.Contains("- Edited nest: saved since the release (now revision 5, To Be Cut)", text);
+        Assert.Contains("- Removed nest: deleted since the release", text);
+        Assert.Equal("This release was already undone.",
+            SetReleaseText.UndoRefusal(new SetReleaseUndoConflict { Reason = SetReleaseUndoRefusal.AlreadyUndone }));
+    }
+
+    [Fact]
     public void Origin_OfAMergeOfSeveralSets_NamesThemAll_AndAnUndo()
     {
         var nest = Guid.NewGuid();

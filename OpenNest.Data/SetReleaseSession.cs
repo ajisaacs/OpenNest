@@ -4,7 +4,10 @@ namespace OpenNest.Data;
 
 public enum SetReleaseGroupOutcome
 {
-    /// <summary>The group's nest is on the server; <see cref="SetReleaseGroupResult.Record"/> is its record.</summary>
+    /// <summary>
+    /// The group's nest is on the server, new or merged; <see cref="SetReleaseGroupResult.Record"/>
+    /// is its record.
+    /// </summary>
     Created,
 
     /// <summary>The group could not be built; nothing was uploaded for any group.</summary>
@@ -35,8 +38,14 @@ public sealed class SetReleaseGroupResult
     /// </summary>
     public Nest? Nest { get; internal set; }
 
-    /// <summary>The server record of a created nest: its id and revision.</summary>
+    /// <summary>The server record of a created or merged nest: its id and the revision the release wrote.</summary>
     public NestRecord? Record { get; internal set; }
+
+    /// <summary>The draft the group merged into, as chosen (its revision before the merge); null for a new nest.</summary>
+    public NestRecord? MergedInto { get; internal set; }
+
+    /// <summary>What nesting after release did; null when it was not asked for.</summary>
+    public SetReleaseRenest? Renest { get; internal set; }
 
     /// <summary>Why the group was refused or failed; empty otherwise.</summary>
     public string Error { get; internal set; } = "";
@@ -45,12 +54,21 @@ public sealed class SetReleaseGroupResult
     public IReadOnlyList<string> Warnings { get; internal set; } = Array.Empty<string>();
 }
 
+/// <summary>
+/// What nesting a group after release did: <see cref="Nested"/> when a layout was kept,
+/// and an operator-facing note either way (unplaced parts, or why nothing was kept).
+/// </summary>
+public sealed record SetReleaseRenest(bool Nested, string Note);
+
 public enum SetReleaseStage
 {
-    /// <summary>Downloading the group's drawings and building its nest; nothing is uploaded yet.</summary>
+    /// <summary>
+    /// Downloading the group's drawings (and draft), building its nest and nesting it when
+    /// asked; nothing is uploaded yet.
+    /// </summary>
     Preparing,
 
-    /// <summary>Uploading the group's nest.</summary>
+    /// <summary>Uploading the group's nest, or saving the draft it merged into.</summary>
     Uploading,
 
     /// <summary>Every nest is uploaded; the release record is being posted.</summary>
@@ -115,10 +133,16 @@ public sealed class SetReleaseResult
 }
 
 /// <summary>
-/// Releases a drawing set: one new nest per chosen group of a <see cref="SetReleasePlan"/>,
-/// each built through <see cref="LibraryDrawingInsert"/> from the members' exact library
-/// revisions, uploaded as a <see cref="NestStatus.Draft"/>, and only then recorded as one
-/// release (S7).
+/// Releases one or more drawing sets: one nest per chosen group of a <see cref="SetReleasePlan"/>,
+/// either new (uploaded as a <see cref="NestStatus.Draft"/>) or an existing draft of the same
+/// group that the release merges into, each built through <see cref="LibraryDrawingInsert"/>
+/// from the items' exact library revisions, and only then recorded as one release (S7).
+/// <para>
+/// A merge downloads the draft at the revision it was chosen at, adds the items, and removes
+/// every plate, so the whole demand is nested again (M5); it is saved only while the draft is
+/// still at that revision. When the caller supplies a renest step, every chosen group, new or
+/// merged, is nested before anything is uploaded.
+/// </para>
 /// <para>
 /// Every group is built before any is uploaded, so a refusal (a package that no longer
 /// matches its record, units the new nest does not use, an insert refusal) creates
@@ -137,6 +161,8 @@ public sealed class SetReleaseSession
     private readonly Func<byte[], LibraryPackage> _readPackage;
     private readonly Func<Nest, byte[]> _writeNest;
     private readonly Func<SetReleaseGroup, CancellationToken, Task<Nest>> _createNest;
+    private readonly Func<byte[], Nest>? _readNest;
+    private readonly Func<Nest, CancellationToken, Task<SetReleaseRenest>>? _renest;
     private bool _started;
     private SetReleaseRecord? _pendingRelease;
 
@@ -146,10 +172,19 @@ public sealed class SetReleaseSession
     /// Makes an empty nest for a group, named and set up as File > New would, in the group's
     /// units. The session then sets its material, grade, thickness, customer and status.
     /// </param>
+    /// <param name="readNest">Reads a downloaded nest archive (the desktop uses <c>NestReader</c>); required to merge.</param>
+    /// <param name="renest">
+    /// Nests a group's nest from scratch (the desktop runs Auto Nest headless): every drawing's
+    /// required quantity onto plates from the nest's defaults. Null skips nesting after release.
+    /// It must leave the nest without plates when it keeps no layout.
+    /// </param>
     public SetReleaseSession(IDrawingSetStore sets, IDrawingLibrary library, INestRepository nests, string serverUrl,
         Func<byte[], LibraryPackage> readPackage, Func<Nest, byte[]> writeNest,
-        Func<SetReleaseGroup, CancellationToken, Task<Nest>> createNest)
+        Func<SetReleaseGroup, CancellationToken, Task<Nest>> createNest,
+        Func<byte[], Nest>? readNest = null, Func<Nest, CancellationToken, Task<SetReleaseRenest>>? renest = null)
     {
+        _readNest = readNest;
+        _renest = renest;
         _sets = sets ?? throw new ArgumentNullException(nameof(sets));
         _library = library ?? throw new ArgumentNullException(nameof(library));
         _nests = nests ?? throw new ArgumentNullException(nameof(nests));
@@ -164,11 +199,16 @@ public sealed class SetReleaseSession
     /// <summary>Every nest was created but the release was not recorded; <see cref="RetryReleaseAsync"/> may post it.</summary>
     public bool HasPendingRelease => _pendingRelease != null;
 
-    /// <summary>Releases <paramref name="groups"/>, all from <paramref name="plan"/>. Call once per session.</summary>
+    /// <summary>
+    /// Releases <paramref name="groups"/>, all from <paramref name="plan"/>. A group named in
+    /// <paramref name="mergeInto"/> merges into that draft (as read, at that revision) instead
+    /// of making a new nest. Call once per session.
+    /// </summary>
     public async Task<SetReleaseResult> RunAsync(SetReleasePlan plan, IReadOnlyCollection<SetReleaseGroup> groups,
         string releasedBy, string notes, IProgress<SetReleaseProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, IReadOnlyDictionary<SetReleaseGroup, NestRecord>? mergeInto = null)
     {
+        mergeInto ??= new Dictionary<SetReleaseGroup, NestRecord>();
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(groups);
         if (groups.Count == 0)
@@ -181,11 +221,22 @@ public sealed class SetReleaseSession
             ?? DrawingLibraryRules.TextError("notes", notes ?? "", DrawingLibraryRules.MaxNotesLength);
         if (textError is not null)
             throw new ArgumentException(textError);
+        if (mergeInto.Keys.Any(g => !groups.Contains(g)))
+            throw new ArgumentException("Every merged group must be one of the groups released.", nameof(mergeInto));
+        if (mergeInto.Values.Any(d => d is null || d.Id == Guid.Empty || d.Revision < 1))
+            throw new ArgumentException("Merge only into a draft read from the server.", nameof(mergeInto));
+        if (mergeInto.Values.Select(d => d.Id).Distinct().Count() != mergeInto.Count)
+            throw new ArgumentException("Two groups cannot merge into the same nest.", nameof(mergeInto));
+        if (mergeInto.Count > 0 && _readNest is null)
+            throw new InvalidOperationException("Merging into a draft needs a nest reader.");
         if (_started)
             throw new InvalidOperationException("This release session has already run.");
         _started = true;
 
-        var results = plan.Groups.Where(groups.Contains).Select(g => new SetReleaseGroupResult(g)).ToList();
+        var results = plan.Groups.Where(groups.Contains).Select(g => new SetReleaseGroupResult(g)
+        {
+            MergedInto = mergeInto.TryGetValue(g, out var draft) ? draft : null,
+        }).ToList();
 
         // Build every nest first: a refusal here leaves nothing on the server.
         for (var i = 0; i < results.Count; i++)
@@ -236,24 +287,27 @@ public sealed class SetReleaseSession
         _pendingRelease = new SetReleaseRecord
         {
             Id = Guid.NewGuid(),
-            Sets = new[]
+            Sets = plan.Lines.Select(l => new SetReleaseLine
             {
-                new SetReleaseLine { SetId = plan.Set.Id, SetRevision = plan.Set.Revision, Quantity = plan.Multiplier },
-            },
+                SetId = l.Set.Id,
+                SetRevision = l.Set.Revision,
+                Quantity = l.Quantity,
+            }).ToList(),
             Notes = notes ?? "",
             ReleasedBy = releasedBy ?? "",
             Nests = results.Select(r => new SetReleaseNest
             {
                 NestId = r.Record!.Id,
-                Kind = SetReleaseNestKind.Created,
+                Kind = r.MergedInto is null ? SetReleaseNestKind.Created : SetReleaseNestKind.Merged,
+                RevisionBefore = r.MergedInto?.Revision,
                 RevisionAfter = r.Record.Revision,
-                Items = r.Group.Items.Select(i => new SetReleaseNestItem
+                Items = r.Group.Items.SelectMany(i => i.Sources.Select(source => new SetReleaseNestItem
                 {
-                    SetId = plan.Set.Id,
+                    SetId = source.SetId,
                     DrawingId = i.Drawing.Id,
                     DrawingRevision = i.Drawing.Revision,
-                    Quantity = i.Quantity,
-                }).ToList(),
+                    Quantity = source.Quantity,
+                })).ToList(),
                 MaterialName = r.Group.MaterialName,
                 MaterialGrade = r.Group.MaterialGrade,
                 Thickness = r.Group.Thickness,
@@ -285,24 +339,52 @@ public sealed class SetReleaseSession
         return PostPendingAsync(cancellationToken);
     }
 
-    // Builds the group's nest in memory; false when the group is refused.
+    // Builds the group's nest in memory, new or merged, and nests it when asked; false when
+    // the group is refused.
     private async Task<bool> PrepareAsync(SetReleasePlan plan, SetReleaseGroupResult result, CancellationToken cancellationToken)
     {
         var group = result.Group;
-        var nest = await _createNest(group, cancellationToken)
-            ?? throw new InvalidOperationException("The nest factory returned no nest.");
-        if (nest.Units != group.Units)
-            return Refuse(result, $"The new nest for {Describe(group)} is in {Name(nest.Units)}, not {Name(group.Units)}.");
+        Nest nest;
+        if (result.MergedInto is { } draft)
+        {
+            var archive = await _nests.GetRevisionFileAsync(draft.Id, draft.Revision, cancellationToken);
+            if (archive == null)
+                return Refuse(result, $"Draft '{draft.Name}' revision {draft.Revision} is no longer on the server. Choose again.");
+            nest = await Task.Run(() => _readNest!(archive), cancellationToken);
+            NestRecordFactory.ApplyMetadata(nest, draft);
+            if (draft.Status != NestStatus.Draft || draft.Deleted)
+                return Refuse(result, $"'{draft.Name}' is not a draft, so the release cannot merge into it.");
+            if (nest.Units != group.Units)
+                return Refuse(result, $"Draft '{draft.Name}' is in {Name(nest.Units)}, not {Name(group.Units)}.");
+            if (SharedListNames.Key(nest.Material?.Name) != SharedListNames.Key(group.MaterialName)
+                || SharedListNames.Key(nest.Material?.Grade) != SharedListNames.Key(group.MaterialGrade)
+                || DrawingLibraryRules.NormalizeThickness(nest.Thickness) != group.Thickness)
+                return Refuse(result, $"Draft '{draft.Name}' is not {Describe(group)}.");
+            if (nest.Drawings.FirstOrDefault(d => d.Library is { } link && link.CutType != group.CutType) is { } other)
+                return Refuse(result, $"Draft '{draft.Name}' holds '{other.Name}' for {other.Library!.CutType.ToString().ToLowerInvariant()} "
+                    + $"cutting, not {group.CutType.ToString().ToLowerInvariant()}.");
 
-        var current = nest.Material;
-        nest.Material = current != null && SharedListNames.Key(current.Name) == SharedListNames.Key(group.MaterialName)
-            && SharedListNames.Key(current.Grade) == SharedListNames.Key(group.MaterialGrade)
-                ? new Material(group.MaterialName, group.MaterialGrade, current.Density)
-                : new Material(group.MaterialName, group.MaterialGrade);
-        nest.Thickness = group.Thickness;
-        nest.Status = NestStatus.Draft;
-        if (!string.IsNullOrWhiteSpace(plan.Set.Customer))
-            nest.Customer = plan.Set.Customer;
+            // M5: a merge renests the whole demand, so the draft's layout goes.
+            nest.Plates.Clear();
+            nest.UpdateDrawingQuantities();
+        }
+        else
+        {
+            nest = await _createNest(group, cancellationToken)
+                ?? throw new InvalidOperationException("The nest factory returned no nest.");
+            if (nest.Units != group.Units)
+                return Refuse(result, $"The new nest for {Describe(group)} is in {Name(nest.Units)}, not {Name(group.Units)}.");
+
+            var current = nest.Material;
+            nest.Material = current != null && SharedListNames.Key(current.Name) == SharedListNames.Key(group.MaterialName)
+                && SharedListNames.Key(current.Grade) == SharedListNames.Key(group.MaterialGrade)
+                    ? new Material(group.MaterialName, group.MaterialGrade, current.Density)
+                    : new Material(group.MaterialName, group.MaterialGrade);
+            nest.Thickness = group.Thickness;
+            nest.Status = NestStatus.Draft;
+            if (plan.Customer.Length > 0)
+                nest.Customer = plan.Customer;
+        }
 
         var warnings = group.Warnings.ToList();
         foreach (var item in group.Items)
@@ -321,6 +403,24 @@ public sealed class SetReleaseSession
             insert.Apply();
         }
 
+        if (_renest != null)
+        {
+            try
+            {
+                result.Renest = await _renest(nest, cancellationToken)
+                    ?? throw new InvalidOperationException("The renest step returned nothing.");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // The nest is still released; the operator runs Auto Nest on it.
+                nest.Plates.Clear();
+                nest.UpdateDrawingQuantities();
+                result.Renest = new SetReleaseRenest(false, $"Auto Nest failed: {ex.Message}");
+            }
+            if (result.Renest.Note.Length > 0)
+                warnings.Add(result.Renest.Note);
+        }
+
         result.Nest = nest;
         result.Warnings = warnings;
         return true;
@@ -330,6 +430,8 @@ public sealed class SetReleaseSession
     // other client can hold, so a nest stored before its reply was lost is still reported.
     private async Task<bool> UploadAsync(SetReleaseGroupResult result)
     {
+        if (result.MergedInto is { } draft)
+            return await SaveMergeAsync(result, draft);
         var nest = result.Nest!;
         var id = Guid.NewGuid();
         Exception failure;
@@ -362,6 +464,50 @@ public sealed class SetReleaseSession
 
         result.Outcome = SetReleaseGroupOutcome.Failed;
         result.Error = $"Could not upload the {Describe(result.Group)} nest: {failure.Message} {stored}";
+        return false;
+    }
+
+    // True when the merged draft is saved. The save is guarded by the revision the draft was
+    // chosen at; a failed one counts as saved only when the server holds exactly these bytes.
+    private async Task<bool> SaveMergeAsync(SetReleaseGroupResult result, NestRecord draft)
+    {
+        var nest = result.Nest!;
+        var archive = await Task.Run(() => _writeNest(nest));
+        Exception failure;
+        try
+        {
+            var saved = await _nests.UpdateFileAsync(draft.Id, archive, NestRecordFactory.FromNest(nest, draft.Id, archive.LongLength),
+                draft.Revision, CancellationToken.None);
+            if (saved.Id == draft.Id && saved.Revision > draft.Revision)
+                return Created(result, saved);
+            failure = new IOException($"The nest server did not save a new revision of '{draft.Name}'.");
+        }
+        catch (Exception ex)
+        {
+            failure = ex;
+        }
+
+        string detail;
+        try
+        {
+            var current = await _nests.GetMetadataAsync(draft.Id, CancellationToken.None);
+            if (current is { } found && found.Revision > draft.Revision
+                && await _nests.GetFileAsync(draft.Id, CancellationToken.None) is { } stored && stored.AsSpan().SequenceEqual(archive))
+                return Created(result, found);
+            detail = current == null
+                ? "It was deleted."
+                : current.Revision != draft.Revision
+                    ? $"Someone saved it since you chose it (now revision {current.Revision}); it was left as they saved it."
+                    : "It was not changed.";
+        }
+        catch (Exception ex) when (ex is IOException or HttpRequestException or System.Text.Json.JsonException
+            or OperationCanceledException)
+        {
+            detail = $"It may have been saved; check its history before releasing again.";
+        }
+
+        result.Outcome = SetReleaseGroupOutcome.Failed;
+        result.Error = $"Could not merge into draft '{draft.Name}': {failure.Message} {detail}";
         return false;
     }
 

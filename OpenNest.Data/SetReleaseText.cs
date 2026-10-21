@@ -54,6 +54,27 @@ public static class SetReleaseText
         return deleted == 0 ? text : $"{text}, {deleted} deleted";
     }
 
+    /// <summary>
+    /// Why an undo was refused, for the operator: the release was undone before, or the nests
+    /// that changed since it, each with what happened to it, so they can be skipped.
+    /// </summary>
+    public static string UndoRefusal(SetReleaseUndoConflict conflict)
+    {
+        ArgumentNullException.ThrowIfNull(conflict);
+        if (conflict.Reason == SetReleaseUndoRefusal.AlreadyUndone)
+            return "This release was already undone.";
+        var lines = conflict.ChangedNests.Select(n =>
+        {
+            var name = string.IsNullOrWhiteSpace(n.Name) ? n.Id.ToString() : n.Name;
+            return n.Deleted
+                ? $"- {name}: deleted since the release"
+                : $"- {name}: saved since the release (now revision {n.Revision}, {NestStatuses.DisplayName(n.Status)})";
+        });
+        return "These nests changed after the release, so undoing would overwrite that work:\n"
+            + string.Join("\n", lines)
+            + "\n\nUndo the rest and leave these as they are, or restore them from their history.";
+    }
+
     /// <summary>The state of one nest of a release: its status name, or "Deleted".</summary>
     public static string NestState(SetReleaseNest nest)
     {
