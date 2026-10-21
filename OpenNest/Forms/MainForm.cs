@@ -111,8 +111,8 @@ namespace OpenNest.Forms
                 Resources.cut_planner, PlatePlanCutting_Click));
             toolStrip1.Items.Add(CreateActionButton("btnSimulateCutting", "Simulate Cutting",
                 Resources.cut_simulate, SimulateCutting_Click));
-            toolStrip1.Items.Add(CreateActionButton("btnManualSequence", "Manual Sequence",
-                Resources.manual_sequence, ManualSequenceParts_Click));
+            toolStrip1.Items.Add(CreateActionButton("btnSequenceByPath", "Sequence by Path",
+                Resources.manual_sequence, SequenceByPath_Click));
             toolStrip1.Items.Add(postButton);
             storageModeMenu.Click += StorageMode_Click;
             exportNestMenu.Click += ExportNest_Click;

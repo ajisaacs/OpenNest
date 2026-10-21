@@ -19,7 +19,7 @@ public class NestReportExportTests
         var toolbar = (ToolStrip)typeof(MainForm)
             .GetField("toolStrip1", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(host)!;
-        foreach (var name in new[] { "btnCutPlanner", "btnManualSequence", "btnPost" })
+        foreach (var name in new[] { "btnCutPlanner", "btnSequenceByPath", "btnPost" })
         {
             var item = Assert.Single(toolbar.Items.Find(name, false));
             Assert.Equal(24, item.Image!.Width);
@@ -32,7 +32,7 @@ public class NestReportExportTests
         Assert.Equal(menu.DropDownItems.Count, post.DropDownItems.Count);
         // Without a document these toolbar shortcuts must be harmless.
         ((ToolStripButton)toolbar.Items["btnCutPlanner"]!).PerformClick();
-        ((ToolStripButton)toolbar.Items["btnManualSequence"]!).PerformClick();
+        ((ToolStripButton)toolbar.Items["btnSequenceByPath"]!).PerformClick();
         foreach (ToolStripMenuItem item in menu.DropDownItems)
         {
             var toolbarItem = Assert.Single(post.DropDownItems.OfType<ToolStripMenuItem>(),
