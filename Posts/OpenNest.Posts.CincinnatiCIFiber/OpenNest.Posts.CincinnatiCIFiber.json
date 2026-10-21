@@ -17,6 +17,7 @@
   "ProgramStartMacro": "PROGRAMSTART.NC",
   "ProgramEndMacro": "PROGRAMEND.NC",
   "MaterialCodes": {
+    "Carbon Steel": "MSN",
     "Mild Steel": "MSN"
   },
   "DefaultMaterialCode": "MSN"

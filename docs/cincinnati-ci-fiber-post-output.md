@@ -61,6 +61,12 @@ In the desktop app these settings open in a sectioned editor (Machine, Sheets,
 Material, Program output, Macros) with a material-code table; values are
 validated and saved only when OK is pressed.
 
+Steel is "Carbon Steel" in OpenNest, as in the Cincinnati post's cut libraries.
+The material-code table maps both "Carbon Steel" and "Mild Steel" to `MSN`. A
+deployed config is copied from the shipped JSON only when a PC has none, so an
+existing PC needs the "Carbon Steel" row added in the material-code table.
+Until then such nests still post `MSN` through `DefaultMaterialCode`.
+
 - Assign linear lead-ins before posting, including circular holes. The writer
   rejects missing or arc-first lead-ins. Its conservative rule cites the G238
   compensation-selection restriction in TF5200 §13.2.4.1; do not generalize it

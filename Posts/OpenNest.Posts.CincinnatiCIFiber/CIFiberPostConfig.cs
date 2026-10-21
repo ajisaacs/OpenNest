@@ -188,6 +188,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
 
         private Dictionary<string, string> _materialCodes = new(StringComparer.OrdinalIgnoreCase)
         {
+            ["Carbon Steel"] = "MSN",
             ["Mild Steel"] = "MSN",
         };
 
