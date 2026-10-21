@@ -56,13 +56,16 @@ namespace OpenNest.Forms
             set { salvageRateBox.Text = (value * 100).ToString("F0"); }
         }
 
+        /// <summary>The smallest offcut credited as salvage unless the operator types another.</summary>
+        public const double DefaultMinRemnantSize = 12.0;
+
         public double MinRemnantSize
         {
             get
             {
                 if (double.TryParse(minRemnantBox.Text, out var val) && val > 0)
                     return val;
-                return 12.0;
+                return DefaultMinRemnantSize;
             }
         }
 

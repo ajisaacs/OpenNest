@@ -62,11 +62,11 @@ public sealed record SetReleaseRenest(bool Nested, string Note);
 
 public enum SetReleaseStage
 {
-    /// <summary>
-    /// Downloading the group's drawings (and draft), building its nest and nesting it when
-    /// asked; nothing is uploaded yet.
-    /// </summary>
+    /// <summary>Downloading the group's drawings (and draft) and building its nest; nothing is uploaded yet.</summary>
     Preparing,
+
+    /// <summary>Nesting the group's built nest after release; nothing is uploaded yet.</summary>
+    Nesting,
 
     /// <summary>Uploading the group's nest, or saving the draft it merged into.</summary>
     Uploading,
@@ -242,11 +242,13 @@ public sealed class SetReleaseSession
         for (var i = 0; i < results.Count; i++)
         {
             var result = results[i];
+            var index = i;
             progress?.Report(new SetReleaseProgress(SetReleaseStage.Preparing, i, results.Count, result.Group));
             bool ready;
             try
             {
-                ready = await PrepareAsync(plan, result, cancellationToken);
+                ready = await PrepareAsync(plan, result, () => progress?.Report(
+                    new SetReleaseProgress(SetReleaseStage.Nesting, index, results.Count, result.Group)), cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -341,7 +343,8 @@ public sealed class SetReleaseSession
 
     // Builds the group's nest in memory, new or merged, and nests it when asked; false when
     // the group is refused.
-    private async Task<bool> PrepareAsync(SetReleasePlan plan, SetReleaseGroupResult result, CancellationToken cancellationToken)
+    private async Task<bool> PrepareAsync(SetReleasePlan plan, SetReleaseGroupResult result, Action nesting,
+        CancellationToken cancellationToken)
     {
         var group = result.Group;
         Nest nest;
@@ -405,6 +408,7 @@ public sealed class SetReleaseSession
 
         if (_renest != null)
         {
+            nesting();
             try
             {
                 result.Renest = await _renest(nest, cancellationToken)

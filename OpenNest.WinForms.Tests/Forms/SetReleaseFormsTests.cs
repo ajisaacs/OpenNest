@@ -255,6 +255,86 @@ public class SetReleaseFormsTests
     }
 
     [Fact]
+    public void NestAfterRelease_NestsEachGroupWithAutoNest_AndListsItsSheets()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var sets = new InMemoryDrawingSets();
+                var set = CreateSet(sets, (a, 3));
+                var opened = new List<Nest>();
+                var questions = new List<string>();
+
+                using var form = new ReleaseSetForm(sets, library, new MemoryNests(), Server, set, (nest, _) => opened.Add(nest));
+                form.ShowMessage = (text, _, _) => { questions.Add(text); return DialogResult.OK; };
+                form.CreateNest = (group, _) =>
+                {
+                    var nest = new Nest("N26-0200") { Units = group.Units };
+                    nest.PlateDefaults.Size = new OpenNest.Geometry.Size(48, 96);
+                    return Task.FromResult(nest);
+                };
+                form.Show();
+                Assert.True(Field<CheckBox>(form, "nestAfterReleaseCheckBox").Checked);
+
+                Run(form.ReleaseAsync());
+
+                Assert.Contains("Each is nested with Auto Nest", Assert.Single(questions));
+                var nest = Assert.Single(opened);
+                Assert.Equal(3, nest.Plates.Sum(p => p.Parts.Count * p.Quantity));
+                Assert.Equal(0, Assert.Single(nest.Drawings).Quantity.Remaining);
+                var status = (string)Field<DataGridView>(form, "groupGrid").Rows[0].Cells["statusColumn"].Value;
+                Assert.StartsWith("Created N26-0200 — Nested on 1 sheet, ", status);
+            },
+            TestTimeout,
+            "The nest after release test did not complete.");
+    }
+
+    [Fact]
+    public void NestAfterRelease_Unticked_LeavesNestsAndMergedDraftsForAutoNest()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var sets = new InMemoryDrawingSets();
+                var set = CreateSet(sets, (a, 2));
+                var nests = new MemoryNests();
+                var draft = nests.AddDraft("N26-0007", "Synthetic Steel", "Grade A", 0.25);
+                var questions = new List<string>();
+                var renested = 0;
+
+                using var form = new ReleaseSetForm(sets, library, nests, Server, set, (_, _) => { });
+                form.ShowMessage = (text, _, _) => { questions.Add(text); return DialogResult.OK; };
+                form.CreateNest = (group, _) => Task.FromResult(new Nest("N") { Units = group.Units });
+                form.Renest = (_, _) => { renested++; return Task.FromResult(new SetReleaseRenest(true, "")); };
+                form.Show();
+                var row = Field<DataGridView>(form, "groupGrid").Rows[0];
+                PumpUntil(() => ((DataGridViewComboBoxCell)row.Cells["targetColumn"]).Items.Count == 2, "the drafts to merge into");
+                row.Cells["targetColumn"].Value = ((DataGridViewComboBoxCell)row.Cells["targetColumn"]).Items[1];
+                Assert.Contains("and nests everything again", (string)row.Cells["statusColumn"].Value);
+
+                Field<CheckBox>(form, "nestAfterReleaseCheckBox").Checked = false;
+                Assert.Contains("and leaves everything for Auto Nest", (string)row.Cells["statusColumn"].Value);
+
+                Run(form.ReleaseAsync());
+
+                Assert.Equal(0, renested);
+                Assert.Contains("current layout, left for Auto Nest", Assert.Single(questions));
+                Assert.DoesNotContain("nested with Auto Nest", questions[0]);
+                var merged = Assert.Single(form.Result!.Created);
+                Assert.Same(draft, merged.MergedInto);
+                Assert.Empty(merged.Nest!.Plates);
+                Assert.Null(merged.Renest);
+                Assert.False(Field<CheckBox>(form, "nestAfterReleaseCheckBox").Enabled);
+            },
+            TestTimeout,
+            "The release without nesting test did not complete.");
+    }
+
+    [Fact]
     public void Releases_UndoOffersToLeaveChangedNests_AndShowsWhatTheReleaseDid()
     {
         StaTestThread.Run(

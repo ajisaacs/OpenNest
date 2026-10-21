@@ -465,6 +465,29 @@ public class SetReleaseSessionTests
     }
 
     [Fact]
+    public async Task Run_CanceledWhileNestingAfterRelease_UploadsNothing()
+    {
+        var plan = SetReleasePlan.Build(Set((Stored("SYN-A"), 1), (Stored("SYN-B", cutType: CutType.Plasma), 1)), 1, false);
+        using var cancel = new CancellationTokenSource();
+        var progress = new RecordingProgress();
+        var session = Session(renest: (_, token) =>
+        {
+            cancel.Cancel();
+            token.ThrowIfCancellationRequested();
+            return Task.FromResult(new SetReleaseRenest(true, ""));
+        });
+
+        var result = await session.RunAsync(plan, plan.Groups, "", "", progress, cancel.Token);
+
+        Assert.True(result.Canceled);
+        Assert.Equal(new[] { (SetReleaseStage.Preparing, 0), (SetReleaseStage.Nesting, 0) },
+            progress.Reports.Select(p => (p.Stage, p.Index)));
+        Assert.All(result.Groups, g => Assert.Equal(SetReleaseGroupOutcome.NotStarted, g.Outcome));
+        Assert.Empty(_nests.Uploaded);
+        Assert.Empty(_sets.Posted);
+    }
+
+    [Fact]
     public async Task FindDrafts_AsksForDraftsOfTheGroup()
     {
         var plan = SetReleasePlan.Build(Set((Stored("SYN-A"), 1)), 1, false);

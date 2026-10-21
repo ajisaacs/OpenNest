@@ -10,6 +10,7 @@ using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Data;
 using OpenNest.Engine.BestFit;
+using OpenNest.Engine.Jobs;
 using OpenNest.IO;
 
 namespace OpenNest.Forms
@@ -19,10 +20,10 @@ namespace OpenNest.Forms
     /// the browser, each with a number of kits, and the dialog previews how they split into one
     /// nest per material group (<see cref="SetReleasePlan"/>), with an archived-drawing toggle
     /// and a tick per group. Each group makes a new Draft nest or merges into a Draft nest of
-    /// the same material, which is renested. <see cref="SetReleaseSession"/> then builds and
-    /// saves those nests, opens each in its own tab, and records the release once every
-    /// chosen nest exists. The dialog shows every group's outcome; a release runs once per
-    /// dialog.
+    /// the same material, whose layout is discarded. <see cref="SetReleaseSession"/> then builds
+    /// those nests, nests each one with Auto Nest when Nest after release is ticked, saves them,
+    /// opens each in its own tab, and records the release once every chosen nest exists. The
+    /// dialog shows every group's outcome; a release runs once per dialog.
     /// </summary>
     public partial class ReleaseSetForm : Form
     {
@@ -51,6 +52,12 @@ namespace OpenNest.Forms
 
         /// <summary>Makes the empty nest for a group, as File &gt; New would in its units; replaced by tests.</summary>
         internal Func<SetReleaseGroup, CancellationToken, Task<Nest>> CreateNest { get; set; }
+
+        /// <summary>
+        /// Nests a group's built nest when Nest after release is ticked: Auto Nest headless with
+        /// the selected engine (<see cref="NestRenest"/>); replaced by tests.
+        /// </summary>
+        internal Func<Nest, CancellationToken, Task<SetReleaseRenest>> Renest { get; set; } = RenestAsync;
 
         /// <summary>
         /// True when a server nest is open in a tab of this desktop. Such a draft is not merged
@@ -123,6 +130,20 @@ namespace OpenNest.Forms
         {
             if (!running && Result == null)
                 BuildPlan();
+        }
+
+        // The merge notes say what happens to a draft's layout, which this choice changes.
+        private void NestAfterReleaseCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            if (running || Result != null)
+                return;
+            populating = true;
+            foreach (DataGridViewRow row in groupGrid.Rows)
+            {
+                if (row.Tag is SetReleaseGroup group)
+                    row.Cells[statusColumn.Index].Value = GroupNote(group);
+            }
+            populating = false;
         }
 
         private void SetGrid_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
@@ -381,17 +402,21 @@ namespace OpenNest.Forms
                 : $"{lines.Count} sets";
             var created = chosen.Count - merges.Count;
             var text = $"Release {setsText} into {chosen.Count} Draft nest{(chosen.Count == 1 ? "" : "s")}";
+            var nestAfter = nestAfterReleaseCheckBox.Checked;
             if (merges.Count > 0)
                 text += $": {created} new and {merges.Count} merged into existing drafts. A merged draft loses its "
-                    + "current layout and is nested again; Undo Release restores it";
-            if (ShowMessage(text + ". Each opens in its own tab.", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK)
+                    + (nestAfter ? "current layout and is nested again" : "current layout, left for Auto Nest")
+                    + "; Undo Release restores it";
+            text += nestAfter ? ". Each is nested with Auto Nest and opens in its own tab." : ". Each opens in its own tab.";
+            if (ShowMessage(text, MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK)
                 return;
 
             running = true;
             cancellation = new CancellationTokenSource();
             closeButton.Text = "Cancel";
             UpdateCommands();
-            session = new SetReleaseSession(sets, library, nests, serverUrl, ReadPackage, WriteNest, CreateNest, ReadNest);
+            session = new SetReleaseSession(sets, library, nests, serverUrl, ReadPackage, WriteNest, CreateNest, ReadNest,
+                nestAfter ? Renest : null);
             var progress = new Progress<SetReleaseProgress>(ShowProgress);
             try
             {
@@ -545,7 +570,9 @@ namespace OpenNest.Forms
             var notes = group.Warnings.ToList();
             if (targets.TryGetValue(group.Key, out var draft))
                 notes.Insert(0, $"Merging discards the layout of '{draft.Name}' ({draft.PlateCount} sheet"
-                    + $"{(draft.PlateCount == 1 ? "" : "s")}) and nests everything again; Undo Release restores it.");
+                    + $"{(draft.PlateCount == 1 ? "" : "s")}) and "
+                    + (nestAfterReleaseCheckBox.Checked ? "nests everything again" : "leaves everything for Auto Nest")
+                    + "; Undo Release restores it.");
             return string.Join(" ", notes);
         }
 
@@ -561,6 +588,7 @@ namespace OpenNest.Forms
             statusLabel.Text = progress.Stage switch
             {
                 SetReleaseStage.Preparing => $"Preparing nest {progress.Index + 1} of {progress.Count}: {Describe(progress.Group)}...",
+                SetReleaseStage.Nesting => $"Nesting nest {progress.Index + 1} of {progress.Count}: {Describe(progress.Group)}...",
                 SetReleaseStage.Uploading => $"Saving nest {progress.Index + 1} of {progress.Count}: {Describe(progress.Group)}...",
                 _ => "Recording the release...",
             };
@@ -608,6 +636,7 @@ namespace OpenNest.Forms
             addSetButton.Enabled = editable;
             removeSetButton.Enabled = editable && setGrid.Rows.Count > 1 && setGrid.CurrentRow != null;
             includeArchivedCheckBox.Enabled = editable;
+            nestAfterReleaseCheckBox.Enabled = editable;
             notesBox.ReadOnly = !editable;
             includeColumn.ReadOnly = !editable;
             targetColumn.ReadOnly = !editable;
@@ -641,6 +670,17 @@ namespace OpenNest.Forms
                 group.MaterialGrade,
                 $"{group.Thickness.ToString("0.####", CultureInfo.CurrentCulture)} {UnitsHelper.GetShortString(group.Units)}",
             }.Where(s => !string.IsNullOrWhiteSpace(s)));
+
+        // The nest is not shown anywhere yet, so Auto Nest runs off the UI thread on it alone.
+        private static Task<SetReleaseRenest> RenestAsync(Nest nest, CancellationToken token)
+        {
+            var engineName = EngineSelection.EngineName;
+            return Task.Run(() =>
+            {
+                var renested = NestRenest.Run(nest, engineName, AutoNestForm.DefaultMinRemnantSize, token: token);
+                return new SetReleaseRenest(renested.Nested, renested.Note);
+            }, token);
+        }
 
         private static LibraryPackage ReadPackage(byte[] bytes)
         {

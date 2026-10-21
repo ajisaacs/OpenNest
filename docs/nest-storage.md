@@ -404,10 +404,21 @@ survives changing the sets, kits or the archived toggle.
 
 **Nest** is **New Draft nest** or **Merge into** one of the Draft nests of the
 group's material, grade and thickness, listed with their sheet count and when
-they were saved. A merge discards that draft's layout and nests the whole demand
-again (the status column says so); **Undo Release** restores it. A draft open in
-a tab of this desktop is refused, since that tab could hold edits the merge would
-leave behind: close it first.
+they were saved. A merge adds the demand to that draft's drawings and discards
+every sheet (placements, cutoffs, cut plans), keeping drawing-level setup such as
+cut pins (the status column says so); **Undo Release** restores it. A draft open
+in a tab of this desktop is refused, since that tab could hold edits the merge
+would leave behind: close it first.
+
+**Nest after release** (ticked by default) runs Auto Nest on every released
+group, new or merged, before anything is saved (`OpenNest.Engine.Jobs.NestRenest`):
+every drawing's required quantity, the selected engine, sheets from the nest's
+plate defaults and plate-size options, as the Auto Nest dialog would offer them.
+A layout is kept only when it is valid; otherwise the nest is saved without
+sheets and its status says "Auto Nest could not keep a layout: open it and run
+Auto Nest". The status column lists each group's sheets and utilization, and any
+copies left unplaced, which stay as remaining quantity. Unticked, new nests are
+saved without sheets and merged drafts are left cleared for Auto Nest.
 
 **Release** confirms, then runs `OpenNest.Data.SetReleaseSession`: every ticked
 group's new nest is made as File > New would (the server's next nest name, the
@@ -418,8 +429,9 @@ and the **Draft** status. A merged draft is saved only while nobody else has
 saved it since it was listed. Each created or merged nest opens in its own tab,
 bound to its server record, and the release (with the release notes) is
 recorded. The grid then shows every group's outcome: Created or Merged into with
-the nest name, Refused or Failed with the reason, or Not started. Cancel stops
-between saves, never during one. When every nest was saved but recording failed,
+the nest name, Refused or Failed with the reason, or Not started. Cancel during
+preparing or nesting saves nothing; once saving starts it stops between saves,
+never during one. When every nest was saved but recording failed,
 the button becomes **Record Release** and posts the same release again. A dialog
 runs one release.
 

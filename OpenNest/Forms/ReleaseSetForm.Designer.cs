@@ -36,6 +36,7 @@ namespace OpenNest.Forms
             kitsColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             optionsTable = new System.Windows.Forms.TableLayoutPanel();
             includeArchivedCheckBox = new System.Windows.Forms.CheckBox();
+            nestAfterReleaseCheckBox = new System.Windows.Forms.CheckBox();
             notesLabel = new System.Windows.Forms.Label();
             notesBox = new System.Windows.Forms.TextBox();
             groupGrid = new System.Windows.Forms.DataGridView();
@@ -211,13 +212,15 @@ namespace OpenNest.Forms
             // optionsTable
             //
             optionsTable.AutoSize = true;
-            optionsTable.ColumnCount = 3;
+            optionsTable.ColumnCount = 4;
+            optionsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             optionsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             optionsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             optionsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             optionsTable.Controls.Add(includeArchivedCheckBox, 0, 0);
-            optionsTable.Controls.Add(notesLabel, 1, 0);
-            optionsTable.Controls.Add(notesBox, 2, 0);
+            optionsTable.Controls.Add(nestAfterReleaseCheckBox, 1, 0);
+            optionsTable.Controls.Add(notesLabel, 2, 0);
+            optionsTable.Controls.Add(notesBox, 3, 0);
             optionsTable.Dock = System.Windows.Forms.DockStyle.Fill;
             optionsTable.Margin = new System.Windows.Forms.Padding(0, 0, 0, 6);
             optionsTable.Name = "optionsTable";
@@ -235,13 +238,26 @@ namespace OpenNest.Forms
             includeArchivedCheckBox.UseVisualStyleBackColor = true;
             includeArchivedCheckBox.CheckedChanged += Options_Changed;
             //
+            // nestAfterReleaseCheckBox
+            //
+            nestAfterReleaseCheckBox.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            nestAfterReleaseCheckBox.AutoSize = true;
+            nestAfterReleaseCheckBox.Checked = true;
+            nestAfterReleaseCheckBox.CheckState = System.Windows.Forms.CheckState.Checked;
+            nestAfterReleaseCheckBox.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
+            nestAfterReleaseCheckBox.Name = "nestAfterReleaseCheckBox";
+            nestAfterReleaseCheckBox.TabIndex = 1;
+            nestAfterReleaseCheckBox.Text = "Nest after release";
+            nestAfterReleaseCheckBox.UseVisualStyleBackColor = true;
+            nestAfterReleaseCheckBox.CheckedChanged += NestAfterReleaseCheckBox_CheckedChanged;
+            //
             // notesLabel
             //
             notesLabel.Anchor = System.Windows.Forms.AnchorStyles.Left;
             notesLabel.AutoSize = true;
             notesLabel.Margin = new System.Windows.Forms.Padding(12, 0, 3, 0);
             notesLabel.Name = "notesLabel";
-            notesLabel.TabIndex = 1;
+            notesLabel.TabIndex = 2;
             notesLabel.Text = "Release notes:";
             //
             // notesBox
@@ -249,7 +265,7 @@ namespace OpenNest.Forms
             notesBox.Dock = System.Windows.Forms.DockStyle.Fill;
             notesBox.MaxLength = 4000;
             notesBox.Name = "notesBox";
-            notesBox.TabIndex = 2;
+            notesBox.TabIndex = 3;
             //
             // groupGrid
             //
@@ -462,6 +478,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.DataGridViewTextBoxColumn kitsColumn;
         private System.Windows.Forms.TableLayoutPanel optionsTable;
         private System.Windows.Forms.CheckBox includeArchivedCheckBox;
+        private System.Windows.Forms.CheckBox nestAfterReleaseCheckBox;
         private System.Windows.Forms.Label notesLabel;
         private System.Windows.Forms.TextBox notesBox;
         private System.Windows.Forms.DataGridView groupGrid;
