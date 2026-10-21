@@ -174,7 +174,13 @@ internal static class BarPacker
                     trial.Items.Add(next);
                 }
 
-                if (trial.Remaining < before)
+                // Judge the swap on the merged run: the trial charges gains again for types the
+                // run already holds, so trading a copy for an identical one looks fuller and the
+                // swap would repeat forever.
+                var merged = new PackedSegment(segment.Capacity);
+                merged.Items.AddRange(segment.Items);
+                merged.Items.AddRange(trial.Items);
+                if (merged.Remaining < before)
                 {
                     remaining.Add(removed);
                     segment.Items.AddRange(trial.Items);
