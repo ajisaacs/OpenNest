@@ -21,12 +21,17 @@ namespace OpenNest.BestFit
         IReadOnlyList<double> HullAngles
     );
 
-    /// <summary>The saved best-fit results for one drawing at one plate size and spacing.</summary>
+    /// <summary>
+    /// The saved best-fit results for one drawing at one plate size and spacing.
+    /// <paramref name="CanonicalAngle"/> is the drawing's canonical angle (radians) when the
+    /// set was saved: the frame its pair geometry is in. Null means the frame is unknown.
+    /// </summary>
     public sealed record SavedPairSet(
         double PlateWidth,
         double PlateHeight,
         double Spacing,
-        IReadOnlyList<SavedPairResult> Results
+        IReadOnlyList<SavedPairResult> Results,
+        double? CanonicalAngle = null
     );
 
     /// <summary>
@@ -45,7 +50,10 @@ namespace OpenNest.BestFit
             IReadOnlySet<(double Width, double Length, double Spacing)> plateKeys
         );
 
-        /// <summary>Restores saved sets for <paramref name="drawing"/>.</summary>
+        /// <summary>
+        /// Restores saved sets for <paramref name="drawing"/>. Sets saved in a frame other
+        /// than the drawing's current canonical frame, or in an unknown one, are stale.
+        /// </summary>
         void Import(Drawing drawing, IReadOnlyList<SavedPairSet> sets);
     }
 }

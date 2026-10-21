@@ -149,12 +149,21 @@ it now explicitly refreshes only the edited drawing's layout colors.
 
 Optional `bestfits/bestfit-N` entries hold drawing N's cached best-fit pair
 results: a JSON array of sets, each with `plateWidth`, `plateHeight` and
-`spacing` (the plate size and part spacing it was filtered for) and `results`.
-Each result has `part1Rotation`, `part2Rotation`, `part2OffsetX`,
-`part2OffsetY`, `strategyType`, `testNumber`, `candidateSpacing`,
-`rotatedArea`, `boundingWidth`, `boundingHeight`, `optimalRotation`, `keep`,
-`reason`, `trueArea` and `hullAngles`. Angles are radians; pair geometry is in
-the drawing's canonical frame.
+`spacing` (the plate size and part spacing it was filtered for),
+`canonicalAngle` and `results`. Each result has `part1Rotation`,
+`part2Rotation`, `part2OffsetX`, `part2OffsetY`, `strategyType`, `testNumber`,
+`candidateSpacing`, `rotatedArea`, `boundingWidth`, `boundingHeight`,
+`optimalRotation`, `keep`, `reason`, `trueArea` and `hullAngles`. Angles are
+radians; pair geometry is in the drawing's canonical frame.
+
+The canonical angle is not saved with the drawing: readers recompute it from
+the program, so a change to that computation turns the frame of drawings saved
+before it. `canonicalAngle` records the drawing's canonical angle when the set
+was saved, and `BestFitCacheStore` drops a set on load unless it matches the
+recomputed angle (within 1e-9 radians, modulo a full turn), since pairs replayed
+in a turned frame can overlap. Sets from files saved before the field existed
+have no angle and are dropped the same way; their pairs are recomputed when
+next needed.
 
 The entries are only a cache: readers may ignore them and writers may omit
 them, at the cost of recomputing pairs. Writers save only sets whose

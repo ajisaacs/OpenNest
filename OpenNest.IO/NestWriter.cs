@@ -460,6 +460,7 @@ namespace OpenNest.IO
                 PlateWidth = set.PlateWidth,
                 PlateHeight = set.PlateHeight,
                 Spacing = set.Spacing,
+                CanonicalAngle = set.CanonicalAngle,
                 Results = set
                     .Results.Select(r => new BestFitResultDto
                     {

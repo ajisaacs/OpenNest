@@ -726,6 +726,7 @@ namespace OpenNest.IO
             public double PlateWidth { get; init; }
             public double PlateHeight { get; init; }
             public double Spacing { get; init; }
+            public double? CanonicalAngle { get; init; }
             public List<BestFitResultDto> Results { get; init; } = new();
         }
 

@@ -2,6 +2,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Nodes;
 using OpenNest.Engine;
 using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
@@ -28,13 +29,15 @@ public class BestFitPersistenceTests
     // Narrow enough that the filter drops some computed pairs (the T-shape pairs are ~8 x 17).
     private const double NarrowWidth = 8.1;
 
-    // Captured from the writer before the best-fit mapping moved out of OpenNest.IO.
+    // Captured from the writer before the best-fit mapping moved out of OpenNest.IO, plus the
+    // canonical angle each set now records.
     private const string GoldenBestFitJson = """
         [
           {
             "plateWidth": 60,
             "plateHeight": 40,
             "spacing": 0.25,
+            "canonicalAngle": 1.5707963267948966,
             "results": [
               {
                 "part1Rotation": 0,
@@ -171,6 +174,45 @@ public class BestFitPersistenceTests
     }
 
     [Fact]
+    public void Read_SetSavedUnderAnotherCanonicalAngle_IsDropped()
+    {
+        // As if saved before a change to the canonical-angle computation turned this drawing's
+        // frame: replaying those pairs in the new frame could overlap them.
+        BestFitCache.Clear();
+        var nest = CreateNest(MakeRotatedTShape());
+        var source = nest.Drawings.First();
+        BestFitCache.GetOrCompute(source, UsedWidth, UsedLength, Spacing);
+        var bytes = RewriteBestFits(Save(nest), sets =>
+        {
+            foreach (var set in sets)
+                set["canonicalAngle"] = source.Source.Angle + 0.35;
+        });
+
+        BestFitCache.Clear();
+        var drawing = Load(bytes).Drawings.Single();
+
+        Assert.Empty(BestFitCache.GetAllForDrawing(drawing));
+    }
+
+    [Fact]
+    public void Read_SetFromAnOlderFileWithoutACanonicalAngle_IsDropped()
+    {
+        BestFitCache.Clear();
+        var nest = CreateNest(MakeTShape());
+        PopulateHandBuiltSets(nest.Drawings.First());
+        var bytes = RewriteBestFits(Save(nest), sets =>
+        {
+            foreach (var set in sets)
+                set.Remove("canonicalAngle");
+        });
+
+        BestFitCache.Clear();
+        var drawing = Load(bytes).Drawings.Single();
+
+        Assert.Empty(BestFitCache.GetAllForDrawing(drawing));
+    }
+
+    [Fact]
     public void RoundTrip_NoBestFits_LoadsAndSavesUnchanged()
     {
         BestFitCache.Clear();
@@ -295,6 +337,26 @@ public class BestFitPersistenceTests
     }
 
     private static Nest Load(byte[] bytes) => new NestReader(new MemoryStream(bytes)) { BestFitStore = BestFitCacheStore.Shared }.Read();
+
+    /// <summary>Edits every saved set of drawing 1 in place, as an older or foreign writer might have saved it.</summary>
+    private static byte[] RewriteBestFits(byte[] bytes, System.Action<System.Collections.Generic.List<JsonObject>> edit)
+    {
+        var entries = ReadEntries(bytes);
+        var sets = JsonNode.Parse(new MemoryStream(entries["bestfits/bestfit-1"]))!.AsArray();
+        edit(sets.Select(n => n!.AsObject()).ToList());
+        entries["bestfits/bestfit-1"] = Encoding.UTF8.GetBytes(sets.ToJsonString());
+
+        using var stream = new MemoryStream();
+        using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var (name, content) in entries)
+            {
+                using var entryStream = zip.CreateEntry(name).Open();
+                entryStream.Write(content);
+            }
+        }
+        return stream.ToArray();
+    }
 
     private static System.Collections.Generic.Dictionary<string, byte[]> ReadEntries(byte[] bytes)
     {

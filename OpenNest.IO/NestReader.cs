@@ -465,7 +465,8 @@ namespace OpenNest.IO
                     r.Reason,
                     r.TrueArea,
                     r.HullAngles
-                )).ToList()
+                )).ToList(),
+                set.CanonicalAngle
             );
 
         /// <summary>

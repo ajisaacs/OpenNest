@@ -8,9 +8,17 @@ namespace OpenNest.Engine.BestFit
     /// <summary>
     /// Saves and restores <see cref="BestFitCache"/> entries for .nest archives. Only kept
     /// results are exported; imported sets are added without replacing computed ones.
+    /// Each set records the canonical angle its pairs were computed in, and import drops sets
+    /// whose angle no longer matches the drawing's recomputed one.
     /// </summary>
     public sealed class BestFitCacheStore : IBestFitStore
     {
+        /// <summary>
+        /// Largest difference (radians) at which a saved canonical angle still matches. The
+        /// angle round-trips exactly, so this only absorbs floating-point noise in recomputing it.
+        /// </summary>
+        private const double FrameTolerance = 1e-9;
+
         /// <summary>The store over the process-wide <see cref="BestFitCache"/>.</summary>
         public static BestFitCacheStore Shared { get; } = new();
 
@@ -50,7 +58,8 @@ namespace OpenNest.Engine.BestFit
                     ))
                     .ToList();
 
-                sets.Add(new SavedPairSet(kvp.Key.PlateWidth, kvp.Key.PlateHeight, kvp.Key.Spacing, results));
+                sets.Add(new SavedPairSet(
+                    kvp.Key.PlateWidth, kvp.Key.PlateHeight, kvp.Key.Spacing, results, FrameAngle(drawing)));
             }
 
             return sets;
@@ -64,7 +73,7 @@ namespace OpenNest.Engine.BestFit
 
             foreach (var set in sets)
             {
-                if (set.Results.Count == 0)
+                if (set.Results.Count == 0 || !MatchesFrame(set, drawing))
                     continue;
 
                 canonical ??= CanonicalFrame.AsCanonicalCopy(drawing);
@@ -94,6 +103,22 @@ namespace OpenNest.Engine.BestFit
 
                 BestFitCache.Populate(drawing, set.PlateWidth, set.PlateHeight, set.Spacing, results);
             }
+        }
+
+        private static double FrameAngle(Drawing drawing) => drawing.Source?.Angle ?? 0.0;
+
+        /// <summary>
+        /// True when the set was saved in the drawing's current canonical frame. A changed
+        /// canonical-angle computation would replay old pairs in a turned frame, where they can
+        /// overlap; sets with no saved angle (older files) are treated the same way.
+        /// </summary>
+        private static bool MatchesFrame(SavedPairSet set, Drawing drawing)
+        {
+            if (set.CanonicalAngle is not double saved || !double.IsFinite(saved))
+                return false;
+
+            var difference = System.Math.IEEERemainder(saved - FrameAngle(drawing), 2.0 * System.Math.PI);
+            return System.Math.Abs(difference) <= FrameTolerance;
         }
     }
 }

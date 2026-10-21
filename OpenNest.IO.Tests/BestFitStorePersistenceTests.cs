@@ -45,7 +45,7 @@ public class BestFitStorePersistenceTests
     [Fact]
     public void Read_WithStore_ImportsSavedSetsWithWireDefaults()
     {
-        var bytes = Save(CreateNest(), new RecordingStore { ToExport = [new SavedPairSet(60, 40, 0.25, [Result])] });
+        var bytes = Save(CreateNest(), new RecordingStore { ToExport = [new SavedPairSet(60, 40, 0.25, [Result], 0.75)] });
         var store = new RecordingStore();
 
         var nest = new NestReader(new MemoryStream(bytes)) { BestFitStore = store }.Read();
@@ -54,10 +54,27 @@ public class BestFitStorePersistenceTests
         Assert.Same(nest.Drawings.Single(), imported.Drawing);
         var set = Assert.Single(imported.Sets);
         Assert.Equal((60.0, 40.0, 0.25), (set.PlateWidth, set.PlateHeight, set.Spacing));
+        Assert.Equal(0.75, set.CanonicalAngle);
         var result = Assert.Single(set.Results);
         // A null reason and hull list are written as "" and [].
         Assert.Equal(Result with { Reason = "", HullAngles = result.HullAngles }, result);
         Assert.Empty(result.HullAngles);
+    }
+
+    [Fact]
+    public void Read_SetWithoutCanonicalAngle_ImportsAnUnknownFrame()
+    {
+        // Files saved before sets recorded their frame; the store decides whether they are stale.
+        const string olderSets = """
+            [{ "plateWidth": 60, "plateHeight": 40, "spacing": 0.25, "results": [] }]
+            """;
+        var bytes = AddEntry(Save(CreateNest(), store: null), "bestfits/bestfit-1", olderSets);
+        var store = new RecordingStore();
+
+        new NestReader(new MemoryStream(bytes)) { BestFitStore = store }.Read();
+
+        var set = Assert.Single(Assert.Single(store.Imported).Sets);
+        Assert.Null(set.CanonicalAngle);
     }
 
     [Fact]

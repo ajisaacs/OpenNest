@@ -53,6 +53,7 @@ public class BestFitCacheStoreTests
 
         var set = Assert.Single(sets);
         Assert.Equal((60.0, 40.0, Spacing), (set.PlateWidth, set.PlateHeight, set.Spacing));
+        Assert.Equal(drawing.Source.Angle, set.CanonicalAngle);
         var result = Assert.Single(set.Results);
         Assert.Equal(
             new SavedPairResult(0.5, System.Math.PI, 3.25, -1.5, 2, 7, Spacing, 90, 12, 7.5, 0.1, true, "Valid", 70, result.HullAngles),
@@ -78,7 +79,8 @@ public class BestFitCacheStoreTests
         var drawing = MakeDrawing();
         var saved = new SavedPairResult(0.5, System.Math.PI, 3.25, -1.5, 2, 7, Spacing, 90, 12, 7.5, 0.1, true, "Valid", 70, new[] { 0.25, -0.5 });
 
-        BestFitCacheStore.Shared.Import(drawing, new[] { new SavedPairSet(60, 40, Spacing, new[] { saved }) });
+        BestFitCacheStore.Shared.Import(
+            drawing, new[] { new SavedPairSet(60, 40, Spacing, new[] { saved }, drawing.Source.Angle) });
 
         var restored = Assert.Single(BestFitCache.GetAllForDrawing(drawing));
         Assert.Equal((60.0, 40.0, Spacing), restored.Key);
@@ -111,7 +113,8 @@ public class BestFitCacheStoreTests
         BestFitCache.Populate(drawing, 60, 40, Spacing, existing);
         var saved = new SavedPairResult(0, 0, 1, 1, 0, 1, Spacing, 5, 1, 5, 0, true, "Valid", 4, new double[0]);
 
-        BestFitCacheStore.Shared.Import(drawing, new[] { new SavedPairSet(60, 40, Spacing, new[] { saved }) });
+        BestFitCacheStore.Shared.Import(
+            drawing, new[] { new SavedPairSet(60, 40, Spacing, new[] { saved }, drawing.Source.Angle) });
 
         Assert.Same(existing, BestFitCache.GetAllForDrawing(drawing)[(60, 40, Spacing)]);
     }
@@ -122,8 +125,77 @@ public class BestFitCacheStoreTests
         BestFitCache.Clear();
         var drawing = MakeDrawing();
 
-        BestFitCacheStore.Shared.Import(drawing, new[] { new SavedPairSet(60, 40, Spacing, new SavedPairResult[0]) });
+        BestFitCacheStore.Shared.Import(
+            drawing, new[] { new SavedPairSet(60, 40, Spacing, new SavedPairResult[0], drawing.Source.Angle) });
 
         Assert.Empty(BestFitCache.GetAllForDrawing(drawing));
+    }
+
+    [Fact]
+    public void Import_SetSavedUnderTheCurrentCanonicalAngle_IsKept()
+    {
+        BestFitCache.Clear();
+        var drawing = MakeRotatedDrawing();
+        BestFitCache.Populate(drawing, 60, 40, Spacing, new() { MakeResult(drawing, keep: true) });
+        var sets = BestFitCacheStore.Shared.Export(drawing, new HashSet<(double, double, double)> { (60, 40, Spacing) });
+        BestFitCache.Clear();
+
+        BestFitCacheStore.Shared.Import(drawing, sets);
+
+        Assert.Single(Assert.Single(BestFitCache.GetAllForDrawing(drawing)).Value);
+    }
+
+    [Fact]
+    public void Import_SetSavedUnderAnotherCanonicalAngle_IsDropped()
+    {
+        // A changed canonical-angle computation turns the drawing's frame; pairs saved in the
+        // old frame would be replayed turned and could overlap.
+        BestFitCache.Clear();
+        var drawing = MakeRotatedDrawing();
+        BestFitCache.Populate(drawing, 60, 40, Spacing, new() { MakeResult(drawing, keep: true) });
+        var sets = BestFitCacheStore.Shared.Export(drawing, new HashSet<(double, double, double)> { (60, 40, Spacing) });
+        BestFitCache.Clear();
+        drawing.Source.Angle += 0.35;
+
+        BestFitCacheStore.Shared.Import(drawing, sets);
+
+        Assert.Empty(BestFitCache.GetAllForDrawing(drawing));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(double.NaN)]
+    public void Import_SetWithoutAUsableCanonicalAngle_IsDropped(double? angle)
+    {
+        BestFitCache.Clear();
+        var drawing = MakeDrawing();
+        var saved = new SavedPairResult(0, 0, 1, 1, 0, 1, Spacing, 5, 1, 5, 0, true, "Valid", 4, new double[0]);
+
+        BestFitCacheStore.Shared.Import(drawing, new[] { new SavedPairSet(60, 40, Spacing, new[] { saved }, angle) });
+
+        Assert.Empty(BestFitCache.GetAllForDrawing(drawing));
+    }
+
+    [Fact]
+    public void Import_AngleAWholeTurnAway_MatchesTheSameFrame()
+    {
+        BestFitCache.Clear();
+        var drawing = MakeRotatedDrawing();
+        var saved = new SavedPairResult(0, 0, 1, 1, 0, 1, Spacing, 5, 1, 5, 0, true, "Valid", 4, new double[0]);
+
+        BestFitCacheStore.Shared.Import(
+            drawing,
+            new[] { new SavedPairSet(60, 40, Spacing, new[] { saved }, drawing.Source.Angle - 2 * System.Math.PI) });
+
+        Assert.Single(BestFitCache.GetAllForDrawing(drawing));
+    }
+
+    private static Drawing MakeRotatedDrawing()
+    {
+        var drawing = MakeDrawing();
+        drawing.Program.Rotate(0.5, drawing.Program.BoundingBox().Center);
+        drawing.RecomputeCanonicalAngle();
+        Assert.NotEqual(0.0, drawing.Source.Angle);
+        return drawing;
     }
 }
