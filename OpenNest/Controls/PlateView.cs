@@ -649,8 +649,9 @@ namespace OpenNest.Controls
             switch (e.KeyCode)
             {
                 case Keys.Delete:
-                    // Clamp edit mode deletes its selected clamp, never parts.
-                    if (actionManager.CurrentAction is ActionClampEdit)
+                    // Clamp edit deletes its selected clamp, never parts; Clone's selection is its
+                    // unplaced previews, so it handles Delete itself.
+                    if (actionManager.CurrentAction is ActionClampEdit or ActionClone)
                         base.OnKeyDown(e);
                     else
                         selection.DeleteSelected();

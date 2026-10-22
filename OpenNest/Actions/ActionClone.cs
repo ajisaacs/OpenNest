@@ -32,12 +32,16 @@ namespace OpenNest.Actions
             lastScale = double.NaN;
 
             for (int i = 0; i < partsToClone.Count; i++)
-            {
-                var part = LayoutPart.Create(partsToClone[i].Clone() as Part, plateView);
-                part.IsSelected = true;
-                parts.Add(part);
-            }
+                parts.Add(LayoutPart.Create(partsToClone[i].Clone() as Part, plateView));
 
+            SelectPreviews();
+        }
+
+        // Re-flag on every reselect: a deselect elsewhere would otherwise leave the
+        // previews drawn with the solid fill of placed parts.
+        private void SelectPreviews()
+        {
+            parts.ForEach(p => p.IsSelected = true);
             plateView.SelectedParts.Clear();
             plateView.SelectedParts.AddRange(parts);
         }
@@ -111,11 +115,7 @@ namespace OpenNest.Actions
 
         public override bool SurvivesPlateChange => true;
 
-        public override void OnPlateChanged()
-        {
-            plateView.SelectedParts.Clear();
-            plateView.SelectedParts.AddRange(parts);
-        }
+        public override void OnPlateChanged() => SelectPreviews();
 
         public override void ConnectEvents()
         {
@@ -124,8 +124,7 @@ namespace OpenNest.Actions
             plateView.MouseDown += plateView_MouseDown;
             plateView.Paint += plateView_Paint;
 
-            plateView.SelectedParts.Clear();
-            plateView.SelectedParts.AddRange(parts);
+            SelectPreviews();
         }
 
         public override void DisconnectEvents()
