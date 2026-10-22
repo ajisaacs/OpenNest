@@ -408,9 +408,9 @@ review and Save; nothing is stored before then.
 
 **Release...** (in the drawing sets window) reads the
 selected active set with its members and opens the release dialog with it listed.
-More sets are added by typing in **Add a set** (the list of matching active sets
-fills as you type; Enter or **Add** takes the picked set, or the one set whose
-name is exactly what was typed). **Add Drawings...** adds library drawings on
+More sets are added from **Add a set**: the list opens with the first active sets
+by name and narrows as you type; Enter or **Add** takes the picked set, or the one
+set whose name is exactly what was typed. **Add Drawings...** adds library drawings on
 their own, outside any set: it browses every active drawing as the set editor's
 library pane does (search, server-side sort, pages, several selected at once),
 and **Add to Release**, a double-click or Enter adds the selection at the

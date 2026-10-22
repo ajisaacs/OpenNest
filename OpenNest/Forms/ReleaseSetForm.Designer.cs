@@ -141,6 +141,7 @@ namespace OpenNest.Forms
             addSetCombo.Name = "addSetCombo";
             addSetCombo.TabIndex = 1;
             addSetCombo.TextUpdate += AddSetCombo_TextUpdate;
+            addSetCombo.DropDown += AddSetCombo_DropDown;
             addSetCombo.KeyDown += AddSetCombo_KeyDown;
             //
             // addSetButton

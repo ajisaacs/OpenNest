@@ -121,6 +121,8 @@ namespace OpenNest.Forms
                 AddRow(line.Drawing, line.Drawing.Name, line.Drawing.Customer, line.Drawing.Revision, line.Quantity);
             populating = false;
             BuildPlan();
+            // The first sets by name are listed before anything is typed, so the arrow shows them.
+            Shown += async (_, _) => await SearchSetsAsync("", dropDown: false);
         }
 
         /// <summary>The sets listed, in order, with their kits.</summary>
@@ -282,6 +284,13 @@ namespace OpenNest.Forms
             BuildPlan();
         }
 
+        // Opening the empty list reads the first sets when the initial read failed or found none yet.
+        private async void AddSetCombo_DropDown(object sender, EventArgs e)
+        {
+            if (addSetCombo.Items.Count == 0 && string.IsNullOrEmpty(addSetCombo.Text) && addSetCombo.Enabled)
+                await SearchSetsAsync("", dropDown: false);
+        }
+
         // Type-ahead: the set list is queried once typing pauses.
         private void AddSetCombo_TextUpdate(object sender, EventArgs e)
         {
@@ -305,8 +314,12 @@ namespace OpenNest.Forms
 
         private async void AddSetButton_Click(object sender, EventArgs e) => await AddTypedSetAsync();
 
-        /// <summary>Lists active sets whose name, customer or notes contain <paramref name="text"/>.</summary>
-        internal async Task SearchSetsAsync(string text)
+        /// <summary>
+        /// Lists the first active sets by name whose name, customer or notes contain
+        /// <paramref name="text"/> (all of them for an empty text); <paramref name="dropDown"/>
+        /// opens the list when the box has focus, as typing does.
+        /// </summary>
+        internal async Task SearchSetsAsync(string text, bool dropDown = true)
         {
             searchCancellation?.Cancel();
             searchCancellation?.Dispose();
@@ -340,7 +353,7 @@ namespace OpenNest.Forms
             addSetCombo.EndUpdate();
             addSetCombo.Text = typed;
             addSetCombo.SelectionStart = System.Math.Min(caret, typed.Length);
-            if (addSetCombo.Focused && page.Items.Count > 0)
+            if (dropDown && addSetCombo.Focused && page.Items.Count > 0)
                 addSetCombo.DroppedDown = true;
         }
 

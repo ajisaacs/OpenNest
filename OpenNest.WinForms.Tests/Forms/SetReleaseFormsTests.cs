@@ -640,6 +640,33 @@ public class SetReleaseFormsTests
     }
 
     [Fact]
+    public void Release_ListsTheFirstSetsInTheAddSetBox_BeforeAnythingIsTyped()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var sets = new InMemoryDrawingSets();
+                CreateSet(sets, "Synthetic kit", (a, 1));
+                CreateSet(sets, "Synthetic frame", (a, 2));
+                var nests = new MemoryNests();
+
+                using var form = new ReleaseSetForm(sets, library, nests, Server, Array.Empty<DrawingSetRecord>(),
+                    Array.Empty<SetReleaseDrawingLine>(), (_, _) => { });
+                form.Show();
+                var combo = Field<ComboBox>(form, "addSetCombo");
+                PumpUntil(() => combo.Items.Count == 2, "the set list");
+
+                Assert.Equal(new[] { "Synthetic frame", "Synthetic kit" }, combo.Items.Cast<object>().Select(i => i.ToString()!.Split(" (")[0]));
+                Assert.Equal("", combo.Text);
+                Assert.False(combo.DroppedDown);
+            },
+            TestTimeout,
+            "The set list test did not complete.");
+    }
+
+    [Fact]
     public void Release_StartedEmpty_AddsASetAndReleasesIt()
     {
         StaTestThread.Run(
