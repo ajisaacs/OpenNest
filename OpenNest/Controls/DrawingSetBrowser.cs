@@ -12,7 +12,7 @@ namespace OpenNest.Controls
     /// <summary>
     /// Browses the server's drawing sets one bounded page at a time through
     /// <see cref="DrawingSetBrowseSession"/>, and creates, edits, archives or restores them and
-    /// shows their history. The Drawing Library dialog hosts it as its Sets tab. In pick mode
+    /// shows their history. <see cref="DrawingSetsForm"/> hosts it to manage and release sets. In pick mode
     /// (<see cref="ChooseDrawingSetForm"/>) only active sets are listed, and choosing a set or
     /// New Set raises <see cref="SetActivated"/> or <see cref="NewSetChosen"/> instead.
     /// </summary>

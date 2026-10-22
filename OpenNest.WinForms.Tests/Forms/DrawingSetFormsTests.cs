@@ -14,7 +14,7 @@ public class DrawingSetFormsTests
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(60);
 
     [Fact]
-    public void SetsTab_LoadsWhenShown_AndNewSetIsSavedThroughTheEditor()
+    public void DrawingSetsForm_LoadsWhenShown_AndNewSetIsSavedThroughTheEditor()
     {
         StaTestThread.Run(
             () =>
@@ -24,9 +24,8 @@ public class DrawingSetFormsTests
                 var gusset = library.Add("SYN-GUSSET", "Synthetic Aluminum", 0.125);
                 var sets = new InMemoryDrawingSets();
 
-                using var form = new DrawingLibraryForm(library, Server, MatchingNest(), sets);
-                form.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
-                var browser = form.SetBrowser;
+                using var form = new DrawingSetsForm(sets, library, Server);
+                var browser = form.Browser;
                 browser.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
                 browser.EditSet = edit =>
                 {
@@ -47,13 +46,10 @@ public class DrawingSetFormsTests
                     Run(editor.SaveAsync());
                     return editor.Saved;
                 };
+                Assert.Empty(sets.Queries);
                 form.Show();
-                var tabs = Field<TabControl>(form, "tabControl");
                 var grid = Field<DataGridView>(browser, "setGrid");
 
-                Assert.Equal(new[] { "Drawings", "Sets" }, tabs.TabPages.Cast<TabPage>().Select(t => t.Text));
-                Assert.Empty(sets.Queries);
-                tabs.SelectedIndex = 1;
                 PumpUntil(() => sets.Queries.Count == 1 && !Field<Label>(browser, "summaryLabel").Text.StartsWith("Loading"), "the set list");
                 Assert.Contains("New Set", Field<Label>(browser, "summaryLabel").Text);
 

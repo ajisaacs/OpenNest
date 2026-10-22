@@ -96,6 +96,44 @@ namespace OpenNest.Forms
             form.ShowDialog(this);
         }
 
+        private void FileMenu_Opening(object sender, EventArgs e)
+        {
+            // Drawing sets live on the nest server; File mode has nothing to browse.
+            var databaseMode = NestStorage.Settings.IsDatabaseMode;
+            mnuFile.DropDown.ShowItemToolTips = true;
+            mnuFileDrawingSets.Enabled = databaseMode;
+            mnuFileDrawingSets.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
+        }
+
+        /// <summary>
+        /// Browses, edits and releases drawing sets; needs no open nest, since a release
+        /// creates or merges into nests and opens each in its own tab.
+        /// </summary>
+        private void DrawingSets_Click(object sender, EventArgs e)
+        {
+            if (!NestStorage.Settings.IsDatabaseMode)
+                return;
+
+            IDrawingLibraryStore library;
+            IDrawingSetStore sets;
+            INestRepository nests;
+            try
+            {
+                library = NestStorage.CreateDrawingLibrary();
+                sets = NestStorage.CreateDrawingSetStore();
+                nests = NestStorage.CreateRepository();
+            }
+            catch (ArgumentException ex)
+            {
+                MessageBox.Show(this, ex.Message, "Drawing Sets", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            using var form = new DrawingSetsForm(sets, library, NestStorage.Settings.ServerUrl);
+            form.EnableRelease(nests, OpenServerNest, IsServerNestOpen);
+            form.ShowDialog(this);
+        }
+
         private async void Save_Click(object sender, EventArgs e)
         {
             var form = activeForm;

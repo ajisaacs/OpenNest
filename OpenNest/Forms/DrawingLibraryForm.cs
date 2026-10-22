@@ -21,8 +21,8 @@ namespace OpenNest.Forms
     /// shows any warning or refusal first and only then changes the nest. Edit Settings
     /// changes the selected drawing's notes and nesting settings (Cut first, priority,
     /// rotation, color) on the server as a new revision with the same package. With a set
-    /// store, the Sets tab browses and edits drawing sets (<see cref="Controls.DrawingSetBrowser"/>),
-    /// and the drawing grid's menu lists the sets a drawing is in and adds it to a set.
+    /// store, the drawing grid's menu lists the sets a drawing is in and adds it to a set;
+    /// sets themselves are browsed and released in <see cref="DrawingSetsForm"/>.
     /// The details pane previews the selected revision's geometry, downloaded shortly after
     /// the selection settles and cached per revision for the dialog's lifetime.
     /// </summary>
@@ -119,14 +119,7 @@ namespace OpenNest.Forms
             Text = $"Add from Drawing Library — {this.serverUrl}";
 
             if (sets != null)
-            {
                 drawingGrid.ContextMenuStrip = drawingMenu;
-                setBrowser.Initialize(sets, library, this.serverUrl);
-            }
-            else
-            {
-                tabControl.TabPages.Remove(setsTab);
-            }
             showAllCheckBox.Enabled = session.IsFilteredToNest;
             UpdateFilterLabel();
             UpdateNavigation();
@@ -334,26 +327,6 @@ namespace OpenNest.Forms
 
         private async void AddButton_Click(object sender, EventArgs e) => await AddSelectedAsync();
 
-        /// <summary>The Sets tab's browser; loaded the first time the tab is shown.</summary>
-        internal OpenNest.Controls.DrawingSetBrowser SetBrowser => setBrowser;
-
-        /// <summary>
-        /// Lets the Sets tab release sets: nests are saved through <paramref name="nests"/>
-        /// and each is opened with <paramref name="openNest"/>; a nest <paramref name="isNestOpen"/>
-        /// reports as open in a tab is never merged into.
-        /// </summary>
-        public void EnableRelease(INestRepository nests, Action<Nest, NestRecord> openNest, Func<Guid, bool> isNestOpen = null)
-        {
-            if (setBrowser.IsInitialized)
-                setBrowser.EnableRelease(nests, openNest, isNestOpen);
-        }
-
-        private async void TabControl_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            if (tabControl.SelectedTab == setsTab && setBrowser.IsInitialized && !setBrowser.HasLoaded)
-                await setBrowser.RefreshAsync();
-        }
-
         // A right-click selects the row under the pointer, so the menu acts on what was clicked.
         private void DrawingGrid_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
         {
@@ -478,8 +451,6 @@ namespace OpenNest.Forms
             if (saved == null || IsDisposed)
                 return;
             statusLabel.Text = $"Added '{record.Name}' to set '{saved.Name}' (revision {saved.Revision}).";
-            if (setBrowser.HasLoaded)
-                await setBrowser.RefreshAsync();
         }
 
         private async void EditButton_Click(object sender, EventArgs e) => await EditSelectedAsync();

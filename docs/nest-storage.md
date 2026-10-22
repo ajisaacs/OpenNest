@@ -345,8 +345,9 @@ revision; save the nest to keep it.
 
 ### Drawing sets (desktop)
 
-The Drawing Library dialog has a **Sets** tab beside **Drawings** (Database
-mode only, like the dialog). It lists sets a page at a time
+**File > Drawing Sets...** (Database mode only) opens the drawing sets window;
+it needs no open nest, since releasing a set makes new nests or merges into
+draft ones and opens each in its own tab. It lists sets a page at a time
 (`OpenNest.Data.DrawingSetBrowseSession`): search by name, customer or notes,
 sort by name, customer, revision or saved time, and **Show archived**. Selecting
 a set shows its notes.
@@ -356,7 +357,7 @@ a set shows its notes.
   grid (drawing, material, grade, thickness, units, cut type, quantity, note).
   The editor's left pane browses the library in place, with no second dialog:
   every active drawing (never filtered to a nest), searched, sorted and paged
-  like the Drawings tab. Select one or several and choose **Add to Set**,
+  like the Drawing Library dialog. Select one or several and choose **Add to Set**,
   double-click or press Enter to add them at the entered quantity per kit.
   Drawings already in the set are greyed; one picked again is skipped and
   named, so there is one member per drawing. Quantities are edited
@@ -374,7 +375,7 @@ a set shows its notes.
   deleted. **History...** lists revisions newest first with the members of the
   selected one, shown with their drawings' current library details.
 
-On the Drawings tab, right-click a drawing for **Used in Sets...** (the sets
+In the Drawing Library dialog, right-click a drawing for **Used in Sets...** (the sets
 whose current revision contains it) or **Add to Set...**: choose an active set
 or **New Set**, and the set editor opens with the drawing added at the entered
 quantity for review and Save.
@@ -393,7 +394,7 @@ library's latest revision. Anything kept, skipped, archived in the library or
 newer there than in the nest is listed first, then the set editor opens for
 review and Save; nothing is stored before then.
 
-**Release...** (the Sets tab, when the dialog was opened from a nest) reads the
+**Release...** (in the drawing sets window) reads the
 selected active set with its members and opens the release dialog with it listed.
 More sets are added by typing in **Add a set** (the list of matching active sets
 fills as you type; Enter or **Add** takes the picked set, or the one set whose
@@ -462,8 +463,8 @@ A **drawing set** (schema v7) is a named, versioned list of library drawings
 with a quantity each: a kit, an assembly or a recurring order. Members name
 drawings by id and always mean each drawing's **current** revision; there is no
 per-member revision pin. Sets travel as JSON (`application/json`, at most 1 MiB).
-The desktop browses and edits them on the Drawing Library dialog's Sets tab
-([Drawing sets (desktop)](#drawing-sets-desktop)), where sets are also released.
+The desktop browses, edits and releases them in File > Drawing Sets
+([Drawing sets (desktop)](#drawing-sets-desktop)).
 
 `OpenNest.Data.DrawingSetRecord` fields: `id` (client-allocated before the
 first save), `revision`, `name`, `customer`, `notes`, `archived`, `savedBy`,
