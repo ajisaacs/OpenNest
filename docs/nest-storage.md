@@ -474,6 +474,15 @@ deletes the nests the release created (they can be recovered) and restores the
 drafts it merged into. When some nests were changed after the release, it lists
 them and offers to undo the others, leaving those as they are.
 
+**File > Releases...** lists every release on the server the same way, newest
+first, with a **Released** column naming what each one had ("Kit A ×2, Kit B;
+Bracket ×4": sets with their kits past one, then drawings on their own with
+their quantities) in place of the set revision and kits, and Undo Release.
+**New Release...** opens the release dialog empty; sets are added by name and
+drawings with Add Drawings, and once the dialog records a release the list
+re-reads from the newest. Like Drawing Sets, it is enabled in database mode
+only.
+
 **Nest > Edit** (Nest Info) shows, beside its buttons, the newest release that
 made or merged into a server nest ("Released from set 'Kit A' revision 3 ×2 on
 10/20/2026 by ...", "Released from drawing 'Bracket' ×4", or "Merged from sets

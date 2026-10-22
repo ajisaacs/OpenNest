@@ -573,6 +573,109 @@ public class SetReleaseFormsTests
             "The drawing releases view test did not complete.");
     }
 
+    [Fact]
+    public void AllReleases_NamesWhatEachReleased_AndNewReleaseRereadsOnceOneIsRecorded()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var sets = new InMemoryDrawingSets();
+                var set = CreateSet(sets, (a, 1));
+                var other = CreateSet(sets, "Synthetic frame", (a, 2));
+                SetReleaseRecord Release(DateTime at, SetReleaseLine[] lines, SetReleaseDrawing[] drawings) => new()
+                {
+                    Id = Guid.NewGuid(),
+                    Sets = lines,
+                    Drawings = drawings,
+                    ReleasedBy = "Synthetic operator",
+                    ReleasedAt = at,
+                    Nests = new[] { new SetReleaseNest { NestId = Guid.NewGuid(), Nest = new NestRecord { Name = "N1", Status = NestStatus.Draft } } },
+                };
+                sets.Releases.Add(Release(new DateTime(2026, 10, 20, 12, 0, 0, DateTimeKind.Utc),
+                    new[]
+                    {
+                        new SetReleaseLine { SetId = set.Id, SetRevision = 1, SetName = set.Name, Quantity = 2 },
+                        new SetReleaseLine { SetId = other.Id, SetRevision = 1, SetName = other.Name, Quantity = 1 },
+                    },
+                    new[] { new SetReleaseDrawing { DrawingId = a.Id, DrawingName = a.Name, Quantity = 4 } }));
+                sets.Releases.Add(Release(new DateTime(2026, 10, 21, 12, 0, 0, DateTimeKind.Utc),
+                    Array.Empty<SetReleaseLine>(),
+                    new[] { new SetReleaseDrawing { DrawingId = a.Id, DrawingName = a.Name, Quantity = 1 } }));
+
+                using var form = new SetReleasesForm(sets);
+                var opened = 0;
+                form.ShowNewRelease = () =>
+                {
+                    opened++;
+                    // The dialog records a release before it closes; a cancelled dialog records none.
+                    if (opened == 2)
+                        sets.Releases.Add(Release(DateTime.UtcNow, new[] { new SetReleaseLine { SetId = set.Id, SetRevision = 1, SetName = set.Name } },
+                            Array.Empty<SetReleaseDrawing>()));
+                    return opened == 2;
+                };
+                form.Show();
+                var releases = Field<DataGridView>(form, "releaseGrid");
+                PumpUntil(() => releases.Rows.Count == 2, "the releases");
+
+                Assert.Equal("Releases", form.Text);
+                Assert.False(releases.Columns["revisionColumn"]!.Visible);
+                Assert.Equal("Released", releases.Columns["multiplierColumn"]!.HeaderText);
+                Assert.Equal(new object[] { "SYN-A ×1", "Synthetic kit ×2, Synthetic frame; SYN-A ×4" },
+                    releases.Rows.Cast<DataGridViewRow>().Select(r => r.Cells["multiplierColumn"].Value));
+                Assert.Equal("Releases 1-2 of 2", Field<Label>(form, "summaryLabel").Text);
+                Assert.False(Field<Button>(form, "newReleaseButton").Visible);
+
+                Run(form.NewReleaseAsync());
+                Assert.Equal(2, releases.Rows.Count);
+
+                Run(form.NewReleaseAsync());
+                PumpUntil(() => releases.Rows.Count == 3, "the re-read releases");
+                Assert.Equal("Synthetic kit", releases.Rows[0].Cells["multiplierColumn"].Value);
+                Assert.Equal("Releases 1-3 of 3", Field<Label>(form, "summaryLabel").Text);
+            },
+            TestTimeout,
+            "The all-releases view test did not complete.");
+    }
+
+    [Fact]
+    public void Release_StartedEmpty_AddsASetAndReleasesIt()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var sets = new InMemoryDrawingSets();
+                var set = CreateSet(sets, (a, 2));
+                var nests = new MemoryNests();
+                var opened = new List<(Nest Nest, NestRecord Record)>();
+
+                using var form = new ReleaseSetForm(sets, library, nests, Server, Array.Empty<DrawingSetRecord>(),
+                    Array.Empty<SetReleaseDrawingLine>(), (nest, record) => opened.Add((nest, record)));
+                form.ShowMessage = (_, _, _) => DialogResult.OK;
+                form.CreateNest = (group, _) => Task.FromResult(new Nest("N26-0001") { Units = group.Units });
+                form.Show();
+
+                Assert.Equal("New Release", form.Text);
+                Assert.Empty(Field<DataGridView>(form, "groupGrid").Rows);
+                Assert.False(Field<Button>(form, "releaseButton").Enabled);
+
+                Assert.True(form.AddLine(set, 3));
+                Assert.Equal("Release 'Synthetic kit'", form.Text);
+                Assert.True(Field<Button>(form, "releaseButton").Enabled);
+
+                Run(form.ReleaseAsync());
+
+                Assert.Single(opened);
+                Assert.Equal(6, opened[0].Nest.Drawings.Single().Quantity.Required);
+                Assert.Equal(3, Assert.Single(sets.Releases).Sets.Single().Quantity);
+            },
+            TestTimeout,
+            "The empty release test did not complete.");
+    }
+
     private static DrawingSetRecord CreateSet(InMemoryDrawingSets sets, params (DrawingLibraryRecord Drawing, int Quantity)[] members) =>
         CreateSet(sets, "Synthetic kit", members);
 

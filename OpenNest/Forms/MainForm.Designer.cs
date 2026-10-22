@@ -39,6 +39,7 @@ namespace OpenNest.Forms
             mnuFileOpen = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileImportBom = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileDrawingSets = new System.Windows.Forms.ToolStripMenuItem();
+            mnuFileReleases = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem1 = new System.Windows.Forms.ToolStripSeparator();
             mnuFileSave = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileSaveAs = new System.Windows.Forms.ToolStripMenuItem();
@@ -204,7 +205,7 @@ namespace OpenNest.Forms
             // 
             // mnuFile
             // 
-            mnuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuFileNew, mnuFileOpen, mnuFileImportBom, mnuFileDrawingSets, toolStripMenuItem1, mnuFileSave, mnuFileSaveAs, toolStripMenuItem2, mnuFileExport, mnuFileExportAll, mnuFileExportNestReport, toolStripMenuItem3, mnuFileExit });
+            mnuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuFileNew, mnuFileOpen, mnuFileImportBom, mnuFileDrawingSets, mnuFileReleases, toolStripMenuItem1, mnuFileSave, mnuFileSaveAs, toolStripMenuItem2, mnuFileExport, mnuFileExportAll, mnuFileExportNestReport, toolStripMenuItem3, mnuFileExit });
             mnuFile.Name = "mnuFile";
             mnuFile.DropDownOpening += FileMenu_Opening;
             mnuFile.Size = new System.Drawing.Size(37, 20);
@@ -241,6 +242,13 @@ namespace OpenNest.Forms
             mnuFileDrawingSets.Size = new System.Drawing.Size(180, 22);
             mnuFileDrawingSets.Text = "Drawing Sets...";
             mnuFileDrawingSets.Click += DrawingSets_Click;
+            //
+            // mnuFileReleases
+            //
+            mnuFileReleases.Name = "mnuFileReleases";
+            mnuFileReleases.Size = new System.Drawing.Size(180, 22);
+            mnuFileReleases.Text = "Releases...";
+            mnuFileReleases.Click += Releases_Click;
             //
             // toolStripMenuItem1
             // 
@@ -1331,6 +1339,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuFileOpen;
         private System.Windows.Forms.ToolStripMenuItem mnuFileImportBom;
         private System.Windows.Forms.ToolStripMenuItem mnuFileDrawingSets;
+        private System.Windows.Forms.ToolStripMenuItem mnuFileReleases;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem1;
         private System.Windows.Forms.ToolStripMenuItem mnuFileSave;
         private System.Windows.Forms.ToolStripMenuItem mnuFileSaveAs;

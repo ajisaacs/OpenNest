@@ -104,12 +104,17 @@ public class SetReleasePlanTests
     }
 
     [Fact]
-    public void Build_RefusesTheSameSetTwice_AndNoSets()
+    public void Build_RefusesTheSameSetTwice_AndMakesAnEmptyPlanOfNothing()
     {
         var set = Set((Drawing("SYN-A"), 1));
 
         Assert.Throws<ArgumentException>(() => SetReleasePlan.Build(new[] { new SetReleasePlanLine(set, 1), new SetReleasePlanLine(set, 2) }, false));
-        Assert.Throws<ArgumentException>(() => SetReleasePlan.Build(Array.Empty<SetReleasePlanLine>(), false));
+
+        // The release dialog starts empty (File > Releases > New Release) and fills in.
+        var empty = SetReleasePlan.Build(Array.Empty<SetReleasePlanLine>(), false);
+        Assert.Empty(empty.Groups);
+        Assert.Empty(empty.Lines);
+        Assert.Empty(empty.SkippedArchived);
     }
 
     [Fact]
@@ -164,7 +169,7 @@ public class SetReleasePlanTests
         Assert.Throws<ArgumentOutOfRangeException>(() => Build(new SetReleaseDrawingLine(drawing, 0)));
         Assert.Throws<ArgumentOutOfRangeException>(() => Build(new SetReleaseDrawingLine(drawing, SetReleaseRules.MaxDrawingQuantity + 1)));
         Assert.Throws<ArgumentException>(() => Build(new SetReleaseDrawingLine(unsaved, 1)));
-        Assert.Throws<ArgumentException>(() => Build());
+        Assert.Empty(Build().Groups);
     }
 
     [Theory]

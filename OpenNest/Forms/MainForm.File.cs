@@ -103,6 +103,8 @@ namespace OpenNest.Forms
             mnuFile.DropDown.ShowItemToolTips = true;
             mnuFileDrawingSets.Enabled = databaseMode;
             mnuFileDrawingSets.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
+            mnuFileReleases.Enabled = databaseMode;
+            mnuFileReleases.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
         }
 
         /// <summary>
@@ -131,6 +133,35 @@ namespace OpenNest.Forms
 
             using var form = new DrawingSetsForm(sets, library, NestStorage.Settings.ServerUrl);
             form.EnableRelease(nests, OpenServerNest, IsServerNestOpen);
+            form.ShowDialog(this);
+        }
+
+        /// <summary>
+        /// Lists every release on the nest server and starts new ones; needs no open nest, since
+        /// a release creates or merges into nests and opens each in its own tab.
+        /// </summary>
+        private void Releases_Click(object sender, EventArgs e)
+        {
+            if (!NestStorage.Settings.IsDatabaseMode)
+                return;
+
+            IDrawingLibraryStore library;
+            IDrawingSetStore sets;
+            INestRepository nests;
+            try
+            {
+                library = NestStorage.CreateDrawingLibrary();
+                sets = NestStorage.CreateDrawingSetStore();
+                nests = NestStorage.CreateRepository();
+            }
+            catch (ArgumentException ex)
+            {
+                MessageBox.Show(this, ex.Message, "Releases", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            using var form = new SetReleasesForm(sets);
+            form.EnableRelease(library, nests, NestStorage.Settings.ServerUrl, OpenServerNest, IsServerNestOpen);
             form.ShowDialog(this);
         }
 

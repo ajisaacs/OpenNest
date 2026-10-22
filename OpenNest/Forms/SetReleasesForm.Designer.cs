@@ -39,6 +39,7 @@ namespace OpenNest.Forms
             previousButton = new System.Windows.Forms.Button();
             nextButton = new System.Windows.Forms.Button();
             summaryLabel = new System.Windows.Forms.Label();
+            newReleaseButton = new System.Windows.Forms.Button();
             undoButton = new System.Windows.Forms.Button();
             closeButton = new System.Windows.Forms.Button();
             layoutTable.SuspendLayout();
@@ -204,17 +205,19 @@ namespace OpenNest.Forms
             // bottomTable
             //
             bottomTable.AutoSize = true;
-            bottomTable.ColumnCount = 5;
+            bottomTable.ColumnCount = 6;
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.Controls.Add(previousButton, 0, 0);
             bottomTable.Controls.Add(nextButton, 1, 0);
             bottomTable.Controls.Add(summaryLabel, 2, 0);
-            bottomTable.Controls.Add(undoButton, 3, 0);
-            bottomTable.Controls.Add(closeButton, 4, 0);
+            bottomTable.Controls.Add(newReleaseButton, 3, 0);
+            bottomTable.Controls.Add(undoButton, 4, 0);
+            bottomTable.Controls.Add(closeButton, 5, 0);
             bottomTable.Dock = System.Windows.Forms.DockStyle.Fill;
             bottomTable.Margin = new System.Windows.Forms.Padding(0, 6, 0, 0);
             bottomTable.Name = "bottomTable";
@@ -249,12 +252,22 @@ namespace OpenNest.Forms
             summaryLabel.Name = "summaryLabel";
             summaryLabel.TabIndex = 2;
             //
+            // newReleaseButton
+            //
+            newReleaseButton.AutoSize = true;
+            newReleaseButton.Name = "newReleaseButton";
+            newReleaseButton.TabIndex = 3;
+            newReleaseButton.Text = "New Release...";
+            newReleaseButton.UseVisualStyleBackColor = true;
+            newReleaseButton.Visible = false;
+            newReleaseButton.Click += NewReleaseButton_Click;
+            //
             // undoButton
             //
             undoButton.AutoSize = true;
             undoButton.Enabled = false;
             undoButton.Name = "undoButton";
-            undoButton.TabIndex = 3;
+            undoButton.TabIndex = 4;
             undoButton.Text = "Undo Release...";
             undoButton.UseVisualStyleBackColor = true;
             undoButton.Click += UndoButton_Click;
@@ -264,7 +277,7 @@ namespace OpenNest.Forms
             closeButton.AutoSize = true;
             closeButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             closeButton.Name = "closeButton";
-            closeButton.TabIndex = 4;
+            closeButton.TabIndex = 5;
             closeButton.Text = "Close";
             closeButton.UseVisualStyleBackColor = true;
             //
@@ -316,6 +329,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Button previousButton;
         private System.Windows.Forms.Button nextButton;
         private System.Windows.Forms.Label summaryLabel;
+        private System.Windows.Forms.Button newReleaseButton;
         private System.Windows.Forms.Button undoButton;
         private System.Windows.Forms.Button closeButton;
     }

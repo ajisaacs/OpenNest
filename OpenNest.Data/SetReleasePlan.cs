@@ -177,8 +177,7 @@ public sealed class SetReleasePlan
     {
         ArgumentNullException.ThrowIfNull(lines);
         ArgumentNullException.ThrowIfNull(drawings);
-        if (lines.Count + drawings.Count == 0)
-            throw new ArgumentException("Release at least one set or drawing.", nameof(lines));
+        // Both empty makes an empty plan: the release dialog starts that way and fills in.
         if (lines.Count > SetReleaseRules.MaxSetLines)
             throw new ArgumentException($"Release at most {SetReleaseRules.MaxSetLines} sets.", nameof(lines));
         if (drawings.Count > SetReleaseRules.MaxDrawingLines)

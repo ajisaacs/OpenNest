@@ -84,7 +84,11 @@ namespace OpenNest.Forms
         {
         }
 
-        /// <param name="setsToRelease">Sets read with <see cref="IDrawingSetStore.GetAsync"/>, members joined, each at one kit.</param>
+        /// <param name="setsToRelease">
+        /// Sets read with <see cref="IDrawingSetStore.GetAsync"/>, members joined, each at one kit.
+        /// With <paramref name="drawings"/> empty too, the dialog starts empty (File &gt; Releases
+        /// &gt; New Release) and the operator adds sets and drawings before releasing.
+        /// </param>
         /// <param name="drawings">Library drawings to release on their own, each with its quantity.</param>
         /// <param name="openNest">Opens a created or merged nest in its own tab, bound to its server record.</param>
         public ReleaseSetForm(IDrawingSetStore sets, IDrawingLibrary library, INestRepository nests, string serverUrl,
@@ -99,8 +103,6 @@ namespace OpenNest.Forms
             this.openNest = openNest ?? throw new ArgumentNullException(nameof(openNest));
             ArgumentNullException.ThrowIfNull(setsToRelease);
             ArgumentNullException.ThrowIfNull(drawings);
-            if (setsToRelease.Count + drawings.Count == 0)
-                throw new ArgumentException("Release at least one set or drawing.", nameof(setsToRelease));
             ShowMessage = (text, buttons, icon) => MessageBox.Show(this, text, Text, buttons, icon);
             CreateNest = (group, _) => NewNestFactory.CreateAsync(this, group.Units);
             ShowAddDrawings = () =>
@@ -574,9 +576,12 @@ namespace OpenNest.Forms
         private void BuildPlan()
         {
             plan = SetReleasePlan.Build(Lines(), DrawingLines(), includeArchivedCheckBox.Checked);
-            Text = plan.Lines.Count + plan.Drawings.Count == 1
-                ? $"Release '{(plan.Lines.Count == 1 ? plan.Lines[0].Set.Name : plan.Drawings[0].Drawing.Name)}'"
-                : $"Release {DescribeLines()}";
+            Text = (plan.Lines.Count + plan.Drawings.Count) switch
+            {
+                0 => "New Release",
+                1 => $"Release '{(plan.Lines.Count == 1 ? plan.Lines[0].Set.Name : plan.Drawings[0].Drawing.Name)}'",
+                _ => $"Release {DescribeLines()}",
+            };
             populating = true;
             groupGrid.Rows.Clear();
             foreach (var group in plan.Groups)
