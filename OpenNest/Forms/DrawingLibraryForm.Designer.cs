@@ -454,7 +454,7 @@ namespace OpenNest.Forms
             Name = "DrawingLibraryForm";
             ShowIcon = false;
             ShowInTaskbar = false;
-            StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+            StartPosition = System.Windows.Forms.FormStartPosition.Manual;
             Text = "Add from Drawing Library";
             Shown += DrawingLibraryForm_Shown;
             rootTable.ResumeLayout(false);

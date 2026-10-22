@@ -300,7 +300,7 @@ namespace OpenNest.Forms
             Name = "ShapeLibraryForm";
             ShowIcon = false;
             ShowInTaskbar = false;
-            StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+            StartPosition = System.Windows.Forms.FormStartPosition.Manual;
             Text = "Shape Library";
             splitContainer.Panel1.ResumeLayout(false);
             splitContainer.Panel2.ResumeLayout(false);

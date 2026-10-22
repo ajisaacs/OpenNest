@@ -40,6 +40,7 @@ namespace OpenNest.Forms
                     : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             InitializeComponent();
+            Load += (_, _) => DialogBounds.FitToOwnerScreen(this);
             DiscoverShapes();
             PopulateShapeList();
 

@@ -59,6 +59,7 @@ namespace OpenNest.Forms
         public DrawingLibraryForm(IDrawingLibraryStore library, string serverUrl, Nest nest, IDrawingSetStore sets = null)
         {
             InitializeComponent();
+            Load += (_, _) => DialogBounds.FitToOwnerScreen(this);
             this.library = library ?? throw new ArgumentNullException(nameof(library));
             this.serverUrl = serverUrl ?? "";
             this.nest = nest ?? throw new ArgumentNullException(nameof(nest));
