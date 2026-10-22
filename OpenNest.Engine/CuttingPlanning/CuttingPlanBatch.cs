@@ -20,6 +20,9 @@ public enum CuttingPlanPhase
 
     /// <summary>Checking the plate's clean part material for overlaps.</summary>
     CheckingOverlap,
+
+    /// <summary>No route passed every check within the search limit: finding the safest one.</summary>
+    SafestRoute,
 }
 
 /// <summary>Worker progress: zero-based position in the batch, the plate's display number and phase.</summary>
@@ -187,10 +190,53 @@ public sealed class CuttingPlanBatch
                 }
             }
             progress?.Report(new(index, entries.Length, entry.Number, CuttingPlanPhase.KeepingOrder));
-            plans[index] = new(entry.Plate, entry.Number,
-                WithFallback(entry, CuttingPlanService.Plan(entry.KeepOrder, token), token), reorder, overlap);
+            var kept = WithFallback(entry, CuttingPlanService.Plan(entry.KeepOrder, token), token);
+            if (SearchLimited(kept, reorder))
+            {
+                progress?.Report(new(index, entries.Length, entry.Number, CuttingPlanPhase.SafestRoute));
+                if (SafestRoute(entry, token) is var (safest, freeOrder))
+                {
+                    plans[index] = new(entry.Plate, entry.Number, safest, freeOrder ? null : reorder, overlap);
+                    continue;
+                }
+            }
+            plans[index] = new(entry.Plate, entry.Number, kept, reorder, overlap);
         }
         return new(plans, ownedParameters);
+    }
+
+    // The strict search stopped at its limit: no complete plan, and no other reason to refuse.
+    private static bool SearchLimited(CuttingPlanResult kept, CuttingPlanResult reorder) =>
+        kept.Status == CuttingPlanStatus.NoSolutionWithinBudget
+        || reorder?.Status == CuttingPlanStatus.NoSolutionWithinBudget && kept.Status == CuttingPlanStatus.ConstraintConflict;
+
+    /// <summary>
+    /// Safest first, then fastest: the replayed safest route from the free order and from the
+    /// current order, whichever breaks fewer checks (most severe first), then has less rapid
+    /// travel. A route whose planner-chosen motions pass every check is taken at once, even
+    /// when fixed lead-ins still warn. Null when neither walk finds a route.
+    /// </summary>
+    private static (CuttingPlanResult Result, bool FreeOrder)? SafestRoute(Entry entry, CancellationToken token)
+    {
+        (CuttingPlanResult Result, bool FreeOrder)? best = null;
+        try
+        {
+            foreach (var (snapshot, freeOrder) in new[] { (entry.Reorder, true), (entry.KeepOrder, false) })
+            {
+                if (CuttingPlanService.PlanSafestRoute(snapshot, token) is not { } candidate)
+                    continue;
+                if (!candidate.IsSafestRouteFallback)
+                    return (candidate, freeOrder);
+                if (best is not { } known || candidate.SafestRoute < known.Result.SafestRoute
+                    || candidate.SafestRoute == known.Result.SafestRoute && candidate.RapidDistance < known.Result.RapidDistance)
+                    best = (candidate, freeOrder);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return (new(CuttingPlanStatus.Cancelled), true);
+        }
+        return best;
     }
 
     internal static CuttingPlanResult PlanReorder(CuttingPlanSnapshot snapshot, CancellationToken token,
@@ -427,7 +473,9 @@ public sealed class CuttingPlanProposal
         else if (RequiresWarningAcceptance)
             lines.Add((Plates.All(p => p.IsReady || p.HasOnlyFixedLeadWarnings)
                     ? "Unverified plan available: fixed lead-ins could not be certified. "
-                    : "Best-effort plan available. ")
+                    : Plates.Any(p => p.Result.IsSafestRouteFallback)
+                        ? "Safest-route plan available: no route passed every check within the search limit. "
+                        : "Best-effort plan available. ")
                 + "Review the warnings and accept the unverified plan to apply. "
                 + "Posting CNC output still requires its own review and approval.");
         else
@@ -471,6 +519,11 @@ public sealed class CuttingPlanProposal
             yield return heading + (plate.HasOnlyFixedLeadWarnings
                 ? $"unverified: fixed lead-ins need review. {Count(plate.PartCount, "part")}, "
                     + $"{plate.RegeneratedCount} regenerated; every planned motion passed its checks."
+                : result.SafestRoute is { } severity
+                ? $"safest route found, unverified. No route passed every check within the search limit; "
+                    + $"this one breaks {Count(severity.Count, "check")}, listed below. {Count(plate.PartCount, "part")}, "
+                    + $"{plate.RegeneratedCount} regenerated; rapid travel "
+                    + $"{result.RapidDistance.ToString("0.##", CultureInfo.CurrentCulture)} {unit}."
                 : $"best-effort, unverified. {Count(plate.PartCount, "part")}, "
                     + $"{plate.RegeneratedCount} regenerated; review lead-ins and cutting order.");
             // Unverified Apply requires the operator to see every finding, not just a

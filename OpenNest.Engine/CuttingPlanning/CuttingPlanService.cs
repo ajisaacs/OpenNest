@@ -319,10 +319,40 @@ public static class CuttingPlanService
             expansions: expansions, rapidDistance: distance, independentlyReplayed: true);
     }
 
+    /// <summary>
+    /// The safest route the greedy walk finds, independently replayed; null when there is none.
+    /// A route that passes every check is Ready. One that does not is an UNVERIFIED BestEffort
+    /// carrying every violation, applicable only with explicit acceptance. A route the replay
+    /// cannot check completely, or with any motion into material (a lead that does not fit,
+    /// a cut-order or nested-lead conflict), is never offered: the strict refusal stands.
+    /// </summary>
+    internal static CuttingPlanResult PlanSafestRoute(CuttingPlanSnapshot snapshot, CancellationToken token)
+    {
+        if (snapshot == null || snapshot.Failure != null || !snapshot.Regeneration || snapshot.BestEffort
+            || snapshot.Placements.Count == 0)
+            return null;
+        // The walk weighs every part it cuts rather than stopping at the first refusal: it gets
+        // twice the strict search's budget. Replay still checks it against the captured input.
+        var budget = (int)System.Math.Min(int.MaxValue, 2L * snapshot.ExpansionBudget);
+        var order = JointCuttingPlanSearch.SafestRoute(snapshot.WithSearchLimits(budget, snapshot.MaxEntries), token);
+        if (order == null)
+            return null;
+        var result = ReplayPrograms(snapshot, order, 0, token, safestRoute: true);
+        if (result.Status is not (CuttingPlanStatus.Ready or CuttingPlanStatus.BestEffort)
+            || result.SafestRoute is { Severe: > 0 })
+            return null;
+        result.Snapshot = snapshot;
+        return result;
+    }
+
     // Re-read EXACT selected programs with a fresh checker and native lead validation.
     // No emission/regeneration or cached branch verdict is used here.
+    /// <param name="safestRoute">
+    /// Return a route whose planner-chosen motions break checks as an UNVERIFIED BestEffort with
+    /// those findings rather than refusing it; incomplete checks are still refused.
+    /// </param>
     internal static CuttingPlanResult ReplayPrograms(CuttingPlanSnapshot snapshot,
-        IReadOnlyList<FixedProgramPlacement> order, int expansions, CancellationToken token)
+        IReadOnlyList<FixedProgramPlacement> order, int expansions, CancellationToken token, bool safestRoute = false)
     {
         if (order == null || order.Count != snapshot.Placements.Count
             || order.Any(p => p == null || p.SourceOrdinal < 0 || p.SourceOrdinal >= snapshot.Placements.Count)
@@ -392,7 +422,7 @@ public static class CuttingPlanService
             // selection to compare with; a regenerated program's never escapes the strict rule.
             if (!complete && source.Prepared == null && isFixed != null)
                 warnings.Add(FixedLeadWarnings.Uncertified(source));
-            else if (!complete && findings.Count == 0)
+            else if (!complete && (findings.Count == 0 || safestRoute))
                 return new(CuttingPlanStatus.InvalidInput,
                     findings: [JointCuttingPlanSearch.Finding(source, null,
                         "Selected program does not preserve complete directed contours, certified tabs or selected entry/style geometry.")],
@@ -404,12 +434,18 @@ public static class CuttingPlanService
             position = execution.DeparturePoint;
         }
         token.ThrowIfCancellationRequested();
+        // Support tabs that cannot hold their part level are noted, never refused.
+        var notes = order.SelectMany(SupportTabCapture.Notes).ToList();
+        if (safestRoute && findings.Count != 0 && findings.All(f => f.Kind != PostVerificationKind.Incomplete))
+            return new(CuttingPlanStatus.BestEffort, order, findings.Concat(warnings).Concat(notes).Distinct(),
+                expansions, distance)
+            {
+                SafestRoute = RouteSeverity.Of(findings.Distinct().Select(f => f.Kind)),
+            };
         if (findings.Count != 0)
             return new(findings.Any(f => f.Kind == PostVerificationKind.Incomplete)
                 ? CuttingPlanStatus.UnsupportedGeometry : CuttingPlanStatus.ConstraintConflict,
                 findings: findings, expansions: expansions);
-        // Support tabs that cannot hold their part level are noted, never refused.
-        var notes = order.SelectMany(SupportTabCapture.Notes).ToList();
         // Every planner-chosen motion passed. Fixed-emission warnings make the proposal
         // UNVERIFIED: never Ready, applicable only through explicit warning acceptance.
         if (warnings.Count != 0)

@@ -116,6 +116,26 @@ internal static class JointCuttingPlanSearch
         }
     }
 
+    /// <summary>
+    /// The safest complete route a greedy walk finds, for when the strict search ran out of budget.
+    /// From the start point it cuts, each step, the dependency-ready part whose own route breaks the
+    /// fewest checks (most severe first), then the nearest. It ranks violating motions rather than
+    /// refusing them, so the route needs the full replay before anyone sees it. It has one search
+    /// budget of its own; null when that runs out or a part cannot be emitted at all.
+    /// </summary>
+    internal static IReadOnlyList<FixedProgramPlacement> SafestRoute(CuttingPlanSnapshot snapshot, CancellationToken token)
+    {
+        var walk = new Walk(snapshot, token);
+        try
+        {
+            return walk.SafestRoute();
+        }
+        catch (BudgetExceededException)
+        {
+            return null;
+        }
+    }
+
     // Captured containment (never learned rules) and each host's placed cut contours.
     private static CuttingNestedOrder.Context NestedOrder(CuttingPlanSnapshot snapshot, Vector[] centres,
         HashSet<int>[] prerequisites, CancellationToken token)
@@ -565,8 +585,10 @@ internal static class JointCuttingPlanSearch
         // Recovery only: solve directed contour transitions rather than assuming
         // that a centre-to-centre hole tour can cross the already released material.
         // One complete checked chain per outside endpoint; original DFS remains fallback.
+        // arrivalMayCross (safest route only): the rapid onto the part may cross cut contours;
+        // every other motion of the part stays strict.
         private IEnumerable<Edge> RecoverPart(Node node, int[] sequence,
-            FixedProgramPlacement source, Attempt attempt)
+            FixedProgramPlacement source, Attempt attempt, bool arrivalMayCross = false)
         {
             var prepared = source.Prepared;
             var target = LookAheadCentre(node, sequence, source) - source.Location;
@@ -596,7 +618,7 @@ internal static class JointCuttingPlanSearch
                 var findings = released.Check(opening, node.Position, source.SourceOrdinal + 1, token);
                 rejected.AddRange(Map(snapshot, findings));
                 attempt.NoteCrossings(source.SourceOrdinal, findings);
-                if (findings.Count != 0) yield break;
+                if (findings.Count != 0 && !(arrivalMayCross && OnlyCrossings(findings))) yield break;
                 start = opening.DeparturePoint;
             }
             OwnedExecution Motion(ContourChoice choice)
@@ -632,7 +654,8 @@ internal static class JointCuttingPlanSearch
                 var execution = ExecutionMotionReader.Read(program, source.Location, node.Position, token);
                 var checker = node.Checker.Copy();
                 CountExpansion(source);
-                if (!Check(source, execution, node.Position, checker, attempt, chain)) continue;
+                if (arrivalMayCross ? Score(source, execution, node.Position, checker, chain) is not { Severe: 0, Minor: 0 }
+                    : !Check(source, execution, node.Position, checker, attempt, chain)) continue;
                 var proposal = source.Propose(program, execution, chain, token);
                 yield return new(new([.. node.Order, proposal], execution.DeparturePoint, checker, null, node),
                     execution.RapidDistanceFrom(node.Position), source.SourceOrdinal, -1, endpoint, endpoint);
@@ -674,7 +697,9 @@ internal static class JointCuttingPlanSearch
                         var findings = after.Check(execution, position, source.SourceOrdinal + 1, token);
                         rejected.AddRange(Map(snapshot, findings));
                         attempt.NoteCrossings(source.SourceOrdinal, findings);
-                        if (findings.Count != 0) continue;
+                        // The first contour's rapid is the arrival unless the part opens with scribes.
+                        if (findings.Count != 0 && !(arrivalMayCross && mask == 0 && openingProgram.Length == 0
+                            && OnlyCrossings(findings))) continue;
                         chain.Add(choice);
                         if (Solve(mask | (1 << choice.ContourOrdinal), execution.DeparturePoint, after)) return true;
                         chain.RemoveAt(chain.Count - 1);
@@ -694,6 +719,9 @@ internal static class JointCuttingPlanSearch
                 }
             }
         }
+
+        private static bool OnlyCrossings(IReadOnlyList<PostVerificationFinding> findings) =>
+            findings.All(f => f.Kind == PostVerificationKind.RapidCrossing);
 
         // An isolated contour probe repeats the part's scribes first; keep the contour alone.
         private static OwnedExecution WithoutScribes(OwnedExecution execution)
@@ -942,6 +970,142 @@ internal static class JointCuttingPlanSearch
             token.ThrowIfCancellationRequested();
         }
 
+        /// <summary>The nearest ready parts a safest-route step weighs when none has a safe route.</summary>
+        private const int SafestRouteNearest = 4;
+
+        // A kept order's parts face the next part along it; a free walk's, the nearest ready part.
+        private int[] KeptSequence => snapshot.PreservePartOrder ? Enumerable.Range(0, snapshot.Placements.Count).ToArray() : null;
+
+        internal IReadOnlyList<FixedProgramPlacement> SafestRoute()
+        {
+            var node = new Node([], snapshot.StartPoint, new ReleasedContourState(reportMissingLeadIns: false), null, null);
+            while (node.Order.Length < snapshot.Placements.Count)
+            {
+                token.ThrowIfCancellationRequested();
+                var finished = node.Order.Select(o => o.SourceOrdinal).ToHashSet();
+                var ready = (snapshot.PreservePartOrder ? [snapshot.Placements[node.Order.Length]]
+                        : snapshot.Placements.Where(p => !finished.Contains(p.SourceOrdinal)
+                            && snapshot.Dependencies.IsReady(p.SourceOrdinal, finished)))
+                    .OrderBy(p => Centre(p).DistanceTo(node.Position)).ThenBy(p => p.SourceOrdinal).ToArray();
+                // Nearest first, the first part with a route that passes every check wins. When
+                // none of the nearby parts has one, the least unsafe of them is cut.
+                SafestStep best = null;
+                foreach (var source in ready.Take(SafestRouteNearest))
+                {
+                    if (best is { Severity.IsClear: true })
+                        break;
+                    if (SafestPart(node, source) is { } step
+                        && (best == null || step.Severity < best.Severity
+                            || step.Severity == best.Severity && step.Distance < best.Distance))
+                        best = step;
+                }
+                if (best == null)
+                    return null;
+                node = best.Node;
+            }
+            return node.Order;
+        }
+
+        /// <summary>The holes, next along the tour, a safest-route step weighs for its next cut.</summary>
+        private const int SafestHoleWindow = 4;
+
+        // One part's route from the node, its perimeter last. Null when it cannot be emitted.
+        private SafestStep SafestPart(Node node, FixedProgramPlacement source)
+        {
+            var arrival = node.Position;
+            if (source.Prepared is not { } prepared)
+            {
+                CountExpansion(source);
+                var fixedChecker = node.Checker.Copy();
+                return new(new([.. node.Order, source], source.Execution.DeparturePoint, fixedChecker, null, node),
+                    Score(source, source.Execution, arrival, fixedChecker), source.Execution.RapidDistanceFrom(arrival));
+            }
+            // Recovery's contour solver first: its first route whose only violations, if any, are
+            // where the arrival rapid crosses cut contours. It passes every check when it can.
+            if (prepared.Count > 1 && prepared.PerimeterOrdinal <= MaximumRecoveryHoles
+                && RecoverPart(node, KeptSequence, source, new Attempt(null), arrivalMayCross: true).FirstOrDefault() is { } recovered)
+            {
+                var proposal = recovered.Node.Order[^1];
+                return new(recovered.Node, Score(proposal, proposal.Execution, arrival, node.Checker.Copy(),
+                    proposal.ContourChoices), recovered.Distance);
+            }
+            // Otherwise contour by contour: of the next few holes along the tour, the cut that adds
+            // the fewest violations to the part's route, nearest along the tour on a tie.
+            var approach = arrival - source.Location;
+            var holes = Enumerable.Range(0, prepared.PerimeterOrdinal).ToArray();
+            var centres = CuttingHoleOrder.Centres(prepared, approach, token);
+            var remaining = CuttingHoleOrder.Plan(holes, centres, approach, null, token).ToList();
+            var onward = LookAheadCentre(node, KeptSequence, source) - source.Location;
+            var choices = new List<ContourChoice>();
+            Program program = null;
+            OwnedExecution execution = null;
+            ReleasedContourState checker = null;
+            var severity = default(RouteSeverity);
+            while (choices.Count < prepared.Count)
+            {
+                var local = (execution?.DeparturePoint ?? arrival) - source.Location;
+                var before = severity;
+                ContourChoice chosen = null;
+                foreach (var contour in remaining.Count == 0 ? [prepared.PerimeterOrdinal] : remaining.Take(SafestHoleWindow))
+                {
+                    // Leave each hole toward the next one along the tour, so its exit rapid does
+                    // not run back across it; the perimeter faces the next part.
+                    var next = remaining.FirstOrDefault(h => h != contour, -1);
+                    var entries = SelectEntries(source, contour, next >= 0 ? centres[next] : onward, local);
+                    if (entries.Count == 0)
+                        entries = [prepared.ClosestEntry(contour, local)];
+                    foreach (var entry in entries)
+                    {
+                        CountExpansion(source);
+                        var prefix = choices.Append(entry).ToArray();
+                        Program emitted;
+                        OwnedExecution read;
+                        try
+                        {
+                            emitted = prefix.Length == prepared.Count ? prepared.Emit(prefix) : prepared.EmitPrefix(prefix);
+                            read = ExecutionMotionReader.Read(emitted, source.Location, arrival, token);
+                        }
+                        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or ArithmeticException or NotSupportedException)
+                        {
+                            continue;
+                        }
+                        // The prefix repeats the part's earlier contours: score it from before the part.
+                        var trial = node.Checker.Copy();
+                        var score = Score(source, read, arrival, trial, prefix);
+                        if (chosen == null || score < severity)
+                            (chosen, program, execution, checker, severity) = (entry, emitted, read, trial, score);
+                        if (score == before)
+                            break;
+                    }
+                    if (chosen != null && severity == before)
+                        break;
+                }
+                if (chosen == null)
+                    return null;
+                choices.Add(chosen);
+                remaining.Remove(chosen.ContourOrdinal);
+            }
+            return new(new([.. node.Order, source.Propose(program, execution, choices, token)],
+                execution.DeparturePoint, checker, null, node), severity, execution.RapidDistanceFrom(arrival));
+        }
+
+        // The strict checks of Check, counted instead of refused.
+        private RouteSeverity Score(FixedProgramPlacement source, OwnedExecution execution, Vector arrival,
+            ReleasedContourState checker, IReadOnlyList<ContourChoice> choices = null)
+        {
+            var isFixed = source.FixedMotions(execution, choices);
+            var findings = checker.Check(execution, arrival, source.SourceOrdinal + 1, source.IsCutOff, isFixed, token).Strict;
+            var lead = source.IsCutOff ? new LeadPathValidationResult(true, true, null)
+                : LeadPathValidator.Check(execution, source.Material, materials, isFixed, [], token, leadContacts,
+                    snapshot.PierceZoneRadius);
+            var kinds = findings.Select(f => (PostVerificationKind?)f.Kind);
+            if (!lead.IsComplete)
+                kinds = kinds.Append(PostVerificationKind.Incomplete);
+            else if (!lead.IsClear)
+                kinds = kinds.Append(null);
+            return RouteSeverity.Of(kinds);
+        }
+
         // choices: the contours a regenerated execution emits, so its pinned ones are known.
         private bool Check(FixedProgramPlacement source, OwnedExecution execution, Vector arrival,
             ReleasedContourState checker, Attempt attempt, IReadOnlyList<ContourChoice> choices = null)
@@ -1037,6 +1201,7 @@ internal static class JointCuttingPlanSearch
     /// <summary>Rank is the automatic selection slot (entry order) inside its contour stage; int.MinValue for legacy children.</summary>
     private sealed record Edge(Node Node, double Distance, int Ordinal, int Contour, int Entry,
         int Rank = int.MinValue, int ContourRank = 0);
+    private sealed record SafestStep(Node Node, RouteSeverity Severity, double Distance);
     private sealed class Frame(Node node)
     {
         internal Node Node { get; } = node;

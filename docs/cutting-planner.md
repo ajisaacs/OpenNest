@@ -214,7 +214,8 @@ material-centre distance. When a branch stalls, it disposes the deeper search
 frames and resumes alternatives at the root instead of spending the remainder
 on that branch's completed prefix. Any budget left then goes to the retained full
 search. Recovery shares the original total expansion budget; exhausting it still
-returns a refusal, never a best-effort upgrade.
+returns a refusal from the service, never a best-effort upgrade. Only the batch then
+looks for the separate [safest route](#safest-route-fallback-when-the-search-runs-out).
 
 Candidates use native closest points, vertices, midpoints and circle angles in
 stable order. `maxEntries` caps the normal ranked shortlist, not the recovery
@@ -391,7 +392,8 @@ readiness or physical machine safety.
 Findings and source ordinals use the original zero-based source list, not proposed
 sequence positions. Strict service refusals contain no proposed order. The desktop batch may
 produce a separate `BestEffort` proposal as described below; it never labels it `Ready` or
-sets `IndependentlyReplayed`.
+sets `IndependentlyReplayed`. The one exception is a safest route that passes every check
+on its own fresh replay: that is an ordinary replayed `Ready` proposal.
 
 - `ConstraintConflict`: fixed programs or explored fixed routing violate the
   modeled constraints. Locked internal crossings cannot be repaired by regeneration;
@@ -619,6 +621,8 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   `NoSolutionWithinBudget` is retried once with the current part order, and the summary
   says the order was kept. Both are allowed 400 expansions per part (at least the
   default 20000), because both still plan contour order and entries for every part.
+  When both stop at that limit, the batch looks for the
+  [safest route](#safest-route-fallback-when-the-search-runs-out) before refusing the plate.
 - **Tools > Options > Cut planning effort** (`Settings.CuttingPlanEffort`, default 1.0,
   0.5–10) multiplies both of those budgets. The panel reads it when planning starts and
   passes it to `CuttingPlanBatch.Capture(..., budgetMultiplier)`; the worker never reads
@@ -703,6 +707,40 @@ overlap check may likewise be accepted with warnings. `CanApply` and parameterle
 `Apply()` remain strict; `CanApplyWithWarnings` and `Apply(acceptWarnings: true)` are the
 explicit review path. `CuttingPlanService.Apply` still rejects best-effort results directly.
 Acceptance never skips the separate pre-post checks or grants posting consent.
+
+### Safest-route fallback when the search runs out
+
+Planning ranks routes safest first, then fastest. The strict search only accepts a route that
+passes every check, so on a hard plate (for example scrap cut-offs whose trimmed segments wall
+off a column of parts, since rapids are straight) it can run out of budget without a plan even
+when a slightly unsafe one would be acceptable after review. The batch then plans the safest
+route it can find instead of refusing the plate. It runs only when the plate's plan stopped at
+the search limit (`NoSolutionWithinBudget`, or a free-order search at its limit followed by a
+refused current order), never for overlaps, unsupported geometry, invalid input or
+cancellation, and the progress phase is `SafestRoute`.
+
+`JointCuttingPlanSearch.SafestRoute` walks the plate greedily from the start point. Each step,
+of the dependency-ready parts nearest first (the next part when the order is kept), it cuts
+the first whose route passes every check; when none of the four nearest has one, it cuts the
+least unsafe of them, then the nearer. A part's route comes from the recovery contour solver
+when it has 16 holes or fewer, with every motion strict except the rapid onto the part, which
+may cross cut contours; otherwise its next contour is the safest of the next four holes along
+the hole tour, each entry facing the hole after it, the perimeter last. Cut-off and nested-part
+prerequisites always hold. The walk weighs violations with `RouteSeverity`, compared in tiers:
+motions into material, cut-order and nested-lead conflicts and incomplete checks first, then
+rapids across cut contours, then everything else (missing lead-ins, pierce zones, support).
+It gets twice the plate's expansion budget, so the planning effort scales it too.
+
+The batch walks both the free order and the current order, replays each against its captured
+input with fresh checks, and keeps the one with the lower severity, then the shorter rapid
+travel. A route that passes every check on replay is an ordinary `Ready` proposal. Otherwise
+the result is `BestEffort` with `IsSafestRouteFallback`, listing every violation; the summary
+calls it the safest route found, gives the number of checks it breaks and its rapid travel,
+and Apply requires explicit warning acceptance like any unverified plan. The fallback never
+offers material damage: a route with any motion in the first tier (a lead-in that does not
+fit, a cut-order or nested-lead conflict) or whose replay cannot be completed is dropped, and
+the plate keeps its strict refusal and its advice, such as shortening a lead-in that does not
+fit. A walk that finds no route likewise leaves the refusal unchanged.
 
 ## Console and MCP
 

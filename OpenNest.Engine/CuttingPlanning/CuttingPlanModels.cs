@@ -340,6 +340,16 @@ public sealed class CuttingPlanResult
     public int Expansions { get; }
     public double RapidDistance { get; }
     public bool IndependentlyReplayed { get; }
+
+    /// <summary>
+    /// The violations of a safest-route fallback: no route passed every check within the search
+    /// limit, so this BestEffort is the replayed route that breaks the fewest. Null otherwise.
+    /// </summary>
+    internal RouteSeverity? SafestRoute { get; init; }
+
+    /// <summary>Whether this is a safest-route fallback rather than a route that passed every check.</summary>
+    public bool IsSafestRouteFallback => SafestRoute != null;
+
     /// <summary>The captured input this result was planned from; binds Apply to its freshness record.</summary>
     internal CuttingPlanSnapshot Snapshot { get; set; }
 }

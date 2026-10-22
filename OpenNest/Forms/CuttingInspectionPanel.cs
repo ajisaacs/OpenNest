@@ -686,6 +686,7 @@ internal sealed class CuttingInspectionPanel : UserControl
     {
         CuttingPlanPhase.Reordering => "finding a part order",
         CuttingPlanPhase.KeepingOrder => "keeping the current order",
+        CuttingPlanPhase.SafestRoute => "finding the safest route",
         CuttingPlanPhase.CheckingOverlap => "checking for overlaps",
         _ => phase.ToString(),
     };
