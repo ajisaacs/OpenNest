@@ -90,13 +90,19 @@ public class DisplayPerimeterTests
     [Theory]
     [InlineData("mixed", "one whole closed contour")]
     [InlineData("hole", "enclose every other contour")]
-    [InlineData("nothing", "noncutting")]
+    [InlineData("nothing", "display perimeter with no cutouts")]
+    [InlineData("notch", "enclose every other contour")]
+    [InlineData("second", "enclose every other contour")]
+    [InlineData("tabbedOnly", "closed cutout without tabs")]
     public void InvalidDisplayPerimeters_AreRefusedWithTheirReason(string layout, string reason)
     {
         var program = layout switch
         {
             "mixed" => Door(lastEdge: LayerType.Cut),
             "nothing" => Door(cutouts: false),
+            "notch" => NotchedDoor(),
+            "second" => SecondDisplayRing(),
+            "tabbedOnly" => TabbedOnly(),
             _ => HoleOnDisplay(),
         };
         var plate = DoorPlate(program);
@@ -106,6 +112,38 @@ public class DisplayPerimeterTests
 
         Assert.NotEqual(CuttingPlanStatus.Ready, result.Status);
         Assert.Contains(result.Findings, f => f.Message.Contains(reason, StringComparison.OrdinalIgnoreCase));
+        // Not even an unverified plan: nothing about a refused blank may be applied.
+        var proposal = CuttingPlanBatch.Capture([DoorPlate(program)], ExplicitContourTests.Parameters(), false).Plan();
+        Assert.False(proposal.CanApply);
+        Assert.False(proposal.CanApplyWithWarnings);
+
+        // An L-shaped blank with a cutout in its notch: inside the outline's box, outside the blank.
+        static Program NotchedDoor()
+        {
+            var program = new Program();
+            Ring(program, LayerType.DisplayPerimeter, (0, 0), (0, 20), (15, 20), (15, 10), (30, 10), (30, 0));
+            Ring(program, LayerType.Cut, (2, 2), (2, 6), (6, 6), (6, 2));
+            Ring(program, LayerType.Cut, (20, 14), (20, 18), (25, 18), (25, 14));
+            return program;
+        }
+
+        static Program SecondDisplayRing()
+        {
+            var program = Door();
+            Ring(program, LayerType.DisplayPerimeter, (26, 14), (26, 18), (28, 18), (28, 14));
+            return program;
+        }
+
+        static Program TabbedOnly()
+        {
+            var program = Door(cutouts: false);
+            program.Codes.Add(new RapidMove(5, 5));
+            program.Codes.Add(new LinearMove(5, 10) { Layer = LayerType.Cut });
+            program.Codes.Add(new LinearMove(10, 10) { Layer = LayerType.Tab });
+            program.Codes.Add(new LinearMove(10, 5) { Layer = LayerType.Cut });
+            program.Codes.Add(new LinearMove(5, 5) { Layer = LayerType.Cut });
+            return program;
+        }
 
         static Program HoleOnDisplay()
         {
@@ -115,6 +153,33 @@ public class DisplayPerimeterTests
                 program.Codes.Add(new LinearMove(x, y) { Layer = LayerType.DisplayPerimeter });
             return program;
         }
+    }
+
+    private static void Ring(Program program, LayerType layer, params (double X, double Y)[] points)
+    {
+        program.Codes.Add(new RapidMove(points[0].X, points[0].Y));
+        foreach (var (x, y) in points.Skip(1).Append(points[0]))
+            program.Codes.Add(new LinearMove(x, y) { Layer = layer });
+    }
+
+    [Fact]
+    public void Preparation_HasNoCutPerimeterAndTreatsEveryContourAsAHole()
+    {
+        var prepared = PreparedContours.Capture(Door(), ExplicitContourTests.Parameters());
+
+        Assert.False(prepared.HasCutPerimeter);
+        Assert.Equal(3, prepared.Count);
+        Assert.Equal(prepared.Count, prepared.PerimeterOrdinal);
+        Assert.True(PreparedContours.Capture(Door(LayerType.Cut), ExplicitContourTests.Parameters()).HasCutPerimeter);
+    }
+
+    [Fact]
+    public void CleanBounds_IncludeTheDisplayPerimeter()
+    {
+        var bounds = NestedPartContainment.CleanBounds(Door(), Vector.Zero, default);
+
+        Assert.Equal(30, bounds.Length, 9);
+        Assert.Equal(20, bounds.Width, 9);
     }
 
     [Fact]

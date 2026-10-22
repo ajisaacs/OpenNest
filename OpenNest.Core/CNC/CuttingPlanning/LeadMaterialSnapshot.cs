@@ -134,7 +134,9 @@ public sealed class LeadMaterialSnapshot
                 }
             }
             if (outer < 0)
-                throw new ArgumentException("Material must have exactly one enclosing perimeter.");
+                throw new ArgumentException(ringDisplay.Contains(true)
+                    ? "A display perimeter must enclose every other contour."
+                    : "Material must have exactly one enclosing perimeter.");
             if (ringTabs[outer].Any(tab => tab))
                 throw new ArgumentException("A perimeter cannot have tabs.");
             if (ringDisplay.Where((_, i) => i != outer).Any(display => display))

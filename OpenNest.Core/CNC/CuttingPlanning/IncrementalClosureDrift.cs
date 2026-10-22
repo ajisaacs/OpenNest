@@ -49,8 +49,8 @@ internal static class IncrementalClosureDrift
 
     // The chains material capture closes: cut, display and tab moves between rapids and other layers.
     private static bool IsContour(Motion motion) => !motion.Suppressed
-        && motion is LinearMove { Layer: LayerType.Cut or LayerType.Display or LayerType.Tab }
-            or ArcMove { Layer: LayerType.Cut or LayerType.Display or LayerType.Tab };
+        && motion is LinearMove { Layer: LayerType.Cut or LayerType.Display or LayerType.Tab or LayerType.DisplayPerimeter }
+            or ArcMove { Layer: LayerType.Cut or LayerType.Display or LayerType.Tab or LayerType.DisplayPerimeter };
 
     private static bool TryClose(Program program, List<Motion> run, Vector start, Vector end, int next)
     {

@@ -105,7 +105,9 @@ public static class CuttingPlanService
                 }
                 var clean = ExecutionMotionReader.ReadSupported(source.BaseDrawing.Program, Vector.Zero, null, token);
                 if (!clean.HasCuttingContour)
-                    throw new NotSupportedException("Scribe-only or noncutting source drawings are outside this route slice.");
+                    throw new NotSupportedException(clean.Motions.Any(m => m.Layer == LayerType.DisplayPerimeter)
+                        ? "A display perimeter with no cutouts has nothing to cut."
+                        : "Scribe-only or noncutting source drawings are outside this route slice.");
                 var execution = ExecutionMotionReader.ReadSupported(source.Program, source.Location, request.StartPoint, token);
                 if (!execution.HasCuttingContour)
                     throw new ArgumentException("Placed program has no nonzero cutting contour motions.");

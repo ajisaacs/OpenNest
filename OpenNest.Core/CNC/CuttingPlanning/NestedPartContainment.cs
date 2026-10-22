@@ -54,7 +54,7 @@ internal static class NestedPartContainment
     /// <summary>Material extent of a clean program at a location: rapids and scribe marks excluded.</summary>
     internal static Box CleanBounds(Program clean, Vector location, CancellationToken token) =>
         ExecutionMotionReader.ReadSupported(clean, location, null, token).Motions
-            .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display && m.Curve != null)
+            .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display or LayerType.DisplayPerimeter && m.Curve != null)
             .Select(m => m.Curve.ToEntity().BoundingBox).ToList().GetBoundingBox();
 
     /// <summary>Whether a host's bounds admit an inner part's bounds as a containment candidate.</summary>

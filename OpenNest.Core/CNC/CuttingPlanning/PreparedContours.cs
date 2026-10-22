@@ -293,15 +293,16 @@ public sealed class PreparedContours
                 throw new ArgumentException("Preparation requires nonempty closed contours.");
             if (contours.Count == 0 && tabbedCutouts.Count == 0 && breakCuts.Count == 0)
                 throw new ArgumentException("A display perimeter with no cutouts has nothing to cut.");
-            var outline = displayPerimeter.BoundingBox;
+            // Every cut must lie on the blank: a non-rectangular blank's box is not enough.
+            var outline = displayPerimeter.ToPolygon();
             foreach (var shape in contours.Concat(tabbedCutouts).Concat(breakCuts))
-            {
-                shape.UpdateBounds();
-                var box = shape.BoundingBox;
-                if (box.Left < outline.Left - PostVerificationGeometry.Epsilon || box.Right > outline.Right + PostVerificationGeometry.Epsilon
-                    || box.Bottom < outline.Bottom - PostVerificationGeometry.Epsilon || box.Top > outline.Top + PostVerificationGeometry.Epsilon)
-                    throw new ArgumentException("A display perimeter must enclose every other contour.");
-            }
+                foreach (var entity in shape.Entities)
+                    if (!outline.ContainsPoint(entity is Circle circle ? circle.Center + new Vector(circle.Radius, 0) : Start(entity)))
+                        throw new ArgumentException("A display perimeter must enclose every other contour.");
+            // The search plans a part through its closed contours; tabbed cutouts and break cuts
+            // alone leave it nothing to choose.
+            if (contours.Count == 0)
+                throw new ArgumentException("A display perimeter needs at least one closed cutout without tabs.");
             foreach (var cut in breakCuts)
                 cut.UpdateBounds();
             // Never a contour: nothing can choose, emit or lead it. Every contour is a hole.

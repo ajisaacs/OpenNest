@@ -72,8 +72,8 @@ internal static class SeamOvercut
             // Incremental coordinates only need a consistent origin within one contour.
             var reference = incremental ? position ?? new Vector() : new Vector();
             var end = reference + motion.EndPoint;
-            var cut = !motion.Suppressed && motion is LinearMove { Layer: LayerType.Cut or LayerType.Display }
-                or ArcMove { Layer: LayerType.Cut or LayerType.Display };
+            var cut = !motion.Suppressed && motion is LinearMove { Layer: LayerType.Cut or LayerType.Display or LayerType.DisplayPerimeter }
+                or ArcMove { Layer: LayerType.Cut or LayerType.Display or LayerType.DisplayPerimeter };
             if (!cut || position == null)
             {
                 Finish();
