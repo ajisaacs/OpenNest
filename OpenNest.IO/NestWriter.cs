@@ -720,6 +720,9 @@ namespace OpenNest.IO
                 case LayerType.Tab:
                     return ":TAB";
 
+                case LayerType.DisplayPerimeter:
+                    return ":DISPLAYPERIMETER";
+
                 default:
                     return string.Empty;
             }

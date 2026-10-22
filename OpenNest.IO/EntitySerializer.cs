@@ -191,6 +191,8 @@ namespace OpenNest.IO
                 return SpecialLayers.Break;
             if (string.Equals(name, SpecialLayers.Tab.Name, StringComparison.OrdinalIgnoreCase))
                 return SpecialLayers.Tab;
+            if (string.Equals(name, SpecialLayers.DisplayPerimeter.Name, StringComparison.OrdinalIgnoreCase))
+                return SpecialLayers.DisplayPerimeter;
 
             return new Layer(name);
         }

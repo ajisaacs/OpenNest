@@ -288,6 +288,10 @@ namespace OpenNest.IO
                                         layer = LayerType.Tab;
                                         break;
 
+                                    case "DISPLAYPERIMETER":
+                                        layer = LayerType.DisplayPerimeter;
+                                        break;
+
                                     case "SUPPRESSED":
                                         suppressed = true;
                                         break;
@@ -392,6 +396,10 @@ namespace OpenNest.IO
 
                                     case "TAB":
                                         layer = LayerType.Tab;
+                                        break;
+
+                                    case "DISPLAYPERIMETER":
+                                        layer = LayerType.DisplayPerimeter;
                                         break;
 
                                     case "SUPPRESSED":
