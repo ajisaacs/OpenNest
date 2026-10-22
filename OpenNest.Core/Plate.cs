@@ -266,17 +266,16 @@ namespace OpenNest
         }
 
         /// <summary>
-        /// Regenerates all cut-off drawings and materializes them as parts.
-        /// Existing cut-off parts are removed first, then each cut-off is
-        /// regenerated and put back at the same place in the cut sequence
-        /// (<see cref="Parts"/> order). New cut-offs are added at the end.
+        /// Regenerates all cut-off drawings and materializes each of their trimmed segments as
+        /// a part. Existing cut-off parts are removed first, then each regenerated segment goes
+        /// back to the place in the cut sequence (<see cref="Parts"/> order) of the saved segment
+        /// of its cut-off it overlaps most, so a part drag or cut-off move doesn't send it to the
+        /// end of the sequence; a segment with no saved counterpart follows the segment before
+        /// it. New cut-offs are added at the end.
         /// </summary>
         public void RegenerateCutOffs(CutOffSettings settings)
         {
-            // Remember each cut-off's place in the cut sequence, so a part drag
-            // or cut-off move doesn't send it to the end of the sequence.
-            var sequence = new Dictionary<CutOff, int>();
-
+            var saved = new Dictionary<CutOff, List<(int Index, double Start, double End)>>();
             for (var i = Parts.Count - 1; i >= 0; i--)
             {
                 if (!Parts[i].BaseDrawing.IsCutOff)
@@ -284,44 +283,108 @@ namespace OpenNest
 
                 var cutoff = CutOffs.FirstOrDefault(c => ReferenceEquals(c.Drawing, Parts[i].BaseDrawing));
                 if (cutoff != null)
-                    sequence[cutoff] = i;
+                {
+                    if (!saved.TryGetValue(cutoff, out var segments))
+                        saved[cutoff] = segments = new List<(int, double, double)>();
+                    var extent = CutOffSegments.Extent(Parts[i], cutoff.Axis == CutOffAxis.Vertical);
+                    segments.Add((i, extent?.Start ?? double.NaN, extent?.End ?? double.NaN));
+                }
 
                 Parts.RemoveAt(i);
             }
 
-            RegenerateCutOffs(settings, sequence);
+            RegenerateCutOffs(settings, (cutoff, extents) =>
+            {
+                if (!saved.TryGetValue(cutoff, out var segments))
+                    return null;
+                var indices = new int[extents.Count];
+                var previous = segments.Min(s => s.Index);
+                for (var k = 0; k < extents.Count; k++)
+                {
+                    var (start, end) = extents[k];
+                    var best = -1;
+                    var bestOverlap = 0.0;
+                    foreach (var (index, savedStart, savedEnd) in segments)
+                    {
+                        var overlap = System.Math.Min(end, savedEnd) - System.Math.Max(start, savedStart);
+                        if (overlap > bestOverlap)
+                        {
+                            best = index;
+                            bestOverlap = overlap;
+                        }
+                    }
+                    indices[k] = previous = best >= 0 ? best : previous;
+                }
+                return indices;
+            });
         }
 
         /// <summary>
-        /// Regenerates all cut-off drawings and materializes them as parts, placing
-        /// each cut-off at its index in <paramref name="sequence"/> (its place in
-        /// <see cref="Parts"/> order). Cut-offs missing from it are added at the end.
-        /// Callers must remove existing cut-off parts first.
+        /// Regenerates all cut-off drawings and materializes each of their trimmed segments as a
+        /// part, placing a cut-off's segments consecutively from its index in
+        /// <paramref name="sequence"/> (its place in <see cref="Parts"/> order). Cut-offs missing
+        /// from it are added at the end. Callers must remove existing cut-off parts first.
         /// </summary>
-        public void RegenerateCutOffs(CutOffSettings settings, IReadOnlyDictionary<CutOff, int> sequence)
+        public void RegenerateCutOffs(CutOffSettings settings, IReadOnlyDictionary<CutOff, int> sequence) =>
+            RegenerateCutOffs(settings, (cutoff, extents) =>
+                sequence != null && sequence.TryGetValue(cutoff, out var index)
+                    ? Enumerable.Range(index, extents.Count).ToArray() : null);
+
+        /// <summary>
+        /// As <see cref="RegenerateCutOffs(CutOffSettings, IReadOnlyDictionary{CutOff, int})"/>,
+        /// but each cut-off lists one index per segment in ascending order along its axis. A list
+        /// whose length differs from the regenerated segment count places the segments
+        /// consecutively from its smallest index.
+        /// </summary>
+        public void RegenerateCutOffs(CutOffSettings settings, IReadOnlyDictionary<CutOff, IReadOnlyList<int>> sequence) =>
+            RegenerateCutOffs(settings, (cutoff, extents) =>
+            {
+                if (sequence == null || !sequence.TryGetValue(cutoff, out var indices) || indices == null || indices.Count == 0)
+                    return null;
+                if (indices.Count != extents.Count)
+                    return Enumerable.Range(indices.Min(), extents.Count).ToArray();
+                // Program order can run toward the origin; the file lists segments ascending.
+                var ascending = Enumerable.Range(0, extents.Count).OrderBy(k => extents[k].Start).ToArray();
+                var result = new int[extents.Count];
+                for (var rank = 0; rank < ascending.Length; rank++)
+                    result[ascending[rank]] = indices[rank];
+                return result;
+            });
+
+        // sequence gives a cut-off's segment indices in program order from its segments' extents
+        // along its axis (NaN when unmeasurable), or null to append them.
+        private void RegenerateCutOffs(CutOffSettings settings,
+            Func<CutOff, IReadOnlyList<(double Start, double End)>, IReadOnlyList<int>> sequence)
         {
             var cache = BuildPerimeterCache(this);
-            var placed = new List<(int Index, Part Part)>();
+            var placed = new List<(int Index, int Order, Part Part)>();
 
-            // Regenerate and materialize each cut-off
+            // Regenerate and materialize each cut-off's segments
             foreach (var cutoff in CutOffs)
             {
                 cutoff.Regenerate(this, settings, cache);
 
-                if (cutoff.Drawing.Program.Codes.Count == 0)
+                var programs = cutoff.SegmentPrograms();
+                if (programs.Count == 0)
                     continue;
 
-                var part = new Part(cutoff.Drawing);
-
-                if (sequence != null && sequence.TryGetValue(cutoff, out var index))
-                    placed.Add((index, part));
-                else
-                    Parts.Add(part);
+                var vertical = cutoff.Axis == CutOffAxis.Vertical;
+                var parts = programs.Select(program => new Part(cutoff.Drawing, program)).ToArray();
+                var extents = parts.Select(part => CutOffSegments.Extent(part, vertical) ?? (double.NaN, double.NaN)).ToArray();
+                var indices = sequence?.Invoke(cutoff, extents);
+                for (var k = 0; k < parts.Length; k++)
+                {
+                    if (indices != null && k < indices.Count)
+                        placed.Add((indices[k], placed.Count, parts[k]));
+                    else
+                        Parts.Add(parts[k]);
+                }
             }
 
-            // Lowest index first: each insert then lands on its saved index, because
-            // every part sequenced before it is already in place.
-            foreach (var (index, part) in placed.OrderBy(p => p.Index))
+            // Lowest index first: each insert then lands on its saved index, because every part
+            // sequenced before it is already in place. Segments sharing an index keep their
+            // program order (a later insert at the same index lands before an earlier one).
+            foreach (var (index, _, part) in placed.OrderBy(p => p.Index).ThenByDescending(p => p.Order))
                 Parts.Insert(System.Math.Clamp(index, 0, Parts.Count), part);
         }
 

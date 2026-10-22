@@ -233,7 +233,8 @@ public class AutomaticCutOffFormTests
             Assert.Same(existing, view.Plate.CutOffs[0]);
             Assert.Equal(expected.Definitions.Select(c => c.Position.X),
                 view.Plate.CutOffs.Skip(1).Select(c => c.Position.X));
-            Assert.Equal(view.Plate.CutOffs.Count, view.Plate.Parts.Count(p => p.BaseDrawing.IsCutOff));
+            Assert.Equal(view.Plate.CutOffs.Sum(c => c.SegmentPrograms().Count),
+                view.Plate.Parts.Count(p => p.BaseDrawing.IsCutOff));
             Assert.All(preview, p => Assert.DoesNotContain(p, view.Plate.Parts));
             Assert.Empty(PreviewParts(view));
         });

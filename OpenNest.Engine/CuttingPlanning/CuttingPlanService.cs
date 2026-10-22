@@ -53,6 +53,9 @@ public static class CuttingPlanService
             foreach (var cutOff in request.Plate?.CutOffs ?? [])
                 if (cutOff?.Drawing != null)
                     definitions[cutOff.Drawing] = cutOff;
+            // Each cut-off part cuts one trimmed segment of its line and precedes only the parts
+            // in that segment's span (docs/automatic-scrap-cutoffs.md), not every part the line passes.
+            var spans = new Dictionary<CutOff, Dictionary<Part, (double Start, double End)>>(ReferenceEqualityComparer.Instance);
             var nodes = new List<DependencyNode>();
             // Reuse the reader's coordinate validation without publishing its native kernel.
             var identities = new HashSet<Part>(ReferenceEqualityComparer.Instance);
@@ -79,11 +82,22 @@ public static class CuttingPlanService
                     if (!cut.HasCuttingContour)
                         throw new ArgumentException("Placed cutoff program has no nonzero cutting motions.");
                     var defined = definitions.TryGetValue(source.BaseDrawing, out var definition);
-                    var separates = defined && CutOff.SeparatesSheet(source, definition,
-                        request.Plate.BoundingBox(includeParts: false));
-                    nodes.Add(new(true, defined
-                        ? new(definition.Axis, definition.Position, definition.StartLimit, definition.EndLimit) : null,
-                        source.BoundingBox, null, null, separates));
+                    var sheet = request.Plate.BoundingBox(includeParts: false);
+                    var separates = defined && CutOff.SeparatesSheet(source, definition, sheet);
+                    CutOffDefinition nominal = null;
+                    if (defined)
+                    {
+                        if (!spans.TryGetValue(definition, out var segments))
+                        {
+                            spans[definition] = segments = new(ReferenceEqualityComparer.Instance);
+                            foreach (var segment in CutOffSegments.Of(definition, request.Parts, sheet))
+                                segments[segment.Part] = (segment.SpanStart, segment.SpanEnd);
+                        }
+                        nominal = segments.TryGetValue(source, out var span)
+                            ? new(definition.Axis, definition.Position, span.Start, span.End)
+                            : new(definition.Axis, definition.Position, definition.StartLimit, definition.EndLimit);
+                    }
+                    nodes.Add(new(true, nominal, source.BoundingBox, null, null, separates));
                     placements.Add(new(source, index, source.Location, source.Rotation, source.LeadInsLocked,
                         cut, OwnedProgramCopy.Copy(source.Program, token))
                     { IsCutOff = true, SeparatesSheet = separates });

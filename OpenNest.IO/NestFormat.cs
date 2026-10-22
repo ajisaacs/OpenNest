@@ -610,9 +610,19 @@ namespace OpenNest.IO
 
             /// <summary>
             /// Zero-based place in the plate's cut sequence (<c>Plate.Parts</c> order,
-            /// cut-offs included). Null in older files, which load it at the end.
+            /// cut-offs included) of the cut-off's first segment. Null in older files, which
+            /// load it at the end.
             /// </summary>
             public int? Sequence { get; init; }
+
+            /// <summary>
+            /// The place of each of the cut-off's trimmed segments in the cut sequence, in
+            /// ascending order along its line, when they are not consecutive. Omitted for one
+            /// segment or consecutive segments; readers without it place the segments
+            /// consecutively from <see cref="Sequence"/>.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public int[] Segments { get; init; }
         }
 
         public record SizeDto

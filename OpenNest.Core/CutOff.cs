@@ -39,6 +39,29 @@ namespace OpenNest
             Drawing.Program = program;
         }
 
+        /// <summary>
+        /// The regenerated program split into its cutting segments, one rapid-and-cut program
+        /// each in program order, so the plate can sequence every segment on its own.
+        /// </summary>
+        public IReadOnlyList<Program> SegmentPrograms()
+        {
+            var program = Drawing.Program;
+            var result = new List<Program>();
+            if (program == null)
+                return result;
+            Program current = null;
+            foreach (var code in program.Codes)
+            {
+                if (code is RapidMove || current == null)
+                {
+                    current = new Program(program.Mode);
+                    result.Add(current);
+                }
+                current.Codes.Add(code);
+            }
+            return result;
+        }
+
         /// <summary>Measures the same trimmed, filtered segments as regeneration without building a program.</summary>
         internal (double Length, int SegmentCount) MeasureSegments(
             Plate plate,

@@ -55,6 +55,25 @@ internal static class TestHelpers
         return plate;
     }
 
+    /// <summary>A cut-off's segment parts in cut-sequence order: each trimmed segment is its own part.</summary>
+    public static Part[] CutOffParts(Plate plate, CutOff cutOff) =>
+        plate.Parts.Where(p => ReferenceEquals(p.BaseDrawing, cutOff.Drawing)).ToArray();
+
+    /// <summary>A cut-off's materialized cutting moves: its segment parts' programs joined in cut-sequence order.</summary>
+    public static Program CutOffProgram(Plate plate, CutOff cutOff)
+    {
+        var program = new Program();
+        foreach (var part in CutOffParts(plate, cutOff))
+        {
+            Assert.Equal(Vector.Zero, part.Location);
+            program.Codes.AddRange(part.Program.Codes);
+        }
+        return program;
+    }
+
+    /// <summary>The number of parts the plate's cut-offs materialize, one per trimmed segment.</summary>
+    public static int CutOffPartCount(Plate plate) => plate.CutOffs.Sum(c => c.SegmentPrograms().Count);
+
     public static Drawing MakeSquareDrawing(double size = 10)
     {
         // CW winding matches CNC convention (OffsetSide.Left = outward)

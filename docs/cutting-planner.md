@@ -107,10 +107,13 @@ The overlap analyzer trims the same shape from its own copy (see
 Capture builds whole-part prerequisites from owned values, and both the search and
 the final replay enforce them:
 
-- A cutoff precedes every part its nominal line crosses within its span, using the
-  same rule as automatic sequencing: nominal position and limits against the part's
-  placed bounds, matched by drawing reference, never by name or trimmed segments. A
-  cutoff whose definition is missing precedes every part. Cutoffs need a
+- A cutoff's trimmed segments are separate parts (see [automatic scrap
+  cutoffs](automatic-scrap-cutoffs.md#part-sequencing)); each precedes every part its
+  nominal line crosses within the segment's span of the line (from the end of the
+  segment before it to the start of the one after it, or the line's limits), using the
+  same rule as automatic sequencing: nominal position and span against the part's
+  placed bounds, matched by drawing reference, never by name or the trimmed cut
+  itself. A cutoff whose definition is missing precedes every part. Cutoffs need a
   plate-scoped request; they are always fixed programs, need no lead-in, are not
   material for lead validation and, being open cuts, never become rapid obstacles.
   Rapids into and out of them are still checked.
@@ -174,7 +177,11 @@ state is memoized only in recovery; it never prunes the retained full search.
 Recovered whole programs are checked again and independently replayed. Single-part
 and no-hole requests keep their existing search order.
 
-A preserved order is followed as given. Otherwise the order is an open
+A preserved order is followed as given, cutoff segments included. Otherwise the
+cutoff segments that must precede some part are left out of the search: the parts are
+planned as if the segments were not there, so a plate's route does not change because
+strip lines were added, and the segments are placed into that plan afterwards (see
+[cutoff segments](#cutoff-segments) below). The order is an open
 travelling-salesman path over part centres from the start point: nearest neighbour,
 then 2-opt reversals and Or-opt moves of one to three parts, never placing a part
 before a cutoff or nested-part prerequisite. A part with other parts nested in its
@@ -216,6 +223,32 @@ on that branch's completed prefix. Any budget left then goes to the retained ful
 search. Recovery shares the original total expansion budget; exhausting it still
 returns a refusal from the service, never a best-effort upgrade. Only the batch then
 looks for the separate [safest route](#safest-route-fallback-when-the-search-runs-out).
+
+### Cutoff segments
+
+A cutoff segment is a fixed open cut that is cut the same way wherever it goes and is
+never a rapid obstacle, so all that its place in the order changes are the rapid into
+its pierce and the rapid from its end to what follows. Once the parts are planned, each
+segment that must precede some part (`CutOffInsertion`) goes as late as it can before
+the first part in its span of the line, into the latest gap where both rapids cross
+nothing cut before that point: the part after it keeps the program it was planned with,
+and only its incoming rapid is checked again from the segment's end. Segments due in the
+same gap are chained in the order placed, latest-due first. This keeps cutting local:
+the segment below a row of parts is cut while the route passes it, not up front, and
+never before a part it need not precede unless the geometry allows nothing later (a
+segment whose pierce is walled off by every part cut after a point goes before that
+point). Each gap tried is charged to the expansion budget. When a segment fits in no
+gap before its first part, the whole plate is searched again with the segments among
+the parts, within the same budget, as plates with cutoffs were planned before. A sheet
+separator or a line through open scrap precedes nothing and is planned like a part: a
+separator after everything, the other at its tour position.
+
+Wherever a segment sits in an order, the search looks through it: the part before it
+faces the next part, not the segment, and the part after it ranks its entries and hole
+route from where the tool was before the segment, while every rapid is still checked
+from the segment's end. A kept order with segments where a plan put them (an applied
+plan replanned with `Keep the current part order`) therefore gets the entries and
+routes the plan had, and replays Ready again.
 
 Candidates use native closest points, vertices, midpoints and circle angles in
 stable order. `maxEntries` caps the normal ranked shortlist, not the recovery
@@ -579,10 +612,11 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
 - `Add scrap cut-offs` runs the automatic cut-off planner (defaults 35 in /
   889 mm strips, half-strip minimum, 12 in / 304.8 mm tail) on every plate in scope
   *before* capture, so the cutting plan sequences the new lines like any
-  other cut-off. Each added cut-off is moved in the part list to just before the first part
-  its nominal line crosses (a sheet-separating one last, one that crosses nothing ahead of any
-  existing separator), so a kept order, including the fallback after a free search runs out of
-  budget, satisfies the cut-off rules; other parts and cut-offs keep their positions.
+  other cut-off. Each segment of an added cut-off is moved in the part list to just before the
+  first part in its span of the line (a sheet-separating one last, one that crosses nothing
+  ahead of any existing separator), so a kept order, including the fallback after a free
+  search runs out of budget, satisfies the cut-off rules; other parts and cut-offs keep their
+  positions. The free search places the segments itself (see [cutoff segments](#cutoff-segments)).
   These are the only live changes made before Apply: Apply keeps them,
   while unticking the box, Close or switching to Validate removes them and
   restores the earlier cut-offs and sequence. The proposal preview draws planned cut-offs

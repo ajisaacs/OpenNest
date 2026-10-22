@@ -657,8 +657,8 @@ public class AutomaticCutOffPlannerTests
         Assert.Equal(first.UsedSpan, second.UsedSpan);
         Assert.Equal(3, second.Diagnostics.Count(d => d.Code == AutomaticCutOffDiagnosticCode.ExistingCutOff));
         plate.RegenerateCutOffs(settings);
-        Assert.Equal(4, plate.Parts.Count(p => p.BaseDrawing.IsCutOff));
-        Assert.All(plate.CutOffs, c => Assert.Single(plate.Parts.Where(p => ReferenceEquals(p.BaseDrawing, c.Drawing))));
+        Assert.Equal(TestHelpers.CutOffPartCount(plate), plate.Parts.Count(p => p.BaseDrawing.IsCutOff));
+        Assert.All(plate.CutOffs, c => Assert.Equal(c.SegmentPrograms().Count, TestHelpers.CutOffParts(plate, c).Length));
         Assert.Same(manual.Drawing, plate.Parts[0].BaseDrawing);
         Assert.Same(real, plate.Parts[1]);
         Assert.Same(secondReal, plate.Parts[2]);
@@ -934,15 +934,14 @@ public class AutomaticCutOffPlannerTests
             plate.CutOffs.Add(definition);
         plate.RegenerateCutOffs(settings);
 
-        var cuts = plate.Parts.Where(p => p.BaseDrawing.IsCutOff).ToArray();
-        Assert.Equal(plan.Definitions.Count, cuts.Length);
-        for (var i = 0; i < cuts.Length; i++)
-            Assert.Equal(previewSegments[i], Segments(cuts[i].Program));
-        var repeated = Segments(cuts[0].Program);
+        Assert.Equal(TestHelpers.CutOffPartCount(plate), plate.Parts.Count(p => p.BaseDrawing.IsCutOff));
+        for (var i = 0; i < plan.Definitions.Count; i++)
+            Assert.Equal(previewSegments[i], Segments(TestHelpers.CutOffProgram(plate, plan.Definitions[i])));
+        var repeated = Segments(TestHelpers.CutOffProgram(plate, plan.Definitions[0]));
         Assert.Equal(2, repeated.Length);
         Assert.Equal(20 - System.Math.Sqrt(75), repeated[0].To.Y, 8);
         Assert.Equal(20 + System.Math.Sqrt(75), repeated[1].From.Y, 8);
-        var separator = Assert.Single(Segments(cuts[1].Program));
+        var separator = Assert.Single(Segments(TestHelpers.CutOffProgram(plate, plan.Definitions[1])));
         Assert.Equal(new Vector(plan.TailSeparatorX!.Value, 0), separator.From);
         Assert.Equal(new Vector(plan.TailSeparatorX.Value, 81), separator.To);
         var arc = Assert.Single(ConvertProgram.ToGeometry(real.Program).OfType<Arc>());
@@ -986,7 +985,7 @@ public class AutomaticCutOffPlannerTests
         Assert.True(second.HasSeparatedTail);
         Assert.Equal(first.TailSeparatorX, second.TailSeparatorX);
         Assert.Equal(first.TailLength, second.TailLength);
-        Assert.Equal(3, plate.Parts.Count(p => p.BaseDrawing.IsCutOff));
+        Assert.Equal(TestHelpers.CutOffPartCount(plate), plate.Parts.Count(p => p.BaseDrawing.IsCutOff));
     }
 
     [Fact]

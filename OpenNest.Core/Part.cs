@@ -45,6 +45,15 @@ namespace OpenNest
             UpdateBounds();
         }
 
+        /// <summary>A placement of one owned program of the drawing, such as one cut-off segment.</summary>
+        internal Part(Drawing baseDrawing, Program program)
+        {
+            BaseDrawing = baseDrawing;
+            Program = program;
+            ownsProgram = true;
+            UpdateBounds();
+        }
+
         /// <summary>
         /// Location of the part.
         /// </summary>

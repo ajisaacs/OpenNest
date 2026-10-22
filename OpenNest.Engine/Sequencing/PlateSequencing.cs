@@ -37,28 +37,31 @@ namespace OpenNest.Engine.Sequencing
         }
 
         /// <summary>
-        /// Moves the given cutoffs' parts to where the cutoff rules need them while every other
-        /// part and cutoff keeps its position: just before the first part each nominal line
-        /// crosses, or last when it splits the whole sheet. One that crosses nothing stays put,
-        /// unless it would follow a sheet-separating cutoff.
+        /// Moves the given cutoffs' segment parts to where the cutoff rules need them while every
+        /// other part and cutoff keeps its position: each segment just before the first part in
+        /// its span of the nominal line (see <see cref="CutOffSegments"/>), or last when it splits
+        /// the whole sheet. One that crosses nothing stays put, unless it would follow a
+        /// sheet-separating cutoff.
         /// </summary>
         public static void PlaceCutOffs(Plate plate, IEnumerable<CutOff> definitions)
         {
             var bounds = plate.BoundingBox(includeParts: false);
             var moving = definitions
-                .Select(definition => (Definition: definition, Part: plate.Parts.FirstOrDefault(part =>
-                    ReferenceEquals(part.BaseDrawing, definition.Drawing))))
-                .Where(item => item.Part != null).ToList();
+                .SelectMany(definition => CutOffSegments.Of(plate, definition)
+                    .Select(segment => (Definition: definition, Segment: segment)))
+                .ToList();
             if (moving.Count == 0)
                 return;
+            var movingParts = new HashSet<Part>(moving.Select(item => item.Segment.Part), ReferenceEqualityComparer.Instance);
 
             var existing = new Dictionary<Drawing, CutOff>(ReferenceEqualityComparer.Instance);
             foreach (var cutOff in plate.CutOffs)
                 existing[cutOff.Drawing] = cutOff;
             var order = plate.Parts.ToList();
             var separating = new List<Part>();
-            foreach (var (definition, part) in moving)
+            foreach (var (definition, segment) in moving)
             {
+                var part = segment.Part;
                 if (CutOff.SeparatesSheet(part, definition, bounds))
                 {
                     order.Remove(part);
@@ -67,9 +70,9 @@ namespace OpenNest.Engine.Sequencing
                 }
                 var target = order.FindIndex(other => !other.BaseDrawing.IsCutOff
                     && CuttingDependencyGraph.CutOffCrosses(definition.Axis, definition.Position,
-                        definition.StartLimit, definition.EndLimit, other.BoundingBox, bounds));
+                        segment.SpanStart, segment.SpanEnd, other.BoundingBox, bounds));
                 if (target < 0)
-                    target = order.FindIndex(other => other.BaseDrawing.IsCutOff && !moving.Any(m => ReferenceEquals(m.Part, other))
+                    target = order.FindIndex(other => other.BaseDrawing.IsCutOff && !movingParts.Contains(other)
                         && existing.TryGetValue(other.BaseDrawing, out var cut) && CutOff.SeparatesSheet(other, cut, bounds));
                 if (target < 0 || target > order.IndexOf(part))
                     continue;
@@ -79,11 +82,11 @@ namespace OpenNest.Engine.Sequencing
             order.AddRange(separating);
 
             // Touch only the moved cutoff parts; real parts never leave the plate.
-            foreach (var (_, part) in moving)
+            foreach (var part in movingParts)
                 plate.Parts.Remove(part);
             for (var index = 0; index < order.Count; index++)
             {
-                if (moving.Any(item => ReferenceEquals(item.Part, order[index])))
+                if (movingParts.Contains(order[index]))
                     plate.Parts.Insert(index, order[index]);
             }
         }
@@ -101,6 +104,11 @@ namespace OpenNest.Engine.Sequencing
             foreach (var cutOff in plate.CutOffs)
                 definitions[cutOff.Drawing] = cutOff;
             var bounds = plate.BoundingBox(includeParts: false);
+            // Each cutoff part cuts one segment of its line and precedes the parts in that segment's span.
+            var spans = new Dictionary<Part, (double Start, double End)>(ReferenceEqualityComparer.Instance);
+            foreach (var cutOff in plate.CutOffs)
+                foreach (var segment in CutOffSegments.Of(cutOff, ordered, bounds))
+                    spans[segment.Part] = (segment.SpanStart, segment.SpanEnd);
 
             // A cutoff that splits the whole sheet goes after every part and other cutoff, so the
             // head never travels back across it. It passes through no part.
@@ -117,6 +125,12 @@ namespace OpenNest.Engine.Sequencing
                 .Where(item => item.Part.BaseDrawing.IsCutOff).ToList();
             if (cuts.Count == 0)
                 return ordered.Concat(separating).ToList();
+            // Cutoffs keep the route's order; within one cutoff, the segments due before the same
+            // part keep the order they were regenerated in (the line's program order).
+            var firstOnRoute = cuts.GroupBy(item => item.Part.BaseDrawing)
+                .ToDictionary(group => group.Key, group => group.Min(item => item.Index));
+            cuts = cuts.OrderBy(item => firstOnRoute[item.Part.BaseDrawing])
+                .ThenBy(item => plate.Parts.IndexOf(item.Part)).ToList();
 
             var emitted = new bool[ordered.Count];
             var result = new List<Part>(ordered.Count);
@@ -133,8 +147,9 @@ namespace OpenNest.Engine.Sequencing
                         // An orphaned cutoff still must not follow potentially
                         // crossed parts when its nominal span cannot be recovered.
                         if (!definitions.TryGetValue(cut.Part.BaseDrawing, out var definition)
+                            || !spans.TryGetValue(cut.Part, out var span)
                             || CuttingDependencyGraph.CutOffCrosses(definition.Axis, definition.Position,
-                                definition.StartLimit, definition.EndLimit, part.BoundingBox, bounds))
+                                span.Start, span.End, part.BoundingBox, bounds))
                         {
                             result.Add(cut.Part);
                             emitted[cut.Index] = true;

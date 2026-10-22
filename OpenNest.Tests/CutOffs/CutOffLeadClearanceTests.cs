@@ -86,14 +86,13 @@ public class CutOffLeadClearanceTests
 
     private static void AssertClearance(Plate plate, bool horizontal)
     {
-        var cutPart = Assert.Single(plate.Parts.Where(p => p.BaseDrawing.IsCutOff));
-        var codes = cutPart.Program.Codes;
+        var codes = TestHelpers.CutOffProgram(plate, Assert.Single(plate.CutOffs)).Codes;
         Assert.Equal(4, codes.Count);
         // Independent material oracle: the unrotated outline is a union of three rectangles.
         // Undo the test's exact quarter-turn, not a production geometry/offset operation.
         Vector Local(Vector point)
         {
-            point += cutPart.Location - new Vector(50, 10);
+            point -= new Vector(50, 10);
             return horizontal ? new Vector(point.Y, -point.X) : point;
         }
         var rectangles = new[] { (0.0, 40.0, 0.0, 20.0), (0.0, 2.0, 20.0, 20.25), (38.0, 40.0, 20.0, 20.25) };

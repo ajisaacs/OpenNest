@@ -37,7 +37,7 @@ public class AutomaticCutOffBatchTests
         Assert.Same(manual.Drawing, plates[0].Parts[0].BaseDrawing);
         Assert.Same(realParts[0], plates[0].Parts[1]);
         Assert.Same(realParts[1], plates[1].Parts[0]);
-        Assert.All(plates.Take(2), p => Assert.Equal(p.CutOffs.Count, p.Parts.Count(x => x.BaseDrawing.IsCutOff)));
+        Assert.All(plates.Take(2), p => Assert.Equal(TestHelpers.CutOffPartCount(p), p.Parts.Count(x => x.BaseDrawing.IsCutOff)));
         Assert.All(plates[1].CutOffs, c => Assert.True(c.Position.X < 0));
         var tailProgram = plates[1].Parts[^1].Program;
         Assert.Equal(50, tailProgram.BoundingBox().Width, 6);

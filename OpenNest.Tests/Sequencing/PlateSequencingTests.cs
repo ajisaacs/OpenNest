@@ -1,4 +1,5 @@
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Engine.Sequencing;
 using OpenNest.Geometry;
 using OpenNest.IO;
@@ -235,12 +236,15 @@ public class PlateSequencingTests
         plate.CutOffs.Add(upper);
         plate.RegenerateCutOffs(new CutOffSettings());
         Assert.Equal(lower.Drawing.Name, upper.Drawing.Name);
-        var lowerPart = plate.Parts.Single(p => ReferenceEquals(p.BaseDrawing, lower.Drawing));
-        var upperPart = plate.Parts.Single(p => ReferenceEquals(p.BaseDrawing, upper.Drawing));
+        // Each line is trimmed around its part into two segment parts.
+        var lowerParts = TestHelpers.CutOffParts(plate, lower);
+        var upperParts = TestHelpers.CutOffParts(plate, upper);
+        Assert.Equal(2, lowerParts.Length);
+        Assert.Equal(2, upperParts.Length);
 
         PlateSequencing.Apply(plate, new SequenceParameters { Method = method });
 
-        Assert.Equal(new[] { upperPart, second, lowerPart, first }, plate.Parts);
+        Assert.Equal(upperParts.Append(second).Concat(lowerParts).Append(first), plate.Parts);
         Assert.Equal(new[] { lower, upper }, plate.CutOffs);
     }
 
@@ -277,7 +281,7 @@ public class PlateSequencingTests
 
             Assert.Same(separatorPart, plate.Parts[^1]);
             AssertPrecedes(plate, crossing, right);
-            Assert.Equal(4, plate.Parts.Count);
+            Assert.Equal(5, plate.Parts.Count); // The crossing line is two segment parts.
         }
         // Without the rule, at least one route cuts the separator before a part.
         Assert.True(hazards > 0);
@@ -332,7 +336,8 @@ public class PlateSequencingTests
         PlateSequencing.Apply(plate,
             new SequenceParameters { Method = SequenceMethod.LeftSide });
         AssertPrecedes(plate, crossing, part);
-        Assert.False(plate.Parts[1].BaseDrawing.IsCutOff);
+        Assert.Equal(2, TestHelpers.CutOffParts(plate, crossing).Length); // Trimmed around the part.
+        Assert.Same(part, plate.Parts[2]);
         var expected = plate.Parts.Select(p => p.BaseDrawing.Name).ToArray();
 
         using var stream = new MemoryStream();
@@ -402,6 +407,24 @@ public class PlateSequencingTests
     }
 
     [Fact]
+    public void PlaceCutOffs_PlacesEachSegmentBeforeTheFirstPartInItsSpan()
+    {
+        var upper = TestHelpers.MakePartAt(10, 30, 10);
+        var lower = TestHelpers.MakePartAt(10, 10, 10);
+        var plate = TestHelpers.MakePlate(60, 120, upper, lower);
+        var cutOff = new CutOff(new Vector(15, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(cutOff);
+        plate.RegenerateCutOffs(new CutOffSettings());
+        var segments = CutOffSegments.Of(plate, cutOff).Select(s => s.Part).ToArray();
+        Assert.Equal(new[] { upper, lower, segments[0], segments[1], segments[2] }, plate.Parts);
+
+        PlateSequencing.PlaceCutOffs(plate, [cutOff]);
+
+        // The bottom segment is beside the lower part only; the middle one beside both.
+        Assert.Equal(new[] { segments[1], segments[2], upper, segments[0], lower }, plate.Parts);
+    }
+
+    [Fact]
     public void PlaceCutOffs_MovesOnlyTheGivenCutOffsWhereTheRulesNeedThem()
     {
         var a = TestHelpers.MakePartAt(10, 10, 10);
@@ -418,30 +441,40 @@ public class PlateSequencingTests
         // As staging adds them: appended after everything, the existing separator included.
         plate.CutOffs.AddRange([crossing, limited, separator]);
         plate.RegenerateCutOffs(settings);
-        Part Cut(CutOff cutOff) => plate.Parts.Single(p => ReferenceEquals(p.BaseDrawing, cutOff.Drawing));
-        Assert.Equal(new[] { a, b, c, Cut(existingSeparator), Cut(crossing), Cut(limited), Cut(separator) },
-            plate.Parts);
+        Part[] Cut(CutOff cutOff) => TestHelpers.CutOffParts(plate, cutOff);
+        Assert.Equal(2, Cut(crossing).Length); // Trimmed around b: two segment parts.
+        Assert.Equal(new[] { a, b, c }.Concat(Cut(existingSeparator)).Concat(Cut(crossing)).Concat(Cut(limited))
+            .Concat(Cut(separator)), plate.Parts);
         var removed = 0;
         plate.PartRemoved += (_, e) => Assert.True(e.Item.BaseDrawing.IsCutOff, "Only cut-off parts move.");
         plate.PartRemoved += (_, _) => removed++;
 
         PlateSequencing.PlaceCutOffs(plate, [crossing, limited, separator]);
 
-        Assert.Equal(new[] { a, Cut(crossing), b, c, Cut(limited), Cut(existingSeparator), Cut(separator) },
-            plate.Parts);
-        Assert.Equal(3, removed);
+        Assert.Equal(new[] { a }.Concat(Cut(crossing)).Concat([b, c]).Concat(Cut(limited)).Concat(Cut(existingSeparator))
+            .Concat(Cut(separator)), plate.Parts);
+        Assert.Equal(4, removed);
     }
 
     private static Part[] Baseline(Plate plate, SequenceParameters parameters) =>
         PartSequencerFactory.Create(parameters).Sequence(plate.Parts.ToList(), plate)
             .Select(p => p.Part).Reverse().ToArray();
 
+    // Each of the cut-off's segment parts precedes the crossed parts in its span of the line,
+    // and every crossed part follows at least one segment.
     private static void AssertPrecedes(Plate plate, CutOff cutOff, params Part[] crossed)
     {
-        var cutPart = Assert.Single(plate.Parts,
-            p => ReferenceEquals(p.BaseDrawing, cutOff.Drawing));
+        var bounds = plate.BoundingBox(includeParts: false);
+        var segments = CutOffSegments.Of(plate, cutOff);
+        Assert.NotEmpty(segments);
         foreach (var part in crossed)
-            Assert.True(plate.Parts.IndexOf(cutPart) < plate.Parts.IndexOf(part),
-                $"{cutOff.Drawing.Name} must precede the part at {part.Location}.");
+        {
+            var beside = segments.Where(segment => CuttingDependencyGraph.CutOffCrosses(cutOff.Axis, cutOff.Position,
+                segment.SpanStart, segment.SpanEnd, part.BoundingBox, bounds)).ToList();
+            Assert.NotEmpty(beside);
+            foreach (var segment in beside)
+                Assert.True(plate.Parts.IndexOf(segment.Part) < plate.Parts.IndexOf(part),
+                    $"{cutOff.Drawing.Name} [{segment.Start}, {segment.End}] must precede the part at {part.Location}.");
+        }
     }
 }

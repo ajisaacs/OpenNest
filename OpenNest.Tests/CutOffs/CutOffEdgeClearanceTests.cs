@@ -56,9 +56,10 @@ public class CutOffEdgeClearanceTests
             for (var iteration = 0; iteration < 2; iteration++)
             {
                 plate.RegenerateCutOffs(settings);
-                var cutPart = Assert.Single(plate.Parts.Where(p => p.BaseDrawing.IsCutOff));
-                Assert.Same(cutoff.Drawing, cutPart.BaseDrawing);
-                AssertRectangleClearance(cutPart.Program, cutPart.Location, axis,
+                var cutParts = plate.Parts.Where(p => p.BaseDrawing.IsCutOff).ToArray();
+                Assert.All(cutParts, cutPart => Assert.Same(cutoff.Drawing, cutPart.BaseDrawing));
+                Assert.All(cutParts, cutPart => Assert.Equal(2, cutPart.Program.Codes.Count)); // One segment each.
+                AssertRectangleClearance(TestHelpers.CutOffProgram(plate, cutoff), Vector.Zero, axis,
                     left, right, bottom, top, settings.PartClearance);
             }
         }
@@ -118,11 +119,10 @@ public class CutOffEdgeClearanceTests
         var cutoff = new CutOff(Orient(new Vector(cutCoordinate, 0)), axis);
         plate.CutOffs.Add(cutoff);
         plate.RegenerateCutOffs(new CutOffSettings { PartClearance = 0 });
-        var cutPart = Assert.Single(plate.Parts.Where(p => p.BaseDrawing.IsCutOff));
-        var codes = cutPart.Program.Codes;
+        var codes = TestHelpers.CutOffProgram(plate, cutoff).Codes;
         Assert.Equal(4, codes.Count);
-        var before = Assert.IsType<LinearMove>(codes[1]).EndPoint + cutPart.Location;
-        var after = Assert.IsType<RapidMove>(codes[2]).EndPoint + cutPart.Location;
+        var before = Assert.IsType<LinearMove>(codes[1]).EndPoint;
+        var after = Assert.IsType<RapidMove>(codes[2]).EndPoint;
         Assert.Equal(occupiedStart, axis == CutOffAxis.Vertical ? before.Y : before.X, 9);
         Assert.Equal(occupiedEnd, axis == CutOffAxis.Vertical ? after.Y : after.X, 9);
     }

@@ -62,6 +62,22 @@ is raised. The drawing hash is checked against the file text before this
 repair, so saved programs still load; the next save writes the marks into
 `programs/program-N`.
 
+## Cut-offs
+
+Each serialized plate's `cutOffs` array holds its cut-off definitions: `x`, `y`,
+`axis` (`vertical` or `horizontal`), optional `startLimit` and `endLimit`, and the
+places in the plate's cut sequence (`Plate.Parts` order, cut-offs included) of the
+parts the definition materializes. Loading regenerates each definition with the
+reader's default cut-off settings and makes one part per trimmed segment. `sequence`
+is the zero-based place of the first segment (by position along the line); null or
+absent in older files, which load the cut-off at the end. `segments` lists the place
+of every segment in ascending order along the line and is written only when the
+segments are not consecutive, as after Plan Cutting cuts a strip line in pieces where
+the route passes them. Readers without `segments` place the segments consecutively
+from `sequence`, which is still a dependency-safe order. A `segments` list whose length
+differs from the regenerated segment count (nondefault cut-off settings, a moved part)
+places the segments consecutively from its smallest entry.
+
 ## Plate cutting parameters
 
 Each plate's optional `cuttingParameters` stores the settings used by Assign

@@ -368,15 +368,13 @@ namespace OpenNest.IO
                 var cutoffs = new List<CutOffDto>();
                 foreach (var cutoff in plate.CutOffs)
                 {
-                    var sequence = -1;
-                    for (var j = 0; j < plate.Parts.Count; j++)
-                    {
-                        if (ReferenceEquals(plate.Parts[j].BaseDrawing, cutoff.Drawing))
-                        {
-                            sequence = j;
-                            break;
-                        }
-                    }
+                    // Each trimmed segment is its own part with its own place in the sequence.
+                    var segments = CutOffSegments.Of(plate, cutoff)
+                        .Select(segment => plate.Parts.IndexOf(segment.Part))
+                        .Where(index => index >= 0)
+                        .ToArray();
+                    var consecutive = segments.Length == 0
+                        || segments.SequenceEqual(Enumerable.Range(segments.Min(), segments.Length));
 
                     cutoffs.Add(
                         new CutOffDto
@@ -386,7 +384,8 @@ namespace OpenNest.IO
                             Axis = cutoff.Axis == CutOffAxis.Vertical ? "vertical" : "horizontal",
                             StartLimit = cutoff.StartLimit,
                             EndLimit = cutoff.EndLimit,
-                            Sequence = sequence >= 0 ? sequence : null,
+                            Sequence = segments.Length > 0 ? segments.Min() : null,
+                            Segments = consecutive ? null : segments,
                         }
                     );
                 }

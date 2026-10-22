@@ -55,8 +55,11 @@ public class CuttingDependencyTests
         var order = result.ProposedOrder.Select(o => o.SourcePart).ToList();
         Assert.Same(separator, order[^1]);
         Assert.True(result.ProposedOrder[^1].SeparatesSheet);
-        Assert.False(result.ProposedOrder.Single(o => ReferenceEquals(o.SourcePart, crossing)).SeparatesSheet);
-        Assert.True(order.IndexOf(crossing) < order.IndexOf(left));
+        foreach (var segment in crossing)
+        {
+            Assert.False(result.ProposedOrder.Single(o => ReferenceEquals(o.SourcePart, segment)).SeparatesSheet);
+            Assert.True(order.IndexOf(segment) < order.IndexOf(left));
+        }
         Assert.Equal(CuttingCommitStatus.Applied, CuttingPlanService.Apply([result]).Status);
         Assert.Same(separator, plate.Parts[^1]);
         Assert.Contains(right, plate.Parts);
@@ -111,8 +114,9 @@ public class CuttingDependencyTests
     }
 
     // 100 x 100 sheet: squares at X 1-11 and 60-70; a cutoff at X 5 is trimmed around the left
-    // square, while a continuous line at X 40 splits the sheet. Both cutoffs start the sequence.
-    private static (Plate, Part Separator, Part Crossing, Part Left, Part Right) SeparatedPlate()
+    // square into two segment parts, while a continuous line at X 40 splits the sheet. Both
+    // cutoffs start the sequence.
+    private static (Plate, Part Separator, Part[] Crossing, Part Left, Part Right) SeparatedPlate()
     {
         var nest = new Nest();
         var plate = nest.CreatePlate();
@@ -127,11 +131,12 @@ public class CuttingDependencyTests
         plate.CutOffs.Add(crossing);
         plate.RegenerateCutOffs(new CutOffSettings());
         var cuts = plate.Parts.Where(p => p.BaseDrawing.IsCutOff).ToArray();
-        Assert.Equal(2, cuts.Length);
+        Assert.Equal(3, cuts.Length);
         var separatorPart = cuts.Single(p => ReferenceEquals(p.BaseDrawing, separator.Drawing));
-        var crossingPart = cuts.Single(p => ReferenceEquals(p.BaseDrawing, crossing.Drawing));
-        plate.Parts.Reorder([separatorPart, crossingPart, left, right]);
-        return (plate, separatorPart, crossingPart, left, right);
+        var crossingParts = cuts.Where(p => ReferenceEquals(p.BaseDrawing, crossing.Drawing)).ToArray();
+        Assert.Equal(2, crossingParts.Length);
+        plate.Parts.Reorder([separatorPart, .. crossingParts, left, right]);
+        return (plate, separatorPart, crossingParts, left, right);
     }
 
     [Fact]

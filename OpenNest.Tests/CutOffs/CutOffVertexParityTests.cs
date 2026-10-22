@@ -146,9 +146,7 @@ public class CutOffVertexParityTests
         {
             plate.CutOffs.Add(cutoff);
             plate.RegenerateCutOffs(settings);
-            var cutPart = Assert.Single(plate.Parts.Where(p => p.BaseDrawing.IsCutOff));
-            program = cutPart.Program;
-            location = cutPart.Location;
+            program = TestHelpers.CutOffProgram(plate, cutoff);
         }
         else
         {

@@ -57,8 +57,10 @@ public class CutOffSeparationTests
         Assert.False(CutOff.SeparatesSheet(Part(plate, limited), null, plate.BoundingBox(false)));
     }
 
+    // A line trimmed around a part is two segment parts, neither of which spans the sheet.
     private static bool Separates(Plate plate, CutOff cutOff) =>
-        CutOff.SeparatesSheet(Part(plate, cutOff), cutOff, plate.BoundingBox(includeParts: false));
+        TestHelpers.CutOffParts(plate, cutOff) is [var part]
+        && CutOff.SeparatesSheet(part, cutOff, plate.BoundingBox(includeParts: false));
 
     private static Part Part(Plate plate, CutOff cutOff) =>
         Assert.Single(plate.Parts, p => ReferenceEquals(p.BaseDrawing, cutOff.Drawing));

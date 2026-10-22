@@ -37,7 +37,8 @@ public class PlateRapidEnumeratorTests
 
         // Two interrupted skeleton cuts followed by an uninterrupted tail separator.
         var cutoffs = plate.Parts.Where(p => p.BaseDrawing.IsCutOff).ToArray();
-        Assert.Equal(new[] { 2, 2, 1 }, cutoffs.Select(p => p.Program.Codes.OfType<LinearMove>().Count()));
+        Assert.Equal(new[] { 2, 2, 1 }, plate.CutOffs.Select(c => TestHelpers.CutOffParts(plate, c).Length));
+        Assert.All(cutoffs, p => Assert.Single(p.Program.Codes.OfType<LinearMove>()));
         var before = plate.Parts.Select(p => NestWriter.GetProgramText(p.Program)).ToArray();
         var expected = new List<RapidEnumerator.Segment>();
         var position = Vector.Zero;

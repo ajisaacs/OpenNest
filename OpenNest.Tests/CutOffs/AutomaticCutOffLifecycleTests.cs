@@ -38,14 +38,15 @@ public class AutomaticCutOffLifecycleTests
         Assert.Equal(new[] { manual }.Concat(plan.Definitions), plate.CutOffs);
         Assert.Equal(manualDefinition, Definition(manual));
         AssertSequence(plate, realParts[0].Part, realParts[1].Part);
-        AssertOnePartPerDefinition(plate);
+        AssertOnePartPerSegment(plate);
         AssertRealPartsUnchanged(plate, realParts);
         for (var i = 0; i < plan.Definitions.Count; i++)
         {
-            var materialized = plate.Parts[i + 3];
-            Assert.Same(plan.Definitions[i].Drawing, materialized.BaseDrawing);
-            Assert.NotSame(plan.PreviewParts[i], materialized);
-            Assert.Equal(previewPrograms[i], NestWriter.GetProgramText(materialized.Program));
+            // One part per trimmed segment, which together cut what the preview part cut.
+            var materialized = TestHelpers.CutOffParts(plate, plan.Definitions[i]);
+            Assert.NotEmpty(materialized);
+            Assert.All(materialized, p => Assert.DoesNotContain(p, plan.PreviewParts));
+            Assert.Equal(previewPrograms[i], NestWriter.GetProgramText(TestHelpers.CutOffProgram(plate, plan.Definitions[i])));
         }
 
         var repeated = AutomaticCutOffPlanner.Create(plate, new AutomaticCutOffOptions { Spacing = 35 }, settings);
@@ -62,7 +63,7 @@ public class AutomaticCutOffLifecycleTests
         Apply(plate, repeated, settings);
         Assert.Equal(new[] { manual }.Concat(plan.Definitions), plate.CutOffs);
         AssertSequence(plate, realParts[0].Part, realParts[1].Part);
-        AssertOnePartPerDefinition(plate);
+        AssertOnePartPerSegment(plate);
         AssertRealPartsUnchanged(plate, realParts);
     }
 
@@ -98,7 +99,7 @@ public class AutomaticCutOffLifecycleTests
         Assert.Equal(realParts.Select(p => p.ProgramText), loadedRealParts.Select(p => NestWriter.GetProgramText(p.Program)));
         Assert.Equal(realParts.Select(p => p.Rotation), loadedRealParts.Select(p => p.Rotation));
         AssertSequence(loadedPlate, loadedRealParts[0], loadedRealParts[1]);
-        AssertOnePartPerDefinition(loadedPlate);
+        AssertOnePartPerSegment(loadedPlate);
         var loadedDrawing = Assert.Single(loaded.Drawings);
         Assert.False(loadedDrawing.IsCutOff);
         Assert.All(loadedRealParts, p => Assert.Same(loadedDrawing, p.BaseDrawing));
@@ -110,7 +111,7 @@ public class AutomaticCutOffLifecycleTests
         loadedPlate.RegenerateCutOffs(settings);
         Assert.Equal(definitions, loadedPlate.CutOffs.Select(Definition));
         AssertSequence(loadedPlate, loadedRealParts[0], loadedRealParts[1]);
-        AssertOnePartPerDefinition(loadedPlate);
+        AssertOnePartPerSegment(loadedPlate);
         AssertRealPartsUnchanged(loadedPlate, loadedState);
     }
 
@@ -159,12 +160,12 @@ public class AutomaticCutOffLifecycleTests
         Assert.Equal(definitions, plate.CutOffs.ToArray());
         Assert.Equal(definitionValues, plate.CutOffs.Select(Definition));
         AssertSequence(plate, realParts[0].Part, moved);
-        AssertOnePartPerDefinition(plate);
+        AssertOnePartPerSegment(plate);
         AssertRealPartsUnchanged(plate, movedState);
         AssertRealPartsUnchanged(plate, new[] { realParts[0], realParts[1] with { Location = moved.Location } });
         Assert.NotSame(separatorPart, plate.Parts[^1]);
         Assert.DoesNotContain(separatorPart, plate.Parts);
-        var after = Segments(plate.Parts[^1]);
+        var after = TestHelpers.CutOffParts(plate, separator).Select(p => Assert.Single(Segments(p))).ToArray();
         Assert.Equal(2, after.Length);
         Assert.All(after, s =>
         {
@@ -180,7 +181,7 @@ public class AutomaticCutOffLifecycleTests
         Assert.Equal(regeneratedPrograms, plate.Parts.Where(p => p.BaseDrawing.IsCutOff)
             .Select(p => NestWriter.GetProgramText(p.Program)));
         AssertSequence(plate, realParts[0].Part, moved);
-        AssertOnePartPerDefinition(plate);
+        AssertOnePartPerSegment(plate);
         AssertRealPartsUnchanged(plate, movedState);
         AssertCutsAvoidRectangles(plate, settings.PartClearance);
     }
@@ -251,23 +252,31 @@ public class AutomaticCutOffLifecycleTests
         plate.RegenerateCutOffs(settings);
     }
 
-    private static void AssertSequence(Plate plate, Part first, Part second) =>
-        Assert.Collection(plate.Parts,
-            p => Assert.Same(first, p),
-            p => Assert.Same(plate.CutOffs[0].Drawing, p.BaseDrawing),
-            p => Assert.Same(second, p),
-            p => Assert.Same(plate.CutOffs[1].Drawing, p.BaseDrawing),
-            p => Assert.Same(plate.CutOffs[2].Drawing, p.BaseDrawing),
-            p => Assert.Same(plate.CutOffs[3].Drawing, p.BaseDrawing));
+    // The manual cut-off's segment between the real parts, then each planned cut-off's segments
+    // in definition order; the planned line through the second part has two.
+    private static void AssertSequence(Plate plate, Part first, Part second)
+    {
+        var expected = new List<Part> { first };
+        expected.AddRange(TestHelpers.CutOffParts(plate, plate.CutOffs[0]));
+        expected.Add(second);
+        foreach (var definition in plate.CutOffs.Skip(1))
+            expected.AddRange(TestHelpers.CutOffParts(plate, definition));
+        Assert.Equal(expected, plate.Parts);
+        Assert.Single(TestHelpers.CutOffParts(plate, plate.CutOffs[0]));
+        Assert.Single(TestHelpers.CutOffParts(plate, plate.CutOffs[1]));
+        Assert.Equal(2, TestHelpers.CutOffParts(plate, plate.CutOffs[2]).Length);
+    }
 
-    private static void AssertOnePartPerDefinition(Plate plate)
+    private static void AssertOnePartPerSegment(Plate plate)
     {
         Assert.Equal(4, plate.CutOffs.Count);
-        Assert.Equal(4, plate.Parts.Count(p => p.BaseDrawing.IsCutOff));
+        Assert.Equal(TestHelpers.CutOffPartCount(plate), plate.Parts.Count(p => p.BaseDrawing.IsCutOff));
         Assert.All(plate.CutOffs, c =>
         {
             Assert.True(c.Drawing.IsCutOff);
-            Assert.Single(plate.Parts.Where(p => ReferenceEquals(p.BaseDrawing, c.Drawing)));
+            var parts = TestHelpers.CutOffParts(plate, c);
+            Assert.Equal(c.SegmentPrograms().Count, parts.Length);
+            Assert.All(parts, p => Assert.Equal(2, p.Program.Codes.Count));
         });
     }
 
@@ -318,7 +327,9 @@ public class AutomaticCutOffLifecycleTests
             Assert.Equal(realParts[i].Location.Y, savedParts[i].GetProperty("y").GetDouble());
         }
         var cuts = savedPlate.GetProperty("cutOffs").EnumerateArray().ToArray();
-        Assert.Equal(new[] { 1, 3, 4, 5 }, cuts.Select(c => c.GetProperty("sequence").GetInt32()));
+        // The line through the second part has two consecutive segments at 4 and 5.
+        Assert.Equal(new[] { 1, 3, 4, 6 }, cuts.Select(c => c.GetProperty("sequence").GetInt32()));
+        Assert.All(cuts, c => Assert.False(c.TryGetProperty("segments", out _)));
     }
 
     private static (Vector From, Vector To)[] Segments(Part part)

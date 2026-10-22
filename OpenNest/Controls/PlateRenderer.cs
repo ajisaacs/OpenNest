@@ -272,35 +272,40 @@ namespace OpenNest.Controls
                 if (program == null || program.Codes.Count == 0)
                     continue;
 
-                var activePen = view.Selection.SelectedCutOffs.Contains(cutoff) ? selectedPen
-                    : IsCutOffPending(plate, cutoff) ? mutedPen
-                    : pen;
-
-                for (var i = 0; i < program.Codes.Count - 1; i += 2)
+                if (view.Selection.SelectedCutOffs.Contains(cutoff))
                 {
-                    if (
-                        program.Codes[i] is RapidMove rapid
-                        && program.Codes[i + 1] is LinearMove linear
-                    )
-                    {
-                        DrawLine(g, rapid.EndPoint, linear.EndPoint, activePen);
-                    }
+                    DrawCutOffSegments(g, program, Vector.Zero, selectedPen);
+                    continue;
                 }
+                if (view.CutSimulation.IsActive)
+                {
+                    // The simulator mutes parts the torch has not reached yet; each of the
+                    // cut-off's trimmed segments is its own part, found by its drawing's reference.
+                    for (var i = 0; i < plate.Parts.Count; i++)
+                    {
+                        var part = plate.Parts[i];
+                        if (ReferenceEquals(part.BaseDrawing, cutoff.Drawing))
+                            DrawCutOffSegments(g, part.Program, part.Location,
+                                view.CutSimulation.IsPartPending(i) ? mutedPen : pen);
+                    }
+                    continue;
+                }
+                DrawCutOffSegments(g, program, Vector.Zero, pen);
             }
         }
 
-        // The simulator mutes parts the torch has not reached yet; a cut-off line is its
-        // part's cutting path, found by its drawing's reference.
-        private bool IsCutOffPending(Plate plate, CutOff cutoff)
+        private void DrawCutOffSegments(Graphics g, Program program, Vector offset, Pen pen)
         {
-            if (!view.CutSimulation.IsActive)
-                return false;
-            for (var i = 0; i < plate.Parts.Count; i++)
+            for (var i = 0; i < program.Codes.Count - 1; i += 2)
             {
-                if (ReferenceEquals(plate.Parts[i].BaseDrawing, cutoff.Drawing))
-                    return view.CutSimulation.IsPartPending(i);
+                if (
+                    program.Codes[i] is RapidMove rapid
+                    && program.Codes[i + 1] is LinearMove linear
+                )
+                {
+                    DrawLine(g, rapid.EndPoint + offset, linear.EndPoint + offset, pen);
+                }
             }
-            return false;
         }
 
         /// <summary>

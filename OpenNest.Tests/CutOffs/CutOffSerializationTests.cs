@@ -7,6 +7,46 @@ namespace OpenNest.Tests.CutOffs;
 public class CutOffSerializationTests
 {
     [Fact]
+    public void RoundTrip_SegmentsKeepTheirOwnPlacesInTheSequence()
+    {
+        var nest = new Nest();
+        var drawing = TestHelpers.MakeSquareDrawing();
+        nest.Drawings.Add(drawing);
+        var lower = new Part(drawing, new Vector(10, 10));
+        var upper = new Part(drawing, new Vector(10, 30));
+        var plate = TestHelpers.MakePlate(60, 120, lower, upper);
+        nest.Plates.Add(plate);
+        var cutOff = new CutOff(new Vector(15, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(cutOff);
+        plate.RegenerateCutOffs(new CutOffSettings());
+        var segments = CutOffSegments.Of(plate, cutOff).Select(s => s.Part).ToArray();
+        plate.Parts.Reorder([segments[0], lower, segments[1], upper, segments[2]]);
+
+        using var stream = new MemoryStream();
+        Assert.True(new NestWriter(nest).Write(stream));
+        stream.Position = 0;
+        using (var archive = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Read, leaveOpen: true))
+        using (var reader = new StreamReader(archive.GetEntry("nest.json")!.Open()))
+        using (var json = System.Text.Json.JsonDocument.Parse(reader.ReadToEnd()))
+        {
+            var saved = Assert.Single(Assert.Single(json.RootElement.GetProperty("plates").EnumerateArray())
+                .GetProperty("cutOffs").EnumerateArray());
+            Assert.Equal(0, saved.GetProperty("sequence").GetInt32());
+            Assert.Equal(new[] { 0, 2, 4 }, saved.GetProperty("segments").EnumerateArray().Select(e => e.GetInt32()));
+        }
+        stream.Position = 0;
+        var loaded = new NestReader(stream).Read();
+
+        var loadedPlate = Assert.Single(loaded.Plates);
+        var loadedCutOff = Assert.Single(loadedPlate.CutOffs);
+        var loadedSegments = CutOffSegments.Of(loadedPlate, loadedCutOff);
+        Assert.Equal(3, loadedSegments.Count);
+        Assert.Equal(new[] { true, false, true, false, true }, loadedPlate.Parts.Select(p => p.BaseDrawing.IsCutOff));
+        Assert.Equal(new[] { 0, 2, 4 }, loadedSegments.Select(s => loadedPlate.Parts.IndexOf(s.Part)));
+        Assert.True(loadedSegments[0].End < loadedSegments[1].Start && loadedSegments[1].End < loadedSegments[2].Start);
+    }
+
+    [Fact]
     public void RoundTrip_CutOffsPreserved()
     {
         var nest = new Nest();
