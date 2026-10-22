@@ -13,7 +13,7 @@ namespace OpenNest.Server;
 /// </summary>
 internal static class ReleaseRequest
 {
-    private static readonly string[] QueryKeys = { "setId", "nestId", "offset", "limit" };
+    private static readonly string[] QueryKeys = { "setId", "nestId", "drawingId", "offset", "limit" };
 
     // Integer enum values are refused; names are additionally checked before deserializing.
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
@@ -23,10 +23,11 @@ internal static class ReleaseRequest
     };
 
     public static bool TryParseQuery(IQueryCollection values, out Guid? setId, out Guid? nestId,
-        out int offset, out int limit, out string error)
+        out Guid? drawingId, out int offset, out int limit, out string error)
     {
         setId = null;
         nestId = null;
+        drawingId = null;
         offset = 0;
         limit = DrawingLibraryRules.DefaultRevisionLimit;
         foreach (var key in values.Keys)
@@ -45,6 +46,7 @@ internal static class ReleaseRequest
         }
 
         if (!TryId(values, "setId", out setId, out error) || !TryId(values, "nestId", out nestId, out error)
+            || !TryId(values, "drawingId", out drawingId, out error)
             || !DrawingLibraryRequest.TryInteger(values, "offset", ref offset, out error)
             || !DrawingLibraryRequest.TryInteger(values, "limit", ref limit, out error))
             return false;
@@ -60,7 +62,8 @@ internal static class ReleaseRequest
 
     /// <summary>
     /// Reads and validates one release JSON object. <c>sets</c> and <c>nests</c> must be
-    /// present, enums must be single names, and joined or server-computed values are dropped.
+    /// present, <c>drawings</c> may be left out (clients from before drawings on their own),
+    /// enums must be single names, and joined or server-computed values are dropped.
     /// </summary>
     public static bool TryReadRelease(string? json, out SetReleaseRecord release, out string error)
     {
@@ -85,6 +88,7 @@ internal static class ReleaseRequest
                 return false;
             }
 
+            DrawingSetRequest.RemoveJoined(root, "drawings", "drawingName");
             if (!DrawingSetRequest.RemoveJoined(root, "nests", "nest"))
             {
                 error = "nests is required.";

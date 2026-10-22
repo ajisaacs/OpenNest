@@ -21,6 +21,8 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
 
     private const string ReleaseFeature = "releasing several drawing sets at once";
 
+    private const string DrawingReleaseFeature = "releasing library drawings on their own";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -173,11 +175,16 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
             throw new ServerTooOldException(ReleaseFeature);
         if (response.StatusCode == HttpStatusCode.Conflict)
             throw new SetReleasePostConflictException(await ReadRelease(response, cancellationToken));
+        // A server without drawings on their own refuses such a release as malformed.
+        if (response.StatusCode == HttpStatusCode.BadRequest && release.Drawings.Count > 0)
+            await EnsureDrawingReleasesSupportedAsync(cancellationToken);
         await EnsureSuccess(response, "record the release", cancellationToken);
         var stored = await ReadRelease(response, cancellationToken);
         if (stored.Id != release.Id
             || !stored.Sets.Select(s => (s?.SetId, s?.SetRevision, s?.Quantity))
                 .SequenceEqual(release.Sets.Select(s => ((Guid?)s.SetId, (int?)s.SetRevision, (int?)s.Quantity)))
+            || !stored.Drawings.Select(d => (d?.DrawingId, d?.Quantity))
+                .SequenceEqual(release.Drawings.Select(d => ((Guid?)d.DrawingId, (int?)d.Quantity)))
             || !stored.Nests.Select(n => (n?.NestId, n?.Kind, n?.RevisionAfter))
                 .SequenceEqual(release.Nests.Select(n => ((Guid?)n.NestId, (SetReleaseNestKind?)n.Kind, (int?)n.RevisionAfter))))
             throw new IOException("The nest server recorded a different release than was posted.");
@@ -200,27 +207,45 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         return release;
     }
 
-    public async Task<SetReleasePage> QueryReleasesAsync(Guid? setId = null, Guid? nestId = null, int offset = 0,
-        int limit = DrawingLibraryRules.DefaultRevisionLimit, CancellationToken cancellationToken = default)
+    public async Task<SetReleasePage> QueryReleasesAsync(Guid? setId = null, Guid? nestId = null, Guid? drawingId = null,
+        int offset = 0, int limit = DrawingLibraryRules.DefaultRevisionLimit, CancellationToken cancellationToken = default)
     {
         if (setId == Guid.Empty) throw new ArgumentException("A drawing set id is required.", nameof(setId));
         if (nestId == Guid.Empty) throw new ArgumentException("A nest id is required.", nameof(nestId));
+        if (drawingId == Guid.Empty) throw new ArgumentException("A library drawing id is required.", nameof(drawingId));
         ValidatePaging(offset, limit);
         var query = Paging(offset, limit);
         if (setId is not null) query += $"&setId={setId}";
         if (nestId is not null) query += $"&nestId={nestId}";
+        if (drawingId is not null) query += $"&drawingId={drawingId}";
         using var response = await _httpClient.GetAsync(Url($"api/releases/query?{query}"), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
-            throw new ServerTooOldException(ReleaseFeature);
+            throw new ServerTooOldException(drawingId is null ? ReleaseFeature : DrawingReleaseFeature);
+        // A server without drawings on their own refuses the unknown drawingId parameter.
+        if (response.StatusCode == HttpStatusCode.BadRequest && drawingId is not null)
+            throw new ServerTooOldException(DrawingReleaseFeature);
         await EnsureSuccess(response, "read releases", cancellationToken);
         var page = await response.Content.ReadFromJsonAsync<SetReleasePage>(JsonOptions, cancellationToken)
             ?? throw new IOException("Nest server returned an empty release page.");
         if (page.Items is null || !IsBoundedPage(page.Items.Count, page.Total, page.Offset, page.Limit, offset, limit)
-            || page.Items.Any(item => item is null || item.Sets is null || item.Nests is null
+            || page.Items.Any(item => item is null || item.Sets is null || item.Drawings is null || item.Nests is null
                 || (setId is not null && item.Sets.All(s => s?.SetId != setId))
-                || (nestId is not null && item.Nests.All(n => n?.NestId != nestId))))
+                || (nestId is not null && item.Nests.All(n => n?.NestId != nestId))
+                || (drawingId is not null && item.Drawings.All(d => d?.DrawingId != drawingId))))
             throw new IOException("Nest server returned an invalid or unbounded release page.");
         return page;
+    }
+
+    /// <summary>
+    /// Asks for releases of a drawing no release can name: a server from before drawings on
+    /// their own answers 400 for the unknown parameter (or 404 without releases at all).
+    /// </summary>
+    public async Task EnsureDrawingReleasesSupportedAsync(CancellationToken cancellationToken = default)
+    {
+        using var probe = await _httpClient.GetAsync(Url($"api/releases/query?drawingId={Guid.NewGuid()}&limit=1"), cancellationToken);
+        if (probe.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.BadRequest)
+            throw new ServerTooOldException(DrawingReleaseFeature);
+        await EnsureSuccess(probe, "check the release support", cancellationToken);
     }
 
     /// <summary>
@@ -377,6 +402,11 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
             SetRevision = s.SetRevision,
             Quantity = s.Quantity,
         }).ToList(),
+        Drawings = release.Drawings.Select(d => new SetReleaseDrawing
+        {
+            DrawingId = d.DrawingId,
+            Quantity = d.Quantity,
+        }).ToList(),
         Nests = release.Nests.Select(n => new SetReleaseNest
         {
             NestId = n.NestId,
@@ -442,7 +472,7 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
     private static async Task<SetReleaseRecord> ReadRelease(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var release = await response.Content.ReadFromJsonAsync<SetReleaseRecord>(JsonOptions, cancellationToken);
-        if (release is null || release.Sets is null || release.Nests is null)
+        if (release is null || release.Sets is null || release.Drawings is null || release.Nests is null)
             throw new IOException("Nest server returned an empty set release record.");
         return release;
     }

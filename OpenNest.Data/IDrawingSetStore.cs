@@ -44,9 +44,18 @@ public interface IDrawingSetStore
     /// <summary>One release with its sets and nests, or null for an unknown id.</summary>
     Task<SetReleaseRecord?> GetReleaseAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>One page of releases with their sets and nests, newest first, optionally only those including a set or a nest.</summary>
-    Task<SetReleasePage> QueryReleasesAsync(Guid? setId = null, Guid? nestId = null, int offset = 0,
-        int limit = DrawingLibraryRules.DefaultRevisionLimit, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// One page of releases with their sets and nests, newest first, optionally only those
+    /// including a set, a nest, or a drawing released on its own.
+    /// </summary>
+    Task<SetReleasePage> QueryReleasesAsync(Guid? setId = null, Guid? nestId = null, Guid? drawingId = null,
+        int offset = 0, int limit = DrawingLibraryRules.DefaultRevisionLimit, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Raises <see cref="ServerTooOldException"/> when the server cannot record drawings released
+    /// on their own. A release asks before building its nests, since the record is posted last.
+    /// </summary>
+    Task EnsureDrawingReleasesSupportedAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Undoes a release, all or nothing; a refusal raises <see cref="SetReleaseUndoConflictException"/>.</summary>
     Task<SetReleaseRecord> UndoReleaseAsync(Guid id, SetReleaseUndoRequest request, CancellationToken cancellationToken = default);

@@ -34,12 +34,12 @@ internal static class DrawingSetFixtures
         return (await Upload(client, record, Package(name))).Id;
     }
 
-    /// <summary>Drops the v9 release tables, for fixtures that rebuild a schema older than v7.</summary>
+    /// <summary>Drops the v11 release tables, for fixtures that rebuild a schema older than v7.</summary>
     public const string DropReleaseTables = """
-        DROP TABLE release_nest_items; DROP TABLE release_nests; DROP TABLE release_sets; DROP TABLE releases;
+        DROP TABLE release_drawings; DROP TABLE release_nest_items; DROP TABLE release_nests; DROP TABLE release_sets; DROP TABLE releases;
         """;
 
-    /// <summary>Puts back the v7/v8 release tables in place of the v9 ones, for fixtures that rebuild v7 or v8.</summary>
+    /// <summary>Puts back the v7/v8 release tables in place of the v11 ones, for fixtures that rebuild v7 or v8.</summary>
     public const string ReleaseTablesBackToV8 = DropReleaseTables + """
         CREATE TABLE set_releases (
             id          TEXT NOT NULL PRIMARY KEY,

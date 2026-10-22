@@ -3,7 +3,7 @@ using OpenNest.Data;
 namespace OpenNest.Server;
 
 /// <summary>
-/// <c>/api/releases</c>: append-only records of drawing set releases into nests, and their
+/// <c>/api/releases</c>: append-only records of releases of drawing sets and library drawings into nests, and their
 /// undo. A release is posted after every nest it names is uploaded; its id is allocated by
 /// the client, so a post whose reply was lost can be sent again (409 with the stored release).
 /// </summary>
@@ -28,8 +28,9 @@ internal static class ReleaseRoutes
         });
 
         app.MapGet("/api/releases/query", (HttpRequest request, NestDatabase db) =>
-            ReleaseRequest.TryParseQuery(request.Query, out var setId, out var nestId, out var offset, out var limit, out var error)
-                ? Results.Ok(db.QueryReleases(setId, nestId, offset, limit))
+            ReleaseRequest.TryParseQuery(request.Query, out var setId, out var nestId, out var drawingId, out var offset,
+                out var limit, out var error)
+                ? Results.Ok(db.QueryReleases(setId, nestId, offset, limit, drawingId))
                 : Results.BadRequest(error));
 
         app.MapGet("/api/releases/{id:guid}", (Guid id, NestDatabase db) =>

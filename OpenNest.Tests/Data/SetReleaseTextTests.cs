@@ -53,6 +53,21 @@ public class SetReleaseTextTests
         Assert.Equal("Released from set 'Synthetic kit' revision 3 ×2 by Synthetic operator", text);
     }
 
+    [Fact]
+    public void Origin_NamesDrawingsOnTheirOwn_BesideSetsOrAlone()
+    {
+        SetReleaseDrawing Loose(string name, int quantity) => new() { DrawingName = name, Quantity = quantity };
+        var set = new SetReleaseLine { SetName = "Synthetic kit", SetRevision = 3, Quantity = 2 };
+
+        Assert.Equal("Released from drawing 'SYN-A' ×4",
+            SetReleaseText.Origin(new SetReleaseRecord { Drawings = new[] { Loose("SYN-A", 4) } }));
+        Assert.Equal("Released from set 'Synthetic kit' revision 3 ×2 and drawings 'SYN-A' ×4 and 'SYN-B' ×1",
+            SetReleaseText.Origin(new SetReleaseRecord { Sets = new[] { set }, Drawings = new[] { Loose("SYN-A", 4), Loose("SYN-B", 1) } }));
+        Assert.Equal("drawings 'A' ×1, 'B' ×2 and 'C' ×3",
+            SetReleaseText.Drawings(new[] { Loose("A", 1), Loose("B", 2), Loose("C", 3) }));
+        Assert.Equal("4 drawings", SetReleaseText.Drawings(Enumerable.Range(1, 4).Select(i => Loose("D" + i, i)).ToList()));
+    }
+
     [Theory]
     [InlineData(SetReleaseNestKind.Created, null, "Created")]
     [InlineData(SetReleaseNestKind.Created, SetReleaseNestUndo.Deleted, "Created; undo deleted it")]

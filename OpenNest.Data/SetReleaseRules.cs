@@ -3,8 +3,8 @@ using OpenNest;
 namespace OpenNest.Data;
 
 /// <summary>
-/// Bounds shared by the set release client and server. Whether the set revisions, nests
-/// and nest revisions exist, and whether a created nest already belongs to a release, is
+/// Bounds shared by the set release client and server. Whether the set revisions, drawings,
+/// nests and nest revisions exist, and whether a created nest already belongs to a release, is
 /// checked by the server.
 /// </summary>
 public static class SetReleaseRules
@@ -15,11 +15,17 @@ public static class SetReleaseRules
     /// <summary>Most sets in one release.</summary>
     public const int MaxSetLines = 50;
 
+    /// <summary>Most drawings released on their own in one release, as many as one set may list.</summary>
+    public const int MaxDrawingLines = DrawingSetRules.MaxMembers;
+
+    /// <summary>Most of one drawing released on its own, as for one set member.</summary>
+    public const int MaxDrawingQuantity = DrawingSetRules.MaxQuantity;
+
     /// <summary>One nest per material group.</summary>
     public const int MaxNests = DrawingSetRules.MaxMembers;
 
-    /// <summary>Most drawing quantities recorded against one nest: every member of every set.</summary>
-    public const int MaxItemsPerNest = DrawingSetRules.MaxMembers * MaxSetLines;
+    /// <summary>Most drawing quantities recorded against one nest: every member of every set, and every drawing on its own.</summary>
+    public const int MaxItemsPerNest = DrawingSetRules.MaxMembers * MaxSetLines + MaxDrawingLines;
 
     /// <summary>The first rule <paramref name="release"/> breaks, or null when it may be posted.</summary>
     public static string? GetError(SetReleaseRecord? release)
@@ -28,7 +34,8 @@ public static class SetReleaseRules
             return "Missing release.";
         var error = DrawingLibraryRules.TextError("releasedBy", release.ReleasedBy, DrawingLibraryRules.MaxTextLength)
             ?? DrawingLibraryRules.TextError("notes", release.Notes, DrawingLibraryRules.MaxNotesLength)
-            ?? SetsError(release.Sets);
+            ?? SetsError(release.Sets, release.Drawings)
+            ?? DrawingsError(release.Drawings);
         if (error is not null)
             return error;
         if (release.Nests is null || release.Nests.Count == 0)
@@ -37,6 +44,7 @@ public static class SetReleaseRules
             return $"A release may have at most {MaxNests} nests.";
 
         var sets = release.Sets.Select(s => s.SetId).ToHashSet();
+        var drawings = release.Drawings.Select(d => d.DrawingId).ToHashSet();
         var seen = new HashSet<Guid>();
         for (var i = 0; i < release.Nests.Count; i++)
         {
@@ -55,7 +63,7 @@ public static class SetReleaseRules
                     : null)
                 ?? (!Enum.IsDefined(nest.Units) ? $"nests[{i}].units must be a supported unit name." : null)
                 ?? (!Enum.IsDefined(nest.CutType) ? $"nests[{i}].cutType must be Laser, Waterjet or Plasma." : null)
-                ?? ItemsError(i, nest.Items, sets);
+                ?? ItemsError(i, nest.Items, sets, drawings);
             if (error is not null)
                 return error;
         }
@@ -77,10 +85,13 @@ public static class SetReleaseRules
         return DrawingLibraryRules.TextError("undoneBy", request.UndoneBy, DrawingLibraryRules.MaxTextLength);
     }
 
-    private static string? SetsError(IReadOnlyList<SetReleaseLine>? lines)
+    // A release names at least one set or one drawing on its own.
+    private static string? SetsError(IReadOnlyList<SetReleaseLine>? lines, IReadOnlyList<SetReleaseDrawing>? drawings)
     {
-        if (lines is null || lines.Count == 0)
-            return "sets must list at least one set.";
+        if (lines is null)
+            return "sets must be a list.";
+        if (lines.Count == 0 && (drawings is null || drawings.Count == 0))
+            return "sets or drawings must list at least one set or drawing.";
         if (lines.Count > MaxSetLines)
             return $"A release may have at most {MaxSetLines} sets.";
 
@@ -103,6 +114,30 @@ public static class SetReleaseRules
         return null;
     }
 
+    private static string? DrawingsError(IReadOnlyList<SetReleaseDrawing>? drawings)
+    {
+        if (drawings is null)
+            return "drawings must be a list.";
+        if (drawings.Count > MaxDrawingLines)
+            return $"A release may have at most {MaxDrawingLines} drawings on their own.";
+
+        var seen = new HashSet<Guid>();
+        for (var i = 0; i < drawings.Count; i++)
+        {
+            var drawing = drawings[i];
+            if (drawing is null)
+                return $"drawings[{i}] is required.";
+            if (drawing.DrawingId == Guid.Empty)
+                return $"drawings[{i}].drawingId is required.";
+            if (!seen.Add(drawing.DrawingId))
+                return $"drawings[{i}] repeats drawing {drawing.DrawingId}.";
+            if (drawing.Quantity < 1 || drawing.Quantity > MaxDrawingQuantity)
+                return $"drawings[{i}].quantity must be between 1 and {MaxDrawingQuantity}.";
+        }
+
+        return null;
+    }
+
     private static string? RevisionsError(int i, SetReleaseNest nest)
     {
         if (!Enum.IsDefined(nest.Kind))
@@ -116,26 +151,32 @@ public static class SetReleaseRules
         return nest.RevisionAfter > before ? null : $"nests[{i}].revisionAfter must be later than revisionBefore.";
     }
 
-    private static string? ItemsError(int i, IReadOnlyList<SetReleaseNestItem>? items, HashSet<Guid> sets)
+    // An item with no set is the quantity of a drawing released on its own.
+    private static string? ItemsError(int i, IReadOnlyList<SetReleaseNestItem>? items, HashSet<Guid> sets,
+        HashSet<Guid> drawings)
     {
         if (items is null)
             return $"nests[{i}].items is required.";
         if (items.Count > MaxItemsPerNest)
             return $"nests[{i}] may record at most {MaxItemsPerNest} items.";
 
-        var seen = new HashSet<(Guid, Guid)>();
+        var seen = new HashSet<(Guid?, Guid)>();
         for (var j = 0; j < items.Count; j++)
         {
             var item = items[j];
             var name = $"nests[{i}].items[{j}]";
             if (item is null)
                 return $"{name} is required.";
-            if (!sets.Contains(item.SetId))
+            if (item.SetId is { } setId && !sets.Contains(setId))
                 return $"{name}.setId must be one of the release's sets.";
             if (item.DrawingId == Guid.Empty)
                 return $"{name}.drawingId is required.";
+            if (item.SetId is null && !drawings.Contains(item.DrawingId))
+                return $"{name} has no setId, so drawingId must be one of the release's drawings.";
             if (!seen.Add((item.SetId, item.DrawingId)))
-                return $"{name} repeats drawing {item.DrawingId} of set {item.SetId}.";
+                return item.SetId is null
+                    ? $"{name} repeats drawing {item.DrawingId}."
+                    : $"{name} repeats drawing {item.DrawingId} of set {item.SetId}.";
             if (item.DrawingRevision < 1)
                 return $"{name}.drawingRevision must be a positive revision.";
             if (item.Quantity < 1)

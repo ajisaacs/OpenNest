@@ -6,9 +6,10 @@ namespace OpenNest.Server;
 /// <summary>
 /// Release storage. <c>releases</c> records who released and whether it was undone;
 /// <c>release_sets</c> which set revisions were released and how many kits of each;
+/// <c>release_drawings</c> which library drawings were released on their own and how many;
 /// <c>release_nests</c> the nests each release created or merged into, with the nest
-/// revision before and after; <c>release_nest_items</c> the drawing quantities each set
-/// added to each nest. A created nest belongs to that release only; a merged nest may be in
+/// revision before and after; <c>release_nest_items</c> the drawing quantities each set, or
+/// each drawing on its own (no set), added to each nest. A created nest belongs to that release only; a merged nest may be in
 /// several. Releases are append-only and read joined to each nest's current metadata.
 /// </summary>
 public sealed partial class NestDatabase
@@ -106,6 +107,37 @@ public sealed partial class NestDatabase
         PRAGMA user_version=9;
         """;
 
+    // v10 -> v11. Releases may name library drawings on their own, and an item without a set
+    // is such a drawing's quantity. SQLite cannot drop NOT NULL from a column, so the item
+    // table is rebuilt with every row kept. IF NOT EXISTS keeps the step safe on a database
+    // rewound to v10.
+    private const string ReleaseUpgradeToV11 = """
+        CREATE TABLE IF NOT EXISTS release_drawings (
+            releaseId TEXT NOT NULL REFERENCES releases(id),
+            position  INTEGER NOT NULL,
+            drawingId TEXT NOT NULL REFERENCES drawings(id),
+            quantity  INTEGER NOT NULL,
+            PRIMARY KEY (releaseId, position),
+            UNIQUE (releaseId, drawingId));
+        CREATE INDEX IF NOT EXISTS ix_release_drawings_drawing ON release_drawings(drawingId);
+        CREATE TABLE release_nest_items_v11 (
+            releaseId       TEXT NOT NULL,
+            nestId          TEXT NOT NULL,
+            position        INTEGER NOT NULL,
+            setId           TEXT,
+            drawingId       TEXT NOT NULL,
+            drawingRevision INTEGER NOT NULL,
+            quantity        INTEGER NOT NULL,
+            PRIMARY KEY (releaseId, nestId, position),
+            UNIQUE (releaseId, nestId, setId, drawingId),
+            FOREIGN KEY (releaseId, nestId) REFERENCES release_nests(releaseId, nestId));
+        INSERT INTO release_nest_items_v11 (releaseId, nestId, position, setId, drawingId, drawingRevision, quantity)
+            SELECT releaseId, nestId, position, setId, drawingId, drawingRevision, quantity FROM release_nest_items;
+        DROP TABLE release_nest_items;
+        ALTER TABLE release_nest_items_v11 RENAME TO release_nest_items;
+        PRAGMA user_version=11;
+        """;
+
     private const string ReleaseSelect =
         "SELECT x.id, x.notes, x.releasedAt, x.releasedBy, x.undoneAt, x.undoneBy FROM releases x";
 
@@ -113,8 +145,8 @@ public sealed partial class NestDatabase
         string.Join(", ", RecordColumns.Split(',').Select(column => "n." + column.Trim()));
 
     /// <summary>
-    /// Records a release whose nests already exist. Set revisions must exist but need not be
-    /// current, and sets may be archived: the nests already exist, so a release is never
+    /// Records a release whose nests already exist. Set revisions and drawings released on
+    /// their own must exist but need not be current, and sets and drawings may be archived: the nests already exist, so a release is never
     /// refused for a state the operator cannot fix. A merged nest need not still be at the
     /// revision the release wrote.
     /// </summary>
@@ -140,6 +172,12 @@ public sealed partial class NestDatabase
                         ? $"Set {line.SetId} does not exist."
                         : $"Set {line.SetId} has no revision {line.SetRevision}.");
                 }
+            }
+
+            foreach (var drawing in release.Drawings)
+            {
+                if (GetDrawing(drawing.DrawingId) is null)
+                    throw new ArgumentException($"Drawing {drawing.DrawingId} does not exist.");
             }
 
             foreach (var nest in release.Nests)
@@ -176,9 +214,10 @@ public sealed partial class NestDatabase
 
     /// <summary>
     /// One page of releases, newest first, optionally only those that include
-    /// <paramref name="setId"/> or <paramref name="nestId"/>.
+    /// <paramref name="setId"/>, <paramref name="nestId"/> or <paramref name="drawingId"/>
+    /// released on its own.
     /// </summary>
-    public SetReleasePage QueryReleases(Guid? setId, Guid? nestId, int offset, int limit)
+    public SetReleasePage QueryReleases(Guid? setId, Guid? nestId, int offset, int limit, Guid? drawingId = null)
     {
         if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
         if (limit < 1 || limit > DrawingLibraryRules.MaxRevisionLimit) throw new ArgumentOutOfRangeException(nameof(limit));
@@ -187,12 +226,15 @@ public sealed partial class NestDatabase
             filters.Add("EXISTS (SELECT 1 FROM release_sets s WHERE s.releaseId = x.id AND s.setId = $setId)");
         if (nestId is not null)
             filters.Add("EXISTS (SELECT 1 FROM release_nests r WHERE r.releaseId = x.id AND r.nestId = $nestId)");
+        if (drawingId is not null)
+            filters.Add("EXISTS (SELECT 1 FROM release_drawings d WHERE d.releaseId = x.id AND d.drawingId = $drawingId)");
         var where = filters.Count == 0 ? "" : "WHERE " + string.Join(" AND ", filters);
 
         void AddFilters(SqliteCommand command)
         {
             if (setId is not null) command.Parameters.AddWithValue("$setId", setId.Value.ToString());
             if (nestId is not null) command.Parameters.AddWithValue("$nestId", nestId.Value.ToString());
+            if (drawingId is not null) command.Parameters.AddWithValue("$drawingId", drawingId.Value.ToString());
         }
 
         lock (_sync)
@@ -380,6 +422,23 @@ public sealed partial class NestDatabase
 
         command.Parameters.Clear();
         command.CommandText = """
+            INSERT INTO release_drawings (releaseId, position, drawingId, quantity)
+            VALUES ($id, $position, $drawing, $quantity)
+            """;
+        command.Parameters.AddWithValue("$id", release.Id.ToString());
+        position = command.Parameters.Add("$position", SqliteType.Integer);
+        var drawing = command.Parameters.Add("$drawing", SqliteType.Text);
+        quantity = command.Parameters.Add("$quantity", SqliteType.Integer);
+        for (var i = 0; i < release.Drawings.Count; i++)
+        {
+            position.Value = i;
+            drawing.Value = release.Drawings[i].DrawingId.ToString();
+            quantity.Value = release.Drawings[i].Quantity;
+            command.ExecuteNonQuery();
+        }
+
+        command.Parameters.Clear();
+        command.CommandText = """
             INSERT INTO release_nests (releaseId, position, nestId, kind, revisionBefore, revisionAfter,
                 materialName, materialGrade, thickness, units, cutType)
             VALUES ($id, $position, $nest, $kind, $before, $after,
@@ -431,7 +490,7 @@ public sealed partial class NestDatabase
             {
                 var item = nest.Items[i];
                 position.Value = i;
-                setId.Value = item.SetId.ToString();
+                setId.Value = (object?)item.SetId?.ToString() ?? DBNull.Value;
                 drawingId.Value = item.DrawingId.ToString();
                 drawingRevision.Value = item.DrawingRevision;
                 quantity.Value = item.Quantity;
@@ -471,8 +530,9 @@ public sealed partial class NestDatabase
         return releases;
     }
 
-    // Called only under _sync. Reads the release's sets (named as at their revision) and its
-    // nests, each joined to its current metadata, deleted or not, with its items.
+    // Called only under _sync. Reads the release's sets (named as at their revision), its
+    // drawings on their own (named as now) and its nests, each joined to its current metadata,
+    // deleted or not, with its items.
     private void Complete(SetReleaseRecord release)
     {
         var id = release.Id.ToString();
@@ -499,6 +559,28 @@ public sealed partial class NestDatabase
             release.Sets = sets;
         }
 
+        using (var command = _connection.CreateCommand())
+        {
+            command.CommandText = """
+                SELECT d.drawingId, d.quantity, COALESCE(x.name, '')
+                FROM release_drawings d LEFT JOIN drawings x ON x.id = d.drawingId
+                WHERE d.releaseId=$id ORDER BY d.position
+                """;
+            command.Parameters.AddWithValue("$id", id);
+            var drawings = new List<SetReleaseDrawing>();
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                drawings.Add(new SetReleaseDrawing
+                {
+                    DrawingId = Guid.Parse(reader.GetString(0)),
+                    Quantity = reader.GetInt32(1),
+                    DrawingName = reader.GetString(2),
+                });
+            }
+            release.Drawings = drawings;
+        }
+
         var items = new Dictionary<Guid, List<SetReleaseNestItem>>();
         using (var command = _connection.CreateCommand())
         {
@@ -515,7 +597,7 @@ public sealed partial class NestDatabase
                     items[nestId] = list = new List<SetReleaseNestItem>();
                 list.Add(new SetReleaseNestItem
                 {
-                    SetId = Guid.Parse(reader.GetString(1)),
+                    SetId = reader.IsDBNull(1) ? null : Guid.Parse(reader.GetString(1)),
                     DrawingId = Guid.Parse(reader.GetString(2)),
                     DrawingRevision = reader.GetInt32(3),
                     Quantity = reader.GetInt32(4),

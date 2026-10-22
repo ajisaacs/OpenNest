@@ -133,7 +133,7 @@ public sealed class SetReleaseResult
 }
 
 /// <summary>
-/// Releases one or more drawing sets: one nest per chosen group of a <see cref="SetReleasePlan"/>,
+/// Releases drawing sets and library drawings on their own: one nest per chosen group of a <see cref="SetReleasePlan"/>,
 /// either new (uploaded as a <see cref="NestStatus.Draft"/>) or an existing draft of the same
 /// group that the release merges into, each built through <see cref="LibraryDrawingInsert"/>
 /// from the items' exact library revisions, and only then recorded as one release (S7).
@@ -146,7 +146,8 @@ public sealed class SetReleaseResult
 /// <para>
 /// Every group is built before any is uploaded, so a refusal (a package that no longer
 /// matches its record, units the new nest does not use, an insert refusal) creates
-/// nothing. Uploads then run in order; the first failure stops them, and cancellation is
+/// nothing, and so does a server too old to record drawings released on their own, which is
+/// checked first. Uploads then run in order; the first failure stops them, and cancellation is
 /// honoured between uploads, never during one. Nests already uploaded stay as ordinary
 /// nests and are listed in the result; the release is posted only when every chosen group
 /// was created. Nothing is rolled back.
@@ -238,6 +239,32 @@ public sealed class SetReleaseSession
             MergedInto = mergeInto.TryGetValue(g, out var draft) ? draft : null,
         }).ToList();
 
+        // A server that cannot record drawings on their own would refuse the release after its
+        // nests were saved, so it is asked before anything is built.
+        if (plan.Drawings.Count > 0)
+        {
+            try
+            {
+                await _sets.EnsureDrawingReleasesSupportedAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return new SetReleaseResult(results, canceled: true, null, "");
+            }
+            catch (ServerTooOldException ex)
+            {
+                Refuse(results[0], ex.Message);
+                return new SetReleaseResult(results, canceled: false, null, "");
+            }
+            catch (Exception ex) when (ex is IOException or HttpRequestException or System.Text.Json.JsonException
+                or TimeoutException)
+            {
+                results[0].Outcome = SetReleaseGroupOutcome.Failed;
+                results[0].Error = $"Could not check that the nest server records drawings released on their own: {ex.Message}";
+                return new SetReleaseResult(results, canceled: false, null, "");
+            }
+        }
+
         // Build every nest first: a refusal here leaves nothing on the server.
         for (var i = 0; i < results.Count; i++)
         {
@@ -294,6 +321,11 @@ public sealed class SetReleaseSession
                 SetId = l.Set.Id,
                 SetRevision = l.Set.Revision,
                 Quantity = l.Quantity,
+            }).ToList(),
+            Drawings = plan.Drawings.Select(d => new SetReleaseDrawing
+            {
+                DrawingId = d.Drawing.Id,
+                Quantity = d.Quantity,
             }).ToList(),
             Notes = notes ?? "",
             ReleasedBy = releasedBy ?? "",
@@ -395,7 +427,7 @@ public sealed class SetReleaseSession
             var record = item.Drawing;
             var bytes = await _library.GetRevisionPackageAsync(record.Id, record.Revision, cancellationToken);
             if (bytes == null)
-                return Refuse(result, $"'{record.Name}' revision {record.Revision} is no longer in the library. Reload the set.");
+                return Refuse(result, $"'{record.Name}' revision {record.Revision} is no longer in the library. Reload the set or drawing.");
 
             var package = await Task.Run(() => _readPackage(bytes), cancellationToken);
             var insert = LibraryDrawingInsert.Plan(nest, _serverUrl, record, package, item.Quantity);

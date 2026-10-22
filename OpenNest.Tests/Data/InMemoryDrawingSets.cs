@@ -116,6 +116,12 @@ internal sealed class InMemoryDrawingSets : IDrawingSetStore
     public int PostAttempts { get; private set; }
     public bool FailNextPost { get; set; }
 
+    /// <summary>Plays a server from before drawings released on their own.</summary>
+    public bool WithoutDrawingReleases { get; set; }
+
+    /// <summary>Library drawing names joined onto stored releases, by id.</summary>
+    public Dictionary<Guid, string> DrawingNames { get; } = new();
+
     public Task<SetReleaseRecord> PostReleaseAsync(SetReleaseRecord release, CancellationToken cancellationToken = default)
     {
         PostAttempts++;
@@ -137,6 +143,12 @@ internal sealed class InMemoryDrawingSets : IDrawingSetStore
                 Quantity = s.Quantity,
                 SetName = _revisions[s.SetId].First(r => r.Revision == s.SetRevision).Name,
             }).ToList(),
+            Drawings = release.Drawings.Select(d => new SetReleaseDrawing
+            {
+                DrawingId = d.DrawingId,
+                Quantity = d.Quantity,
+                DrawingName = DrawingNames.TryGetValue(d.DrawingId, out var name) ? name : "",
+            }).ToList(),
             Notes = release.Notes,
             ReleasedBy = release.ReleasedBy,
             ReleasedAt = new DateTime(2026, 10, 20, 15, 0, 0, DateTimeKind.Utc),
@@ -149,12 +161,15 @@ internal sealed class InMemoryDrawingSets : IDrawingSetStore
     public Task<SetReleaseRecord?> GetReleaseAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Releases.FirstOrDefault(r => r.Id == id));
 
-    public Task<SetReleasePage> QueryReleasesAsync(Guid? setId = null, Guid? nestId = null, int offset = 0, int limit = 100,
-        CancellationToken cancellationToken = default)
+    public Task<SetReleasePage> QueryReleasesAsync(Guid? setId = null, Guid? nestId = null, Guid? drawingId = null,
+        int offset = 0, int limit = 100, CancellationToken cancellationToken = default)
     {
+        if (drawingId is not null && WithoutDrawingReleases)
+            throw new ServerTooOldException("releasing library drawings on their own");
         var newest = Enumerable.Reverse(Releases
             .Where(r => setId is null || r.Sets.Any(s => s.SetId == setId))
             .Where(r => nestId is null || r.Nests.Any(n => n.NestId == nestId))
+            .Where(r => drawingId is null || r.Drawings.Any(d => d.DrawingId == drawingId))
             .ToList()).ToList();
         return Task.FromResult(new SetReleasePage
         {
@@ -164,6 +179,11 @@ internal sealed class InMemoryDrawingSets : IDrawingSetStore
             Limit = limit,
         });
     }
+
+    public Task EnsureDrawingReleasesSupportedAsync(CancellationToken cancellationToken = default) =>
+        WithoutDrawingReleases
+            ? Task.FromException(new ServerTooOldException("releasing library drawings on their own"))
+            : Task.CompletedTask;
 
     /// <summary>Every undo request, in order.</summary>
     public List<(Guid Id, SetReleaseUndoRequest Request)> UndoRequests { get; } = new();

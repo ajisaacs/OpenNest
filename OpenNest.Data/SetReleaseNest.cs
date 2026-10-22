@@ -50,7 +50,8 @@ public sealed class SetReleaseNest
     public CutType CutType { get; set; } = CutType.Laser;
 
     /// <summary>
-    /// The drawing quantities this release added to the nest, per set. Empty for releases
+    /// The drawing quantities this release added to the nest, per set and for the drawings
+    /// released on their own. Empty for releases
     /// recorded before items were kept (schema v8).
     /// </summary>
     public IReadOnlyList<SetReleaseNestItem> Items { get; set; } = Array.Empty<SetReleaseNestItem>();
@@ -68,10 +69,11 @@ public sealed class SetReleaseNest
     public NestRecord? Nest { get; set; }
 }
 
-/// <summary>A drawing quantity one set of a release added to one nest.</summary>
+/// <summary>A drawing quantity one set of a release, or the drawing released on its own, added to one nest.</summary>
 public sealed class SetReleaseNestItem
 {
-    public Guid SetId { get; set; }
+    /// <summary>The set that asked for the quantity; null for a drawing released on its own.</summary>
+    public Guid? SetId { get; set; }
 
     public Guid DrawingId { get; set; }
 

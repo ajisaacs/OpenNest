@@ -48,7 +48,7 @@ public sealed class SetReleaseTests
             stored.Nests.Select(n => (n.NestId, n.Kind, n.RevisionBefore, n.RevisionAfter)));
         Assert.Equal(("Synthetic Steel 1", "Grade A", 0.1235, Units.Millimeters, CutType.Waterjet),
             (stored.Nests[1].MaterialName, stored.Nests[1].MaterialGrade, stored.Nests[1].Thickness, stored.Nests[1].Units, stored.Nests[1].CutType));
-        Assert.Equal(new[] { (kit.Id, 2), (other.Id, 6) }, stored.Nests[1].Items.Select(i => (i.SetId, i.Quantity)));
+        Assert.Equal(new[] { ((Guid?)kit.Id, 2), (other.Id, 6) }, stored.Nests[1].Items.Select(i => (i.SetId, i.Quantity)));
         Assert.Empty(stored.Nests[0].Items);
         Assert.Equal(("Created nest", NestStatus.Draft, false), (stored.Nests[0].Nest!.Name, stored.Nests[0].Nest!.Status, stored.Nests[0].Nest!.Deleted));
         Assert.Null(stored.Nests[0].Undo);
@@ -294,7 +294,7 @@ public sealed class SetReleaseTests
 
         using var upgraded = new NestDatabase(factory.DatabasePath, pooling: false);
 
-        Assert.Equal(10L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+        Assert.Equal(11L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
         Assert.Equal(0L, Scalar(factory.DatabasePath, "SELECT COUNT(*) FROM sqlite_master WHERE name LIKE 'set_release%' OR name LIKE 'ix_set_release%'"));
         var release = upgraded.GetRelease(releaseId)!;
         Assert.Equal(("Legacy notes", "Legacy operator", false), (release.Notes, release.ReleasedBy, release.IsUndone));

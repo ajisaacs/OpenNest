@@ -381,7 +381,7 @@ public class SetReleaseSessionTests
         Assert.Equal(new[] { (first.Id, 2), (second.Id, 1) }, release.Sets.Select(l => (l.SetId, l.Quantity)));
         var nestLine = Assert.Single(release.Nests);
         Assert.Equal((SetReleaseNestKind.Merged, (int?)3, 4), (nestLine.Kind, nestLine.RevisionBefore, nestLine.RevisionAfter));
-        Assert.Equal(new[] { (first.Id, a.Id, 2), (second.Id, a.Id, 2), (first.Id, b.Id, 2) },
+        Assert.Equal(new[] { ((Guid?)first.Id, a.Id, 2), (second.Id, a.Id, 2), (first.Id, b.Id, 2) },
             nestLine.Items.Select(i => (i.SetId, i.DrawingId, i.Quantity)));
     }
 
@@ -496,6 +496,65 @@ public class SetReleaseSessionTests
 
         var query = Assert.Single(_nests.Queries);
         Assert.Equal((NestStatus.Draft, "Synthetic Steel", "Grade A", 0.25), (query.Status, query.Material, query.MaterialGrade, query.Thickness));
+    }
+
+    [Fact]
+    public async Task Run_OfDrawingsOnTheirOwn_ChecksTheServer_BuildsTheirNests_AndRecordsThemWithoutASet()
+    {
+        var a = Stored("SYN-A");
+        var b = Stored("SYN-B");
+        var c = Stored("SYN-C", material: "Synthetic Aluminum");
+        var set = Set((a, 2));
+        var plan = SetReleasePlan.Build(new[] { new SetReleasePlanLine(set, 3) },
+            new[] { new SetReleaseDrawingLine(a, 5), new SetReleaseDrawingLine(b, 1), new SetReleaseDrawingLine(c, 40) }, false);
+
+        var result = await Session().RunAsync(plan, plan.Groups, "Synthetic operator", "");
+
+        Assert.Equal("", result.ReleaseError);
+        Assert.Equal(1, _sets.DrawingReleaseChecks);
+        var steel = result.Groups.Single(g => g.Group.MaterialName == "Synthetic Steel").Nest!;
+        Assert.Equal(new[] { ("SYN-A", 11), ("SYN-B", 1) }, steel.Drawings.OrderBy(d => d.Name).Select(d => (d.Name, d.Quantity.Required)));
+        var release = Assert.Single(_sets.Posted);
+        Assert.Equal((set.Id, 3), (release.Sets.Single().SetId, release.Sets.Single().Quantity));
+        Assert.Equal(new[] { (a.Id, 5), (b.Id, 1), (c.Id, 40) }, release.Drawings.Select(d => (d.DrawingId, d.Quantity)));
+        Assert.Equal(new[] { ((Guid?)set.Id, a.Id, 6), (null, a.Id, 5), (null, b.Id, 1) },
+            release.Nests.Single(n => n.MaterialName == "Synthetic Steel").Items.Select(i => (i.SetId, i.DrawingId, i.Quantity)));
+        Assert.Equal(new[] { ((Guid?)null, c.Id, 40) },
+            release.Nests.Single(n => n.MaterialName == "Synthetic Aluminum").Items.Select(i => (i.SetId, i.DrawingId, i.Quantity)));
+        Assert.Null(SetReleaseRules.GetError(release));
+    }
+
+    [Fact]
+    public async Task Run_OfSetsOnly_DoesNotAskAboutDrawingsOnTheirOwn()
+    {
+        var plan = SetReleasePlan.Build(Set((Stored("SYN-A"), 1)), 1, false);
+
+        await Session().RunAsync(plan, plan.Groups, "", "");
+
+        Assert.Equal(0, _sets.DrawingReleaseChecks);
+        Assert.Empty(_sets.Posted.Single().Drawings);
+    }
+
+    [Fact]
+    public async Task Run_OnAServerWithoutDrawingsOnTheirOwn_RefusesBeforeAnythingIsBuilt()
+    {
+        _sets.DrawingReleaseFailure = new ServerTooOldException("releasing library drawings on their own");
+        var plan = SetReleasePlan.Build(Array.Empty<SetReleasePlanLine>(), new[] { new SetReleaseDrawingLine(Stored("SYN-A"), 2) }, false);
+
+        var result = await Session().RunAsync(plan, plan.Groups, "", "");
+
+        var group = Assert.Single(result.Groups);
+        Assert.Equal(SetReleaseGroupOutcome.Refused, group.Outcome);
+        Assert.Contains("does not support releasing library drawings on their own", group.Error);
+        Assert.Empty(_created);
+        Assert.Empty(_nests.Uploaded);
+        Assert.Empty(_sets.Posted);
+
+        _sets.DrawingReleaseFailure = new IOException("Synthetic outage");
+        var failed = await Session().RunAsync(plan, plan.Groups, "", "");
+        Assert.Equal(SetReleaseGroupOutcome.Failed, failed.Groups.Single().Outcome);
+        Assert.Contains("Synthetic outage", failed.Groups.Single().Error);
+        Assert.Empty(_nests.Uploaded);
     }
 
     private sealed class RecordingProgress(Action<SetReleaseProgress>? onReport = null) : IProgress<SetReleaseProgress>
@@ -638,6 +697,7 @@ public class SetReleaseSessionTests
                     Quantity = s.Quantity,
                     SetName = "Synthetic kit",
                 }).ToList(),
+                Drawings = release.Drawings,
                 Nests = release.Nests,
             };
             if (ConflictWithPosted)
@@ -656,7 +716,18 @@ public class SetReleaseSessionTests
         public Task<DrawingSetRecord> ArchiveAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<DrawingSetRecord> RestoreAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<SetReleaseRecord?> GetReleaseAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<SetReleasePage> QueryReleasesAsync(Guid? setId = null, Guid? nestId = null, int offset = 0, int limit = 100, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<SetReleasePage> QueryReleasesAsync(Guid? setId = null, Guid? nestId = null, Guid? drawingId = null, int offset = 0, int limit = 100, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        /// <summary>Thrown by the support check; null plays a server that records drawings on their own.</summary>
+        public Exception? DrawingReleaseFailure { get; set; }
+
+        public int DrawingReleaseChecks { get; private set; }
+
+        public Task EnsureDrawingReleasesSupportedAsync(CancellationToken cancellationToken = default)
+        {
+            DrawingReleaseChecks++;
+            return DrawingReleaseFailure is { } failure ? Task.FromException(failure) : Task.CompletedTask;
+        }
         public Task<SetReleaseRecord> UndoReleaseAsync(Guid id, SetReleaseUndoRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

@@ -6,12 +6,21 @@ namespace OpenNest.Data;
 /// <summary>One set of a release plan: a set read from the server and how many kits of it.</summary>
 public sealed record SetReleasePlanLine(DrawingSetRecord Set, int Quantity);
 
-/// <summary>How many of an item one set of the release asked for.</summary>
-public sealed record SetReleaseItemSource(Guid SetId, int Quantity);
+/// <summary>
+/// One library drawing released on its own, outside any set: its current record, as read from
+/// the library, and how many of it.
+/// </summary>
+public sealed record SetReleaseDrawingLine(DrawingLibraryRecord Drawing, int Quantity);
+
+/// <summary>
+/// How many of an item one set of the release asked for, kits included; <see cref="SetId"/>
+/// is null for the drawing released on its own.
+/// </summary>
+public sealed record SetReleaseItemSource(Guid? SetId, int Quantity);
 
 /// <summary>
 /// One library drawing as released: its current record and the quantity summed over every
-/// set of the release that lists it, kits included.
+/// set of the release that lists it, kits included, and over the drawing released on its own.
 /// </summary>
 public sealed class SetReleaseItem
 {
@@ -23,7 +32,10 @@ public sealed class SetReleaseItem
         Quantity = checked(sources.Sum(s => s.Quantity));
     }
 
-    /// <summary>The member that first listed the drawing, in set order.</summary>
+    /// <summary>
+    /// The member that first listed the drawing, in set order; for a drawing that no set
+    /// lists, a member made from its line released on its own.
+    /// </summary>
     public DrawingSetMember Member { get; }
 
     /// <summary>
@@ -32,7 +44,10 @@ public sealed class SetReleaseItem
     /// </summary>
     public DrawingLibraryRecord Drawing { get; }
 
-    /// <summary>Each set's share: its member quantity times its kits, in set order.</summary>
+    /// <summary>
+    /// Each set's share, its member quantity times its kits, in set order, then the quantity
+    /// released on its own (with no set).
+    /// </summary>
     public IReadOnlyList<SetReleaseItemSource> Sources { get; }
 
     /// <summary>The total over <see cref="Sources"/>.</summary>
@@ -100,9 +115,10 @@ public sealed class SetReleaseGroup
 }
 
 /// <summary>
-/// How one or more drawing set revisions split into nests, before anything is downloaded or
-/// created. Pure: it reads the members' joined drawing records only. A drawing listed by
-/// several sets becomes one item with the quantities summed, each set's share kept. Items are
+/// How drawing set revisions and library drawings released on their own split into nests,
+/// before anything is downloaded or created. Pure: it reads the members' joined drawing
+/// records and the drawings' records only. A drawing listed by several sets, or by a set and
+/// on its own, becomes one item with the quantities summed, each share kept. Items are
 /// grouped by material name and grade (compared by <see cref="SharedListNames.Key"/>),
 /// thickness (rounded as the library stores it), units and cut type. Archived drawings are
 /// skipped unless included (S5). A group is refused when two of its drawings share a name,
@@ -110,21 +126,26 @@ public sealed class SetReleaseGroup
 /// </summary>
 public sealed class SetReleasePlan
 {
-    private SetReleasePlan(IReadOnlyList<SetReleasePlanLine> lines, bool includeArchived,
-        IReadOnlyList<SetReleaseGroup> groups, IReadOnlyList<DrawingSetMember> skippedArchived)
+    private SetReleasePlan(IReadOnlyList<SetReleasePlanLine> lines, IReadOnlyList<SetReleaseDrawingLine> drawings,
+        bool includeArchived, IReadOnlyList<SetReleaseGroup> groups, IReadOnlyList<DrawingSetMember> skippedArchived)
     {
         Lines = lines;
+        Drawings = drawings;
         IncludeArchived = includeArchived;
         Groups = groups;
         SkippedArchived = skippedArchived;
-        var customers = lines.Select(l => (l.Set.Customer ?? "").Trim()).Distinct(StringComparer.Ordinal).ToList();
+        var customers = lines.Select(l => l.Set.Customer).Concat(drawings.Select(d => d.Drawing.Customer))
+            .Select(c => (c ?? "").Trim()).Distinct(StringComparer.Ordinal).ToList();
         Customer = customers.Count == 1 ? customers[0] : "";
     }
 
     /// <summary>The sets released and how many kits of each, as read from the server.</summary>
     public IReadOnlyList<SetReleasePlanLine> Lines { get; }
 
-    /// <summary>The customer every set names, or blank when they differ.</summary>
+    /// <summary>The library drawings released on their own and how many of each, as read from the library.</summary>
+    public IReadOnlyList<SetReleaseDrawingLine> Drawings { get; }
+
+    /// <summary>The customer every set and every drawing on its own names, or blank when they differ.</summary>
     public string Customer { get; }
 
     public bool IncludeArchived { get; }
@@ -135,7 +156,10 @@ public sealed class SetReleasePlan
     /// </summary>
     public IReadOnlyList<SetReleaseGroup> Groups { get; }
 
-    /// <summary>Members left out because their drawing is archived and archived drawings were not included.</summary>
+    /// <summary>
+    /// Members left out because their drawing is archived and archived drawings were not
+    /// included; a drawing released on its own is listed as a member made from its line.
+    /// </summary>
     public IReadOnlyList<DrawingSetMember> SkippedArchived { get; }
 
     /// <param name="set">A set read from the server, so every member carries its drawing's current record.</param>
@@ -143,11 +167,22 @@ public sealed class SetReleasePlan
         Build(new[] { new SetReleasePlanLine(set, multiplier) }, includeArchived);
 
     /// <param name="lines">Sets read from the server, so every member carries its drawing's current record.</param>
-    public static SetReleasePlan Build(IReadOnlyList<SetReleasePlanLine> lines, bool includeArchived)
+    public static SetReleasePlan Build(IReadOnlyList<SetReleasePlanLine> lines, bool includeArchived) =>
+        Build(lines, Array.Empty<SetReleaseDrawingLine>(), includeArchived);
+
+    /// <param name="lines">Sets read from the server, so every member carries its drawing's current record; may be empty.</param>
+    /// <param name="drawings">Library drawings released on their own, as read from the library; may be empty.</param>
+    public static SetReleasePlan Build(IReadOnlyList<SetReleasePlanLine> lines, IReadOnlyList<SetReleaseDrawingLine> drawings,
+        bool includeArchived)
     {
         ArgumentNullException.ThrowIfNull(lines);
-        if (lines.Count == 0 || lines.Count > SetReleaseRules.MaxSetLines)
-            throw new ArgumentException($"Release between 1 and {SetReleaseRules.MaxSetLines} sets.", nameof(lines));
+        ArgumentNullException.ThrowIfNull(drawings);
+        if (lines.Count + drawings.Count == 0)
+            throw new ArgumentException("Release at least one set or drawing.", nameof(lines));
+        if (lines.Count > SetReleaseRules.MaxSetLines)
+            throw new ArgumentException($"Release at most {SetReleaseRules.MaxSetLines} sets.", nameof(lines));
+        if (drawings.Count > SetReleaseRules.MaxDrawingLines)
+            throw new ArgumentException($"Release at most {SetReleaseRules.MaxDrawingLines} drawings on their own.", nameof(drawings));
         var seenSets = new HashSet<Guid>();
         foreach (var line in lines)
         {
@@ -164,32 +199,47 @@ public sealed class SetReleasePlan
                 throw new ArgumentException("A set member is missing its library drawing. Reload the set.", nameof(lines));
         }
 
-        // One entry per drawing, in first-listed order; each set's share kept.
+        var seenDrawings = new HashSet<Guid>();
+        foreach (var line in drawings)
+        {
+            var drawing = line?.Drawing ?? throw new ArgumentException("Every drawing line needs a drawing.", nameof(drawings));
+            if (line.Quantity < 1 || line.Quantity > SetReleaseRules.MaxDrawingQuantity)
+                throw new ArgumentOutOfRangeException(nameof(drawings), line.Quantity,
+                    $"The quantity must be between 1 and {SetReleaseRules.MaxDrawingQuantity}.");
+            if (drawing.Id == Guid.Empty || drawing.Revision < 1)
+                throw new ArgumentException("Only a drawing read from the library can be released.", nameof(drawings));
+            if (!seenDrawings.Add(drawing.Id))
+                throw new ArgumentException($"Drawing '{drawing.Name}' is listed twice. Release it once with a larger quantity.",
+                    nameof(drawings));
+        }
+
+        // One entry per drawing, in first-listed order (sets, then drawings on their own); each share kept.
         var skipped = new List<DrawingSetMember>();
         var order = new List<Guid>();
         var entries = new Dictionary<Guid, (DrawingSetMember Member, DrawingLibraryRecord Drawing, List<SetReleaseItemSource> Sources)>();
-        foreach (var line in lines)
+        var shares = lines.SelectMany(line => line.Set.Members.Select(member =>
+                (Member: member, Share: new SetReleaseItemSource(line.Set.Id, checked(member.Quantity * line.Quantity)))))
+            .Concat(drawings.Select(line =>
+                (Member: new DrawingSetMember { DrawingId = line.Drawing.Id, Quantity = line.Quantity, Drawing = line.Drawing },
+                    Share: new SetReleaseItemSource(null, line.Quantity))));
+        foreach (var (member, share) in shares)
         {
-            foreach (var member in line.Set.Members)
+            if (member.Drawing!.Archived && !includeArchived)
             {
-                if (member.Drawing!.Archived && !includeArchived)
-                {
-                    skipped.Add(member);
-                    continue;
-                }
+                skipped.Add(member);
+                continue;
+            }
 
-                var share = new SetReleaseItemSource(line.Set.Id, checked(member.Quantity * line.Quantity));
-                if (entries.TryGetValue(member.DrawingId, out var entry))
-                {
-                    entry.Sources.Add(share);
-                    if (member.Drawing.Revision > entry.Drawing.Revision)
-                        entries[member.DrawingId] = (entry.Member, member.Drawing, entry.Sources);
-                }
-                else
-                {
-                    order.Add(member.DrawingId);
-                    entries[member.DrawingId] = (member, member.Drawing, new List<SetReleaseItemSource> { share });
-                }
+            if (entries.TryGetValue(member.DrawingId, out var entry))
+            {
+                entry.Sources.Add(share);
+                if (member.Drawing.Revision > entry.Drawing.Revision)
+                    entries[member.DrawingId] = (entry.Member, member.Drawing, entry.Sources);
+            }
+            else
+            {
+                order.Add(member.DrawingId);
+                entries[member.DrawingId] = (member, member.Drawing, new List<SetReleaseItemSource> { share });
             }
         }
 
@@ -211,7 +261,7 @@ public sealed class SetReleasePlan
             .ThenBy(g => g.Units)
             .ThenBy(g => g.CutType)
             .ToList();
-        return new SetReleasePlan(lines.ToList(), includeArchived, groups, skipped);
+        return new SetReleasePlan(lines.ToList(), drawings.ToList(), includeArchived, groups, skipped);
     }
 
     /// <summary>

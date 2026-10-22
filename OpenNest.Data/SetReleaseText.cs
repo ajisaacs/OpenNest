@@ -8,15 +8,22 @@ public static class SetReleaseText
 {
     /// <summary>
     /// Where a nest came from, such as "Released from set 'Kit A' revision 3 ×2 by J. Smith",
-    /// or "Merged from sets 'Kit A' revision 3 ×2 and 'Kit B' revision 1 ×1 ..." for a release
-    /// that added to <paramref name="nestId"/> rather than creating it.
+    /// "Released from drawing 'Bracket' ×4", or "Merged from sets 'Kit A' revision 3 ×2 and
+    /// 'Kit B' revision 1 ×1 ..." for a release that added to <paramref name="nestId"/> rather
+    /// than creating it.
     /// </summary>
     public static string Origin(SetReleaseRecord release, Guid nestId = default)
     {
         ArgumentNullException.ThrowIfNull(release);
         var merged = release.Nests?.FirstOrDefault(n => n.NestId == nestId)?.Kind == SetReleaseNestKind.Merged;
         var sets = release.Sets ?? Array.Empty<SetReleaseLine>();
-        var text = $"{(merged ? "Merged" : "Released")} from {(sets.Count == 1 ? "set" : "sets")} {Sets(sets)}";
+        var drawings = release.Drawings ?? Array.Empty<SetReleaseDrawing>();
+        var sources = new List<string>();
+        if (sets.Count > 0)
+            sources.Add($"{(sets.Count == 1 ? "set" : "sets")} {Sets(sets)}");
+        if (drawings.Count > 0)
+            sources.Add(Drawings(drawings));
+        var text = $"{(merged ? "Merged" : "Released")} from {string.Join(" and ", sources)}";
         if (release.ReleasedAt != default)
             text += $" on {release.ReleasedAt.ToLocalTime().ToString("d", CultureInfo.CurrentCulture)}";
         if (!string.IsNullOrWhiteSpace(release.ReleasedBy))
@@ -32,6 +39,22 @@ public static class SetReleaseText
         return names.Count <= 1
             ? string.Concat(names)
             : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
+    }
+
+    /// <summary>
+    /// The drawings a release had on their own: "drawing 'Bracket' ×4", "drawings 'A' ×1 and
+    /// 'B' ×2", or "5 drawings" when there are more than three.
+    /// </summary>
+    public static string Drawings(IReadOnlyList<SetReleaseDrawing> drawings)
+    {
+        ArgumentNullException.ThrowIfNull(drawings);
+        if (drawings.Count > 3)
+            return $"{drawings.Count} drawings";
+        var names = drawings.Select(d => $"'{d.DrawingName}' ×{d.Quantity}").ToList();
+        var text = names.Count <= 1
+            ? string.Concat(names)
+            : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
+        return $"{(drawings.Count == 1 ? "drawing" : "drawings")} {text}";
     }
 
     /// <summary>

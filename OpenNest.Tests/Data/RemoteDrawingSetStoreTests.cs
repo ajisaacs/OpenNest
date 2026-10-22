@@ -51,6 +51,27 @@ public class RemoteDrawingSetStoreTests
     }
 
     [Fact]
+    public async Task ServerWithoutDrawingsOnTheirOwn_RefusesTheDrawingFilter_AndTheSupportCheck()
+    {
+        // A server from before drawings on their own refuses the unknown query parameter.
+        var handler = new StubHandler(request => request.RequestUri!.Query.Contains("drawingId=")
+            ? new HttpResponseMessage(HttpStatusCode.BadRequest)
+            : StubHandler.Json(new { items = Array.Empty<object>(), total = 0, offset = 0, limit = 100 }));
+        using var store = Store(handler);
+
+        var check = await Assert.ThrowsAsync<ServerTooOldException>(() => store.EnsureDrawingReleasesSupportedAsync());
+        await Assert.ThrowsAsync<ServerTooOldException>(() => store.QueryReleasesAsync(drawingId: Guid.NewGuid()));
+        await store.QueryReleasesAsync(setId: Guid.NewGuid());
+
+        Assert.Contains("releasing library drawings on their own", check.Message);
+        Assert.Contains("api/releases/query?drawingId=", handler.Requests[0].RequestUri!.AbsoluteUri);
+        using var missing = Store(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)));
+        await Assert.ThrowsAsync<ServerTooOldException>(() => missing.EnsureDrawingReleasesSupportedAsync());
+        using var current = Store(new StubHandler(_ => StubHandler.Json(new { items = Array.Empty<object>(), total = 0, offset = 0, limit = 1 })));
+        await current.EnsureDrawingReleasesSupportedAsync();
+    }
+
+    [Fact]
     public async Task UnknownSet_OnASetAwareServer_IsNull()
     {
         var handler = new StubHandler(request => request.RequestUri!.AbsolutePath.EndsWith("/api/sets/query")

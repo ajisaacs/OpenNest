@@ -1,8 +1,9 @@
 namespace OpenNest.Data;
 
 /// <summary>
-/// One release of one or more drawing sets: the nests it made or merged into, one per
-/// material group, with every member quantity multiplied by its set line's quantity.
+/// One release of drawing sets, library drawings on their own, or both: the nests it made or
+/// merged into, one per material group, with every member quantity multiplied by its set
+/// line's quantity.
 /// Releases are append-only; undoing one restores or deletes its nests and marks it
 /// undone, it never removes the record.
 /// </summary>
@@ -13,6 +14,12 @@ public sealed class SetReleaseRecord
 
     /// <summary>The sets released and how many times each, in the order posted.</summary>
     public IReadOnlyList<SetReleaseLine> Sets { get; set; } = Array.Empty<SetReleaseLine>();
+
+    /// <summary>
+    /// Library drawings released on their own, outside any set, in the order posted. Empty for
+    /// a release of sets only and for every release recorded before schema v11.
+    /// </summary>
+    public IReadOnlyList<SetReleaseDrawing> Drawings { get; set; } = Array.Empty<SetReleaseDrawing>();
 
     public string Notes { get; set; } = "";
 
@@ -47,4 +54,15 @@ public sealed class SetReleaseLine
 
     /// <summary>The set's name at <see cref="SetRevision"/>. Server-joined; ignored on post.</summary>
     public string SetName { get; set; } = "";
+}
+
+/// <summary>One library drawing released on its own, outside any set, and how many of it.</summary>
+public sealed class SetReleaseDrawing
+{
+    public Guid DrawingId { get; set; }
+
+    public int Quantity { get; set; } = 1;
+
+    /// <summary>The drawing's current library name. Server-joined; ignored on post.</summary>
+    public string DrawingName { get; set; } = "";
 }

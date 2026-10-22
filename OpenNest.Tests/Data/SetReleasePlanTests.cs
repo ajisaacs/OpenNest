@@ -112,6 +112,61 @@ public class SetReleasePlanTests
         Assert.Throws<ArgumentException>(() => SetReleasePlan.Build(Array.Empty<SetReleasePlanLine>(), false));
     }
 
+    [Fact]
+    public void Build_OfDrawingsOnTheirOwn_GroupsThemWithSetMembers_SummingAShareWithNoSet()
+    {
+        var shared = Drawing("SYN-SHARED");
+        var loose = Drawing("SYN-LOOSE");
+        var aluminum = Drawing("SYN-AL", material: "Synthetic Aluminum");
+        var set = Set((shared, 2));
+
+        var plan = SetReleasePlan.Build(new[] { new SetReleasePlanLine(set, 3) },
+            new[] { new SetReleaseDrawingLine(loose, 7), new SetReleaseDrawingLine(shared, 4), new SetReleaseDrawingLine(aluminum, 100_000) },
+            false);
+
+        var steel = plan.Groups.Single(g => g.MaterialName == "Synthetic Steel");
+        Assert.Equal(new[] { "SYN-SHARED", "SYN-LOOSE" }, steel.Items.Select(i => i.Drawing.Name));
+        Assert.Equal(new[] { new SetReleaseItemSource(set.Id, 6), new SetReleaseItemSource(null, 4) }, steel.Items[0].Sources);
+        Assert.Equal((7, loose.Id), (steel.Items[1].Quantity, steel.Items[1].Member.DrawingId));
+        Assert.Equal(100_000, plan.Groups.Single(g => g.MaterialName == "Synthetic Aluminum").TotalQuantity);
+        Assert.Equal(new[] { loose.Id, shared.Id, aluminum.Id }, plan.Drawings.Select(d => d.Drawing.Id));
+        Assert.Equal("", plan.Customer);
+    }
+
+    [Fact]
+    public void Build_OfDrawingsAlone_TakesTheirCustomer_AndTheSameRefusalsAsSets()
+    {
+        var archived = Drawing("SYN-OLD", archived: true);
+        var unassigned = Drawing("SYN-NOMAT", material: "");
+        var plan = SetReleasePlan.Build(Array.Empty<SetReleasePlanLine>(), new[]
+        {
+            new SetReleaseDrawingLine(Drawing("SYN-A"), 1),
+            new SetReleaseDrawingLine(Drawing("SYN-A"), 2),
+            new SetReleaseDrawingLine(archived, 3),
+            new SetReleaseDrawingLine(unassigned, 4),
+        }, includeArchived: false);
+
+        Assert.Equal("Synthetic customer", plan.Customer);
+        Assert.Contains("2 drawings in this group are named 'SYN-A'", plan.Groups[0].Refusal);
+        Assert.True(plan.Groups[^1].IsUnassigned);
+        Assert.Equal(new[] { (archived.Id, 3) }, plan.SkippedArchived.Select(m => (m.DrawingId, m.Quantity)));
+    }
+
+    [Fact]
+    public void Build_RefusesADrawingTwice_OutOfRangeQuantities_AndADrawingNotReadFromTheLibrary()
+    {
+        var drawing = Drawing("SYN-A");
+        var unsaved = Drawing("SYN-B");
+        unsaved.Revision = 0;
+        SetReleasePlan Build(params SetReleaseDrawingLine[] lines) => SetReleasePlan.Build(Array.Empty<SetReleasePlanLine>(), lines, false);
+
+        Assert.Throws<ArgumentException>(() => Build(new SetReleaseDrawingLine(drawing, 1), new SetReleaseDrawingLine(drawing, 2)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Build(new SetReleaseDrawingLine(drawing, 0)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Build(new SetReleaseDrawingLine(drawing, SetReleaseRules.MaxDrawingQuantity + 1)));
+        Assert.Throws<ArgumentException>(() => Build(new SetReleaseDrawingLine(unsaved, 1)));
+        Assert.Throws<ArgumentException>(() => Build());
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(SetReleaseRules.MaxQuantity + 1)]
