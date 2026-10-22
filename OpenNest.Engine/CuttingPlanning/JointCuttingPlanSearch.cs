@@ -518,13 +518,16 @@ internal static class JointCuttingPlanSearch
                     continue;
                 }
                 var prepared = source.Prepared;
-                if (contourRecovery && prepared.Count > 1 && prepared.PerimeterOrdinal <= MaximumRecoveryHoles && node.Active == null)
+                // Recovery and endpoint branches are led by the cut perimeter; a display perimeter
+                // is never cut, so its holes take the plain contour-by-contour search below.
+                if (contourRecovery && prepared.HasCutPerimeter && prepared.Count > 1
+                    && prepared.PerimeterOrdinal <= MaximumRecoveryHoles && node.Active == null)
                 {
                     foreach (var edge in RecoverPart(node, sequence, source, attempt))
                         yield return edge;
                     continue;
                 }
-                if (prepared.Count > 1 && node.Active == null)
+                if (prepared.HasCutPerimeter && prepared.Count > 1 && node.Active == null)
                 {
                     // Selecting an endpoint does not cut it. Each endpoint owns a separate
                     // branch, whose holes are still emitted first and checked normally.
@@ -547,7 +550,7 @@ internal static class JointCuttingPlanSearch
                 var arrival = node.Active?.Arrival ?? node.Position;
                 var before = node.Active?.Before ?? node.Checker;
                 var boundary = node.Active?.Boundary ?? node;
-                var contours = choices.Length == prepared.Count - 1 ? new[] { prepared.PerimeterOrdinal }
+                var contours = prepared.HasCutPerimeter && choices.Length == prepared.Count - 1 ? new[] { prepared.PerimeterOrdinal }
                     : Enumerable.Range(0, prepared.PerimeterOrdinal).Where(c => !choices.Any(e => e.ContourOrdinal == c));
                 // First try one ranked hole chain per endpoint. A later-part failure then
                 // changes the endpoint before replaying all earlier hole combinations.
@@ -835,7 +838,7 @@ internal static class JointCuttingPlanSearch
         {
             reason = null;
             var prepared = source.Prepared;
-            if (snapshot.PierceZoneRadius <= 0 || prepared.IsPinned(prepared.PerimeterOrdinal)
+            if (snapshot.PierceZoneRadius <= 0 || !prepared.HasCutPerimeter || prepared.IsPinned(prepared.PerimeterOrdinal)
                 || source.Material is not { IsComplete: true })
                 return [];
             CountExpansion(source);
@@ -1076,7 +1079,7 @@ internal static class JointCuttingPlanSearch
             }
             // Recovery's contour solver first: its first route whose only violations, if any, are
             // where the arrival rapid crosses cut contours. It passes every check when it can.
-            if (prepared.Count > 1 && prepared.PerimeterOrdinal <= MaximumRecoveryHoles
+            if (prepared.HasCutPerimeter && prepared.Count > 1 && prepared.PerimeterOrdinal <= MaximumRecoveryHoles
                 && RecoverPart(node, KeptSequence, source, new Attempt(null), arrivalMayCross: true).FirstOrDefault() is { } recovered)
             {
                 var proposal = recovered.Node.Order[^1];
@@ -1100,7 +1103,8 @@ internal static class JointCuttingPlanSearch
                 var local = (execution?.DeparturePoint ?? arrival) - source.Location;
                 var before = severity;
                 ContourChoice chosen = null;
-                foreach (var contour in remaining.Count == 0 ? [prepared.PerimeterOrdinal] : remaining.Take(SafestHoleWindow))
+                foreach (var contour in remaining.Count == 0 ? (prepared.HasCutPerimeter ? [prepared.PerimeterOrdinal] : [])
+                    : remaining.Take(SafestHoleWindow))
                 {
                     // Leave each hole toward the next one along the tour, so its exit rapid does
                     // not run back across it; the perimeter faces the next part.

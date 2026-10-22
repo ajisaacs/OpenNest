@@ -46,10 +46,20 @@ public sealed class PreparedContours
     // automatic entries keep to points where the tab steadies the part. World = local + origin.
     private readonly PartSupport support;
     private readonly Vector supportOrigin;
+    // False when the outside is a display perimeter: shown and material, never cut. It is not one
+    // of the contours, so every contour is a hole and no emission can reach the outline.
+    private readonly bool hasCutPerimeter;
 
     private PreparedContours(Shape[] shapes, List<Entity> scribes, List<Shape> breakCuts, List<Shape> tabbedCutouts,
         CuttingParameters parameters)
+        : this(shapes, scribes, breakCuts, tabbedCutouts, parameters, hasCutPerimeter: true)
     {
+    }
+
+    private PreparedContours(Shape[] shapes, List<Entity> scribes, List<Shape> breakCuts, List<Shape> tabbedCutouts,
+        CuttingParameters parameters, bool hasCutPerimeter)
+    {
+        this.hasCutPerimeter = hasCutPerimeter;
         this.shapes = shapes;
         this.scribes = scribes;
         this.breakCuts = breakCuts;
@@ -60,7 +70,8 @@ public sealed class PreparedContours
     }
 
     private PreparedContours(PreparedContours unpinned, IReadOnlyList<CutPinResolution> pins, CancellationToken token)
-        : this(unpinned.shapes, unpinned.scribes, unpinned.breakCuts, unpinned.tabbedCutouts, unpinned.parameters)
+        : this(unpinned.shapes, unpinned.scribes, unpinned.breakCuts, unpinned.tabbedCutouts, unpinned.parameters,
+            unpinned.hasCutPerimeter)
     {
         contourParameters = new CuttingParameters[shapes.Length];
         var rejected = new List<CutPinResolution>();
@@ -95,7 +106,8 @@ public sealed class PreparedContours
     // A copy that tabs the perimeter for support; every pin keeps its entry, now owned here, and
     // a pinned perimeter keeps its pin's settings: the analysis is only kept for review.
     private PreparedContours(PreparedContours source, PartSupport support, Vector location, Tab tab)
-        : this(source.shapes, source.scribes, source.breakCuts, source.tabbedCutouts, source.parameters)
+        : this(source.shapes, source.scribes, source.breakCuts, source.tabbedCutouts, source.parameters,
+            source.hasCutPerimeter)
     {
         for (var contour = 0; contour < Count; contour++)
         {
@@ -132,6 +144,8 @@ public sealed class PreparedContours
         PostVerificationGeometry.Validate(location);
         if (!support.IsComplete || support.BestTabPoint == null)
             throw new ArgumentException("Support tabs need a complete analysis with a tab point.", nameof(support));
+        if (!hasCutPerimeter)
+            throw new ArgumentException("A display perimeter is never cut, so it cannot hold a support tab.", nameof(support));
         return new PreparedContours(this, support, location, tab);
     }
 
@@ -145,19 +159,27 @@ public sealed class PreparedContours
     public Vector SupportOrigin => supportOrigin;
 
     /// <summary>Whether the emitted perimeter is tabbed: by the plate settings, its pin or support.</summary>
-    internal bool PerimeterTabbed => ParametersFor(PerimeterOrdinal).TabsEnabled;
+    internal bool PerimeterTabbed => hasCutPerimeter && ParametersFor(PerimeterOrdinal).TabsEnabled;
 
     public int Count => shapes.Length;
 
     /// <summary>The pierce zone every lead-in pierce of these contours keeps; 0 when off.</summary>
     internal double PierceZoneRadius => parameters.GetPierceZoneRadius();
-    public int PerimeterOrdinal => Count - 1;
+    /// <summary>
+    /// The cut perimeter, emitted after every hole; <see cref="Count"/> (no contour) when the outside
+    /// is a display perimeter, so every contour below it is a hole.
+    /// </summary>
+    public int PerimeterOrdinal => hasCutPerimeter ? Count - 1 : Count;
+
+    /// <summary>False when the outside is a display perimeter that is never cut: all contours are holes.</summary>
+    public bool HasCutPerimeter => hasCutPerimeter;
 
     /// <summary>Resolved pins this preparation could not honour: a tab on an internal contour.</summary>
     public IReadOnlyList<CutPinResolution> RejectedPins { get; } = Array.Empty<CutPinResolution>();
 
     /// <summary>True when a drawing pin fixes this contour's entry, leads and tab.</summary>
-    public bool IsPinned(int contourOrdinal) => GetShape(contourOrdinal) != null && pinned[contourOrdinal] != null;
+    public bool IsPinned(int contourOrdinal) => !(contourOrdinal == PerimeterOrdinal && !hasCutPerimeter)
+        && GetShape(contourOrdinal) != null && pinned[contourOrdinal] != null;
 
     /// <summary>The one-based drawing pin that fixes this contour, or null.</summary>
     public int? PinNumberOf(int contourOrdinal) => IsPinned(contourOrdinal) ? pinNumbers[contourOrdinal] : null;
@@ -215,6 +237,7 @@ public sealed class PreparedContours
         var scribes = new List<Entity>();
         var breakCuts = new List<Shape>();
         var tabbedCutouts = new List<Shape>();
+        Shape displayPerimeter = null;
         Shape breakCut = null;
         var current = new Shape();
         foreach (var entity in geometryProgram.ToGeometry())
@@ -245,7 +268,8 @@ public sealed class PreparedContours
                     scribes.Add(entity);
                 continue;
             }
-            if (entity.Layer != SpecialLayers.Cut && entity.Layer != SpecialLayers.Display && entity.Layer != SpecialLayers.Tab)
+            if (entity.Layer != SpecialLayers.Cut && entity.Layer != SpecialLayers.Display && entity.Layer != SpecialLayers.Tab
+                && entity.Layer != SpecialLayers.DisplayPerimeter)
                 throw new ArgumentException("Preparation requires clean cut/display contours.");
             if (entity.Length <= PostVerificationGeometry.Epsilon || !double.IsFinite(entity.Length))
                 throw new ArgumentException("Degenerate contour entity.");
@@ -262,6 +286,26 @@ public sealed class PreparedContours
             current.Entities.Add(entity);
             if (NominalContourClosure.IsClosed(Start(current.Entities[0]), End(entity)))
                 FinishContour();
+        }
+        if (displayPerimeter != null)
+        {
+            if (current.Entities.Count != 0)
+                throw new ArgumentException("Preparation requires nonempty closed contours.");
+            if (contours.Count == 0 && tabbedCutouts.Count == 0 && breakCuts.Count == 0)
+                throw new ArgumentException("A display perimeter with no cutouts has nothing to cut.");
+            var outline = displayPerimeter.BoundingBox;
+            foreach (var shape in contours.Concat(tabbedCutouts).Concat(breakCuts))
+            {
+                shape.UpdateBounds();
+                var box = shape.BoundingBox;
+                if (box.Left < outline.Left - PostVerificationGeometry.Epsilon || box.Right > outline.Right + PostVerificationGeometry.Epsilon
+                    || box.Bottom < outline.Bottom - PostVerificationGeometry.Epsilon || box.Top > outline.Top + PostVerificationGeometry.Epsilon)
+                    throw new ArgumentException("A display perimeter must enclose every other contour.");
+            }
+            foreach (var cut in breakCuts)
+                cut.UpdateBounds();
+            // Never a contour: nothing can choose, emit or lead it. Every contour is a hole.
+            return new(contours.ToArray(), scribes, breakCuts, tabbedCutouts, ownedParameters, hasCutPerimeter: false);
         }
         if (current.Entities.Count != 0 || contours.Count == 0)
             throw new ArgumentException("Preparation requires nonempty closed contours.");
@@ -283,7 +327,15 @@ public sealed class PreparedContours
         void FinishContour()
         {
             current.UpdateBounds();
-            if (ContourCuttingStrategy.IsTabbedCutout(current))
+            if (current.Entities.Exists(e => e.Layer == SpecialLayers.DisplayPerimeter))
+            {
+                if (!current.Entities.TrueForAll(e => e.Layer == SpecialLayers.DisplayPerimeter))
+                    throw new ArgumentException("A display perimeter must be one whole closed contour.");
+                if (displayPerimeter != null)
+                    throw new ArgumentException("A display perimeter must enclose every other contour.");
+                displayPerimeter = current;
+            }
+            else if (ContourCuttingStrategy.IsTabbedCutout(current))
             {
                 if (current.Entities.TrueForAll(e => e.Layer == SpecialLayers.Tab))
                     throw new ArgumentException("A tabbed cutout has nothing to cut.");
@@ -728,7 +780,7 @@ public sealed class PreparedContours
         // directly, so the probe cannot drift the preparation or mutate it.
         return new ContourCuttingStrategy { Parameters = parameters }.EmitCandidateIsolated(
             shapes.Select(s => (Shape)s.Clone()).ToArray(), scribes.Select(e => e.Clone()).ToList(), choice,
-            contourParameters);
+            contourParameters, PerimeterOrdinal);
     }
 
     // Each prefix is a standalone owned program, including the same scribes and break cuts once.
@@ -738,7 +790,7 @@ public sealed class PreparedContours
         return new ContourCuttingStrategy { Parameters = parameters }.EmitPrepared(
             shapes.Select(s => (Shape)s.Clone()).ToArray(), scribes.Select(e => e.Clone()).ToList(), choices,
             contourParameters, breakCuts.Select(s => (Shape)s.Clone()).ToList(),
-            tabbedCutouts.Select(s => (Shape)s.Clone()).ToList());
+            tabbedCutouts.Select(s => (Shape)s.Clone()).ToList(), PerimeterOrdinal);
     }
 
     /// <summary>Open break cuts this preparation cuts before its contours.</summary>
@@ -760,6 +812,8 @@ public sealed class PreparedContours
         token.ThrowIfCancellationRequested();
         var expected = ExecutionMotionReader.ReadSupported(Emit(choices), location, null, token);
         // Only the outside is tabbed, with its own pin's tab when it is pinned.
+        if (!hasCutPerimeter)
+            return new(this, choices, expected, 0);
         var perimeter = ParametersFor(PerimeterOrdinal);
         return new(this, choices, expected, perimeter.TabsEnabled ? perimeter.TabConfig.Size : 0);
     }

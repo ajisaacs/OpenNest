@@ -21,5 +21,14 @@ namespace OpenNest.CNC
         /// leaves it out, cutting the rest of the contour as open pieces.
         /// </summary>
         Tab,
+
+        /// <summary>
+        /// The outside edge of a supplied blank that is only shown, never cut (for example a
+        /// purchased door whose instrument cutouts are the only cuts). It bounds material like
+        /// <see cref="Cut"/>, so nesting, containment, lead clearance and cut-offs all see the
+        /// blank, but it has no pierce, lead or motion in any emitted program. It must be one whole
+        /// closed contour enclosing every other contour.
+        /// </summary>
+        DisplayPerimeter,
     }
 }

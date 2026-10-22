@@ -251,14 +251,14 @@ namespace OpenNest.CNC.CuttingStrategy
         internal Program EmitPrepared(Shape[] shapes, List<Entity> scribes,
             IReadOnlyList<CuttingPlanning.ContourChoice> choices,
             IReadOnlyList<CuttingParameters> contourParameters = null, IReadOnlyList<Shape> breakCuts = null,
-            IReadOnlyList<Shape> tabbedCutouts = null)
+            IReadOnlyList<Shape> tabbedCutouts = null, int? perimeterOrdinal = null)
         {
             var result = new Program(Mode.Absolute);
             EmitScribeContours(result, scribes);
             EmitBreakCuts(result, breakCuts, shapes);
             foreach (var cutout in tabbedCutouts ?? Array.Empty<Shape>())
                 EmitTabbedCutout(result, cutout);
-            EmitChosenContours(result, shapes, choices, contourParameters);
+            EmitChosenContours(result, shapes, choices, contourParameters, perimeterOrdinal ?? shapes.Length - 1);
             result.Mode = Mode.Incremental;
             return result;
         }
@@ -269,20 +269,23 @@ namespace OpenNest.CNC.CuttingStrategy
         // perimeter never degrades to a hole because it was isolated. Output must not be
         // installed on a Part or accepted as a complete plan.
         internal Program EmitCandidateIsolated(Shape[] shapes, List<Entity> scribes,
-            CuttingPlanning.ContourChoice choice, IReadOnlyList<CuttingParameters> contourParameters = null)
+            CuttingPlanning.ContourChoice choice, IReadOnlyList<CuttingParameters> contourParameters = null,
+            int? perimeterOrdinal = null)
         {
             var result = new Program(Mode.Absolute);
             EmitScribeContours(result, scribes);
-            EmitChosenContours(result, shapes, new[] { choice }, contourParameters);
+            EmitChosenContours(result, shapes, new[] { choice }, contourParameters, perimeterOrdinal ?? shapes.Length - 1);
             result.Mode = Mode.Incremental;
             return result;
         }
 
-        // One contour per choice in order; the perimeter (last shape) is always External.
+        // One contour per choice in order; the perimeter is always External. Without a cut perimeter
+        // (a display perimeter outside) perimeterOrdinal is past the last shape: every contour is a hole.
         // Contour emission itself reads only the contour's own geometry and settings, never
         // prior choices â€” the differential tests in ContourCandidateEmissionTests pin this.
         private void EmitChosenContours(Program result, Shape[] shapes,
-            IReadOnlyList<CuttingPlanning.ContourChoice> choices, IReadOnlyList<CuttingParameters> contourParameters)
+            IReadOnlyList<CuttingPlanning.ContourChoice> choices, IReadOnlyList<CuttingParameters> contourParameters,
+            int perimeterOrdinal)
         {
             var shared = Parameters;
             try
@@ -294,7 +297,7 @@ namespace OpenNest.CNC.CuttingStrategy
                     Parameters = contourParameters?[choice.ContourOrdinal] ?? shared;
                     var shape = shapes[choice.ContourOrdinal];
                     EmitContour(result, shape, choice.Point, shape.Entities[choice.EntityOrdinal],
-                        choice.ContourOrdinal == shapes.Length - 1 ? ContourType.External : null,
+                        choice.ContourOrdinal == perimeterOrdinal ? ContourType.External : null,
                         exactCirclePrograms: true, scrapPierce: choice.Pierce);
                 }
             }

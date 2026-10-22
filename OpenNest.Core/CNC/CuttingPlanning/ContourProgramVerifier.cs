@@ -72,6 +72,8 @@ internal static class ContourProgramVerifier
                 }
             }
             if (ringIndex < 0) return false;
+            // A display perimeter is never cut: any run along it is not this plan.
+            if (ringIndex == 0 && material.HasDisplayPerimeter) return false;
             var tabs = material.Tabs[ringIndex];
             if (tabs.Any(tab => tab))
             {
@@ -108,7 +110,7 @@ internal static class ContourProgramVerifier
             if (!Follows(run.Curves, ring, entityIndex, ring[entityIndex].DistanceAlong(first.Start),
                 true, tolerance, token, ref budget)) return false;
         }
-        return visited.Count == material.Rings.Count;
+        return visited.Count == material.Rings.Count - (material.HasDisplayPerimeter ? 1 : 0);
     }
 
     // Indexes of the curves that start a span between tabs: uncut-to-cut transitions.

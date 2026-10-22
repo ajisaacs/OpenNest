@@ -12,8 +12,9 @@ namespace OpenNest.CNC.CuttingPlanning;
 public sealed class LeadMaterialSnapshot
 {
     private LeadMaterialSnapshot(IReadOnlyList<PostVerificationGeometry.Curve[]> rings, IReadOnlyList<bool[]> tabs,
-        string reason)
+        string reason, bool displayPerimeter = false)
     {
+        HasDisplayPerimeter = displayPerimeter;
         Rings = rings;
         Tabs = tabs;
         Reason = reason;
@@ -41,6 +42,12 @@ public sealed class LeadMaterialSnapshot
     /// </summary>
     internal IReadOnlyList<bool[]> Tabs { get; }
 
+    /// <summary>
+    /// True when the perimeter (<see cref="Rings"/>[0]) is a display perimeter: a supplied blank's
+    /// edge that bounds material but is never cut. Every other ring is a hole the program cuts.
+    /// </summary>
+    internal bool HasDisplayPerimeter { get; }
+
     /// <summary>Capture a stable, clean, rotation-baked program, applying location once.
     /// Unsupported or malformed geometry produces an incomplete snapshot; cancellation throws.</summary>
     public static LeadMaterialSnapshot Capture(Program cleanProgram, Vector location,
@@ -53,6 +60,8 @@ public sealed class LeadMaterialSnapshot
             var ringTabs = new List<bool[]>();
             var chain = new List<PostVerificationGeometry.Curve>();
             var chainTabs = new List<bool>();
+            var ringDisplay = new List<bool>();
+            var chainDisplay = new List<bool>();
             foreach (var motion in execution.Motions)
             {
                 token.ThrowIfCancellationRequested();
@@ -63,7 +72,8 @@ public sealed class LeadMaterialSnapshot
                     continue;
                 }
                 // A tabbed cutout's tabs are never cut but still close its hole.
-                if (motion.Layer is not (LayerType.Cut or LayerType.Display or LayerType.Tab))
+                // A display perimeter is never cut but still bounds the blank's material.
+                if (motion.Layer is not (LayerType.Cut or LayerType.Display or LayerType.Tab or LayerType.DisplayPerimeter))
                     throw new ArgumentException("Material capture contains an unsupported layer.");
                 var curve = motion.Curve;
                 if (curve == null || !double.IsFinite(curve.Length) || curve.Length <= PostVerificationGeometry.Epsilon)
@@ -72,6 +82,7 @@ public sealed class LeadMaterialSnapshot
                     throw new ArgumentException("Material contour is discontinuous.");
                 chain.Add(curve);
                 chainTabs.Add(motion.Layer == LayerType.Tab);
+                chainDisplay.Add(motion.Layer == LayerType.DisplayPerimeter);
                 if (NominalContourClosure.IsClosed(chain[0].Start, chain[^1].End))
                     Finish();
             }
@@ -126,13 +137,17 @@ public sealed class LeadMaterialSnapshot
                 throw new ArgumentException("Material must have exactly one enclosing perimeter.");
             if (ringTabs[outer].Any(tab => tab))
                 throw new ArgumentException("A perimeter cannot have tabs.");
+            if (ringDisplay.Where((_, i) => i != outer).Any(display => display))
+                throw new ArgumentException("A display perimeter must enclose every other contour.");
+            if (ringDisplay[outer] && rings.Count == 1)
+                throw new ArgumentException("A display perimeter with no cutouts has nothing to cut.");
             var holes = rings.Where((_, i) => i != outer).ToArray();
             for (var i = 0; i < holes.Length; i++)
                 for (var j = i + 1; j < holes.Length; j++)
                     if (Inside(holes[i][0].Start, holes[j], token) || Inside(holes[j][0].Start, holes[i], token))
                         throw new ArgumentException("Nested cutouts are not supported material.");
             return new LeadMaterialSnapshot(new[] { rings[outer] }.Concat(holes).ToArray(),
-                new[] { ringTabs[outer] }.Concat(ringTabs.Where((_, i) => i != outer)).ToArray(), null);
+                new[] { ringTabs[outer] }.Concat(ringTabs.Where((_, i) => i != outer)).ToArray(), null, ringDisplay[outer]);
 
             void Finish()
             {
@@ -145,10 +160,14 @@ public sealed class LeadMaterialSnapshot
                         $"Nominal material contour {rings.Count + 1} is open: endpoint gap {gap:G6} model units exceeds closure tolerance {NominalContourClosure.Tolerance:G6}.")
                         + " Review the source contour in the drawing editor; gaps cannot be filled implicitly.");
                 }
+                if (chainDisplay.Contains(true) && chainDisplay.Contains(false))
+                    throw new ArgumentException("A display perimeter must be one whole closed contour.");
                 rings.Add(chain.ToArray());
                 ringTabs.Add(chainTabs.ToArray());
+                ringDisplay.Add(chainDisplay.Count > 0 && chainDisplay[0]);
                 chain.Clear();
                 chainTabs.Clear();
+                chainDisplay.Clear();
             }
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException)

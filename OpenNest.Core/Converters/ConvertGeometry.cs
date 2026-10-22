@@ -183,6 +183,9 @@ namespace OpenNest.Converters
             if (string.Equals(name, SpecialLayers.Tab.Name, System.StringComparison.OrdinalIgnoreCase))
                 return LayerType.Tab;
 
+            if (string.Equals(name, SpecialLayers.DisplayPerimeter.Name, System.StringComparison.OrdinalIgnoreCase))
+                return LayerType.DisplayPerimeter;
+
             return LayerType.Cut;
         }
     }

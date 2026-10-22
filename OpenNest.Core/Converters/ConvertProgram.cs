@@ -213,6 +213,9 @@ namespace OpenNest.Converters
                 case LayerType.Tab:
                     return SpecialLayers.Tab;
 
+                case LayerType.DisplayPerimeter:
+                    return SpecialLayers.DisplayPerimeter;
+
                 default:
                     return new Layer(layer.ToString());
             }

@@ -51,7 +51,7 @@ internal static class BestEffortCuttingPlan
                     var holes = Enumerable.Range(0, prepared.PerimeterOrdinal).ToArray();
                     var route = CuttingHoleOrder.Plan(holes, CuttingHoleOrder.Centres(prepared, approach, token),
                         approach, null, token);
-                    foreach (var contour in route.Append(prepared.PerimeterOrdinal))
+                    foreach (var contour in prepared.HasCutPerimeter ? route.Append(prepared.PerimeterOrdinal) : route)
                     {
                         token.ThrowIfCancellationRequested();
                         choices.Add(prepared.ClosestEntry(contour, approach));

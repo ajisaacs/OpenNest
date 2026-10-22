@@ -24,7 +24,8 @@ internal static class SupportTabCapture
         CuttingPlanRequest request, CancellationToken token)
     {
         var parameters = request.ConfirmedParameters;
-        if (prepared == null || request.SupportBed == null || parameters?.SupportTabs != true
+        // A display perimeter is a supplied blank: it is never cut free, so it needs no tab.
+        if (prepared == null || !prepared.HasCutPerimeter || request.SupportBed == null || parameters?.SupportTabs != true
             || parameters.TabConfig == null)
             return prepared;
         token.ThrowIfCancellationRequested();
