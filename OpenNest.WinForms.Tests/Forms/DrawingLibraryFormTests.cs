@@ -26,6 +26,8 @@ public class DrawingLibraryFormTests
 
                 using var form = new DrawingLibraryForm(library, Server, nest);
                 form.ShowMessage = (text, _, _) => { messages.Add(text); return DialogResult.OK; };
+                // Only the adds' downloads are counted here; the preview has its own test.
+                form.LoadPreview = (_, _) => Task.FromResult<Drawing>(null!);
                 form.Show();
                 var grid = Field<DataGridView>(form, "drawingGrid");
                 var notes = Field<TextBox>(form, "notesBox");
@@ -52,6 +54,41 @@ public class DrawingLibraryFormTests
             },
             TestTimeout,
             "The drawing library dialog test did not complete.");
+    }
+
+    [Fact]
+    public void SelectingADrawing_ShowsItsDetailsAndPreviewsItsGeometry()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var record = library.Add("SYN-505", "Synthetic Steel", "Grade A", 0.25, Units.Inches, "");
+                var nest = MatchingNest();
+
+                using var form = new DrawingLibraryForm(library, Server, nest);
+                form.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                form.Show();
+                var grid = Field<DataGridView>(form, "drawingGrid");
+                var preview = Field<OpenNest.Controls.ShapePreviewControl>(form, "previewBox");
+
+                PumpUntil(() => grid.Rows.Count == 1, "the library page");
+                Assert.Equal("SYN-505", Field<Label>(form, "detailNameLabel").Text);
+                Assert.Equal("Synthetic Steel Grade A", Field<Label>(form, "materialValue").Text);
+                Assert.Equal("0.25 in", Field<Label>(form, "thicknessValue").Text);
+
+                Run(form.LoadSelectedPreviewAsync());
+                PumpUntil(() => preview.Plate.Parts.Count > 0, "the preview");
+                Assert.NotNull(Assert.Single(preview.Plate.Parts).BaseDrawing.Program);
+
+                // A cached revision is shown again without another download.
+                Run(form.LoadSelectedPreviewAsync());
+                Assert.Single(preview.Plate.Parts);
+                Assert.Single(library.Downloads, d => d == (record.Id, record.Revision));
+                Assert.Empty(nest.Drawings);
+            },
+            TestTimeout,
+            "The drawing library preview test did not complete.");
     }
 
     [Fact]

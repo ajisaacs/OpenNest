@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Controls;
@@ -22,17 +23,31 @@ namespace OpenNest.Forms
     /// rotation, color) on the server as a new revision with the same package. With a set
     /// store, the Sets tab browses and edits drawing sets (<see cref="Controls.DrawingSetBrowser"/>),
     /// and the drawing grid's menu lists the sets a drawing is in and adds it to a set.
+    /// The details pane previews the selected revision's geometry, downloaded shortly after
+    /// the selection settles and cached per revision for the dialog's lifetime.
     /// </summary>
     public partial class DrawingLibraryForm : Form
     {
         private const string LoadingText = "Loading...";
+        private const int DetailsWidth = 380;
+        private const int PreviewCacheLimit = 64;
 
         private readonly IDrawingLibraryStore library;
         private readonly string serverUrl;
         private readonly Nest nest;
         private readonly IDrawingSetStore sets;
         private readonly DrawingLibraryBrowseSession session;
+        private readonly Dictionary<(Guid Id, int Revision), Drawing> previews = new();
+        private CancellationTokenSource previewCancel;
+        private (Guid Id, int Revision) previewKey;
+        private Task<Drawing> previewLoad;
         private bool adding;
+
+        /// <summary>
+        /// Reads the drawing a record's package holds for the preview, or null when the
+        /// revision is gone; replaced by tests.
+        /// </summary>
+        internal Func<DrawingLibraryRecord, CancellationToken, Task<Drawing>> LoadPreview { get; set; }
 
         /// <summary>Shows a message and returns the operator's answer; replaced by tests.</summary>
         internal Func<string, MessageBoxButtons, MessageBoxIcon, DialogResult> ShowMessage { get; set; }
@@ -59,7 +74,11 @@ namespace OpenNest.Forms
         public DrawingLibraryForm(IDrawingLibraryStore library, string serverUrl, Nest nest, IDrawingSetStore sets = null)
         {
             InitializeComponent();
-            Load += (_, _) => DialogBounds.FitToOwnerScreen(this);
+            Load += (_, _) =>
+            {
+                DialogBounds.FitToOwnerScreen(this);
+                FitDetailsPane();
+            };
             this.library = library ?? throw new ArgumentNullException(nameof(library));
             this.serverUrl = serverUrl ?? "";
             this.nest = nest ?? throw new ArgumentNullException(nameof(nest));
@@ -80,6 +99,11 @@ namespace OpenNest.Forms
             {
                 using var form = new EditDrawingSetForm(edit, library, this.serverUrl);
                 return form.ShowDialog(this) == DialogResult.OK ? form.Saved : null;
+            };
+            LoadPreview = async (record, token) =>
+            {
+                var bytes = await library.GetRevisionPackageAsync(record.Id, record.Revision, token);
+                return bytes == null ? null : await Task.Run(() => DrawingPackage.Read(bytes).Drawing, token);
             };
 
             GridStyle.Apply(drawingGrid);
@@ -106,6 +130,7 @@ namespace OpenNest.Forms
             showAllCheckBox.Enabled = session.IsFilteredToNest;
             UpdateFilterLabel();
             UpdateNavigation();
+            ShowDetails();
         }
 
         private async void DrawingLibraryForm_Shown(object sender, EventArgs e) =>
@@ -145,8 +170,160 @@ namespace OpenNest.Forms
 
         private void DrawingGrid_SelectionChanged(object sender, EventArgs e)
         {
-            notesBox.Text = SelectedRecord()?.Notes ?? "";
+            ShowDetails();
             UpdateCommands();
+        }
+
+        // The grid takes the spare width; the details pane keeps its width as the dialog resizes.
+        private void FitDetailsPane()
+        {
+            splitContainer.Panel1MinSize = 320;
+            splitContainer.Panel2MinSize = 300;
+            var available = splitContainer.Width - splitContainer.SplitterWidth;
+            if (available >= splitContainer.Panel1MinSize + splitContainer.Panel2MinSize)
+            {
+                splitContainer.SplitterDistance = System.Math.Clamp(available - DetailsWidth,
+                    splitContainer.Panel1MinSize, available - splitContainer.Panel2MinSize);
+            }
+        }
+
+        /// <summary>Fills the details pane for the selected record and schedules its preview.</summary>
+        private void ShowDetails()
+        {
+            var record = SelectedRecord();
+            previewTimer.Stop();
+            previewCancel?.Cancel();
+
+            detailNameLabel.Text = record?.Name ?? "No drawing selected";
+            customerValue.Text = record == null ? "" : OrDash(record.Customer);
+            materialValue.Text = record == null ? "" : OrDash($"{record.MaterialName} {record.MaterialGrade}".Trim());
+            thicknessValue.Text = record == null ? "" : $"{FormatThickness(record.Thickness)} {UnitSuffix(record.Units)}";
+            cuttingValue.Text = record == null ? "" : record.Settings?.CutFirst == true ? $"{record.CutType}, cut first" : record.CutType.ToString();
+            revisionValue.Text = record == null ? "" : FormatRevision(record);
+            notesBox.Text = record?.Notes ?? "";
+
+            if (record == null)
+            {
+                previewBox.ShowDrawing(null);
+                previewBox.SetInfo("Select a drawing to preview it.");
+            }
+            else if (previews.TryGetValue((record.Id, record.Revision), out var cached))
+            {
+                ShowPreview(cached);
+            }
+            else
+            {
+                previewBox.ShowDrawing(null);
+                previewBox.SetInfo("Loading preview...");
+                // Arrowing through the list should not download every row it passes.
+                previewTimer.Start();
+            }
+        }
+
+        private async void PreviewTimer_Tick(object sender, EventArgs e) =>
+            await LoadSelectedPreviewAsync();
+
+        /// <summary>
+        /// Downloads and shows the selected revision's geometry unless it is cached. A newer
+        /// selection cancels the request, and a result for a row no longer selected is only cached.
+        /// </summary>
+        internal async Task LoadSelectedPreviewAsync()
+        {
+            previewTimer.Stop();
+            var record = SelectedRecord();
+            if (record == null)
+                return;
+
+            var key = (record.Id, record.Revision);
+            if (previews.TryGetValue(key, out var cached))
+            {
+                ShowPreview(cached);
+                return;
+            }
+
+            // A request already loading this revision is shared rather than restarted.
+            if (previewLoad == null || previewKey != key || previewCancel.IsCancellationRequested)
+            {
+                previewCancel?.Cancel();
+                previewCancel = new CancellationTokenSource();
+                previewKey = key;
+                previewLoad = LoadPreview(record, previewCancel.Token);
+            }
+
+            var cancel = previewCancel;
+            Drawing drawing = null;
+            Exception failure = null;
+            try
+            {
+                drawing = await previewLoad;
+            }
+            catch (OperationCanceledException) when (cancel.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                // The preview is best-effort: whatever fails here, the dialog keeps working.
+                failure = ex;
+            }
+
+            if (IsDisposed)
+                return;
+            // The await resumes on the dialog's thread only when that thread has a WinForms context.
+            if (!InvokeRequired)
+            {
+                ApplyPreview(record, cancel, drawing, failure);
+                return;
+            }
+
+            try
+            {
+                BeginInvoke(new Action(() => ApplyPreview(record, cancel, drawing, failure)));
+            }
+            catch (InvalidOperationException)
+            {
+                // The dialog closed meanwhile.
+            }
+        }
+
+        private void ApplyPreview(DrawingLibraryRecord record, CancellationTokenSource cancel, Drawing drawing, Exception failure)
+        {
+            if (cancel.IsCancellationRequested || IsDisposed)
+                return;
+            if (failure != null)
+            {
+                previewBox.ShowDrawing(null);
+                previewBox.SetInfo("Preview unavailable.", failure.Message);
+                return;
+            }
+
+            var key = (record.Id, record.Revision);
+            if (drawing != null)
+            {
+                // The package leaves color to the record; GetNextColor would advance the nest's palette.
+                var color = System.Drawing.Color.FromArgb(record.Settings?.ColorArgb ?? 0);
+                drawing.Color = color.A != 0 ? color : System.Drawing.Color.SteelBlue;
+                if (previews.Count >= PreviewCacheLimit)
+                    previews.Clear();
+                previews[key] = drawing;
+            }
+
+            if (SelectedRecord() is { } current && (current.Id, current.Revision) == key)
+                ShowPreview(drawing);
+        }
+
+        private void ShowPreview(Drawing drawing)
+        {
+            previewBox.ShowDrawing(drawing);
+            if (drawing?.Program == null)
+            {
+                previewBox.SetInfo("This revision is no longer on the server.");
+                return;
+            }
+
+            var size = drawing.Program.BoundingBox().Size;
+            var units = UnitSuffix(SelectedRecord()?.Units ?? Units.Inches);
+            previewBox.SetInfo($"{size.Length:0.###} x {size.Width:0.###} {units}");
         }
 
         private async void DrawingGrid_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
@@ -477,7 +654,7 @@ namespace OpenNest.Forms
                     : SortOrder.None;
             }
 
-            notesBox.Text = SelectedRecord()?.Notes ?? "";
+            ShowDetails();
         }
 
         private DrawingLibraryRecord SelectedRecord() =>
@@ -516,5 +693,19 @@ namespace OpenNest.Forms
 
         private static string FormatThickness(double value) =>
             value.ToString("0.####", CultureInfo.CurrentCulture);
+
+        private static string FormatRevision(DrawingLibraryRecord record)
+        {
+            var text = record.Revision.ToString(CultureInfo.CurrentCulture);
+            if (record.SavedAt != default)
+                text += $", saved {record.SavedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)}";
+            if (!string.IsNullOrWhiteSpace(record.SavedBy))
+                text += $" by {record.SavedBy}";
+            return text;
+        }
+
+        private static string UnitSuffix(Units units) => units == Units.Millimeters ? "mm" : "in";
+
+        private static string OrDash(string value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
     }
 }

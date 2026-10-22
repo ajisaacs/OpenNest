@@ -277,8 +277,13 @@ to open a v5 database, so rolling back after the upgrade needs the pre-upgrade b
 **Nest > Add from Drawing Library...** and the **Library** button above the
 drawing list open a paged browser of active library drawings (Database mode
 only; in File mode both are disabled with "Database mode only"). It starts
-filtered to the nest's material, grade and thickness; **Show all** lifts that
-filter. Selecting a drawing shows its notes. **Add to Nest** (or double-click /
+filtered to the nest's material, grade and thickness; **Show all materials**
+lifts that filter. Selecting a drawing fills the details pane beside the list:
+its details, notes and a preview of its geometry. The preview downloads the
+listed revision's package shortly after the selection settles (arrowing through
+the list does not download each row), caches it per revision while the dialog is
+open, and is best-effort: a failed download shows "Preview unavailable" and
+never blocks adding. **Add to Nest** (or double-click /
 Enter) downloads that exact revision, checks its SHA-256 against the record and
 plans the insert (`OpenNest.Data.LibraryDrawingInsert`) before changing anything:
 
