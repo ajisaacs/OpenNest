@@ -53,7 +53,8 @@ namespace OpenNest.Forms
             customerBox.Text = metadata.Customer;
             materialBox.Text = metadata.MaterialName;
             gradeBox.Text = metadata.MaterialGrade;
-            thicknessBox.Value = System.Math.Min(thicknessBox.Maximum, (decimal)metadata.Thickness);
+            thicknessBox.Units = metadata.Units;
+            thicknessBox.Value = metadata.Thickness;
             thicknessLabel.Text = $"Thickness ({UnitsHelper.GetShortString(metadata.Units)}):";
             cutTypeBox.SelectedItem = metadata.CutType;
             notesBox.Text = metadata.Notes;
@@ -241,7 +242,10 @@ namespace OpenNest.Forms
             Customer = customerBox.Text.Trim(),
             MaterialName = materialBox.Text.Trim(),
             MaterialGrade = gradeBox.Text.Trim(),
-            Thickness = DrawingLibraryRules.NormalizeThickness((double)thicknessBox.Value),
+            // Unreadable text fails the metadata rules instead of reading as 0.
+            Thickness = thicknessBox.TryGetValue(out var thickness)
+                ? DrawingLibraryRules.NormalizeThickness(thickness)
+                : double.NaN,
             Units = session.Nest.Units,
             CutType = cutTypeBox.SelectedItem is CutType cutType ? cutType : CutType.Laser,
             Notes = notesBox.Text,

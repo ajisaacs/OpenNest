@@ -30,7 +30,7 @@ public class SaveToDrawingLibraryFormTests
                 Assert.Equal("SYN-101", Field<TextBox>(form, "nameBox").Text);
                 Assert.Equal("Synthetic Steel", Field<ComboBox>(form, "materialBox").Text);
                 Assert.Equal("Grade A", Field<TextBox>(form, "gradeBox").Text);
-                Assert.Equal(0.25m, Field<NumericUpDown>(form, "thicknessBox").Value);
+                Assert.Equal("1/4\" - 0.25", Field<OpenNest.Controls.ThicknessComboBox>(form, "thicknessBox").Text);
                 Assert.Equal(CutType.Waterjet, Field<ComboBox>(form, "cutTypeBox").SelectedItem);
                 PumpUntil(() => save.Enabled, "the duplicate check");
                 Assert.Equal("Create a separate library drawing", saveAs.Text);
@@ -62,18 +62,18 @@ public class SaveToDrawingLibraryFormTests
                 form.Show();
                 var saveAs = Field<ComboBox>(form, "saveAsBox");
                 var save = Field<Button>(form, "saveButton");
-                var thickness = Field<NumericUpDown>(form, "thicknessBox");
+                var thickness = Field<OpenNest.Controls.ThicknessComboBox>(form, "thicknessBox");
 
                 PumpUntil(() => save.Enabled, "the duplicate check");
                 Assert.StartsWith("Revision 2 of 'SYN-101'", saveAs.Text);
 
-                thickness.Value = 0.1875m;
+                thickness.Value = 0.1875;
                 Assert.False(save.Enabled);
                 Assert.Equal(-1, saveAs.SelectedIndex);
                 PumpUntil(() => save.Enabled, "the second duplicate check");
                 Assert.Equal("Create a separate library drawing", saveAs.Text);
 
-                thickness.Value = 0.25m;
+                thickness.Value = 0.25;
                 PumpUntil(() => save.Enabled, "the third duplicate check");
                 Run(form.SaveAsync());
 

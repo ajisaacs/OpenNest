@@ -38,6 +38,7 @@ namespace OpenNest.Forms
             };
             Disposed += (sender, e) => timer.Dispose();
             nameBox.TextChanged += (sender, e) => EnableCheck();
+            thicknessBox.TextChanged += (sender, e) => EnableCheck();
             materialBox.TextChanged += (sender, e) => RefreshGrades();
             EnableCheck();
         }
@@ -137,8 +138,8 @@ namespace OpenNest.Forms
 
         public double Thickness
         {
-            get { return (double)thicknessBox.Value; }
-            set { thicknessBox.Value = (decimal)value; }
+            get { return thicknessBox.Value; }
+            set { thicknessBox.Value = value; }
         }
 
         public string MaterialName
@@ -241,7 +242,6 @@ namespace OpenNest.Forms
         {
             var unitBoxes = new Controls.NumericUpDown[]
             {
-                thicknessBox,
                 partSpacingBox,
                 leftSpacingBox,
                 topSpacingBox,
@@ -253,6 +253,8 @@ namespace OpenNest.Forms
 
             foreach (var box in unitBoxes)
                 box.Suffix = unitString;
+
+            thicknessBox.Units = GetUnits();
         }
 
         public int Quadrant
@@ -266,6 +268,12 @@ namespace OpenNest.Forms
             Size size;
 
             if (NestName.Length == 0)
+            {
+                applyButton.Enabled = false;
+                return;
+            }
+
+            if (!thicknessBox.IsValid)
             {
                 applyButton.Enabled = false;
                 return;

@@ -55,7 +55,7 @@
             this.radioButton1 = new System.Windows.Forms.RadioButton();
             this.radioButton2 = new System.Windows.Forms.RadioButton();
             this.label2 = new System.Windows.Forms.Label();
-            this.thicknessBox = new OpenNest.Controls.NumericUpDown();
+            this.thicknessBox = new OpenNest.Controls.ThicknessComboBox();
             this.label3 = new System.Windows.Forms.Label();
             this.label4 = new System.Windows.Forms.Label();
             this.customerBox = new System.Windows.Forms.TextBox();
@@ -90,7 +90,6 @@
             this.tabPage1.SuspendLayout();
             this.tableLayoutPanel3.SuspendLayout();
             this.tableLayoutPanel4.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.thicknessBox)).BeginInit();
             this.tabPage2.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.bottomPanel1.SuspendLayout();
@@ -502,21 +501,10 @@
             // thicknessBox
             // 
             this.thicknessBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.thicknessBox.DecimalPlaces = 4;
-            this.thicknessBox.Increment = new decimal(new int[] {
-            25,
-            0,
-            0,
-            131072});
             this.thicknessBox.Location = new System.Drawing.Point(135, 125);
-            this.thicknessBox.Maximum = new decimal(new int[] {
-            999999,
-            0,
-            0,
-            0});
             this.thicknessBox.Name = "thicknessBox";
             this.thicknessBox.Size = new System.Drawing.Size(224, 22);
-            this.thicknessBox.Suffix = "";
+            this.thicknessBox.FormattingEnabled = true;
             this.thicknessBox.TabIndex = 7;
             //
             // labelMaterial
@@ -753,7 +741,6 @@
             this.tableLayoutPanel3.PerformLayout();
             this.tableLayoutPanel4.ResumeLayout(false);
             this.tableLayoutPanel4.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.thicknessBox)).EndInit();
             this.tabPage2.ResumeLayout(false);
             this.tabPage3.ResumeLayout(false);
             this.tabPage3.PerformLayout();
@@ -779,7 +766,7 @@
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
         private System.Windows.Forms.Label labelSize;
         private System.Windows.Forms.TextBox sizeBox;
-        private Controls.NumericUpDown thicknessBox;
+        private Controls.ThicknessComboBox thicknessBox;
         private System.Windows.Forms.Label labelThk;
         private System.Windows.Forms.Label labelPartSpacing;
         private Controls.NumericUpDown partSpacingBox;

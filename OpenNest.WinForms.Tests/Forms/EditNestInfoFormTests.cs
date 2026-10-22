@@ -49,6 +49,31 @@ public class EditNestInfoFormTests
         });
     }
 
+    [Fact]
+    public void ThicknessBox_ReadsAPickedGauge_AndRejectsUnreadableText()
+    {
+        RunSta(() =>
+        {
+            using var form = new EditNestInfoForm();
+            var nest = AcceptanceNest();
+            form.LoadNestInfo(nest);
+            var thickness = (OpenNest.Controls.ThicknessComboBox)form.Controls.Find("thicknessBox", true).Single();
+            var apply = form.Controls.Find("applyButton", true).Single();
+
+            Assert.Equal("1/4\" - 0.25", thickness.Text);
+            thickness.SelectedItem = "16 ga - 0.0598";
+            Assert.Equal(0.0598, form.Thickness);
+            Assert.True(apply.Enabled);
+
+            thickness.Text = "sixteen";
+            Assert.False(apply.Enabled);
+
+            thickness.Text = "16ga";
+            form.SaveNestInfo(nest);
+            Assert.Equal(0.0598, nest.Thickness);
+        });
+    }
+
     private static Nest AcceptanceNest()
     {
         var nest = new Nest("Acceptance nest")

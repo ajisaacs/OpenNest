@@ -28,7 +28,7 @@ namespace OpenNest.Forms
             gradeLabel = new System.Windows.Forms.Label();
             gradeBox = new System.Windows.Forms.TextBox();
             thicknessLabel = new System.Windows.Forms.Label();
-            thicknessBox = new System.Windows.Forms.NumericUpDown();
+            thicknessBox = new OpenNest.Controls.ThicknessComboBox();
             cutTypeLabel = new System.Windows.Forms.Label();
             cutTypeBox = new System.Windows.Forms.ComboBox();
             notesLabel = new System.Windows.Forms.Label();
@@ -44,7 +44,6 @@ namespace OpenNest.Forms
             saveButton = new System.Windows.Forms.Button();
             lookupTimer = new System.Windows.Forms.Timer(components);
             layoutTable.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)thicknessBox).BeginInit();
             buttonPanel.SuspendLayout();
             SuspendLayout();
             //
@@ -172,14 +171,10 @@ namespace OpenNest.Forms
             // thicknessBox
             //
             thicknessBox.Anchor = System.Windows.Forms.AnchorStyles.Left;
-            thicknessBox.DecimalPlaces = 4;
-            thicknessBox.Increment = new decimal(new int[] { 1, 0, 0, 131072 });
-            thicknessBox.Maximum = new decimal(new int[] { 10000, 0, 0, 0 });
             thicknessBox.Name = "thicknessBox";
-            thicknessBox.Size = new System.Drawing.Size(100, 25);
+            thicknessBox.Size = new System.Drawing.Size(160, 25);
             thicknessBox.TabIndex = 9;
-            thicknessBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
-            thicknessBox.ValueChanged += Details_Changed;
+            thicknessBox.TextChanged += Details_Changed;
             //
             // cutTypeLabel
             //
@@ -321,7 +316,6 @@ namespace OpenNest.Forms
             Shown += SaveToDrawingLibraryForm_Shown;
             layoutTable.ResumeLayout(false);
             layoutTable.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)thicknessBox).EndInit();
             buttonPanel.ResumeLayout(false);
             buttonPanel.PerformLayout();
             ResumeLayout(false);
@@ -339,7 +333,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Label gradeLabel;
         private System.Windows.Forms.TextBox gradeBox;
         private System.Windows.Forms.Label thicknessLabel;
-        private System.Windows.Forms.NumericUpDown thicknessBox;
+        private OpenNest.Controls.ThicknessComboBox thicknessBox;
         private System.Windows.Forms.Label cutTypeLabel;
         private System.Windows.Forms.ComboBox cutTypeBox;
         private System.Windows.Forms.Label notesLabel;
