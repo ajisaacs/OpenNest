@@ -21,7 +21,7 @@ A Windows desktop application for CNC nesting — imports DXF drawings, arranges
 - Windows 10+ for the desktop app; the console, API, and most test projects build on Linux/macOS too.
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) to build from source.
 
-Windows release ZIPs are self-contained: extract the entire archive into a new folder and run `OpenNest.exe`; no separate .NET installation is needed. To update, close OpenNest and extract the new release into a new folder; ZIP releases do not auto-update (optional installer-based updates need a separately hosted [Velopack feed](docs/auto-update.md)). All nesting engines (Default, Rectangles, Irregular, Circles, FlatBar and the fill strategies) are built in; see [nesting engines](docs/nesting-engines.md). Use the ZIP and SHA-256 checksum from [GitHub Releases](https://github.com/ajisaacs/OpenNest/releases), not the source-code archives.
+Prebuilt Windows downloads are on [GitHub Releases](https://github.com/ajisaacs/OpenNest/releases), or [build from source](#build-test-run) to run the latest code. Release ZIPs are self-contained: extract the entire archive into a new folder and run `OpenNest.exe`; no separate .NET installation is needed. To update, close OpenNest and extract the new release into a new folder; ZIP releases do not auto-update (optional installer-based updates need a separately hosted [Velopack feed](docs/auto-update.md)). All nesting engines (Default, Rectangles, Irregular, Circles, FlatBar and the fill strategies) are built in; see [nesting engines](docs/nesting-engines.md).
 
 ## Build, Test, Run
 
