@@ -302,6 +302,14 @@ id, revision and a snapshot of the library details) that is saved with the nest
 in the nest never changes the library. The copy takes its name, customer,
 material and nesting settings from the library record, not from the package.
 
+The **In This Nest** tab (its title counts them) lists the nest's drawings,
+library or not, cutoffs excluded: name, library revision ("Not from the library"
+or "(other server)" when it is linked elsewhere), and the Required, Nested and
+Remaining quantities, with totals below. It refreshes after every add. Required
+is edited in place (0 to 99,999; one click starts editing, a bad number keeps
+the editor open with an error) and applies to the nest at once, like an add;
+the main window's drawing list refreshes when the dialog closes.
+
 The browser's **Cut first** column shows the setting. **Edit Settings...**
 (`OpenNest.Data.DrawingLibraryEditSession`) edits the selected active drawing's
 Cut first flag, priority, rotation step/start/end (degrees), 180° equivalent,

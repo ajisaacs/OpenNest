@@ -23,7 +23,20 @@ namespace OpenNest.Forms
         {
             components = new System.ComponentModel.Container();
             System.Windows.Forms.DataGridViewCellStyle rightAligned = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle editableQuantity = new System.Windows.Forms.DataGridViewCellStyle();
             rootTable = new System.Windows.Forms.TableLayoutPanel();
+            tabControl = new System.Windows.Forms.TabControl();
+            drawingsTab = new System.Windows.Forms.TabPage();
+            nestTab = new System.Windows.Forms.TabPage();
+            nestTable = new System.Windows.Forms.TableLayoutPanel();
+            nestHintLabel = new System.Windows.Forms.Label();
+            nestGrid = new System.Windows.Forms.DataGridView();
+            nestNameColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            nestLibraryColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            nestRequiredColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            nestNestedColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            nestRemainingColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            nestSummaryLabel = new System.Windows.Forms.Label();
             footerPanel = new System.Windows.Forms.FlowLayoutPanel();
             layoutTable = new System.Windows.Forms.TableLayoutPanel();
             filterTable = new System.Windows.Forms.TableLayoutPanel();
@@ -80,6 +93,11 @@ namespace OpenNest.Forms
             releaseMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             releasesMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             rootTable.SuspendLayout();
+            tabControl.SuspendLayout();
+            drawingsTab.SuspendLayout();
+            nestTab.SuspendLayout();
+            nestTable.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)nestGrid).BeginInit();
             footerPanel.SuspendLayout();
             layoutTable.SuspendLayout();
             filterTable.SuspendLayout();
@@ -103,7 +121,7 @@ namespace OpenNest.Forms
             //
             rootTable.ColumnCount = 1;
             rootTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            rootTable.Controls.Add(layoutTable, 0, 0);
+            rootTable.Controls.Add(tabControl, 0, 0);
             rootTable.Controls.Add(footerPanel, 0, 1);
             rootTable.Dock = System.Windows.Forms.DockStyle.Fill;
             rootTable.Location = new System.Drawing.Point(0, 0);
@@ -114,6 +132,124 @@ namespace OpenNest.Forms
             rootTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             rootTable.Size = new System.Drawing.Size(1184, 721);
             rootTable.TabIndex = 0;
+            //
+            // tabControl
+            //
+            tabControl.Controls.Add(drawingsTab);
+            tabControl.Controls.Add(nestTab);
+            tabControl.Dock = System.Windows.Forms.DockStyle.Fill;
+            tabControl.Margin = new System.Windows.Forms.Padding(0);
+            tabControl.Name = "tabControl";
+            tabControl.SelectedIndex = 0;
+            tabControl.TabIndex = 0;
+            //
+            // drawingsTab
+            //
+            drawingsTab.Controls.Add(layoutTable);
+            drawingsTab.Name = "drawingsTab";
+            drawingsTab.Text = "Drawings";
+            drawingsTab.UseVisualStyleBackColor = true;
+            //
+            // nestTab
+            //
+            nestTab.Controls.Add(nestTable);
+            nestTab.Name = "nestTab";
+            nestTab.Text = "In This Nest";
+            nestTab.UseVisualStyleBackColor = true;
+            //
+            // nestTable
+            //
+            nestTable.ColumnCount = 1;
+            nestTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            nestTable.Controls.Add(nestHintLabel, 0, 0);
+            nestTable.Controls.Add(nestGrid, 0, 1);
+            nestTable.Controls.Add(nestSummaryLabel, 0, 2);
+            nestTable.Dock = System.Windows.Forms.DockStyle.Fill;
+            nestTable.Name = "nestTable";
+            nestTable.Padding = new System.Windows.Forms.Padding(8);
+            nestTable.RowCount = 3;
+            nestTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            nestTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            nestTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            nestTable.TabIndex = 0;
+            //
+            // nestHintLabel
+            //
+            nestHintLabel.AutoSize = true;
+            nestHintLabel.ForeColor = System.Drawing.SystemColors.GrayText;
+            nestHintLabel.Margin = new System.Windows.Forms.Padding(3, 0, 3, 6);
+            nestHintLabel.Name = "nestHintLabel";
+            nestHintLabel.TabIndex = 0;
+            nestHintLabel.Text = "The parts this nest needs. Edit Required to change a quantity; it applies to the nest right away.";
+            //
+            // nestGrid
+            //
+            nestGrid.AllowUserToAddRows = false;
+            nestGrid.AllowUserToDeleteRows = false;
+            nestGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { nestNameColumn, nestLibraryColumn, nestRequiredColumn, nestNestedColumn, nestRemainingColumn });
+            nestGrid.Dock = System.Windows.Forms.DockStyle.Fill;
+            nestGrid.EditMode = System.Windows.Forms.DataGridViewEditMode.EditOnKeystrokeOrF2;
+            nestGrid.Margin = new System.Windows.Forms.Padding(0);
+            nestGrid.MultiSelect = false;
+            nestGrid.Name = "nestGrid";
+            nestGrid.RowHeadersVisible = false;
+            nestGrid.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.CellSelect;
+            nestGrid.StandardTab = true;
+            nestGrid.TabIndex = 1;
+            nestGrid.CellClick += NestGrid_CellClick;
+            nestGrid.CellValidating += NestGrid_CellValidating;
+            nestGrid.CellValueChanged += NestGrid_CellValueChanged;
+            //
+            // nestNameColumn
+            //
+            nestNameColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            nestNameColumn.HeaderText = "Name";
+            nestNameColumn.MinimumWidth = 160;
+            nestNameColumn.Name = "nestNameColumn";
+            nestNameColumn.ReadOnly = true;
+            //
+            // nestLibraryColumn
+            //
+            nestLibraryColumn.HeaderText = "Library";
+            nestLibraryColumn.Name = "nestLibraryColumn";
+            nestLibraryColumn.ReadOnly = true;
+            nestLibraryColumn.Width = 160;
+            //
+            // nestRequiredColumn
+            //
+            editableQuantity.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleRight;
+            editableQuantity.Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Bold);
+            nestRequiredColumn.DefaultCellStyle = editableQuantity;
+            nestRequiredColumn.HeaderText = "Required";
+            nestRequiredColumn.Name = "nestRequiredColumn";
+            nestRequiredColumn.ValueType = typeof(int);
+            nestRequiredColumn.Width = 90;
+            //
+            // nestNestedColumn
+            //
+            nestNestedColumn.DefaultCellStyle = rightAligned;
+            nestNestedColumn.HeaderText = "Nested";
+            nestNestedColumn.Name = "nestNestedColumn";
+            nestNestedColumn.ReadOnly = true;
+            nestNestedColumn.Width = 80;
+            //
+            // nestRemainingColumn
+            //
+            nestRemainingColumn.DefaultCellStyle = rightAligned;
+            nestRemainingColumn.HeaderText = "Remaining";
+            nestRemainingColumn.Name = "nestRemainingColumn";
+            nestRemainingColumn.ReadOnly = true;
+            nestRemainingColumn.Width = 90;
+            //
+            // nestSummaryLabel
+            //
+            nestSummaryLabel.AutoEllipsis = true;
+            nestSummaryLabel.Dock = System.Windows.Forms.DockStyle.Fill;
+            nestSummaryLabel.ForeColor = System.Drawing.SystemColors.GrayText;
+            nestSummaryLabel.Margin = new System.Windows.Forms.Padding(3, 6, 3, 0);
+            nestSummaryLabel.Name = "nestSummaryLabel";
+            nestSummaryLabel.Size = new System.Drawing.Size(100, 20);
+            nestSummaryLabel.TabIndex = 2;
             //
             // footerPanel
             //
@@ -134,6 +270,7 @@ namespace OpenNest.Forms
             layoutTable.Controls.Add(statusLabel, 0, 2);
             layoutTable.Dock = System.Windows.Forms.DockStyle.Fill;
             layoutTable.Margin = new System.Windows.Forms.Padding(0);
+            layoutTable.Padding = new System.Windows.Forms.Padding(8);
             layoutTable.Name = "layoutTable";
             layoutTable.RowCount = 3;
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
@@ -684,6 +821,12 @@ namespace OpenNest.Forms
             Shown += DrawingLibraryForm_Shown;
             rootTable.ResumeLayout(false);
             rootTable.PerformLayout();
+            tabControl.ResumeLayout(false);
+            drawingsTab.ResumeLayout(false);
+            nestTab.ResumeLayout(false);
+            nestTable.ResumeLayout(false);
+            nestTable.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)nestGrid).EndInit();
             footerPanel.ResumeLayout(false);
             footerPanel.PerformLayout();
             layoutTable.ResumeLayout(false);
@@ -716,6 +859,18 @@ namespace OpenNest.Forms
         #endregion
 
         private System.Windows.Forms.TableLayoutPanel rootTable;
+        private System.Windows.Forms.TabControl tabControl;
+        private System.Windows.Forms.TabPage drawingsTab;
+        private System.Windows.Forms.TabPage nestTab;
+        private System.Windows.Forms.TableLayoutPanel nestTable;
+        private System.Windows.Forms.Label nestHintLabel;
+        private System.Windows.Forms.DataGridView nestGrid;
+        private System.Windows.Forms.DataGridViewTextBoxColumn nestNameColumn;
+        private System.Windows.Forms.DataGridViewTextBoxColumn nestLibraryColumn;
+        private System.Windows.Forms.DataGridViewTextBoxColumn nestRequiredColumn;
+        private System.Windows.Forms.DataGridViewTextBoxColumn nestNestedColumn;
+        private System.Windows.Forms.DataGridViewTextBoxColumn nestRemainingColumn;
+        private System.Windows.Forms.Label nestSummaryLabel;
         private System.Windows.Forms.FlowLayoutPanel footerPanel;
         private System.Windows.Forms.TableLayoutPanel layoutTable;
         private System.Windows.Forms.TableLayoutPanel filterTable;

@@ -1289,7 +1289,7 @@ namespace OpenNest.Forms
             if (MdiParent is MainForm main)
                 form.EnableRelease(NestStorage.CreateRepository(), main.OpenServerNest, main.IsServerNestOpen);
             form.ShowDialog(this);
-            if (form.AddedDrawings.Count > 0)
+            if (form.AddedDrawings.Count > 0 || form.QuantitiesChanged)
                 UpdateDrawingList();
         }
 

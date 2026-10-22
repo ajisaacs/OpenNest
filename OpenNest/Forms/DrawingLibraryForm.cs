@@ -25,13 +25,15 @@ namespace OpenNest.Forms
     /// the releases that had it on its own and, once release is enabled, releases it; sets
     /// themselves are browsed and released in <see cref="DrawingSetsForm"/>.
     /// The details pane previews the selected revision's geometry, downloaded shortly after
-    /// the selection settles and cached per revision for the dialog's lifetime.
+    /// the selection settles and cached per revision for the dialog's lifetime. The In This
+    /// Nest tab lists the nest's drawings and edits their required quantities in place.
     /// </summary>
     public partial class DrawingLibraryForm : Form
     {
         private const string LoadingText = "Loading...";
         private const int DetailsWidth = 380;
         private const int PreviewCacheLimit = 64;
+        private const int MaxQuantity = 99999;
 
         private readonly IDrawingLibraryStore library;
         private readonly string serverUrl;
@@ -42,6 +44,7 @@ namespace OpenNest.Forms
         private CancellationTokenSource previewCancel;
         private (Guid Id, int Revision) previewKey;
         private Task<Drawing> previewLoad;
+        private bool populatingNest;
         private bool adding;
 
         /// <summary>
@@ -79,6 +82,12 @@ namespace OpenNest.Forms
         /// dialog stays open after each add, so callers check this rather than the dialog result.
         /// </summary>
         public List<Drawing> AddedDrawings { get; } = new();
+
+        /// <summary>
+        /// True once the In This Nest tab changed a drawing's required quantity; like an add,
+        /// the change is already applied to the nest when the dialog closes.
+        /// </summary>
+        public bool QuantitiesChanged { get; private set; }
 
         /// <param name="sets">Enables Used in Sets and Add to Set; null hides them.</param>
         public DrawingLibraryForm(IDrawingLibraryStore library, string serverUrl, Nest nest, IDrawingSetStore sets = null)
@@ -122,6 +131,7 @@ namespace OpenNest.Forms
             };
 
             GridStyle.Apply(drawingGrid);
+            GridStyle.Apply(nestGrid);
             nameColumn.Tag = DrawingSortField.Name;
             customerColumn.Tag = DrawingSortField.Customer;
             materialColumn.Tag = DrawingSortField.MaterialName;
@@ -139,6 +149,7 @@ namespace OpenNest.Forms
             UpdateFilterLabel();
             UpdateNavigation();
             ShowDetails();
+            RefreshNestTab();
         }
 
         private async void DrawingLibraryForm_Shown(object sender, EventArgs e) =>
@@ -629,6 +640,7 @@ namespace OpenNest.Forms
                 insert.Apply();
                 if (!AddedDrawings.Contains(insert.Drawing))
                     AddedDrawings.Add(insert.Drawing);
+                RefreshNestTab();
                 statusLabel.Text = insert.Kind == LibraryInsertKind.AddQuantity
                     ? $"Added {quantity} to '{insert.Drawing.Name}' (now {insert.Drawing.Quantity.Required})."
                     : $"Added '{insert.Drawing.Name}' revision {record.Revision}, quantity {quantity}.";
@@ -755,6 +767,127 @@ namespace OpenNest.Forms
 
         private static string FormatThickness(double value) =>
             value.ToString("0.####", CultureInfo.CurrentCulture);
+
+        /// <summary>
+        /// Lists the nest's drawings (cutoffs excluded) with their required, nested and
+        /// remaining quantities, and counts them on the tab.
+        /// </summary>
+        private void RefreshNestTab()
+        {
+            if (nestGrid.IsCurrentCellInEditMode)
+                nestGrid.CancelEdit();
+
+            populatingNest = true;
+            try
+            {
+                nestGrid.Rows.Clear();
+                foreach (var drawing in nest.Drawings.Where(drawing => !drawing.IsCutOff))
+                {
+                    var index = nestGrid.Rows.Add(
+                        drawing.Name,
+                        LibraryText(drawing),
+                        drawing.Quantity.Required,
+                        drawing.Quantity.Nested,
+                        drawing.Quantity.Remaining);
+                    nestGrid.Rows[index].Tag = drawing;
+                }
+            }
+            finally
+            {
+                populatingNest = false;
+            }
+
+            nestTab.Text = $"In This Nest ({nestGrid.Rows.Count:N0})";
+            UpdateNestSummary();
+        }
+
+        // One click on a Required cell starts editing it; the other columns are read-only.
+        private void NestGrid_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0 && e.ColumnIndex == nestRequiredColumn.Index)
+                nestGrid.BeginEdit(true);
+        }
+
+        private void NestGrid_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex != nestRequiredColumn.Index)
+                return;
+
+            var valid = int.TryParse(Convert.ToString(e.FormattedValue, CultureInfo.CurrentCulture),
+                NumberStyles.Integer, CultureInfo.CurrentCulture, out var value)
+                && value >= 0 && value <= MaxQuantity;
+            nestGrid.Rows[e.RowIndex].ErrorText = valid ? "" : $"Enter a whole number from 0 to {MaxQuantity:N0}.";
+            e.Cancel = !valid;
+        }
+
+        private void NestGrid_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        {
+            if (populatingNest || e.RowIndex < 0 || e.ColumnIndex != nestRequiredColumn.Index)
+                return;
+
+            var row = nestGrid.Rows[e.RowIndex];
+            if (row.Tag is not Drawing drawing)
+                return;
+
+            // CellValidating runs only when focus leaves the cell; a commit by EndEdit skips it.
+            if (row.Cells[e.ColumnIndex].Value is int value && value >= 0 && value <= MaxQuantity)
+            {
+                SetRequiredQuantity(row, drawing, value);
+                return;
+            }
+
+            populatingNest = true;
+            try
+            {
+                row.Cells[e.ColumnIndex].Value = drawing.Quantity.Required;
+            }
+            finally
+            {
+                populatingNest = false;
+            }
+        }
+
+        private void SetRequiredQuantity(DataGridViewRow row, Drawing drawing, int value)
+        {
+            if (drawing.Quantity.Required == value)
+                return;
+
+            var before = drawing.Quantity.Required;
+            drawing.Quantity.Required = value;
+            QuantitiesChanged = true;
+            populatingNest = true;
+            try
+            {
+                row.Cells[nestRemainingColumn.Index].Value = drawing.Quantity.Remaining;
+            }
+            finally
+            {
+                populatingNest = false;
+            }
+
+            statusLabel.Text = $"'{drawing.Name}' now requires {value:N0} (was {before:N0}).";
+            UpdateNestSummary();
+        }
+
+        private void UpdateNestSummary()
+        {
+            var drawings = nest.Drawings.Where(drawing => !drawing.IsCutOff).ToList();
+            nestSummaryLabel.Text = drawings.Count == 0
+                ? "This nest has no drawings yet. Add them from the Drawings tab."
+                : $"{drawings.Count:N0} drawing{(drawings.Count == 1 ? "" : "s")}: "
+                    + $"{drawings.Sum(drawing => drawing.Quantity.Required):N0} parts required, "
+                    + $"{drawings.Sum(drawing => drawing.Quantity.Nested):N0} nested, "
+                    + $"{drawings.Sum(drawing => drawing.Quantity.Remaining):N0} remaining.";
+        }
+
+        private string LibraryText(Drawing drawing)
+        {
+            if (drawing.Library == null)
+                return "Not from the library";
+            return string.Equals(drawing.Library.ServerKey, serverUrl, StringComparison.OrdinalIgnoreCase)
+                ? $"Revision {drawing.Library.Revision}"
+                : $"Revision {drawing.Library.Revision} (other server)";
+        }
 
         private static string FormatRevision(DrawingLibraryRecord record)
         {

@@ -92,6 +92,70 @@ public class DrawingLibraryFormTests
     }
 
     [Fact]
+    public void InThisNestTab_ListsTheNestsDrawings_AndEditsTheirRequiredQuantity()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var record = library.Add("SYN-606", "Synthetic Steel", "Grade A", 0.25, Units.Inches, "");
+                var nest = MatchingNest();
+                var local = new RectangleShape { Name = "LOCAL-1", Length = 3, Width = 1 }.GetDrawing();
+                local.Quantity.Required = 4;
+                nest.Drawings.Add(local);
+                var cutoff = new RectangleShape { Name = "CUTOFF", Length = 1, Width = 1 }.GetDrawing();
+                cutoff.IsCutOff = true;
+                nest.Drawings.Add(cutoff);
+
+                using var form = new DrawingLibraryForm(library, Server, nest);
+                form.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                form.LoadPreview = (_, _) => Task.FromResult<Drawing>(null!);
+                form.Show();
+                var grid = Field<DataGridView>(form, "drawingGrid");
+                var nestGrid = Field<DataGridView>(form, "nestGrid");
+                var nestTab = Field<TabPage>(form, "nestTab");
+
+                Assert.Equal("In This Nest (1)", nestTab.Text);
+                Assert.Equal("LOCAL-1", Assert.Single(nestGrid.Rows.Cast<DataGridViewRow>()).Cells["nestNameColumn"].Value);
+                Assert.Equal("Not from the library", nestGrid.Rows[0].Cells["nestLibraryColumn"].Value);
+
+                PumpUntil(() => grid.Rows.Count == 1, "the library page");
+                Field<NumericUpDown>(form, "quantityBox").Value = 2;
+                Run(form.AddSelectedAsync());
+                Assert.Equal("In This Nest (2)", nestTab.Text);
+                Assert.Equal($"Revision {record.Revision}", nestGrid.Rows[1].Cells["nestLibraryColumn"].Value);
+                Assert.Equal(2, nestGrid.Rows[1].Cells["nestRequiredColumn"].Value);
+
+                Field<TabControl>(form, "tabControl").SelectedTab = nestTab;
+                var required = nestGrid.Rows[0].Cells["nestRequiredColumn"];
+
+                nestGrid.CurrentCell = required;
+                Assert.True(nestGrid.BeginEdit(true));
+                nestGrid.EditingControl!.Text = "-1";
+                nestGrid.NotifyCurrentCellDirty(true);
+                // Leaving the cell validates it and keeps the editor open on a bad number.
+                Assert.Throws<InvalidOperationException>(() => nestGrid.CurrentCell = nestGrid.Rows[0].Cells["nestNameColumn"]);
+                Assert.NotEmpty(nestGrid.Rows[0].ErrorText);
+                // A commit that skips validation is refused when it is applied.
+                nestGrid.EndEdit();
+                Assert.Equal(4, local.Quantity.Required);
+                Assert.Equal(4, required.Value);
+                Assert.False(form.QuantitiesChanged);
+
+                Assert.True(nestGrid.BeginEdit(true));
+                nestGrid.EditingControl!.Text = "9";
+                nestGrid.NotifyCurrentCellDirty(true);
+                Assert.True(nestGrid.EndEdit());
+                Assert.Equal(9, local.Quantity.Required);
+                Assert.Equal(9, nestGrid.Rows[0].Cells["nestRemainingColumn"].Value);
+                Assert.True(form.QuantitiesChanged);
+                Assert.Contains("11 parts required", Field<Label>(form, "nestSummaryLabel").Text);
+            },
+            TestTimeout,
+            "The In This Nest tab test did not complete.");
+    }
+
+    [Fact]
     public void MismatchWarning_IsShownBeforeTheAdd_AndCancelLeavesTheNestAlone()
     {
         StaTestThread.Run(
