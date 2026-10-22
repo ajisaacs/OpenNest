@@ -1025,11 +1025,30 @@ namespace OpenNest.Forms
 
         private void FirePlateChanged(bool updateListView = true)
         {
-            if (updateListView && PlateManager.CurrentIndex < platesListView.Items.Count)
-                platesListView.Items[PlateManager.CurrentIndex].Selected = true;
+            if (updateListView)
+                SelectCurrentPlateInList();
 
             UpdatePlateHeader();
             PlateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void SelectCurrentPlateInList()
+        {
+            var index = PlateManager.CurrentIndex;
+            if (index < 0 || index >= platesListView.Items.Count)
+                return;
+
+            var item = platesListView.Items[index];
+            if (item.Selected)
+                return;
+
+            // Guarded so the list's own SelectedIndexChanged doesn't reload the plate.
+            var wasUpdating = updatingPlateList;
+            updatingPlateList = true;
+            item.Selected = true;
+            item.Focused = true;
+            item.EnsureVisible();
+            updatingPlateList = wasUpdating;
         }
 
         private void UpdatePlateHeader()
@@ -1445,6 +1464,7 @@ namespace OpenNest.Forms
         {
             PlateView.Plate = PlateManager.CurrentPlate;
             PlateView.ZoomToFit();
+            SelectCurrentPlateInList();
             UpdatePlateHeader();
             UpdateRemovePlateButton();
             PlateChanged?.Invoke(this, EventArgs.Empty);
