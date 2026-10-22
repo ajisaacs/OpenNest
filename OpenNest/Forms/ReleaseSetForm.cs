@@ -17,7 +17,8 @@ namespace OpenNest.Forms
 {
     /// <summary>
     /// Drawing Sets &gt; Release: the operator lists the sets to release, typed in or added from
-    /// the browser, each with a number of kits, and the dialog previews how they split into one
+    /// the browser, each with a number of kits, and library drawings on their own (Add
+    /// Drawings), each with a quantity, and the dialog previews how they split into one
     /// nest per material group (<see cref="SetReleasePlan"/>), with an archived-drawing toggle
     /// and a tick per group. Each group makes a new Draft nest or merges into a Draft nest of
     /// the same material, whose layout is discarded. <see cref="SetReleaseSession"/> then builds
@@ -65,6 +66,12 @@ namespace OpenNest.Forms
         /// </summary>
         public Func<Guid, bool> IsNestOpen { get; set; } = _ => false;
 
+        /// <summary>
+        /// Shows the library browser that adds drawings on their own (<see cref="AddReleaseDrawingsForm"/>);
+        /// replaced by tests.
+        /// </summary>
+        internal Action ShowAddDrawings { get; set; }
+
         /// <summary>The finished release, once one has run; otherwise null.</summary>
         public SetReleaseResult Result { get; private set; }
 
@@ -72,6 +79,17 @@ namespace OpenNest.Forms
         /// <param name="openNest">Opens a created or merged nest in its own tab, bound to its server record.</param>
         public ReleaseSetForm(IDrawingSetStore sets, IDrawingLibrary library, INestRepository nests, string serverUrl,
             DrawingSetRecord set, Action<Nest, NestRecord> openNest)
+            : this(sets, library, nests, serverUrl, new[] { set ?? throw new ArgumentNullException(nameof(set)) },
+                Array.Empty<SetReleaseDrawingLine>(), openNest)
+        {
+        }
+
+        /// <param name="setsToRelease">Sets read with <see cref="IDrawingSetStore.GetAsync"/>, members joined, each at one kit.</param>
+        /// <param name="drawings">Library drawings to release on their own, each with its quantity.</param>
+        /// <param name="openNest">Opens a created or merged nest in its own tab, bound to its server record.</param>
+        public ReleaseSetForm(IDrawingSetStore sets, IDrawingLibrary library, INestRepository nests, string serverUrl,
+            IReadOnlyList<DrawingSetRecord> setsToRelease, IReadOnlyList<SetReleaseDrawingLine> drawings,
+            Action<Nest, NestRecord> openNest)
         {
             InitializeComponent();
             this.sets = sets ?? throw new ArgumentNullException(nameof(sets));
@@ -79,19 +97,42 @@ namespace OpenNest.Forms
             this.nests = nests ?? throw new ArgumentNullException(nameof(nests));
             this.serverUrl = serverUrl ?? "";
             this.openNest = openNest ?? throw new ArgumentNullException(nameof(openNest));
-            ArgumentNullException.ThrowIfNull(set);
+            ArgumentNullException.ThrowIfNull(setsToRelease);
+            ArgumentNullException.ThrowIfNull(drawings);
+            if (setsToRelease.Count + drawings.Count == 0)
+                throw new ArgumentException("Release at least one set or drawing.", nameof(setsToRelease));
             ShowMessage = (text, buttons, icon) => MessageBox.Show(this, text, Text, buttons, icon);
             CreateNest = (group, _) => NewNestFactory.CreateAsync(this, group.Units);
+            ShowAddDrawings = () =>
+            {
+                using var form = new AddReleaseDrawingsForm(library, this.serverUrl, AddDrawingLines,
+                    id => DrawingLines().Any(l => l.Drawing.Id == id));
+                form.ShowDialog(this);
+            };
 
             GridStyle.Apply(setGrid);
             GridStyle.Apply(groupGrid);
-            AddLine(set, 1);
+            populating = true;
+            foreach (var set in setsToRelease)
+                AddRow(set, set.Name, set.Customer, set.Revision, 1);
+            foreach (var line in drawings)
+                AddRow(line.Drawing, line.Drawing.Name, line.Drawing.Customer, line.Drawing.Revision, line.Quantity);
+            populating = false;
+            BuildPlan();
         }
 
         /// <summary>The sets listed, in order, with their kits.</summary>
         internal IReadOnlyList<SetReleasePlanLine> Lines() =>
             setGrid.Rows.Cast<DataGridViewRow>()
+                .Where(r => r.Tag is DrawingSetRecord)
                 .Select(r => new SetReleasePlanLine((DrawingSetRecord)r.Tag, Kits(r)))
+                .ToList();
+
+        /// <summary>The drawings listed on their own, in order, with their quantities.</summary>
+        internal IReadOnlyList<SetReleaseDrawingLine> DrawingLines() =>
+            setGrid.Rows.Cast<DataGridViewRow>()
+                .Where(r => r.Tag is DrawingLibraryRecord)
+                .Select(r => new SetReleaseDrawingLine((DrawingLibraryRecord)r.Tag, Kits(r)))
                 .ToList();
 
         /// <summary>
@@ -101,7 +142,7 @@ namespace OpenNest.Forms
         internal bool AddLine(DrawingSetRecord set, int kits)
         {
             ArgumentNullException.ThrowIfNull(set);
-            var listed = setGrid.Rows.Cast<DataGridViewRow>().FirstOrDefault(r => ((DrawingSetRecord)r.Tag).Id == set.Id);
+            var listed = setGrid.Rows.Cast<DataGridViewRow>().FirstOrDefault(r => r.Tag is DrawingSetRecord s && s.Id == set.Id);
             if (listed != null)
             {
                 listed.Selected = true;
@@ -114,12 +155,76 @@ namespace OpenNest.Forms
                 return false;
             }
 
-            var row = new DataGridViewRow { Tag = set };
-            row.CreateCells(setGrid, set.Name, set.Customer, set.Revision, kits.ToString(CultureInfo.CurrentCulture));
-            setGrid.Rows.Add(row);
+            AddRow(set, set.Name, set.Customer, set.Revision, kits);
             statusLabel.Text = "";
             BuildPlan();
             return true;
+        }
+
+        /// <summary>
+        /// Adds library drawings on their own at <paramref name="quantity"/> each, skipping (and
+        /// naming) those already listed or archived, and returns what happened for the operator.
+        /// </summary>
+        internal string AddDrawingLines(IReadOnlyList<DrawingLibraryRecord> drawings, int quantity)
+        {
+            ArgumentNullException.ThrowIfNull(drawings);
+            if (running || Result != null)
+                return "The release has run; nothing can be added.";
+            var listed = DrawingLines().Select(l => l.Drawing.Id).ToHashSet();
+            var added = new List<DrawingLibraryRecord>();
+            var already = new List<DrawingLibraryRecord>();
+            var archived = new List<DrawingLibraryRecord>();
+            foreach (var drawing in drawings)
+            {
+                if (drawing.Archived)
+                    archived.Add(drawing);
+                else if (!listed.Add(drawing.Id))
+                    already.Add(drawing);
+                else if (listed.Count > SetReleaseRules.MaxDrawingLines)
+                {
+                    listed.Remove(drawing.Id);
+                    break;
+                }
+                else
+                    added.Add(drawing);
+            }
+
+            foreach (var drawing in added)
+                AddRow(drawing, drawing.Name, drawing.Customer, drawing.Revision, quantity);
+            if (added.Count > 0)
+                BuildPlan();
+
+            var text = added.Count switch
+            {
+                0 => "Nothing added.",
+                1 => $"Added '{added[0].Name}'.",
+                _ => $"Added {added.Count} drawings.",
+            };
+            if (already.Count > 0)
+                text += $" Already listed (change the quantity there): {Names(already)}.";
+            if (archived.Count > 0)
+                text += $" Archived, restore before releasing: {Names(archived)}.";
+            if (added.Count + already.Count + archived.Count < drawings.Count)
+                text += $" A release may list at most {SetReleaseRules.MaxDrawingLines} drawings on their own.";
+            statusLabel.Text = text;
+            return text;
+        }
+
+        private static string Names(IEnumerable<DrawingLibraryRecord> drawings) =>
+            string.Join(", ", drawings.Select(d => $"'{d.Name}'"));
+
+        private void AddRow(object tag, string name, string customer, int revision, int quantity)
+        {
+            var row = new DataGridViewRow { Tag = tag };
+            row.CreateCells(setGrid, tag is DrawingSetRecord ? "Set" : "Drawing", name, customer, revision,
+                quantity.ToString(CultureInfo.CurrentCulture));
+            setGrid.Rows.Add(row);
+        }
+
+        private void AddDrawingsButton_Click(object sender, EventArgs e)
+        {
+            if (!running && Result == null && setGrid.EndEdit())
+                ShowAddDrawings();
         }
 
         private static int Kits(DataGridViewRow row) =>
@@ -150,15 +255,18 @@ namespace OpenNest.Forms
         {
             if (e.ColumnIndex != kitsColumn.Index)
                 return;
+            var drawing = setGrid.Rows[e.RowIndex].Tag is DrawingLibraryRecord;
+            var maximum = drawing ? SetReleaseRules.MaxDrawingQuantity : SetReleaseRules.MaxQuantity;
             var valid = int.TryParse(Convert.ToString(e.FormattedValue, CultureInfo.CurrentCulture), NumberStyles.Integer,
-                CultureInfo.CurrentCulture, out var kits) && kits >= 1 && kits <= SetReleaseRules.MaxQuantity;
-            setGrid.Rows[e.RowIndex].ErrorText = valid ? "" : $"Kits must be a whole number from 1 to {SetReleaseRules.MaxQuantity}.";
+                CultureInfo.CurrentCulture, out var kits) && kits >= 1 && kits <= maximum;
+            setGrid.Rows[e.RowIndex].ErrorText = valid ? ""
+                : $"{(drawing ? "The quantity" : "Kits")} must be a whole number from 1 to {maximum:N0}.";
             e.Cancel = !valid;
         }
 
         private void SetGrid_CellValueChanged(object sender, DataGridViewCellEventArgs e)
         {
-            if (e.RowIndex >= 0 && e.ColumnIndex == kitsColumn.Index && !running && Result == null)
+            if (e.RowIndex >= 0 && e.ColumnIndex == kitsColumn.Index && !running && Result == null && !populating)
                 BuildPlan();
         }
 
@@ -396,12 +504,8 @@ namespace OpenNest.Forms
                 return;
             }
 
-            var lines = plan.Lines;
-            var setsText = lines.Count == 1
-                ? $"set '{lines[0].Set.Name}'" + (lines[0].Quantity == 1 ? "" : $" ×{lines[0].Quantity}")
-                : $"{lines.Count} sets";
             var created = chosen.Count - merges.Count;
-            var text = $"Release {setsText} into {chosen.Count} Draft nest{(chosen.Count == 1 ? "" : "s")}";
+            var text = $"Release {DescribeLines()} into {chosen.Count} Draft nest{(chosen.Count == 1 ? "" : "s")}";
             var nestAfter = nestAfterReleaseCheckBox.Checked;
             if (merges.Count > 0)
                 text += $": {created} new and {merges.Count} merged into existing drafts. A merged draft loses its "
@@ -469,8 +573,10 @@ namespace OpenNest.Forms
 
         private void BuildPlan()
         {
-            plan = SetReleasePlan.Build(Lines(), includeArchivedCheckBox.Checked);
-            Text = plan.Lines.Count == 1 ? $"Release '{plan.Lines[0].Set.Name}'" : $"Release {plan.Lines.Count} Drawing Sets";
+            plan = SetReleasePlan.Build(Lines(), DrawingLines(), includeArchivedCheckBox.Checked);
+            Text = plan.Lines.Count + plan.Drawings.Count == 1
+                ? $"Release '{(plan.Lines.Count == 1 ? plan.Lines[0].Set.Name : plan.Drawings[0].Drawing.Name)}'"
+                : $"Release {DescribeLines()}";
             populating = true;
             groupGrid.Rows.Clear();
             foreach (var group in plan.Groups)
@@ -503,6 +609,21 @@ namespace OpenNest.Forms
                 + ". Tick Include archived drawings to release them.";
             UpdateCommands();
             _ = LoadDraftsAsync();
+        }
+
+        // "set 'Kit A' ×2", "3 sets and 2 drawings", "drawing 'SYN-A' ×4".
+        private string DescribeLines()
+        {
+            var parts = new List<string>();
+            if (plan.Lines.Count == 1)
+                parts.Add($"set '{plan.Lines[0].Set.Name}'" + (plan.Lines[0].Quantity == 1 ? "" : $" ×{plan.Lines[0].Quantity}"));
+            else if (plan.Lines.Count > 1)
+                parts.Add($"{plan.Lines.Count} sets");
+            if (plan.Drawings.Count == 1)
+                parts.Add($"drawing '{plan.Drawings[0].Drawing.Name}' ×{plan.Drawings[0].Quantity}");
+            else if (plan.Drawings.Count > 1)
+                parts.Add($"{plan.Drawings.Count} drawings");
+            return string.Join(" and ", parts);
         }
 
         // The target list of one group: a new nest, then each draft it could merge into.
@@ -634,6 +755,7 @@ namespace OpenNest.Forms
             setGrid.ReadOnly = !editable;
             addSetCombo.Enabled = editable;
             addSetButton.Enabled = editable;
+            addDrawingsButton.Enabled = editable;
             removeSetButton.Enabled = editable && setGrid.Rows.Count > 1 && setGrid.CurrentRow != null;
             includeArchivedCheckBox.Enabled = editable;
             nestAfterReleaseCheckBox.Enabled = editable;
@@ -656,7 +778,7 @@ namespace OpenNest.Forms
             var parts = chosen.Sum(g => (long)g.TotalQuantity);
             var merged = chosen.Count(g => targets.ContainsKey(g.Key));
             summaryLabel.Text = plan == null || plan.Groups.Count == 0
-                ? "These sets have nothing to release."
+                ? "Nothing listed can be released."
                 : $"{chosen.Count} of {plan.Groups.Count} group{(plan.Groups.Count == 1 ? "" : "s")} chosen: "
                     + $"{chosen.Count - merged} new Draft nest{(chosen.Count - merged == 1 ? "" : "s")}"
                     + (merged == 0 ? "" : $", {merged} merge{(merged == 1 ? "" : "s")}")

@@ -444,6 +444,135 @@ public class SetReleaseFormsTests
             "The browser release test did not complete.");
     }
 
+    [Fact]
+    public void Release_OfASetAndDrawingsAddedFromTheLibrary_GroupsThemTogether_AndRecordsBoth()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                library.Add("SYN-B", "Synthetic Steel");
+                library.Add("SYN-C", "Synthetic Aluminum");
+                var sets = new InMemoryDrawingSets();
+                var set = CreateSet(sets, (a, 2));
+                var nests = new MemoryNests();
+                var questions = new List<string>();
+
+                using var form = new ReleaseSetForm(sets, library, nests, Server, set, (_, _) => { });
+                form.ShowMessage = (text, _, _) => { questions.Add(text); return DialogResult.OK; };
+                var created = 0;
+                form.CreateNest = (group, _) => Task.FromResult(new Nest($"N26-{++created:D4}") { Units = group.Units });
+                form.Show();
+                using var picker = new AddReleaseDrawingsForm(library, Server, form.AddDrawingLines,
+                    id => form.DrawingLines().Any(l => l.Drawing.Id == id));
+                picker.Show(form);
+                Run(picker.RefreshAsync());
+
+                picker.Select("SYN-A", "SYN-C");
+                picker.Quantity = 5;
+                picker.AddSelectedDrawings();
+                Assert.Equal("Added 2 drawings.", picker.Status);
+                picker.Select("SYN-C", "SYN-B");
+                picker.Quantity = 1;
+                picker.AddSelectedDrawings();
+                Assert.Equal("Added 'SYN-B'. Already listed (change the quantity there): 'SYN-C'.", picker.Status);
+
+                var lines = Field<DataGridView>(form, "setGrid");
+                Assert.Equal(new object[] { "Set", "Drawing", "Drawing", "Drawing" },
+                    lines.Rows.Cast<DataGridViewRow>().Select(r => r.Cells["lineTypeColumn"].Value));
+                lines.Rows[2].Cells["kitsColumn"].Value = "40";
+                Assert.Equal(new[] { ("SYN-A", 5), ("SYN-C", 40), ("SYN-B", 1) }, form.DrawingLines().Select(l => (l.Drawing.Name, l.Quantity)));
+                var grid = Field<DataGridView>(form, "groupGrid");
+                Assert.Equal(new object[] { 40, 8 }, grid.Rows.Cast<DataGridViewRow>().Select(r => r.Cells["partsColumn"].Value));
+
+                Run(form.ReleaseAsync());
+
+                Assert.Contains("Release set 'Synthetic kit' and 3 drawings into 2 Draft nests", Assert.Single(questions));
+                var release = Assert.Single(sets.Releases);
+                Assert.Equal(new[] { 5, 40, 1 }, release.Drawings.Select(d => d.Quantity));
+                var steel = release.Nests.Single(n => n.MaterialName == "Synthetic Steel");
+                Assert.Equal(new[] { ((Guid?)set.Id, 2), (null, 5), (null, 1) }, steel.Items.Select(i => (i.SetId, i.Quantity)));
+                Assert.Equal(2, nests.Uploaded.Count);
+                Assert.False(Field<Button>(form, "addDrawingsButton").Enabled);
+            },
+            TestTimeout,
+            "The drawing release test did not complete.");
+    }
+
+    [Fact]
+    public void Release_OfADrawingAlone_OnAServerWithoutDrawingsOnTheirOwn_SavesNothing()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var sets = new InMemoryDrawingSets { WithoutDrawingReleases = true };
+                var nests = new MemoryNests();
+
+                using var form = new ReleaseSetForm(sets, library, nests, Server, Array.Empty<DrawingSetRecord>(),
+                    new[] { new SetReleaseDrawingLine(a, 4) }, (_, _) => { });
+                form.ShowMessage = (_, _, _) => DialogResult.OK;
+                form.CreateNest = (group, _) => Task.FromResult(new Nest("N") { Units = group.Units });
+                form.Show();
+
+                Assert.Equal("Release 'SYN-A'", form.Text);
+                Assert.False(Field<Button>(form, "removeSetButton").Enabled);
+                Assert.Contains("4 parts", Field<Label>(form, "summaryLabel").Text);
+
+                Run(form.ReleaseAsync());
+
+                Assert.Empty(nests.Uploaded);
+                Assert.Empty(sets.Releases);
+                Assert.Equal("Nothing was saved. See the Status column.", Field<Label>(form, "statusLabel").Text);
+                Assert.Contains("does not support releasing library drawings on their own",
+                    (string)Field<DataGridView>(form, "groupGrid").Rows[0].Cells["statusColumn"].Value);
+            },
+            TestTimeout,
+            "The old-server drawing release test did not complete.");
+    }
+
+    [Fact]
+    public void Releases_OfADrawing_ListsReleasesThatHadItOnItsOwn_AndUndoesOne()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var sets = new InMemoryDrawingSets();
+                var release = new SetReleaseRecord
+                {
+                    Id = Guid.NewGuid(),
+                    Sets = new[] { new SetReleaseLine { SetId = Guid.NewGuid(), SetRevision = 1, SetName = "Synthetic kit", Quantity = 1 } },
+                    Drawings = new[] { new SetReleaseDrawing { DrawingId = a.Id, DrawingName = a.Name, Quantity = 4 } },
+                    ReleasedBy = "Synthetic operator",
+                    Nests = new[] { new SetReleaseNest { NestId = Guid.NewGuid(), Nest = new NestRecord { Name = "N1", Status = NestStatus.Draft } } },
+                };
+                sets.Releases.Add(release);
+                sets.UndoHandler = (id, request) => new SetReleaseRecord { Id = id, UndoneAt = DateTime.UtcNow };
+                var questions = new List<string>();
+
+                using var form = new SetReleasesForm(sets, a);
+                form.ShowMessage = (text, _, _) => { questions.Add(text); return DialogResult.OK; };
+                form.Show();
+                var releases = Field<DataGridView>(form, "releaseGrid");
+                PumpUntil(() => releases.Rows.Count == 1, "the releases");
+
+                Assert.Equal("Releases of drawing 'SYN-A'", form.Text);
+                Assert.Equal("×4 (+1 set)", releases.Rows[0].Cells["multiplierColumn"].Value);
+                Assert.False(releases.Columns["revisionColumn"]!.Visible);
+
+                Run(form.UndoSelectedAsync());
+
+                Assert.Equal(release.Id, Assert.Single(sets.UndoRequests).Id);
+                Assert.Contains("deleted (they can be recovered)", Assert.Single(questions));
+            },
+            TestTimeout,
+            "The drawing releases view test did not complete.");
+    }
+
     private static DrawingSetRecord CreateSet(InMemoryDrawingSets sets, params (DrawingLibraryRecord Drawing, int Quantity)[] members) =>
         CreateSet(sets, "Synthetic kit", members);
 

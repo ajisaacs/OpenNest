@@ -28,8 +28,10 @@ namespace OpenNest.Forms
             addSetLabel = new System.Windows.Forms.Label();
             addSetCombo = new System.Windows.Forms.ComboBox();
             addSetButton = new System.Windows.Forms.Button();
+            addDrawingsButton = new System.Windows.Forms.Button();
             removeSetButton = new System.Windows.Forms.Button();
             setGrid = new System.Windows.Forms.DataGridView();
+            lineTypeColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             setNameColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             setCustomerColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             setRevisionColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
@@ -102,20 +104,22 @@ namespace OpenNest.Forms
             setLabel.Name = "setLabel";
             setLabel.Size = new System.Drawing.Size(100, 20);
             setLabel.TabIndex = 0;
-            setLabel.Text = "Sets to release";
+            setLabel.Text = "Sets and drawings to release";
             //
             // addSetTable
             //
             addSetTable.AutoSize = true;
-            addSetTable.ColumnCount = 4;
+            addSetTable.ColumnCount = 5;
             addSetTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             addSetTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 360F));
+            addSetTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             addSetTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             addSetTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             addSetTable.Controls.Add(addSetLabel, 0, 0);
             addSetTable.Controls.Add(addSetCombo, 1, 0);
             addSetTable.Controls.Add(addSetButton, 2, 0);
-            addSetTable.Controls.Add(removeSetButton, 3, 0);
+            addSetTable.Controls.Add(addDrawingsButton, 3, 0);
+            addSetTable.Controls.Add(removeSetButton, 4, 0);
             addSetTable.Dock = System.Windows.Forms.DockStyle.Fill;
             addSetTable.Margin = new System.Windows.Forms.Padding(0, 0, 0, 3);
             addSetTable.Name = "addSetTable";
@@ -148,13 +152,24 @@ namespace OpenNest.Forms
             addSetButton.UseVisualStyleBackColor = true;
             addSetButton.Click += AddSetButton_Click;
             //
+            // addDrawingsButton
+            //
+            addDrawingsButton.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            addDrawingsButton.AutoSize = true;
+            addDrawingsButton.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
+            addDrawingsButton.Name = "addDrawingsButton";
+            addDrawingsButton.TabIndex = 3;
+            addDrawingsButton.Text = "Add Drawings...";
+            addDrawingsButton.UseVisualStyleBackColor = true;
+            addDrawingsButton.Click += AddDrawingsButton_Click;
+            //
             // removeSetButton
             //
             removeSetButton.Anchor = System.Windows.Forms.AnchorStyles.Left;
             removeSetButton.AutoSize = true;
             removeSetButton.Name = "removeSetButton";
-            removeSetButton.TabIndex = 3;
-            removeSetButton.Text = "Remove Set";
+            removeSetButton.TabIndex = 4;
+            removeSetButton.Text = "Remove";
             removeSetButton.UseVisualStyleBackColor = true;
             removeSetButton.Click += RemoveSetButton_Click;
             //
@@ -162,7 +177,7 @@ namespace OpenNest.Forms
             //
             setGrid.AllowUserToAddRows = false;
             setGrid.AllowUserToDeleteRows = false;
-            setGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { setNameColumn, setCustomerColumn, setRevisionColumn, kitsColumn });
+            setGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { lineTypeColumn, setNameColumn, setCustomerColumn, setRevisionColumn, kitsColumn });
             setGrid.Dock = System.Windows.Forms.DockStyle.Fill;
             setGrid.Margin = new System.Windows.Forms.Padding(3, 3, 3, 6);
             setGrid.MultiSelect = false;
@@ -175,10 +190,18 @@ namespace OpenNest.Forms
             setGrid.CellValueChanged += SetGrid_CellValueChanged;
             setGrid.SelectionChanged += SetGrid_SelectionChanged;
             //
+            // lineTypeColumn
+            //
+            lineTypeColumn.HeaderText = "Type";
+            lineTypeColumn.Name = "lineTypeColumn";
+            lineTypeColumn.ReadOnly = true;
+            lineTypeColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            lineTypeColumn.Width = 70;
+            //
             // setNameColumn
             //
             setNameColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
-            setNameColumn.HeaderText = "Set";
+            setNameColumn.HeaderText = "Set or drawing";
             setNameColumn.Name = "setNameColumn";
             setNameColumn.ReadOnly = true;
             setNameColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
@@ -203,11 +226,11 @@ namespace OpenNest.Forms
             // kitsColumn
             //
             kitsColumn.DefaultCellStyle = rightAligned;
-            kitsColumn.HeaderText = "Kits";
+            kitsColumn.HeaderText = "Kits / Qty";
             kitsColumn.Name = "kitsColumn";
             kitsColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            kitsColumn.ToolTipText = "How many of this set to release: every quantity in the set is multiplied by it.";
-            kitsColumn.Width = 70;
+            kitsColumn.ToolTipText = "For a set, how many kits: every quantity in the set is multiplied by it. For a drawing, how many to release.";
+            kitsColumn.Width = 80;
             //
             // optionsTable
             //
@@ -447,7 +470,7 @@ namespace OpenNest.Forms
             ShowIcon = false;
             ShowInTaskbar = false;
             StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            Text = "Release Drawing Sets";
+            Text = "Release Drawing Sets and Drawings";
             FormClosing += ReleaseSetForm_FormClosing;
             layoutTable.ResumeLayout(false);
             layoutTable.PerformLayout();
@@ -470,8 +493,10 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Label addSetLabel;
         private System.Windows.Forms.ComboBox addSetCombo;
         private System.Windows.Forms.Button addSetButton;
+        private System.Windows.Forms.Button addDrawingsButton;
         private System.Windows.Forms.Button removeSetButton;
         private System.Windows.Forms.DataGridView setGrid;
+        private System.Windows.Forms.DataGridViewTextBoxColumn lineTypeColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn setNameColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn setCustomerColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn setRevisionColumn;

@@ -76,6 +76,9 @@ namespace OpenNest.Forms
             drawingMenu = new System.Windows.Forms.ContextMenuStrip(components);
             usedInSetsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             addToSetMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            releaseSeparator = new System.Windows.Forms.ToolStripSeparator();
+            releaseMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            releasesMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             rootTable.SuspendLayout();
             footerPanel.SuspendLayout();
             layoutTable.SuspendLayout();
@@ -628,7 +631,7 @@ namespace OpenNest.Forms
             //
             // drawingMenu
             //
-            drawingMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { usedInSetsMenuItem, addToSetMenuItem });
+            drawingMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { usedInSetsMenuItem, addToSetMenuItem, releaseSeparator, releaseMenuItem, releasesMenuItem });
             drawingMenu.Name = "drawingMenu";
             drawingMenu.Opening += DrawingMenu_Opening;
             //
@@ -643,6 +646,26 @@ namespace OpenNest.Forms
             addToSetMenuItem.Name = "addToSetMenuItem";
             addToSetMenuItem.Text = "Add to Set...";
             addToSetMenuItem.Click += AddToSetMenuItem_Click;
+            //
+            // releaseSeparator
+            //
+            releaseSeparator.Name = "releaseSeparator";
+            releaseSeparator.Visible = false;
+            //
+            // releaseMenuItem
+            //
+            releaseMenuItem.Name = "releaseMenuItem";
+            releaseMenuItem.Text = "Release...";
+            releaseMenuItem.ToolTipText = "Release this drawing on its own, at the entered quantity, with any other drawings or sets";
+            releaseMenuItem.Visible = false;
+            releaseMenuItem.Click += ReleaseMenuItem_Click;
+            //
+            // releasesMenuItem
+            //
+            releasesMenuItem.Name = "releasesMenuItem";
+            releasesMenuItem.Text = "Releases...";
+            releasesMenuItem.ToolTipText = "The releases that had this drawing on its own";
+            releasesMenuItem.Click += ReleasesMenuItem_Click;
             //
             // DrawingLibraryForm
             //
@@ -745,5 +768,8 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ContextMenuStrip drawingMenu;
         private System.Windows.Forms.ToolStripMenuItem usedInSetsMenuItem;
         private System.Windows.Forms.ToolStripMenuItem addToSetMenuItem;
+        private System.Windows.Forms.ToolStripSeparator releaseSeparator;
+        private System.Windows.Forms.ToolStripMenuItem releaseMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem releasesMenuItem;
     }
 }

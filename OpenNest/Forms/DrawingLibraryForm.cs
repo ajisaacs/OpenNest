@@ -21,8 +21,9 @@ namespace OpenNest.Forms
     /// shows any warning or refusal first and only then changes the nest. Edit Settings
     /// changes the selected drawing's notes and nesting settings (Cut first, priority,
     /// rotation, color) on the server as a new revision with the same package. With a set
-    /// store, the drawing grid's menu lists the sets a drawing is in and adds it to a set;
-    /// sets themselves are browsed and released in <see cref="DrawingSetsForm"/>.
+    /// store, the drawing grid's menu lists the sets a drawing is in, adds it to a set, lists
+    /// the releases that had it on its own and, once release is enabled, releases it; sets
+    /// themselves are browsed and released in <see cref="DrawingSetsForm"/>.
     /// The details pane previews the selected revision's geometry, downloaded shortly after
     /// the selection settles and cached per revision for the dialog's lifetime.
     /// </summary>
@@ -65,6 +66,15 @@ namespace OpenNest.Forms
         internal Func<DrawingSetEditSession, DrawingSetRecord> EditSet { get; set; }
 
         /// <summary>
+        /// Shows the release dialog for a drawing read from the library, at a quantity; set by
+        /// <see cref="EnableRelease"/> and replaced by tests.
+        /// </summary>
+        internal Action<DrawingLibraryRecord, int> ShowRelease { get; set; }
+
+        /// <summary>Shows the releases that had a drawing on its own; replaced by tests.</summary>
+        internal Action<DrawingLibraryRecord> ShowReleases { get; set; }
+
+        /// <summary>
         /// The library drawings this dialog added or raised the quantity of, in order. The
         /// dialog stays open after each add, so callers check this rather than the dialog result.
         /// </summary>
@@ -99,6 +109,11 @@ namespace OpenNest.Forms
             {
                 using var form = new EditDrawingSetForm(edit, library, this.serverUrl);
                 return form.ShowDialog(this) == DialogResult.OK ? form.Saved : null;
+            };
+            ShowReleases = record =>
+            {
+                using var form = new SetReleasesForm(sets, record);
+                form.ShowDialog(this);
             };
             LoadPreview = async (record, token) =>
             {
@@ -327,6 +342,28 @@ namespace OpenNest.Forms
 
         private async void AddButton_Click(object sender, EventArgs e) => await AddSelectedAsync();
 
+        /// <summary>
+        /// Lets the drawing menu release a drawing on its own: nests are saved through
+        /// <paramref name="nests"/> and each is opened with <paramref name="openNest"/>; a nest
+        /// <paramref name="isNestOpen"/> reports as open in a tab is never merged into.
+        /// </summary>
+        public void EnableRelease(INestRepository nests, Action<Nest, NestRecord> openNest, Func<Guid, bool> isNestOpen = null)
+        {
+            if (sets == null)
+                return;
+            ArgumentNullException.ThrowIfNull(nests);
+            ArgumentNullException.ThrowIfNull(openNest);
+            ShowRelease = (record, quantity) =>
+            {
+                using var form = new ReleaseSetForm(sets, library, nests, serverUrl, Array.Empty<DrawingSetRecord>(),
+                    new[] { new SetReleaseDrawingLine(record, quantity) }, openNest)
+                { IsNestOpen = isNestOpen ?? (_ => false) };
+                form.ShowDialog(this);
+            };
+            releaseSeparator.Visible = true;
+            releaseMenuItem.Visible = true;
+        }
+
         // A right-click selects the row under the pointer, so the menu acts on what was clicked.
         private void DrawingGrid_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
         {
@@ -339,6 +376,60 @@ namespace OpenNest.Forms
             var record = SelectedRecord();
             usedInSetsMenuItem.Enabled = record != null && !adding;
             addToSetMenuItem.Enabled = record != null && !adding;
+            releaseMenuItem.Enabled = record is { Archived: false } && !adding && ShowRelease != null;
+            releasesMenuItem.Enabled = record != null && !adding;
+        }
+
+        private async void ReleaseMenuItem_Click(object sender, EventArgs e) => await ReleaseSelectedAsync();
+
+        private void ReleasesMenuItem_Click(object sender, EventArgs e)
+        {
+            if (SelectedRecord() is { } record && sets != null)
+                ShowReleases(record);
+        }
+
+        /// <summary>
+        /// Reads the selected drawing's current record and opens the release dialog with it at
+        /// the entered quantity; more drawings and sets can be added there.
+        /// </summary>
+        internal async Task ReleaseSelectedAsync()
+        {
+            var listed = SelectedRecord();
+            if (listed == null || ShowRelease == null || adding)
+                return;
+
+            DrawingLibraryRecord current;
+            adding = true;
+            UpdateCommands();
+            statusLabel.Text = $"Reading '{listed.Name}'...";
+            try
+            {
+                current = await library.GetAsync(listed.Id);
+            }
+            catch (Exception ex) when (ex is IOException || ex is HttpRequestException || ex is TaskCanceledException)
+            {
+                Fail($"Could not read '{listed.Name}': {ex.Message}");
+                return;
+            }
+            finally
+            {
+                adding = false;
+                if (!IsDisposed)
+                    UpdateCommands();
+            }
+
+            if (IsDisposed)
+                return;
+            statusLabel.Text = "";
+            if (current == null || current.Archived)
+            {
+                ShowMessage(current == null
+                    ? $"'{listed.Name}' is no longer in the library."
+                    : $"'{listed.Name}' was archived. Restore it to release it.", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            ShowRelease(current, (int)quantityBox.Value);
         }
 
         private async void UsedInSetsMenuItem_Click(object sender, EventArgs e) => await ShowUsedInSetsAsync();

@@ -378,7 +378,11 @@ a set shows its notes.
 In the Drawing Library dialog, right-click a drawing for **Used in Sets...** (the sets
 whose current revision contains it) or **Add to Set...**: choose an active set
 or **New Set**, and the set editor opens with the drawing added at the entered
-quantity for review and Save.
+quantity for review and Save. **Releases...** lists the releases that had the
+drawing on its own (see below), with Undo Release. When the dialog was opened
+from a nest, **Release...** reads the drawing's current record and opens the
+release dialog with it on its own at the entered quantity; more drawings and
+sets are added there.
 
 The nest's drawing list has **Add Library Drawings to Set...** (right-click any
 drawing; it acts on the whole nest, `OpenNest.Data.NestSetMerge`). It takes each
@@ -398,9 +402,17 @@ review and Save; nothing is stored before then.
 selected active set with its members and opens the release dialog with it listed.
 More sets are added by typing in **Add a set** (the list of matching active sets
 fills as you type; Enter or **Add** takes the picked set, or the one set whose
-name is exactly what was typed) and removed with **Remove Set**; each set's
-**Kits** (1 to 1000) multiplies its quantities, and a set is listed once. The
-grid below has one row per material group across all the sets
+name is exactly what was typed). **Add Drawings...** adds library drawings on
+their own, outside any set: it browses every active drawing as the set editor's
+library pane does (search, server-side sort, pages, several selected at once),
+and **Add to Release**, a double-click or Enter adds the selection at the
+entered quantity. It stays open for more; a drawing already listed is greyed
+and skipped, and an archived one is refused. **Remove** takes a set or drawing
+out while another remains. The list shows each line's type; **Kits / Qty** is a
+set's kits (1 to 1000, multiplying its quantities) or a drawing's quantity (1 to
+100,000), and a set or drawing is listed once. A drawing that a set also lists
+becomes one item with both quantities. The grid below has one row per material
+group across all the sets and drawings
 (`OpenNest.Data.SetReleasePlan`): material, grade, thickness, units, cut type,
 drawings, parts, **Nest** and status. **Include archived drawings** puts archived
 members back in, otherwise they are named below the grid as left out. Each group
@@ -431,10 +443,13 @@ group's new nest is made as File > New would (the server's next nest name, the
 saved plate defaults and clamps), in the group's units, with the saved plate size
 and spacings converted (25.4 mm per inch) when those differ; the nest takes the
 group's material, grade and thickness, the sets' customer when they share one,
-and the **Draft** status. A merged draft is saved only while nobody else has
+and the **Draft** status (with drawings on their own, their library customers
+count too). A merged draft is saved only while nobody else has
 saved it since it was listed. Each created or merged nest opens in its own tab,
 bound to its server record, and the release (with the release notes) is
-recorded. The grid then shows every group's outcome: Created or Merged into with
+recorded. A release with drawings on their own first checks that the server can
+record them (see below) and, on an older server, saves nothing and says so. The
+grid then shows every group's outcome: Created or Merged into with
 the nest name, Refused or Failed with the reason, or Not started. Cancel during
 preparing or nesting saves nothing; once saving starts it stops between saves,
 never during one. When every nest was saved but recording failed,
@@ -443,7 +458,7 @@ runs one release.
 
 **Releases...** lists the releases that include the selected set, newest first:
 when, by whom, the set revision, the kits of this set (and how many other sets
-the release had), the number of nests, progress such as "2 of 3 cut" (deleted
+and drawings the release had), the number of nests, progress such as "2 of 3 cut" (deleted
 nests are not counted) or "Undone", and the notes. The selected release's nests
 show their material group, what the release did ("Created", "Merged (revision
 3 → 4)", and what undo did) and current status, or Deleted. **Undo Release...**
@@ -453,7 +468,8 @@ them and offers to undo the others, leaving those as they are.
 
 **Nest > Edit** (Nest Info) shows, beside its buttons, the newest release that
 made or merged into a server nest ("Released from set 'Kit A' revision 3 ×2 on
-10/20/2026 by ...", or "Merged from sets ..."), with a count of earlier ones. It
+10/20/2026 by ...", "Released from drawing 'Bracket' ×4", or "Merged from sets
+..."), with a count of earlier ones. It
 is read in the background and left blank when the nest came from none or the
 server cannot be reached.
 
@@ -519,31 +535,37 @@ may be one the release **created** or an existing draft it **merged** into
 quantities each set added to each nest are kept in `release_nest_items`, so a
 kit can still be traced once kits share a nest. The v8 → v9 migration turns each
 v7 release into one set line (its multiplier is the quantity) and created nests
-at their first revision, with no items.
+at their first revision, with no items. Since schema v11 a release may also
+name library drawings **on their own** (`release_drawings`), with or without
+sets; their items in `release_nest_items` have no set.
 
 `OpenNest.Data.SetReleaseRecord` fields: `id` (client-allocated, so an
 ambiguous post can be retried), `sets` (each `{ setId, setRevision, quantity,
 setName }`; `setName` is the set's name at that revision, joined on read),
+`drawings` (each `{ drawingId, quantity, drawingName }`, the drawings released on
+their own; `drawingName` is the drawing's current library name, joined on read),
 `notes`, `releasedBy`, the server-computed `releasedAt`, `undoneAt` and
 `undoneBy`, and `nests`, in order, each `{ nestId, kind, revisionBefore,
 revisionAfter, materialName, materialGrade, thickness, units, cutType, items,
 undo, undoRevision, nest }`. `kind` is `created` (no `revisionBefore`) or
 `merged`; `revisionAfter` is the nest revision the release wrote. `items` are
 `{ setId, drawingId, drawingRevision, quantity }`. `undo` and `undoRevision`
-are server-computed. `nest` is the nest's current metadata (deleted or not),
+are server-computed. An item's `setId` is null for a drawing released on its own;
+every other item names one of the release's sets. `nest` is the nest's current metadata (deleted or not),
 joined on every read so status and deletion are always current. Joined and
 server-computed values are ignored on post.
 
 | Method | Path | Body | Response |
 |---|---|---|---|
 | POST | `/api/releases` | JSON release with a nonempty `id` | The stored release; 400 for an unknown set or revision; 409 with the release that already holds the id or one of the created nests |
-| GET | `/api/releases/query?setId=&nestId=&offset=0&limit=100` | — | Release page, newest first, optionally only releases including the set or the nest; limit 1–200 |
+| GET | `/api/releases/query?setId=&nestId=&drawingId=&offset=0&limit=100` | — | Release page, newest first, optionally only releases including the set, the nest or the drawing on its own; limit 1–200 |
 | GET | `/api/releases/{id}` | — | The release, or 404 |
 | POST | `/api/releases/{id}/undo` | `{ "undoneBy": "...", "skipNests": [...] }` | The undone release; 404 for an unknown release; 409 with `{ reason, release, changedNests }` |
 
 - Releases are append-only: there is no edit or delete. Undo marks the release
   undone and records what it did to each nest.
-- Set revisions must exist but need not be current, and sets may be archived: the
+- Set revisions and drawings on their own must exist but need not be current, and
+  sets and drawings may be archived: the
   nests already exist by the time the release is posted, so it is never refused
   for a state the operator cannot fix. A merged nest need not still be at
   `revisionAfter` when the release is posted.
@@ -556,33 +578,45 @@ server-computed values are ignored on post.
   caller can skip them and try again. A second undo is refused with
   `alreadyUndone`. Because each undo writes a new nest revision, releases that
   share a nest are undone newest first.
-- Validation (400, no state change): 1–50 `sets`, no set twice, each quantity
-  1–1000; notes at most 4000 and releasedBy at most 200 characters; `nests`
+- Validation (400, no state change): at most 50 `sets`, no set twice, each
+  quantity 1–1000; `drawings` (may be left out, as older clients do) at most 500,
+  no drawing twice, each quantity 1–100,000; at least one set or drawing; notes at most 4000 and releasedBy at most 200 characters; `nests`
   present, 1–500 entries, no nest twice, each an existing, not deleted nest whose
   named revisions exist, with material name and grade at most 200 characters,
   `thickness` finite and at least 0 (stored rounded to 4 decimals), and `kind`,
   `units` and `cutType` single enum names; each item names one of the release's
-  sets, at most once per drawing, with a positive revision and quantity.
+  sets, or has no set and names one of its drawings on their own, at most once per
+  set (or no set) and drawing, with a positive revision and quantity.
+- **Compatibility.** A v11 server accepts releases from older clients (no
+  `drawings`). A server older than v11 knows no `drawingId` parameter and answers
+  `400` for it, so clients probe `GET /api/releases/query?drawingId=<any id>&limit=1`
+  before building a release with drawings on their own; a 400 or 404 there means
+  the server is too old, and nothing is saved.
 
 #### Client and release session
 
 `OpenNest.Data.RemoteDrawingSetStore` is the client for every route above. It
 checks `DrawingSetRules`/`SetReleaseRules` before sending, raises
 `ServerTooOldException` on a server without sets (or, for releases, without
-`/api/releases`), `DrawingSetSaveConflictException` or
+`/api/releases`, and for drawings on their own, without the `drawingId` query:
+`EnsureDrawingReleasesSupportedAsync`), `DrawingSetSaveConflictException` or
 `SetReleasePostConflictException` (carrying the current record) on 409,
 `SetReleaseUndoConflictException` (carrying the refusal) when an undo is
 refused, and refuses replies whose id, revision, members, sets or nests differ
 from what was sent.
 
-`SetReleasePlan.Build(lines, includeArchived)` splits one or more sets read from
-the server, each with a number of kits (`SetReleasePlanLine`; `Build(set,
-multiplier, includeArchived)` is the one-set form), into groups without any I/O.
-A drawing listed by several sets becomes one item with the quantities summed and
-each set's share kept (`Sources`), using the newest revision the sets were read
-with. A group is the items whose drawings share material name and grade (by
+`SetReleasePlan.Build(lines, drawings, includeArchived)` splits sets read from
+the server, each with a number of kits (`SetReleasePlanLine`), and library
+drawings on their own, each with a quantity (`SetReleaseDrawingLine`), into
+groups without any I/O; either list may be empty, not both (`Build(lines,
+includeArchived)` and `Build(set, multiplier, includeArchived)` are the
+sets-only forms). A drawing listed by several sets, or by a set and on its own,
+becomes one item with the quantities summed and each share kept (`Sources`; a
+share with no set is the drawing on its own), using the newest revision it was
+read with. A drawing listed twice on its own is refused (give it a larger
+quantity). A group is the items whose drawings share material name and grade (by
 `SharedListNames.Key`), thickness (rounded to 4 decimals), units and cut type.
-The plan's customer is the one every set names, or blank. A set listed twice is
+The plan's customer is the one every set and drawing on its own names, or blank. A set listed twice is
 refused (give it more kits instead). Archived drawings are skipped unless included. A group is refused when two of its drawings share a
 name (compared ordinally, as a nest keys drawings), and every drawing without a
 material or a positive thickness goes to one refused "unassigned" group, listed last.
@@ -594,7 +628,10 @@ downloaded nest.
 
 `SetReleaseSession.RunAsync` releases the chosen releasable groups in plan order.
 A group named in its `mergeInto` map merges into that draft instead of making a
-new nest:
+new nest. When the plan has drawings on their own it first asks the server
+whether it can record them (`IDrawingSetStore.EnsureDrawingReleasesSupportedAsync`):
+an older server refuses the first group with the reason, a failed check fails
+it, and nothing is built or saved.
 
 1. **Build every group first.** For a new nest the caller's factory makes an
    empty nest in the group's units; the session sets material, grade,
@@ -619,9 +656,10 @@ new nest:
    otherwise says whether someone saved the draft meanwhile. The first real
    failure stops the rest.
 3. **Post the release** only when every chosen group was created or merged,
-   under a client-allocated id. It names every set with its kits, each nest as
-   created or merged with the revisions before and after, and the drawing
-   revisions and quantities each set put in each nest. When the post fails, the nests stay and
+   under a client-allocated id. It names every set with its kits, every drawing
+   on its own with its quantity, each nest as created or merged with the
+   revisions before and after, and the drawing revisions and quantities each set
+   (or no set, for a drawing on its own) put in each nest. When the post fails, the nests stay and
    `RetryReleaseAsync` posts the same id again; a 409 naming that id is adopted
    as the stored release.
 
@@ -670,6 +708,12 @@ no NUL characters.
 Schema v10 adds empty `materials` and `material_grades` tables. Existing
 records are not read into the list; fill it through `POST /api/materials`. No
 other table changes. A server older than v10 refuses to open a v10 database, so
+rolling back needs the pre-upgrade backup.
+
+Schema v11 adds `release_drawings` (each release's drawings on their own, by
+position, unique per drawing) and rebuilds `release_nest_items` with a nullable
+`setId`, copying every row (SQLite cannot drop `NOT NULL` from a column). No
+other table changes. A server older than v11 refuses to open a v11 database, so
 rolling back needs the pre-upgrade backup.
 
 ## Storage

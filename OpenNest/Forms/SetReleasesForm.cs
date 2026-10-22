@@ -11,7 +11,8 @@ using OpenNest.Data;
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// Drawing Sets &gt; Releases: the releases that include one set, newest first, a bounded
+    /// Drawing Sets &gt; Releases: the releases that include one set, or one library drawing on
+    /// its own (Drawings tab &gt; Releases), newest first, a bounded
     /// page at a time, each with its progress ("2 of 3 cut"), and the nests of the selected
     /// release with what the release did to each and their current status, or Deleted. The
     /// server joins every nest's current metadata on each read. Undo Release deletes the nests
@@ -24,6 +25,7 @@ namespace OpenNest.Forms
 
         private readonly IDrawingSetStore sets;
         private readonly DrawingSetRecord set;
+        private readonly DrawingLibraryRecord drawing;
         private SetReleasePage page;
         private int offset;
         private int pageRequest;
@@ -33,13 +35,28 @@ namespace OpenNest.Forms
         internal Func<string, MessageBoxButtons, MessageBoxIcon, DialogResult> ShowMessage { get; set; }
 
         public SetReleasesForm(IDrawingSetStore sets, DrawingSetRecord set)
+            : this(sets)
+        {
+            this.set = set ?? throw new ArgumentNullException(nameof(set));
+            Text = $"Releases of '{set.Name}'";
+        }
+
+        /// <summary>The releases that had <paramref name="drawing"/> on its own, outside any set.</summary>
+        public SetReleasesForm(IDrawingSetStore sets, DrawingLibraryRecord drawing)
+            : this(sets)
+        {
+            this.drawing = drawing ?? throw new ArgumentNullException(nameof(drawing));
+            Text = $"Releases of drawing '{drawing.Name}'";
+            revisionColumn.Visible = false;
+            multiplierColumn.HeaderText = "Quantity";
+        }
+
+        private SetReleasesForm(IDrawingSetStore sets)
         {
             InitializeComponent();
             this.sets = sets ?? throw new ArgumentNullException(nameof(sets));
-            this.set = set ?? throw new ArgumentNullException(nameof(set));
             GridStyle.Apply(releaseGrid);
             GridStyle.Apply(nestGrid);
-            Text = $"Releases of '{set.Name}'";
             ShowMessage = (text, buttons, icon) => MessageBox.Show(this, text, Text, buttons, icon);
         }
 
@@ -125,7 +142,7 @@ namespace OpenNest.Forms
             summaryLabel.Text = "Loading...";
             try
             {
-                var loaded = await sets.QueryReleasesAsync(setId: set.Id, offset: requestedOffset, limit: PageSize);
+                var loaded = await sets.QueryReleasesAsync(setId: set?.Id, drawingId: drawing?.Id, offset: requestedOffset, limit: PageSize);
                 if (IsDisposed || request != pageRequest)
                     return;
 
@@ -136,15 +153,31 @@ namespace OpenNest.Forms
                 foreach (var release in loaded.Items)
                 {
                     // Tagged before it is added: adding the first row selects it, which shows its nests.
-                    // This set's line; a release of several sets says how many others it had.
-                    var line = release.Sets.First(s => s.SetId == set.Id);
-                    var others = release.Sets.Count - 1;
+                    // This set's or drawing's line; the release's other sets and drawings are counted.
+                    int revision, quantity, otherSets, otherDrawings;
+                    if (set != null)
+                    {
+                        var line = release.Sets.First(s => s.SetId == set.Id);
+                        (revision, quantity) = (line.SetRevision, line.Quantity);
+                        (otherSets, otherDrawings) = (release.Sets.Count - 1, release.Drawings.Count);
+                    }
+                    else
+                    {
+                        var line = release.Drawings.First(d => d.DrawingId == drawing.Id);
+                        (revision, quantity) = (0, line.Quantity);
+                        (otherSets, otherDrawings) = (release.Sets.Count, release.Drawings.Count - 1);
+                    }
+                    var others = new[]
+                    {
+                        otherSets == 0 ? null : $"{otherSets} {(set != null ? "other " : "")}{(otherSets == 1 ? "set" : "sets")}",
+                        otherDrawings == 0 ? null : $"{otherDrawings} {(drawing != null ? "other " : "")}{(otherDrawings == 1 ? "drawing" : "drawings")}",
+                    }.Where(o => o != null).ToList();
                     var row = new DataGridViewRow { Tag = release };
                     row.CreateCells(releaseGrid,
                         release.ReleasedAt == default ? "" : release.ReleasedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture),
                         release.ReleasedBy,
-                        line.SetRevision,
-                        others == 0 ? $"×{line.Quantity}" : $"×{line.Quantity} (+{others} other {(others == 1 ? "set" : "sets")})",
+                        revision,
+                        others.Count == 0 ? $"×{quantity}" : $"×{quantity} (+{string.Join(", ", others)})",
                         release.Nests.Count,
                         SetReleaseText.Progress(release),
                         release.Notes);
@@ -156,7 +189,7 @@ namespace OpenNest.Forms
                     releaseGrid.CurrentCell = releaseGrid.Rows[0].Cells[0];
 
                 summaryLabel.Text = loaded.Total == 0
-                    ? "This set has not been released yet."
+                    ? set != null ? "This set has not been released yet." : "This drawing has not been released on its own yet."
                     : $"Releases {offset + 1:N0}-{offset + loaded.Items.Count:N0} of {loaded.Total:N0}";
             }
             catch (Exception ex) when (ex is IOException || ex is HttpRequestException || ex is TaskCanceledException)
