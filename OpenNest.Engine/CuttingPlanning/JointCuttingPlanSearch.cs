@@ -70,6 +70,10 @@ internal static class JointCuttingPlanSearch
         var maxContours = snapshot.Placements.Max(p => p.Prepared?.Count ?? 1);
         var stall = StallExpansionsPerEntry * snapshot.MaxEntries * maxContours;
         var preferEndpoints = count > 1 && maxContours > 1;
+        // A supplied blank alone on its sheet (its holes are the whole part) goes to contour
+        // recovery first; any other lone part keeps the plain search, whose routes are shorter.
+        var doorAlone = count == 1 && maxContours > 1
+            && snapshot.Placements[0].Material is { IsComplete: true, HasDisplayPerimeter: true };
         var planned = Enumerable.Range(0, count).Except(excluded).ToArray();
         try
         {
@@ -108,7 +112,8 @@ internal static class JointCuttingPlanSearch
                 // only repeat the same blocked approach along the same order.
                 Attempt attempt = null;
                 foreach (var (preferredOnly, contourRecovery) in preferEndpoints
-                    ? new[] { (true, false), (false, true), (false, false) } : [(false, false)])
+                    ? new[] { (true, false), (false, true), (false, false) }
+                    : doorAlone ? [(false, true), (false, false)] : [(false, false)])
                 {
                     var pass = walk.Follow(sequence, stall, resume, preferredOnly, contourRecovery, prerequisites);
                     if (pass.Order != null)
@@ -518,9 +523,9 @@ internal static class JointCuttingPlanSearch
                     continue;
                 }
                 var prepared = source.Prepared;
-                // Recovery and endpoint branches are led by the cut perimeter; a display perimeter
-                // is never cut, so its holes take the plain contour-by-contour search below.
-                if (contourRecovery && prepared.HasCutPerimeter && prepared.Count > 1
+                // Recovery solves the part's hole transitions, its outside last. A supplied blank's
+                // display perimeter is never cut, so its holes alone are the part.
+                if (contourRecovery && HasRecoverableHoles(source) && prepared.Count > 1
                     && prepared.PerimeterOrdinal <= MaximumRecoveryHoles && node.Active == null)
                 {
                     foreach (var edge in RecoverPart(node, sequence, source, attempt))
@@ -645,6 +650,11 @@ internal static class JointCuttingPlanSearch
             }
         }
 
+        // A part whose holes recovery can order: one with a cut perimeter, which it cuts last, or
+        // a supplied blank whose display perimeter is never cut.
+        private static bool HasRecoverableHoles(FixedProgramPlacement source) =>
+            source.Prepared.HasCutPerimeter || source.Material is { IsComplete: true, HasDisplayPerimeter: true };
+
         // Recovery only: solve directed contour transitions rather than assuming
         // that a centre-to-centre hole tour can cross the already released material.
         // One complete checked chain per outside endpoint; original DFS remains fallback.
@@ -655,14 +665,21 @@ internal static class JointCuttingPlanSearch
         {
             var prepared = source.Prepared;
             var target = LookAheadCentre(node, sequence, source) - source.Location;
-            // Placement origins are authored program coordinates, not a downstream cut.
-            // Use the same material-centre look-ahead as the retained entry search.
-            var ranked = prepared.AutomaticEntryCandidatesWithFallbacks(prepared.PerimeterOrdinal, token: token)
-                .OrderBy(c => c.Choice.Point.DistanceTo(target ?? node.RoutePosition - source.Location)).ToArray();
-            var perimeters = ranked.Where(c => Evaluate(source, c).Status == ContourFeasibilityStatus.Clear)
-                .Select(c => c.Choice).ToArray();
-            if (perimeters.Length == 0)
-                perimeters = [.. ScrapPierceEntries(source, ranked, out _)];
+            ContourChoice[] perimeters;
+            if (prepared.HasCutPerimeter)
+            {
+                // Placement origins are authored program coordinates, not a downstream cut.
+                // Use the same material-centre look-ahead as the retained entry search.
+                var ranked = prepared.AutomaticEntryCandidatesWithFallbacks(prepared.PerimeterOrdinal, token: token)
+                    .OrderBy(c => c.Choice.Point.DistanceTo(target ?? node.RoutePosition - source.Location)).ToArray();
+                perimeters = ranked.Where(c => Evaluate(source, c).Status == ContourFeasibilityStatus.Clear)
+                    .Select(c => c.Choice).ToArray();
+                if (perimeters.Length == 0)
+                    perimeters = [.. ScrapPierceEntries(source, ranked, out _)];
+            }
+            else
+                // No outside to cut: one pass, complete once every hole is cut.
+                perimeters = [null];
             var holes = Enumerable.Range(0, prepared.PerimeterOrdinal)
                 .Select(c => prepared.AutomaticEntryCandidatesWithFallbacks(c, token: token)
                     .Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear).Select(e => e.Choice).ToArray()).ToArray();
@@ -712,7 +729,22 @@ internal static class JointCuttingPlanSearch
                 // This dominance heuristic is confined to recovery: emitted
                 // seams can differ for the same released subset. Never prune full DFS.
                 var failed = new HashSet<(int Mask, long X, long Y)>();
-                if (!Solve(0, start, released)) continue;
+                // Learned order, as for whole parts: a hop onto a hole that crosses holes already cut
+                // teaches "cut it before them" (never a rule that closes a cycle). Each new rule
+                // restarts the chain, so the order changes before entry combinations are retried.
+                // Rules only order candidates (a hole still waiting for one goes last); no hole is
+                // ever skipped. Until the first rule the chain is nearest-first, as before.
+                var prerequisites = holes.Select(_ => new HashSet<int>()).ToArray();
+                var learnedNew = false;
+                bool solved;
+                do
+                {
+                    learnedNew = false;
+                    chain.Clear();
+                    solved = Solve(0, start, released);
+                }
+                while (!solved && learnedNew && Expansions < limit);
+                if (!solved) continue;
                 var program = prepared.Emit(chain);
                 var execution = ExecutionMotionReader.Read(program, source.Location, node.Position, token);
                 var checker = node.Checker.Copy();
@@ -723,7 +755,7 @@ internal static class JointCuttingPlanSearch
                 yield return new(new([.. node.Order, proposal], execution.DeparturePoint, checker, null, node),
                     execution.RapidDistanceFrom(node.Position), source.SourceOrdinal, -1, endpoint, endpoint);
 
-                bool Solve(int mask, Vector position, ReleasedContourState before)
+                bool Solve(int mask, Vector position, ReleasedContourState released)
                 {
                     token.ThrowIfCancellationRequested();
                     if (Expansions >= limit) return false;
@@ -732,8 +764,10 @@ internal static class JointCuttingPlanSearch
                     if (failed.Contains(key)) return false;
                     if (mask == (1 << prepared.PerimeterOrdinal) - 1)
                     {
+                        if (outside == null)
+                            return true;
                         CountExpansion(source);
-                        var findings = before.Copy().Check(Motion(outside), position, source.SourceOrdinal + 1, token);
+                        var findings = released.Copy().Check(Motion(outside), position, source.SourceOrdinal + 1, token);
                         rejected.AddRange(Map(snapshot, findings));
                         attempt.NoteCrossings(source.SourceOrdinal, findings);
                         if (findings.Count != 0) { failed.Add(key); return false; }
@@ -745,7 +779,9 @@ internal static class JointCuttingPlanSearch
                     // cut first: a hop must not run back across the hole just cut.
                     var candidates = remaining
                         .Where(c => holes[c].Length != 0)
-                        .OrderBy(c => holes[c].Min(e => Motion(e).Motions[0].End.DistanceTo(position)))
+                        // A hole still waiting for a learned prerequisite goes last.
+                        .OrderBy(c => prerequisites[c].Any(p => (mask & (1 << p)) == 0))
+                        .ThenBy(c => holes[c].Min(e => Motion(e).Motions[0].End.DistanceTo(position)))
                         .ThenBy(c => c)
                         .SelectMany(c => holes[c]
                             .OrderBy(e => Onward(Motion(e).DeparturePoint, c, remaining))
@@ -756,19 +792,47 @@ internal static class JointCuttingPlanSearch
                         if (Expansions >= limit) return false;
                         CountExpansion(source);
                         var execution = Motion(choice);
-                        var after = before.Copy();
+                        var after = released.Copy();
                         var findings = after.Check(execution, position, source.SourceOrdinal + 1, token);
                         rejected.AddRange(Map(snapshot, findings));
                         attempt.NoteCrossings(source.SourceOrdinal, findings);
                         // The first contour's rapid is the arrival unless the part opens with scribes.
                         if (findings.Count != 0 && !(arrivalMayCross && mask == 0 && openingProgram.Length == 0
-                            && OnlyCrossings(findings))) continue;
+                            && OnlyCrossings(findings)))
+                        {
+                            if (Learn(choice.ContourOrdinal, position, execution)) return false;
+                            continue;
+                        }
                         chain.Add(choice);
                         if (Solve(mask | (1 << choice.ContourOrdinal), execution.DeparturePoint, after)) return true;
                         chain.RemoveAt(chain.Count - 1);
+                        // A new rule restarts the chain from the part's first hole.
+                        if (learnedNew) return false;
                     }
-                    failed.Add(key);
+                    if (!learnedNew)
+                        failed.Add(key);
                     return false;
+                }
+
+                // Rules from a hop that crossed holes of this chain; true when one is new.
+                bool Learn(int hole, Vector position, OwnedExecution execution)
+                {
+                    if (execution.Motions.Count == 0 || !execution.Motions[0].Rapid)
+                        return false;
+                    var pierce = execution.Motions[0].End;
+                    foreach (var cut in chain)
+                    {
+                        var curves = Motion(cut).Motions.Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display)
+                            .Select(m => m.Curve).ToArray();
+                        if (curves.Length == 0 || !PostVerificationGeometry.Crosses(position, pierce, curves, token))
+                            continue;
+                        var crossed = cut.ContourOrdinal;
+                        if (prerequisites[crossed].Contains(hole) || Precedes(crossed, hole, prerequisites))
+                            continue;
+                        prerequisites[crossed].Add(hole);
+                        learnedNew = true;
+                    }
+                    return learnedNew;
                 }
 
                 // How far a departure is from the nearest hole still to cut, or else the outside entry.
@@ -778,7 +842,11 @@ internal static class JointCuttingPlanSearch
                     foreach (var other in remaining)
                         if (other != hole && centres[other] is { } centre)
                             onward = System.Math.Min(onward, departure.DistanceTo(centre + source.Location));
-                    return double.IsPositiveInfinity(onward) ? departure.DistanceTo(Motion(outside).Motions[0].End) : onward;
+                    if (!double.IsPositiveInfinity(onward))
+                        return onward;
+                    // The last hole: toward the outside entry, or with none, toward the next part.
+                    return outside != null ? departure.DistanceTo(Motion(outside).Motions[0].End)
+                        : target is { } next ? departure.DistanceTo(next + source.Location) : 0;
                 }
             }
         }
@@ -1093,7 +1161,7 @@ internal static class JointCuttingPlanSearch
             }
             // Recovery's contour solver first: its first route whose only violations, if any, are
             // where the arrival rapid crosses cut contours. It passes every check when it can.
-            if (prepared.HasCutPerimeter && prepared.Count > 1 && prepared.PerimeterOrdinal <= MaximumRecoveryHoles
+            if (HasRecoverableHoles(source) && prepared.Count > 1 && prepared.PerimeterOrdinal <= MaximumRecoveryHoles
                 && RecoverPart(node, KeptSequence, source, new Attempt(null), arrivalMayCross: true).FirstOrDefault() is { } recovered)
             {
                 var proposal = recovered.Node.Order[^1];
