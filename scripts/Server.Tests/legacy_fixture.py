@@ -34,7 +34,9 @@ def create(directory):
             metadata: dict[str, object] = dict(zip(('id', 'name', 'customer', 'dateCreated', 'dateModified', 'material',
                                  'thickness', 'status', 'plateCount', 'partCount', 'comments',
                                  'madeBy', 'fileSize', 'savedAt'), fields))
-            metadata.update(status='toBeCut', revision=1, deleted=False, restoredFromRevision=None)
+            # Columns added by later migrations read back as their defaults.
+            metadata.update(status='toBeCut', revision=1, deleted=False, restoredFromRevision=None,
+                            materialGrade='')
             archive = {'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)}
             expected.append({'current': metadata, 'archive': archive,
                              'revisions': [{'metadata': metadata, 'archive': archive}]})
