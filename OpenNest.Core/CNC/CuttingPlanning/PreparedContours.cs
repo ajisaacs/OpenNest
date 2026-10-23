@@ -96,7 +96,9 @@ public sealed class PreparedContours
                 rejected.Add(pin);
                 continue;
             }
-            var choice = new ContourChoice(contour, pin.EntityOrdinal, pin.Point) { Owner = this };
+            var choice = new ContourChoice(contour, pin.EntityOrdinal,
+                SnapToVertex(shapes[contour], pin.EntityOrdinal, pin.Point))
+            { Owner = this };
             ValidateChoice(choice);
             pinned[contour] = choice;
             pinNumbers[contour] = pin.PinIndex + 1;
@@ -401,8 +403,12 @@ public sealed class PreparedContours
         void Add(int entityOrdinal, Vector point)
         {
             token.ThrowIfCancellationRequested();
-            if (entries.Count < maxEntries && !entries.Any(e => e.Point.DistanceTo(point) <= PostVerificationGeometry.Epsilon))
-                entries.Add(Entry(contourOrdinal, entityOrdinal, point));
+            if (entries.Count >= maxEntries)
+                return;
+            // Compare the entry as emitted: snapping can bring two raw points together.
+            var entry = Entry(contourOrdinal, entityOrdinal, point);
+            if (!entries.Any(e => e.Point.DistanceTo(entry.Point) <= PostVerificationGeometry.Epsilon))
+                entries.Add(entry);
         }
     }
 
@@ -427,6 +433,7 @@ public sealed class PreparedContours
 
     public ContourChoice Entry(int contourOrdinal, int entityOrdinal, Vector point)
     {
+        point = SnapToVertex(GetShape(contourOrdinal), entityOrdinal, point);
         var choice = new ContourChoice(contourOrdinal, entityOrdinal, point) { Owner = this };
         ValidateChoice(choice);
         return choice;
@@ -444,6 +451,7 @@ public sealed class PreparedContours
         PostVerificationGeometry.Validate(pierce);
         var shape = GetShape(PerimeterOrdinal);
         var point = shape.ClosestPointTo(pierce, out var entity);
+        point = SnapToVertex(shape, shape.Entities.IndexOf(entity), point);
         var choice = new ContourChoice(PerimeterOrdinal, shape.Entities.IndexOf(entity), point)
         {
             Owner = this,
@@ -630,9 +638,10 @@ public sealed class PreparedContours
             var point = inward ? line.StartPoint + offset : line.EndPoint - offset;
             // Strictly inside the edge by projection parameter (distance alone loses the
             // sign when a short edge is overshoot): never the corner, never the far
-            // endpoint (where a reflex vertex might sit). Short edges omit the point.
+            // endpoint (where a reflex vertex might sit). Short edges omit the point. The
+            // margin is the vertex snap distance, so Entry cannot snap it onto either end.
             var t = (point.X - line.StartPoint.X) * direction.X + (point.Y - line.StartPoint.Y) * direction.Y;
-            if (t <= PostVerificationGeometry.Epsilon || t >= line.Length - PostVerificationGeometry.Epsilon)
+            if (t <= OpenNest.Math.Tolerance.Epsilon || t >= line.Length - OpenNest.Math.Tolerance.Epsilon)
                 return;
             fallbacks.Add(Fallback(entityOrdinal, point, AutomaticEntryKind.NearCorner));
         }
@@ -895,6 +904,33 @@ public sealed class PreparedContours
         var shape = GetShape(contourOrdinal);
         return contourOrdinal != PerimeterOrdinal && shape.BoundingBox.Contains(point)
             && shape.ToPolygonWithTolerance(PlateOverlapAnalyzer.ChordTolerance).ContainsPoint(point);
+    }
+
+    /// <summary>
+    /// Emission splits a contour at its entry with <see cref="Arc.SplitAt"/>/<see cref="Line.SplitAt"/>,
+    /// which treat a point within <see cref="OpenNest.Math.Tolerance.Epsilon"/> of an endpoint as that endpoint and
+    /// start the contour there. An entry that close to a vertex is that vertex, so the lead-in ends
+    /// where the contour starts: otherwise the span between them (5e-8 in on imported arcs whose
+    /// stored centre sits beside the chord's midpoint) is never cut.
+    /// </summary>
+    private static Vector SnapToVertex(Shape shape, int entityOrdinal, Vector point)
+    {
+        if (entityOrdinal < 0 || entityOrdinal >= shape.Entities.Count
+            || shape.Entities[entityOrdinal] is not (Line or Arc))
+            return point;
+        var entity = shape.Entities[entityOrdinal];
+        // Within the verifier's epsilon the entry already cuts the contour whole: leave it, so
+        // programs emitted before this snap (saved pinned entries) re-emit unchanged.
+        bool Snaps(Vector vertex)
+        {
+            var distance = point.DistanceTo(vertex);
+            return distance > PostVerificationGeometry.Epsilon && distance < OpenNest.Math.Tolerance.Epsilon;
+        }
+        var start = Start(entity);
+        if (point.DistanceTo(start) < OpenNest.Math.Tolerance.Epsilon)
+            return Snaps(start) ? start : point;
+        var end = End(entity);
+        return Snaps(end) ? end : point;
     }
 
     private static Vector Start(Entity entity) => entity is Line line ? line.StartPoint : ((Arc)entity).StartPoint();
