@@ -135,6 +135,11 @@ public static class PostVerificationAnalyzer
                     if (part == null || !double.IsFinite(part.Rotation))
                         throw new ArgumentException("Missing part or invalid rotation.");
                     var moves = ExecutionMotionReader.Read(part.Program, part.Location, position, cancellationToken).Motions;
+                    // Executed reads stop at an applied program's display tail, so any display
+                    // perimeter left is an unplanned blank whose outline a post would refuse.
+                    if (moves.Any(move => move.Layer == LayerType.DisplayPerimeter))
+                        Incomplete("This part has a display perimeter (a supplied blank's outline that is never cut) "
+                            + "but no cutting plan; posts refuse it. Run Plan Cutting so only its cutouts are cut.");
                     if (expectsCuts && !moves.Any(move => !move.Rapid
                         && move.Layer is LayerType.Cut or LayerType.Display
                         && move.Curve.Length > PostVerificationGeometry.Epsilon))

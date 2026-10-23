@@ -135,7 +135,7 @@ public sealed class CincinnatiPartSubprogramWriter
                 if (part.BaseDrawing.IsCutOff)
                     continue;
 
-                var pgm = PostedCopy(part.Program);
+                var pgm = PostedCopy(FeatureUtils.PostedProgram(part));
                 var bbox = pgm.BoundingBox();
                 pgm.Offset(-bbox.Location.X, -bbox.Location.Y);
 
@@ -222,7 +222,7 @@ public sealed class CincinnatiPartSubprogramWriter
             foreach (var part in plate.Parts)
             {
                 if (!part.BaseDrawing.IsCutOff)
-                    Register(part.Program);
+                    Register(FeatureUtils.PostedProgram(part));
             }
         }
 

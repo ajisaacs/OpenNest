@@ -52,7 +52,9 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                 throw new ArgumentNullException(nameof(part));
 
             var contours = new List<CIFiberContour>();
-            Flatten(part.Program, part.Location, Vector.Zero, contours);
+            // A display perimeter's tail is never cut; an unplanned one is refused.
+            var program = DisplayPerimeterTail.ForPosting(part.Program, $"Part '{part.BaseDrawing?.Name}'");
+            Flatten(program, part.Location, Vector.Zero, contours);
             return contours;
         }
 

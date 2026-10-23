@@ -80,9 +80,16 @@ public static class FeatureUtils
     /// Splits a part's program into features by rapids, classifies each as etch or cut,
     /// and orders etch features before cut features. The part's program is not modified.
     /// </summary>
+    /// <summary>
+    /// The part program this post may write: a display perimeter's never-cut tail removed, and an
+    /// unplanned display perimeter refused (<see cref="DisplayPerimeterTail.ForPosting"/>).
+    /// </summary>
+    public static Program PostedProgram(Part part) =>
+        DisplayPerimeterTail.ForPosting(part.Program, $"Part '{part.BaseDrawing?.Name}'");
+
     public static List<(List<ICode> codes, bool isEtch)> SplitAndClassify(Part part)
     {
-        var codes = RemoveSuppressed(AbsoluteCodes(part.Program));
+        var codes = RemoveSuppressed(AbsoluteCodes(PostedProgram(part)));
         InsertLeadingRapid(codes);
 
         return ClassifyAndOrder(SplitByRapids(codes));
