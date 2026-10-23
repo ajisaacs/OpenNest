@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using OpenNest.Geometry;
+using static OpenNest.IO.Tests.NestArchiveJson;
 
 namespace OpenNest.IO.Tests;
 
@@ -517,43 +518,5 @@ public class ClampRailPersistenceTests
             default:
                 return false;
         }
-    }
-
-    private static string ReadNestJson(MemoryStream zipBytes)
-    {
-        zipBytes.Position = 0;
-        using var archive = new ZipArchive(zipBytes, ZipArchiveMode.Read, leaveOpen: true);
-        var entry = archive.GetEntry("nest.json");
-        Assert.NotNull(entry);
-        using var reader = new StreamReader(entry.Open(), Encoding.UTF8);
-        return reader.ReadToEnd();
-    }
-
-    private static MemoryStream RewriteNestJson(MemoryStream zipBytes, Func<string, string> rewrite)
-    {
-        zipBytes.Position = 0;
-        var output = new MemoryStream();
-        using (var source = new ZipArchive(zipBytes, ZipArchiveMode.Read, leaveOpen: true))
-        using (var target = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
-        {
-            foreach (var entry in source.Entries)
-            {
-                var newEntry = target.CreateEntry(entry.FullName);
-                using var input = entry.Open();
-                using var outStream = newEntry.Open();
-                if (entry.FullName == "nest.json")
-                {
-                    using var text = new StreamReader(input, Encoding.UTF8);
-                    using var writer = new StreamWriter(outStream, new UTF8Encoding(false));
-                    writer.Write(rewrite(text.ReadToEnd()));
-                }
-                else
-                {
-                    input.CopyTo(outStream);
-                }
-            }
-        }
-        output.Position = 0;
-        return output;
     }
 }

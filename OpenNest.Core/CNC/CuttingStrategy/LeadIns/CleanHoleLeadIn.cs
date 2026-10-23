@@ -1,11 +1,12 @@
 using System.Collections.Generic;
 using OpenNest.Geometry;
-using OpenNest.Math;
 
 namespace OpenNest.CNC.CuttingStrategy
 {
     public class CleanHoleLeadIn : LeadIn
     {
+        private const double ApproachAngle = 135.0;
+
         public double LineLength { get; set; }
         public double ArcRadius { get; set; }
         public double Kerf { get; set; }
@@ -14,42 +15,10 @@ namespace OpenNest.CNC.CuttingStrategy
             Vector contourStartPoint,
             double contourNormalAngle,
             RotationType winding = RotationType.CW
-        )
-        {
-            var piercePoint = GetPiercePoint(contourStartPoint, contourNormalAngle);
+        ) => Approach(contourStartPoint, contourNormalAngle).ToCodes(contourStartPoint, winding);
 
-            var arcCenterX = contourStartPoint.X + ArcRadius * System.Math.Cos(contourNormalAngle);
-            var arcCenterY = contourStartPoint.Y + ArcRadius * System.Math.Sin(contourNormalAngle);
-            var arcCenter = new Vector(arcCenterX, arcCenterY);
-
-            var lineAngle = contourNormalAngle + Angle.ToRadians(135.0);
-            var arcStart = new Vector(
-                arcCenterX + ArcRadius * System.Math.Cos(lineAngle),
-                arcCenterY + ArcRadius * System.Math.Sin(lineAngle)
-            );
-
-            return new List<ICode>
-            {
-                new RapidMove(piercePoint),
-                new LinearMove(arcStart) { Layer = LayerType.Leadin },
-                new ArcMove(contourStartPoint, arcCenter, winding) { Layer = LayerType.Leadin },
-            };
-        }
-
-        public override Vector GetPiercePoint(Vector contourStartPoint, double contourNormalAngle)
-        {
-            var arcCenterX = contourStartPoint.X + ArcRadius * System.Math.Cos(contourNormalAngle);
-            var arcCenterY = contourStartPoint.Y + ArcRadius * System.Math.Sin(contourNormalAngle);
-
-            var lineAngle = contourNormalAngle + Angle.ToRadians(135.0);
-            var arcStartX = arcCenterX + ArcRadius * System.Math.Cos(lineAngle);
-            var arcStartY = arcCenterY + ArcRadius * System.Math.Sin(lineAngle);
-
-            return new Vector(
-                arcStartX + LineLength * System.Math.Cos(lineAngle),
-                arcStartY + LineLength * System.Math.Sin(lineAngle)
-            );
-        }
+        public override Vector GetPiercePoint(Vector contourStartPoint, double contourNormalAngle) =>
+            Approach(contourStartPoint, contourNormalAngle).PiercePoint;
 
         public override LeadIn Scale(double factor) =>
             new CleanHoleLeadIn
@@ -58,5 +27,8 @@ namespace OpenNest.CNC.CuttingStrategy
                 ArcRadius = ArcRadius * factor,
                 Kerf = Kerf,
             };
+
+        private LineArcApproach Approach(Vector contourStartPoint, double contourNormalAngle) =>
+            LineArcApproach.Create(contourStartPoint, contourNormalAngle, ArcRadius, ApproachAngle, LineLength);
     }
 }

@@ -31,7 +31,6 @@ public sealed class SavedNestsForm : Form
     private const string IdColumn = "Id";
     private const string PlateSizeColumn = "PlateSize";
     private const string AreaColumn = "Area";
-    private const string LoadingText = "Loading...";
     private const string LoadingDetailsText = "Loading details...";
     private const string WindowTitle = "Open Nest — Database";
 
@@ -40,6 +39,7 @@ public sealed class SavedNestsForm : Form
     private readonly INestRepository repository;
     private readonly string serverUrl;
     private readonly NestBrowseSession session;
+    private readonly BrowsePager<NestPage, NestSortField> pager;
     private NestDetailsSession details;
     private readonly SplitContainer split;
     private readonly DataGridView nestGrid;
@@ -289,6 +289,12 @@ public sealed class SavedNestsForm : Form
         nextButton = new Button { Text = "\u25B6", Width = 32, Enabled = false };
         nextButton.Click += async (_, _) => await RunAsync(session.NextPageAsync);
         summaryLabel = new Label { AutoSize = true, Margin = new Padding(12, 8, 3, 0) };
+        pager = new BrowsePager<NestPage, NestSortField>(
+            session, nestGrid, summaryLabel, previousButton, nextButton, "nests from the server")
+        {
+            Populate = Populate,
+            Failed = () => UpdateTitle(""),
+        };
 
         var findBar = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
         findBar.Controls.Add(new Label { Text = "Find:", AutoSize = true, Margin = new Padding(3, 8, 0, 0) });
@@ -429,42 +435,7 @@ public sealed class SavedNestsForm : Form
     /// renders nothing; a failure clears the rows and shows the error in the summary line.
     /// Navigation follows only the latest request (<see cref="NestBrowseSession.IsLoading"/>).
     /// </summary>
-    private async Task RunAsync(Func<Task<bool>> request)
-    {
-        summaryLabel.Text = LoadingText;
-        try
-        {
-            var started = request();
-            UpdateNavigation();
-            if (await started && !IsDisposed)
-                Populate(session.Page);
-        }
-        catch (Exception ex)
-        {
-            if (!IsDisposed)
-            {
-                nestGrid.Rows.Clear();
-                summaryLabel.Text = $"Could not load nests from the server: {ex.Message}";
-                UpdateTitle("");
-            }
-        }
-        finally
-        {
-            if (!IsDisposed)
-            {
-                UpdateNavigation();
-                // A request that was declined or superseded renders nothing of its own.
-                if (!session.IsLoading && summaryLabel.Text == LoadingText)
-                    summaryLabel.Text = session.Summary;
-            }
-        }
-    }
-
-    private void UpdateNavigation()
-    {
-        previousButton.Enabled = !session.IsLoading && session.CanGoPrevious;
-        nextButton.Enabled = !session.IsLoading && session.CanGoNext;
-    }
+    private Task RunAsync(Func<Task<bool>> request) => pager.RunAsync(request);
 
     private void UpdateCommands()
     {
@@ -509,12 +480,7 @@ public sealed class SavedNestsForm : Form
             nestGrid.Rows[index].HeaderCell.Value = (page.Offset + i + 1).ToString("N0", CultureInfo.CurrentCulture);
         }
 
-        foreach (DataGridViewColumn column in nestGrid.Columns)
-        {
-            column.HeaderCell.SortGlyphDirection = column.Tag is NestSortField field && field == session.Sort
-                ? session.Descending ? SortOrder.Descending : SortOrder.Ascending
-                : SortOrder.None;
-        }
+        pager.ShowSortGlyphs();
 
         if (nestGrid.Rows.Count > 0 && nestGrid.CurrentCell == null)
             nestGrid.CurrentCell = nestGrid.Rows[0].Cells[0];

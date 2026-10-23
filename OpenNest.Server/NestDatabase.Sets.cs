@@ -186,18 +186,13 @@ public sealed partial class NestDatabase
         lock (_sync)
         {
             if (GetDrawingSet(id) is null) return null;
-            using var count = _connection.CreateCommand();
-            count.CommandText = "SELECT COUNT(*) FROM drawing_set_revisions WHERE id=$id";
-            count.Parameters.AddWithValue("$id", id.ToString());
-            var total = checked((int)(long)count.ExecuteScalar()!);
+            var total = CountRevisions("drawing_set_revisions", id);
             using var command = _connection.CreateCommand();
             command.CommandText = $"""
                 SELECT {SetColumns}, {SetMemberCount} FROM drawing_set_revisions s WHERE s.id=$id
                 ORDER BY s.revision DESC LIMIT $limit OFFSET $offset
                 """;
-            command.Parameters.AddWithValue("$id", id.ToString());
-            command.Parameters.AddWithValue("$limit", limit);
-            command.Parameters.AddWithValue("$offset", offset);
+            BindRevisionPage(command, id, offset, limit);
             return new DrawingSetPage { Items = ReadSets(command), Total = total, Offset = offset, Limit = limit };
         }
     }

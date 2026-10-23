@@ -1,7 +1,7 @@
 namespace OpenNest.Data;
 
 /// <summary>One bounded page of drawing set records, without their members.</summary>
-public sealed class DrawingSetPage
+public sealed class DrawingSetPage : IBrowsePage
 {
     /// <summary>At most <see cref="Limit"/> records, in the requested order.</summary>
     public IReadOnlyList<DrawingSetRecord> Items { get; init; } = Array.Empty<DrawingSetRecord>();
@@ -12,4 +12,6 @@ public sealed class DrawingSetPage
     public int Offset { get; init; }
 
     public int Limit { get; init; }
+
+    int IBrowsePage.ItemCount => Items.Count;
 }

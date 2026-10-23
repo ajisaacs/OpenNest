@@ -16,13 +16,6 @@ namespace OpenNest.Data;
 /// </summary>
 public sealed class RemoteNestRepository : INestRepository, IDisposable
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
-    };
-
     private readonly HttpClient _httpClient;
     private readonly bool _ownsClient;
     private readonly Uri _baseUri;
@@ -46,9 +39,9 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
     public async Task<IReadOnlyList<NestRecord>> ListAsync(CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync(Url("api/nests"), cancellationToken);
-        await EnsureSuccess(response, "list nests", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, "list nests", cancellationToken);
         var items = await response.Content
-            .ReadFromJsonAsync<List<NestRecord>>(JsonOptions, cancellationToken);
+            .ReadFromJsonAsync<List<NestRecord>>(NestServerHttp.JsonOptions, cancellationToken);
         return items ?? new List<NestRecord>();
     }
 
@@ -73,8 +66,8 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
                 "This nest server does not support filtered browsing (HTTP 404). Update the nest server to this OpenNest version.");
         }
 
-        await EnsureSuccess(response, "query nests", cancellationToken);
-        var page = await response.Content.ReadFromJsonAsync<NestPage>(JsonOptions, cancellationToken)
+        await NestServerHttp.EnsureSuccessAsync(response, "query nests", cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<NestPage>(NestServerHttp.JsonOptions, cancellationToken)
             ?? throw new IOException("Nest server returned an empty page.");
         if (page.Items.Count > query.Limit)
         {
@@ -115,8 +108,8 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         using var response = await _httpClient.GetAsync(Url($"api/nests/{(deleted ? "deleted/" : "")}{id}"), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             return null;
-        await EnsureSuccess(response, $"get nest {id}", cancellationToken);
-        return await response.Content.ReadFromJsonAsync<NestRecord>(JsonOptions, cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, $"get nest {id}", cancellationToken);
+        return await response.Content.ReadFromJsonAsync<NestRecord>(NestServerHttp.JsonOptions, cancellationToken);
     }
 
     public Task<byte[]?> GetFileAsync(Guid id, CancellationToken cancellationToken = default) =>
@@ -130,7 +123,7 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         using var response = await _httpClient.GetAsync(Url($"api/nests/{(deleted ? "deleted/" : "")}{id}/file"), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             return null;
-        await EnsureSuccess(response, $"download nest {id}", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, $"download nest {id}", cancellationToken);
         return await response.Content.ReadAsByteArrayAsync(cancellationToken);
     }
 
@@ -139,7 +132,7 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
     {
         using var content = BuildMultipart(nestFile, record);
         using var response = await _httpClient.PostAsync(Url("api/nests"), content, cancellationToken);
-        await EnsureSuccess(response, $"upload nest '{record.Name}'", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, $"upload nest '{record.Name}'", cancellationToken);
         return await ReadRecord(response, cancellationToken);
     }
 
@@ -151,8 +144,8 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
             Url("api/nest-names/next?year=" + year.ToString(CultureInfo.InvariantCulture)), null, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             throw new NotSupportedException("This nest server does not allocate nest names (HTTP 404).");
-        await EnsureSuccess(response, "allocate a nest name", cancellationToken);
-        var allocation = await response.Content.ReadFromJsonAsync<NestNameAllocation>(JsonOptions, cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, "allocate a nest name", cancellationToken);
+        var allocation = await response.Content.ReadFromJsonAsync<NestNameAllocation>(NestServerHttp.JsonOptions, cancellationToken);
         if (allocation is null || allocation.Year != year || allocation.Number < 1)
             throw new IOException("Nest server returned an invalid nest name allocation.");
         return allocation.Number;
@@ -192,8 +185,8 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
             Url($"api/nests/{(deleted ? "deleted/" : "")}{id}/revisions?offset={offset.ToString(CultureInfo.InvariantCulture)}&limit={limit.ToString(CultureInfo.InvariantCulture)}"), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             throw new IOException("Nest history is unavailable or this nest no longer exists. Upgrade the nest server if it does not support version history, then reload.");
-        await EnsureSuccess(response, $"read nest history {id}", cancellationToken);
-        var page = await response.Content.ReadFromJsonAsync<NestRevisionPage>(JsonOptions, cancellationToken)
+        await NestServerHttp.EnsureSuccessAsync(response, $"read nest history {id}", cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<NestRevisionPage>(NestServerHttp.JsonOptions, cancellationToken)
             ?? throw new IOException("Nest server returned an empty history page.");
         if (page.Items is null || page.Items.Count > limit || page.Offset != offset || page.Limit != limit
             || page.Total < 0 || page.Items.Count > System.Math.Max(0L, (long)page.Total - offset)
@@ -216,7 +209,7 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         ValidateRevision(revisionNumber);
         using var response = await _httpClient.GetAsync(Url($"api/nests/{(deleted ? "deleted/" : "")}{id}/revisions/{revisionNumber.ToString(CultureInfo.InvariantCulture)}/file"), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
-        await EnsureSuccess(response, $"download nest {id} revision {revisionNumber}", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, $"download nest {id} revision {revisionNumber}", cancellationToken);
         return await response.Content.ReadAsByteArrayAsync(cancellationToken);
     }
 
@@ -232,10 +225,10 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         if (history.Items.Count == 0)
             throw new IOException("Nest server returned no revision history. Upgrade the nest server and reload before saving.");
         using var request = new HttpRequestMessage(HttpMethod.Put, Url($"api/nests/{id}/file"));
-        request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{expectedRevision.ToString(CultureInfo.InvariantCulture)}\""));
+        NestServerHttp.AddIfMatch(request, expectedRevision);
         request.Content = BuildMultipart(nestFile, record);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
-        await EnsureSuccess(response, $"update nest {id}; reload the current version or Save As after a conflict", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, $"update nest {id}; reload the current version or Save As after a conflict", cancellationToken);
         var saved = await ReadRecord(response, cancellationToken);
         if (saved.Id != id || saved.Revision < expectedRevision)
             throw new IOException("Nest server returned an invalid saved revision. Reload to reconcile before saving again.");
@@ -249,10 +242,10 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         ValidateRevision(expectedRevision);
         await GetRevisionsAsync(id, limit: 1, cancellationToken: cancellationToken);
         using var request = new HttpRequestMessage(HttpMethod.Put, Url($"api/nests/{id}/metadata"));
-        request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{expectedRevision.ToString(CultureInfo.InvariantCulture)}\""));
-        request.Content = JsonContent.Create(record, options: JsonOptions);
+        NestServerHttp.AddIfMatch(request, expectedRevision);
+        request.Content = JsonContent.Create(record, options: NestServerHttp.JsonOptions);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
-        await EnsureSuccess(response, $"edit nest {id}; reload after a conflict", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, $"edit nest {id}; reload after a conflict", cancellationToken);
         return await ReadRecord(response, cancellationToken);
     }
 
@@ -265,9 +258,9 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         await GetRevisionsAsync(id, limit: 1, cancellationToken: cancellationToken);
         using var request = new HttpRequestMessage(HttpMethod.Post,
             Url($"api/nests/{id}/revisions/{sourceRevision.ToString(CultureInfo.InvariantCulture)}/restore"));
-        request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{expectedRevision.ToString(CultureInfo.InvariantCulture)}\""));
+        NestServerHttp.AddIfMatch(request, expectedRevision);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
-        await EnsureSuccess(response, $"restore nest {id}; reload after a conflict", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, $"restore nest {id}; reload after a conflict", cancellationToken);
         return await ReadRecord(response, cancellationToken);
     }
 
@@ -286,9 +279,9 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         await GetHistoryAsync(id, 0, 1, !deleted, cancellationToken);
         using var request = new HttpRequestMessage(deleted ? HttpMethod.Delete : HttpMethod.Post,
             Url(deleted ? $"api/nests/{id}" : $"api/nests/deleted/{id}/recover"));
-        request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{expectedRevision.ToString(CultureInfo.InvariantCulture)}\""));
+        NestServerHttp.AddIfMatch(request, expectedRevision);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
-        await EnsureSuccess(response, $"change nest visibility {id}; reload after a conflict", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, $"change nest visibility {id}; reload after a conflict", cancellationToken);
         return await ReadRecord(response, cancellationToken);
     }
 
@@ -312,7 +305,7 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
     {
         var content = new MultipartFormDataContent();
         var metadata = new StringContent(
-            JsonSerializer.Serialize(record, JsonOptions), Encoding.UTF8, "application/json");
+            JsonSerializer.Serialize(record, NestServerHttp.JsonOptions), Encoding.UTF8, "application/json");
         content.Add(metadata, "metadata");
         var file = new ByteArrayContent(nestFile);
         file.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
@@ -323,29 +316,7 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
     private static async Task<NestRecord> ReadRecord(
         HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        var record = await response.Content.ReadFromJsonAsync<NestRecord>(JsonOptions, cancellationToken);
+        var record = await response.Content.ReadFromJsonAsync<NestRecord>(NestServerHttp.JsonOptions, cancellationToken);
         return record ?? throw new IOException("Nest server returned an empty record.");
-    }
-
-    private static async Task EnsureSuccess(
-        HttpResponseMessage response, string action, CancellationToken cancellationToken)
-    {
-        if (response.IsSuccessStatusCode)
-            return;
-
-        var detail = "";
-        try
-        {
-            detail = await response.Content.ReadAsStringAsync(cancellationToken);
-        }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException)
-        {
-            // The status code is the useful part; the body is best-effort.
-        }
-
-        if (detail.Length > 200)
-            detail = detail[..200] + "…";
-        throw new IOException(
-            $"Could not {action} on the nest server: HTTP {(int)response.StatusCode} {response.ReasonPhrase}. {detail}".TrimEnd());
     }
 }

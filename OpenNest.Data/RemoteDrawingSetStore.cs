@@ -23,13 +23,6 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
 
     private const string DrawingReleaseFeature = "releasing library drawings on their own";
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
-    };
-
     private readonly HttpClient _httpClient;
     private readonly bool _ownsClient;
     private readonly Uri _baseUri;
@@ -59,8 +52,8 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         using var response = await _httpClient.GetAsync(Url("api/sets/query?" + BuildQueryString(query)), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             throw new ServerTooOldException(Feature);
-        await EnsureSuccess(response, "browse drawing sets", cancellationToken);
-        var page = await response.Content.ReadFromJsonAsync<DrawingSetPage>(JsonOptions, cancellationToken)
+        await NestServerHttp.EnsureSuccessAsync(response, "browse drawing sets", cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<DrawingSetPage>(NestServerHttp.JsonOptions, cancellationToken)
             ?? throw new IOException("Nest server returned an empty drawing set page.");
         if (page.Items is null || page.Items.Count > query.Limit || page.Total < 0 || page.Items.Any(item => item is null))
             throw new IOException($"Nest server returned an invalid drawing set page for a page limited to {query.Limit}.");
@@ -121,12 +114,12 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         ValidateId(record.Id);
         ValidateSet(record);
         using var response = await _httpClient.PostAsync(Url("api/sets"),
-            JsonContent.Create(ForSave(record), options: JsonOptions), cancellationToken);
+            JsonContent.Create(ForSave(record), options: NestServerHttp.JsonOptions), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             throw new ServerTooOldException(Feature);
         if (response.StatusCode == HttpStatusCode.Conflict)
             throw new DrawingSetSaveConflictException(await ReadSet(response, cancellationToken));
-        await EnsureSuccess(response, $"save drawing set '{record.Name}'", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, $"save drawing set '{record.Name}'", cancellationToken);
         var saved = await ReadSet(response, cancellationToken);
         if (saved.Id != record.Id || saved.Revision != 1 || !SameMembers(saved, record))
             throw new IOException("The nest server returned a different drawing set than was saved. Reload the set before saving again.");
@@ -143,7 +136,7 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         if (record.Id != Guid.Empty && record.Id != id)
             throw new ArgumentException("The set id does not match the set being saved.", nameof(record));
         using var request = Guarded(HttpMethod.Put, $"api/sets/{id}", expectedRevision);
-        request.Content = JsonContent.Create(ForSave(record), options: JsonOptions);
+        request.Content = JsonContent.Create(ForSave(record), options: NestServerHttp.JsonOptions);
         var saved = await SendGuarded(request, id, expectedRevision, $"save drawing set {id}", cancellationToken);
         if (!SameMembers(saved, record))
             throw new IOException("The nest server stored different set members. Reload the set before saving again.");
@@ -170,7 +163,7 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
             throw new ArgumentException(error, nameof(release));
 
         using var response = await _httpClient.PostAsync(Url("api/releases"),
-            JsonContent.Create(ForPost(release), options: JsonOptions), cancellationToken);
+            JsonContent.Create(ForPost(release), options: NestServerHttp.JsonOptions), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             throw new ServerTooOldException(ReleaseFeature);
         if (response.StatusCode == HttpStatusCode.Conflict)
@@ -178,7 +171,7 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         // A server without drawings on their own refuses such a release as malformed.
         if (response.StatusCode == HttpStatusCode.BadRequest && release.Drawings.Count > 0)
             await EnsureDrawingReleasesSupportedAsync(cancellationToken);
-        await EnsureSuccess(response, "record the release", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, "record the release", cancellationToken);
         var stored = await ReadRelease(response, cancellationToken);
         if (stored.Id != release.Id
             || !stored.Sets.Select(s => (s?.SetId, s?.SetRevision, s?.Quantity))
@@ -200,7 +193,7 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
             await ThrowIfReleasesUnsupported(cancellationToken);
             return null;
         }
-        await EnsureSuccess(response, $"read release {id}", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, $"read release {id}", cancellationToken);
         var release = await ReadRelease(response, cancellationToken);
         if (release.Id != id)
             throw new IOException("Nest server returned a different release.");
@@ -224,8 +217,8 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         // A server without drawings on their own refuses the unknown drawingId parameter.
         if (response.StatusCode == HttpStatusCode.BadRequest && drawingId is not null)
             throw new ServerTooOldException(DrawingReleaseFeature);
-        await EnsureSuccess(response, "read releases", cancellationToken);
-        var page = await response.Content.ReadFromJsonAsync<SetReleasePage>(JsonOptions, cancellationToken)
+        await NestServerHttp.EnsureSuccessAsync(response, "read releases", cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<SetReleasePage>(NestServerHttp.JsonOptions, cancellationToken)
             ?? throw new IOException("Nest server returned an empty release page.");
         if (page.Items is null || !IsBoundedPage(page.Items.Count, page.Total, page.Offset, page.Limit, offset, limit)
             || page.Items.Any(item => item is null || item.Sets is null || item.Drawings is null || item.Nests is null
@@ -245,7 +238,7 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         using var probe = await _httpClient.GetAsync(Url($"api/releases/query?drawingId={Guid.NewGuid()}&limit=1"), cancellationToken);
         if (probe.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.BadRequest)
             throw new ServerTooOldException(DrawingReleaseFeature);
-        await EnsureSuccess(probe, "check the release support", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(probe, "check the release support", cancellationToken);
     }
 
     /// <summary>
@@ -262,7 +255,7 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
             throw new ArgumentException(error, nameof(request));
 
         using var response = await _httpClient.PostAsync(Url($"api/releases/{id}/undo"),
-            JsonContent.Create(request, options: JsonOptions), cancellationToken);
+            JsonContent.Create(request, options: NestServerHttp.JsonOptions), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             await ThrowIfReleasesUnsupported(cancellationToken);
@@ -270,12 +263,12 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         }
         if (response.StatusCode == HttpStatusCode.Conflict)
         {
-            var conflict = await response.Content.ReadFromJsonAsync<SetReleaseUndoConflict>(JsonOptions, cancellationToken);
+            var conflict = await response.Content.ReadFromJsonAsync<SetReleaseUndoConflict>(NestServerHttp.JsonOptions, cancellationToken);
             if (conflict?.Release is null || conflict.ChangedNests is null)
                 throw new IOException("Nest server refused the undo without saying why.");
             throw new SetReleaseUndoConflictException(conflict);
         }
-        await EnsureSuccess(response, $"undo release {id}", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, $"undo release {id}", cancellationToken);
         var undone = await ReadRelease(response, cancellationToken);
         if (undone.Id != id || !undone.IsUndone)
             throw new IOException("Nest server did not report the release as undone.");
@@ -297,7 +290,7 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
     private HttpRequestMessage Guarded(HttpMethod method, string relative, int expectedRevision)
     {
         var request = new HttpRequestMessage(method, Url(relative));
-        request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{expectedRevision.ToString(CultureInfo.InvariantCulture)}\""));
+        NestServerHttp.AddIfMatch(request, expectedRevision);
         return request;
     }
 
@@ -312,7 +305,7 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         }
         if (response.StatusCode == HttpStatusCode.Conflict)
             throw new DrawingSetSaveConflictException(await ReadSet(response, cancellationToken));
-        await EnsureSuccess(response, action, cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, action, cancellationToken);
         var saved = await ReadSet(response, cancellationToken);
         if (saved.Id != id || saved.Revision < expectedRevision)
             throw new IOException("Nest server returned an invalid drawing set revision. Reload the set before saving again.");
@@ -327,7 +320,7 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
             await ThrowIfServerTooOld(cancellationToken);
             return null;
         }
-        await EnsureSuccess(response, action, cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, action, cancellationToken);
         return await ReadSet(response, cancellationToken);
     }
 
@@ -341,8 +334,8 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
             await ThrowIfServerTooOld(cancellationToken);
             return null;
         }
-        await EnsureSuccess(response, action, cancellationToken);
-        var page = await response.Content.ReadFromJsonAsync<DrawingSetPage>(JsonOptions, cancellationToken)
+        await NestServerHttp.EnsureSuccessAsync(response, action, cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<DrawingSetPage>(NestServerHttp.JsonOptions, cancellationToken)
             ?? throw new IOException("Nest server returned an empty drawing set page.");
         if (page.Items is null || !IsBoundedPage(page.Items.Count, page.Total, page.Offset, page.Limit, offset, limit)
             || page.Items.Any(item => item is null))
@@ -465,38 +458,18 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
 
     private static async Task<DrawingSetRecord> ReadSet(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        var record = await response.Content.ReadFromJsonAsync<DrawingSetRecord>(JsonOptions, cancellationToken);
+        var record = await response.Content.ReadFromJsonAsync<DrawingSetRecord>(NestServerHttp.JsonOptions, cancellationToken);
         return record ?? throw new IOException("Nest server returned an empty drawing set record.");
     }
 
     private static async Task<SetReleaseRecord> ReadRelease(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        var release = await response.Content.ReadFromJsonAsync<SetReleaseRecord>(JsonOptions, cancellationToken);
+        var release = await response.Content.ReadFromJsonAsync<SetReleaseRecord>(NestServerHttp.JsonOptions, cancellationToken);
         if (release is null || release.Sets is null || release.Drawings is null || release.Nests is null)
             throw new IOException("Nest server returned an empty set release record.");
         return release;
     }
 
-    private static async Task EnsureSuccess(HttpResponseMessage response, string action, CancellationToken cancellationToken)
-    {
-        if (response.IsSuccessStatusCode)
-            return;
-
-        var detail = "";
-        try
-        {
-            detail = await response.Content.ReadAsStringAsync(cancellationToken);
-        }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException)
-        {
-            // The status code is the useful part; the body is best-effort.
-        }
-
-        if (detail.Length > 200)
-            detail = detail[..200] + "…";
-        throw new IOException(
-            $"Could not {action} on the nest server: HTTP {(int)response.StatusCode} {response.ReasonPhrase}. {detail}".TrimEnd());
-    }
 
     public void Dispose()
     {

@@ -18,13 +18,6 @@ namespace OpenNest.Data;
 /// </summary>
 public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
-    };
-
     private readonly HttpClient _httpClient;
     private readonly bool _ownsClient;
     private readonly Uri _baseUri;
@@ -61,7 +54,7 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
             throw new ServerTooOldException();
         if (response.StatusCode == HttpStatusCode.Conflict)
             throw new DrawingLibraryConflictException(await ReadRecord(response, cancellationToken));
-        await EnsureSuccess(response, $"save drawing '{record.Name}' to the library", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, $"save drawing '{record.Name}' to the library", cancellationToken);
         var saved = await ReadRecord(response, cancellationToken);
         if (saved.Id != record.Id || saved.Revision != 1 || saved.PackageSha256 != Sha256(package))
             throw new IOException("The nest server returned a different drawing than was saved. Reload the library before saving again.");
@@ -78,8 +71,8 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
         using var response = await _httpClient.GetAsync(Url("api/drawings/query?" + BuildQueryString(query)), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             throw new ServerTooOldException();
-        await EnsureSuccess(response, "browse the drawing library", cancellationToken);
-        var page = await response.Content.ReadFromJsonAsync<DrawingLibraryPage>(JsonOptions, cancellationToken)
+        await NestServerHttp.EnsureSuccessAsync(response, "browse the drawing library", cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<DrawingLibraryPage>(NestServerHttp.JsonOptions, cancellationToken)
             ?? throw new IOException("Nest server returned an empty drawing page.");
         if (page.Items is null || page.Items.Count > query.Limit || page.Total < 0 || page.Items.Any(item => item is null))
             throw new IOException($"Nest server returned an invalid drawing page for a page limited to {query.Limit}.");
@@ -96,7 +89,7 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
             await ThrowIfServerTooOld(cancellationToken);
             return null;
         }
-        await EnsureSuccess(response, $"read library drawing {id}", cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, $"read library drawing {id}", cancellationToken);
         var record = await ReadRecord(response, cancellationToken);
         return record.Id == id ? record : throw new IOException("Nest server returned a different library drawing.");
     }
@@ -123,8 +116,8 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
             await ThrowIfServerTooOld(cancellationToken);
             return null;
         }
-        await EnsureSuccess(response, $"read library drawing history {id}", cancellationToken);
-        var page = await response.Content.ReadFromJsonAsync<DrawingLibraryPage>(JsonOptions, cancellationToken)
+        await NestServerHttp.EnsureSuccessAsync(response, $"read library drawing history {id}", cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<DrawingLibraryPage>(NestServerHttp.JsonOptions, cancellationToken)
             ?? throw new IOException("Nest server returned an empty drawing history page.");
         if (page.Items is null || page.Items.Count > limit || page.Offset != offset || page.Limit != limit
             || page.Total < 0 || page.Items.Count > System.Math.Max(0L, (long)page.Total - offset)
@@ -170,7 +163,7 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
         if (error is not null)
             throw new ArgumentException(error, nameof(record));
         using var request = Guarded(HttpMethod.Put, $"api/drawings/{id}/metadata", expectedRevision);
-        request.Content = JsonContent.Create(record, options: JsonOptions);
+        request.Content = JsonContent.Create(record, options: NestServerHttp.JsonOptions);
         return await SendGuarded(request, id, expectedRevision, $"edit library drawing {id}", cancellationToken);
     }
 
@@ -195,7 +188,7 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
     private HttpRequestMessage Guarded(HttpMethod method, string relative, int expectedRevision)
     {
         var request = new HttpRequestMessage(method, Url(relative));
-        request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{expectedRevision.ToString(CultureInfo.InvariantCulture)}\""));
+        NestServerHttp.AddIfMatch(request, expectedRevision);
         return request;
     }
 
@@ -210,7 +203,7 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
         }
         if (response.StatusCode == HttpStatusCode.Conflict)
             throw new DrawingLibraryConflictException(await ReadRecord(response, cancellationToken));
-        await EnsureSuccess(response, action, cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, action, cancellationToken);
         var saved = await ReadRecord(response, cancellationToken);
         if (saved.Id != id || saved.Revision < expectedRevision)
             throw new IOException("Nest server returned an invalid library drawing revision. Reload the library before saving again.");
@@ -225,7 +218,7 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
             await ThrowIfServerTooOld(cancellationToken);
             return null;
         }
-        await EnsureSuccess(response, action, cancellationToken);
+        await NestServerHttp.EnsureSuccessAsync(response, action, cancellationToken);
         return await response.Content.ReadAsByteArrayAsync(cancellationToken);
     }
 
@@ -288,7 +281,7 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
     private static MultipartFormDataContent BuildMultipart(DrawingLibraryRecord record, byte[] package)
     {
         var content = new MultipartFormDataContent();
-        content.Add(new StringContent(JsonSerializer.Serialize(record, JsonOptions), Encoding.UTF8, "application/json"), "metadata");
+        content.Add(new StringContent(JsonSerializer.Serialize(record, NestServerHttp.JsonOptions), Encoding.UTF8, "application/json"), "metadata");
         var file = new ByteArrayContent(package);
         file.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
         content.Add(file, "package", "drawing.nest");
@@ -297,30 +290,10 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
 
     private static async Task<DrawingLibraryRecord> ReadRecord(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        var record = await response.Content.ReadFromJsonAsync<DrawingLibraryRecord>(JsonOptions, cancellationToken);
+        var record = await response.Content.ReadFromJsonAsync<DrawingLibraryRecord>(NestServerHttp.JsonOptions, cancellationToken);
         return record ?? throw new IOException("Nest server returned an empty library drawing record.");
     }
 
-    private static async Task EnsureSuccess(HttpResponseMessage response, string action, CancellationToken cancellationToken)
-    {
-        if (response.IsSuccessStatusCode)
-            return;
-
-        var detail = "";
-        try
-        {
-            detail = await response.Content.ReadAsStringAsync(cancellationToken);
-        }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException)
-        {
-            // The status code is the useful part; the body is best-effort.
-        }
-
-        if (detail.Length > 200)
-            detail = detail[..200] + "…";
-        throw new IOException(
-            $"Could not {action} on the nest server: HTTP {(int)response.StatusCode} {response.ReasonPhrase}. {detail}".TrimEnd());
-    }
 
     public void Dispose()
     {

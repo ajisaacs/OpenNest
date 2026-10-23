@@ -1,16 +1,14 @@
 using System;
-using System.Linq;
 using System.Threading;
 
-using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.Jobs.Placement.Fillers;
 namespace OpenNest.Engine.Jobs.Placement;
 
 /// <summary>
 /// Built-in remnant placement strategy for the whole-job runner. Fills one candidate per trial with
-/// a <see cref="RemnantPlateFiller"/> for the vertical or horizontal remnant policy, on a fresh
-/// private plate, using the same run-scoped identity, progress, and accounting boundaries as
-/// <see cref="DefaultPlateNester"/>.
+/// a <see cref="RemnantPlateFiller"/> for the vertical or horizontal remnant policy. Placement is
+/// <see cref="DefaultPlateNester"/>'s with that filler: the same fresh private plate per trial and
+/// the same run-scoped identity, progress, and accounting boundaries.
 /// </summary>
 /// <remarks>
 /// The remnant fillers share the Fill pipeline's automatic-rotation limitation, so non-automatic
@@ -18,14 +16,12 @@ namespace OpenNest.Engine.Jobs.Placement;
 /// </remarks>
 public sealed class RemnantPlateNester : IPlateNester
 {
-    private readonly Func<Plate, RemnantPlateFiller> fillerFactory;
-    private readonly OrderedPlateNester restrictedRotationNester = new();
-    private readonly CandidatePlacementContext context = new();
+    private readonly DefaultPlateNester nester;
 
     internal RemnantPlateNester(Func<Plate, RemnantPlateFiller> fillerFactory)
     {
-        this.fillerFactory =
-            fillerFactory ?? throw new ArgumentNullException(nameof(fillerFactory));
+        nester = new DefaultPlateNester(
+            fillerFactory ?? throw new ArgumentNullException(nameof(fillerFactory)));
     }
 
     /// <summary>Vertical-remnant policy: minimize X-extent, prefer horizontal placement.</summary>
@@ -40,29 +36,5 @@ public sealed class RemnantPlateNester : IPlateNester
         PlatePlacementRequest request,
         IProgress<NestJobProgress> progress = null,
         CancellationToken token = default
-    )
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        token.ThrowIfCancellationRequested();
-
-        // Same safety rule as DefaultPlateNester: the remnant fillers inherit the Fill pipeline's
-        // automatic-rotation limitation, so any non-automatic requirement goes to the policy-aware
-        // ordered nester.
-        if (request.Parts.Any(part => part.Rotation.Kind != RotationPolicyKind.Automatic))
-            return restrictedRotationNester.Place(request, progress, token);
-
-        var plate = DrawingJobMapper.CreatePlate(request.Stock);
-        var items = context.CreateItems(request.Parts);
-
-        var filler =
-            fillerFactory(plate)
-            ?? throw new InvalidOperationException("Filler factory returned null.");
-        var candidateProgress = CandidateProgressBridge.Create(progress, request.Stock.Id);
-        var parts = filler.Nest(items, candidateProgress, token);
-        token.ThrowIfCancellationRequested();
-        if (parts == null)
-            throw new InvalidOperationException("Filler returned null placements.");
-
-        return new PlateCandidate(context.MapPlacements(parts));
-    }
+    ) => nester.Place(request, progress, token);
 }

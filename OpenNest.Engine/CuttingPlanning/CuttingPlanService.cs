@@ -276,7 +276,7 @@ public static class CuttingPlanService
                 // Ignore only the unknown incoming rapid. Every fixed internal motion is checked.
                 var findings = new ReleasedContourState(reportMissingLeadIns: false).Check(placement.Execution, null,
                     placement.SourceOrdinal + 1, placement.IsCutOff, token);
-                fixedFindings.AddRange(Map(snapshot, findings));
+                fixedFindings.AddRange(JointCuttingPlanSearch.Map(snapshot, findings));
             }
             if (fixedFindings.Count != 0)
                 return new(fixedFindings.Any(f => f.Kind == PostVerificationKind.Incomplete)
@@ -293,7 +293,7 @@ public static class CuttingPlanService
             }
             var search = FixedProgramSearch.Run(snapshot, token);
             if (search.Status != CuttingPlanStatus.Ready)
-                return new(search.Status, findings: Map(snapshot, search.Findings), expansions: search.Expansions);
+                return new(search.Status, findings: JointCuttingPlanSearch.Map(snapshot, search.Findings), expansions: search.Expansions);
             return Replay(snapshot, search.Order, search.Expansions, token);
         }
         catch (OperationCanceledException)
@@ -330,7 +330,7 @@ public static class CuttingPlanService
         if (findings.Count != 0)
             return new(findings.Any(f => f.Kind == PostVerificationKind.Incomplete)
                 ? CuttingPlanStatus.UnsupportedGeometry : CuttingPlanStatus.ConstraintConflict,
-                findings: Map(snapshot, findings), expansions: expansions);
+                findings: JointCuttingPlanSearch.Map(snapshot, findings), expansions: expansions);
         return new(CuttingPlanStatus.Ready, order.Select(index => snapshot.Placements[index]),
             expansions: expansions, rapidDistance: distance, independentlyReplayed: true);
     }
@@ -489,14 +489,4 @@ public static class CuttingPlanService
 
     private static bool SameBits(double source, double proposed) =>
         BitConverter.DoubleToInt64Bits(source) == BitConverter.DoubleToInt64Bits(proposed);
-
-    private static IEnumerable<CuttingPlanFinding> Map(CuttingPlanSnapshot snapshot,
-        IEnumerable<PostVerificationFinding> findings) => findings.Select(finding =>
-    {
-        var source = finding.PartNumber is { } part ? snapshot.Placements[part - 1] : null;
-        var other = finding.OtherPartNumber is { } otherPart ? snapshot.Placements[otherPart - 1] : null;
-        return new CuttingPlanFinding(source?.SourceOrdinal, source?.SourcePart,
-            other?.SourceOrdinal, other?.SourcePart, finding.Kind, finding.Message)
-        { Witness = finding };
-    });
 }

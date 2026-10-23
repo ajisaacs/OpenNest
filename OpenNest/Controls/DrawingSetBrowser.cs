@@ -18,8 +18,6 @@ namespace OpenNest.Controls
     /// </summary>
     public partial class DrawingSetBrowser : UserControl
     {
-        private const string LoadingText = "Loading...";
-
         private IDrawingSetStore sets;
         private IDrawingLibraryStore library;
         private string serverUrl;
@@ -27,6 +25,7 @@ namespace OpenNest.Controls
         private Action<Nest, NestRecord> openNest;
         private Func<Guid, bool> isNestOpen = _ => false;
         private DrawingSetBrowseSession session;
+        private BrowsePager<DrawingSetPage, DrawingSetSortField> pager;
         private bool pick;
         private bool busy;
 
@@ -84,6 +83,13 @@ namespace OpenNest.Controls
             this.serverUrl = serverUrl ?? "";
             this.pick = pick;
             session = new DrawingSetBrowseSession(sets);
+            Disposed += (_, _) => session.Dispose();
+            pager = new BrowsePager<DrawingSetPage, DrawingSetSortField>(
+                session, setGrid, summaryLabel, previousButton, nextButton, "the drawing sets")
+            {
+                Populate = Populate,
+                Settled = UpdateCommands,
+            };
             ShowMessage = (text, buttons, icon) => MessageBox.Show(FindForm(), text, FindForm()?.Text ?? "Drawing Sets", buttons, icon);
             EditSet = edit =>
             {
@@ -116,7 +122,7 @@ namespace OpenNest.Controls
                 releasesButton.Visible = false;
             }
 
-            UpdateNavigation();
+            pager.UpdateNavigation();
             UpdateCommands();
         }
 
@@ -396,38 +402,7 @@ namespace OpenNest.Controls
             ShowMessage(message, MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
-        private async Task RunAsync(Func<Task<bool>> request)
-        {
-            summaryLabel.Text = LoadingText;
-            try
-            {
-                var started = request();
-                UpdateNavigation();
-                if (await started && !IsDisposed)
-                    Populate(session.Page);
-            }
-            catch (Exception ex)
-            {
-                if (!IsDisposed)
-                {
-                    setGrid.Rows.Clear();
-                    summaryLabel.Text = ex is ServerTooOldException
-                        ? ex.Message
-                        : $"Could not load the drawing sets: {ex.Message}";
-                }
-            }
-            finally
-            {
-                if (!IsDisposed)
-                {
-                    UpdateNavigation();
-                    // A request that was declined or superseded renders nothing of its own.
-                    if (!session.IsLoading && summaryLabel.Text == LoadingText)
-                        summaryLabel.Text = session.Summary;
-                    UpdateCommands();
-                }
-            }
-        }
+        private Task RunAsync(Func<Task<bool>> request) => pager.RunAsync(request);
 
         private void Populate(DrawingSetPage page)
         {
@@ -452,20 +427,8 @@ namespace OpenNest.Controls
             if (setGrid.CurrentCell == null && setGrid.Rows.Count > 0)
                 setGrid.CurrentCell = setGrid.Rows[0].Cells[0];
 
-            foreach (DataGridViewColumn column in setGrid.Columns)
-            {
-                column.HeaderCell.SortGlyphDirection = column.Tag is DrawingSetSortField field && field == session.Sort
-                    ? session.Descending ? SortOrder.Descending : SortOrder.Ascending
-                    : SortOrder.None;
-            }
-
+            pager.ShowSortGlyphs();
             notesBox.Text = SelectedSet?.Notes ?? "";
-        }
-
-        private void UpdateNavigation()
-        {
-            previousButton.Enabled = session is { IsLoading: false, CanGoPrevious: true };
-            nextButton.Enabled = session is { IsLoading: false, CanGoNext: true };
         }
 
         private void UpdateCommands()

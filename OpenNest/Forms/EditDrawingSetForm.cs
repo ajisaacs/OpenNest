@@ -23,10 +23,9 @@ namespace OpenNest.Forms
     /// </summary>
     public partial class EditDrawingSetForm : Form
     {
-        private const string LoadingText = "Loading...";
-
         private readonly DrawingSetEditSession session;
         private readonly DrawingLibraryBrowseSession librarySession;
+        private readonly BrowsePager<DrawingLibraryPage, DrawingSortField> libraryPager;
         private bool loading;
         private bool saving;
 
@@ -44,6 +43,12 @@ namespace OpenNest.Forms
             // A set mixes materials and thicknesses, so the library is never filtered to a nest.
             librarySession = new DrawingLibraryBrowseSession(library, new Nest());
             Disposed += (_, _) => librarySession.Dispose();
+            libraryPager = new BrowsePager<DrawingLibraryPage, DrawingSortField>(
+                librarySession, libraryGrid, librarySummaryLabel, previousButton, nextButton, "the drawing library")
+            {
+                Populate = PopulateLibrary,
+                Settled = UpdateAddCommand,
+            };
             ShowMessage = (text, buttons, icon) => MessageBox.Show(this, text, Text, buttons, icon);
 
             GridStyle.Apply(memberGrid);
@@ -217,51 +222,10 @@ namespace OpenNest.Forms
                 : $"{added} Already in the set: {string.Join(", ", result.AlreadyMembers.Select(d => $"'{d.Name}'"))}.";
         }
 
-        // Every selected row in list order; the current row alone when nothing is selected.
-        private IReadOnlyList<DrawingLibraryRecord> SelectedLibraryDrawings()
-        {
-            var picked = libraryGrid.SelectedRows.Cast<DataGridViewRow>()
-                .OrderBy(row => row.Index)
-                .Select(row => row.Tag as DrawingLibraryRecord)
-                .Where(record => record != null)
-                .ToList();
-            if (picked.Count == 0 && libraryGrid.CurrentRow?.Tag is DrawingLibraryRecord current)
-                picked.Add(current);
-            return picked;
-        }
+        private IReadOnlyList<DrawingLibraryRecord> SelectedLibraryDrawings() =>
+            libraryPager.SelectedRecords<DrawingLibraryRecord>();
 
-        private async Task RunLibraryAsync(Func<Task<bool>> request)
-        {
-            librarySummaryLabel.Text = LoadingText;
-            try
-            {
-                var started = request();
-                UpdateLibraryNavigation();
-                if (await started && !IsDisposed)
-                    PopulateLibrary(librarySession.Page);
-            }
-            catch (Exception ex)
-            {
-                if (!IsDisposed)
-                {
-                    libraryGrid.Rows.Clear();
-                    librarySummaryLabel.Text = ex is ServerTooOldException
-                        ? ex.Message
-                        : $"Could not load the drawing library: {ex.Message}";
-                }
-            }
-            finally
-            {
-                if (!IsDisposed)
-                {
-                    UpdateLibraryNavigation();
-                    // A request that was declined or superseded renders nothing of its own.
-                    if (!librarySession.IsLoading && librarySummaryLabel.Text == LoadingText)
-                        librarySummaryLabel.Text = librarySession.Summary;
-                    UpdateAddCommand();
-                }
-            }
-        }
+        private Task RunLibraryAsync(Func<Task<bool>> request) => libraryPager.RunAsync(request);
 
         private void PopulateLibrary(DrawingLibraryPage page)
         {
@@ -277,13 +241,7 @@ namespace OpenNest.Forms
                 libraryGrid.Rows[index].Tag = record;
             }
 
-            foreach (DataGridViewColumn column in libraryGrid.Columns)
-            {
-                column.HeaderCell.SortGlyphDirection = column.Tag is DrawingSortField field && field == librarySession.Sort
-                    ? librarySession.Descending ? SortOrder.Descending : SortOrder.Ascending
-                    : SortOrder.None;
-            }
-
+            libraryPager.ShowSortGlyphs();
             MarkMembersInLibrary();
             UpdateAddCommand();
         }
@@ -298,12 +256,6 @@ namespace OpenNest.Forms
                 row.DefaultCellStyle.ForeColor = inSet ? SystemColors.GrayText : Color.Empty;
                 row.Cells[libraryNameColumn.Index].ToolTipText = inSet ? "Already in this set" : "";
             }
-        }
-
-        private void UpdateLibraryNavigation()
-        {
-            previousButton.Enabled = !librarySession.IsLoading && librarySession.CanGoPrevious;
-            nextButton.Enabled = !librarySession.IsLoading && librarySession.CanGoNext;
         }
 
         private void UpdateAddCommand() =>

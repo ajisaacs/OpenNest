@@ -35,9 +35,9 @@ internal static class NestQueryRequest
 
         var sort = NestSortField.SavedAt;
         if (values.TryGetValue("sort", out var sortText)
-            && !TrySortField(sortText.ToString(), out sort))
+            && !DrawingLibraryRequest.TryEnumName(sortText.ToString(), out sort))
         {
-            error = $"sort must be one of: {string.Join(", ", Enum.GetNames<NestSortField>().Select(CamelCase))}.";
+            error = $"sort must be one of: {string.Join(", ", Enum.GetNames<NestSortField>().Select(DrawingLibraryRequest.CamelCase))}.";
             return false;
         }
 
@@ -80,7 +80,8 @@ internal static class NestQueryRequest
 
         var offset = 0;
         var limit = NestQuery.DefaultLimit;
-        if (!TryInteger(values, "offset", ref offset, out error) || !TryInteger(values, "limit", ref limit, out error))
+        if (!DrawingLibraryRequest.TryInteger(values, "offset", ref offset, out error)
+            || !DrawingLibraryRequest.TryInteger(values, "limit", ref limit, out error))
             return false;
 
         query = new NestQuery
@@ -98,30 +99,5 @@ internal static class NestQueryRequest
         };
         error = query.GetValidationError() ?? "";
         return error.Length == 0;
-    }
-
-    // Names only: Enum.TryParse would also accept numbers and undefined values.
-    private static bool TrySortField(string text, out NestSortField field)
-    {
-        field = NestSortField.SavedAt;
-        return text.Length > 0
-            && text.All(char.IsAsciiLetter)
-            && Enum.TryParse(text, ignoreCase: true, out field)
-            && Enum.IsDefined(field);
-    }
-
-    private static string CamelCase(string name) => char.ToLowerInvariant(name[0]) + name[1..];
-
-    private static bool TryInteger(IQueryCollection values, string key, ref int value, out string error)
-    {
-        error = "";
-        if (!values.TryGetValue(key, out var text))
-            return true;
-
-        if (int.TryParse(text.ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out value))
-            return true;
-
-        error = $"{key} must be a non-negative integer.";
-        return false;
     }
 }

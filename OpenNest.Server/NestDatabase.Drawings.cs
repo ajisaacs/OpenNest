@@ -249,15 +249,10 @@ public sealed partial class NestDatabase
         lock (_sync)
         {
             if (GetDrawing(id) is null) return null;
-            using var count = _connection.CreateCommand();
-            count.CommandText = "SELECT COUNT(*) FROM drawing_revisions WHERE id=$id";
-            count.Parameters.AddWithValue("$id", id.ToString());
-            var total = checked((int)(long)count.ExecuteScalar()!);
+            var total = CountRevisions("drawing_revisions", id);
             using var command = _connection.CreateCommand();
             command.CommandText = $"SELECT {DrawingColumns} FROM drawing_revisions WHERE id=$id ORDER BY revision DESC LIMIT $limit OFFSET $offset";
-            command.Parameters.AddWithValue("$id", id.ToString());
-            command.Parameters.AddWithValue("$limit", limit);
-            command.Parameters.AddWithValue("$offset", offset);
+            BindRevisionPage(command, id, offset, limit);
             var records = new List<DrawingLibraryRecord>();
             using var reader = command.ExecuteReader();
             while (reader.Read()) records.Add(ReadDrawing(reader));

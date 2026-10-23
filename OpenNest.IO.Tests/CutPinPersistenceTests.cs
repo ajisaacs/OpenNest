@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Geometry;
+using static OpenNest.IO.Tests.NestArchiveJson;
 
 namespace OpenNest.IO.Tests;
 
@@ -193,37 +194,10 @@ public class CutPinPersistenceTests
         return stream.ToArray();
     }
 
-    private static (Nest Nest, IReadOnlyList<string> Warnings) RoundTrip(byte[] archive)
-    {
-        var reader = new NestReader(new MemoryStream(archive));
-        return (reader.Read(), reader.Warnings);
-    }
-
-    private static JsonObject NestJson(byte[] archive)
-    {
-        using var zip = new ZipArchive(new MemoryStream(archive), ZipArchiveMode.Read);
-        using var reader = new StreamReader(zip.GetEntry("nest.json")!.Open(), Encoding.UTF8);
-        return JsonNode.Parse(reader.ReadToEnd())!.AsObject();
-    }
-
     private static byte[] ReplaceCutPins(byte[] archive, JsonNode? cutPins)
     {
         var json = NestJson(archive);
         json["drawings"]![0]!["cutPins"] = cutPins;
         return ReplaceNestJson(archive, json);
-    }
-
-    private static byte[] ReplaceNestJson(byte[] archive, JsonObject json)
-    {
-        using var output = new MemoryStream();
-        output.Write(archive);
-        using (var zip = new ZipArchive(output, ZipArchiveMode.Update, leaveOpen: true))
-        {
-            zip.GetEntry("nest.json")!.Delete();
-            using var writer = new StreamWriter(zip.CreateEntry("nest.json").Open(), new UTF8Encoding(false));
-            writer.Write(json.ToJsonString());
-        }
-
-        return output.ToArray();
     }
 }

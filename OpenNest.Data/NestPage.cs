@@ -1,7 +1,7 @@
 namespace OpenNest.Data;
 
 /// <summary>One page of saved-nest metadata returned by <c>GET /api/nests/query</c>.</summary>
-public sealed class NestPage
+public sealed class NestPage : IBrowsePage
 {
     /// <summary>At most <see cref="Limit"/> matching records, in the requested order.</summary>
     public IReadOnlyList<NestRecord> Items { get; init; } = Array.Empty<NestRecord>();
@@ -12,4 +12,6 @@ public sealed class NestPage
     public int Offset { get; init; }
 
     public int Limit { get; init; }
+
+    int IBrowsePage.ItemCount => Items.Count;
 }

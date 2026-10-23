@@ -30,7 +30,6 @@ namespace OpenNest.Forms
     /// </summary>
     public partial class DrawingLibraryForm : Form
     {
-        private const string LoadingText = "Loading...";
         private const int DetailsWidth = 380;
         private const int PreviewCacheLimit = 64;
         private const int MaxQuantity = 99999;
@@ -40,6 +39,7 @@ namespace OpenNest.Forms
         private readonly Nest nest;
         private readonly IDrawingSetStore sets;
         private readonly DrawingLibraryBrowseSession session;
+        private readonly BrowsePager<DrawingLibraryPage, DrawingSortField> pager;
         private readonly Dictionary<(Guid Id, int Revision), Drawing> previews = new();
         private CancellationTokenSource previewCancel;
         private (Guid Id, int Revision) previewKey;
@@ -103,6 +103,13 @@ namespace OpenNest.Forms
             this.nest = nest ?? throw new ArgumentNullException(nameof(nest));
             this.sets = sets;
             session = new DrawingLibraryBrowseSession(library, nest);
+            Disposed += (_, _) => session.Dispose();
+            pager = new BrowsePager<DrawingLibraryPage, DrawingSortField>(
+                session, drawingGrid, summaryLabel, previousButton, nextButton, "the drawing library")
+            {
+                Populate = Populate,
+                Settled = UpdateCommands,
+            };
             ShowMessage = (text, buttons, icon) => MessageBox.Show(this, text, Text, buttons, icon);
             EditDrawing = edit =>
             {
@@ -147,7 +154,7 @@ namespace OpenNest.Forms
                 drawingGrid.ContextMenuStrip = drawingMenu;
             showAllCheckBox.Enabled = session.IsFilteredToNest;
             UpdateFilterLabel();
-            UpdateNavigation();
+            pager.UpdateNavigation();
             ShowDetails();
             RefreshNestTab();
         }
@@ -670,38 +677,7 @@ namespace OpenNest.Forms
             ShowMessage(message, MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
-        private async Task RunAsync(Func<Task<bool>> request)
-        {
-            summaryLabel.Text = LoadingText;
-            try
-            {
-                var started = request();
-                UpdateNavigation();
-                if (await started && !IsDisposed)
-                    Populate(session.Page);
-            }
-            catch (Exception ex)
-            {
-                if (!IsDisposed)
-                {
-                    drawingGrid.Rows.Clear();
-                    summaryLabel.Text = ex is ServerTooOldException
-                        ? ex.Message
-                        : $"Could not load the drawing library: {ex.Message}";
-                }
-            }
-            finally
-            {
-                if (!IsDisposed)
-                {
-                    UpdateNavigation();
-                    // A request that was declined or superseded renders nothing of its own.
-                    if (!session.IsLoading && summaryLabel.Text == LoadingText)
-                        summaryLabel.Text = session.Summary;
-                    UpdateCommands();
-                }
-            }
-        }
+        private Task RunAsync(Func<Task<bool>> request) => pager.RunAsync(request);
 
         private void Populate(DrawingLibraryPage page)
         {
@@ -721,24 +697,12 @@ namespace OpenNest.Forms
                 drawingGrid.Rows[index].Tag = record;
             }
 
-            foreach (DataGridViewColumn column in drawingGrid.Columns)
-            {
-                column.HeaderCell.SortGlyphDirection = column.Tag is DrawingSortField field && field == session.Sort
-                    ? session.Descending ? SortOrder.Descending : SortOrder.Ascending
-                    : SortOrder.None;
-            }
-
+            pager.ShowSortGlyphs();
             ShowDetails();
         }
 
         private DrawingLibraryRecord SelectedRecord() =>
             drawingGrid.CurrentRow?.Tag as DrawingLibraryRecord;
-
-        private void UpdateNavigation()
-        {
-            previousButton.Enabled = !session.IsLoading && session.CanGoPrevious;
-            nextButton.Enabled = !session.IsLoading && session.CanGoNext;
-        }
 
         private void UpdateCommands()
         {

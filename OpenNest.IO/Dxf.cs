@@ -8,14 +8,13 @@ using CSMath;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using AcadArc = ACadSharp.Entities.Arc;
+using AcadCircle = ACadSharp.Entities.Circle;
+using AcadLine = ACadSharp.Entities.Line;
+using Layer = ACadSharp.Tables.Layer;
 
 namespace OpenNest.IO
 {
-    using AcadArc = ACadSharp.Entities.Arc;
-    using AcadCircle = ACadSharp.Entities.Circle;
-    using AcadLine = ACadSharp.Entities.Line;
-    using Layer = ACadSharp.Tables.Layer;
-
     public static class Dxf
     {
         #region Import
@@ -43,64 +42,17 @@ namespace OpenNest.IO
             return new DxfImportResult { Entities = entities, Document = doc };
         }
 
-        public static List<Entity> GetGeometry(string path)
-        {
-            try
-            {
-                var doc = ReadDocument(path);
-                return ConvertEntities(doc);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(ex.Message);
-                return new List<Entity>();
-            }
-        }
+        public static List<Entity> GetGeometry(string path) =>
+            ReadGeometry(() => ReadDocument(path), null);
 
-        public static List<Entity> GetGeometry(Stream stream)
-        {
-            try
-            {
-                using var reader = new DxfReader(stream);
-                var doc = reader.Read();
-                return ConvertEntities(doc);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(ex.Message);
-                return new List<Entity>();
-            }
-        }
+        public static List<Entity> GetGeometry(Stream stream) =>
+            GetGeometry(stream, null);
 
-        public static List<Entity> GetGeometry(string path, Func<string, bool> layerFilter)
-        {
-            try
-            {
-                using var reader = new DxfReader(path);
-                var doc = reader.Read();
-                return ConvertEntities(doc, layerFilter);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(ex.Message);
-                return new List<Entity>();
-            }
-        }
+        public static List<Entity> GetGeometry(string path, Func<string, bool> layerFilter) =>
+            ReadGeometry(() => ReadDxf(new DxfReader(path)), layerFilter);
 
-        public static List<Entity> GetGeometry(Stream stream, Func<string, bool> layerFilter)
-        {
-            try
-            {
-                using var reader = new DxfReader(stream);
-                var doc = reader.Read();
-                return ConvertEntities(doc, layerFilter);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(ex.Message);
-                return new List<Entity>();
-            }
-        }
+        public static List<Entity> GetGeometry(Stream stream, Func<string, bool> layerFilter) =>
+            ReadGeometry(() => ReadDxf(new DxfReader(stream)), layerFilter);
 
         #endregion
 
@@ -150,6 +102,26 @@ namespace OpenNest.IO
 
         private static bool IsDwg(string path) =>
             Path.GetExtension(path).Equals(".dwg", StringComparison.OrdinalIgnoreCase);
+
+        // An unreadable drawing yields no geometry rather than an exception.
+        private static List<Entity> ReadGeometry(Func<CadDocument> read, Func<string, bool> layerFilter)
+        {
+            try
+            {
+                return ConvertEntities(read(), layerFilter);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                return new List<Entity>();
+            }
+        }
+
+        private static CadDocument ReadDxf(DxfReader reader)
+        {
+            using (reader)
+                return reader.Read();
+        }
 
         private static CadDocument ReadDocument(string path)
         {

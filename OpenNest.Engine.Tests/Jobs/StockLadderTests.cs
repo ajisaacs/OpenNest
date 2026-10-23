@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using OpenNest.Engine.Jobs;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Tests.Jobs;
 
@@ -209,9 +209,9 @@ public class StockLadderTests
                 new[] { stock },
                 new NestJobOptions(salvageRate: rate, minimumSalvageDimension: min)
             );
-        Assert.Equal(100, StockLadderNestingEngine.EstimateNetArea(Job(0.5, 0), sheet));
-        Assert.Equal(100, StockLadderNestingEngine.EstimateNetArea(Job(0.5, 7), sheet));
-        Assert.Equal(70, StockLadderNestingEngine.EstimateNetArea(Job(0.5, 5), sheet), 6);
+        Assert.Equal(100, NestJobCost.NetSheetArea(Job(0.5, 0), sheet));
+        Assert.Equal(100, NestJobCost.NetSheetArea(Job(0.5, 7), sheet));
+        Assert.Equal(70, NestJobCost.NetSheetArea(Job(0.5, 5), sheet), 6);
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new NestJobOptions(salvageRate: double.NaN)
         );

@@ -293,15 +293,10 @@ public sealed partial class NestDatabase : IDisposable
         lock (_sync)
         {
             if (Get(id, deleted) is null) return null;
-            using var count = _connection.CreateCommand();
-            count.CommandText = "SELECT COUNT(*) FROM nest_revisions WHERE id=$id";
-            count.Parameters.AddWithValue("$id", id.ToString());
-            var total = checked((int)(long)count.ExecuteScalar()!);
+            var total = CountRevisions("nest_revisions", id);
             using var command = _connection.CreateCommand();
             command.CommandText = $"SELECT {RecordColumns} FROM nest_revisions WHERE id=$id ORDER BY revision DESC LIMIT $limit OFFSET $offset";
-            command.Parameters.AddWithValue("$id", id.ToString());
-            command.Parameters.AddWithValue("$limit", limit);
-            command.Parameters.AddWithValue("$offset", offset);
+            BindRevisionPage(command, id, offset, limit);
             var records = new List<NestRecord>();
             using var reader = command.ExecuteReader();
             while (reader.Read()) records.Add(ReadRecord(reader));
@@ -512,6 +507,23 @@ public sealed partial class NestDatabase : IDisposable
         + (query.Material is null ? "" : " AND shared_key(material)=$materialKey")
         + (query.MaterialGrade is null ? "" : " AND shared_key(materialGrade)=$gradeKey")
         + (query.Thickness is null ? "" : " AND ABS(ROUND(thickness, 4) - $thickness) < 0.000001");
+
+    // Revisions of one id in a *_revisions table; call under _sync.
+    private int CountRevisions(string table, Guid id)
+    {
+        using var count = _connection.CreateCommand();
+        count.CommandText = $"SELECT COUNT(*) FROM {table} WHERE id=$id";
+        count.Parameters.AddWithValue("$id", id.ToString());
+        return checked((int)(long)count.ExecuteScalar()!);
+    }
+
+    // Binds a newest-first revision page query's $id, $limit and $offset.
+    private static void BindRevisionPage(SqliteCommand command, Guid id, int offset, int limit)
+    {
+        command.Parameters.AddWithValue("$id", id.ToString());
+        command.Parameters.AddWithValue("$limit", limit);
+        command.Parameters.AddWithValue("$offset", offset);
+    }
 
     private static void AddFilterParameters(SqliteCommand command, NestQuery query)
     {

@@ -60,7 +60,7 @@ public sealed class SupportGridSettings
     }
 
     /// <summary>The grid these settings describe in <paramref name="units"/>, or null when it is invalid.</summary>
-    public SupportGrid GridFor(Units units)
+    public SupportGrid? GridFor(Units units)
     {
         var converted = ConvertedTo(units);
         try

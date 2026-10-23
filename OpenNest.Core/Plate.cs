@@ -131,7 +131,7 @@ namespace OpenNest
         /// Raised after <see cref="ClampZones"/> content changes so views can refresh
         /// the zone overlay. Carries no geometry arguments.
         /// </summary>
-        public event EventHandler? ClampZonesChanged;
+        public event EventHandler ClampZonesChanged;
 
         private void OnClampZonesChanged() => ClampZonesChanged?.Invoke(this, EventArgs.Empty);
 
