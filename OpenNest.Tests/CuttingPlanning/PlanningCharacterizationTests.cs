@@ -45,7 +45,7 @@ public class PlanningCharacterizationTests
     [InlineData("holes-grid-kept-order", "07B70B43549E95C65407B24944DA8F7262B784CFC4ABF86241C10DD8272B1780")]
     [InlineData("rounded-circle-leads", "73677429BFC950669D238E834CAE48F54A483759BE4E0BB1437D096F0AF7F3DA")]
     [InlineData("tabbed-perimeters", "6858C09A02D73E4531D0D59B6CD1CFFFA2C9C8BA5F48CF4943D9C4AEC17195BA")]
-    [InlineData("locked-among-regenerated", "D7914712F87513E38AA93776886AAFD5025EC89A0D4D7314F900A1163F830019")]
+    [InlineData("locked-among-regenerated", "42AFCF0DE942F501D8542C091C9D4407EAE41DE9442F75300348DCDB4FF0C733")]
     public void FocusedFixture_PlansExactlyAsBefore(string name, string expected)
     {
         var nest = new Nest();

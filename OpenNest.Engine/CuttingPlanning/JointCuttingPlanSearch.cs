@@ -155,9 +155,14 @@ internal static class JointCuttingPlanSearch
                 }
                 // Back up to just before the earliest part the blocked approach crossed, keep the
                 // parts cut before it, and re-plan the rest from where the tool is at that point.
+                // The last kept part was planned facing the part that followed it in the old
+                // order; when another part follows it now, it is planned again, in the same
+                // place, facing that one.
                 var back = attempt.Crossed.Min(part => Array.IndexOf(sequence, part));
-                resume = attempt.BoundaryAt(back);
-                sequence = [.. sequence.Take(back), .. CuttingNestedOrder.Plan(sequence[back..], resume.Position, nesting)];
+                var rest = CuttingNestedOrder.Plan(sequence[back..], attempt.BoundaryAt(back).Position, nesting);
+                var replan = back > 0 && rest.Length != 0 && rest[0] != sequence[back] ? back - 1 : back;
+                resume = attempt.BoundaryAt(replan);
+                sequence = [.. sequence.Take(back), .. rest];
             }
         }
         catch (BudgetExceededException)

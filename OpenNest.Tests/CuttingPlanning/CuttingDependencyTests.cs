@@ -147,8 +147,9 @@ public class CuttingDependencyTests
         Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
         var order = result.ProposedOrder.Select(o => o.SourcePart).ToList();
         Assert.True(order.IndexOf(cut) < order.IndexOf(a), string.Join(",", result.ProposedOrder.Select(o => o.SourceOrdinal)));
-        // Learning at once took 22 expansions; retrying every entry of B first took 60.
-        Assert.True(result.Expansions < 40, Describe(result));
+        // Learning at once takes 40 expansions (22, then B planned again to face the cutoff that
+        // now follows it); retrying every entry of B first took 60.
+        Assert.True(result.Expansions < 50, Describe(result));
     }
 
     // 100 x 100 sheet: squares at X 1-11 and 60-70; a cutoff at X 5 is trimmed around the left
