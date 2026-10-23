@@ -49,16 +49,23 @@ namespace OpenNest.Forms
             BuildMachineMenu();
         }
 
-        // Lists the machines on file, checking the active nest's; one assigned but no longer on
-        // file is shown checked and disabled so the nest still says what it was made for.
+        // Nest > Machine is rebuilt each time the Nest menu opens.
         private void BuildMachineMenu()
         {
-            mnuNestMachine.DropDownItems.Clear();
+            mnuNestMachine.Enabled = activeForm != null;
+            FillMachineItems(mnuNestMachine.DropDownItems);
+        }
+
+        // Lists the machines on file, checking the active nest's; one assigned but no longer on
+        // file is shown checked and disabled so the nest still says what it was made for. Shared
+        // by Nest > Machine and the status bar's machine label.
+        private void FillMachineItems(ToolStripItemCollection items)
+        {
+            items.Clear();
             var nest = activeForm?.Nest;
-            mnuNestMachine.Enabled = nest != null;
             if (nest == null)
             {
-                mnuNestMachine.DropDownItems.Add(new ToolStripMenuItem("(no nest open)") { Enabled = false });
+                items.Add(new ToolStripMenuItem("(no nest open)") { Enabled = false });
                 return;
             }
 
@@ -69,12 +76,12 @@ namespace OpenNest.Forms
             {
                 var item = new ToolStripMenuItem(machine.Name) { Checked = machine.Id == nest.Machine?.Id };
                 item.Click += (_, _) => AssignMachine(machine);
-                mnuNestMachine.DropDownItems.Add(item);
+                items.Add(item);
             }
             if (nest.Machine is { } assigned && machines.All(m => m.Id != assigned.Id))
-                mnuNestMachine.DropDownItems.Add(new ToolStripMenuItem($"{assigned.Name} (not on file)") { Checked = true, Enabled = false });
-            if (mnuNestMachine.DropDownItems.Count == 0)
-                mnuNestMachine.DropDownItems.Add(new ToolStripMenuItem("(no machines; see Tools > Machine Configuration)") { Enabled = false });
+                items.Add(new ToolStripMenuItem($"{assigned.Name} (not on file)") { Checked = true, Enabled = false });
+            if (items.Count == 0)
+                items.Add(new ToolStripMenuItem("(no machines; see Tools > Machine Configuration)") { Enabled = false });
         }
 
         // Assigning a machine also puts every sheet on that machine's support grid and gives
@@ -100,6 +107,7 @@ namespace OpenNest.Forms
                 MachineSettings.ApplyCutOffDefaults(view, nest);
                 view.Invalidate();
             }
+            statusBar.UpdatePlate();
         }
 
         private async void EditNest_Click(object sender, EventArgs e)

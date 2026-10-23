@@ -12,7 +12,7 @@ namespace OpenNest.Forms
 {
     /// <summary>
     /// The main window's status labels for the active nest document: status text, cursor
-    /// location, selection bounds, nest material and plate utilization. Plate number, size and
+    /// location, selection bounds, nest machine and material, and plate utilization. Plate number, size and
     /// quantity live in the plate view header instead. The location
     /// follows the mouse (the default, throttled), or only left clicks while click mode is on;
     /// the mode persists as a user setting.
@@ -25,6 +25,7 @@ namespace OpenNest.Forms
         private readonly ToolStripStatusLabel status;
         private readonly ToolStripStatusLabel location;
         private readonly ToolStripStatusLabel selection;
+        private readonly ToolStripStatusLabel machine;
         private readonly ToolStripStatusLabel material;
         private readonly ToolStripStatusLabel plateUtil;
         private readonly Timer locationTimer;
@@ -34,11 +35,13 @@ namespace OpenNest.Forms
         private bool locationPending;
 
         public MainStatusBar(ToolStripStatusLabel status, ToolStripStatusLabel location,
-            ToolStripStatusLabel selection, ToolStripStatusLabel material, ToolStripStatusLabel plateUtil)
+            ToolStripStatusLabel selection, ToolStripStatusLabel machine, ToolStripStatusLabel material,
+            ToolStripStatusLabel plateUtil)
         {
             this.status = status;
             this.location = location;
             this.selection = selection;
+            this.machine = machine;
             this.material = material;
             this.plateUtil = plateUtil;
 
@@ -124,18 +127,28 @@ namespace OpenNest.Forms
         {
             if (form == null)
             {
+                machine.Text = string.Empty;
                 material.Text = string.Empty;
                 plateUtil.Text = string.Empty;
                 return;
             }
 
             var nest = form.Nest;
+            machine.Text = FormatMachine(nest.Machine);
             material.Text = FormatMaterial(nest.Material?.Name, nest.Thickness, nest.Units);
 
             plateUtil.Text = string.Format(
                 "Util: {0:P1}",
                 form.PlateView.Plate.Utilization()
             );
+        }
+
+        /// <summary>Status text for the nest's machine, e.g. "Machine: CL-980".</summary>
+        internal static string FormatMachine(NestMachine machine)
+        {
+            if (machine == null)
+                return "Machine: (none)";
+            return "Machine: " + (string.IsNullOrWhiteSpace(machine.Name) ? "(unnamed)" : machine.Name.Trim());
         }
 
         /// <summary>Status text for the nest's material and thickness, e.g. "Material: A36 · 0.25 in".</summary>

@@ -69,6 +69,19 @@ namespace OpenNest.Forms
         private void MaterialStatusLabel_Click(object sender, EventArgs e) =>
             EditNest_Click(sender, e);
 
+        // Either button lists the machines above the label, as Nest > Machine does.
+        private void MachineStatusLabel_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (activeForm == null || nestingInProgress || e.Button is not (MouseButtons.Left or MouseButtons.Right))
+                return;
+
+            var menu = new ContextMenuStrip();
+            FillMachineItems(menu.Items);
+            menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
+            var bounds = machineStatusLabel.Bounds;
+            menu.Show(statusStrip1, new System.Drawing.Point(bounds.Left, bounds.Top), ToolStripDropDownDirection.AboveRight);
+        }
+
         #endregion Statusbar Events
     }
 }

@@ -23,4 +23,12 @@ public class MainStatusBarTests
             CultureInfo.CurrentCulture = previous;
         }
     }
+
+    [Fact]
+    public void FormatMachine_ShowsTheNestsMachine()
+    {
+        Assert.Equal("Machine: CL-980", MainStatusBar.FormatMachine(new NestMachine(Guid.NewGuid(), " CL-980 ")));
+        Assert.Equal("Machine: (unnamed)", MainStatusBar.FormatMachine(new NestMachine(Guid.NewGuid(), "")));
+        Assert.Equal("Machine: (none)", MainStatusBar.FormatMachine(null));
+    }
 }

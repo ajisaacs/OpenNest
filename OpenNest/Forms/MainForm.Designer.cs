@@ -172,6 +172,7 @@ namespace OpenNest.Forms
             statusLabel1 = new System.Windows.Forms.ToolStripStatusLabel();
             locationStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             spacerLabel = new System.Windows.Forms.ToolStripStatusLabel();
+            machineStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             materialStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             plateUtilStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             selectionStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
@@ -1133,7 +1134,7 @@ namespace OpenNest.Forms
             // 
             // statusStrip1
             // 
-            statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { statusLabel1, locationStatusLabel, selectionStatusLabel, spacerLabel, materialStatusLabel, plateUtilStatusLabel });
+            statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { statusLabel1, locationStatusLabel, selectionStatusLabel, spacerLabel, machineStatusLabel, materialStatusLabel, plateUtilStatusLabel });
             statusStrip1.Location = new System.Drawing.Point(0, 630);
             statusStrip1.Name = "statusStrip1";
             statusStrip1.Padding = new System.Windows.Forms.Padding(1, 0, 16, 0);
@@ -1169,6 +1170,16 @@ namespace OpenNest.Forms
             spacerLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
             spacerLabel.Size = new System.Drawing.Size(931, 19);
             spacerLabel.Spring = true;
+            //
+            // machineStatusLabel
+            //
+            machineStatusLabel.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
+            machineStatusLabel.Name = "machineStatusLabel";
+            machineStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
+            machineStatusLabel.Size = new System.Drawing.Size(95, 19);
+            machineStatusLabel.Text = "Machine: (none)";
+            machineStatusLabel.ToolTipText = "Click or right-click to change the machine";
+            machineStatusLabel.MouseUp += MachineStatusLabel_MouseUp;
             //
             // materialStatusLabel
             //
@@ -1407,6 +1418,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripStatusLabel locationStatusLabel;
         private System.Windows.Forms.ToolStrip toolStrip1;
         private System.Windows.Forms.ToolStripButton btnOpen;
+        private System.Windows.Forms.ToolStripStatusLabel machineStatusLabel;
         private System.Windows.Forms.ToolStripStatusLabel materialStatusLabel;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripMenuItem mnuWindow;
