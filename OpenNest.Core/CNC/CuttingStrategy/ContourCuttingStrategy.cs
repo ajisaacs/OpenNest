@@ -433,6 +433,22 @@ namespace OpenNest.CNC.CuttingStrategy
         private static bool SameVector(Vector a, Vector b) => SameBits(a.X, b.X) && SameBits(a.Y, b.Y);
         private static bool SameBits(double a, double b) => BitConverter.DoubleToInt64Bits(a) == BitConverter.DoubleToInt64Bits(b);
 
+        // ReindexAt starts the contour at the vertex when the entry is within Tolerance.Epsilon of it
+        // (Line/Arc.SplitAt keep the entity whole), so the lead-in must end there too; otherwise the
+        // cut closes at the vertex, short of the entry by that sliver.
+        private static Vector SnapToSplitVertex(Vector point, Entity entity)
+        {
+            var (start, end) = entity switch
+            {
+                Line line => (line.StartPoint, line.EndPoint),
+                Arc arc => (arc.StartPoint(), arc.EndPoint()),
+                _ => (point, point),
+            };
+            if (point.DistanceTo(start) < Tolerance.Epsilon)
+                return start;
+            return point.DistanceTo(end) < Tolerance.Epsilon ? end : point;
+        }
+
         private void EmitContour(
             Program program,
             Shape shape,
@@ -443,6 +459,7 @@ namespace OpenNest.CNC.CuttingStrategy
             Vector? scrapPierce = null
         )
         {
+            point = SnapToSplitVertex(point, entity);
             var contourType = forceType ?? DetectContourType(shape);
             var winding = DetermineWinding(shape);
             var normal = ComputeNormal(point, entity, contourType, winding);
