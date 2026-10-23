@@ -37,8 +37,10 @@ and expands it into the package's `Help\` folder; both `Publish-Windows.ps1` and
 `Deploy-OpenNest.ps1` call it, and `build-info.json` records the help version. Pass
 `-HelpDirectory <site folder>` to either script to package a local build instead.
 
-To ship new help: tag the help repo `vX.Y.Z`, wait for its release, then update `tag`
-and `sha256` here (the release attaches `opennest-help.zip.sha256`).
+To ship new help: tag the help repo `vX.Y.Z` by the version rules in its README
+(Releases > Version numbers: MINOR for new pages or topic IDs, PATCH for fixes and
+recaptures; tag only once the behavior it describes is on `master`), wait for its release,
+then update `tag` and `sha256` here (the release attaches `opennest-help.zip.sha256`).
 
 When a UI change alters a documented screen or workflow, update or recapture the
 affected opennest-help pages (its README covers capture and markup).
