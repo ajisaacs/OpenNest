@@ -85,7 +85,7 @@ public static class FeatureUtils
     /// unplanned display perimeter refused (<see cref="DisplayPerimeterTail.ForPosting"/>).
     /// </summary>
     public static Program PostedProgram(Part part) =>
-        DisplayPerimeterTail.ForPosting(part.Program, $"Part '{part.BaseDrawing?.Name}'");
+        DisplayPerimeterTail.ForPosting(part.Program, DisplayPerimeterTail.PartName(part));
 
     public static List<(List<ICode> codes, bool isEtch)> SplitAndClassify(Part part)
     {

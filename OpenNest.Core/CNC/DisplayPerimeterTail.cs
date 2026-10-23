@@ -22,11 +22,47 @@ namespace OpenNest.CNC
             "This part's outline is a display perimeter: a supplied blank that is never cut. "
             + "Lead-ins for its cutouts come from Plan Cutting, which keeps every pierce inside a cutout.";
 
-        /// <summary>The index of the tail's marker in <paramref name="program"/>'s codes, or -1.</summary>
+        /// <summary>
+        /// The index of the tail's marker in <paramref name="program"/>'s codes, or -1. A marker that is
+        /// repeated, sits in a sub-program, or is followed by anything but one rapid and moves on the
+        /// display perimeter layer is a malformed program (<see cref="ArgumentException"/>): cuts after
+        /// it must never be dropped silently.
+        /// </summary>
         public static int IndexOf(Program program)
         {
             ArgumentNullException.ThrowIfNull(program);
-            return program.Codes.FindIndex(code => code is Comment { Value: Marker });
+            var marker = -1;
+            for (var i = 0; i < program.Codes.Count; i++)
+            {
+                if (program.Codes[i] is Comment { Value: Marker })
+                {
+                    if (marker >= 0)
+                        throw new ArgumentException("A program has more than one display perimeter tail.");
+                    marker = i;
+                }
+                else if (program.Codes[i] is SubProgramCall call
+                    && HasMarker(call.Program, new HashSet<Program>(ReferenceEqualityComparer.Instance)))
+                    throw new ArgumentException("A display perimeter tail can only end the part's own program, not a sub-program.");
+            }
+            if (marker < 0)
+                return -1;
+            var tail = program.Codes.Count - marker - 1;
+            if (tail < 2 || program.Codes[marker + 1] is not RapidMove
+                || !program.Codes.Skip(marker + 2).All(code =>
+                    code is LinearMove { Layer: LayerType.DisplayPerimeter } or ArcMove { Layer: LayerType.DisplayPerimeter }))
+                throw new ArgumentException(
+                    "A display perimeter tail must be one rapid followed only by the outline on the display perimeter layer.");
+            return marker;
+        }
+
+        private static bool HasMarker(Program program, HashSet<Program> visited)
+        {
+            if (program?.Codes == null || !visited.Add(program))
+                return false;
+            foreach (var code in program.Codes)
+                if (code is Comment { Value: Marker } || code is SubProgramCall call && HasMarker(call.Program, visited))
+                    return true;
+            return false;
         }
 
         public static bool HasTail(Program program) => IndexOf(program) >= 0;
@@ -45,13 +81,21 @@ namespace OpenNest.CNC
         }
 
         /// <summary>
-        /// The executed program: <paramref name="program"/> itself when it has no tail, otherwise a
-        /// shallow copy of the codes before the marker (shared instructions and sub-programs).
+        /// The executed program for estimates and drawing: <paramref name="program"/> itself when it
+        /// has no well-formed tail, otherwise a shallow copy of the codes before the marker. Posts
+        /// and verification use the strict <see cref="ForPosting"/> and executed reads instead.
         /// </summary>
         public static Program WithoutTail(Program program)
         {
-            var marker = IndexOf(program);
-            return marker < 0 ? program : program.HeadCopy(marker);
+            try
+            {
+                var marker = IndexOf(program);
+                return marker < 0 ? program : program.HeadCopy(marker);
+            }
+            catch (ArgumentException)
+            {
+                return program;
+            }
         }
 
         /// <summary>Whether <paramref name="program"/> or any sub-program it calls moves on the display perimeter layer.</summary>
@@ -78,12 +122,37 @@ namespace OpenNest.CNC
         /// </summary>
         public static Program ForPosting(Program program, string partName)
         {
-            var executed = WithoutTail(program);
+            int marker;
+            try
+            {
+                marker = IndexOf(program);
+            }
+            catch (ArgumentException ex)
+            {
+                throw new InvalidOperationException($"{partName} cannot be posted: {ex.Message}", ex);
+            }
+            var executed = marker < 0 ? program : program.HeadCopy(marker);
             if (HasDisplayPerimeterMotion(executed))
                 throw new InvalidOperationException(
                     $"{partName} has a display perimeter (a supplied blank's outline that is never cut) but no "
                     + "cutting plan. Run Plan Cutting before posting so only its cutouts are cut.");
             return executed;
+        }
+
+        /// <summary>The name posts give a part in a refusal.</summary>
+        public static string PartName(Part part) => $"Part '{part.BaseDrawing?.Name}'";
+
+        /// <summary>
+        /// Refuses a nest a post cannot write, before any output is created: every part's program
+        /// must pass <see cref="ForPosting"/>, so a refusal never leaves an empty or partial file.
+        /// </summary>
+        public static void EnsurePostable(Nest nest)
+        {
+            ArgumentNullException.ThrowIfNull(nest);
+            foreach (var plate in nest.Plates)
+                foreach (var part in plate.Parts)
+                    if (part?.Program != null && part.BaseDrawing?.IsCutOff != true)
+                        ForPosting(part.Program, PartName(part));
         }
     }
 }

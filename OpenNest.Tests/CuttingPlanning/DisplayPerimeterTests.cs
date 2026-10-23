@@ -164,6 +164,38 @@ public class DisplayPerimeterTests
         Assert.Equal(before, ExplicitContourTests.Fingerprint(part.Program));
     }
 
+    private static Program SquareThenMarker(bool displayTail, bool markerInSubProgram = false)
+    {
+        var cuts = new Program();
+        cuts.MoveTo(1, 1); cuts.LineTo(1, 2); cuts.LineTo(2, 2); cuts.LineTo(2, 1); cuts.LineTo(1, 1);
+        cuts.Codes.Add(new Comment(DisplayPerimeterTail.Marker));
+        cuts.Codes.Add(new RapidMove(3, 3));
+        var layer = displayTail ? LayerType.DisplayPerimeter : LayerType.Cut;
+        foreach (var (x, y) in new[] { (3.0, 4.0), (4.0, 4.0), (4.0, 3.0), (3.0, 3.0) })
+            cuts.Codes.Add(new LinearMove(x, y) { Layer = layer });
+        if (!markerInSubProgram)
+            return cuts;
+        var main = new Program();
+        main.Codes.Add(new SubProgramCall(cuts, 0) { Id = 1 });
+        main.SubPrograms[1] = cuts;
+        return main;
+    }
+
+    // A tail marker anywhere but the end of the top-level program, or followed by anything but
+    // a rapid and the outline, is a malformed program: nothing may silently drop cuts after it.
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    public void MalformedTailMarker_IsRefusedByPostsAndVerification(bool displayTail, bool inSubProgram)
+    {
+        var program = SquareThenMarker(displayTail, inSubProgram);
+
+        Assert.Throws<InvalidOperationException>(() => DisplayPerimeterTail.ForPosting(program, "Part 1"));
+        Assert.Throws<ArgumentException>(() => ExecutionMotionReader.Read(program, Vector.Zero, null, default));
+        Assert.True(DisplayPerimeterTail.HasTail(SquareThenMarker(displayTail: true)));
+    }
+
     [Fact]
     public void Posting_RefusesAnUnplannedDisplayPerimeter()
     {

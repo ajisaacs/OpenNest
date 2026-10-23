@@ -250,6 +250,8 @@ namespace OpenNest.Posts.Cincinnati
 
         public void Post(Nest nest, string outputFile)
         {
+            // Refuse before creating the file, so a refusal never empties an existing program.
+            DisplayPerimeterTail.EnsurePostable(nest);
             using var fs = new FileStream(outputFile, FileMode.Create, FileAccess.Write);
             Post(nest, fs);
         }

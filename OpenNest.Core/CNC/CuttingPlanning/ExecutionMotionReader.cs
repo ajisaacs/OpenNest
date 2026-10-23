@@ -49,8 +49,14 @@ public static class ExecutionMotionReader
                 if (code == null)
                     throw new ArgumentException("Program contains a missing instruction.");
                 // A display perimeter's tail is never executed: an applied program ends at its marker.
+                // Only a well-formed tail at the end of the part's own program may end the read.
                 if (code is Comment { Value: DisplayPerimeterTail.Marker })
+                {
+                    if (!ReferenceEquals(current, program))
+                        throw new ArgumentException("A display perimeter tail can only end the part's own program, not a sub-program.");
+                    DisplayPerimeterTail.IndexOf(current);
                     break;
+                }
                 if (requireSupportedTypes)
                 {
                     var type = code.GetType();

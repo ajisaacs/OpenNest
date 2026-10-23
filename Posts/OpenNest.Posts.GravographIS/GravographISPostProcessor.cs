@@ -92,6 +92,8 @@ namespace OpenNest.Posts.GravographIS
 
         public void Post(Nest nest, string outputFile)
         {
+            // Refuse before creating the file, so a refusal never empties an existing program.
+            CNC.DisplayPerimeterTail.EnsurePostable(nest);
             using var fs = new FileStream(outputFile, FileMode.Create, FileAccess.Write);
             Post(nest, fs);
         }

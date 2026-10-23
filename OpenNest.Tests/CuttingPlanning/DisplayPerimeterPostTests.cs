@@ -79,6 +79,28 @@ public class DisplayPerimeterPostTests
         Assert.Contains("Plan Cutting", error.Message);
     }
 
+    [Theory]
+    [MemberData(nameof(Posts))]
+    public void UnplannedDoor_IsRefusedBeforeTheOutputFileIsTouched(string post)
+    {
+        var (nest, _) = DoorNest();
+        var directory = Directory.CreateTempSubdirectory("display-perimeter-post-");
+        try
+        {
+            var path = Path.Combine(directory.FullName, "door.cnc");
+            File.WriteAllText(path, "PREVIOUS GOOD PROGRAM");
+
+            Assert.Throws<InvalidOperationException>(() => Post(post).Post(nest, path));
+
+            Assert.Equal("PREVIOUS GOOD PROGRAM", File.ReadAllText(path));
+            Assert.Single(directory.GetFiles());
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     [Fact]
     public void UnplannedDoor_PrePostReviewNamesTheDisplayPerimeter()
     {

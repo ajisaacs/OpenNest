@@ -57,7 +57,15 @@ namespace OpenNest.Forms.Commands
                 return;
             }
 
-            postProcessor.Post(nest, path);
+            try
+            {
+                postProcessor.Post(nest, path);
+            }
+            catch (Exception ex)
+                when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+            {
+                MessageBox.Show(owner, ex.Message, postProcessor.Name, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         private void PostMultiFile(IMultiFilePostProcessor multiFile, string path)

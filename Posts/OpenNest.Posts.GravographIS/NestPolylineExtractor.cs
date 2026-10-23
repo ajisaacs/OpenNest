@@ -95,7 +95,7 @@ namespace OpenNest.Posts.GravographIS
             if (program == null)
                 return;
             // A display perimeter's tail is never cut; an unplanned one is refused.
-            program = DisplayPerimeterTail.ForPosting(program, $"Part '{part.BaseDrawing?.Name}'");
+            program = DisplayPerimeterTail.ForPosting(program, DisplayPerimeterTail.PartName(part));
 
             // The walk below treats Motion.EndPoint as absolute. Convert a working
             // copy to absolute mode so G91 programs (the form OpenNest's UI writes)
