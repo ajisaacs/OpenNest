@@ -23,9 +23,14 @@ Every bed also carries:
 
 The bed belongs to the nest (`Nest.SetSupportBed`); every plate follows it, including plates
 added later. It is display, analysis and tab placement only: never material, spacing or a
-keep-out. Nest > Support Grid... edits it; Save as Machine Defaults writes
-`%APPDATA%\OpenNest\support-grid.json`, which new nests receive while it is enabled. The
-nest file stores it in `plateDefaults.supportBed` (see [nest file format](nest-file-format.md)).
+keep-out. Nest > Support Grid... edits it; Save as Machine Defaults writes it to the nest's
+machine configuration (`MachineConfig.SupportGrid`), which nests assigned that machine receive
+while it is enabled: File > New and BOM import assign the Tools > Nest Defaults machine (the
+first by name when none is chosen), and Nest > Machine reassigns a nest and replaces its grid
+with the new machine's (none when that machine gives nests no grid). A machine with no grid
+saved yet uses the legacy shared `%APPDATA%\OpenNest\support-grid.json`. The nest file stores
+the bed in `plateDefaults.supportBed` and the machine in `machine` (see
+[nest file format](nest-file-format.md)).
 
 ## The support check
 

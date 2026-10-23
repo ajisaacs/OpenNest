@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 using OpenNest.Collections;
+using OpenNest.Data;
 using OpenNest.Engine.Fill;
 using OpenNest.Forms.Commands;
 
@@ -45,6 +46,56 @@ namespace OpenNest.Forms
             mnuNestDrawingLibrary.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
             // Parts can be added without a plate change, so refresh the clear state on open.
             mnuNestClear.Enabled = activeForm?.PlateManager.CanClearAll ?? false;
+            BuildMachineMenu();
+        }
+
+        // Lists the machines on file, checking the active nest's; one assigned but no longer on
+        // file is shown checked and disabled so the nest still says what it was made for.
+        private void BuildMachineMenu()
+        {
+            mnuNestMachine.DropDownItems.Clear();
+            var nest = activeForm?.Nest;
+            mnuNestMachine.Enabled = nest != null;
+            if (nest == null)
+            {
+                mnuNestMachine.DropDownItems.Add(new ToolStripMenuItem("(no nest open)") { Enabled = false });
+                return;
+            }
+
+            var machines = MachineSettings.LoadMachines()
+                .OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+            foreach (var machine in machines)
+            {
+                var item = new ToolStripMenuItem(machine.Name) { Checked = machine.Id == nest.Machine?.Id };
+                item.Click += (_, _) => AssignMachine(machine);
+                mnuNestMachine.DropDownItems.Add(item);
+            }
+            if (nest.Machine is { } assigned && machines.All(m => m.Id != assigned.Id))
+                mnuNestMachine.DropDownItems.Add(new ToolStripMenuItem($"{assigned.Name} (not on file)") { Checked = true, Enabled = false });
+            if (mnuNestMachine.DropDownItems.Count == 0)
+                mnuNestMachine.DropDownItems.Add(new ToolStripMenuItem("(no machines; see Tools > Machine Configuration)") { Enabled = false });
+        }
+
+        // Assigning a machine also puts every sheet on that machine's support grid.
+        private void AssignMachine(MachineConfig machine)
+        {
+            var editForm = activeForm;
+            if (editForm == null || editForm.Nest.Machine?.Id == machine.Id)
+                return;
+
+            var nest = editForm.Nest;
+            var views = ViewsOf(nest);
+            if (IsPlateWorkBusy(views))
+            {
+                MessageBox.Show(this, "Finish or cancel the current nesting or plate action first.",
+                    "Machine", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            MachineSettings.AssignMachine(nest, machine);
+            foreach (var view in views)
+                view.Invalidate();
         }
 
         private async void EditNest_Click(object sender, EventArgs e)
@@ -100,7 +151,12 @@ namespace OpenNest.Forms
                 return;
             }
 
-            using var form = new SupportGridForm(nest.SupportBed, nest.Units, MachineSettings.LoadSupportGridSettings());
+            var machine = MachineSettings.FindMachine(nest.Machine);
+            Action<SupportGridSettings> save = machine == null
+                ? null
+                : settings => MachineSettings.SaveSupportGridSettings(machine.Id, settings);
+            using var form = new SupportGridForm(nest.SupportBed, nest.Units, MachineSettings.LoadSupportGridSettings(machine),
+                machine?.Name ?? nest.Machine?.Name, save);
             if (form.ShowDialog(this) != DialogResult.OK)
                 return;
 

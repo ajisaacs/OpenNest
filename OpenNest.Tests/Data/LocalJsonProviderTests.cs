@@ -166,4 +166,44 @@ public class LocalJsonProviderTests : IDisposable
         Assert.NotNull(loaded);
         Assert.Equal(1, loaded.SchemaVersion);
     }
+
+    [Fact]
+    public void SaveMachine_RoundTripsTheSupportGrid()
+    {
+        var provider = CreateProvider();
+        var machine = new MachineConfig
+        {
+            Name = "Plasma",
+            SupportGrid = new SupportGridSettings
+            {
+                Enabled = true,
+                Units = Units.Millimeters,
+                PitchX = 50,
+                PitchY = 40,
+                OffsetX = -5,
+                StabilityMargin = 6,
+            },
+        };
+
+        provider.SaveMachine(machine);
+        var grid = provider.GetMachine(machine.Id)!.SupportGrid!;
+
+        Assert.True(grid.Enabled);
+        Assert.Equal(Units.Millimeters, grid.Units);
+        Assert.Equal(50, grid.PitchX);
+        Assert.Equal(40, grid.PitchY);
+        Assert.Equal(-5, grid.OffsetX);
+        Assert.Equal(6, grid.StabilityMargin);
+    }
+
+    [Fact]
+    public void MachineWithoutSupportGrid_LoadsWithNone()
+    {
+        var provider = CreateProvider();
+        var machine = new MachineConfig { Name = "Laser" };
+
+        provider.SaveMachine(machine);
+
+        Assert.Null(provider.GetMachine(machine.Id)!.SupportGrid);
+    }
 }

@@ -10,7 +10,7 @@ using OpenNest.Properties;
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// Creates File > New nests: machine defaults and clamps, then the year's next name
+    /// Creates File > New nests: nest defaults, clamps, the default machine and its support grid, then the year's next name
     /// (<see cref="NestNames"/>). In Database mode the nest server allocates the number so
     /// every PC shares one sequence; when it cannot, <see cref="Settings.NestNumber"/> is the
     /// local fallback, kept above every number the server handed out and reset each year.
@@ -39,9 +39,9 @@ namespace OpenNest.Forms
             var nest = new Nest();
             var defaults = MachineSettings.LoadNestDefaults();
             (units is { } converted ? defaults.ConvertedTo(converted) : defaults).ApplyTo(nest);
-            // After the defaults so the rail is converted to the new nest's units.
+            // After the defaults so the rail and grid are converted to the new nest's units.
             MachineSettings.LoadClampSettings(owner).ApplyToNewNest(nest);
-            MachineSettings.LoadSupportGridSettings().ApplyToNewNest(nest);
+            MachineSettings.AssignMachine(nest, MachineSettings.DefaultMachine(defaults, MachineSettings.LoadMachines()));
             return nest;
         }
 

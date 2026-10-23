@@ -11,13 +11,13 @@ namespace OpenNest.Forms;
 /// Nest &gt; Support Grid...: edits the laser grid of contact points every sheet of the current
 /// nest rests on, used to judge whether cut parts stay level and where support tabs go (see
 /// docs/support-tabs.md). OK applies it to the nest; Cancel discards the edits. Save as Machine
-/// Defaults writes support-grid.json immediately and is not undone by Cancel.
+/// Defaults writes the grid to the nest's machine configuration immediately and is not undone by Cancel.
 /// </summary>
 public sealed class SupportGridForm : Form
 {
     private readonly Units units;
     private readonly SupportGridSettings machineDefaults;
-    private readonly string settingsPath;
+    private readonly Action<SupportGridSettings> saveMachineDefaults;
     private readonly CheckBox useGridBox;
     private readonly NumericUpDown pitchXBox;
     private readonly NumericUpDown pitchYBox;
@@ -28,11 +28,16 @@ public sealed class SupportGridForm : Form
     private readonly CheckBox applyToNewNestsBox;
     private readonly Label savedLabel;
 
-    public SupportGridForm(SupportBed bed, Units units, SupportGridSettings machineDefaults, string settingsPath = null)
+    /// <param name="machineName">The nest's machine, or null when none is assigned.</param>
+    /// <param name="saveMachineDefaults">
+    /// Saves the grid as that machine's; null disables saving, when the nest has no machine on file.
+    /// </param>
+    public SupportGridForm(SupportBed bed, Units units, SupportGridSettings machineDefaults, string machineName,
+        Action<SupportGridSettings> saveMachineDefaults)
     {
         this.units = units;
         this.machineDefaults = machineDefaults ?? new SupportGridSettings();
-        this.settingsPath = settingsPath ?? SupportGridSettings.DefaultPath;
+        this.saveMachineDefaults = saveMachineDefaults;
         var grid = bed as SupportGrid;
         // A nest without a grid starts from the machine defaults, so enabling it is one click.
         var initial = grid != null
@@ -86,7 +91,12 @@ public sealed class SupportGridForm : Form
         AddRow(values, "Stability margin:", marginBox, unit);
         layout.Controls.Add(values);
 
-        var defaultsGroup = new GroupBox { Text = "Machine defaults (support-grid.json)", AutoSize = true, Padding = new Padding(8) };
+        var defaultsGroup = new GroupBox
+        {
+            Text = string.IsNullOrEmpty(machineName) ? "Machine defaults (no machine assigned)" : $"Machine defaults ({machineName})",
+            AutoSize = true,
+            Padding = new Padding(8),
+        };
         var defaultsLayout = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -96,7 +106,7 @@ public sealed class SupportGridForm : Form
         };
         applyToNewNestsBox = new CheckBox
         {
-            Text = "Give new nests this grid",
+            Text = "Give nests on this machine this grid",
             AutoSize = true,
             Checked = this.machineDefaults.Enabled,
         };
@@ -109,8 +119,12 @@ public sealed class SupportGridForm : Form
         {
             AutoSize = true,
             MaximumSize = new Size(410, 0),
-            Text = "Save as Machine Defaults writes the file immediately; Cancel below does not undo it.",
+            Text = saveMachineDefaults == null
+                ? "Assign this nest a machine on file in Nest > Machine to save its grid."
+                : "Save as Machine Defaults writes the machine configuration immediately; Cancel below does not undo it.",
         };
+        applyToNewNestsBox.Enabled = saveMachineDefaults != null;
+        saveDefaultsButton.Enabled = saveMachineDefaults != null;
         defaultsLayout.Controls.Add(applyToNewNestsBox);
         defaultsLayout.Controls.Add(defaultsButtons);
         defaultsLayout.Controls.Add(savedLabel);
@@ -172,14 +186,14 @@ public sealed class SupportGridForm : Form
         var settings = Read();
         try
         {
-            settings.Save(settingsPath);
+            saveMachineDefaults(settings);
             savedLabel.Text = settings.Enabled
-                ? $"Saved {DateTime.Now:t}: new nests get this grid. Cancel does not undo this."
-                : $"Saved {DateTime.Now:t}: new nests get no grid. Cancel does not undo this.";
+                ? $"Saved {DateTime.Now:t}: nests on this machine get this grid. Cancel does not undo this."
+                : $"Saved {DateTime.Now:t}: nests on this machine get no grid. Cancel does not undo this.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
-            MessageBox.Show(this, $"The machine defaults could not be saved:\n{settingsPath}\n\n{ex.Message}",
+            MessageBox.Show(this, $"The machine defaults could not be saved:\n\n{ex.Message}",
                 Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }

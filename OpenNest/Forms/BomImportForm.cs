@@ -415,7 +415,7 @@ namespace OpenNest.Forms
             var importErrors = new List<string>();
             // Read when the nests are created, warning (once per session) like New does.
             var clamps = MachineSettings.LoadClampSettings(this);
-            var supportGrid = MachineSettings.LoadSupportGridSettings();
+            var machine = MachineSettings.DefaultMachine(_defaults, MachineSettings.LoadMachines());
 
             foreach (var group in groups)
             {
@@ -439,10 +439,10 @@ namespace OpenNest.Forms
                     jobName,
                     nest =>
                     {
-                        // As New does: saved defaults, then the machine clamps in those units.
+                        // As New does: saved defaults, then the machine clamps and grid in those units.
                         _defaults.ApplyTo(nest);
                         clamps.ApplyToNewNest(nest);
-                        supportGrid.ApplyToNewNest(nest);
+                        MachineSettings.AssignMachine(nest, machine);
                     }
                 );
                 importErrors.AddRange(result.Errors);

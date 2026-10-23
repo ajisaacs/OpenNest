@@ -171,7 +171,7 @@ namespace OpenNest.Forms
 
         private void NestDefaults_Click(object sender, EventArgs e)
         {
-            using (var form = new NestDefaultsForm(MachineSettings.LoadSavedNestDefaults(out _)))
+            using (var form = new NestDefaultsForm(MachineSettings.LoadSavedNestDefaults(out _), MachineSettings.LoadMachines()))
             {
                 if (form.ShowDialog(this) == DialogResult.OK)
                     form.GetDefaults().Save(NestDefaults.DefaultPath);
@@ -183,9 +183,10 @@ namespace OpenNest.Forms
             if (activeForm == null)
                 return;
 
-            NestDefaults
-                .FromPlate(activeForm.Nest.Units, activeForm.PlateView.Plate)
-                .Save(NestDefaults.DefaultPath);
+            var defaults = NestDefaults.FromPlate(activeForm.Nest.Units, activeForm.PlateView.Plate);
+            // The nest's machine becomes the default; a nest without one keeps the saved choice.
+            defaults.MachineId = activeForm.Nest.Machine?.Id ?? MachineSettings.LoadSavedNestDefaults(out _).MachineId;
+            defaults.Save(NestDefaults.DefaultPath);
         }
 
         private void MachineConfig_Click(object sender, EventArgs e)

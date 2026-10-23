@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Geometry;
@@ -11,9 +13,25 @@ namespace OpenNest.Forms
     /// </summary>
     public partial class NestDefaultsForm : Form
     {
-        public NestDefaultsForm(NestDefaults defaults)
+        private sealed record MachineChoice(MachineConfig Machine)
+        {
+            public override string ToString() => Machine.Name;
+        }
+
+        private readonly Guid? savedMachineId;
+
+        /// <param name="machines">The machines new nests can be assigned.</param>
+        public NestDefaultsForm(NestDefaults defaults, IEnumerable<MachineConfig> machines)
         {
             InitializeComponent();
+
+            savedMachineId = defaults.MachineId;
+            var sorted = machines.OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+            foreach (var machine in sorted)
+                machineCombo.Items.Add(new MachineChoice(machine));
+            var selected = MachineSettings.DefaultMachine(defaults, sorted);
+            machineCombo.SelectedItem = machineCombo.Items.Cast<MachineChoice>().FirstOrDefault(c => c.Machine == selected);
+            machineCombo.Enabled = machineCombo.Items.Count > 0;
 
             unitsCombo.SelectedIndex = defaults.Units == Units.Millimeters ? 1 : 0;
             widthBox.Value = Clamp(widthBox, defaults.Size.Width);
@@ -42,6 +60,8 @@ namespace OpenNest.Forms
                     (double)edgeRightBox.Value,
                     (double)edgeTopBox.Value
                 ),
+                // With no machines on file there is nothing to choose, so keep the saved choice.
+                MachineId = (machineCombo.SelectedItem as MachineChoice)?.Machine.Id ?? savedMachineId,
             };
         }
 

@@ -105,6 +105,9 @@ namespace OpenNest.IO
                 AssistGas = nest.AssistGas ?? "",
                 Status = nest.Status.ToString(),
                 MadeBy = nest.MadeBy ?? "",
+                Machine = nest.Machine is { } machine
+                    ? new MachineDto { Id = machine.Id, Name = machine.Name }
+                    : null,
                 Thickness = nest.Thickness,
                 Material = new MaterialDto
                 {

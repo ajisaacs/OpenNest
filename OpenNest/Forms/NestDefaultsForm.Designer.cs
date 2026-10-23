@@ -47,6 +47,8 @@ namespace OpenNest.Forms
             this.edgeTopBox = new OpenNest.Controls.NumericUpDown();
             this.quadrantLabel = new System.Windows.Forms.Label();
             this.quadrantSelect1 = new OpenNest.Controls.QuadrantSelect();
+            this.machineLabel = new System.Windows.Forms.Label();
+            this.machineCombo = new System.Windows.Forms.ComboBox();
             this.saveButton = new System.Windows.Forms.Button();
             this.cancelButton = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.widthBox)).BeginInit();
@@ -82,19 +84,22 @@ namespace OpenNest.Forms
             this.tableLayoutPanel1.Controls.Add(this.edgeTopBox, 1, 7);
             this.tableLayoutPanel1.Controls.Add(this.quadrantLabel, 0, 8);
             this.tableLayoutPanel1.Controls.Add(this.quadrantSelect1, 1, 8);
+            this.tableLayoutPanel1.Controls.Add(this.machineLabel, 0, 9);
+            this.tableLayoutPanel1.Controls.Add(this.machineCombo, 1, 9);
             this.tableLayoutPanel1.Location = new System.Drawing.Point(12, 12);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
-            this.tableLayoutPanel1.RowCount = 9;
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
-            this.tableLayoutPanel1.Size = new System.Drawing.Size(410, 260);
+            this.tableLayoutPanel1.RowCount = 10;
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 10F));
+            this.tableLayoutPanel1.Size = new System.Drawing.Size(410, 288);
             this.tableLayoutPanel1.TabIndex = 0;
             //
             // unitsLabel
@@ -286,11 +291,30 @@ namespace OpenNest.Forms
             this.quadrantSelect1.Size = new System.Drawing.Size(120, 28);
             this.quadrantSelect1.TabIndex = 17;
             //
+            // machineLabel
+            //
+            this.machineLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.machineLabel.AutoSize = true;
+            this.machineLabel.Location = new System.Drawing.Point(3, 263);
+            this.machineLabel.Name = "machineLabel";
+            this.machineLabel.Size = new System.Drawing.Size(100, 16);
+            this.machineLabel.TabIndex = 18;
+            this.machineLabel.Text = "Machine:";
+            //
+            // machineCombo
+            //
+            this.machineCombo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.machineCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.machineCombo.Location = new System.Drawing.Point(109, 259);
+            this.machineCombo.Name = "machineCombo";
+            this.machineCombo.Size = new System.Drawing.Size(298, 24);
+            this.machineCombo.TabIndex = 19;
+            //
             // saveButton
             //
             this.saveButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.saveButton.DialogResult = System.Windows.Forms.DialogResult.OK;
-            this.saveButton.Location = new System.Drawing.Point(243, 285);
+            this.saveButton.Location = new System.Drawing.Point(243, 313);
             this.saveButton.Name = "saveButton";
             this.saveButton.Size = new System.Drawing.Size(90, 28);
             this.saveButton.TabIndex = 1;
@@ -301,7 +325,7 @@ namespace OpenNest.Forms
             //
             this.cancelButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.cancelButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.cancelButton.Location = new System.Drawing.Point(339, 285);
+            this.cancelButton.Location = new System.Drawing.Point(339, 313);
             this.cancelButton.Name = "cancelButton";
             this.cancelButton.Size = new System.Drawing.Size(90, 28);
             this.cancelButton.TabIndex = 2;
@@ -313,7 +337,7 @@ namespace OpenNest.Forms
             this.AcceptButton = this.saveButton;
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.CancelButton = this.cancelButton;
-            this.ClientSize = new System.Drawing.Size(434, 322);
+            this.ClientSize = new System.Drawing.Size(434, 350);
             this.Controls.Add(this.tableLayoutPanel1);
             this.Controls.Add(this.saveButton);
             this.Controls.Add(this.cancelButton);
@@ -358,6 +382,8 @@ namespace OpenNest.Forms
         private OpenNest.Controls.NumericUpDown edgeTopBox;
         private System.Windows.Forms.Label quadrantLabel;
         private OpenNest.Controls.QuadrantSelect quadrantSelect1;
+        private System.Windows.Forms.Label machineLabel;
+        private System.Windows.Forms.ComboBox machineCombo;
         private System.Windows.Forms.Button saveButton;
         private System.Windows.Forms.Button cancelButton;
     }

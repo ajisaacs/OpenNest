@@ -307,4 +307,49 @@ public class NestDefaultsTests : IDisposable
         Assert.Equal(1, loaded.PartSpacing);
         Assert.Equal(new Spacing(1, 1, 1, 1), loaded.EdgeSpacing);
     }
+
+    [Fact]
+    public void MachineId_RoundTrips()
+    {
+        var id = Guid.NewGuid();
+        new NestDefaults { MachineId = id }.Save(_path);
+
+        Assert.Equal(id, NestDefaults.Load(_path).MachineId);
+    }
+
+    [Fact]
+    public void MachineId_Unset_IsNotWrittenAndLoadsAsNull()
+    {
+        new NestDefaults().Save(_path);
+
+        Assert.DoesNotContain("machineId", File.ReadAllText(_path));
+        Assert.Null(NestDefaults.Load(_path).MachineId);
+    }
+
+    [Theory]
+    [InlineData("42")]
+    [InlineData("\"not-a-guid\"")]
+    [InlineData("\"00000000-0000-0000-0000-000000000000\"")]
+    public void MachineId_Invalid_LoadsAsNullAndKeepsOtherFields(string machineId)
+    {
+        File.WriteAllText(_path, $"{{\"partSpacing\": 4, \"machineId\": {machineId}}}");
+
+        var loaded = NestDefaults.Load(_path, out var status);
+
+        Assert.Equal(NestDefaultsStatus.Ok, status);
+        Assert.Null(loaded.MachineId);
+        Assert.Equal(4, loaded.PartSpacing);
+    }
+
+    [Fact]
+    public void FromNest_AndConvertedTo_KeepTheMachine()
+    {
+        var id = Guid.NewGuid();
+        var nest = new Nest { Units = Units.Inches, Machine = new NestMachine(id, "Plasma") };
+
+        var defaults = NestDefaults.FromNest(nest);
+
+        Assert.Equal(id, defaults.MachineId);
+        Assert.Equal(id, defaults.ConvertedTo(Units.Millimeters).MachineId);
+    }
 }

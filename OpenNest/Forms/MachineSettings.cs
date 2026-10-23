@@ -79,9 +79,57 @@ namespace OpenNest.Forms
             return settings;
         }
 
-        /// <summary>The persisted machine support grid; never throws, and loads as off when unreadable.</summary>
-        public static SupportGridSettings LoadSupportGridSettings() =>
-            SupportGridSettings.Load(SupportGridSettings.DefaultPath);
+        /// <summary>
+        /// The machine new nests are assigned: the nest defaults' machine when it is on file,
+        /// otherwise the first by name, or null when there are none.
+        /// </summary>
+        public static MachineConfig DefaultMachine(NestDefaults defaults, IEnumerable<MachineConfig> machines)
+        {
+            var sorted = machines.OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+            return sorted.FirstOrDefault(m => m.Id == defaults?.MachineId) ?? sorted.FirstOrDefault();
+        }
+
+        /// <summary>The configuration of <paramref name="machine"/>, or null when none is assigned or it is not on file.</summary>
+        public static MachineConfig FindMachine(NestMachine machine)
+        {
+            if (machine == null)
+                return null;
+            try
+            {
+                return CreateMachineProvider().GetMachine(machine.Id);
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            return null;
+        }
+
+        /// <summary>
+        /// Assigns <paramref name="machine"/> to <paramref name="nest"/> (null for none) and gives
+        /// every sheet that machine's support grid, or none when the machine gives nests no grid.
+        /// </summary>
+        public static void AssignMachine(Nest nest, MachineConfig machine)
+        {
+            nest.Machine = machine == null ? null : new NestMachine(machine.Id, machine.Name);
+            var grid = LoadSupportGridSettings(machine);
+            nest.SetSupportBed(grid.Enabled ? grid.GridFor(nest.Units) : null);
+        }
+
+        /// <summary>
+        /// The support grid of <paramref name="machine"/>; a machine without one saved yet, or no
+        /// machine, uses the legacy shared support-grid.json. Never throws, and loads as off when unreadable.
+        /// </summary>
+        public static SupportGridSettings LoadSupportGridSettings(MachineConfig machine) =>
+            machine?.SupportGrid ?? SupportGridSettings.Load(SupportGridSettings.DefaultPath);
+
+        /// <summary>Saves <paramref name="settings"/> as the support grid of the machine with <paramref name="machineId"/>.</summary>
+        public static void SaveSupportGridSettings(Guid machineId, SupportGridSettings settings)
+        {
+            var provider = CreateMachineProvider();
+            var machine = provider.GetMachine(machineId)
+                ?? throw new IOException("The machine configuration is no longer on file.");
+            machine.SupportGrid = settings;
+            provider.SaveMachine(machine);
+        }
 
         /// <summary>The single desktop entry point for the persisted machine clamp settings.</summary>
         public static ClampSettings LoadSavedClampSettings(out ClampSettingsStatus status) =>

@@ -13,6 +13,12 @@ Status and made-by are additive: files written before them load as Quote with an
 empty maker, and an unrecognized status value likewise falls back to Quote. Builds
 before `Draft` therefore open a Draft nest as Quote, and saving it there keeps Quote.
 
+`machine` optionally names the machine the nest is cut on: `id` (its machine
+configuration's GUID) and `name` (the configuration's name when assigned, so the nest
+still says what it was made for on a PC without that configuration). The key is omitted
+when no machine is assigned. A non-object, a missing, non-string, unparseable or empty
+`id` loads as no machine; a missing or non-string `name` loads as empty.
+
 ## Programs and placements
 
 - `programs/program-N` is drawing N's clean G-code program; optional

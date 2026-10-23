@@ -57,6 +57,9 @@ namespace OpenNest
 
         public Units Units { get; set; }
 
+        /// <summary>The machine this nest is cut on, or null when none is assigned.</summary>
+        public NestMachine Machine { get; set; }
+
         public DateTime DateCreated { get; set; }
 
         public DateTime DateLastModified { get; set; }

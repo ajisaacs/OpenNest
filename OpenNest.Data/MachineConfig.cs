@@ -14,6 +14,12 @@ public class MachineConfig
     /// <summary>Acceleration limits; null until entered, when <see cref="GetMotionOrPlaceholder"/> stands in.</summary>
     public MotionConfig? Motion { get; set; }
 
+    /// <summary>
+    /// The support grid nests assigned this machine rest on; null until saved from
+    /// Nest &gt; Support Grid, when the legacy shared support-grid.json stands in.
+    /// </summary>
+    public SupportGridSettings? SupportGrid { get; set; }
+
     public MotionConfig GetMotionOrPlaceholder() => Motion ?? MotionConfig.Placeholder(Units);
 
     public ThicknessConfig? GetParameters(string material, double thickness) =>

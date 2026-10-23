@@ -47,6 +47,12 @@ public sealed class NestDefaults
     public Spacing EdgeSpacing { get; set; } = new(1, 1, 1, 1);
 
     /// <summary>
+    /// The machine configuration new nests are assigned, or null to use the first machine
+    /// by name. An id with no configuration on file falls back the same way.
+    /// </summary>
+    public Guid? MachineId { get; set; }
+
+    /// <summary>
     /// The built-in defaults used when no file exists and for every field
     /// that is missing or invalid. Matches the historical
     /// File > New values (units default to Inches; callers
@@ -149,6 +155,10 @@ public sealed class NestDefaults
         )
             defaults.EdgeSpacing = new Spacing(left, bottom, right, top);
 
+        if (dto.MachineId is { ValueKind: JsonValueKind.String } machineId
+            && Guid.TryParse(machineId.GetString(), out var machine) && machine != Guid.Empty)
+            defaults.MachineId = machine;
+
         return defaults;
     }
 
@@ -166,6 +176,7 @@ public sealed class NestDefaults
             Quadrant = plate.Quadrant,
             PartSpacing = plate.PartSpacing,
             EdgeSpacing = plate.EdgeSpacing,
+            MachineId = nest.Machine?.Id,
         };
     }
 
@@ -203,6 +214,7 @@ public sealed class NestDefaults
             PartSpacing = Convert(PartSpacing),
             EdgeSpacing = new Spacing(Convert(EdgeSpacing.Left), Convert(EdgeSpacing.Bottom),
                 Convert(EdgeSpacing.Right), Convert(EdgeSpacing.Top)),
+            MachineId = MachineId,
         };
     }
 
@@ -239,6 +251,7 @@ public sealed class NestDefaults
                 Right = EdgeSpacing.Right,
                 Top = EdgeSpacing.Top,
             },
+            MachineId = MachineId is { } machineId ? JsonSerializer.SerializeToElement(machineId.ToString()) : null,
         };
 
         var json = JsonSerializer.Serialize(dto, JsonOptions);
@@ -319,6 +332,9 @@ public sealed class NestDefaults
         public int? Quadrant { get; init; }
         public double? PartSpacing { get; init; }
         public SpacingDto? EdgeSpacing { get; init; }
+        // Raw JSON for the same reason as Units.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public JsonElement? MachineId { get; init; }
     }
 
     private sealed record SizeDto

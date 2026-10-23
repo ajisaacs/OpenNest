@@ -539,6 +539,7 @@ namespace OpenNest.IO
                 ? status
                 : NestStatus.Quote;
             nest.MadeBy = dto.MadeBy ?? "";
+            nest.Machine = dto.Machine is { } machine ? new NestMachine(machine.Id, machine.Name) : null;
 
             // Nest-level material and thickness (fall back to PlateDefaults for old files)
             var pd = dto.PlateDefaults;

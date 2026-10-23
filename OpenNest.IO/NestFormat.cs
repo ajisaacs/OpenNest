@@ -28,6 +28,15 @@ namespace OpenNest.IO
             public string AssistGas { get; init; } = "";
             public string Status { get; init; } = "Quote";
             public string MadeBy { get; init; } = "";
+
+            /// <summary>
+            /// The machine the nest is cut on. Omitted when none is assigned; older files and
+            /// older readers simply have none.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            [JsonConverter(typeof(LenientMachineConverter))]
+            public MachineDto Machine { get; init; }
+
             public double Thickness { get; init; }
             public MaterialDto Material { get; init; } = new();
             public PlateDefaultsDto PlateDefaults { get; init; } = new();
@@ -61,6 +70,43 @@ namespace OpenNest.IO
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             [JsonConverter(typeof(LenientSupportBedConverter))]
             public SupportBedDto SupportBed { get; init; }
+        }
+
+        /// <summary>A machine configuration's id and the name it had when the nest was saved.</summary>
+        public record MachineDto
+        {
+            public Guid Id { get; init; }
+            public string Name { get; init; } = "";
+        }
+
+        /// <summary>
+        /// Reads a malformed or wrongly typed machine, or one without a valid id, as none instead
+        /// of failing the whole nest. A missing or wrongly typed name reads as empty.
+        /// </summary>
+        public sealed class LenientMachineConverter : JsonConverter<MachineDto>
+        {
+            public override MachineDto Read(ref Utf8JsonReader reader, Type typeToConvert,
+                JsonSerializerOptions options)
+            {
+                using var document = JsonDocument.ParseValue(ref reader);
+                var machine = document.RootElement;
+                if (machine.ValueKind != JsonValueKind.Object
+                    || !machine.TryGetProperty("id", out var id) || id.ValueKind != JsonValueKind.String
+                    || !Guid.TryParse(id.GetString(), out var guid) || guid == Guid.Empty)
+                    return null;
+                var name = machine.TryGetProperty("name", out var nameElement) && nameElement.ValueKind == JsonValueKind.String
+                    ? nameElement.GetString()
+                    : "";
+                return new MachineDto { Id = guid, Name = name };
+            }
+
+            public override void Write(Utf8JsonWriter writer, MachineDto value, JsonSerializerOptions options)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("id", value.Id);
+                writer.WriteString("name", value.Name ?? "");
+                writer.WriteEndObject();
+            }
         }
 
         /// <summary>
