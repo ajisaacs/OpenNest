@@ -896,6 +896,37 @@ use **Tools > Options > Nest server URL > Set / Change Server**. This saves the 
 immediately, independently of the Options Save button; it does not migrate nests
 or enable Database mode. Canceling Options afterward does not undo that address.
 
+### Redeploying a development build
+
+Until a verified image is published, `scripts/Deploy-Server.ps1` redeploys a
+development build of this checkout to a host's Compose stack over SSH, using the
+local Docker engine (no build on the host, no registry):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/Deploy-Server.ps1 `
+    -DeployHost <host> -StackDir ~/docker/opennest `
+    -LocalComposeFile <config-repo>\opennest\compose.yml
+```
+
+It builds `opennest-server:<yyyyMMdd>-<short sha>` (`-dirty` and a warning when
+`OpenNest.Server`, `OpenNest.Data` or `OpenNest.Core` have uncommitted changes;
+`VERSION` stays `0.0.0-dev`, `SOURCE_REVISION` is the full commit), copies it with
+`docker save`/`scp`/`docker load`, stops the container, tars the data volume to
+`<BackupRoot>/opennest-<tag>/backup/` with the previous `compose.yml`, rewrites the
+stack's `image: opennest-server:<tag>` line, starts the stack and waits for
+`healthy`. The stack's `compose.yml` must name the image literally on that line,
+not through a variable as `compose.server.yaml` does. `-LocalComposeFile` updates
+a config repository's copy, uncommitted. Host, user and paths are parameters so
+no private address is in source; `-SkipBackup` and `-NoPull` are available but
+the backup is the only way back across a schema upgrade.
+
+Build from a pushed commit (a clean worktree is simplest) so the running image
+can be traced. When the build raises the schema version, first run the new image
+in a throwaway loopback container on a snapshot of the live database and check
+`user_version`, integrity and record counts. To roll back, stop the stack,
+restore the tarball into the volume and set the printed previous tag: an older
+server refuses a newer schema.
+
 ### Backup, restore, and upgrade
 
 SQLite runs in WAL mode, so copying `nests.db` from a running service is not a
