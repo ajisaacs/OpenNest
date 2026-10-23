@@ -76,7 +76,11 @@ segments are not consecutive, as after Plan Cutting cuts a strip line in pieces 
 the route passes them. Readers without `segments` place the segments consecutively
 from `sequence`, which is still a dependency-safe order. A `segments` list whose length
 differs from the regenerated segment count (nondefault cut-off settings, a moved part)
-places the segments consecutively from its smallest entry.
+places the segments consecutively from its smallest entry. `headLockOvercut`
+(model units) and `farEdgeFirst` record a head-locked overcut past the far sheet
+edge and whether its segment starts at that edge (see
+[automatic cutoffs](automatic-scrap-cutoffs.md#head-locked-overcut-at-the-far-edge));
+both are omitted when zero or false, and older files load without them.
 
 ## Plate cutting parameters
 

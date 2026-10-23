@@ -123,10 +123,25 @@ public sealed class CincinnatiFeatureWriter
         currentPos = piercePoint;
 
         // 6. Lead-in + contour moves with kerf comp and feedrate variables
+        var headLocked = false;
         foreach (var code in ctx.Codes)
         {
             if (code is RapidMove)
                 continue; // skip rapids in contour (already handled above)
+
+            // A cut-off's overcut past the far sheet edge runs with the head height locked.
+            if (HeadHeightLock.IsLock(code))
+            {
+                writer.WriteLine(_config.HeadHeightLockCode);
+                headLocked = true;
+                continue;
+            }
+            if (HeadHeightLock.IsUnlock(code))
+            {
+                writer.WriteLine(_config.HeadHeightUnlockCode);
+                headLocked = false;
+                continue;
+            }
 
             if (code is LinearMove linear)
             {
@@ -230,8 +245,9 @@ public sealed class CincinnatiFeatureWriter
         if (_config.UseAntiDive)
             writer.WriteLine("M131 (ANTI DIVE ON)");
 
-        // 10. Head raise (unless last feature on sheet)
-        if (!ctx.IsLastFeatureOnSheet)
+        // 10. Head raise (unless last feature on sheet). A locked head stays down for the
+        // rapid back along a cut-off's overcut; the next feature unlocks it.
+        if (!ctx.IsLastFeatureOnSheet && !headLocked)
             WriteM47(writer, ctx);
     }
 

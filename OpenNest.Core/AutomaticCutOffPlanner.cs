@@ -234,6 +234,17 @@ public static class AutomaticCutOffPlanner
         if (!shifted)
             fixedGridCutLength = stripCutLength;
 
+        // Lines are planned and measured without the head-locked overcut: it only extends the
+        // segment reaching the far edge past the sheet, where there is nothing to separate.
+        if (settings.NewCutOffHeadLockOvercut > 0)
+        {
+            foreach (var definition in definitions)
+            {
+                definition.HeadLockOvercut = settings.NewCutOffHeadLockOvercut;
+                definition.Regenerate(plate, settings, cache);
+            }
+        }
+
         return new AutomaticCutOffPlan
         {
             Definitions = definitions.AsReadOnly(),
@@ -423,6 +434,8 @@ public static class AutomaticCutOffPlanner
             "Clamp zones and bottom-edge clearance must be finite and valid.", nameof(plate));
         Require(Nonnegative(settings.PartClearance) && Nonnegative(settings.MinSegmentLength) &&
             Nonnegative(settings.Overtravel), "Cut-off settings must be finite and nonnegative.", nameof(settings));
+        Require(!settings.LockHeadHeight || double.IsFinite(settings.HeadLockOvercut) && settings.HeadLockOvercut > 0,
+            "A head-locked overcut must be finite and positive.", nameof(settings));
         Require(Enum.IsDefined(settings.CutDirection), "Unknown cut direction.", nameof(settings));
         Require(plate.Parts != null && plate.CutOffs != null,
             "Plate parts and cut-off collections are required.", nameof(plate));

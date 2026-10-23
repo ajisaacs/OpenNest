@@ -256,6 +256,16 @@ public sealed class FixedProgramPlacement
     /// <summary>A cutoff that splits the whole sheet; it is cut after every other placement.</summary>
     public bool SeparatesSheet { get; internal init; }
 
+    /// <summary>
+    /// For a cutoff segment reaching the far sheet edge with a head-locked overcut, the same
+    /// segment cut the other way at that edge (<see cref="CutOff.ReverseAtFarEdge"/>); the search
+    /// may propose it in place of this placement. Null for everything else.
+    /// </summary>
+    internal FixedProgramPlacement Reversed { get; init; }
+
+    /// <summary>Whether this proposal cuts its cutoff segment the other way from the placed program.</summary>
+    public bool ReversesCutOff { get; internal init; }
+
     public Part SourcePart { get; }
     public int SourceOrdinal { get; }
     public Vector Location { get; }

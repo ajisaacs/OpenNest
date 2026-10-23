@@ -21,6 +21,23 @@ namespace OpenNest
         public double? EndLimit { get; set; }
         public Drawing Drawing { get; private set; }
 
+        /// <summary>
+        /// How far past the nominal far sheet edge (the edge away from the plate's origin) the
+        /// segment reaching that edge cuts with the head height locked; zero for none. Stock can
+        /// arrive wider than nominal, so only the origin-side edge is certain: the overcut cuts the
+        /// oversize off. It replaces <see cref="CutOffSettings.Overtravel"/> at the far edge and
+        /// applies only when the line runs to that edge (no limit on that side).
+        /// </summary>
+        public double HeadLockOvercut { get; set; }
+
+        /// <summary>
+        /// Whether the segment reaching the far edge is cut from it toward the origin: it starts at
+        /// the nominal far edge, overcuts outward with the head locked, rapids back with the head
+        /// still locked, unlocks and cuts toward the origin. Ignored without a head-locked overcut,
+        /// since nothing else may start a cut at an edge whose position is unknown.
+        /// </summary>
+        public bool FarEdgeFirst { get; set; }
+
         public CutOff(Vector position, CutOffAxis axis)
         {
             Position = position;
@@ -35,13 +52,14 @@ namespace OpenNest
         )
         {
             var segments = ComputeSegments(plate, settings, cache);
-            var program = BuildProgram(segments, settings);
+            var program = BuildProgram(segments, settings, LockedFarEdge(plate));
             Drawing.Program = program;
         }
 
         /// <summary>
         /// The regenerated program split into its cutting segments, one rapid-and-cut program
-        /// each in program order, so the plate can sequence every segment on its own.
+        /// each in program order, so the plate can sequence every segment on its own. A rapid with
+        /// the head height locked returns along the overcut and stays in its segment.
         /// </summary>
         public IReadOnlyList<Program> SegmentPrograms()
         {
@@ -50,17 +68,111 @@ namespace OpenNest
             if (program == null)
                 return result;
             Program current = null;
+            var locked = false;
             foreach (var code in program.Codes)
             {
-                if (code is RapidMove || current == null)
+                if (code is RapidMove && !locked || current == null)
                 {
                     current = new Program(program.Mode);
                     result.Add(current);
                 }
+                if (HeadHeightLock.IsLock(code))
+                    locked = true;
+                else if (HeadHeightLock.IsUnlock(code))
+                    locked = false;
                 current.Codes.Add(code);
             }
             return result;
         }
+
+        /// <summary>
+        /// Whether the far edge, along this axis on <paramref name="plate"/>, is the high
+        /// coordinate: the sheet runs from the origin toward positive coordinates on that axis.
+        /// </summary>
+        internal static bool FarEdgeIsHigh(CutOffAxis axis, int quadrant) =>
+            axis == CutOffAxis.Vertical ? quadrant is 1 or 2 : quadrant is 1 or 4;
+
+        /// <summary>
+        /// The nominal far edge this cut-off overcuts with the head locked, along its axis, or null
+        /// when it has no head-locked overcut or a limit stops it short of that edge.
+        /// </summary>
+        private (double Edge, bool High)? LockedFarEdge(Plate plate)
+        {
+            if (!(HeadLockOvercut > 0) || !double.IsFinite(HeadLockOvercut))
+                return null;
+            var bounds = plate.BoundingBox(includeParts: false);
+            var high = FarEdgeIsHigh(Axis, plate.Quadrant);
+            if ((high ? EndLimit : StartLimit) != null)
+                return null;
+            var vertical = Axis == CutOffAxis.Vertical;
+            return (high ? (vertical ? bounds.Top : bounds.Right) : (vertical ? bounds.Bottom : bounds.Left), high);
+        }
+
+        /// <summary>
+        /// The same segment cut the other way at the far edge: a head-locked segment cut toward the
+        /// far edge becomes one started there, and back; null when <paramref name="segment"/> is not
+        /// one of the two forms <see cref="Regenerate"/> builds for the segment reaching that edge.
+        /// </summary>
+        public static Program ReverseAtFarEdge(Program segment)
+        {
+            if (segment?.Codes == null || segment.Mode != Mode.Absolute)
+                return null;
+            var codes = segment.Codes;
+            var result = new Program(segment.Mode);
+            // Toward the far edge: rapid near, cut to the edge, lock, overcut, unlock.
+            if (codes.Count == 5 && codes[0] is RapidMove { Suppressed: false } near
+                && codes[1] is LinearMove { Suppressed: false, Layer: LayerType.Cut } toEdge
+                && HeadHeightLock.IsLock(codes[2])
+                && codes[3] is LinearMove { Suppressed: false, Layer: LayerType.Cut } overcut
+                && HeadHeightLock.IsUnlock(codes[4]))
+            {
+                result.Codes.Add(new RapidMove(toEdge.EndPoint));
+                result.Codes.Add(new Comment(HeadHeightLock.Lock));
+                result.Codes.Add(new LinearMove(overcut.EndPoint));
+                result.Codes.Add(new RapidMove(toEdge.EndPoint));
+                result.Codes.Add(new Comment(HeadHeightLock.Unlock));
+                result.Codes.Add(new LinearMove(near.EndPoint));
+                return result;
+            }
+            // From the far edge: rapid to the edge, lock, overcut, rapid back, unlock, cut away.
+            if (codes.Count == 6 && codes[0] is RapidMove { Suppressed: false } edge
+                && HeadHeightLock.IsLock(codes[1])
+                && codes[2] is LinearMove { Suppressed: false, Layer: LayerType.Cut } outward
+                && codes[3] is RapidMove { Suppressed: false } back && back.EndPoint == edge.EndPoint
+                && HeadHeightLock.IsUnlock(codes[4])
+                && codes[5] is LinearMove { Suppressed: false, Layer: LayerType.Cut } away)
+            {
+                result.Codes.Add(new RapidMove(away.EndPoint));
+                result.Codes.Add(new LinearMove(edge.EndPoint));
+                result.Codes.Add(new Comment(HeadHeightLock.Lock));
+                result.Codes.Add(new LinearMove(outward.EndPoint));
+                result.Codes.Add(new Comment(HeadHeightLock.Unlock));
+                return result;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Installs Plan Cutting's choice for the far-edge segment: <paramref name="segment"/> (one
+        /// of this cut-off's placed parts) takes <paramref name="program"/>, the same segment cut the
+        /// other way, and <see cref="FarEdgeFirst"/> and the whole-line program follow it, so
+        /// regeneration keeps the direction. The caller has checked that the program is that flip.
+        /// </summary>
+        internal void InstallFarEdgeSegment(Part segment, Program program)
+        {
+            var codes = new List<ICode>();
+            foreach (var part in SegmentPrograms())
+                codes.AddRange((ReverseAtFarEdge(part) != null ? program : part).Codes);
+            var whole = new Program(Drawing.Program?.Mode ?? Mode.Absolute);
+            whole.Codes.AddRange(codes);
+            segment.ReplaceCutOffProgram(program);
+            FarEdgeFirst = StartsAtFarEdge(program);
+            Drawing.Program = whole;
+        }
+
+        /// <summary>Whether <paramref name="segment"/> is the far-edge segment cut from the far edge.</summary>
+        public static bool StartsAtFarEdge(Program segment) =>
+            segment?.Codes is { Count: 6 } codes && codes[0] is RapidMove && HeadHeightLock.IsLock(codes[1]);
 
         /// <summary>Measures the same trimmed, filtered segments as regeneration without building a program.</summary>
         internal (double Length, int SegmentCount) MeasureSegments(
@@ -96,13 +208,20 @@ namespace OpenNest
             Vector? position = null;
             double? low = null, high = null;
             var cutting = false;
+            var locked = false;
             foreach (var code in part.Program.Codes)
             {
+                if (HeadHeightLock.IsLock(code))
+                    locked = true;
+                else if (HeadHeightLock.IsUnlock(code))
+                    locked = false;
                 switch (code)
                 {
                     case RapidMove rapid:
-                        if (cutting)
-                            return false; // A second pierce leaves an uncut gap.
+                        // A second pierce leaves an uncut gap; a head-locked rapid returns along
+                        // the overcut to where the cut toward the origin begins.
+                        if (cutting && !locked)
+                            return false;
                         position = rapid.EndPoint + part.Location;
                         break;
                     case LinearMove move when position != null:
@@ -142,6 +261,8 @@ namespace OpenNest
         )
         {
             var bounds = plate.BoundingBox(includeParts: false);
+            // A head-locked overcut replaces the overtravel at the high edge when that is the far edge.
+            var overtravel = LockedFarEdge(plate) is { High: true } ? 0 : settings.Overtravel;
 
             double lineStart,
                 lineEnd,
@@ -151,13 +272,13 @@ namespace OpenNest
             {
                 cutPosition = Position.X;
                 lineStart = StartLimit ?? bounds.Y;
-                lineEnd = EndLimit ?? (bounds.Y + bounds.Width + settings.Overtravel);
+                lineEnd = EndLimit ?? (bounds.Y + bounds.Width + overtravel);
             }
             else
             {
                 cutPosition = Position.Y;
                 lineStart = StartLimit ?? bounds.X;
-                lineEnd = EndLimit ?? (bounds.X + bounds.Length + settings.Overtravel);
+                lineEnd = EndLimit ?? (bounds.X + bounds.Length + overtravel);
             }
 
             var exclusions = new List<(double Start, double End)>();
@@ -459,7 +580,8 @@ namespace OpenNest
 
         private Program BuildProgram(
             List<(double Start, double End)> segments,
-            CutOffSettings settings
+            CutOffSettings settings,
+            (double Edge, bool High)? farEdge
         )
         {
             var program = new Program();
@@ -476,6 +598,22 @@ namespace OpenNest
 
             foreach (var seg in segments)
             {
+                if (farEdge is var (edge, high) && (high ? seg.End : seg.Start) == edge)
+                {
+                    // The segment reaching the far edge overcuts it with the head height locked,
+                    // whichever way the rest of the line runs.
+                    var near = MakePoint(cutPos, high ? seg.Start : seg.End);
+                    var atEdge = MakePoint(cutPos, edge);
+                    var beyond = MakePoint(cutPos, high ? edge + HeadLockOvercut : edge - HeadLockOvercut);
+                    var towardEdge = new Program();
+                    towardEdge.Codes.Add(new RapidMove(near));
+                    towardEdge.Codes.Add(new LinearMove(atEdge));
+                    towardEdge.Codes.Add(new Comment(HeadHeightLock.Lock));
+                    towardEdge.Codes.Add(new LinearMove(beyond));
+                    towardEdge.Codes.Add(new Comment(HeadHeightLock.Unlock));
+                    program.Codes.AddRange((FarEdgeFirst ? ReverseAtFarEdge(towardEdge) : towardEdge).Codes);
+                    continue;
+                }
                 var (from, to) = toward ? (seg.End, seg.Start) : (seg.Start, seg.End);
                 program.Codes.Add(new RapidMove(MakePoint(cutPos, from)));
                 program.Codes.Add(new LinearMove(MakePoint(cutPos, to)));

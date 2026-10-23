@@ -35,6 +35,13 @@ namespace OpenNest.Posts.CincinnatiCIFiber
 
         /// <summary>True when the contour is an external perimeter (exterior).</summary>
         public bool IsExterior { get; set; }
+
+        /// <summary>
+        /// Head-height lock changes in a cut-off's overcut: each is written before the cut at
+        /// <c>Before</c> (<see cref="Cuts"/>.Count: after the last cut), locking when
+        /// <c>Lock</c> is true and unlocking otherwise.
+        /// </summary>
+        public List<(int Before, bool Lock)> HeadLocks { get; } = new();
     }
 
     /// <summary>
@@ -100,6 +107,13 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             {
                 if (code is Motion suppressed && suppressed.Suppressed)
                     continue;
+
+                if (HeadHeightLock.IsLock(code) || HeadHeightLock.IsUnlock(code))
+                {
+                    current ??= new CIFiberContour { Pierce = origin };
+                    current.HeadLocks.Add((current.Cuts.Count, HeadHeightLock.IsLock(code)));
+                    continue;
+                }
 
                 switch (code)
                 {

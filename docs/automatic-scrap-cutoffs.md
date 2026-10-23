@@ -41,6 +41,21 @@ Each trimmed segment of a cut-off is materialized as a part of its own with its 
 - Internal-hole scrap is not processed. This command reuses the outside-skeleton behavior of manual cutoffs; it does not force cuts through parts or remove clearance to guarantee separation.
 - Review the preview and posted NC using the normal machine-review process before production cutting.
 
+## Head-locked overcut at the far edge
+
+A cut-off starts only where an edge is certain. The origin-side edge always is. Stock often arrives up to 1.5 in wider than nominal, so the far edge (the one away from the plate's origin, by quadrant) may still have material past it. Without a head-height lock a cut-off never starts at the far edge, and Plan Cutting never reverses one.
+
+**Lock head height and overcut the far edge by** in the automatic cut-off dialog (also opened from Plan Cutting's cut-off settings) turns on a head-locked overcut for cut-offs created afterwards: automatic, Plan Cutting's staged cut-offs, and the manual **Sheet Cut-Off** tool. The choice and amount (1.5 in, or 38.1 mm in a metric nest, by default) are kept between sessions. Existing cut-offs keep theirs; delete and re-add one to change it. Each cut-off stores its own overcut (`CutOff.HeadLockOvercut`), so loading a nest regenerates it exactly.
+
+Only the segment that reaches the far edge is affected, and only when no limit stops the line short of it. The overcut replaces **Overtravel** there.
+
+- Cut toward the far edge (the default): rapid to the segment's start, cut to the nominal far edge, lock the head height, cut on past the edge by the overcut, unlock.
+- Started at the far edge (`CutOff.FarEdgeFirst`): rapid to the nominal far edge (for a 48-in sheet that is really 48.5 in, the 48-in mark), lock, cut outward past the edge by the overcut, rapid back to the nominal edge with the head still locked, unlock, cut toward the origin.
+
+Plan Cutting may cut a head-locked far-edge segment either way: the joint search, the safest-route fallback and segment placement each try the nearer end first and keep whichever passes the checks (the safest route takes the one breaking fewer). The plan summary reports how many far-edge segments change direction. Apply installs the segment's program and records the direction on its cut-off, so regenerating, saving and loading keep it. A plan made without confirmed cutting parameters only reorders and never reverses. A direction changed after planning makes the plan stale.
+
+The program marks the locked stretch with `HEAD HEIGHT LOCK` and `HEAD HEIGHT UNLOCK` comments (`HeadHeightLock`). Posts write their configured lock and unlock codes there and refuse a nest with a head-locked cut-off when the codes are not set; see [Cincinnati CL](cincinnati-post-output.md#head-locked-cut-off-overcuts) and [CI Fiber](cincinnati-ci-fiber-post-output.md). The overcut leg lies outside the nominal sheet; the clamp-contact check includes it. Machine behavior with the head locked (piercing at the nominal edge, beam off and rapid back) is unconfirmed: verify on the machine before production.
+
 ## Part sequencing
 
 For **Plate > Sequence Parts > Manual Sequence**, choose the one-based sequence number and hover a part on the sheet; only the part under the pointer is outlined. Click it to place it at that exact position, then the number advances up to the last part. Clicking empty sheet space changes nothing. Use **Done**, the window close button, right-click on the sheet, or Escape to leave the tool. Manual reordering changes neither geometry nor quantities.
@@ -65,7 +80,7 @@ Rerunning unchanged suppresses equivalent existing full-span lines. A limited cu
 
 In the plate view, a left-to-right selection window selects a cut-off only when it encloses every visible cut segment; a right-to-left window selects it when it crosses any visible segment (not an empty gap). Cut-offs and parts can be selected together and deleted together. Clicking a cut-off still starts its existing single-line drag.
 
-Saving `.nest` retains ordinary cutoff positions, axes, limits, and the sequence place of every segment (see [the file format](nest-file-format.md#cut-offs)). Loading regenerates cutoff programs using the reader's default cutoff settings; exact toolpaths made with nondefault cutoff settings are not guaranteed to round-trip, and a cut-off that regenerates into a different number of segments loads them consecutively from its first saved place. Review regenerated paths before posting.
+Saving `.nest` retains ordinary cutoff positions, axes, limits, head-locked overcut and far-edge direction, and the sequence place of every segment (see [the file format](nest-file-format.md#cut-offs)). Loading regenerates cutoff programs using the reader's default cutoff settings; exact toolpaths made with nondefault cutoff settings are not guaranteed to round-trip, and a cut-off that regenerates into a different number of segments loads them consecutively from its first saved place. Review regenerated paths before posting.
 
 ## Implementation boundary
 

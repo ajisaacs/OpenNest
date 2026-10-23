@@ -428,6 +428,7 @@ namespace OpenNest.Forms
             Document = new Document { Nest = nest };
             // Units are read when each check starts, matching the manual command.
             PlateView.SetOverlapAutoCheck(() => Nest.Units);
+            CutOffHeadLockDefaults.Load(PlateView.CutOffSettings, nest.Units);
 
             PlateManager = new PlateManager(nest);
             PlateManager.CurrentPlateChanged += PlateManager_CurrentPlateChanged;

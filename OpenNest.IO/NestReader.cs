@@ -656,6 +656,10 @@ namespace OpenNest.IO
                         {
                             StartLimit = cutoffDto.StartLimit,
                             EndLimit = cutoffDto.EndLimit,
+                            // A nonpositive or nonfinite overcut is no head-locked overcut.
+                            HeadLockOvercut = double.IsFinite(cutoffDto.HeadLockOvercut)
+                                && cutoffDto.HeadLockOvercut > 0 ? cutoffDto.HeadLockOvercut : 0,
+                            FarEdgeFirst = cutoffDto.FarEdgeFirst,
                         };
                         plate.CutOffs.Add(cutoff);
 

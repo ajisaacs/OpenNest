@@ -19,6 +19,7 @@ public partial class AutomaticCutOffForm : Form
     private readonly Plate plate;
     private readonly Nest nest;
     private readonly Func<bool> isOperationBusy;
+    private readonly Units units;
     private readonly string unit;
     private bool minimumStripEdited;
     private bool settingMinimumStrip;
@@ -59,6 +60,7 @@ public partial class AutomaticCutOffForm : Form
         plate = plateView.Plate ?? throw new ArgumentException("An active plate is required.", nameof(plateView));
         this.nest = nest;
         this.isOperationBusy = isOperationBusy;
+        this.units = units;
         unit = UnitsHelper.GetShortString(units);
         InitializeComponent();
         spacingLabel.Text = $"Nominal spacing along sheet length ({unit}):";
@@ -66,6 +68,10 @@ public partial class AutomaticCutOffForm : Form
         minimumStripLabel.Text = $"Minimum strip ({unit}):";
         minimumTailLabel.Text = $"Minimum tail to keep ({unit}):";
         minimumTailBox.Text = (units == Units.Millimeters ? 304.8 : 12).ToString(CultureInfo.CurrentCulture);
+        headLockBox.Text = $"Lock head height and overcut the far edge by ({unit}):";
+        headLockBox.Checked = plateView.CutOffSettings.LockHeadHeight;
+        headLockOvercutBox.Text = plateView.CutOffSettings.HeadLockOvercut.ToString(CultureInfo.CurrentCulture);
+        headLockOvercutBox.Enabled = headLockBox.Checked;
         sheetLabel.Text = $"Sheet: {Measure(plate.Size.Length)} length × {Measure(plate.Size.Width)} width";
         if (nest != null)
         {
@@ -116,7 +122,7 @@ public partial class AutomaticCutOffForm : Form
             throw new InvalidOperationException("The active plate is no longer in this nest. Close this dialog and try again.");
 
         var options = ParseOptions();
-        var settings = plateView.CutOffSettings;
+        var settings = WithHeadLock(plateView.CutOffSettings);
         var plans = apply
             ? AutomaticCutOffBatch.Apply(plates, options, settings)
             : AutomaticCutOffBatch.Create(plates, options, settings);
@@ -138,6 +144,39 @@ public partial class AutomaticCutOffForm : Form
             MinimumStripLength = minimumStrip,
             MinimumTailLength = minimumTail,
         };
+    }
+
+    // The view's settings with this dialog's head-lock choice; the view keeps its own until OK.
+    private CutOffSettings WithHeadLock(CutOffSettings current)
+    {
+        var overcut = current.HeadLockOvercut;
+        if (headLockBox.Checked && (!double.TryParse(headLockOvercutBox.Text, NumberStyles.Float, CultureInfo.CurrentCulture,
+                out overcut) || !double.IsFinite(overcut) || overcut <= 0))
+            throw new ArgumentException($"Enter a positive head-locked overcut in {unit}.");
+        return new CutOffSettings
+        {
+            PartClearance = current.PartClearance,
+            Overtravel = current.Overtravel,
+            MinSegmentLength = current.MinSegmentLength,
+            CutDirection = current.CutDirection,
+            LockHeadHeight = headLockBox.Checked,
+            HeadLockOvercut = overcut,
+        };
+    }
+
+    // New cut-offs from here on, including Plan Cutting's and the manual tool's, use the choice.
+    private void KeepHeadLock()
+    {
+        var chosen = WithHeadLock(plateView.CutOffSettings);
+        plateView.CutOffSettings.LockHeadHeight = chosen.LockHeadHeight;
+        plateView.CutOffSettings.HeadLockOvercut = chosen.HeadLockOvercut;
+        CutOffHeadLockDefaults.Save(chosen.LockHeadHeight, chosen.HeadLockOvercut, units);
+    }
+
+    private void HeadLockBox_CheckedChanged(object sender, EventArgs e)
+    {
+        headLockOvercutBox.Enabled = headLockBox.Checked;
+        SettingsBox_TextChanged(sender, e);
     }
 
     private string DiagnosticLine(AutomaticCutOffPlan plan) => string.Join(Environment.NewLine,
@@ -318,6 +357,7 @@ public partial class AutomaticCutOffForm : Form
                 // Validate exactly as planning will, without changing any plate.
                 Calculate(apply: false);
                 SelectedOptions = ParseOptions();
+                KeepHeadLock();
                 DialogResult = DialogResult.OK;
                 Close();
             }
@@ -339,6 +379,7 @@ public partial class AutomaticCutOffForm : Form
             if (plans.Any(p => p.HasBlockingDiagnostics) || plans.All(p => p.Definitions.Count == 0))
                 return;
 
+            KeepHeadLock();
             DialogResult = DialogResult.OK;
             Close();
         }

@@ -98,9 +98,15 @@ public static class CuttingPlanService
                             : new(definition.Axis, definition.Position, definition.StartLimit, definition.EndLimit);
                     }
                     nodes.Add(new(true, nominal, source.BoundingBox, null, null, separates));
+                    // A head-locked far-edge segment may be cut from either end (docs/automatic-scrap-cutoffs.md).
+                    FixedProgramPlacement reversed = null;
+                    if (defined && CutOff.ReverseAtFarEdge(source.Program) is { } flipped)
+                        reversed = new(source, index, source.Location, source.Rotation, source.LeadInsLocked,
+                            ExecutionMotionReader.ReadSupported(flipped, source.Location, request.StartPoint, token), flipped)
+                        { IsCutOff = true, SeparatesSheet = separates, ReversesCutOff = true };
                     placements.Add(new(source, index, source.Location, source.Rotation, source.LeadInsLocked,
                         cut, OwnedProgramCopy.Copy(source.Program, token))
-                    { IsCutOff = true, SeparatesSheet = separates });
+                    { IsCutOff = true, SeparatesSheet = separates, Reversed = reversed });
                     continue;
                 }
                 var clean = ExecutionMotionReader.ReadSupported(source.BaseDrawing.Program, Vector.Zero, null, token);
@@ -226,8 +232,11 @@ public static class CuttingPlanService
                 return new(CuttingCommitStatus.InvalidInput,
                     "Only Ready, independently replayed plate-scoped proposals can be applied.");
             var programs = new List<PlannedPartProgram>();
+            var cutOffs = new List<PlannedCutOffProgram>();
             foreach (var proposal in result.ProposedOrder)
             {
+                if (proposal.ReversesCutOff)
+                    cutOffs.Add(new(proposal.SourcePart, proposal.CopyProgram()));
                 if (!proposal.IsRegenerated)
                     continue;
                 if (snapshot.OwnedParameters == null)
@@ -238,7 +247,7 @@ public static class CuttingPlanService
                 programs.Add(new(proposal.SourcePart, proposal.CopyProgram(),
                     OwnedCuttingParameters.Copy(snapshot.OwnedParameters)));
             }
-            plans.Add(new(snapshot.PlateState, result.ProposedOrder.Select(p => p.SourcePart), programs));
+            plans.Add(new(snapshot.PlateState, result.ProposedOrder.Select(p => p.SourcePart), programs, cutOffs));
         }
         return CuttingPlanCommit.Apply(plans, token, beforeInstall);
     }
@@ -399,7 +408,7 @@ public static class CuttingPlanService
                 return new(CuttingPlanStatus.InvalidInput, expansions: expansions);
             if (source.Prepared == null)
             {
-                if (!ReferenceEquals(source, proposal))
+                if (!ReferenceEquals(source, proposal) && !ReferenceEquals(source.Reversed, proposal))
                     return new(CuttingPlanStatus.InvalidInput, expansions: expansions);
             }
             else if (proposal.SelectedProgram == null

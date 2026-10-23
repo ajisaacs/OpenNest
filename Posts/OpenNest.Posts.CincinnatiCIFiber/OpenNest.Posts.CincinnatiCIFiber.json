@@ -16,6 +16,8 @@
   "LayerCutEnd": "ZHSOFF",
   "ProgramStartMacro": "PROGRAMSTART.NC",
   "ProgramEndMacro": "PROGRAMEND.NC",
+  "HeadHeightLockCode": "",
+  "HeadHeightUnlockCode": "",
   "MaterialCodes": {
     "Carbon Steel": "MSN",
     "Mild Steel": "MSN"

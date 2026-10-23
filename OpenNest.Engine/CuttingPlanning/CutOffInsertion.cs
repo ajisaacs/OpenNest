@@ -72,26 +72,33 @@ internal static class CutOffInsertion
         // Latest gap first: a segment due late never takes a gap an earlier one needs.
         foreach (var cutOff in cutOffs.OrderByDescending(c => latest[c]).ThenBy(c => c))
         {
-            var cut = snapshot.Placements[cutOff];
+            var source = snapshot.Placements[cutOff];
             var placed = false;
             for (var gap = latest[cutOff]; gap >= 0 && !placed; gap--)
             {
                 token.ThrowIfCancellationRequested();
-                countExpansion(cut);
                 var chain = chains[gap];
                 var arrival = chain is { Count: > 0 } ? chain[^1].Execution.DeparturePoint : arrivals[gap];
-                if (states[gap].Copy().Check(cut.Execution, arrival, cut.SourceOrdinal + 1, true, null, token).Strict.Count != 0)
-                    continue;
-                if (gap < count)
+                // A head-locked far-edge segment may be cut from either end: the nearer first.
+                var variants = source.Reversed == null ? [source]
+                    : new[] { source, source.Reversed }.OrderBy(v => v.Execution.RapidDistanceFrom(arrival)).ToArray();
+                foreach (var cut in variants)
                 {
-                    var next = planned[gap];
-                    var findings = states[gap].Copy().Check(next.Execution, cut.Execution.DeparturePoint,
-                        next.SourceOrdinal + 1, next.IsCutOff, next.FixedMotions(next.Execution), token).Strict;
-                    if (findings.Count != 0)
+                    countExpansion(source);
+                    if (states[gap].Copy().Check(cut.Execution, arrival, cut.SourceOrdinal + 1, true, null, token).Strict.Count != 0)
                         continue;
+                    if (gap < count)
+                    {
+                        var next = planned[gap];
+                        var findings = states[gap].Copy().Check(next.Execution, cut.Execution.DeparturePoint,
+                            next.SourceOrdinal + 1, next.IsCutOff, next.FixedMotions(next.Execution), token).Strict;
+                        if (findings.Count != 0)
+                            continue;
+                    }
+                    (chains[gap] ??= []).Add(cut);
+                    placed = true;
+                    break;
                 }
-                (chains[gap] ??= []).Add(cut);
-                placed = true;
             }
             if (!placed)
                 return null;

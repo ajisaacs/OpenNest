@@ -358,5 +358,31 @@ namespace OpenNest.Properties {
                 this["CuttingPlanEffort"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        // New cut-offs lock the head height and overcut the far sheet edge.
+        public bool CutOffLockHeadHeight {
+            get {
+                return ((bool)(this["CutOffLockHeadHeight"]));
+            }
+            set {
+                this["CutOffLockHeadHeight"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1.5")]
+        // How far a head-locked cut-off overcuts the far sheet edge, in inches.
+        public double CutOffHeadLockOvercutInches {
+            get {
+                return ((double)(this["CutOffHeadLockOvercutInches"]));
+            }
+            set {
+                this["CutOffHeadLockOvercutInches"] = value;
+            }
+        }
     }
 }

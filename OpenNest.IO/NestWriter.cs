@@ -386,6 +386,8 @@ namespace OpenNest.IO
                             EndLimit = cutoff.EndLimit,
                             Sequence = segments.Length > 0 ? segments.Min() : null,
                             Segments = consecutive ? null : segments,
+                            HeadLockOvercut = cutoff.HeadLockOvercut,
+                            FarEdgeFirst = cutoff.FarEdgeFirst,
                         }
                     );
                 }

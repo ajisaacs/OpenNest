@@ -109,6 +109,21 @@ block in a sheet or sub-program output follows this order
 10. Head raise before the rapid to the next feature, unless this is the last
     feature on the sheet (§3.47). See [Head raises](#head-raises-m47).
 
+### Head-locked cut-off overcuts
+
+A cut-off with a head-locked overcut (see
+[automatic cutoffs](automatic-scrap-cutoffs.md#head-locked-overcut-at-the-far-edge))
+writes `HeadHeightLockCode` where its program locks the head and
+`HeadHeightUnlockCode` where it unlocks, each as its own block inside the feature
+loop: after the pierce, between cut moves. A feature that ends with the head
+locked gets no head raise, so the rapid back along the overcut keeps the head
+down; the next feature pierces at the nominal edge and then unlocks before it cuts
+toward the origin. Both codes are empty by default. A nest with a head-locked
+cut-off is refused before anything is written while either is empty
+(`HeadHeightLock.EnsurePostable`). The codes and the machine's behavior when it
+pierces, beams off or rapids with the head locked are unconfirmed; enter and
+verify them on the machine before relying on the overcut.
+
 ## Head raises (M47)
 
 Every raise is written at the end of the feature it follows, before the rapid

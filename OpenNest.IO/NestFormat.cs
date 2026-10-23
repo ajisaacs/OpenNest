@@ -623,6 +623,20 @@ namespace OpenNest.IO
             /// </summary>
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             public int[] Segments { get; init; }
+
+            /// <summary>
+            /// How far past the nominal far sheet edge the cut-off cuts with the head height
+            /// locked (<c>CutOff.HeadLockOvercut</c>). Omitted when zero, as in older files.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+            public double HeadLockOvercut { get; init; }
+
+            /// <summary>
+            /// Whether the segment reaching the far edge is cut from it toward the origin
+            /// (<c>CutOff.FarEdgeFirst</c>). Omitted when false, as in older files.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+            public bool FarEdgeFirst { get; init; }
         }
 
         public record SizeDto

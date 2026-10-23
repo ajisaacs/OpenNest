@@ -186,6 +186,16 @@ namespace OpenNest
             BoundingBox = bounds;
         }
 
+        /// <summary>Installs an owned program for a cut-off segment, cut the other way; nothing else changes.</summary>
+        internal void ReplaceCutOffProgram(Program program)
+        {
+            var bounds = program.BoundingBox();
+            bounds.Offset(Location);
+            Program = program;
+            ownsProgram = true;
+            BoundingBox = bounds;
+        }
+
         public void RemoveLeadIns()
         {
             var rotation = preLeadInRotation;

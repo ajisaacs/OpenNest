@@ -73,6 +73,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             if (nest == null)
                 throw new ArgumentNullException(nameof(nest));
 
+            HeadHeightLock.EnsurePostable(nest, _config.HasHeadHeightLockCodes(), "Cincinnati CI Fiber");
             Write(nest, PostedSheets(nest), 1, w);
         }
 
@@ -87,6 +88,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             if (sheet == null)
                 throw new ArgumentNullException(nameof(sheet));
 
+            HeadHeightLock.EnsurePostable(nest, _config.HasHeadHeightLockCodes(), "Cincinnati CI Fiber");
             Write(nest, new[] { sheet }, sheetNumber, w);
         }
 
@@ -320,10 +322,21 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                 prev = contour.LeadIn.EndPoint;
             }
 
-            foreach (var motion in contour.LeadInExtra.Concat(contour.Cuts))
+            foreach (var motion in contour.LeadInExtra)
             {
                 CIFiberFormatter.Line(w, FormatMotion(motion, prev));
                 prev = motion.EndPoint;
+            }
+
+            // The overcut past the far sheet edge runs with the head height locked.
+            for (var i = 0; i <= contour.Cuts.Count; i++)
+            {
+                foreach (var (_, locks) in contour.HeadLocks.Where(change => change.Before == i))
+                    CIFiberFormatter.Line(w, locks ? _config.HeadHeightLockCode : _config.HeadHeightUnlockCode);
+                if (i == contour.Cuts.Count)
+                    break;
+                CIFiberFormatter.Line(w, FormatMotion(contour.Cuts[i], prev));
+                prev = contour.Cuts[i].EndPoint;
             }
 
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerCutEnd));

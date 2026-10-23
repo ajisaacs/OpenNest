@@ -22,20 +22,39 @@ internal sealed class PlannedPartProgram
     public CuttingParameters Parameters { get; }
 }
 
+/// <summary>
+/// An owned cutoff segment program cut the other way at the far sheet edge
+/// (<see cref="CutOff.ReverseAtFarEdge"/>); Apply installs it and records the direction on the
+/// segment's cutoff definition, so regeneration keeps it.
+/// </summary>
+internal sealed class PlannedCutOffProgram
+{
+    public PlannedCutOffProgram(Part segment, Program program)
+    {
+        Segment = segment;
+        Program = program;
+    }
+
+    public Part Segment { get; }
+    public Program Program { get; }
+}
+
 /// <summary>The verified order and planned programs for one plate, bound to its captured state.</summary>
 internal sealed class PlateCuttingPlan
 {
     public PlateCuttingPlan(PlateCuttingState expected, IEnumerable<Part> order,
-        IEnumerable<PlannedPartProgram> programs = null)
+        IEnumerable<PlannedPartProgram> programs = null, IEnumerable<PlannedCutOffProgram> cutOffs = null)
     {
         Expected = expected;
         Order = order == null ? null : Array.AsReadOnly(order.ToArray());
         Programs = Array.AsReadOnly((programs ?? []).ToArray());
+        CutOffs = Array.AsReadOnly((cutOffs ?? []).ToArray());
     }
 
     public PlateCuttingState Expected { get; }
     public IReadOnlyList<Part> Order { get; }
     public IReadOnlyList<PlannedPartProgram> Programs { get; }
+    public IReadOnlyList<PlannedCutOffProgram> CutOffs { get; }
 }
 
 public enum CuttingCommitStatus
@@ -161,26 +180,48 @@ internal static class CuttingPlanCommit
                 }
                 programs.Add((planned.Part, planned.Program, bounds, planned.Parameters));
             }
+            var cutOffs = new List<(Part, Program, CutOff)>();
+            foreach (var planned in plan.CutOffs)
+            {
+                if (planned?.Segment == null || !onPlate.Contains(planned.Segment) || !targets.Add(planned.Segment))
+                    return Invalid(plate, "Planned programs must target distinct parts of their own plate.");
+                var definition = plate.CutOffs.FirstOrDefault(c => ReferenceEquals(c?.Drawing, planned.Segment.BaseDrawing));
+                // Only the placed far-edge segment, cut exactly the other way, may be installed.
+                if (definition == null || planned.Program == null || live.Contains(planned.Program)
+                    || !installed.Add(planned.Program)
+                    || CutOff.ReverseAtFarEdge(planned.Segment.Program) is not { } expected
+                    || !ProgramContent.Equal(expected, planned.Program, token))
+                    return Invalid(plate, "A cutoff segment can only be installed cut the other way at the far edge.");
+                cutOffs.Add((planned.Segment, planned.Program, definition));
+            }
             var reordered = !order.SequenceEqual(plate.Parts, ReferenceEqualityComparer.Instance);
-            staged.Add(new(plate, order, programs, reordered || programs.Count != 0));
+            staged.Add(new(plate, order, programs, cutOffs, reordered || programs.Count != 0 || cutOffs.Count != 0));
         }
 
         // Last cancellation point. The boundary below has no await, search or geometry work.
         if (token.IsCancellationRequested)
             return new(CuttingCommitStatus.Cancelled, "Cancelled before commit.");
 
-        var undo = new List<(Plate Plate, Part[] Order, (Part Part, PartCuttingState State)[] States)>();
+        var undo = new List<(Plate Plate, Part[] Order, (Part Part, PartCuttingState State)[] States,
+            (CutOff CutOff, bool FarEdgeFirst, Program Program)[] CutOffs)>();
         try
         {
             foreach (var item in staged)
             {
                 undo.Add((item.Plate, item.Plate.Parts.ToArray(),
-                    item.Programs.Select(p => (p.Part, p.Part.CaptureCuttingState())).ToArray()));
+                    item.Programs.Select(p => p.Part).Concat(item.CutOffs.Select(c => c.Segment))
+                        .Select(part => (part, part.CaptureCuttingState())).ToArray(),
+                    item.CutOffs.Select(c => (c.CutOff, c.CutOff.FarEdgeFirst, c.CutOff.Drawing.Program)).ToArray()));
                 item.Plate.Parts.SetOrder(item.Order);
                 foreach (var (part, program, bounds, parameters) in item.Programs)
                 {
                     beforeInstall?.Invoke(item.Plate, part);
                     part.InstallPlannedProgram(program, bounds, parameters);
+                }
+                foreach (var (segment, program, cutOff) in item.CutOffs)
+                {
+                    beforeInstall?.Invoke(item.Plate, segment);
+                    cutOff.InstallFarEdgeSegment(segment, program);
                 }
             }
         }
@@ -190,6 +231,11 @@ internal static class CuttingPlanCommit
             {
                 foreach (var (part, state) in undo[i].States)
                     part.RestoreCuttingState(state);
+                foreach (var (cutOff, farEdgeFirst, program) in undo[i].CutOffs)
+                {
+                    cutOff.FarEdgeFirst = farEdgeFirst;
+                    cutOff.Drawing.Program = program;
+                }
                 undo[i].Plate.Parts.SetOrder(undo[i].Order);
             }
             return new(CuttingCommitStatus.Failed, "Install failed; every plate was restored.",
@@ -208,5 +254,6 @@ internal static class CuttingPlanCommit
         new(CuttingCommitStatus.InvalidInput, message, plate);
 
     private sealed record Staged(Plate Plate, Part[] Order,
-        List<(Part Part, Program Program, Box Bounds, CuttingParameters Parameters)> Programs, bool Changed);
+        List<(Part Part, Program Program, Box Bounds, CuttingParameters Parameters)> Programs,
+        List<(Part Segment, Program Program, CutOff CutOff)> CutOffs, bool Changed);
 }

@@ -21,6 +21,8 @@
   "M47OverrideDistanceThreshold": null,
   "SafetyHeadraiseDistance": 2000,
   "SafetyHeadraiseRapidDistance": 12.0,
+  "HeadHeightLockCode": "",
+  "HeadHeightUnlockCode": "",
   "PalletExchange": "EndOfSheet",
   "LeadInFeedratePercent": 0.5,
   "LeadInArcLine2FeedratePercent": 0.5,

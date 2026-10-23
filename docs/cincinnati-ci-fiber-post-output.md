@@ -47,6 +47,14 @@ uses the Cincinnati machine-sample convention, not a generic TF5200 laser API:
   centreline and has no inside or outside. Whether the `L4` macro runs
   correctly without a following lead-in move has not been confirmed on the
   machine.
+- A head-locked cut-off overcut (see
+  [automatic cutoffs](automatic-scrap-cutoffs.md#head-locked-overcut-at-the-far-edge))
+  writes the `Head height lock` block before the overcut's `G1` and the
+  `Head height unlock` block where the program unlocks: after the overcut, or,
+  for a segment started at the far edge, after the rapid back and before the
+  `G1` toward the origin. Both blocks are blank by default, and a nest with a
+  head-locked cut-off is refused while either is blank. Whether `ZHSOFF` and the
+  next contour's `L0` keep a locked head down for the rapid back is unconfirmed.
 - Hole subprogram geometry is inlined. Suppressed moves and, by default,
   wholly scribe contours are omitted.
 - Files use UTF-8 without a BOM and CRLF lines. Default accuracy is three decimal

@@ -191,6 +191,24 @@ namespace OpenNest.Posts.Cincinnati
         )]
         public double? SafetyHeadraiseRapidDistance { get; set; } = 12.0;
 
+        [Category("7. Safety")]
+        [DisplayName("Head Height Lock Code")]
+        [Description(
+            "Block that locks the head height before a cut-off overcuts past the far sheet edge. Empty = not set: a nest with head-locked cut-offs is refused."
+        )]
+        public string HeadHeightLockCode { get; set; } = "";
+
+        [Category("7. Safety")]
+        [DisplayName("Head Height Unlock Code")]
+        [Description(
+            "Block that releases the head height lock after a cut-off's overcut. Empty = not set: a nest with head-locked cut-offs is refused."
+        )]
+        public string HeadHeightUnlockCode { get; set; } = "";
+
+        /// <summary>Whether both head-height lock blocks are set.</summary>
+        public bool HasHeadHeightLockCodes() =>
+            !string.IsNullOrWhiteSpace(HeadHeightLockCode) && !string.IsNullOrWhiteSpace(HeadHeightUnlockCode);
+
         [Category("8. Pallet")]
         [DisplayName("Pallet Exchange")]
         [Description("When pallet exchange occurs (None, EndOfSheet, or StartAndEnd).")]

@@ -329,6 +329,9 @@ public sealed class CuttingPlanPlateResult
     public int PartCount => Result.ProposedOrder.Count;
     public int RegeneratedCount => Result.ProposedOrder.Count(p => p.IsRegenerated);
 
+    /// <summary>Head-locked far-edge cutoff segments the plan cuts the other way.</summary>
+    public int ReversedCutOffCount => Result.ProposedOrder.Count(p => p.ReversesCutOff);
+
     public bool OrderChanged =>
         Result.ProposedOrder.Select((proposal, index) => proposal.SourceOrdinal != index).Any(changed => changed);
 }
@@ -507,7 +510,9 @@ public sealed class CuttingPlanProposal
                 : plate.OrderChanged ? "The part order changes." : "The part order is unchanged.";
             yield return heading + $"ready. {Count(plate.PartCount, "part")}, {plate.RegeneratedCount} "
                 + $"regenerated, {kept} kept as is; rapid travel "
-                + $"{result.RapidDistance.ToString("0.##", CultureInfo.CurrentCulture)} {unit}. {order}";
+                + $"{result.RapidDistance.ToString("0.##", CultureInfo.CurrentCulture)} {unit}. {order}"
+                + (plate.ReversedCutOffCount == 0 ? ""
+                    : $" {Count(plate.ReversedCutOffCount, "cutoff segment")} at the far edge change direction.");
             // A ready plan's findings are advisory notes (support tabs that may not hold a part level).
             foreach (var line in Limit(result.Findings.Select(DescribeFinding)))
                 yield return line;

@@ -95,6 +95,9 @@ namespace OpenNest.Posts.Cincinnati
 
         public void Post(Nest nest, Stream outputStream)
         {
+            // Refuse before writing anything: a head-locked overcut needs the lock codes.
+            HeadHeightLock.EnsurePostable(nest, Config.HasHeadHeightLockCodes(), Name);
+
             // 1. Create variable manager and register standard variables
             var vars = CreateVariableManager();
 
@@ -252,6 +255,7 @@ namespace OpenNest.Posts.Cincinnati
         {
             // Refuse before creating the file, so a refusal never empties an existing program.
             DisplayPerimeterTail.EnsurePostable(nest);
+            HeadHeightLock.EnsurePostable(nest, Config.HasHeadHeightLockCodes(), Name);
             using var fs = new FileStream(outputFile, FileMode.Create, FileAccess.Write);
             Post(nest, fs);
         }

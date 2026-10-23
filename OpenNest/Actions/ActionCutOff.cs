@@ -53,7 +53,7 @@ namespace OpenNest.Actions
         private void OnMouseMove(object sender, MouseEventArgs e)
         {
             var pt = plateView.CurrentPoint;
-            previewCutOff = new CutOff(pt, lockedAxis);
+            previewCutOff = new CutOff(pt, lockedAxis) { HeadLockOvercut = settings.NewCutOffHeadLockOvercut };
             previewCutOff.Regenerate(plateView.Plate, settings, perimeterCache);
             plateView.Invalidate();
         }
@@ -64,7 +64,7 @@ namespace OpenNest.Actions
                 return;
 
             var pt = plateView.CurrentPoint;
-            var cutoff = new CutOff(pt, lockedAxis);
+            var cutoff = new CutOff(pt, lockedAxis) { HeadLockOvercut = settings.NewCutOffHeadLockOvercut };
 
             plateView.Plate.CutOffs.Add(cutoff);
             plateView.Plate.RegenerateCutOffs(settings);
@@ -80,7 +80,10 @@ namespace OpenNest.Actions
 
                 if (previewCutOff != null)
                 {
-                    previewCutOff = new CutOff(plateView.CurrentPoint, lockedAxis);
+                    previewCutOff = new CutOff(plateView.CurrentPoint, lockedAxis)
+                    {
+                        HeadLockOvercut = settings.NewCutOffHeadLockOvercut,
+                    };
                     previewCutOff.Regenerate(plateView.Plate, settings, perimeterCache);
                     plateView.Invalidate();
                 }

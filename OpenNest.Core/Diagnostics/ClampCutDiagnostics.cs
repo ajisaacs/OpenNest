@@ -28,12 +28,17 @@ public static class ClampCutDiagnostics
             var cut = plate.CutOffs[index];
             if (cut == null || !Enum.IsDefined(cut.Axis))
                 throw new ArgumentException("Cut-off has an invalid axis.", nameof(plate));
+            // A head-locked overcut runs on past the far edge, where an off-sheet clamp can be.
+            var overcut = cut.HeadLockOvercut > 0 && double.IsFinite(cut.HeadLockOvercut) ? cut.HeadLockOvercut : 0;
+            var farHigh = CutOff.FarEdgeIsHigh(cut.Axis, plate.Quadrant);
+            var low = farHigh ? 0 : overcut;
+            var high = farHigh ? overcut : 0;
             var start = cut.Axis == CutOffAxis.Vertical
-                ? new Vector(cut.Position.X, cut.StartLimit ?? sheet.Bottom)
-                : new Vector(cut.StartLimit ?? sheet.Left, cut.Position.Y);
+                ? new Vector(cut.Position.X, cut.StartLimit ?? sheet.Bottom - low)
+                : new Vector(cut.StartLimit ?? sheet.Left - low, cut.Position.Y);
             var end = cut.Axis == CutOffAxis.Vertical
-                ? new Vector(cut.Position.X, cut.EndLimit ?? sheet.Top)
-                : new Vector(cut.EndLimit ?? sheet.Right, cut.Position.Y);
+                ? new Vector(cut.Position.X, cut.EndLimit ?? sheet.Top + high)
+                : new Vector(cut.EndLimit ?? sheet.Right + high, cut.Position.Y);
             foreach (var zone in zones)
                 if (Intersects(start, end, zone.Bounds, out var location))
                     findings.Add(new CutOffClampFinding(index, zone.Id, location));

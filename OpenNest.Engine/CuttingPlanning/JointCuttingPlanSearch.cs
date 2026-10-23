@@ -512,14 +512,20 @@ internal static class JointCuttingPlanSearch
                 token.ThrowIfCancellationRequested();
                 if (source.Prepared == null)
                 {
-                    CountExpansion(source);
-                    var checker = node.Checker.Copy();
-                    if (Check(source, source.Execution, node.Position, checker, attempt))
-                        // A segment is transparent: the part after it ranks its entries and hole route
-                        // from where the tool was before the segment, as planned without it.
-                        yield return new(new([.. node.Order, source], source.Execution.DeparturePoint, checker, null, node,
-                                IsSegment(source) ? node.RoutePosition : null),
-                            source.Execution.RapidDistanceFrom(node.Position), source.SourceOrdinal, -1, -1);
+                    // A head-locked far-edge cutoff segment may be cut from either end: nearer first.
+                    var variants = source.Reversed == null ? [source]
+                        : new[] { source, source.Reversed }.OrderBy(v => v.Execution.RapidDistanceFrom(node.Position)).ToArray();
+                    foreach (var cut in variants)
+                    {
+                        CountExpansion(source);
+                        var checker = node.Checker.Copy();
+                        if (Check(cut, cut.Execution, node.Position, checker, attempt))
+                            // A segment is transparent: the part after it ranks its entries and hole route
+                            // from where the tool was before the segment, as planned without it.
+                            yield return new(new([.. node.Order, cut], cut.Execution.DeparturePoint, checker, null, node,
+                                    IsSegment(cut) ? node.RoutePosition : null),
+                                cut.Execution.RapidDistanceFrom(node.Position), cut.SourceOrdinal, -1, -1);
+                    }
                     continue;
                 }
                 var prepared = source.Prepared;
@@ -1154,10 +1160,19 @@ internal static class JointCuttingPlanSearch
             var arrival = node.Position;
             if (source.Prepared is not { } prepared)
             {
-                CountExpansion(source);
-                var fixedChecker = node.Checker.Copy();
-                return new(new([.. node.Order, source], source.Execution.DeparturePoint, fixedChecker, null, node),
-                    Score(source, source.Execution, arrival, fixedChecker), source.Execution.RapidDistanceFrom(arrival));
+                // A head-locked far-edge cutoff segment: the end that breaks fewer checks, then the nearer.
+                SafestStep fixedBest = null;
+                foreach (var cut in source.Reversed == null ? [source] : new[] { source, source.Reversed })
+                {
+                    CountExpansion(source);
+                    var fixedChecker = node.Checker.Copy();
+                    var step = new SafestStep(new([.. node.Order, cut], cut.Execution.DeparturePoint, fixedChecker, null, node),
+                        Score(cut, cut.Execution, arrival, fixedChecker), cut.Execution.RapidDistanceFrom(arrival));
+                    if (fixedBest == null || step.Severity < fixedBest.Severity
+                        || step.Severity == fixedBest.Severity && step.Distance < fixedBest.Distance)
+                        fixedBest = step;
+                }
+                return fixedBest;
             }
             // Recovery's contour solver first: its first route whose only violations, if any, are
             // where the arrival rapid crosses cut contours. It passes every check when it can.

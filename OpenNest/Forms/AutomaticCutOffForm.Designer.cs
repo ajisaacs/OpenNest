@@ -29,6 +29,8 @@ partial class AutomaticCutOffForm
         minimumStripBox = new TextBox();
         minimumTailLabel = new Label();
         minimumTailBox = new TextBox();
+        headLockBox = new CheckBox();
+        headLockOvercutBox = new TextBox();
         statusLabel = new Label();
         metricsPanel = new TableLayoutPanel();
         occupiedCaption = new Label();
@@ -110,10 +112,13 @@ partial class AutomaticCutOffForm
         spacingPanel.Controls.Add(minimumStripBox, 1, 1);
         spacingPanel.Controls.Add(minimumTailLabel, 0, 2);
         spacingPanel.Controls.Add(minimumTailBox, 1, 2);
+        spacingPanel.Controls.Add(headLockBox, 0, 3);
+        spacingPanel.Controls.Add(headLockOvercutBox, 1, 3);
         spacingPanel.Dock = DockStyle.Fill;
         spacingPanel.Margin = new Padding(0, 0, 0, 6);
         spacingPanel.Name = "spacingPanel";
-        spacingPanel.RowCount = 3;
+        spacingPanel.RowCount = 4;
+        spacingPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         spacingPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         spacingPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         spacingPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -163,6 +168,26 @@ partial class AutomaticCutOffForm
         minimumTailBox.Name = "minimumTailBox";
         minimumTailBox.TabIndex = 5;
         minimumTailBox.TextChanged += SettingsBox_TextChanged;
+        //
+        // headLockBox
+        //
+        headLockBox.Anchor = AnchorStyles.Left;
+        headLockBox.AutoSize = true;
+        headLockBox.Name = "headLockBox";
+        headLockBox.TabIndex = 6;
+        headLockBox.Text = "Lock head height and overcut the far edge by:";
+        toolTip.SetToolTip(headLockBox,
+            "Stock can arrive wider than nominal. New cut-offs cut past the far sheet edge by this much with "
+            + "the head height locked, and Plan Cutting may start them there. Posting needs the post's "
+            + "head-height lock codes.");
+        headLockBox.CheckedChanged += HeadLockBox_CheckedChanged;
+        //
+        // headLockOvercutBox
+        //
+        headLockOvercutBox.Dock = DockStyle.Fill;
+        headLockOvercutBox.Name = "headLockOvercutBox";
+        headLockOvercutBox.TabIndex = 7;
+        headLockOvercutBox.TextChanged += SettingsBox_TextChanged;
         //
         // statusLabel
         //
@@ -409,6 +434,8 @@ partial class AutomaticCutOffForm
     private TextBox minimumStripBox;
     private Label minimumTailLabel;
     private TextBox minimumTailBox;
+    private CheckBox headLockBox;
+    private TextBox headLockOvercutBox;
     private Label statusLabel;
     private TableLayoutPanel metricsPanel;
     private Label occupiedCaption;

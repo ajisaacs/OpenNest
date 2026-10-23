@@ -82,7 +82,8 @@ public sealed class PlateCuttingState
         }
         var cutOffs = plate.CutOffs.Select(c => c == null
             ? throw new ArgumentException("Plate contains a missing cutoff definition.")
-            : new CutOffRecord(c, c.Drawing, c.Axis, c.Position, c.StartLimit, c.EndLimit)).ToArray();
+            : new CutOffRecord(c, c.Drawing, c.Axis, c.Position, c.StartLimit, c.EndLimit,
+                c.HeadLockOvercut, c.FarEdgeFirst)).ToArray();
         return new(plate, records.ToArray(), cutOffs, drawings, settings);
 
         void Fingerprint(CuttingParameters parameters)
@@ -155,7 +156,8 @@ public sealed class PlateCuttingState
             if (!ReferenceEquals(cutOff, record.CutOff) || !ReferenceEquals(cutOff.Drawing, record.Drawing)
                 || cutOff.Axis != record.Axis || !Bits(cutOff.Position.X, record.Position.X)
                 || !Bits(cutOff.Position.Y, record.Position.Y)
-                || !Bits(cutOff.StartLimit, record.StartLimit) || !Bits(cutOff.EndLimit, record.EndLimit))
+                || !Bits(cutOff.StartLimit, record.StartLimit) || !Bits(cutOff.EndLimit, record.EndLimit)
+                || !Bits(cutOff.HeadLockOvercut, record.HeadLockOvercut) || cutOff.FarEdgeFirst != record.FarEdgeFirst)
                 return $"Cutoff {i + 1} definition changed.";
         }
         // Part.Rotation derives from the manual flag, PreLeadInRotation and Program.Rotation,
@@ -204,5 +206,5 @@ public sealed class PlateCuttingState
         List<ContourCutPin> Pins, string PinsFingerprint);
 
     private sealed record CutOffRecord(CutOff CutOff, Drawing Drawing, CutOffAxis Axis, Vector Position,
-        double? StartLimit, double? EndLimit);
+        double? StartLimit, double? EndLimit, double HeadLockOvercut, bool FarEdgeFirst);
 }

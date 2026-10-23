@@ -171,6 +171,26 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         [PostSetting(MacrosSection, 6)]
         public string ProgramEndMacro { get; set; } = "PROGRAMEND.NC";
 
+        /// <summary>Block that locks the head height before a cut-off overcuts past the far sheet edge.</summary>
+        [DisplayName("Head height lock")]
+        [Description(
+            "Written before a cut-off overcuts past the far sheet edge. Blank = not set: a nest with head-locked cut-offs is refused."
+        )]
+        [PostSetting(MacrosSection, 7)]
+        public string HeadHeightLockCode { get; set; } = "";
+
+        /// <summary>Block that releases the head height lock after a cut-off's overcut.</summary>
+        [DisplayName("Head height unlock")]
+        [Description(
+            "Written after a cut-off's overcut, back at the nominal sheet edge. Blank = not set: a nest with head-locked cut-offs is refused."
+        )]
+        [PostSetting(MacrosSection, 8)]
+        public string HeadHeightUnlockCode { get; set; } = "";
+
+        /// <summary>Whether both head-height lock blocks are set.</summary>
+        public bool HasHeadHeightLockCodes() =>
+            !string.IsNullOrWhiteSpace(HeadHeightLockCode) && !string.IsNullOrWhiteSpace(HeadHeightUnlockCode);
+
         /// <summary>
         /// Material name (case-insensitive) to machine material code map for
         /// V.E.MATERIAL. The setter re-keys any assigned map (including one
