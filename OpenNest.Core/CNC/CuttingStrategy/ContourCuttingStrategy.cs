@@ -251,7 +251,7 @@ namespace OpenNest.CNC.CuttingStrategy
         internal Program EmitPrepared(Shape[] shapes, List<Entity> scribes,
             IReadOnlyList<CuttingPlanning.ContourChoice> choices,
             IReadOnlyList<CuttingParameters> contourParameters = null, IReadOnlyList<Shape> breakCuts = null,
-            IReadOnlyList<Shape> tabbedCutouts = null, int? perimeterOrdinal = null)
+            IReadOnlyList<Shape> tabbedCutouts = null, int? perimeterOrdinal = null, Shape displayTail = null)
         {
             var result = new Program(Mode.Absolute);
             EmitScribeContours(result, scribes);
@@ -259,6 +259,12 @@ namespace OpenNest.CNC.CuttingStrategy
             foreach (var cutout in tabbedCutouts ?? Array.Empty<Shape>())
                 EmitTabbedCutout(result, cutout);
             EmitChosenContours(result, shapes, choices, contourParameters, perimeterOrdinal ?? shapes.Length - 1);
+            if (displayTail != null)
+            {
+                // Display only, after every cut: executed reads and posts stop at its marker.
+                var start = GetShapeStartPoint(displayTail);
+                DisplayPerimeterTail.Append(result, ConvertShapeToMoves(displayTail, start, LayerType.DisplayPerimeter), start);
+            }
             result.Mode = Mode.Incremental;
             return result;
         }

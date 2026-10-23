@@ -10,6 +10,8 @@ namespace OpenNest
     {
         public static TimingInfo GetTimingInfo(Program pgm)
         {
+            // A display perimeter's tail is never cut, so it takes no time.
+            pgm = DisplayPerimeterTail.WithoutTail(pgm);
             var entities = ConvertProgram.ToGeometry(pgm);
             var shapes = ShapeBuilder.GetShapes(
                 entities.Where(entity => entity.Layer != SpecialLayers.Rapid)
@@ -36,7 +38,7 @@ namespace OpenNest
 
             foreach (var part in plate.Parts)
             {
-                var endpt = part.Program.EndPoint() + part.Location;
+                var endpt = DisplayPerimeterTail.WithoutTail(part.Program).EndPoint() + part.Location;
                 info += GetTimingInfo(part.Program);
                 info.TravelDistance += pos.DistanceTo(endpt);
                 pos = endpt;

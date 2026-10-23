@@ -508,6 +508,21 @@ namespace OpenNest.CNC
             return true;
         }
 
+        /// <summary>
+        /// A shallow copy holding only the first <paramref name="count"/> codes: the same
+        /// instruction, variable and sub-program instances, mode and rotation.
+        /// </summary>
+        internal Program HeadCopy(int count)
+        {
+            var head = new Program() { mode = this.mode, Rotation = this.Rotation };
+            head.Codes.AddRange(Codes.GetRange(0, count));
+            foreach (var kvp in Variables)
+                head.Variables[kvp.Key] = kvp.Value;
+            foreach (var kvp in SubPrograms)
+                head.SubPrograms[kvp.Key] = kvp.Value;
+            return head;
+        }
+
         public object Clone()
         {
             var pgm = new Program() { mode = this.mode, Rotation = this.Rotation };

@@ -46,20 +46,22 @@ public sealed class PreparedContours
     // automatic entries keep to points where the tab steadies the part. World = local + origin.
     private readonly PartSupport support;
     private readonly Vector supportOrigin;
-    // False when the outside is a display perimeter: shown and material, never cut. It is not one
-    // of the contours, so every contour is a hole and no emission can reach the outline.
-    private readonly bool hasCutPerimeter;
+    // The outside when it is a display perimeter: shown and material, never cut. It is not one of
+    // the contours, so every contour is a hole; a complete emission only appends it as the
+    // never-executed DisplayPerimeterTail. Null for an ordinary cut perimeter.
+    private readonly Shape displayOutline;
+    private bool hasCutPerimeter => displayOutline == null;
 
     private PreparedContours(Shape[] shapes, List<Entity> scribes, List<Shape> breakCuts, List<Shape> tabbedCutouts,
         CuttingParameters parameters)
-        : this(shapes, scribes, breakCuts, tabbedCutouts, parameters, hasCutPerimeter: true)
+        : this(shapes, scribes, breakCuts, tabbedCutouts, parameters, displayOutline: null)
     {
     }
 
     private PreparedContours(Shape[] shapes, List<Entity> scribes, List<Shape> breakCuts, List<Shape> tabbedCutouts,
-        CuttingParameters parameters, bool hasCutPerimeter)
+        CuttingParameters parameters, Shape displayOutline)
     {
-        this.hasCutPerimeter = hasCutPerimeter;
+        this.displayOutline = displayOutline;
         this.shapes = shapes;
         this.scribes = scribes;
         this.breakCuts = breakCuts;
@@ -71,7 +73,7 @@ public sealed class PreparedContours
 
     private PreparedContours(PreparedContours unpinned, IReadOnlyList<CutPinResolution> pins, CancellationToken token)
         : this(unpinned.shapes, unpinned.scribes, unpinned.breakCuts, unpinned.tabbedCutouts, unpinned.parameters,
-            unpinned.hasCutPerimeter)
+            unpinned.displayOutline)
     {
         contourParameters = new CuttingParameters[shapes.Length];
         var rejected = new List<CutPinResolution>();
@@ -107,7 +109,7 @@ public sealed class PreparedContours
     // a pinned perimeter keeps its pin's settings: the analysis is only kept for review.
     private PreparedContours(PreparedContours source, PartSupport support, Vector location, Tab tab)
         : this(source.shapes, source.scribes, source.breakCuts, source.tabbedCutouts, source.parameters,
-            source.hasCutPerimeter)
+            source.displayOutline)
     {
         for (var contour = 0; contour < Count; contour++)
         {
@@ -306,7 +308,7 @@ public sealed class PreparedContours
             foreach (var cut in breakCuts)
                 cut.UpdateBounds();
             // Never a contour: nothing can choose, emit or lead it. Every contour is a hole.
-            return new(contours.ToArray(), scribes, breakCuts, tabbedCutouts, ownedParameters, hasCutPerimeter: false);
+            return new(contours.ToArray(), scribes, breakCuts, tabbedCutouts, ownedParameters, displayPerimeter);
         }
         if (current.Entities.Count != 0 || contours.Count == 0)
             throw new ArgumentException("Preparation requires nonempty closed contours.");
@@ -761,7 +763,7 @@ public sealed class PreparedContours
     public Program Emit(IReadOnlyList<ContourChoice> choices)
     {
         Validate(choices, true);
-        return EmitPrefix(choices);
+        return EmitOwned(choices, complete: true);
     }
 
     /// <summary>
@@ -788,11 +790,16 @@ public sealed class PreparedContours
     internal Program EmitPrefix(IReadOnlyList<ContourChoice> choices)
     {
         Validate(choices, false);
-        return new ContourCuttingStrategy { Parameters = parameters }.EmitPrepared(
+        return EmitOwned(choices, complete: false);
+    }
+
+    // Only a complete emission carries a display perimeter's tail: prefixes are search probes.
+    private Program EmitOwned(IReadOnlyList<ContourChoice> choices, bool complete) =>
+        new ContourCuttingStrategy { Parameters = parameters }.EmitPrepared(
             shapes.Select(s => (Shape)s.Clone()).ToArray(), scribes.Select(e => e.Clone()).ToList(), choices,
             contourParameters, breakCuts.Select(s => (Shape)s.Clone()).ToList(),
-            tabbedCutouts.Select(s => (Shape)s.Clone()).ToList(), PerimeterOrdinal);
-    }
+            tabbedCutouts.Select(s => (Shape)s.Clone()).ToList(), PerimeterOrdinal,
+            complete ? (Shape)displayOutline?.Clone() : null);
 
     /// <summary>Open break cuts this preparation cuts before its contours.</summary>
     public int BreakCutCount => breakCuts.Count;

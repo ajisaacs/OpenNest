@@ -31,6 +31,8 @@ namespace OpenNest.CNC
 
         private static Vector AppendProgram(Program pgm, Vector basePos, Vector startPos, List<Segment> results)
         {
+            // The head never travels to a display perimeter's tail.
+            pgm = DisplayPerimeterTail.WithoutTail(pgm);
             // Draw the approach to the first rapid destination, or to the program
             // origin when it starts cutting without a rapid. Only an initial rapid
             // (or call arrival) is already represented by this approach; a later

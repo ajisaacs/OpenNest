@@ -75,6 +75,86 @@ public class DisplayPerimeterTests
         Assert.All(motions.Where(m => !m.Rapid), m => Assert.True(InsideACutout(m.End), $"Cut to ({m.End.X}, {m.End.Y}) leaves the cutouts."));
     }
 
+    private static (Plate Plate, Part Part) PlannedDoor()
+    {
+        var plate = DoorPlate(Door());
+        var proposal = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false).Plan();
+        Assert.True(proposal.CanApply, string.Join("\n", proposal.Describe("in")));
+        Assert.Equal(CuttingCommitStatus.Applied, proposal.Apply(acceptWarnings: false).Status);
+        return (plate, plate.Parts[0]);
+    }
+
+    [Fact]
+    public void AfterApply_TheDoorKeepsItsOutlineAsANeverCutTail()
+    {
+        var (_, part) = PlannedDoor();
+
+        Assert.Equal(30, part.BoundingBox.Length, 6);
+        Assert.Equal(20, part.BoundingBox.Width, 6);
+        Assert.True(DisplayPerimeterTail.HasTail(part.Program));
+        var executed = DisplayPerimeterTail.ForPosting(part.Program, "Part 1");
+        Assert.False(DisplayPerimeterTail.HasDisplayPerimeterMotion(executed));
+        // Posting and executed reads agree: the tail is the only thing either leaves out.
+        var full = ExecutionMotionReader.Read(part.Program, part.Location, null, default).Motions;
+        var posted = ExecutionMotionReader.Read(executed, part.Location, null, default).Motions;
+        Assert.Equal(full.Count, posted.Count);
+        Assert.True(executed.Codes.Count < part.Program.Codes.Count);
+    }
+
+    [Fact]
+    public void AfterApply_AutomaticCutOffsStillAddNoLineAcrossTheBlank()
+    {
+        var (plate, _) = PlannedDoor();
+
+        var staging = AutomaticCutOffBatch.Stage([plate],
+            new AutomaticCutOffOptions { Spacing = 10, MinimumStripLength = 5 }, new CutOffSettings());
+
+        Assert.Empty(Assert.Single(staging.Plans).Definitions);
+    }
+
+    [Fact]
+    public void AfterApply_TheDoorPlansAgainWithTheSameHoles()
+    {
+        var (plate, _) = PlannedDoor();
+
+        var again = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false).Plan();
+
+        Assert.True(again.CanApply, string.Join("\n", again.Describe("in")));
+    }
+
+    [Fact]
+    public void AfterApply_TimingRapidsAndSimulationIgnoreTheTail()
+    {
+        var (plate, part) = PlannedDoor();
+
+        var executed = DisplayPerimeterTail.WithoutTail(part.Program);
+        Assert.Equal(Timing.GetTimingInfo(executed).PierceCount, Timing.GetTimingInfo(part.Program).PierceCount);
+        Assert.Equal(Timing.GetTimingInfo(executed).CutDistance, Timing.GetTimingInfo(part.Program).CutDistance, 9);
+        // The tail starts at the outline's first corner (0, 0); no rapid may travel there.
+        var rapids = RapidEnumerator.Enumerate(plate.Parts);
+        Assert.DoesNotContain(rapids, r => r.To.DistanceTo(Vector.Zero) < 1e-9);
+        var simulation = CutSimulation.Build(plate, new CutParameters
+        {
+            Feedrate = 100,
+            RapidTravelRate = 600,
+            PierceTime = TimeSpan.FromSeconds(1),
+            Units = Units.Inches,
+        });
+        Assert.Equal(3, simulation.Steps.Count(step => step.Kind == CutSimulationStepKind.Pierce));
+        Assert.DoesNotContain(simulation.Steps, step => step.Layer == LayerType.DisplayPerimeter);
+    }
+
+    [Fact]
+    public void Posting_RefusesAnUnplannedDisplayPerimeter()
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => DisplayPerimeterTail.ForPosting(Door(), "Part 4"));
+
+        Assert.Contains("Part 4", error.Message);
+        Assert.Contains("Plan Cutting", error.Message);
+        var holesOnly = Door(LayerType.Cut);
+        Assert.Same(holesOnly, DisplayPerimeterTail.ForPosting(holesOnly, "Part 1"));
+    }
+
     [Fact]
     public void Door_AutomaticCutOffsAddNoLineAcrossTheBlank()
     {

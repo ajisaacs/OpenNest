@@ -48,6 +48,9 @@ public static class ExecutionMotionReader
                     throw new ArgumentException("Program expansion exceeds the verification limit.");
                 if (code == null)
                     throw new ArgumentException("Program contains a missing instruction.");
+                // A display perimeter's tail is never executed: an applied program ends at its marker.
+                if (code is Comment { Value: DisplayPerimeterTail.Marker })
+                    break;
                 if (requireSupportedTypes)
                 {
                     var type = code.GetType();

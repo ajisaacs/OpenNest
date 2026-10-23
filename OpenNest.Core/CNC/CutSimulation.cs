@@ -238,7 +238,7 @@ namespace OpenNest.CNC
                 builder.PartIndex = i;
                 var mode = Mode.Absolute;
                 var pos = part.Location;
-                builder.AddProgram(part.Program, part.Location, ref mode, ref pos);
+                builder.AddProgram(DisplayPerimeterTail.WithoutTail(part.Program), part.Location, ref mode, ref pos);
             }
 
             var steps = ContourTiming.Finish(builder.Steps, plate, parameters);
