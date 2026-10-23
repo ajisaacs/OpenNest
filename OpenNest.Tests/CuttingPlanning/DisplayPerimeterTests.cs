@@ -175,6 +175,33 @@ public class DisplayPerimeterTests
         Assert.Same(holesOnly, DisplayPerimeterTail.ForPosting(holesOnly, "Part 1"));
     }
 
+    // A sparse support bed and a pierce zone both steer perimeter-led paths (support tabs, scrap
+    // pierces); a blank has no cut perimeter, so neither may reach it.
+    [Theory]
+    [InlineData("supportBed")]
+    [InlineData("pierceZone")]
+    public void Door_PlansWithSupportTabsOrAPierceZoneAndStillNeverTouchesTheOutline(string setting)
+    {
+        var plate = DoorPlate(Door());
+        var parameters = ExplicitContourTests.Parameters();
+        if (setting == "supportBed")
+        {
+            plate.SupportBed = new OpenNest.Support.SupportGrid(25, 100, 2, 2, stabilityMargin: 0.1);
+            parameters.SupportTabs = true;
+            parameters.TabConfig = new OpenNest.CNC.CuttingStrategy.NormalTab { Size = 0.05 };
+        }
+        else
+            parameters.PierceDiameter = 0.1;
+        var part = plate.Parts[0];
+
+        var proposal = CuttingPlanBatch.Capture([plate], parameters, false).Plan();
+
+        Assert.True(proposal.CanApply, string.Join("\n", proposal.Describe("in")));
+        Assert.Equal(CuttingCommitStatus.Applied, proposal.Apply(acceptWarnings: false).Status);
+        var motions = ExecutionMotionReader.Read(part.Program, part.Location, null, default).Motions;
+        Assert.All(motions.Where(m => !m.Rapid), m => Assert.True(InsideACutout(m.End), $"({m.End.X}, {m.End.Y}) leaves the cutouts."));
+    }
+
     [Fact]
     public void Door_AutomaticCutOffsAddNoLineAcrossTheBlank()
     {
