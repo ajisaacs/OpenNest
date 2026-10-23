@@ -80,34 +80,34 @@ public sealed class SupportGridForm : Form
         layout.Controls.Add(kinds);
 
         var gridValues = new TableLayoutPanel { AutoSize = true, ColumnCount = 3 };
-        pitchXBox = NewLengthBox(initial.PitchX, 0.0001m);
-        pitchYBox = NewLengthBox(initial.PitchY, 0.0001m);
-        offsetXBox = NewLengthBox(initial.OffsetX, -100000m);
-        offsetYBox = NewLengthBox(initial.OffsetY, -100000m);
-        AddRow(gridValues, "Pitch along X:", pitchXBox, unit);
-        AddRow(gridValues, "Pitch along Y:", pitchYBox, unit);
-        AddRow(gridValues, "First point, X from the origin:", offsetXBox, unit);
-        AddRow(gridValues, "First point, Y from the origin:", offsetYBox, unit);
+        pitchXBox = SettingsRows.NewLengthBox(initial.PitchX, 0.0001m);
+        pitchYBox = SettingsRows.NewLengthBox(initial.PitchY, 0.0001m);
+        offsetXBox = SettingsRows.NewLengthBox(initial.OffsetX, -100000m);
+        offsetYBox = SettingsRows.NewLengthBox(initial.OffsetY, -100000m);
+        SettingsRows.AddRow(gridValues, "Pitch along X:", pitchXBox, unit);
+        SettingsRows.AddRow(gridValues, "Pitch along Y:", pitchYBox, unit);
+        SettingsRows.AddRow(gridValues, "First point, X from the origin:", offsetXBox, unit);
+        SettingsRows.AddRow(gridValues, "First point, Y from the origin:", offsetYBox, unit);
         layout.Controls.Add(gridValues);
 
         var slatValues = new TableLayoutPanel { AutoSize = true, ColumnCount = 3 };
         slatAxisBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
         slatAxisBox.Items.AddRange(new object[] { "Along X (the full length)", "Along Y (the full width)" });
         slatAxisBox.SelectedIndex = initial.SlatAxis == SlatAxis.X ? 0 : 1;
-        slatPitchBox = NewLengthBox(initial.SlatPitch, 0.0001m);
-        slatThicknessBox = NewLengthBox(initial.SlatThickness, 0m);
-        slatOffsetBox = NewLengthBox(initial.SlatOffset, -100000m);
-        AddRow(slatValues, "Slats run:", slatAxisBox, "");
-        AddRow(slatValues, "Pitch between slats:", slatPitchBox, unit);
-        AddRow(slatValues, "Slat thickness:", slatThicknessBox, unit);
-        AddRow(slatValues, "First slat's center from the origin:", slatOffsetBox, unit);
+        slatPitchBox = SettingsRows.NewLengthBox(initial.SlatPitch, 0.0001m);
+        slatThicknessBox = SettingsRows.NewLengthBox(initial.SlatThickness, 0m);
+        slatOffsetBox = SettingsRows.NewLengthBox(initial.SlatOffset, -100000m);
+        SettingsRows.AddRow(slatValues, "Slats run:", slatAxisBox, "");
+        SettingsRows.AddRow(slatValues, "Pitch between slats:", slatPitchBox, unit);
+        SettingsRows.AddRow(slatValues, "Slat thickness:", slatThicknessBox, unit);
+        SettingsRows.AddRow(slatValues, "First slat's center from the origin:", slatOffsetBox, unit);
         layout.Controls.Add(slatValues);
 
         var sharedValues = new TableLayoutPanel { AutoSize = true, ColumnCount = 3 };
-        toleranceBox = NewLengthBox(initial.RegistrationTolerance, 0m);
-        marginBox = NewLengthBox(initial.StabilityMargin, 0m);
-        AddRow(sharedValues, "Registration tolerance:", toleranceBox, unit);
-        AddRow(sharedValues, "Stability margin:", marginBox, unit);
+        toleranceBox = SettingsRows.NewLengthBox(initial.RegistrationTolerance, 0m);
+        marginBox = SettingsRows.NewLengthBox(initial.StabilityMargin, 0m);
+        SettingsRows.AddRow(sharedValues, "Registration tolerance:", toleranceBox, unit);
+        SettingsRows.AddRow(sharedValues, "Stability margin:", marginBox, unit);
         layout.Controls.Add(sharedValues);
 
         var defaultsGroup = new GroupBox
@@ -211,18 +211,18 @@ public sealed class SupportGridForm : Form
 
     private void ShowValues(SupportGridSettings settings)
     {
-        pitchXBox.Value = ToBoxValue(pitchXBox, settings.PitchX);
-        pitchYBox.Value = ToBoxValue(pitchYBox, settings.PitchY);
-        offsetXBox.Value = ToBoxValue(offsetXBox, settings.OffsetX);
-        offsetYBox.Value = ToBoxValue(offsetYBox, settings.OffsetY);
+        pitchXBox.Value = SettingsRows.ToBoxValue(pitchXBox, settings.PitchX);
+        pitchYBox.Value = SettingsRows.ToBoxValue(pitchYBox, settings.PitchY);
+        offsetXBox.Value = SettingsRows.ToBoxValue(offsetXBox, settings.OffsetX);
+        offsetYBox.Value = SettingsRows.ToBoxValue(offsetYBox, settings.OffsetY);
         gridButton.Checked = !settings.UseSlats;
         slatsButton.Checked = settings.UseSlats;
         slatAxisBox.SelectedIndex = settings.SlatAxis == SlatAxis.X ? 0 : 1;
-        slatPitchBox.Value = ToBoxValue(slatPitchBox, settings.SlatPitch);
-        slatThicknessBox.Value = ToBoxValue(slatThicknessBox, settings.SlatThickness);
-        slatOffsetBox.Value = ToBoxValue(slatOffsetBox, settings.SlatOffset);
-        toleranceBox.Value = ToBoxValue(toleranceBox, settings.RegistrationTolerance);
-        marginBox.Value = ToBoxValue(marginBox, settings.StabilityMargin);
+        slatPitchBox.Value = SettingsRows.ToBoxValue(slatPitchBox, settings.SlatPitch);
+        slatThicknessBox.Value = SettingsRows.ToBoxValue(slatThicknessBox, settings.SlatThickness);
+        slatOffsetBox.Value = SettingsRows.ToBoxValue(slatOffsetBox, settings.SlatOffset);
+        toleranceBox.Value = SettingsRows.ToBoxValue(toleranceBox, settings.RegistrationTolerance);
+        marginBox.Value = SettingsRows.ToBoxValue(marginBox, settings.StabilityMargin);
         applyToNewNestsBox.Checked = settings.Enabled;
     }
 
@@ -265,33 +265,5 @@ public sealed class SupportGridForm : Form
             return;
         }
         DialogResult = DialogResult.OK;
-    }
-
-    private static NumericUpDown NewLengthBox(double value, decimal minimum)
-    {
-        var box = new NumericUpDown
-        {
-            DecimalPlaces = 4,
-            Minimum = minimum,
-            Maximum = 100000,
-            Increment = 0.125m,
-            Width = 110,
-        };
-        box.Value = ToBoxValue(box, value);
-        return box;
-    }
-
-    private static decimal ToBoxValue(NumericUpDown box, double value)
-    {
-        if (!double.IsFinite(value) || value < (double)box.Minimum)
-            return box.Minimum;
-        return value > (double)box.Maximum ? box.Maximum : (decimal)value;
-    }
-
-    private static void AddRow(TableLayoutPanel table, string label, Control box, string unit)
-    {
-        table.Controls.Add(new Label { Text = label, AutoSize = true, Padding = new Padding(0, 6, 6, 0) });
-        table.Controls.Add(box);
-        table.Controls.Add(new Label { Text = unit, AutoSize = true, Padding = new Padding(0, 6, 0, 0) });
     }
 }

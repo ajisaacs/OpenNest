@@ -252,13 +252,17 @@ public static class DrawingSplitter
                 && line.Position < bounds.Top - OpenNest.Math.Tolerance.Epsilon;
     }
 
-    private static List<Box> BuildClipRegions(List<SplitLine> sortedLines, Box bounds)
+    /// <summary>
+    /// The grid of pieces the split lines cut <paramref name="bounds"/> into, row by row
+    /// from the bottom-left.
+    /// </summary>
+    public static List<Box> BuildClipRegions(IEnumerable<SplitLine> lines, Box bounds)
     {
-        var verticals = sortedLines
+        var verticals = lines
             .Where(l => l.Axis == CutOffAxis.Vertical)
             .OrderBy(l => l.Position)
             .ToList();
-        var horizontals = sortedLines
+        var horizontals = lines
             .Where(l => l.Axis == CutOffAxis.Horizontal)
             .OrderBy(l => l.Position)
             .ToList();

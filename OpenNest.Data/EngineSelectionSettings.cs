@@ -27,20 +27,9 @@ public sealed class EngineSelectionSettings
     /// <summary>Missing, unreadable or corrupt settings safely use Default without writing.</summary>
     public static EngineSelectionSettings Load(string path)
     {
-        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-            return new();
-
-        try
-        {
-            var settings = JsonSerializer.Deserialize<EngineSelectionSettings>(
-                File.ReadAllText(path), JsonOptions) ?? new();
-            settings.EngineName = NormalizeName(settings.EngineName);
-            return settings;
-        }
-        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
-        {
-            return new();
-        }
+        var settings = SettingsFile.Read<EngineSelectionSettings>(path, JsonOptions) ?? new();
+        settings.EngineName = NormalizeName(settings.EngineName);
+        return settings;
     }
 
     /// <summary>
@@ -81,22 +70,7 @@ public sealed class EngineSelectionSettings
     {
         var json = JsonSerializer.Serialize(
             new EngineSelectionSettings { EngineName = NormalizeName(EngineName) }, JsonOptions);
-        var directory = Path.GetDirectoryName(Path.GetFullPath(path));
-
-        for (var attempt = 0; attempt < 3; attempt++)
-        {
-            try
-            {
-                if (!string.IsNullOrEmpty(directory))
-                    Directory.CreateDirectory(directory);
-                File.WriteAllText(path, json);
-                return;
-            }
-            catch (IOException) when (attempt < 2)
-            {
-                Thread.Sleep(100);
-            }
-        }
+        SettingsFile.Write(path, json);
     }
 
     private static string NormalizeName(string? name) =>

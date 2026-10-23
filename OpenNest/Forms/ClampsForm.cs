@@ -83,12 +83,12 @@ public sealed class ClampsForm : Form
         );
 
         var size = new TableLayoutPanel { AutoSize = true, ColumnCount = 3, Dock = DockStyle.Top };
-        widthBox = NewLengthBox(Editor.Width, minimum: 0.0001m);
-        depthBox = NewLengthBox(Editor.Depth, minimum: 0.0001m);
-        removalMinutesBox = NewLengthBox(Editor.RemovalMinutes, minimum: 0m);
-        AddRow(size, "Clamp width (along the edge):", widthBox, unit);
-        AddRow(size, "Clamp depth (into the plate):", depthBox, unit);
-        AddRow(size, "Minutes to remove and replace one clamp:", removalMinutesBox, "min");
+        widthBox = SettingsRows.NewLengthBox(Editor.Width, minimum: 0.0001m);
+        depthBox = SettingsRows.NewLengthBox(Editor.Depth, minimum: 0.0001m);
+        removalMinutesBox = SettingsRows.NewLengthBox(Editor.RemovalMinutes, minimum: 0m);
+        SettingsRows.AddRow(size, "Clamp width (along the edge):", widthBox, unit);
+        SettingsRows.AddRow(size, "Clamp depth (into the plate):", depthBox, unit);
+        SettingsRows.AddRow(size, "Minutes to remove and replace one clamp:", removalMinutesBox, "min");
         ownClearanceBox = new CheckBox
         {
             Text = "Clearance from parts:",
@@ -96,7 +96,7 @@ public sealed class ClampsForm : Form
             Checked = Editor.Clearance.HasValue,
             Padding = new Padding(0, 3, 6, 0),
         };
-        clearanceBox = NewLengthBox(Editor.Clearance ?? 0, minimum: 0m);
+        clearanceBox = SettingsRows.NewLengthBox(Editor.Clearance ?? 0, minimum: 0m);
         clearanceBox.Enabled = ownClearanceBox.Checked;
         ownClearanceBox.CheckedChanged += (_, _) => clearanceBox.Enabled = ownClearanceBox.Checked;
         size.Controls.Add(ownClearanceBox);
@@ -117,7 +117,7 @@ public sealed class ClampsForm : Form
             AutoSize = true,
             WrapContents = false,
         };
-        centerBox = NewLengthBox(0, minimum: 0m);
+        centerBox = SettingsRows.NewLengthBox(0, minimum: 0m);
         edgeBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 120 };
         foreach (var edge in ClampEdgeText.All)
             edgeBox.Items.Add(ClampEdgeText.Name(edge));
@@ -209,34 +209,6 @@ public sealed class ClampsForm : Form
     /// <summary>The edited rail; the caller applies it to the nest after OK.</summary>
     internal ClampRailEditor Editor { get; }
 
-    private static NumericUpDown NewLengthBox(double value, decimal minimum)
-    {
-        var box = new NumericUpDown
-        {
-            DecimalPlaces = 4,
-            Minimum = minimum,
-            Maximum = 100000,
-            Increment = 0.125m,
-            Width = 110,
-        };
-        box.Value = ToBoxValue(box, value);
-        return box;
-    }
-
-    private static decimal ToBoxValue(NumericUpDown box, double value)
-    {
-        if (!double.IsFinite(value) || value < (double)box.Minimum)
-            return box.Minimum;
-        return value > (double)box.Maximum ? box.Maximum : (decimal)value;
-    }
-
-    private static void AddRow(TableLayoutPanel table, string label, Control box, string unit)
-    {
-        table.Controls.Add(new Label { Text = label, AutoSize = true, Padding = new Padding(0, 6, 6, 0) });
-        table.Controls.Add(box);
-        table.Controls.Add(new Label { Text = unit, AutoSize = true, Padding = new Padding(0, 6, 0, 0) });
-    }
-
     private void ReadSizes()
     {
         Editor.Width = (double)widthBox.Value;
@@ -282,11 +254,11 @@ public sealed class ClampsForm : Form
     private void LoadMachineDefaults()
     {
         Editor.LoadMachineDefaults(machineDefaults);
-        widthBox.Value = ToBoxValue(widthBox, Editor.Width);
-        depthBox.Value = ToBoxValue(depthBox, Editor.Depth);
-        removalMinutesBox.Value = ToBoxValue(removalMinutesBox, Editor.RemovalMinutes);
+        widthBox.Value = SettingsRows.ToBoxValue(widthBox, Editor.Width);
+        depthBox.Value = SettingsRows.ToBoxValue(depthBox, Editor.Depth);
+        removalMinutesBox.Value = SettingsRows.ToBoxValue(removalMinutesBox, Editor.RemovalMinutes);
         ownClearanceBox.Checked = Editor.Clearance.HasValue;
-        clearanceBox.Value = ToBoxValue(clearanceBox, Editor.Clearance ?? 0);
+        clearanceBox.Value = SettingsRows.ToBoxValue(clearanceBox, Editor.Clearance ?? 0);
         applyToNewNestsBox.Checked = Editor.ApplyToNewNests;
         RefreshCenters();
     }

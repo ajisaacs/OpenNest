@@ -216,7 +216,7 @@ public sealed class ClampSettings
         {
             json = File.ReadAllText(path);
         }
-        catch (Exception ex) when (IsUnreadableFile(ex))
+        catch (Exception ex) when (SettingsFile.IsUnreadableFile(ex))
         {
             status = ClampSettingsStatus.Invalid;
             return Fallback;
@@ -247,7 +247,7 @@ public sealed class ClampSettings
             foreach (var property in document.RootElement.EnumerateObject())
                 values[property.Name] = property.Value.Clone();
         }
-        catch (Exception ex) when (IsUnreadableFile(ex))
+        catch (Exception ex) when (SettingsFile.IsUnreadableFile(ex))
         {
             status = ClampSettingsStatus.Invalid;
             return settings;
@@ -265,7 +265,7 @@ public sealed class ClampSettings
 
         if (values.TryGetValue("units", out var units))
         {
-            if (TryParseUnits(units, out var parsed))
+            if (SettingsFile.TryParseUnits(units, out var parsed))
                 settings.Units = parsed;
             else
                 ignored = true;
@@ -347,24 +347,7 @@ public sealed class ClampSettings
     /// </summary>
     public void Save(string path, int maxRetries = 3)
     {
-        var json = ToJson();
-
-        var directory = Path.GetDirectoryName(Path.GetFullPath(path));
-        if (!string.IsNullOrEmpty(directory))
-            Directory.CreateDirectory(directory);
-
-        for (var attempt = 0; attempt < maxRetries; attempt++)
-        {
-            try
-            {
-                File.WriteAllText(path, json);
-                return;
-            }
-            catch (IOException) when (attempt < maxRetries - 1)
-            {
-                Thread.Sleep(100);
-            }
-        }
+        SettingsFile.Write(path, ToJson(), maxRetries);
     }
 
     /// <summary>The settings as <see cref="Save"/> writes them, for the shared copy.</summary>
@@ -412,35 +395,4 @@ public sealed class ClampSettings
             && double.IsFinite(value)
             && double.IsFinite(value * MillimetersPerInch);
     }
-
-    /// <summary>
-    /// Accepts only a defined unit name (case-insensitive); Enum.TryParse would also accept
-    /// numeric strings and comma-joined names.
-    /// </summary>
-    private static bool TryParseUnits(JsonElement element, out Units units)
-    {
-        units = default;
-        if (element.ValueKind != JsonValueKind.String)
-            return false;
-
-        var text = element.GetString();
-        foreach (var candidate in Enum.GetValues<Units>())
-        {
-            if (string.Equals(candidate.ToString(), text, StringComparison.OrdinalIgnoreCase))
-            {
-                units = candidate;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsUnreadableFile(Exception ex) =>
-        ex
-            is JsonException
-                or IOException
-                or UnauthorizedAccessException
-                or NotSupportedException
-                or System.Security.SecurityException;
 }

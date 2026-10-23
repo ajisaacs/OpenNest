@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -750,64 +750,25 @@ namespace OpenNest.Geometry
         /// Normalizes to CW winding before offsetting Left (which is outward for CW),
         /// making the method independent of the original contour winding direction.
         /// </summary>
-        internal Shape OffsetOutward(double distance)
-        {
-            var poly = ToPolygon();
-
-            if (
-                poly == null
-                || poly.Vertices.Count < 3
-                || poly.RotationDirection() == RotationType.CW
-            )
-                return OffsetEntity(distance, OffsetSide.Left) as Shape;
-
-            // Shape is CCW — reverse to CW so Left offset goes outward.
-            var copy = new Shape();
-
-            for (var i = Entities.Count - 1; i >= 0; i--)
-            {
-                switch (Entities[i])
-                {
-                    case Line l:
-                        copy.Entities.Add(new Line(l.EndPoint, l.StartPoint) { Layer = l.Layer });
-                        break;
-                    case Arc a:
-                        copy.Entities.Add(
-                            new Arc(a.Center, a.Radius, a.EndAngle, a.StartAngle, !a.IsReversed)
-                            {
-                                Layer = a.Layer,
-                            }
-                        );
-                        break;
-                    case Circle c:
-                        copy.Entities.Add(
-                            new Circle(c.Center, c.Radius)
-                            {
-                                Layer = c.Layer,
-                                Rotation = RotationType.CW,
-                            }
-                        );
-                        break;
-                }
-            }
-
-            return copy.OffsetEntity(distance, OffsetSide.Left) as Shape;
-        }
+        internal Shape OffsetOutward(double distance) =>
+            OffsetLeftWithWinding(distance, RotationType.CW);
 
         /// <summary>
         /// Offsets the shape inward by the given distance.
         /// Normalizes to CCW winding before offsetting Left (which is inward for CCW),
         /// making the method independent of the original contour winding direction.
         /// </summary>
-        internal Shape OffsetInward(double distance)
+        internal Shape OffsetInward(double distance) =>
+            OffsetLeftWithWinding(distance, RotationType.CCW);
+
+        /// <summary>
+        /// Offsets Left after normalizing the contour to <paramref name="winding"/>.
+        /// </summary>
+        private Shape OffsetLeftWithWinding(double distance, RotationType winding)
         {
             var poly = ToPolygon();
 
-            if (
-                poly == null
-                || poly.Vertices.Count < 3
-                || poly.RotationDirection() == RotationType.CCW
-            )
+            if (poly == null || poly.Vertices.Count < 3 || poly.RotationDirection() == winding)
                 return OffsetEntity(distance, OffsetSide.Left) as Shape;
 
             // Create a reversed copy to avoid mutating shared entity objects.
@@ -833,7 +794,7 @@ namespace OpenNest.Geometry
                             new Circle(c.Center, c.Radius)
                             {
                                 Layer = c.Layer,
-                                Rotation = RotationType.CCW,
+                                Rotation = winding,
                             }
                         );
                         break;

@@ -106,7 +106,7 @@ public sealed class NestDefaults
         {
             json = File.ReadAllText(path);
         }
-        catch (Exception ex) when (IsUnreadableFile(ex))
+        catch (Exception ex) when (SettingsFile.IsUnreadableFile(ex))
         {
             // A file that exists but cannot be read (locked, access-denied)
             // must never block creating a nest.
@@ -129,7 +129,7 @@ public sealed class NestDefaults
         {
             dto = JsonSerializer.Deserialize<NestDefaultsDto>(json ?? "", JsonOptions);
         }
-        catch (Exception ex) when (IsUnreadableFile(ex))
+        catch (Exception ex) when (SettingsFile.IsUnreadableFile(ex))
         {
             // Defaults that cannot be parsed must never block creating a nest.
             status = NestDefaultsStatus.Invalid;
@@ -144,7 +144,7 @@ public sealed class NestDefaults
 
         status = NestDefaultsStatus.Ok;
 
-        if (TryParseUnits(dto.Units, out var units))
+        if (SettingsFile.TryParseUnits(dto.Units, out var units))
             defaults.Units = units;
 
         if (
@@ -261,24 +261,7 @@ public sealed class NestDefaults
     /// </summary>
     public void Save(string path, int maxRetries = 3)
     {
-        var json = ToJson();
-
-        var directory = Path.GetDirectoryName(Path.GetFullPath(path));
-        if (!string.IsNullOrEmpty(directory))
-            Directory.CreateDirectory(directory);
-
-        for (var attempt = 0; attempt < maxRetries; attempt++)
-        {
-            try
-            {
-                File.WriteAllText(path, json);
-                return;
-            }
-            catch (IOException) when (attempt < maxRetries - 1)
-            {
-                Thread.Sleep(100);
-            }
-        }
+        SettingsFile.Write(path, ToJson(), maxRetries);
     }
 
     /// <summary>The defaults as <see cref="Save"/> writes them, for the shared copy.</summary>
@@ -303,38 +286,6 @@ public sealed class NestDefaults
 
         return JsonSerializer.Serialize(dto, JsonOptions);
     }
-
-    /// <summary>
-    /// Accepts only a defined unit name (case-insensitive). Enum.TryParse
-    /// would also accept numeric strings ("7") and comma-joined names,
-    /// producing undefined or unintended values.
-    /// </summary>
-    private static bool TryParseUnits(JsonElement? element, out Units units)
-    {
-        units = default;
-        if (element is not { ValueKind: JsonValueKind.String } value)
-            return false;
-
-        var text = value.GetString();
-        foreach (var candidate in Enum.GetValues<Units>())
-        {
-            if (string.Equals(candidate.ToString(), text, StringComparison.OrdinalIgnoreCase))
-            {
-                units = candidate;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsUnreadableFile(Exception ex) =>
-        ex
-            is JsonException
-                or IOException
-                or UnauthorizedAccessException
-                or NotSupportedException
-                or System.Security.SecurityException;
 
     private static bool IsValidSize(double width, double length) =>
         !double.IsNaN(width)

@@ -191,7 +191,7 @@ namespace OpenNest.Engine.BestFit
                     {
                         points.Add(arc.StartPoint());
                         points.Add(arc.EndPoint());
-                        AddArcExtremes(points, arc);
+                        SpatialQuery.AddArcExtremeVertices(points, arc);
                     }
                 }
             }
@@ -218,35 +218,6 @@ namespace OpenNest.Engine.BestFit
             }
 
             return hullAngles;
-        }
-
-        /// <summary>
-        /// Adds the cardinal extreme points of an arc (0°, 90°, 180°, 270°)
-        /// if they fall within the arc's angular span.
-        /// </summary>
-        private static void AddArcExtremes(List<Vector> points, Arc arc)
-        {
-            var a1 = arc.StartAngle;
-            var a2 = arc.EndAngle;
-
-            if (arc.IsReversed)
-                Generic.Swap(ref a1, ref a2);
-
-            // Right (0°)
-            if (Angle.IsBetweenRad(Angle.TwoPI, a1, a2))
-                points.Add(new Vector(arc.Center.X + arc.Radius, arc.Center.Y));
-
-            // Top (90°)
-            if (Angle.IsBetweenRad(Angle.HalfPI, a1, a2))
-                points.Add(new Vector(arc.Center.X, arc.Center.Y + arc.Radius));
-
-            // Left (180°)
-            if (Angle.IsBetweenRad(System.Math.PI, a1, a2))
-                points.Add(new Vector(arc.Center.X - arc.Radius, arc.Center.Y));
-
-            // Bottom (270°)
-            if (Angle.IsBetweenRad(System.Math.PI * 1.5, a1, a2))
-                points.Add(new Vector(arc.Center.X, arc.Center.Y - arc.Radius));
         }
 
         /// <summary>

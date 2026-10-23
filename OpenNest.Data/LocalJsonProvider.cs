@@ -42,7 +42,7 @@ public class LocalJsonProvider : IDataProvider
     {
         var json = JsonSerializer.Serialize(machine, JsonOptions);
         var path = GetPath(machine.Id);
-        WriteWithRetry(path, json);
+        SettingsFile.Write(path, json);
     }
 
     public void DeleteMachine(Guid id)
@@ -96,21 +96,5 @@ public class LocalJsonProvider : IDataProvider
             return;
 
         SaveMachine(config);
-    }
-
-    private static void WriteWithRetry(string path, string json, int maxRetries = 3)
-    {
-        for (var attempt = 0; attempt < maxRetries; attempt++)
-        {
-            try
-            {
-                File.WriteAllText(path, json);
-                return;
-            }
-            catch (IOException) when (attempt < maxRetries - 1)
-            {
-                Thread.Sleep(100);
-            }
-        }
     }
 }

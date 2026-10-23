@@ -791,7 +791,11 @@ namespace OpenNest.Geometry
             return vertices.ToArray();
         }
 
-        private static void AddArcExtremeVertices(HashSet<Vector> points, Arc arc)
+        /// <summary>
+        /// Adds the cardinal extreme points of an arc (0°, 90°, 180°, 270°)
+        /// if they fall within the arc's angular span.
+        /// </summary>
+        internal static void AddArcExtremeVertices(ICollection<Vector> points, Arc arc)
         {
             var a1 = arc.StartAngle;
             var a2 = arc.EndAngle;

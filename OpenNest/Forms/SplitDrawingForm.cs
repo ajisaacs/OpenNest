@@ -581,39 +581,8 @@ public partial class SplitDrawingForm : Form
         Color.FromArgb(40, 128, 222, 234),
     };
 
-    private List<Box> BuildPreviewRegions()
-    {
-        var verticals = _splitLines
-            .Where(l => l.Axis == CutOffAxis.Vertical)
-            .OrderBy(l => l.Position)
-            .ToList();
-        var horizontals = _splitLines
-            .Where(l => l.Axis == CutOffAxis.Horizontal)
-            .OrderBy(l => l.Position)
-            .ToList();
-
-        var xEdges = new List<double> { _drawingBounds.Left };
-        xEdges.AddRange(verticals.Select(v => v.Position));
-        xEdges.Add(_drawingBounds.Right);
-
-        var yEdges = new List<double> { _drawingBounds.Bottom };
-        yEdges.AddRange(horizontals.Select(h => h.Position));
-        yEdges.Add(_drawingBounds.Top);
-
-        var regions = new List<Box>();
-        for (var yi = 0; yi < yEdges.Count - 1; yi++)
-        for (var xi = 0; xi < xEdges.Count - 1; xi++)
-            regions.Add(
-                new Box(
-                    xEdges[xi],
-                    yEdges[yi],
-                    xEdges[xi + 1] - xEdges[xi],
-                    yEdges[yi + 1] - yEdges[yi]
-                )
-            );
-
-        return regions;
-    }
+    private List<Box> BuildPreviewRegions() =>
+        DrawingSplitter.BuildClipRegions(_splitLines, _drawingBounds);
 
     // --- OK/Cancel ---
 

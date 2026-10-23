@@ -10,14 +10,14 @@ namespace OpenNest.Geometry
         public static void Optimize(IList<Arc> arcs) =>
             MergePass(
                 arcs,
-                (list, item, i) => list.GetCoradialArs(item, i),
+                (a, b) => a.IsCoradialTo(b),
                 (Arc a, Arc b, out Arc joined) => TryJoinArcs(a, b, out joined)
             );
 
         public static void Optimize(IList<Line> lines) =>
             MergePass(
                 lines,
-                (list, item, i) => list.GetCollinearLines(item, i),
+                (a, b) => a.IsCollinearTo(b),
                 (Line a, Line b, out Line joined) => TryJoinLines(a, b, out joined)
             );
 
@@ -61,7 +61,7 @@ namespace OpenNest.Geometry
 
         private static void MergePass<T>(
             IList<T> items,
-            Func<IList<T>, T, int, List<T>> findCandidates,
+            Func<T, T, bool> related,
             TryJoin<T> tryJoin
         )
             where T : class
@@ -69,7 +69,7 @@ namespace OpenNest.Geometry
             for (var i = 0; i < items.Count; ++i)
             {
                 var item = items[i];
-                var candidates = findCandidates(items, item, i);
+                var candidates = FindRelated(items, item, i, related);
                 var index = 0;
 
                 while (index < candidates.Count)
@@ -214,62 +214,41 @@ namespace OpenNest.Geometry
             return true;
         }
 
-        private static List<Line> GetCollinearLines(
-            this IList<Line> lines,
-            Line line,
-            int startIndex
+        /// <summary>
+        /// The items from <paramref name="startIndex"/> on, other than <paramref name="item"/>
+        /// itself, that are <paramref name="related"/> to it.
+        /// </summary>
+        private static List<T> FindRelated<T>(
+            IList<T> items,
+            T item,
+            int startIndex,
+            Func<T, T, bool> related
         )
+            where T : class
         {
-            var collinearLines = new List<Line>();
+            var matches = new List<T>();
 
             Parallel.For(
                 startIndex,
-                lines.Count,
+                items.Count,
                 index =>
                 {
-                    var compareLine = lines[index];
+                    var candidate = items[index];
 
-                    if (Object.ReferenceEquals(line, compareLine))
+                    if (Object.ReferenceEquals(item, candidate))
                         return;
 
-                    if (!line.IsCollinearTo(compareLine))
+                    if (!related(item, candidate))
                         return;
 
-                    lock (collinearLines)
+                    lock (matches)
                     {
-                        collinearLines.Add(compareLine);
+                        matches.Add(candidate);
                     }
                 }
             );
 
-            return collinearLines;
-        }
-
-        private static List<Arc> GetCoradialArs(this IList<Arc> arcs, Arc arc, int startIndex)
-        {
-            var coradialArcs = new List<Arc>();
-
-            Parallel.For(
-                startIndex,
-                arcs.Count,
-                index =>
-                {
-                    var compareArc = arcs[index];
-
-                    if (Object.ReferenceEquals(arc, compareArc))
-                        return;
-
-                    if (!arc.IsCoradialTo(compareArc))
-                        return;
-
-                    lock (coradialArcs)
-                    {
-                        coradialArcs.Add(compareArc);
-                    }
-                }
-            );
-
-            return coradialArcs;
+            return matches;
         }
     }
 }
