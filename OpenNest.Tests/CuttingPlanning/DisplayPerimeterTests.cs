@@ -234,6 +234,96 @@ public class DisplayPerimeterTests
         Assert.All(motions.Where(m => !m.Rapid), m => Assert.True(InsideACutout(m.End), $"({m.End.X}, {m.End.Y}) leaves the cutouts."));
     }
 
+    // PEP draws a supplied blank a few hundred-thousandths of an inch past its sheet (an outline
+    // skew of 0.000006 plus placements rounded to 0.001). The outline is never cut, so automatic
+    // cut-offs accept it within DisplayPerimeterSheetAllowance; anything larger, or the same overhang
+    // on geometry that is cut, is still refused.
+    [Theory]
+    [InlineData(LayerType.DisplayPerimeter, 3e-5, 0, true)]
+    [InlineData(LayerType.DisplayPerimeter, 0, 3e-5, true)]
+    [InlineData(LayerType.DisplayPerimeter, 2e-4, 0, false)]
+    [InlineData(LayerType.Cut, 3e-5, 0, false)]
+    public void AutomaticCutOffs_AcceptOnlyADisplayPerimeterWithinTheAllowancePastTheSheet(
+        LayerType outline, double overRight, double overBottom, bool accepted)
+    {
+        var plate = new Plate(new Size(20, 30 - overRight));
+        plate.Parts.Add(new Part(new Drawing("door", Door(outline)), new Vector(0, -overBottom)));
+
+        var create = () => AutomaticCutOffPlanner.Create(plate,
+            new AutomaticCutOffOptions { Spacing = 35, MinimumStripLength = 17.5, MinimumTailLength = 12 },
+            new CutOffSettings());
+
+        if (!accepted)
+        {
+            var refusal = Assert.Throws<ArgumentException>(create);
+            Assert.Contains("outside the physical sheet", refusal.Message);
+            return;
+        }
+        // The blank fills the sheet: nothing is left to cut off.
+        Assert.Empty(create().Definitions);
+    }
+
+    // Cut-offs are staged before planning checks the door, so a malformed one can still carry a
+    // cut past the sheet while its outline is inside: the allowance covers the outline only.
+    [Fact]
+    public void AutomaticCutOffs_RefuseACutPastTheSheetEvenOnADisplayPerimeterPart()
+    {
+        var program = Door();
+        program.MoveTo(29, 1); program.LineTo(30.00003, 1); program.LineTo(30.00003, 2); program.LineTo(29, 2); program.LineTo(29, 1);
+        var plate = new Plate(new Size(20, 30));
+        plate.Parts.Add(new Part(new Drawing("door", program), Vector.Zero));
+
+        var refusal = Assert.Throws<ArgumentException>(() => AutomaticCutOffPlanner.Create(plate,
+            new AutomaticCutOffOptions { Spacing = 35, MinimumStripLength = 17.5, MinimumTailLength = 12 },
+            new CutOffSettings()));
+
+        Assert.Contains("outside the physical sheet", refusal.Message);
+    }
+
+    private static AutomaticCutOffPlan StageCutOffs(Plate plate) => AutomaticCutOffPlanner.Create(plate,
+        new AutomaticCutOffOptions { Spacing = 35, MinimumStripLength = 17.5, MinimumTailLength = 12 },
+        new CutOffSettings());
+
+    // The allowance belongs to the outline alone: a scribe (lasered) or a rapid past the sheet on a
+    // door is refused at the ordinary tolerance, except a rapid ending on the outline itself.
+    [Theory]
+    [InlineData("scribe")]
+    [InlineData("rapid")]
+    public void AutomaticCutOffs_RefuseAScribeOrRapidPastTheSheetOnADisplayPerimeterPart(string motion)
+    {
+        var program = Door();
+        if (motion == "scribe")
+        {
+            program.Codes.Add(new RapidMove(29, 1));
+            program.Codes.Add(new LinearMove(30.00003, 1) { Layer = LayerType.Scribe });
+            program.Codes.Add(new RapidMove(29, 2));
+        }
+        else
+            program.Codes.Add(new RapidMove(30.00005, 1));
+        var plate = new Plate(new Size(20, 30));
+        plate.Parts.Add(new Part(new Drawing("door", program), Vector.Zero));
+
+        var refusal = Assert.Throws<ArgumentException>(() => StageCutOffs(plate));
+
+        Assert.Contains("outside the physical sheet", refusal.Message);
+    }
+
+    // The door's rapid to its outline's first corner, in the drawing and again in an applied
+    // program's display tail, ends on the outline, so it shares the outline's allowance.
+    [Fact]
+    public void AutomaticCutOffs_AcceptTheRapidToAnOverhangingOutlineBeforeAndAfterApply()
+    {
+        var plate = new Plate(new Size(20, 30 - 3e-5));
+        var part = new Part(new Drawing("door", Door()), new Vector(-3e-5, 0));
+        plate.Parts.Add(part);
+
+        Assert.Empty(StageCutOffs(plate).Definitions);
+        var proposal = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false).Plan();
+        Assert.Equal(CuttingCommitStatus.Applied, proposal.Apply(acceptWarnings: false).Status);
+        Assert.True(DisplayPerimeterTail.HasTail(part.Program));
+        Assert.Empty(StageCutOffs(plate).Definitions);
+    }
+
     [Fact]
     public void Door_AutomaticCutOffsAddNoLineAcrossTheBlank()
     {

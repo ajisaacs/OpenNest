@@ -90,6 +90,15 @@ public sealed class AutomaticCutOffPlan
 public static class AutomaticCutOffPlanner
 {
     public const double GeometryTolerance = Tolerance.Epsilon;
+
+    /// <summary>
+    /// How far a display perimeter (a supplied blank's never-cut outline) may extend past the
+    /// physical sheet, in model units. Imported blanks equal their sheet but carry the source CAM's
+    /// rounding (PEP: a 0.000006 outline skew plus placements rounded to 0.001), a few hundred-
+    /// thousandths of an inch. Nothing cuts that outline, so it is accepted; anything cut, or a
+    /// larger overhang that signals a real placement error, is still refused.
+    /// </summary>
+    public const double DisplayPerimeterSheetAllowance = 1e-4;
     public const double MinimumSpacing = 2 * GeometryTolerance;
     public const int MaximumCandidateCount = 10000;
     public const int MaximumShiftCandidateCount = 20000;
@@ -432,19 +441,31 @@ public static class AutomaticCutOffPlanner
         Require(ValidBox(cached) && Near(box.Left, cached.Left) && Near(box.Right, cached.Right) &&
             Near(box.Bottom, cached.Bottom) && Near(box.Top, cached.Top),
             "Part geometry has stale bounds; update it before planning.", "plate");
-        Require(Inside(box, sheet), "Part geometry extends outside the physical sheet.", "plate");
+        var hasDisplayPerimeter = DisplayPerimeterTail.HasDisplayPerimeterMotion(part.Program);
+        Require(Inside(box, sheet, hasDisplayPerimeter ? DisplayPerimeterSheetAllowance : GeometryTolerance),
+            "Part geometry extends outside the physical sheet.", "plate");
 
         // Checking raw coordinates above prevents NaNs being hidden by min/max comparisons.
         // Checking converted entities catches overflowing incremental moves and curve bounds.
         var hasMaterial = false;
         var occupied = sign > 0 ? box.Right : -box.Left;
         var roundoff = CutOff.GetBoundsRoundoff(part);
-        foreach (var entity in ConvertProgram.ToGeometry(part.Program))
+        var entities = ConvertProgram.ToGeometry(part.Program);
+        var outline = entities.Where(e => e.Layer == SpecialLayers.DisplayPerimeter).ToList();
+        foreach (var entity in entities)
         {
             var entityBox = entity.BoundingBox;
             Require(ValidBox(entityBox), "Part contains invalid converted geometry.", "plate");
             if (!SpecialLayers.IsMaterial(entity.Layer))
+            {
+                // Travel and marks (a scribe is lasered) keep the ordinary tolerance. Only a rapid
+                // ending on the outline (its first corner, or an applied program's display tail)
+                // shares the outline's allowance.
+                Require(Inside(entityBox.Translate(part.Location), sheet)
+                        || hasDisplayPerimeter && IsRapidOntoOutline(entity, outline, part.Location, sheet),
+                    "Part geometry extends outside the physical sheet.", "plate");
                 continue;
+            }
             entityBox = entityBox.Translate(part.Location);
             // Permit only bounded floating-point roundoff, with the same conservative
             // padding in CutOff's broad phase and fallback. Geometry-scale protrusions
@@ -452,7 +473,9 @@ public static class AutomaticCutOffPlanner
             Require(entityBox.Left >= cached.Left - roundoff && entityBox.Right <= cached.Right + roundoff &&
                 entityBox.Bottom >= cached.Bottom - roundoff && entityBox.Top <= cached.Top + roundoff,
                 "Converted material extends outside cached part bounds; repair it before planning.", "plate");
-            Require(Inside(entityBox, sheet), "Part geometry extends outside the physical sheet.", "plate");
+            Require(Inside(entityBox, sheet,
+                    entity.Layer == SpecialLayers.DisplayPerimeter ? DisplayPerimeterSheetAllowance : GeometryTolerance),
+                "Part geometry extends outside the physical sheet.", "plate");
             occupied = System.Math.Max(occupied, sign > 0 ? entityBox.Right : -entityBox.Left);
             hasMaterial |= entityBox.Length > 0 || entityBox.Width > 0;
         }
@@ -531,9 +554,21 @@ public static class AutomaticCutOffPlanner
         Nonnegative(box.Length) && Nonnegative(box.Width) &&
         double.IsFinite(box.Right) && double.IsFinite(box.Top);
 
-    private static bool Inside(Box box, Box sheet) =>
-        box.Left >= sheet.Left - GeometryTolerance && box.Right <= sheet.Right + GeometryTolerance &&
-        box.Bottom >= sheet.Bottom - GeometryTolerance && box.Top <= sheet.Top + GeometryTolerance;
+    // A rapid that leaves the sheet only at an end lying on the display perimeter, within its allowance.
+    private static bool IsRapidOntoOutline(Entity entity, List<Entity> outline, Vector location, Box sheet)
+    {
+        if (entity.Layer != SpecialLayers.Rapid || entity is not Line rapid
+            || !Inside(rapid.BoundingBox.Translate(location), sheet, DisplayPerimeterSheetAllowance))
+            return false;
+        bool Allowed(Vector point) =>
+            Inside(new Box(point.X + location.X, point.Y + location.Y, 0, 0), sheet)
+            || outline.Any(e => e.ClosestPointTo(point).DistanceTo(point) <= GeometryTolerance);
+        return Allowed(rapid.StartPoint) && Allowed(rapid.EndPoint);
+    }
+
+    private static bool Inside(Box box, Box sheet, double tolerance = GeometryTolerance) =>
+        box.Left >= sheet.Left - tolerance && box.Right <= sheet.Right + tolerance &&
+        box.Bottom >= sheet.Bottom - tolerance && box.Top <= sheet.Top + tolerance;
 
     private static bool Finite(Vector point) => double.IsFinite(point.X) && double.IsFinite(point.Y);
     private static bool Nonnegative(double value) => double.IsFinite(value) && value >= 0;
