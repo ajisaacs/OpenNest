@@ -221,6 +221,8 @@ public class DisplayPerimeterTests
     [InlineData("notch", "enclose every other contour")]
     [InlineData("second", "enclose every other contour")]
     [InlineData("tabbedOnly", "closed cutout without tabs")]
+    [InlineData("circleOverEdge", "enclose every other contour")]
+    [InlineData("edgeOverNotch", "enclose every other contour")]
     public void InvalidDisplayPerimeters_AreRefusedWithTheirReason(string layout, string reason)
     {
         var program = layout switch
@@ -230,6 +232,8 @@ public class DisplayPerimeterTests
             "notch" => NotchedDoor(),
             "second" => SecondDisplayRing(),
             "tabbedOnly" => TabbedOnly(),
+            "circleOverEdge" => CircleOverEdge(),
+            "edgeOverNotch" => EdgeOverNotch(),
             _ => HoleOnDisplay(),
         };
         var plate = DoorPlate(program);
@@ -251,6 +255,24 @@ public class DisplayPerimeterTests
             Ring(program, LayerType.DisplayPerimeter, (0, 0), (0, 20), (15, 20), (15, 10), (30, 10), (30, 0));
             Ring(program, LayerType.Cut, (2, 2), (2, 6), (6, 6), (6, 2));
             Ring(program, LayerType.Cut, (20, 14), (20, 18), (25, 18), (25, 14));
+            return program;
+        }
+
+        // A round cutout whose start lies on the blank but whose arc runs past its edge.
+        static Program CircleOverEdge()
+        {
+            var program = Door(cutouts: false);
+            program.Codes.Add(new RapidMove(3, 10));
+            program.Codes.Add(new ArcMove(new Vector(3, 10), new Vector(1, 10), RotationType.CW));
+            return program;
+        }
+
+        // Every corner on an L-shaped blank, but the long edge crosses its notch.
+        static Program EdgeOverNotch()
+        {
+            var program = new Program();
+            Ring(program, LayerType.DisplayPerimeter, (0, 0), (0, 20), (15, 20), (15, 10), (30, 10), (30, 0));
+            Ring(program, LayerType.Cut, (2, 19), (29, 2), (2, 2));
             return program;
         }
 

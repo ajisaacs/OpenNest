@@ -296,11 +296,12 @@ public sealed class PreparedContours
             if (contours.Count == 0 && tabbedCutouts.Count == 0 && breakCuts.Count == 0)
                 throw new ArgumentException("A display perimeter with no cutouts has nothing to cut.");
             // Every cut must lie on the blank: a non-rectangular blank's box is not enough.
+            // Each cut is sampled along its arcs and must not cross or touch the outline anywhere.
             var outline = displayPerimeter.ToPolygon();
             foreach (var shape in contours.Concat(tabbedCutouts).Concat(breakCuts))
-                foreach (var entity in shape.Entities)
-                    if (!outline.ContainsPoint(entity is Circle circle ? circle.Center + new Vector(circle.Radius, 0) : Start(entity)))
-                        throw new ArgumentException("A display perimeter must enclose every other contour.");
+                if (shape.ToPolygon().Vertices.Any(vertex => !outline.ContainsPoint(vertex))
+                    || displayPerimeter.Intersects(shape))
+                    throw new ArgumentException("A display perimeter must enclose every other contour.");
             // The search plans a part through its closed contours; tabbed cutouts and break cuts
             // alone leave it nothing to choose.
             if (contours.Count == 0)

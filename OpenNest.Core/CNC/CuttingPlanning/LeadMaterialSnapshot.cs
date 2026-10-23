@@ -120,7 +120,9 @@ public sealed class LeadMaterialSnapshot
                                     && p.DistanceTo(b.Start) <= Tolerance.Epsilon)
                                 && !(p.DistanceTo(a.Start) <= Tolerance.Epsilon
                                     && p.DistanceTo(b.End) <= Tolerance.Epsilon)))
-                                throw new ArgumentException($"Material boundaries overlap, touch or self-intersect ({r}:{i}, {s}:{j}, overlap={overlap}).");
+                                throw new ArgumentException(r != s && (ringDisplay[r] || ringDisplay[s])
+                                    ? "A display perimeter must enclose every other contour."
+                                    : $"Material boundaries overlap, touch or self-intersect ({r}:{i}, {s}:{j}, overlap={overlap}).");
                         }
             var outer = -1;
             for (var i = 0; i < rings.Count; i++)
