@@ -1,5 +1,6 @@
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
+using OpenNest.Converters;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Geometry;
 
@@ -142,6 +143,25 @@ public class DisplayPerimeterTests
         });
         Assert.Equal(3, simulation.Steps.Count(step => step.Kind == CutSimulationStepKind.Pierce));
         Assert.DoesNotContain(simulation.Steps, step => step.Layer == LayerType.DisplayPerimeter);
+    }
+
+    [Fact]
+    public void ManualAndLegacyLeadIns_RefuseADisplayPerimeterAndLeaveThePartAlone()
+    {
+        var part = new Part(new Drawing("door", Door()), Vector.Zero);
+        var before = ExplicitContourTests.Fingerprint(part.Program);
+        var edge = ConvertProgram.ToGeometry(part.Program).First(e => e.Layer == SpecialLayers.DisplayPerimeter);
+        var hole = ConvertProgram.ToGeometry(part.Program).First(e => e.Layer == SpecialLayers.Cut);
+
+        var onEdge = Assert.Throws<InvalidOperationException>(() => part.ApplySingleLeadIn(
+            ExplicitContourTests.Parameters(), new Vector(0, 10), edge, OpenNest.CNC.CuttingStrategy.ContourType.External));
+        Assert.Throws<InvalidOperationException>(() => part.ApplySingleLeadIn(
+            ExplicitContourTests.Parameters(), new Vector(5, 7), hole, OpenNest.CNC.CuttingStrategy.ContourType.Internal));
+        Assert.Throws<InvalidOperationException>(() => part.ApplyLeadIns(ExplicitContourTests.Parameters(), Vector.Zero));
+
+        Assert.Contains("Plan Cutting", onEdge.Message);
+        Assert.False(part.HasManualLeadIns);
+        Assert.Equal(before, ExplicitContourTests.Fingerprint(part.Program));
     }
 
     [Fact]

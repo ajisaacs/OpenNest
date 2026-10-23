@@ -20,6 +20,7 @@ namespace OpenNest.CNC.CuttingStrategy
         public CuttingResult Apply(Program partProgram, Vector approachPoint, Vector nextPartStart)
         {
             var entities = partProgram.ToGeometry();
+            RefuseDisplayPerimeter(entities);
             var breakCuts = TakeBreakCuts(entities);
             entities.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
 
@@ -107,6 +108,14 @@ namespace OpenNest.CNC.CuttingStrategy
             return new CuttingResult { Program = result, LastCutPoint = perimeterPt };
         }
 
+        // These tools would lead the outline or mistake the largest cutout for it (an External lead
+        // pierced on the blank). Only the cutting planner knows every contour of such a part is a hole.
+        private static void RefuseDisplayPerimeter(List<Entity> entities)
+        {
+            if (entities.Exists(e => e.Layer == SpecialLayers.DisplayPerimeter))
+                throw new InvalidOperationException(DisplayPerimeterTail.LeadInRefusal);
+        }
+
         public CuttingResult ApplySingle(
             Program partProgram,
             Vector point,
@@ -115,6 +124,7 @@ namespace OpenNest.CNC.CuttingStrategy
         )
         {
             var entities = partProgram.ToGeometry();
+            RefuseDisplayPerimeter(entities);
             var breakCuts = TakeBreakCuts(entities);
             entities.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
 

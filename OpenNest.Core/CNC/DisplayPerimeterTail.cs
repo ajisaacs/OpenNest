@@ -17,6 +17,11 @@ namespace OpenNest.CNC
         /// <summary>The comment that starts the tail; every code after it is display only.</summary>
         public const string Marker = "DISPLAY PERIMETER NEVER CUT";
 
+        /// <summary>Why the manual and legacy lead-in tools leave a display-perimeter part alone.</summary>
+        public const string LeadInRefusal =
+            "This part's outline is a display perimeter: a supplied blank that is never cut. "
+            + "Lead-ins for its cutouts come from Plan Cutting, which keeps every pierce inside a cutout.";
+
         /// <summary>The index of the tail's marker in <paramref name="program"/>'s codes, or -1.</summary>
         public static int IndexOf(Program program)
         {

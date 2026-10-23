@@ -423,6 +423,14 @@ namespace OpenNest.Actions
             if (part.BaseDrawing.IsCutOff)
                 return;
 
+            // A supplied blank's cutouts get their leads from Plan Cutting only.
+            if (CNC.DisplayPerimeterTail.HasDisplayPerimeterMotion(part.BaseDrawing.Program))
+            {
+                MessageBox.Show(plateView.FindForm(), CNC.DisplayPerimeterTail.LeadInRefusal, "Place Lead-in",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
             selectedLayoutPart = layoutPart;
             selectedPart = part;
 
