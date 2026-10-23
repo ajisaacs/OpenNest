@@ -315,7 +315,7 @@ namespace OpenNest.Forms
             if (CuttingInspection != null)
                 return;
             PlateView.EndAction();
-            var panel = new CuttingInspectionPanel(this, LoadOrDefaultParameters(PlateView.Plate.CuttingParameters), allPlates, mode)
+            var panel = new CuttingInspectionPanel(this, PlateView.Plate.CuttingParameters ?? MachineSettings.DefaultCuttingParameters(Nest), allPlates, mode)
             {
                 BeforePlan = CuttingBeforePlan
             };
@@ -429,6 +429,7 @@ namespace OpenNest.Forms
             // Units are read when each check starts, matching the manual command.
             PlateView.SetOverlapAutoCheck(() => Nest.Units);
             CutOffHeadLockDefaults.Load(PlateView.CutOffSettings, nest.Units);
+            MachineSettings.ApplyCutOffDefaults(PlateView, nest);
 
             PlateManager = new PlateManager(nest);
             PlateManager.CurrentPlateChanged += PlateManager_CurrentPlateChanged;
@@ -770,6 +771,8 @@ namespace OpenNest.Forms
                     continue;
 
                 PlateManager.ChangePlateDefaults(() => form.SaveNestInfo(Nest));
+                // The material, thickness or units may have changed.
+                MachineSettings.ApplyCutOffDefaults(PlateView, Nest);
                 Text = Nest.Name;
                 drawingListBox1.Units = Nest.Units;
                 drawingListBox1.Invalidate();
@@ -1202,29 +1205,9 @@ namespace OpenNest.Forms
             var plate = PlateView.Plate;
 
             if (plate.CuttingParameters == null)
-                plate.CuttingParameters = LoadOrDefaultParameters(null);
+                plate.CuttingParameters = MachineSettings.DefaultCuttingParameters(Nest);
 
             PlateView.SetAction(typeof(Actions.ActionLeadIn));
-        }
-
-        private static CuttingParameters LoadOrDefaultParameters(CuttingParameters existing)
-        {
-            if (existing != null)
-                return existing;
-
-            var json = Properties.Settings.Default.CuttingParametersJson;
-            if (!string.IsNullOrEmpty(json))
-            {
-                try
-                {
-                    return CuttingParametersSerializer.Deserialize(json);
-                }
-                catch
-                { /* fall through */
-                }
-            }
-
-            return new CuttingParameters();
         }
 
         private static void SaveCuttingParameters(CuttingParameters parameters)

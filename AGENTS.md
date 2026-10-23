@@ -65,6 +65,7 @@ Read the relevant contract before changing its behavior:
 - [Material-overlap diagnostics](docs/geometry/visual-overlap-check.md)
 - [Automatic cutoffs and sequencing](docs/automatic-scrap-cutoffs.md)
 - [Pre-post verification](docs/post-verification.md)
+- [Machine cutting defaults](docs/machine-cutting-defaults.md): the nest's machine supplies leads, kerf and cut-off settings for plates without their own parameters
 - [Cut-time estimates](docs/cut-time-estimates.md): simulator/Calculate Cut Time acceleration planner and placeholder machine limits
 - [Cincinnati CL](docs/cincinnati-post-output.md) and [CI Fiber](docs/cincinnati-ci-fiber-post-output.md)
 - [Fill verification](docs/performance/fill-verification.md): opt-in benchmarks, frozen oracles, Debug-only counters and predictor initialization. Zero Release counters do not prove work removal.

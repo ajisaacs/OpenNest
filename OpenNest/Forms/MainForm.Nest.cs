@@ -77,7 +77,8 @@ namespace OpenNest.Forms
                 mnuNestMachine.DropDownItems.Add(new ToolStripMenuItem("(no machines; see Tools > Machine Configuration)") { Enabled = false });
         }
 
-        // Assigning a machine also puts every sheet on that machine's support grid.
+        // Assigning a machine also puts every sheet on that machine's support grid and gives
+        // the views its cut-off settings; plates' own cutting parameters are kept.
         private void AssignMachine(MachineConfig machine)
         {
             var editForm = activeForm;
@@ -95,7 +96,10 @@ namespace OpenNest.Forms
 
             MachineSettings.AssignMachine(nest, machine);
             foreach (var view in views)
+            {
+                MachineSettings.ApplyCutOffDefaults(view, nest);
                 view.Invalidate();
+            }
         }
 
         private async void EditNest_Click(object sender, EventArgs e)

@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Controls;
 using OpenNest.Data;
+using OpenNest.IO;
 
 namespace OpenNest.Forms
 {
@@ -113,6 +116,44 @@ namespace OpenNest.Forms
             var grid = LoadSupportGridSettings(machine);
             nest.SetSupportBed(grid.Enabled ? grid.GridFor(nest.Units) : null);
         }
+
+        /// <summary>
+        /// The cutting parameters a plate of <paramref name="nest"/> without its own starts from:
+        /// the last ones applied (or the built-in defaults), with the lead-ins, lead-outs and kerf
+        /// of the nest's machine for its material and thickness when the machine has them.
+        /// </summary>
+        public static CuttingParameters DefaultCuttingParameters(Nest nest)
+        {
+            var parameters = LastCuttingParameters();
+            MachineCuttingDefaults.ApplyTo(parameters, FindMachine(nest.Machine), nest);
+            return parameters;
+        }
+
+        /// <summary>The cutting parameters last applied, or the built-in defaults when none are saved or readable.</summary>
+        public static CuttingParameters LastCuttingParameters()
+        {
+            var json = Properties.Settings.Default.CuttingParametersJson;
+            if (!string.IsNullOrEmpty(json))
+            {
+                try
+                {
+                    return CuttingParametersSerializer.Deserialize(json);
+                }
+                catch
+                { /* fall through */
+                }
+            }
+            return new CuttingParameters();
+        }
+
+        /// <summary>
+        /// Gives <paramref name="view"/> the cut-off clearance, overtravel, minimum segment and
+        /// direction of the nest's machine for its material and thickness, when the machine has
+        /// them; otherwise the view keeps its settings. Existing cut-offs follow them the next time
+        /// they regenerate.
+        /// </summary>
+        public static void ApplyCutOffDefaults(PlateView view, Nest nest) =>
+            MachineCuttingDefaults.ApplyTo(view.CutOffSettings, FindMachine(nest.Machine), nest);
 
         /// <summary>
         /// The support grid of <paramref name="machine"/>; a machine without one saved yet, or no

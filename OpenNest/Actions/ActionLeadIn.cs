@@ -100,23 +100,7 @@ namespace OpenNest.Actions
 
             // Load current parameters or defaults
             var plate = plateView.Plate;
-            if (plate?.CuttingParameters != null)
-                cuttingPanel.LoadFromParameters(plate.CuttingParameters);
-            else
-            {
-                var json = Properties.Settings.Default.CuttingParametersJson;
-                if (!string.IsNullOrEmpty(json))
-                {
-                    try
-                    {
-                        var saved = CuttingParametersSerializer.Deserialize(json);
-                        cuttingPanel.LoadFromParameters(saved);
-                    }
-                    catch
-                    { /* use defaults */
-                    }
-                }
-            }
+            cuttingPanel.LoadFromParameters(plate?.CuttingParameters ?? MachineSettings.DefaultCuttingParameters(form.Nest));
 
             form.ShowSidePanel(cuttingPanel, "Place Lead-in");
         }
