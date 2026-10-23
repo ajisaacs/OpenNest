@@ -62,4 +62,30 @@
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
   </ItemGroup>
+
+  <!-- Dev builds get the help release pinned in scripts/help.json, downloaded once into obj/
+       and refreshed when the pin changes. Packaging scripts install help themselves; CI and
+       offline builds skip it (/p:InstallHelp=false), and a failed download only warns. -->
+  <PropertyGroup>
+    <InstallHelp Condition="'$(InstallHelp)' == '' and '$(CI)' == 'true'">false</InstallHelp>
+    <HelpPin>$(MSBuildProjectDirectory)\..\scripts\help.json</HelpPin>
+    <HelpCacheDir>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)help\</HelpCacheDir>
+    <HelpCacheStamp>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)help.stamp</HelpCacheStamp>
+  </PropertyGroup>
+
+  <Target Name="DownloadPinnedHelp" Condition="'$(InstallHelp)' != 'false' and '$(OS)' == 'Windows_NT'"
+          Inputs="$(HelpPin)" Outputs="$(HelpCacheStamp)">
+    <RemoveDir Directories="$(HelpCacheDir)" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Install-Help.ps1&quot; -Destination &quot;$(HelpCacheDir.TrimEnd('\'))&quot;"
+          ContinueOnError="true" />
+    <Touch Files="$(HelpCacheStamp)" AlwaysCreate="true" Condition="Exists('$(HelpCacheDir)index.html')" />
+  </Target>
+
+  <Target Name="CopyPinnedHelp" AfterTargets="Build" DependsOnTargets="DownloadPinnedHelp"
+          Condition="'$(InstallHelp)' != 'false' and '$(OS)' == 'Windows_NT'">
+    <ItemGroup>
+      <HelpFile Include="$(HelpCacheDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(HelpFile)" DestinationFolder="$(OutDir)Help\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

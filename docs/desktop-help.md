@@ -17,6 +17,10 @@ holds only the code that shows that HTML and the pin of which help release ships
 - The help folder is `Help\` beside `OpenNest.exe`. Set `OPENNEST_HELP_DIR` to a local
   opennest-help `site\` build to preview unreleased pages. Without either, the menu
   explains that help is not installed.
+- A Windows `dotnet build` of `OpenNest.csproj` downloads the pinned release once into
+  `obj\help\` (again when `scripts/help.json` changes) and copies it to the build output's
+  `Help\`. A failed download only warns. CI (`CI=true`) skips it; pass
+  `-p:InstallHelp=false` to skip it offline. It never reaches `dotnet publish` output.
 
 ## Topic IDs
 
