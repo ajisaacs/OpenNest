@@ -95,7 +95,7 @@ public sealed class ReleasedContourState
                     Finish();
                     if (reportMissingLeadIns && !cutoff && !hasLead)
                         Add(new(PostVerificationKind.MissingLeadIn, plate, part, null,
-                            "A break cut has no nonzero placed lead-in motion.")
+                            "A break cut is missing lead-in geometry.")
                         { Location = move.Curve.Start }, owned);
                     inBreakCut = true;
                     hasLead = false;
@@ -179,7 +179,7 @@ public sealed class ReleasedContourState
                     contourNumber++;
                     if (reportMissingLeadIns && !cutoff && !hasLead)
                         Add(new(PostVerificationKind.MissingLeadIn, plate, part, null,
-                            $"Cutting contour {contourNumber} has no nonzero placed lead-in motion.")
+                            $"Cutting contour {contourNumber} is missing lead-in geometry.")
                         { Location = move.Curve.Start }, owned);
                     hasLead = false;
                     // A rapid can pause/reposition without leaving any material gap.

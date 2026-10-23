@@ -23,7 +23,9 @@ pulls from GitHub every hour; it refuses pushes.
 4. Download the `OpenNest-X.Y.Z-win-x64` artifact and verify its `.sha256`.
    It contains `OpenNest.vX.Y.Z.win-x64.zip`, with the .NET runtime, native
    dependencies, shipped configurations, all three post-processors, license,
-   and `build-info.json` identifying the exact source commit. The nesting engines
+   the `Help` folder from the opennest-help release pinned in `scripts/help.json`
+   (see [desktop help](desktop-help.md)), and `build-info.json` identifying the exact
+   source commit and help version. The nesting engines
    are built into `OpenNest.Engine.dll`; no external engine repository or plug-in
    DLL is packaged. `scripts/ReleaseSmoke` loads the packaged engine assembly and
    checks that every built-in engine instantiates from it, that the renamed

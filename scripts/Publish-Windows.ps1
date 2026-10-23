@@ -3,7 +3,9 @@ param(
     [Parameter(Mandatory)]
     [ValidatePattern('^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$')]
     [string] $Version,
-    [string] $OutputDirectory = 'artifacts'
+    [string] $OutputDirectory = 'artifacts',
+    # A built opennest-help site/ folder to package instead of the release pinned in help.json.
+    [string] $HelpDirectory
 )
 
 $ErrorActionPreference = 'Stop'
@@ -39,6 +41,9 @@ try {
         if ($name -eq 'GravographIS') { Copy-Item "$staging/System.IO.Ports.dll" $package }
     }
 
+    # Help ships as the opennest-help release pinned in help.json, verified against its hash.
+    $helpVersion = & (Join-Path $PSScriptRoot 'Install-Help.ps1') -Destination (Join-Path $package 'Help') -HelpDirectory $HelpDirectory
+
     New-Item -ItemType Directory -Path (Join-Path $package 'Schemes') -Force | Out-Null
     Copy-Item LICENSE $package
     @{
@@ -46,6 +51,7 @@ try {
         sourceCommit = $commit
         runtime = 'win-x64'
         selfContained = $true
+        help = $helpVersion
     } | ConvertTo-Json | Set-Content (Join-Path $package 'build-info.json') -Encoding utf8NoBOM
 
     $required = @(
@@ -54,7 +60,8 @@ try {
         'onnxruntime.dll', 'System.IO.Ports.dll', 'Configurations/PipeFlangeShape.json',
         'Posts/OpenNest.Posts.Cincinnati.dll', 'Posts/OpenNest.Posts.Cincinnati.json',
         'Posts/OpenNest.Posts.CincinnatiCIFiber.dll', 'Posts/OpenNest.Posts.CincinnatiCIFiber.json',
-        'Posts/OpenNest.Posts.GravographIS.dll', 'LICENSE', 'build-info.json'
+        'Posts/OpenNest.Posts.GravographIS.dll', 'Help/index.html', 'Help/topics.json',
+        'LICENSE', 'build-info.json'
     )
     foreach ($file in $required) {
         if (-not (Test-Path (Join-Path $package $file) -PathType Leaf)) { throw "Package missing $file" }

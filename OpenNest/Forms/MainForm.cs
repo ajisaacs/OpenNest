@@ -8,6 +8,7 @@ using System.Windows.Forms;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Jobs;
 using OpenNest.Forms.Commands;
+using OpenNest.Help;
 using OpenNest.IO;
 using OpenNest.Properties;
 
@@ -119,6 +120,7 @@ namespace OpenNest.Forms
             mnuFile.DropDownItems.Insert(mnuFile.DropDownItems.IndexOf(mnuFileExport), exportNestMenu);
             mnuFile.DropDownItems.Insert(mnuFile.DropDownItems.IndexOf(mnuFileExit), storageModeMenu);
             InitializeAlignMenu();
+            InitializeHelpMenu();
             UpdateOverlapMenu();
             MainWindowSettings.Load(this);
 
@@ -159,6 +161,17 @@ namespace OpenNest.Forms
         }
 
         private UpdaterStatus updaterStatus;
+
+        private void InitializeHelpMenu()
+        {
+            var contents = new ToolStripMenuItem("OpenNest &Help") { ShortcutKeys = Keys.F1 };
+            contents.Click += (_, _) => HelpTopics.Show(this, HelpTopics.Home);
+            var firstNest = new ToolStripMenuItem("&Your First Nest");
+            firstNest.Click += (_, _) => HelpTopics.Show(this, HelpTopics.FirstNest);
+            var help = new ToolStripMenuItem("&Help");
+            help.DropDownItems.AddRange(new ToolStripItem[] { contents, firstNest });
+            menuStrip1.Items.Add(help);
+        }
 
         private static ToolStripButton CreateActionButton(string name, string text, Image image,
             EventHandler click)

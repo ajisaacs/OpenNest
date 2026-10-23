@@ -22,7 +22,9 @@ Param(
     [string]$FeedHost,
     [string]$FeedUser = "aj",
     [Parameter(Mandatory)]
-    [string]$RemoteDataDir
+    [string]$RemoteDataDir,
+    # A built opennest-help site/ folder to package instead of the release pinned in help.json.
+    [string]$HelpDirectory
 )
 
 Set-StrictMode -Version Latest
@@ -54,6 +56,9 @@ if (Test-Path $PublishDir) { Remove-Item $PublishDir -Recurse -Force }
 Write-Host "Publishing self-contained build..."
 & dotnet publish $ProjectPath -c $PublishConfiguration -r win-x64 --self-contained true -o $PublishDir
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE" }
+
+$helpVersion = & (Join-Path $ScriptDir 'Install-Help.ps1') -Destination (Join-Path $PublishDir 'Help') -HelpDirectory $HelpDirectory
+Write-Host "Packaged help $helpVersion"
 
 Write-Host "Packing Velopack release v$Version..."
 & vpk pack -u OpenNest -v $Version -p $PublishDir -e OpenNest.exe -o $ReleasesDir

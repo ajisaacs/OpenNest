@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Engine;
+using OpenNest.Help;
 
 namespace OpenNest.Forms
 {
@@ -29,6 +30,7 @@ namespace OpenNest.Forms
             LoadDrawings(nest);
             LoadDefaultPlateOptions();
             SetPlateOptimizerVisible(false);
+            HelpTopics.Attach(this, HelpTopics.AutoNest);
 
             partsGrid.DataError += PartsGrid_DataError;
         }
