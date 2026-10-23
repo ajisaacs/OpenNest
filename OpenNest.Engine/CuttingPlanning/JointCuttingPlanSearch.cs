@@ -550,13 +550,14 @@ internal static class JointCuttingPlanSearch
                 var arrival = node.Active?.Arrival ?? node.Position;
                 var before = node.Active?.Before ?? node.Checker;
                 var boundary = node.Active?.Boundary ?? node;
+                var chosen = choices.Select(e => e.ContourOrdinal).ToHashSet();
                 var contours = prepared.HasCutPerimeter && choices.Length == prepared.Count - 1 ? new[] { prepared.PerimeterOrdinal }
-                    : Enumerable.Range(0, prepared.PerimeterOrdinal).Where(c => !choices.Any(e => e.ContourOrdinal == c));
+                    : Enumerable.Range(0, prepared.PerimeterOrdinal).Where(c => !chosen.Contains(c));
                 // First try one ranked hole chain per endpoint. A later-part failure then
                 // changes the endpoint before replaying all earlier hole combinations.
                 // The retained pass below still searches every entry and hole order.
                 if (preference != null)
-                    contours = contours.OrderBy(c => Array.IndexOf(preference.Route, c)).ThenBy(c => c);
+                    contours = contours.OrderBy(preference.RankOf).ThenBy(c => c);
                 if (preferredOnly && preference != null)
                     contours = contours.Take(1);
                 foreach (var contour in contours)
@@ -570,9 +571,9 @@ internal static class JointCuttingPlanSearch
                             entries = [perimeter];
                         else
                         {
-                            contourRank = Array.IndexOf(preference.Route, contour);
+                            contourRank = preference.RankOf(contour);
                             var downstream = preference.Route.Skip(contourRank + 1)
-                                .FirstOrDefault(c => !choices.Any(e => e.ContourOrdinal == c), -1);
+                                .FirstOrDefault(c => !chosen.Contains(c), -1);
                             var target = downstream < 0 ? preference.PerimeterPierce
                                 : preference.Pierces[downstream];
                             // The coarse pass already checked one owned, lead-feasible entry
@@ -601,6 +602,19 @@ internal static class JointCuttingPlanSearch
                     {
                         CountExpansion(source); // Before emission/native queries, including rejected candidates.
                         var prefix = choices.Append(entries[entry]).ToArray();
+                        // A many-holed part's middle steps check only the contour they add; the full
+                        // prefix runs when that cannot be done exactly, and always for the last contour.
+                        if (Continues(source, choices, prefix)
+                            && ContinueContour(source, entries[entry], node, attempt) is { } step)
+                        {
+                            if (step.Checker == null) continue;
+                            var added = node.Active.Distance + step.Execution.RapidDistanceFrom(node.Position);
+                            yield return new(new Node(node.Order, step.Execution.DeparturePoint, step.Checker,
+                                    new(source, prefix, arrival, before, added, boundary,
+                                        node.Active.Perimeter, preference), null),
+                                added - node.Active.Distance, source.SourceOrdinal, contour, entry, entry, contourRank);
+                            continue;
+                        }
                         Program program;
                         OwnedExecution execution;
                         try
@@ -1147,6 +1161,54 @@ internal static class JointCuttingPlanSearch
                 execution.DeparturePoint, checker, null, node), severity, execution.RapidDistanceFrom(arrival));
         }
 
+        /// <summary>Parts with fewer contours always check the whole prefix, as they always have.</summary>
+        internal const int ContinuedContours = 64;
+
+        // Whether a step may check only the contour it adds: a middle contour (not the first,
+        // which also cuts the part's scribes and open cuts, nor the last, whose full prefix is
+        // the part's certified program) of a many-holed part, with no drawing-pinned contour.
+        private static bool Continues(FixedProgramPlacement source, ContourChoice[] choices, ContourChoice[] prefix) =>
+            !source.IsCutOff && source.Prepared.Count >= ContinuedContours && choices.Length > 0
+            && prefix.Length < source.Prepared.Count && !prefix.Any(c => source.Prepared.IsPinned(c.ContourOrdinal));
+
+        // Each choice's own motions, read once; the rapid into it starts where each check says.
+        private readonly Dictionary<ContourChoice, OwnedExecution> contourMotions = [];
+
+        /// <summary>
+        /// Checks one added contour against the state its prefix left, as <see cref="Check"/> judges
+        /// it inside the whole prefix: earlier contours' rapids and leads were checked when they were
+        /// added, and contour emission never reads other choices. Null when that cannot be done
+        /// exactly (the isolated emission refused, or the checker cannot continue the part); the
+        /// caller then checks the full prefix. A step whose checks fail has a null checker.
+        /// </summary>
+        private ContinuedStep ContinueContour(FixedProgramPlacement source, ContourChoice choice, Node node, Attempt attempt)
+        {
+            if (!contourMotions.TryGetValue(choice, out var execution))
+            {
+                try
+                {
+                    execution = WithoutScribes(ExecutionMotionReader.Read(
+                        source.Prepared.EmitCandidateForValidation(choice), source.Location, null, token));
+                }
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or ArithmeticException or NotSupportedException)
+                {
+                    return null;
+                }
+                contourMotions[choice] = execution;
+            }
+            var checker = node.Checker.Copy();
+            var findings = checker.Continue(execution, node.Position, source.SourceOrdinal + 1, token);
+            if (findings == null)
+                return null;
+            rejected.AddRange(Map(snapshot, findings));
+            attempt.NoteCrossings(source.SourceOrdinal, findings);
+            var lead = LeadPathValidator.Check(execution, source.Material, materials, null, [], token, leadContacts,
+                snapshot.PierceZoneRadius);
+            if (!lead.IsComplete || !lead.IsClear)
+                rejected.Add(Finding(source, lead.IsComplete ? null : PostVerificationKind.Incomplete, lead.Reason));
+            return new(execution, findings.Count == 0 && lead.IsComplete && lead.IsClear ? checker : null);
+        }
+
         // The strict checks of Check, counted instead of refused.
         private RouteSeverity Score(FixedProgramPlacement source, OwnedExecution execution, Vector arrival,
             ReleasedContourState checker, IReadOnlyList<ContourChoice> choices = null)
@@ -1249,7 +1311,14 @@ internal static class JointCuttingPlanSearch
     private sealed class BudgetExceededException : Exception;
     // Every endpoint branch owns its preference; all retained entries/orders remain searchable.
     private sealed record HolePreference(int[] Route, IReadOnlyDictionary<int, ContourChoice> Entries,
-        IReadOnlyDictionary<int, Vector> Pierces, Vector PerimeterPierce);
+        IReadOnlyDictionary<int, Vector> Pierces, Vector PerimeterPierce)
+    {
+        private readonly Dictionary<int, int> ranks = Route.Select((contour, rank) => (contour, rank))
+            .DistinctBy(r => r.contour).ToDictionary(r => r.contour, r => r.rank);
+
+        /// <summary>The contour's place along <see cref="Route"/>, or -1 when it is not on it.</summary>
+        internal int RankOf(int contour) => ranks.TryGetValue(contour, out var rank) ? rank : -1;
+    }
     private sealed record ActivePart(FixedProgramPlacement Source, ContourChoice[] Choices, Vector Arrival,
         ReleasedContourState Before, double Distance, Node Boundary,
         ContourChoice Perimeter = null, HolePreference Preference = null);
@@ -1267,6 +1336,7 @@ internal static class JointCuttingPlanSearch
     private sealed record Edge(Node Node, double Distance, int Ordinal, int Contour, int Entry,
         int Rank = int.MinValue, int ContourRank = 0);
     private sealed record SafestStep(Node Node, RouteSeverity Severity, double Distance);
+    private sealed record ContinuedStep(OwnedExecution Execution, ReleasedContourState Checker);
     private sealed class Frame(Node node)
     {
         internal Node Node { get; } = node;

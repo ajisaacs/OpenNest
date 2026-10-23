@@ -78,7 +78,7 @@ internal static class PostVerificationGeometry
 
         // Math.Max propagates NaN and no comparison with NaN holds, so NaN and infinite bounds
         // (including the empty extent's) fail this test too.
-        private bool IsWellConditioned =>
+        internal bool IsWellConditioned =>
             System.Math.Max(System.Math.Max(System.Math.Abs(MinX), System.Math.Abs(MaxX)),
                 System.Math.Max(System.Math.Abs(MinY), System.Math.Abs(MaxY))) <= WellConditionedLimit;
     }

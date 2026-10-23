@@ -125,7 +125,8 @@ public static class LeadPathValidator
                         var edge = execution.Motions[groupEdge];
                         var joint = move.Layer == LayerType.Leadin ? edge.End : edge.Curve.Start;
                         var contourJoint = move.Layer == LayerType.Leadin ? adjacent.Curve.Start : adjacent.End;
-                        foreach (var boundary in target.Rings.SelectMany(r => r))
+                        // A boundary clear of the contour's first motion contains none of its points.
+                        foreach (var boundary in target.BoundariesNear(adjacent.Curve.Extent))
                         {
                             token.ThrowIfCancellationRequested();
                             if (--budget < 0)
@@ -190,10 +191,7 @@ public static class LeadPathValidator
                         // Every boundary of material this far away is farther than the zone.
                         if (new PostVerificationGeometry.Extent(start.X, start.Y, start.X, start.Y)
                             .IsClearOfQueriesFrom(material.Extent, pierceRadius))
-                        {
-                            Charge(material.BoundaryCount);
                             continue;
-                        }
                         if (Clearance(material) is { } distance)
                             return (Short(distance, "another placed part"), other);
                     }
@@ -232,11 +230,11 @@ public static class LeadPathValidator
                 }
 
                 // Material too far from the lead for any native boundary query to report a contact
-                // (see IsClearOfQueriesFrom): the result the full scan gives, charged as if it ran.
-                // Ray parity is still asked natively unless the lead lies beside the material's rows.
+                // (see IsClearOfQueriesFrom): the result the full scan gives. Only queries that run
+                // are charged, so many far parts or holes do not exhaust the budget. Ray parity is
+                // still asked natively unless the lead lies beside the material's rows.
                 bool FarInside(LeadMaterialSnapshot material)
                 {
-                    Charge(material.BoundaryCount);
                     var midpoint = move.Curve.Midpoint;
                     return !material.Extent.IsClearOfRow(midpoint.Y) && material.ContainsMaterial(midpoint, token);
                 }
@@ -289,7 +287,8 @@ public static class LeadPathValidator
     internal static string MaterialContact(PostVerificationGeometry.Curve curve, LeadMaterialSnapshot material,
         Vector? permittedJoint, ref int budget, CancellationToken token, bool allowInterior = false)
     {
-        foreach (var boundary in material.Rings.SelectMany(r => r))
+        // Boundaries no native query from the curve can reach report no contact; only the others run.
+        foreach (var boundary in material.BoundariesNear(curve.Extent))
         {
             token.ThrowIfCancellationRequested();
             if (--budget < 0)

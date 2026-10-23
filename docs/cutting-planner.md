@@ -285,9 +285,15 @@ circles, and leads keep those results: a lead check skips another part's materia
 only when their extents are clear by that 0.001 plus 1e-6 times the span of both
 extents. The discriminant's rounding error is bounded by about 1e-7 times that span
 (about 2e-9 is seen), so a skipped material has no native contact; a 900000-long lead
-beside a small circle is still checked. A skipped scan is charged to the native query
-budget as if it ran, and ray parity is still asked natively unless the lead's midpoint
-lies outside the material's Y range. A pierce zone skips material farther than its
+beside a small circle is still checked. Only native queries that run are charged to
+the native query budget, so a skipped material costs nothing, and ray parity is still
+asked natively unless the lead's midpoint lies outside the material's Y range. Material
+with at least 64 boundaries keeps a grid of its boundary extents: a lead check, a
+contour-joint match or replay's contour accounting queries only the boundaries that the
+same per-pair clearance cannot skip, in ring order, and ray parity reads only the holes
+whose extents reach the point's row. Material capture certifies its boundaries the same
+way, sweeping extents along X instead of pairing every boundary with every other, so a
+part with thousands of holes stays within the limit. A pierce zone skips material farther than its
 radius by the same gap. Every prefix of a part repeats its earlier contours' leads, so one search
 remembers each other-material verdict by the lead curve's exact bits and the material's
 reference, and charges the native query budget the scan ran; replay never uses it. An arc's
@@ -375,6 +381,17 @@ that endpoint, using bounded nearest-neighbour, 2-opt and Or-opt improvement.
 A cutout that contains the arrival point (the tool comes from a part nested in it) is
 routed from the arrival point itself, not its centre, so it is cut first, before a
 later hop to it would have to cross the other parts nested there.
+On a part with at least 64 contours, a middle step of that route (neither the first
+contour, which also cuts the part's scribes and open cuts, nor the last) checks only the
+contour it adds, continuing the completed-contour state its prefix left rather than emitting
+and replaying the whole prefix from before the part. Contour emission reads only its own
+contour, so the added rapid and leads are the ones the prefix would cut, and the continued
+check numbers contours as the full check does. It continues only when the prefix ended with
+every cut closed and nothing deferred, and never for a drawing-pinned contour, a cutoff or
+a fixed program; otherwise, and whenever the isolated emission refuses, the step checks its
+full prefix. The step that adds the last contour always emits and checks the whole part
+from before it, so each completed part's program is certified exactly as before. Parts with
+fewer contours check every prefix in full.
 Preferred hole entries are then resolved backward from the outside's actual emitted
 pierce, ignoring scribe marks: each hole faces the following contour's actual pierce.
 Convex corners lead the preference tiers, then straight midpoints/tangent joints,

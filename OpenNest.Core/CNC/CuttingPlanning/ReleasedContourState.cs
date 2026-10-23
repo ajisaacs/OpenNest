@@ -12,6 +12,11 @@ public sealed class ReleasedContourState
 {
     private readonly List<Obstacle> obstacles = new();
     private readonly bool reportMissingLeadIns;
+    // How the last analysed part ended: the contours it numbered, and whether nothing it left
+    // (open fragments, deferred findings, a reported tab, a dangling lead-in) can change how
+    // motions appended to it are judged. See Continue.
+    private int partContours;
+    private bool partClosed;
 
     public ReleasedContourState() : this(true) { }
 
@@ -24,7 +29,11 @@ public sealed class ReleasedContourState
 
     public ReleasedContourState Copy()
     {
-        var copy = new ReleasedContourState(reportMissingLeadIns);
+        var copy = new ReleasedContourState(reportMissingLeadIns)
+        {
+            partContours = partContours,
+            partClosed = partClosed,
+        };
         copy.obstacles.AddRange(obstacles);
         return copy;
     }
@@ -62,10 +71,33 @@ public sealed class ReleasedContourState
         return (findings.AsReadOnly(), fixedFindings.AsReadOnly());
     }
 
+    /// <summary>
+    /// Checks <paramref name="execution"/> as the continuation of the part the last check ended
+    /// in, as if that part's whole execution had been checked with these motions appended: the
+    /// findings are those the appended motions would add, and the state advances the same way.
+    /// It needs that part to have ended with every cut closed and nothing deferred, and the
+    /// continuation to open with a rapid and end the same way; otherwise the result is null and
+    /// this state must be discarded, and the caller checks the whole execution instead. Fixed
+    /// emissions and cutoffs are not continued.
+    /// </summary>
+    internal IReadOnlyList<PostVerificationFinding> Continue(OwnedExecution execution, Vector arrival,
+        int partNumber, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(execution);
+        PostVerificationGeometry.Validate(arrival);
+        if (!partClosed || execution.Motions.Count == 0 || !execution.Motions[0].Rapid)
+            return null;
+        var moves = execution.Motions.ToArray();
+        moves[0] = moves[0].WithStart(arrival);
+        var findings = new List<PostVerificationFinding>();
+        AnalyzeMoves(moves, false, findings, 1, partNumber, token, contoursBefore: partContours);
+        return partClosed ? findings.AsReadOnly() : null;
+    }
+
     internal void AnalyzeMoves(IReadOnlyList<ExecutionMotion> moves, bool cutoff,
         List<PostVerificationFinding> findings, int plate, int part, CancellationToken token,
         Func<int, bool> isFixed = null, List<PostVerificationFinding> fixedFindings = null,
-        bool proveOpenCuts = false)
+        bool proveOpenCuts = false, int contoursBefore = 0)
     {
         var current = new CutGroup();
         var unfinished = new List<CutGroup>();
@@ -78,7 +110,7 @@ public sealed class ReleasedContourState
         CutGroup previous = null;
         var deferred = new List<(List<PostVerificationFinding> Target, int Index, PostVerificationFinding Finding)>();
         var hasLead = false;
-        var contourNumber = 0;
+        var contourNumber = contoursBefore;
         var inBreakCut = false;
         var reportedTab = false;
         for (var index = 0; index < moves.Count; index++)
@@ -222,6 +254,9 @@ public sealed class ReleasedContourState
                 "Multiple interrupted/open cutting fragments remain. Their combined cuts may release material; " +
                 "they cannot be assumed to be retained by tabs. Review rapid travel manually."),
                 unfinished.Any(chain => chain.Fixed));
+        partContours = contourNumber;
+        partClosed = !cutoff && isFixed == null && unfinished.Count == 0 && deferred.Count == 0 && !reportedTab
+            && !inBreakCut && loose.Leads.Count == 0;
 
         void Add(PostVerificationFinding finding, bool fixedEmission)
         {

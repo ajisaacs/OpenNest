@@ -781,10 +781,12 @@ public sealed class PreparedContours
             throw new ArgumentException("Foreign contour choice.");
         ValidateChoice(choice);
         // Same owned clones as a real emission; the source shapes/settings are never used
-        // directly, so the probe cannot drift the preparation or mutate it.
+        // directly, so the probe cannot drift the preparation or mutate it. Isolated emission
+        // reads only the chosen contour and the contour count, so only that contour is cloned.
+        var owned = new Shape[shapes.Length];
+        owned[choice.ContourOrdinal] = (Shape)shapes[choice.ContourOrdinal].Clone();
         return new ContourCuttingStrategy { Parameters = parameters }.EmitCandidateIsolated(
-            shapes.Select(s => (Shape)s.Clone()).ToArray(), scribes.Select(e => e.Clone()).ToList(), choice,
-            contourParameters, PerimeterOrdinal);
+            owned, scribes.Select(e => e.Clone()).ToList(), choice, contourParameters, PerimeterOrdinal);
     }
 
     // Each prefix is a standalone owned program, including the same scribes and break cuts once.

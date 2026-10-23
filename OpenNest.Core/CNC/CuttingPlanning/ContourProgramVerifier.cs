@@ -55,20 +55,19 @@ internal static class ContourProgramVerifier
             var first = run.Curves[0];
             var ringIndex = -1;
             var entityIndex = -1;
-            for (var r = 0; r < material.Rings.Count && ringIndex < 0; r++)
+            // The admitted slack is far below any extent margin, so only boundaries near the run's
+            // start can contain it; they come in ring order, as the full scan met them.
+            foreach (var (r, e) in material.PositionsNear(new(first.Start.X, first.Start.Y, first.Start.X, first.Start.Y)))
             {
+                Query(token, ref budget);
                 var admitted = AdmittedClosureSlack(material.Rings[r]);
-                for (var e = 0; e < material.Rings[r].Length; e++)
+                var curve = material.Rings[r][e];
+                if (curve.SameDirection(first, admitted) && curve.Contains(first.Start, admitted)
+                    && curve.DistanceAlong(first.Start) < curve.Length - Epsilon)
                 {
-                    Query(token, ref budget);
-                    var curve = material.Rings[r][e];
-                    if (curve.SameDirection(first, admitted) && curve.Contains(first.Start, admitted)
-                        && curve.DistanceAlong(first.Start) < curve.Length - Epsilon)
-                    {
-                        ringIndex = r;
-                        entityIndex = e;
-                        break;
-                    }
+                    ringIndex = r;
+                    entityIndex = e;
+                    break;
                 }
             }
             if (ringIndex < 0) return false;
