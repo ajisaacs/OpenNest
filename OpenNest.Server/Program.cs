@@ -49,6 +49,16 @@ app.MapGet("/api/nests/{id:guid}", (Guid id, NestDatabase db) =>
 app.MapGet("/api/nests/{id:guid}/file", (Guid id, NestDatabase db) =>
     db.GetFile(id) is { } file ? Results.File(file, "application/zip", $"{id}.nest") : Results.NotFound());
 
+// Sheet sizes and part counts the stored archive needs (inventory holds read this).
+app.MapGet("/api/nests/{id:guid}/sheets", (Guid id, NestDatabase db) =>
+{
+    if (db.Get(id) is not { } record || db.GetFile(id) is not { } file)
+        return Results.NotFound();
+    return NestArchive.ReadSheets(record, file, out var sheets) is { } archiveError
+        ? Results.Problem(archiveError)
+        : Results.Ok(sheets);
+});
+
 // Next generated nest name for a year; one counter per year shared by every client.
 app.MapPost("/api/nest-names/next", (int year, NestDatabase db) =>
 {

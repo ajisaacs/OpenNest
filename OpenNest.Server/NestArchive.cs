@@ -24,7 +24,75 @@ internal static class NestArchive
     /// </summary>
     public static string? Apply(NestRecord record, byte[] file)
     {
-        NestJson? nest;
+        if (Read(file, out var nest) is { } error)
+            return error;
+
+        var defaults = nest.PlateDefaults ?? new PlateDefaultsJson();
+        // NestReader: an absent nest-level material is an empty one; only an explicit null
+        // falls back to the plate defaults. Thickness falls back when not positive.
+        record.Material = (nest.Material ?? defaults.Material)?.Name ?? "";
+        record.Thickness = nest.Thickness > 0 ? nest.Thickness : defaults.Thickness;
+
+        // NestReader drops parts whose drawing is missing. Cut-off parts are never written as
+        // parts, so every remaining part counts.
+        var drawingIds = (nest.Drawings ?? new()).Select(d => d.Id).ToHashSet();
+        var plates = NestPlates(nest, drawingIds);
+        record.PartCount = plates.Sum(p => (p.Parts ?? new()).Count(part => drawingIds.Contains(part.DrawingId)));
+        record.PlateCount = plates.Count;
+        return null;
+    }
+
+    /// <summary>
+    /// Reads the sheet sizes and part counts the archive's plates need, by the same plate
+    /// rules as <see cref="Apply"/>. Returns an error when the bytes are not a readable nest archive.
+    /// </summary>
+    public static string? ReadSheets(NestRecord record, byte[] file, out NestSheets? sheets)
+    {
+        sheets = null;
+        if (Read(file, out var nest) is { } error)
+            return error;
+
+        var drawings = nest.Drawings ?? new();
+        var drawingIds = drawings.Select(d => d.Id).ToHashSet();
+        var plates = NestPlates(nest, drawingIds);
+
+        // Width is the shorter side, so a plate stored rotated groups with its unrotated twin.
+        var sizes = plates
+            .Select(p => (Size: p.Size ?? new SizeJson(), p.Quantity))
+            .GroupBy(p => (Width: System.Math.Min(p.Size.Width, p.Size.Length), Length: System.Math.Max(p.Size.Width, p.Size.Length)))
+            .OrderBy(g => g.Key.Width)
+            .ThenBy(g => g.Key.Length)
+            .Select(g => new NestSheetSize { Width = g.Key.Width, Length = g.Key.Length, Quantity = g.Sum(p => p.Quantity) })
+            .ToList();
+
+        var nested = new Dictionary<int, int>();
+        foreach (var plate in plates)
+        {
+            foreach (var part in plate.Parts ?? new())
+            {
+                if (drawingIds.Contains(part.DrawingId))
+                    nested[part.DrawingId] = nested.GetValueOrDefault(part.DrawingId) + plate.Quantity;
+            }
+        }
+
+        var parts = drawings
+            .Select(d => new NestPartCount
+            {
+                Name = d.Name ?? "",
+                Required = d.Quantity?.Required ?? 0,
+                Nested = nested.GetValueOrDefault(d.Id),
+            })
+            .OrderBy(p => p.Name, StringComparer.Ordinal)
+            .ToList();
+
+        sheets = new NestSheets { NestId = record.Id, Revision = record.Revision, Sheets = sizes, Parts = parts };
+        return null;
+    }
+
+    private static string? Read(byte[] file, out NestJson nest)
+    {
+        nest = null!;
+        NestJson? read;
         try
         {
             using var archive = new ZipArchive(new MemoryStream(file, writable: false), ZipArchiveMode.Read);
@@ -37,35 +105,32 @@ internal static class NestArchive
             using (var stream = entry.Open())
                 CopyBounded(stream, json);
             json.Position = 0;
-            nest = JsonSerializer.Deserialize<NestJson>(json, Options);
+            read = JsonSerializer.Deserialize<NestJson>(json, Options);
         }
         catch (Exception ex) when (ex is InvalidDataException or JsonException or IOException)
         {
             return "The file is not a readable nest archive.";
         }
 
-        if (nest is null)
+        if (read is null)
             return "The nest archive's nest.json is empty.";
+        nest = read;
+        return null;
+    }
 
-        var defaults = nest.PlateDefaults ?? new PlateDefaultsJson();
-        // NestReader: an absent nest-level material is an empty one; only an explicit null
-        // falls back to the plate defaults. Thickness falls back when not positive.
-        record.Material = (nest.Material ?? defaults.Material)?.Name ?? "";
-        record.Thickness = nest.Thickness > 0 ? nest.Thickness : defaults.Thickness;
-
-        // NestReader drops parts whose drawing is missing. Cut-off parts are never written as
-        // parts, so every remaining part counts.
-        var drawingIds = (nest.Drawings ?? new()).Select(d => d.Id).ToHashSet();
+    /// <summary>The nest's plates in id order, as NestReader orders them, without the new-plate slot.</summary>
+    private static List<PlateJson> NestPlates(NestJson nest, HashSet<int> drawingIds)
+    {
         var plates = (nest.Plates ?? new()).OrderBy(p => p.Id).ToList();
-        record.PartCount = plates.Sum(p => (p.Parts ?? new()).Count(part => drawingIds.Contains(part.DrawingId)));
         // PlateDisplayNumbering.DisplayedPlateCount: a trailing plate with nothing on it is the
         // editor's new-plate slot, not a plate of the nest.
         var last = plates.LastOrDefault();
         var trailingEmpty = last is not null
             && !(last.Parts ?? new()).Any(part => drawingIds.Contains(part.DrawingId))
             && (last.CutOffs ?? new()).Count == 0;
-        record.PlateCount = plates.Count - (trailingEmpty ? 1 : 0);
-        return null;
+        if (trailingEmpty)
+            plates.RemoveAt(plates.Count - 1);
+        return plates;
     }
 
     // The declared entry size is untrusted; stop at the cap however much the data inflates.
@@ -106,13 +171,28 @@ internal static class NestArchive
     private sealed class DrawingJson
     {
         public int Id { get; set; }
+        public string? Name { get; set; } = "";
+        public QuantityJson? Quantity { get; set; } = new();
+    }
+
+    private sealed class QuantityJson
+    {
+        public int Required { get; set; }
     }
 
     private sealed class PlateJson
     {
         public int Id { get; set; }
+        public SizeJson? Size { get; set; } = new();
+        public int Quantity { get; set; } = 1;
         public List<PartJson>? Parts { get; set; }
         public List<CutOffJson>? CutOffs { get; set; }
+    }
+
+    private sealed class SizeJson
+    {
+        public double Width { get; set; }
+        public double Length { get; set; }
     }
 
     private sealed class PartJson

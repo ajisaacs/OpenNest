@@ -102,6 +102,7 @@ entry, never programs or geometry, and takes the archive-derived fields below fr
 | GET | `/api/nests/query?search=&status=&material=&materialGrade=&thickness=&sort=&order=&offset=&limit=` | — | `{ "items": NestRecord[], "total", "offset", "limit" }`: one bounded page filtered in SQL (see below), or 400 for an invalid parameter |
 | GET | `/api/nests/{id}` | — | `NestRecord` or 404 |
 | GET | `/api/nests/{id}/file` | — | `.nest` archive bytes (`application/zip`) or 404 |
+| GET | `/api/nests/{id}/sheets` | — | `{ "nestId", "revision", "sheets": [{ "width", "length", "quantity" }], "parts": [{ "name", "required", "nested" }] }` read from the current archive (see below), 404, or 500 problem when the stored archive is unreadable |
 | POST | `/api/nests` | multipart: `metadata` (JSON `NestRecord`) + `file` (`.nest` bytes) | `NestRecord` with server-assigned `id` when the client sends an empty guid; 409 with the current record (active or deleted) when the `id` already exists, storing nothing |
 | PUT | `/api/nests/{id}/file` | multipart: `metadata` + `file` | Updated `NestRecord`, or 404 if `id` is unknown |
 | PUT | `/api/nests/{id}/metadata` | JSON `NestRecord` | Updated `NestRecord` (archive untouched), or 404 |
@@ -120,6 +121,16 @@ stale precondition 409 with current metadata; none mutate data. Ordinary reads
 of hidden records return 404. Changed file/metadata saves and visibility changes
 append snapshots atomically; an identical save at the current revision is a no-op.
 Restore appends a new snapshot, never rewrites its source or intervening history.
+
+### Sheets and part counts
+
+`/sheets` lists what a nest needs cut, for inventory holds (MaterialLedger). It
+skips the trailing empty new-plate slot, as `plateCount` does. Sheets group by
+size with `width` the shorter side, sizes as stored (unrounded), `quantity` the
+sum of those plates' quantities, ordered by width then length. `parts` has one
+entry per drawing, ordered by name: `required` is the drawing's required
+quantity, `nested` its parts on each plate times that plate's quantity; parts
+whose drawing is missing are skipped.
 
 ### Generated nest names
 
