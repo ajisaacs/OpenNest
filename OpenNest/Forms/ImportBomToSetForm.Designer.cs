@@ -190,7 +190,6 @@ namespace OpenNest.Forms
             drawingGrid.AllowUserToAddRows = false;
             drawingGrid.AllowUserToDeleteRows = false;
             drawingGrid.AllowUserToResizeRows = false;
-            drawingGrid.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
             drawingGrid.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             drawingGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { drawingColumn, materialColumn, thicknessColumn, quantityColumn, libraryColumn, noteColumn });
             drawingGrid.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -203,21 +202,21 @@ namespace OpenNest.Forms
             //
             // drawingColumn
             //
-            drawingColumn.FillWeight = 130F;
+            drawingColumn.Width = 180;
             drawingColumn.HeaderText = "Drawing";
             drawingColumn.Name = "drawingColumn";
             drawingColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             //
             // materialColumn
             //
-            materialColumn.FillWeight = 80F;
+            materialColumn.Width = 120;
             materialColumn.HeaderText = "Material";
             materialColumn.Name = "materialColumn";
             materialColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             //
             // thicknessColumn
             //
-            thicknessColumn.FillWeight = 50F;
+            thicknessColumn.Width = 80;
             thicknessColumn.HeaderText = "Thickness";
             thicknessColumn.Name = "thicknessColumn";
             thicknessColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
@@ -225,7 +224,7 @@ namespace OpenNest.Forms
             // quantityColumn
             //
             quantityColumn.DefaultCellStyle = new System.Windows.Forms.DataGridViewCellStyle { Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleRight };
-            quantityColumn.FillWeight = 40F;
+            quantityColumn.Width = 60;
             quantityColumn.HeaderText = "Qty";
             quantityColumn.Name = "quantityColumn";
             quantityColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
@@ -233,14 +232,14 @@ namespace OpenNest.Forms
             //
             // libraryColumn
             //
-            libraryColumn.FillWeight = 120F;
+            libraryColumn.Width = 180;
             libraryColumn.HeaderText = "Drawing library";
             libraryColumn.Name = "libraryColumn";
             libraryColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             //
             // noteColumn
             //
-            noteColumn.FillWeight = 120F;
+            noteColumn.Width = 200;
             noteColumn.HeaderText = "Note";
             noteColumn.Name = "noteColumn";
             noteColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;

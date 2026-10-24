@@ -212,17 +212,15 @@ internal sealed class CuttingInspectionPanel : UserControl
             warningGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 HeaderText = name,
-                Width = 48,
+                Width = name is "Issue" or "Status" ? 260 : 48,
                 SortMode = DataGridViewColumnSortMode.NotSortable,
-                AutoSizeMode = name == "Issue" ? DataGridViewAutoSizeColumnMode.Fill : DataGridViewAutoSizeColumnMode.None
             });
         foreach (var name in new[] { "Plate", "Part", "Status" })
             partsGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 HeaderText = name,
-                Width = 48,
+                Width = name is "Issue" or "Status" ? 260 : 48,
                 SortMode = DataGridViewColumnSortMode.NotSortable,
-                AutoSizeMode = name == "Status" ? DataGridViewAutoSizeColumnMode.Fill : DataGridViewAutoSizeColumnMode.None
             });
         Padding = new Padding(10);
         planButton.Click += (_, _) => StartCurrentMode();

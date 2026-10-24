@@ -199,7 +199,7 @@ namespace OpenNest.Controls
             //
             // nestNameColumn
             //
-            nestNameColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            nestNameColumn.Width = 240;
             nestNameColumn.HeaderText = "Name";
             nestNameColumn.MinimumWidth = 160;
             nestNameColumn.Name = "nestNameColumn";
@@ -366,7 +366,7 @@ namespace OpenNest.Controls
             //
             // nameColumn
             //
-            nameColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            nameColumn.Width = 240;
             nameColumn.HeaderText = "Name";
             nameColumn.MinimumWidth = 160;
             nameColumn.Name = "nameColumn";

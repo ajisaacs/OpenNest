@@ -258,14 +258,13 @@ namespace OpenNest.Controls
                 Height = 200,
                 AllowUserToAddRows = true,
                 AllowUserToDeleteRows = true,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 RowHeadersWidth = 28,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = true,
                 Margin = new Padding(0, 4, 0, 0),
             });
-            table.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = field.KeyHeader, FillWeight = 65 });
-            table.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = field.ValueHeader, FillWeight = 35 });
+            table.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = field.KeyHeader, Width = 260 });
+            table.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = field.ValueHeader, Width = 140 });
 
             if (map != null)
             {

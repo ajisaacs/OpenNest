@@ -176,7 +176,7 @@ namespace OpenNest.Controls
             releaseNotesColumn.HeaderText = "Notes";
             releaseNotesColumn.Name = "releaseNotesColumn";
             releaseNotesColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            releaseNotesColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            releaseNotesColumn.Width = 300;
             //
             // nestsGroup
             //

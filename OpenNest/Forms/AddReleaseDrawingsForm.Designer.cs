@@ -138,7 +138,7 @@ namespace OpenNest.Forms
             //
             // libraryCustomerColumn
             //
-            libraryCustomerColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            libraryCustomerColumn.Width = 150;
             libraryCustomerColumn.HeaderText = "Customer";
             libraryCustomerColumn.MinimumWidth = 60;
             libraryCustomerColumn.Name = "libraryCustomerColumn";

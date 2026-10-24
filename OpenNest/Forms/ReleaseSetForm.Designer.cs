@@ -209,7 +209,7 @@ namespace OpenNest.Forms
             //
             // setNameColumn
             //
-            setNameColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            setNameColumn.Width = 260;
             setNameColumn.HeaderText = "Set or drawing";
             setNameColumn.Name = "setNameColumn";
             setNameColumn.ReadOnly = true;
@@ -434,7 +434,7 @@ namespace OpenNest.Forms
             //
             // statusColumn
             //
-            statusColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            statusColumn.Width = 200;
             statusColumn.HeaderText = "Status";
             statusColumn.Name = "statusColumn";
             statusColumn.ReadOnly = true;

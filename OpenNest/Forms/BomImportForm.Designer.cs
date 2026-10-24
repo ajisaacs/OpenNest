@@ -270,7 +270,6 @@ namespace OpenNest.Forms
             //
             dgvParts.AllowUserToAddRows = false;
             dgvParts.AllowUserToDeleteRows = false;
-            dgvParts.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
             dgvParts.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { colItemNum, colFileName, colDescription, colMaterial, colThickness, colQty, colStatus });
             dgvParts.Dock = System.Windows.Forms.DockStyle.Fill;
             dgvParts.Name = "dgvParts";
@@ -288,7 +287,7 @@ namespace OpenNest.Forms
             // colItemNum
             //
             colItemNum.DataPropertyName = "ItemNum";
-            colItemNum.FillWeight = 40F;
+            colItemNum.Width = 60;
             colItemNum.HeaderText = "Item #";
             colItemNum.Name = "colItemNum";
             colItemNum.ReadOnly = true;
@@ -297,7 +296,7 @@ namespace OpenNest.Forms
             // colFileName
             //
             colFileName.DataPropertyName = "FileName";
-            colFileName.FillWeight = 120F;
+            colFileName.Width = 180;
             colFileName.HeaderText = "File Name";
             colFileName.Name = "colFileName";
             colFileName.ReadOnly = true;
@@ -306,7 +305,7 @@ namespace OpenNest.Forms
             // colDescription
             //
             colDescription.DataPropertyName = "Description";
-            colDescription.FillWeight = 150F;
+            colDescription.Width = 220;
             colDescription.HeaderText = "Description";
             colDescription.Name = "colDescription";
             colDescription.ReadOnly = true;
@@ -315,7 +314,7 @@ namespace OpenNest.Forms
             // colMaterial
             //
             colMaterial.DataPropertyName = "Material";
-            colMaterial.FillWeight = 110F;
+            colMaterial.Width = 140;
             colMaterial.HeaderText = "Material";
             colMaterial.Name = "colMaterial";
             colMaterial.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
@@ -327,7 +326,7 @@ namespace OpenNest.Forms
             thicknessCellStyle.Format = "0.####";
             colThickness.DataPropertyName = "Thickness";
             colThickness.DefaultCellStyle = thicknessCellStyle;
-            colThickness.FillWeight = 70F;
+            colThickness.Width = 80;
             colThickness.HeaderText = "Thickness";
             colThickness.Name = "colThickness";
             colThickness.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
@@ -338,7 +337,7 @@ namespace OpenNest.Forms
             qtyCellStyle.DataSourceNullValue = null;
             colQty.DataPropertyName = "Qty";
             colQty.DefaultCellStyle = qtyCellStyle;
-            colQty.FillWeight = 50F;
+            colQty.Width = 60;
             colQty.HeaderText = "Qty";
             colQty.Name = "colQty";
             colQty.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
@@ -346,7 +345,7 @@ namespace OpenNest.Forms
             // colStatus
             //
             colStatus.DataPropertyName = "StatusText";
-            colStatus.FillWeight = 100F;
+            colStatus.Width = 140;
             colStatus.HeaderText = "Status";
             colStatus.Name = "colStatus";
             colStatus.ReadOnly = true;
@@ -363,7 +362,6 @@ namespace OpenNest.Forms
             //
             dgvGroups.AllowUserToAddRows = false;
             dgvGroups.AllowUserToDeleteRows = false;
-            dgvGroups.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
             dgvGroups.Dock = System.Windows.Forms.DockStyle.Fill;
             dgvGroups.Name = "dgvGroups";
             dgvGroups.RowHeadersVisible = false;

@@ -46,7 +46,7 @@ namespace OpenNest.Forms
                     Name = "Name",
                     HeaderText = "Strategy",
                     ReadOnly = true,
-                    AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                    Width = 220,
                 }
             );
 
