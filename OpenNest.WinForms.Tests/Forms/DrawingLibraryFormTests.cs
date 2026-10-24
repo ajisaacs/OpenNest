@@ -267,6 +267,57 @@ public class DrawingLibraryFormTests
             "The drawing library edit test did not complete.");
     }
 
+    [Fact]
+    public void EditDrawing_SavesNewDetailsAsANewRevision_KeepingUnits()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var record = library.Add("SYN-405", "", "", 0, Units.Inches, "Test square");
+                var nest = MatchingNest();
+
+                using var form = new DrawingLibraryForm(library, Server, nest);
+                form.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                form.EditDrawing = edit =>
+                {
+                    using var editor = new EditLibraryDrawingForm(edit);
+                    editor.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                    editor.Show();
+                    var save = Field<Button>(editor, "saveButton");
+                    Assert.Equal("SYN-405", Field<TextBox>(editor, "nameBox").Text);
+                    Assert.Equal("in", Field<Label>(editor, "unitsLabel").Text);
+                    Assert.False(save.Enabled);
+                    Field<TextBox>(editor, "nameBox").Text = "SYN-405B";
+                    Field<TextBox>(editor, "materialBox").Text = "Synthetic Stainless";
+                    Field<TextBox>(editor, "gradeBox").Text = "304";
+                    Field<NumericUpDown>(editor, "thicknessBox").Value = 0.1875m;
+                    Field<ComboBox>(editor, "cutTypeBox").SelectedItem = "Waterjet";
+                    Assert.True(save.Enabled);
+                    Field<TextBox>(editor, "nameBox").Text = " ";
+                    Assert.False(save.Enabled);
+                    Field<TextBox>(editor, "nameBox").Text = "SYN-405B";
+                    Run(editor.SaveAsync());
+                    return editor.Saved;
+                };
+                form.Show();
+                var grid = Field<DataGridView>(form, "drawingGrid");
+                PumpUntil(() => grid.Rows.Count == 1, "the library page");
+
+                Run(form.EditSelectedAsync());
+                PumpUntil(() => Equals(grid.Rows[0].Cells["nameColumn"].Value, "SYN-405B"), "the reloaded page");
+
+                var update = Assert.Single(library.MetadataUpdates);
+                Assert.Equal((record.Id, record.Revision), (update.Id, update.ExpectedRevision));
+                Assert.Equal(("SYN-405B", "Synthetic Stainless", "304", 0.1875, CutType.Waterjet, Units.Inches),
+                    (update.Record.Name, update.Record.MaterialName, update.Record.MaterialGrade, update.Record.Thickness,
+                        update.Record.CutType, update.Record.Units));
+                Assert.Equal("Waterjet", grid.Rows[0].Cells["cutTypeColumn"].Value);
+            },
+            TestTimeout,
+            "The drawing library details edit test did not complete.");
+    }
+
     private static Nest MatchingNest() => new("Synthetic job")
     {
         Units = Units.Inches,
@@ -358,13 +409,13 @@ public class DrawingLibraryFormTests
             {
                 Id = id,
                 Revision = current.Revision + 1,
-                Name = current.Name,
-                Customer = current.Customer,
-                MaterialName = current.MaterialName,
-                MaterialGrade = current.MaterialGrade,
-                Thickness = current.Thickness,
-                Units = current.Units,
-                CutType = current.CutType,
+                Name = record.Name,
+                Customer = record.Customer,
+                MaterialName = record.MaterialName,
+                MaterialGrade = record.MaterialGrade,
+                Thickness = record.Thickness,
+                Units = record.Units,
+                CutType = record.CutType,
                 Notes = record.Notes,
                 Settings = record.Settings,
                 PackageSha256 = current.PackageSha256,

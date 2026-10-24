@@ -1,10 +1,23 @@
 namespace OpenNest.Data;
 
 /// <summary>
-/// Edits one listed library drawing's notes and nesting settings in place: the save is a
-/// metadata-only revision guarded by the revision it was listed with, so the package (and
-/// its hash) stays the same. A stale revision raises <see cref="DrawingLibraryConflictException"/>
-/// and changes nothing.
+/// A library drawing's editable details. Units are not among them: they give the stored
+/// geometry its meaning, so changing them would rescale the part.
+/// </summary>
+public sealed record DrawingLibraryDetails(
+    string Name,
+    string Customer,
+    string MaterialName,
+    string MaterialGrade,
+    double Thickness,
+    CutType CutType);
+
+/// <summary>
+/// Edits one listed library drawing's details (name, customer, material, grade, thickness,
+/// cut type), notes and nesting settings in place: the save is a metadata-only revision
+/// guarded by the revision it was listed with, so the package (and its hash) stays the same
+/// and nests keep the revision they hold. A stale revision raises
+/// <see cref="DrawingLibraryConflictException"/> and changes nothing.
 /// </summary>
 public sealed class DrawingLibraryEditSession
 {
@@ -26,42 +39,64 @@ public sealed class DrawingLibraryEditSession
 
     public string SavedBy { get; }
 
-    /// <summary>The record to save: the listed details with new notes and settings.</summary>
-    public DrawingLibraryRecord Build(string notes, DrawingNestingSettings settings) => new()
+    /// <summary>The listed record's details, the starting point of an edit.</summary>
+    public DrawingLibraryDetails Details => new(Listed.Name, Listed.Customer, Listed.MaterialName,
+        Listed.MaterialGrade, Listed.Thickness, Listed.CutType);
+
+    /// <summary>
+    /// The record to save: the edited details (text trimmed, thickness rounded as stored),
+    /// the listed units, and the new notes and settings.
+    /// </summary>
+    public DrawingLibraryRecord Build(DrawingLibraryDetails details, string notes, DrawingNestingSettings settings)
     {
-        Id = Listed.Id,
-        Name = Listed.Name,
-        Customer = Listed.Customer,
-        MaterialName = Listed.MaterialName,
-        MaterialGrade = Listed.MaterialGrade,
-        Thickness = Listed.Thickness,
-        Units = Listed.Units,
-        CutType = Listed.CutType,
-        Notes = notes ?? "",
-        Settings = settings ?? throw new ArgumentNullException(nameof(settings)),
-        SavedBy = SavedBy,
-    };
+        ArgumentNullException.ThrowIfNull(details);
+        return new DrawingLibraryRecord
+        {
+            Id = Listed.Id,
+            Name = (details.Name ?? "").Trim(),
+            Customer = (details.Customer ?? "").Trim(),
+            MaterialName = (details.MaterialName ?? "").Trim(),
+            MaterialGrade = (details.MaterialGrade ?? "").Trim(),
+            Thickness = double.IsFinite(details.Thickness)
+                ? DrawingLibraryRules.NormalizeThickness(details.Thickness)
+                : details.Thickness,
+            Units = Listed.Units,
+            CutType = details.CutType,
+            Notes = notes ?? "",
+            Settings = settings ?? throw new ArgumentNullException(nameof(settings)),
+            SavedBy = SavedBy,
+        };
+    }
 
     /// <summary>The first rule the edit breaks, or null when it may be saved.</summary>
-    public string? GetError(string notes, DrawingNestingSettings settings) =>
-        DrawingLibraryRules.GetMetadataError(Build(notes, settings));
+    public string? GetError(DrawingLibraryDetails details, string notes, DrawingNestingSettings settings) =>
+        DrawingLibraryRules.GetMetadataError(Build(details, notes, settings));
 
     /// <summary>True when saving would change nothing.</summary>
-    public bool IsUnchanged(string notes, DrawingNestingSettings settings) =>
-        (notes ?? "") == Listed.Notes && Equals(settings, Listed.Settings);
+    public bool IsUnchanged(DrawingLibraryDetails details, string notes, DrawingNestingSettings settings) =>
+        SameDetails(Build(details, notes, settings), Listed)
+        && (notes ?? "") == Listed.Notes && Equals(settings, Listed.Settings);
 
     /// <summary>Saves the edit as the next revision; returns the stored record.</summary>
-    public async Task<DrawingLibraryRecord> SaveAsync(string notes, DrawingNestingSettings settings,
-        CancellationToken cancellationToken = default)
+    public async Task<DrawingLibraryRecord> SaveAsync(DrawingLibraryDetails details, string notes,
+        DrawingNestingSettings settings, CancellationToken cancellationToken = default)
     {
-        var record = Build(notes, settings);
+        var record = Build(details, notes, settings);
         var error = DrawingLibraryRules.GetMetadataError(record);
         if (error != null)
-            throw new ArgumentException(error, nameof(settings));
+            throw new ArgumentException(error, nameof(details));
         var saved = await _library.UpdateMetadataAsync(Listed.Id, record, Listed.Revision, cancellationToken);
         if (!string.Equals(saved.PackageSha256, Listed.PackageSha256, StringComparison.OrdinalIgnoreCase)
+            || !SameDetails(saved, record) || saved.Units != record.Units
             || !Equals(saved.Settings, record.Settings) || saved.Notes != record.Notes)
             throw new IOException("The nest server stored a different library drawing than was edited. Reload the library.");
         return saved;
     }
+
+    // Compares a built (trimmed, rounded) record with another, as stored.
+    private static bool SameDetails(DrawingLibraryRecord built, DrawingLibraryRecord other) =>
+        built.Name == other.Name.Trim() && built.Customer == other.Customer.Trim()
+        && built.MaterialName == other.MaterialName.Trim() && built.MaterialGrade == other.MaterialGrade.Trim()
+        && built.Thickness == DrawingLibraryRules.NormalizeThickness(other.Thickness)
+        && built.CutType == other.CutType;
 }

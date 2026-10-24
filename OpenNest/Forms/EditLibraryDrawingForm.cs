@@ -11,10 +11,11 @@ using OpenNest.Math;
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// Drawing library &gt; Edit Settings. Edits one library drawing's notes and nesting
+    /// Drawing library &gt; Edit Drawing. Edits one library drawing's details (name, customer,
+    /// material, grade, thickness, cut type; units are shown, not edited), notes and nesting
     /// settings (Cut first, priority, rotation constraints, color) through
     /// <see cref="DrawingLibraryEditSession"/>. Saving adds a revision on the server that
-    /// keeps the same package; nests that already hold the drawing are not changed.
+    /// keeps the same package; nests that already hold the drawing keep their revision.
     /// </summary>
     public partial class EditLibraryDrawingForm : Form
     {
@@ -38,6 +39,15 @@ namespace OpenNest.Forms
             ShowMessage = (text, buttons, icon) => MessageBox.Show(this, text, Text, buttons, icon);
 
             var listed = session.Listed;
+            nameBox.Text = listed.Name;
+            customerBox.Text = listed.Customer;
+            materialBox.Text = listed.MaterialName;
+            gradeBox.Text = listed.MaterialGrade;
+            thicknessBox.Value = System.Math.Clamp((decimal)DrawingLibraryRules.NormalizeThickness(listed.Thickness),
+                thicknessBox.Minimum, thicknessBox.Maximum);
+            unitsLabel.Text = UnitsHelper.GetShortString(listed.Units);
+            cutTypeBox.Items.AddRange(Enum.GetNames<CutType>());
+            cutTypeBox.SelectedItem = listed.CutType.ToString();
             var settings = listed.Settings ?? new DrawingNestingSettings();
             cutFirstCheckBox.Checked = settings.CutFirst;
             priorityBox.Value = settings.Priority;
@@ -52,6 +62,15 @@ namespace OpenNest.Forms
             Text = $"Edit '{listed.Name}' — library revision {listed.Revision}";
             UpdateCommands();
         }
+
+        /// <summary>The details as currently entered.</summary>
+        internal DrawingLibraryDetails ReadDetails() => new(
+            nameBox.Text,
+            customerBox.Text,
+            materialBox.Text,
+            gradeBox.Text,
+            (double)thicknessBox.Value,
+            Enum.TryParse<CutType>(cutTypeBox.SelectedItem as string, out var cutType) ? cutType : session.Listed.CutType);
 
         /// <summary>The settings as currently entered; unchanged angles keep their exact stored radians.</summary>
         internal DrawingNestingSettings ReadSettings()
@@ -95,7 +114,7 @@ namespace OpenNest.Forms
             statusLabel.Text = "Saving...";
             try
             {
-                Saved = await session.SaveAsync(notesBox.Text, ReadSettings());
+                Saved = await session.SaveAsync(ReadDetails(), notesBox.Text, ReadSettings());
                 if (IsDisposed)
                     return;
                 DialogResult = DialogResult.OK;
@@ -122,13 +141,15 @@ namespace OpenNest.Forms
 
         private bool CanSave()
         {
+            var details = ReadDetails();
             var settings = ReadSettings();
-            return session.GetError(notesBox.Text, settings) == null && !session.IsUnchanged(notesBox.Text, settings);
+            return session.GetError(details, notesBox.Text, settings) == null
+                && !session.IsUnchanged(details, notesBox.Text, settings);
         }
 
         private void UpdateCommands()
         {
-            var error = session.GetError(notesBox.Text, ReadSettings());
+            var error = session.GetError(ReadDetails(), notesBox.Text, ReadSettings());
             saveButton.Enabled = !saving && CanSave();
             if (!saving)
                 statusLabel.Text = error == null ? "" : char.ToUpper(error[0], CultureInfo.CurrentCulture) + error[1..];

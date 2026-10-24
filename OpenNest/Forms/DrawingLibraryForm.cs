@@ -18,9 +18,9 @@ namespace OpenNest.Forms
     /// one bounded page at a time through <see cref="DrawingLibraryBrowseSession"/>, filtered
     /// to the nest's material and thickness unless Show all is ticked. Add downloads the
     /// listed revision's exact package, plans it with <see cref="LibraryDrawingInsert"/>,
-    /// shows any warning or refusal first and only then changes the nest. Edit Settings
-    /// changes the selected drawing's notes and nesting settings (Cut first, priority,
-    /// rotation, color) on the server as a new revision with the same package. With a set
+    /// shows any warning or refusal first and only then changes the nest. Edit Drawing
+    /// changes the selected drawing's details (name, customer, material, grade, thickness,
+    /// cut type), notes and nesting settings (Cut first, priority, rotation, color) on the server as a new revision with the same package. With a set
     /// store, the drawing grid's menu lists the sets a drawing is in, adds it to a set, lists
     /// the releases that had it on its own and, once release is enabled, releases it; sets
     /// themselves are browsed and released in <see cref="DrawingSetsForm"/>.
@@ -565,7 +565,7 @@ namespace OpenNest.Forms
         private async void EditButton_Click(object sender, EventArgs e) => await EditSelectedAsync();
 
         /// <summary>
-        /// Edits the selected drawing's notes and nesting settings as a new library revision,
+        /// Edits the selected drawing's details, notes and nesting settings as a new library revision,
         /// then reloads the page so the list shows the saved revision.
         /// </summary>
         internal async Task EditSelectedAsync()

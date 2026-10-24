@@ -321,13 +321,17 @@ is edited in place (0 to 99,999; one click starts editing, a bad number keeps
 the editor open with an error) and applies to the nest at once, like an add;
 the main window's drawing list refreshes when the dialog closes.
 
-The browser's **Cut first** column shows the setting. **Edit Settings...**
+The browser's **Cut first** column shows the setting. **Edit Drawing...**
 (`OpenNest.Data.DrawingLibraryEditSession`) edits the selected active drawing's
-Cut first flag, priority, rotation step/start/end (degrees), 180° equivalent,
-color and notes, and saves them through the metadata endpoint guarded by the
-listed revision: a new revision with the same package. A 409 is shown and the
-operator reloads. Nests that already hold the drawing keep their copy and
-revision.
+details (name, customer, material, grade, thickness and cut type; text is
+trimmed, the name is required, units are shown but not editable since they give
+the geometry its meaning) and its Cut first flag, priority, rotation
+step/start/end (degrees), 180° equivalent, color and notes, and saves them
+through the metadata endpoint guarded by the listed revision: a new revision
+with the same package. A material or thickness change is an edit of the same
+drawing, not a new one. A 409 is shown and the operator reloads. Nests that
+already hold the drawing keep their copy and revision; sets list the drawing,
+so their next release uses the new details.
 
 ### Save to Drawing Library (desktop)
 
@@ -340,7 +344,7 @@ has none), and the cut type and notes of the linked revision when the drawing
 came from this server's library, otherwise the cut type last saved on this PC.
 Units follow the nest and cannot be changed. The drawing's own nesting
 settings (Cut first, priority, rotation, color) are saved in the record and
-summarized read-only in the dialog; change them later with Edit Settings.
+summarized read-only in the dialog; change them later with Edit Drawing.
 
 Whenever the details change, the dialog looks up active library drawings with
 the same normalized customer, name, material and grade and the exact thickness,

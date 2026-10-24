@@ -734,7 +734,7 @@ namespace OpenNest.Forms
             editButton.Margin = new System.Windows.Forms.Padding(9, 3, 0, 0);
             editButton.Name = "editButton";
             editButton.TabIndex = 3;
-            editButton.Text = "Edit Settings...";
+            editButton.Text = "Edit Drawing...";
             editButton.UseVisualStyleBackColor = true;
             editButton.Click += EditButton_Click;
             //
