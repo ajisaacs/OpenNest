@@ -324,8 +324,9 @@ the main window's drawing list refreshes when the dialog closes.
 The browser's **Cut first** column shows the setting.
 
 **File > Drawing Library...** (Database mode only, like Drawing Sets) opens the
-same browser without a nest: it lists every active drawing, has no Add to Nest
-or In This Nest tab, and a double-click or Enter edits the selected drawing. Its
+drawing sets window on its **Library** tab ([below](#drawing-sets-desktop)),
+the same browser without a nest: it lists every active drawing, has no Add to
+Nest or In This Nest tab, and a double-click or Enter edits the selected drawing. Its
 right-click menu has Edit Drawing and the set and release items below.
 
 ### Edit Drawing (desktop)
@@ -404,9 +405,10 @@ revision; save the nest to keep it.
 
 **File > Drawing Sets...** (Database mode only) opens the drawing sets window;
 it needs no open nest, since releasing a set makes new nests or merges into
-draft ones and opens each in its own tab. The window has two tabs, **Sets** and
-**Releases** ([below](#releases-tab)); **File > Releases...** is a shortcut that
-opens the same window on the Releases tab. Each tab reads its list when first
+draft ones and opens each in its own tab. The window has three tabs, **Library**
+(**File > Drawing Library...** opens on it), **Sets** and **Releases**
+([below](#releases-tab)); **File > Releases...** is a shortcut that opens the
+same window on the Releases tab. Each tab reads its list when first
 shown, and Releases re-reads its page each time it is shown again. Sets lists sets a page at a time
 (`OpenNest.Data.DrawingSetBrowseSession`): search by name, customer or notes,
 sort by name, customer, revision or saved time, and **Show archived**. Selecting

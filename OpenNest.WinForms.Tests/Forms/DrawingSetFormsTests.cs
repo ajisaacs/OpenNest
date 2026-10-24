@@ -67,6 +67,32 @@ public class DrawingSetFormsTests
     }
 
     [Fact]
+    public void DrawingSetsForm_LibraryTab_ListsTheLibraryWhenFirstShown()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                library.Add("SYN-BRACKET", "Synthetic Steel", 0.25);
+                library.Add("SYN-GUSSET", "Synthetic Aluminum", 0.125);
+
+                using var form = new DrawingSetsForm(new InMemoryDrawingSets(), library, Server);
+                var view = form.LibraryView;
+                var grid = Field<DataGridView>(view, "drawingGrid");
+                form.Show();
+                PumpUntil(() => form.Browser.HasLoaded, "the set list");
+                Assert.False(view.HasLoaded);
+                Assert.Empty(grid.Rows);
+
+                form.ShowLibrary();
+                PumpUntil(() => grid.Rows.Count == 2, "the library page");
+                Assert.True(view.HasLoaded);
+            },
+            TestTimeout,
+            "The library tab test did not complete.");
+    }
+
+    [Fact]
     public void Editor_History_ShowsTheSavedSetsRevisions_AndIsHiddenForANewSet()
     {
         StaTestThread.Run(
@@ -178,9 +204,9 @@ public class DrawingSetFormsTests
                 var edited = new List<DrawingSetEditSession>();
 
                 using var form = new DrawingLibraryForm(library, Server, MatchingNest(), sets);
-                form.ShowMessage = (text, _, _) => { messages.Add(text); return DialogResult.OK; };
-                form.ChooseSet = () => (true, set);
-                form.EditSet = edit =>
+                form.View.ShowMessage = (text, _, _) => { messages.Add(text); return DialogResult.OK; };
+                form.View.ChooseSet = () => (true, set);
+                form.View.EditSet = edit =>
                 {
                     edited.Add(edit);
                     return Run(edit.SaveAsync());
@@ -191,9 +217,9 @@ public class DrawingSetFormsTests
 
                 grid.CurrentCell = grid.Rows[1].Cells[0];
                 Field<NumericUpDown>(form, "quantityBox").Value = 5;
-                Run(form.AddSelectedToSetAsync());
+                Run(form.View.AddSelectedToSetAsync());
                 grid.CurrentCell = grid.Rows[0].Cells[0];
-                Run(form.AddSelectedToSetAsync());
+                Run(form.View.AddSelectedToSetAsync());
 
                 var edit = Assert.Single(edited);
                 Assert.Equal(set.Id, edit.Id);
@@ -272,11 +298,11 @@ public class DrawingSetFormsTests
                 var messages = new List<string>();
 
                 using var form = new DrawingLibraryForm(library, Server, MatchingNest(), sets);
-                form.ShowMessage = (text, _, _) => { messages.Add(text); return DialogResult.OK; };
+                form.View.ShowMessage = (text, _, _) => { messages.Add(text); return DialogResult.OK; };
                 form.Show();
                 PumpUntil(() => Field<DataGridView>(form, "drawingGrid").Rows.Count == 1, "the library page");
 
-                Run(form.ShowUsedInSetsAsync());
+                Run(form.View.ShowUsedInSetsAsync());
 
                 Assert.Contains("is in 1 drawing set", Assert.Single(messages));
                 Assert.Contains("Synthetic kit (Synthetic customer)", messages[0]);
@@ -677,8 +703,12 @@ public class DrawingSetFormsTests
         Assert.True(condition(), $"Timed out waiting for {what}.");
     }
 
-    private static T Field<T>(object owner, string name) =>
-        (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
+    private static T Field<T>(object owner, string name)
+    {
+        if (owner is DrawingLibraryForm dialog)
+            owner = dialog.View;
+        return (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
+    }
 
     /// <summary>Serves every record, ignoring filters; packages are never needed here.</summary>
     private sealed class FakeLibrary : IDrawingLibraryStore

@@ -124,33 +124,10 @@ namespace OpenNest.Forms
         }
 
         /// <summary>
-        /// Browses the drawing library and edits its drawings' details and settings; needs no
-        /// open nest. Drawings are added to sets or released from it, never to a nest.
+        /// Opens the Drawing Sets window on its Library tab, which edits the drawings' details and
+        /// settings; needs no open nest. Drawings are added to sets or released from it, never to a nest.
         /// </summary>
-        private void FileDrawingLibrary_Click(object sender, EventArgs e)
-        {
-            if (!NestStorage.Settings.IsDatabaseMode)
-                return;
-
-            IDrawingLibraryStore library;
-            IDrawingSetStore sets;
-            INestRepository nests;
-            try
-            {
-                library = NestStorage.CreateDrawingLibrary();
-                sets = NestStorage.CreateDrawingSetStore();
-                nests = NestStorage.CreateRepository();
-            }
-            catch (ArgumentException ex)
-            {
-                MessageBox.Show(this, ex.Message, "Drawing Library", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            using var form = new DrawingLibraryForm(library, NestStorage.Settings.ServerUrl, null, sets);
-            form.EnableRelease(nests, OpenServerNest, IsServerNestOpen);
-            form.ShowDialog(this);
-        }
+        private void FileDrawingLibrary_Click(object sender, EventArgs e) => ShowDrawingSets(releases: false, libraryTab: true);
 
         /// <summary>
         /// Browses, edits and releases drawing sets; needs no open nest, since a release
@@ -161,7 +138,7 @@ namespace OpenNest.Forms
         /// <summary>A shortcut to the Drawing Sets window's Releases tab, listing every release.</summary>
         private void Releases_Click(object sender, EventArgs e) => ShowDrawingSets(releases: true);
 
-        private void ShowDrawingSets(bool releases, bool importBom = false)
+        private void ShowDrawingSets(bool releases, bool importBom = false, bool libraryTab = false)
         {
             if (!NestStorage.Settings.IsDatabaseMode)
                 return;
@@ -185,6 +162,8 @@ namespace OpenNest.Forms
             form.EnableRelease(nests, OpenServerNest, IsServerNestOpen);
             if (releases)
                 _ = form.ShowReleasesAsync();
+            else if (libraryTab)
+                form.ShowLibrary();
             form.ImportBomWhenShown = importBom;
             form.ShowDialog(this);
         }

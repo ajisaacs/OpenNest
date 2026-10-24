@@ -25,9 +25,9 @@ public class DrawingLibraryFormTests
                 var messages = new List<string>();
 
                 using var form = new DrawingLibraryForm(library, Server, nest);
-                form.ShowMessage = (text, _, _) => { messages.Add(text); return DialogResult.OK; };
+                form.View.ShowMessage = (text, _, _) => { messages.Add(text); return DialogResult.OK; };
                 // Only the adds' downloads are counted here; the preview has its own test.
-                form.LoadPreview = (_, _) => Task.FromResult<Drawing>(null!);
+                form.View.LoadPreview = (_, _) => Task.FromResult<Drawing>(null!);
                 form.Show();
                 var grid = Field<DataGridView>(form, "drawingGrid");
                 var notes = Field<TextBox>(form, "notesBox");
@@ -41,9 +41,9 @@ public class DrawingLibraryFormTests
                 Assert.Equal("Deburr both sides", notes.Text);
 
                 quantity.Value = 3;
-                Run(form.AddSelectedAsync());
+                Run(form.View.AddSelectedAsync());
                 quantity.Value = 2;
-                Run(form.AddSelectedAsync());
+                Run(form.View.AddSelectedAsync());
 
                 Assert.Empty(messages);
                 var drawing = Assert.Single(nest.Drawings);
@@ -67,7 +67,7 @@ public class DrawingLibraryFormTests
                 var nest = MatchingNest();
 
                 using var form = new DrawingLibraryForm(library, Server, nest);
-                form.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                form.View.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
                 form.Show();
                 var grid = Field<DataGridView>(form, "drawingGrid");
                 var preview = Field<OpenNest.Controls.ShapePreviewControl>(form, "previewBox");
@@ -77,12 +77,12 @@ public class DrawingLibraryFormTests
                 Assert.Equal("Synthetic Steel Grade A", Field<Label>(form, "materialValue").Text);
                 Assert.Equal("0.25 in", Field<Label>(form, "thicknessValue").Text);
 
-                Run(form.LoadSelectedPreviewAsync());
+                Run(form.View.LoadSelectedPreviewAsync());
                 PumpUntil(() => preview.Plate.Parts.Count > 0, "the preview");
                 Assert.NotNull(Assert.Single(preview.Plate.Parts).BaseDrawing.Program);
 
                 // A cached revision is shown again without another download.
-                Run(form.LoadSelectedPreviewAsync());
+                Run(form.View.LoadSelectedPreviewAsync());
                 Assert.Single(preview.Plate.Parts);
                 Assert.Single(library.Downloads, d => d == (record.Id, record.Revision));
                 Assert.Empty(nest.Drawings);
@@ -108,8 +108,8 @@ public class DrawingLibraryFormTests
                 nest.Drawings.Add(cutoff);
 
                 using var form = new DrawingLibraryForm(library, Server, nest);
-                form.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
-                form.LoadPreview = (_, _) => Task.FromResult<Drawing>(null!);
+                form.View.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                form.View.LoadPreview = (_, _) => Task.FromResult<Drawing>(null!);
                 form.Show();
                 var grid = Field<DataGridView>(form, "drawingGrid");
                 var nestGrid = Field<DataGridView>(form, "nestGrid");
@@ -121,7 +121,7 @@ public class DrawingLibraryFormTests
 
                 PumpUntil(() => grid.Rows.Count == 1, "the library page");
                 Field<NumericUpDown>(form, "quantityBox").Value = 2;
-                Run(form.AddSelectedAsync());
+                Run(form.View.AddSelectedAsync());
                 Assert.Equal("In This Nest (2)", nestTab.Text);
                 Assert.Equal($"Revision {record.Revision}", nestGrid.Rows[1].Cells["nestLibraryColumn"].Value);
                 Assert.Equal(2, nestGrid.Rows[1].Cells["nestRequiredColumn"].Value);
@@ -168,7 +168,7 @@ public class DrawingLibraryFormTests
                 var messages = new List<string>();
 
                 using var form = new DrawingLibraryForm(library, Server, nest);
-                form.ShowMessage = (text, buttons, _) =>
+                form.View.ShowMessage = (text, buttons, _) =>
                 {
                     messages.Add(text);
                     Assert.Equal(MessageBoxButtons.OKCancel, buttons);
@@ -182,9 +182,9 @@ public class DrawingLibraryFormTests
                 PumpUntil(() => grid.Rows.Count == 1, "the unfiltered page");
                 Assert.Equal(("", "", (double?)null), (library.Queries[^1].MaterialName, library.Queries[^1].MaterialGrade, library.Queries[^1].Thickness));
 
-                Run(form.AddSelectedAsync());
+                Run(form.View.AddSelectedAsync());
                 Assert.Empty(nest.Drawings);
-                Run(form.AddSelectedAsync());
+                Run(form.View.AddSelectedAsync());
 
                 Assert.Equal(2, messages.Count);
                 Assert.Contains("thickness 0.1875 (nest 0.25)", messages[0]);
@@ -207,12 +207,12 @@ public class DrawingLibraryFormTests
                 var messages = new List<string>();
 
                 using var form = new DrawingLibraryForm(library, Server, nest);
-                form.ShowMessage = (text, buttons, _) => { messages.Add(text); return DialogResult.OK; };
+                form.View.ShowMessage = (text, buttons, _) => { messages.Add(text); return DialogResult.OK; };
                 form.Show();
                 var grid = Field<DataGridView>(form, "drawingGrid");
 
                 PumpUntil(() => grid.Rows.Count == 1, "the library page");
-                Run(form.AddSelectedAsync());
+                Run(form.View.AddSelectedAsync());
 
                 Assert.Contains("millimeters", Assert.Single(messages));
                 Assert.Empty(nest.Drawings);
@@ -233,8 +233,8 @@ public class DrawingLibraryFormTests
                 var nest = MatchingNest();
 
                 using var form = new DrawingLibraryForm(library, Server, nest);
-                form.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
-                form.EditDrawing = edit =>
+                form.View.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                form.View.EditDrawing = edit =>
                 {
                     using var editor = new EditLibraryDrawingForm(edit);
                     editor.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
@@ -251,7 +251,7 @@ public class DrawingLibraryFormTests
                 PumpUntil(() => grid.Rows.Count == 1, "the library page");
                 Assert.Equal("", grid.Rows[0].Cells["cutFirstColumn"].Value);
 
-                Run(form.EditSelectedAsync());
+                Run(form.View.EditSelectedAsync());
                 PumpUntil(() => Equals(grid.Rows[0].Cells["revisionColumn"].Value, record.Revision + 1), "the reloaded page");
 
                 var update = Assert.Single(library.MetadataUpdates);
@@ -260,7 +260,7 @@ public class DrawingLibraryFormTests
                 Assert.Equal("Test square", update.Record.Notes);
                 Assert.Equal("Yes", grid.Rows[0].Cells["cutFirstColumn"].Value);
 
-                Run(form.AddSelectedAsync());
+                Run(form.View.AddSelectedAsync());
                 Assert.True(Assert.Single(nest.Drawings).CutFirst);
             },
             TestTimeout,
@@ -278,8 +278,8 @@ public class DrawingLibraryFormTests
                 var nest = MatchingNest();
 
                 using var form = new DrawingLibraryForm(library, Server, nest);
-                form.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
-                form.EditDrawing = edit =>
+                form.View.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                form.View.EditDrawing = edit =>
                 {
                     using var editor = new EditLibraryDrawingForm(edit);
                     editor.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
@@ -304,7 +304,7 @@ public class DrawingLibraryFormTests
                 var grid = Field<DataGridView>(form, "drawingGrid");
                 PumpUntil(() => grid.Rows.Count == 1, "the library page");
 
-                Run(form.EditSelectedAsync());
+                Run(form.View.EditSelectedAsync());
                 PumpUntil(() => Equals(grid.Rows[0].Cells["nameColumn"].Value, "SYN-405B"), "the reloaded page");
 
                 var update = Assert.Single(library.MetadataUpdates);
@@ -371,9 +371,9 @@ public class DrawingLibraryFormTests
                 var edited = new List<DrawingLibraryEditSession>();
 
                 using var form = new DrawingLibraryForm(library, Server, null);
-                form.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
-                form.LoadPreview = (_, _) => Task.FromResult<Drawing>(null!);
-                form.EditDrawing = edit =>
+                form.View.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                form.View.LoadPreview = (_, _) => Task.FromResult<Drawing>(null!);
+                form.View.EditDrawing = edit =>
                 {
                     edited.Add(edit);
                     var save = edit.SaveAsync(edit.Details with { MaterialName = "Synthetic Steel", Thickness = 0.25 },
@@ -386,11 +386,10 @@ public class DrawingLibraryFormTests
 
                 var query = Assert.Single(library.Queries);
                 Assert.Equal(("", "", (double?)null), (query.MaterialName, query.MaterialGrade, query.Thickness));
-                Assert.StartsWith("Drawing Library", form.Text);
                 Assert.DoesNotContain(Field<TabPage>(form, "nestTab"), Field<TabControl>(form, "tabControl").TabPages.Cast<TabPage>());
                 Assert.False(Field<Button>(form, "addButton").Visible);
                 Assert.Equal("Edit Drawing...", Field<Button>(form, "editButton").Text);
-                Run(form.AddSelectedAsync());
+                Run(form.View.AddSelectedAsync());
                 Assert.Empty(library.Downloads);
 
                 typeof(DataGridView).GetMethod("OnCellDoubleClick", BindingFlags.Instance | BindingFlags.NonPublic)!
@@ -431,8 +430,12 @@ public class DrawingLibraryFormTests
         Assert.True(condition(), $"Timed out waiting for {what}.");
     }
 
-    private static T Field<T>(object owner, string name) =>
-        (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
+    private static T Field<T>(object owner, string name)
+    {
+        if (owner is DrawingLibraryForm dialog)
+            owner = dialog.View;
+        return (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
+    }
 
     /// <summary>Serves every record (ignoring filters) and real packages by revision.</summary>
     private sealed class FakeLibrary : IDrawingLibraryStore

@@ -19,6 +19,8 @@ namespace OpenNest.Forms
         {
             layoutTable = new System.Windows.Forms.TableLayoutPanel();
             tabs = new System.Windows.Forms.TabControl();
+            libraryTab = new System.Windows.Forms.TabPage();
+            libraryView = new OpenNest.Controls.DrawingLibraryView();
             setsTab = new System.Windows.Forms.TabPage();
             browser = new OpenNest.Controls.DrawingSetBrowser();
             releasesTab = new System.Windows.Forms.TabPage();
@@ -27,6 +29,7 @@ namespace OpenNest.Forms
             closeButton = new System.Windows.Forms.Button();
             layoutTable.SuspendLayout();
             tabs.SuspendLayout();
+            libraryTab.SuspendLayout();
             setsTab.SuspendLayout();
             releasesTab.SuspendLayout();
             buttonPanel.SuspendLayout();
@@ -50,21 +53,38 @@ namespace OpenNest.Forms
             //
             // tabs
             //
+            tabs.Controls.Add(libraryTab);
             tabs.Controls.Add(setsTab);
             tabs.Controls.Add(releasesTab);
             tabs.Dock = System.Windows.Forms.DockStyle.Fill;
             tabs.Margin = new System.Windows.Forms.Padding(0);
             tabs.Name = "tabs";
-            tabs.SelectedIndex = 0;
+            tabs.SelectedIndex = 1;
             tabs.TabIndex = 0;
             tabs.SelectedIndexChanged += Tabs_SelectedIndexChanged;
+            //
+            // libraryTab
+            //
+            libraryTab.Controls.Add(libraryView);
+            libraryTab.Name = "libraryTab";
+            libraryTab.Padding = new System.Windows.Forms.Padding(6);
+            libraryTab.TabIndex = 0;
+            libraryTab.Text = "Library";
+            libraryTab.UseVisualStyleBackColor = true;
+            //
+            // libraryView
+            //
+            libraryView.Dock = System.Windows.Forms.DockStyle.Fill;
+            libraryView.Margin = new System.Windows.Forms.Padding(0);
+            libraryView.Name = "libraryView";
+            libraryView.TabIndex = 0;
             //
             // setsTab
             //
             setsTab.Controls.Add(browser);
             setsTab.Name = "setsTab";
             setsTab.Padding = new System.Windows.Forms.Padding(6);
-            setsTab.TabIndex = 0;
+            setsTab.TabIndex = 1;
             setsTab.Text = "Sets";
             setsTab.UseVisualStyleBackColor = true;
             //
@@ -80,7 +100,7 @@ namespace OpenNest.Forms
             releasesTab.Controls.Add(releasesView);
             releasesTab.Name = "releasesTab";
             releasesTab.Padding = new System.Windows.Forms.Padding(6);
-            releasesTab.TabIndex = 1;
+            releasesTab.TabIndex = 2;
             releasesTab.Text = "Releases";
             releasesTab.UseVisualStyleBackColor = true;
             //
@@ -128,6 +148,7 @@ namespace OpenNest.Forms
             layoutTable.ResumeLayout(false);
             layoutTable.PerformLayout();
             tabs.ResumeLayout(false);
+            libraryTab.ResumeLayout(false);
             setsTab.ResumeLayout(false);
             releasesTab.ResumeLayout(false);
             buttonPanel.ResumeLayout(false);
@@ -139,6 +160,8 @@ namespace OpenNest.Forms
 
         private System.Windows.Forms.TableLayoutPanel layoutTable;
         private System.Windows.Forms.TabControl tabs;
+        private System.Windows.Forms.TabPage libraryTab;
+        private OpenNest.Controls.DrawingLibraryView libraryView;
         private System.Windows.Forms.TabPage setsTab;
         private OpenNest.Controls.DrawingSetBrowser browser;
         private System.Windows.Forms.TabPage releasesTab;

@@ -7,8 +7,9 @@ using OpenNest.Data;
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// File &gt; Drawing Sets and File &gt; Releases (Database mode), one window with two tabs.
-    /// Sets browses, edits and releases the server's drawing sets with
+    /// File &gt; Drawing Library, File &gt; Drawing Sets and File &gt; Releases (Database mode), one
+    /// window with three tabs. Library browses and edits the server's drawing library with
+    /// <see cref="DrawingLibraryView"/>; Sets browses, edits and releases the server's drawing sets with
     /// <see cref="DrawingSetBrowser"/>; Releases lists the releases with
     /// <see cref="SetReleasesView"/>, and a set's Releases (or a library drawing's) opens that
     /// tab filtered to it. It needs no open nest, since a release creates new nests or merges
@@ -23,6 +24,8 @@ namespace OpenNest.Forms
 
         internal DrawingSetBrowser Browser => browser;
 
+        internal DrawingLibraryView LibraryView => libraryView;
+
         internal SetReleasesView Releases => releasesView;
 
         /// <summary>True while the Releases tab is showing.</summary>
@@ -36,8 +39,10 @@ namespace OpenNest.Forms
             this.serverUrl = serverUrl ?? "";
             browser.Initialize(sets, library, serverUrl);
             browser.ShowReleases = set => _ = ShowReleasesAsync(set);
+            libraryView.Initialize(library, serverUrl, null, sets);
+            libraryView.ShowReleases = drawing => _ = ShowReleasesAsync(drawing: drawing);
             releasesView.Initialize(sets);
-            Text = $"Drawing Sets — {serverUrl}";
+            Text = $"Drawing Library — {serverUrl}";
         }
 
         /// <summary>
@@ -47,6 +52,7 @@ namespace OpenNest.Forms
         /// </summary>
         public void EnableRelease(INestRepository nests, Action<Nest, NestRecord> openNest, Func<Guid, bool> isNestOpen = null)
         {
+            libraryView.EnableRelease(nests, openNest, isNestOpen);
             browser.EnableRelease(nests, openNest, isNestOpen);
             releasesView.EnableRelease(library, nests, serverUrl, openNest, isNestOpen);
         }
@@ -65,6 +71,9 @@ namespace OpenNest.Forms
             tabs.SelectedTab = releasesTab;
             return Task.CompletedTask;
         }
+
+        /// <summary>Switches to the Library tab.</summary>
+        public void ShowLibrary() => tabs.SelectedTab = libraryTab;
 
         /// <summary>Switches to the Sets tab.</summary>
         public void ShowSets() => tabs.SelectedTab = setsTab;
@@ -97,6 +106,8 @@ namespace OpenNest.Forms
         {
             if (ShowsReleases)
                 return releasesView.RefreshAsync();
+            if (tabs.SelectedTab == libraryTab)
+                return libraryView.HasLoaded ? Task.CompletedTask : libraryView.RefreshAsync();
             return browser.HasLoaded ? Task.CompletedTask : browser.RefreshAsync();
         }
     }

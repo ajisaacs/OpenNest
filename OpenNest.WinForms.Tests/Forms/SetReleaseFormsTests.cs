@@ -901,7 +901,7 @@ public class SetReleaseFormsTests
                 form.ShowSets();
                 Assert.False(form.ShowsReleases);
                 sets.Releases.Add(Release(frame));
-                Field<TabControl>(form, "tabs").SelectedIndex = 1;
+                Field<TabControl>(form, "tabs").SelectedIndex = 2;
                 PumpUntil(() => releases.Rows.Count == 3, "the re-read releases");
                 Assert.Equal("Releases 1-3 of 3", Field<Label>(view, "summaryLabel").Text);
             },
