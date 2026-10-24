@@ -48,6 +48,9 @@ namespace OpenNest.Controls
             statusLabel = new System.Windows.Forms.Label();
             searchTimer = new System.Windows.Forms.Timer(components);
             moreMenu = new System.Windows.Forms.ContextMenuStrip(components);
+            addToReleaseMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            editMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            editSeparator = new System.Windows.Forms.ToolStripSeparator();
             archiveMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             historyMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             previewMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -135,7 +138,7 @@ namespace OpenNest.Controls
             setGrid.AllowUserToDeleteRows = false;
             setGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { nameColumn, customerColumn, membersColumn, revisionColumn, savedColumn, savedByColumn, stateColumn });
             setGrid.Dock = System.Windows.Forms.DockStyle.Fill;
-            setGrid.MultiSelect = false;
+            setGrid.MultiSelect = true;
             setGrid.Name = "setGrid";
             setGrid.ReadOnly = true;
             setGrid.RowHeadersVisible = false;
@@ -319,7 +322,7 @@ namespace OpenNest.Controls
             releaseButton.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
             releaseButton.Name = "releaseButton";
             releaseButton.TabIndex = 7;
-            releaseButton.Text = "&Make Nests...";
+            releaseButton.Text = "&Add to Release";
             releaseButton.UseVisualStyleBackColor = true;
             releaseButton.Visible = false;
             releaseButton.Click += ReleaseButton_Click;
@@ -340,9 +343,28 @@ namespace OpenNest.Controls
             //
             // moreMenu
             //
-            moreMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { previewMenuItem, archiveMenuItem, historyMenuItem, releasesMenuItem, importSeparator, importBomMenuItem });
+            moreMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { addToReleaseMenuItem, editMenuItem, previewMenuItem, editSeparator, archiveMenuItem, historyMenuItem, releasesMenuItem, importSeparator, importBomMenuItem });
             moreMenu.Name = "moreMenu";
             moreMenu.Opening += MoreMenu_Opening;
+            //
+            // addToReleaseMenuItem
+            //
+            addToReleaseMenuItem.Enabled = false;
+            addToReleaseMenuItem.Name = "addToReleaseMenuItem";
+            addToReleaseMenuItem.Text = "Add to Re&lease";
+            addToReleaseMenuItem.Visible = false;
+            addToReleaseMenuItem.Click += ReleaseButton_Click;
+            //
+            // editMenuItem
+            //
+            editMenuItem.Enabled = false;
+            editMenuItem.Name = "editMenuItem";
+            editMenuItem.Text = "&Edit Set...";
+            editMenuItem.Click += EditButton_Click;
+            //
+            // editSeparator
+            //
+            editSeparator.Name = "editSeparator";
             //
             // previewMenuItem
             //
@@ -369,7 +391,7 @@ namespace OpenNest.Controls
             //
             releasesMenuItem.Enabled = false;
             releasesMenuItem.Name = "releasesMenuItem";
-            releasesMenuItem.Text = "Re&leases...";
+            releasesMenuItem.Text = "Relea&ses...";
             releasesMenuItem.Click += ReleasesMenuItem_Click;
             //
             // importSeparator
@@ -432,6 +454,9 @@ namespace OpenNest.Controls
         private System.Windows.Forms.Label statusLabel;
         private System.Windows.Forms.Timer searchTimer;
         private System.Windows.Forms.ContextMenuStrip moreMenu;
+        private System.Windows.Forms.ToolStripMenuItem addToReleaseMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem editMenuItem;
+        private System.Windows.Forms.ToolStripSeparator editSeparator;
         private System.Windows.Forms.ToolStripMenuItem archiveMenuItem;
         private System.Windows.Forms.ToolStripMenuItem historyMenuItem;
         private System.Windows.Forms.ToolStripMenuItem previewMenuItem;

@@ -19,14 +19,17 @@ namespace OpenNest.Controls
     /// <see cref="DrawingLibraryBrowseSession"/>, filtered to the nest's material and thickness
     /// unless Show all is ticked. Add downloads the listed revision's exact package, plans it
     /// with <see cref="LibraryDrawingInsert"/>, shows any warning or refusal first and only then
-    /// changes the nest. Opened without a nest, it lists every active drawing and has no Add or
-    /// In This Nest tab; a double-click edits the drawing instead. Edit Drawing changes the
+    /// changes the nest. Opened without a nest, it lists every active drawing and has no In This
+    /// Nest tab; as the Library tab of <see cref="DrawingSetsForm"/> a double-click, Enter or Add
+    /// to Release adds the drawing on its own, at the entered quantity, to the window's
+    /// <see cref="ReleasePanel"/>, and elsewhere a double-click edits it. Edit Drawing changes the
     /// selected drawing's details, notes and nesting settings (Cut first, priority, rotation,
     /// color) on the server as a new revision with the same package. With a set
     /// store, the drawing grid's menu lists the sets a drawing is in, adds it to a set, lists
     /// the releases that had it on its own (the Releases tab of <see cref="DrawingSetsForm"/>,
-    /// filtered to it) and, once release is enabled, releases it; sets themselves are browsed
-    /// and released in <see cref="DrawingSetsForm"/>.
+    /// filtered to it) and, once release is enabled, adds it to the release (with a nest, Make
+    /// Nests opens the release dialog on it); sets themselves are browsed and released in
+    /// <see cref="DrawingSetsForm"/>.
     /// The details pane previews the selected revision's geometry, downloaded shortly after
     /// the selection settles and cached per revision for the dialog's lifetime. The In This
     /// Nest tab lists the nest's drawings and edits their required quantities in place.
@@ -73,10 +76,11 @@ namespace OpenNest.Controls
         internal Func<DrawingSetEditSession, DrawingSetRecord> EditSet { get; set; }
 
         /// <summary>
-        /// Shows the release dialog for a drawing read from the library, at a quantity; set by
-        /// <see cref="EnableRelease"/> and replaced by tests.
+        /// Adds a drawing read from the library, at a quantity, to the release: the host's
+        /// release panel, or with a nest the release dialog; set by <see cref="EnableRelease(Action{DrawingLibraryRecord, int})"/>
+        /// or <see cref="EnableRelease(INestRepository, Action{Nest, NestRecord}, Func{Guid, bool})"/>.
         /// </summary>
-        internal Action<DrawingLibraryRecord, int> ShowRelease { get; set; }
+        internal Action<DrawingLibraryRecord, int> AddToRelease { get; private set; }
 
         /// <summary>
         /// Shows the releases that had a drawing on its own: opens a Drawing Sets window on its
@@ -387,18 +391,43 @@ namespace OpenNest.Controls
         {
             if (e.RowIndex < 0)
                 return;
-            if (nest == null)
-                await EditSelectedAsync();
-            else
-                await AddSelectedAsync();
+            await ActivateSelectedAsync();
         }
 
-        private async void AddButton_Click(object sender, EventArgs e) => await AddSelectedAsync();
+        // Without a nest a drawing is added to the release where there is one, else edited.
+        private Task ActivateSelectedAsync() =>
+            nest != null ? AddSelectedAsync()
+                : AddToRelease != null ? AddSelectedToReleaseAsync()
+                : EditSelectedAsync();
+
+        private async void AddButton_Click(object sender, EventArgs e) =>
+            await (nest == null ? AddSelectedToReleaseAsync() : AddSelectedAsync());
 
         /// <summary>
-        /// Lets the drawing menu release a drawing on its own: nests are saved through
-        /// <paramref name="nests"/> and each is opened with <paramref name="openNest"/>; a nest
-        /// <paramref name="isNestOpen"/> reports as open in a tab is never merged into.
+        /// Without a nest: a double-click, Enter, Add to Release or the drawing menu adds the
+        /// drawing on its own, at the entered quantity, through <paramref name="addToRelease"/>
+        /// (the Drawing Sets window's release panel).
+        /// </summary>
+        public void EnableRelease(Action<DrawingLibraryRecord, int> addToRelease)
+        {
+            if (sets == null || nest != null)
+                return;
+            AddToRelease = addToRelease ?? throw new ArgumentNullException(nameof(addToRelease));
+            addButton.Text = "Add to Release";
+            addButton.Visible = true;
+            releaseMenuItem.Text = "Add to Release";
+            releaseMenuItem.ToolTipText = "Add this drawing on its own, at the entered quantity, to the release";
+            releaseSeparator.Visible = true;
+            releaseMenuItem.Visible = true;
+            UpdateFilterLabel();
+            UpdateCommands();
+        }
+
+        /// <summary>
+        /// With a nest: lets the drawing menu release a drawing on its own in the release dialog:
+        /// nests are saved through <paramref name="nests"/> and each is opened with
+        /// <paramref name="openNest"/>; a nest <paramref name="isNestOpen"/> reports as open in a
+        /// tab is never merged into.
         /// </summary>
         public void EnableRelease(INestRepository nests, Action<Nest, NestRecord> openNest, Func<Guid, bool> isNestOpen = null)
         {
@@ -406,7 +435,7 @@ namespace OpenNest.Controls
                 return;
             ArgumentNullException.ThrowIfNull(nests);
             ArgumentNullException.ThrowIfNull(openNest);
-            ShowRelease = (record, quantity) =>
+            AddToRelease = (record, quantity) =>
             {
                 using var form = new ReleaseSetForm(sets, library, nests, serverUrl, Array.Empty<DrawingSetRecord>(),
                     new[] { new SetReleaseDrawingLine(record, quantity) }, openNest)
@@ -431,11 +460,11 @@ namespace OpenNest.Controls
             editMenuItem.Enabled = record is { Archived: false } && !adding;
             usedInSetsMenuItem.Enabled = record != null && !adding;
             addToSetMenuItem.Enabled = record != null && !adding;
-            releaseMenuItem.Enabled = record is { Archived: false } && !adding && ShowRelease != null;
+            releaseMenuItem.Enabled = record is { Archived: false } && !adding && AddToRelease != null;
             releasesMenuItem.Enabled = record != null && !adding;
         }
 
-        private async void ReleaseMenuItem_Click(object sender, EventArgs e) => await ReleaseSelectedAsync();
+        private async void ReleaseMenuItem_Click(object sender, EventArgs e) => await AddSelectedToReleaseAsync();
 
         private void ReleasesMenuItem_Click(object sender, EventArgs e)
         {
@@ -444,13 +473,13 @@ namespace OpenNest.Controls
         }
 
         /// <summary>
-        /// Reads the selected drawing's current record and opens the release dialog with it at
-        /// the entered quantity; more drawings and sets can be added there.
+        /// Reads the selected drawing's current record and adds it to the release at the entered
+        /// quantity.
         /// </summary>
-        internal async Task ReleaseSelectedAsync()
+        internal async Task AddSelectedToReleaseAsync()
         {
             var listed = SelectedRecord();
-            if (listed == null || ShowRelease == null || adding)
+            if (listed == null || AddToRelease == null || adding)
                 return;
 
             DrawingLibraryRecord current;
@@ -484,7 +513,7 @@ namespace OpenNest.Controls
                 return;
             }
 
-            ShowRelease(current, (int)quantityBox.Value);
+            AddToRelease(current, (int)quantityBox.Value);
         }
 
         private async void UsedInSetsMenuItem_Click(object sender, EventArgs e) => await ShowUsedInSetsAsync();
@@ -623,7 +652,7 @@ namespace OpenNest.Controls
         {
             if (keyData == Keys.Enter && drawingGrid.ContainsFocus && SelectedRecord() != null)
             {
-                _ = nest == null ? EditSelectedAsync() : AddSelectedAsync();
+                _ = ActivateSelectedAsync();
                 return true;
             }
 
@@ -743,7 +772,8 @@ namespace OpenNest.Controls
 
         private void UpdateCommands()
         {
-            addButton.Enabled = !adding && nest != null && SelectedRecord() != null;
+            addButton.Enabled = !adding && (nest != null ? SelectedRecord() != null
+                : AddToRelease != null && SelectedRecord() is { Archived: false });
             editButton.Enabled = !adding && SelectedRecord() is { Archived: false };
         }
 
@@ -751,7 +781,9 @@ namespace OpenNest.Controls
         {
             if (nest == null)
             {
-                filterLabel.Text = "Showing every active drawing. Double-click one to edit it.";
+                filterLabel.Text = AddToRelease != null
+                    ? "Showing every active drawing. Double-click one to add it to the release."
+                    : "Showing every active drawing. Double-click one to edit it.";
                 return;
             }
 

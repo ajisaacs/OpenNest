@@ -19,7 +19,8 @@ public static class GridStyle
     private static readonly Color SelectionBackColor = Color.FromArgb(204, 228, 247);
     private static readonly Color LineColor = Color.FromArgb(230, 230, 230);
 
-    public static T Apply<T>(T grid) where T : DataGridView
+    /// <param name="sizeColumns">False leaves column widths to the grid, as for columns that fill it.</param>
+    public static T Apply<T>(T grid, bool sizeColumns = true) where T : DataGridView
     {
         grid.AllowUserToResizeRows = false;
         grid.BackgroundColor = SystemColors.Window;
@@ -44,7 +45,8 @@ public static class GridStyle
         grid.RowHeadersDefaultCellStyle.SelectionBackColor = SelectionBackColor;
         grid.RowHeadersDefaultCellStyle.SelectionForeColor = Color.Black;
         grid.RowHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-        SizeColumnsOnceToContent(grid);
+        if (sizeColumns)
+            SizeColumnsOnceToContent(grid);
         return grid;
     }
 

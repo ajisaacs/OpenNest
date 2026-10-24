@@ -307,7 +307,15 @@ namespace OpenNest.Forms
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             base.OnClosing(e);
-            MainWindowSettings.Save(this);
+            // The Drawing Sets window closes with this one; while Make Nests runs, neither does.
+            if (!e.Cancel && drawingSetsForm is { IsDisposed: false } sets)
+            {
+                sets.Close();
+                if (!sets.IsDisposed)
+                    e.Cancel = true;
+            }
+            if (!e.Cancel)
+                MainWindowSettings.Save(this);
         }
 
         #endregion

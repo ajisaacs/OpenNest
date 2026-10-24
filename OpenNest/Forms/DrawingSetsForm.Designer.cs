@@ -18,6 +18,8 @@ namespace OpenNest.Forms
         private void InitializeComponent()
         {
             layoutTable = new System.Windows.Forms.TableLayoutPanel();
+            splitContainer = new System.Windows.Forms.SplitContainer();
+            releasePanel = new OpenNest.Controls.ReleasePanel();
             tabs = new System.Windows.Forms.TabControl();
             libraryTab = new System.Windows.Forms.TabPage();
             libraryView = new OpenNest.Controls.DrawingLibraryView();
@@ -28,6 +30,10 @@ namespace OpenNest.Forms
             buttonPanel = new System.Windows.Forms.FlowLayoutPanel();
             closeButton = new System.Windows.Forms.Button();
             layoutTable.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
+            splitContainer.Panel1.SuspendLayout();
+            splitContainer.Panel2.SuspendLayout();
+            splitContainer.SuspendLayout();
             tabs.SuspendLayout();
             libraryTab.SuspendLayout();
             setsTab.SuspendLayout();
@@ -39,7 +45,7 @@ namespace OpenNest.Forms
             //
             layoutTable.ColumnCount = 1;
             layoutTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            layoutTable.Controls.Add(tabs, 0, 0);
+            layoutTable.Controls.Add(splitContainer, 0, 0);
             layoutTable.Controls.Add(buttonPanel, 0, 1);
             layoutTable.Dock = System.Windows.Forms.DockStyle.Fill;
             layoutTable.Location = new System.Drawing.Point(0, 0);
@@ -50,6 +56,27 @@ namespace OpenNest.Forms
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.Size = new System.Drawing.Size(984, 601);
             layoutTable.TabIndex = 0;
+            //
+            // splitContainer
+            //
+            splitContainer.Dock = System.Windows.Forms.DockStyle.Fill;
+            splitContainer.FixedPanel = System.Windows.Forms.FixedPanel.Panel2;
+            splitContainer.Margin = new System.Windows.Forms.Padding(0);
+            splitContainer.Name = "splitContainer";
+            splitContainer.Panel1.Controls.Add(tabs);
+            splitContainer.Panel2.Controls.Add(releasePanel);
+            splitContainer.Panel2.Padding = new System.Windows.Forms.Padding(6, 0, 0, 0);
+            splitContainer.Panel2Collapsed = true;
+            splitContainer.Size = new System.Drawing.Size(1008, 580);
+            splitContainer.SplitterDistance = 560;
+            splitContainer.TabIndex = 0;
+            //
+            // releasePanel
+            //
+            releasePanel.Dock = System.Windows.Forms.DockStyle.Fill;
+            releasePanel.Margin = new System.Windows.Forms.Padding(0);
+            releasePanel.Name = "releasePanel";
+            releasePanel.TabIndex = 0;
             //
             // tabs
             //
@@ -137,16 +164,21 @@ namespace OpenNest.Forms
             ClientSize = new System.Drawing.Size(1024, 641);
             Controls.Add(layoutTable);
             Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            MinimizeBox = false;
             MinimumSize = new System.Drawing.Size(720, 440);
             Name = "DrawingSetsForm";
             ShowIcon = false;
             ShowInTaskbar = false;
             StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+            Activated += DrawingSetsForm_Activated;
+            FormClosing += DrawingSetsForm_FormClosing;
             Text = "Drawing Sets";
             Shown += DrawingSetsForm_Shown;
             layoutTable.ResumeLayout(false);
             layoutTable.PerformLayout();
+            splitContainer.Panel1.ResumeLayout(false);
+            splitContainer.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)splitContainer).EndInit();
+            splitContainer.ResumeLayout(false);
             tabs.ResumeLayout(false);
             libraryTab.ResumeLayout(false);
             setsTab.ResumeLayout(false);
@@ -159,6 +191,8 @@ namespace OpenNest.Forms
         #endregion
 
         private System.Windows.Forms.TableLayoutPanel layoutTable;
+        private System.Windows.Forms.SplitContainer splitContainer;
+        private OpenNest.Controls.ReleasePanel releasePanel;
         private System.Windows.Forms.TabControl tabs;
         private System.Windows.Forms.TabPage libraryTab;
         private OpenNest.Controls.DrawingLibraryView libraryView;

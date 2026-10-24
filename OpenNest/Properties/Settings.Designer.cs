@@ -384,5 +384,58 @@ namespace OpenNest.Properties {
                 this["CutOffHeadLockOvercutInches"] = value;
             }
         }
+    
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        // Make Nests nests each group with Auto Nest; the release panel remembers the last choice.
+        public bool ReleaseNestAfter {
+            get {
+                return ((bool)(this["ReleaseNestAfter"]));
+            }
+            set {
+                this["ReleaseNestAfter"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0, 0")]
+        // The Drawing Sets window's restored location.
+        public global::System.Drawing.Point DrawingSetsWindowLocation {
+            get {
+                return ((global::System.Drawing.Point)(this["DrawingSetsWindowLocation"]));
+            }
+            set {
+                this["DrawingSetsWindowLocation"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0, 0")]
+        // The Drawing Sets window's restored size; empty until it first closes.
+        public global::System.Drawing.Size DrawingSetsWindowSize {
+            get {
+                return ((global::System.Drawing.Size)(this["DrawingSetsWindowSize"]));
+            }
+            set {
+                this["DrawingSetsWindowSize"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Maximized")]
+        // Whether the Drawing Sets window opens maximized.
+        public global::System.Windows.Forms.FormWindowState DrawingSetsWindowState {
+            get {
+                return ((global::System.Windows.Forms.FormWindowState)(this["DrawingSetsWindowState"]));
+            }
+            set {
+                this["DrawingSetsWindowState"] = value;
+            }
+        }
     }
 }

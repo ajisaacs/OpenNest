@@ -17,8 +17,9 @@ namespace OpenNest.Controls
     /// the release did to each and their current status, or Deleted. A filter narrows the list
     /// to the releases that include one set, or one library drawing on its own; the filter
     /// shows above the list until Clear Filter. The server joins every nest's current metadata
-    /// on each read. New Release opens the release dialog empty; the list re-reads once a
-    /// release is recorded. Undo Release deletes the nests a release created and restores the
+    /// on each read. New Release switches to the Sets tab, where the window's
+    /// <see cref="ReleasePanel"/> builds the release; the list re-reads when the tab is shown
+    /// again. Undo Release deletes the nests a release created and restores the
     /// drafts it merged into, all or nothing; nests changed since can be left as they are.
     /// </summary>
     public partial class SetReleasesView : UserControl
@@ -38,11 +39,8 @@ namespace OpenNest.Controls
         /// <summary>Shows a message and returns the operator's answer; replaced by tests.</summary>
         internal Func<string, MessageBoxButtons, MessageBoxIcon, DialogResult> ShowMessage { get; set; }
 
-        /// <summary>
-        /// Shows the release dialog empty and returns true when it recorded a release; set by
-        /// <see cref="EnableRelease"/> and replaced by tests.
-        /// </summary>
-        internal Func<bool> ShowNewRelease { get; set; }
+        /// <summary>Starts a release in the host's release panel; set by <see cref="EnableRelease"/>.</summary>
+        internal Action StartRelease { get; private set; }
 
         public SetReleasesView()
         {
@@ -71,27 +69,12 @@ namespace OpenNest.Controls
             ShowMessage = (text, buttons, icon) => MessageBox.Show(FindForm(), text, FindForm()?.Text ?? "Releases", buttons, icon);
         }
 
-        /// <summary>
-        /// Shows New Release: the release dialog starts empty, saves nests through
-        /// <paramref name="nests"/> and opens each with <paramref name="openNest"/>; a nest
-        /// <paramref name="isNestOpen"/> reports as open in a tab is never merged into.
-        /// </summary>
-        public void EnableRelease(IDrawingLibrary library, INestRepository nests, string serverUrl,
-            Action<Nest, NestRecord> openNest, Func<Guid, bool> isNestOpen = null)
+        /// <summary>Shows New Release, which calls <paramref name="startRelease"/>.</summary>
+        public void EnableRelease(Action startRelease)
         {
-            ArgumentNullException.ThrowIfNull(library);
-            ArgumentNullException.ThrowIfNull(nests);
-            ArgumentNullException.ThrowIfNull(openNest);
             if (sets == null)
                 throw new InvalidOperationException("New Release needs an initialized releases view.");
-            ShowNewRelease = () =>
-            {
-                using var form = new ReleaseSetForm(sets, library, nests, serverUrl, Array.Empty<DrawingSetRecord>(),
-                    Array.Empty<SetReleaseDrawingLine>(), openNest)
-                { IsNestOpen = isNestOpen ?? (_ => false) };
-                form.ShowDialog(FindForm());
-                return form.Result?.Release != null;
-            };
+            StartRelease = startRelease ?? throw new ArgumentNullException(nameof(startRelease));
             newReleaseButton.Visible = true;
         }
 
@@ -137,16 +120,10 @@ namespace OpenNest.Controls
                 : "";
         }
 
-        private async void NewReleaseButton_Click(object sender, EventArgs e) => await NewReleaseAsync();
-
-        /// <summary>Opens the empty release dialog and, once it recorded a release, shows the newest page.</summary>
-        internal async Task NewReleaseAsync()
+        private void NewReleaseButton_Click(object sender, EventArgs e)
         {
-            if (ShowNewRelease == null || undoing)
-                return;
-            var recorded = ShowNewRelease();
-            if (recorded && !IsDisposed)
-                await LoadPageAsync(0);
+            if (!undoing)
+                StartRelease?.Invoke();
         }
 
         private async void PreviousButton_Click(object sender, EventArgs e) =>

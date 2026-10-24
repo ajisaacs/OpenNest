@@ -298,7 +298,7 @@ namespace OpenNest.Controls
             newReleaseButton.AutoSize = true;
             newReleaseButton.Name = "newReleaseButton";
             newReleaseButton.TabIndex = 3;
-            newReleaseButton.Text = "New Release...";
+            newReleaseButton.Text = "New Release";
             newReleaseButton.UseVisualStyleBackColor = true;
             newReleaseButton.Visible = false;
             newReleaseButton.Click += NewReleaseButton_Click;

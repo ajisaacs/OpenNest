@@ -11,6 +11,10 @@ namespace OpenNest.Forms
 {
     public partial class MainForm
     {
+        // The Drawing Sets window while it is open, and the release it was building when it last closed.
+        private DrawingSetsForm drawingSetsForm;
+        private Controls.ReleaseDraft releaseDraft;
+
         private void LoadNest(Nest nest, FormWindowState windowState = FormWindowState.Maximized,
             Guid remoteId = default, string serverUrl = null, int remoteRevision = 0)
         {
@@ -144,9 +148,10 @@ namespace OpenNest.Forms
                 return;
 
             // One Drawing Sets window at a time: a second menu click brings it forward on the tab asked for.
-            var open = MdiChildren.OfType<DrawingSetsForm>().FirstOrDefault();
-            if (open != null)
+            if (drawingSetsForm is { IsDisposed: false } open)
             {
+                if (open.WindowState == FormWindowState.Minimized)
+                    open.WindowState = FormWindowState.Normal;
                 open.Activate();
                 if (releases)
                     _ = open.ShowReleasesAsync();
@@ -174,16 +179,35 @@ namespace OpenNest.Forms
                 return;
             }
 
-            // An MDI child beside the nest tabs, maximized when it opens; disposed when closed.
-            var form = new DrawingSetsForm(sets, library, NestStorage.Settings.ServerUrl);
+            // A window of its own, beside the main window rather than in it: the main window's
+            // menus and toolbar edit nests. It is not owned, so either can be in front.
+            var form = new DrawingSetsForm(sets, library, NestStorage.Settings.ServerUrl)
+            {
+                Icon = Icon,
+                ShowIcon = true,
+                ShowInTaskbar = true,
+                MinimizeBox = true,
+            };
             form.EnableRelease(nests, OpenServerNest, IsServerNestOpen);
+            form.RestoreRelease(releaseDraft);
+            releaseDraft = null;
+            // The nests a release made open here, so this window comes forward to show them.
+            form.NestsOpened += (_, _) => Activate();
             if (releases)
                 _ = form.ShowReleasesAsync();
             else if (libraryTab)
                 form.ShowLibrary();
             form.ImportBomWhenShown = importBom;
-            form.MdiParent = this;
-            form.WindowState = FormWindowState.Maximized;
+            MainWindowSettings.LoadDrawingSets(form);
+            form.FormClosed += (_, _) =>
+            {
+                // A release not yet made is kept for the next time the window opens in this run.
+                releaseDraft = form.TakeRelease();
+                MainWindowSettings.SaveDrawingSets(form);
+                if (drawingSetsForm == form)
+                    drawingSetsForm = null;
+            };
+            drawingSetsForm = form;
             form.Show();
         }
 

@@ -325,9 +325,12 @@ The browser's **Cut first** column shows the setting.
 
 **File > Drawing Library...** (Database mode only, like Drawing Sets) opens the
 drawing sets window on its **Library** tab ([below](#drawing-sets-desktop)),
-the same browser without a nest: it lists every active drawing, has no Add to
-Nest or In This Nest tab, and a double-click or Enter edits the selected drawing. Its
-right-click menu has Edit Drawing and the set and release items below.
+the same browser without a nest: it lists every active drawing and has no Add to
+Nest or In This Nest tab. There a double-click, Enter or **Add to Release** adds
+the selected drawing on its own, at the entered **Quantity**, to the window's
+release panel ([below](#make-nests-the-release-panel)); **Edit Drawing...** (the
+button or the right-click menu) edits it. Its right-click menu also has the set
+and release items below.
 
 ### Edit Drawing (desktop)
 
@@ -360,7 +363,7 @@ Edit Drawing opens from:
   right-click it, or **Edit Drawing...** beside the grid. It first reads the
   member's current record, so a set read earlier does not cause a conflict; the
   row then shows what was saved. The set itself is unchanged and needs no save;
-- the release dialog: a group refused for its drawings (no material or
+- the release panel: a group refused for its drawings (no material or
   thickness, or two drawings with one name) has **Fix Drawings...**, which opens
   Edit Drawing on each drawing it is refused for in turn (Cancel stops), as does
   a double-click on the group; with a releasable group selected, it takes the
@@ -405,19 +408,28 @@ revision; save the nest to keep it.
 
 **File > Drawing Sets...** (Database mode only) opens the drawing sets window;
 it needs no open nest, since releasing a set makes new nests or merges into
-draft ones and opens each in its own tab. The window has three tabs, **Library**
+draft ones and opens each in its own tab. It is a window of its own beside the
+main window (in the taskbar, with its own minimize button), not a tab inside it,
+since the main window's menus and toolbar are for editing nests. There is one
+at a time: the menu items bring it forward on the tab asked for. It opens
+maximized the first time, then where and as it was last closed, and closes with
+the main window. The window has three tabs, **Library**
 (**File > Drawing Library...** opens on it), **Sets** and **Releases**
 ([below](#releases-tab)); **File > Releases...** is a shortcut that opens the
-same window on the Releases tab. Each tab reads its list when first
+same window on the Releases tab. Beside the Library and Sets tabs is the
+release panel ([below](#make-nests-the-release-panel)), which builds one release
+from both. Each tab reads its list when first
 shown, and Releases re-reads its page each time it is shown again. Sets lists sets a page at a time
 (`OpenNest.Data.DrawingSetBrowseSession`): search by name, customer or notes,
 sort by name, customer, revision or saved time, and **Show archived**. Selecting
-a set shows its notes. Below the list are **New Set...**, **Edit...** (also a
-double-click or Enter on a set), **More ▾** and **Make Nests...** in bold, the
-main action (below). **More ▾**, also the list's right-click
-menu (the menu key or Shift+F10 opens it from the keyboard), holds **Archive**
-or **Restore**, **History...** and **Releases...** for the selected set, then
-**Import BOM...** ([below](#import-bom-to-a-set-desktop)), which needs no selection.
+a set shows its notes. A double-click or Enter adds the set to the release at
+one kit (again adds another kit). Below the list are **New Set...**, **Edit...**,
+**More ▾** and **Add to Release** in bold, which adds every selected set
+(Ctrl- or Shift-click selects several). **More ▾**, also the list's right-click
+menu (the menu key or Shift+F10 opens it from the keyboard), holds **Add to
+Release** and **Edit Set...**, then **Archive** or **Restore**, **History...**
+and **Releases...** for the selected set, then **Import BOM...**
+([below](#import-bom-to-a-set-desktop)), which needs no selection.
 
 - **New Set...** and **Edit...** open the set editor
   (`OpenNest.Data.DrawingSetEditSession`): name, customer, notes and the member
@@ -456,7 +468,7 @@ or **Restore**, **History...** and **Releases...** for the selected set, then
 Database mode opens the drawing sets window straight into it) turns a BOM into a
 new drawing set. It sits in More rather than beside New Set because it is another
 way to start a set, used once per job, and the Sets tab keeps New Set, Edit and
-Make Nests as its only buttons; File > Import BOM stays the familiar way in.
+Add to Release as its only buttons; File > Import BOM stays the familiar way in.
 
 1. Choose the BOM (`.xlsx`, read by `BomReader`) and the folder of its drawings,
    the **Set name** (prefilled from the BOM file name without a trailing " BOM")
@@ -497,7 +509,7 @@ Make Nests as its only buttons; File > Import BOM stays the familiar way in.
    leaves the set unchanged; Read BOM again then reuses those drawings, so
    importing twice never stores a drawing twice.
 
-Releasing the set (**Make Nests...**) then makes the nests, replacing File-mode
+Releasing the set (**Make Nests** in the release panel) then makes the nests, replacing File-mode
 BOM import's Create Nests for Database mode. In File mode, **File > Import BOM...**
 still makes nests directly, unchanged.
 
@@ -506,10 +518,12 @@ whose current revision contains it) or **Add to Set...**: choose an active set
 or **New Set**, and the set editor opens with the drawing added at the entered
 quantity for review and Save. **Releases...** opens the drawing sets window on
 its Releases tab, filtered to the releases that had the drawing on its own (see
-below), with Undo Release. When the dialog was opened
-from a nest, **Make Nests...** reads the drawing's current record and opens the
-release dialog with it on its own at the entered quantity; more drawings and
-sets are added there.
+below), with Undo Release. In the drawing sets window, **Add to Release** adds
+the drawing to the release panel. When the dialog was opened from a nest,
+**Make Nests...** reads the drawing's current record and opens the release panel
+in a dialog of its own with the drawing on its own at the entered quantity;
+**Add Drawings...** there adds more library drawings (sets are released from the
+drawing sets window).
 
 The nest's drawing list has **Add Library Drawings to Set...** (right-click any
 drawing; it acts on the whole nest, `OpenNest.Data.NestSetMerge`). It takes each
@@ -525,80 +539,89 @@ library's latest revision. Anything kept, skipped, archived in the library or
 newer there than in the nest is listed first, then the set editor opens for
 review and Save; nothing is stored before then.
 
-**Make Nests...** (on the drawing sets window's Sets tab) reads the
-selected active set with its members and opens the release dialog with it listed.
-More sets are added from **Add a set**: the list opens with the first active sets
-by name and narrows as you type; Enter or **Add** takes the picked set, or the one
-set whose name is exactly what was typed. **Add Drawings...** adds library drawings on
-their own, outside any set: it browses every active drawing as the set editor's
-library pane does (search, server-side sort, pages, several selected at once),
-and **Add to Release**, a double-click or Enter adds the selection at the
-entered quantity. It stays open for more; a drawing already listed is greyed
-and skipped, and an archived one is refused. **Remove** takes a set or drawing
-out while another remains. The list shows each line's type; **Quantity** is how
-many of a set (1 to 1000, multiplying its quantities) or of a drawing (1 to
-100,000), and a set or drawing is listed once. A drawing that a set also lists
-becomes one item with both quantities. The heading reads as a sentence of what
-is listed, such as "Release set 'Frame kit' ×2", or the first few lines by name
-and quantity when there are several.
+<a id="make-nests-the-release-panel"></a>
+### Make Nests: the release panel (desktop)
 
-Below, a sentence previews what **Make Nests...** will do, such as "Creates 3
-nests: A36 Grade A 0.25 in, 304 0.1875 in, ...", and the grid has one row per
-material (name, grade, thickness, units and cut type) across all the sets and
-drawings (`OpenNest.Data.SetReleasePlan`): material, grade, thickness, units,
-cut type, drawings, parts and status. Refused groups (two drawings with one name,
-or drawings without material or thickness) show why in the status column and
-the preview counts them. **Fix Drawings...** opens
-[Edit Drawing](#edit-drawing-desktop) on the selected refused group's drawings,
-or the first refused group's when another row is selected, and rebuilds the plan
-with what was saved. Archived members are left out and named below the grid.
+The release panel (`OpenNest.Controls.ReleasePanel`) sits beside the Library and
+Sets tabs and holds one release in progress for both. Adding is a double-click
+(or Enter) in either list: a set is read with its members' current drawings and
+listed at one kit; a library drawing is read afresh and listed on its own at the
+Library tab's **Quantity**. Adding a set or drawing already listed adds to its
+quantity instead, so double-clicking a set twice makes it ×2 kits. An archived
+set or drawing is refused. Each line shows its name, its quantity (edited in
+place: 1 to 1000 kits of a set, multiplying its quantities, or 1 to 100,000
+pieces of a drawing) and **kits** or **pcs**; **✕** (or Delete) removes it. A
+drawing that a set also lists becomes one item with both quantities. Above the
+lines, the heading reads as a sentence of what is listed, such as "Release set
+'Frame kit' ×2", or the first few lines when there are several. Below them are
+the release's **Customer** (the one every line names, or left blank when they
+differ) and **Notes**. Closing the window keeps a release not yet made for the
+next time it opens in this run of OpenNest; it is not saved to disk.
 
-The common case needs nothing more: every releasable material makes a new Draft
-nest and **Nest after release** is ticked. **Options ▸** expands the choices that
-change that: a **Release** tick per group (refused groups cannot be ticked), the
-**Nest** column, and **Include archived drawings**, which puts archived members
-back in. A tick survives changing the sets, quantities or the archived toggle.
-Collapsing Options hides only what is at its default: an unticked group keeps the
-Release column shown, and a ticked Include archived drawings stays shown. The
-**Nest** column also shows, with a hint in the preview, whenever a Draft nest
-exists that a material could merge into.
+**Nests it will make** previews, live as lines change, one row per material
+(name, grade, thickness, units and cut type) across all the sets and drawings
+(`OpenNest.Data.SetReleasePlan`): a tick, the material, its parts, its **Nest**
+and **What happens**. Untick a group to leave it out; the choice survives
+changing the lines. Refused groups (two drawings with one name, or drawings
+without material or thickness) cannot be ticked and say why at once.
+**Fix Drawings...** opens [Edit Drawing](#edit-drawing-desktop) on the selected
+refused group's drawings, or the first refused group's when another row is
+selected, and rebuilds the plan with what was saved. Archived members are left
+out and named below the grid, where **Include archived drawings** appears to put
+them back in.
 
-**Nest** is **New Draft nest** or **Merge into** one of the Draft nests of the
-group's material, grade and thickness, listed with their sheet count and when
-they were saved. A merge adds the demand to that draft's drawings and discards
-every sheet (placements, cutoffs, cut plans), keeping drawing-level setup such as
-cut pins (the status column says so); **Undo Release** restores it. A draft open
-in a tab of this desktop is refused, since that tab could hold edits the merge
-would leave behind: close it first.
+A group **merges into a Draft nest by default**, which is what Draft status is
+for: the plan looks up the Draft nests of the group's material, grade and
+thickness (`SetReleasePlan.FindDraftsAsync`) and
 
-**Nest after release** (ticked by default) runs Auto Nest on every released
+- with exactly one, merges into it: the row says "→ merges into N26-0007";
+- with several, merges into the most recently saved; the **Nest** list in the
+  row offers the others (newest first) and **New Draft nest**, and the row says
+  how many match;
+- with none, makes a new Draft nest ("→ new Draft nest");
+- when the draft it would merge into is open in a tab of this desktop, the row
+  says "N26-0007 is open — save and close it to merge into it" and **Make Nests**
+  waits: the tab could hold edits the merge would leave behind, and a parallel
+  nest is never made silently. Close the tab (the panel checks again when the
+  window is activated), choose New Draft nest for the group, or untick it.
+
+Make Nests also waits until every chosen group's drafts have been looked up. A
+merge adds the demand to that draft's drawings and renests the whole draft: every
+sheet (placements, cutoffs, cut plans) is discarded and rebuilt, keeping
+drawing-level setup such as cut pins; **Undo Release** restores it. With **Nest
+after release** unticked, the row says the merged draft is left without sheets
+until it is nested.
+
+**Nest after release** (beside the button, ticked by default; the panel
+remembers the operator's last choice) runs Auto Nest on every released
 group, new or merged, before anything is saved (`OpenNest.Engine.Jobs.NestRenest`):
 every drawing's required quantity, the selected engine, sheets from the nest's
 plate defaults and plate-size options, as the Auto Nest dialog would offer them.
 A layout is kept only when it is valid; otherwise the nest is saved without
 sheets and its status says "Auto Nest could not keep a layout: open it and run
-Auto Nest". The status column lists each group's sheets and utilization, and any
+Auto Nest". The row lists each group's sheets and utilization, and any
 copies left unplaced, which stay as remaining quantity. Unticked, new nests are
 saved without sheets and merged drafts are left cleared for Auto Nest.
 
-**Make Nests...** confirms, then runs `OpenNest.Data.SetReleaseSession`: every ticked
-group's new nest is made as File > New would (the server's next nest name, the
-saved plate defaults and clamps), in the group's units, with the saved plate size
-and spacings converted (25.4 mm per inch) when those differ; the nest takes the
-group's material, grade and thickness, the sets' customer when they share one,
-and the **Draft** status (with drawings on their own, their library customers
-count too). A merged draft is saved only while nobody else has
-saved it since it was listed. Each created or merged nest opens in its own tab,
-bound to its server record, and the release (with the release notes) is
-recorded. A release with drawings on their own first checks that the server can
-record them (see below) and, on an older server, saves nothing and says so. The
-grid then shows every group's outcome: Created or Merged into with
-the nest name, Refused or Failed with the reason, or Not started. Cancel during
-preparing or nesting saves nothing; once saving starts it stops between saves,
-never during one. When every nest was saved but recording failed,
-the button becomes **Try Again** and posts the same release again without making
-the nests again. A dialog
-runs one release.
+**Make Nests (n)**, in bold, with n the groups ticked, is the only step that
+writes; **Clear** empties the panel. It runs `OpenNest.Data.SetReleaseSession`:
+every ticked group's new nest is made as File > New would (the server's next nest
+name, the saved plate defaults and clamps), in the group's units, with the saved
+plate size and spacings converted (25.4 mm per inch) when those differ; the nest
+takes the group's material, grade and thickness, the release's customer when
+there is one, and the **Draft** status. A merged draft is saved only while nobody
+else has saved it since it was listed. Each created or merged nest opens in its
+own tab of the main window, bound to its server record, the main window comes
+forward, and the release (with its notes) is recorded. A release with drawings
+on their own first checks that the server can record them (see below) and, on an
+older server, saves nothing and says so. Each row then shows its group's outcome:
+Created or Merged into with the nest name, Refused or Failed with the reason, or
+Not started. **Stop** (Clear while running) during preparing or nesting saves
+nothing; once saving starts it stops between saves, never during one, and the
+window does not close while it runs. When every nest was saved but recording
+failed, the button becomes **Try Again** and posts the same release again
+without making the nests again; until then nothing more can be added. After a
+release, the next double-click starts the next one.
 
 <a id="releases-tab"></a>
 The **Releases** tab lists every release on the server, newest first, 100 at a
@@ -611,9 +634,9 @@ notes. The selected release's nests show their **Material**, the **Action**
 Deleted. **Undo Release...** deletes the nests the release created (they can be
 recovered) and restores the drafts it merged into. When some nests were changed
 after the release, it lists them and offers to undo the others, leaving those as
-they are. **New Release...** opens the release dialog empty; sets are added by
-name and drawings with Add Drawings, and once the dialog records a release the
-list re-reads from the newest.
+they are. **New Release** switches to the Sets tab, where the release panel
+builds the next release; the list re-reads from the newest when the tab is
+shown again.
 
 A filter narrows the tab to one set or one drawing, shown above the list
 ("Releases of set 'Frame A'") until **Clear Filter** lists every release again:
@@ -783,7 +806,8 @@ material or a positive thickness goes to one refused "unassigned" group, listed 
 `SetReleasePlan.FindDraftsAsync(nests, group)` lists the Draft nests a group
 could merge into, using the nest query's status, material, grade and thickness
 filters. Units and cut type are not in nest metadata, so they are checked on the
-downloaded nest.
+downloaded nest. The desktop merges into the most recently saved of them by
+default and never into one open in a tab ([release panel](#make-nests-the-release-panel)).
 
 `SetReleaseSession.RunAsync` releases the chosen releasable groups in plan order.
 A group named in its `mergeInto` map merges into that draft instead of making a

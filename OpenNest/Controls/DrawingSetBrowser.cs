@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -15,11 +17,13 @@ namespace OpenNest.Controls
     /// <summary>
     /// Browses the server's drawing sets one bounded page at a time through
     /// <see cref="DrawingSetBrowseSession"/>, and creates, edits, archives or restores them and
-    /// shows their history. <see cref="DrawingSetsForm"/> hosts it on its Sets tab to manage and
-    /// release sets, and shows a set's Releases on its Releases tab. New Set, Edit, Preview and
-    /// Make Nests are buttons; Preview, Archive/Restore, History and Releases, then Import BOM,
-    /// are in the More menu, which is also the list's right-click menu. Preview shows all of a
-    /// set's drawings in one window at the same scale (<see cref="DrawingSetPreviewForm"/>). In pick mode
+    /// shows their history. <see cref="DrawingSetsForm"/> hosts it on its Sets tab beside its
+    /// <see cref="ReleasePanel"/>, and shows a set's Releases on its Releases tab. Once release is
+    /// enabled, a double-click or Enter adds the set to the release (Add to Release does so for
+    /// every selected set); Edit opens the set editor. New Set, Edit, Preview and Add to Release
+    /// are buttons; Add to Release, Edit Set, Preview, Archive/Restore, History and Releases, then
+    /// Import BOM, are in the More menu, which is also the list's right-click menu. Preview shows
+    /// all of a set's drawings in one window at the same scale (<see cref="DrawingSetPreviewForm"/>). In pick mode
     /// (<see cref="ChooseDrawingSetForm"/>) only active sets are listed, and choosing a set or
     /// New Set raises <see cref="SetActivated"/> or <see cref="NewSetChosen"/> instead.
     /// </summary>
@@ -28,9 +32,6 @@ namespace OpenNest.Controls
         private IDrawingSetStore sets;
         private IDrawingLibraryStore library;
         private string serverUrl;
-        private INestRepository nests;
-        private Action<Nest, NestRecord> openNest;
-        private Func<Guid, bool> isNestOpen = _ => false;
         private DrawingSetBrowseSession session;
         private BrowsePager<DrawingSetPage, DrawingSetSortField> pager;
         private bool pick;
@@ -57,8 +58,8 @@ namespace OpenNest.Controls
         /// <summary>Shows the same-scale preview of a set read with its members; replaced by tests.</summary>
         internal Action<DrawingSetRecord> ShowPreview { get; set; }
 
-        /// <summary>Shows the release dialog for a set read with its members; replaced by tests.</summary>
-        internal Action<DrawingSetRecord> ShowRelease { get; set; }
+        /// <summary>Adds a set read with its members to the release; set by <see cref="EnableRelease"/>.</summary>
+        internal Action<DrawingSetRecord> AddToRelease { get; private set; }
 
         /// <summary>Pick mode: an active set was double-clicked (or chosen with Enter).</summary>
         public event EventHandler SetActivated;
@@ -87,6 +88,14 @@ namespace OpenNest.Controls
 
         /// <summary>The highlighted set as listed (without members).</summary>
         public DrawingSetRecord SelectedSet => setGrid.CurrentRow?.Tag as DrawingSetRecord;
+
+        /// <summary>The selected sets as listed, in list order; the highlighted one when none is selected.</summary>
+        internal IReadOnlyList<DrawingSetRecord> SelectedSets()
+        {
+            var selected = setGrid.SelectedRows.Cast<DataGridViewRow>().OrderBy(r => r.Index)
+                .Select(r => r.Tag).OfType<DrawingSetRecord>().ToList();
+            return selected.Count > 0 || SelectedSet == null ? selected : new[] { SelectedSet };
+        }
 
         /// <param name="library">Used by the set editor to pick drawings.</param>
         /// <param name="pick">Choose an active set instead of managing them.</param>
@@ -135,11 +144,9 @@ namespace OpenNest.Controls
                 });
                 form.ShowDialog(FindForm());
             };
-            ShowRelease = set =>
-            {
-                using var form = new ReleaseSetForm(sets, library, nests, this.serverUrl, set, openNest) { IsNestOpen = isNestOpen };
-                form.ShowDialog(FindForm());
-            };
+            setGrid.MultiSelect = !pick;
+            // Add to Release acts on every selected set.
+            setGrid.SelectionChanged += (_, _) => UpdateCommands();
 
             if (pick)
             {
@@ -155,19 +162,16 @@ namespace OpenNest.Controls
         }
 
         /// <summary>
-        /// Shows Release, which makes nests from the selected set and any others the operator
-        /// adds: saves them through <paramref name="nests"/> and opens each with
-        /// <paramref name="openNest"/>. <paramref name="isNestOpen"/> says whether a server nest
-        /// is open in a tab, which keeps a release from merging into it.
+        /// Shows Add to Release and makes a double-click or Enter add the set, read with its
+        /// members' current drawings, through <paramref name="addToRelease"/>.
         /// </summary>
-        public void EnableRelease(INestRepository nests, Action<Nest, NestRecord> openNest, Func<Guid, bool> isNestOpen = null)
+        public void EnableRelease(Action<DrawingSetRecord> addToRelease)
         {
-            this.isNestOpen = isNestOpen ?? (_ => false);
             if (session == null || pick)
                 throw new InvalidOperationException("Release needs an initialized set browser that is not picking.");
-            this.nests = nests ?? throw new ArgumentNullException(nameof(nests));
-            this.openNest = openNest ?? throw new ArgumentNullException(nameof(openNest));
+            AddToRelease = addToRelease ?? throw new ArgumentNullException(nameof(addToRelease));
             releaseButton.Visible = true;
+            addToReleaseMenuItem.Visible = true;
             UpdateCommands();
         }
 
@@ -223,6 +227,8 @@ namespace OpenNest.Controls
                 return;
             if (pick)
                 ActivateSelected();
+            else if (AddToRelease != null)
+                await AddSelectedToReleaseAsync(highlightedOnly: true);
             else
                 await EditSelectedAsync();
         }
@@ -249,6 +255,8 @@ namespace OpenNest.Controls
             {
                 if (pick)
                     ActivateSelected();
+                else if (AddToRelease != null)
+                    _ = AddSelectedToReleaseAsync();
                 else
                     _ = EditSelectedAsync();
                 return true;
@@ -277,7 +285,7 @@ namespace OpenNest.Controls
                 ShowReleases?.Invoke(set);
         }
 
-        private async void ReleaseButton_Click(object sender, EventArgs e) => await ReleaseSelectedAsync();
+        private async void ReleaseButton_Click(object sender, EventArgs e) => await AddSelectedToReleaseAsync();
 
         private async void ImportBomMenuItem_Click(object sender, EventArgs e) => await ImportBomAsync();
 
@@ -307,24 +315,41 @@ namespace OpenNest.Controls
                 statusLabel.Text = $"Saved set '{saved.Name}' revision {saved.Revision}.";
         }
 
-        /// <summary>Reads the selected active set with its members' current drawings and opens the release dialog.</summary>
-        internal async Task ReleaseSelectedAsync()
+        /// <summary>
+        /// Reads each selected active set with its members' current drawings and adds it to the
+        /// release at one kit; <paramref name="highlightedOnly"/> takes just the highlighted one,
+        /// as a double-click does.
+        /// </summary>
+        internal async Task AddSelectedToReleaseAsync(bool highlightedOnly = false)
         {
-            var listed = SelectedSet;
-            if (session == null || nests == null || listed == null || listed.Archived || busy)
+            if (session == null || AddToRelease == null || busy)
+                return;
+            var chosen = (highlightedOnly && SelectedSet != null ? new[] { SelectedSet } : SelectedSets())
+                .Where(s => !s.Archived).ToList();
+            if (chosen.Count == 0)
                 return;
 
-            DrawingSetRecord current;
+            var read = new List<DrawingSetRecord>();
+            var gone = new List<string>();
             busy = true;
             UpdateCommands();
-            statusLabel.Text = $"Reading set '{listed.Name}'...";
             try
             {
-                current = await sets.GetAsync(listed.Id);
+                foreach (var listed in chosen)
+                {
+                    statusLabel.Text = $"Reading set '{listed.Name}'...";
+                    var current = await sets.GetAsync(listed.Id);
+                    if (IsDisposed)
+                        return;
+                    if (current == null || current.Archived)
+                        gone.Add(listed.Name);
+                    else
+                        read.Add(current);
+                }
             }
             catch (Exception ex) when (ex is IOException || ex is HttpRequestException || ex is TaskCanceledException)
             {
-                Fail($"Could not read set '{listed.Name}': {ex.Message}");
+                Fail($"Could not read the set: {ex.Message}");
                 return;
             }
             finally
@@ -334,19 +359,15 @@ namespace OpenNest.Controls
                     UpdateCommands();
             }
 
-            if (IsDisposed)
-                return;
             statusLabel.Text = "";
-            if (current == null || current.Archived)
+            foreach (var set in read)
+                AddToRelease(set);
+            if (gone.Count > 0)
             {
-                ShowMessage(current == null
-                    ? $"Set '{listed.Name}' no longer exists on the server."
-                    : $"Set '{listed.Name}' was archived. Restore it to release it.", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ShowMessage($"No longer releasable (deleted or archived since listed): {string.Join(", ", gone.Select(n => $"'{n}'"))}.",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 await RunAsync(session.RefreshAsync);
-                return;
             }
-
-            ShowRelease(current);
         }
 
         /// <summary>
@@ -554,6 +575,8 @@ namespace OpenNest.Controls
             var ready = session != null && !busy;
             newButton.Enabled = ready;
             editButton.Enabled = ready && selected is { Archived: false };
+            editMenuItem.Enabled = editButton.Enabled;
+            editMenuItem.Visible = editSeparator.Visible = !pick;
             previewButton.Enabled = previewMenuItem.Enabled = ready && !pick && selected is { MemberCount: > 0 };
             archiveMenuItem.Enabled = ready && selected != null;
             archiveMenuItem.Text = selected is { Archived: true } ? "&Restore" : "&Archive";
@@ -562,7 +585,9 @@ namespace OpenNest.Controls
             importBomMenuItem.Enabled = ready && !pick;
             moreButton.Enabled = previewMenuItem.Enabled || archiveMenuItem.Enabled || historyMenuItem.Enabled || releasesMenuItem.Enabled
                 || importBomMenuItem.Enabled;
-            releaseButton.Enabled = ready && nests != null && selected is { Archived: false, MemberCount: > 0 };
+            releaseButton.Enabled = ready && AddToRelease != null
+                && SelectedSets().Any(s => !s.Archived && s.MemberCount > 0);
+            addToReleaseMenuItem.Enabled = releaseButton.Enabled;
         }
     }
 }
