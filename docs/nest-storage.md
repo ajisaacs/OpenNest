@@ -414,16 +414,21 @@ a set shows its notes.
 
 - **New Set...** and **Edit...** open the set editor
   (`OpenNest.Data.DrawingSetEditSession`): name, customer, notes and the member
-  grid (drawing, material, grade, thickness, units, cut type, quantity, note).
+  grid: drawing, material (name, grade, thickness and units in one column, such
+  as "Steel A36 0.25 in"), quantity per set and a note. A cut type column
+  appears only when the set mixes cut types.
   The editor's left pane browses the library in place, with no second dialog:
   every active drawing (never filtered to a nest), searched, sorted and paged
   like the Drawing Library dialog. Select one or several and choose **Add to Set**,
   double-click or press Enter to add them at the entered **Qty per set**.
   Drawings already in the set are greyed; one picked again is skipped and
   named, so there is one member per drawing. Quantities are edited
-  in the grid (1 to 100,000); **Remove**, **Move Up** and **Move Down** change
-  the list. The note column flags drawings archived in the library (skipped on
-  release unless included) and drawings with no material or thickness (cannot be
+  in the grid (1 to 100,000) and **Remove** drops a member. Members stay in
+  the order they were added (and stored in that order); nothing a release
+  makes depends on it, since materials are grouped and sorted and nests list
+  drawings by name, so the editor has no Move Up/Down. Drag the divider to
+  widen the library pane. The note column flags drawings archived in the
+  library (skipped on release unless included) and drawings with no material or thickness (cannot be
   released until set; double-click to open
   [Edit Drawing](#edit-drawing-desktop)).
 - **Save** adds a revision guarded by the revision the set was read at; a 409 is

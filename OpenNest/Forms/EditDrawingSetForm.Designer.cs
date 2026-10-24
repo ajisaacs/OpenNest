@@ -18,7 +18,6 @@ namespace OpenNest.Forms
         private void InitializeComponent()
         {
             components = new System.ComponentModel.Container();
-            System.Windows.Forms.DataGridViewCellStyle rightAligned = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle quantityStyle = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle libraryRightAligned = new System.Windows.Forms.DataGridViewCellStyle();
             layoutTable = new System.Windows.Forms.TableLayoutPanel();
@@ -52,17 +51,12 @@ namespace OpenNest.Forms
             memberGrid = new System.Windows.Forms.DataGridView();
             drawingColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             materialColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            gradeColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            thicknessColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            unitsColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             cutTypeColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             quantityColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             warningColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             memberButtons = new System.Windows.Forms.FlowLayoutPanel();
             editDrawingButton = new System.Windows.Forms.Button();
             removeButton = new System.Windows.Forms.Button();
-            upButton = new System.Windows.Forms.Button();
-            downButton = new System.Windows.Forms.Button();
             bottomTable = new System.Windows.Forms.TableLayoutPanel();
             summaryLabel = new System.Windows.Forms.Label();
             historyButton = new System.Windows.Forms.Button();
@@ -109,7 +103,7 @@ namespace OpenNest.Forms
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            layoutTable.Size = new System.Drawing.Size(1264, 641);
+            layoutTable.Size = new System.Drawing.Size(1040, 641);
             layoutTable.TabIndex = 0;
             //
             // detailsTable
@@ -193,11 +187,11 @@ namespace OpenNest.Forms
             splitContainer.Name = "splitContainer";
             splitContainer.Panel1.Controls.Add(libraryGroup);
             splitContainer.Panel2.Controls.Add(memberGroup);
-            splitContainer.Size = new System.Drawing.Size(1248, 470);
-            splitContainer.SplitterDistance = 450;
+            splitContainer.Size = new System.Drawing.Size(1024, 470);
+            splitContainer.SplitterDistance = 440;
             splitContainer.SplitterWidth = 6;
             splitContainer.Panel1MinSize = 320;
-            splitContainer.Panel2MinSize = 420;
+            splitContainer.Panel2MinSize = 380;
             splitContainer.TabIndex = 1;
             //
             // libraryGroup
@@ -424,7 +418,7 @@ namespace OpenNest.Forms
             memberGrid.AllowUserToDeleteRows = false;
             memberGrid.AllowUserToOrderColumns = false;
             memberGrid.ContextMenuStrip = memberMenu;
-            memberGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { drawingColumn, materialColumn, gradeColumn, thicknessColumn, unitsColumn, cutTypeColumn, quantityColumn, warningColumn });
+            memberGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { drawingColumn, materialColumn, cutTypeColumn, quantityColumn, warningColumn });
             memberGrid.Dock = System.Windows.Forms.DockStyle.Fill;
             memberGrid.EditMode = System.Windows.Forms.DataGridViewEditMode.EditOnKeystrokeOrF2;
             memberGrid.Margin = new System.Windows.Forms.Padding(0);
@@ -447,7 +441,7 @@ namespace OpenNest.Forms
             drawingColumn.Name = "drawingColumn";
             drawingColumn.ReadOnly = true;
             drawingColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            drawingColumn.Width = 150;
+            drawingColumn.Width = 140;
             //
             // materialColumn
             //
@@ -455,33 +449,8 @@ namespace OpenNest.Forms
             materialColumn.Name = "materialColumn";
             materialColumn.ReadOnly = true;
             materialColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            materialColumn.Width = 100;
-            //
-            // gradeColumn
-            //
-            gradeColumn.HeaderText = "Grade";
-            gradeColumn.Name = "gradeColumn";
-            gradeColumn.ReadOnly = true;
-            gradeColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            gradeColumn.Width = 60;
-            //
-            // thicknessColumn
-            //
-            rightAligned.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleRight;
-            thicknessColumn.DefaultCellStyle = rightAligned;
-            thicknessColumn.HeaderText = "Thickness";
-            thicknessColumn.Name = "thicknessColumn";
-            thicknessColumn.ReadOnly = true;
-            thicknessColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            thicknessColumn.Width = 70;
-            //
-            // unitsColumn
-            //
-            unitsColumn.HeaderText = "Units";
-            unitsColumn.Name = "unitsColumn";
-            unitsColumn.ReadOnly = true;
-            unitsColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            unitsColumn.Width = 50;
+            materialColumn.ToolTipText = "Material, grade, thickness and units";
+            materialColumn.Width = 150;
             //
             // cutTypeColumn
             //
@@ -489,6 +458,8 @@ namespace OpenNest.Forms
             cutTypeColumn.Name = "cutTypeColumn";
             cutTypeColumn.ReadOnly = true;
             cutTypeColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            cutTypeColumn.ToolTipText = "Shown when the set mixes cut types";
+            cutTypeColumn.Visible = false;
             cutTypeColumn.Width = 65;
             //
             // quantityColumn
@@ -517,8 +488,6 @@ namespace OpenNest.Forms
             memberButtons.AutoSize = true;
             memberButtons.Controls.Add(editDrawingButton);
             memberButtons.Controls.Add(removeButton);
-            memberButtons.Controls.Add(upButton);
-            memberButtons.Controls.Add(downButton);
             memberButtons.Dock = System.Windows.Forms.DockStyle.Fill;
             memberButtons.FlowDirection = System.Windows.Forms.FlowDirection.TopDown;
             memberButtons.Margin = new System.Windows.Forms.Padding(6, 0, 0, 0);
@@ -540,35 +509,13 @@ namespace OpenNest.Forms
             // removeButton
             //
             removeButton.Enabled = false;
-            removeButton.Margin = new System.Windows.Forms.Padding(0, 0, 0, 3);
+            removeButton.Margin = new System.Windows.Forms.Padding(0);
             removeButton.Name = "removeButton";
             removeButton.Size = new System.Drawing.Size(100, 28);
             removeButton.TabIndex = 1;
             removeButton.Text = "Remove";
             removeButton.UseVisualStyleBackColor = true;
             removeButton.Click += RemoveButton_Click;
-            //
-            // upButton
-            //
-            upButton.Enabled = false;
-            upButton.Margin = new System.Windows.Forms.Padding(0, 12, 0, 3);
-            upButton.Name = "upButton";
-            upButton.Size = new System.Drawing.Size(100, 28);
-            upButton.TabIndex = 2;
-            upButton.Text = "Move Up";
-            upButton.UseVisualStyleBackColor = true;
-            upButton.Click += UpButton_Click;
-            //
-            // downButton
-            //
-            downButton.Enabled = false;
-            downButton.Margin = new System.Windows.Forms.Padding(0, 0, 0, 3);
-            downButton.Name = "downButton";
-            downButton.Size = new System.Drawing.Size(100, 28);
-            downButton.TabIndex = 3;
-            downButton.Text = "Move Down";
-            downButton.UseVisualStyleBackColor = true;
-            downButton.Click += DownButton_Click;
             //
             // bottomTable
             //
@@ -662,11 +609,11 @@ namespace OpenNest.Forms
             //
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             CancelButton = cancelButton;
-            ClientSize = new System.Drawing.Size(1264, 641);
+            ClientSize = new System.Drawing.Size(1040, 641);
             Controls.Add(layoutTable);
             Font = new System.Drawing.Font("Segoe UI", 9.75F);
             MinimizeBox = false;
-            MinimumSize = new System.Drawing.Size(1000, 480);
+            MinimumSize = new System.Drawing.Size(840, 480);
             Name = "EditDrawingSetForm";
             ShowIcon = false;
             ShowInTaskbar = false;
@@ -733,16 +680,11 @@ namespace OpenNest.Forms
         private System.Windows.Forms.DataGridView memberGrid;
         private System.Windows.Forms.DataGridViewTextBoxColumn drawingColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn materialColumn;
-        private System.Windows.Forms.DataGridViewTextBoxColumn gradeColumn;
-        private System.Windows.Forms.DataGridViewTextBoxColumn thicknessColumn;
-        private System.Windows.Forms.DataGridViewTextBoxColumn unitsColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn cutTypeColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn quantityColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn warningColumn;
         private System.Windows.Forms.FlowLayoutPanel memberButtons;
         private System.Windows.Forms.Button removeButton;
-        private System.Windows.Forms.Button upButton;
-        private System.Windows.Forms.Button downButton;
         private System.Windows.Forms.TableLayoutPanel bottomTable;
         private System.Windows.Forms.Label summaryLabel;
         private System.Windows.Forms.Button historyButton;

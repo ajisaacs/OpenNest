@@ -14,7 +14,7 @@ namespace OpenNest.Forms
 {
     /// <summary>
     /// Creates or edits one drawing set through <see cref="DrawingSetEditSession"/>: name,
-    /// customer, notes and the ordered members with a quantity each. The drawing library is
+    /// customer, notes and the members with a quantity each. The drawing library is
     /// browsed in the left pane (every active drawing, a page at a time through
     /// <see cref="DrawingLibraryBrowseSession"/>); Add to Set, a double-click or Enter adds the
     /// selected drawings at the entered quantity, and a drawing already in the set is greyed
@@ -22,7 +22,8 @@ namespace OpenNest.Forms
     /// the button) reads the member's current library record and edits its details there, so
     /// a drawing without a material or thickness can be fixed in place. History lists a saved
     /// set's revisions. Saving adds a revision on the server, guarded by the revision the set
-    /// was read at.
+    /// was read at. Members keep the order they were added in: nothing a release makes depends
+    /// on it (materials are grouped and sorted, nests list drawings by name), so it is not edited.
     /// </summary>
     public partial class EditDrawingSetForm : Form
     {
@@ -131,7 +132,7 @@ namespace OpenNest.Forms
             e.Cancel = true;
         }
 
-        // A programmatic EndEdit (Save, Remove, Move) commits without validating, so check again.
+        // A programmatic EndEdit (Save, Remove, Edit Drawing) commits without validating, so check again.
         private void MemberGrid_CellEndEdit(object sender, DataGridViewCellEventArgs e)
         {
             if (e.ColumnIndex != quantityColumn.Index)
@@ -309,19 +310,6 @@ namespace OpenNest.Forms
                 Populate(index);
         }
 
-        private void UpButton_Click(object sender, EventArgs e) => MoveSelected(-1);
-
-        private void DownButton_Click(object sender, EventArgs e) => MoveSelected(1);
-
-        private void MoveSelected(int offset)
-        {
-            var index = SelectedIndex();
-            if (index < 0 || !memberGrid.EndEdit() || !session.Move(index, offset))
-                return;
-            Populate(index + offset);
-            UpdateCommands();
-        }
-
         /// <summary>
         /// Adds the drawings selected in the library pane, in list order, at the entered
         /// quantity, skipping those already in the set.
@@ -446,19 +434,21 @@ namespace OpenNest.Forms
         private void Populate(int select)
         {
             memberGrid.Rows.Clear();
+            // Most sets are cut one way; the column appears only when the cut type tells members apart.
+            cutTypeColumn.Visible = session.Members
+                .Where(m => m.Drawing != null).Select(m => m.Drawing.CutType).Distinct().Skip(1).Any();
             foreach (var member in session.Members)
             {
                 var drawing = member.Drawing;
                 var index = memberGrid.Rows.Add(
                     drawing?.Name ?? member.DrawingId.ToString(),
-                    drawing?.MaterialName ?? "",
-                    drawing?.MaterialGrade ?? "",
-                    drawing == null ? "" : drawing.Thickness.ToString("0.####", CultureInfo.CurrentCulture),
-                    drawing?.Units.ToString() ?? "",
+                    MaterialText(drawing),
                     drawing?.CutType.ToString() ?? "",
                     member.Quantity,
                     Warning(drawing));
-                memberGrid.Rows[index].Tag = member;
+                var row = memberGrid.Rows[index];
+                row.Tag = member;
+                row.Cells[warningColumn.Index].ToolTipText = (string)row.Cells[warningColumn.Index].Value;
             }
 
             if (select >= 0 && select < memberGrid.Rows.Count)
@@ -471,6 +461,18 @@ namespace OpenNest.Forms
             summaryLabel.Text = session.Members.Count == 0
                 ? "No drawings yet. Select drawings in the library on the left and choose Add to Set."
                 : $"{session.Members.Count:N0} drawing{(session.Members.Count == 1 ? "" : "s")}, {parts:N0} part{(parts == 1 ? "" : "s")} per set";
+        }
+
+        /// <summary>Material, grade, thickness and units in one line, such as "Steel A36 0.25 in".</summary>
+        internal static string MaterialText(DrawingLibraryRecord drawing)
+        {
+            if (drawing == null)
+                return "";
+            var thickness = drawing.Thickness > 0
+                ? $"{drawing.Thickness.ToString("0.####", CultureInfo.CurrentCulture)} {UnitsHelper.GetShortString(drawing.Units)}"
+                : "";
+            return string.Join(" ", new[] { drawing.MaterialName, drawing.MaterialGrade, thickness }
+                .Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()));
         }
 
         private static string Warning(DrawingLibraryRecord drawing)
@@ -493,8 +495,6 @@ namespace OpenNest.Forms
             UpdateAddCommand();
             editDrawingButton.Enabled = !saving && !editing && index >= 0;
             removeButton.Enabled = !saving && index >= 0;
-            upButton.Enabled = !saving && index > 0;
-            downButton.Enabled = !saving && index >= 0 && index < session.Members.Count - 1;
             saveButton.Enabled = !saving && error == null && session.IsChanged;
             if (!saving)
                 statusLabel.Text = error == null ? "" : char.ToUpper(error[0], CultureInfo.CurrentCulture) + error[1..];

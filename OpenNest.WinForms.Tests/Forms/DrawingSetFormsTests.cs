@@ -322,7 +322,7 @@ public class DrawingSetFormsTests
     }
 
     [Fact]
-    public void Editor_EditsQuantityOrderAndMembers_AndAsksBeforeDiscarding()
+    public void Editor_EditsQuantityAndMembers_KeepsTheirOrder_AndAsksBeforeDiscarding()
     {
         StaTestThread.Run(
             () =>
@@ -358,9 +358,10 @@ public class DrawingSetFormsTests
                 grid.EditingControl!.Text = "12";
                 Assert.True(grid.EndEdit());
                 Assert.Equal("", grid.Rows[0].ErrorText);
-                grid.CurrentCell = grid.Rows[2].Cells["drawingColumn"];
-                Field<Button>(editor, "upButton").PerformClick();
-                grid.CurrentCell = grid.Rows[2].Cells["drawingColumn"];
+                // Member order changes nothing a release makes, so there is no Move Up/Down.
+                Assert.Null(typeof(EditDrawingSetForm).GetField("upButton", BindingFlags.Instance | BindingFlags.NonPublic));
+                Assert.Null(typeof(EditDrawingSetForm).GetField("downButton", BindingFlags.Instance | BindingFlags.NonPublic));
+                grid.CurrentCell = grid.Rows[1].Cells["drawingColumn"];
                 Field<Button>(editor, "removeButton").PerformClick();
                 Assert.True(save.Enabled);
 
@@ -415,7 +416,7 @@ public class DrawingSetFormsTests
 
                 var edit = Assert.Single(edits);
                 Assert.Equal((a.Id, 2, "Newer notes"), (edit.Listed.Id, edit.Listed.Revision, edit.Listed.Notes));
-                Assert.Equal("Synthetic Aluminum", grid.Rows[0].Cells["materialColumn"].Value);
+                Assert.Equal("Synthetic Aluminum Grade A 0.125 in", grid.Rows[0].Cells["materialColumn"].Value);
                 Assert.Equal("", grid.Rows[0].Cells["warningColumn"].Value);
                 Assert.Contains("revision 3", Field<Label>(editor, "statusLabel").Text);
                 // Members are listed by id, so the set has nothing new to save.
@@ -423,6 +424,58 @@ public class DrawingSetFormsTests
             },
             TestTimeout,
             "The set editor edit drawing test did not complete.");
+    }
+
+    [Fact]
+    public void Editor_ShowsMaterialInOneColumn_AndCutTypeOnlyWhenMixed()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel", 0.25);
+                var b = library.Add("SYN-B", "", 0);
+                var c = library.Add("SYN-C", "Synthetic Steel", 6);
+                c.MaterialGrade = "";
+                c.Units = Units.Millimeters;
+                c.CutType = CutType.Waterjet;
+                var sets = new InMemoryDrawingSets();
+                var created = Run(sets.CreateAsync(new DrawingSetRecord
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Synthetic kit",
+                    Members = new[] { a, b }.Select(d => new DrawingSetMember { DrawingId = d.Id, Quantity = 1, Drawing = d }).ToList(),
+                }));
+
+                using var editor = new EditDrawingSetForm(new DrawingSetEditSession(sets, created, "Synthetic operator"), library, Server);
+                editor.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                editor.Show();
+                var grid = Field<DataGridView>(editor, "memberGrid");
+
+                Assert.Equal(new[] { "drawingColumn", "materialColumn", "quantityColumn", "warningColumn" },
+                    grid.Columns.Cast<DataGridViewColumn>().Where(col => col.Visible).OrderBy(col => col.DisplayIndex).Select(col => col.Name));
+                Assert.Equal("Synthetic Steel Grade A 0.25 in", grid.Rows[0].Cells["materialColumn"].Value);
+                // Grade A alone: no material name or thickness to show.
+                Assert.Equal("Grade A", grid.Rows[1].Cells["materialColumn"].Value);
+                Assert.Equal("Qty", grid.Columns["quantityColumn"].HeaderText);
+
+                // Another cut type in the set brings the column back.
+                var libraryGrid = Field<DataGridView>(editor, "libraryGrid");
+                PumpUntil(() => libraryGrid.Rows.Count == 3, "the editor's library pane");
+                libraryGrid.ClearSelection();
+                libraryGrid.Rows[2].Selected = true;
+                editor.AddSelectedDrawings();
+                Assert.Equal(3, grid.Rows.Count);
+                Assert.True(grid.Columns["cutTypeColumn"].Visible);
+                Assert.Equal("Synthetic Steel 6 mm", grid.Rows[2].Cells["materialColumn"].Value);
+                Assert.Equal("Waterjet", grid.Rows[2].Cells["cutTypeColumn"].Value);
+
+                grid.CurrentCell = grid.Rows[2].Cells["drawingColumn"];
+                Field<Button>(editor, "removeButton").PerformClick();
+                Assert.False(grid.Columns["cutTypeColumn"].Visible);
+            },
+            TestTimeout,
+            "The set editor columns test did not complete.");
     }
 
     [Fact]
