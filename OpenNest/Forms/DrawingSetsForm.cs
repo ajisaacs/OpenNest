@@ -43,6 +43,8 @@ namespace OpenNest.Forms
             libraryView.ShowReleases = drawing => _ = ShowReleasesAsync(drawing: drawing);
             releasesView.Initialize(sets);
             Text = $"Drawing Library — {serverUrl}";
+            // Shown as an MDI child, where a DialogResult button no longer closes the window.
+            closeButton.Click += (_, _) => Close();
         }
 
         /// <summary>
@@ -84,6 +86,13 @@ namespace OpenNest.Forms
         /// </summary>
         public bool ImportBomWhenShown { get; set; }
 
+        /// <summary>Switches to the Sets tab and opens Import BOM on it.</summary>
+        public Task ImportBomAsync()
+        {
+            ShowSets();
+            return browser.ImportBomAsync();
+        }
+
         private async void DrawingSetsForm_Shown(object sender, EventArgs e)
         {
             shown = true;
@@ -91,8 +100,7 @@ namespace OpenNest.Forms
             if (ImportBomWhenShown && !IsDisposed)
             {
                 ImportBomWhenShown = false;
-                ShowSets();
-                await browser.ImportBomAsync();
+                await ImportBomAsync();
             }
         }
 

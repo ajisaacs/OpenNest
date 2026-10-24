@@ -143,6 +143,22 @@ namespace OpenNest.Forms
             if (!NestStorage.Settings.IsDatabaseMode)
                 return;
 
+            // One Drawing Sets window at a time: a second menu click brings it forward on the tab asked for.
+            var open = MdiChildren.OfType<DrawingSetsForm>().FirstOrDefault();
+            if (open != null)
+            {
+                open.Activate();
+                if (releases)
+                    _ = open.ShowReleasesAsync();
+                else if (libraryTab)
+                    open.ShowLibrary();
+                else if (importBom)
+                    _ = open.ImportBomAsync();
+                else
+                    open.ShowSets();
+                return;
+            }
+
             IDrawingLibraryStore library;
             IDrawingSetStore sets;
             INestRepository nests;
@@ -158,14 +174,17 @@ namespace OpenNest.Forms
                 return;
             }
 
-            using var form = new DrawingSetsForm(sets, library, NestStorage.Settings.ServerUrl);
+            // An MDI child beside the nest tabs, maximized when it opens; disposed when closed.
+            var form = new DrawingSetsForm(sets, library, NestStorage.Settings.ServerUrl);
             form.EnableRelease(nests, OpenServerNest, IsServerNestOpen);
             if (releases)
                 _ = form.ShowReleasesAsync();
             else if (libraryTab)
                 form.ShowLibrary();
             form.ImportBomWhenShown = importBom;
-            form.ShowDialog(this);
+            form.MdiParent = this;
+            form.WindowState = FormWindowState.Maximized;
+            form.Show();
         }
 
         private async void Save_Click(object sender, EventArgs e)
