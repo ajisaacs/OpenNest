@@ -219,6 +219,8 @@ public class SetReleasePlanTests
         var laser = plan.Groups.Single(g => g.CutType == CutType.Laser);
         Assert.False(laser.CanRelease);
         Assert.Contains("2 drawings in this group are named 'SYN-A'", laser.Refusal);
+        Assert.Equal(new[] { "SYN-A", "SYN-A" }, laser.RefusedItems.Select(i => i.Drawing.Name));
+        Assert.Empty(plan.Groups.Single(g => g.CutType == CutType.Plasma).RefusedItems);
         // The same name in another group, or differently cased, nests separately.
         Assert.True(plan.Groups.Single(g => g.CutType == CutType.Plasma).CanRelease);
     }
@@ -238,6 +240,7 @@ public class SetReleasePlanTests
         Assert.Equal(new[] { "SYN-NOMAT", "SYN-NOTHICK" }, unassigned.Items.Select(i => i.Drawing.Name));
         Assert.False(unassigned.CanRelease);
         Assert.Contains("no material or thickness", unassigned.Refusal);
+        Assert.Equal(unassigned.Items, unassigned.RefusedItems);
         Assert.False(plan.Groups[0].IsUnassigned);
     }
 

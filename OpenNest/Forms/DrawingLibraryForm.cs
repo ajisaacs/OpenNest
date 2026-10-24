@@ -14,13 +14,15 @@ using OpenNest.IO;
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// Nest &gt; Add from Drawing Library (Database mode). Browses the server drawing library
-    /// one bounded page at a time through <see cref="DrawingLibraryBrowseSession"/>, filtered
-    /// to the nest's material and thickness unless Show all is ticked. Add downloads the
-    /// listed revision's exact package, plans it with <see cref="LibraryDrawingInsert"/>,
-    /// shows any warning or refusal first and only then changes the nest. Edit Drawing
-    /// changes the selected drawing's details (name, customer, material, grade, thickness,
-    /// cut type), notes and nesting settings (Cut first, priority, rotation, color) on the server as a new revision with the same package. With a set
+    /// Nest &gt; Add from Drawing Library and File &gt; Drawing Library (Database mode). Browses
+    /// the server drawing library one bounded page at a time through
+    /// <see cref="DrawingLibraryBrowseSession"/>, filtered to the nest's material and thickness
+    /// unless Show all is ticked. Add downloads the listed revision's exact package, plans it
+    /// with <see cref="LibraryDrawingInsert"/>, shows any warning or refusal first and only then
+    /// changes the nest. Opened without a nest, it lists every active drawing and has no Add or
+    /// In This Nest tab; a double-click edits the drawing instead. Edit Drawing changes the
+    /// selected drawing's details, notes and nesting settings (Cut first, priority, rotation,
+    /// color) on the server as a new revision with the same package. With a set
     /// store, the drawing grid's menu lists the sets a drawing is in, adds it to a set, lists
     /// the releases that had it on its own and, once release is enabled, releases it; sets
     /// themselves are browsed and released in <see cref="DrawingSetsForm"/>.
@@ -56,7 +58,7 @@ namespace OpenNest.Forms
         /// <summary>Shows a message and returns the operator's answer; replaced by tests.</summary>
         internal Func<string, MessageBoxButtons, MessageBoxIcon, DialogResult> ShowMessage { get; set; }
 
-        /// <summary>Shows the settings editor and returns the saved record, or null; replaced by tests.</summary>
+        /// <summary>Shows Edit Drawing and returns the saved record, or null; replaced by tests.</summary>
         internal Func<DrawingLibraryEditSession, DrawingLibraryRecord> EditDrawing { get; set; }
 
         /// <summary>
@@ -89,6 +91,7 @@ namespace OpenNest.Forms
         /// </summary>
         public bool QuantitiesChanged { get; private set; }
 
+        /// <param name="nest">The nest to add drawings to, or null to browse and edit the library alone.</param>
         /// <param name="sets">Enables Used in Sets and Add to Set; null hides them.</param>
         public DrawingLibraryForm(IDrawingLibraryStore library, string serverUrl, Nest nest, IDrawingSetStore sets = null)
         {
@@ -100,7 +103,7 @@ namespace OpenNest.Forms
             };
             this.library = library ?? throw new ArgumentNullException(nameof(library));
             this.serverUrl = serverUrl ?? "";
-            this.nest = nest ?? throw new ArgumentNullException(nameof(nest));
+            this.nest = nest;
             this.sets = sets;
             session = new DrawingLibraryBrowseSession(library, nest);
             Disposed += (_, _) => session.Dispose();
@@ -148,10 +151,19 @@ namespace OpenNest.Forms
             revisionColumn.Tag = DrawingSortField.Revision;
             savedColumn.Tag = DrawingSortField.SavedAt;
 
-            Text = $"Add from Drawing Library — {this.serverUrl}";
+            Text = nest == null ? $"Drawing Library — {this.serverUrl}" : $"Add from Drawing Library — {this.serverUrl}";
+            if (nest == null)
+            {
+                tabControl.TabPages.Remove(nestTab);
+                addButton.Visible = false;
+                showAllCheckBox.Visible = false;
+                // The quantity is only for adding to a set or releasing.
+                quantityLabel.Visible = quantityBox.Visible = sets != null;
+            }
 
-            if (sets != null)
-                drawingGrid.ContextMenuStrip = drawingMenu;
+            drawingGrid.ContextMenuStrip = drawingMenu;
+            editSeparator.Visible = sets != null;
+            usedInSetsMenuItem.Visible = addToSetMenuItem.Visible = releasesMenuItem.Visible = sets != null;
             showAllCheckBox.Enabled = session.IsFilteredToNest;
             UpdateFilterLabel();
             pager.UpdateNavigation();
@@ -354,7 +366,11 @@ namespace OpenNest.Forms
 
         private async void DrawingGrid_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
         {
-            if (e.RowIndex >= 0)
+            if (e.RowIndex < 0)
+                return;
+            if (nest == null)
+                await EditSelectedAsync();
+            else
                 await AddSelectedAsync();
         }
 
@@ -392,6 +408,7 @@ namespace OpenNest.Forms
         private void DrawingMenu_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
             var record = SelectedRecord();
+            editMenuItem.Enabled = record is { Archived: false } && !adding;
             usedInSetsMenuItem.Enabled = record != null && !adding;
             addToSetMenuItem.Enabled = record != null && !adding;
             releaseMenuItem.Enabled = record is { Archived: false } && !adding && ShowRelease != null;
@@ -565,8 +582,8 @@ namespace OpenNest.Forms
         private async void EditButton_Click(object sender, EventArgs e) => await EditSelectedAsync();
 
         /// <summary>
-        /// Edits the selected drawing's details, notes and nesting settings as a new library revision,
-        /// then reloads the page so the list shows the saved revision.
+        /// Edits the selected drawing's details, notes and nesting settings as a new library
+        /// revision, then reloads the page so the list shows the saved revision.
         /// </summary>
         internal async Task EditSelectedAsync()
         {
@@ -586,7 +603,7 @@ namespace OpenNest.Forms
         {
             if (keyData == Keys.Enter && drawingGrid.ContainsFocus && SelectedRecord() != null)
             {
-                _ = AddSelectedAsync();
+                _ = nest == null ? EditSelectedAsync() : AddSelectedAsync();
                 return true;
             }
 
@@ -601,7 +618,7 @@ namespace OpenNest.Forms
         internal async Task AddSelectedAsync()
         {
             var record = SelectedRecord();
-            if (record == null || adding)
+            if (record == null || adding || nest == null)
                 return;
 
             adding = true;
@@ -706,12 +723,18 @@ namespace OpenNest.Forms
 
         private void UpdateCommands()
         {
-            addButton.Enabled = !adding && SelectedRecord() != null;
+            addButton.Enabled = !adding && nest != null && SelectedRecord() != null;
             editButton.Enabled = !adding && SelectedRecord() is { Archived: false };
         }
 
         private void UpdateFilterLabel(bool showAll = false)
         {
+            if (nest == null)
+            {
+                filterLabel.Text = "Showing every active drawing. Double-click one to edit it.";
+                return;
+            }
+
             if (!session.IsFilteredToNest && !showAll)
             {
                 filterLabel.Text = "This nest has no material or thickness; showing every drawing.";
@@ -738,6 +761,8 @@ namespace OpenNest.Forms
         /// </summary>
         private void RefreshNestTab()
         {
+            if (nest == null)
+                return;
             if (nestGrid.IsCurrentCellInEditMode)
                 nestGrid.CancelEdit();
 

@@ -64,7 +64,8 @@ public sealed class SetReleaseItem
 public sealed class SetReleaseGroup
 {
     internal SetReleaseGroup(string key, DrawingLibraryRecord first, bool unassigned,
-        IReadOnlyList<SetReleaseItem> items, IReadOnlyList<string> warnings, string refusal)
+        IReadOnlyList<SetReleaseItem> items, IReadOnlyList<string> warnings, string refusal,
+        IReadOnlyList<SetReleaseItem> refusedItems)
     {
         Key = key;
         MaterialName = (first.MaterialName ?? "").Trim();
@@ -76,6 +77,7 @@ public sealed class SetReleaseGroup
         Items = items;
         Warnings = warnings;
         Refusal = refusal;
+        RefusedItems = refusedItems;
     }
 
     /// <summary>Identifies the group across rebuilds of the plan (for example after the multiplier changes).</summary>
@@ -112,6 +114,12 @@ public sealed class SetReleaseGroup
     public string Refusal { get; }
 
     public bool CanRelease => Refusal.Length == 0;
+
+    /// <summary>
+    /// The items whose library drawings must be edited before the group can be released (all
+    /// of an unassigned group, or those sharing a name), in set order; empty when it can be.
+    /// </summary>
+    public IReadOnlyList<SetReleaseItem> RefusedItems { get; }
 }
 
 /// <summary>
@@ -312,21 +320,26 @@ public sealed class SetReleasePlan
             .ToList();
 
         var refusal = "";
+        IReadOnlyList<SetReleaseItem> refused = Array.Empty<SetReleaseItem>();
         if (unassigned)
         {
             refusal = $"{Names(items)} {(items.Count == 1 ? "has" : "have")} no material or thickness. "
-                + "Set them on the library drawings, then release again.";
+                + "Set them on the library drawings (Edit Drawing), then release again.";
+            refused = items;
         }
         else
         {
             // Matches LibraryDrawingInsert, which refuses a second drawing with the same name.
             var duplicate = items.GroupBy(i => i.Drawing.Name, StringComparer.Ordinal).FirstOrDefault(g => g.Count() > 1);
             if (duplicate != null)
+            {
                 refusal = $"{duplicate.Count()} drawings in this group are named '{duplicate.Key}'. "
-                    + "A nest keys drawings by name, so rename all but one in the library first.";
+                    + "A nest keys drawings by name, so rename all but one in the library (Edit Drawing) first.";
+                refused = duplicate.ToList();
+            }
         }
 
-        return new SetReleaseGroup(key, items[0].Drawing, unassigned, items, warnings, refusal);
+        return new SetReleaseGroup(key, items[0].Drawing, unassigned, items, warnings, refusal, refused);
     }
 
     private static string Names(IReadOnlyList<SetReleaseItem> items)

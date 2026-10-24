@@ -318,6 +318,92 @@ public class DrawingLibraryFormTests
             "The drawing library details edit test did not complete.");
     }
 
+    [Fact]
+    public void EditDrawing_WarnsBeforeDuplicatingAnotherDrawing_AndCancelSavesNothing()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var record = library.Add("SYN-606", "", "", 0, Units.Millimeters, "No material yet");
+                var twin = library.Add("SYN-707", "Synthetic Steel", "Grade A", 6.35, Units.Millimeters, "");
+                var warnings = new List<string>();
+                var answer = DialogResult.Cancel;
+
+                using var editor = new EditLibraryDrawingForm(new DrawingLibraryEditSession(library, record, "Synthetic operator"));
+                editor.ShowMessage = (text, _, _) => { warnings.Add(text); return answer; };
+                editor.Show();
+                Field<TextBox>(editor, "nameBox").Text = "SYN-707";
+                Field<TextBox>(editor, "materialBox").Text = "Synthetic Steel";
+                Field<TextBox>(editor, "gradeBox").Text = "Grade A";
+                Field<NumericUpDown>(editor, "thicknessBox").Value = 6.35m;
+
+                // The new details duplicate SYN-707: cancelling the warning saves nothing.
+                Run(editor.SaveAsync());
+                Assert.Contains("'SYN-707'", Assert.Single(warnings));
+                Assert.Empty(library.MetadataUpdates);
+                Assert.Null(editor.Saved);
+
+                Field<TextBox>(editor, "nameBox").Text = "SYN-606";
+                Field<ComboBox>(editor, "cutTypeBox").SelectedItem = "Plasma";
+                answer = DialogResult.OK;
+                Run(editor.SaveAsync());
+
+                Assert.Single(warnings);
+                var update = Assert.Single(library.MetadataUpdates);
+                Assert.Equal(("SYN-606", "Synthetic Steel", "Grade A", 6.35, Units.Millimeters, CutType.Plasma),
+                    (update.Record.Name, update.Record.MaterialName, update.Record.MaterialGrade, update.Record.Thickness,
+                        update.Record.Units, update.Record.CutType));
+                Assert.NotEqual(twin.Id, editor.Saved!.Id);
+            },
+            TestTimeout,
+            "The edit drawing duplicate warning test did not complete.");
+    }
+
+    [Fact]
+    public void WithoutANest_ListsEveryDrawing_HasNoAdd_AndEditsOnDoubleClick()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var record = library.Add("SYN-909", "", "", 0, Units.Inches, "");
+                var edited = new List<DrawingLibraryEditSession>();
+
+                using var form = new DrawingLibraryForm(library, Server, null);
+                form.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                form.LoadPreview = (_, _) => Task.FromResult<Drawing>(null!);
+                form.EditDrawing = edit =>
+                {
+                    edited.Add(edit);
+                    var save = edit.SaveAsync(edit.Details with { MaterialName = "Synthetic Steel", Thickness = 0.25 },
+                        edit.Listed.Notes, edit.Listed.Settings ?? new DrawingNestingSettings());
+                    return Run(save);
+                };
+                form.Show();
+                var grid = Field<DataGridView>(form, "drawingGrid");
+                PumpUntil(() => grid.Rows.Count == 1, "the library page");
+
+                var query = Assert.Single(library.Queries);
+                Assert.Equal(("", "", (double?)null), (query.MaterialName, query.MaterialGrade, query.Thickness));
+                Assert.StartsWith("Drawing Library", form.Text);
+                Assert.DoesNotContain(Field<TabPage>(form, "nestTab"), Field<TabControl>(form, "tabControl").TabPages.Cast<TabPage>());
+                Assert.False(Field<Button>(form, "addButton").Visible);
+                Assert.Equal("Edit Drawing...", Field<Button>(form, "editButton").Text);
+                Run(form.AddSelectedAsync());
+                Assert.Empty(library.Downloads);
+
+                typeof(DataGridView).GetMethod("OnCellDoubleClick", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .Invoke(grid, new object[] { new DataGridViewCellEventArgs(0, 0) });
+                PumpUntil(() => Equals(grid.Rows[0].Cells["revisionColumn"].Value, record.Revision + 1), "the reloaded page");
+
+                Assert.Equal(record.Id, Assert.Single(edited).Listed.Id);
+                Assert.Equal("Synthetic Steel", grid.Rows[0].Cells["materialColumn"].Value);
+            },
+            TestTimeout,
+            "The library-only dialog test did not complete.");
+    }
+
     private static Nest MatchingNest() => new("Synthetic job")
     {
         Units = Units.Inches,
@@ -326,6 +412,12 @@ public class DrawingLibraryFormTests
     };
 
     private static void Run(Task task) => PumpUntil(() => task.IsCompleted, "the add to finish");
+
+    private static T Run<T>(Task<T> task)
+    {
+        Run((Task)task);
+        return task.Result;
+    }
 
     private static void PumpUntil(Func<bool> condition, string what)
     {

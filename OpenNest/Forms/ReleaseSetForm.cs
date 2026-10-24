@@ -24,7 +24,10 @@ namespace OpenNest.Forms
     /// the same material, whose layout is discarded. <see cref="SetReleaseSession"/> then builds
     /// those nests, nests each one with Auto Nest when Nest after release is ticked, saves them,
     /// opens each in its own tab, and records the release once every chosen nest exists. The
-    /// dialog shows every group's outcome; a release runs once per dialog.
+    /// dialog shows every group's outcome; a release runs once per dialog. A group refused for
+    /// its drawings (no material or thickness, or two with one name) is not a dead end: Fix
+    /// Drawings, a double-click or the group's right-click menu opens Edit Drawing on the
+    /// current library record, and the plan is rebuilt with what was saved.
     /// </summary>
     public partial class ReleaseSetForm : Form
     {
@@ -32,6 +35,8 @@ namespace OpenNest.Forms
 
         private readonly IDrawingSetStore sets;
         private readonly IDrawingLibrary library;
+        // Edit Drawing needs a writable library; null hides it.
+        private readonly IDrawingLibraryStore libraryStore;
         private readonly INestRepository nests;
         private readonly string serverUrl;
         private readonly Action<Nest, NestRecord> openNest;
@@ -47,6 +52,7 @@ namespace OpenNest.Forms
         private bool populating;
         private bool running;
         private bool loadingDrafts;
+        private bool editing;
 
         /// <summary>Shows a message and returns the operator's answer; replaced by tests.</summary>
         internal Func<string, MessageBoxButtons, MessageBoxIcon, DialogResult> ShowMessage { get; set; }
@@ -71,6 +77,9 @@ namespace OpenNest.Forms
         /// replaced by tests.
         /// </summary>
         internal Action ShowAddDrawings { get; set; }
+
+        /// <summary>Shows Edit Drawing and returns the saved record, or null; replaced by tests.</summary>
+        internal Func<DrawingLibraryEditSession, DrawingLibraryRecord> EditDrawing { get; set; }
 
         /// <summary>The finished release, once one has run; otherwise null.</summary>
         public SetReleaseResult Result { get; private set; }
@@ -98,6 +107,7 @@ namespace OpenNest.Forms
             InitializeComponent();
             this.sets = sets ?? throw new ArgumentNullException(nameof(sets));
             this.library = library ?? throw new ArgumentNullException(nameof(library));
+            libraryStore = library as IDrawingLibraryStore;
             this.nests = nests ?? throw new ArgumentNullException(nameof(nests));
             this.serverUrl = serverUrl ?? "";
             this.openNest = openNest ?? throw new ArgumentNullException(nameof(openNest));
@@ -111,6 +121,12 @@ namespace OpenNest.Forms
                     id => DrawingLines().Any(l => l.Drawing.Id == id));
                 form.ShowDialog(this);
             };
+            EditDrawing = edit =>
+            {
+                using var form = new EditLibraryDrawingForm(edit);
+                return form.ShowDialog(this) == DialogResult.OK ? form.Saved : null;
+            };
+            fixDrawingsButton.Visible = libraryStore != null;
 
             GridStyle.Apply(setGrid);
             GridStyle.Apply(groupGrid);
@@ -462,6 +478,163 @@ namespace OpenNest.Forms
             populating = false;
         }
 
+        private void GroupGrid_CurrentCellChanged(object sender, EventArgs e) => UpdateCommands();
+
+        // A right-click selects the row under the pointer, so the menu acts on what was clicked.
+        private void GroupGrid_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Right && e.RowIndex >= 0 && groupGrid.CurrentRow?.Index != e.RowIndex)
+                groupGrid.CurrentCell = groupGrid.Rows[e.RowIndex].Cells[materialColumn.Index];
+        }
+
+        private async void GroupGrid_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0 && groupGrid.Rows[e.RowIndex].Tag is SetReleaseGroup { CanRelease: false })
+                await FixSelectedGroupAsync();
+        }
+
+        private async void FixDrawingsButton_Click(object sender, EventArgs e) => await FixSelectedGroupAsync();
+
+        // One Edit Drawing item per drawing of the group, the ones it is refused for first.
+        private void GroupMenu_Opening(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            groupMenu.Items.Clear();
+            if (libraryStore == null || groupGrid.CurrentRow?.Tag is not SetReleaseGroup group)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            const int listed = 15;
+            var items = group.RefusedItems.Concat(group.Items.Where(i => !group.RefusedItems.Contains(i))).ToList();
+            var enabled = CanEditDrawings();
+            foreach (var item in items.Take(listed))
+            {
+                var menuItem = new ToolStripMenuItem($"Edit Drawing '{item.Drawing.Name}'...") { Enabled = enabled };
+                menuItem.Click += async (_, _) => await EditItemDrawingAsync(item);
+                groupMenu.Items.Add(menuItem);
+            }
+            if (items.Count > listed)
+            {
+                groupMenu.Items.Add(new ToolStripMenuItem(
+                    $"...and {items.Count - listed} more: edit them in the set or the Drawing Library")
+                { Enabled = false });
+            }
+        }
+
+        private bool CanEditDrawings() => libraryStore != null && !running && !editing && Result == null;
+
+        /// <summary>
+        /// Opens Edit Drawing, one after another, on each drawing the selected group is refused
+        /// for; cancelling one stops. The plan is rebuilt after each save.
+        /// </summary>
+        internal async Task FixSelectedGroupAsync()
+        {
+            if (!CanEditDrawings() || groupGrid.CurrentRow?.Tag is not SetReleaseGroup { CanRelease: false } group)
+                return;
+            foreach (var item in group.RefusedItems.ToList())
+            {
+                if (!await EditItemDrawingAsync(item) || IsDisposed)
+                    return;
+            }
+        }
+
+        /// <summary>
+        /// Reads the item's current library record and opens Edit Drawing on it; true when it
+        /// was saved. What was read or saved replaces the drawing in the plan.
+        /// </summary>
+        internal async Task<bool> EditItemDrawingAsync(SetReleaseItem item)
+        {
+            ArgumentNullException.ThrowIfNull(item);
+            if (!CanEditDrawings())
+                return false;
+
+            var name = item.Drawing.Name;
+            DrawingLibraryRecord current;
+            editing = true;
+            UpdateCommands();
+            statusLabel.Text = $"Reading '{name}'...";
+            try
+            {
+                current = await libraryStore.GetAsync(item.Drawing.Id);
+            }
+            catch (Exception ex) when (ex is IOException || ex is HttpRequestException || ex is TaskCanceledException)
+            {
+                if (!IsDisposed)
+                {
+                    statusLabel.Text = "";
+                    ShowMessage($"Could not read '{name}': {ex.Message}", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                return false;
+            }
+            finally
+            {
+                editing = false;
+                if (!IsDisposed)
+                    UpdateCommands();
+            }
+
+            if (IsDisposed)
+                return false;
+            statusLabel.Text = "";
+            if (current == null)
+            {
+                ShowMessage($"'{name}' is no longer in the library.", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+            if (current.Archived)
+            {
+                ShowMessage($"'{current.Name}' is archived in the library. Restore it there before editing it.",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return false;
+            }
+
+            var saved = EditDrawing(new DrawingLibraryEditSession(libraryStore, current, Environment.UserName));
+            if (IsDisposed)
+                return false;
+            ApplyDrawing(saved ?? current);
+            if (saved == null)
+                return false;
+            statusLabel.Text = $"Saved '{saved.Name}' revision {saved.Revision} to the library.";
+            return true;
+        }
+
+        /// <summary>
+        /// Shows a newer library record of a listed drawing, in the sets that list it (their
+        /// joined members) and on its own line, and rebuilds the plan. Sets list drawings by id,
+        /// so the release takes the drawing as it now is.
+        /// </summary>
+        internal void ApplyDrawing(DrawingLibraryRecord drawing)
+        {
+            ArgumentNullException.ThrowIfNull(drawing);
+            var changed = false;
+            foreach (DataGridViewRow row in setGrid.Rows)
+            {
+                if (row.Tag is DrawingSetRecord set)
+                {
+                    foreach (var member in set.Members ?? new List<DrawingSetMember>())
+                    {
+                        if (member.DrawingId == drawing.Id && (member.Drawing == null || member.Drawing.Revision < drawing.Revision))
+                        {
+                            member.Drawing = drawing;
+                            changed = true;
+                        }
+                    }
+                }
+                else if (row.Tag is DrawingLibraryRecord listed && listed.Id == drawing.Id && listed.Revision < drawing.Revision)
+                {
+                    row.Tag = drawing;
+                    row.Cells[setNameColumn.Index].Value = drawing.Name;
+                    row.Cells[setCustomerColumn.Index].Value = drawing.Customer;
+                    row.Cells[setRevisionColumn.Index].Value = drawing.Revision;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+                BuildPlan();
+        }
+
         private async void ReleaseButton_Click(object sender, EventArgs e)
         {
             if (Result is { Release: null, ReleaseError.Length: > 0 })
@@ -789,6 +962,8 @@ namespace OpenNest.Forms
                     row.Cells[targetColumn.Index].ReadOnly = refused;
                 }
             }
+
+            fixDrawingsButton.Enabled = CanEditDrawings() && groupGrid.CurrentRow?.Tag is SetReleaseGroup { CanRelease: false };
 
             var retry = Result is { Release: null, ReleaseError.Length: > 0 };
             releaseButton.Text = retry ? "Record Release" : "Release";

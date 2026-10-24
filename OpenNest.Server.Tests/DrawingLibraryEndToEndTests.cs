@@ -181,6 +181,50 @@ public sealed class DrawingLibraryEndToEndTests
     }
 
     [Fact]
+    public async Task EditSession_ChangesTheDetails_KeepsThePackage_AndSetsReleaseTheNewRevision()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        using var library = new RemoteDrawingLibrary(client, client.BaseAddress!.ToString());
+        using var sets = new RemoteDrawingSetStore(client, client.BaseAddress!.ToString());
+        var bracket = SyntheticDrawing("Synthetic bracket", 2);
+        var missing = Metadata(bracket, CutType.Laser, 0);
+        missing.MaterialName = "";
+        var package = DrawingPackage.Write(bracket, Units.Inches);
+        var stored = await library.UploadAsync(missing, package);
+        var twin = Metadata(SyntheticDrawing("Synthetic plate", 5), CutType.Laser, 0.25);
+        await library.UploadAsync(twin, DrawingPackage.Write(SyntheticDrawing("Synthetic plate", 5), Units.Inches));
+        var set = await sets.CreateAsync(new DrawingSetRecord
+        {
+            Id = Guid.NewGuid(),
+            Name = "Synthetic kit",
+            Members = new[] { new DrawingSetMember { DrawingId = stored.Id, Quantity = 2 } },
+        });
+        var before = SetReleasePlan.Build(set, 1, includeArchived: false);
+
+        var session = new DrawingLibraryEditSession(library, stored, "Synthetic operator");
+        var fixedDetails = session.Details with { MaterialName = "Synthetic Steel", Thickness = 0.25 };
+        var colliding = session.Details with { Name = "Synthetic plate", MaterialName = "Synthetic Steel", Thickness = 0.25 };
+        var none = await session.FindCollisionsAsync(fixedDetails);
+        var collisions = await session.FindCollisionsAsync(colliding);
+        var settings = stored.Settings ?? new DrawingNestingSettings();
+        var saved = await session.SaveAsync(fixedDetails, stored.Notes, settings);
+        var stale = await Assert.ThrowsAsync<DrawingLibraryConflictException>(() => session.SaveAsync(fixedDetails, "Late", settings));
+        var after = SetReleasePlan.Build((await sets.GetAsync(set.Id))!, 1, includeArchived: false);
+
+        Assert.Empty(none);
+        Assert.Equal(twin.Id, Assert.Single(collisions).Id);
+        Assert.Equal((2, "Synthetic Steel", 0.25, Units.Inches), (saved.Revision, saved.MaterialName, saved.Thickness, saved.Units));
+        Assert.Equal(stored.PackageSha256, saved.PackageSha256);
+        Assert.Equal(package, await library.GetRevisionPackageAsync(stored.Id, 2));
+        Assert.Equal(2, stale.Current.Revision);
+        Assert.True(Assert.Single(before.Groups).IsUnassigned);
+        var group = Assert.Single(after.Groups);
+        Assert.True(group.CanRelease);
+        Assert.Equal(2, Assert.Single(group.Items).Drawing.Revision);
+    }
+
+    [Fact]
     public async Task ArchiveRestoreAndMetadata_ThroughTheClient()
     {
         using var factory = new ServerFactory();

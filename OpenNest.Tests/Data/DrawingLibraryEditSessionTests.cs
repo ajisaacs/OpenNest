@@ -117,6 +117,44 @@ public class DrawingLibraryEditSessionTests
         Assert.Throws<ArgumentException>(() => new DrawingLibraryEditSession(new RecordingStore(), Listed(archived: true), ""));
     }
 
+    [Fact]
+    public void ChangesIdentity_FollowsTheDuplicateKey_NotNotesOrSettings()
+    {
+        var session = new DrawingLibraryEditSession(new RecordingStore(), Listed(), "");
+
+        Assert.False(session.ChangesIdentity(session.Details));
+        // Customer, name, material and grade compare by normalized key, as duplicates are matched.
+        Assert.False(session.ChangesIdentity(session.Details with { Name = "test  SQUARE", MaterialName = "synthetic steel" }));
+        Assert.True(session.ChangesIdentity(session.Details with { Thickness = 0.1875 }));
+        Assert.True(session.ChangesIdentity(session.Details with { CutType = CutType.Plasma }));
+        Assert.True(session.ChangesIdentity(session.Details with { Customer = "" }));
+    }
+
+    [Fact]
+    public async Task FindCollisionsAsync_ListsOtherActiveDrawingsWithTheNewDetails_AndSkipsTheQueryWhenUnchanged()
+    {
+        var listed = Listed();
+        var store = new RecordingStore();
+        var twin = Listed();
+        twin.Name = "Test square B";
+        var archived = Listed(archived: true);
+        archived.Name = "Test square B";
+        var near = Listed();
+        near.Name = "Test square B";
+        near.Thickness = 0.5;
+        store.Library.AddRange(new[] { listed, twin, archived, near });
+        var session = new DrawingLibraryEditSession(store, listed, "");
+
+        Assert.Empty(await session.FindCollisionsAsync(session.Details));
+        Assert.Empty(store.Queries);
+
+        var collisions = await session.FindCollisionsAsync(session.Details with { Name = "Test square B" });
+
+        Assert.Equal(twin.Id, Assert.Single(collisions).Id);
+        var query = Assert.Single(store.Queries);
+        Assert.Equal(("square", "Synthetic Steel", (double?)0.25), (query.Search, query.MaterialName, query.Thickness));
+    }
+
     private sealed class RecordingStore : IDrawingLibraryStore
     {
         public List<(Guid Id, int Expected, DrawingLibraryRecord Record)> Updates { get; } = new();
@@ -145,8 +183,16 @@ public class DrawingLibraryEditSessionTests
             });
         }
 
-        public Task<DrawingLibraryPage> QueryAsync(DrawingLibraryQuery query, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+        public List<DrawingLibraryRecord> Library { get; } = new();
+
+        public List<DrawingLibraryQuery> Queries { get; } = new();
+
+        // Every record, as a server that ignored the filters would; the session checks the key itself.
+        public Task<DrawingLibraryPage> QueryAsync(DrawingLibraryQuery query, CancellationToken cancellationToken = default)
+        {
+            Queries.Add(query);
+            return Task.FromResult(new DrawingLibraryPage { Items = Library.ToArray(), Total = Library.Count, Offset = query.Offset, Limit = query.Limit });
+        }
 
         public Task<byte[]?> GetRevisionPackageAsync(Guid id, int revision, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

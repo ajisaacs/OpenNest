@@ -77,6 +77,32 @@ public sealed class DrawingLibraryEditSession
         SameDetails(Build(details, notes, settings), Listed)
         && (notes ?? "") == Listed.Notes && Equals(settings, Listed.Settings);
 
+    /// <summary>
+    /// True when the edit changes the details that identify a library drawing (D4: customer,
+    /// name, material, grade, thickness and cut type, normalized as duplicates are matched).
+    /// </summary>
+    public bool ChangesIdentity(DrawingLibraryDetails details) =>
+        !DrawingLibraryDuplicates.SameDuplicateKey(BuildDetails(details), Listed);
+
+    /// <summary>
+    /// The other active library drawings the edited details would duplicate (D4), newest
+    /// first. Empty when the edit keeps this drawing's identity, so drawings that already
+    /// shared it are not reported on every save.
+    /// </summary>
+    public async Task<IReadOnlyList<DrawingLibraryRecord>> FindCollisionsAsync(DrawingLibraryDetails details,
+        CancellationToken cancellationToken = default)
+    {
+        var record = BuildDetails(details);
+        if (!ChangesIdentity(details) || DrawingLibraryRules.GetMetadataError(record) != null)
+            return Array.Empty<DrawingLibraryRecord>();
+        var matches = await DrawingLibraryDuplicates.FindMatchesAsync(_library, record, cancellationToken);
+        return matches.Where(m => m.Id != Listed.Id).ToList();
+    }
+
+    // The record with the edited details and the listed notes and settings, for identity checks.
+    private DrawingLibraryRecord BuildDetails(DrawingLibraryDetails details) =>
+        Build(details, Listed.Notes, Listed.Settings ?? new DrawingNestingSettings());
+
     /// <summary>Saves the edit as the next revision; returns the stored record.</summary>
     public async Task<DrawingLibraryRecord> SaveAsync(DrawingLibraryDetails details, string notes,
         DrawingNestingSettings settings, CancellationToken cancellationToken = default)

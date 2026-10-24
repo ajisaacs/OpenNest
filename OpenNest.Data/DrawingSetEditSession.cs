@@ -131,6 +131,21 @@ public sealed class DrawingSetEditSession
         _members[index].Quantity = quantity;
     }
 
+    /// <summary>
+    /// Shows <paramref name="drawing"/>, a newer revision of a member's library drawing (for
+    /// example one just edited), on that member. Members are saved by id, so the set itself is
+    /// not changed; false when no member lists the drawing or it already shows that revision.
+    /// </summary>
+    public bool UpdateDrawing(DrawingLibraryRecord drawing)
+    {
+        ArgumentNullException.ThrowIfNull(drawing);
+        var member = _members.FirstOrDefault(m => m.DrawingId == drawing.Id);
+        if (member == null || (member.Drawing != null && member.Drawing.Revision >= drawing.Revision))
+            return false;
+        member.Drawing = drawing;
+        return true;
+    }
+
     /// <summary>The record a save sends.</summary>
     public DrawingSetRecord Build() => new()
     {

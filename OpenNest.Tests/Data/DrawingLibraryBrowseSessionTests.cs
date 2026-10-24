@@ -60,6 +60,19 @@ public class DrawingLibraryBrowseSessionTests
     }
 
     [Fact]
+    public async Task WithoutANest_ListsEveryDrawing()
+    {
+        var library = new PagedLibrary(3);
+        using var session = new DrawingLibraryBrowseSession(library, null);
+
+        await session.RefreshAsync();
+
+        var query = Assert.Single(library.Queries);
+        Assert.Equal(("", "", (double?)null), (query.MaterialName, query.MaterialGrade, query.Thickness));
+        Assert.False(session.IsFilteredToNest);
+    }
+
+    [Fact]
     public async Task SearchSortAndPaging_FollowTheNestBrowseRules()
     {
         var library = new PagedLibrary(25);

@@ -11,17 +11,17 @@ public sealed class DrawingLibraryBrowseSession : BrowseSession<DrawingLibraryPa
 {
     private readonly IDrawingLibrary _library;
 
-    public DrawingLibraryBrowseSession(IDrawingLibrary library, Nest nest, int pageSize = DrawingLibraryQuery.DefaultLimit)
+    /// <param name="nest">The nest to filter to, or null to list every active drawing (File &gt; Drawing Library).</param>
+    public DrawingLibraryBrowseSession(IDrawingLibrary library, Nest? nest, int pageSize = DrawingLibraryQuery.DefaultLimit)
         : base(pageSize, DrawingLibraryQuery.MaxLimit, DrawingSortField.SavedAt)
     {
         ArgumentNullException.ThrowIfNull(library);
-        ArgumentNullException.ThrowIfNull(nest);
 
         _library = library;
-        MaterialName = (nest.Material?.Name ?? "").Trim();
-        MaterialGrade = (nest.Material?.Grade ?? "").Trim();
+        MaterialName = (nest?.Material?.Name ?? "").Trim();
+        MaterialGrade = (nest?.Material?.Grade ?? "").Trim();
         // A nest without a thickness has nothing to match; it filters by material only.
-        Thickness = double.IsFinite(nest.Thickness) && nest.Thickness > 0
+        Thickness = nest != null && double.IsFinite(nest.Thickness) && nest.Thickness > 0
             ? DrawingLibraryRules.NormalizeThickness(nest.Thickness)
             : null;
     }

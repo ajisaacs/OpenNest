@@ -98,13 +98,44 @@ namespace OpenNest.Forms
 
         private void FileMenu_Opening(object sender, EventArgs e)
         {
-            // Drawing sets live on the nest server; File mode has nothing to browse.
+            // The drawing library and sets live on the nest server; File mode has nothing to browse.
             var databaseMode = NestStorage.Settings.IsDatabaseMode;
             mnuFile.DropDown.ShowItemToolTips = true;
+            mnuFileDrawingLibrary.Enabled = databaseMode;
+            mnuFileDrawingLibrary.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
             mnuFileDrawingSets.Enabled = databaseMode;
             mnuFileDrawingSets.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
             mnuFileReleases.Enabled = databaseMode;
             mnuFileReleases.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
+        }
+
+        /// <summary>
+        /// Browses the drawing library and edits its drawings' details and settings; needs no
+        /// open nest. Drawings are added to sets or released from it, never to a nest.
+        /// </summary>
+        private void FileDrawingLibrary_Click(object sender, EventArgs e)
+        {
+            if (!NestStorage.Settings.IsDatabaseMode)
+                return;
+
+            IDrawingLibraryStore library;
+            IDrawingSetStore sets;
+            INestRepository nests;
+            try
+            {
+                library = NestStorage.CreateDrawingLibrary();
+                sets = NestStorage.CreateDrawingSetStore();
+                nests = NestStorage.CreateRepository();
+            }
+            catch (ArgumentException ex)
+            {
+                MessageBox.Show(this, ex.Message, "Drawing Library", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            using var form = new DrawingLibraryForm(library, NestStorage.Settings.ServerUrl, null, sets);
+            form.EnableRelease(nests, OpenServerNest, IsServerNestOpen);
+            form.ShowDialog(this);
         }
 
         /// <summary>

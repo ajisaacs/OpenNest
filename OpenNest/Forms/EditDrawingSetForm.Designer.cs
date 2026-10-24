@@ -59,6 +59,7 @@ namespace OpenNest.Forms
             quantityColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             warningColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             memberButtons = new System.Windows.Forms.FlowLayoutPanel();
+            editDrawingButton = new System.Windows.Forms.Button();
             removeButton = new System.Windows.Forms.Button();
             upButton = new System.Windows.Forms.Button();
             downButton = new System.Windows.Forms.Button();
@@ -68,6 +69,9 @@ namespace OpenNest.Forms
             cancelButton = new System.Windows.Forms.Button();
             statusLabel = new System.Windows.Forms.Label();
             searchTimer = new System.Windows.Forms.Timer(components);
+            memberMenu = new System.Windows.Forms.ContextMenuStrip(components);
+            editDrawingMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            removeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             layoutTable.SuspendLayout();
             detailsTable.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
@@ -418,6 +422,7 @@ namespace OpenNest.Forms
             memberGrid.AllowUserToAddRows = false;
             memberGrid.AllowUserToDeleteRows = false;
             memberGrid.AllowUserToOrderColumns = false;
+            memberGrid.ContextMenuStrip = memberMenu;
             memberGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { drawingColumn, materialColumn, gradeColumn, thicknessColumn, unitsColumn, cutTypeColumn, quantityColumn, warningColumn });
             memberGrid.Dock = System.Windows.Forms.DockStyle.Fill;
             memberGrid.EditMode = System.Windows.Forms.DataGridViewEditMode.EditOnKeystrokeOrF2;
@@ -432,6 +437,8 @@ namespace OpenNest.Forms
             memberGrid.DataError += MemberGrid_DataError;
             memberGrid.CellEndEdit += MemberGrid_CellEndEdit;
             memberGrid.CurrentCellChanged += MemberGrid_CurrentCellChanged;
+            memberGrid.CellDoubleClick += MemberGrid_CellDoubleClick;
+            memberGrid.CellMouseDown += MemberGrid_CellMouseDown;
             //
             // drawingColumn
             //
@@ -507,6 +514,7 @@ namespace OpenNest.Forms
             // memberButtons
             //
             memberButtons.AutoSize = true;
+            memberButtons.Controls.Add(editDrawingButton);
             memberButtons.Controls.Add(removeButton);
             memberButtons.Controls.Add(upButton);
             memberButtons.Controls.Add(downButton);
@@ -517,13 +525,24 @@ namespace OpenNest.Forms
             memberButtons.TabIndex = 1;
             memberButtons.WrapContents = false;
             //
+            // editDrawingButton
+            //
+            editDrawingButton.Enabled = false;
+            editDrawingButton.Margin = new System.Windows.Forms.Padding(0, 0, 0, 12);
+            editDrawingButton.Name = "editDrawingButton";
+            editDrawingButton.Size = new System.Drawing.Size(100, 28);
+            editDrawingButton.TabIndex = 0;
+            editDrawingButton.Text = "Edit Drawing...";
+            editDrawingButton.UseVisualStyleBackColor = true;
+            editDrawingButton.Click += EditDrawingButton_Click;
+            //
             // removeButton
             //
             removeButton.Enabled = false;
             removeButton.Margin = new System.Windows.Forms.Padding(0, 0, 0, 3);
             removeButton.Name = "removeButton";
             removeButton.Size = new System.Drawing.Size(100, 28);
-            removeButton.TabIndex = 0;
+            removeButton.TabIndex = 1;
             removeButton.Text = "Remove";
             removeButton.UseVisualStyleBackColor = true;
             removeButton.Click += RemoveButton_Click;
@@ -534,7 +553,7 @@ namespace OpenNest.Forms
             upButton.Margin = new System.Windows.Forms.Padding(0, 12, 0, 3);
             upButton.Name = "upButton";
             upButton.Size = new System.Drawing.Size(100, 28);
-            upButton.TabIndex = 1;
+            upButton.TabIndex = 2;
             upButton.Text = "Move Up";
             upButton.UseVisualStyleBackColor = true;
             upButton.Click += UpButton_Click;
@@ -545,7 +564,7 @@ namespace OpenNest.Forms
             downButton.Margin = new System.Windows.Forms.Padding(0, 0, 0, 3);
             downButton.Name = "downButton";
             downButton.Size = new System.Drawing.Size(100, 28);
-            downButton.TabIndex = 2;
+            downButton.TabIndex = 3;
             downButton.Text = "Move Down";
             downButton.UseVisualStyleBackColor = true;
             downButton.Click += DownButton_Click;
@@ -606,6 +625,24 @@ namespace OpenNest.Forms
             //
             searchTimer.Interval = 300;
             searchTimer.Tick += SearchTimer_Tick;
+            //
+            // memberMenu
+            //
+            memberMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { editDrawingMenuItem, removeMenuItem });
+            memberMenu.Name = "memberMenu";
+            memberMenu.Opening += MemberMenu_Opening;
+            //
+            // editDrawingMenuItem
+            //
+            editDrawingMenuItem.Name = "editDrawingMenuItem";
+            editDrawingMenuItem.Text = "Edit Drawing...";
+            editDrawingMenuItem.Click += EditDrawingButton_Click;
+            //
+            // removeMenuItem
+            //
+            removeMenuItem.Name = "removeMenuItem";
+            removeMenuItem.Text = "Remove";
+            removeMenuItem.Click += RemoveButton_Click;
             //
             // EditDrawingSetForm
             //
@@ -698,5 +735,9 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Button cancelButton;
         private System.Windows.Forms.Label statusLabel;
         private System.Windows.Forms.Timer searchTimer;
+        private System.Windows.Forms.Button editDrawingButton;
+        private System.Windows.Forms.ContextMenuStrip memberMenu;
+        private System.Windows.Forms.ToolStripMenuItem editDrawingMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem removeMenuItem;
     }
 }

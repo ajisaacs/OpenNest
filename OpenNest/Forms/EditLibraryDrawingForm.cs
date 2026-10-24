@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -15,10 +17,14 @@ namespace OpenNest.Forms
     /// material, grade, thickness, cut type; units are shown, not edited), notes and nesting
     /// settings (Cut first, priority, rotation constraints, color) through
     /// <see cref="DrawingLibraryEditSession"/>. Saving adds a revision on the server that
-    /// keeps the same package; nests that already hold the drawing keep their revision.
+    /// keeps the same package; nests that already hold the drawing keep their revision. When
+    /// the new details would duplicate another active library drawing (D4), the operator is
+    /// warned before saving.
     /// </summary>
     public partial class EditLibraryDrawingForm : Form
     {
+        private const int CollisionNames = 5;
+
         private readonly DrawingLibraryEditSession session;
         private readonly decimal initialStep;
         private readonly decimal initialStart;
@@ -111,10 +117,20 @@ namespace OpenNest.Forms
 
             saving = true;
             UpdateCommands();
-            statusLabel.Text = "Saving...";
+            var details = ReadDetails();
             try
             {
-                Saved = await session.SaveAsync(ReadDetails(), notesBox.Text, ReadSettings());
+                if (session.ChangesIdentity(details) && !await ConfirmIdentityAsync(details))
+                {
+                    if (!IsDisposed)
+                        statusLabel.Text = "";
+                    return;
+                }
+
+                if (IsDisposed)
+                    return;
+                statusLabel.Text = "Saving...";
+                Saved = await session.SaveAsync(details, notesBox.Text, ReadSettings());
                 if (IsDisposed)
                     return;
                 DialogResult = DialogResult.OK;
@@ -137,6 +153,50 @@ namespace OpenNest.Forms
                 if (!IsDisposed)
                     UpdateCommands();
             }
+        }
+
+        /// <summary>
+        /// Looks up the active library drawings the new details would duplicate (D4) and, when
+        /// there are any or the lookup fails, asks whether to save anyway.
+        /// </summary>
+        private async Task<bool> ConfirmIdentityAsync(DrawingLibraryDetails details)
+        {
+            statusLabel.Text = "Checking the library for drawings with these details...";
+            IReadOnlyList<DrawingLibraryRecord> collisions;
+            try
+            {
+                collisions = await session.FindCollisionsAsync(details);
+            }
+            catch (Exception ex) when (ex is IOException || ex is HttpRequestException || ex is TaskCanceledException)
+            {
+                if (IsDisposed)
+                    return false;
+                return ShowMessage($"Could not check the library for drawings with these details: {ex.Message}"
+                    + Environment.NewLine + Environment.NewLine + "Save anyway?",
+                    MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) == DialogResult.OK;
+            }
+
+            if (IsDisposed)
+                return false;
+            if (collisions.Count == 0)
+                return true;
+            return ShowMessage(DescribeCollisions(collisions), MessageBoxButtons.OKCancel, MessageBoxIcon.Warning)
+                == DialogResult.OK;
+        }
+
+        internal static string DescribeCollisions(IReadOnlyList<DrawingLibraryRecord> collisions)
+        {
+            var lines = collisions.Take(CollisionNames).Select(r =>
+                $"- '{r.Name}'" + (string.IsNullOrWhiteSpace(r.Customer) ? "" : $" ({r.Customer})")
+                + $", {$"{r.MaterialName} {r.MaterialGrade}".Trim()} "
+                + $"{r.Thickness.ToString("0.####", CultureInfo.CurrentCulture)} {UnitsHelper.GetShortString(r.Units)} {r.CutType}"
+                + $", revision {r.Revision.ToString(CultureInfo.CurrentCulture)}");
+            var more = collisions.Count > CollisionNames ? $"{Environment.NewLine}...and {collisions.Count - CollisionNames} more." : "";
+            var count = collisions.Count == 1 ? "Another library drawing already has" : $"{collisions.Count} other library drawings already have";
+            return $"{count} this name, customer, material, grade, thickness and cut type:"
+                + Environment.NewLine + string.Join(Environment.NewLine, lines) + more
+                + Environment.NewLine + Environment.NewLine
+                + "Saving makes them hard to tell apart, and Save to Drawing Library will offer to revise either. Save anyway?";
         }
 
         private bool CanSave()

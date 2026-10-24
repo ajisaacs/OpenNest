@@ -59,6 +59,8 @@ namespace OpenNest.Forms
             closeButton = new System.Windows.Forms.Button();
             statusLabel = new System.Windows.Forms.Label();
             searchTimer = new System.Windows.Forms.Timer(components);
+            fixDrawingsButton = new System.Windows.Forms.Button();
+            groupMenu = new System.Windows.Forms.ContextMenuStrip(components);
             layoutTable.SuspendLayout();
             addSetTable.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)setGrid).BeginInit();
@@ -295,6 +297,7 @@ namespace OpenNest.Forms
             //
             groupGrid.AllowUserToAddRows = false;
             groupGrid.AllowUserToDeleteRows = false;
+            groupGrid.ContextMenuStrip = groupMenu;
             groupGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { includeColumn, materialColumn, gradeColumn, thicknessColumn, unitsColumn, cutTypeColumn, drawingsColumn, partsColumn, targetColumn, statusColumn });
             groupGrid.Dock = System.Windows.Forms.DockStyle.Fill;
             groupGrid.EditMode = System.Windows.Forms.DataGridViewEditMode.EditOnEnter;
@@ -307,6 +310,9 @@ namespace OpenNest.Forms
             groupGrid.CellValueChanged += GroupGrid_CellValueChanged;
             groupGrid.CurrentCellDirtyStateChanged += GroupGrid_CurrentCellDirtyStateChanged;
             groupGrid.DataError += GroupGrid_DataError;
+            groupGrid.CellDoubleClick += GroupGrid_CellDoubleClick;
+            groupGrid.CellMouseDown += GroupGrid_CellMouseDown;
+            groupGrid.CurrentCellChanged += GroupGrid_CurrentCellChanged;
             //
             // includeColumn
             //
@@ -405,13 +411,15 @@ namespace OpenNest.Forms
             // bottomTable
             //
             bottomTable.AutoSize = true;
-            bottomTable.ColumnCount = 3;
+            bottomTable.ColumnCount = 4;
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.Controls.Add(summaryLabel, 0, 0);
-            bottomTable.Controls.Add(releaseButton, 1, 0);
-            bottomTable.Controls.Add(closeButton, 2, 0);
+            bottomTable.Controls.Add(fixDrawingsButton, 1, 0);
+            bottomTable.Controls.Add(releaseButton, 2, 0);
+            bottomTable.Controls.Add(closeButton, 3, 0);
             bottomTable.Dock = System.Windows.Forms.DockStyle.Fill;
             bottomTable.Margin = new System.Windows.Forms.Padding(0, 6, 0, 0);
             bottomTable.Name = "bottomTable";
@@ -426,12 +434,23 @@ namespace OpenNest.Forms
             summaryLabel.Name = "summaryLabel";
             summaryLabel.TabIndex = 0;
             //
+            // fixDrawingsButton
+            //
+            fixDrawingsButton.AutoSize = true;
+            fixDrawingsButton.Enabled = false;
+            fixDrawingsButton.Margin = new System.Windows.Forms.Padding(3, 3, 12, 3);
+            fixDrawingsButton.Name = "fixDrawingsButton";
+            fixDrawingsButton.TabIndex = 1;
+            fixDrawingsButton.Text = "Fix Drawings...";
+            fixDrawingsButton.UseVisualStyleBackColor = true;
+            fixDrawingsButton.Click += FixDrawingsButton_Click;
+            //
             // releaseButton
             //
             releaseButton.AutoSize = true;
             releaseButton.Enabled = false;
             releaseButton.Name = "releaseButton";
-            releaseButton.TabIndex = 1;
+            releaseButton.TabIndex = 2;
             releaseButton.Text = "Release";
             releaseButton.UseVisualStyleBackColor = true;
             releaseButton.Click += ReleaseButton_Click;
@@ -440,7 +459,7 @@ namespace OpenNest.Forms
             //
             closeButton.AutoSize = true;
             closeButton.Name = "closeButton";
-            closeButton.TabIndex = 2;
+            closeButton.TabIndex = 3;
             closeButton.Text = "Close";
             closeButton.UseVisualStyleBackColor = true;
             closeButton.Click += CloseButton_Click;
@@ -458,6 +477,11 @@ namespace OpenNest.Forms
             //
             searchTimer.Interval = 250;
             searchTimer.Tick += SearchTimer_Tick;
+            //
+            // groupMenu
+            //
+            groupMenu.Name = "groupMenu";
+            groupMenu.Opening += GroupMenu_Opening;
             //
             // ReleaseSetForm
             //
@@ -519,6 +543,8 @@ namespace OpenNest.Forms
         private System.Windows.Forms.DataGridViewComboBoxColumn targetColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn statusColumn;
         private System.Windows.Forms.Label skippedLabel;
+        private System.Windows.Forms.Button fixDrawingsButton;
+        private System.Windows.Forms.ContextMenuStrip groupMenu;
         private System.Windows.Forms.TableLayoutPanel bottomTable;
         private System.Windows.Forms.Label summaryLabel;
         private System.Windows.Forms.Button releaseButton;

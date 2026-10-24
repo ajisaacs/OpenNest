@@ -115,6 +115,56 @@ public class SetReleaseFormsTests
     }
 
     [Fact]
+    public void FixDrawings_EditsEachDrawingTheGroupIsRefusedFor_ThenTheGroupCanBeReleased()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var noMaterial = library.Add("SYN-B", "");
+                var noThickness = library.Add("SYN-C", "Synthetic Steel", thickness: 0);
+                var sets = new InMemoryDrawingSets();
+                var set = CreateSet(sets, (a, 1), (noMaterial, 2), (noThickness, 3));
+                var nests = new MemoryNests();
+                var edits = new List<string>();
+
+                using var form = new ReleaseSetForm(sets, library, nests, Server, set, (_, _) => { });
+                form.ShowMessage = (_, _, _) => DialogResult.OK;
+                form.CreateNest = (group, _) => Task.FromResult(new Nest("N") { Units = group.Units });
+                form.EditDrawing = edit =>
+                {
+                    edits.Add(edit.Listed.Name);
+                    return Run(edit.SaveAsync(edit.Details with { MaterialName = "Synthetic Steel", Thickness = 0.25 }, edit.Listed.Notes, edit.Listed.Settings ?? new DrawingNestingSettings()));
+                };
+                Field<CheckBox>(form, "nestAfterReleaseCheckBox").Checked = false;
+                form.Show();
+                var grid = Field<DataGridView>(form, "groupGrid");
+                var fix = Field<Button>(form, "fixDrawingsButton");
+                var refused = grid.Rows.Cast<DataGridViewRow>().Single(r => ((SetReleaseGroup)r.Tag!).IsUnassigned);
+                Assert.Contains("Edit Drawing", (string)refused.Cells["statusColumn"].Value);
+                grid.CurrentCell = grid.Rows[0].Cells["materialColumn"];
+                Assert.False(fix.Enabled);
+                grid.CurrentCell = refused.Cells["materialColumn"];
+                Assert.True(fix.Enabled);
+
+                Run(form.FixSelectedGroupAsync());
+
+                Assert.Equal(new[] { "SYN-B", "SYN-C" }, edits);
+                var group = Assert.IsType<SetReleaseGroup>(Assert.Single(grid.Rows.Cast<DataGridViewRow>()).Tag);
+                Assert.True(group.CanRelease);
+                Assert.Equal(new[] { ("SYN-A", 1), ("SYN-B", 2), ("SYN-C", 2) }, group.Items.Select(i => (i.Drawing.Name, i.Drawing.Revision)));
+
+                Run(form.ReleaseAsync());
+
+                Assert.Single(nests.Uploaded);
+                Assert.Equal("Synthetic Steel", Assert.Single(Assert.Single(sets.Releases).Nests).MaterialName);
+            },
+            TestTimeout,
+            "The fix drawings test did not complete.");
+    }
+
+    [Fact]
     public void ReleaseNotRecorded_CanBeRecordedAgain()
     {
         StaTestThread.Run(
@@ -720,6 +770,12 @@ public class SetReleaseFormsTests
 
     private static void Run(Task task) => PumpUntil(() => task.IsCompleted, "the operation to finish");
 
+    private static T Run<T>(Task<T> task)
+    {
+        Run((Task)task);
+        return task.GetAwaiter().GetResult();
+    }
+
     private static void PumpUntil(Func<bool> condition, string what)
     {
         var until = DateTime.UtcNow.AddSeconds(15);
@@ -741,7 +797,7 @@ public class SetReleaseFormsTests
         private readonly List<DrawingLibraryRecord> _records = new();
         private readonly Dictionary<(Guid, int), byte[]> _packages = new();
 
-        public DrawingLibraryRecord Add(string name, string material, bool archived = false)
+        public DrawingLibraryRecord Add(string name, string material, bool archived = false, double thickness = 0.25)
         {
             var package = DrawingPackage.Write(new RectangleShape { Name = name, Length = 4, Width = 2 }.GetDrawing(), Units.Inches);
             var record = new DrawingLibraryRecord
@@ -751,7 +807,7 @@ public class SetReleaseFormsTests
                 Name = name,
                 MaterialName = material,
                 MaterialGrade = "Grade A",
-                Thickness = 0.25,
+                Thickness = thickness,
                 Units = Units.Inches,
                 CutType = CutType.Laser,
                 Archived = archived,
@@ -769,7 +825,7 @@ public class SetReleaseFormsTests
             Task.FromResult(new DrawingLibraryPage { Items = _records.ToArray(), Total = _records.Count, Offset = query.Offset, Limit = query.Limit });
 
         public Task<DrawingLibraryRecord?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            Task.FromResult(_records.FirstOrDefault(r => r.Id == id));
 
         public Task<DrawingLibraryPage?> GetRevisionsAsync(Guid id, int offset = 0,
             int limit = DrawingLibraryRules.DefaultRevisionLimit, CancellationToken cancellationToken = default) =>
@@ -781,8 +837,33 @@ public class SetReleaseFormsTests
         public Task<DrawingLibraryRecord> UpdatePackageAsync(Guid id, DrawingLibraryRecord record, byte[] package,
             int expectedRevision, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
+        /// <summary>Stores the next revision of the sent details with the same package.</summary>
         public Task<DrawingLibraryRecord> UpdateMetadataAsync(Guid id, DrawingLibraryRecord record, int expectedRevision,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            CancellationToken cancellationToken = default)
+        {
+            var index = _records.FindIndex(r => r.Id == id);
+            var current = _records[index];
+            if (current.Revision != expectedRevision)
+                throw new DrawingLibraryConflictException(current);
+            var saved = new DrawingLibraryRecord
+            {
+                Id = id,
+                Revision = expectedRevision + 1,
+                Name = record.Name,
+                Customer = record.Customer,
+                MaterialName = record.MaterialName,
+                MaterialGrade = record.MaterialGrade,
+                Thickness = record.Thickness,
+                Units = current.Units,
+                CutType = record.CutType,
+                Notes = record.Notes,
+                Settings = record.Settings,
+                PackageSha256 = current.PackageSha256,
+            };
+            _records[index] = saved;
+            _packages[(id, saved.Revision)] = _packages[(id, current.Revision)];
+            return Task.FromResult(saved);
+        }
     }
 
     /// <summary>Stores uploads in memory under their client-allocated ids, and drafts a release can merge into.</summary>

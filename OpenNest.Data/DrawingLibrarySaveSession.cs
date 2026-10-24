@@ -85,6 +85,51 @@ public sealed class DrawingLibraryDuplicates
     /// <summary>True when these duplicates were found for exactly <paramref name="metadata"/>'s matching details.</summary>
     public bool IsFor(DrawingLibraryRecord metadata) => SameDuplicateKey(Metadata, metadata);
 
+    /// <summary>
+    /// The active library drawings whose duplicate key equals <paramref name="metadata"/>'s,
+    /// newest first, reading every page the server filters down to; none when it is invalid.
+    /// </summary>
+    internal static async Task<List<DrawingLibraryRecord>> FindMatchesAsync(IDrawingLibrary library,
+        DrawingLibraryRecord metadata, CancellationToken cancellationToken)
+    {
+        var matches = new List<DrawingLibraryRecord>();
+        if (string.IsNullOrWhiteSpace(metadata.Name) || DrawingLibraryRules.GetMetadataError(metadata) != null)
+            return matches;
+
+        // The server matches customer, material and grade by the same normalized key. A
+        // blank one means "any" there, so every key is checked again here; the name search
+        // narrows by its longest word because LIKE does not collapse whitespace.
+        var offset = 0;
+        while (true)
+        {
+            var page = await library.QueryAsync(new DrawingLibraryQuery
+            {
+                Search = LongestWord(metadata.Name),
+                Customer = metadata.Customer,
+                MaterialName = metadata.MaterialName,
+                MaterialGrade = metadata.MaterialGrade,
+                Thickness = metadata.Thickness,
+                CutType = metadata.CutType,
+                Sort = DrawingSortField.SavedAt,
+                Descending = true,
+                Offset = offset,
+                Limit = DrawingLibraryQuery.MaxLimit,
+            }, cancellationToken);
+            matches.AddRange(page.Items.Where(r => !r.Archived && SameDuplicateKey(r, metadata)
+                && matches.All(m => m.Id != r.Id)));
+            offset += page.Items.Count;
+            if (page.Items.Count == 0 || offset >= page.Total)
+                return matches;
+            if (offset >= DrawingLibrarySaveSession.MaxScannedDrawings)
+                throw new IOException($"More than {DrawingLibrarySaveSession.MaxScannedDrawings} library drawings share this name's details. Narrow the name or customer before saving.");
+        }
+    }
+
+    private static string LongestWord(string name) =>
+        name.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+            .OrderByDescending(word => word.Length)
+            .FirstOrDefault() ?? "";
+
     internal static bool SameDuplicateKey(DrawingLibraryRecord a, DrawingLibraryRecord b) =>
         SharedListNames.Key(a.Customer) == SharedListNames.Key(b.Customer)
         && SharedListNames.Key(a.Name) == SharedListNames.Key(b.Name)
@@ -169,37 +214,7 @@ public sealed class DrawingLibrarySaveSession
     {
         ArgumentNullException.ThrowIfNull(metadata);
         var snapshot = Copy(metadata);
-        var matches = new List<DrawingLibraryRecord>();
-        if (!string.IsNullOrWhiteSpace(snapshot.Name) && DrawingLibraryRules.GetMetadataError(snapshot) == null)
-        {
-            // The server matches customer, material and grade by the same normalized key. A
-            // blank one means "any" there, so every key is checked again here; the name search
-            // narrows by its longest word because LIKE does not collapse whitespace.
-            var offset = 0;
-            while (true)
-            {
-                var page = await _library.QueryAsync(new DrawingLibraryQuery
-                {
-                    Search = LongestWord(snapshot.Name),
-                    Customer = snapshot.Customer,
-                    MaterialName = snapshot.MaterialName,
-                    MaterialGrade = snapshot.MaterialGrade,
-                    Thickness = snapshot.Thickness,
-                    CutType = snapshot.CutType,
-                    Sort = DrawingSortField.SavedAt,
-                    Descending = true,
-                    Offset = offset,
-                    Limit = DrawingLibraryQuery.MaxLimit,
-                }, cancellationToken);
-                matches.AddRange(page.Items.Where(r => !r.Archived && DrawingLibraryDuplicates.SameDuplicateKey(r, snapshot)
-                    && matches.All(m => m.Id != r.Id)));
-                offset += page.Items.Count;
-                if (page.Items.Count == 0 || offset >= page.Total)
-                    break;
-                if (offset >= MaxScannedDrawings)
-                    throw new IOException($"More than {MaxScannedDrawings} library drawings share this name's details. Narrow the name or customer before saving.");
-            }
-        }
+        var matches = await DrawingLibraryDuplicates.FindMatchesAsync(_library, snapshot, cancellationToken);
 
         DrawingLibraryRecord? linked = null;
         if (Drawing.Library is { } link && link.ServerKey == ServerKey
@@ -335,11 +350,6 @@ public sealed class DrawingLibrarySaveSession
             saved.PackageSha256.ToLowerInvariant());
         return new DrawingLibrarySaveResult(saved, outcome, recoveredEarlierSave);
     }
-
-    private static string LongestWord(string name) =>
-        name.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
-            .OrderByDescending(word => word.Length)
-            .FirstOrDefault() ?? "";
 
     private static DrawingLibraryRecord Copy(DrawingLibraryRecord record) => new()
     {

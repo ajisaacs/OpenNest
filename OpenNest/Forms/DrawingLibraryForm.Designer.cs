@@ -87,6 +87,8 @@ namespace OpenNest.Forms
             searchTimer = new System.Windows.Forms.Timer(components);
             previewTimer = new System.Windows.Forms.Timer(components);
             drawingMenu = new System.Windows.Forms.ContextMenuStrip(components);
+            editMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            editSeparator = new System.Windows.Forms.ToolStripSeparator();
             usedInSetsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             addToSetMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             releaseSeparator = new System.Windows.Forms.ToolStripSeparator();
@@ -768,9 +770,19 @@ namespace OpenNest.Forms
             //
             // drawingMenu
             //
-            drawingMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { usedInSetsMenuItem, addToSetMenuItem, releaseSeparator, releaseMenuItem, releasesMenuItem });
+            drawingMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { editMenuItem, editSeparator, usedInSetsMenuItem, addToSetMenuItem, releaseSeparator, releaseMenuItem, releasesMenuItem });
             drawingMenu.Name = "drawingMenu";
             drawingMenu.Opening += DrawingMenu_Opening;
+            //
+            // editMenuItem
+            //
+            editMenuItem.Name = "editMenuItem";
+            editMenuItem.Text = "Edit Drawing...";
+            editMenuItem.Click += EditButton_Click;
+            //
+            // editSeparator
+            //
+            editSeparator.Name = "editSeparator";
             //
             // usedInSetsMenuItem
             //
@@ -921,6 +933,8 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Timer searchTimer;
         private System.Windows.Forms.Timer previewTimer;
         private System.Windows.Forms.ContextMenuStrip drawingMenu;
+        private System.Windows.Forms.ToolStripMenuItem editMenuItem;
+        private System.Windows.Forms.ToolStripSeparator editSeparator;
         private System.Windows.Forms.ToolStripMenuItem usedInSetsMenuItem;
         private System.Windows.Forms.ToolStripMenuItem addToSetMenuItem;
         private System.Windows.Forms.ToolStripSeparator releaseSeparator;

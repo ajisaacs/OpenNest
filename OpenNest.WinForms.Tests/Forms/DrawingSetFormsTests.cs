@@ -342,6 +342,53 @@ public class DrawingSetFormsTests
     }
 
     [Fact]
+    public void Editor_EditDrawing_ReadsTheCurrentRecord_AndShowsWhatWasSaved_WithoutChangingTheSet()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var a = library.Add("SYN-A", "", 0);
+                var b = library.Add("SYN-B", "Synthetic Steel", 0.25);
+                var sets = new InMemoryDrawingSets();
+                var created = Run(sets.CreateAsync(new DrawingSetRecord
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Synthetic kit",
+                    Members = new[] { a, b }.Select(d => new DrawingSetMember { DrawingId = d.Id, Quantity = 2, Drawing = d }).ToList(),
+                }));
+                // The library moved on since the set was read: the edit starts from the current record.
+                library.Replace(a.Id, r => r.Notes = "Newer notes");
+                var edits = new List<DrawingLibraryEditSession>();
+
+                using var editor = new EditDrawingSetForm(new DrawingSetEditSession(sets, created, "Synthetic operator"), library, Server);
+                editor.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                editor.EditDrawing = edit =>
+                {
+                    edits.Add(edit);
+                    return Run(edit.SaveAsync(edit.Details with { MaterialName = "Synthetic Aluminum", Thickness = 0.125 }, edit.Listed.Notes, edit.Listed.Settings ?? new DrawingNestingSettings()));
+                };
+                editor.Show();
+                var grid = Field<DataGridView>(editor, "memberGrid");
+                Assert.Contains("double-click", (string)grid.Rows[0].Cells["warningColumn"].Value);
+                grid.CurrentCell = grid.Rows[0].Cells["drawingColumn"];
+                Assert.True(Field<Button>(editor, "editDrawingButton").Enabled);
+
+                Run(editor.EditSelectedDrawingAsync());
+
+                var edit = Assert.Single(edits);
+                Assert.Equal((a.Id, 2, "Newer notes"), (edit.Listed.Id, edit.Listed.Revision, edit.Listed.Notes));
+                Assert.Equal("Synthetic Aluminum", grid.Rows[0].Cells["materialColumn"].Value);
+                Assert.Equal("", grid.Rows[0].Cells["warningColumn"].Value);
+                Assert.Contains("revision 3", Field<Label>(editor, "statusLabel").Text);
+                // Members are listed by id, so the set has nothing new to save.
+                Assert.False(Field<Button>(editor, "saveButton").Enabled);
+            },
+            TestTimeout,
+            "The set editor edit drawing test did not complete.");
+    }
+
+    [Fact]
     public void History_ListsRevisionsNewestFirst_AndTheSelectedRevisionsMembers()
     {
         StaTestThread.Run(
@@ -564,8 +611,45 @@ public class DrawingSetFormsTests
             int expectedRevision, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        /// <summary>Stores the next revision of a drawing, as another operator's save would.</summary>
+        public void Replace(Guid id, Action<DrawingLibraryRecord> edit)
+        {
+            var index = _records.FindIndex(r => r.Id == id);
+            var next = Copy(_records[index]);
+            next.Revision++;
+            edit(next);
+            _records[index] = next;
+        }
+
         public Task<DrawingLibraryRecord> UpdateMetadataAsync(Guid id, DrawingLibraryRecord record, int expectedRevision,
-            CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            CancellationToken cancellationToken = default)
+        {
+            var index = _records.FindIndex(r => r.Id == id);
+            if (_records[index].Revision != expectedRevision)
+                throw new DrawingLibraryConflictException(_records[index]);
+            var saved = Copy(record);
+            saved.Revision = expectedRevision + 1;
+            saved.Units = _records[index].Units;
+            saved.PackageSha256 = _records[index].PackageSha256;
+            _records[index] = saved;
+            return Task.FromResult(saved);
+        }
+
+        private static DrawingLibraryRecord Copy(DrawingLibraryRecord r) => new()
+        {
+            Id = r.Id,
+            Revision = r.Revision,
+            Name = r.Name,
+            Customer = r.Customer,
+            MaterialName = r.MaterialName,
+            MaterialGrade = r.MaterialGrade,
+            Thickness = r.Thickness,
+            Units = r.Units,
+            CutType = r.CutType,
+            Notes = r.Notes,
+            Settings = r.Settings,
+            PackageSha256 = r.PackageSha256,
+            SavedAt = r.SavedAt,
+        };
     }
 }

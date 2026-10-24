@@ -18,19 +18,26 @@ namespace OpenNest.Forms
     /// browsed in the left pane (every active drawing, a page at a time through
     /// <see cref="DrawingLibraryBrowseSession"/>); Add to Set, a double-click or Enter adds the
     /// selected drawings at the entered quantity, and a drawing already in the set is greyed
-    /// and not added twice. Saving adds a revision on the server, guarded by the revision the
-    /// set was read at.
+    /// and not added twice. Edit Drawing (a double-click on a member, its right-click menu or
+    /// the button) reads the member's current library record and edits its details there, so
+    /// a drawing without a material or thickness can be fixed in place. Saving adds a revision
+    /// on the server, guarded by the revision the set was read at.
     /// </summary>
     public partial class EditDrawingSetForm : Form
     {
         private readonly DrawingSetEditSession session;
+        private readonly IDrawingLibraryStore library;
         private readonly DrawingLibraryBrowseSession librarySession;
         private readonly BrowsePager<DrawingLibraryPage, DrawingSortField> libraryPager;
         private bool loading;
         private bool saving;
+        private bool editing;
 
         /// <summary>Shows a message and returns the operator's answer; replaced by tests.</summary>
         internal Func<string, MessageBoxButtons, MessageBoxIcon, DialogResult> ShowMessage { get; set; }
+
+        /// <summary>Shows Edit Drawing and returns the saved record, or null; replaced by tests.</summary>
+        internal Func<DrawingLibraryEditSession, DrawingLibraryRecord> EditDrawing { get; set; }
 
         /// <summary>The saved revision once the dialog closes with OK; otherwise null.</summary>
         public DrawingSetRecord Saved { get; private set; }
@@ -39,9 +46,9 @@ namespace OpenNest.Forms
         {
             InitializeComponent();
             this.session = session ?? throw new ArgumentNullException(nameof(session));
-            ArgumentNullException.ThrowIfNull(library);
+            this.library = library ?? throw new ArgumentNullException(nameof(library));
             // A set mixes materials and thicknesses, so the library is never filtered to a nest.
-            librarySession = new DrawingLibraryBrowseSession(library, new Nest());
+            librarySession = new DrawingLibraryBrowseSession(library, null);
             Disposed += (_, _) => librarySession.Dispose();
             libraryPager = new BrowsePager<DrawingLibraryPage, DrawingSortField>(
                 librarySession, libraryGrid, librarySummaryLabel, previousButton, nextButton, "the drawing library")
@@ -50,6 +57,11 @@ namespace OpenNest.Forms
                 Settled = UpdateAddCommand,
             };
             ShowMessage = (text, buttons, icon) => MessageBox.Show(this, text, Text, buttons, icon);
+            EditDrawing = edit =>
+            {
+                using var form = new EditLibraryDrawingForm(edit);
+                return form.ShowDialog(this) == DialogResult.OK ? form.Saved : null;
+            };
 
             GridStyle.Apply(memberGrid);
             GridStyle.Apply(libraryGrid);
@@ -183,6 +195,101 @@ namespace OpenNest.Forms
             session.RemoveAt(index);
             Populate(System.Math.Min(index, session.Members.Count - 1));
             UpdateCommands();
+        }
+
+        // The quantity cell edits in place; a double-click anywhere else edits the drawing.
+        private async void MemberGrid_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0 && e.ColumnIndex != quantityColumn.Index)
+                await EditSelectedDrawingAsync();
+        }
+
+        // A right-click selects the row under the pointer, so the menu acts on what was clicked.
+        private void MemberGrid_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Right && e.RowIndex >= 0 && SelectedIndex() != e.RowIndex && memberGrid.EndEdit())
+                memberGrid.CurrentCell = memberGrid.Rows[e.RowIndex].Cells[drawingColumn.Index];
+        }
+
+        private void MemberMenu_Opening(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            var index = SelectedIndex();
+            editDrawingMenuItem.Enabled = !saving && !editing && index >= 0;
+            removeMenuItem.Enabled = !saving && !editing && index >= 0;
+            e.Cancel = index < 0;
+        }
+
+        private async void EditDrawingButton_Click(object sender, EventArgs e) => await EditSelectedDrawingAsync();
+
+        /// <summary>
+        /// Reads the selected member's current library record and opens Edit Drawing on it. The
+        /// member then shows what was read or saved; the set itself lists drawings by id, so it
+        /// is not changed and the next release takes the new revision.
+        /// </summary>
+        internal async Task EditSelectedDrawingAsync()
+        {
+            var index = SelectedIndex();
+            if (index < 0 || saving || editing || !memberGrid.EndEdit())
+                return;
+
+            var member = session.Members[index];
+            var name = member.Drawing?.Name ?? member.DrawingId.ToString();
+            DrawingLibraryRecord current;
+            editing = true;
+            UpdateCommands();
+            statusLabel.Text = $"Reading '{name}'...";
+            try
+            {
+                current = await library.GetAsync(member.DrawingId);
+            }
+            catch (Exception ex) when (ex is IOException || ex is HttpRequestException || ex is TaskCanceledException)
+            {
+                if (!IsDisposed)
+                {
+                    statusLabel.Text = "";
+                    ShowMessage($"Could not read '{name}': {ex.Message}", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                return;
+            }
+            finally
+            {
+                editing = false;
+                if (!IsDisposed)
+                    UpdateCommands();
+            }
+
+            if (IsDisposed)
+                return;
+            statusLabel.Text = "";
+            if (current == null)
+            {
+                ShowMessage($"'{name}' is no longer in the library.", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            ShowMemberDrawing(current);
+            if (current.Archived)
+            {
+                ShowMessage($"'{current.Name}' is archived in the library. Restore it there before editing it.",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var saved = EditDrawing(new DrawingLibraryEditSession(library, current, Environment.UserName));
+            if (saved == null || IsDisposed)
+                return;
+            ShowMemberDrawing(saved);
+            // The library pane may list the old details.
+            await RunLibraryAsync(librarySession.RefreshAsync);
+            if (!IsDisposed)
+                statusLabel.Text = $"Saved '{saved.Name}' revision {saved.Revision} to the library.";
+        }
+
+        private void ShowMemberDrawing(DrawingLibraryRecord drawing)
+        {
+            var index = SelectedIndex();
+            if (session.UpdateDrawing(drawing))
+                Populate(index);
         }
 
         private void UpButton_Click(object sender, EventArgs e) => MoveSelected(-1);
@@ -356,7 +463,7 @@ namespace OpenNest.Forms
             if (drawing.Archived)
                 return "Archived in the library: skipped on release unless included";
             if (string.IsNullOrWhiteSpace(drawing.MaterialName) || !(drawing.Thickness > 0))
-                return "No material or thickness: cannot be released until set in the library";
+                return "No material or thickness: double-click to set them before releasing";
             return "";
         }
 
@@ -367,6 +474,7 @@ namespace OpenNest.Forms
             var index = SelectedIndex();
             var error = session.GetError();
             UpdateAddCommand();
+            editDrawingButton.Enabled = !saving && !editing && index >= 0;
             removeButton.Enabled = !saving && index >= 0;
             upButton.Enabled = !saving && index > 0;
             downButton.Enabled = !saving && index >= 0 && index < session.Members.Count - 1;

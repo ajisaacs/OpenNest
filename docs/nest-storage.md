@@ -321,17 +321,50 @@ is edited in place (0 to 99,999; one click starts editing, a bad number keeps
 the editor open with an error) and applies to the nest at once, like an add;
 the main window's drawing list refreshes when the dialog closes.
 
-The browser's **Cut first** column shows the setting. **Edit Drawing...**
-(`OpenNest.Data.DrawingLibraryEditSession`) edits the selected active drawing's
-details (name, customer, material, grade, thickness and cut type; text is
-trimmed, the name is required, units are shown but not editable since they give
-the geometry its meaning) and its Cut first flag, priority, rotation
-step/start/end (degrees), 180° equivalent, color and notes, and saves them
-through the metadata endpoint guarded by the listed revision: a new revision
-with the same package. A material or thickness change is an edit of the same
-drawing, not a new one. A 409 is shown and the operator reloads. Nests that
-already hold the drawing keep their copy and revision; sets list the drawing,
-so their next release uses the new details.
+The browser's **Cut first** column shows the setting.
+
+**File > Drawing Library...** (Database mode only, like Drawing Sets) opens the
+same browser without a nest: it lists every active drawing, has no Add to Nest
+or In This Nest tab, and a double-click or Enter edits the selected drawing. Its
+right-click menu has Edit Drawing and the set and release items below.
+
+### Edit Drawing (desktop)
+
+**Edit Drawing...** (`OpenNest.Data.DrawingLibraryEditSession`) edits one active
+library drawing. Its **Details** are the name, customer, material, grade,
+thickness and cut type; **Units** are shown read-only, since changing them would
+change what the geometry means. Its **Nesting settings** are Cut first, priority,
+rotation step/start/end (degrees), 180° equivalent and color, then the notes.
+Text is trimmed and thickness rounded as the server stores it; Save stays
+disabled until something changed and every value passes the library rules.
+
+When the new details would give the drawing another identity (D4: normalized
+customer, name, material and grade, exact thickness, units and cut type), Save
+first looks up active library drawings that already have them and, if any do,
+names them and asks before saving; a failed lookup also asks. Editing only notes
+or settings never asks.
+
+Save goes through `PUT /api/drawings/{id}/metadata`, guarded by the revision
+the dialog opened with: a new revision with the same package. A material or
+thickness change is an edit of the same drawing, not a new one. A 409 (someone
+else saved first) is shown, nothing is saved and the dialog stays open; close it
+and edit again. Nests that already hold the drawing keep their copy and
+revision. Sets list drawings by id, so they release the new revision next time.
+
+Edit Drawing opens from:
+
+- the Drawing Library dialog (the **Edit Drawing...** button or the drawing's
+  right-click menu), which reloads the page after a save;
+- the set editor's member grid: double-click a member (outside its quantity),
+  right-click it, or **Edit Drawing...** beside the grid. It first reads the
+  member's current record, so a set read earlier does not cause a conflict; the
+  row then shows what was saved. The set itself is unchanged and needs no save;
+- the release dialog: a group refused for its drawings (no material or
+  thickness, or two drawings with one name) has **Fix Drawings...**, which opens
+  Edit Drawing on each drawing it is refused for in turn (Cancel stops), as does
+  a double-click on the group. Its right-click menu lists Edit Drawing for each of
+  the group's drawings. Each edit reads the current record first, and the plan
+  is rebuilt with what was saved, so a fixed drawing joins its material group.
 
 ### Save to Drawing Library (desktop)
 
@@ -387,7 +420,8 @@ a set shows its notes.
   in the grid (1 to 100,000); **Remove**, **Move Up** and **Move Down** change
   the list. The note column flags drawings archived in the library (skipped on
   release unless included) and drawings with no material or thickness (cannot be
-  released until set in the library).
+  released until set; double-click to open
+  [Edit Drawing](#edit-drawing-desktop)).
 - **Save** adds a revision guarded by the revision the set was read at; a 409 is
   shown and the operator cancels and reloads. A new set's id is allocated
   before its first save, and a save that fails without a definite answer stays
@@ -441,7 +475,9 @@ drawings, parts, **Nest** and status. **Include archived drawings** puts archive
 members back in, otherwise they are named below the grid as left out. Each group
 has a **Release** tick; refused groups (two drawings with one name, or drawings
 without material or thickness) show why and cannot be ticked, and a tick
-survives changing the sets, kits or the archived toggle.
+survives changing the sets, kits or the archived toggle. **Fix Drawings...**
+opens [Edit Drawing](#edit-drawing-desktop) on a refused group's drawings and
+rebuilds the plan with what was saved.
 
 **Nest** is **New Draft nest** or **Merge into** one of the Draft nests of the
 group's material, grade and thickness, listed with their sheet count and when

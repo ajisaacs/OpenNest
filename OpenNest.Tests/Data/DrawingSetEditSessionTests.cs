@@ -32,6 +32,23 @@ public class DrawingSetEditSessionTests
     }
 
     [Fact]
+    public void UpdateDrawing_ShowsANewerRevisionOnItsMember_WithoutChangingTheSet()
+    {
+        var a = Drawing("SYN-A");
+        var session = new DrawingSetEditSession(new InMemoryDrawingSets(), null, "");
+        session.AddDrawings(new[] { a, Drawing("SYN-B") }, 2);
+        var before = session.Build();
+        var edited = new DrawingLibraryRecord { Id = a.Id, Revision = 2, Name = "SYN-A2", MaterialName = "Synthetic Aluminum", Thickness = 0.125 };
+
+        Assert.True(session.UpdateDrawing(edited));
+        Assert.False(session.UpdateDrawing(a));
+        Assert.False(session.UpdateDrawing(Drawing("SYN-C")));
+
+        Assert.Same(edited, session.Members[0].Drawing);
+        Assert.Equal(before.Members.Select(m => (m.DrawingId, m.Quantity)), session.Build().Members.Select(m => (m.DrawingId, m.Quantity)));
+    }
+
+    [Fact]
     public void MoveRemoveAndQuantity_ChangeTheMemberList()
     {
         var session = new DrawingSetEditSession(new InMemoryDrawingSets(), null, "");
