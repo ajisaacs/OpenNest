@@ -410,7 +410,11 @@ opens the same window on the Releases tab. Each tab reads its list when first
 shown, and Releases re-reads its page each time it is shown again. Sets lists sets a page at a time
 (`OpenNest.Data.DrawingSetBrowseSession`): search by name, customer or notes,
 sort by name, customer, revision or saved time, and **Show archived**. Selecting
-a set shows its notes.
+a set shows its notes. Below the list are **New Set...**, **Edit...** (also a
+double-click or Enter on a set), **More ▾** and **Make Nests...** in bold, the
+main action (below). **More ▾**, also the list's right-click
+menu (the menu key or Shift+F10 opens it from the keyboard), holds **Archive**
+or **Restore**, **History...** and **Releases...** for the selected set.
 
 - **New Set...** and **Edit...** open the set editor
   (`OpenNest.Data.DrawingSetEditSession`): name, customer, notes and the member
@@ -439,8 +443,8 @@ a set shows its notes.
   unsaved edits asks first. Editing a saved set, the editor's **History...**
   lists the set's revisions (below).
 - **Archive** (after confirming) and **Restore** add a revision; nothing is
-  deleted. **History...** (in the set editor, and on the Sets tab for the
-  selected set) lists revisions newest first with the members of the selected
+  deleted. **History...** (in the set editor, and in the Sets tab's More menu
+  for the selected set) lists revisions newest first with the members of the selected
   one, shown with their drawings' current library details.
 
 In the Drawing Library dialog, right-click a drawing for **Used in Sets...** (the sets
@@ -560,7 +564,7 @@ list re-reads from the newest.
 A filter narrows the tab to one set or one drawing, shown above the list
 ("Releases of set 'Frame A'") until **Clear Filter** lists every release again:
 
-- **Releases...** on the Sets tab filters to the releases that include the
+- **Releases...** in the Sets tab's More menu filters to the releases that include the
   selected set, with the set's **Revision** and the **Quantity** of this set (and
   how many other sets and drawings the release had) in place of Released.
 - **Releases...** in the Drawing Library's right-click menu opens the window

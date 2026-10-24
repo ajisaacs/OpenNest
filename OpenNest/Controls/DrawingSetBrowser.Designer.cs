@@ -42,17 +42,20 @@ namespace OpenNest.Controls
             summaryLabel = new System.Windows.Forms.Label();
             newButton = new System.Windows.Forms.Button();
             editButton = new System.Windows.Forms.Button();
-            archiveButton = new System.Windows.Forms.Button();
-            historyButton = new System.Windows.Forms.Button();
-            releasesButton = new System.Windows.Forms.Button();
+            moreButton = new System.Windows.Forms.Button();
             releaseButton = new System.Windows.Forms.Button();
             statusLabel = new System.Windows.Forms.Label();
             searchTimer = new System.Windows.Forms.Timer(components);
+            moreMenu = new System.Windows.Forms.ContextMenuStrip(components);
+            archiveMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            historyMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            releasesMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             layoutTable.SuspendLayout();
             filterTable.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)setGrid).BeginInit();
             notesGroup.SuspendLayout();
             bottomTable.SuspendLayout();
+            moreMenu.SuspendLayout();
             SuspendLayout();
             //
             // layoutTable
@@ -136,6 +139,7 @@ namespace OpenNest.Controls
             setGrid.StandardTab = true;
             setGrid.TabIndex = 1;
             setGrid.CellDoubleClick += SetGrid_CellDoubleClick;
+            setGrid.CellMouseDown += SetGrid_CellMouseDown;
             setGrid.ColumnHeaderMouseClick += SetGrid_ColumnHeaderMouseClick;
             setGrid.CurrentCellChanged += SetGrid_CurrentCellChanged;
             //
@@ -214,9 +218,7 @@ namespace OpenNest.Controls
             // bottomTable
             //
             bottomTable.AutoSize = true;
-            bottomTable.ColumnCount = 9;
-            bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
-            bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            bottomTable.ColumnCount = 7;
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
@@ -229,10 +231,8 @@ namespace OpenNest.Controls
             bottomTable.Controls.Add(summaryLabel, 2, 0);
             bottomTable.Controls.Add(newButton, 3, 0);
             bottomTable.Controls.Add(editButton, 4, 0);
-            bottomTable.Controls.Add(archiveButton, 5, 0);
-            bottomTable.Controls.Add(historyButton, 6, 0);
-            bottomTable.Controls.Add(releasesButton, 7, 0);
-            bottomTable.Controls.Add(releaseButton, 8, 0);
+            bottomTable.Controls.Add(moreButton, 5, 0);
+            bottomTable.Controls.Add(releaseButton, 6, 0);
             bottomTable.Dock = System.Windows.Forms.DockStyle.Fill;
             bottomTable.Margin = new System.Windows.Forms.Padding(0, 6, 0, 0);
             bottomTable.Name = "bottomTable";
@@ -271,7 +271,7 @@ namespace OpenNest.Controls
             newButton.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
             newButton.Name = "newButton";
             newButton.TabIndex = 3;
-            newButton.Text = "New Set...";
+            newButton.Text = "&New Set...";
             newButton.UseVisualStyleBackColor = true;
             newButton.Click += NewButton_Click;
             //
@@ -281,48 +281,29 @@ namespace OpenNest.Controls
             editButton.Enabled = false;
             editButton.Name = "editButton";
             editButton.TabIndex = 4;
-            editButton.Text = "Edit...";
+            editButton.Text = "&Edit...";
             editButton.UseVisualStyleBackColor = true;
             editButton.Click += EditButton_Click;
             //
-            // archiveButton
+            // moreButton
             //
-            archiveButton.AutoSize = true;
-            archiveButton.Enabled = false;
-            archiveButton.Name = "archiveButton";
-            archiveButton.TabIndex = 5;
-            archiveButton.Text = "Archive";
-            archiveButton.UseVisualStyleBackColor = true;
-            archiveButton.Click += ArchiveButton_Click;
-            //
-            // historyButton
-            //
-            historyButton.AutoSize = true;
-            historyButton.Enabled = false;
-            historyButton.Name = "historyButton";
-            historyButton.TabIndex = 6;
-            historyButton.Text = "History...";
-            historyButton.UseVisualStyleBackColor = true;
-            historyButton.Click += HistoryButton_Click;
-            //
-            // releasesButton
-            //
-            releasesButton.AutoSize = true;
-            releasesButton.Enabled = false;
-            releasesButton.Name = "releasesButton";
-            releasesButton.TabIndex = 7;
-            releasesButton.Text = "Releases...";
-            releasesButton.UseVisualStyleBackColor = true;
-            releasesButton.Click += ReleasesButton_Click;
+            moreButton.AutoSize = true;
+            moreButton.Enabled = false;
+            moreButton.Name = "moreButton";
+            moreButton.TabIndex = 5;
+            moreButton.Text = "M&ore ▾";
+            moreButton.UseVisualStyleBackColor = true;
+            moreButton.Click += MoreButton_Click;
             //
             // releaseButton
             //
             releaseButton.AutoSize = true;
             releaseButton.Enabled = false;
+            releaseButton.Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Bold);
             releaseButton.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
             releaseButton.Name = "releaseButton";
-            releaseButton.TabIndex = 8;
-            releaseButton.Text = "Make Nests...";
+            releaseButton.TabIndex = 6;
+            releaseButton.Text = "&Make Nests...";
             releaseButton.UseVisualStyleBackColor = true;
             releaseButton.Visible = false;
             releaseButton.Click += ReleaseButton_Click;
@@ -341,6 +322,33 @@ namespace OpenNest.Controls
             searchTimer.Interval = 300;
             searchTimer.Tick += SearchTimer_Tick;
             //
+            // moreMenu
+            //
+            moreMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { archiveMenuItem, historyMenuItem, releasesMenuItem });
+            moreMenu.Name = "moreMenu";
+            moreMenu.Opening += MoreMenu_Opening;
+            //
+            // archiveMenuItem
+            //
+            archiveMenuItem.Enabled = false;
+            archiveMenuItem.Name = "archiveMenuItem";
+            archiveMenuItem.Text = "&Archive";
+            archiveMenuItem.Click += ArchiveMenuItem_Click;
+            //
+            // historyMenuItem
+            //
+            historyMenuItem.Enabled = false;
+            historyMenuItem.Name = "historyMenuItem";
+            historyMenuItem.Text = "&History...";
+            historyMenuItem.Click += HistoryMenuItem_Click;
+            //
+            // releasesMenuItem
+            //
+            releasesMenuItem.Enabled = false;
+            releasesMenuItem.Name = "releasesMenuItem";
+            releasesMenuItem.Text = "Re&leases...";
+            releasesMenuItem.Click += ReleasesMenuItem_Click;
+            //
             // DrawingSetBrowser
             //
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
@@ -357,6 +365,7 @@ namespace OpenNest.Controls
             notesGroup.PerformLayout();
             bottomTable.ResumeLayout(false);
             bottomTable.PerformLayout();
+            moreMenu.ResumeLayout(false);
             ResumeLayout(false);
         }
 
@@ -383,11 +392,13 @@ namespace OpenNest.Controls
         private System.Windows.Forms.Label summaryLabel;
         private System.Windows.Forms.Button newButton;
         private System.Windows.Forms.Button editButton;
-        private System.Windows.Forms.Button archiveButton;
-        private System.Windows.Forms.Button historyButton;
-        private System.Windows.Forms.Button releasesButton;
+        private System.Windows.Forms.Button moreButton;
         private System.Windows.Forms.Button releaseButton;
         private System.Windows.Forms.Label statusLabel;
         private System.Windows.Forms.Timer searchTimer;
+        private System.Windows.Forms.ContextMenuStrip moreMenu;
+        private System.Windows.Forms.ToolStripMenuItem archiveMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem historyMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem releasesMenuItem;
     }
 }

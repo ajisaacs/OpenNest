@@ -1,4 +1,6 @@
 using System;
+using System.ComponentModel;
+using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Net.Http;
@@ -13,7 +15,9 @@ namespace OpenNest.Controls
     /// Browses the server's drawing sets one bounded page at a time through
     /// <see cref="DrawingSetBrowseSession"/>, and creates, edits, archives or restores them and
     /// shows their history. <see cref="DrawingSetsForm"/> hosts it on its Sets tab to manage and
-    /// release sets, and shows a set's Releases on its Releases tab. In pick mode
+    /// release sets, and shows a set's Releases on its Releases tab. New Set, Edit and Make Nests
+    /// are buttons; Archive/Restore, History and Releases are in the More menu, which is also the
+    /// list's right-click menu. In pick mode
     /// (<see cref="ChooseDrawingSetForm"/>) only active sets are listed, and choosing a set or
     /// New Set raises <see cref="SetActivated"/> or <see cref="NewSetChosen"/> instead.
     /// </summary>
@@ -102,6 +106,7 @@ namespace OpenNest.Controls
                 using var form = new DrawingSetHistoryForm(sets, set);
                 form.ShowDialog(FindForm());
             };
+            setGrid.ContextMenuStrip = pick ? null : moreMenu;
             ShowRelease = set =>
             {
                 using var form = new ReleaseSetForm(sets, library, nests, this.serverUrl, set, openNest) { IsNestOpen = isNestOpen };
@@ -113,9 +118,7 @@ namespace OpenNest.Controls
                 newButton.Text = "New Set";
                 showArchivedCheckBox.Visible = false;
                 editButton.Visible = false;
-                archiveButton.Visible = false;
-                historyButton.Visible = false;
-                releasesButton.Visible = false;
+                moreButton.Visible = false;
             }
 
             pager.UpdateNavigation();
@@ -195,6 +198,22 @@ namespace OpenNest.Controls
                 await EditSelectedAsync();
         }
 
+        private void SetGrid_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
+        {
+            // A right-click acts on the row under the pointer, as the menu's commands read the selection.
+            if (e.Button == MouseButtons.Right && e.RowIndex >= 0 && !pick)
+                setGrid.CurrentCell = setGrid.Rows[e.RowIndex].Cells[System.Math.Max(e.ColumnIndex, 0)];
+        }
+
+        private void MoreButton_Click(object sender, EventArgs e) =>
+            moreMenu.Show(moreButton, new Point(0, moreButton.Height));
+
+        private void MoreMenu_Opening(object sender, CancelEventArgs e)
+        {
+            UpdateCommands();
+            e.Cancel = session == null || pick;
+        }
+
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             if (keyData == Keys.Enter && setGrid.ContainsFocus && SelectedSet != null)
@@ -213,15 +232,15 @@ namespace OpenNest.Controls
 
         private async void EditButton_Click(object sender, EventArgs e) => await EditSelectedAsync();
 
-        private async void ArchiveButton_Click(object sender, EventArgs e) => await ToggleArchivedAsync();
+        private async void ArchiveMenuItem_Click(object sender, EventArgs e) => await ToggleArchivedAsync();
 
-        private void HistoryButton_Click(object sender, EventArgs e)
+        private void HistoryMenuItem_Click(object sender, EventArgs e)
         {
             if (SelectedSet is { } set)
                 ShowHistory(set);
         }
 
-        private void ReleasesButton_Click(object sender, EventArgs e)
+        private void ReleasesMenuItem_Click(object sender, EventArgs e)
         {
             if (SelectedSet is { } set)
                 ShowReleases?.Invoke(set);
@@ -433,10 +452,11 @@ namespace OpenNest.Controls
             var ready = session != null && !busy;
             newButton.Enabled = ready;
             editButton.Enabled = ready && selected is { Archived: false };
-            archiveButton.Enabled = ready && selected != null;
-            archiveButton.Text = selected is { Archived: true } ? "Restore" : "Archive";
-            historyButton.Enabled = ready && selected != null;
-            releasesButton.Enabled = ready && selected != null && ShowReleases != null;
+            archiveMenuItem.Enabled = ready && selected != null;
+            archiveMenuItem.Text = selected is { Archived: true } ? "&Restore" : "&Archive";
+            historyMenuItem.Enabled = ready && selected != null;
+            releasesMenuItem.Enabled = ready && selected != null && ShowReleases != null;
+            moreButton.Enabled = archiveMenuItem.Enabled || historyMenuItem.Enabled || releasesMenuItem.Enabled;
             releaseButton.Enabled = ready && nests != null && selected is { Archived: false, MemberCount: > 0 };
         }
     }

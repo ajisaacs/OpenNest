@@ -226,7 +226,12 @@ public class DrawingSetFormsTests
                     PumpUntil(() => grid.Rows.Count == 1 && choose.Enabled, "the active set");
 
                     Assert.False(Field<CheckBox>(picker.Browser, "showArchivedCheckBox").Visible);
+                    // The picker keeps its own Choose/Cancel: none of the Sets tab's commands show.
+                    Assert.Equal("New Set", Field<Button>(picker.Browser, "newButton").Text);
                     Assert.False(Field<Button>(picker.Browser, "editButton").Visible);
+                    Assert.False(Field<Button>(picker.Browser, "moreButton").Visible);
+                    Assert.False(Field<Button>(picker.Browser, "releaseButton").Visible);
+                    Assert.Null(grid.ContextMenuStrip);
                     choose.PerformClick();
 
                     Assert.Equal(DialogResult.OK, picker.DialogResult);
@@ -281,7 +286,7 @@ public class DrawingSetFormsTests
     }
 
     [Fact]
-    public void Browser_ArchivesAfterConfirming_AndRestoresFromShowArchived()
+    public void Browser_MoreMenu_ArchivesAfterConfirming_RestoresFromShowArchived_AndShowsHistory()
     {
         StaTestThread.Run(
             () =>
@@ -298,9 +303,24 @@ public class DrawingSetFormsTests
                 browser.ShowMessage = (_, _, _) => answers.Dequeue();
                 host.Show();
                 var grid = Field<DataGridView>(browser, "setGrid");
+                var more = Field<Button>(browser, "moreButton");
+                var archive = Field<ToolStripMenuItem>(browser, "archiveMenuItem");
+                var history = Field<ToolStripMenuItem>(browser, "historyMenuItem");
+                var releases = Field<ToolStripMenuItem>(browser, "releasesMenuItem");
+                Assert.Same(Field<ContextMenuStrip>(browser, "moreMenu"), grid.ContextMenuStrip);
                 Run(browser.RefreshAsync());
                 PumpUntil(() => grid.Rows.Count == 1, "the set list");
 
+                Assert.True(more.Enabled);
+                Assert.Equal("&Archive", archive.Text);
+                Assert.True(archive.Enabled);
+                Assert.True(history.Enabled);
+                // Releases needs a host that shows them (the Drawing Sets window).
+                Assert.False(releases.Enabled);
+                var shown = new List<DrawingSetRecord>();
+                browser.ShowHistory = shown.Add;
+                history.PerformClick();
+                Assert.Equal("Synthetic kit", Assert.Single(shown).Name);
                 Run(browser.ToggleArchivedAsync());
                 Assert.False(Assert.Single(sets.Current).Archived);
                 Run(browser.ToggleArchivedAsync());
@@ -310,12 +330,25 @@ public class DrawingSetFormsTests
                 Field<CheckBox>(browser, "showArchivedCheckBox").Checked = true;
                 PumpUntil(() => grid.Rows.Count == 1, "the archived set");
                 Assert.Equal("Archived", grid.Rows[0].Cells["stateColumn"].Value);
-                Assert.Equal("Restore", Field<Button>(browser, "archiveButton").Text);
+                Assert.Equal("&Restore", archive.Text);
+                Assert.True(archive.Enabled);
+                Assert.True(history.Enabled);
                 Assert.False(Field<Button>(browser, "editButton").Enabled);
-                Run(browser.ToggleArchivedAsync());
+                archive.PerformClick();
+                PumpUntil(() => !sets.Current.Single().Archived, "the set to be restored");
 
-                Assert.False(Assert.Single(sets.Current).Archived);
                 Assert.Equal(3, sets.Current.Single().Revision);
+                PumpUntil(() => archive.Text == "&Archive", "the restored set's menu");
+
+                // Nothing selected: only New Set stays enabled.
+                Field<CheckBox>(browser, "showArchivedCheckBox").Checked = false;
+                PumpUntil(() => grid.Rows.Count == 1, "the active set");
+                grid.CurrentCell = null;
+                Assert.True(Field<Button>(browser, "newButton").Enabled);
+                Assert.False(Field<Button>(browser, "editButton").Enabled);
+                Assert.False(more.Enabled);
+                Assert.False(archive.Enabled);
+                Assert.False(history.Enabled);
             },
             TestTimeout,
             "The archive test did not complete.");

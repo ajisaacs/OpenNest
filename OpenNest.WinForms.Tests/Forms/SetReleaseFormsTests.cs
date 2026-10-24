@@ -569,6 +569,8 @@ public class SetReleaseFormsTests
                 browser.EnableRelease(new MemoryNests(), (_, _) => { });
                 Assert.True(releaseButton.Visible);
                 Assert.True(releaseButton.Enabled);
+                // Make Nests is the Sets tab's primary command.
+                Assert.True(releaseButton.Font.Bold);
                 Run(browser.ReleaseSelectedAsync());
 
                 var set = Assert.Single(released);
@@ -877,7 +879,8 @@ public class SetReleaseFormsTests
 
                 setGrid.CurrentCell = setGrid.Rows.Cast<DataGridViewRow>()
                     .Single(r => (string)r.Cells["nameColumn"].Value == "Synthetic kit").Cells[0];
-                Field<Button>(browser, "releasesButton").PerformClick();
+                Assert.True(Field<Button>(browser, "moreButton").Enabled);
+                Field<ToolStripMenuItem>(browser, "releasesMenuItem").PerformClick();
                 PumpUntil(() => releases.Rows.Count == 1, "the set's releases");
 
                 Assert.True(form.ShowsReleases);
