@@ -65,6 +65,7 @@ namespace OpenNest.Forms
             downButton = new System.Windows.Forms.Button();
             bottomTable = new System.Windows.Forms.TableLayoutPanel();
             summaryLabel = new System.Windows.Forms.Label();
+            historyButton = new System.Windows.Forms.Button();
             saveButton = new System.Windows.Forms.Button();
             cancelButton = new System.Windows.Forms.Button();
             statusLabel = new System.Windows.Forms.Label();
@@ -572,13 +573,15 @@ namespace OpenNest.Forms
             // bottomTable
             //
             bottomTable.AutoSize = true;
-            bottomTable.ColumnCount = 3;
+            bottomTable.ColumnCount = 4;
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.Controls.Add(summaryLabel, 0, 0);
-            bottomTable.Controls.Add(saveButton, 1, 0);
-            bottomTable.Controls.Add(cancelButton, 2, 0);
+            bottomTable.Controls.Add(historyButton, 1, 0);
+            bottomTable.Controls.Add(saveButton, 2, 0);
+            bottomTable.Controls.Add(cancelButton, 3, 0);
             bottomTable.Dock = System.Windows.Forms.DockStyle.Fill;
             bottomTable.Margin = new System.Windows.Forms.Padding(0, 6, 0, 0);
             bottomTable.Name = "bottomTable";
@@ -593,12 +596,23 @@ namespace OpenNest.Forms
             summaryLabel.Name = "summaryLabel";
             summaryLabel.TabIndex = 0;
             //
+            // historyButton
+            //
+            historyButton.AutoSize = true;
+            historyButton.Margin = new System.Windows.Forms.Padding(3, 3, 12, 3);
+            historyButton.Name = "historyButton";
+            historyButton.TabIndex = 1;
+            historyButton.Text = "History...";
+            historyButton.UseVisualStyleBackColor = true;
+            historyButton.Visible = false;
+            historyButton.Click += HistoryButton_Click;
+            //
             // saveButton
             //
             saveButton.AutoSize = true;
             saveButton.Enabled = false;
             saveButton.Name = "saveButton";
-            saveButton.TabIndex = 1;
+            saveButton.TabIndex = 2;
             saveButton.Text = "Save";
             saveButton.UseVisualStyleBackColor = true;
             saveButton.Click += SaveButton_Click;
@@ -608,7 +622,7 @@ namespace OpenNest.Forms
             cancelButton.AutoSize = true;
             cancelButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             cancelButton.Name = "cancelButton";
-            cancelButton.TabIndex = 2;
+            cancelButton.TabIndex = 3;
             cancelButton.Text = "Cancel";
             cancelButton.UseVisualStyleBackColor = true;
             //
@@ -731,6 +745,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Button downButton;
         private System.Windows.Forms.TableLayoutPanel bottomTable;
         private System.Windows.Forms.Label summaryLabel;
+        private System.Windows.Forms.Button historyButton;
         private System.Windows.Forms.Button saveButton;
         private System.Windows.Forms.Button cancelButton;
         private System.Windows.Forms.Label statusLabel;

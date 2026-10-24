@@ -12,7 +12,8 @@ namespace OpenNest.Controls
     /// <summary>
     /// Browses the server's drawing sets one bounded page at a time through
     /// <see cref="DrawingSetBrowseSession"/>, and creates, edits, archives or restores them and
-    /// shows their history. <see cref="DrawingSetsForm"/> hosts it to manage and release sets. In pick mode
+    /// shows their history. <see cref="DrawingSetsForm"/> hosts it on its Sets tab to manage and
+    /// release sets, and shows a set's Releases on its Releases tab. In pick mode
     /// (<see cref="ChooseDrawingSetForm"/>) only active sets are listed, and choosing a set or
     /// New Set raises <see cref="SetActivated"/> or <see cref="NewSetChosen"/> instead.
     /// </summary>
@@ -38,7 +39,7 @@ namespace OpenNest.Controls
         /// <summary>Shows a set's revision history; replaced by tests.</summary>
         internal Action<DrawingSetRecord> ShowHistory { get; set; }
 
-        /// <summary>Shows a set's releases; replaced by tests.</summary>
+        /// <summary>Shows a set's releases; set by the host (Releases is disabled without it) and replaced by tests.</summary>
         internal Action<DrawingSetRecord> ShowReleases { get; set; }
 
         /// <summary>Shows the release dialog for a set read with its members; replaced by tests.</summary>
@@ -99,11 +100,6 @@ namespace OpenNest.Controls
             ShowHistory = set =>
             {
                 using var form = new DrawingSetHistoryForm(sets, set);
-                form.ShowDialog(FindForm());
-            };
-            ShowReleases = set =>
-            {
-                using var form = new SetReleasesForm(sets, set);
                 form.ShowDialog(FindForm());
             };
             ShowRelease = set =>
@@ -228,7 +224,7 @@ namespace OpenNest.Controls
         private void ReleasesButton_Click(object sender, EventArgs e)
         {
             if (SelectedSet is { } set)
-                ShowReleases(set);
+                ShowReleases?.Invoke(set);
         }
 
         private async void ReleaseButton_Click(object sender, EventArgs e) => await ReleaseSelectedAsync();
@@ -440,7 +436,7 @@ namespace OpenNest.Controls
             archiveButton.Enabled = ready && selected != null;
             archiveButton.Text = selected is { Archived: true } ? "Restore" : "Archive";
             historyButton.Enabled = ready && selected != null;
-            releasesButton.Enabled = ready && selected != null;
+            releasesButton.Enabled = ready && selected != null && ShowReleases != null;
             releaseButton.Enabled = ready && nests != null && selected is { Archived: false, MemberCount: > 0 };
         }
     }

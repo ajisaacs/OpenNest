@@ -5,29 +5,31 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using OpenNest.Controls;
 using OpenNest.Data;
+using OpenNest.Forms;
 
-namespace OpenNest.Forms
+namespace OpenNest.Controls
 {
     /// <summary>
-    /// File &gt; Releases: every release on the nest server, newest first, a bounded page at a
-    /// time, each with what it released ("Kit A ×2; Bracket ×4") and its progress ("2 of 3
-    /// cut"), and the nests of the selected release with what the release did to each and
-    /// their current status, or Deleted. Drawing Sets &gt; Releases and Drawings tab &gt;
-    /// Releases show the same view for the releases that include one set, or one library
-    /// drawing on its own. The server joins every nest's current metadata on each read. New
-    /// Release opens the release dialog empty; the list re-reads once a release is recorded.
-    /// Undo Release deletes the nests a release created and restores the drafts it merged
-    /// into, all or nothing; nests changed since can be left as they are.
+    /// The Releases tab of <see cref="DrawingSetsForm"/>: every release on the nest server,
+    /// newest first, a bounded page at a time, each with what it released ("Kit A ×2; Bracket
+    /// ×4") and its progress ("2 of 3 cut"), and the nests of the selected release with what
+    /// the release did to each and their current status, or Deleted. A filter narrows the list
+    /// to the releases that include one set, or one library drawing on its own; the filter
+    /// shows above the list until Clear Filter. The server joins every nest's current metadata
+    /// on each read. New Release opens the release dialog empty; the list re-reads once a
+    /// release is recorded. Undo Release deletes the nests a release created and restores the
+    /// drafts it merged into, all or nothing; nests changed since can be left as they are.
     /// </summary>
-    public partial class SetReleasesForm : Form
+    public partial class SetReleasesView : UserControl
     {
         private const int PageSize = 100;
 
-        private readonly IDrawingSetStore sets;
-        private readonly DrawingSetRecord set;
-        private readonly DrawingLibraryRecord drawing;
+        private readonly int releasedWidth;
+        private readonly DataGridViewCellStyle releasedStyle;
+        private IDrawingSetStore sets;
+        private DrawingSetRecord set;
+        private DrawingLibraryRecord drawing;
         private SetReleasePage page;
         private int offset;
         private int pageRequest;
@@ -42,43 +44,31 @@ namespace OpenNest.Forms
         /// </summary>
         internal Func<bool> ShowNewRelease { get; set; }
 
-        /// <summary>Every release on the server, newest first.</summary>
-        public SetReleasesForm(IDrawingSetStore sets)
-            : this(sets, all: true)
+        public SetReleasesView()
         {
-            Text = "Releases";
-            revisionColumn.Visible = false;
-            multiplierColumn.HeaderText = "Released";
-            multiplierColumn.Width = 320;
-            multiplierColumn.DefaultCellStyle = null;
-        }
-
-        public SetReleasesForm(IDrawingSetStore sets, DrawingSetRecord set)
-            : this(sets, all: false)
-        {
-            this.set = set ?? throw new ArgumentNullException(nameof(set));
-            Text = $"Releases of '{set.Name}'";
-        }
-
-        /// <summary>The releases that had <paramref name="drawing"/> on its own, outside any set.</summary>
-        public SetReleasesForm(IDrawingSetStore sets, DrawingLibraryRecord drawing)
-            : this(sets, all: false)
-        {
-            this.drawing = drawing ?? throw new ArgumentNullException(nameof(drawing));
-            Text = $"Releases of drawing '{drawing.Name}'";
-            revisionColumn.Visible = false;
-            multiplierColumn.HeaderText = "Quantity";
-        }
-
-        // The flag only tells the public constructors apart; the public ones set what differs.
-        private SetReleasesForm(IDrawingSetStore sets, bool all)
-        {
-            _ = all;
             InitializeComponent();
-            this.sets = sets ?? throw new ArgumentNullException(nameof(sets));
             GridStyle.Apply(releaseGrid);
             GridStyle.Apply(nestGrid);
-            ShowMessage = (text, buttons, icon) => MessageBox.Show(this, text, Text, buttons, icon);
+            releasedWidth = multiplierColumn.Width;
+            releasedStyle = multiplierColumn.DefaultCellStyle;
+            ApplyFilter();
+        }
+
+        /// <summary>True after a page of releases has been requested at least once.</summary>
+        public bool HasLoaded { get; private set; }
+
+        /// <summary>The set the list is narrowed to, or null.</summary>
+        public DrawingSetRecord FilterSet => set;
+
+        /// <summary>The drawing the list is narrowed to, or null.</summary>
+        public DrawingLibraryRecord FilterDrawing => drawing;
+
+        public void Initialize(IDrawingSetStore sets)
+        {
+            if (this.sets != null)
+                throw new InvalidOperationException("The releases view is already initialized.");
+            this.sets = sets ?? throw new ArgumentNullException(nameof(sets));
+            ShowMessage = (text, buttons, icon) => MessageBox.Show(FindForm(), text, FindForm()?.Text ?? "Releases", buttons, icon);
         }
 
         /// <summary>
@@ -92,18 +82,60 @@ namespace OpenNest.Forms
             ArgumentNullException.ThrowIfNull(library);
             ArgumentNullException.ThrowIfNull(nests);
             ArgumentNullException.ThrowIfNull(openNest);
+            if (sets == null)
+                throw new InvalidOperationException("New Release needs an initialized releases view.");
             ShowNewRelease = () =>
             {
                 using var form = new ReleaseSetForm(sets, library, nests, serverUrl, Array.Empty<DrawingSetRecord>(),
                     Array.Empty<SetReleaseDrawingLine>(), openNest)
                 { IsNestOpen = isNestOpen ?? (_ => false) };
-                form.ShowDialog(this);
+                form.ShowDialog(FindForm());
                 return form.Result?.Release != null;
             };
             newReleaseButton.Visible = true;
         }
 
-        private async void SetReleasesForm_Shown(object sender, EventArgs e) => await LoadPageAsync(0);
+        /// <summary>
+        /// Narrows the list to the releases that include <paramref name="set"/>, or that had
+        /// <paramref name="drawing"/> on its own outside any set; both null lists every release.
+        /// The next read starts at the newest page.
+        /// </summary>
+        public void SetFilter(DrawingSetRecord set, DrawingLibraryRecord drawing)
+        {
+            if (set != null && drawing != null)
+                throw new ArgumentException("Filter by a set or a drawing, not both.");
+            this.set = set;
+            this.drawing = drawing;
+            offset = 0;
+            ApplyFilter();
+        }
+
+        /// <summary>Re-reads the current page (the first call reads the newest).</summary>
+        public Task RefreshAsync() => LoadPageAsync(offset);
+
+        /// <summary>Lists every release again, from the newest.</summary>
+        internal Task ClearFilterAsync()
+        {
+            SetFilter(null, null);
+            return LoadPageAsync(0);
+        }
+
+        private async void ClearFilterButton_Click(object sender, EventArgs e) => await ClearFilterAsync();
+
+        // Per set the release's revision of it and its quantity; per drawing its quantity; across
+        // all releases, everything each one had.
+        private void ApplyFilter()
+        {
+            var all = set == null && drawing == null;
+            revisionColumn.Visible = set != null;
+            multiplierColumn.HeaderText = all ? "Released" : "Quantity";
+            multiplierColumn.Width = all ? 320 : releasedWidth;
+            multiplierColumn.DefaultCellStyle = all ? null : releasedStyle;
+            filterTable.Visible = !all;
+            filterLabel.Text = set != null ? $"Releases of set '{set.Name}'"
+                : drawing != null ? $"Releases of drawing '{drawing.Name}' on its own"
+                : "";
+        }
 
         private async void NewReleaseButton_Click(object sender, EventArgs e) => await NewReleaseAsync();
 
@@ -192,12 +224,16 @@ namespace OpenNest.Forms
         /// <summary>Reads one page of releases; a later request discards an earlier one's result.</summary>
         internal async Task LoadPageAsync(int requestedOffset)
         {
+            if (sets == null)
+                return;
+            HasLoaded = true;
             var request = ++pageRequest;
+            var (filterSet, filterDrawing) = (set, drawing);
             previousButton.Enabled = nextButton.Enabled = false;
             summaryLabel.Text = "Loading...";
             try
             {
-                var loaded = await sets.QueryReleasesAsync(setId: set?.Id, drawingId: drawing?.Id, offset: requestedOffset, limit: PageSize);
+                var loaded = await sets.QueryReleasesAsync(setId: filterSet?.Id, drawingId: filterDrawing?.Id, offset: requestedOffset, limit: PageSize);
                 if (IsDisposed || request != pageRequest)
                     return;
 
@@ -212,29 +248,29 @@ namespace OpenNest.Forms
                     // counted; the all-releases view names everything the release had.
                     var revision = 0;
                     string released;
-                    if (set == null && drawing == null)
+                    if (filterSet == null && filterDrawing == null)
                     {
                         released = Contents(release);
                     }
                     else
                     {
                         int quantity, otherSets, otherDrawings;
-                        if (set != null)
+                        if (filterSet != null)
                         {
-                            var line = release.Sets.First(s => s.SetId == set.Id);
+                            var line = release.Sets.First(s => s.SetId == filterSet.Id);
                             (revision, quantity) = (line.SetRevision, line.Quantity);
                             (otherSets, otherDrawings) = (release.Sets.Count - 1, release.Drawings.Count);
                         }
                         else
                         {
-                            var line = release.Drawings.First(d => d.DrawingId == drawing.Id);
+                            var line = release.Drawings.First(d => d.DrawingId == filterDrawing.Id);
                             quantity = line.Quantity;
                             (otherSets, otherDrawings) = (release.Sets.Count, release.Drawings.Count - 1);
                         }
                         var others = new[]
                         {
-                            otherSets == 0 ? null : $"{otherSets} {(set != null ? "other " : "")}{(otherSets == 1 ? "set" : "sets")}",
-                            otherDrawings == 0 ? null : $"{otherDrawings} {(drawing != null ? "other " : "")}{(otherDrawings == 1 ? "drawing" : "drawings")}",
+                            otherSets == 0 ? null : $"{otherSets} {(filterSet != null ? "other " : "")}{(otherSets == 1 ? "set" : "sets")}",
+                            otherDrawings == 0 ? null : $"{otherDrawings} {(filterDrawing != null ? "other " : "")}{(otherDrawings == 1 ? "drawing" : "drawings")}",
                         }.Where(o => o != null).ToList();
                         released = others.Count == 0 ? $"×{quantity}" : $"×{quantity} (+{string.Join(", ", others)})";
                     }
@@ -255,8 +291,8 @@ namespace OpenNest.Forms
                     releaseGrid.CurrentCell = releaseGrid.Rows[0].Cells[0];
 
                 summaryLabel.Text = loaded.Total == 0
-                    ? set != null ? "This set has not been released yet."
-                        : drawing != null ? "This drawing has not been released on its own yet."
+                    ? filterSet != null ? "This set has not been released yet."
+                        : filterDrawing != null ? "This drawing has not been released on its own yet."
                         : "Nothing has been released yet."
                     : $"Releases {offset + 1:N0}-{offset + loaded.Items.Count:N0} of {loaded.Total:N0}";
             }

@@ -293,12 +293,18 @@ public class SetReleaseFormsTests
                     Nests = new[] { Nest("N1", NestStatus.HasBeenCut), Nest("N2", NestStatus.ToBeCut), Nest("N3", NestStatus.Draft, deleted: true) },
                 });
 
-                using var form = new SetReleasesForm(sets, set);
+                using var form = new DrawingSetsForm(sets, new PackageLibrary(), Server);
+                Run(form.ShowReleasesAsync(set));
                 form.Show();
-                var releases = Field<DataGridView>(form, "releaseGrid");
-                var nests = Field<DataGridView>(form, "nestGrid");
+                var view = form.Releases;
+                var releases = Field<DataGridView>(view, "releaseGrid");
+                var nests = Field<DataGridView>(view, "nestGrid");
                 PumpUntil(() => releases.Rows.Count == 1 && nests.Rows.Count == 3, "the releases");
 
+                Assert.True(form.ShowsReleases);
+                Assert.True(Field<TableLayoutPanel>(view, "filterTable").Visible);
+                Assert.Equal("Releases of set 'Synthetic kit'", Field<Label>(view, "filterLabel").Text);
+                Assert.True(releases.Columns["revisionColumn"]!.Visible);
                 Assert.Equal("1 of 2 cut, 1 deleted", releases.Rows[0].Cells["progressColumn"].Value);
                 Assert.Equal("×2", releases.Rows[0].Cells["multiplierColumn"].Value);
                 Assert.Equal(new object[] { "Has Been Cut", "To Be Cut", "Deleted" },
@@ -505,21 +511,23 @@ public class SetReleaseFormsTests
                 };
                 var questions = new List<string>();
 
-                using var form = new SetReleasesForm(sets, set);
-                form.ShowMessage = (text, buttons, _) =>
+                using var form = new DrawingSetsForm(sets, new PackageLibrary(), Server);
+                var view = form.Releases;
+                view.ShowMessage = (text, buttons, _) =>
                 {
                     questions.Add(text);
                     return buttons == MessageBoxButtons.YesNo ? DialogResult.Yes : DialogResult.OK;
                 };
+                Run(form.ShowReleasesAsync(set));
                 form.Show();
-                var releases = Field<DataGridView>(form, "releaseGrid");
-                var nests = Field<DataGridView>(form, "nestGrid");
+                var releases = Field<DataGridView>(view, "releaseGrid");
+                var nests = Field<DataGridView>(view, "nestGrid");
                 PumpUntil(() => releases.Rows.Count == 1 && nests.Rows.Count == 2, "the releases");
                 Assert.Equal("×2 (+1 other set)", releases.Rows[0].Cells["multiplierColumn"].Value);
                 Assert.Equal(new object[] { "Created", "Merged (revision 3 → 4)" }, nests.Rows.Cast<DataGridViewRow>().Select(r => r.Cells["changeColumn"].Value));
-                Assert.True(Field<Button>(form, "undoButton").Enabled);
+                Assert.True(Field<Button>(view, "undoButton").Enabled);
 
-                Run(form.UndoSelectedAsync());
+                Run(view.UndoSelectedAsync());
 
                 Assert.Contains("1 nest it created is deleted", questions[0]);
                 Assert.Contains("1 draft it merged into goes back", questions[0]);
@@ -529,7 +537,8 @@ public class SetReleaseFormsTests
                 PumpUntil(() => (string)releases.Rows[0].Cells["progressColumn"].Value == "Undone", "the release to read as undone");
                 Assert.Equal(new object[] { "Created; undo deleted it", "Merged (revision 3 → 4); undo left it as it was" },
                     nests.Rows.Cast<DataGridViewRow>().Select(r => r.Cells["changeColumn"].Value));
-                Assert.False(Field<Button>(form, "undoButton").Enabled);
+                Assert.False(Field<Button>(view, "undoButton").Enabled);
+                Assert.Same(set, view.FilterSet);
             },
             TestTimeout,
             "The release undo test did not complete.");
@@ -679,17 +688,20 @@ public class SetReleaseFormsTests
                 sets.UndoHandler = (id, request) => new SetReleaseRecord { Id = id, UndoneAt = DateTime.UtcNow };
                 var questions = new List<string>();
 
-                using var form = new SetReleasesForm(sets, a);
-                form.ShowMessage = (text, _, _) => { questions.Add(text); return DialogResult.OK; };
+                using var form = new DrawingSetsForm(sets, library, Server);
+                var view = form.Releases;
+                view.ShowMessage = (text, _, _) => { questions.Add(text); return DialogResult.OK; };
+                Run(form.ShowReleasesAsync(drawing: a));
                 form.Show();
-                var releases = Field<DataGridView>(form, "releaseGrid");
+                var releases = Field<DataGridView>(view, "releaseGrid");
                 PumpUntil(() => releases.Rows.Count == 1, "the releases");
 
-                Assert.Equal("Releases of drawing 'SYN-A'", form.Text);
+                Assert.Equal("Releases of drawing 'SYN-A' on its own", Field<Label>(view, "filterLabel").Text);
+                Assert.Equal("Quantity", releases.Columns["multiplierColumn"]!.HeaderText);
                 Assert.Equal("×4 (+1 set)", releases.Rows[0].Cells["multiplierColumn"].Value);
                 Assert.False(releases.Columns["revisionColumn"]!.Visible);
 
-                Run(form.UndoSelectedAsync());
+                Run(view.UndoSelectedAsync());
 
                 Assert.Equal(release.Id, Assert.Single(sets.UndoRequests).Id);
                 Assert.Contains("deleted (they can be recovered)", Assert.Single(questions));
@@ -729,9 +741,10 @@ public class SetReleaseFormsTests
                     Array.Empty<SetReleaseLine>(),
                     new[] { new SetReleaseDrawing { DrawingId = a.Id, DrawingName = a.Name, Quantity = 1 } }));
 
-                using var form = new SetReleasesForm(sets);
+                using var form = new DrawingSetsForm(sets, library, Server);
+                var view = form.Releases;
                 var opened = 0;
-                form.ShowNewRelease = () =>
+                view.ShowNewRelease = () =>
                 {
                     opened++;
                     // The dialog records a release before it closes; a cancelled dialog records none.
@@ -740,25 +753,26 @@ public class SetReleaseFormsTests
                             Array.Empty<SetReleaseDrawing>()));
                     return opened == 2;
                 };
+                Run(form.ShowReleasesAsync());
                 form.Show();
-                var releases = Field<DataGridView>(form, "releaseGrid");
+                var releases = Field<DataGridView>(view, "releaseGrid");
                 PumpUntil(() => releases.Rows.Count == 2, "the releases");
 
-                Assert.Equal("Releases", form.Text);
+                Assert.False(Field<TableLayoutPanel>(view, "filterTable").Visible);
                 Assert.False(releases.Columns["revisionColumn"]!.Visible);
                 Assert.Equal("Released", releases.Columns["multiplierColumn"]!.HeaderText);
                 Assert.Equal(new object[] { "SYN-A ×1", "Synthetic kit ×2, Synthetic frame; SYN-A ×4" },
                     releases.Rows.Cast<DataGridViewRow>().Select(r => r.Cells["multiplierColumn"].Value));
-                Assert.Equal("Releases 1-2 of 2", Field<Label>(form, "summaryLabel").Text);
-                Assert.False(Field<Button>(form, "newReleaseButton").Visible);
+                Assert.Equal("Releases 1-2 of 2", Field<Label>(view, "summaryLabel").Text);
+                Assert.False(Field<Button>(view, "newReleaseButton").Visible);
 
-                Run(form.NewReleaseAsync());
+                Run(view.NewReleaseAsync());
                 Assert.Equal(2, releases.Rows.Count);
 
-                Run(form.NewReleaseAsync());
+                Run(view.NewReleaseAsync());
                 PumpUntil(() => releases.Rows.Count == 3, "the re-read releases");
                 Assert.Equal("Synthetic kit", releases.Rows[0].Cells["multiplierColumn"].Value);
-                Assert.Equal("Releases 1-3 of 3", Field<Label>(form, "summaryLabel").Text);
+                Assert.Equal("Releases 1-3 of 3", Field<Label>(view, "summaryLabel").Text);
             },
             TestTimeout,
             "The all-releases view test did not complete.");
@@ -826,6 +840,70 @@ public class SetReleaseFormsTests
             },
             TestTimeout,
             "The empty release test did not complete.");
+    }
+
+    [Fact]
+    public void DrawingSetsWindow_ReadsEachTabWhenShown_AndASetsReleasesFilterTheReleasesTab_UntilCleared()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var sets = new InMemoryDrawingSets();
+                var kit = CreateSet(sets, "Synthetic kit", (a, 1));
+                var frame = CreateSet(sets, "Synthetic frame", (a, 2));
+                SetReleaseRecord Release(DrawingSetRecord set) => new()
+                {
+                    Id = Guid.NewGuid(),
+                    Sets = new[] { new SetReleaseLine { SetId = set.Id, SetRevision = 1, SetName = set.Name, Quantity = 1 } },
+                    ReleasedBy = "Synthetic operator",
+                    Nests = new[] { new SetReleaseNest { NestId = Guid.NewGuid(), Nest = new NestRecord { Name = "N1", Status = NestStatus.Draft } } },
+                };
+                sets.Releases.Add(Release(kit));
+                sets.Releases.Add(Release(frame));
+
+                using var form = new DrawingSetsForm(sets, library, Server);
+                var browser = form.Browser;
+                var view = form.Releases;
+                form.Show();
+                var setGrid = Field<DataGridView>(browser, "setGrid");
+                var releases = Field<DataGridView>(view, "releaseGrid");
+                var filter = Field<TableLayoutPanel>(view, "filterTable");
+                PumpUntil(() => setGrid.Rows.Count == 2, "the set list");
+
+                Assert.False(form.ShowsReleases);
+                Assert.False(view.HasLoaded);
+
+                setGrid.CurrentCell = setGrid.Rows.Cast<DataGridViewRow>()
+                    .Single(r => (string)r.Cells["nameColumn"].Value == "Synthetic kit").Cells[0];
+                Field<Button>(browser, "releasesButton").PerformClick();
+                PumpUntil(() => releases.Rows.Count == 1, "the set's releases");
+
+                Assert.True(form.ShowsReleases);
+                Assert.Equal(kit.Id, view.FilterSet.Id);
+                Assert.True(filter.Visible);
+                Assert.Equal("Releases of set 'Synthetic kit'", Field<Label>(view, "filterLabel").Text);
+                Assert.Equal("Quantity", releases.Columns["multiplierColumn"]!.HeaderText);
+
+                Field<Button>(view, "clearFilterButton").PerformClick();
+                PumpUntil(() => releases.Rows.Count == 2, "every release");
+
+                Assert.Null(view.FilterSet);
+                Assert.False(filter.Visible);
+                Assert.Equal("Released", releases.Columns["multiplierColumn"]!.HeaderText);
+                Assert.False(releases.Columns["revisionColumn"]!.Visible);
+
+                // A release made meanwhile (as Make Nests on the Sets tab does) shows once the tab is shown again.
+                form.ShowSets();
+                Assert.False(form.ShowsReleases);
+                sets.Releases.Add(Release(frame));
+                Field<TabControl>(form, "tabs").SelectedIndex = 1;
+                PumpUntil(() => releases.Rows.Count == 3, "the re-read releases");
+                Assert.Equal("Releases 1-3 of 3", Field<Label>(view, "summaryLabel").Text);
+            },
+            TestTimeout,
+            "The drawing sets window tabs test did not complete.");
     }
 
     private static DrawingSetRecord CreateSet(InMemoryDrawingSets sets, params (DrawingLibraryRecord Drawing, int Quantity)[] members) =>

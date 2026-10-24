@@ -56,6 +56,9 @@ public sealed class DrawingSetEditSession
 
     public Guid Id { get; }
 
+    /// <summary>The store the set is read from and saved to; also reads its history.</summary>
+    public IDrawingSetStore Store => _sets;
+
     public string SavedBy { get; }
 
     /// <summary>The set as last read or saved; null until a new set is first saved.</summary>

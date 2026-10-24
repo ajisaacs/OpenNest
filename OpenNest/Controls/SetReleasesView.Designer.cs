@@ -1,6 +1,6 @@
-namespace OpenNest.Forms
+namespace OpenNest.Controls
 {
-    partial class SetReleasesForm
+    partial class SetReleasesView
     {
         private System.ComponentModel.IContainer components = null;
 
@@ -19,6 +19,9 @@ namespace OpenNest.Forms
         {
             System.Windows.Forms.DataGridViewCellStyle rightAligned = new System.Windows.Forms.DataGridViewCellStyle();
             layoutTable = new System.Windows.Forms.TableLayoutPanel();
+            filterTable = new System.Windows.Forms.TableLayoutPanel();
+            filterLabel = new System.Windows.Forms.Label();
+            clearFilterButton = new System.Windows.Forms.Button();
             releaseGrid = new System.Windows.Forms.DataGridView();
             revisionColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             releasedColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
@@ -41,8 +44,8 @@ namespace OpenNest.Forms
             summaryLabel = new System.Windows.Forms.Label();
             newReleaseButton = new System.Windows.Forms.Button();
             undoButton = new System.Windows.Forms.Button();
-            closeButton = new System.Windows.Forms.Button();
             layoutTable.SuspendLayout();
+            filterTable.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)releaseGrid).BeginInit();
             nestsGroup.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)nestGrid).BeginInit();
@@ -53,19 +56,58 @@ namespace OpenNest.Forms
             //
             layoutTable.ColumnCount = 1;
             layoutTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            layoutTable.Controls.Add(releaseGrid, 0, 0);
-            layoutTable.Controls.Add(nestsGroup, 0, 1);
-            layoutTable.Controls.Add(bottomTable, 0, 2);
+            layoutTable.Controls.Add(filterTable, 0, 0);
+            layoutTable.Controls.Add(releaseGrid, 0, 1);
+            layoutTable.Controls.Add(nestsGroup, 0, 2);
+            layoutTable.Controls.Add(bottomTable, 0, 3);
             layoutTable.Dock = System.Windows.Forms.DockStyle.Fill;
             layoutTable.Location = new System.Drawing.Point(0, 0);
             layoutTable.Name = "layoutTable";
-            layoutTable.Padding = new System.Windows.Forms.Padding(8);
-            layoutTable.RowCount = 3;
+            layoutTable.Padding = new System.Windows.Forms.Padding(0);
+            layoutTable.RowCount = 4;
+            layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            layoutTable.Size = new System.Drawing.Size(824, 541);
+            layoutTable.Size = new System.Drawing.Size(984, 541);
             layoutTable.TabIndex = 0;
+            //
+            // filterTable
+            //
+            filterTable.AutoSize = true;
+            filterTable.ColumnCount = 3;
+            filterTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            filterTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            filterTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            filterTable.Controls.Add(filterLabel, 0, 0);
+            filterTable.Controls.Add(clearFilterButton, 1, 0);
+            filterTable.Dock = System.Windows.Forms.DockStyle.Fill;
+            filterTable.Margin = new System.Windows.Forms.Padding(0, 0, 0, 6);
+            filterTable.Name = "filterTable";
+            filterTable.RowCount = 1;
+            filterTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            filterTable.TabIndex = 0;
+            //
+            // filterLabel
+            //
+            filterLabel.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            filterLabel.AutoSize = true;
+            filterLabel.BackColor = System.Drawing.SystemColors.Info;
+            filterLabel.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            filterLabel.ForeColor = System.Drawing.SystemColors.InfoText;
+            filterLabel.Name = "filterLabel";
+            filterLabel.Padding = new System.Windows.Forms.Padding(4, 2, 4, 2);
+            filterLabel.TabIndex = 0;
+            //
+            // clearFilterButton
+            //
+            clearFilterButton.AutoSize = true;
+            clearFilterButton.Margin = new System.Windows.Forms.Padding(6, 3, 3, 3);
+            clearFilterButton.Name = "clearFilterButton";
+            clearFilterButton.TabIndex = 1;
+            clearFilterButton.Text = "Clear Filter";
+            clearFilterButton.UseVisualStyleBackColor = true;
+            clearFilterButton.Click += ClearFilterButton_Click;
             //
             // releaseGrid
             //
@@ -79,7 +121,7 @@ namespace OpenNest.Forms
             releaseGrid.RowHeadersVisible = false;
             releaseGrid.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             releaseGrid.StandardTab = true;
-            releaseGrid.TabIndex = 0;
+            releaseGrid.TabIndex = 1;
             releaseGrid.CurrentCellChanged += ReleaseGrid_CurrentCellChanged;
             //
             // revisionColumn
@@ -142,7 +184,7 @@ namespace OpenNest.Forms
             nestsGroup.Dock = System.Windows.Forms.DockStyle.Fill;
             nestsGroup.Margin = new System.Windows.Forms.Padding(0, 6, 0, 0);
             nestsGroup.Name = "nestsGroup";
-            nestsGroup.TabIndex = 1;
+            nestsGroup.TabIndex = 2;
             nestsGroup.TabStop = false;
             nestsGroup.Text = "Nests of the selected release";
             //
@@ -206,11 +248,10 @@ namespace OpenNest.Forms
             // bottomTable
             //
             bottomTable.AutoSize = true;
-            bottomTable.ColumnCount = 6;
+            bottomTable.ColumnCount = 5;
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.Controls.Add(previousButton, 0, 0);
@@ -218,13 +259,12 @@ namespace OpenNest.Forms
             bottomTable.Controls.Add(summaryLabel, 2, 0);
             bottomTable.Controls.Add(newReleaseButton, 3, 0);
             bottomTable.Controls.Add(undoButton, 4, 0);
-            bottomTable.Controls.Add(closeButton, 5, 0);
             bottomTable.Dock = System.Windows.Forms.DockStyle.Fill;
             bottomTable.Margin = new System.Windows.Forms.Padding(0, 6, 0, 0);
             bottomTable.Name = "bottomTable";
             bottomTable.RowCount = 1;
             bottomTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            bottomTable.TabIndex = 2;
+            bottomTable.TabIndex = 3;
             //
             // previousButton
             //
@@ -273,32 +313,17 @@ namespace OpenNest.Forms
             undoButton.UseVisualStyleBackColor = true;
             undoButton.Click += UndoButton_Click;
             //
-            // closeButton
-            //
-            closeButton.AutoSize = true;
-            closeButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            closeButton.Name = "closeButton";
-            closeButton.TabIndex = 5;
-            closeButton.Text = "Close";
-            closeButton.UseVisualStyleBackColor = true;
-            //
-            // SetReleasesForm
+            // SetReleasesView
             //
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-            CancelButton = closeButton;
-            ClientSize = new System.Drawing.Size(1004, 541);
             Controls.Add(layoutTable);
             Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            MinimizeBox = false;
-            MinimumSize = new System.Drawing.Size(600, 400);
-            Name = "SetReleasesForm";
-            ShowIcon = false;
-            ShowInTaskbar = false;
-            StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            Text = "Set Releases";
-            Shown += SetReleasesForm_Shown;
+            Name = "SetReleasesView";
+            Size = new System.Drawing.Size(984, 541);
             layoutTable.ResumeLayout(false);
             layoutTable.PerformLayout();
+            filterTable.ResumeLayout(false);
+            filterTable.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)releaseGrid).EndInit();
             nestsGroup.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)nestGrid).EndInit();
@@ -310,6 +335,9 @@ namespace OpenNest.Forms
         #endregion
 
         private System.Windows.Forms.TableLayoutPanel layoutTable;
+        private System.Windows.Forms.TableLayoutPanel filterTable;
+        private System.Windows.Forms.Label filterLabel;
+        private System.Windows.Forms.Button clearFilterButton;
         private System.Windows.Forms.DataGridView releaseGrid;
         private System.Windows.Forms.DataGridViewTextBoxColumn revisionColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn releasedColumn;
@@ -332,6 +360,5 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Label summaryLabel;
         private System.Windows.Forms.Button newReleaseButton;
         private System.Windows.Forms.Button undoButton;
-        private System.Windows.Forms.Button closeButton;
     }
 }

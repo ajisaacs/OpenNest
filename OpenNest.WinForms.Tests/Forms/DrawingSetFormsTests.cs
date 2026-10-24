@@ -67,6 +67,43 @@ public class DrawingSetFormsTests
     }
 
     [Fact]
+    public void Editor_History_ShowsTheSavedSetsRevisions_AndIsHiddenForANewSet()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel", 0.25);
+                var sets = new InMemoryDrawingSets();
+                var created = Run(sets.CreateAsync(new DrawingSetRecord
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Synthetic kit",
+                    Members = new[] { new DrawingSetMember { DrawingId = a.Id, Quantity = 2, Drawing = a } },
+                }));
+                var shown = new List<DrawingSetRecord>();
+
+                using (var editor = new EditDrawingSetForm(new DrawingSetEditSession(sets, created, "Synthetic operator"), library, Server))
+                {
+                    editor.ShowHistory = shown.Add;
+                    editor.Show();
+                    var history = Field<Button>(editor, "historyButton");
+                    Assert.True(history.Visible);
+
+                    history.PerformClick();
+
+                    Assert.Equal(created.Id, Assert.Single(shown).Id);
+                }
+
+                using var fresh = new EditDrawingSetForm(new DrawingSetEditSession(sets, null, "Synthetic operator"), library, Server);
+                fresh.Show();
+                Assert.False(Field<Button>(fresh, "historyButton").Visible);
+            },
+            TestTimeout,
+            "The editor history test did not complete.");
+    }
+
+    [Fact]
     public void EditorLibraryPane_ListsEveryDrawing_AddsTheSelectionInListOrder_AndGreysMembers()
     {
         StaTestThread.Run(

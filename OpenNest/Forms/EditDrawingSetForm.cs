@@ -20,8 +20,9 @@ namespace OpenNest.Forms
     /// selected drawings at the entered quantity, and a drawing already in the set is greyed
     /// and not added twice. Edit Drawing (a double-click on a member, its right-click menu or
     /// the button) reads the member's current library record and edits its details there, so
-    /// a drawing without a material or thickness can be fixed in place. Saving adds a revision
-    /// on the server, guarded by the revision the set was read at.
+    /// a drawing without a material or thickness can be fixed in place. History lists a saved
+    /// set's revisions. Saving adds a revision on the server, guarded by the revision the set
+    /// was read at.
     /// </summary>
     public partial class EditDrawingSetForm : Form
     {
@@ -38,6 +39,9 @@ namespace OpenNest.Forms
 
         /// <summary>Shows Edit Drawing and returns the saved record, or null; replaced by tests.</summary>
         internal Func<DrawingLibraryEditSession, DrawingLibraryRecord> EditDrawing { get; set; }
+
+        /// <summary>Shows a set's revision history; replaced by tests.</summary>
+        internal Action<DrawingSetRecord> ShowHistory { get; set; }
 
         /// <summary>The saved revision once the dialog closes with OK; otherwise null.</summary>
         public DrawingSetRecord Saved { get; private set; }
@@ -62,6 +66,11 @@ namespace OpenNest.Forms
                 using var form = new EditLibraryDrawingForm(edit);
                 return form.ShowDialog(this) == DialogResult.OK ? form.Saved : null;
             };
+            ShowHistory = set =>
+            {
+                using var form = new DrawingSetHistoryForm(session.Store, set);
+                form.ShowDialog(this);
+            };
 
             GridStyle.Apply(memberGrid);
             GridStyle.Apply(libraryGrid);
@@ -80,6 +89,8 @@ namespace OpenNest.Forms
             Text = session.IsNew
                 ? "New Drawing Set"
                 : $"Edit Set '{session.Saved.Name}' — revision {session.Saved.Revision}";
+            // A new set has no history until it is saved, and the dialog closes on save.
+            historyButton.Visible = !session.IsNew;
             Populate(session.Members.Count > 0 ? 0 : -1);
             UpdateCommands();
         }
@@ -95,6 +106,12 @@ namespace OpenNest.Forms
         }
 
         private void MemberGrid_CurrentCellChanged(object sender, EventArgs e) => UpdateCommands();
+
+        private void HistoryButton_Click(object sender, EventArgs e)
+        {
+            if (session.Saved is { } saved)
+                ShowHistory(saved);
+        }
 
         private void MemberGrid_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
         {

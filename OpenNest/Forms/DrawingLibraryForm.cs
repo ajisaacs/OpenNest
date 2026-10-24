@@ -24,8 +24,9 @@ namespace OpenNest.Forms
     /// selected drawing's details, notes and nesting settings (Cut first, priority, rotation,
     /// color) on the server as a new revision with the same package. With a set
     /// store, the drawing grid's menu lists the sets a drawing is in, adds it to a set, lists
-    /// the releases that had it on its own and, once release is enabled, releases it; sets
-    /// themselves are browsed and released in <see cref="DrawingSetsForm"/>.
+    /// the releases that had it on its own (the Releases tab of <see cref="DrawingSetsForm"/>,
+    /// filtered to it) and, once release is enabled, releases it; sets themselves are browsed
+    /// and released in <see cref="DrawingSetsForm"/>.
     /// The details pane previews the selected revision's geometry, downloaded shortly after
     /// the selection settles and cached per revision for the dialog's lifetime. The In This
     /// Nest tab lists the nest's drawings and edits their required quantities in place.
@@ -48,6 +49,7 @@ namespace OpenNest.Forms
         private Task<Drawing> previewLoad;
         private bool populatingNest;
         private bool adding;
+        private Action<DrawingSetsForm> enableSetsRelease = _ => { };
 
         /// <summary>
         /// Reads the drawing a record's package holds for the preview, or null when the
@@ -131,7 +133,9 @@ namespace OpenNest.Forms
             };
             ShowReleases = record =>
             {
-                using var form = new SetReleasesForm(sets, record);
+                using var form = new DrawingSetsForm(sets, library, this.serverUrl);
+                enableSetsRelease(form);
+                _ = form.ShowReleasesAsync(drawing: record);
                 form.ShowDialog(this);
             };
             LoadPreview = async (record, token) =>
@@ -394,6 +398,7 @@ namespace OpenNest.Forms
                 { IsNestOpen = isNestOpen ?? (_ => false) };
                 form.ShowDialog(this);
             };
+            enableSetsRelease = form => form.EnableRelease(nests, openNest, isNestOpen);
             releaseSeparator.Visible = true;
             releaseMenuItem.Visible = true;
         }

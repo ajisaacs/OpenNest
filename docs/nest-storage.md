@@ -404,7 +404,10 @@ revision; save the nest to keep it.
 
 **File > Drawing Sets...** (Database mode only) opens the drawing sets window;
 it needs no open nest, since releasing a set makes new nests or merges into
-draft ones and opens each in its own tab. It lists sets a page at a time
+draft ones and opens each in its own tab. The window has two tabs, **Sets** and
+**Releases** ([below](#releases-tab)); **File > Releases...** is a shortcut that
+opens the same window on the Releases tab. Each tab reads its list when first
+shown, and Releases re-reads its page each time it is shown again. Sets lists sets a page at a time
 (`OpenNest.Data.DrawingSetBrowseSession`): search by name, customer or notes,
 sort by name, customer, revision or saved time, and **Show archived**. Selecting
 a set shows its notes.
@@ -428,16 +431,19 @@ a set shows its notes.
   before its first save, and a save that fails without a definite answer stays
   pending: the next Save reads that id and adopts the stored set (saving any
   later edit as its next revision) instead of creating it twice. Closing with
-  unsaved edits asks first.
+  unsaved edits asks first. Editing a saved set, the editor's **History...**
+  lists the set's revisions (below).
 - **Archive** (after confirming) and **Restore** add a revision; nothing is
-  deleted. **History...** lists revisions newest first with the members of the
-  selected one, shown with their drawings' current library details.
+  deleted. **History...** (in the set editor, and on the Sets tab for the
+  selected set) lists revisions newest first with the members of the selected
+  one, shown with their drawings' current library details.
 
 In the Drawing Library dialog, right-click a drawing for **Used in Sets...** (the sets
 whose current revision contains it) or **Add to Set...**: choose an active set
 or **New Set**, and the set editor opens with the drawing added at the entered
-quantity for review and Save. **Releases...** lists the releases that had the
-drawing on its own (see below), with Undo Release. When the dialog was opened
+quantity for review and Save. **Releases...** opens the drawing sets window on
+its Releases tab, filtered to the releases that had the drawing on its own (see
+below), with Undo Release. When the dialog was opened
 from a nest, **Make Nests...** reads the drawing's current record and opens the
 release dialog with it on its own at the entered quantity; more drawings and
 sets are added there.
@@ -456,7 +462,7 @@ library's latest revision. Anything kept, skipped, archived in the library or
 newer there than in the nest is listed first, then the set editor opens for
 review and Save; nothing is stored before then.
 
-**Make Nests...** (in the drawing sets window) reads the
+**Make Nests...** (on the drawing sets window's Sets tab) reads the
 selected active set with its members and opens the release dialog with it listed.
 More sets are added from **Add a set**: the list opens with the first active sets
 by name and narrows as you type; Enter or **Add** takes the picked set, or the one
@@ -531,24 +537,30 @@ the button becomes **Try Again** and posts the same release again without making
 the nests again. A dialog
 runs one release.
 
-**Releases...** lists the releases that include the selected set, newest first:
-when, by whom, the set's **Revision**, the **Quantity** of this set (and how many other sets
-and drawings the release had), the number of nests, progress such as "2 of 3 cut" (deleted
-nests are not counted) or "Undone", and the notes. The selected release's nests
-show their **Material**, the **Action** ("Created", "Merged (revision
-3 → 4)", and what undo did) and current status, or Deleted. **Undo Release...**
-deletes the nests the release created (they can be recovered) and restores the
-drafts it merged into. When some nests were changed after the release, it lists
-them and offers to undo the others, leaving those as they are.
+<a id="releases-tab"></a>
+The **Releases** tab lists every release on the server, newest first, 100 at a
+time (**< Newer** / **Older >**): when, by whom, a **Released** column naming what
+each one had ("Frame A ×2, Frame B; Bracket ×4": sets with their quantity past
+one, then drawings on their own with their quantities), the number of nests,
+progress such as "2 of 3 cut" (deleted nests are not counted) or "Undone", and the
+notes. The selected release's nests show their **Material**, the **Action**
+("Created", "Merged (revision 3 → 4)", and what undo did) and current status, or
+Deleted. **Undo Release...** deletes the nests the release created (they can be
+recovered) and restores the drafts it merged into. When some nests were changed
+after the release, it lists them and offers to undo the others, leaving those as
+they are. **New Release...** opens the release dialog empty; sets are added by
+name and drawings with Add Drawings, and once the dialog records a release the
+list re-reads from the newest.
 
-**File > Releases...** lists every release on the server the same way, newest
-first, with a **Released** column naming what each one had ("Frame A ×2, Frame B;
-Bracket ×4": sets with their quantity past one, then drawings on their own with
-their quantities) in place of the revision and quantity, and Undo Release.
-**New Release...** opens the release dialog empty; sets are added by name and
-drawings with Add Drawings, and once the dialog records a release the list
-re-reads from the newest. Like Drawing Sets, it is enabled in database mode
-only.
+A filter narrows the tab to one set or one drawing, shown above the list
+("Releases of set 'Frame A'") until **Clear Filter** lists every release again:
+
+- **Releases...** on the Sets tab filters to the releases that include the
+  selected set, with the set's **Revision** and the **Quantity** of this set (and
+  how many other sets and drawings the release had) in place of Released.
+- **Releases...** in the Drawing Library's right-click menu opens the window
+  filtered to the releases that had that drawing on its own, with its
+  **Quantity** (and how many sets and other drawings the release had).
 
 **Nest > Edit** (Nest Info) shows, beside its buttons, the newest release that
 made or merged into a server nest ("Released from set 'Frame A' revision 3 ×2 on
