@@ -18,10 +18,12 @@ namespace OpenNest.Forms
     /// <summary>
     /// Drawing Sets &gt; Release: the operator lists the sets to release, typed in or added from
     /// the browser, each with a number of kits, and library drawings on their own (Add
-    /// Drawings), each with a quantity, and the dialog previews how they split into one
-    /// nest per material group (<see cref="SetReleasePlan"/>), with an archived-drawing toggle
-    /// and a tick per group. Each group makes a new Draft nest or merges into a Draft nest of
-    /// the same material, whose layout is discarded. <see cref="SetReleaseSession"/> then builds
+    /// Drawings), each with a quantity, and the dialog previews, in a sentence and a grid, how
+    /// they split into one nest per material group (<see cref="SetReleasePlan"/>). Options
+    /// shows an archived-drawing toggle and a tick per group; an option left changed stays
+    /// shown while Options is collapsed. Each group makes a new Draft nest or merges into a
+    /// Draft nest of the same material, whose layout is discarded; the Nest column shows
+    /// whenever such a draft exists. <see cref="SetReleaseSession"/> then builds
     /// those nests, nests each one with Auto Nest when Nest after release is ticked, saves them,
     /// opens each in its own tab, and records the release once every chosen nest exists. The
     /// dialog shows every group's outcome; a release runs once per dialog. A group refused for
@@ -53,6 +55,8 @@ namespace OpenNest.Forms
         private bool running;
         private bool loadingDrafts;
         private bool editing;
+        private bool optionsExpanded;
+        private bool archivedShown;
 
         /// <summary>Shows a message and returns the operator's answer; replaced by tests.</summary>
         internal Func<string, MessageBoxButtons, MessageBoxIcon, DialogResult> ShowMessage { get; set; }
@@ -80,6 +84,23 @@ namespace OpenNest.Forms
 
         /// <summary>Shows Edit Drawing and returns the saved record, or null; replaced by tests.</summary>
         internal Func<DrawingLibraryEditSession, DrawingLibraryRecord> EditDrawing { get; set; }
+
+        /// <summary>
+        /// Shows the Release ticks, the Nest column and Include archived drawings; collapsed,
+        /// they show only when they differ from the defaults or a draft could be merged into.
+        /// </summary>
+        internal bool OptionsExpanded
+        {
+            get => optionsExpanded;
+            set
+            {
+                // Hiding a column mid-edit would drop the edit, so it is committed first.
+                if (optionsExpanded == value || !groupGrid.EndEdit())
+                    return;
+                optionsExpanded = value;
+                UpdateOptions(plan == null ? Array.Empty<SetReleaseGroup>() : ChosenGroups(), collapsing: !value);
+            }
+        }
 
         /// <summary>The finished release, once one has run; otherwise null.</summary>
         public SetReleaseResult Result { get; private set; }
@@ -130,6 +151,10 @@ namespace OpenNest.Forms
 
             GridStyle.Apply(setGrid);
             GridStyle.Apply(groupGrid);
+            // A refusal or outcome wraps rather than being cut off.
+            groupGrid.RowTemplate.MinimumHeight = groupGrid.RowTemplate.Height;
+            groupGrid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
+            statusColumn.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
             populating = true;
             foreach (var set in setsToRelease)
                 AddRow(set, set.Name, set.Customer, set.Revision, 1);
@@ -250,6 +275,8 @@ namespace OpenNest.Forms
         private static int Kits(DataGridViewRow row) =>
             int.TryParse(Convert.ToString(row.Cells["kitsColumn"].Value, CultureInfo.CurrentCulture), NumberStyles.Integer,
                 CultureInfo.CurrentCulture, out var kits) ? kits : 1;
+
+        private void OptionsButton_Click(object sender, EventArgs e) => OptionsExpanded = !OptionsExpanded;
 
         private void Options_Changed(object sender, EventArgs e)
         {
@@ -522,16 +549,24 @@ namespace OpenNest.Forms
             }
         }
 
+        // The selected refused group, else the first one.
+        private DataGridViewRow RefusedRow() =>
+            groupGrid.CurrentRow?.Tag is SetReleaseGroup { CanRelease: false } ? groupGrid.CurrentRow
+                : groupGrid.Rows.Cast<DataGridViewRow>().FirstOrDefault(r => r.Tag is SetReleaseGroup { CanRelease: false });
+
         private bool CanEditDrawings() => libraryStore != null && !running && !editing && Result == null;
 
         /// <summary>
         /// Opens Edit Drawing, one after another, on each drawing the selected group is refused
-        /// for; cancelling one stops. The plan is rebuilt after each save.
+        /// for, or the first refused group's when a releasable one is selected; cancelling one
+        /// stops. The plan is rebuilt after each save.
         /// </summary>
         internal async Task FixSelectedGroupAsync()
         {
-            if (!CanEditDrawings() || groupGrid.CurrentRow?.Tag is not SetReleaseGroup { CanRelease: false } group)
+            if (!CanEditDrawings() || RefusedRow() is not { Tag: SetReleaseGroup group } row)
                 return;
+            if (groupGrid.CurrentRow != row)
+                groupGrid.CurrentCell = row.Cells[materialColumn.Index];
             foreach (var item in group.RefusedItems.ToList())
             {
                 if (!await EditItemDrawingAsync(item) || IsDisposed)
@@ -768,6 +803,7 @@ namespace OpenNest.Forms
                 1 => $"Release '{(plan.Lines.Count == 1 ? plan.Lines[0].Set.Name : plan.Drawings[0].Drawing.Name)}'",
                 _ => $"Release {DescribeLines()}",
             };
+            setLabel.Text = Heading();
             populating = true;
             groupGrid.Rows.Clear();
             foreach (var group in plan.Groups)
@@ -797,9 +833,27 @@ namespace OpenNest.Forms
                 $"{skipped.Count} archived drawing{(skipped.Count == 1 ? " is" : "s are")} left out: "
                 + string.Join(", ", skipped.Take(5).Select(m => $"'{m.Drawing!.Name}'"))
                 + (skipped.Count > 5 ? $" and {skipped.Count - 5} more" : "")
-                + ". Tick Include archived drawings to add them.";
+                + ". Tick Include archived drawings (under Options) to add them.";
             UpdateCommands();
             _ = LoadDraftsAsync();
+        }
+
+        // "Release set 'Kit A' ×2", "Release 'Kit A' ×2, 'Kit B' ×1 and 'SYN-A' ×4".
+        private string Heading()
+        {
+            if (plan.Lines.Count + plan.Drawings.Count == 1)
+                return plan.Lines.Count == 1
+                    ? $"Release set '{plan.Lines[0].Set.Name}' ×{plan.Lines[0].Quantity}"
+                    : $"Release drawing '{plan.Drawings[0].Drawing.Name}' ×{plan.Drawings[0].Quantity}";
+            const int named = 3;
+            var lines = plan.Lines.Select(l => $"'{l.Set.Name}' ×{l.Quantity}")
+                .Concat(plan.Drawings.Select(d => $"'{d.Drawing.Name}' ×{d.Quantity}"))
+                .ToList();
+            if (lines.Count == 0)
+                return "Add a set or drawings to release";
+            if (lines.Count <= named + 1)
+                return $"Release {string.Join(", ", lines.Take(lines.Count - 1))} and {lines[^1]}";
+            return $"Release {string.Join(", ", lines.Take(named))} and {lines.Count - named} more";
         }
 
         // "set 'Kit A' ×2", "3 sets and 2 drawings", "drawing 'SYN-A' ×4".
@@ -873,7 +927,12 @@ namespace OpenNest.Forms
                     FillTargets(row, group);
             }
             populating = false;
+            UpdateCommands();
         }
+
+        // A releasable group has a draft it could merge into.
+        private bool CanMerge() =>
+            plan.Groups.Any(g => g.CanRelease && drafts.TryGetValue(g.Key, out var candidates) && candidates.Count > 0);
 
         private string GroupNote(SetReleaseGroup group)
         {
@@ -929,7 +988,8 @@ namespace OpenNest.Forms
             if (Result.Release != null)
                 statusLabel.Text = $"Done: {nestsText} saved and opened.";
             else if (Result.ReleaseError.Length > 0)
-                statusLabel.Text = Result.ReleaseError + " Choose Try Again.";
+                statusLabel.Text = Result.ReleaseError.TrimEnd('.', ' ')
+                    + ". Try Again records it; the nests are not made again.";
             else if (Result.Canceled)
                 statusLabel.Text = $"Canceled: {nestsText} saved, release not recorded.";
             else
@@ -963,7 +1023,8 @@ namespace OpenNest.Forms
                 }
             }
 
-            fixDrawingsButton.Enabled = CanEditDrawings() && groupGrid.CurrentRow?.Tag is SetReleaseGroup { CanRelease: false };
+            fixDrawingsButton.Enabled = CanEditDrawings() && RefusedRow() != null;
+            UpdateOptions(chosen);
 
             var retry = Result is { Release: null, ReleaseError.Length: > 0 };
             releaseButton.Text = retry ? "Try Again" : "Make Nests...";
@@ -976,6 +1037,60 @@ namespace OpenNest.Forms
                     + $"{chosen.Count - merged} new Draft nest{(chosen.Count - merged == 1 ? "" : "s")}"
                     + (merged == 0 ? "" : $", {merged} merge{(merged == 1 ? "" : "s")}")
                     + $", {parts:N0} part{(parts == 1 ? "" : "s")}";
+        }
+
+        // Collapsed, an option shows while it differs from its default or, for the Nest column,
+        // while a draft could be merged into. Only collapsing hides one: hiding a column from its
+        // own cell's events would move the current cell mid-event, and a control should not
+        // vanish under the pointer.
+        private void UpdateOptions(IReadOnlyList<SetReleaseGroup> chosen, bool collapsing = false)
+        {
+            var anyExcluded = plan != null && plan.Groups.Any(g => g.CanRelease && excluded.Contains(g.Key));
+            var canMerge = plan != null && CanMerge();
+            optionsButton.Text = optionsExpanded ? "Options ▾" : "Options ▸";
+            // A control reads as hidden until the form is shown, so the checkbox's state is kept here.
+            archivedShown = Reveal(includeArchivedCheckBox.Checked, archivedShown);
+            includeArchivedCheckBox.Visible = archivedShown;
+            includeColumn.Visible = Reveal(anyExcluded, includeColumn.Visible);
+            targetColumn.Visible = Reveal(canMerge || targets.Count > 0, targetColumn.Visible);
+            previewLabel.Text = Preview(chosen, canMerge);
+
+            bool Reveal(bool changed, bool shown) => optionsExpanded || changed || (shown && !collapsing);
+        }
+
+        // "Creates 2 nests: A36 0.25 in, 304 0.1875 in." and what needs the operator's attention.
+        private string Preview(IReadOnlyList<SetReleaseGroup> chosen, bool canMerge)
+        {
+            if (plan == null || plan.Groups.Count == 0)
+                return "Add a set or drawings to see the nests they make.";
+            const int named = 4;
+            var merges = chosen.Count(g => targets.ContainsKey(g.Key));
+            var created = chosen.Count - merges;
+            var text = (created, merges) switch
+            {
+                (0, 0) => "No nests chosen.",
+                (_, 0) => $"Creates {created} nest{(created == 1 ? "" : "s")}: ",
+                (0, _) => $"Merges into {merges} Draft nest{(merges == 1 ? "" : "s")}: ",
+                _ => $"Creates {created} nest{(created == 1 ? "" : "s")} and merges into "
+                    + $"{merges} Draft nest{(merges == 1 ? "" : "s")}: ",
+            };
+            if (chosen.Count > 0)
+                text += string.Join(", ", chosen.Take(named).Select(g =>
+                        targets.TryGetValue(g.Key, out var draft) ? $"{Describe(g)} into '{draft.Name}'" : Describe(g)))
+                    + (chosen.Count > named ? $" and {chosen.Count - named} more." : ".");
+
+            var refused = plan.Groups.Count(g => !g.CanRelease);
+            if (refused == 1)
+                text += " 1 material can't be released yet: " + (libraryStore == null ? "see its Status." : "choose Fix Drawings.");
+            else if (refused > 1)
+                text += $" {refused} materials can't be released yet: "
+                    + (libraryStore == null ? "see their Status." : "select one and choose Fix Drawings.");
+            var left = plan.Groups.Count(g => g.CanRelease && excluded.Contains(g.Key));
+            if (left > 0)
+                text += $" {left} material{(left == 1 ? " is" : "s are")} left out (unticked under Release).";
+            if (merges == 0 && canMerge)
+                text += " A Draft nest of the same material exists: choose it under Nest to merge into it.";
+            return text;
         }
 
         private static string Describe(SetReleaseGroup group) =>

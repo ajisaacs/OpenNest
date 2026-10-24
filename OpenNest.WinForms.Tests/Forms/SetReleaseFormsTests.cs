@@ -115,6 +115,72 @@ public class SetReleaseFormsTests
     }
 
     [Fact]
+    public void Release_PreviewsTheNestsWithOptionsCollapsed_AndKeepsChangedOptionsShown()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var c = library.Add("SYN-C", "Synthetic Aluminum");
+                var old = library.Add("SYN-OLD", "Synthetic Steel", archived: true);
+                var sets = new InMemoryDrawingSets();
+                var set = CreateSet(sets, (a, 2), (c, 1), (old, 1));
+                var nests = new MemoryNests();
+
+                using var form = new ReleaseSetForm(sets, library, nests, Server, set, (_, _) => { });
+                form.ShowMessage = (_, _, _) => DialogResult.OK;
+                form.CreateNest = (group, _) => Task.FromResult(new Nest("N") { Units = group.Units });
+                form.Show();
+                var grid = Field<DataGridView>(form, "groupGrid");
+                var archived = Field<CheckBox>(form, "includeArchivedCheckBox");
+                var options = Field<Button>(form, "optionsButton");
+                var preview = Field<Label>(form, "previewLabel");
+                Run(form.LoadDraftsAsync());
+
+                // Collapsed: the defaults, read-only, with no draft to merge into.
+                Assert.False(form.OptionsExpanded);
+                Assert.Equal("Release set 'Synthetic kit' ×1", Field<Label>(form, "setLabel").Text);
+                Assert.Equal("Creates 2 nests: Synthetic Aluminum Grade A 0.25 in, Synthetic Steel Grade A 0.25 in.", preview.Text);
+                Assert.Equal((false, false, false), (grid.Columns["includeColumn"]!.Visible, grid.Columns["targetColumn"]!.Visible, archived.Visible));
+                Assert.Contains("under Options", Field<Label>(form, "skippedLabel").Text);
+                Assert.True(grid.Rows.Cast<DataGridViewRow>().All(r => (bool)r.Cells["includeColumn"].Value));
+                Assert.Equal(new object[] { "New Draft nest", "New Draft nest" }, grid.Rows.Cast<DataGridViewRow>().Select(r => r.Cells["targetColumn"].Value));
+                Assert.True(Field<CheckBox>(form, "nestAfterReleaseCheckBox").Checked);
+
+                Field<DataGridView>(form, "setGrid").Rows[0].Cells["kitsColumn"].Value = "3";
+                Assert.Equal("Release set 'Synthetic kit' ×3", Field<Label>(form, "setLabel").Text);
+
+                options.PerformClick();
+                Assert.True(form.OptionsExpanded);
+                Assert.Equal("Options ▾", options.Text);
+                Assert.Equal((true, true, true), (grid.Columns["includeColumn"]!.Visible, grid.Columns["targetColumn"]!.Visible, archived.Visible));
+
+                // Options left changed stay shown when collapsed; the defaults hide again.
+                grid.Rows[0].Cells["includeColumn"].Value = false;
+                archived.Checked = true;
+                options.PerformClick();
+                Assert.Equal("Options ▸", options.Text);
+                Assert.Equal((true, false, true), (grid.Columns["includeColumn"]!.Visible, grid.Columns["targetColumn"]!.Visible, archived.Visible));
+                Assert.Equal("Creates 1 nest: Synthetic Steel Grade A 0.25 in. 1 material is left out (unticked under Release).", preview.Text);
+
+                grid.Rows[0].Cells["includeColumn"].Value = true;
+                archived.Checked = false;
+                // Nothing vanishes while collapsed until Options is toggled.
+                Assert.True(grid.Columns["includeColumn"]!.Visible);
+                options.PerformClick();
+                options.PerformClick();
+                Assert.Equal((false, false, false), (grid.Columns["includeColumn"]!.Visible, grid.Columns["targetColumn"]!.Visible, archived.Visible));
+
+                Run(form.ReleaseAsync());
+
+                Assert.Equal(2, Assert.Single(sets.Releases).Nests.Count);
+            },
+            TestTimeout,
+            "The collapsed options test did not complete.");
+    }
+
+    [Fact]
     public void FixDrawings_EditsEachDrawingTheGroupIsRefusedFor_ThenTheGroupCanBeReleased()
     {
         StaTestThread.Run(
@@ -143,14 +209,16 @@ public class SetReleaseFormsTests
                 var fix = Field<Button>(form, "fixDrawingsButton");
                 var refused = grid.Rows.Cast<DataGridViewRow>().Single(r => ((SetReleaseGroup)r.Tag!).IsUnassigned);
                 Assert.Contains("Edit Drawing", (string)refused.Cells["statusColumn"].Value);
+                Assert.Contains("1 material can't be released yet: choose Fix Drawings.", Field<Label>(form, "previewLabel").Text);
+                // With a releasable group selected, Fix Drawings takes the refused one.
                 grid.CurrentCell = grid.Rows[0].Cells["materialColumn"];
-                Assert.False(fix.Enabled);
-                grid.CurrentCell = refused.Cells["materialColumn"];
+                Assert.NotSame(refused, grid.CurrentRow);
                 Assert.True(fix.Enabled);
 
                 Run(form.FixSelectedGroupAsync());
 
                 Assert.Equal(new[] { "SYN-B", "SYN-C" }, edits);
+                Assert.False(fix.Enabled);
                 var group = Assert.IsType<SetReleaseGroup>(Assert.Single(grid.Rows.Cast<DataGridViewRow>()).Tag);
                 Assert.True(group.CanRelease);
                 Assert.Equal(new[] { ("SYN-A", 1), ("SYN-B", 2), ("SYN-C", 2) }, group.Items.Select(i => (i.Drawing.Name, i.Drawing.Revision)));
@@ -188,7 +256,8 @@ public class SetReleaseFormsTests
                 Assert.Equal(1, opened);
                 Assert.Empty(sets.Releases);
                 Assert.Equal(("Try Again", true), (release.Text, release.Enabled));
-                Assert.Contains("Synthetic release post failure.", Field<Label>(form, "statusLabel").Text);
+                Assert.EndsWith("Synthetic release post failure. Try Again records it; the nests are not made again.",
+                    Field<Label>(form, "statusLabel").Text);
 
                 Run(form.RetryRecordAsync());
 
@@ -273,6 +342,10 @@ public class SetReleaseFormsTests
                 var grid = Field<DataGridView>(form, "groupGrid");
                 DataGridViewRow Steel() => grid.Rows.Cast<DataGridViewRow>().Single(r => ((SetReleaseGroup)r.Tag!).MaterialName == "Synthetic Steel");
                 PumpUntil(() => ((DataGridViewComboBoxCell)Steel().Cells["targetColumn"]).Items.Count == 2, "the drafts to merge into");
+                // A draft to merge into shows the Nest column while Options is collapsed.
+                Assert.False(form.OptionsExpanded);
+                Assert.True(grid.Columns["targetColumn"]!.Visible);
+                Assert.Contains("A Draft nest of the same material exists", Field<Label>(form, "previewLabel").Text);
                 Assert.Equal(new object[] { 1, 4 }, new[] { a, b }.Select(d => (object)((SetReleaseGroup)Steel().Tag!).Items.Single(i => i.Drawing.Id == d.Id).Quantity));
                 var mergeChoice = (string)((DataGridViewComboBoxCell)Steel().Cells["targetColumn"]).Items[1]!;
                 Assert.StartsWith("Merge into N26-0007 (1 sheet", mergeChoice);
@@ -288,6 +361,8 @@ public class SetReleaseFormsTests
                 Assert.Same(draft, form.ChosenMerges().Values.Single());
                 Assert.Contains("Replaces the layout of 'N26-0007'", (string)Steel().Cells["statusColumn"].Value);
                 Assert.Contains("1 new Draft nest, 1 merge, 6 parts", Field<Label>(form, "summaryLabel").Text);
+                Assert.Contains("Creates 1 nest and merges into 1 Draft nest: ", Field<Label>(form, "previewLabel").Text);
+                Assert.Contains("Synthetic Steel Grade A 0.25 in into 'N26-0007'", Field<Label>(form, "previewLabel").Text);
 
                 Run(form.ReleaseAsync());
 

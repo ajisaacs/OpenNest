@@ -362,7 +362,8 @@ Edit Drawing opens from:
 - the release dialog: a group refused for its drawings (no material or
   thickness, or two drawings with one name) has **Fix Drawings...**, which opens
   Edit Drawing on each drawing it is refused for in turn (Cancel stops), as does
-  a double-click on the group. Its right-click menu lists Edit Drawing for each of
+  a double-click on the group; with a releasable group selected, it takes the
+  first refused one. Its right-click menu lists Edit Drawing for each of
   the group's drawings. Each edit reads the current record first, and the plan
   is rebuilt with what was saved, so a fixed drawing joins its material group.
 
@@ -468,16 +469,30 @@ and skipped, and an archived one is refused. **Remove** takes a set or drawing
 out while another remains. The list shows each line's type; **Quantity** is how
 many of a set (1 to 1000, multiplying its quantities) or of a drawing (1 to
 100,000), and a set or drawing is listed once. A drawing that a set also lists
-becomes one item with both quantities. The grid below has one row per material
-(name, grade, thickness, units and cut type) across all the sets and drawings
-(`OpenNest.Data.SetReleasePlan`): material, grade, thickness, units, cut type,
-drawings, parts, **Nest** and status. **Include archived drawings** puts archived
-members back in, otherwise they are named below the grid as left out. Each group
-has a **Release** tick; refused groups (two drawings with one name, or drawings
-without material or thickness) show why and cannot be ticked, and a tick
-survives changing the sets, quantities or the archived toggle. **Fix Drawings...**
-opens [Edit Drawing](#edit-drawing-desktop) on a refused group's drawings and
-rebuilds the plan with what was saved.
+becomes one item with both quantities. The heading reads as a sentence of what
+is listed, such as "Release set 'Frame kit' ×2", or the first few lines by name
+and quantity when there are several.
+
+Below, a sentence previews what **Make Nests...** will do, such as "Creates 3
+nests: A36 Grade A 0.25 in, 304 0.1875 in, ...", and the grid has one row per
+material (name, grade, thickness, units and cut type) across all the sets and
+drawings (`OpenNest.Data.SetReleasePlan`): material, grade, thickness, units,
+cut type, drawings, parts and status. Refused groups (two drawings with one name,
+or drawings without material or thickness) show why in the status column and
+the preview counts them. **Fix Drawings...** opens
+[Edit Drawing](#edit-drawing-desktop) on the selected refused group's drawings,
+or the first refused group's when another row is selected, and rebuilds the plan
+with what was saved. Archived members are left out and named below the grid.
+
+The common case needs nothing more: every releasable material makes a new Draft
+nest and **Nest after release** is ticked. **Options ▸** expands the choices that
+change that: a **Release** tick per group (refused groups cannot be ticked), the
+**Nest** column, and **Include archived drawings**, which puts archived members
+back in. A tick survives changing the sets, quantities or the archived toggle.
+Collapsing Options hides only what is at its default: an unticked group keeps the
+Release column shown, and a ticked Include archived drawings stays shown. The
+**Nest** column also shows, with a hint in the preview, whenever a Draft nest
+exists that a material could merge into.
 
 **Nest** is **New Draft nest** or **Merge into** one of the Draft nests of the
 group's material, grade and thickness, listed with their sheet count and when
@@ -512,7 +527,8 @@ grid then shows every group's outcome: Created or Merged into with
 the nest name, Refused or Failed with the reason, or Not started. Cancel during
 preparing or nesting saves nothing; once saving starts it stops between saves,
 never during one. When every nest was saved but recording failed,
-the button becomes **Try Again** and posts the same release again. A dialog
+the button becomes **Try Again** and posts the same release again without making
+the nests again. A dialog
 runs one release.
 
 **Releases...** lists the releases that include the selected set, newest first:

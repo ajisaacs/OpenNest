@@ -41,6 +41,9 @@ namespace OpenNest.Forms
             nestAfterReleaseCheckBox = new System.Windows.Forms.CheckBox();
             notesLabel = new System.Windows.Forms.Label();
             notesBox = new System.Windows.Forms.TextBox();
+            previewTable = new System.Windows.Forms.TableLayoutPanel();
+            previewLabel = new System.Windows.Forms.Label();
+            optionsButton = new System.Windows.Forms.Button();
             groupGrid = new System.Windows.Forms.DataGridView();
             includeColumn = new System.Windows.Forms.DataGridViewCheckBoxColumn();
             materialColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
@@ -65,6 +68,7 @@ namespace OpenNest.Forms
             addSetTable.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)setGrid).BeginInit();
             optionsTable.SuspendLayout();
+            previewTable.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)groupGrid).BeginInit();
             bottomTable.SuspendLayout();
             SuspendLayout();
@@ -77,18 +81,20 @@ namespace OpenNest.Forms
             layoutTable.Controls.Add(addSetTable, 0, 1);
             layoutTable.Controls.Add(setGrid, 0, 2);
             layoutTable.Controls.Add(optionsTable, 0, 3);
-            layoutTable.Controls.Add(groupGrid, 0, 4);
-            layoutTable.Controls.Add(skippedLabel, 0, 5);
-            layoutTable.Controls.Add(bottomTable, 0, 6);
-            layoutTable.Controls.Add(statusLabel, 0, 7);
+            layoutTable.Controls.Add(previewTable, 0, 4);
+            layoutTable.Controls.Add(groupGrid, 0, 5);
+            layoutTable.Controls.Add(skippedLabel, 0, 6);
+            layoutTable.Controls.Add(bottomTable, 0, 7);
+            layoutTable.Controls.Add(statusLabel, 0, 8);
             layoutTable.Dock = System.Windows.Forms.DockStyle.Fill;
             layoutTable.Location = new System.Drawing.Point(0, 0);
             layoutTable.Name = "layoutTable";
             layoutTable.Padding = new System.Windows.Forms.Padding(8);
-            layoutTable.RowCount = 8;
+            layoutTable.RowCount = 9;
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 130F));
+            layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
@@ -238,15 +244,13 @@ namespace OpenNest.Forms
             // optionsTable
             //
             optionsTable.AutoSize = true;
-            optionsTable.ColumnCount = 4;
-            optionsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            optionsTable.ColumnCount = 3;
             optionsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             optionsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             optionsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            optionsTable.Controls.Add(includeArchivedCheckBox, 0, 0);
-            optionsTable.Controls.Add(nestAfterReleaseCheckBox, 1, 0);
-            optionsTable.Controls.Add(notesLabel, 2, 0);
-            optionsTable.Controls.Add(notesBox, 3, 0);
+            optionsTable.Controls.Add(nestAfterReleaseCheckBox, 0, 0);
+            optionsTable.Controls.Add(notesLabel, 1, 0);
+            optionsTable.Controls.Add(notesBox, 2, 0);
             optionsTable.Dock = System.Windows.Forms.DockStyle.Fill;
             optionsTable.Margin = new System.Windows.Forms.Padding(0, 0, 0, 6);
             optionsTable.Name = "optionsTable";
@@ -258,8 +262,10 @@ namespace OpenNest.Forms
             //
             includeArchivedCheckBox.Anchor = System.Windows.Forms.AnchorStyles.Left;
             includeArchivedCheckBox.AutoSize = true;
+            includeArchivedCheckBox.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
             includeArchivedCheckBox.Name = "includeArchivedCheckBox";
-            includeArchivedCheckBox.TabIndex = 0;
+            includeArchivedCheckBox.TabIndex = 1;
+            includeArchivedCheckBox.Visible = false;
             includeArchivedCheckBox.Text = "Include archived drawings";
             includeArchivedCheckBox.UseVisualStyleBackColor = true;
             includeArchivedCheckBox.CheckedChanged += Options_Changed;
@@ -270,9 +276,8 @@ namespace OpenNest.Forms
             nestAfterReleaseCheckBox.AutoSize = true;
             nestAfterReleaseCheckBox.Checked = true;
             nestAfterReleaseCheckBox.CheckState = System.Windows.Forms.CheckState.Checked;
-            nestAfterReleaseCheckBox.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
             nestAfterReleaseCheckBox.Name = "nestAfterReleaseCheckBox";
-            nestAfterReleaseCheckBox.TabIndex = 1;
+            nestAfterReleaseCheckBox.TabIndex = 0;
             nestAfterReleaseCheckBox.Text = "Nest after release";
             nestAfterReleaseCheckBox.UseVisualStyleBackColor = true;
             nestAfterReleaseCheckBox.CheckedChanged += NestAfterReleaseCheckBox_CheckedChanged;
@@ -283,7 +288,7 @@ namespace OpenNest.Forms
             notesLabel.AutoSize = true;
             notesLabel.Margin = new System.Windows.Forms.Padding(12, 0, 3, 0);
             notesLabel.Name = "notesLabel";
-            notesLabel.TabIndex = 2;
+            notesLabel.TabIndex = 1;
             notesLabel.Text = "Release notes:";
             //
             // notesBox
@@ -291,7 +296,42 @@ namespace OpenNest.Forms
             notesBox.Dock = System.Windows.Forms.DockStyle.Fill;
             notesBox.MaxLength = 4000;
             notesBox.Name = "notesBox";
-            notesBox.TabIndex = 3;
+            notesBox.TabIndex = 2;
+            //
+            // previewTable
+            //
+            previewTable.AutoSize = true;
+            previewTable.ColumnCount = 3;
+            previewTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            previewTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            previewTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            previewTable.Controls.Add(previewLabel, 0, 0);
+            previewTable.Controls.Add(includeArchivedCheckBox, 1, 0);
+            previewTable.Controls.Add(optionsButton, 2, 0);
+            previewTable.Dock = System.Windows.Forms.DockStyle.Fill;
+            previewTable.Margin = new System.Windows.Forms.Padding(0, 0, 0, 3);
+            previewTable.Name = "previewTable";
+            previewTable.RowCount = 1;
+            previewTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            previewTable.TabIndex = 4;
+            //
+            // previewLabel
+            //
+            previewLabel.AutoSize = true;
+            previewLabel.Dock = System.Windows.Forms.DockStyle.Fill;
+            previewLabel.Margin = new System.Windows.Forms.Padding(3, 6, 3, 6);
+            previewLabel.Name = "previewLabel";
+            previewLabel.TabIndex = 0;
+            //
+            // optionsButton
+            //
+            optionsButton.Anchor = System.Windows.Forms.AnchorStyles.Right;
+            optionsButton.AutoSize = true;
+            optionsButton.Name = "optionsButton";
+            optionsButton.TabIndex = 2;
+            optionsButton.Text = "Options ▸";
+            optionsButton.UseVisualStyleBackColor = true;
+            optionsButton.Click += OptionsButton_Click;
             //
             // groupGrid
             //
@@ -306,7 +346,7 @@ namespace OpenNest.Forms
             groupGrid.RowHeadersVisible = false;
             groupGrid.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             groupGrid.StandardTab = true;
-            groupGrid.TabIndex = 4;
+            groupGrid.TabIndex = 5;
             groupGrid.CellValueChanged += GroupGrid_CellValueChanged;
             groupGrid.CurrentCellDirtyStateChanged += GroupGrid_CurrentCellDirtyStateChanged;
             groupGrid.DataError += GroupGrid_DataError;
@@ -318,6 +358,7 @@ namespace OpenNest.Forms
             //
             includeColumn.HeaderText = "Release";
             includeColumn.Name = "includeColumn";
+            includeColumn.Visible = false;
             includeColumn.Width = 65;
             //
             // materialColumn
@@ -386,6 +427,7 @@ namespace OpenNest.Forms
             targetColumn.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             targetColumn.HeaderText = "Nest";
             targetColumn.Name = "targetColumn";
+            targetColumn.Visible = false;
             targetColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             targetColumn.ToolTipText = "Make a new Draft nest, or merge into a Draft nest of the same material and renest it.";
             targetColumn.Width = 260;
@@ -405,7 +447,7 @@ namespace OpenNest.Forms
             skippedLabel.Margin = new System.Windows.Forms.Padding(3, 6, 3, 0);
             skippedLabel.MaximumSize = new System.Drawing.Size(1080, 0);
             skippedLabel.Name = "skippedLabel";
-            skippedLabel.TabIndex = 5;
+            skippedLabel.TabIndex = 6;
             skippedLabel.Visible = false;
             //
             // bottomTable
@@ -425,7 +467,7 @@ namespace OpenNest.Forms
             bottomTable.Name = "bottomTable";
             bottomTable.RowCount = 1;
             bottomTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            bottomTable.TabIndex = 6;
+            bottomTable.TabIndex = 7;
             //
             // summaryLabel
             //
@@ -471,7 +513,7 @@ namespace OpenNest.Forms
             statusLabel.Margin = new System.Windows.Forms.Padding(3, 6, 3, 0);
             statusLabel.Name = "statusLabel";
             statusLabel.Size = new System.Drawing.Size(100, 20);
-            statusLabel.TabIndex = 7;
+            statusLabel.TabIndex = 8;
             //
             // searchTimer
             //
@@ -504,6 +546,8 @@ namespace OpenNest.Forms
             ((System.ComponentModel.ISupportInitialize)setGrid).EndInit();
             optionsTable.ResumeLayout(false);
             optionsTable.PerformLayout();
+            previewTable.ResumeLayout(false);
+            previewTable.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)groupGrid).EndInit();
             bottomTable.ResumeLayout(false);
             bottomTable.PerformLayout();
@@ -531,6 +575,9 @@ namespace OpenNest.Forms
         private System.Windows.Forms.CheckBox nestAfterReleaseCheckBox;
         private System.Windows.Forms.Label notesLabel;
         private System.Windows.Forms.TextBox notesBox;
+        private System.Windows.Forms.TableLayoutPanel previewTable;
+        private System.Windows.Forms.Label previewLabel;
+        private System.Windows.Forms.Button optionsButton;
         private System.Windows.Forms.DataGridView groupGrid;
         private System.Windows.Forms.DataGridViewCheckBoxColumn includeColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn materialColumn;
