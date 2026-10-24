@@ -30,8 +30,9 @@ namespace OpenNest.Controls
     /// name) shows why at once; Fix Drawings, a double-click or the group's right-click menu
     /// opens Edit Drawing and the plan is rebuilt with what was saved. Make Nests is the only
     /// step that writes: <see cref="SetReleaseSession"/> builds the nests, nests each with Auto
-    /// Nest when Nest after release is ticked (remembered per user), saves them, opens each in
-    /// its own tab and records the release; each group's outcome is then shown.
+    /// Nest when Nest after release is ticked (remembered per user; live in the main window
+    /// through <see cref="NestingHost"/>, else headless), saves them, opens each in its own
+    /// tab and records the release; each group's outcome is then shown.
     /// </summary>
     public partial class ReleasePanel : UserControl
     {
@@ -84,6 +85,18 @@ namespace OpenNest.Controls
 
         /// <summary>Raised once Make Nests has opened the nests it made, so the host can show them.</summary>
         public event EventHandler NestsOpened;
+
+        /// <summary>Raised when Make Nests hands its nesting to <see cref="NestingHost"/>.</summary>
+        public event EventHandler NestingStarted;
+
+        /// <summary>Raised when Make Nests has finished, whatever its outcome (see <see cref="NeedsAttention"/>).</summary>
+        public event EventHandler MakeNestsFinished;
+
+        /// <summary>
+        /// Nests each released nest where the operator can watch it (the main window, live, in
+        /// the nest's own tab) when Nest after release is ticked; null nests headless here.
+        /// </summary>
+        public IReleaseNestingHost NestingHost { get; set; }
 
         /// <summary>The finished release, once Make Nests has run; otherwise null.</summary>
         public SetReleaseResult Result { get; private set; }
@@ -719,29 +732,62 @@ namespace OpenNest.Controls
 
             var merges = ChosenMerges();
             var nestAfter = nestAfterReleaseCheckBox.Checked;
+            var live = nestAfter ? NestingHost : null;
             running = true;
             cancellation = new CancellationTokenSource();
             UpdateCommands();
             session = new SetReleaseSession(sets, library, nests, serverUrl, ReadPackage, WriteNest, CreateNest, ReadNest,
-                nestAfter ? Renest : null);
+                !nestAfter ? null : live == null ? Renest : LiveRenest(live));
             var progress = new Progress<SetReleaseProgress>(ShowProgress);
+            if (live != null)
+            {
+                live.Begin();
+                NestingStarted?.Invoke(this, EventArgs.Empty);
+            }
             try
             {
                 Result = await session.RunAsync(plan, chosen, Environment.UserName, notesBox.Text, progress, cancellation.Token, merges);
+                // A nest nested live is already in its tab, which this binds to its saved record.
+                foreach (var done in Result.Created)
+                    openNest(done.Nest, done.Record);
             }
             finally
             {
                 running = false;
+                live?.End(Result);
             }
 
-            foreach (var done in Result.Created)
-                openNest(done.Nest, done.Record);
-            if (IsDisposed)
-                return;
-            ShowOutcome();
-            if (Result.Created.Count > 0)
-                NestsOpened?.Invoke(this, EventArgs.Empty);
+            if (!IsDisposed)
+            {
+                ShowOutcome();
+                if (Result.Created.Count > 0)
+                    NestsOpened?.Invoke(this, EventArgs.Empty);
+            }
+            MakeNestsFinished?.Invoke(this, EventArgs.Empty);
         }
+
+        // The host's Auto Nest stops the whole release, as Stop here does.
+        private Func<Nest, CancellationToken, Task<SetReleaseRenest>> LiveRenest(IReleaseNestingHost live) =>
+            async (nest, token) =>
+            {
+                try
+                {
+                    return await live.RenestAsync(nest, token);
+                }
+                catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                {
+                    cancellation.Cancel();
+                    throw;
+                }
+            };
+
+        /// <summary>
+        /// True when the last Make Nests needs the operator here: a group failed or was
+        /// refused, or the release was not recorded.
+        /// </summary>
+        public bool NeedsAttention =>
+            Result != null && (Result.Release == null
+                || Result.Groups.Any(g => g.Outcome is SetReleaseGroupOutcome.Failed or SetReleaseGroupOutcome.Refused));
 
         /// <summary>Posts the release again after every nest was saved but recording it failed.</summary>
         internal async Task RetryRecordAsync()
@@ -1120,6 +1166,30 @@ namespace OpenNest.Controls
             new NestWriter(nest) { BestFitStore = BestFitCacheStore.Shared }.Write(stream);
             return stream.ToArray();
         }
+    }
+
+    /// <summary>
+    /// Where Make Nests nests what it releases when Nest after release is ticked: the main
+    /// window, which shows each nest in its tab while Auto Nest runs on it.
+    /// </summary>
+    public interface IReleaseNestingHost
+    {
+        /// <summary>Make Nests is starting; nesting follows, one nest at a time in plan order.</summary>
+        void Begin();
+
+        /// <summary>
+        /// Shows <paramref name="nest"/>, built but not saved, and nests it from scratch: every
+        /// drawing's required quantity, keeping only a valid layout (else no sheets and a note).
+        /// Throws <see cref="OperationCanceledException"/> when the operator stops it, which
+        /// stops the release.
+        /// </summary>
+        Task<SetReleaseRenest> RenestAsync(Nest nest, CancellationToken token);
+
+        /// <summary>
+        /// Make Nests has finished (<paramref name="result"/> is null if it threw) and has
+        /// already opened what it saved: whatever was shown but not saved goes.
+        /// </summary>
+        void End(SetReleaseResult result);
     }
 
     /// <summary>A release being built, kept while the Drawing Sets window is closed.</summary>

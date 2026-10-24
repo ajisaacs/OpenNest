@@ -84,6 +84,30 @@ public class NestRenestTests
         Assert.Empty(nest.Plates);
     }
 
+    [Fact]
+    public void CreateRequest_LeavesTheNestAlone_AndKeepCommitsTheSolvedLayoutThroughTheCaller()
+    {
+        var nest = NestOf(("SYN-A", 4, 2, 6), ("SYN-B", 3, 3, 0));
+        Assert.Null(NestRenest.CreateRequest(NestOf(("SYN-Z", 4, 2, 0)), "Rectangles"));
+
+        var request = NestRenest.CreateRequest(nest, "Rectangles");
+
+        Assert.NotNull(request);
+        Assert.Empty(nest.Plates);
+        Assert.Equal(new[] { ("SYN-A", 6) }, request.Items.Select(i => (i.Drawing.Name, i.Quantity)));
+        var solved = NestPipeline.Run(request);
+        var committed = 0;
+        var kept = NestRenest.Keep(solved, r =>
+        {
+            committed++;
+            return NestPipelineCommit.ApplyToPlates(r, nest.CreatePlate);
+        });
+        Assert.True(kept.Nested, kept.Note);
+        Assert.Equal(1, committed);
+        Assert.Equal(6, nest.Plates.Sum(p => p.Parts.Count * p.Quantity));
+        Assert.StartsWith("Nested on 1 sheet", kept.Note);
+    }
+
     /// <summary>Puts every copy at the same spot, so the layout never validates.</summary>
     private sealed class OverlappingEngine : INestingEngine
     {

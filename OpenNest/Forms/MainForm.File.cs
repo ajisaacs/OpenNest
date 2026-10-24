@@ -45,6 +45,13 @@ namespace OpenNest.Forms
         {
             ArgumentNullException.ThrowIfNull(nest);
             ArgumentNullException.ThrowIfNull(record);
+            // Make Nests nested it in a tab already: that tab becomes the saved nest.
+            if (MdiChildren.OfType<EditNestForm>().FirstOrDefault(f => ReferenceEquals(f.Nest, nest)) is { } shown)
+            {
+                shown.Document.BindRemote(record.Id, NestStorage.Settings.ServerUrl, record.Revision);
+                releaseTabs.Remove(shown);
+                return;
+            }
             var windowState = ActiveMdiChild?.WindowState ?? FormWindowState.Maximized;
             LoadNest(nest, windowState, record.Id, NestStorage.Settings.ServerUrl, record.Revision);
         }
@@ -188,7 +195,7 @@ namespace OpenNest.Forms
                 ShowInTaskbar = true,
                 MinimizeBox = true,
             };
-            form.EnableRelease(nests, OpenServerNest, IsServerNestOpen);
+            form.EnableRelease(nests, OpenServerNest, IsServerNestOpen, this);
             form.RestoreRelease(releaseDraft);
             releaseDraft = null;
             // The nests a release made open here, so this window comes forward to show them.
@@ -214,7 +221,7 @@ namespace OpenNest.Forms
         private async void Save_Click(object sender, EventArgs e)
         {
             var form = activeForm;
-            if (form == null || storage.IsSaving)
+            if (form == null || storage.IsSaving || RefuseSaveDuringRelease(form))
                 return;
             if (NestStorage.Settings.Mode == NestStorageMode.File)
                 form.Save();
@@ -225,7 +232,7 @@ namespace OpenNest.Forms
         private async void SaveAs_Click(object sender, EventArgs e)
         {
             var form = activeForm;
-            if (form == null || storage.IsSaving)
+            if (form == null || storage.IsSaving || RefuseSaveDuringRelease(form))
                 return;
             if (NestStorage.Settings.Mode == NestStorageMode.File)
                 form.SaveAs();

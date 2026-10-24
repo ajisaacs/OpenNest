@@ -603,6 +603,24 @@ Auto Nest". The row lists each group's sheets and utilization, and any
 copies left unplaced, which stay as remaining quantity. Unticked, new nests are
 saved without sheets and merged drafts are left cleared for Auto Nest.
 
+Ticked, the nesting runs where the operator can watch it. When Make Nests
+starts, the drawing sets window minimizes and the main window comes forward.
+Each group's nest opens in its own main-window tab as soon as it is built, before
+it is saved, and Auto Nest runs on it there with the usual progress window and
+live plan strip (`AutoNestCommand.SolveAsync`), one nest at a time in plan order,
+switching to each tab in turn. The release keeps the layout as headless
+`NestRenest` would (only a valid one, with no Keep or validation review). Stop in
+the progress window (or switching tabs, as for Auto Nest) stops the whole release,
+as the panel's Stop does: nothing is saved. Until Make Nests finishes the main
+window's Nest and Plate menus are locked and Save is refused in those tabs, since
+the release saves them. After saving, each tab is bound to its server record
+(no second tab opens). A tab whose nest was not saved (a later group refused or
+failed, or the release stopped before upload) is **closed**, since it is not part
+of any release. The main window stays in front with the saved nests, and the
+drawing sets window keeps the outcomes; its taskbar button flashes when a group
+failed or was refused or the release was not recorded. A renest that throws
+still leaves the nest without sheets and a note, and the release goes on.
+
 **Make Nests (n)**, in bold, with n the groups ticked, is the only step that
 writes; **Clear** empties the panel. It runs `OpenNest.Data.SetReleaseSession`:
 every ticked group's new nest is made as File > New would (the server's next nest
@@ -611,7 +629,7 @@ plate size and spacings converted (25.4 mm per inch) when those differ; the nest
 takes the group's material, grade and thickness, the release's customer when
 there is one, and the **Draft** status. A merged draft is saved only while nobody
 else has saved it since it was listed. Each created or merged nest opens in its
-own tab of the main window, bound to its server record, the main window comes
+own tab of the main window (or keeps the tab it was nested in), bound to its server record, the main window comes
 forward, and the release (with its notes) is recorded. A release with drawings
 on their own first checks that the server can record them (see below) and, on an
 older server, saves nothing and says so. Each row then shows its group's outcome:

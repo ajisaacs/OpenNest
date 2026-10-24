@@ -55,18 +55,23 @@ namespace OpenNest.Forms
             // Shown modeless, where a DialogResult button does not close the window.
             closeButton.Click += (_, _) => Close();
             Load += (_, _) => FitReleasePanel();
+            releasePanel.NestingStarted += ReleasePanel_NestingStarted;
+            releasePanel.MakeNestsFinished += ReleasePanel_MakeNestsFinished;
         }
 
         /// <summary>
         /// Shows the release panel beside the Library and Sets tabs, and New Release on the
         /// Releases tab: nests are saved through <paramref name="nests"/> and each is opened with
         /// <paramref name="openNest"/>; a nest <paramref name="isNestOpen"/> reports as open in a
-        /// tab is never merged into.
+        /// tab is never merged into. With <paramref name="nestingHost"/>, Nest after release nests
+        /// each nest there, live, and this window steps aside (minimized) meanwhile.
         /// </summary>
-        public void EnableRelease(INestRepository nests, Action<Nest, NestRecord> openNest, Func<Guid, bool> isNestOpen = null)
+        public void EnableRelease(INestRepository nests, Action<Nest, NestRecord> openNest, Func<Guid, bool> isNestOpen = null,
+            IReleaseNestingHost nestingHost = null)
         {
             releasePanel.Initialize(sets, library, nests, serverUrl, openNest);
             releasePanel.IsNestOpen = isNestOpen ?? (_ => false);
+            releasePanel.NestingHost = nestingHost;
             browser.EnableRelease(set => releasePanel.AddSet(set));
             libraryView.EnableRelease((drawing, quantity) => releasePanel.AddDrawings(new[] { drawing }, quantity));
             releasesView.EnableRelease(StartRelease);
@@ -116,6 +121,16 @@ namespace OpenNest.Forms
             if (available >= splitContainer.Panel1MinSize + splitContainer.Panel2MinSize)
                 splitContainer.SplitterDistance = System.Math.Clamp(available - ReleasePanelWidth,
                     splitContainer.Panel1MinSize, available - splitContainer.Panel2MinSize);
+        }
+
+        // The nesting shows in the main window, so this one gets out of its way.
+        private void ReleasePanel_NestingStarted(object sender, EventArgs e) => WindowState = FormWindowState.Minimized;
+
+        // The outcomes stay here; a release that needs a look flashes the taskbar button.
+        private void ReleasePanel_MakeNestsFinished(object sender, EventArgs e)
+        {
+            if (!IsDisposed && IsHandleCreated && releasePanel.NeedsAttention && ActiveForm != this)
+                Win32.FlashTaskbarUntilActive(Handle);
         }
 
         // A draft closed in a tab meanwhile can be merged into now.

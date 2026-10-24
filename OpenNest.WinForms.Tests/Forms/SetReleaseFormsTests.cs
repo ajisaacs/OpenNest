@@ -6,6 +6,7 @@ using OpenNest.Forms;
 using OpenNest.IO;
 using OpenNest.Shapes;
 using OpenNest.Tests.Data;
+using IReleaseNestingHost = OpenNest.Controls.IReleaseNestingHost;
 using ReleasePanel = OpenNest.Controls.ReleasePanel;
 
 namespace OpenNest.WinForms.Tests.Forms;
@@ -477,6 +478,109 @@ public class SetReleaseFormsTests
             },
             TestTimeout,
             "The remembered nest-after test did not complete.");
+    }
+
+    [Fact]
+    public void NestAfterRelease_WithANestingHost_NestsEachNestThereInPlanOrder_AndTheWindowStepsAside()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var c = library.Add("SYN-C", "Synthetic Aluminum");
+                var sets = new InMemoryDrawingSets();
+                var set = CreateSet(sets, (a, 1), (c, 2));
+                var nests = new MemoryNests();
+                var host = new FakeNestingHost();
+                var opened = new List<Nest>();
+
+                using var form = new DrawingSetsForm(sets, library, Server);
+                form.EnableRelease(nests, (nest, _) => opened.Add(nest), null, host);
+                var panel = form.ReleasePanel;
+                panel.CreateNest = (group, _) => Task.FromResult(new Nest("N") { Units = group.Units });
+                var finished = 0;
+                panel.MakeNestsFinished += (_, _) => finished++;
+                form.Show();
+                Field<CheckBox>(panel, "nestAfterReleaseCheckBox").Checked = true;
+                panel.AddSet(set);
+
+                Run(panel.ReleaseAsync());
+
+                Assert.Equal(new[] { "Begin", "Renest Synthetic Aluminum", "Renest Synthetic Steel", "End" }, host.Calls);
+                Assert.Equal(FormWindowState.Minimized, form.WindowState);
+                Assert.Same(panel.Result, host.Ended);
+                // The host's nests are the ones saved and opened (bound) afterwards.
+                Assert.Equal(host.Nests, opened);
+                Assert.Equal(2, nests.Uploaded.Count);
+                Assert.All(Field<DataGridView>(panel, "groupGrid").Rows.Cast<DataGridViewRow>(),
+                    r => Assert.EndsWith("Nested live.", Note(r)));
+                Assert.False(panel.NeedsAttention);
+                Assert.Equal(1, finished);
+            },
+            TestTimeout,
+            "The live nesting test did not complete.");
+    }
+
+    [Fact]
+    public void NestingHostStop_StopsTheRelease_SavesNothing_AndEndsTheHost()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var c = library.Add("SYN-C", "Synthetic Aluminum");
+                var sets = new InMemoryDrawingSets();
+                var set = CreateSet(sets, (a, 1), (c, 2));
+                var nests = new MemoryNests();
+                var host = new FakeNestingHost { StopAt = 2 };
+
+                var (window, panel) = ShowPanel(sets, library, nests);
+                using var _ = window;
+                panel.NestingHost = host;
+                panel.AddSet(set);
+
+                Run(panel.ReleaseAsync());
+
+                Assert.Equal(new[] { "Begin", "Renest Synthetic Aluminum", "Renest Synthetic Steel", "End" }, host.Calls);
+                Assert.True(panel.Result!.Canceled);
+                Assert.Empty(nests.Uploaded);
+                Assert.Empty(sets.Releases);
+                Assert.Same(panel.Result, host.Ended);
+                Assert.Empty(panel.Result.Created);
+                Assert.True(panel.NeedsAttention);
+                Assert.StartsWith("Canceled: 0 nests saved", Field<Label>(panel, "statusLabel").Text);
+            },
+            TestTimeout,
+            "The live nesting stop test did not complete.");
+    }
+
+    [Fact]
+    public void NestAfterRelease_Unticked_DoesNotUseTheNestingHost()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var sets = new InMemoryDrawingSets();
+                var set = CreateSet(sets, (a, 1));
+                var host = new FakeNestingHost();
+
+                var (window, panel) = ShowPanel(sets, library, new MemoryNests());
+                using var _ = window;
+                panel.NestingHost = host;
+                Field<CheckBox>(panel, "nestAfterReleaseCheckBox").Checked = false;
+                panel.AddSet(set);
+
+                Run(panel.ReleaseAsync());
+
+                Assert.Empty(host.Calls);
+                Assert.Single(sets.Releases);
+            },
+            TestTimeout,
+            "The unticked live nesting test did not complete.");
     }
 
     [Fact]
@@ -1039,6 +1143,32 @@ public class SetReleaseFormsTests
 
     private static T Field<T>(object owner, string name) =>
         (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
+
+    /// <summary>Records what Make Nests asks of the main window, and can stop at a given nest.</summary>
+    private sealed class FakeNestingHost : IReleaseNestingHost
+    {
+        public List<string> Calls { get; } = new();
+        public List<Nest> Nests { get; } = new();
+        public SetReleaseResult? Ended { get; private set; }
+        public int StopAt { get; init; }
+
+        public void Begin() => Calls.Add("Begin");
+
+        public Task<SetReleaseRenest> RenestAsync(Nest nest, CancellationToken token)
+        {
+            Nests.Add(nest);
+            Calls.Add($"Renest {nest.Material.Name}");
+            if (Nests.Count == StopAt)
+                throw new OperationCanceledException();
+            return Task.FromResult(new SetReleaseRenest(true, "Nested live."));
+        }
+
+        public void End(SetReleaseResult result)
+        {
+            Calls.Add("End");
+            Ended = result;
+        }
+    }
 
     /// <summary>Real drawing packages by revision, so the release reads them as the desktop does.</summary>
     private sealed class PackageLibrary : IDrawingLibraryStore

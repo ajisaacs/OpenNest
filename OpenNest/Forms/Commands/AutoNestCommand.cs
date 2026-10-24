@@ -76,25 +76,6 @@ namespace OpenNest.Forms.Commands
         /// </summary>
         public async Task RunAsync(CancellationTokenSource cts)
         {
-            using var progressForm = new NestProgressForm(cts, showPlateRow: true)
-            {
-                AllowAccept = false,
-                HoldOpenUntilCompleted = true,
-            };
-            progressForm.ShowPlanStrip(target.PlateView.ColorScheme);
-            var receivingProgress = true;
-            bool Receiving() => receivingProgress && !target.IsDisposed && !cts.IsCancellationRequested;
-            var progress = new Progress<NestProgress>(p =>
-            {
-                if (Receiving())
-                    progressForm.UpdateProgress(p);
-            });
-            var plans = new Progress<IReadOnlyList<ProposedPlate>>(sheets =>
-            {
-                if (Receiving())
-                    progressForm.UpdatePlan(sheets);
-            });
-            var jobProgress = JobEngineNest.CreateProgress(EngineName, progress, plans);
             try
             {
                 var request = new NestPipelineRequest(EngineName, items,
@@ -102,26 +83,7 @@ namespace OpenNest.Forms.Commands
                     new NestJobOptions(maxPlates: 100,
                         salvageRate: plateOptions?.Count > 0 ? salvageRate : 0,
                         minimumSalvageDimension: minRemnantSize));
-
-                async Task<NestPipelineResult> SolveAsync()
-                {
-                    try
-                    {
-                        return await Task.Run(() => NestPipeline.Run(request, jobProgress, cts.Token));
-                    }
-                    finally
-                    {
-                        receivingProgress = false;
-                        progressForm.ShowCompleted();
-                        progressForm.Close();
-                    }
-                }
-
-                var solve = SolveAsync();
-                // Owned modal progress holds drawings/plates stable through solve and cancellation.
-                if (!solve.IsCompleted)
-                    progressForm.ShowDialog(owner);
-                var result = await solve;
+                var result = await SolveAsync(owner, target, request, cts);
                 cts.Token.ThrowIfCancellationRequested();
 
                 var allowInvalid = false;
@@ -169,10 +131,56 @@ namespace OpenNest.Forms.Commands
                 MessageBox.Show(owner, $"Nesting error: {ex.Message}", Caption,
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            finally
+        }
+
+        /// <summary>
+        /// Solves <paramref name="request"/> off the UI thread behind the owned modal progress
+        /// window, with the best plan so far as a sheet strip; its Stop cancels
+        /// <paramref name="cts"/>. Nothing is committed: the caller keeps or discards the result.
+        /// Make Nests uses it too, to nest each released nest in its tab as Auto Nest would.
+        /// </summary>
+        internal static async Task<NestPipelineResult> SolveAsync(IWin32Window owner, EditNestForm target,
+            NestPipelineRequest request, CancellationTokenSource cts)
+        {
+            using var progressForm = new NestProgressForm(cts, showPlateRow: true)
             {
-                receivingProgress = false;
+                AllowAccept = false,
+                HoldOpenUntilCompleted = true,
+            };
+            progressForm.ShowPlanStrip(target.PlateView.ColorScheme);
+            var receivingProgress = true;
+            bool Receiving() => receivingProgress && !target.IsDisposed && !cts.IsCancellationRequested;
+            var progress = new Progress<NestProgress>(p =>
+            {
+                if (Receiving())
+                    progressForm.UpdateProgress(p);
+            });
+            var plans = new Progress<IReadOnlyList<ProposedPlate>>(sheets =>
+            {
+                if (Receiving())
+                    progressForm.UpdatePlan(sheets);
+            });
+            var jobProgress = JobEngineNest.CreateProgress(request.EngineName, progress, plans);
+
+            async Task<NestPipelineResult> RunSolveAsync()
+            {
+                try
+                {
+                    return await Task.Run(() => NestPipeline.Run(request, jobProgress, cts.Token));
+                }
+                finally
+                {
+                    receivingProgress = false;
+                    progressForm.ShowCompleted();
+                    progressForm.Close();
+                }
             }
+
+            var solve = RunSolveAsync();
+            // Owned modal progress holds drawings/plates stable through solve and cancellation.
+            if (!solve.IsCompleted)
+                progressForm.ShowDialog(owner);
+            return await solve;
         }
 
         // Costs and unplaced parts were shown in the review; clamp removals exist only once kept.

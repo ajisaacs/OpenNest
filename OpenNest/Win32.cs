@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -40,6 +40,34 @@ namespace OpenNest
             int cy,
             uint uFlags
         );
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool FlashWindowEx(ref FLASHWINFO info);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FLASHWINFO
+        {
+            public uint cbSize;
+            public IntPtr hwnd;
+            public uint dwFlags;
+            public uint uCount;
+            public uint dwTimeout;
+        }
+
+        /// <summary>Flashes the window's taskbar button until the window comes to the foreground.</summary>
+        public static void FlashTaskbarUntilActive(IntPtr hWnd)
+        {
+            const uint FLASHW_TRAY = 0x2;
+            const uint FLASHW_TIMERNOFG = 0xC;
+            var info = new FLASHWINFO
+            {
+                cbSize = (uint)Marshal.SizeOf<FLASHWINFO>(),
+                hwnd = hWnd,
+                dwFlags = FLASHW_TRAY | FLASHW_TIMERNOFG,
+            };
+            FlashWindowEx(ref info);
+        }
 
         #region Constants
 
