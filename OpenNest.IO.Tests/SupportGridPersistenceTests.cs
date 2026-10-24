@@ -81,6 +81,35 @@ public class SupportGridPersistenceTests
     }
 
     [Fact]
+    public void SlatsRoundTripWithTheirTypeAndAxis()
+    {
+        var slats = new SupportSlats(SlatAxis.Y, 4, 0.125, 1.5, 0.125, 0.25);
+        var file = Write(NestWith(slats));
+
+        var bed = NestJson(file)["plateDefaults"]!["supportBed"]!;
+        var reopened = new NestReader(file).Read();
+
+        Assert.Equal("slats", bed["type"]!.GetValue<string>());
+        Assert.Equal("y", bed["axis"]!.GetValue<string>());
+        Assert.Equal(0.125, bed["thickness"]!.GetValue<double>());
+        Assert.False(bed.AsObject().ContainsKey("pitchX"));
+        Assert.Equal(slats, reopened.SupportBed);
+        Assert.Same(reopened.SupportBed, Assert.Single(reopened.Plates).SupportBed);
+    }
+
+    [Theory]
+    [InlineData("""{"type":"slats","axis":"z","pitch":4,"thickness":0.125}""")]
+    [InlineData("""{"type":"slats","axis":"x","pitch":0,"thickness":0.125}""")]
+    [InlineData("""{"type":"slats","axis":"x","pitch":4}""")]
+    [InlineData("""{"type":"slats","axis":"x","pitch":4,"thickness":0.125,"offset":"one"}""")]
+    public void MalformedSlats_LoadAsNone(string bed)
+    {
+        var file = Rewrite(Write(NestWith(Grid)), json => json["plateDefaults"]!["supportBed"] = JsonNode.Parse(bed));
+
+        Assert.Null(new NestReader(file).Read().SupportBed);
+    }
+
+    [Fact]
     public void NestWithoutGrid_WritesNoKey()
     {
         var defaults = NestJson(Write(NestWith(null)))["plateDefaults"]!.AsObject();

@@ -110,8 +110,10 @@ namespace OpenNest.IO
         }
 
         /// <summary>
-        /// A support bed layout. <see cref="Type"/> names the layout: only <c>grid</c>, a regular
-        /// grid of contact points, so far. Lengths are in the nest's units.
+        /// A support bed layout. <see cref="Type"/> names the layout: <c>grid</c>, a regular grid
+        /// of contact points (pitch and offset along X and Y), or <c>slats</c>, straight slats
+        /// running along <see cref="Axis"/> (<see cref="Pitch"/>, <see cref="Thickness"/>,
+        /// <see cref="Offset"/>). Lengths are in the nest's units.
         /// </summary>
         public record SupportBedDto
         {
@@ -120,6 +122,10 @@ namespace OpenNest.IO
             public double PitchY { get; init; }
             public double OffsetX { get; init; }
             public double OffsetY { get; init; }
+            public string Axis { get; init; }
+            public double Pitch { get; init; }
+            public double Thickness { get; init; }
+            public double Offset { get; init; }
             public double RegistrationTolerance { get; init; }
             public double StabilityMargin { get; init; }
         }
@@ -131,7 +137,9 @@ namespace OpenNest.IO
         /// </summary>
         public sealed class LenientSupportBedConverter : JsonConverter<SupportBedDto>
         {
-            private static readonly string[] Optional = { "offsetX", "offsetY", "registrationTolerance", "stabilityMargin" };
+            private static readonly string[] Shared = { "registrationTolerance", "stabilityMargin" };
+            private static readonly string[] GridOffsets = { "offsetX", "offsetY" };
+            private static readonly string[] SlatOffset = { "offset" };
 
             public override SupportBedDto Read(ref Utf8JsonReader reader, Type typeToConvert,
                 JsonSerializerOptions options)
@@ -140,35 +148,74 @@ namespace OpenNest.IO
                 var bed = document.RootElement;
                 if (bed.ValueKind != JsonValueKind.Object
                     || !bed.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String
-                    || type.GetString() != "grid"
-                    || !TryNumber(bed, "pitchX", out var pitchX) || !TryNumber(bed, "pitchY", out var pitchY))
+                    || !TryOptional(bed, Shared, out var shared))
                     return null;
-                var values = new double[Optional.Length];
-                for (var i = 0; i < Optional.Length; i++)
-                    if (bed.TryGetProperty(Optional[i], out _) && !TryNumber(bed, Optional[i], out values[i]))
-                        return null;
-                return new SupportBedDto
+                switch (type.GetString())
                 {
-                    PitchX = pitchX,
-                    PitchY = pitchY,
-                    OffsetX = values[0],
-                    OffsetY = values[1],
-                    RegistrationTolerance = values[2],
-                    StabilityMargin = values[3],
-                };
+                    case "grid":
+                        if (!TryNumber(bed, "pitchX", out var pitchX) || !TryNumber(bed, "pitchY", out var pitchY)
+                            || !TryOptional(bed, GridOffsets, out var offsets))
+                            return null;
+                        return new SupportBedDto
+                        {
+                            PitchX = pitchX,
+                            PitchY = pitchY,
+                            OffsetX = offsets[0],
+                            OffsetY = offsets[1],
+                            RegistrationTolerance = shared[0],
+                            StabilityMargin = shared[1],
+                        };
+                    case "slats":
+                        if (!bed.TryGetProperty("axis", out var axis) || axis.ValueKind != JsonValueKind.String
+                            || !TryNumber(bed, "pitch", out var pitch) || !TryNumber(bed, "thickness", out var thickness)
+                            || !TryOptional(bed, SlatOffset, out var offset))
+                            return null;
+                        return new SupportBedDto
+                        {
+                            Type = "slats",
+                            Axis = axis.GetString(),
+                            Pitch = pitch,
+                            Thickness = thickness,
+                            Offset = offset[0],
+                            RegistrationTolerance = shared[0],
+                            StabilityMargin = shared[1],
+                        };
+                    default:
+                        return null;
+                }
             }
 
             public override void Write(Utf8JsonWriter writer, SupportBedDto value, JsonSerializerOptions options)
             {
                 writer.WriteStartObject();
                 writer.WriteString("type", value.Type);
-                writer.WriteNumber("pitchX", value.PitchX);
-                writer.WriteNumber("pitchY", value.PitchY);
-                writer.WriteNumber("offsetX", value.OffsetX);
-                writer.WriteNumber("offsetY", value.OffsetY);
+                if (value.Type == "slats")
+                {
+                    writer.WriteString("axis", value.Axis);
+                    writer.WriteNumber("pitch", value.Pitch);
+                    writer.WriteNumber("thickness", value.Thickness);
+                    writer.WriteNumber("offset", value.Offset);
+                }
+                else
+                {
+                    writer.WriteNumber("pitchX", value.PitchX);
+                    writer.WriteNumber("pitchY", value.PitchY);
+                    writer.WriteNumber("offsetX", value.OffsetX);
+                    writer.WriteNumber("offsetY", value.OffsetY);
+                }
                 writer.WriteNumber("registrationTolerance", value.RegistrationTolerance);
                 writer.WriteNumber("stabilityMargin", value.StabilityMargin);
                 writer.WriteEndObject();
+            }
+
+            // Optional lengths default to zero; one that is present must be a number.
+            private static bool TryOptional(JsonElement bed, string[] names, out double[] values)
+            {
+                values = new double[names.Length];
+                for (var i = 0; i < names.Length; i++)
+                    if (bed.TryGetProperty(names[i], out _) && !TryNumber(bed, names[i], out values[i]))
+                        return false;
+                return true;
             }
 
             private static bool TryNumber(JsonElement bed, string name, out double value)

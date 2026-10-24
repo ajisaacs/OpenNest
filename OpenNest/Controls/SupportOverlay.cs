@@ -8,8 +8,8 @@ using OpenNest.Support;
 namespace OpenNest.Controls
 {
     /// <summary>
-    /// View &gt; Draw Support: the plate's support grid and, for each part, the contacts it rests
-    /// on and its center of gravity, green where the grid holds it level and red where it can
+    /// View &gt; Draw Support: the plate's support grid or slats and, for each part, the contacts it
+    /// rests on and its center of gravity, green where the bed holds it level and red where it can
     /// tip; a red part's best tab point is marked with an orange diamond. Display only: it
     /// takes part in no hit test, selection or sequencing. Analyses are cached per part until
     /// its program, pose, the bed or the quadrant changes.
@@ -23,6 +23,7 @@ namespace OpenNest.Controls
         private const float GridPointSize = 3f;
 
         private static readonly Color GridColor = Color.FromArgb(110, 120, 120, 120);
+        private static readonly Color SlatColor = Color.FromArgb(90, 120, 120, 120);
         private static readonly Color ContactColor = Color.FromArgb(220, 30, 150, 60);
         private static readonly Color SupportedColor = Color.FromArgb(230, 20, 140, 50);
         private static readonly Color TippingColor = Color.FromArgb(240, 210, 30, 30);
@@ -41,6 +42,8 @@ namespace OpenNest.Controls
 
             if (bed is SupportGrid grid)
                 DrawGrid(g, view, plate, grid);
+            else if (bed is SupportSlats slats)
+                DrawSlats(g, view, plate, slats);
 
             using var contactBrush = new SolidBrush(ContactColor);
             using var supportedPen = new Pen(SupportedColor, 2f);
@@ -76,13 +79,47 @@ namespace OpenNest.Controls
             return support;
         }
 
+        private static Box Sheet(Plate plate)
+        {
+            var left = plate.Quadrant is 2 or 3 ? -plate.Size.Length : 0;
+            var bottom = plate.Quadrant is 3 or 4 ? -plate.Size.Width : 0;
+            return new Box(left, bottom, plate.Size.Length, plate.Size.Width);
+        }
+
+        // Each slat a strip cut off to the sheet, at least a pixel wide however far out the view is.
+        private static void DrawSlats(Graphics g, PlateView view, Plate plate, SupportSlats slats)
+        {
+            if (view.LengthWorldToGui(slats.Pitch) < MinimumGridSpacing)
+                return;
+            using var brush = new SolidBrush(SlatColor);
+            const float minimum = 1f;
+            foreach (var slat in slats.SlatsIn(Sheet(plate), plate.Quadrant))
+            {
+                var a = view.PointWorldToGraph(new Vector(slat.Left, slat.Top));
+                var b = view.PointWorldToGraph(new Vector(slat.Right, slat.Bottom));
+                var x = System.Math.Min(a.X, b.X);
+                var y = System.Math.Min(a.Y, b.Y);
+                var width = System.Math.Abs(b.X - a.X);
+                var height = System.Math.Abs(b.Y - a.Y);
+                if (width < minimum)
+                {
+                    x -= (minimum - width) / 2;
+                    width = minimum;
+                }
+                if (height < minimum)
+                {
+                    y -= (minimum - height) / 2;
+                    height = minimum;
+                }
+                g.FillRectangle(brush, x, y, width, height);
+            }
+        }
+
         private static void DrawGrid(Graphics g, PlateView view, Plate plate, SupportGrid grid)
         {
             if (view.LengthWorldToGui(System.Math.Min(grid.PitchX, grid.PitchY)) < MinimumGridSpacing)
                 return;
-            var left = plate.Quadrant is 2 or 3 ? -plate.Size.Length : 0;
-            var bottom = plate.Quadrant is 3 or 4 ? -plate.Size.Width : 0;
-            var sheet = new Box(left, bottom, plate.Size.Length, plate.Size.Width);
+            var sheet = Sheet(plate);
             using var brush = new SolidBrush(GridColor);
             // Anti-aliased dots smear differently at each subpixel offset; whole-pixel squares
             // drawn without smoothing are all the same size.

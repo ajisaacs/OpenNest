@@ -8,8 +8,9 @@ using OpenNest.Support;
 namespace OpenNest.Forms;
 
 /// <summary>
-/// Nest &gt; Support Grid...: edits the laser grid of contact points every sheet of the current
-/// nest rests on, used to judge whether cut parts stay level and where support tabs go (see
+/// Nest &gt; Support Bed...: edits what every sheet of the current nest rests on, a laser grid of
+/// contact points or a plasma table's slats, used to judge whether cut parts stay level and where
+/// support tabs go (see
 /// docs/support-tabs.md). OK applies it to the nest; Cancel discards the edits. Save as Machine
 /// Defaults writes the grid to the nest's machine configuration immediately and is not undone by Cancel.
 /// </summary>
@@ -23,6 +24,12 @@ public sealed class SupportGridForm : Form
     private readonly NumericUpDown pitchYBox;
     private readonly NumericUpDown offsetXBox;
     private readonly NumericUpDown offsetYBox;
+    private readonly RadioButton gridButton;
+    private readonly RadioButton slatsButton;
+    private readonly ComboBox slatAxisBox;
+    private readonly NumericUpDown slatPitchBox;
+    private readonly NumericUpDown slatThicknessBox;
+    private readonly NumericUpDown slatOffsetBox;
     private readonly NumericUpDown toleranceBox;
     private readonly NumericUpDown marginBox;
     private readonly CheckBox applyToNewNestsBox;
@@ -38,14 +45,14 @@ public sealed class SupportGridForm : Form
         this.units = units;
         this.machineDefaults = machineDefaults ?? new SupportGridSettings();
         this.saveMachineDefaults = saveMachineDefaults;
-        var grid = bed as SupportGrid;
-        // A nest without a grid starts from the machine defaults, so enabling it is one click.
-        var initial = grid != null
-            ? SupportGridSettings.FromGrid(grid, units, this.machineDefaults.Enabled)
+        // A nest without a bed starts from the machine defaults, so enabling it is one click; the
+        // layout it does not use keeps the defaults' values.
+        var initial = bed != null
+            ? SupportGridSettings.FromBed(bed, units, this.machineDefaults.Enabled, this.machineDefaults)
             : this.machineDefaults.ConvertedTo(units);
         var unit = UnitsHelper.GetShortString(units);
 
-        Text = "Support Grid";
+        Text = "Support Bed";
         StartPosition = FormStartPosition.CenterParent;
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
@@ -66,30 +73,55 @@ public sealed class SupportGridForm : Form
             AutoSize = true,
             MaximumSize = new Size(430, 0),
             Padding = new Padding(0, 0, 0, 8),
-            Text = "The grid of contact points cut parts rest on, one every pitch along X and Y, the first "
-                + "at the offset from the plate origin into the sheet. A part whose center of gravity "
-                + "is not inside its contacts by the stability margin can tip; with \"Tab parts the "
-                + "grid cannot support\" in Cutting Settings, Plan Cutting tabs it where the tab "
-                + "steadies it. The registration tolerance allows for a sheet loaded off its place.",
+            Text = "What cut parts rest on: a grid of contact points, one every pitch along X and Y, the "
+                + "first at the offset from the plate origin into the sheet; or slats, each a strip of "
+                + "the slat thickness running the full length or width of the table, one every pitch, "
+                + "the first centered at the offset. A part whose center of gravity is not inside its "
+                + "contacts by the stability margin can tip; with \"Tab parts the support grid cannot "
+                + "hold level\" in Cutting Settings, Plan Cutting tabs it where the tab steadies it. "
+                + "The registration tolerance allows for a sheet loaded off its place.",
         });
 
-        useGridBox = new CheckBox { Text = "This nest's sheets rest on a support grid", AutoSize = true, Checked = grid != null };
+        useGridBox = new CheckBox { Text = "This nest's sheets rest on a support bed", AutoSize = true, Checked = bed != null };
         layout.Controls.Add(useGridBox);
 
-        var values = new TableLayoutPanel { AutoSize = true, ColumnCount = 3 };
+        var kinds = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(16, 0, 0, 0) };
+        gridButton = new RadioButton { Text = "Grid of points", AutoSize = true, Checked = !initial.UseSlats };
+        slatsButton = new RadioButton { Text = "Slats", AutoSize = true, Checked = initial.UseSlats };
+        kinds.Controls.Add(gridButton);
+        kinds.Controls.Add(slatsButton);
+        layout.Controls.Add(kinds);
+
+        var gridValues = new TableLayoutPanel { AutoSize = true, ColumnCount = 3 };
         pitchXBox = NewLengthBox(initial.PitchX, 0.0001m);
         pitchYBox = NewLengthBox(initial.PitchY, 0.0001m);
         offsetXBox = NewLengthBox(initial.OffsetX, -100000m);
         offsetYBox = NewLengthBox(initial.OffsetY, -100000m);
+        AddRow(gridValues, "Pitch along X:", pitchXBox, unit);
+        AddRow(gridValues, "Pitch along Y:", pitchYBox, unit);
+        AddRow(gridValues, "First point, X from the origin:", offsetXBox, unit);
+        AddRow(gridValues, "First point, Y from the origin:", offsetYBox, unit);
+        layout.Controls.Add(gridValues);
+
+        var slatValues = new TableLayoutPanel { AutoSize = true, ColumnCount = 3 };
+        slatAxisBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
+        slatAxisBox.Items.AddRange(new object[] { "Along X (the full length)", "Along Y (the full width)" });
+        slatAxisBox.SelectedIndex = initial.SlatAxis == SlatAxis.X ? 0 : 1;
+        slatPitchBox = NewLengthBox(initial.SlatPitch, 0.0001m);
+        slatThicknessBox = NewLengthBox(initial.SlatThickness, 0m);
+        slatOffsetBox = NewLengthBox(initial.SlatOffset, -100000m);
+        AddRow(slatValues, "Slats run:", slatAxisBox, "");
+        AddRow(slatValues, "Pitch between slats:", slatPitchBox, unit);
+        AddRow(slatValues, "Slat thickness:", slatThicknessBox, unit);
+        AddRow(slatValues, "First slat's center from the origin:", slatOffsetBox, unit);
+        layout.Controls.Add(slatValues);
+
+        var sharedValues = new TableLayoutPanel { AutoSize = true, ColumnCount = 3 };
         toleranceBox = NewLengthBox(initial.RegistrationTolerance, 0m);
         marginBox = NewLengthBox(initial.StabilityMargin, 0m);
-        AddRow(values, "Pitch along X:", pitchXBox, unit);
-        AddRow(values, "Pitch along Y:", pitchYBox, unit);
-        AddRow(values, "First point, X from the origin:", offsetXBox, unit);
-        AddRow(values, "First point, Y from the origin:", offsetYBox, unit);
-        AddRow(values, "Registration tolerance:", toleranceBox, unit);
-        AddRow(values, "Stability margin:", marginBox, unit);
-        layout.Controls.Add(values);
+        AddRow(sharedValues, "Registration tolerance:", toleranceBox, unit);
+        AddRow(sharedValues, "Stability margin:", marginBox, unit);
+        layout.Controls.Add(sharedValues);
 
         var defaultsGroup = new GroupBox
         {
@@ -106,7 +138,7 @@ public sealed class SupportGridForm : Form
         };
         applyToNewNestsBox = new CheckBox
         {
-            Text = "Give nests on this machine this grid",
+            Text = "Give nests on this machine this bed",
             AutoSize = true,
             Checked = this.machineDefaults.Enabled,
         };
@@ -143,14 +175,15 @@ public sealed class SupportGridForm : Form
         CancelButton = cancel;
 
         useGridBox.CheckedChanged += (_, _) => UpdateEnabled();
+        slatsButton.CheckedChanged += (_, _) => UpdateEnabled();
         loadDefaultsButton.Click += (_, _) => ShowValues(this.machineDefaults.ConvertedTo(units));
         saveDefaultsButton.Click += (_, _) => SaveMachineDefaults();
         ok.Click += (_, _) => Accept();
         UpdateEnabled();
     }
 
-    /// <summary>The grid the nest's sheets rest on after OK, or null for none.</summary>
-    public SupportGrid Grid { get; private set; }
+    /// <summary>The bed the nest's sheets rest on after OK, or null for none.</summary>
+    public SupportBed Bed { get; private set; }
 
     private SupportGridSettings Read() => new()
     {
@@ -160,6 +193,11 @@ public sealed class SupportGridForm : Form
         PitchY = (double)pitchYBox.Value,
         OffsetX = (double)offsetXBox.Value,
         OffsetY = (double)offsetYBox.Value,
+        UseSlats = slatsButton.Checked,
+        SlatAxis = slatAxisBox.SelectedIndex == 0 ? SlatAxis.X : SlatAxis.Y,
+        SlatPitch = (double)slatPitchBox.Value,
+        SlatThickness = (double)slatThicknessBox.Value,
+        SlatOffset = (double)slatOffsetBox.Value,
         RegistrationTolerance = (double)toleranceBox.Value,
         StabilityMargin = (double)marginBox.Value,
     };
@@ -170,6 +208,12 @@ public sealed class SupportGridForm : Form
         pitchYBox.Value = ToBoxValue(pitchYBox, settings.PitchY);
         offsetXBox.Value = ToBoxValue(offsetXBox, settings.OffsetX);
         offsetYBox.Value = ToBoxValue(offsetYBox, settings.OffsetY);
+        gridButton.Checked = !settings.UseSlats;
+        slatsButton.Checked = settings.UseSlats;
+        slatAxisBox.SelectedIndex = settings.SlatAxis == SlatAxis.X ? 0 : 1;
+        slatPitchBox.Value = ToBoxValue(slatPitchBox, settings.SlatPitch);
+        slatThicknessBox.Value = ToBoxValue(slatThicknessBox, settings.SlatThickness);
+        slatOffsetBox.Value = ToBoxValue(slatOffsetBox, settings.SlatOffset);
         toleranceBox.Value = ToBoxValue(toleranceBox, settings.RegistrationTolerance);
         marginBox.Value = ToBoxValue(marginBox, settings.StabilityMargin);
         applyToNewNestsBox.Checked = settings.Enabled;
@@ -177,8 +221,13 @@ public sealed class SupportGridForm : Form
 
     private void UpdateEnabled()
     {
-        foreach (var box in new[] { pitchXBox, pitchYBox, offsetXBox, offsetYBox, toleranceBox, marginBox })
-            box.Enabled = useGridBox.Checked;
+        var on = useGridBox.Checked;
+        gridButton.Enabled = slatsButton.Enabled = on;
+        foreach (var box in new Control[] { pitchXBox, pitchYBox, offsetXBox, offsetYBox })
+            box.Enabled = on && !slatsButton.Checked;
+        foreach (var box in new Control[] { slatAxisBox, slatPitchBox, slatThicknessBox, slatOffsetBox })
+            box.Enabled = on && slatsButton.Checked;
+        toleranceBox.Enabled = marginBox.Enabled = on;
     }
 
     private void SaveMachineDefaults()
@@ -188,8 +237,8 @@ public sealed class SupportGridForm : Form
         {
             saveMachineDefaults(settings);
             savedLabel.Text = settings.Enabled
-                ? $"Saved {DateTime.Now:t}: nests on this machine get this grid. Cancel does not undo this."
-                : $"Saved {DateTime.Now:t}: nests on this machine get no grid. Cancel does not undo this.";
+                ? $"Saved {DateTime.Now:t}: nests on this machine get this bed. Cancel does not undo this."
+                : $"Saved {DateTime.Now:t}: nests on this machine get no bed. Cancel does not undo this.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
@@ -200,10 +249,11 @@ public sealed class SupportGridForm : Form
 
     private void Accept()
     {
-        Grid = useGridBox.Checked ? Read().GridFor(units) : null;
-        if (useGridBox.Checked && Grid == null)
+        Bed = useGridBox.Checked ? Read().BedFor(units) : null;
+        if (useGridBox.Checked && Bed == null)
         {
-            MessageBox.Show(this, "Both pitches must be greater than zero.", Text,
+            MessageBox.Show(this, slatsButton.Checked ? "The slat pitch must be greater than zero."
+                : "Both pitches must be greater than zero.", Text,
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }

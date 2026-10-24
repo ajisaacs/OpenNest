@@ -114,7 +114,7 @@ namespace OpenNest.Forms
         {
             nest.Machine = machine == null ? null : new NestMachine(machine.Id, machine.Name);
             var grid = LoadSupportGridSettings(machine);
-            nest.SetSupportBed(grid.Enabled ? grid.GridFor(nest.Units) : null);
+            nest.SetSupportBed(grid.Enabled ? grid.BedFor(nest.Units) : null);
         }
 
         /// <summary>

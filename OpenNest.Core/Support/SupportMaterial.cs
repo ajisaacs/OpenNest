@@ -182,6 +182,25 @@ namespace OpenNest.Support
             return spans;
         }
 
+        /// <summary>
+        /// The spans of the vertical line at <paramref name="x"/> that lie in material, in
+        /// ascending order, on the same half-open rule as <see cref="SpansAtY"/>.
+        /// </summary>
+        public IReadOnlyList<(double Start, double End)> SpansAtX(double x)
+        {
+            var crossings = new List<double>();
+            if (!IsComplete || x < bounds.Left || x > bounds.Right)
+                return Array.Empty<(double, double)>();
+            AddCrossingsAtX(outline, x, crossings);
+            foreach (var hole in holes)
+                AddCrossingsAtX(hole, x, crossings);
+            crossings.Sort();
+            var spans = new List<(double, double)>(crossings.Count / 2);
+            for (var i = 0; i + 1 < crossings.Count; i += 2)
+                spans.Add((crossings[i], crossings[i + 1]));
+            return spans;
+        }
+
         /// <summary>Whether <paramref name="point"/> lies in material (even-odd over outline and holes).</summary>
         public bool Contains(Vector point)
         {
@@ -202,6 +221,17 @@ namespace OpenNest.Support
                 var b = ring[i];
                 if ((a.Y > y) != (b.Y > y))
                     crossings.Add(a.X + (y - a.Y) * (b.X - a.X) / (b.Y - a.Y));
+            }
+        }
+
+        private static void AddCrossingsAtX(Vector[] ring, double x, List<double> crossings)
+        {
+            for (int i = 0, j = ring.Length - 1; i < ring.Length; j = i++)
+            {
+                var a = ring[j];
+                var b = ring[i];
+                if ((a.X > x) != (b.X > x))
+                    crossings.Add(a.Y + (x - a.X) * (b.Y - a.Y) / (b.X - a.X));
             }
         }
 

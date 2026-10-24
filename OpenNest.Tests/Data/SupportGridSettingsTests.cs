@@ -61,6 +61,48 @@ public class SupportGridSettingsTests : IDisposable
     }
 
     [Fact]
+    public void SavedSlatsRoundTrip_AndKeepTheGridValuesForSwitchingBack()
+    {
+        new SupportGridSettings
+        {
+            Enabled = true,
+            PitchX = 3,
+            UseSlats = true,
+            SlatAxis = SlatAxis.X,
+            SlatPitch = 4,
+            SlatThickness = 0.125,
+            SlatOffset = 2,
+        }.Save(_path);
+        var settings = SupportGridSettings.Load(_path);
+        var nest = new Nest { Units = Units.Millimeters };
+
+        settings.ApplyToNewNest(nest);
+
+        var slats = Assert.IsType<SupportSlats>(nest.SupportBed);
+        Assert.Equal(SlatAxis.X, slats.Axis);
+        Assert.Equal(101.6, slats.Pitch, 9);
+        Assert.Equal(3.175, slats.Thickness, 9);
+        Assert.Equal(50.8, slats.Offset, 9);
+        Assert.Equal(3, settings.PitchX);
+
+        var fromBed = SupportGridSettings.FromBed(slats, Units.Millimeters, enabled: true, settings);
+        Assert.True(fromBed.UseSlats);
+        Assert.Equal(76.2, fromBed.PitchX, 9);
+    }
+
+    [Fact]
+    public void OlderFile_WithoutALayout_IsAGrid()
+    {
+        File.WriteAllText(_path, """{"enabled":true,"pitchX":2,"pitchY":2}""");
+
+        var settings = SupportGridSettings.Load(_path);
+
+        Assert.False(settings.UseSlats);
+        Assert.Equal(0.125, settings.SlatThickness);
+        Assert.IsType<SupportGrid>(settings.BedFor(Units.Inches));
+    }
+
+    [Fact]
     public void InvalidValues_KeepTheirDefaults_AndBadJsonLoadsAsOff()
     {
         File.WriteAllText(_path, """{"enabled":true,"pitchX":-1,"pitchY":"x","offsetX":0.5,"stabilityMargin":-2}""");

@@ -481,8 +481,19 @@ namespace OpenNest.IO
                 return null;
             try
             {
-                return new SupportGrid(dto.PitchX, dto.PitchY, dto.OffsetX, dto.OffsetY,
-                    dto.RegistrationTolerance, dto.StabilityMargin);
+                if (dto.Type != "slats")
+                    return new SupportGrid(dto.PitchX, dto.PitchY, dto.OffsetX, dto.OffsetY,
+                        dto.RegistrationTolerance, dto.StabilityMargin);
+                SlatAxis? axis = dto.Axis switch
+                {
+                    "x" => SlatAxis.X,
+                    "y" => SlatAxis.Y,
+                    _ => null,
+                };
+                return axis is { } along
+                    ? new SupportSlats(along, dto.Pitch, dto.Thickness, dto.Offset,
+                        dto.RegistrationTolerance, dto.StabilityMargin)
+                    : null;
             }
             catch (ArgumentOutOfRangeException)
             {

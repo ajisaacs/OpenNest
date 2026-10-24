@@ -9,10 +9,20 @@ perimeter point where one tab steadies the part most.
 
 `OpenNest.Support.SupportBed` is the machine's bed, fixed to the machine and measured from the
 plate origin into the sheet; a sheet in another quadrant sees it mirrored. The built-in layout
-is the laser grid, `SupportGrid`: one contact point every `PitchX` along X and `PitchY` along
-Y, the first at (`OffsetX`, `OffsetY`). Lengths are in the nest's units. Straight slats, and
-curved slats imported from a CAD layout (as on the plasma table), are planned as further
-`SupportBed` subclasses: a layout only reports its contacts under a part's material.
+is one of two layouts; a layout only reports its contacts under a part's material. Lengths are
+in the nest's units.
+
+- The laser grid, `SupportGrid`: one contact point every `PitchX` along X and `PitchY` along
+  Y, the first at (`OffsetX`, `OffsetY`).
+- Straight slats, `SupportSlats` (as on the plasma table): each slat a strip `Thickness` wide
+  running the full length (`Axis` X) or width (`Axis` Y) of the table, one every `Pitch`
+  across it, the first centered `Offset` from the origin. A part rests on the region where its
+  material crosses a slat, so its contacts are that region's corners: where the outline and
+  holes cross each slat's two edges, and the outline and hole vertices on a slat. A part
+  narrower than a slat rests on its own corners; one balanced across a single slat has a margin
+  of at most half the thickness, which the stability margin rejects.
+
+Curved slats imported from a CAD layout are not modeled yet.
 
 Every bed also carries:
 
@@ -23,14 +33,15 @@ Every bed also carries:
 
 The bed belongs to the nest (`Nest.SetSupportBed`); every plate follows it, including plates
 added later. It is display, analysis and tab placement only: never material, spacing or a
-keep-out. Nest > Support Grid... edits it; Save as Machine Defaults writes it to the nest's
-machine configuration (`MachineConfig.SupportGrid`), which nests assigned that machine receive
-while it is enabled: File > New and BOM import assign the Tools > Nest Defaults machine (the
-first by name when none is chosen), and Nest > Machine (or the status bar's machine label) reassigns a nest and replaces its grid
-with the new machine's (none when that machine gives nests no grid). A machine with no grid
-saved yet uses the legacy shared `%APPDATA%\OpenNest\support-grid.json`. The nest file stores
-the bed in `plateDefaults.supportBed` and the machine in `machine` (see
-[nest file format](nest-file-format.md)).
+keep-out. Nest > Support Bed... edits it and picks the grid or slats; Save as Machine Defaults
+writes it to the nest's machine configuration (`MachineConfig.SupportGrid`: both layouts' values
+and which one is in use; settings saved before slats existed are a grid), which nests assigned that
+machine receive while it is enabled: File > New and BOM import assign the Tools > Nest Defaults
+machine (the first by name when none is chosen), and Nest > Machine (or the status bar's machine
+label) reassigns a nest and replaces its bed with the new machine's (none when that machine gives
+nests no bed). A machine with no bed saved yet uses the legacy shared
+`%APPDATA%\OpenNest\support-grid.json`. The nest file stores the bed in
+`plateDefaults.supportBed` and the machine in `machine` (see [nest file format](nest-file-format.md)).
 
 ## The support check
 
@@ -61,7 +72,8 @@ off the corner only), and `AcceptsTabAt` rejects closer points. The tie-break ab
 the clear points only; points equally near the center line go to the one farthest from an
 inside corner. Only when every outline point is too close does the clearance give way.
 
-View > Draw Support shows the grid (while its points are at least 6 pixels apart), each part's
+View > Draw Support shows the grid or the slats, cut off to the sheet (while its points or slats
+are at least 6 pixels apart), each part's
 contacts, and its center of gravity: green when supported, red when it can tip, with an orange
 diamond on a red part's best tab point (keeping the plate's tab-size clearance).
 

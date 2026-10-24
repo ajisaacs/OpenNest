@@ -152,13 +152,16 @@ spacing differs from the saved defaults, is still written.
 ## Support grid
 
 `plateDefaults.supportBed` optionally stores the machine support bed every sheet of
-the nest rests on (see [support tabs](support-tabs.md)): `type` (`grid`, the only
-layout so far), `pitchX`, `pitchY`, `offsetX`, `offsetY` (the first grid point,
-measured from the plate origin into the sheet), `registrationTolerance` and
-`stabilityMargin`, all in the nest's units. The key is omitted when the nest has
-none, so such files are unchanged. A missing pitch, a non-numeric value, an unknown
-`type` or an invalid value (a non-positive pitch, a negative tolerance or margin)
-loads as no bed; the rest of the nest loads. Every plate follows the nest's bed.
+the nest rests on (see [support tabs](support-tabs.md)): `type`, then for `grid`
+`pitchX`, `pitchY`, `offsetX`, `offsetY` (the first grid point, measured from the
+plate origin into the sheet), or for `slats` `axis` (`x` or `y`, the axis the slats
+run along), `pitch`, `thickness` and `offset` (the first slat's center line); both
+end with `registrationTolerance` and `stabilityMargin`. All lengths are in the
+nest's units. The key is omitted when the nest has none, so such files are
+unchanged. A missing pitch or thickness, a non-numeric value, an unknown `type` or
+`axis`, or an invalid value (a non-positive pitch, a negative thickness, tolerance
+or margin) loads as no bed; the rest of the nest loads. Versions without slat
+support read a `slats` bed as none. Every plate follows the nest's bed.
 
 ## Drawing edits
 

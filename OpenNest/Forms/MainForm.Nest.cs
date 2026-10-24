@@ -159,7 +159,7 @@ namespace OpenNest.Forms
             if (IsPlateWorkBusy(views))
             {
                 MessageBox.Show(this, "Finish or cancel the current nesting or plate action first.",
-                    "Support Grid", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    "Support Bed", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -172,7 +172,7 @@ namespace OpenNest.Forms
             if (form.ShowDialog(this) != DialogResult.OK)
                 return;
 
-            nest.SetSupportBed(form.Grid);
+            nest.SetSupportBed(form.Bed);
             foreach (var view in views)
                 view.Invalidate();
         }

@@ -159,8 +159,9 @@ namespace OpenNest.IO
         }
 
         private static SupportBedDto ToDto(SupportBed bed) =>
-            bed is SupportGrid grid
-                ? new SupportBedDto
+            bed switch
+            {
+                SupportGrid grid => new SupportBedDto
                 {
                     PitchX = grid.PitchX,
                     PitchY = grid.PitchY,
@@ -168,8 +169,19 @@ namespace OpenNest.IO
                     OffsetY = grid.OffsetY,
                     RegistrationTolerance = grid.RegistrationTolerance,
                     StabilityMargin = grid.StabilityMargin,
-                }
-                : null;
+                },
+                SupportSlats slats => new SupportBedDto
+                {
+                    Type = "slats",
+                    Axis = slats.Axis == SlatAxis.X ? "x" : "y",
+                    Pitch = slats.Pitch,
+                    Thickness = slats.Thickness,
+                    Offset = slats.Offset,
+                    RegistrationTolerance = slats.RegistrationTolerance,
+                    StabilityMargin = slats.StabilityMargin,
+                },
+                _ => null,
+            };
 
         private List<DrawingDto> BuildDrawingDtos()
         {

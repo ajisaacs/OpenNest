@@ -632,7 +632,7 @@ namespace OpenNest.Forms
             //
             mnuNestSupportGrid.Name = "mnuNestSupportGrid";
             mnuNestSupportGrid.Size = new System.Drawing.Size(205, 22);
-            mnuNestSupportGrid.Text = "Support Grid...";
+            mnuNestSupportGrid.Text = "Support Bed...";
             mnuNestSupportGrid.Click += SupportGrid_Click;
             // 
             // mnuNestImportDrawing
