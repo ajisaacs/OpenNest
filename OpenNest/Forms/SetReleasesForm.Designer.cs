@@ -86,7 +86,8 @@ namespace OpenNest.Forms
             //
             rightAligned.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleRight;
             revisionColumn.DefaultCellStyle = rightAligned;
-            revisionColumn.HeaderText = "Set revision";
+            revisionColumn.HeaderText = "Revision";
+            revisionColumn.ToolTipText = "Which saved revision of the set was released; see the set's History.";
             revisionColumn.Name = "revisionColumn";
             revisionColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             revisionColumn.Width = 70;
@@ -107,7 +108,7 @@ namespace OpenNest.Forms
             //
             // multiplierColumn
             //
-            multiplierColumn.HeaderText = "Kits";
+            multiplierColumn.HeaderText = "Quantity";
             multiplierColumn.Name = "multiplierColumn";
             multiplierColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             multiplierColumn.Width = 50;
@@ -168,17 +169,17 @@ namespace OpenNest.Forms
             //
             // groupColumn
             //
-            groupColumn.HeaderText = "Material group";
+            groupColumn.HeaderText = "Material";
             groupColumn.Name = "groupColumn";
             groupColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             groupColumn.Width = 260;
             //
             // changeColumn
             //
-            changeColumn.HeaderText = "Release did";
+            changeColumn.HeaderText = "Action";
             changeColumn.Name = "changeColumn";
             changeColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            changeColumn.ToolTipText = "Whether the release created the nest or merged into it, and what undoing it did.";
+            changeColumn.ToolTipText = "Whether the release created this nest or merged into it, and what Undo did.";
             changeColumn.Width = 190;
             //
             // statusColumn

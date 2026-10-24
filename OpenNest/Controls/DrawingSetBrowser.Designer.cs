@@ -322,7 +322,7 @@ namespace OpenNest.Controls
             releaseButton.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
             releaseButton.Name = "releaseButton";
             releaseButton.TabIndex = 8;
-            releaseButton.Text = "Release...";
+            releaseButton.Text = "Make Nests...";
             releaseButton.UseVisualStyleBackColor = true;
             releaseButton.Visible = false;
             releaseButton.Click += ReleaseButton_Click;

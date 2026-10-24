@@ -414,7 +414,7 @@ a set shows its notes.
   The editor's left pane browses the library in place, with no second dialog:
   every active drawing (never filtered to a nest), searched, sorted and paged
   like the Drawing Library dialog. Select one or several and choose **Add to Set**,
-  double-click or press Enter to add them at the entered quantity per kit.
+  double-click or press Enter to add them at the entered **Qty per set**.
   Drawings already in the set are greyed; one picked again is skipped and
   named, so there is one member per drawing. Quantities are edited
   in the grid (1 to 100,000); **Remove**, **Move Up** and **Move Down** change
@@ -437,7 +437,7 @@ whose current revision contains it) or **Add to Set...**: choose an active set
 or **New Set**, and the set editor opens with the drawing added at the entered
 quantity for review and Save. **Releases...** lists the releases that had the
 drawing on its own (see below), with Undo Release. When the dialog was opened
-from a nest, **Release...** reads the drawing's current record and opens the
+from a nest, **Make Nests...** reads the drawing's current record and opens the
 release dialog with it on its own at the entered quantity; more drawings and
 sets are added there.
 
@@ -450,12 +450,12 @@ named; cutoffs are left out. If none remain it says so before anything else.
 Otherwise choose an active set or **New Set** (named after the nest, with its
 customer): the set's current library records are read, drawings the set already
 lists **keep the set's quantity** (a released nest carries its multiplier, so
-copying its quantities back would scale the kit), and members are added at the
+copying its quantities back would multiply them again), and members are added at the
 library's latest revision. Anything kept, skipped, archived in the library or
 newer there than in the nest is listed first, then the set editor opens for
 review and Save; nothing is stored before then.
 
-**Release...** (in the drawing sets window) reads the
+**Make Nests...** (in the drawing sets window) reads the
 selected active set with its members and opens the release dialog with it listed.
 More sets are added from **Add a set**: the list opens with the first active sets
 by name and narrows as you type; Enter or **Add** takes the picked set, or the one
@@ -465,17 +465,17 @@ library pane does (search, server-side sort, pages, several selected at once),
 and **Add to Release**, a double-click or Enter adds the selection at the
 entered quantity. It stays open for more; a drawing already listed is greyed
 and skipped, and an archived one is refused. **Remove** takes a set or drawing
-out while another remains. The list shows each line's type; **Kits / Qty** is a
-set's kits (1 to 1000, multiplying its quantities) or a drawing's quantity (1 to
+out while another remains. The list shows each line's type; **Quantity** is how
+many of a set (1 to 1000, multiplying its quantities) or of a drawing (1 to
 100,000), and a set or drawing is listed once. A drawing that a set also lists
 becomes one item with both quantities. The grid below has one row per material
-group across all the sets and drawings
+(name, grade, thickness, units and cut type) across all the sets and drawings
 (`OpenNest.Data.SetReleasePlan`): material, grade, thickness, units, cut type,
 drawings, parts, **Nest** and status. **Include archived drawings** puts archived
 members back in, otherwise they are named below the grid as left out. Each group
 has a **Release** tick; refused groups (two drawings with one name, or drawings
 without material or thickness) show why and cannot be ticked, and a tick
-survives changing the sets, kits or the archived toggle. **Fix Drawings...**
+survives changing the sets, quantities or the archived toggle. **Fix Drawings...**
 opens [Edit Drawing](#edit-drawing-desktop) on a refused group's drawings and
 rebuilds the plan with what was saved.
 
@@ -497,7 +497,7 @@ Auto Nest". The status column lists each group's sheets and utilization, and any
 copies left unplaced, which stay as remaining quantity. Unticked, new nests are
 saved without sheets and merged drafts are left cleared for Auto Nest.
 
-**Release** confirms, then runs `OpenNest.Data.SetReleaseSession`: every ticked
+**Make Nests...** confirms, then runs `OpenNest.Data.SetReleaseSession`: every ticked
 group's new nest is made as File > New would (the server's next nest name, the
 saved plate defaults and clamps), in the group's units, with the saved plate size
 and spacings converted (25.4 mm per inch) when those differ; the nest takes the
@@ -512,30 +512,30 @@ grid then shows every group's outcome: Created or Merged into with
 the nest name, Refused or Failed with the reason, or Not started. Cancel during
 preparing or nesting saves nothing; once saving starts it stops between saves,
 never during one. When every nest was saved but recording failed,
-the button becomes **Record Release** and posts the same release again. A dialog
+the button becomes **Try Again** and posts the same release again. A dialog
 runs one release.
 
 **Releases...** lists the releases that include the selected set, newest first:
-when, by whom, the set revision, the kits of this set (and how many other sets
+when, by whom, the set's **Revision**, the **Quantity** of this set (and how many other sets
 and drawings the release had), the number of nests, progress such as "2 of 3 cut" (deleted
 nests are not counted) or "Undone", and the notes. The selected release's nests
-show their material group, what the release did ("Created", "Merged (revision
+show their **Material**, the **Action** ("Created", "Merged (revision
 3 → 4)", and what undo did) and current status, or Deleted. **Undo Release...**
 deletes the nests the release created (they can be recovered) and restores the
 drafts it merged into. When some nests were changed after the release, it lists
 them and offers to undo the others, leaving those as they are.
 
 **File > Releases...** lists every release on the server the same way, newest
-first, with a **Released** column naming what each one had ("Kit A ×2, Kit B;
-Bracket ×4": sets with their kits past one, then drawings on their own with
-their quantities) in place of the set revision and kits, and Undo Release.
+first, with a **Released** column naming what each one had ("Frame A ×2, Frame B;
+Bracket ×4": sets with their quantity past one, then drawings on their own with
+their quantities) in place of the revision and quantity, and Undo Release.
 **New Release...** opens the release dialog empty; sets are added by name and
 drawings with Add Drawings, and once the dialog records a release the list
 re-reads from the newest. Like Drawing Sets, it is enabled in database mode
 only.
 
 **Nest > Edit** (Nest Info) shows, beside its buttons, the newest release that
-made or merged into a server nest ("Released from set 'Kit A' revision 3 ×2 on
+made or merged into a server nest ("Released from set 'Frame A' revision 3 ×2 on
 10/20/2026 by ...", "Released from drawing 'Bracket' ×4", or "Merged from sets
 ..."), with a count of earlier ones. It
 is read in the background and left blank when the nest came from none or the
@@ -544,7 +544,7 @@ server cannot be reached.
 ## Drawing set endpoints
 
 A **drawing set** (schema v7) is a named, versioned list of library drawings
-with a quantity each: a kit, an assembly or a recurring order. Members name
+with a quantity each: an assembly, a job or a recurring order. Members name
 drawings by id and always mean each drawing's **current** revision; there is no
 per-member revision pin. Sets travel as JSON (`application/json`, at most 1 MiB).
 The desktop browses, edits and releases them in File > Drawing Sets
@@ -601,7 +601,7 @@ Since schema v9 a release covers one or more sets (`release_sets`), and a nest
 may be one the release **created** or an existing draft it **merged** into
 (`release_nests`, with the nest revision before and after). The drawing
 quantities each set added to each nest are kept in `release_nest_items`, so a
-kit can still be traced once kits share a nest. The v8 → v9 migration turns each
+set can still be traced once sets share a nest. The v8 → v9 migration turns each
 v7 release into one set line (its multiplier is the quantity) and created nests
 at their first revision, with no items. Since schema v11 a release may also
 name library drawings **on their own** (`release_drawings`), with or without
@@ -674,7 +674,7 @@ refused, and refuses replies whose id, revision, members, sets or nests differ
 from what was sent.
 
 `SetReleasePlan.Build(lines, drawings, includeArchived)` splits sets read from
-the server, each with a number of kits (`SetReleasePlanLine`), and library
+the server, each with a quantity (`SetReleasePlanLine`), and library
 drawings on their own, each with a quantity (`SetReleaseDrawingLine`), into
 groups without any I/O; either list may be empty, not both (`Build(lines,
 includeArchived)` and `Build(set, multiplier, includeArchived)` are the
@@ -685,7 +685,7 @@ read with. A drawing listed twice on its own is refused (give it a larger
 quantity). A group is the items whose drawings share material name and grade (by
 `SharedListNames.Key`), thickness (rounded to 4 decimals), units and cut type.
 The plan's customer is the one every set and drawing on its own names, or blank. A set listed twice is
-refused (give it more kits instead). Archived drawings are skipped unless included. A group is refused when two of its drawings share a
+refused (give it a larger quantity instead). Archived drawings are skipped unless included. A group is refused when two of its drawings share a
 name (compared ordinally, as a nest keys drawings), and every drawing without a
 material or a positive thickness goes to one refused "unassigned" group, listed last.
 
@@ -724,7 +724,7 @@ it, and nothing is built or saved.
    otherwise says whether someone saved the draft meanwhile. The first real
    failure stops the rest.
 3. **Post the release** only when every chosen group was created or merged,
-   under a client-allocated id. It names every set with its kits, every drawing
+   under a client-allocated id. It names every set with its quantity, every drawing
    on its own with its quantity, each nest as created or merged with the
    revisions before and after, and the drawing revisions and quantities each set
    (or no set, for a drawing on its own) put in each nest. When the post fails, the nests stay and

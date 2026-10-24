@@ -369,7 +369,7 @@ namespace OpenNest.Forms
             quantityLabel.AutoSize = true;
             quantityLabel.Name = "quantityLabel";
             quantityLabel.TabIndex = 0;
-            quantityLabel.Text = "Qty per kit:";
+            quantityLabel.Text = "Qty per set:";
             //
             // quantityBox
             //
@@ -498,7 +498,7 @@ namespace OpenNest.Forms
             quantityColumn.HeaderText = "Qty";
             quantityColumn.Name = "quantityColumn";
             quantityColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            quantityColumn.ToolTipText = "Quantity per kit; type to change it";
+            quantityColumn.ToolTipText = "Quantity per set; type to change it";
             quantityColumn.ValueType = typeof(int);
             quantityColumn.Width = 50;
             //

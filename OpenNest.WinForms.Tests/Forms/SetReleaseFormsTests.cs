@@ -49,7 +49,7 @@ public class SetReleaseFormsTests
 
                 Run(form.ReleaseAsync());
 
-                Assert.Contains("Release set 'Synthetic kit' ×3 into 2 Draft nests", Assert.Single(questions));
+                Assert.Contains("Make 2 Draft nests from set 'Synthetic kit' ×3?", Assert.Single(questions));
                 Assert.Equal(2, nests.Uploaded.Count);
                 Assert.Equal(2, opened.Count);
                 Assert.All(opened, o => Assert.Equal(NestStatus.Draft, o.Nest.Status));
@@ -61,7 +61,7 @@ public class SetReleaseFormsTests
                 var release = Assert.Single(sets.Releases);
                 Assert.Equal((3, "Synthetic run", 2), (release.Sets.Single().Quantity, release.Notes, release.Nests.Count));
                 Assert.Same(release, form.Result!.Release);
-                Assert.StartsWith("Released: 2 nests", Field<Label>(form, "statusLabel").Text);
+                Assert.StartsWith("Done: 2 nests", Field<Label>(form, "statusLabel").Text);
                 Assert.All(grid.Rows.Cast<DataGridViewRow>(), r => Assert.StartsWith("Created N26-", (string)r.Cells["statusColumn"].Value));
                 Assert.False(Field<Button>(form, "releaseButton").Enabled);
                 Assert.True(Field<DataGridView>(form, "setGrid").ReadOnly);
@@ -99,7 +99,7 @@ public class SetReleaseFormsTests
                 Assert.True(refused.Cells["includeColumn"].ReadOnly);
                 Assert.Contains("named 'SYN-A'", (string)refused.Cells["statusColumn"].Value);
                 copper.Cells["includeColumn"].Value = false;
-                Assert.Contains("1 of 3 groups chosen", Field<Label>(form, "summaryLabel").Text);
+                Assert.Contains("1 of 3 materials chosen", Field<Label>(form, "summaryLabel").Text);
                 // Rebuilding the plan keeps the operator's choice.
                 Field<CheckBox>(form, "includeArchivedCheckBox").Checked = true;
                 Assert.Equal(false, grid.Rows.Cast<DataGridViewRow>()
@@ -187,14 +187,14 @@ public class SetReleaseFormsTests
 
                 Assert.Equal(1, opened);
                 Assert.Empty(sets.Releases);
-                Assert.Equal(("Record Release", true), (release.Text, release.Enabled));
+                Assert.Equal(("Try Again", true), (release.Text, release.Enabled));
                 Assert.Contains("Synthetic release post failure.", Field<Label>(form, "statusLabel").Text);
 
                 Run(form.RetryRecordAsync());
 
                 Assert.Equal(2, sets.PostAttempts);
                 Assert.Same(Assert.Single(sets.Releases), form.Result!.Release);
-                Assert.Equal(("Release", false), (release.Text, release.Enabled));
+                Assert.Equal(("Make Nests...", false), (release.Text, release.Enabled));
             },
             TestTimeout,
             "The release retry test did not complete.");
@@ -286,12 +286,12 @@ public class SetReleaseFormsTests
                 openTabs.Clear();
                 Steel().Cells["targetColumn"].Value = mergeChoice;
                 Assert.Same(draft, form.ChosenMerges().Values.Single());
-                Assert.Contains("Merging discards the layout of 'N26-0007'", (string)Steel().Cells["statusColumn"].Value);
+                Assert.Contains("Replaces the layout of 'N26-0007'", (string)Steel().Cells["statusColumn"].Value);
                 Assert.Contains("1 new Draft nest, 1 merge, 6 parts", Field<Label>(form, "summaryLabel").Text);
 
                 Run(form.ReleaseAsync());
 
-                Assert.Contains("1 new and 1 merged into existing drafts", messages[^1]);
+                Assert.Contains("1 new, 1 merged into existing drafts", messages[^1]);
                 var release = Assert.Single(sets.Releases);
                 Assert.Equal(new[] { ("First kit", 1), ("Second kit", 2) }, release.Sets.Select(l => (l.SetName, l.Quantity)));
                 var merged = release.Nests.Single(n => n.Kind == SetReleaseNestKind.Merged);
@@ -364,15 +364,15 @@ public class SetReleaseFormsTests
                 var row = Field<DataGridView>(form, "groupGrid").Rows[0];
                 PumpUntil(() => ((DataGridViewComboBoxCell)row.Cells["targetColumn"]).Items.Count == 2, "the drafts to merge into");
                 row.Cells["targetColumn"].Value = ((DataGridViewComboBoxCell)row.Cells["targetColumn"]).Items[1];
-                Assert.Contains("and nests everything again", (string)row.Cells["statusColumn"].Value);
+                Assert.Contains("and nests again", (string)row.Cells["statusColumn"].Value);
 
                 Field<CheckBox>(form, "nestAfterReleaseCheckBox").Checked = false;
-                Assert.Contains("and leaves everything for Auto Nest", (string)row.Cells["statusColumn"].Value);
+                Assert.Contains("and leaves it for Auto Nest", (string)row.Cells["statusColumn"].Value);
 
                 Run(form.ReleaseAsync());
 
                 Assert.Equal(0, renested);
-                Assert.Contains("current layout, left for Auto Nest", Assert.Single(questions));
+                Assert.Contains("layout is cleared for Auto Nest", Assert.Single(questions));
                 Assert.DoesNotContain("nested with Auto Nest", questions[0]);
                 var merged = Assert.Single(form.Result!.Created);
                 Assert.Same(draft, merged.MergedInto);
@@ -538,7 +538,7 @@ public class SetReleaseFormsTests
 
                 Run(form.ReleaseAsync());
 
-                Assert.Contains("Release set 'Synthetic kit' and 3 drawings into 2 Draft nests", Assert.Single(questions));
+                Assert.Contains("Make 2 Draft nests from set 'Synthetic kit' and 3 drawings?", Assert.Single(questions));
                 var release = Assert.Single(sets.Releases);
                 Assert.Equal(new[] { 5, 40, 1 }, release.Drawings.Select(d => d.Quantity));
                 var steel = release.Nests.Single(n => n.MaterialName == "Synthetic Steel");
@@ -575,7 +575,7 @@ public class SetReleaseFormsTests
 
                 Assert.Empty(nests.Uploaded);
                 Assert.Empty(sets.Releases);
-                Assert.Equal("Nothing was saved. See the Status column.", Field<Label>(form, "statusLabel").Text);
+                Assert.Equal("Nothing saved. See Status.", Field<Label>(form, "statusLabel").Text);
                 Assert.Contains("does not support releasing library drawings on their own",
                     (string)Field<DataGridView>(form, "groupGrid").Rows[0].Cells["statusColumn"].Value);
             },

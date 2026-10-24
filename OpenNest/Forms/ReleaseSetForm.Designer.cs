@@ -229,10 +229,10 @@ namespace OpenNest.Forms
             // kitsColumn
             //
             kitsColumn.DefaultCellStyle = rightAligned;
-            kitsColumn.HeaderText = "Kits / Qty";
+            kitsColumn.HeaderText = "Quantity";
             kitsColumn.Name = "kitsColumn";
             kitsColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            kitsColumn.ToolTipText = "For a set, how many kits: every quantity in the set is multiplied by it. For a drawing, how many to release.";
+            kitsColumn.ToolTipText = "How many to make. For a set, every quantity in the set is multiplied by it.";
             kitsColumn.Width = 80;
             //
             // optionsTable
@@ -451,7 +451,7 @@ namespace OpenNest.Forms
             releaseButton.Enabled = false;
             releaseButton.Name = "releaseButton";
             releaseButton.TabIndex = 2;
-            releaseButton.Text = "Release";
+            releaseButton.Text = "Make Nests...";
             releaseButton.UseVisualStyleBackColor = true;
             releaseButton.Click += ReleaseButton_Click;
             //

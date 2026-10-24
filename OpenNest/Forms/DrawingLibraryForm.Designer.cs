@@ -804,8 +804,8 @@ namespace OpenNest.Forms
             // releaseMenuItem
             //
             releaseMenuItem.Name = "releaseMenuItem";
-            releaseMenuItem.Text = "Release...";
-            releaseMenuItem.ToolTipText = "Release this drawing on its own, at the entered quantity, with any other drawings or sets";
+            releaseMenuItem.Text = "Make Nests...";
+            releaseMenuItem.ToolTipText = "Make nests of this drawing at the entered quantity, with any other drawings or sets";
             releaseMenuItem.Visible = false;
             releaseMenuItem.Click += ReleaseMenuItem_Click;
             //

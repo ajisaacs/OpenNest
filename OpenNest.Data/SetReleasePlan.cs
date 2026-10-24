@@ -196,11 +196,11 @@ public sealed class SetReleasePlan
             var set = line?.Set ?? throw new ArgumentException("Every line needs a set.", nameof(lines));
             if (line.Quantity < 1 || line.Quantity > SetReleaseRules.MaxQuantity)
                 throw new ArgumentOutOfRangeException(nameof(lines), line.Quantity,
-                    $"The number of kits must be between 1 and {SetReleaseRules.MaxQuantity}.");
+                    $"The quantity of a set must be between 1 and {SetReleaseRules.MaxQuantity}.");
             if (set.Id == Guid.Empty || set.Revision < 1)
                 throw new ArgumentException("Only a set read from the server can be released.", nameof(lines));
             if (!seenSets.Add(set.Id))
-                throw new ArgumentException($"Set '{set.Name}' is listed twice. Release it once with more kits.", nameof(lines));
+                throw new ArgumentException($"Set '{set.Name}' is listed twice. List it once with a larger quantity.", nameof(lines));
             var members = set.Members ?? throw new ArgumentException("The set has no member list.", nameof(lines));
             if (members.Any(m => m?.Drawing is null || m.Drawing.Id != m.DrawingId))
                 throw new ArgumentException("A set member is missing its library drawing. Reload the set.", nameof(lines));
@@ -216,7 +216,7 @@ public sealed class SetReleasePlan
             if (drawing.Id == Guid.Empty || drawing.Revision < 1)
                 throw new ArgumentException("Only a drawing read from the library can be released.", nameof(drawings));
             if (!seenDrawings.Add(drawing.Id))
-                throw new ArgumentException($"Drawing '{drawing.Name}' is listed twice. Release it once with a larger quantity.",
+                throw new ArgumentException($"Drawing '{drawing.Name}' is listed twice. List it once with a larger quantity.",
                     nameof(drawings));
         }
 
@@ -324,7 +324,7 @@ public sealed class SetReleasePlan
         if (unassigned)
         {
             refusal = $"{Names(items)} {(items.Count == 1 ? "has" : "have")} no material or thickness. "
-                + "Set them on the library drawings (Edit Drawing), then release again.";
+                + "Set them with Fix Drawings or Edit Drawing.";
             refused = items;
         }
         else
@@ -334,7 +334,7 @@ public sealed class SetReleasePlan
             if (duplicate != null)
             {
                 refusal = $"{duplicate.Count()} drawings in this group are named '{duplicate.Key}'. "
-                    + "A nest keys drawings by name, so rename all but one in the library (Edit Drawing) first.";
+                    + "A nest needs unique names, so rename all but one (Fix Drawings or Edit Drawing).";
                 refused = duplicate.ToList();
             }
         }

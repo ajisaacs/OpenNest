@@ -166,7 +166,7 @@ namespace OpenNest.Forms
             if (listed != null)
             {
                 listed.Selected = true;
-                statusLabel.Text = $"'{set.Name}' is already listed. Change its kits instead.";
+                statusLabel.Text = $"'{set.Name}' is already listed. Change its quantity instead.";
                 return false;
             }
             if (set.Archived)
@@ -280,7 +280,7 @@ namespace OpenNest.Forms
             var valid = int.TryParse(Convert.ToString(e.FormattedValue, CultureInfo.CurrentCulture), NumberStyles.Integer,
                 CultureInfo.CurrentCulture, out var kits) && kits >= 1 && kits <= maximum;
             setGrid.Rows[e.RowIndex].ErrorText = valid ? ""
-                : $"{(drawing ? "The quantity" : "Kits")} must be a whole number from 1 to {maximum:N0}.";
+                : $"Enter a whole number from 1 to {maximum:N0}.";
             e.Cancel = !valid;
         }
 
@@ -693,13 +693,13 @@ namespace OpenNest.Forms
             }
 
             var created = chosen.Count - merges.Count;
-            var text = $"Release {DescribeLines()} into {chosen.Count} Draft nest{(chosen.Count == 1 ? "" : "s")}";
+            var text = $"Make {chosen.Count} Draft nest{(chosen.Count == 1 ? "" : "s")} from {DescribeLines()}?";
             var nestAfter = nestAfterReleaseCheckBox.Checked;
             if (merges.Count > 0)
-                text += $": {created} new and {merges.Count} merged into existing drafts. A merged draft loses its "
-                    + (nestAfter ? "current layout and is nested again" : "current layout, left for Auto Nest")
-                    + "; Undo Release restores it";
-            text += nestAfter ? ". Each is nested with Auto Nest and opens in its own tab." : ". Each opens in its own tab.";
+                text += $" {created} new, {merges.Count} merged into existing drafts. A merged draft's layout is "
+                    + (nestAfter ? "replaced" : "cleared for Auto Nest")
+                    + "; Undo Release restores it.";
+            text += nestAfter ? " Each is nested with Auto Nest and opens in a tab." : " Each opens in a tab.";
             if (ShowMessage(text, MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK)
                 return;
 
@@ -797,7 +797,7 @@ namespace OpenNest.Forms
                 $"{skipped.Count} archived drawing{(skipped.Count == 1 ? " is" : "s are")} left out: "
                 + string.Join(", ", skipped.Take(5).Select(m => $"'{m.Drawing!.Name}'"))
                 + (skipped.Count > 5 ? $" and {skipped.Count - 5} more" : "")
-                + ". Tick Include archived drawings to release them.";
+                + ". Tick Include archived drawings to add them.";
             UpdateCommands();
             _ = LoadDraftsAsync();
         }
@@ -881,9 +881,9 @@ namespace OpenNest.Forms
                 return group.Refusal;
             var notes = group.Warnings.ToList();
             if (targets.TryGetValue(group.Key, out var draft))
-                notes.Insert(0, $"Merging discards the layout of '{draft.Name}' ({draft.PlateCount} sheet"
-                    + $"{(draft.PlateCount == 1 ? "" : "s")}) and "
-                    + (nestAfterReleaseCheckBox.Checked ? "nests everything again" : "leaves everything for Auto Nest")
+                notes.Insert(0, $"Replaces the layout of '{draft.Name}' ({draft.PlateCount} sheet"
+                    + $"{(draft.PlateCount == 1 ? "" : "s")}) "
+                    + (nestAfterReleaseCheckBox.Checked ? "and nests again" : "and leaves it for Auto Nest")
                     + "; Undo Release restores it.");
             return string.Join(" ", notes);
         }
@@ -927,15 +927,15 @@ namespace OpenNest.Forms
             var done = Result.Created.Count;
             var nestsText = $"{done} nest{(done == 1 ? "" : "s")}";
             if (Result.Release != null)
-                statusLabel.Text = $"Released: {nestsText} saved and opened, and the release recorded.";
+                statusLabel.Text = $"Done: {nestsText} saved and opened.";
             else if (Result.ReleaseError.Length > 0)
-                statusLabel.Text = Result.ReleaseError + " Choose Record Release to try again.";
+                statusLabel.Text = Result.ReleaseError + " Choose Try Again.";
             else if (Result.Canceled)
-                statusLabel.Text = $"Canceled: {nestsText} saved; no release recorded.";
+                statusLabel.Text = $"Canceled: {nestsText} saved, release not recorded.";
             else
                 statusLabel.Text = done == 0
-                    ? "Nothing was saved. See the Status column."
-                    : $"Stopped: {nestsText} saved; no release recorded. See the Status column.";
+                    ? "Nothing saved. See Status."
+                    : $"Stopped: {nestsText} saved, release not recorded. See Status.";
             UpdateCommands();
         }
 
@@ -966,13 +966,13 @@ namespace OpenNest.Forms
             fixDrawingsButton.Enabled = CanEditDrawings() && groupGrid.CurrentRow?.Tag is SetReleaseGroup { CanRelease: false };
 
             var retry = Result is { Release: null, ReleaseError.Length: > 0 };
-            releaseButton.Text = retry ? "Record Release" : "Release";
+            releaseButton.Text = retry ? "Try Again" : "Make Nests...";
             releaseButton.Enabled = !running && (retry || (editable && chosen.Count > 0));
             var parts = chosen.Sum(g => (long)g.TotalQuantity);
             var merged = chosen.Count(g => targets.ContainsKey(g.Key));
             summaryLabel.Text = plan == null || plan.Groups.Count == 0
-                ? "Nothing listed can be released."
-                : $"{chosen.Count} of {plan.Groups.Count} group{(plan.Groups.Count == 1 ? "" : "s")} chosen: "
+                ? "No nests to make."
+                : $"{chosen.Count} of {plan.Groups.Count} material{(plan.Groups.Count == 1 ? "" : "s")} chosen: "
                     + $"{chosen.Count - merged} new Draft nest{(chosen.Count - merged == 1 ? "" : "s")}"
                     + (merged == 0 ? "" : $", {merged} merge{(merged == 1 ? "" : "s")}")
                     + $", {parts:N0} part{(parts == 1 ? "" : "s")}";

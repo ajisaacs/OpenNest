@@ -453,7 +453,7 @@ namespace OpenNest.Forms
             var parts = session.Members.Sum(m => (long)m.Quantity);
             summaryLabel.Text = session.Members.Count == 0
                 ? "No drawings yet. Select drawings in the library on the left and choose Add to Set."
-                : $"{session.Members.Count:N0} drawing{(session.Members.Count == 1 ? "" : "s")}, {parts:N0} part{(parts == 1 ? "" : "s")} per kit";
+                : $"{session.Members.Count:N0} drawing{(session.Members.Count == 1 ? "" : "s")}, {parts:N0} part{(parts == 1 ? "" : "s")} per set";
         }
 
         private static string Warning(DrawingLibraryRecord drawing)
