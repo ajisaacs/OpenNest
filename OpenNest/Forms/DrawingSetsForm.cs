@@ -69,10 +69,22 @@ namespace OpenNest.Forms
         /// <summary>Switches to the Sets tab.</summary>
         public void ShowSets() => tabs.SelectedTab = setsTab;
 
+        /// <summary>
+        /// Opens Import BOM on the Sets tab once the window is shown (File &gt; Import BOM in
+        /// Database mode).
+        /// </summary>
+        public bool ImportBomWhenShown { get; set; }
+
         private async void DrawingSetsForm_Shown(object sender, EventArgs e)
         {
             shown = true;
             await RefreshSelectedTabAsync();
+            if (ImportBomWhenShown && !IsDisposed)
+            {
+                ImportBomWhenShown = false;
+                ShowSets();
+                await browser.ImportBomAsync();
+            }
         }
 
         private async void Tabs_SelectedIndexChanged(object sender, EventArgs e)

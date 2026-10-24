@@ -16,8 +16,8 @@ namespace OpenNest.Controls
     /// <see cref="DrawingSetBrowseSession"/>, and creates, edits, archives or restores them and
     /// shows their history. <see cref="DrawingSetsForm"/> hosts it on its Sets tab to manage and
     /// release sets, and shows a set's Releases on its Releases tab. New Set, Edit and Make Nests
-    /// are buttons; Archive/Restore, History and Releases are in the More menu, which is also the
-    /// list's right-click menu. In pick mode
+    /// are buttons; Archive/Restore, History and Releases, then Import BOM, are in the More menu,
+    /// which is also the list's right-click menu. In pick mode
     /// (<see cref="ChooseDrawingSetForm"/>) only active sets are listed, and choosing a set or
     /// New Set raises <see cref="SetActivated"/> or <see cref="NewSetChosen"/> instead.
     /// </summary>
@@ -45,6 +45,12 @@ namespace OpenNest.Controls
 
         /// <summary>Shows a set's releases; set by the host (Releases is disabled without it) and replaced by tests.</summary>
         internal Action<DrawingSetRecord> ShowReleases { get; set; }
+
+        /// <summary>
+        /// Shows Import BOM and returns the new set it prefilled (its library drawings already
+        /// stored with the operator's consent), or null when cancelled; replaced by tests.
+        /// </summary>
+        internal Func<DrawingSetEditSession> ImportBom { get; set; }
 
         /// <summary>Shows the release dialog for a set read with its members; replaced by tests.</summary>
         internal Action<DrawingSetRecord> ShowRelease { get; set; }
@@ -105,6 +111,14 @@ namespace OpenNest.Controls
             {
                 using var form = new DrawingSetHistoryForm(sets, set);
                 form.ShowDialog(FindForm());
+            };
+            ImportBom = () =>
+            {
+                var defaults = MachineSettings.LoadSavedNestDefaults(out _);
+                var cutType = Enum.TryParse<CutType>(Properties.Settings.Default.DrawingLibraryCutType, out var saved)
+                    && Enum.IsDefined(saved) ? saved : CutType.Laser;
+                using var form = new ImportBomToSetForm(sets, library, defaults.Units, cutType, Environment.UserName);
+                return form.ShowDialog(FindForm()) == DialogResult.OK ? form.Edit : null;
             };
             setGrid.ContextMenuStrip = pick ? null : moreMenu;
             ShowRelease = set =>
@@ -247,6 +261,34 @@ namespace OpenNest.Controls
         }
 
         private async void ReleaseButton_Click(object sender, EventArgs e) => await ReleaseSelectedAsync();
+
+        private async void ImportBomMenuItem_Click(object sender, EventArgs e) => await ImportBomAsync();
+
+        /// <summary>
+        /// Imports a BOM into a new set: the import dialog matches its drawings to the library,
+        /// then the set editor opens prefilled for review and Save, as New Set does.
+        /// </summary>
+        internal async Task ImportBomAsync()
+        {
+            if (session == null || pick || busy)
+                return;
+
+            var edit = ImportBom();
+            if (edit == null || IsDisposed)
+                return;
+            var saved = EditSet(edit);
+            if (IsDisposed)
+                return;
+            if (saved == null)
+            {
+                statusLabel.Text = "The imported set was not saved.";
+                return;
+            }
+
+            await RunAsync(session.RefreshAsync);
+            if (!IsDisposed)
+                statusLabel.Text = $"Saved set '{saved.Name}' revision {saved.Revision}.";
+        }
 
         /// <summary>Reads the selected active set with its members' current drawings and opens the release dialog.</summary>
         internal async Task ReleaseSelectedAsync()
@@ -456,7 +498,9 @@ namespace OpenNest.Controls
             archiveMenuItem.Text = selected is { Archived: true } ? "&Restore" : "&Archive";
             historyMenuItem.Enabled = ready && selected != null;
             releasesMenuItem.Enabled = ready && selected != null && ShowReleases != null;
-            moreButton.Enabled = archiveMenuItem.Enabled || historyMenuItem.Enabled || releasesMenuItem.Enabled;
+            importBomMenuItem.Enabled = ready && !pick;
+            moreButton.Enabled = archiveMenuItem.Enabled || historyMenuItem.Enabled || releasesMenuItem.Enabled
+                || importBomMenuItem.Enabled;
             releaseButton.Enabled = ready && nests != null && selected is { Archived: false, MemberCount: > 0 };
         }
     }

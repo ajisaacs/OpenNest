@@ -235,6 +235,13 @@ changes the hash:
 Adding a library drawing to a nest ignores whatever a package holds for these fields
 and applies the record's values.
 
+An unchanged DXF file imports with the same entity ids, but from another folder its
+package records another `source.path`, and packages saved before entity ids were stable
+carry random ones, so the packages' hashes differ. `DrawingPackage.GeometryKey`
+compares geometry instead: the SHA-256 of the package entries with `source.path` left
+out and every GUID replaced by its order of first appearance. BOM import to a set uses
+it to reuse a library drawing whose geometry has not changed.
+
 ## Drawing colors
 
 `color` is the drawing's display fill. A drawing writes `customColor: true` when

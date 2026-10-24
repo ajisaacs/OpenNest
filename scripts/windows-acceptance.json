@@ -58,10 +58,21 @@
           "project": "OpenNest.WinForms.Tests",
           "method": "OpenNest.WinForms.Tests.Forms.BomImportFormTests.DuplicateRows_CreateNestsButtonImportsOneDrawingWithCombinedQuantity",
           "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.ImportBomToSetFormTests.ImportBom_OpensTheEditorPrefilled_AndCancellingItStoresNoSet",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.ImportBomToSetFormTests.DecliningTheLibraryWrites_OrCancelling_StoresNothing",
+          "minimum_cases": 1
         }
       ],
       "remaining_acceptance": [
-        "Visual appearance of disabled rows; additional material-dropdown behavior is not covered."
+        "Visual appearance of disabled rows; additional material-dropdown behavior is not covered.",
+        "Import BOM to a set against a live nest server (HTTP uploads, revisions and package downloads) is not covered."
       ]
     },
     {

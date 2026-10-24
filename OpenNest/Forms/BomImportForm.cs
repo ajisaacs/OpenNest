@@ -62,12 +62,7 @@ namespace OpenNest.Forms
                 txtDxfFolder.Text = Path.GetDirectoryName(dlg.FileName);
 
             if (string.IsNullOrWhiteSpace(txtJobName.Text))
-            {
-                var name = Path.GetFileNameWithoutExtension(dlg.FileName);
-                if (name.EndsWith(" BOM", StringComparison.OrdinalIgnoreCase))
-                    name = name.Substring(0, name.Length - 4).TrimEnd();
-                txtJobName.Text = name;
-            }
+                txtJobName.Text = BomImportRows.JobName(dlg.FileName);
         }
 
         private void BrowseDxf_Click(object sender, EventArgs e)

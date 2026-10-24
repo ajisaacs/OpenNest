@@ -89,8 +89,19 @@ namespace OpenNest.Forms
                     "Nest Load Warnings", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
+        /// <summary>
+        /// File mode: the BOM import dialog, which makes nests directly. Database mode: a BOM
+        /// becomes a drawing set instead (Drawing Sets &gt; More &gt; Import BOM), whose Make Nests
+        /// makes the nests.
+        /// </summary>
         private void ImportBom_Click(object sender, EventArgs e)
         {
+            if (NestStorage.Settings.IsDatabaseMode)
+            {
+                ShowDrawingSets(releases: false, importBom: true);
+                return;
+            }
+
             var form = new BomImportForm();
             form.MdiParentForm = this;
             form.ShowDialog(this);
@@ -107,6 +118,9 @@ namespace OpenNest.Forms
             mnuFileDrawingSets.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
             mnuFileReleases.Enabled = databaseMode;
             mnuFileReleases.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
+            mnuFileImportBom.ToolTipText = databaseMode
+                ? "Imports the BOM into a new drawing set; Make Nests then makes its nests."
+                : "";
         }
 
         /// <summary>
@@ -147,7 +161,7 @@ namespace OpenNest.Forms
         /// <summary>A shortcut to the Drawing Sets window's Releases tab, listing every release.</summary>
         private void Releases_Click(object sender, EventArgs e) => ShowDrawingSets(releases: true);
 
-        private void ShowDrawingSets(bool releases)
+        private void ShowDrawingSets(bool releases, bool importBom = false)
         {
             if (!NestStorage.Settings.IsDatabaseMode)
                 return;
@@ -171,6 +185,7 @@ namespace OpenNest.Forms
             form.EnableRelease(nests, OpenServerNest, IsServerNestOpen);
             if (releases)
                 _ = form.ShowReleasesAsync();
+            form.ImportBomWhenShown = importBom;
             form.ShowDialog(this);
         }
 

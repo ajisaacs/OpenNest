@@ -50,6 +50,8 @@ namespace OpenNest.Controls
             archiveMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             historyMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             releasesMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            importSeparator = new System.Windows.Forms.ToolStripSeparator();
+            importBomMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             layoutTable.SuspendLayout();
             filterTable.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)setGrid).BeginInit();
@@ -324,7 +326,7 @@ namespace OpenNest.Controls
             //
             // moreMenu
             //
-            moreMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { archiveMenuItem, historyMenuItem, releasesMenuItem });
+            moreMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { archiveMenuItem, historyMenuItem, releasesMenuItem, importSeparator, importBomMenuItem });
             moreMenu.Name = "moreMenu";
             moreMenu.Opening += MoreMenu_Opening;
             //
@@ -348,6 +350,17 @@ namespace OpenNest.Controls
             releasesMenuItem.Name = "releasesMenuItem";
             releasesMenuItem.Text = "Re&leases...";
             releasesMenuItem.Click += ReleasesMenuItem_Click;
+            //
+            // importSeparator
+            //
+            importSeparator.Name = "importSeparator";
+            //
+            // importBomMenuItem
+            //
+            importBomMenuItem.Enabled = false;
+            importBomMenuItem.Name = "importBomMenuItem";
+            importBomMenuItem.Text = "&Import BOM...";
+            importBomMenuItem.Click += ImportBomMenuItem_Click;
             //
             // DrawingSetBrowser
             //
@@ -400,5 +413,7 @@ namespace OpenNest.Controls
         private System.Windows.Forms.ToolStripMenuItem archiveMenuItem;
         private System.Windows.Forms.ToolStripMenuItem historyMenuItem;
         private System.Windows.Forms.ToolStripMenuItem releasesMenuItem;
+        private System.Windows.Forms.ToolStripSeparator importSeparator;
+        private System.Windows.Forms.ToolStripMenuItem importBomMenuItem;
     }
 }

@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace OpenNest.IO.Bom;
 
@@ -40,5 +42,17 @@ public static class BomImportRows
         }
 
         return rows;
+    }
+
+    /// <summary>
+    /// The job a BOM file is for: its file name without the extension or a trailing
+    /// " BOM" ("Frame A BOM.xlsx" is "Frame A").
+    /// </summary>
+    public static string JobName(string bomPath)
+    {
+        var name = Path.GetFileNameWithoutExtension(bomPath ?? "");
+        if (name.EndsWith(" BOM", StringComparison.OrdinalIgnoreCase))
+            name = name.Substring(0, name.Length - 4).TrimEnd();
+        return name;
     }
 }

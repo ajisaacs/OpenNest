@@ -414,7 +414,8 @@ a set shows its notes. Below the list are **New Set...**, **Edit...** (also a
 double-click or Enter on a set), **More ▾** and **Make Nests...** in bold, the
 main action (below). **More ▾**, also the list's right-click
 menu (the menu key or Shift+F10 opens it from the keyboard), holds **Archive**
-or **Restore**, **History...** and **Releases...** for the selected set.
+or **Restore**, **History...** and **Releases...** for the selected set, then
+**Import BOM...** ([below](#import-bom-to-a-set-desktop)), which needs no selection.
 
 - **New Set...** and **Edit...** open the set editor
   (`OpenNest.Data.DrawingSetEditSession`): name, customer, notes and the member
@@ -446,6 +447,57 @@ or **Restore**, **History...** and **Releases...** for the selected set.
   deleted. **History...** (in the set editor, and in the Sets tab's More menu
   for the selected set) lists revisions newest first with the members of the selected
   one, shown with their drawings' current library details.
+
+### Import BOM to a set (desktop)
+
+**Import BOM...** (the Sets tab's **More ▾** menu; **File > Import BOM...** in
+Database mode opens the drawing sets window straight into it) turns a BOM into a
+new drawing set. It sits in More rather than beside New Set because it is another
+way to start a set, used once per job, and the Sets tab keeps New Set, Edit and
+Make Nests as its only buttons; File > Import BOM stays the familiar way in.
+
+1. Choose the BOM (`.xlsx`, read by `BomReader`) and the folder of its drawings,
+   the **Set name** (prefilled from the BOM file name without a trailing " BOM")
+   and an optional **Customer**, then **Read BOM**. Rows resolve to drawing files
+   as in File-mode BOM import (`BomImportRows`). Rows that name the same file with
+   the same material (ignoring case) and thickness are one drawing needing their
+   total quantity, which becomes its quantity per set (`BomSetDrawings`). Rows
+   with no file name, no drawing file or a quantity below 1, and files that fail
+   to import, are listed greyed and left out. Rows with no material or thickness
+   are kept: the drawing is stored with a blank material and thickness 0, and the
+   set editor's note column leads to Edit Drawing to fix it before Make Nests.
+2. Each drawing is matched to the library (`OpenNest.Data.DrawingSetImport`) by
+   its identity (D4: normalized customer, name, material and grade, exact
+   thickness, units and cut type; the name is the file name without extension,
+   the grade blank, the units the new-nest default and the cut type the one last
+   saved to the library on this PC) and its geometry:
+   - an active drawing with the same identity and geometry is **used as it is**;
+   - one active drawing with the same identity and other geometry gets a **new
+     revision** with the new package, keeping its details, notes and settings;
+   - no active match: a **new library drawing**;
+   - several matches, none with this geometry, or a second BOM drawing with the
+     same identity as an earlier one: left out with a reason (add the right
+     drawing in the set editor).
+   Geometry is compared by package hash, then by
+   `DrawingPackage.GeometryKey` on the matching drawing's current package
+   (see [drawing packages](nest-file-format.md#drawing-packages)), since a file read
+   from another folder records another source path (and drawings stored before
+   entity ids were stable carry random ones). Reading only queries and downloads.
+   Changing the BOM, folder or customer afterwards asks for Read BOM again.
+3. **Create Set...**: when the import would upload drawings or add revisions, a
+   confirmation lists each one first; Cancel stores nothing. On OK they are
+   stored in order (each revision guarded by the revision it was matched
+   against), and then the set editor opens with a new, unsaved set holding
+   every imported drawing at its BOM quantity, named and with the customer as
+   entered and notes naming the BOM file. The set is stored only by the editor's
+   **Save**; cancelling the editor leaves the confirmed library drawings and no
+   set. A failed write stops the import, names what was already stored and
+   leaves the set unchanged; Read BOM again then reuses those drawings, so
+   importing twice never stores a drawing twice.
+
+Releasing the set (**Make Nests...**) then makes the nests, replacing File-mode
+BOM import's Create Nests for Database mode. In File mode, **File > Import BOM...**
+still makes nests directly, unchanged.
 
 In the Drawing Library dialog, right-click a drawing for **Used in Sets...** (the sets
 whose current revision contains it) or **Add to Set...**: choose an active set

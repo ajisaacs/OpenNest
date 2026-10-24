@@ -18,5 +18,6 @@
     <ProjectReference Include="..\OpenNest.Gpu\OpenNest.Gpu.csproj" />
     <Content Include="Fixtures\absolute-coordinate-parts.nest" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="..\OpenNest.Tests\Data\InMemoryDrawingSets.cs" Link="Fixtures\InMemoryDrawingSets.cs" />
+    <Compile Include="..\OpenNest.Tests\Data\InMemoryDrawingLibrary.cs" Link="Fixtures\InMemoryDrawingLibrary.cs" />
   </ItemGroup>
 </Project>

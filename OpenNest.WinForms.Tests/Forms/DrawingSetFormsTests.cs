@@ -340,13 +340,14 @@ public class DrawingSetFormsTests
                 Assert.Equal(3, sets.Current.Single().Revision);
                 PumpUntil(() => archive.Text == "&Archive", "the restored set's menu");
 
-                // Nothing selected: only New Set stays enabled.
+                // Nothing selected: only New Set and More's Import BOM stay enabled.
                 Field<CheckBox>(browser, "showArchivedCheckBox").Checked = false;
                 PumpUntil(() => grid.Rows.Count == 1, "the active set");
                 grid.CurrentCell = null;
                 Assert.True(Field<Button>(browser, "newButton").Enabled);
                 Assert.False(Field<Button>(browser, "editButton").Enabled);
-                Assert.False(more.Enabled);
+                Assert.True(more.Enabled);
+                Assert.True(Field<ToolStripMenuItem>(browser, "importBomMenuItem").Enabled);
                 Assert.False(archive.Enabled);
                 Assert.False(history.Enabled);
             },

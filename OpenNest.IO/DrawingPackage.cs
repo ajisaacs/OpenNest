@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace OpenNest.IO
 {
@@ -69,6 +71,53 @@ namespace OpenNest.IO
                 throw new InvalidDataException("The drawing package is not a readable .nest archive.", ex);
             }
         }
+
+        /// <summary>
+        /// A key that is equal for packages holding the same geometry: the SHA-256 of the
+        /// package's entries with the source file path left out and every GUID (entity ids
+        /// and the references to them) replaced by its order of first appearance. An unchanged
+        /// DXF now imports with the same entity ids, but from another folder it records another
+        /// path, and packages saved before stable ids carry random ones, so their hashes differ
+        /// while this key does not.
+        /// </summary>
+        public static string GeometryKey(byte[] package)
+        {
+            ArgumentNullException.ThrowIfNull(package);
+            var text = new StringBuilder();
+            try
+            {
+                using var archive = new ZipArchive(new MemoryStream(package, writable: false), ZipArchiveMode.Read);
+                foreach (var entry in archive.Entries.OrderBy(e => e.FullName, StringComparer.Ordinal))
+                {
+                    var content = ReadText(entry);
+                    if (entry.FullName == "nest.json" && JsonNode.Parse(content) is JsonObject root)
+                    {
+                        foreach (var drawing in (root["drawings"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+                            (drawing["source"] as JsonObject)?.Remove("path");
+                        content = root.ToJsonString();
+                    }
+
+                    text.Append(entry.FullName).Append('\n').Append(content).Append('\n');
+                }
+            }
+            catch (Exception ex) when (ex is JsonException || (ex is IOException && ex is not InvalidDataException))
+            {
+                throw new InvalidDataException("The drawing package is not a readable .nest archive.", ex);
+            }
+
+            var ids = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var normalized = GuidPattern.Replace(text.ToString(), match =>
+            {
+                if (!ids.TryGetValue(match.Value, out var index))
+                    ids[match.Value] = index = ids.Count;
+                return "#" + index;
+            });
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized))).ToLowerInvariant();
+        }
+
+        private static readonly Regex GuidPattern = new(
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         // Checks the archive's own declaration before the lenient nest reader sees it: that
         // reader defaults unknown units and drops empty plates, which a package must not hide.
