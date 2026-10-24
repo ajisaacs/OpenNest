@@ -156,5 +156,51 @@ namespace OpenNest.Tests.IO
             Assert.NotNull(drawing.Program);
             Assert.NotNull(drawing.SourceEntities);
         }
+
+        [Fact]
+        public void ImportDrawing_UnchangedFile_GivesTheSameLibraryPackage()
+        {
+            var first = CadImporter.ImportDrawing(TestDxf);
+            var second = CadImporter.ImportDrawing(TestDxf);
+
+            Assert.Equal(
+                first.SourceEntities.Select(e => e.Id),
+                second.SourceEntities.Select(e => e.Id)
+            );
+            Assert.Equal(
+                DrawingPackage.Write(first, Units.Inches),
+                DrawingPackage.Write(second, Units.Inches)
+            );
+        }
+
+        [Fact]
+        public void Import_EntityIdsAreUniqueAndNonempty()
+        {
+            var ids = CadImporter.Import(TestDxf).Entities.Select(e => e.Id).ToList();
+
+            Assert.DoesNotContain(System.Guid.Empty, ids);
+            Assert.Equal(ids.Count, ids.Distinct().Count());
+        }
+
+        [Fact]
+        public void Import_ChangedFile_ReusesNoEntityIds()
+        {
+            // Ids key suppression, roles and edge selections, so a changed file must not
+            // hand an old id to whatever entity now sits at that position.
+            var changed = Path.Combine(Path.GetTempPath(), $"cadimporter-changed-{System.Guid.NewGuid():N}.dxf");
+            try
+            {
+                File.WriteAllText(changed, "999\nchanged\n" + File.ReadAllText(TestDxf));
+                var original = CadImporter.Import(TestDxf).Entities.Select(e => e.Id).ToHashSet();
+                var edited = CadImporter.Import(changed).Entities.Select(e => e.Id).ToList();
+
+                Assert.NotEmpty(edited);
+                Assert.DoesNotContain(edited, original.Contains);
+            }
+            finally
+            {
+                File.Delete(changed);
+            }
+        }
     }
 }

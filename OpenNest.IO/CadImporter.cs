@@ -1,6 +1,9 @@
+using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using OpenNest.Bending;
 using OpenNest.Breakoffs;
 using OpenNest.Converters;
@@ -77,6 +80,8 @@ namespace OpenNest.IO
                     repairReports = BendRepair.Apply(dxf.Entities, bends, options.BendRepair);
             }
 
+            AssignFileIds(path, dxf.Entities);
+
             return new CadImportResult
             {
                 Entities = dxf.Entities,
@@ -87,6 +92,31 @@ namespace OpenNest.IO
                 Name = options.Name ?? Path.GetFileNameWithoutExtension(path),
                 Document = dxf.Document,
             };
+        }
+
+        /// <summary>
+        /// Gives each imported entity an id derived from the file's bytes and the entity's
+        /// position in the import, so importing an unchanged file again yields the same ids
+        /// (and the same library package), while any change to the file yields entirely new
+        /// ids: ids key suppression, roles and edge selections, so one must never move to
+        /// another entity.
+        /// </summary>
+        private static void AssignFileIds(string path, IList<Entity> entities)
+        {
+            Span<byte> input = stackalloc byte[32 + 4];
+            Span<byte> digest = stackalloc byte[32];
+            using (var stream = File.OpenRead(path))
+                SHA256.HashData(stream, input[..32]);
+
+            for (var i = 0; i < entities.Count; i++)
+            {
+                BinaryPrimitives.WriteInt32LittleEndian(input[32..], i);
+                SHA256.HashData(input, digest);
+                // RFC 9562 version 8 (custom) layout.
+                digest[7] = (byte)((digest[7] & 0x0F) | 0x80);
+                digest[8] = (byte)((digest[8] & 0x3F) | 0x80);
+                entities[i].Id = new Guid(digest[..16]);
+            }
         }
 
         /// <summary>
