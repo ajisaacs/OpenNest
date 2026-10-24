@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -11,11 +12,14 @@ namespace OpenNest
 {
     public class LayoutPart : IPart
     {
-        private static Font programIdFont;
-        private static Color selectedColor;
-        private static Pen selectedPen;
-        private static Brush selectedBrush;
-        private static Pen leadInPen;
+        private static Color selectedColor = Color.FromArgb(90, 150, 200, 255);
+
+        // GDI+ objects are not thread-safe, so views on different UI threads each draw
+        // with their own; sharing one fails with "Object is currently in use elsewhere".
+        [ThreadStatic] private static Font programIdFont;
+        [ThreadStatic] private static Pen selectedPen;
+        [ThreadStatic] private static Brush selectedBrush;
+        [ThreadStatic] private static Pen leadInPen;
 
         private Color color;
         private Color? colorOverride;
@@ -32,13 +36,6 @@ namespace OpenNest
         private PointF _labelScreenPoint;
 
         public readonly Part BasePart;
-
-        static LayoutPart()
-        {
-            programIdFont = new Font(SystemFonts.DefaultFont, FontStyle.Bold | FontStyle.Underline);
-            SelectedColor = Color.FromArgb(90, 150, 200, 255);
-            leadInPen = new Pen(Color.OrangeRed, 1.5f);
-        }
 
         private LayoutPart(Part part)
         {
@@ -105,15 +102,15 @@ namespace OpenNest
             RefreshColors();
             using var schemeSelectionBrush = IsSelected && !colorScheme.SelectedPartColor.IsEmpty
                 ? new SolidBrush(colorScheme.SelectedPartColor) : null;
-            g.FillPath(muted ? Brushes.Gainsboro : schemeSelectionBrush ?? (IsSelected ? selectedBrush : brush),
+            g.FillPath(muted ? Brushes.Gainsboro : schemeSelectionBrush ?? (IsSelected ? SelectedBrush : brush),
                 MaterialPath);
             DrawDisplay(g, muted);
             DrawEtch(g, muted);
             // Keep real cuts visible even where an etch overlaps them.
-            g.DrawPath(muted ? Pens.Gray : IsSelected && colorScheme.PartOutlineColor.IsEmpty ? selectedPen : pen, Path);
+            g.DrawPath(muted ? Pens.Gray : IsSelected && colorScheme.PartOutlineColor.IsEmpty ? SelectedPen : pen, Path);
 
             if (LeadInPath != null)
-                g.DrawPath(muted ? Pens.Gray : leadInPen, LeadInPath);
+                g.DrawPath(muted ? Pens.Gray : LeadInPen, LeadInPath);
         }
 
         public void Draw(Graphics g, string id) => Draw(g, id, false);
@@ -129,7 +126,7 @@ namespace OpenNest
             };
             g.DrawString(
                 id,
-                programIdFont,
+                ProgramIdFont,
                 muted ? Brushes.DimGray : Brushes.Black,
                 _labelScreenPoint.X,
                 _labelScreenPoint.Y,
@@ -393,19 +390,40 @@ namespace OpenNest
         public static Color SelectedColor
         {
             get { return selectedColor; }
-            set
+            set { selectedColor = value; }
+        }
+
+        private static Font ProgramIdFont =>
+            programIdFont ??= new Font(SystemFonts.DefaultFont, FontStyle.Bold | FontStyle.Underline);
+
+        private static Pen LeadInPen => leadInPen ??= new Pen(Color.OrangeRed, 1.5f);
+
+        private static Brush SelectedBrush
+        {
+            get
             {
-                selectedColor = value;
+                if (selectedBrush is not SolidBrush current || current.Color != selectedColor)
+                {
+                    selectedBrush?.Dispose();
+                    selectedBrush = new SolidBrush(selectedColor);
+                }
 
-                if (selectedBrush != null)
-                    selectedBrush.Dispose();
+                return selectedBrush;
+            }
+        }
 
-                selectedBrush = new SolidBrush(value);
+        private static Pen SelectedPen
+        {
+            get
+            {
+                var color = ControlPaint.Dark(selectedColor);
+                if (selectedPen == null || selectedPen.Color != color)
+                {
+                    selectedPen?.Dispose();
+                    selectedPen = new Pen(color);
+                }
 
-                if (selectedPen != null)
-                    selectedPen.Dispose();
-
-                selectedPen = new Pen(ControlPaint.Dark(value));
+                return selectedPen;
             }
         }
 

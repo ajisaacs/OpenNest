@@ -1,5 +1,7 @@
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Threading;
 
 namespace OpenNest
 {
@@ -45,25 +47,110 @@ namespace OpenNest
 
         #region Pens/Brushes
 
-        public Pen LayoutOutlinePen { get; private set; }
+        // GDI+ objects are not thread-safe, and views on different UI threads share a
+        // scheme (Default), so each thread draws with its own set, rebuilt after a color
+        // change. Two views painting at once otherwise fail with "Object is currently in
+        // use elsewhere".
+        private readonly ThreadLocal<DrawingTools> tools = new();
+        private int toolsVersion;
 
-        public Brush LayoutFillBrush { get; private set; }
+        private DrawingTools Tools
+        {
+            get
+            {
+                var current = tools.Value;
+                if (current == null || current.Version != toolsVersion)
+                {
+                    current?.Dispose();
+                    current = new DrawingTools(this, toolsVersion);
+                    tools.Value = current;
+                }
 
-        public Pen BoundingBoxPen { get; private set; }
+                return current;
+            }
+        }
 
-        public Pen RapidPen { get; private set; }
+        public Pen LayoutOutlinePen => Tools.LayoutOutlinePen;
 
-        public Pen OriginPen { get; private set; }
+        public Brush LayoutFillBrush => Tools.LayoutFillBrush;
 
-        public Pen EdgeSpacingPen { get; private set; }
+        public Pen BoundingBoxPen => Tools.BoundingBoxPen;
 
-        public Pen PreviewPartPen { get; private set; }
+        public Pen RapidPen => Tools.RapidPen;
 
-        public Brush PreviewPartBrush { get; private set; }
+        public Pen OriginPen => Tools.OriginPen;
 
-        public Pen ActivePreviewPartPen { get; private set; }
+        public Pen EdgeSpacingPen => Tools.EdgeSpacingPen;
 
-        public Brush ActivePreviewPartBrush { get; private set; }
+        public Pen PreviewPartPen => Tools.PreviewPartPen;
+
+        public Brush PreviewPartBrush => Tools.PreviewPartBrush;
+
+        public Pen ActivePreviewPartPen => Tools.ActivePreviewPartPen;
+
+        public Brush ActivePreviewPartBrush => Tools.ActivePreviewPartBrush;
+
+        private sealed class DrawingTools : IDisposable
+        {
+            public DrawingTools(ColorScheme scheme, int version)
+            {
+                Version = version;
+                LayoutOutlinePen = new Pen(scheme.layoutOutlineColor);
+                LayoutFillBrush = new SolidBrush(scheme.layoutFillColor);
+                BoundingBoxPen = new Pen(scheme.boundingBoxColor);
+                RapidPen = new Pen(scheme.rapidColor)
+                {
+                    DashPattern = new float[] { 10, 10 },
+                    DashCap = DashCap.Flat,
+                };
+                OriginPen = new Pen(scheme.originColor);
+                EdgeSpacingPen = new Pen(scheme.edgeSpacingColor)
+                {
+                    DashPattern = new float[] { 3, 3 },
+                    DashCap = DashCap.Flat,
+                };
+                PreviewPartPen = new Pen(scheme.previewPartColor, 1);
+                PreviewPartBrush = new SolidBrush(Color.FromArgb(60, scheme.previewPartColor));
+                ActivePreviewPartPen = new Pen(Color.FromArgb(128, scheme.previewPartColor), 1);
+                ActivePreviewPartBrush = new SolidBrush(Color.FromArgb(30, scheme.previewPartColor));
+            }
+
+            public int Version { get; }
+
+            public Pen LayoutOutlinePen { get; }
+
+            public Brush LayoutFillBrush { get; }
+
+            public Pen BoundingBoxPen { get; }
+
+            public Pen RapidPen { get; }
+
+            public Pen OriginPen { get; }
+
+            public Pen EdgeSpacingPen { get; }
+
+            public Pen PreviewPartPen { get; }
+
+            public Brush PreviewPartBrush { get; }
+
+            public Pen ActivePreviewPartPen { get; }
+
+            public Brush ActivePreviewPartBrush { get; }
+
+            public void Dispose()
+            {
+                LayoutOutlinePen.Dispose();
+                LayoutFillBrush.Dispose();
+                BoundingBoxPen.Dispose();
+                RapidPen.Dispose();
+                OriginPen.Dispose();
+                EdgeSpacingPen.Dispose();
+                PreviewPartPen.Dispose();
+                PreviewPartBrush.Dispose();
+                ActivePreviewPartPen.Dispose();
+                ActivePreviewPartBrush.Dispose();
+            }
+        }
 
         #endregion Pens/Brushes
 
@@ -74,119 +161,43 @@ namespace OpenNest
         public Color LayoutOutlineColor
         {
             get { return layoutOutlineColor; }
-            set
-            {
-                layoutOutlineColor = value;
-
-                if (LayoutOutlinePen != null)
-                    LayoutOutlinePen.Dispose();
-
-                LayoutOutlinePen = new Pen(value);
-            }
+            set { layoutOutlineColor = value; Interlocked.Increment(ref toolsVersion); }
         }
 
         public Color LayoutFillColor
         {
             get { return layoutFillColor; }
-            set
-            {
-                layoutFillColor = value;
-
-                if (LayoutFillBrush != null)
-                    LayoutFillBrush.Dispose();
-
-                LayoutFillBrush = new SolidBrush(value);
-            }
+            set { layoutFillColor = value; Interlocked.Increment(ref toolsVersion); }
         }
 
         public Color BoundingBoxColor
         {
             get { return boundingBoxColor; }
-            set
-            {
-                boundingBoxColor = value;
-
-                if (BoundingBoxPen != null)
-                    BoundingBoxPen.Dispose();
-
-                BoundingBoxPen = new Pen(value);
-            }
+            set { boundingBoxColor = value; Interlocked.Increment(ref toolsVersion); }
         }
 
         public Color RapidColor
         {
             get { return rapidColor; }
-            set
-            {
-                rapidColor = value;
-
-                if (RapidPen != null)
-                    RapidPen.Dispose();
-
-                RapidPen = new Pen(value)
-                {
-                    DashPattern = new float[] { 10, 10 },
-                    DashCap = DashCap.Flat,
-                };
-            }
+            set { rapidColor = value; Interlocked.Increment(ref toolsVersion); }
         }
 
         public Color OriginColor
         {
             get { return originColor; }
-            set
-            {
-                originColor = value;
-
-                if (OriginPen != null)
-                    OriginPen.Dispose();
-
-                OriginPen = new Pen(value);
-            }
+            set { originColor = value; Interlocked.Increment(ref toolsVersion); }
         }
 
         public Color EdgeSpacingColor
         {
             get { return edgeSpacingColor; }
-            set
-            {
-                edgeSpacingColor = value;
-
-                if (EdgeSpacingPen != null)
-                    EdgeSpacingPen.Dispose();
-
-                EdgeSpacingPen = new Pen(value)
-                {
-                    DashPattern = new float[] { 3, 3 },
-                    DashCap = DashCap.Flat,
-                };
-            }
+            set { edgeSpacingColor = value; Interlocked.Increment(ref toolsVersion); }
         }
 
         public Color PreviewPartColor
         {
             get { return previewPartColor; }
-            set
-            {
-                previewPartColor = value;
-
-                if (PreviewPartPen != null)
-                    PreviewPartPen.Dispose();
-
-                if (PreviewPartBrush != null)
-                    PreviewPartBrush.Dispose();
-
-                if (ActivePreviewPartPen != null)
-                    ActivePreviewPartPen.Dispose();
-
-                if (ActivePreviewPartBrush != null)
-                    ActivePreviewPartBrush.Dispose();
-
-                PreviewPartPen = new Pen(value, 1);
-                PreviewPartBrush = new SolidBrush(Color.FromArgb(60, value));
-                ActivePreviewPartPen = new Pen(Color.FromArgb(128, value), 1);
-                ActivePreviewPartBrush = new SolidBrush(Color.FromArgb(30, value));
-            }
+            set { previewPartColor = value; Interlocked.Increment(ref toolsVersion); }
         }
 
         #endregion Colors
