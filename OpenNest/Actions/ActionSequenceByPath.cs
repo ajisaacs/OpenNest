@@ -38,6 +38,11 @@ namespace OpenNest.Actions
         };
         private List<Vector> drawing;
         private bool disconnecting;
+        private IReadOnlySet<Part> muted;
+
+        // Starting the tool again builds the new one before this one is cancelled and
+        // disconnected, so this one must leave the view's muting to its successor.
+        private bool OwnsView => ReferenceEquals(plateView.MutedParts, muted);
 
         public override bool ResumeOnEscape => false;
 
@@ -69,6 +74,7 @@ namespace OpenNest.Actions
             plateView.KeyDown += plateView_KeyDown;
             plateView.Paint += plateView_Paint;
             UpdateMuted(lines);
+            plateView.Invalidate();
         }
 
         private void plateView_MouseDown(object sender, MouseEventArgs e)
@@ -182,13 +188,14 @@ namespace OpenNest.Actions
         /// <summary>Mutes the parts the lines do not reach, so what is left to sequence stands out.</summary>
         private void UpdateMuted(IReadOnlyList<IReadOnlyList<Vector>> paths)
         {
-            var muted = new HashSet<Part>(ReferenceEqualityComparer.Instance);
+            var unreached = new HashSet<Part>(ReferenceEqualityComparer.Instance);
             foreach (var part in plateView.Plate.Parts)
             {
                 if (!DrawnPathSequencing.Reaches(paths, part))
-                    muted.Add(part);
+                    unreached.Add(part);
             }
-            plateView.MutedParts = muted;
+            muted = unreached;
+            plateView.MutedParts = unreached;
         }
 
         private void plateView_Paint(object sender, PaintEventArgs e)
@@ -230,8 +237,11 @@ namespace OpenNest.Actions
             plateView.MouseUp -= plateView_MouseUp;
             plateView.KeyDown -= plateView_KeyDown;
             plateView.Paint -= plateView_Paint;
-            plateView.PreviewSequence = null;
-            plateView.MutedParts = null;
+            if (OwnsView)
+            {
+                plateView.PreviewSequence = null;
+                plateView.MutedParts = null;
+            }
             form.Close();
             form.Dispose();
             linePen.Dispose();
@@ -246,6 +256,8 @@ namespace OpenNest.Actions
         public override void CancelAction()
         {
             drawing = null;
+            if (!OwnsView)
+                return;
             plateView.PreviewSequence = null;
             UpdateMuted(lines);
             plateView.Invalidate();
