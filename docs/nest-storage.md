@@ -83,6 +83,7 @@ entry, never programs or geometry, and takes the archive-derived fields below fr
 | `material` | string | Material name (type), e.g. `Stainless`. Read from the uploaded archive (nest material, else plate defaults' on an explicit null); a metadata-only PUT may change it, and the desktop applies the record's value when opening the nest. |
 | `materialGrade` | string | Optional; default blank. Older servers drop it. A blank grade on a record saved before schema v8 is treated as unrecorded: opening keeps the archive's grade while the material name matches. |
 | `thickness` | number | Read from the uploaded archive (nest thickness, else plate defaults' when not positive); editable like `material`. |
+| `units` | `"inches"` \| `"millimeters"` | The nest's units, which `thickness` is in. Server-computed from the uploaded archive (absent or unknown values are inches, as `NestReader` reads them); ignored on upload and kept by a metadata-only PUT. Schema v12 read every stored archive, current and historical, to fill it. Older servers omit it, which readers take as inches. |
 | `status` | `"draft"` \| `"quote"` \| `"toBeCut"` \| `"hasBeenCut"` | Default `quote`. |
 | `plateCount` / `partCount` | integer | Server-computed from the uploaded archive (non-cutoff parts only; a trailing plate with no parts or cut-offs is not counted); ignored on upload and kept by a metadata-only PUT. |
 | `comments` | string | |
@@ -247,7 +248,8 @@ only the requested page of metadata (never archive bytes):
   can merge into): `status` (`draft`, `quote`, `toBeCut` or `hasBeenCut`),
   `material` and `materialGrade` (compared by `SharedListNames.Key`, so case and
   spacing are ignored; a present but blank `materialGrade` asks for nests with no
-  grade) and `thickness` (a number, zero or greater, matched at four decimals).
+  grade) and `thickness` (a number, zero or greater, matched at four decimals in
+  each nest's own units).
   The client sends them only when set, so plain browsing still works against
   servers without them.
 - `offset` (default 0, at least 0) and `limit` (default 100, 1 to 500).

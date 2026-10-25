@@ -46,6 +46,7 @@ public static class NestRecordFactory
             Material = nest.Material?.Name ?? "",
             MaterialGrade = nest.Material?.Grade ?? "",
             Thickness = nest.Thickness,
+            Units = nest.Units,
             Status = nest.Status,
             // The trailing empty plate is the editor's new-plate slot, not a plate of the nest.
             PlateCount = PlateDisplayNumbering.DisplayedPlateCount(nest.Plates),

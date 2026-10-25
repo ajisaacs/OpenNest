@@ -34,6 +34,12 @@ public sealed class NestRecord
 
     public double Thickness { get; set; }
 
+    /// <summary>
+    /// The nest's units, which <see cref="Thickness"/> is in. The server reads them from the
+    /// archive like the counts; inches when the archive has none or the server predates them.
+    /// </summary>
+    public Units Units { get; set; }
+
     /// <summary>quote | toBeCut | hasBeenCut (camelCase on the wire, case-insensitive readers).</summary>
     public NestStatus Status { get; set; } = NestStatus.Quote;
 

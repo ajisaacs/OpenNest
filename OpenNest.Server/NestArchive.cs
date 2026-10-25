@@ -20,7 +20,7 @@ internal static class NestArchive
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
 
     /// <summary>
-    /// Overwrites the record's plate count, part count, material and thickness with the
+    /// Overwrites the record's plate count, part count, material, thickness and units with the
     /// archive's own. Returns an error when the bytes are not a readable nest archive.
     /// </summary>
     public static string? Apply(NestRecord record, byte[] file)
@@ -33,6 +33,7 @@ internal static class NestArchive
         // falls back to the plate defaults. Thickness falls back when not positive.
         record.Material = (nest.Material ?? defaults.Material)?.Name ?? "";
         record.Thickness = nest.Thickness > 0 ? nest.Thickness : defaults.Thickness;
+        record.Units = UnitsOf(nest);
 
         // NestReader drops parts whose drawing is missing. Cut-off parts are never written as
         // parts, so every remaining part counts.
@@ -106,8 +107,7 @@ internal static class NestArchive
             })
             .ToList();
 
-        // NestReader: absent or unknown units keep the nest default, inches.
-        var units = Enum.TryParse<Units>(nest.Units, ignoreCase: true, out var parsed) ? parsed : Units.Inches;
+        var units = UnitsOf(nest);
 
         sheets = new NestSheets
         {
@@ -120,6 +120,13 @@ internal static class NestArchive
         };
         return null;
     }
+
+    /// <summary>The archive's units, for backfilling records stored before they were kept; inches when unreadable.</summary>
+    public static Units ReadUnits(byte[] file) => Read(file, out var nest) is null ? UnitsOf(nest) : Units.Inches;
+
+    // NestReader: absent or unknown units keep the nest default, inches.
+    private static Units UnitsOf(NestJson nest) =>
+        Enum.TryParse<Units>(nest.Units, ignoreCase: true, out var parsed) ? parsed : Units.Inches;
 
     private static string? Read(byte[] file, out NestJson nest)
     {

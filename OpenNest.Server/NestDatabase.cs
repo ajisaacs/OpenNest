@@ -154,10 +154,10 @@ public sealed partial class NestDatabase : IDisposable
             command.Transaction = transaction;
             command.CommandText = """
                 INSERT INTO nests (id, name, customer, dateCreated, dateModified, material,
-                    materialGrade, thickness, status, plateCount, partCount, comments, madeBy,
+                    materialGrade, thickness, units, status, plateCount, partCount, comments, madeBy,
                     fileSize, savedAt, file)
                 VALUES ($id, $name, $customer, $dateCreated, $dateModified, $material,
-                    $materialGrade, $thickness, $status, $plateCount, $partCount, $comments,
+                    $materialGrade, $thickness, $units, $status, $plateCount, $partCount, $comments,
                     $madeBy, $fileSize, $savedAt, $file)
                 """;
             AddRecordParameters(command, id, record, file, updateFile: true);
@@ -186,9 +186,10 @@ public sealed partial class NestDatabase : IDisposable
             if (current.Revision != expectedRevision) throw new RevisionConflictException(current);
             if (file is null)
             {
-                // The counts describe the archive, which a metadata-only save leaves unchanged.
+                // The counts and units describe the archive, which a metadata-only save leaves unchanged.
                 record.PlateCount = current.PlateCount;
                 record.PartCount = current.PartCount;
+                record.Units = current.Units;
             }
             file ??= GetFile(id)!;
             if (SameMetadata(current, record) && GetFile(id)!.AsSpan().SequenceEqual(file)) return current;
@@ -210,7 +211,7 @@ public sealed partial class NestDatabase : IDisposable
                 UPDATE nests SET
                     name = $name, customer = $customer, dateCreated = $dateCreated,
                     dateModified = $dateModified, material = $material,
-                    materialGrade = $materialGrade, thickness = $thickness, status = $status, plateCount = $plateCount,
+                    materialGrade = $materialGrade, thickness = $thickness, units = $units, status = $status, plateCount = $plateCount,
                     partCount = $partCount, comments = $comments, madeBy = $madeBy,
                     savedAt = $savedAt, revision = $revision, restoredFromRevision=$source{fileClause}
                 WHERE id = $id
@@ -320,7 +321,7 @@ public sealed partial class NestDatabase : IDisposable
     private static bool SameMetadata(NestRecord a, NestRecord b) =>
         a.Name == b.Name && a.Customer == b.Customer && a.DateCreated == b.DateCreated &&
         a.DateModified == b.DateModified && a.Material == b.Material && a.MaterialGrade == b.MaterialGrade &&
-        a.Thickness == b.Thickness && a.Status == b.Status && a.PlateCount == b.PlateCount && a.PartCount == b.PartCount &&
+        a.Thickness == b.Thickness && a.Units == b.Units && a.Status == b.Status && a.PlateCount == b.PlateCount && a.PartCount == b.PartCount &&
         a.Comments == b.Comments && a.MadeBy == b.MadeBy;
 
     private void Snapshot(Guid id, SqliteTransaction transaction)
@@ -341,7 +342,7 @@ public sealed partial class NestDatabase : IDisposable
             command.Transaction = transaction;
             command.CommandText = "PRAGMA user_version";
             var version = (long)command.ExecuteScalar()!;
-            if (version > 11) throw new InvalidOperationException("Database schema is newer than this server.");
+            if (version > 12) throw new InvalidOperationException("Database schema is newer than this server.");
             if (version == 0)
             {
                 command.CommandText = """
@@ -426,8 +427,45 @@ public sealed partial class NestDatabase : IDisposable
                 command.CommandText = ReleaseUpgradeToV11;
                 command.ExecuteNonQuery();
             }
+            if (version < 12)
+                AddUnits(command);
             transaction.Commit();
         }
+    }
+
+    // v12: records keep the archive's units, which their thickness is in. Every stored archive,
+    // current or historical, is read once so millimeter nests are not reported as inches.
+    private static void AddUnits(SqliteCommand command)
+    {
+        foreach (var table in new[] { "nests", "nest_revisions" })
+        {
+            command.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name='units'";
+            if ((long)command.ExecuteScalar()! == 0)
+            {
+                command.CommandText = $"ALTER TABLE {table} ADD COLUMN units TEXT NOT NULL DEFAULT 'Inches'";
+                command.ExecuteNonQuery();
+            }
+            var millimeters = new List<long>();
+            command.CommandText = $"SELECT rowid, file FROM {table}";
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (NestArchive.ReadUnits((byte[])reader.GetValue(1)) == Units.Millimeters)
+                        millimeters.Add(reader.GetInt64(0));
+                }
+            }
+            command.CommandText = $"UPDATE {table} SET units='Millimeters' WHERE rowid=$rowid";
+            var rowid = command.Parameters.Add("$rowid", SqliteType.Integer);
+            foreach (var id in millimeters)
+            {
+                rowid.Value = id;
+                command.ExecuteNonQuery();
+            }
+            command.Parameters.Clear();
+        }
+        command.CommandText = "PRAGMA user_version=12";
+        command.ExecuteNonQuery();
     }
 
     /// <summary>Checks the live connection without exposing storage error details.</summary>
@@ -464,7 +502,7 @@ public sealed partial class NestDatabase : IDisposable
     private const string RecordColumns = """
         id, name, customer, dateCreated, dateModified, material, thickness,
         status, plateCount, partCount, comments, madeBy, fileSize, savedAt, revision, deleted, restoredFromRevision,
-        materialGrade
+        materialGrade, units
         """;
 
     // Case-insensitive (ASCII) substring over the text columns and the status's stored
@@ -557,6 +595,7 @@ public sealed partial class NestDatabase : IDisposable
         command.Parameters.AddWithValue("$material", record.Material);
         command.Parameters.AddWithValue("$materialGrade", record.MaterialGrade);
         command.Parameters.AddWithValue("$thickness", record.Thickness);
+        command.Parameters.AddWithValue("$units", record.Units.ToString());
         command.Parameters.AddWithValue("$status", record.Status.ToString());
         command.Parameters.AddWithValue("$plateCount", record.PlateCount);
         command.Parameters.AddWithValue("$partCount", record.PartCount);
@@ -594,6 +633,7 @@ public sealed partial class NestDatabase : IDisposable
             Deleted = reader.GetInt32(first + 15) != 0,
             RestoredFromRevision = reader.IsDBNull(first + 16) ? null : reader.GetInt32(first + 16),
             MaterialGrade = reader.GetString(first + 17),
+            Units = Enum.TryParse<Units>(reader.GetString(first + 18), true, out var units) ? units : Units.Inches,
         };
     }
 }
