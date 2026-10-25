@@ -106,10 +106,14 @@ internal static class NestArchive
             })
             .ToList();
 
+        // NestReader: absent or unknown units keep the nest default, inches.
+        var units = Enum.TryParse<Units>(nest.Units, ignoreCase: true, out var parsed) ? parsed : Units.Inches;
+
         sheets = new NestSheets
         {
             NestId = record.Id,
             Revision = record.Revision,
+            Units = units,
             Sheets = sizes,
             Parts = parts,
             Plates = platesOut,
@@ -178,6 +182,7 @@ internal static class NestArchive
 
     private sealed class NestJson
     {
+        public string? Units { get; set; }
         public double Thickness { get; set; }
         public MaterialJson? Material { get; set; } = new();
         public PlateDefaultsJson? PlateDefaults { get; set; }

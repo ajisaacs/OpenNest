@@ -237,6 +237,53 @@ public sealed class NestSheetsTests
     }
 
     [Fact]
+    public async Task Units_AreTheNestsAndSizesStayAsStored()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        var nest = NestApiTests.SyntheticNest();
+        nest.Units = Units.Millimeters;
+        var id = await Create(client, nest);
+
+        var json = await client.GetStringAsync($"/api/nests/{id}/sheets");
+
+        using var document = JsonDocument.Parse(json);
+        Assert.Equal("millimeters", document.RootElement.GetProperty("units").GetString());
+        var sheets = JsonSerializer.Deserialize<NestSheets>(json, Options)!;
+        Assert.Equal(Units.Millimeters, sheets.Units);
+        Assert.Equal([(20.0, 30.0, 1)], Sizes(sheets));
+    }
+
+    [Fact]
+    public async Task InchNest_ReportsInches()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        var nest = NestApiTests.SyntheticNest();
+        nest.Units = Units.Inches;
+
+        var sheets = await Sheets(client, nest);
+
+        Assert.Equal(Units.Inches, sheets.Units);
+    }
+
+    // NestReader keeps the default units when the field is absent or unrecognized.
+    [Theory]
+    [InlineData("")]
+    [InlineData("\"units\":\"furlongs\",")]
+    public async Task AbsentOrUnknownUnits_AreInches(string unitsField)
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        var archive = TestNests.Zip("nest.json", "{" + unitsField + "\"drawings\":[],\"plates\":[]}");
+        var id = await Create(client, archive);
+
+        var sheets = (await client.GetFromJsonAsync<NestSheets>($"/api/nests/{id}/sheets", Options))!;
+
+        Assert.Equal(Units.Inches, sheets.Units);
+    }
+
+    [Fact]
     public async Task UnknownNest_Returns404()
     {
         using var factory = new ServerFactory();

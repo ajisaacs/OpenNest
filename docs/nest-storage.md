@@ -126,8 +126,11 @@ Restore appends a new snapshot, never rewrites its source or intervening history
 
 `/sheets` lists what a nest needs cut, for inventory holds (MaterialLedger). It
 skips the trailing empty new-plate slot, as `plateCount` does. Sheets group by
-size with `width` the shorter side, sizes as stored (unrounded), `quantity` the
-sum of those plates' quantities, ordered by width then length. `parts` has one
+size with `width` the shorter side, sizes as stored (unrounded, in the nest's
+`units`: `inches` or `millimeters`, inches when the archive has none or an
+unknown value, as `NestReader` reads it), `quantity` the sum of those plates'
+quantities, ordered by width then length. Callers that work in one unit, such
+as MaterialLedger's inches, must convert using `units`. `parts` has one
 entry per drawing, ordered by name: `required` is the drawing's required
 quantity, `nested` its parts on each plate times that plate's quantity; parts
 whose drawing is missing are skipped.

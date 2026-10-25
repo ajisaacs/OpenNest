@@ -10,6 +10,9 @@ public sealed class NestSheets
 
     public int Revision { get; init; }
 
+    /// <summary>The nest's units, which every size in <see cref="Sheets"/> is stored in.</summary>
+    public Units Units { get; init; }
+
     /// <summary>One entry per distinct sheet size, ordered by width, then length.</summary>
     public IReadOnlyList<NestSheetSize> Sheets { get; init; } = Array.Empty<NestSheetSize>();
 
