@@ -44,6 +44,12 @@ namespace OpenNest.IO
             public List<PlateDto> Plates { get; init; } = new();
             public List<PlateOptionDto> PlateOptions { get; init; } = new();
             public double SalvageRate { get; init; } = 0.5;
+
+            /// <summary>
+            /// Smallest remnant side in model units. Missing in older files, which load the Auto
+            /// Nest default.
+            /// </summary>
+            public double MinimumRemnantDimension { get; init; } = Nest.DefaultMinimumRemnantDimension;
         }
 
         public record PlateDefaultsDto
@@ -339,6 +345,21 @@ namespace OpenNest.IO
         /// Reads an optional list of strings without failing the nest: a non-array value
         /// reads as an empty list and non-string entries are skipped.
         /// </summary>
+        /// <summary>Writes derived data and skips it on read, whatever its shape.</summary>
+        public sealed class WriteOnlyConverter<T> : JsonConverter<T>
+            where T : class
+        {
+            public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+                reader.Skip();
+                return null;
+            }
+
+            // The converter sits on the property, not the type, so this does not recurse.
+            public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options) =>
+                JsonSerializer.Serialize(writer, value, options);
+        }
+
         public sealed class LenientStringListConverter : JsonConverter<List<string>>
         {
             public override List<string> Read(
@@ -666,6 +687,25 @@ namespace OpenNest.IO
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             [JsonConverter(typeof(LenientClampRailConverter))]
             public ClampRailDto ClampRail { get; init; }
+
+            /// <summary>
+            /// Derived at save from the layout (<see cref="PlateRemnant.Expected"/>) for readers
+            /// without geometry, such as the server. Omitted when the plate leaves none; never read
+            /// back, so a stale value cannot reach the model.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            [JsonConverter(typeof(WriteOnlyConverter<ExpectedRemnantDto>))]
+            public ExpectedRemnantDto ExpectedRemnant { get; init; }
+        }
+
+        /// <summary>A plate's expected rectangular drop, with <see cref="Width"/> the shorter side.</summary>
+        public record ExpectedRemnantDto
+        {
+            public double Width { get; init; }
+            public double Length { get; init; }
+
+            /// <summary><c>cutoff</c> or <c>offcut</c>.</summary>
+            public string Source { get; init; } = "";
         }
 
         public record ClampZoneDto

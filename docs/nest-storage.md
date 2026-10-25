@@ -102,7 +102,7 @@ entry, never programs or geometry, and takes the archive-derived fields below fr
 | GET | `/api/nests/query?search=&status=&material=&materialGrade=&thickness=&sort=&order=&offset=&limit=` | — | `{ "items": NestRecord[], "total", "offset", "limit" }`: one bounded page filtered in SQL (see below), or 400 for an invalid parameter |
 | GET | `/api/nests/{id}` | — | `NestRecord` or 404 |
 | GET | `/api/nests/{id}/file` | — | `.nest` archive bytes (`application/zip`) or 404 |
-| GET | `/api/nests/{id}/sheets` | — | `{ "nestId", "revision", "sheets": [{ "width", "length", "quantity" }], "parts": [{ "name", "required", "nested" }], "plates": [{ "index", "width", "length", "quantity", "stockItemCodes" }] }` read from the current archive (see below), 404, or 500 problem when the stored archive is unreadable |
+| GET | `/api/nests/{id}/sheets` | — | `{ "nestId", "revision", "sheets": [{ "width", "length", "quantity" }], "parts": [{ "name", "required", "nested" }], "plates": [{ "index", "width", "length", "quantity", "stockItemCodes", "expectedRemnant" }] }` read from the current archive (see below), 404, or 500 problem when the stored archive is unreadable |
 | POST | `/api/nests` | multipart: `metadata` (JSON `NestRecord`) + `file` (`.nest` bytes) | `NestRecord` with server-assigned `id` when the client sends an empty guid; 409 with the current record (active or deleted) when the `id` already exists, storing nothing |
 | PUT | `/api/nests/{id}/file` | multipart: `metadata` + `file` | Updated `NestRecord`, or 404 if `id` is unknown |
 | PUT | `/api/nests/{id}/metadata` | JSON `NestRecord` | Updated `NestRecord` (archive untouched), or 404 |
@@ -140,6 +140,14 @@ its code; empty when none is coded). Codes come from the plate's optional
 `stockItemCodes` in `nest.json` (see the [nest file format](nest-file-format.md)),
 read as `NestReader` reads them. MaterialLedger can hold exactly those items and
 match uncoded sheets by size.
+
+Each plate also reports `expectedRemnant`, `{ "width", "length", "source" }`
+(`width` the shorter side, in the nest's units, `source` `cutoff` or `offcut`), the
+rectangular drop each of its sheets is expected to leave, or `null` when none. The
+server has no geometry: it reports the plate's derived `expectedRemnant` that the
+desktop wrote at save (see [expected remnants](nest-file-format.md#expected-remnants)).
+A file without it, or with a malformed or non-positive value or an unknown source,
+reports `null`.
 
 ### Generated nest names
 

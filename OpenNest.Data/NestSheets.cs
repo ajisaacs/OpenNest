@@ -40,6 +40,23 @@ public sealed class NestPlateSheet
     /// bundle used for several sheets repeats its code. Empty when no sheet is coded.
     /// </summary>
     public IReadOnlyList<string> StockItemCodes { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// The rectangular drop each of this plate's sheets is expected to leave, as the desktop
+    /// computed it at save; null when none (or the file predates it).
+    /// </summary>
+    public NestExpectedRemnant? ExpectedRemnant { get; init; }
+}
+
+/// <summary>A plate's expected drop as stored, with <see cref="Width"/> the shorter side.</summary>
+public sealed class NestExpectedRemnant
+{
+    public double Width { get; init; }
+
+    public double Length { get; init; }
+
+    /// <summary><c>cutoff</c> when a full-span cut-off frees it, <c>offcut</c> for the largest edge strip.</summary>
+    public string Source { get; init; } = "";
 }
 
 /// <summary>A sheet size as stored, with <see cref="Width"/> the shorter side.</summary>

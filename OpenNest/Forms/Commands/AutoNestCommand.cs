@@ -56,6 +56,8 @@ namespace OpenNest.Forms.Commands
             using var form = new AutoNestForm(target.Nest);
             if (target.Nest.PlateOptions.Count > 0)
                 form.LoadPlateOptions(target.Nest.PlateOptions, target.Nest.SalvageRate);
+            if (target.Nest.MinimumRemnantDimension > 0)
+                form.MinRemnantSize = target.Nest.MinimumRemnantDimension;
             if (form.ShowDialog(owner) != DialogResult.OK)
                 return null;
 
@@ -126,6 +128,7 @@ namespace OpenNest.Forms.Commands
                     if (savedOptions?.Count > 0)
                         target.Nest.PlateOptions = savedOptions;
                     target.Nest.SalvageRate = salvageRate;
+                    target.Nest.MinimumRemnantDimension = minRemnantSize;
                 }
                 target.PlateView.Invalidate();
                 if (allowInvalid)

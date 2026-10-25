@@ -101,6 +101,7 @@ internal static class NestArchive
                         .TakeWhile(code => !string.IsNullOrWhiteSpace(code))
                         .Take(System.Math.Max(p.Quantity, 0))
                         .ToList(),
+                    ExpectedRemnant = ReadRemnant(p.ExpectedRemnant),
                 };
             })
             .ToList();
@@ -217,7 +218,58 @@ internal static class NestArchive
 
         [JsonConverter(typeof(LenientStringListJson))]
         public List<string>? StockItemCodes { get; set; }
+
+        [JsonConverter(typeof(LenientRemnantJson))]
+        public RemnantJson? ExpectedRemnant { get; set; }
     }
+
+    private sealed class RemnantJson
+    {
+        public double Width { get; set; }
+        public double Length { get; set; }
+        public string? Source { get; set; }
+    }
+
+    // Derived data: a wrongly shaped value reads as none rather than failing the whole nest.
+    private sealed class LenientRemnantJson : JsonConverter<RemnantJson?>
+    {
+        public override RemnantJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            using var document = JsonDocument.ParseValue(ref reader);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object
+                || !TryNumber(root, "width", out var width)
+                || !TryNumber(root, "length", out var length))
+                return null;
+            var source = root.TryGetProperty("source", out var s) && s.ValueKind == JsonValueKind.String
+                ? s.GetString()
+                : null;
+            return new RemnantJson { Width = width, Length = length, Source = source };
+        }
+
+        public override void Write(Utf8JsonWriter writer, RemnantJson? value, JsonSerializerOptions options) =>
+            JsonSerializer.Serialize(writer, value);
+
+        private static bool TryNumber(JsonElement element, string name, out double value)
+        {
+            value = 0;
+            return element.TryGetProperty(name, out var property)
+                && property.ValueKind == JsonValueKind.Number
+                && property.TryGetDouble(out value);
+        }
+    }
+
+    private static NestExpectedRemnant? ReadRemnant(RemnantJson? remnant) =>
+        remnant is { Source: "cutoff" or "offcut" }
+            && double.IsFinite(remnant.Width) && double.IsFinite(remnant.Length)
+            && remnant.Width > 0 && remnant.Length > 0
+                ? new NestExpectedRemnant
+                {
+                    Width = System.Math.Min(remnant.Width, remnant.Length),
+                    Length = System.Math.Max(remnant.Width, remnant.Length),
+                    Source = remnant.Source,
+                }
+                : null;
 
     // NestReader's lenient list: a wrongly shaped value reads as empty, non-strings are skipped.
     private sealed class LenientStringListJson : JsonConverter<List<string>>

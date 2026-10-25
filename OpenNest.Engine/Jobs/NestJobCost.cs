@@ -92,23 +92,9 @@ public static class NestJobCost
     }
 
     private static double LargestOffcut(
-        NestPlateStock stock, double left, double bottom, double right, double top, double minimum)
-    {
-        var work = stock.WorkArea;
-        var gap = stock.PartSpacing;
-        var candidates = new[]
-        {
-            (work.Length, bottom - work.Bottom - gap),
-            (work.Length, work.Top - top - gap),
-            (left - work.Left - gap, work.Width),
-            (work.Right - right - gap, work.Width),
-        };
-        return candidates
-            .Where(c => c.Item1 >= minimum && c.Item2 >= minimum)
-            .Select(c => c.Item1 * c.Item2)
-            .DefaultIfEmpty(0)
-            .Max();
-    }
+        NestPlateStock stock, double left, double bottom, double right, double top, double minimum) =>
+        PlateRemnant.LargestOffcut(stock.WorkArea, stock.PartSpacing, left, bottom, right, top, minimum)
+            is { } offcut ? offcut.Length * offcut.Width : 0;
 
     public static bool UsesExplicitCosts(NestJob job) =>
         job.Plates.Any(s => s.Quantity != 0 && s.Cost.HasValue);

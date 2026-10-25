@@ -112,6 +112,16 @@ namespace OpenNest
 
         public double SalvageRate { get; set; } = 0.5;
 
+        /// <summary>
+        /// The smallest side, in model units, of an offcut credited as salvage or reported as the
+        /// plate's expected remnant (<see cref="PlateRemnant.Expected"/>). Auto Nest records the
+        /// minimum it last used.
+        /// </summary>
+        public double MinimumRemnantDimension { get; set; } = DefaultMinimumRemnantDimension;
+
+        /// <summary>Auto Nest's default minimum remnant side.</summary>
+        public const double DefaultMinimumRemnantDimension = 12.0;
+
         public Plate CreatePlate()
         {
             var plate = PlateDefaults.CreateNew();

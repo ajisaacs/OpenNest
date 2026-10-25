@@ -178,9 +178,62 @@ public sealed class NestSheetsTests
 
         var plate = Assert.Single(document.RootElement.GetProperty("plates").EnumerateArray());
         Assert.Equal(
-            ["index", "width", "length", "quantity", "stockItemCodes"],
+            ["index", "width", "length", "quantity", "stockItemCodes", "expectedRemnant"],
             plate.EnumerateObject().Select(p => p.Name).ToArray());
         Assert.Equal("DROP-1182", Assert.Single(plate.GetProperty("stockItemCodes").EnumerateArray()).GetString());
+        Assert.Equal(
+            ["width", "length", "source"],
+            plate.GetProperty("expectedRemnant").EnumerateObject().Select(p => p.Name).ToArray());
+    }
+
+    [Fact]
+    public async Task Plates_ReportTheExpectedRemnantNestWriterSaved()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        // The synthetic 20 x 30 plate's 6 x 3 part leaves a 20 x 22 strip beside it.
+        var nest = NestApiTests.SyntheticNest();
+        var drawing = nest.Drawings.Single();
+        var cut = new Plate(new Size(48, 96)) { Quantity = 2 };
+        cut.Parts.Add(new Part(drawing, new Vector(0, 0)));
+        cut.CutOffs.Add(new CutOff(new Vector(60, 0), CutOffAxis.Vertical));
+        cut.RegenerateCutOffs(new CutOffSettings());
+        nest.Plates.Add(cut);
+        // Nothing on a 14 x 14 sheet reaches the 12-inch minimum.
+        var small = new Plate(new Size(14, 14)) { Quantity = 1 };
+        small.Parts.Add(new Part(drawing, new Vector(2, 3)));
+        nest.Plates.Add(small);
+
+        var sheets = await Sheets(client, nest);
+
+        Assert.Equal(
+            [(20.0, 22.0, "offcut"), (36.0, 48.0, "cutoff"), (0.0, 0.0, "none")],
+            sheets.Plates.Select(p => p.ExpectedRemnant is { } r ? (r.Width, r.Length, r.Source) : (0.0, 0.0, "none")).ToArray());
+    }
+
+    [Fact]
+    public async Task Plates_ReadExpectedRemnantsLeniently()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        var archive = TestNests.Zip("nest.json", """
+            {"drawings":[{"id":1,"name":"Kept","quantity":{"required":2}}],
+             "plates":[{"id":1,"size":{"width":48,"length":96},"parts":[{"drawingId":1}],
+                        "expectedRemnant":{"width":60,"length":34.25,"source":"cutoff"}},
+                       {"id":2,"size":{"width":48,"length":96},"parts":[{"drawingId":1}],
+                        "expectedRemnant":"junk"},
+                       {"id":3,"size":{"width":48,"length":96},"parts":[{"drawingId":1}],
+                        "expectedRemnant":{"width":10,"length":20,"source":"guess"}},
+                       {"id":4,"size":{"width":48,"length":96},"parts":[{"drawingId":1}]}]}
+            """);
+        var id = await Create(client, archive);
+
+        var sheets = (await client.GetFromJsonAsync<NestSheets>($"/api/nests/{id}/sheets", Options))!;
+
+        // Width is the short side even when the file says otherwise.
+        var remnant = sheets.Plates[0].ExpectedRemnant!;
+        Assert.Equal((34.25, 60.0, "cutoff"), (remnant.Width, remnant.Length, remnant.Source));
+        Assert.All(sheets.Plates.Skip(1), p => Assert.Null(p.ExpectedRemnant));
     }
 
     [Fact]

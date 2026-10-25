@@ -128,6 +128,7 @@ namespace OpenNest.IO
                         .ToList()
                     ?? new(),
                 SalvageRate = nest.SalvageRate,
+                MinimumRemnantDimension = nest.MinimumRemnantDimension,
             };
         }
 
@@ -449,11 +450,22 @@ namespace OpenNest.IO
                             ? null
                             : ToDto(plate.ClampRail),
                         StockItemCodes = plate.StockItemCodes.Count == 0 ? null : plate.StockItemCodes.ToList(),
+                        ExpectedRemnant = ToDto(PlateRemnant.Expected(plate, nest.MinimumRemnantDimension)),
                     }
                 );
             }
             return list;
         }
+
+        private static ExpectedRemnantDto ToDto(PlateRemnant remnant) =>
+            remnant == null
+                ? null
+                : new ExpectedRemnantDto
+                {
+                    Width = System.Math.Min(remnant.Box.Width, remnant.Box.Length),
+                    Length = System.Math.Max(remnant.Box.Width, remnant.Box.Length),
+                    Source = remnant.Source == PlateRemnantSource.CutOff ? "cutoff" : "offcut",
+                };
 
         private void WriteBestFits(ZipArchive zipArchive)
         {

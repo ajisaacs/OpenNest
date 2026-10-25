@@ -575,6 +575,10 @@ namespace OpenNest.IO
 
             // Stock options: sheet sizes and salvage rate
             nest.SalvageRate = dto.SalvageRate;
+            nest.MinimumRemnantDimension = double.IsFinite(dto.MinimumRemnantDimension)
+                && dto.MinimumRemnantDimension > 0
+                    ? dto.MinimumRemnantDimension
+                    : Nest.DefaultMinimumRemnantDimension;
             if (dto.PlateOptions != null)
             {
                 nest.PlateOptions = dto

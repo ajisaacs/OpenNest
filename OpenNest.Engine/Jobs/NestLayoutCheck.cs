@@ -553,11 +553,7 @@ public static class NestLayoutCheck
     }
 
     /// <summary>Analytic world-space material bounds; surface marks never bound material.</summary>
-    internal static Box MaterialBounds(Part part) =>
-        ConvertProgram.ToGeometry(part.Program)
-            .Where(e => SpecialLayers.IsMaterial(e.Layer))
-            .GetBoundingBox()
-            .Translate(part.Location);
+    internal static Box MaterialBounds(Part part) => PlateRemnant.MaterialBounds(part);
 
     /// <summary>Inflation that enforces <paramref name="spacing"/> less the shared slack.</summary>
     private static double InflationFor(double spacing) => SpacingOutline.InflationFor(spacing);

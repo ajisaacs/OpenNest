@@ -172,6 +172,31 @@ The model drops them when they stop describing the sheet: resizing a plate
 and changing the nest's material, grade or thickness clears every plate's.
 Auto Nest assigns them only to sheets it nests on ledger stock.
 
+## Expected remnants
+
+Each written plate may carry a derived `expectedRemnant`: `{ "width", "length",
+"source" }`, the rectangular drop it is expected to leave, in model units with
+`width` the shorter side. `NestWriter` computes it at every save from the current
+layout with Core's `PlateRemnant.Expected`, for readers that have no geometry
+(OpenNest.Server's `/sheets`). It is omitted when the plate leaves none. Readers
+skip it whatever its shape and never load it into the model, so a value edited by
+hand or left by an older layout cannot go stale.
+
+- `"cutoff"`: a full-span cut-off (no limit short of either sheet edge) frees
+  material no part reaches into. The drop runs from the line's nominal position
+  to the sheet edge or the next such line, across the whole sheet, less the
+  plate's kerf (`cuttingParameters.kerf`, zero without parameters) at each
+  bounding line. A head-locked overcut uses the nominal position. It wins over a
+  larger edge offcut; the largest such piece is reported.
+- `"offcut"`: otherwise, the largest full-width or full-length strip of the
+  work area clear of the parts' material bounds by the part spacing, exactly the
+  offcut whole-job salvage credits. Cut-off parts and marks never bound material.
+
+Both sides must reach the nest's `minimumRemnantDimension` (model units; Auto Nest
+records the minimum remnant size it last used, and older files load 12). A cut-off
+drop below it falls through to the offcut. Interior holes and irregular leftovers
+are not reported.
+
 ## Support grid
 
 `plateDefaults.supportBed` optionally stores the machine support bed every sheet of

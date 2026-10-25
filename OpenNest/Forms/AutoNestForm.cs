@@ -70,7 +70,7 @@ namespace OpenNest.Forms
         }
 
         /// <summary>The smallest offcut credited as salvage unless the operator types another.</summary>
-        public const double DefaultMinRemnantSize = 12.0;
+        public const double DefaultMinRemnantSize = Nest.DefaultMinimumRemnantDimension;
 
         public double MinRemnantSize
         {
@@ -80,6 +80,7 @@ namespace OpenNest.Forms
                     return val;
                 return DefaultMinRemnantSize;
             }
+            set { minRemnantBox.Text = value.ToString("G"); }
         }
 
         private void LoadEngines()
