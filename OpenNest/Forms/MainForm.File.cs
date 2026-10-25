@@ -35,6 +35,15 @@ namespace OpenNest.Forms
             editForm.WindowState = windowState;
             editForm.Show();
             editForm.PlateView.ZoomToFit();
+            if (remoteId != Guid.Empty)
+                _ = editForm.HoldStatus.RefreshAfterSaveAsync();
+        }
+
+        /// <summary>Rereads every open nest's holds, e.g. after the storage mode or ledger changed.</summary>
+        internal void RefreshLedgerHolds()
+        {
+            foreach (var form in MdiChildren.OfType<EditNestForm>())
+                _ = form.HoldStatus.RefreshAfterSaveAsync();
         }
 
         /// <summary>
@@ -50,6 +59,7 @@ namespace OpenNest.Forms
             {
                 shown.Document.BindRemote(record.Id, NestStorage.Settings.ServerUrl, record.Revision);
                 releaseTabs.Remove(shown);
+                _ = shown.HoldStatus.RefreshAfterSaveAsync();
                 return;
             }
             var windowState = ActiveMdiChild?.WindowState ?? FormWindowState.Maximized;
@@ -258,6 +268,7 @@ namespace OpenNest.Forms
                 statusLabel1.Text = $"Nest storage: {dlg.SelectedMode}";
                 foreach (var form in MdiChildren.OfType<EditNestForm>())
                     form.UpdateDrawingLibraryCommand();
+                RefreshLedgerHolds();
             }
             catch (Exception ex)
             {

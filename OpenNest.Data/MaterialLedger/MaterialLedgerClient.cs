@@ -6,9 +6,10 @@ using System.Text.Json;
 namespace OpenNest.Data.MaterialLedger;
 
 /// <summary>
-/// Read-only client for MaterialLedger's stock API. It never writes to the ledger, and what it
-/// reads is a snapshot, not a reservation. Expected failures come back as
-/// <see cref="LedgerStockResult"/> cases; only the caller's own cancellation throws.
+/// Read-only client for MaterialLedger's API. It never writes to the ledger, and what it
+/// reads is a snapshot, not a reservation. Expected failures come back as result cases
+/// (<see cref="LedgerStockResult"/>, <see cref="LedgerHoldsResult"/>); only the caller's own
+/// cancellation throws.
 /// </summary>
 public sealed class MaterialLedgerClient
 {
@@ -40,56 +41,99 @@ public sealed class MaterialLedgerClient
     {
         if (!settings.IsConfigured)
             return new LedgerStockResult.NotConfigured();
-        if (!Uri.TryCreate(settings.BaseUrl.TrimEnd('/') + "/", UriKind.Absolute, out var baseUri)
-            || baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps)
-            return new LedgerStockResult.Unreachable($"'{settings.BaseUrl}' is not an http or https address.");
 
         var query = "api/stock/opennest"
             + "?material=" + Uri.EscapeDataString(material ?? "")
             + "&grade=" + Uri.EscapeDataString(grade ?? "")
             + "&thicknessIn=" + System.Math.Round(thicknessIn, 4).ToString("0.####", CultureInfo.InvariantCulture);
 
+        var reply = await GetJsonAsync<LedgerStockResponse>(query, "stock", cancellationToken);
+        if (reply.Unauthorized)
+            return new LedgerStockResult.Unauthorized();
+        if (reply.Body is not { } stock)
+            return new LedgerStockResult.Unreachable(reply.Failure!);
+        if (!stock.Mapped)
+            return new LedgerStockResult.Unmapped();
+        return new LedgerStockResult.Ok(stock.Specs ?? Array.Empty<LedgerStockSpec>(),
+            stock.Items ?? Array.Empty<LedgerStockItem>());
+    }
+
+    /// <summary>
+    /// Every hold ML has for the sheets of server nest <paramref name="openNestNestId"/>, in
+    /// whatever status; the caller decides which are open.
+    /// </summary>
+    public async Task<LedgerHoldsResult> GetHoldsAsync(Guid openNestNestId, CancellationToken cancellationToken)
+    {
+        if (!settings.IsConfigured)
+            return new LedgerHoldsResult.NotConfigured();
+
+        var query = "api/stock/holds?openNestNestId=" + openNestNestId.ToString("D");
+        var reply = await GetJsonAsync<LedgerHoldsResponse>(query, "holds", cancellationToken);
+        if (reply.Unauthorized)
+            return new LedgerHoldsResult.Unauthorized();
+        if (reply.Body is not { } holds)
+            return new LedgerHoldsResult.Unreachable(reply.Failure!);
+        return new LedgerHoldsResult.Ok((holds.Holds ?? Array.Empty<LedgerHold>())
+            .Where(hold => hold != null)
+            .Select(hold => hold with { ItemCode = hold.ItemCode ?? "", Status = hold.Status ?? "" })
+            .ToList());
+    }
+
+    /// <summary>
+    /// GETs <paramref name="pathAndQuery"/> below the ledger's base URL with the API key and the
+    /// per-request timeout. <paramref name="route"/> names the route in the 404 message.
+    /// </summary>
+    private async Task<Reply<T>> GetJsonAsync<T>(string pathAndQuery, string route,
+        CancellationToken cancellationToken) where T : class
+    {
+        if (!Uri.TryCreate(settings.BaseUrl.TrimEnd('/') + "/", UriKind.Absolute, out var baseUri)
+            || baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps)
+            return Reply<T>.Failed($"'{settings.BaseUrl}' is not an http or https address.");
+
         using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutSource.CancelAfter(timeout);
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(baseUri, query));
+            using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(baseUri, pathAndQuery));
             if (!string.IsNullOrEmpty(settings.ApiKey))
                 request.Headers.TryAddWithoutValidation(ApiKeyHeader, settings.ApiKey);
 
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeoutSource.Token);
             if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-                return new LedgerStockResult.Unauthorized();
+                return new Reply<T>(null, true, null);
             if (response.StatusCode == HttpStatusCode.NotFound)
-                return new LedgerStockResult.Unreachable("This MaterialLedger has no OpenNest stock route; update MaterialLedger.");
+                return Reply<T>.Failed($"This MaterialLedger has no OpenNest {route} route; update MaterialLedger.");
             if (!response.IsSuccessStatusCode)
-                return new LedgerStockResult.Unreachable($"HTTP {(int)response.StatusCode} {response.ReasonPhrase}".TrimEnd());
+                return Reply<T>.Failed($"HTTP {(int)response.StatusCode} {response.ReasonPhrase}".TrimEnd());
 
             await using var body = await response.Content.ReadAsStreamAsync(timeoutSource.Token);
-            var stock = await JsonSerializer.DeserializeAsync<LedgerStockResponse>(body, JsonOptions, timeoutSource.Token);
-            if (stock == null)
-                return new LedgerStockResult.Unreachable("The ledger returned an empty response.");
-            if (!stock.Mapped)
-                return new LedgerStockResult.Unmapped();
-            return new LedgerStockResult.Ok(stock.Specs ?? Array.Empty<LedgerStockSpec>(),
-                stock.Items ?? Array.Empty<LedgerStockItem>());
+            var value = await JsonSerializer.DeserializeAsync<T>(body, JsonOptions, timeoutSource.Token);
+            return value == null
+                ? Reply<T>.Failed("The ledger returned an empty response.")
+                : new Reply<T>(value, false, null);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return new LedgerStockResult.Unreachable(
+            return Reply<T>.Failed(
                 $"No answer within {timeout.TotalSeconds.ToString("0.#", CultureInfo.InvariantCulture)} s.");
         }
         catch (HttpRequestException ex)
         {
-            return new LedgerStockResult.Unreachable(ex.Message);
+            return Reply<T>.Failed(ex.Message);
         }
         catch (JsonException)
         {
-            return new LedgerStockResult.Unreachable("The ledger's response could not be read.");
+            return Reply<T>.Failed("The ledger's response could not be read.");
         }
         catch (IOException ex)
         {
-            return new LedgerStockResult.Unreachable(ex.Message);
+            return Reply<T>.Failed(ex.Message);
         }
+    }
+
+    /// <summary>A parsed body, a rejected key, or why the ledger was unreachable.</summary>
+    private readonly record struct Reply<T>(T? Body, bool Unauthorized, string? Failure) where T : class
+    {
+        public static Reply<T> Failed(string reason) => new(null, false, reason);
     }
 }

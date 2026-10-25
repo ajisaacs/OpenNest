@@ -45,6 +45,9 @@ namespace OpenNest.Forms
 
         public Nest Nest => Document.Nest;
 
+        /// <summary>The nest's MaterialLedger holds; shown only for saved server nests.</summary>
+        public readonly NestHoldStatus HoldStatus;
+
         private readonly Timer updateDrawingListTimer;
         private bool updatingPlateList;
         private bool addingToSet;
@@ -434,6 +437,9 @@ namespace OpenNest.Forms
             updateDrawingListTimer.Elapsed += drawingListUpdateTimer_Elapsed;
 
             Document = new Document { Nest = nest };
+            HoldStatus = new NestHoldStatus(Document);
+            HoldStatus.CloseoutNoteRequested += HoldStatus_CloseoutNoteRequested;
+            FormClosed += (_, _) => HoldStatus.Dispose();
             // Units are read when each check starts, matching the manual command.
             PlateView.SetOverlapAutoCheck(() => Nest.Units);
             CutOffHeadLockDefaults.Load(PlateView.CutOffSettings, nest.Units);
@@ -771,6 +777,7 @@ namespace OpenNest.Forms
             form.SetMaterialCatalog(MachineSettings.LoadMaterials());
             form.LoadNestInfo(Nest);
             _ = ShowReleaseOriginAsync(form);
+            var statusBefore = Nest.Status;
 
             while (form.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
@@ -784,8 +791,19 @@ namespace OpenNest.Forms
                 Text = Nest.Name;
                 drawingListBox1.Units = Nest.Units;
                 drawingListBox1.Invalidate();
+                if (statusBefore != NestStatus.HasBeenCut && Nest.Status == NestStatus.HasBeenCut)
+                    _ = HoldStatus.NoteCutAsync();
                 return;
             }
+        }
+
+        private void HoldStatus_CloseoutNoteRequested(object sender, int openHolds)
+        {
+            if (IsDisposed)
+                return;
+            var note = new LedgerCloseoutNote(Nest.Name, openHolds, HoldStatus.LedgerNestUrl);
+            note.FormClosed += (_, _) => note.Dispose();
+            note.ShowBeside(MdiParent ?? this);
         }
 
         /// <summary>

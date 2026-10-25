@@ -149,6 +149,46 @@ desktop wrote at save (see [expected remnants](nest-file-format.md#expected-remn
 A file without it, or with a malformed or non-positive value or an unknown source,
 reports `null`.
 
+### MaterialLedger holds (desktop)
+
+MaterialLedger creates one hold per physical sheet of a server nest, from
+`/sheets`, and stores the nest's ID. The desktop shows those holds read-only; it
+never creates, approves or closes them, and nothing waits on the ledger.
+
+**Where.** A status bar label after the material label, only for a nest saved to
+the server in Database mode (`Document.RemoteId`, not a first save) while
+Tools > Options > MaterialLedger has a URL ([setup](automatic-nesting.md#stock-from-materialledger)).
+File-mode nests, unsaved nests and PCs without a ledger show nothing. The tooltip lists
+each hold: item code, size in the nest's units, location code and status.
+
+**When.** The holds are read when a server nest opens, after each Save, after the
+storage mode or Options change, and when you click the label. The status bar never polls.
+Each read uses `MaterialLedgerClient.GetHoldsAsync` (`GET /api/stock/holds?openNestNestId=`,
+`X-Api-Key`, 5 s), whose result is `NotConfigured`, `Unreachable(reason)`,
+`Unauthorized` or `Ok(holds)`. A newer read replaces an older one still running.
+
+**Summary.** `LedgerHoldSummary` (`OpenNest.Data/MaterialLedger/`) compares the
+open holds with the sheets of the last open or save: the sum of plate quantities,
+skipping the trailing empty plate as `/sheets` does. Proposed, Approved, Released
+and AwaitingCloseout holds are open. Closed, cancelled, exception and unknown
+statuses are listed but not counted; unknown status strings are kept as sent.
+
+| Holds | Label |
+|-------|-------|
+| One open hold per sheet | `Ledger: 4 of 4 sheets held` |
+| More open holds than sheets | `Ledger: 4 of 4 sheets held, 1 extra` |
+| Some sheets without one | `Ledger: 2 of 4 held, 2 short` |
+| None open | `Ledger: no holds`, or `Ledger: no open holds (3 closed)` |
+| No answer or key rejected | `Ledger: unavailable` (the tooltip gives the reason) |
+
+The label prefix is `Ledger:` rather than `Material:` so it is not confused with the
+nest's material label beside it.
+
+**Has Been Cut.** When Nest Info changes the status to Has Been Cut, the desktop
+rereads the holds. If any are still open, it shows a non-modal note, "Close out N holds
+in MaterialLedger", with a link to `{ledgerUrl}/Nests/{id}`. Closeout happens there.
+The note never blocks the dialog, save or post, and posting is not gated on holds.
+
 ### Generated nest names
 
 **File > New** names a nest `N<yy>-<seq>` (`OpenNest.Data.NestNames`): the

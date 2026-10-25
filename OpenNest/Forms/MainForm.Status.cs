@@ -69,6 +69,13 @@ namespace OpenNest.Forms
         private void MaterialStatusLabel_Click(object sender, EventArgs e) =>
             EditNest_Click(sender, e);
 
+        // Holds are read only on open, save and here; the status bar never polls.
+        private void LedgerStatusLabel_Click(object sender, EventArgs e)
+        {
+            if (activeForm != null)
+                _ = activeForm.HoldStatus.RefreshAsync();
+        }
+
         // Either button lists the machines above the label, as Nest > Machine does.
         private void MachineStatusLabel_MouseUp(object sender, MouseEventArgs e)
         {

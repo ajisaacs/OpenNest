@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Collections;
+using OpenNest.Data.MaterialLedger;
 using OpenNest.Geometry;
 using OpenNest.Properties;
 
@@ -12,7 +13,8 @@ namespace OpenNest.Forms
 {
     /// <summary>
     /// The main window's status labels for the active nest document: status text, cursor
-    /// location, selection bounds, nest machine and material, and plate utilization. Plate number, size and
+    /// location, selection bounds, nest machine and material, MaterialLedger holds of a server nest,
+    /// and plate utilization. Plate number, size and
     /// quantity live in the plate view header instead. The location
     /// follows the mouse (the default, throttled), or only left clicks while click mode is on;
     /// the mode persists as a user setting.
@@ -28,6 +30,7 @@ namespace OpenNest.Forms
         private readonly ToolStripStatusLabel machine;
         private readonly ToolStripStatusLabel material;
         private readonly ToolStripStatusLabel plateUtil;
+        private readonly ToolStripStatusLabel ledger;
         private readonly Timer locationTimer;
 
         private EditNestForm form;
@@ -36,8 +39,9 @@ namespace OpenNest.Forms
 
         public MainStatusBar(ToolStripStatusLabel status, ToolStripStatusLabel location,
             ToolStripStatusLabel selection, ToolStripStatusLabel machine, ToolStripStatusLabel material,
-            ToolStripStatusLabel plateUtil)
+            ToolStripStatusLabel plateUtil, ToolStripStatusLabel ledger = null)
         {
+            this.ledger = ledger;
             this.status = status;
             this.location = location;
             this.selection = selection;
@@ -59,6 +63,7 @@ namespace OpenNest.Forms
             form = editForm;
             UpdatePlate();
             UpdateLocation();
+            UpdateLedger();
 
             if (form == null)
             {
@@ -74,6 +79,7 @@ namespace OpenNest.Forms
             view.SelectionChanged += PlateView_SelectionChanged;
             view.PartAdded += PlateView_PartAdded;
             view.PartRemoved += PlateView_PartRemoved;
+            form.HoldStatus.Changed += HoldStatus_Changed;
             status.Text = view.Status;
         }
 
@@ -90,7 +96,9 @@ namespace OpenNest.Forms
             view.SelectionChanged -= PlateView_SelectionChanged;
             view.PartAdded -= PlateView_PartAdded;
             view.PartRemoved -= PlateView_PartRemoved;
+            form.HoldStatus.Changed -= HoldStatus_Changed;
             form = null;
+            UpdateLedger();
         }
 
         public void ToggleLocationMode()
@@ -106,6 +114,42 @@ namespace OpenNest.Forms
             UpdateLocation();
             UpdatePlate();
             UpdateSelection();
+            UpdateLedger();
+        }
+
+        /// <summary>The hidden-by-default hold label MainForm inserts after the material label.</summary>
+        internal static ToolStripStatusLabel CreateLedgerLabel() => new()
+        {
+            Name = "ledgerStatusLabel",
+            BorderSides = ToolStripStatusLabelBorderSides.Left,
+            Padding = new Padding(5, 0, 5, 0),
+            Visible = false,
+        };
+
+        /// <summary>
+        /// Shows the active nest's hold summary only while it applies (a saved server nest with
+        /// a ledger configured); the tooltip lists the holds.
+        /// </summary>
+        public void UpdateLedger()
+        {
+            if (ledger == null)
+                return;
+            var holds = form?.HoldStatus;
+            ledger.Visible = holds?.IsVisible == true;
+            if (!ledger.Visible)
+            {
+                ledger.Text = string.Empty;
+                ledger.ToolTipText = string.Empty;
+                return;
+            }
+
+            var summary = holds.Summary;
+            ledger.Text = summary?.Text ?? "Ledger: checking…";
+            ledger.ForeColor = summary?.State is LedgerHoldState.Short or LedgerHoldState.Unavailable
+                ? Color.DarkRed
+                : SystemColors.ControlText;
+            var tip = summary?.ToolTip(form.Nest.Units) ?? "Reading holds from MaterialLedger…";
+            ledger.ToolTipText = tip + Environment.NewLine + (holds.IsRefreshing ? "Refreshing…" : "Click to refresh.");
         }
 
         public void UpdateLocation()
@@ -267,5 +311,7 @@ namespace OpenNest.Forms
         private void PlateView_StatusChanged(object sender, EventArgs e) => status.Text = form.PlateView.Status;
 
         private void PlateView_SelectionChanged(object sender, EventArgs e) => UpdateSelection();
+
+        private void HoldStatus_Changed(object sender, EventArgs e) => UpdateLedger();
     }
 }

@@ -130,7 +130,10 @@ namespace OpenNest.Forms.Commands
                 var saved = await form.Document.SaveToDatabaseAsync(
                     repository, serverUrl, saveCopy);
                 if (!form.IsDisposed)
+                {
                     form.Text = form.Document.Name;
+                    _ = form.HoldStatus.RefreshAfterSaveAsync();
+                }
                 if (!owner.IsDisposed)
                     showStatus($"Saved {saved.Name} to nest database");
             }

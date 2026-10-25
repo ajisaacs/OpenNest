@@ -330,3 +330,6 @@ with its own benchmark.
 
 MCP, Console and `OpenNest.Api` do not load ledger stock yet. The client and mapper live
 in `OpenNest.Data`, so these front ends can use them.
+
+The status bar shows a server nest's ledger holds and reminds you to close them out once
+the nest is cut; see [MaterialLedger holds](nest-storage.md#materialledger-holds-desktop).

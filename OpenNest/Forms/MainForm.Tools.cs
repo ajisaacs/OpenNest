@@ -167,6 +167,7 @@ namespace OpenNest.Forms
         {
             using var form = new OptionsForm();
             form.ShowDialog(this);
+            RefreshLedgerHolds(); // The ledger address or key may have changed.
         }
 
         private void NestDefaults_Click(object sender, EventArgs e)

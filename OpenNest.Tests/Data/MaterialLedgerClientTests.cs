@@ -139,6 +139,92 @@ public class MaterialLedgerClientTests
         Assert.Equal("Circular", item.Shape);
     }
 
+    private static readonly Guid NestId = Guid.Parse("4f7c2a1e-0b9d-4e55-8a6f-1c2d3e4f5a6b");
+
+    [Fact]
+    public async Task HoldsAreListedWithTheKeyAndNestId()
+    {
+        HttpRequestMessage? seen = null;
+        var client = Client(request =>
+        {
+            seen = request;
+            return Json("""
+                {
+                  "openNestNestId": "4f7c2a1e-0b9d-4e55-8a6f-1c2d3e4f5a6b",
+                  "holds": [
+                    { "materialReservationId": 91, "itemCode": "DROP-1182", "widthIn": 30, "lengthIn": 52.5,
+                      "status": "Approved", "locationCode": "B3", "createdAtUtc": "2026-10-20T14:00:00Z" },
+                    { "materialReservationId": 92, "itemCode": "FS-4896", "widthIn": 48, "lengthIn": 96,
+                      "status": "ClosedConsumed", "locationCode": null, "createdAtUtc": "2026-10-20T14:00:00Z" }
+                  ]
+                }
+                """);
+        });
+
+        var ok = Assert.IsType<LedgerHoldsResult.Ok>(await client.GetHoldsAsync(NestId, default));
+
+        Assert.Equal("/api/stock/holds?openNestNestId=4f7c2a1e-0b9d-4e55-8a6f-1c2d3e4f5a6b", seen!.RequestUri!.PathAndQuery);
+        Assert.Equal("secret-key", Assert.Single(seen.Headers.GetValues(MaterialLedgerClient.ApiKeyHeader)));
+        Assert.Equal(2, ok.Holds.Count);
+        var first = ok.Holds[0];
+        Assert.Equal((91L, "DROP-1182", 30m, 52.5m, LedgerHoldStatuses.Approved, "B3"),
+            (first.MaterialReservationId, first.ItemCode, first.WidthIn, first.LengthIn, first.Status, first.LocationCode));
+        Assert.Null(ok.Holds[1].LocationCode);
+    }
+
+    [Fact]
+    public async Task NoHoldsIsAnEmptyList()
+    {
+        var client = Client(_ => Json("""{ "openNestNestId": "4f7c2a1e-0b9d-4e55-8a6f-1c2d3e4f5a6b", "holds": [] }"""));
+        Assert.Empty(Assert.IsType<LedgerHoldsResult.Ok>(await client.GetHoldsAsync(NestId, default)).Holds);
+
+        var missing = Client(_ => Json("""{ "openNestNestId": "4f7c2a1e-0b9d-4e55-8a6f-1c2d3e4f5a6b" }"""));
+        Assert.Empty(Assert.IsType<LedgerHoldsResult.Ok>(await missing.GetHoldsAsync(NestId, default)).Holds);
+    }
+
+    [Fact]
+    public async Task UnknownHoldStatusIsKept()
+    {
+        var client = Client(_ => Json("""
+            {
+              "openNestNestId": "4f7c2a1e-0b9d-4e55-8a6f-1c2d3e4f5a6b",
+              "holds": [{ "materialReservationId": 5, "itemCode": "D-1", "widthIn": 10, "lengthIn": 20,
+                "status": "OnTruck", "locationCode": "Y", "createdAtUtc": "2026-10-20T14:00:00Z", "someNewField": 1 }]
+            }
+            """));
+        var hold = Assert.Single(Assert.IsType<LedgerHoldsResult.Ok>(await client.GetHoldsAsync(NestId, default)).Holds);
+        Assert.Equal("OnTruck", hold.Status);
+        Assert.False(LedgerHoldStatuses.IsOpen(hold.Status));
+    }
+
+    [Fact]
+    public async Task HoldFailuresAreResults()
+    {
+        var sent = 0;
+        var notConfigured = Client(_ => { sent++; return Json("{}"); }, new MaterialLedgerSettings());
+        Assert.IsType<LedgerHoldsResult.NotConfigured>(await notConfigured.GetHoldsAsync(NestId, default));
+        Assert.Equal(0, sent);
+
+        var down = Client(_ => throw new HttpRequestException("No such host is known."));
+        Assert.Contains("No such host", Assert.IsType<LedgerHoldsResult.Unreachable>(
+            await down.GetHoldsAsync(NestId, default)).Reason);
+
+        var oldLedger = Client(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
+        Assert.Contains("no OpenNest holds route", Assert.IsType<LedgerHoldsResult.Unreachable>(
+            await oldLedger.GetHoldsAsync(NestId, default)).Reason);
+
+        var rejected = Client(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        Assert.IsType<LedgerHoldsResult.Unauthorized>(await rejected.GetHoldsAsync(NestId, default));
+
+        var garbage = Client(_ => Json("<html>login</html>"));
+        Assert.IsType<LedgerHoldsResult.Unreachable>(await garbage.GetHoldsAsync(NestId, default));
+
+        using var http = new HttpClient(new HangingHandler());
+        var slow = new MaterialLedgerClient(http, Configured, TimeSpan.FromMilliseconds(50));
+        Assert.Contains("No answer", Assert.IsType<LedgerHoldsResult.Unreachable>(
+            await slow.GetHoldsAsync(NestId, default)).Reason);
+    }
+
     private static MaterialLedgerClient Client(Func<HttpRequestMessage, HttpResponseMessage> reply,
         MaterialLedgerSettings? settings = null) =>
         new(new HttpClient(new Handler(reply)), settings ?? Configured);
