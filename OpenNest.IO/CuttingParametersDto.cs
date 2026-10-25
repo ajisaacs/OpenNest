@@ -19,8 +19,9 @@ public class CuttingParametersDto
     public LeadOutDto ExternalLeadOut { get; set; }
     public LeadInDto InternalLeadIn { get; set; }
     public LeadOutDto InternalLeadOut { get; set; }
-    public LeadInDto ArcCircleLeadIn { get; set; }
-    public LeadOutDto ArcCircleLeadOut { get; set; }
+
+    // Older files also stored arcCircleLeadIn/arcCircleLeadOut. Circles now use the internal
+    // leads, so those keys are ignored on read and no longer written.
     public bool TabsEnabled { get; set; }
 
     // Legacy settings only stored tabWidth. A missing TabConfig uses that width;

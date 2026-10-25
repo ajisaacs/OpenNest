@@ -97,6 +97,12 @@ cross-platform DTO mapping; the desktop settings serializer delegates to it so
 existing saved settings keep their JSON contract. Settings are independent of
 the saved part programs: restoring settings never regenerates those programs.
 
+Lead settings are external (the perimeter) and internal (every cutout, full
+circles included). Older files and desktop settings also stored
+`arcCircleLeadIn`/`arcCircleLeadOut`; these are ignored on read and no longer
+written, so circles in a re-planned older nest take its internal leads. Saved
+part programs keep the leads they were cut with.
+
 ## Clamp zones
 
 Each plate may carry an optional `clamps` array of fixed rectangular keep-out

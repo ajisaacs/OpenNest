@@ -83,8 +83,6 @@ internal static class StateFingerprint
             Out(p.ExternalLeadOut);
             Lead(p.InternalLeadIn);
             Out(p.InternalLeadOut);
-            Lead(p.ArcCircleLeadIn);
-            Out(p.ArcCircleLeadOut);
             Number(p.PierceClearance);
             Number(p.PierceDiameter);
             Flag(p.RoundLeadInAngles);

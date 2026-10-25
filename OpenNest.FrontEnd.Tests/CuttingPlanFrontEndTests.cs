@@ -216,7 +216,6 @@ public class CuttingPlanFrontEndTests : IDisposable
     {
         ExternalLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 45 },
         InternalLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 45 },
-        ArcCircleLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 45 },
         ExternalLeadOut = new NoLeadOut(),
         InternalLeadOut = new NoLeadOut(),
         PierceClearance = 0.05,

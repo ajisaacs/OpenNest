@@ -24,15 +24,11 @@ namespace OpenNest.Controls
             cboExternalLeadOut;
         private readonly ComboBox cboInternalLeadIn,
             cboInternalLeadOut;
-        private readonly ComboBox cboArcCircleLeadIn,
-            cboArcCircleLeadOut;
 
         private readonly Panel pnlExternalLeadIn,
             pnlExternalLeadOut;
         private readonly Panel pnlInternalLeadIn,
             pnlInternalLeadOut;
-        private readonly Panel pnlArcCircleLeadIn,
-            pnlArcCircleLeadOut;
 
         private readonly CheckBox chkTabsEnabled;
         private readonly NumericUpDown nudTabWidth;
@@ -56,7 +52,6 @@ namespace OpenNest.Controls
                 {
                     0 => ContourType.External,
                     1 => ContourType.Internal,
-                    2 => ContourType.ArcCircle,
                     _ => null,
                 };
             }
@@ -68,8 +63,8 @@ namespace OpenNest.Controls
                 var index = value.Value switch
                 {
                     ContourType.External => 0,
-                    ContourType.Internal => 1,
-                    ContourType.ArcCircle => 2,
+                    // Circles share the internal leads.
+                    ContourType.Internal or ContourType.ArcCircle => 1,
                     _ => -1,
                 };
 
@@ -88,7 +83,6 @@ namespace OpenNest.Controls
 
             var tabExternal = new TabPage("External") { Padding = new Padding(4) };
             var tabInternal = new TabPage("Internal") { Padding = new Padding(4) };
-            var tabArcCircle = new TabPage("Arc / Circle") { Padding = new Padding(4) };
 
             SetupTab(
                 tabExternal,
@@ -104,17 +98,9 @@ namespace OpenNest.Controls
                 out cboInternalLeadOut,
                 out pnlInternalLeadOut
             );
-            SetupTab(
-                tabArcCircle,
-                out cboArcCircleLeadIn,
-                out pnlArcCircleLeadIn,
-                out cboArcCircleLeadOut,
-                out pnlArcCircleLeadOut
-            );
 
             tabControl.Controls.Add(tabExternal);
             tabControl.Controls.Add(tabInternal);
-            tabControl.Controls.Add(tabArcCircle);
 
             var tabWrapper = new Panel { Dock = DockStyle.Top, Height = 340 };
             tabWrapper.Controls.Add(tabControl);
@@ -264,8 +250,6 @@ namespace OpenNest.Controls
                 ExternalLeadOut = BuildLeadOut(cboExternalLeadOut, pnlExternalLeadOut),
                 InternalLeadIn = BuildLeadIn(cboInternalLeadIn, pnlInternalLeadIn),
                 InternalLeadOut = BuildLeadOut(cboInternalLeadOut, pnlInternalLeadOut),
-                ArcCircleLeadIn = BuildLeadIn(cboArcCircleLeadIn, pnlArcCircleLeadIn),
-                ArcCircleLeadOut = BuildLeadOut(cboArcCircleLeadOut, pnlArcCircleLeadOut),
                 TabsEnabled = chkTabsEnabled.Checked && rbTabAll.Checked,
                 TabConfig = new NormalTab { Size = (double)nudTabWidth.Value },
                 PierceClearance = (double)nudPierceClearance.Value,
@@ -284,8 +268,6 @@ namespace OpenNest.Controls
             LoadLeadOut(cboExternalLeadOut, pnlExternalLeadOut, p.ExternalLeadOut);
             LoadLeadIn(cboInternalLeadIn, pnlInternalLeadIn, p.InternalLeadIn);
             LoadLeadOut(cboInternalLeadOut, pnlInternalLeadOut, p.InternalLeadOut);
-            LoadLeadIn(cboArcCircleLeadIn, pnlArcCircleLeadIn, p.ArcCircleLeadIn);
-            LoadLeadOut(cboArcCircleLeadOut, pnlArcCircleLeadOut, p.ArcCircleLeadOut);
 
             chkTabsEnabled.Checked = p.TabsEnabled || p.SupportTabs;
             rbSupportTab.Checked = p.SupportTabs;
@@ -385,7 +367,7 @@ namespace OpenNest.Controls
         private void PopulateDropdowns()
         {
             foreach (
-                var combo in new[] { cboExternalLeadIn, cboInternalLeadIn, cboArcCircleLeadIn }
+                var combo in new[] { cboExternalLeadIn, cboInternalLeadIn }
             )
             {
                 combo.Items.AddRange(LeadInTypes);
@@ -393,7 +375,7 @@ namespace OpenNest.Controls
             }
 
             foreach (
-                var combo in new[] { cboExternalLeadOut, cboInternalLeadOut, cboArcCircleLeadOut }
+                var combo in new[] { cboExternalLeadOut, cboInternalLeadOut }
             )
             {
                 combo.Items.AddRange(LeadOutTypes);
@@ -405,11 +387,9 @@ namespace OpenNest.Controls
         {
             cboExternalLeadIn.SelectedIndexChanged += OnLeadInTypeChanged;
             cboInternalLeadIn.SelectedIndexChanged += OnLeadInTypeChanged;
-            cboArcCircleLeadIn.SelectedIndexChanged += OnLeadInTypeChanged;
 
             cboExternalLeadOut.SelectedIndexChanged += OnLeadOutTypeChanged;
             cboInternalLeadOut.SelectedIndexChanged += OnLeadOutTypeChanged;
-            cboArcCircleLeadOut.SelectedIndexChanged += OnLeadOutTypeChanged;
         }
 
         private void OnLeadInTypeChanged(object sender, EventArgs e)
@@ -436,8 +416,6 @@ namespace OpenNest.Controls
                 return pnlExternalLeadIn;
             if (combo == cboInternalLeadIn)
                 return pnlInternalLeadIn;
-            if (combo == cboArcCircleLeadIn)
-                return pnlArcCircleLeadIn;
             return null;
         }
 
@@ -447,8 +425,6 @@ namespace OpenNest.Controls
                 return pnlExternalLeadOut;
             if (combo == cboInternalLeadOut)
                 return pnlInternalLeadOut;
-            if (combo == cboArcCircleLeadOut)
-                return pnlArcCircleLeadOut;
             return null;
         }
 

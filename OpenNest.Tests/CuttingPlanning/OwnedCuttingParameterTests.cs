@@ -36,10 +36,8 @@ public class OwnedCuttingParameterTests
             PierceDiameter = 0.3,
             ExternalLeadIn = leadIn,
             InternalLeadIn = leadIn,
-            ArcCircleLeadIn = leadIn,
             ExternalLeadOut = leadOut,
             InternalLeadOut = leadOut,
-            ArcCircleLeadOut = leadOut,
             TabConfig = tab,
             TabsEnabled = true,
             SupportTabs = true,
@@ -122,7 +120,7 @@ public class OwnedCuttingParameterTests
             case "null-settings": source = null; break;
             case "null-sequence": source.Sequencing = null; break;
             case "null-assignment": source.Assignment = null; break;
-            case "null-lead": source.ArcCircleLeadIn = null; break;
+            case "null-lead": source.InternalLeadIn = null; break;
             case "null-leadout": source.InternalLeadOut = null; break;
             case "null-tab": source.TabsEnabled = true; break;
             case "dimension": source.PartSpacing = -1; break;
@@ -131,7 +129,7 @@ public class OwnedCuttingParameterTests
             case "enum": source.Assignment.Method = (SequenceMethod)6; break;
             case "tab-lead": source.TabConfig = new NormalTab { TabLeadIn = new ArcLeadIn { Radius = double.PositiveInfinity } }; break;
             case "custom-in": source.InternalLeadIn = new CustomLeadIn(); break;
-            case "custom-out": source.ArcCircleLeadOut = new CustomLeadOut(); break;
+            case "custom-out": source.InternalLeadOut = new CustomLeadOut(); break;
             case "custom-tab": source.TabConfig = new CustomTab(); break;
             case "custom-settings": source = new CustomParameters(); break;
             case "custom-sequence": source.Sequencing = new CustomSequence(); break;

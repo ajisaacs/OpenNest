@@ -238,7 +238,6 @@ public class SideCoverageRegressionTests
     {
         ExternalLeadIn = new LineLeadIn { Length = length, ApproachAngle = angle },
         InternalLeadIn = new LineLeadIn { Length = length, ApproachAngle = angle },
-        ArcCircleLeadIn = new LineLeadIn { Length = length },
         ExternalLeadOut = new NoLeadOut(),
         InternalLeadOut = new NoLeadOut(),
         TabsEnabled = false,

@@ -184,7 +184,6 @@ public class CIFiberPostProcessorTests
         {
             InternalLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
             ExternalLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
-            ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
         };
         TestLeadIns.Apply(plate);
 

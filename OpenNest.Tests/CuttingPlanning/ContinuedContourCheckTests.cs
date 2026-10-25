@@ -116,7 +116,6 @@ public class ContinuedContourCheckTests
     {
         ExternalLeadIn = new LineLeadIn { Length = 0.2, ApproachAngle = 90 },
         InternalLeadIn = new LineLeadIn { Length = 0.1, ApproachAngle = 90 },
-        ArcCircleLeadIn = new LineLeadIn { Length = 0.1, ApproachAngle = 90 },
         ExternalLeadOut = new NoLeadOut(),
         InternalLeadOut = new NoLeadOut(),
     };

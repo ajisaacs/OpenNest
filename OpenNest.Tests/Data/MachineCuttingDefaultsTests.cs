@@ -48,14 +48,14 @@ public class MachineCuttingDefaultsTests
 
         Assert.True(MachineCuttingDefaults.ApplyTo(parameters, Machine(LineArc), NestOf(0.25)));
 
-        foreach (var leadIn in new[] { parameters.ExternalLeadIn, parameters.InternalLeadIn, parameters.ArcCircleLeadIn })
+        foreach (var leadIn in new[] { parameters.ExternalLeadIn, parameters.InternalLeadIn })
         {
             var lineArc = Assert.IsType<LineArcLeadIn>(leadIn);
             Assert.Equal(0.125, lineArc.LineLength);
             Assert.Equal(0.0625, lineArc.ArcRadius);
             Assert.Equal(90, lineArc.ApproachAngle);
         }
-        foreach (var leadOut in new[] { parameters.ExternalLeadOut, parameters.InternalLeadOut, parameters.ArcCircleLeadOut })
+        foreach (var leadOut in new[] { parameters.ExternalLeadOut, parameters.InternalLeadOut })
         {
             var line = Assert.IsType<LineLeadOut>(leadOut);
             Assert.Equal(0.0625, line.Length);
@@ -118,7 +118,6 @@ public class MachineCuttingDefaultsTests
 
         Assert.Equal(0.3, Assert.IsType<LineLeadIn>(parameters.ExternalLeadIn).Length);
         Assert.Equal(0.012, Assert.IsType<CleanHoleLeadIn>(parameters.InternalLeadIn).Kerf);
-        Assert.IsType<CleanHoleLeadIn>(parameters.ArcCircleLeadIn);
     }
 
     [Fact]

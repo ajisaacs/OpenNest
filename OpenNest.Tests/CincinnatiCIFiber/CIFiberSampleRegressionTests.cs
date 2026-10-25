@@ -54,14 +54,13 @@ public class CIFiberSampleRegressionTests
         var plate = nest.Plates[0];
         plate.CuttingParameters = new CuttingParameters
         {
-            // OpenNest's own short perpendicular linear leads, including the
-            // circles (ArcCircleLeadIn). TF5200 13.2.4.1 requires a LINEAR
+            // OpenNest's own short perpendicular linear leads; circles take the
+            // internal lead. TF5200 13.2.4.1 requires a LINEAR
             // first motion block after G41/G42, so holes must have linear
             // leads. (The sample itself pierces holes at their centre and
             // uses 0.125 in perimeter leads; see the saved-lead-in test.)
             InternalLeadIn = new LineLeadIn { Length = 0.075, ApproachAngle = 90 },
             ExternalLeadIn = new LineLeadIn { Length = 0.075, ApproachAngle = 90 },
-            ArcCircleLeadIn = new LineLeadIn { Length = 0.075, ApproachAngle = 90 },
             PierceClearance = 0.02,
         };
 

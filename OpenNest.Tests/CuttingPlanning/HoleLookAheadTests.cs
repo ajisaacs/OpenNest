@@ -25,7 +25,6 @@ public class HoleLookAheadTests
     {
         var p = ExplicitContourTests.Parameters();
         p.InternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 };
-        p.ArcCircleLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 };
         p.PierceClearance = 0;
         return p;
     }

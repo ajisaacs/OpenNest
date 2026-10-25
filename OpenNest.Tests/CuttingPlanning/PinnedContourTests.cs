@@ -168,7 +168,6 @@ public class PinnedContourTests
     {
         ExternalLeadIn = new ArcLeadIn { Radius = 0.15 },
         InternalLeadIn = new ArcLeadIn { Radius = 0.15 },
-        ArcCircleLeadIn = new ArcLeadIn { Radius = 0.15 },
         ExternalLeadOut = new NoLeadOut(),
         InternalLeadOut = new NoLeadOut(),
         PierceClearance = 0.05

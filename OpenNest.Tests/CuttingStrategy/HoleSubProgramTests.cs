@@ -123,8 +123,6 @@ public class HoleSubProgramTests
         {
             Parameters = new CuttingParameters
             {
-                ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
-                ArcCircleLeadOut = new NoLeadOut(),
             },
         };
 
@@ -167,8 +165,6 @@ public class HoleSubProgramTests
             {
                 RoundLeadInAngles = true,
                 LeadInAngleIncrement = 5.0,
-                ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
-                ArcCircleLeadOut = new NoLeadOut(),
             },
         };
 
@@ -222,8 +218,6 @@ public class HoleSubProgramTests
         {
             Parameters = new CuttingParameters
             {
-                ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
-                ArcCircleLeadOut = new NoLeadOut(),
             },
         };
 
@@ -283,8 +277,6 @@ public class HoleSubProgramTests
         {
             RoundLeadInAngles = true,
             LeadInAngleIncrement = 5.0,
-            ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
-            ArcCircleLeadOut = new NoLeadOut(),
             ExternalLeadIn = new LineLeadIn { Length = 0.25, ApproachAngle = 90 },
             ExternalLeadOut = new NoLeadOut(),
         };

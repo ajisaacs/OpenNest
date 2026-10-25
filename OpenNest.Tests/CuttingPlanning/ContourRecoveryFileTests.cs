@@ -106,7 +106,6 @@ public class ContourRecoveryFileTests
         {
             parameters.ExternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 };
             parameters.InternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 };
-            parameters.ArcCircleLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 };
         }
         return parameters;
     }

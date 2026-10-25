@@ -20,7 +20,6 @@ public class CuttingParametersSerializerTests
         {
             ExternalLeadIn = leadIn,
             InternalLeadIn = leadIn,
-            ArcCircleLeadIn = leadIn,
             TabConfig = new NormalTab { Size = 0.42, TabLeadIn = leadIn },
         };
 
@@ -28,7 +27,6 @@ public class CuttingParametersSerializerTests
 
         AssertEquivalent(leadIn, restored.ExternalLeadIn);
         AssertEquivalent(leadIn, restored.InternalLeadIn);
-        AssertEquivalent(leadIn, restored.ArcCircleLeadIn);
         AssertEquivalent(leadIn, restored.TabConfig.TabLeadIn);
     }
 
@@ -43,7 +41,6 @@ public class CuttingParametersSerializerTests
         {
             ExternalLeadOut = leadOut,
             InternalLeadOut = leadOut,
-            ArcCircleLeadOut = leadOut,
             TabConfig = new NormalTab { Size = 0.42, TabLeadOut = leadOut },
         };
 
@@ -51,7 +48,6 @@ public class CuttingParametersSerializerTests
 
         AssertEquivalent(leadOut, restored.ExternalLeadOut);
         AssertEquivalent(leadOut, restored.InternalLeadOut);
-        AssertEquivalent(leadOut, restored.ArcCircleLeadOut);
         AssertEquivalent(leadOut, restored.TabConfig.TabLeadOut);
     }
 
@@ -118,11 +114,6 @@ public class CuttingParametersSerializerTests
         Assert.Equal(43, lineOut.ApproachAngle);
         Assert.Equal(0.12, Assert.IsType<ArcLeadIn>(restored.InternalLeadIn).Radius);
         Assert.Equal(0.09, Assert.IsType<ArcLeadOut>(restored.InternalLeadOut).Radius);
-        var cleanHole = Assert.IsType<CleanHoleLeadIn>(restored.ArcCircleLeadIn);
-        Assert.Equal(0.8, cleanHole.LineLength);
-        Assert.Equal(0.3, cleanHole.ArcRadius);
-        Assert.Equal(0.04, cleanHole.Kerf);
-        Assert.IsType<NoLeadOut>(restored.ArcCircleLeadOut);
         Assert.True(restored.TabsEnabled);
         Assert.Equal(0.375, Assert.IsType<NormalTab>(restored.TabConfig).Size);
         Assert.Equal(0.0625, restored.PierceClearance);
@@ -131,6 +122,26 @@ public class CuttingParametersSerializerTests
         Assert.False(restored.SupportTabs);
         AssertEquivalent(new AssignmentParameters(), restored.Assignment);
         AssertEquivalent(new SequenceParameters(), restored.Sequencing);
+    }
+
+    [Fact]
+    public void Deserialize_LegacyArcCircleLeads_AreDroppedInFavorOfTheInternalLeads()
+    {
+        const string json = """
+            {
+              "internalLeadIn": { "type": "Line", "length": 0.125, "approachAngle": 90 },
+              "internalLeadOut": { "type": "None" },
+              "arcCircleLeadIn": { "type": "CleanHole", "lineLength": 0.8,
+                                   "arcRadius": 0.3, "kerf": 0.04 },
+              "arcCircleLeadOut": { "type": "Arc", "radius": 0.09 }
+            }
+            """;
+
+        var restored = CuttingParametersSerializer.Deserialize(json);
+
+        Assert.Equal(0.125, Assert.IsType<LineLeadIn>(restored.InternalLeadIn).Length);
+        Assert.IsType<NoLeadOut>(restored.InternalLeadOut);
+        Assert.DoesNotContain("arcCircle", CuttingParametersSerializer.Serialize(restored));
     }
 
     [Theory]
@@ -150,10 +161,8 @@ public class CuttingParametersSerializerTests
 
         Assert.IsType<NoLeadIn>(restored.ExternalLeadIn);
         Assert.IsType<NoLeadIn>(restored.InternalLeadIn);
-        Assert.IsType<NoLeadIn>(restored.ArcCircleLeadIn);
         Assert.IsType<NoLeadOut>(restored.ExternalLeadOut);
         Assert.IsType<NoLeadOut>(restored.InternalLeadOut);
-        Assert.IsType<NoLeadOut>(restored.ArcCircleLeadOut);
         Assert.Equal(0, Assert.IsType<NormalTab>(restored.TabConfig).Size);
         Assert.Equal(0, restored.PierceClearance);
         Assert.Equal(0, restored.PierceDiameter);
@@ -297,8 +306,6 @@ public class CuttingParametersSerializerTests
         ExternalLeadOut = CreateLeadOut("Line"),
         InternalLeadIn = CreateLeadIn("CleanHole"),
         InternalLeadOut = CreateLeadOut("Arc"),
-        ArcCircleLeadIn = CreateLeadIn("LineArc"),
-        ArcCircleLeadOut = CreateLeadOut("None"),
         PierceClearance = 0.17,
         PierceDiameter = 0.41,
         RoundLeadInAngles = true,

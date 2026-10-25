@@ -25,10 +25,8 @@ public class ImportedArcHoleTests
         {
             ExternalLeadIn = lead,
             InternalLeadIn = lead,
-            ArcCircleLeadIn = lead,
             ExternalLeadOut = new NoLeadOut(),
             InternalLeadOut = new NoLeadOut(),
-            ArcCircleLeadOut = new NoLeadOut(),
             PierceClearance = 0.0625
         };
     }

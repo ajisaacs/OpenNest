@@ -205,7 +205,7 @@ public class DrawingProgramSnapshotTests
             part.ApplyLeadIns(new CuttingParameters
             {
                 ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
-                ArcCircleLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 90 },
+                InternalLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 90 },
             }, new Vector(-5, -5));
             part.LeadInsLocked = true;
             Assert.Contains(part.Program.Codes.OfType<LinearMove>(), move => move.Layer == LayerType.Leadin);

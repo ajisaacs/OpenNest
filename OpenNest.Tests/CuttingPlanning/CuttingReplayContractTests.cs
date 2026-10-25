@@ -171,7 +171,6 @@ public class CuttingReplayContractTests
         var settings = ExplicitContourTests.Parameters();
         settings.RoundLeadInAngles = true;
         settings.LeadInAngleIncrement = 90;
-        settings.ArcCircleLeadIn = new LineLeadIn { Length = 10 };
         var clean = PreparedContourTests.Holes();
         if (shape == "mixed-circles") clean.Codes.OfType<ArcMove>().Last().Rotation = RotationType.CW;
         if (shape == "arcs")
@@ -180,6 +179,11 @@ public class CuttingReplayContractTests
             clean.MoveTo(6, 3);
             clean.ArcTo(4, 3, 5, 3, RotationType.CCW);
             clean.LineTo(6, 3);
+        }
+        else
+        {
+            // Circles clamp an over-long lead to their radius; the arc slot has no clamp.
+            settings.InternalLeadIn = new LineLeadIn { Length = 10 };
         }
         var part = new Part(new Drawing("native", clean));
         var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest([part], Start, confirmedParameters: settings));

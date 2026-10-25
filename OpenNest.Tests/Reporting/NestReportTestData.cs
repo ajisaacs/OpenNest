@@ -103,7 +103,7 @@ public static class NestReportTestData
         {
             ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
             ExternalLeadOut = new LineLeadOut { Length = 0.25 },
-            ArcCircleLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 90 },
+            InternalLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 90 },
             TabsEnabled = true,
             TabConfig = new NormalTab { Size = 0.15 },
         }, new Vector(-5, -5));

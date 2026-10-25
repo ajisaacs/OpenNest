@@ -71,7 +71,7 @@ public class ExplicitContourTests
         var parameters = Parameters("line");
         parameters.RoundLeadInAngles = true;
         parameters.LeadInAngleIncrement = 90;
-        parameters.ArcCircleLeadIn = new LineLeadIn { Length = 2 };
+        parameters.InternalLeadIn = new LineLeadIn { Length = 2 };
         var result = new ContourCuttingStrategy { Parameters = parameters }.Apply(program, new Vector(20, 20));
         var calls = result.Program.Codes.OfType<SubProgramCall>().ToArray();
         Assert.Equal(2, calls.Length);
@@ -124,7 +124,6 @@ public class ExplicitContourTests
         {
             ExternalLeadIn = lead,
             InternalLeadIn = lead,
-            ArcCircleLeadIn = lead,
             ExternalLeadOut = new NoLeadOut(),
             InternalLeadOut = new NoLeadOut(),
             PierceClearance = 0.05

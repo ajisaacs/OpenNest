@@ -116,7 +116,6 @@ public class ContourEntryFeasibilityTests
         var parameters = ExplicitContourTests.Parameters();
         parameters.ExternalLeadIn = new NoLeadIn();
         parameters.InternalLeadIn = new NoLeadIn();
-        parameters.ArcCircleLeadIn = new NoLeadIn();
         var clean = ExplicitContourTests.Square(false);
         var prepared = PreparedContours.Capture(clean, parameters);
         var choice = prepared.Entry(0, 0, new Vector(0, 5));

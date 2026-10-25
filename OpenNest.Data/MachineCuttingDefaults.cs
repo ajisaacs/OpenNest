@@ -55,17 +55,15 @@ public static class MachineCuttingDefaults
 
         var scale = Scale(machine!.Units, nest.Units);
         var kerf = settings.Kerf * scale;
-        // Each contour type gets its own instance, as the cutting panel builds them.
+        // Each lead set gets its own instance, as the cutting panel builds them.
         if (ToLeadIn(settings.LeadIn, scale, kerf) is { } leadIn)
         {
             if (leadIn is not CleanHoleLeadIn)
                 parameters.ExternalLeadIn = leadIn;
             parameters.InternalLeadIn = ToLeadIn(settings.LeadIn, scale, kerf);
-            parameters.ArcCircleLeadIn = ToLeadIn(settings.LeadIn, scale, kerf);
         }
         parameters.ExternalLeadOut = ToLeadOut(settings.LeadOut, scale);
         parameters.InternalLeadOut = ToLeadOut(settings.LeadOut, scale);
-        parameters.ArcCircleLeadOut = ToLeadOut(settings.LeadOut, scale);
         parameters.Kerf = kerf;
         parameters.MachineName = machine.Name;
         parameters.MaterialName = nest.Material.Name;

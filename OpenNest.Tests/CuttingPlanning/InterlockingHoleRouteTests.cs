@@ -28,7 +28,6 @@ public class InterlockingHoleRouteTests
         {
             parameters.ExternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 };
             parameters.InternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 };
-            parameters.ArcCircleLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 };
         }
         var before = parts.Select(p => ExplicitContourTests.Fingerprint(p.Program)).ToArray();
         var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest(parts,

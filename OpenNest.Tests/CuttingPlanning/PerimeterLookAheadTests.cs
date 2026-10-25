@@ -165,7 +165,7 @@ public class PerimeterLookAheadTests
         var parameters = Parameters();
         parameters.RoundLeadInAngles = false;
         parameters.PierceClearance = 0;
-        parameters.ArcCircleLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 };
+        parameters.InternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 };
         var arrival = location + new Vector(20, 8);
         var before = ExplicitContourTests.Fingerprint(part.Program);
         var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest([part], arrival,

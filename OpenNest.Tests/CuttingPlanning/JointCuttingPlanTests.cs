@@ -16,7 +16,6 @@ public class JointCuttingPlanTests
         var (part, parameters) = Crossing();
         parameters.ExternalLeadIn = new NoLeadIn();
         parameters.InternalLeadIn = new NoLeadIn();
-        parameters.ArcCircleLeadIn = new NoLeadIn();
         var unchanged = Unchanged(part, parameters);
         var source = Read(part.Program, part.Location);
         Assert.Contains(new ReleasedContourState(reportMissingLeadIns: false).Check(source, Vector.Zero, 1),

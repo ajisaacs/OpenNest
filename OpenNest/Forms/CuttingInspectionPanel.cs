@@ -1154,7 +1154,7 @@ internal sealed class CuttingInspectionPanel : UserControl
     private void ShowSettings()
     {
         settingsLabel.Text = $"Outside: {Describe(parameters.ExternalLeadIn)} · Holes: {Describe(parameters.InternalLeadIn)} · "
-            + $"Arcs: {Describe(parameters.ArcCircleLeadIn)} · Tabs: {(parameters.TabsEnabled ? "on" : "off")}";
+            + $"Tabs: {(parameters.TabsEnabled ? "on" : "off")}";
     }
 
     private static string Describe(LeadIn leadIn)

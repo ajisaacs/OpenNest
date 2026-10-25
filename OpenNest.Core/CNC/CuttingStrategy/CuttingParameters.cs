@@ -15,12 +15,13 @@ namespace OpenNest.CNC.CuttingStrategy
         public LeadIn ExternalLeadIn { get; set; } = new NoLeadIn();
         public LeadOut ExternalLeadOut { get; set; } = new NoLeadOut();
 
+        /// <summary>
+        /// The lead-in of every cutout, full circles included; circles still get their own
+        /// geometry handling (radius clamp, angle rounding) when the lead is emitted.
+        /// </summary>
         public LeadIn InternalLeadIn { get; set; } =
             new LineLeadIn { Length = 0.125, ApproachAngle = 90 };
         public LeadOut InternalLeadOut { get; set; } = new NoLeadOut();
-
-        public LeadIn ArcCircleLeadIn { get; set; } = new NoLeadIn();
-        public LeadOut ArcCircleLeadOut { get; set; } = new NoLeadOut();
 
         public double PierceClearance { get; set; } = 0.0625;
 

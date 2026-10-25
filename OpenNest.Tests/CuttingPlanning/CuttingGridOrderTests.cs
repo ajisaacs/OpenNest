@@ -90,7 +90,6 @@ public class CuttingGridOrderTests
         {
             ExternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 },
             InternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 },
-            ArcCircleLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 },
         };
 
         var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate,

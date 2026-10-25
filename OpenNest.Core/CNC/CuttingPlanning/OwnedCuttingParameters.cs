@@ -33,10 +33,8 @@ internal static class OwnedCuttingParameters
             PierceDiameter = Dimension(source.PierceDiameter),
             ExternalLeadIn = CopyLeadIn(source.ExternalLeadIn),
             InternalLeadIn = CopyLeadIn(source.InternalLeadIn),
-            ArcCircleLeadIn = CopyLeadIn(source.ArcCircleLeadIn),
             ExternalLeadOut = CopyLeadOut(source.ExternalLeadOut),
             InternalLeadOut = CopyLeadOut(source.InternalLeadOut),
-            ArcCircleLeadOut = CopyLeadOut(source.ArcCircleLeadOut),
             RoundLeadInAngles = source.RoundLeadInAngles,
             LeadInAngleIncrement = source.LeadInAngleIncrement,
             TabConfig = source.TabConfig == null

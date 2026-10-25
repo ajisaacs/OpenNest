@@ -63,8 +63,6 @@ public static class CuttingParametersSerializer
             ExternalLeadOut = ToLeadOutDto(parameters.ExternalLeadOut),
             InternalLeadIn = ToLeadInDto(parameters.InternalLeadIn),
             InternalLeadOut = ToLeadOutDto(parameters.InternalLeadOut),
-            ArcCircleLeadIn = ToLeadInDto(parameters.ArcCircleLeadIn),
-            ArcCircleLeadOut = ToLeadOutDto(parameters.ArcCircleLeadOut),
             TabsEnabled = parameters.TabsEnabled,
             TabWidth = parameters.TabConfig?.Size ?? 0.25,
             TabConfig = ToTabDto(parameters.TabConfig),
@@ -97,8 +95,6 @@ public static class CuttingParametersSerializer
             ExternalLeadOut = FromLeadOutDto(dto.ExternalLeadOut),
             InternalLeadIn = FromLeadInDto(dto.InternalLeadIn),
             InternalLeadOut = FromLeadOutDto(dto.InternalLeadOut),
-            ArcCircleLeadIn = FromLeadInDto(dto.ArcCircleLeadIn),
-            ArcCircleLeadOut = FromLeadOutDto(dto.ArcCircleLeadOut),
             TabsEnabled = dto.TabsEnabled,
             TabConfig = dto.TabConfig == null
                 ? new NormalTab { Size = dto.TabWidth }

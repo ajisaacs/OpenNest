@@ -1103,8 +1103,7 @@ namespace OpenNest.CNC.CuttingStrategy
         {
             return contourType switch
             {
-                ContourType.ArcCircle => Parameters.ArcCircleLeadIn ?? Parameters.InternalLeadIn,
-                ContourType.Internal => Parameters.InternalLeadIn,
+                ContourType.Internal or ContourType.ArcCircle => Parameters.InternalLeadIn,
                 _ => Parameters.ExternalLeadIn,
             };
         }
@@ -1113,8 +1112,7 @@ namespace OpenNest.CNC.CuttingStrategy
         {
             return contourType switch
             {
-                ContourType.ArcCircle => Parameters.ArcCircleLeadOut ?? Parameters.InternalLeadOut,
-                ContourType.Internal => Parameters.InternalLeadOut,
+                ContourType.Internal or ContourType.ArcCircle => Parameters.InternalLeadOut,
                 _ => Parameters.ExternalLeadOut,
             };
         }

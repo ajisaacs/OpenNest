@@ -208,17 +208,15 @@ public sealed class PreparedContours
         return pins.Any(p => p?.IsResolved != false) ? new PreparedContours(unpinned, pins, token) : unpinned;
     }
 
-    // The pin's leads replace every contour type's leads, since the type the emitter detects is
+    // The pin's leads replace both lead sets, since the type the emitter detects is
     // not the caller's concern; angle rounding is off because a pinned entry never moves.
     private static CuttingParameters PinParameters(CuttingParameters shared, ContourCutPin pin)
     {
         var owned = OwnedCuttingParameters.Copy(shared);
         owned.ExternalLeadIn = pin.LeadIn;
         owned.InternalLeadIn = pin.LeadIn;
-        owned.ArcCircleLeadIn = pin.LeadIn;
         owned.ExternalLeadOut = pin.LeadOut;
         owned.InternalLeadOut = pin.LeadOut;
-        owned.ArcCircleLeadOut = pin.LeadOut;
         owned.RoundLeadInAngles = false;
         owned.TabsEnabled = pin.HasTab;
         if (pin.HasTab)

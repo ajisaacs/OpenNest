@@ -576,8 +576,7 @@ namespace OpenNest.Actions
         {
             return contourType switch
             {
-                ContourType.ArcCircle => parameters.ArcCircleLeadIn ?? parameters.InternalLeadIn,
-                ContourType.Internal => parameters.InternalLeadIn,
+                ContourType.Internal or ContourType.ArcCircle => parameters.InternalLeadIn,
                 _ => parameters.ExternalLeadIn,
             };
         }

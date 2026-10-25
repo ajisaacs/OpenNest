@@ -129,7 +129,6 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
         var parameters = new CuttingParameters();
         parameters.ExternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 };
         parameters.InternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 };
-        parameters.ArcCircleLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 };
         return parameters;
     }
 

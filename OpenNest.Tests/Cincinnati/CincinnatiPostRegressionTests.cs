@@ -301,8 +301,6 @@ public class CincinnatiPostRegressionTests
         part.ApplyLeadIns(
             new CuttingParameters
             {
-                ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
-                ArcCircleLeadOut = new NoLeadOut(),
                 ExternalLeadIn = new LineLeadIn { Length = leadIn, ApproachAngle = 90 },
                 ExternalLeadOut = new NoLeadOut(),
             },

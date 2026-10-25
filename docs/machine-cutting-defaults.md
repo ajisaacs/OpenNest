@@ -21,8 +21,8 @@ machine, material, grade and thickness recorded on the parameters. A plate that 
 parameters keeps them: changing the machine, material or thickness does not rewrite leads
 the plate was planned with.
 
-The machine holds one lead-in and one lead-out per thickness; both go to external, internal
-and arc/circle contours. Types map as follows:
+The machine holds one lead-in and one lead-out per thickness; both go to external and internal
+contours (internal covers full circles). Types map as follows:
 
 | Machine type | Lead-in |
 |---|---|

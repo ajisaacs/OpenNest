@@ -32,7 +32,7 @@ public class PartLeadInTransformTests
         new()
         {
             ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
-            ArcCircleLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 90 },
+            InternalLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 90 },
         };
 
     private static Part MakeLeadInPart(Drawing drawing, double rotation)

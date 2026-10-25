@@ -240,7 +240,6 @@ public class TabbedCutoutBuilderTests
         {
             ExternalLeadIn = new LineLeadIn { Length = 0.25, ApproachAngle = 90 },
             InternalLeadIn = new ArcLeadIn { Radius = 0.1 },
-            ArcCircleLeadIn = new LineLeadIn { Length = 0.1, ApproachAngle = 90 },
         });
         Assert.True(planned.IsReady, planned.Describe);
         Assert.True(part.RestoreLeadInProgram(planned.Program, false));

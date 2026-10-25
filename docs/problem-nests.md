@@ -30,7 +30,7 @@ nest's. A different outcome at the same or a better rank is only reported. When 
 intended, update the baseline.
 
 Plates use their own cutting parameters. A plate without them uses line lead-ins of 0.15 at
-90 degrees (external, internal and arc/circle) and no lead-outs.
+90 degrees (external and internal) and no lead-outs.
 
 ## Adding a nest
 

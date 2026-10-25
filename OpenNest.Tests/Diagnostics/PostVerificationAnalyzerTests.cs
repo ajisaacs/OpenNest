@@ -607,6 +607,5 @@ public class PostVerificationAnalyzerTests
     {
         ExternalLeadIn = new LineLeadIn { Length = 0.5 },
         InternalLeadIn = new LineLeadIn { Length = 0.5 },
-        ArcCircleLeadIn = new LineLeadIn { Length = 0.5 }
     };
 }

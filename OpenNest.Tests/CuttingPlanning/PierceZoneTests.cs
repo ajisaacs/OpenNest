@@ -322,10 +322,8 @@ public class PierceZoneTests
     {
         ExternalLeadIn = new LineLeadIn { Length = 1, ApproachAngle = 90 },
         InternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 },
-        ArcCircleLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 },
         ExternalLeadOut = new NoLeadOut(),
         InternalLeadOut = new NoLeadOut(),
-        ArcCircleLeadOut = new NoLeadOut(),
         PierceClearance = 0,
         PierceDiameter = pierceDiameter,
     };

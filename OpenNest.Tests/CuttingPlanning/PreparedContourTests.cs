@@ -188,7 +188,7 @@ public class PreparedContourTests
     {
         var source = Holes();
         var parameters = ExplicitContourTests.Parameters();
-        parameters.ArcCircleLeadIn = new LineLeadIn { Length = 10 };
+        parameters.InternalLeadIn = new LineLeadIn { Length = 10 };
         parameters.RoundLeadInAngles = true;
         parameters.LeadInAngleIncrement = 90;
         var prepared = PreparedContours.Capture(source, parameters);

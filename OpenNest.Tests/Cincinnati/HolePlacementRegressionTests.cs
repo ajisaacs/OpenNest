@@ -169,8 +169,6 @@ public class HolePlacementRegressionTests
         part.ApplyLeadIns(
             new CuttingParameters
             {
-                ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
-                ArcCircleLeadOut = new NoLeadOut(),
                 ExternalLeadIn = new LineLeadIn { Length = 0.25, ApproachAngle = 90 },
                 ExternalLeadOut = new NoLeadOut(),
             },

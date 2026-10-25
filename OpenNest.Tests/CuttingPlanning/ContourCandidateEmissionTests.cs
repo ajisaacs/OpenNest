@@ -175,7 +175,7 @@ public class ContourCandidateEmissionTests
         var parameters = ExplicitContourTests.Parameters();
         parameters.RoundLeadInAngles = true;
         parameters.LeadInAngleIncrement = 90;
-        parameters.ArcCircleLeadIn = new LineLeadIn { Length = 2 };
+        parameters.InternalLeadIn = new LineLeadIn { Length = 2 };
         var p = ExplicitContourTests.Square(false);
         foreach (var center in new[] { new Vector(3, 3), new Vector(7, 7) })
         {

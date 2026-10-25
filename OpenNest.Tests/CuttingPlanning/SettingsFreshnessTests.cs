@@ -71,7 +71,7 @@ public class SettingsFreshnessTests
         switch (slot)
         {
             case "lead-in": settings.InternalLeadIn = new CustomLeadIn(); break;
-            case "lead-out": settings.ArcCircleLeadOut = new CustomLeadOut(); break;
+            case "lead-out": settings.InternalLeadOut = new CustomLeadOut(); break;
             case "tab": settings.TabConfig = new CustomTab(); break;
             case "tab-lead-in": settings.TabConfig = new NormalTab { TabLeadIn = new CustomLeadIn() }; break;
             case "sequence": settings.Sequencing = new CustomSequence(); break;
@@ -172,10 +172,8 @@ public class SettingsFreshnessTests
                     {
                         ExternalLeadIn = lead,
                         InternalLeadIn = lead,
-                        ArcCircleLeadIn = lead,
                         ExternalLeadOut = leadOut,
                         InternalLeadOut = leadOut,
-                        ArcCircleLeadOut = leadOut,
                         TabConfig = tab,
                         TabsEnabled = true
                     };

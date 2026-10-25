@@ -957,10 +957,8 @@ public class CuttingInspectionPanelTests
     {
         ExternalLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 45 },
         InternalLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 45 },
-        ArcCircleLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 45 },
         ExternalLeadOut = new NoLeadOut(),
         InternalLeadOut = new NoLeadOut(),
-        ArcCircleLeadOut = new NoLeadOut(),
     };
 
     private static void PumpUntil(Func<bool> condition)
