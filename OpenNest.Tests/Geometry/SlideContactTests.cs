@@ -150,6 +150,28 @@ public class SlideContactTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void FilletWithImpreciseCenter_DoesNotBlockSlidingAlongItsTangentLine(bool cpu)
+    {
+        // N26-243: the G-code fixes the fillet center 1.04e-7 off the tangent normal, so
+        // the arc's top lies just past the flat edge's end rather than on the joint.
+        var offset = 1.043e-7;
+        var fillet = new Arc(new Vector(2 - offset, 0.5), System.Math.Sqrt(1 + offset * offset),
+            0, System.Math.Atan2(1, offset), false);
+        var stationary = new List<Entity>
+        {
+            new Line(0, 0, 3, 0),
+            new Line(new Vector(3, 0), fillet.StartPoint()),
+            fillet,
+            new Line(fillet.EndPoint(), new Vector(0, 1.5)),
+            new Line(0, 1.5, 0, 0),
+        };
+        var moving = Rect(1, 1.5, 2, 1).Cast<Entity>().ToList();
+        Assert.Equal(double.MaxValue, EntityDistance(cpu, moving, stationary, new Vector(-1, 0)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void ThinRing_ArcSeamDoesNotChangeHoleClassification(bool cpu)
     {
         var a = System.Math.PI / 72;

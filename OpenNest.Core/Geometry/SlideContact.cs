@@ -36,6 +36,11 @@ namespace OpenNest.Geometry
         // tangential classification can admit, so keep it far below spacing tolerances.
         internal const double IncidenceTolerance = 1e-7;
 
+        // Drawing data fixes arc centers to finite precision, so a tangent joint's arc end
+        // can sit a little past its neighbour's end. A contact this close to a joint takes
+        // the joint's tangents; otherwise the neighbour reads as a second boundary there.
+        internal const double JointTolerance = 1e-6;
+
         private readonly List<Entity> entities;
         private readonly int[] loopOf;
         private readonly int[] previous;
@@ -254,11 +259,11 @@ namespace OpenNest.Geometry
 
         private bool StartsNear(int index, Vector point) =>
             TryEndpoints(entities[index], out var start, out _)
-            && start.DistanceTo(point) <= IncidenceTolerance;
+            && start.DistanceTo(point) <= JointTolerance;
 
         private bool EndsNear(int index, Vector point) =>
             TryEndpoints(entities[index], out _, out var end)
-            && end.DistanceTo(point) <= IncidenceTolerance;
+            && end.DistanceTo(point) <= JointTolerance;
 
         private bool InRun(int index, int first, int last)
         {
