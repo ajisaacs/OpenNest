@@ -207,6 +207,50 @@ public class AutoNestFormLedgerStockTests
     }
 
     [Fact]
+    public void RankedRowsShowTheirGradeAndSubstitutesAreMarkedButTicked() => RunSta(() =>
+    {
+        using var form = new LedgerTestForm(new Nest { Material = new Material("Steel", "HR"), Thickness = 0.0598 });
+        var grid = GetGrid(form);
+        Assert.IsAssignableFrom<IList>(grid.DataSource).Clear();
+        form.ApplyLedgerStock(new LedgerStockResult.Ok(new[]
+        {
+            Spec(11, 1, "A1011", "HR"), Spec(12, 2, "A1011", "P&O"),
+        }, new[]
+        {
+            Item("H-1", LedgerItemKinds.FullSheet, 48, 96, 1) with { MaterialSpecId = 11, Rank = 1 },
+            Item("P-1", LedgerItemKinds.Drop, 24, 36, 1, "B3") with { MaterialSpecId = 12, Rank = 2 },
+        }));
+
+        var rows = Assert.IsAssignableFrom<IList>(grid.DataSource);
+        Assert.Equal(new[] { "A1011 HR", "A1011 P&O for HR" }, rows.Cast<object>().Select(r => (string)GetValue(r, "Source")));
+        Assert.All(rows.Cast<object>(), r => Assert.True((bool)GetValue(r, "Use")));
+        Assert.Equal(new[] { "ledger:1", "ledger:2" }, form.GetPlateOptions().Select(o => o.Id));
+        Assert.Contains("1 substitute row", Label(form).Text);
+
+        var source = grid.Columns.Cast<DataGridViewColumn>().Single(c => c.DataPropertyName == "Source").Index;
+        Assert.Equal(System.Drawing.SystemColors.GrayText, FormattedForeColor(grid, source, 0));
+        Assert.Equal(AutoNestForm.SubstituteColor, FormattedForeColor(grid, source, 1));
+
+        var tooltip = AutoNestForm.LedgerTooltip(form.LedgerRows[1], "HR");
+        Assert.StartsWith("Substitute: MaterialLedger accepts A1011 P&O in place of HR (rank 2).", tooltip);
+        Assert.Contains("Items: P-1", tooltip);
+        Assert.Contains("Locations: B3", tooltip);
+    });
+
+    [Fact]
+    public void SourceTextFallsBackForUnlabeledAndIrregularRows()
+    {
+        var plain = new LedgerStockRow("ledger:1", new Size(24, 36), 1, true, false, new[] { "D-1" }, new[] { "R1" });
+        Assert.Equal("Ledger", AutoNestForm.LedgerSource(plain, "HR"));
+        Assert.Equal("Ledger (irr.)", AutoNestForm.LedgerSource(plain with { IsIrregular = true }, "HR"));
+        Assert.Equal("A36 (substitute)", AutoNestForm.LedgerSource(plain with { Rank = 4, Label = "A36" }, ""));
+        Assert.Equal("A1011 P&O for HR (irr.)",
+            AutoNestForm.LedgerSource(plain with { Rank = 2, Label = "A1011 P&O", IsIrregular = true }, "HR"));
+        Assert.Equal("A36 HR", AutoNestForm.LedgerSource(plain with { Rank = 0, Label = "A36 HR" }, "HR"));
+        Assert.StartsWith("Items:", AutoNestForm.LedgerTooltip(plain, "HR"));
+    }
+
+    [Fact]
     public void LedgerRowsCarryTheItemCodesAutoNestAssigns() => RunSta(() =>
     {
         using var form = new LedgerTestForm();
@@ -275,8 +319,26 @@ public class AutoNestFormLedgerStockTests
     private static Button Button(AutoNestForm form) =>
         Assert.IsType<Button>(form.Controls.Find("ledgerButton", true).Single());
 
+    private static LedgerStockSpec Spec(long id, int rank, string grade, string finish) =>
+        new(id, $"{grade} {finish}", 0.0598m, "16 ga") { Rank = rank, MaterialFamily = "Steel", Grade = grade, Finish = finish };
+
     private static void SetValue(object row, string property, object value) =>
         TypeDescriptor.GetProperties(row)[property]!.SetValue(row, value);
+
+    private static object GetValue(object row, string property) =>
+        TypeDescriptor.GetProperties(row)[property]!.GetValue(row)!;
+
+    /// <summary>The fore colour the grid's CellFormatting handlers give a cell.</summary>
+    private static System.Drawing.Color FormattedForeColor(DataGridView grid, int column, int row)
+    {
+        var args = new DataGridViewCellFormattingEventArgs(column, row, grid[column, row].Value, typeof(string),
+            new DataGridViewCellStyle());
+        typeof(DataGridView).GetMethod("OnCellFormatting",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null,
+                new[] { typeof(DataGridViewCellFormattingEventArgs) }, null)!
+            .Invoke(grid, new object[] { args });
+        return args.CellStyle!.ForeColor;
+    }
 
     private static void RunSta(Action action) =>
         StaTestThread.Run(action, TimeSpan.FromSeconds(15), "The STA test did not complete.");

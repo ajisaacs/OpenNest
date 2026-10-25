@@ -9,12 +9,24 @@ public sealed record LedgerStockResponse(
     IReadOnlyList<LedgerStockSpec>? Specs,
     IReadOnlyList<LedgerStockItem>? Items);
 
-public sealed record LedgerStockSpec(long MaterialSpecId, string DisplayName, decimal ThicknessIn, string? GaugeLabel);
+/// <summary>
+/// Mirrors ML <c>StockApi.OpenNestStockSpecDto</c>. <see cref="Rank"/> is the spec's place in ML's
+/// acceptance rule (0 an exact mapping, 1 preferred, higher a substitute); an older ledger sends
+/// neither it nor the catalog names, so they stay null and the spec counts as rank 1.
+/// </summary>
+public sealed record LedgerStockSpec(long MaterialSpecId, string DisplayName, decimal ThicknessIn, string? GaugeLabel)
+{
+    public int? Rank { get; init; }
+    public string? MaterialFamily { get; init; }
+    public string? Grade { get; init; }
+    public string? Finish { get; init; }
+}
 
 /// <summary>
 /// Mirrors ML <c>StockApi.StockItemDto</c>. Sizes are inches with <see cref="WidthIn"/> the short
 /// side; <see cref="Quantity"/> is free after active holds. <see cref="Kind"/> and
-/// <see cref="Shape"/> stay strings so a new ML enum value still deserializes.
+/// <see cref="Shape"/> stay strings so a new ML enum value still deserializes. <see cref="Rank"/>
+/// is its spec's rank, null from an older ledger.
 /// </summary>
 public sealed record LedgerStockItem(
     string ItemCode,
@@ -28,7 +40,10 @@ public sealed record LedgerStockItem(
     string LocationName,
     string? ParentLocationCode,
     decimal? CostPerUnit,
-    DateTime LastObservedAtUtc);
+    DateTime LastObservedAtUtc)
+{
+    public int? Rank { get; init; }
+}
 
 /// <summary>ML <c>InventoryItemKind</c> names.</summary>
 public static class LedgerItemKinds

@@ -274,7 +274,14 @@ mapping names, so it reports the connection as working when ML answers `mapped: 
 `GET {url}/api/stock/opennest?material=&grade=&thicknessIn=` with the `X-Api-Key`
 header and a 5 s timeout. The request sends the nest's `Material.Name`, its `Material.Grade`
 and the thickness converted to inches (rounded to 4 places). ML resolves its own
-OpenNest material mapping, and OpenNest keeps no copy of it. The button is enabled when
+OpenNest material mapping, and OpenNest keeps no copy of it. OpenNest's grade is a shop
+condition such as HR or P&O; ML's acceptance rule for the material and grade decides which
+catalog grades and finishes may fill it, ranked by preference. Rank 0 is an exact mapping
+override, rank 1 the rule's preferred entry, and higher ranks are substitutes, which only
+ever upgrade (P&O may fill HR, never the reverse). Specs carry `rank`, `materialFamily`,
+`grade` and `finish`; items carry `rank` and arrive in rank, location code, item code order.
+An older ledger that sends none of these still loads: its stock counts as rank 1, unlabeled.
+The button is enabled when
 the ledger is configured and the nest has a material and a thickness. The request runs
 while the dialog stays usable, and closing the dialog cancels it. The client
 (`OpenNest.Data/MaterialLedger/`) returns `NotConfigured`, `Unreachable(reason)`,
@@ -287,23 +294,30 @@ with the short side first, and become `Size(short, long)` in nest units:
 | Ledger item | Stock row |
 |---|---|
 | `FullSheetBundle` / `FullSheet`, free quantity N | one row, quantity N |
-| `Drop` | drops of identical usable size (3-place inches) share one row; quantity is the count |
+| `Drop` | drops of identical usable size (3-place inches) and the same spec share one row; quantity is the count |
 | `IrregularConservativeRectangle` | its conservative rectangle, kept apart and marked "irregular" |
 | `Unknown` or an unrecognized shape | skipped and counted in the summary |
 | no part to nest fits in either orientation | skipped and counted in the summary |
 
-Each row keeps its item codes (one per sheet, drops ordered by location then code)
-and locations for the row tooltip and for later item assignment. The engine sees only
-ordinary `NestPlateStock` rows with ids `ledger:{n}` and finite quantities. It never
-sees item codes, and `OpenNest.Engine` has no ledger reference.
+Rows run in rank order. Within a rank, and within each row's item codes (one per sheet),
+the ledger's own order is kept, so item assignment takes the preferred, first-listed items
+first. Each row also keeps its locations for the tooltip, its rank and a label from its
+spec's grade and finish (for example "A1011 P&O"). The engine sees only ordinary
+`NestPlateStock` rows with ids `ledger:{n}` and finite quantities. It never sees item
+codes or ranks, so it does not prefer low-rank stock; a stock priority would be a
+separate `NestJob` input. `OpenNest.Engine` has no ledger reference.
 
-**Grid.** A load replaces earlier ledger rows and keeps hand-typed rows. Ledger rows
-show Source "Ledger", and their size and cost are read-only. You can lower a ledger
+**Grid.** A load replaces earlier ledger rows and keeps hand-typed rows. A ledger row's
+Source shows its label, or "Ledger" when the ledger sends no grade or finish, with
+"(irr.)" for an irregular drop. A substitute (rank above 1) reads, for example,
+"A1011 P&O for HR" in amber, and its tooltip names the substitution and rank ahead of the
+usual item codes and locations. Substitutes load ticked like other rows; untick **Use** to
+keep them out of the run. Ledger rows' size and cost are read-only. You can lower a ledger
 row's quantity (not above the free count) or untick **Use** to leave any row out.
 The **Qty** column applies to every row: blank offers the size without limit, as
 hand-typed rows always have, and a number is passed as `PlateOption.Quantity` to
 `NestPlateStock.Quantity`. A summary line under the grid reports the load, for example
-"Ledger: 3 sheet sizes, 7 drops (2 skipped: 2 unknown shape)", or the failure. An
+"Ledger: 3 sheet sizes, 7 drops, 2 substitute rows (2 skipped: 2 unknown shape)", or the failure. An
 unmapped material clears the ledger rows. A failed request keeps them.
 
 **Persistence.** Ledger rows and quantities are request-local and are never written to

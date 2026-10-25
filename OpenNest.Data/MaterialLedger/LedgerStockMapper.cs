@@ -6,7 +6,7 @@ namespace OpenNest.Data.MaterialLedger;
 /// <summary>
 /// One Auto Nest stock row built from ledger items. <see cref="Size"/> is in nest units with
 /// Width the short side. <see cref="ItemCodes"/> lists one code per unit of
-/// <see cref="Quantity"/> (a bundle repeats its code), in the order later steps assign them.
+/// <see cref="Quantity"/> (a bundle repeats its code), in ledger order, which later steps assign.
 /// </summary>
 public sealed record LedgerStockRow(
     string Id,
@@ -20,6 +20,18 @@ public sealed record LedgerStockRow(
     /// <summary>Each item code's ledger location code, for display only.</summary>
     public IReadOnlyDictionary<string, string> ItemLocations { get; init; } =
         new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The row's spec rank in ML's acceptance rule: 0 an exact mapping, 1 the preferred entry,
+    /// higher a substitute. An older ledger sends none, which counts as 1.
+    /// </summary>
+    public int Rank { get; init; } = 1;
+
+    /// <summary>The catalog grade and finish the row is cut from, e.g. "A1011 P&amp;O"; null when the ledger sends neither.</summary>
+    public string? Label { get; init; }
+
+    /// <summary>True for stock ML accepts in place of the preferred material (rank above 1).</summary>
+    public bool IsSubstitute => Rank > 1;
 }
 
 /// <summary>The rows offered to Auto Nest and the counts of ledger items left out.</summary>
@@ -30,8 +42,9 @@ public sealed record LedgerStockMapping(
 {
     public int SheetRows => Rows.Count(r => !r.IsDrop);
     public int Drops => Rows.Where(r => r.IsDrop).Sum(r => r.Quantity);
+    public int SubstituteRows => Rows.Count(r => r.IsSubstitute);
 
-    /// <summary>E.g. "Ledger: 3 sheet sizes, 7 drops (2 skipped: unknown shape)".</summary>
+    /// <summary>E.g. "Ledger: 3 sheet sizes, 7 drops, 2 substitute rows (2 skipped: 2 unknown shape)".</summary>
     public string Summary
     {
         get
@@ -42,6 +55,8 @@ public sealed record LedgerStockMapping(
             if (SkippedTooSmall > 0)
                 skipped.Add($"{SkippedTooSmall} too small for any part");
             var text = $"Ledger: {Plural(SheetRows, "sheet size")}, {Plural(Drops, "drop")}";
+            if (SubstituteRows > 0)
+                text += $", {Plural(SubstituteRows, "substitute row")}";
             return skipped.Count == 0
                 ? text
                 : $"{text} ({SkippedUnknownShape + SkippedTooSmall} skipped: {string.Join(", ", skipped)})";
@@ -53,7 +68,8 @@ public sealed record LedgerStockMapping(
 
 /// <summary>
 /// Turns ledger items into Auto Nest stock rows: each bundle or full sheet becomes a row, and
-/// drops of the same usable size share a row. The engine sees only the <c>ledger:{n}</c> ids.
+/// drops of the same usable size and spec share a row. Rows run in rank order and keep the
+/// ledger's order within a rank. The engine sees only the <c>ledger:{n}</c> ids, never ranks.
 /// </summary>
 public static class LedgerStockMapper
 {
@@ -68,21 +84,28 @@ public static class LedgerStockMapper
     public static double ThicknessInches(double thickness, Units units) =>
         System.Math.Round(units == Units.Millimeters ? thickness / MillimetersPerInch : thickness, 4);
 
-    /// <param name="items">Ledger items in ledger order.</param>
+    /// <param name="items">Ledger items in ledger order (rank, then location code, then item code).</param>
     /// <param name="units">The nest's units; ledger sizes are always inches.</param>
     /// <param name="partEnvelopes">
     /// Bounding sizes of the parts to nest, in nest units. An item no part fits in either
     /// orientation is skipped; null or empty keeps every size.
     /// </param>
+    /// <param name="specs">The response's specs, which name each row's grade and finish; null leaves rows unlabeled.</param>
     public static LedgerStockMapping Map(IEnumerable<LedgerStockItem> items, Units units,
-        IReadOnlyCollection<Size>? partEnvelopes = null)
+        IReadOnlyCollection<Size>? partEnvelopes = null, IEnumerable<LedgerStockSpec>? specs = null)
     {
         ArgumentNullException.ThrowIfNull(items);
         var scale = units == Units.Millimeters ? MillimetersPerInch : 1.0;
         var unknown = 0;
         var tooSmall = 0;
+        var specById = new Dictionary<long, LedgerStockSpec>();
+        foreach (var spec in specs ?? Array.Empty<LedgerStockSpec>())
+        {
+            if (spec != null)
+                specById.TryAdd(spec.MaterialSpecId, spec);
+        }
         var entries = new List<Entry>();
-        var drops = new Dictionary<(decimal Width, decimal Length, bool Irregular), Entry>();
+        var drops = new Dictionary<(long Spec, decimal Width, decimal Length, bool Irregular), Entry>();
 
         foreach (var item in items)
         {
@@ -110,13 +133,16 @@ public static class LedgerStockMapper
             }
 
             var irregular = IsShape(item, LedgerItemShapes.IrregularConservativeRectangle);
+            specById.TryGetValue(item.MaterialSpecId, out var itemSpec);
+            var rank = item.Rank ?? itemSpec?.Rank ?? 1;
             if (IsKind(item, LedgerItemKinds.Drop))
             {
-                // ML stores sizes as decimal(10,3), so identical drops match after rounding.
-                var key = (System.Math.Round(shortIn, 3), System.Math.Round(longIn, 3), irregular);
+                // ML stores sizes as decimal(10,3), so identical drops match after rounding. Drops
+                // of different specs stay apart: they differ in grade, finish or rank.
+                var key = (item.MaterialSpecId, System.Math.Round(shortIn, 3), System.Math.Round(longIn, 3), irregular);
                 if (!drops.TryGetValue(key, out var group))
                 {
-                    group = new Entry(size, IsDrop: true, irregular);
+                    group = new Entry(size, IsDrop: true, irregular, rank, Label(itemSpec));
                     drops.Add(key, group);
                     entries.Add(group);
                 }
@@ -124,19 +150,17 @@ public static class LedgerStockMapper
             }
             else
             {
-                var sheet = new Entry(size, IsDrop: false, irregular);
+                var sheet = new Entry(size, IsDrop: false, irregular, rank, Label(itemSpec));
                 sheet.Items.Add(item);
                 entries.Add(sheet);
             }
         }
 
         var rows = new List<LedgerStockRow>(entries.Count);
-        foreach (var entry in entries)
+        // ML already sends rank order; the stable sort keeps ledger order within a rank.
+        foreach (var entry in entries.OrderBy(e => e.Rank))
         {
-            var ordered = entry.IsDrop
-                ? entry.Items.OrderBy(i => i.LocationCode, StringComparer.Ordinal)
-                    .ThenBy(i => i.ItemCode, StringComparer.Ordinal).ToList()
-                : entry.Items;
+            var ordered = entry.Items;
             var codes = ordered.SelectMany(i => Enumerable.Repeat(i.ItemCode, i.Quantity)).ToList();
             var locations = ordered.Select(i => i.LocationCode).Where(code => !string.IsNullOrEmpty(code))
                 .Distinct(StringComparer.Ordinal).ToList();
@@ -150,6 +174,8 @@ public static class LedgerStockMapper
                 entry.IsDrop, entry.IsIrregular, codes, locations)
             {
                 ItemLocations = itemLocations,
+                Rank = entry.Rank,
+                Label = entry.Label,
             });
         }
         return new LedgerStockMapping(rows, unknown, tooSmall);
@@ -169,13 +195,20 @@ public static class LedgerStockMapper
         return false;
     }
 
+    /// <summary>"A1011 P&amp;O" from the spec's grade and finish; null when it has neither.</summary>
+    private static string? Label(LedgerStockSpec? spec)
+    {
+        var parts = new[] { spec?.Grade?.Trim(), spec?.Finish?.Trim() }.Where(p => !string.IsNullOrEmpty(p)).ToList();
+        return parts.Count == 0 ? null : string.Join(" ", parts);
+    }
+
     private static bool IsKind(LedgerStockItem item, string kind) =>
         string.Equals(item.Kind, kind, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsShape(LedgerStockItem item, string shape) =>
         string.Equals(item.Shape, shape, StringComparison.OrdinalIgnoreCase);
 
-    private sealed record Entry(Size Size, bool IsDrop, bool IsIrregular)
+    private sealed record Entry(Size Size, bool IsDrop, bool IsIrregular, int Rank, string? Label)
     {
         public List<LedgerStockItem> Items { get; } = new();
     }

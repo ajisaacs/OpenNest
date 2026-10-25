@@ -27,18 +27,91 @@ public class LedgerStockMapperTests
         Assert.Equal(new Size(48, 96), bundle.Size);
         Assert.Equal(1, mapping.Rows[1].Quantity);
 
-        // Width is the short side; drops matching after ML's 3-place rounding group, ordered by location then code.
+        // Width is the short side; drops matching after ML's 3-place rounding group, in ledger order.
         var drops = mapping.Rows[2];
         Assert.True(drops.IsDrop);
         Assert.Equal(new Size(24, 36), drops.Size);
         Assert.Equal(3, drops.Quantity);
-        Assert.Equal(new[] { "D-1", "D-3", "D-2" }, drops.ItemCodes);
-        Assert.Equal(new[] { "R1", "R2" }, drops.Locations);
+        Assert.Equal(new[] { "D-2", "D-1", "D-3" }, drops.ItemCodes);
+        Assert.Equal(new[] { "R2", "R1" }, drops.Locations);
         Assert.Equal(new[] { "D-9" }, mapping.Rows[3].ItemCodes);
 
         Assert.Equal(2, mapping.SheetRows);
         Assert.Equal(4, mapping.Drops);
         Assert.Equal("Ledger: 2 sheet sizes, 4 drops", mapping.Summary);
+    }
+
+    [Fact]
+    public void DropsOfOneSizeFromDifferentSpecsKeepTheirOwnRows()
+    {
+        var mapping = LedgerStockMapper.Map(new[]
+        {
+            Item("D-1", LedgerItemKinds.Drop, 24, 36, spec: 11, rank: 1),
+            Item("D-2", LedgerItemKinds.Drop, 24, 36, spec: 12, rank: 2),
+            Item("D-3", LedgerItemKinds.Drop, 24, 36, spec: 11, rank: 1, location: "R2"),
+        }, Units.Inches, specs: new[] { Spec(11, 1, "A1011", "HR"), Spec(12, 2, "A1011", "P&O") });
+
+        Assert.Equal(2, mapping.Rows.Count);
+        Assert.Equal(new[] { "D-1", "D-3" }, mapping.Rows[0].ItemCodes);
+        Assert.Equal("A1011 HR", mapping.Rows[0].Label);
+        Assert.False(mapping.Rows[0].IsSubstitute);
+        Assert.Equal(new[] { "D-2" }, mapping.Rows[1].ItemCodes);
+        Assert.Equal("A1011 P&O", mapping.Rows[1].Label);
+        Assert.Equal(2, mapping.Rows[1].Rank);
+        Assert.True(mapping.Rows[1].IsSubstitute);
+        Assert.Equal("Ledger: 0 sheet sizes, 3 drops, 1 substitute row", mapping.Summary);
+    }
+
+    [Fact]
+    public void RowsRunInRankOrderAndKeepLedgerOrderWithinARank()
+    {
+        // Out of rank order on purpose; within a rank the input order is the ledger's own.
+        var mapping = LedgerStockMapper.Map(new[]
+        {
+            Item("P-2", LedgerItemKinds.FullSheet, 48, 96, spec: 12, rank: 2, location: "R1"),
+            Item("H-9", LedgerItemKinds.Drop, 24, 36, spec: 11, rank: 1, location: "A1"),
+            Item("H-1", LedgerItemKinds.Drop, 24, 36, spec: 11, rank: 1, location: "B2"),
+            Item("X-1", LedgerItemKinds.FullSheet, 60, 120, spec: 10, rank: 0, location: "Z9"),
+            Item("H-5", LedgerItemKinds.FullSheet, 48, 96, spec: 11, rank: 1, location: "C3"),
+            Item("L-1", LedgerItemKinds.FullSheet, 48, 96, spec: 13, rank: 3, location: "A1"),
+        }, Units.Inches, specs: new[]
+        {
+            Spec(10, 0, "A36", "HR"), Spec(11, 1, "A1011", "HR"), Spec(12, 2, "A1011", "P&O"), Spec(13, 3, "A1011", "Laser"),
+        });
+
+        Assert.Equal(new[] { 0, 1, 1, 2, 3 }, mapping.Rows.Select(r => r.Rank));
+        Assert.Equal(new[] { "X-1", "H-9", "H-5", "P-2", "L-1" }, mapping.Rows.Select(r => r.ItemCodes[0]));
+        Assert.Equal(new[] { "H-9", "H-1" }, mapping.Rows[1].ItemCodes);
+        Assert.Equal(new[] { "A1", "B2" }, mapping.Rows[1].Locations);
+        Assert.Equal(new[] { "ledger:1", "ledger:2", "ledger:3", "ledger:4", "ledger:5" }, mapping.Rows.Select(r => r.Id));
+        Assert.Equal(new[] { false, false, false, true, true }, mapping.Rows.Select(r => r.IsSubstitute));
+    }
+
+    [Fact]
+    public void AnOlderLedgerWithoutRanksOrGradesIsRankOneAndUnlabeled()
+    {
+        var mapping = LedgerStockMapper.Map(new[]
+        {
+            Item("S-1", LedgerItemKinds.FullSheet, 48, 96, spec: 7),
+            Item("D-1", LedgerItemKinds.Drop, 24, 36, spec: 7),
+        }, Units.Inches, specs: new[] { new LedgerStockSpec(7, "A36 1/4", 0.25m, null) });
+
+        Assert.All(mapping.Rows, row =>
+        {
+            Assert.Equal(1, row.Rank);
+            Assert.Null(row.Label);
+            Assert.False(row.IsSubstitute);
+        });
+        Assert.Equal(new[] { "S-1", "D-1" }, mapping.Rows.Select(r => r.ItemCodes[0]));
+    }
+
+    [Fact]
+    public void ItemRankFallsBackToItsSpecsRank()
+    {
+        var row = Assert.Single(LedgerStockMapper.Map(new[] { Item("S-1", LedgerItemKinds.FullSheet, 48, 96, spec: 12) },
+            Units.Inches, specs: new[] { Spec(12, 2, "A36", null) }).Rows);
+        Assert.Equal(2, row.Rank);
+        Assert.Equal("A36", row.Label);
     }
 
     [Fact]
@@ -123,6 +196,12 @@ public class LedgerStockMapperTests
     }
 
     private static LedgerStockItem Item(string code, string kind, decimal width, decimal length, int quantity = 1,
-        string shape = LedgerItemShapes.Rectangular, string location = "R1") =>
-        new(code, 7, kind, width, length, quantity, shape, location, location, null, null, DateTime.UtcNow);
+        string shape = LedgerItemShapes.Rectangular, string location = "R1", long spec = 7, int? rank = null) =>
+        new(code, spec, kind, width, length, quantity, shape, location, location, null, null, DateTime.UtcNow)
+        {
+            Rank = rank,
+        };
+
+    private static LedgerStockSpec Spec(long id, int rank, string grade, string? finish) =>
+        new(id, $"{grade} {finish}", 0.0598m, "16 ga") { Rank = rank, MaterialFamily = "Steel", Grade = grade, Finish = finish };
 }

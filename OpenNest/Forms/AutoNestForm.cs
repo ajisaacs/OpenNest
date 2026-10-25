@@ -27,6 +27,9 @@ namespace OpenNest.Forms
         private bool loadingLedger;
         private string ledgerSummary = "";
 
+        /// <summary>A dark amber that reads on the grid's white rows.</summary>
+        internal static readonly System.Drawing.Color SubstituteColor = System.Drawing.Color.FromArgb(160, 82, 0);
+
         public AutoNestForm(Nest nest)
         {
             this.nest = nest;
@@ -205,8 +208,9 @@ namespace OpenNest.Forms
                 {
                     DataPropertyName = "Source",
                     HeaderText = "Source",
+                    ToolTipText = "Where a ledger row's stock comes from. \"for {grade}\" marks a substitute MaterialLedger accepts in place of the nest's grade.",
                     ReadOnly = true,
-                    Width = 90,
+                    Width = 160,
                     AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
                 }
             );
@@ -601,7 +605,7 @@ namespace OpenNest.Forms
             switch (result)
             {
                 case LedgerStockResult.Ok ok:
-                    var mapping = LedgerStockMapper.Map(ok.Items, nest.Units, PartEnvelopes());
+                    var mapping = LedgerStockMapper.Map(ok.Items, nest.Units, PartEnvelopes(), ok.Specs);
                     ReplaceLedgerRows(mapping.Rows);
                     ledgerSummary = mapping.Rows.Count == 0 && mapping.SkippedUnknownShape + mapping.SkippedTooSmall == 0
                         ? $"Ledger: no free stock of {DescribeMaterial()}."
@@ -659,6 +663,8 @@ namespace OpenNest.Forms
                 if (items[i].LedgerRow != null)
                     items.RemoveAt(i);
             }
+            // Substitutes load ticked like the rest; the programmer unticks any not wanted.
+            var grade = nest.Material?.Grade?.Trim();
             foreach (var row in rows)
             {
                 items.Add(new PlateOptionItem
@@ -666,6 +672,8 @@ namespace OpenNest.Forms
                     Size = FormatSize(System.Math.Round(row.Size.Width, 3), System.Math.Round(row.Size.Length, 3)),
                     Quantity = row.Quantity,
                     LedgerRow = row,
+                    Source = LedgerSource(row, grade),
+                    Tooltip = LedgerTooltip(row, grade),
                 });
             }
         }
@@ -716,23 +724,48 @@ namespace OpenNest.Forms
         private void PlateGrid_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
         {
             var property = plateGrid.Columns[e.ColumnIndex].DataPropertyName;
-            if (ItemAt(e.RowIndex)?.LedgerRow != null && property is "Size" or "Cost" or "Source")
+            var ledger = ItemAt(e.RowIndex)?.LedgerRow;
+            if (ledger == null)
+                return;
+            // A substitute's source stays in full colour so it stands out from the preferred stock.
+            if (property == "Source" && ledger.IsSubstitute)
+                e.CellStyle.ForeColor = SubstituteColor;
+            else if (property is "Size" or "Cost" or "Source")
                 e.CellStyle.ForeColor = System.Drawing.SystemColors.GrayText;
         }
 
         private void PlateGrid_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
         {
-            var ledger = ItemAt(e.RowIndex)?.LedgerRow;
-            if (ledger != null)
-                e.ToolTipText = LedgerTooltip(ledger);
+            var item = ItemAt(e.RowIndex);
+            if (item?.LedgerRow != null)
+                e.ToolTipText = item.Tooltip;
         }
 
-        internal static string LedgerTooltip(LedgerStockRow row)
+        /// <summary>
+        /// A ledger row's Source cell: its grade and finish ("A1011 P&amp;O", or "Ledger" when the
+        /// ledger names neither), "for HR" on a substitute, and "(irr.)" on an irregular drop.
+        /// </summary>
+        internal static string LedgerSource(LedgerStockRow row, string requestedGrade)
+        {
+            var text = row.Label ?? "Ledger";
+            if (row.IsSubstitute)
+                text += string.IsNullOrEmpty(requestedGrade) ? " (substitute)" : $" for {requestedGrade}";
+            return row.IsIrregular ? text + " (irr.)" : text;
+        }
+
+        internal static string LedgerTooltip(LedgerStockRow row, string requestedGrade = null)
         {
             const int Shown = 12;
             var codes = row.ItemCodes.Distinct(StringComparer.Ordinal).ToList();
             var codeText = string.Join(", ", codes.Take(Shown)) + (codes.Count > Shown ? $", +{codes.Count - Shown} more" : "");
-            var text = $"Items: {codeText}";
+            var text = "";
+            if (row.IsSubstitute)
+                text = $"Substitute: MaterialLedger accepts {row.Label ?? "this stock"} in place of "
+                    + $"{(string.IsNullOrEmpty(requestedGrade) ? "the nest's grade" : requestedGrade)} (rank {row.Rank}). "
+                    + "Untick Use to leave it out.\n";
+            else if (row.Label != null)
+                text = $"Source: {row.Label}\n";
+            text += $"Items: {codeText}";
             if (row.Locations.Count > 0)
                 text += $"\nLocations: {string.Join(", ", row.Locations.Take(Shown))}"
                     + (row.Locations.Count > Shown ? $", +{row.Locations.Count - Shown} more" : "");
@@ -892,12 +925,13 @@ namespace OpenNest.Forms
 
             public double Cost { get; set; }
 
-            public string Source => LedgerRow == null ? ""
-                : LedgerRow.IsIrregular ? "Ledger (irr.)"
-                : "Ledger";
+            /// <summary>Blank for hand-typed rows; see <see cref="LedgerSource"/>.</summary>
+            public string Source { get; set; } = "";
 
             /// <summary>Set for rows loaded from MaterialLedger; these are never saved with the nest.</summary>
             internal LedgerStockRow LedgerRow { get; set; }
+
+            internal string Tooltip { get; set; }
         }
     }
 }

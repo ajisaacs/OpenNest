@@ -52,6 +52,48 @@ public class MaterialLedgerClientTests
     }
 
     [Fact]
+    public async Task RankedStockReadsRanksAndCatalogNames()
+    {
+        var client = Client(_ => Json("""
+            {
+              "mapped": true,
+              "specs": [
+                { "materialSpecId": 12, "displayName": "A1011 HR 16 ga", "thicknessIn": 0.0598, "gaugeLabel": "16 ga",
+                  "rank": 1, "materialFamily": "Steel", "grade": "A1011", "finish": "HR" },
+                { "materialSpecId": 13, "displayName": "A1011 P&O 16 ga", "thicknessIn": 0.0598, "gaugeLabel": "16 ga",
+                  "rank": 2, "materialFamily": "Steel", "grade": "A1011", "finish": null }
+              ],
+              "items": [{
+                "itemCode": "FS-4896", "materialSpecId": 13, "rank": 2, "kind": "FullSheet", "widthIn": 48, "lengthIn": 96,
+                "quantity": 1, "shape": "Rectangular", "locationCode": "R1-A", "locationName": "Rack 1 A",
+                "parentLocationCode": "R1", "costPerUnit": null, "lastObservedAtUtc": "2026-10-20T14:00:00"
+              }]
+            }
+            """));
+
+        var ok = Assert.IsType<LedgerStockResult.Ok>(await client.GetStockAsync("Steel", "HR", 0.0598, default));
+
+        Assert.Equal(new int?[] { 1, 2 }, ok.Specs.Select(s => s.Rank));
+        Assert.Equal(("Steel", "A1011", "HR"), (ok.Specs[0].MaterialFamily, ok.Specs[0].Grade, ok.Specs[0].Finish));
+        Assert.Null(ok.Specs[1].Finish);
+        Assert.Equal(2, Assert.Single(ok.Items).Rank);
+    }
+
+    [Fact]
+    public async Task AnOlderLedgerWithoutRanksStillDeserializes()
+    {
+        var ok = Assert.IsType<LedgerStockResult.Ok>(await Client(_ => Json(MappedBody))
+            .GetStockAsync("Steel", "A36", 0.25, default));
+
+        var spec = Assert.Single(ok.Specs);
+        Assert.Null(spec.Rank);
+        Assert.Null(spec.MaterialFamily);
+        Assert.Null(spec.Grade);
+        Assert.Null(spec.Finish);
+        Assert.Null(Assert.Single(ok.Items).Rank);
+    }
+
+    [Fact]
     public async Task UnmappedMaterialIsDistinctFromEmptyStock()
     {
         var unmapped = Client(_ => Json("""{ "mapped": false, "specs": [], "items": [] }"""));
