@@ -29,6 +29,12 @@ baseline, when a nest has no baseline, or when the baseline's plate numbers diff
 nest's. A different outcome at the same or a better rank is only reported. When it is
 intended, update the baseline.
 
+A nest whose comments also carry a `planning with cut-offs: 1=Ready 2=BestEffort` line is
+planned a second time, as Plan Cutting does after **Clear Lead-ins & Cut-offs** and **Add scrap
+cut-offs** at their defaults, and each plate is held to that line the same way. Set
+`OPENNEST_PROBLEM_NESTS_CUTOFFS=1` to plan every nest with cut-offs and print the outcomes
+without comparing them, to record a new line.
+
 Plates use their own cutting parameters. A plate without them uses line lead-ins of 0.15 at
 90 degrees (external and internal) and no lead-outs.
 

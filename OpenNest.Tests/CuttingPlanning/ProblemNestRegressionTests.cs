@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Data;
 using OpenNest.Engine.CuttingPlanning;
+using OpenNest.Engine.Sequencing;
 using OpenNest.IO;
 using Xunit.Abstractions;
 
@@ -10,15 +11,19 @@ namespace OpenNest.Tests.CuttingPlanning;
 
 /// <summary>
 /// Plans every nest on a dedicated problem-nest OpenNest server and fails when a plate's outcome is
-/// worse than its recorded baseline. Opt-in and private: the nests and their baselines stay on the
-/// server, never in the repository. See docs/problem-nests.md.
+/// worse than its recorded baseline. A nest with a cut-off baseline is planned a second time with
+/// its applied lead-ins and cut-offs cleared and default scrap cut-offs added. Opt-in and private:
+/// the nests and their baselines stay on the server, never in the repository. See docs/problem-nests.md.
 /// </summary>
 [Trait("Category", "ProblemNests")]
 public partial class ProblemNestRegressionTests(ITestOutputHelper output)
 {
     internal const string ServerVariable = "OPENNEST_PROBLEM_NESTS_SERVER";
     internal const string TimeoutVariable = "OPENNEST_PROBLEM_NESTS_TIMEOUT";
+    internal const string CutOffsVariable = "OPENNEST_PROBLEM_NESTS_CUTOFFS";
     internal const string Timeout = "Timeout";
+    internal const string PlanningLine = "planning:";
+    internal const string CutOffPlanningLine = "planning with cut-offs:";
     // A corpus is a handful of nests; more means the variable names a production archive.
     internal const int MaximumNests = 200;
 
@@ -38,37 +43,70 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
         {
             var bytes = await repository.GetFileAsync(record.Id)
                 ?? throw new InvalidOperationException($"'{record.Name}' has no file.");
-            using var stream = new MemoryStream(bytes);
-            var nest = new NestReader(stream).Read();
             var baseline = Baseline(record.Comments);
-            var observed = new SortedDictionary<int, string>();
-            for (var index = 0; index < nest.Plates.Count; index++)
-            {
-                var plate = nest.Plates[index];
-                if (plate.Parts.Count == 0)
-                    continue;
-                var number = index + 1;
-                var watch = Stopwatch.StartNew();
-                var (outcome, planned) = Plan(plate, number, limit);
-                observed[number] = outcome;
-                var expected = baseline.GetValueOrDefault(number);
-                output.WriteLine($"{record.Name} plate {number}: {outcome} (baseline {expected ?? "none"}), "
-                    + $"{planned?.Result.Expansions ?? 0} expansions, {watch.Elapsed.TotalSeconds:0.0} s");
-                if (expected == null)
-                    continue;
-                if (Rank(outcome) < Rank(expected))
-                    failures.Add($"{record.Name} plate {number}: {outcome}, worse than baseline {expected}. "
-                        + string.Join(" | ", planned?.Result.Findings.Take(3).Select(f => f.Message) ?? []));
-                else if (outcome != expected)
-                    output.WriteLine($"  changed from {expected}; update the baseline if this is intended.");
-            }
-            var line = "planning: " + string.Join(" ", observed.Select(p => $"{p.Key}={p.Value}"));
+            var observed = PlanAll(record.Name, bytes, false, baseline, limit, failures);
             if (baseline.Count == 0)
-                failures.Add($"{record.Name} has no baseline. Add this line to its comments: {line}");
-            else if (baseline.Keys.Except(observed.Keys).Any() || observed.Keys.Except(baseline.Keys).Any())
-                failures.Add($"{record.Name}: baseline plates do not match the nest's plates. Observed: {line}");
+                failures.Add($"{record.Name} has no baseline. Add this line to its comments: {Line(PlanningLine, observed)}");
+            if (Environment.GetEnvironmentVariable(CutOffsVariable) == "1")
+                PlanAll(record.Name, bytes, true, [], limit, failures);
+            else if (Baseline(record.Comments, CutOffPlanningLine) is { Count: > 0 } withCutOffs)
+                PlanAll(record.Name, bytes, true, withCutOffs, limit, failures);
         }
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+    }
+
+    // Plans each plate with parts and compares it with the baseline; plate number to outcome.
+    private SortedDictionary<int, string> PlanAll(string name, byte[] bytes, bool cutOffs,
+        Dictionary<int, string> baseline, TimeSpan limit, List<string> failures)
+    {
+        using var stream = new MemoryStream(bytes);
+        var nest = new NestReader(stream).Read();
+        var label = cutOffs ? $"{name} with cut-offs" : name;
+        var observed = new SortedDictionary<int, string>();
+        for (var index = 0; index < nest.Plates.Count; index++)
+        {
+            var plate = nest.Plates[index];
+            if (plate.Parts.Count == 0)
+                continue;
+            var number = index + 1;
+            var watch = Stopwatch.StartNew();
+            if (cutOffs)
+                AddScrapCutOffs(plate, number, nest.Units);
+            var (outcome, planned) = Plan(plate, number, limit);
+            observed[number] = outcome;
+            var expected = baseline.GetValueOrDefault(number);
+            output.WriteLine($"{label} plate {number}: {outcome} (baseline {expected ?? "none"}), "
+                + $"{planned?.Result.Expansions ?? 0} expansions, {watch.Elapsed.TotalSeconds:0.0} s");
+            if (expected == null)
+                continue;
+            if (Rank(outcome) < Rank(expected))
+                failures.Add($"{label} plate {number}: {outcome}, worse than baseline {expected}. "
+                    + string.Join(" | ", planned?.Result.Findings.Take(3).Select(f => f.Message) ?? []));
+            else if (outcome != expected)
+                output.WriteLine($"  changed from {expected}; update the baseline if this is intended.");
+        }
+        if (baseline.Count != 0 && (baseline.Keys.Except(observed.Keys).Any() || observed.Keys.Except(baseline.Keys).Any()))
+            failures.Add($"{label}: baseline plates do not match the nest's plates. Observed: "
+                + Line(cutOffs ? CutOffPlanningLine : PlanningLine, observed));
+        return observed;
+    }
+
+    private static string Line(string prefix, SortedDictionary<int, string> observed) =>
+        prefix + " " + string.Join(" ", observed.Select(p => $"{p.Key}={p.Value}"));
+
+    // As Plan Cutting after "Clear Lead-ins & Cut-offs", with "Add scrap cut-offs" at its defaults.
+    private static void AddScrapCutOffs(Plate plate, int number, Units units)
+    {
+        AppliedCuttingWork.Clear([plate], [number]);
+        var spacing = units == Units.Millimeters ? 889 : 35;
+        var staging = AutomaticCutOffBatch.Stage([plate], new AutomaticCutOffOptions
+        {
+            Spacing = spacing,
+            MinimumStripLength = spacing / 2.0,
+            MinimumTailLength = units == Units.Millimeters ? 304.8 : 12,
+        }, new CutOffSettings());
+        Assert.False(staging.IsBlocked, $"Plate {number}'s scrap cut-offs are blocked.");
+        PlateSequencing.PlaceCutOffs(plate, staging.Plans[0].Definitions);
     }
 
     // Capture and planning share the limit; a plate that never finishes must not hang the run.
@@ -101,11 +139,14 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
         return page.Items;
     }
 
-    /// <summary>Plate number to outcome, from a "planning: 1=Ready 2=BestEffort" comment line.</summary>
-    internal static Dictionary<int, string> Baseline(string comments)
+    /// <summary>
+    /// Plate number to outcome, from a "planning: 1=Ready 2=BestEffort" comment line, or from the
+    /// line starting with <paramref name="prefix"/>.
+    /// </summary>
+    internal static Dictionary<int, string> Baseline(string comments, string prefix = PlanningLine)
     {
         var line = (comments ?? "").Split('\n').Select(l => l.Trim())
-            .FirstOrDefault(l => l.StartsWith("planning:", StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(l => l.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
         return line == null ? []
             : BaselineEntry().Matches(line).ToDictionary(m => int.Parse(m.Groups[1].Value), m => m.Groups[2].Value);
     }
@@ -146,6 +187,17 @@ public class ProblemNestBaselineTests
 
         Assert.Equal(new Dictionary<int, string> { [1] = "NoSolutionWithinBudget", [2] = "BestEffort" }, baseline);
         Assert.Empty(ProblemNestRegressionTests.Baseline("no baseline yet"));
+    }
+
+    [Fact]
+    public void Baseline_ReadsTheCutOffLineApartFromThePlanningLine()
+    {
+        const string comments = "planning: 1=Ready 2=BestEffort\nplanning with cut-offs: 1=Ready 2=Ready";
+
+        Assert.Equal(new Dictionary<int, string> { [1] = "Ready", [2] = "BestEffort" },
+            ProblemNestRegressionTests.Baseline(comments));
+        Assert.Equal(new Dictionary<int, string> { [1] = "Ready", [2] = "Ready" },
+            ProblemNestRegressionTests.Baseline(comments, ProblemNestRegressionTests.CutOffPlanningLine));
     }
 
     [Fact]
