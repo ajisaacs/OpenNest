@@ -255,3 +255,67 @@ save/reopen preserves them and existing nest metadata. Rejected/cancelled propos
 change neither requirements nor options. Inventory remains request-local; saved
 options are offers, not a per-sheet purchase ledger. These are cost-aware heuristics,
 not global cost optimizers; validation and fulfillment remain required.
+
+## Stock from MaterialLedger
+
+Auto Nest can offer the sheets and drops that MaterialLedger reports as free for the
+nest's material. The ledger is optional: with no URL set, or the ledger unreachable,
+Auto Nest, save and post work exactly as before. OpenNest only reads from the ledger.
+The stock it loads is a snapshot taken at nesting time and reserves nothing. ML's hold
+batch stays the only authority, and another programmer can hold the same drop first.
+
+**Setup (per PC).** Tools > Options > MaterialLedger takes the ledger URL and the API
+key for ML's `Api:Keys:OpenNest`. They are stored in `%APPDATA%\OpenNest\material-ledger.json`,
+with the key encrypted by DPAPI for the current Windows user. The key never goes in
+`defaults.json` or a nest file. **Test** makes the same request with a material no
+mapping names, so it reports the connection as working when ML answers `mapped: false`.
+
+**Request.** **Load from ledger** above the Stock Options grid calls
+`GET {url}/api/stock/opennest?material=&grade=&thicknessIn=` with the `X-Api-Key`
+header and a 5 s timeout. The request sends the nest's `Material.Name`, its `Material.Grade`
+and the thickness converted to inches (rounded to 4 places). ML resolves its own
+OpenNest material mapping, and OpenNest keeps no copy of it. The button is enabled when
+the ledger is configured and the nest has a material and a thickness. The request runs
+while the dialog stays usable, and closing the dialog cancels it. The client
+(`OpenNest.Data/MaterialLedger/`) returns `NotConfigured`, `Unreachable(reason)`,
+`Unauthorized` (401/403), `Unmapped` (`mapped: false`) or `Ok` and never throws for these
+failures. Unknown `kind`/`shape` strings still deserialize.
+
+**Rows.** `LedgerStockMapper` turns the items into stock rows. Ledger sizes are inches
+with the short side first, and become `Size(short, long)` in nest units:
+
+| Ledger item | Stock row |
+|---|---|
+| `FullSheetBundle` / `FullSheet`, free quantity N | one row, quantity N |
+| `Drop` | drops of identical usable size (3-place inches) share one row; quantity is the count |
+| `IrregularConservativeRectangle` | its conservative rectangle, kept apart and marked "irregular" |
+| `Unknown` or an unrecognized shape | skipped and counted in the summary |
+| no part to nest fits in either orientation | skipped and counted in the summary |
+
+Each row keeps its item codes (one per sheet, drops ordered by location then code)
+and locations for the row tooltip and for later item assignment. The engine sees only
+ordinary `NestPlateStock` rows with ids `ledger:{n}` and finite quantities. It never
+sees item codes, and `OpenNest.Engine` has no ledger reference.
+
+**Grid.** A load replaces earlier ledger rows and keeps hand-typed rows. Ledger rows
+show Source "Ledger", and their size and cost are read-only. You can lower a ledger
+row's quantity (not above the free count) or untick **Use** to leave any row out.
+The **Qty** column applies to every row: blank offers the size without limit, as
+hand-typed rows always have, and a number is passed as `PlateOption.Quantity` to
+`NestPlateStock.Quantity`. A summary line under the grid reports the load, for example
+"Ledger: 3 sheet sizes, 7 drops (2 skipped: 2 unknown shape)", or the failure. An
+unmapped material clears the ledger rows. A failed request keeps them.
+
+**Persistence.** Ledger rows and quantities are request-local and are never written to
+`Nest.PlateOptions`. After a kept result, the nest saves the hand-typed rows with their
+typed costs, as before.
+
+**Cost.** Ledger rows load without cost. A ledger `CostPerUnit` is per lot unit, and a
+drop's is its source sheet's. While any ledger row is ticked, the run scores by area and
+hand-typed costs are ignored. The summary line says so, and the saved options keep
+those costs. Pro-rating drop cost by area is a possible later change. Area scoring does
+not make drops preferred over full sheets; a stock priority would be a `NestJob` input
+with its own benchmark.
+
+MCP, Console and `OpenNest.Api` do not load ledger stock yet. The client and mapper live
+in `OpenNest.Data`, so these front ends can use them.

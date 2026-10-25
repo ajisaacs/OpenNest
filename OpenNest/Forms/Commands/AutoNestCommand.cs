@@ -28,6 +28,7 @@ namespace OpenNest.Forms.Commands
         private readonly List<PlateOption> plateOptions;
         private readonly double salvageRate;
         private readonly double minRemnantSize;
+        private List<PlateOption> savedOptions;
 
         private AutoNestCommand(IWin32Window owner, EditNestForm target, List<NestItem> items,
             List<PlateOption> plateOptions, string engineName, double salvageRate, double minRemnantSize)
@@ -60,14 +61,19 @@ namespace OpenNest.Forms.Commands
             if (!items.Any(it => it.Quantity > 0))
                 return null;
             var plateOptions = default(List<PlateOption>);
-            if (form.OptimizePlateSize && !form.TryGetPlateOptions(out plateOptions, out var stockError))
+            var savedOptions = default(List<PlateOption>);
+            if (form.OptimizePlateSize
+                && !form.TryGetPlateOptions(out plateOptions, out savedOptions, out var stockError))
             {
                 MessageBox.Show(owner, stockError, Caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return null;
             }
 
             return new AutoNestCommand(owner, target, items, plateOptions,
-                form.EngineName ?? EngineSelection.EngineName, form.SalvageRate, form.MinRemnantSize);
+                form.EngineName ?? EngineSelection.EngineName, form.SalvageRate, form.MinRemnantSize)
+            {
+                savedOptions = savedOptions,
+            };
         }
 
         /// <summary>
@@ -111,7 +117,10 @@ namespace OpenNest.Forms.Commands
                     target.PlateManager.LoadAt(target.Nest.Plates.IndexOf(applied[0]));
                 if (plateOptions?.Count > 0)
                 {
-                    target.Nest.PlateOptions = plateOptions;
+                    // Ledger rows and quantities are request-local inventory; the nest keeps
+                    // only the hand-typed offers.
+                    if (savedOptions?.Count > 0)
+                        target.Nest.PlateOptions = savedOptions;
                     target.Nest.SalvageRate = salvageRate;
                 }
                 target.PlateView.Invalidate();

@@ -5,7 +5,10 @@ using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Jobs;
 
-/// <summary>Shared stock snapshots for whole-job front ends. Plate repeat count is not inventory.</summary>
+/// <summary>
+/// Shared stock snapshots for whole-job front ends. Plate repeat count is not inventory; an
+/// option's own quantity and id win over <c>quantityPerOption</c> and its position.
+/// </summary>
 public static class NestStockBuilder
 {
     public static IReadOnlyList<NestPlateStock> FromTemplate(
@@ -25,9 +28,9 @@ public static class NestStockBuilder
             ArgumentNullException.ThrowIfNull(option);
             var size = new Size(option.Width, option.Length);
             stock.Add(new NestPlateStock(
-                $"option-{i}",
+                option.Id ?? $"option-{i}",
                 size,
-                quantityPerOption,
+                option.Quantity ?? quantityPerOption,
                 template.PartSpacing,
                 template.EdgeSpacing,
                 template.Quadrant,

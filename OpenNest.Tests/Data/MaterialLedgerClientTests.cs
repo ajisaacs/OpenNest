@@ -1,0 +1,166 @@
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using OpenNest.Data.MaterialLedger;
+
+namespace OpenNest.Tests.Data;
+
+public class MaterialLedgerClientTests
+{
+    private const string MappedBody = """
+        {
+          "mapped": true,
+          "specs": [{ "materialSpecId": 7, "displayName": "A36 1/4", "thicknessIn": 0.25, "gaugeLabel": null }],
+          "items": [{
+            "itemCode": "D-101", "materialSpecId": 7, "kind": "Drop", "widthIn": 24.5, "lengthIn": 36,
+            "quantity": 1, "shape": "Rectangular", "locationCode": "R1-A", "locationName": "Rack 1 A",
+            "parentLocationCode": "R1", "costPerUnit": null, "lastObservedAtUtc": "2026-10-20T14:00:00Z"
+          }]
+        }
+        """;
+
+    private static readonly MaterialLedgerSettings Configured = new() { BaseUrl = "http://ledger:5000/", ApiKey = "secret-key" };
+
+    [Fact]
+    public async Task NotConfiguredNeverSendsARequest()
+    {
+        var sent = 0;
+        var client = Client(_ => { sent++; return Json(MappedBody); }, new MaterialLedgerSettings());
+        Assert.IsType<LedgerStockResult.NotConfigured>(await client.GetStockAsync("Steel", "A36", 0.25, default));
+        Assert.Equal(0, sent);
+    }
+
+    [Fact]
+    public async Task MappedStockIsOkAndSendsTheKeyAndQuery()
+    {
+        HttpRequestMessage? seen = null;
+        var client = Client(request => { seen = request; return Json(MappedBody); });
+
+        var ok = Assert.IsType<LedgerStockResult.Ok>(await client.GetStockAsync("Stainless Steel", "304 #4", 0.18750, default));
+
+        Assert.Equal("secret-key", Assert.Single(seen!.Headers.GetValues(MaterialLedgerClient.ApiKeyHeader)));
+        Assert.Equal("/api/stock/opennest?material=Stainless%20Steel&grade=304%20%234&thicknessIn=0.1875",
+            seen.RequestUri!.PathAndQuery);
+        Assert.Equal("ledger", seen.RequestUri.Host);
+        var spec = Assert.Single(ok.Specs);
+        Assert.Equal(0.25m, spec.ThicknessIn);
+        var item = Assert.Single(ok.Items);
+        Assert.Equal("D-101", item.ItemCode);
+        Assert.Equal(LedgerItemKinds.Drop, item.Kind);
+        Assert.Equal(24.5m, item.WidthIn);
+        Assert.Null(item.CostPerUnit);
+    }
+
+    [Fact]
+    public async Task UnmappedMaterialIsDistinctFromEmptyStock()
+    {
+        var unmapped = Client(_ => Json("""{ "mapped": false, "specs": [], "items": [] }"""));
+        Assert.IsType<LedgerStockResult.Unmapped>(await unmapped.GetStockAsync("Unobtainium", "", 1, default));
+
+        var empty = Client(_ => Json("""{ "mapped": true, "specs": [], "items": [] }"""));
+        var ok = Assert.IsType<LedgerStockResult.Ok>(await empty.GetStockAsync("Steel", "A36", 0.25, default));
+        Assert.Empty(ok.Items);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task RejectedKeyIsUnauthorized(HttpStatusCode status)
+    {
+        var client = Client(_ => new HttpResponseMessage(status));
+        Assert.IsType<LedgerStockResult.Unauthorized>(await client.GetStockAsync("Steel", "A36", 0.25, default));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound, "no OpenNest stock route")]
+    [InlineData(HttpStatusCode.InternalServerError, "HTTP 500")]
+    public async Task OtherStatusesAreUnreachable(HttpStatusCode status, string reason)
+    {
+        var client = Client(_ => new HttpResponseMessage(status));
+        var result = Assert.IsType<LedgerStockResult.Unreachable>(await client.GetStockAsync("Steel", "A36", 0.25, default));
+        Assert.Contains(reason, result.Reason);
+    }
+
+    [Fact]
+    public async Task NetworkFailureAndGarbageAreUnreachable()
+    {
+        var down = Client(_ => throw new HttpRequestException("No such host is known."));
+        Assert.Contains("No such host", Assert.IsType<LedgerStockResult.Unreachable>(
+            await down.GetStockAsync("Steel", "A36", 0.25, default)).Reason);
+
+        var garbage = Client(_ => Json("<html>login</html>"));
+        Assert.IsType<LedgerStockResult.Unreachable>(await garbage.GetStockAsync("Steel", "A36", 0.25, default));
+    }
+
+    [Fact]
+    public async Task InvalidUrlIsUnreachableWithoutARequest()
+    {
+        var client = Client(_ => throw new InvalidOperationException("sent"),
+            new MaterialLedgerSettings { BaseUrl = "ftp://ledger" });
+        Assert.IsType<LedgerStockResult.Unreachable>(await client.GetStockAsync("Steel", "A36", 0.25, default));
+    }
+
+    [Fact]
+    public async Task SlowLedgerTimesOutAsUnreachable()
+    {
+        using var http = new HttpClient(new HangingHandler());
+        var client = new MaterialLedgerClient(http, Configured, TimeSpan.FromMilliseconds(50));
+        var result = Assert.IsType<LedgerStockResult.Unreachable>(await client.GetStockAsync("Steel", "A36", 0.25, default));
+        Assert.Contains("No answer", result.Reason);
+        Assert.Equal(TimeSpan.FromSeconds(5), MaterialLedgerClient.RequestTimeout);
+    }
+
+    [Fact]
+    public async Task CallerCancellationThrows()
+    {
+        using var http = new HttpClient(new HangingHandler());
+        var client = new MaterialLedgerClient(http, Configured);
+        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.GetStockAsync("Steel", "A36", 0.25, cancel.Token));
+    }
+
+    [Fact]
+    public async Task UnknownKindAndShapeStillDeserialize()
+    {
+        var client = Client(_ => Json("""
+            {
+              "mapped": true, "specs": [],
+              "items": [{
+                "itemCode": "X-1", "materialSpecId": 7, "kind": "Coil", "widthIn": 48, "lengthIn": 96,
+                "quantity": 2, "shape": "Circular", "locationCode": "", "locationName": "",
+                "parentLocationCode": null, "costPerUnit": 12.5, "lastObservedAtUtc": "2026-10-20T14:00:00Z",
+                "someNewField": 1
+              }]
+            }
+            """));
+        var ok = Assert.IsType<LedgerStockResult.Ok>(await client.GetStockAsync("Steel", "A36", 0.25, default));
+        var item = Assert.Single(ok.Items);
+        Assert.Equal("Coil", item.Kind);
+        Assert.Equal("Circular", item.Shape);
+    }
+
+    private static MaterialLedgerClient Client(Func<HttpRequestMessage, HttpResponseMessage> reply,
+        MaterialLedgerSettings? settings = null) =>
+        new(new HttpClient(new Handler(reply)), settings ?? Configured);
+
+    private static HttpResponseMessage Json(string body) =>
+        new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+
+    private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> reply) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(reply(request));
+        }
+    }
+
+    private sealed class HangingHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new InvalidOperationException("unreachable");
+        }
+    }
+}

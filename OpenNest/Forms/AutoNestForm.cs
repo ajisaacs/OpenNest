@@ -3,9 +3,13 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Controls;
+using OpenNest.Data.MaterialLedger;
 using OpenNest.Engine;
+using OpenNest.Geometry;
 using OpenNest.Help;
 
 namespace OpenNest.Forms
@@ -18,8 +22,14 @@ namespace OpenNest.Forms
             TimeSpan.FromMilliseconds(250)
         );
 
+        private readonly Nest nest;
+        private CancellationTokenSource ledgerCancellation;
+        private bool loadingLedger;
+        private string ledgerSummary = "";
+
         public AutoNestForm(Nest nest)
         {
+            this.nest = nest;
             InitializeComponent();
             GridStyle.Apply(partsGrid);
             GridStyle.Apply(plateGrid);
@@ -30,6 +40,7 @@ namespace OpenNest.Forms
             LoadDrawings(nest);
             LoadDefaultPlateOptions();
             SetPlateOptimizerVisible(false);
+            UpdateLedgerButton();
             HelpTopics.Attach(this, HelpTopics.AutoNest);
 
             partsGrid.DataError += PartsGrid_DataError;
@@ -147,6 +158,16 @@ namespace OpenNest.Forms
         private void SetupPlateGrid()
         {
             plateGrid.Columns.Add(
+                new DataGridViewCheckBoxColumn
+                {
+                    DataPropertyName = "Use",
+                    HeaderText = "Use",
+                    ToolTipText = "Untick to leave the row out of this Auto Nest.",
+                    Width = 40,
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+                }
+            );
+            plateGrid.Columns.Add(
                 new DataGridViewTextBoxColumn
                 {
                     DataPropertyName = "Size",
@@ -155,6 +176,18 @@ namespace OpenNest.Forms
                     AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
                 }
             );
+            var quantityColumn = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Quantity",
+                HeaderText = "Qty",
+                ToolTipText = "Sheets on hand. Blank offers the size without limit.",
+                Width = 55,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+            };
+            // A blank cell binds as null (unlimited), not DBNull.
+            quantityColumn.DefaultCellStyle.DataSourceNullValue = null;
+            quantityColumn.DefaultCellStyle.NullValue = "";
+            plateGrid.Columns.Add(quantityColumn);
             plateGrid.Columns.Add(
                 new DataGridViewTextBoxColumn
                 {
@@ -166,8 +199,29 @@ namespace OpenNest.Forms
                 }
             );
 
+            plateGrid.Columns.Add(
+                new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = "Source",
+                    HeaderText = "Source",
+                    ReadOnly = true,
+                    Width = 90,
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+                }
+            );
+
             plateGrid.CellValidating += PlateGrid_CellValidating;
             plateGrid.DataError += PlateGrid_DataError;
+            plateGrid.CellBeginEdit += PlateGrid_CellBeginEdit;
+            plateGrid.CellFormatting += PlateGrid_CellFormatting;
+            plateGrid.CellToolTipTextNeeded += PlateGrid_CellToolTipTextNeeded;
+            plateGrid.CellValueChanged += (s, e) => UpdateLedgerSummary();
+            // Commit a Use tick at once so the summary line follows it.
+            plateGrid.CurrentCellDirtyStateChanged += (s, e) =>
+            {
+                if (plateGrid.IsCurrentCellDirty && plateGrid.CurrentCell is DataGridViewCheckBoxCell)
+                    plateGrid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+            };
         }
 
         private void LoadDrawings(Nest nest)
@@ -220,9 +274,20 @@ namespace OpenNest.Forms
             return options;
         }
 
-        public bool TryGetPlateOptions(out List<PlateOption> options, out string error)
+        public bool TryGetPlateOptions(out List<PlateOption> options, out string error) =>
+            TryGetPlateOptions(out options, out _, out error);
+
+        /// <summary>
+        /// <paramref name="options"/> is the stock for this run: ticked rows with their
+        /// quantities, ledger rows under their <c>ledger:{n}</c> ids, and no costs while ledger
+        /// stock is offered. <paramref name="savedOptions"/> is what the nest keeps: every
+        /// hand-typed row with its typed cost, never ledger rows or quantities.
+        /// </summary>
+        public bool TryGetPlateOptions(out List<PlateOption> options, out List<PlateOption> savedOptions,
+            out string error)
         {
             options = new List<PlateOption>();
+            savedOptions = new List<PlateOption>();
             error = null;
 
             // CellValidating cancels an unparsable size and leaves the cell in edit mode;
@@ -253,6 +318,15 @@ namespace OpenNest.Forms
                 return false;
             }
 
+            if (plateGrid.IsCurrentCellInEditMode && plateGrid.CurrentCell != null
+                && plateGrid.Columns[plateGrid.CurrentCell.ColumnIndex].DataPropertyName == "Quantity"
+                && plateGrid.EditingControl != null
+                && !ValidQuantity(plateGrid.EditingControl.Text, ItemAt(plateGrid.CurrentCell.RowIndex)))
+            {
+                error = QuantityError(plateGrid.CurrentCell.RowIndex);
+                return false;
+            }
+
             bool committed;
             try
             {
@@ -273,10 +347,35 @@ namespace OpenNest.Forms
             if (gridItems == null)
                 return true;
 
+            // Ledger costs are per lot unit (a drop carries its source sheet's), so a run with
+            // ledger stock scores by area; hand-typed costs stay saved for later runs.
+            var ledgerOffered = gridItems.Any(i => i.LedgerRow != null && i.Use);
             var validated = new List<PlateOption>();
+            var saved = new List<PlateOption>();
             for (var index = 0; index < gridItems.Count; index++)
             {
                 var item = gridItems[index];
+                if (item.LedgerRow != null)
+                {
+                    if (!ValidQuantity(item.Quantity, item))
+                    {
+                        error = QuantityError(index);
+                        if (index < plateGrid.Rows.Count)
+                            plateGrid.Rows[index].ErrorText = error;
+                        return false;
+                    }
+                    if (index < plateGrid.Rows.Count)
+                        plateGrid.Rows[index].ErrorText = "";
+                    if (item.Use)
+                        validated.Add(new PlateOption
+                        {
+                            Width = item.LedgerRow.Size.Width,
+                            Length = item.LedgerRow.Size.Length,
+                            Quantity = item.Quantity ?? item.LedgerRow.Quantity,
+                            Id = item.LedgerRow.Id,
+                        });
+                    continue;
+                }
                 if (string.IsNullOrWhiteSpace(item.Size))
                     continue;
                 if (!TryParseSize(item.Size, out var width, out var length))
@@ -288,21 +387,44 @@ namespace OpenNest.Forms
                 }
 
                 if (!double.IsFinite(item.Cost) || item.Cost < 0
-                    || validated.Count > 0 && (validated[0].Cost == 0) != (item.Cost == 0))
+                    || saved.Count > 0 && (saved[0].Cost == 0) != (item.Cost == 0))
                 {
                     error = $"Invalid stock cost in row {index + 1}. Use finite positive costs on every active row, or zero on every row.";
                     if (index < plateGrid.Rows.Count)
                         plateGrid.Rows[index].ErrorText = error;
                     return false;
                 }
+                if (!ValidQuantity(item.Quantity, item))
+                {
+                    error = QuantityError(index);
+                    if (index < plateGrid.Rows.Count)
+                        plateGrid.Rows[index].ErrorText = error;
+                    return false;
+                }
                 if (index < plateGrid.Rows.Count)
                     plateGrid.Rows[index].ErrorText = "";
-                validated.Add(new PlateOption { Width = width, Length = length, Cost = item.Cost });
+                saved.Add(new PlateOption { Width = width, Length = length, Cost = item.Cost });
+                if (item.Use)
+                    validated.Add(new PlateOption
+                    {
+                        Width = width,
+                        Length = length,
+                        Cost = ledgerOffered ? 0 : item.Cost,
+                        Quantity = item.Quantity,
+                    });
             }
 
             // Publish only a completely validated collection, never a valid prefix.
             options = validated;
+            savedOptions = saved;
             return true;
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            // Closing the dialog abandons a ledger request still in flight.
+            ledgerCancellation?.Cancel();
+            base.OnFormClosed(e);
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
@@ -341,6 +463,7 @@ namespace OpenNest.Forms
                     {
                         Size = FormatSize(o.Width, o.Length),
                         Cost = o.Cost,
+                        Quantity = o.Quantity,
                     })
                     .ToList();
                 plateGrid.DataSource = new BindingList<PlateOptionItem>(items);
@@ -375,6 +498,8 @@ namespace OpenNest.Forms
         private void SetPlateOptimizerVisible(bool visible)
         {
             plateGrid.Visible = visible;
+            ledgerButton.Visible = visible;
+            ledgerSummaryLabel.Visible = visible;
             salvageRateLabel.Visible = visible;
             salvageRateBox.Visible = visible;
             salvageRatePercentLabel.Visible = visible;
@@ -404,11 +529,223 @@ namespace OpenNest.Forms
                 UpdateSummary();
         }
 
+        /// <summary>True when the ledger is set up on this PC; the form's tests replace it.</summary>
+        internal virtual bool LedgerConfigured => MaterialLedgerStore.Settings.IsConfigured;
+
+        /// <summary>Reads the nest material's free stock; the form's tests replace it.</summary>
+        internal virtual Task<LedgerStockResult> FetchLedgerStockAsync(string material, string grade,
+            double thicknessIn, CancellationToken cancellationToken) =>
+            MaterialLedgerStore.CreateClient().GetStockAsync(material, grade, thicknessIn, cancellationToken);
+
+        private string MaterialName => nest?.Material?.Name?.Trim() ?? "";
+
+        internal void UpdateLedgerButton()
+        {
+            string reason = null;
+            if (!LedgerConfigured)
+                reason = "Set the MaterialLedger URL and API key under Tools > Options first.";
+            else if (MaterialName.Length == 0 || !(nest.Thickness > 0))
+                reason = "Give the nest a material and a thickness first.";
+            ledgerButton.Enabled = reason == null && !loadingLedger;
+            ledgerToolTip.SetToolTip(ledgerButton, reason
+                ?? "Replace the ledger rows with the free sheets and drops of this nest's material. "
+                + "Stock is a snapshot, not a reservation.");
+        }
+
+        private async void ledgerButton_Click(object sender, EventArgs e) => await LoadLedgerStockAsync();
+
+        /// <summary>Requests the nest material's stock and applies the answer, unless the form closed first.</summary>
+        internal async Task LoadLedgerStockAsync()
+        {
+            ledgerCancellation?.Cancel();
+            ledgerCancellation = new CancellationTokenSource();
+            var token = ledgerCancellation.Token;
+            loadingLedger = true;
+            UpdateLedgerButton();
+            ledgerSummaryLabel.Text = "Loading stock from MaterialLedger...";
+            try
+            {
+                var result = await FetchLedgerStockAsync(MaterialName, nest.Material?.Grade?.Trim() ?? "",
+                    LedgerStockMapper.ThicknessInches(nest.Thickness, nest.Units), token);
+                if (token.IsCancellationRequested || IsDisposed)
+                    return;
+                ApplyLedgerStock(result);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                // The form closed or a newer load started.
+            }
+            finally
+            {
+                if (!IsDisposed && !token.IsCancellationRequested)
+                {
+                    loadingLedger = false;
+                    UpdateLedgerButton();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Replaces the ledger rows with <paramref name="result"/>'s stock (an unmapped material
+        /// clears them; a failed request keeps them) and reports the outcome under the grid.
+        /// </summary>
+        internal void ApplyLedgerStock(LedgerStockResult result)
+        {
+            switch (result)
+            {
+                case LedgerStockResult.Ok ok:
+                    var mapping = LedgerStockMapper.Map(ok.Items, nest.Units, PartEnvelopes());
+                    ReplaceLedgerRows(mapping.Rows);
+                    ledgerSummary = mapping.Rows.Count == 0 && mapping.SkippedUnknownShape + mapping.SkippedTooSmall == 0
+                        ? $"Ledger: no free stock of {DescribeMaterial()}."
+                        : mapping.Summary;
+                    break;
+                case LedgerStockResult.Unmapped:
+                    ReplaceLedgerRows(Array.Empty<LedgerStockRow>());
+                    ledgerSummary = $"MaterialLedger has no mapping for {DescribeMaterial()}.";
+                    break;
+                case LedgerStockResult.Unauthorized:
+                    ledgerSummary = "MaterialLedger rejected the API key (Tools > Options).";
+                    break;
+                case LedgerStockResult.Unreachable unreachable:
+                    ledgerSummary = $"MaterialLedger unreachable: {unreachable.Reason}";
+                    break;
+                default:
+                    ledgerSummary = "Set the MaterialLedger URL under Tools > Options.";
+                    break;
+            }
+            UpdateLedgerSummary();
+        }
+
+        private string DescribeMaterial()
+        {
+            var grade = nest.Material?.Grade?.Trim();
+            var unit = nest.Units == Units.Millimeters ? "mm" : "in";
+            return FormattableString.Invariant(
+                $"{MaterialName}{(string.IsNullOrEmpty(grade) ? "" : " " + grade)} {nest.Thickness:G} {unit}");
+        }
+
+        private List<Size> PartEnvelopes()
+        {
+            var envelopes = new List<Size>();
+            if (partsGrid.DataSource is not List<DataGridViewItem> gridItems)
+                return envelopes;
+            foreach (var item in gridItems.Where(i => i.Quantity > 0 && i.RefDrawing?.Program != null))
+            {
+                var box = item.RefDrawing.Program.BoundingBox();
+                if (double.IsFinite(box.Width) && double.IsFinite(box.Length) && box.Width > 0 && box.Length > 0)
+                    envelopes.Add(new Size(box.Width, box.Length));
+            }
+            return envelopes;
+        }
+
+        private void ReplaceLedgerRows(IReadOnlyList<LedgerStockRow> rows)
+        {
+            plateGrid.EndEdit();
+            if (plateGrid.DataSource is not BindingList<PlateOptionItem> items)
+            {
+                items = new BindingList<PlateOptionItem>();
+                plateGrid.DataSource = items;
+            }
+            for (var i = items.Count - 1; i >= 0; i--)
+            {
+                if (items[i].LedgerRow != null)
+                    items.RemoveAt(i);
+            }
+            foreach (var row in rows)
+            {
+                items.Add(new PlateOptionItem
+                {
+                    Size = FormatSize(System.Math.Round(row.Size.Width, 3), System.Math.Round(row.Size.Length, 3)),
+                    Quantity = row.Quantity,
+                    LedgerRow = row,
+                });
+            }
+        }
+
+        private void UpdateLedgerSummary()
+        {
+            var text = ledgerSummary;
+            if (plateGrid.DataSource is BindingList<PlateOptionItem> items
+                && items.Any(i => i.LedgerRow != null && i.Use)
+                && items.Any(i => i.LedgerRow == null && i.Use && i.Cost > 0))
+                text = (text.Length > 0 ? text + "; " : "") + "costs ignored while ledger stock is loaded";
+            ledgerSummaryLabel.Text = text;
+        }
+
+        private PlateOptionItem ItemAt(int rowIndex) =>
+            plateGrid.DataSource is BindingList<PlateOptionItem> items && rowIndex >= 0 && rowIndex < items.Count
+                ? items[rowIndex]
+                : null;
+
+        private string QuantityError(int rowIndex)
+        {
+            var ledger = ItemAt(rowIndex)?.LedgerRow;
+            return ledger == null
+                ? $"Invalid stock quantity in row {rowIndex + 1}. Enter a whole number of sheets, or leave it blank for no limit."
+                : $"Invalid stock quantity in row {rowIndex + 1}. The ledger has {ledger.Quantity} free; enter 1 to {ledger.Quantity}, or untick the row.";
+        }
+
+        private static bool ValidQuantity(int? quantity, PlateOptionItem item) =>
+            quantity == null || quantity >= 1 && (item?.LedgerRow == null || quantity <= item.LedgerRow.Quantity);
+
+        private static bool ValidQuantity(string text, PlateOptionItem item)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return true;
+            return int.TryParse(text.Trim(), System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.CurrentCulture, out var quantity)
+                && ValidQuantity(quantity, item);
+        }
+
+        // Ledger rows keep the ledger's size and carry no cost; only Use and Qty are editable.
+        private void PlateGrid_CellBeginEdit(object sender, DataGridViewCellCancelEventArgs e)
+        {
+            var property = plateGrid.Columns[e.ColumnIndex].DataPropertyName;
+            if (ItemAt(e.RowIndex)?.LedgerRow != null && property is "Size" or "Cost")
+                e.Cancel = true;
+        }
+
+        private void PlateGrid_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            var property = plateGrid.Columns[e.ColumnIndex].DataPropertyName;
+            if (ItemAt(e.RowIndex)?.LedgerRow != null && property is "Size" or "Cost" or "Source")
+                e.CellStyle.ForeColor = System.Drawing.SystemColors.GrayText;
+        }
+
+        private void PlateGrid_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
+        {
+            var ledger = ItemAt(e.RowIndex)?.LedgerRow;
+            if (ledger != null)
+                e.ToolTipText = LedgerTooltip(ledger);
+        }
+
+        internal static string LedgerTooltip(LedgerStockRow row)
+        {
+            const int Shown = 12;
+            var codes = row.ItemCodes.Distinct(StringComparer.Ordinal).ToList();
+            var codeText = string.Join(", ", codes.Take(Shown)) + (codes.Count > Shown ? $", +{codes.Count - Shown} more" : "");
+            var text = $"Items: {codeText}";
+            if (row.Locations.Count > 0)
+                text += $"\nLocations: {string.Join(", ", row.Locations.Take(Shown))}"
+                    + (row.Locations.Count > Shown ? $", +{row.Locations.Count - Shown} more" : "");
+            if (row.IsIrregular)
+                text += "\nIrregular: offered at its conservative usable rectangle.";
+            return text;
+        }
+
         private static bool ValidCost(string text) =>
             double.TryParse(text, out var cost) && double.IsFinite(cost) && cost >= 0;
 
         private void PlateGrid_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
         {
+            if (plateGrid.Columns[e.ColumnIndex].DataPropertyName == "Quantity")
+            {
+                e.Cancel = !plateGrid.Rows[e.RowIndex].IsNewRow
+                    && !ValidQuantity(e.FormattedValue?.ToString(), ItemAt(e.RowIndex));
+                plateGrid.Rows[e.RowIndex].ErrorText = e.Cancel ? QuantityError(e.RowIndex) : "";
+                return;
+            }
             if (plateGrid.Columns[e.ColumnIndex].DataPropertyName == "Cost")
             {
                 e.Cancel = !plateGrid.Rows[e.RowIndex].IsNewRow && !ValidCost(e.FormattedValue?.ToString());
@@ -540,8 +877,20 @@ namespace OpenNest.Forms
         {
             public PlateOptionItem() { }
 
+            public bool Use { get; set; } = true;
             public string Size { get; set; }
+
+            /// <summary>Null offers the size without limit; a ledger row starts at its free count.</summary>
+            public int? Quantity { get; set; }
+
             public double Cost { get; set; }
+
+            public string Source => LedgerRow == null ? ""
+                : LedgerRow.IsIrregular ? "Ledger (irr.)"
+                : "Ledger";
+
+            /// <summary>Set for rows loaded from MaterialLedger; these are never saved with the nest.</summary>
+            internal LedgerStockRow LedgerRow { get; set; }
         }
     }
 }

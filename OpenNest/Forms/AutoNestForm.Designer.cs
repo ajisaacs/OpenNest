@@ -29,6 +29,10 @@ namespace OpenNest.Forms
             this.plateOptimizerGroup = new System.Windows.Forms.GroupBox();
             this.optimizePlateSizeBox = new System.Windows.Forms.CheckBox();
             this.plateGrid = new System.Windows.Forms.DataGridView();
+            this.ledgerButton = new System.Windows.Forms.Button();
+            this.ledgerSummaryLabel = new System.Windows.Forms.Label();
+            this.components = new System.ComponentModel.Container();
+            this.ledgerToolTip = new System.Windows.Forms.ToolTip(this.components);
             this.salvageRateLabel = new System.Windows.Forms.Label();
             this.salvageRateBox = new System.Windows.Forms.TextBox();
             this.salvageRatePercentLabel = new System.Windows.Forms.Label();
@@ -121,7 +125,7 @@ namespace OpenNest.Forms
             // minRemnantLabel
             //
             this.minRemnantLabel.AutoSize = true;
-            this.minRemnantLabel.Location = new System.Drawing.Point(10, 193);
+            this.minRemnantLabel.Location = new System.Drawing.Point(10, 303);
             this.minRemnantLabel.Name = "minRemnantLabel";
             this.minRemnantLabel.Size = new System.Drawing.Size(117, 16);
             this.minRemnantLabel.TabIndex = 3;
@@ -129,7 +133,7 @@ namespace OpenNest.Forms
             //
             // minRemnantBox
             //
-            this.minRemnantBox.Location = new System.Drawing.Point(155, 190);
+            this.minRemnantBox.Location = new System.Drawing.Point(155, 300);
             this.minRemnantBox.Name = "minRemnantBox";
             this.minRemnantBox.Size = new System.Drawing.Size(60, 22);
             this.minRemnantBox.TabIndex = 4;
@@ -141,13 +145,15 @@ namespace OpenNest.Forms
             this.plateOptimizerGroup.Controls.Add(this.minRemnantLabel);
             this.plateOptimizerGroup.Controls.Add(this.minRemnantBox);
             this.plateOptimizerGroup.Controls.Add(this.optimizePlateSizeBox);
+            this.plateOptimizerGroup.Controls.Add(this.ledgerButton);
             this.plateOptimizerGroup.Controls.Add(this.plateGrid);
+            this.plateOptimizerGroup.Controls.Add(this.ledgerSummaryLabel);
             this.plateOptimizerGroup.Controls.Add(this.salvageRateLabel);
             this.plateOptimizerGroup.Controls.Add(this.salvageRateBox);
             this.plateOptimizerGroup.Controls.Add(this.salvageRatePercentLabel);
             this.plateOptimizerGroup.Location = new System.Drawing.Point(10, 52);
             this.plateOptimizerGroup.Name = "plateOptimizerGroup";
-            this.plateOptimizerGroup.Size = new System.Drawing.Size(528, 224);
+            this.plateOptimizerGroup.Size = new System.Drawing.Size(528, 334);
             this.plateOptimizerGroup.TabIndex = 4;
             this.plateOptimizerGroup.TabStop = false;
             this.plateOptimizerGroup.Text = "      Stock Options";
@@ -165,17 +171,37 @@ namespace OpenNest.Forms
             // plateGrid
             //
             this.plateGrid.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
-            this.plateGrid.Location = new System.Drawing.Point(10, 22);
+            this.plateGrid.Location = new System.Drawing.Point(10, 54);
             this.plateGrid.Name = "plateGrid";
             this.plateGrid.RowHeadersVisible = true;
             this.plateGrid.AutoGenerateColumns = false;
-            this.plateGrid.Size = new System.Drawing.Size(508, 130);
+            this.plateGrid.Size = new System.Drawing.Size(508, 190);
             this.plateGrid.TabIndex = 1;
+            //
+            // ledgerButton
+            //
+            this.ledgerButton.Location = new System.Drawing.Point(10, 22);
+            this.ledgerButton.Name = "ledgerButton";
+            this.ledgerButton.Size = new System.Drawing.Size(150, 26);
+            this.ledgerButton.TabIndex = 5;
+            this.ledgerButton.Text = "Load from ledger";
+            this.ledgerButton.UseVisualStyleBackColor = true;
+            this.ledgerButton.Click += new System.EventHandler(this.ledgerButton_Click);
+            //
+            // ledgerSummaryLabel
+            //
+            this.ledgerSummaryLabel.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
+            this.ledgerSummaryLabel.AutoEllipsis = true;
+            this.ledgerSummaryLabel.ForeColor = System.Drawing.SystemColors.GrayText;
+            this.ledgerSummaryLabel.Location = new System.Drawing.Point(10, 248);
+            this.ledgerSummaryLabel.Name = "ledgerSummaryLabel";
+            this.ledgerSummaryLabel.Size = new System.Drawing.Size(508, 18);
+            this.ledgerSummaryLabel.TabIndex = 6;
             //
             // salvageRateLabel
             //
             this.salvageRateLabel.AutoSize = true;
-            this.salvageRateLabel.Location = new System.Drawing.Point(10, 162);
+            this.salvageRateLabel.Location = new System.Drawing.Point(10, 272);
             this.salvageRateLabel.Name = "salvageRateLabel";
             this.salvageRateLabel.Size = new System.Drawing.Size(96, 16);
             this.salvageRateLabel.TabIndex = 2;
@@ -183,7 +209,7 @@ namespace OpenNest.Forms
             //
             // salvageRateBox
             //
-            this.salvageRateBox.Location = new System.Drawing.Point(108, 159);
+            this.salvageRateBox.Location = new System.Drawing.Point(108, 269);
             this.salvageRateBox.Name = "salvageRateBox";
             this.salvageRateBox.Size = new System.Drawing.Size(50, 22);
             this.salvageRateBox.TabIndex = 3;
@@ -192,7 +218,7 @@ namespace OpenNest.Forms
             // salvageRatePercentLabel
             //
             this.salvageRatePercentLabel.AutoSize = true;
-            this.salvageRatePercentLabel.Location = new System.Drawing.Point(160, 162);
+            this.salvageRatePercentLabel.Location = new System.Drawing.Point(160, 272);
             this.salvageRatePercentLabel.Name = "salvageRatePercentLabel";
             this.salvageRatePercentLabel.Size = new System.Drawing.Size(21, 16);
             this.salvageRatePercentLabel.TabIndex = 4;
@@ -274,6 +300,9 @@ namespace OpenNest.Forms
         private System.Windows.Forms.GroupBox plateOptimizerGroup;
         private System.Windows.Forms.CheckBox optimizePlateSizeBox;
         private System.Windows.Forms.DataGridView plateGrid;
+        private System.Windows.Forms.Button ledgerButton;
+        private System.Windows.Forms.Label ledgerSummaryLabel;
+        private System.Windows.Forms.ToolTip ledgerToolTip;
         private System.Windows.Forms.Label salvageRateLabel;
         private System.Windows.Forms.TextBox salvageRateBox;
         private System.Windows.Forms.Label salvageRatePercentLabel;

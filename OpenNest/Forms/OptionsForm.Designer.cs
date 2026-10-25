@@ -49,12 +49,20 @@
             this.updateGroupBox = new System.Windows.Forms.GroupBox();
             this.updateFeedUrlBox = new System.Windows.Forms.TextBox();
             this.setUpdateFeedButton = new System.Windows.Forms.Button();
+            this.ledgerGroupBox = new System.Windows.Forms.GroupBox();
+            this.ledgerUrlLabel = new System.Windows.Forms.Label();
+            this.ledgerUrlBox = new System.Windows.Forms.TextBox();
+            this.ledgerKeyLabel = new System.Windows.Forms.Label();
+            this.ledgerKeyBox = new System.Windows.Forms.TextBox();
+            this.testLedgerButton = new System.Windows.Forms.Button();
+            this.saveLedgerButton = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.planningEffortBox)).BeginInit();
             this.tableLayoutPanel1.SuspendLayout();
             this.bottomPanel1.SuspendLayout();
             this.serverGroupBox.SuspendLayout();
             this.updateGroupBox.SuspendLayout();
+            this.ledgerGroupBox.SuspendLayout();
             this.SuspendLayout();
             // 
             // checkBox1
@@ -176,7 +184,7 @@
             this.bottomPanel1.Controls.Add(this.cancelButton);
             this.bottomPanel1.Controls.Add(this.saveButton);
             this.bottomPanel1.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.bottomPanel1.Location = new System.Drawing.Point(0, 549);
+            this.bottomPanel1.Location = new System.Drawing.Point(0, 647);
             this.bottomPanel1.Name = "bottomPanel1";
             this.bottomPanel1.Size = new System.Drawing.Size(708, 50);
             this.bottomPanel1.TabIndex = 1;
@@ -195,7 +203,7 @@
             // strategyGroupBox
             //
             this.strategyGroupBox.Controls.Add(this.strategyGrid);
-            this.strategyGroupBox.Location = new System.Drawing.Point(12, 359);
+            this.strategyGroupBox.Location = new System.Drawing.Point(12, 457);
             this.strategyGroupBox.Name = "strategyGroupBox";
             this.strategyGroupBox.Size = new System.Drawing.Size(684, 180);
             this.strategyGroupBox.TabIndex = 2;
@@ -254,7 +262,7 @@
             //
             this.updateGroupBox.Controls.Add(this.updateFeedUrlBox);
             this.updateGroupBox.Controls.Add(this.setUpdateFeedButton);
-            this.updateGroupBox.Location = new System.Drawing.Point(12, 293);
+            this.updateGroupBox.Location = new System.Drawing.Point(12, 391);
             this.updateGroupBox.Name = "updateGroupBox";
             this.updateGroupBox.Size = new System.Drawing.Size(684, 60);
             this.updateGroupBox.TabIndex = 3;
@@ -279,14 +287,85 @@
             this.setUpdateFeedButton.UseVisualStyleBackColor = true;
             this.setUpdateFeedButton.Click += new System.EventHandler(this.SetUpdateFeed_Click);
             //
+            // ledgerGroupBox
+            //
+            this.ledgerGroupBox.Controls.Add(this.ledgerUrlLabel);
+            this.ledgerGroupBox.Controls.Add(this.ledgerUrlBox);
+            this.ledgerGroupBox.Controls.Add(this.ledgerKeyLabel);
+            this.ledgerGroupBox.Controls.Add(this.ledgerKeyBox);
+            this.ledgerGroupBox.Controls.Add(this.testLedgerButton);
+            this.ledgerGroupBox.Controls.Add(this.saveLedgerButton);
+            this.ledgerGroupBox.Location = new System.Drawing.Point(12, 293);
+            this.ledgerGroupBox.Name = "ledgerGroupBox";
+            this.ledgerGroupBox.Size = new System.Drawing.Size(684, 92);
+            this.ledgerGroupBox.TabIndex = 4;
+            this.ledgerGroupBox.TabStop = false;
+            this.ledgerGroupBox.Text = "MaterialLedger (optional; Auto Nest loads stock from it; set per machine)";
+            //
+            // ledgerUrlLabel
+            //
+            this.ledgerUrlLabel.AutoSize = true;
+            this.ledgerUrlLabel.Location = new System.Drawing.Point(12, 27);
+            this.ledgerUrlLabel.Name = "ledgerUrlLabel";
+            this.ledgerUrlLabel.Size = new System.Drawing.Size(37, 16);
+            this.ledgerUrlLabel.TabIndex = 0;
+            this.ledgerUrlLabel.Text = "URL:";
+            //
+            // ledgerUrlBox
+            //
+            this.ledgerUrlBox.Location = new System.Drawing.Point(80, 24);
+            this.ledgerUrlBox.Name = "ledgerUrlBox";
+            this.ledgerUrlBox.PlaceholderText = "http://ledger:5000";
+            this.ledgerUrlBox.Size = new System.Drawing.Size(417, 22);
+            this.ledgerUrlBox.TabIndex = 1;
+            //
+            // ledgerKeyLabel
+            //
+            this.ledgerKeyLabel.AutoSize = true;
+            this.ledgerKeyLabel.Location = new System.Drawing.Point(12, 59);
+            this.ledgerKeyLabel.Name = "ledgerKeyLabel";
+            this.ledgerKeyLabel.Size = new System.Drawing.Size(56, 16);
+            this.ledgerKeyLabel.TabIndex = 2;
+            this.ledgerKeyLabel.Text = "API key:";
+            //
+            // ledgerKeyBox
+            //
+            this.ledgerKeyBox.Location = new System.Drawing.Point(80, 56);
+            this.ledgerKeyBox.Name = "ledgerKeyBox";
+            this.ledgerKeyBox.Size = new System.Drawing.Size(417, 22);
+            this.ledgerKeyBox.TabIndex = 3;
+            this.ledgerKeyBox.UseSystemPasswordChar = true;
+            this.toolTip1.SetToolTip(this.ledgerKeyBox, "MaterialLedger's Api:Keys:OpenNest key. Stored encrypted for this Windows user.");
+            //
+            // testLedgerButton
+            //
+            this.testLedgerButton.Location = new System.Drawing.Point(504, 21);
+            this.testLedgerButton.Name = "testLedgerButton";
+            this.testLedgerButton.Size = new System.Drawing.Size(168, 28);
+            this.testLedgerButton.TabIndex = 4;
+            this.testLedgerButton.Text = "Test";
+            this.testLedgerButton.UseVisualStyleBackColor = true;
+            this.testLedgerButton.Click += new System.EventHandler(this.TestLedger_Click);
+            //
+            // saveLedgerButton
+            //
+            this.saveLedgerButton.Location = new System.Drawing.Point(504, 53);
+            this.saveLedgerButton.Name = "saveLedgerButton";
+            this.saveLedgerButton.Size = new System.Drawing.Size(168, 28);
+            this.saveLedgerButton.TabIndex = 5;
+            this.saveLedgerButton.Text = "Save Ledger";
+            this.saveLedgerButton.UseVisualStyleBackColor = true;
+            this.saveLedgerButton.Click += new System.EventHandler(this.SaveLedger_Click);
+            //
             // OptionsForm
             //
             this.AcceptButton = this.saveButton;
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.CancelButton = this.cancelButton;
-            this.ClientSize = new System.Drawing.Size(708, 599);
+            this.ClientSize = new System.Drawing.Size(708, 697);
             this.Controls.Add(this.strategyGroupBox);
             this.Controls.Add(this.updateGroupBox);
+            this.Controls.Add(this.ledgerGroupBox);
             this.Controls.Add(this.serverGroupBox);
             this.Controls.Add(this.tableLayoutPanel1);
             this.Controls.Add(this.bottomPanel1);
@@ -308,6 +387,8 @@
             this.serverGroupBox.PerformLayout();
             this.updateGroupBox.ResumeLayout(false);
             this.updateGroupBox.PerformLayout();
+            this.ledgerGroupBox.ResumeLayout(false);
+            this.ledgerGroupBox.PerformLayout();
             this.ResumeLayout(false);
 
         }
@@ -334,5 +415,12 @@
         private System.Windows.Forms.GroupBox updateGroupBox;
         private System.Windows.Forms.TextBox updateFeedUrlBox;
         private System.Windows.Forms.Button setUpdateFeedButton;
+        private System.Windows.Forms.GroupBox ledgerGroupBox;
+        private System.Windows.Forms.Label ledgerUrlLabel;
+        private System.Windows.Forms.TextBox ledgerUrlBox;
+        private System.Windows.Forms.Label ledgerKeyLabel;
+        private System.Windows.Forms.TextBox ledgerKeyBox;
+        private System.Windows.Forms.Button testLedgerButton;
+        private System.Windows.Forms.Button saveLedgerButton;
     }
 }

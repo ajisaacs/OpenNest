@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Data;
+using OpenNest.Data.MaterialLedger;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Engine.Strategies;
 using OpenNest.Properties;
@@ -80,6 +82,8 @@ namespace OpenNest.Forms
         {
             serverUrlBox.Text = NestStorage.Settings.ServerUrl;
             updateFeedUrlBox.Text = Settings.Default.UpdateFeedUrl;
+            ledgerUrlBox.Text = MaterialLedgerStore.Settings.BaseUrl;
+            ledgerKeyBox.Text = MaterialLedgerStore.Settings.ApiKey;
             checkBox1.Checked = Settings.Default.CreateNewNestOnOpen;
             numericUpDown1.Value = (decimal)Settings.Default.AutoSizePlateFactor;
             planningEffortBox.Value = (decimal)CuttingPlanBatch.ClampBudgetMultiplier(Settings.Default.CuttingPlanEffort);
@@ -175,6 +179,70 @@ namespace OpenNest.Forms
                     "Server URL", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        private void SaveLedger_Click(object sender, EventArgs e)
+        {
+            if (!MaterialLedgerSettings.TryNormalizeUrl(ledgerUrlBox.Text, out var url))
+            {
+                MessageBox.Show(this, "Enter a valid http or https MaterialLedger URL, or clear it to turn the ledger off.",
+                    "MaterialLedger", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                MaterialLedgerStore.Save(url, ledgerKeyBox.Text.Trim());
+                ledgerUrlBox.Text = MaterialLedgerStore.Settings.BaseUrl;
+                MessageBox.Show(this, url.Length == 0
+                        ? "MaterialLedger cleared. Auto Nest will not offer ledger stock."
+                        : "MaterialLedger settings saved.",
+                    "MaterialLedger", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Could not save the MaterialLedger settings: {ex.Message}",
+                    "MaterialLedger", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private async void TestLedger_Click(object sender, EventArgs e)
+        {
+            if (!MaterialLedgerSettings.TryNormalizeUrl(ledgerUrlBox.Text, out var url) || url.Length == 0)
+            {
+                MessageBox.Show(this, "Enter a valid http or https MaterialLedger URL.",
+                    "MaterialLedger", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            testLedgerButton.Enabled = false;
+            try
+            {
+                var client = MaterialLedgerStore.CreateClient(
+                    new MaterialLedgerSettings { BaseUrl = url, ApiKey = ledgerKeyBox.Text.Trim() });
+                // No mapping names this material, so a working ledger answers mapped:false.
+                var result = await client.GetStockAsync("OpenNest connection test", "", 0.25, CancellationToken.None);
+                if (IsDisposed)
+                    return;
+                var (text, icon) = DescribeLedgerTest(result);
+                MessageBox.Show(this, text, "MaterialLedger", MessageBoxButtons.OK, icon);
+            }
+            finally
+            {
+                if (!IsDisposed)
+                    testLedgerButton.Enabled = true;
+            }
+        }
+
+        internal static (string Text, MessageBoxIcon Icon) DescribeLedgerTest(LedgerStockResult result) => result switch
+        {
+            LedgerStockResult.Ok or LedgerStockResult.Unmapped =>
+                ("Connected to MaterialLedger. The API key was accepted.", MessageBoxIcon.Information),
+            LedgerStockResult.Unauthorized =>
+                ("MaterialLedger answered but rejected the API key. Check Api:Keys:OpenNest.", MessageBoxIcon.Warning),
+            LedgerStockResult.Unreachable unreachable =>
+                ($"Could not reach MaterialLedger: {unreachable.Reason}", MessageBoxIcon.Warning),
+            _ => ("Enter a MaterialLedger URL.", MessageBoxIcon.Warning),
+        };
 
         private void SetUpdateFeed_Click(object sender, EventArgs e)
         {

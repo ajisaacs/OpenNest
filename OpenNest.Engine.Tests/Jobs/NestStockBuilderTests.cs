@@ -65,4 +65,19 @@ public class NestStockBuilderTests
         Assert.Throws<ArgumentNullException>(() => NestStockBuilder.FromTemplate(null, null));
         Assert.Throws<ArgumentNullException>(() => NestStockBuilder.SinglePlate(null));
     }
+
+    [Fact]
+    public void OptionQuantityAndIdWinOverTheDefaults()
+    {
+        var options = new[]
+        {
+            new PlateOption { Width = 48, Length = 96, Quantity = 2, Id = "ledger:1" },
+            new PlateOption { Width = 60, Length = 120 },
+        };
+        var stock = NestStockBuilder.FromTemplate(Template(), options, quantityPerOption: 5);
+        Assert.Equal("ledger:1", stock[0].Id);
+        Assert.Equal(2, stock[0].Quantity);
+        Assert.Equal("option-1", stock[1].Id);
+        Assert.Equal(5, stock[1].Quantity);
+    }
 }

@@ -25,7 +25,7 @@ public class AutoNestFormStockOptionsTests
             ((TabControl)form.Controls.Find("tabControl", true).Single()).SelectedIndex = 1;
             form.Show();
             grid.Focus();
-            grid.CurrentCell = grid.Rows[0].Cells[1];
+            grid.CurrentCell = grid.Rows[0].Cells[Column(grid, "Cost")];
             Assert.True(grid.BeginEdit(false));
             grid.EditingControl.Text = text;
             Assert.Equal(valid, form.TryGetPlateOptions(out var options, out var error));
@@ -239,7 +239,7 @@ public class AutoNestFormStockOptionsTests
         form.LoadPlateOptions(new List<PlateOption> { new() { Width = 48, Length = 96 } }, 0.5);
         var grid = GetGrid(form);
         form.Show();
-        grid.CurrentCell = grid.Rows[0].Cells[0];
+        grid.CurrentCell = grid.Rows[0].Cells[Column(grid, "Size")];
         Assert.True(grid.BeginEdit(false));
         grid.EditingControl.Text = "48 x";
 
@@ -308,6 +308,9 @@ public class AutoNestFormStockOptionsTests
         grid.CreateControl();
         return grid;
     }
+
+    private static int Column(DataGridView grid, string property) =>
+        grid.Columns.Cast<DataGridViewColumn>().Single(c => c.DataPropertyName == property).Index;
 
     private static void AssertNewRow(DataGridView grid)
     {
