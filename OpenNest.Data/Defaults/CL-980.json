@@ -16,7 +16,7 @@
           "assistGas": "O2",
           "leadIn": { "type": "Arc", "length": 0.125, "angle": 90.0, "radius": 0.0625 },
           "leadOut": { "type": "Line", "length": 0.0625, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.25, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
           "plateSizes": [ "48x120", "60x120" ]
         },
         {
@@ -25,7 +25,7 @@
           "assistGas": "O2",
           "leadIn": { "type": "Arc", "length": 0.125, "angle": 90.0, "radius": 0.0625 },
           "leadOut": { "type": "Line", "length": 0.0625, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.25, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
           "plateSizes": [ "48x120", "60x120" ]
         },
         {
@@ -34,7 +34,7 @@
           "assistGas": "O2",
           "leadIn": { "type": "Arc", "length": 0.1875, "angle": 90.0, "radius": 0.09375 },
           "leadOut": { "type": "Line", "length": 0.09375, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.375, "overtravel": 0.1875, "minSegmentLength": 0.75, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.1875, "minSegmentLength": 0.75, "direction": "AwayFromOrigin" },
           "plateSizes": [ "48x120", "60x120" ]
         },
         {
@@ -43,7 +43,7 @@
           "assistGas": "O2",
           "leadIn": { "type": "Arc", "length": 0.1875, "angle": 90.0, "radius": 0.09375 },
           "leadOut": { "type": "Line", "length": 0.09375, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.375, "overtravel": 0.1875, "minSegmentLength": 0.75, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.1875, "minSegmentLength": 0.75, "direction": "AwayFromOrigin" },
           "plateSizes": [ "48x120", "60x120", "60x144" ]
         },
         {
@@ -52,7 +52,7 @@
           "assistGas": "O2",
           "leadIn": { "type": "Arc", "length": 0.25, "angle": 90.0, "radius": 0.125 },
           "leadOut": { "type": "Line", "length": 0.125, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.5, "overtravel": 0.25, "minSegmentLength": 1.0, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.25, "minSegmentLength": 1.0, "direction": "AwayFromOrigin" },
           "plateSizes": [ "48x120", "60x120", "60x144" ]
         },
         {
@@ -61,7 +61,7 @@
           "assistGas": "O2",
           "leadIn": { "type": "Arc", "length": 0.25, "angle": 90.0, "radius": 0.125 },
           "leadOut": { "type": "Line", "length": 0.125, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.5, "overtravel": 0.25, "minSegmentLength": 1.0, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.25, "minSegmentLength": 1.0, "direction": "AwayFromOrigin" },
           "plateSizes": [ "48x120", "60x120", "60x144" ]
         },
         {
@@ -70,7 +70,7 @@
           "assistGas": "O2",
           "leadIn": { "type": "Arc", "length": 0.375, "angle": 90.0, "radius": 0.1875 },
           "leadOut": { "type": "Line", "length": 0.1875, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.625, "overtravel": 0.3125, "minSegmentLength": 1.25, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.3125, "minSegmentLength": 1.25, "direction": "AwayFromOrigin" },
           "plateSizes": [ "60x120", "60x144", "72x120" ]
         },
         {
@@ -79,7 +79,7 @@
           "assistGas": "O2",
           "leadIn": { "type": "Arc", "length": 0.5, "angle": 90.0, "radius": 0.25 },
           "leadOut": { "type": "Line", "length": 0.25, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.75, "overtravel": 0.375, "minSegmentLength": 1.5, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.375, "minSegmentLength": 1.5, "direction": "AwayFromOrigin" },
           "plateSizes": [ "60x120", "60x144", "72x120" ]
         }
       ]
@@ -95,7 +95,7 @@
           "assistGas": "N2",
           "leadIn": { "type": "Arc", "length": 0.125, "angle": 90.0, "radius": 0.0625 },
           "leadOut": { "type": "Line", "length": 0.0625, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.25, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
           "plateSizes": [ "48x96", "48x120", "60x120" ]
         },
         {
@@ -104,7 +104,7 @@
           "assistGas": "N2",
           "leadIn": { "type": "Arc", "length": 0.125, "angle": 90.0, "radius": 0.0625 },
           "leadOut": { "type": "Line", "length": 0.0625, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.25, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
           "plateSizes": [ "48x96", "48x120", "60x120" ]
         },
         {
@@ -113,7 +113,7 @@
           "assistGas": "N2",
           "leadIn": { "type": "Arc", "length": 0.1875, "angle": 90.0, "radius": 0.09375 },
           "leadOut": { "type": "Line", "length": 0.09375, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.375, "overtravel": 0.1875, "minSegmentLength": 0.75, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.1875, "minSegmentLength": 0.75, "direction": "AwayFromOrigin" },
           "plateSizes": [ "48x96", "48x120", "60x120" ]
         },
         {
@@ -122,7 +122,7 @@
           "assistGas": "N2",
           "leadIn": { "type": "Arc", "length": 0.25, "angle": 90.0, "radius": 0.125 },
           "leadOut": { "type": "Line", "length": 0.125, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.5, "overtravel": 0.25, "minSegmentLength": 1.0, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.25, "minSegmentLength": 1.0, "direction": "AwayFromOrigin" },
           "plateSizes": [ "48x96", "48x120", "60x120" ]
         }
       ]
@@ -138,7 +138,7 @@
           "assistGas": "N2",
           "leadIn": { "type": "Arc", "length": 0.125, "angle": 90.0, "radius": 0.0625 },
           "leadOut": { "type": "Line", "length": 0.0625, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.25, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
           "plateSizes": [ "48x96", "48x120", "60x120" ]
         },
         {
@@ -147,7 +147,7 @@
           "assistGas": "N2",
           "leadIn": { "type": "Arc", "length": 0.125, "angle": 90.0, "radius": 0.0625 },
           "leadOut": { "type": "Line", "length": 0.0625, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.25, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
           "plateSizes": [ "48x96", "48x120", "60x120" ]
         },
         {
@@ -156,7 +156,7 @@
           "assistGas": "N2",
           "leadIn": { "type": "Arc", "length": 0.1875, "angle": 90.0, "radius": 0.09375 },
           "leadOut": { "type": "Line", "length": 0.09375, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.375, "overtravel": 0.1875, "minSegmentLength": 0.75, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.1875, "minSegmentLength": 0.75, "direction": "AwayFromOrigin" },
           "plateSizes": [ "48x96", "48x120", "60x120" ]
         },
         {
@@ -165,7 +165,7 @@
           "assistGas": "N2",
           "leadIn": { "type": "Arc", "length": 0.25, "angle": 90.0, "radius": 0.125 },
           "leadOut": { "type": "Line", "length": 0.125, "angle": 90.0, "radius": 0.0 },
-          "cutOff": { "partClearance": 0.5, "overtravel": 0.25, "minSegmentLength": 1.0, "direction": "AwayFromOrigin" },
+          "cutOff": { "partClearance": 0.02, "overtravel": 0.25, "minSegmentLength": 1.0, "direction": "AwayFromOrigin" },
           "plateSizes": [ "48x96", "48x120", "60x120" ]
         }
       ]
