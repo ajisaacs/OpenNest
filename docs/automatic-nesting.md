@@ -277,8 +277,11 @@ and the thickness converted to inches (rounded to 4 places). ML resolves its own
 OpenNest material mapping, and OpenNest keeps no copy of it. OpenNest's grade is a shop
 condition such as HR or P&O; ML's acceptance rule for the material and grade decides which
 catalog grades and finishes may fill it, ranked by preference. Rank 0 is an exact mapping
-override, rank 1 the rule's preferred entry, and higher ranks are substitutes, which only
-ever upgrade (P&O may fill HR, never the reverse). Specs carry `rank`, `materialFamily`,
+override and rank 1 the rule's first entry. The best rule rank ML matched at the nest's
+thickness is the preferred material, and higher ranks are substitutes, which only ever
+upgrade (P&O may fill HR, never the reverse). A rule that lists sheet grades first can
+match only its plate entries at plate thickness: there A36 at rank 3 is preferred and
+A572 at rank 4 the substitute, as ML labels them. Specs carry `rank`, `materialFamily`,
 `grade` and `finish`; items carry `rank` and arrive in rank, location code, item code order.
 An older ledger that sends none of these still loads: its stock counts as rank 1, unlabeled.
 The button is enabled when
@@ -309,7 +312,7 @@ separate `NestJob` input. `OpenNest.Engine` has no ledger reference.
 
 **Grid.** A load replaces earlier ledger rows and keeps hand-typed rows. A ledger row's
 Source shows its label, or "Ledger" when the ledger sends no grade or finish, with
-"(irr.)" for an irregular drop. A substitute (rank above 1) reads, for example,
+"(irr.)" for an irregular drop. A substitute (a rank above the preferred one) reads, for example,
 "A1011 P&O for HR" in amber, and its tooltip names the substitution and rank ahead of the
 usual item codes and locations. Substitutes load ticked like other rows; untick **Use** to
 keep them out of the run. Ledger rows' size and cost are read-only. You can lower a ledger

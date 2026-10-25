@@ -30,8 +30,15 @@ public sealed record LedgerStockRow(
     /// <summary>The catalog grade and finish the row is cut from, e.g. "A1011 P&amp;O"; null when the ledger sends neither.</summary>
     public string? Label { get; init; }
 
-    /// <summary>True for stock ML accepts in place of the preferred material (rank above 1).</summary>
-    public bool IsSubstitute => Rank > 1;
+    /// <summary>
+    /// The best rule rank among the specs ML matched at this thickness: the preferred material
+    /// for this request. A rule may list sheet grades first, so at plate thickness its best match
+    /// can be rank 3 and is still not a substitute.
+    /// </summary>
+    public int PreferredRank { get; init; } = 1;
+
+    /// <summary>True for stock ML accepts in place of the preferred material (a rule rank above <see cref="PreferredRank"/>).</summary>
+    public bool IsSubstitute => Rank > PreferredRank;
 }
 
 /// <summary>The rows offered to Auto Nest and the counts of ledger items left out.</summary>
@@ -156,6 +163,11 @@ public static class LedgerStockMapper
             }
         }
 
+        // ML labels substitutes against the best-ranked spec it matched, not against rank 1;
+        // an exact mapping (rank 0) overrides the rule and never makes rule stock a substitute.
+        var ruleRanks = specById.Values.Where(s => s.Rank >= 1).Select(s => s.Rank!.Value)
+            .Concat(entries.Where(e => e.Rank >= 1).Select(e => e.Rank)).ToList();
+        var preferredRank = ruleRanks.Count == 0 ? 1 : ruleRanks.Min();
         var rows = new List<LedgerStockRow>(entries.Count);
         // ML already sends rank order; the stable sort keeps ledger order within a rank.
         foreach (var entry in entries.OrderBy(e => e.Rank))
@@ -175,6 +187,7 @@ public static class LedgerStockMapper
             {
                 ItemLocations = itemLocations,
                 Rank = entry.Rank,
+                PreferredRank = preferredRank,
                 Label = entry.Label,
             });
         }

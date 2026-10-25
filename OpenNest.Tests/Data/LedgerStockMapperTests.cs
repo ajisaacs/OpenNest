@@ -87,6 +87,35 @@ public class LedgerStockMapperTests
         Assert.Equal(new[] { false, false, false, true, true }, mapping.Rows.Select(r => r.IsSubstitute));
     }
 
+    // Steel/HR lists A1011 grades first; at 3/8 only its A36 (rank 3) and A572 (rank 4) entries
+    // match, so A36 is the preferred plate and only A572 is a substitute, as ML labels them.
+    [Fact]
+    public void SubstitutesAreRankedAgainstTheBestRankMatchedAtThisThickness()
+    {
+        var mapping = LedgerStockMapper.Map(new[]
+        {
+            Item("A36-1", LedgerItemKinds.FullSheet, 60, 120, spec: 30, rank: 3),
+            Item("A36-2", LedgerItemKinds.Drop, 20, 70, spec: 30, rank: 3),
+            Item("GR50-1", LedgerItemKinds.FullSheet, 60, 120, spec: 31, rank: 4),
+        }, Units.Inches, specs: new[] { Spec(30, 3, "A36", null), Spec(31, 4, "A572 GR50", null) });
+
+        Assert.Equal(new[] { false, false, true }, mapping.Rows.Select(r => r.IsSubstitute));
+        Assert.Equal(1, mapping.SubstituteRows);
+        Assert.All(mapping.Rows, r => Assert.Equal(3, r.PreferredRank));
+    }
+
+    // The preferred spec may have nothing on the rack: it still sets the bar for substitutes.
+    [Fact]
+    public void AnOutOfStockPreferredSpecStillMakesLowerRanksSubstitutes()
+    {
+        var mapping = LedgerStockMapper.Map(new[]
+        {
+            Item("PO-1", LedgerItemKinds.FullSheet, 48, 96, spec: 41, rank: 2),
+        }, Units.Inches, specs: new[] { Spec(40, 1, "A1011", "HR"), Spec(41, 2, "A1011", "HRPO") });
+
+        Assert.True(Assert.Single(mapping.Rows).IsSubstitute);
+    }
+
     [Fact]
     public void AnOlderLedgerWithoutRanksOrGradesIsRankOneAndUnlabeled()
     {
