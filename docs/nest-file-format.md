@@ -155,6 +155,23 @@ and sheets with parts, cut-offs, removed clamps or explicit zones are not change
 An empty plate with other zones, or a rail-following one whose size, quadrant or
 spacing differs from the saved defaults, is still written.
 
+## Stock item codes
+
+A plate may carry an optional `stockItemCodes` array: the inventory item (a
+MaterialLedger item code) each physical sheet of its `quantity` is cut from, in
+sheet order. Entry *i* names sheet *i*; sheets past the end are uncoded, and a
+bundle used for several sheets repeats its code. It is written only when at
+least one sheet is coded, so files without coded plates are unchanged. A
+missing or malformed value loads as no codes; non-string entries are skipped,
+a blank entry ends the coded sheets, and entries beyond `quantity` are dropped.
+Older readers ignore the key.
+
+Codes are hand-off data for the inventory system, never quantity accounting.
+The model drops them when they stop describing the sheet: resizing a plate
+(other than turning it) clears its codes, lowering its quantity truncates them,
+and changing the nest's material, grade or thickness clears every plate's.
+Auto Nest assigns them only to sheets it nests on ledger stock.
+
 ## Support grid
 
 `plateDefaults.supportBed` optionally stores the machine support bed every sheet of

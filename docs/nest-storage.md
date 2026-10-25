@@ -102,7 +102,7 @@ entry, never programs or geometry, and takes the archive-derived fields below fr
 | GET | `/api/nests/query?search=&status=&material=&materialGrade=&thickness=&sort=&order=&offset=&limit=` | — | `{ "items": NestRecord[], "total", "offset", "limit" }`: one bounded page filtered in SQL (see below), or 400 for an invalid parameter |
 | GET | `/api/nests/{id}` | — | `NestRecord` or 404 |
 | GET | `/api/nests/{id}/file` | — | `.nest` archive bytes (`application/zip`) or 404 |
-| GET | `/api/nests/{id}/sheets` | — | `{ "nestId", "revision", "sheets": [{ "width", "length", "quantity" }], "parts": [{ "name", "required", "nested" }] }` read from the current archive (see below), 404, or 500 problem when the stored archive is unreadable |
+| GET | `/api/nests/{id}/sheets` | — | `{ "nestId", "revision", "sheets": [{ "width", "length", "quantity" }], "parts": [{ "name", "required", "nested" }], "plates": [{ "index", "width", "length", "quantity", "stockItemCodes" }] }` read from the current archive (see below), 404, or 500 problem when the stored archive is unreadable |
 | POST | `/api/nests` | multipart: `metadata` (JSON `NestRecord`) + `file` (`.nest` bytes) | `NestRecord` with server-assigned `id` when the client sends an empty guid; 409 with the current record (active or deleted) when the `id` already exists, storing nothing |
 | PUT | `/api/nests/{id}/file` | multipart: `metadata` + `file` | Updated `NestRecord`, or 404 if `id` is unknown |
 | PUT | `/api/nests/{id}/metadata` | JSON `NestRecord` | Updated `NestRecord` (archive untouched), or 404 |
@@ -131,6 +131,15 @@ sum of those plates' quantities, ordered by width then length. `parts` has one
 entry per drawing, ordered by name: `required` is the drawing's required
 quantity, `nested` its parts on each plate times that plate's quantity; parts
 whose drawing is missing are skipped.
+
+`plates` lists the same plates one by one, in nest order: `index` (0-based
+position), `width` (the shorter side) and `length` as stored, `quantity`, and
+`stockItemCodes`, the inventory item each sheet of that plate is cut from
+(entry *i* is sheet *i*; sheets past the end are uncoded and a bundle repeats
+its code; empty when none is coded). Codes come from the plate's optional
+`stockItemCodes` in `nest.json` (see the [nest file format](nest-file-format.md)),
+read as `NestReader` reads them. MaterialLedger can hold exactly those items and
+match uncoded sheets by size.
 
 ### Generated nest names
 

@@ -274,6 +274,12 @@ namespace OpenNest.Forms
             return options;
         }
 
+        /// <summary>The ledger rows in the grid, ticked or not; their ids name the run's ledger stock.</summary>
+        internal IReadOnlyList<LedgerStockRow> LedgerRows =>
+            plateGrid.DataSource is BindingList<PlateOptionItem> items
+                ? items.Where(i => i.LedgerRow != null).Select(i => i.LedgerRow).ToList()
+                : Array.Empty<LedgerStockRow>();
+
         public bool TryGetPlateOptions(out List<PlateOption> options, out string error) =>
             TryGetPlateOptions(out options, out _, out error);
 

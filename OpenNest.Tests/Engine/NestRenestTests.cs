@@ -43,6 +43,20 @@ public class NestRenestTests
     }
 
     [Fact]
+    public void Run_DropsTheOldPlatesStockItemCodes()
+    {
+        var nest = NestOf(("SYN-A", 4, 2, 2));
+        var old = nest.CreatePlate();
+        old.Parts.Add(new Part(nest.Drawings.First()));
+        old.StockItemCodes = ["DROP-1182"];
+
+        var result = NestRenest.Run(nest, "Rectangles");
+
+        Assert.True(result.Nested, result.Note);
+        Assert.All(nest.Plates, p => Assert.Empty(p.StockItemCodes));
+    }
+
+    [Fact]
     public void Run_LeavesCopiesThatDoNotFit_AsRemainingQuantity_AndListsThem()
     {
         var nest = NestOf(("SYN-SMALL", 4, 2, 2), ("SYN-HUGE", 200, 200, 1));

@@ -448,6 +448,7 @@ namespace OpenNest.IO
                         ClampRail = Equals(plate.ClampRail, nest.PlateDefaults.ClampRail)
                             ? null
                             : ToDto(plate.ClampRail),
+                        StockItemCodes = plate.StockItemCodes.Count == 0 ? null : plate.StockItemCodes.ToList(),
                     }
                 );
             }

@@ -650,6 +650,15 @@ namespace OpenNest.IO
             public List<string> RemovedClamps { get; init; } = new();
 
             /// <summary>
+            /// The inventory item code of each physical sheet, in sheet order; sheets past the
+            /// end are uncoded. Omitted when no sheet is coded; missing means none. Read
+            /// leniently: a wrongly shaped value reads as none, and non-string entries are skipped.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            [JsonConverter(typeof(LenientStringListConverter))]
+            public List<string> StockItemCodes { get; init; } = new();
+
+            /// <summary>
             /// The machine clamp rail this sheet follows, written only when it is not the
             /// nest's default rail (otherwise the sheet re-attaches to that one on load).
             /// Read leniently like <see cref="PlateDefaultsDto.ClampRail"/>.

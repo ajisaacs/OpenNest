@@ -51,9 +51,51 @@ namespace OpenNest
 
         public string MadeBy { get; set; } = "";
 
-        public double Thickness { get; set; }
+        /// <summary>The stock thickness. A different value clears every plate's <see cref="Plate.StockItemCodes"/>.</summary>
+        public double Thickness
+        {
+            get { return thickness; }
+            set
+            {
+                if (value != thickness)
+                    ClearStockItemCodes();
+                thickness = value;
+            }
+        }
 
-        public Material Material { get; set; }
+        private double thickness;
+
+        /// <summary>
+        /// The stock material. A different name or grade (ignoring case and spacing) clears every
+        /// plate's <see cref="Plate.StockItemCodes"/>: the coded items are another material.
+        /// </summary>
+        public Material Material
+        {
+            get { return material; }
+            set
+            {
+                if (!SameStock(material, value))
+                    ClearStockItemCodes();
+                material = value;
+            }
+        }
+
+        private Material material;
+
+        private static bool SameStock(Material a, Material b) =>
+            NameKey(a?.Name) == NameKey(b?.Name) && NameKey(a?.Grade) == NameKey(b?.Grade);
+
+        private static string NameKey(string name) =>
+            name == null ? "" : string.Join(' ', name.Split((char[])null, StringSplitOptions.RemoveEmptyEntries)).ToUpperInvariant();
+
+        private void ClearStockItemCodes()
+        {
+            // Plates is a public field a caller may have replaced.
+            if (Plates == null)
+                return;
+            foreach (var plate in Plates)
+                plate.StockItemCodes = Array.Empty<string>();
+        }
 
         public Units Units { get; set; }
 

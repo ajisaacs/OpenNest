@@ -115,6 +115,75 @@ public sealed class NestSheetsTests
     }
 
     [Fact]
+    public async Task Plates_ListEachPlateWithItsStockItemCodes()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        var nest = NestApiTests.SyntheticNest();
+        var drawing = nest.Drawings.Single();
+        nest.Plates.Single().StockItemCodes = ["DROP-1182"];
+        // Stored rotated: width is still the short side. Two of three sheets are coded.
+        var bundle = new Plate(new Size(120, 60)) { Quantity = 3 };
+        bundle.Parts.Add(new Part(drawing, new Vector(2, 3)));
+        bundle.StockItemCodes = ["SHEET-456", "SHEET-456"];
+        nest.Plates.Add(bundle);
+        var uncoded = new Plate(new Size(48, 96)) { Quantity = 1 };
+        uncoded.Parts.Add(new Part(drawing, new Vector(2, 3)));
+        nest.Plates.Add(uncoded);
+        nest.Plates.Add(new Plate(new Size(48, 96)) { Quantity = 1 });
+
+        var sheets = await Sheets(client, nest);
+
+        Assert.Equal(
+            [
+                (0, 20.0, 30.0, 1, "DROP-1182"),
+                (1, 60.0, 120.0, 3, "SHEET-456,SHEET-456"),
+                (2, 48.0, 96.0, 1, ""),
+            ],
+            Plates(sheets));
+        Assert.Equal([(20.0, 30.0, 1), (48.0, 96.0, 1), (60.0, 120.0, 3)], Sizes(sheets));
+    }
+
+    [Fact]
+    public async Task Plates_ReadStockItemCodesAsNestReaderDoes()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        var archive = TestNests.Zip("nest.json", """
+            {"drawings":[{"id":1,"name":"Kept","quantity":{"required":2}}],
+             "plates":[{"id":1,"size":{"width":48,"length":96},"quantity":2,"parts":[{"drawingId":1}],
+                        "stockItemCodes":["A",7,"B","C"]},
+                       {"id":2,"size":{"width":30,"length":40},"quantity":2,"parts":[{"drawingId":1}],
+                        "stockItemCodes":["D","","E"]},
+                       {"id":3,"size":{"width":30,"length":40},"quantity":1,"parts":[{"drawingId":1}],
+                        "stockItemCodes":{"bad":true}}]}
+            """);
+        var id = await Create(client, archive);
+
+        var sheets = (await client.GetFromJsonAsync<NestSheets>($"/api/nests/{id}/sheets", Options))!;
+
+        Assert.Equal([(0, 48.0, 96.0, 2, "A,B"), (1, 30.0, 40.0, 2, "D"), (2, 30.0, 40.0, 1, "")], Plates(sheets));
+    }
+
+    [Fact]
+    public async Task Plates_SerializeAsTheDocumentedShape()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        var nest = NestApiTests.SyntheticNest();
+        nest.Plates.Single().StockItemCodes = ["DROP-1182"];
+        var id = await Create(client, nest);
+
+        using var document = JsonDocument.Parse(await client.GetStringAsync($"/api/nests/{id}/sheets"));
+
+        var plate = Assert.Single(document.RootElement.GetProperty("plates").EnumerateArray());
+        Assert.Equal(
+            ["index", "width", "length", "quantity", "stockItemCodes"],
+            plate.EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.Equal("DROP-1182", Assert.Single(plate.GetProperty("stockItemCodes").EnumerateArray()).GetString());
+    }
+
+    [Fact]
     public async Task UnknownNest_Returns404()
     {
         using var factory = new ServerFactory();
@@ -127,6 +196,9 @@ public sealed class NestSheetsTests
 
     private static (double, double, int)[] Sizes(NestSheets sheets) =>
         sheets.Sheets.Select(s => (s.Width, s.Length, s.Quantity)).ToArray();
+
+    private static (int, double, double, int, string)[] Plates(NestSheets sheets) =>
+        sheets.Plates.Select(p => (p.Index, p.Width, p.Length, p.Quantity, string.Join(",", p.StockItemCodes))).ToArray();
 
     private static (string, int, int)[] Parts(NestSheets sheets) =>
         sheets.Parts.Select(p => (p.Name, p.Required, p.Nested)).ToArray();

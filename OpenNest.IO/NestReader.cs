@@ -639,6 +639,10 @@ namespace OpenNest.IO
                 if (plateRail != null && plateRail.Matches(plate, removedClamps))
                     plate.SetClampRail(plateRail, removedClamps);
 
+                // Codes name sheets in order, so a blank entry ends the coded sheets.
+                if (p.StockItemCodes != null)
+                    plate.StockItemCodes = p.StockItemCodes.TakeWhile(code => !string.IsNullOrWhiteSpace(code)).ToList();
+
                 for (var partIndex = 0; partIndex < p.Parts.Count; partIndex++)
                 {
                     var partDto = p.Parts[partIndex];

@@ -95,12 +95,39 @@ namespace OpenNest
             get { return size; }
             set
             {
+                // A turned sheet is the same sheet; any other size is no longer the coded item.
+                if (stockItemCodes.Count > 0 && !SameSheet(size, value))
+                    stockItemCodes = Array.Empty<string>();
                 size = value;
                 ResolveClampRail();
             }
         }
 
         private Size size;
+
+        private static bool SameSheet(Size a, Size b) =>
+            a.Width == b.Width && a.Length == b.Length || a.Width == b.Length && a.Length == b.Width;
+
+        /// <summary>
+        /// The inventory item each physical sheet of this plate is cut from: entry i names sheet
+        /// i of <see cref="Quantity"/>, and sheets past the end are uncoded. Empty when no sheet
+        /// is coded. A resize (other than turning the sheet) clears it, lowering
+        /// <see cref="Quantity"/> truncates it, and raising it leaves the extra sheets uncoded.
+        /// Display and hand-off data only: quantity accounting never reads it.
+        /// </summary>
+        public IReadOnlyList<string> StockItemCodes
+        {
+            get { return stockItemCodes; }
+            set
+            {
+                ArgumentNullException.ThrowIfNull(value);
+                if (value.Any(string.IsNullOrWhiteSpace))
+                    throw new ArgumentException("Stock item codes must not be blank.", nameof(value));
+                stockItemCodes = value.Take(System.Math.Max(quantity, 0)).ToArray();
+            }
+        }
+
+        private IReadOnlyList<string> stockItemCodes = Array.Empty<string>();
 
         public CNC.CuttingStrategy.CuttingParameters CuttingParameters { get; set; }
 
@@ -457,9 +484,21 @@ namespace OpenNest
         }
 
         /// <summary>
-        /// The number of times to cut the plate.
+        /// The number of times to cut the plate. Lowering it drops the
+        /// <see cref="StockItemCodes"/> of the sheets no longer cut.
         /// </summary>
-        public int Quantity { get; set; }
+        public int Quantity
+        {
+            get { return quantity; }
+            set
+            {
+                quantity = value;
+                if (stockItemCodes.Count > System.Math.Max(value, 0))
+                    stockItemCodes = stockItemCodes.Take(System.Math.Max(value, 0)).ToArray();
+            }
+        }
+
+        private int quantity;
 
         /// <summary>
         /// The quadrant the plate is located in.

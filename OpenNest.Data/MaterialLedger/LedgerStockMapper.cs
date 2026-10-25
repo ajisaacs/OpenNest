@@ -15,7 +15,12 @@ public sealed record LedgerStockRow(
     bool IsDrop,
     bool IsIrregular,
     IReadOnlyList<string> ItemCodes,
-    IReadOnlyList<string> Locations);
+    IReadOnlyList<string> Locations)
+{
+    /// <summary>Each item code's ledger location code, for display only.</summary>
+    public IReadOnlyDictionary<string, string> ItemLocations { get; init; } =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+}
 
 /// <summary>The rows offered to Auto Nest and the counts of ledger items left out.</summary>
 public sealed record LedgerStockMapping(
@@ -135,8 +140,17 @@ public static class LedgerStockMapper
             var codes = ordered.SelectMany(i => Enumerable.Repeat(i.ItemCode, i.Quantity)).ToList();
             var locations = ordered.Select(i => i.LocationCode).Where(code => !string.IsNullOrEmpty(code))
                 .Distinct(StringComparer.Ordinal).ToList();
+            var itemLocations = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var item in ordered)
+            {
+                if (!string.IsNullOrEmpty(item.LocationCode))
+                    itemLocations.TryAdd(item.ItemCode, item.LocationCode);
+            }
             rows.Add(new LedgerStockRow($"{IdPrefix}{rows.Count + 1}", entry.Size, codes.Count,
-                entry.IsDrop, entry.IsIrregular, codes, locations));
+                entry.IsDrop, entry.IsIrregular, codes, locations)
+            {
+                ItemLocations = itemLocations,
+            });
         }
         return new LedgerStockMapping(rows, unknown, tooSmall);
     }

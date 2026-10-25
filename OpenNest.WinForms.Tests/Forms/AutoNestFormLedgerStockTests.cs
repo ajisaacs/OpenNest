@@ -206,6 +206,22 @@ public class AutoNestFormLedgerStockTests
         Assert.Contains("R1, R2", tooltip);
     }
 
+    [Fact]
+    public void LedgerRowsCarryTheItemCodesAutoNestAssigns() => RunSta(() =>
+    {
+        using var form = new LedgerTestForm();
+        form.LoadPlateOptions(Manual(0, 0), 0.5);
+        GetGrid(form);
+        Assert.Empty(form.LedgerRows);
+
+        form.ApplyLedgerStock(Stock);
+
+        Assert.Equal(new[] { "ledger:1", "ledger:2" }, form.LedgerRows.Select(r => r.Id));
+        Assert.Equal(new[] { "B-1", "B-1", "B-1" }, form.LedgerRows[0].ItemCodes);
+        Assert.Equal(new[] { "D-1", "D-2" }, form.LedgerRows[1].ItemCodes);
+        Assert.Equal("R1", form.LedgerRows[1].ItemLocations["D-2"]);
+    });
+
     private sealed class LedgerTestForm : AutoNestForm
     {
         public LedgerTestForm() : this(LedgerNest()) { }

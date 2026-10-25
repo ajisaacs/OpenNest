@@ -310,6 +310,17 @@ unmapped material clears the ledger rows. A failed request keeps them.
 `Nest.PlateOptions`. After a kept result, the nest saves the hand-typed rows with their
 typed costs, as before.
 
+**Item codes.** After a kept result is committed, `LedgerStockAssignment` gives each
+plate on a ledger row that row's next item codes, in nest plate order, one per sheet of
+the plate's quantity (a bundle repeats its code). It reads each sheet's stock from
+`NestPipelineCommit.PairWithStock`; a sheet Auto Nest solved with clamps removed takes its
+base row's codes. Plates committed on hand-typed stock get none, and a discarded,
+rejected or cancelled result changes no codes. The plate keeps them as
+`Plate.StockItemCodes` (saved in the nest, see the [nest file format](nest-file-format.md)),
+and `/api/nests/{id}/sheets` reports them per plate so MaterialLedger can hold those exact
+items. The plate list's tooltip shows "Stock: CODE (location)"; the location comes from
+this window's ledger load and is never saved. A re-nest builds new plates, so it drops codes.
+
 **Cost.** Ledger rows load without cost. A ledger `CostPerUnit` is per lot unit, and a
 drop's is its source sheet's. While any ledger row is ticked, the run scores by area and
 hand-typed costs are ignored. The summary line says so, and the saved options keep

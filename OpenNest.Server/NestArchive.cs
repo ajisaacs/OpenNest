@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using OpenNest.Data;
 
 namespace OpenNest.Server;
@@ -85,7 +86,33 @@ internal static class NestArchive
             .OrderBy(p => p.Name, StringComparer.Ordinal)
             .ToList();
 
-        sheets = new NestSheets { NestId = record.Id, Revision = record.Revision, Sheets = sizes, Parts = parts };
+        // NestReader: codes end at the first blank entry and at the plate's quantity.
+        var platesOut = plates
+            .Select((p, index) =>
+            {
+                var size = p.Size ?? new SizeJson();
+                return new NestPlateSheet
+                {
+                    Index = index,
+                    Width = System.Math.Min(size.Width, size.Length),
+                    Length = System.Math.Max(size.Width, size.Length),
+                    Quantity = p.Quantity,
+                    StockItemCodes = (p.StockItemCodes ?? new())
+                        .TakeWhile(code => !string.IsNullOrWhiteSpace(code))
+                        .Take(System.Math.Max(p.Quantity, 0))
+                        .ToList(),
+                };
+            })
+            .ToList();
+
+        sheets = new NestSheets
+        {
+            NestId = record.Id,
+            Revision = record.Revision,
+            Sheets = sizes,
+            Parts = parts,
+            Plates = platesOut,
+        };
         return null;
     }
 
@@ -187,6 +214,30 @@ internal static class NestArchive
         public int Quantity { get; set; } = 1;
         public List<PartJson>? Parts { get; set; }
         public List<CutOffJson>? CutOffs { get; set; }
+
+        [JsonConverter(typeof(LenientStringListJson))]
+        public List<string>? StockItemCodes { get; set; }
+    }
+
+    // NestReader's lenient list: a wrongly shaped value reads as empty, non-strings are skipped.
+    private sealed class LenientStringListJson : JsonConverter<List<string>>
+    {
+        public override List<string> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            using var document = JsonDocument.ParseValue(ref reader);
+            var list = new List<string>();
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+                return list;
+            foreach (var element in document.RootElement.EnumerateArray())
+            {
+                if (element.ValueKind == JsonValueKind.String)
+                    list.Add(element.GetString()!);
+            }
+            return list;
+        }
+
+        public override void Write(Utf8JsonWriter writer, List<string> value, JsonSerializerOptions options) =>
+            JsonSerializer.Serialize(writer, value);
     }
 
     private sealed class SizeJson

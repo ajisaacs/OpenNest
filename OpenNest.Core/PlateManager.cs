@@ -236,6 +236,7 @@ namespace OpenNest
                 remaining.CutOffs.Clear();
                 remaining.Parts.Clear();
                 remaining.Quantity = 1;
+                remaining.StockItemCodes = Array.Empty<string>();
             }
             finally
             {

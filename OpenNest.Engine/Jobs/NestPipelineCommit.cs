@@ -49,6 +49,24 @@ public static class NestPipelineCommit
         return Attach(result, nextPlate);
     }
 
+    /// <summary>
+    /// Pairs the plates <see cref="ApplyToEmptyPlates"/> or <see cref="ApplyToPlates"/> returned
+    /// for <paramref name="result"/> with the stock each was solved on: one per proposed plate
+    /// with parts, in proposal order.
+    /// </summary>
+    public static IReadOnlyList<(Plate Plate, NestPlateStock Stock)> PairWithStock(
+        NestPipelineResult result,
+        IReadOnlyList<Plate> applied
+    )
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(applied);
+        var solved = result.Plates.Where(p => p.Parts.Count > 0).ToList();
+        if (solved.Count != applied.Count)
+            throw new ArgumentException("The plates were not committed from this result.", nameof(applied));
+        return applied.Zip(solved, (plate, proposed) => (plate, proposed.Stock)).ToList();
+    }
+
     private static void EnsureCommittable(NestPipelineResult result, bool allowInvalid, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(result);

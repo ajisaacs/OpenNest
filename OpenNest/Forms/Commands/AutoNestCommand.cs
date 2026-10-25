@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using OpenNest.Data.MaterialLedger;
 using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.Jobs;
@@ -29,6 +30,7 @@ namespace OpenNest.Forms.Commands
         private readonly double salvageRate;
         private readonly double minRemnantSize;
         private List<PlateOption> savedOptions;
+        private IReadOnlyList<LedgerStockRow> ledgerRows = Array.Empty<LedgerStockRow>();
 
         private AutoNestCommand(IWin32Window owner, EditNestForm target, List<NestItem> items,
             List<PlateOption> plateOptions, string engineName, double salvageRate, double minRemnantSize)
@@ -73,6 +75,7 @@ namespace OpenNest.Forms.Commands
                 form.EngineName ?? EngineSelection.EngineName, form.SalvageRate, form.MinRemnantSize)
             {
                 savedOptions = savedOptions,
+                ledgerRows = form.OptimizePlateSize ? form.LedgerRows : Array.Empty<LedgerStockRow>(),
             };
         }
 
@@ -113,6 +116,7 @@ namespace OpenNest.Forms.Commands
 
                 var applied = NestPipelineCommit.ApplyToEmptyPlates(result, target.PlateManager,
                     allowInvalid, cts.Token);
+                AssignLedgerStock(result, applied);
                 if (applied.Count > 0)
                     target.PlateManager.LoadAt(target.Nest.Plates.IndexOf(applied[0]));
                 if (plateOptions?.Count > 0)
@@ -190,6 +194,20 @@ namespace OpenNest.Forms.Commands
             if (!solve.IsCompleted)
                 progressForm.ShowDialog(owner);
             return await solve;
+        }
+
+        // Only a committed proposal gets codes: every return above leaves them as they were.
+        private void AssignLedgerStock(NestPipelineResult result, IReadOnlyList<Plate> applied)
+        {
+            LedgerStockAssignment.Assign(target.Nest.Plates,
+                NestPipelineCommit.PairWithStock(result, applied).Select(p => (p.Plate, p.Stock.Id)),
+                ledgerRows);
+            foreach (var row in ledgerRows)
+            {
+                foreach (var (code, location) in row.ItemLocations)
+                    target.LedgerLocations[code] = location;
+            }
+            target.UpdatePlateList();
         }
 
         // Costs and unplaced parts were shown in the review; clamp removals exist only once kept.

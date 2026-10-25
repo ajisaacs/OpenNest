@@ -13,6 +13,7 @@ using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Collections;
 using OpenNest.Controls;
 using OpenNest.Data;
+using OpenNest.Data.MaterialLedger;
 using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.Sequencing;
@@ -89,6 +90,7 @@ namespace OpenNest.Forms
             toolStrip1.Renderer = renderer;
             toolStrip2.Renderer = renderer;
 
+            platesListView.ShowItemToolTips = true;
             platesListView.SelectedIndexChanged += (sender, e) =>
             {
                 if (updatingPlateList || platesListView.SelectedIndices.Count == 0)
@@ -289,6 +291,12 @@ namespace OpenNest.Forms
             return true;
         }
         internal System.Action<System.Threading.CancellationToken> CuttingBeforePlan { get; set; }
+
+        /// <summary>
+        /// Ledger location of each item code Auto Nest loaded in this window, for the plate list's
+        /// stock tooltip. Display-only: only the codes are saved with the nest.
+        /// </summary>
+        internal Dictionary<string, string> LedgerLocations { get; } = new(StringComparer.Ordinal);
 
         internal void OpenValidationInspection()
         {
@@ -1468,9 +1476,10 @@ namespace OpenNest.Forms
 
         #endregion
 
-        private static ListViewItem GetListViewItem(Plate plate, int id)
+        private ListViewItem GetListViewItem(Plate plate, int id)
         {
             var item = new ListViewItem();
+            item.ToolTipText = LedgerStockAssignment.Describe(plate, LedgerLocations) ?? "";
             item.Text = id.ToString();
             item.SubItems.Add(plate.Size.ToString());
             item.SubItems.Add(plate.Quantity.ToString());
