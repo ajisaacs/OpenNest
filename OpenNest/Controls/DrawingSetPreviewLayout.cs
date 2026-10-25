@@ -6,15 +6,19 @@ namespace OpenNest.Controls
 {
     /// <summary>
     /// Packs a set's drawings into rows for <see cref="DrawingSetPreviewControl"/>, every one at
-    /// the same scale and in its own orientation. Rows are filled tallest first (next-fit
-    /// decreasing height) and each row's parts share a baseline with a label strip beneath it.
-    /// The row width is chosen to give the largest fit scale in the view, and the label strip
-    /// and minimum cell width are fixed in pixels, so they are solved together with that scale.
+    /// the same scale and in its own orientation. Rows are filled tallest first and each row's
+    /// parts share a baseline with a label strip beneath it. The label strip and minimum cell
+    /// width are fixed in pixels, so the layout is solved for the largest scale that fits the view.
     /// </summary>
+    /// <remarks>
+    /// At a given scale, filling each row as far as the view's width allows beats any other split
+    /// of the tallest-first order into rows: each row then starts no earlier, so it is no taller,
+    /// and there are no more rows. A larger scale only widens cells, so the packed height grows
+    /// with scale and the largest scale that fits is found by bisection.
+    /// </remarks>
     internal static class DrawingSetPreviewLayout
     {
-        private const int RowWidthCandidates = 48;
-        private const int ScaleIterations = 4;
+        private const int ScaleIterations = 60;
 
         /// <summary>Where one drawing lands: its bounding box's lower-left corner and its label cell, in world units (Y up).</summary>
         internal readonly record struct Placement(int Index, double PartX, double PartY, double CellX, double CellWidth, double LabelTop);
@@ -50,6 +54,9 @@ namespace OpenNest.Controls
 
             viewWidth = System.Math.Max(viewWidth, 1);
             viewHeight = System.Math.Max(viewHeight, 1);
+            labelPixels = System.Math.Max(labelPixels, 0);
+            // A cell wider than the view could never be placed, so the floor gives way to the view.
+            minCellPixels = System.Math.Clamp(minCellPixels, 0, viewWidth);
             var clean = sizes.Select(s => (Width: Positive(s.Width), Height: Positive(s.Height))).ToArray();
             var largest = clean.Max(s => System.Math.Max(s.Width, s.Height));
             var spacing = largest * 0.04;
@@ -58,39 +65,45 @@ namespace OpenNest.Controls
                 .ThenBy(i => i)
                 .ToArray();
 
-            // Any row narrower than the widest part (plus its spacing) cannot hold it; wider
-            // than every part side by side is one row. Candidates are spread geometrically between.
-            var narrowest = clean.Max(s => s.Width);
-            var widest = clean.Sum(s => s.Width) + spacing * clean.Length;
-            Result best = null;
-            for (var c = 0; c <= RowWidthCandidates; c++)
-            {
-                var rowWidth = narrowest * System.Math.Pow(widest / narrowest, (double)c / RowWidthCandidates);
-                var scale = System.Math.Min(viewWidth / widest, viewHeight / clean.Sum(s => s.Height));
-                Result result = null;
-                for (var i = 0; i < ScaleIterations; i++)
-                {
-                    result = Pack(clean, order, rowWidth, spacing, labelPixels / scale, minCellPixels / scale);
-                    scale = System.Math.Min(viewWidth / result.Width, viewHeight / result.Height);
-                }
+            Result PackAt(double scale) =>
+                Pack(clean, order, viewWidth / scale, spacing, labelPixels / scale, minCellPixels / scale);
 
-                // The label strip was sized for the previous scale; repack once at the final one
-                // so the reported scale and the strip agree.
-                result = Pack(clean, order, rowWidth, spacing, labelPixels / scale, minCellPixels / scale);
-                result = new Result
-                {
-                    Placements = result.Placements,
-                    Width = result.Width,
-                    Height = result.Height,
-                    LabelHeight = result.LabelHeight,
-                    Scale = System.Math.Min(viewWidth / result.Width, viewHeight / result.Height),
-                };
-                if (best == null || result.Scale > best.Scale)
-                    best = result;
+            bool Fits(Result packed, double scale) =>
+                packed.Width * scale <= viewWidth * (1 + 1e-9) && packed.Height * scale <= viewHeight * (1 + 1e-9);
+
+            // No scale can exceed the one that fits the widest or the tallest part alone.
+            var high = System.Math.Min(viewWidth / clean.Max(s => s.Width), viewHeight / clean.Max(s => s.Height));
+            var low = high * 1e-9;
+            var packed = PackAt(low);
+            if (!Fits(packed, low))
+            {
+                // Even shrunk to nothing, the label strips of the rows overflow the view: keep
+                // that packing and shrink it to fit, labels included.
+                return WithScale(packed, System.Math.Min(viewWidth / packed.Width, viewHeight / packed.Height));
             }
 
-            return best;
+            if (Fits(PackAt(high), high))
+                low = high;
+            for (var i = 0; i < ScaleIterations && high - low > low * 1e-9; i++)
+            {
+                var scale = (low + high) / 2;
+                if (Fits(PackAt(scale), scale))
+                    low = scale;
+                else
+                    high = scale;
+            }
+
+            return WithScale(PackAt(low), low);
         }
+
+        private static Result WithScale(Result packed, double scale) => new()
+        {
+            Placements = packed.Placements,
+            Width = packed.Width,
+            Height = packed.Height,
+            LabelHeight = packed.LabelHeight,
+            Scale = scale,
+        };
 
         private static Result Pack((double Width, double Height)[] sizes, int[] order, double rowWidth, double spacing,
             double labelHeight, double minCell)
@@ -101,7 +114,7 @@ namespace OpenNest.Controls
             var start = 0;
             while (start < order.Length)
             {
-                // Next-fit: take parts while they fit the row; a row always takes at least one.
+                // Take parts while they fit the row; a row always takes at least one.
                 var x = 0.0;
                 var end = start;
                 while (end < order.Length)

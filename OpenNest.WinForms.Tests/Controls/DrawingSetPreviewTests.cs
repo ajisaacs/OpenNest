@@ -65,6 +65,25 @@ public class DrawingSetPreviewTests
     }
 
     [Fact]
+    public void Arrange_FillsANarrowPaneWhenLabelCellsSetTheRowWidth()
+    {
+        // A tall, narrow pane where the minimum label cell, not the parts, limits each row.
+        var sizes = new List<(double, double)>
+        {
+            (45, 75), (40, 75), (40, 72), (40, 72), (22, 40), (35, 33), (35, 33), (60, 25),
+            (60, 25), (75, 22), (75, 22), (22, 22), (35, 30), (35, 30), (20, 20), (25, 15),
+            (15, 15), (40, 15), (20, 15), (6, 10), (6, 10),
+        };
+
+        var result = DrawingSetPreviewLayout.Arrange(sizes, 400, 590, 17, 90);
+
+        // Rows used to be fixed at four label cells, leaving the pane 40% empty at about half this scale.
+        Assert.True(result.Scale > 2.2, $"scale {result.Scale}");
+        Assert.True(result.Width * result.Scale <= 400 + 1e-6);
+        Assert.InRange(result.Height * result.Scale, 585, 590 + 1e-6);
+    }
+
+    [Fact]
     public void Arrange_UsesTheViewShape()
     {
         var sizes = Enumerable.Repeat((10.0, 10.0), 12).ToList();
