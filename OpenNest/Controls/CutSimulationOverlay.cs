@@ -133,10 +133,20 @@ internal sealed class CutSimulationOverlay : IDisposable
 
     private void Tick()
     {
+        Advance();
+        view.Invalidate();
+    }
+
+    // Moves the playhead by the wall time since the last advance. Paints call it too: WM_TIMER
+    // is only delivered when no paint is pending, so a pan's stream of repaints starves the timer.
+    private void Advance()
+    {
         var elapsed = clock.Elapsed;
         clock.Restart();
-        Time = time + TimeSpan.FromTicks((long)(elapsed.Ticks * Speed));
-        if (simulation == null || time >= simulation.TotalTime)
+        var next = time + TimeSpan.FromTicks((long)(elapsed.Ticks * Speed));
+        time = next > simulation.TotalTime ? simulation.TotalTime : next;
+        Changed?.Invoke(this, EventArgs.Empty);
+        if (time >= simulation.TotalTime)
             Pause();
     }
 
@@ -171,6 +181,8 @@ internal sealed class CutSimulationOverlay : IDisposable
     {
         if (simulation == null || simulation.Steps.Count == 0)
             return;
+        if (IsPlaying)
+            Advance();
 
         var state = graphics.Save();
         try
