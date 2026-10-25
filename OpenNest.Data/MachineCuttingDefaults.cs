@@ -14,8 +14,9 @@ public static class MachineCuttingDefaults
 {
     private const double MillimetersPerInch = 25.4;
 
-    // Thicknesses are typed to a few decimals; this matches one converted between units.
-    private const double ThicknessToleranceInches = 0.0005;
+    // Thicknesses are typed or imported to three decimals (PEP stores 3/16 as 0.188), so this
+    // matches those and ones converted between units; gauges are far further apart.
+    private const double ThicknessToleranceInches = 0.001;
 
     /// <summary>
     /// The thickness settings of <paramref name="machine"/> for the nest's material (its grade

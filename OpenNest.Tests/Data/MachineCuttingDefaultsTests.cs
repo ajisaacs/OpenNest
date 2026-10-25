@@ -94,7 +94,20 @@ public class MachineCuttingDefaultsTests
     }
 
     [Theory]
+    [InlineData(0.2505)] // Off by three-decimal rounding, as PEP's 0.188 is from 3/16 (0.1875).
+    [InlineData(0.2495)]
+    public void ApplyTo_MatchesAThicknessRoundedToThreeDecimals(double thickness)
+    {
+        var parameters = new CuttingParameters();
+
+        Assert.True(MachineCuttingDefaults.ApplyTo(parameters, Machine(LineArc), NestOf(thickness)));
+
+        Assert.Equal(0.012, parameters.Kerf);
+    }
+
+    [Theory]
     [InlineData(0.1875, "A36")]
+    [InlineData(0.252, "A36")]
     [InlineData(0.25, "304")]
     public void ApplyTo_WithoutMachineSettings_ChangesNothing(double thickness, string grade)
     {

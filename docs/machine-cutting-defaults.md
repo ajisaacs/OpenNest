@@ -8,8 +8,9 @@ material and thickness, from that machine's Tools > Machine Configuration entry.
 ## Lookup
 
 The machine's material must match the nest's material name, and its grade when the nest
-has one (otherwise the first grade on file). The thickness matches within 0.0005 in after
-converting the nest's thickness to the machine's units. With no match, or no machine on
+has one (otherwise the first grade on file). The thickness matches within 0.001 in after
+converting the nest's thickness to the machine's units, so a thickness rounded to three
+decimals (PEP stores 3/16 as 0.188) finds the machine's 0.1875; the nearest one wins. With no match, or no machine on
 file, nothing changes and the previous behavior applies. Lengths are converted from the
 machine's units to the nest's.
 
