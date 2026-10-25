@@ -79,7 +79,10 @@ shows the first three check categories, even when there are no findings:
   contours in cutting order, or an active clamp's physical footprint. This includes
   earlier holes within the same part and previously cut parts. A future cut is not
   an obstacle yet. Actual uncut gaps are respected; enabling tabs in settings alone
-  is not evidence that a gap exists. Clamp-rapid warnings are conservative: head
+  is not evidence that a gap exists. A cut that runs on past its own start along its
+  first cut (a converted program's seam overcut, matched within the 1e-6 seam
+  tolerance) is closed at its seam; the rapid leaving its overcut end ignores contact
+  within that tolerance of the departure. Clamp-rapid warnings are conservative: head
   height/retracts are not modeled, so inspect the emitted route and machine setup.
   A clamp whose footprint covers the program start point warns on every posting
   attempt by design; there is no exemption for the first rapid and no persisted

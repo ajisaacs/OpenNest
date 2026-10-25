@@ -1,7 +1,9 @@
+using System.Text;
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
+using OpenNest.IO;
 
 namespace OpenNest.Tests.Diagnostics;
 
@@ -219,6 +221,122 @@ public class PostVerificationAnalyzerTests
         parameters.TabsEnabled = false;
         Assert.Empty(Find(Analyze(part, Scribe(-2, 2), Scribe(6, 2)), PostVerificationKind.RapidCrossing));
     }
+
+    [Theory]
+    [InlineData(2.5, true)] // The overcut retraces part of the first cut: the square is cut free.
+    [InlineData(3.5, false)] // It runs on past the whole first cut: not a recognized overcut.
+    public void Rapid_SeamOvercutAlongTheFirstCutClosesTheContour(double overcutEnd, bool closed)
+    {
+        var part = Rectangle(0, 0, 4);
+        var program = new Program();
+        program.MoveTo(2, 0);
+        program.LineTo(3, 0);
+        program.LineTo(4, 0);
+        program.LineTo(4, 4);
+        program.LineTo(0, 4);
+        program.LineTo(0, 0);
+        program.LineTo(overcutEnd, 0);
+        part.RestoreLeadInProgram(program, false);
+        var report = Analyze(part, Scribe(-2, 2), Scribe(6, 2));
+        Assert.Equal(closed, Find(report, PostVerificationKind.RapidCrossing).Any(f => f.PartNumber == 3));
+        Assert.Empty(Find(report, PostVerificationKind.Incomplete));
+    }
+
+    // P260810-02's SULLYS-009, as converted from a source CAM: each hole's arc runs about 0.03 past
+    // its pierce, the slot's last line runs 0.03 along its first, and the perimeter keeps a 0.02 tab.
+    // Arc centers carry their own endpoint rounding, so a hole's two halves disagree by about 1e-7.
+    [Fact]
+    public void Rapid_ConvertedSeamOvercutsAreCheckedNotLeftIncomplete()
+    {
+        var part = new Part(new Drawing("SULLYS-009", ReadProgram(Sullys009Clean)));
+        Assert.True(part.RestoreLeadInProgram(ReadProgram(Sullys009Cut), true));
+        var report = Analyze(part);
+        Assert.Empty(Find(report, PostVerificationKind.Incomplete));
+        // Holes 2 and 4 really are cut free and then crossed by the rapid leaving them; holes 1
+        // and 3 are left from their overcut end without touching them again.
+        Assert.Equal(new[] { 2, 4 }, Find(report, PostVerificationKind.RapidCrossing)
+            .Select(f => int.Parse(f.Message.Split("contour ")[1].Split(' ')[0])).Order());
+    }
+
+    private static Program ReadProgram(string text)
+    {
+        var reader = new ProgramReader(new MemoryStream(Encoding.UTF8.GetBytes(text)));
+        var program = reader.Read();
+        reader.Close();
+        return program;
+    }
+
+    private const string Sullys009Clean = """
+        G91
+        G00X0.07Y0
+        G03X-0.14Y0I-0.07J0
+        G03X0.133669Y0.02909I0.0699998916J-0.0000000236
+        G01X0.006331Y-0.02909
+        G00X0.11Y0
+        G03X0.14Y0I0.07J0
+        G03X-0.133669Y-0.02909I-0.0699998916J0.0000000236
+        G01X-0.006331Y0.02909
+        G00X0Y0.5
+        G03X0.14Y0I0.07J0
+        G03X-0.133669Y-0.02909I-0.0699998916J0.0000000236
+        G01X-0.006331Y0.02909
+        G00X-0.18Y-0.07
+        G03X0Y0.14I0J0.07
+        G03X0.02909Y-0.133669I-0.0000000236J-0.0699998916
+        G01X-0.02909Y-0.006331
+        G00X-1.3285Y-0.394
+        G01X0.4765Y0
+        G03X0Y0.428I0J0.214
+        G01X-0.953Y0
+        G03X0Y-0.428I0J-0.214
+        G01X0.5065Y0
+        G01X-0.03Y0
+        G00X-0.2665Y-0.411
+        G01X-0.03Y0
+        G02X0Y1.25I0J0.625
+        G01X2.1875Y0
+        G02X0.0625Y-0.0625I0J-0.0625
+        G01X0Y-1.125
+        G02X-0.0625Y-0.0625I-0.0625J0
+        G01X-2.1375Y0
+        G01X-0.02Y0
+        """;
+
+    private const string Sullys009Cut = """
+        G91
+        G01X0.07Y0:LEADIN
+        G03X-0.14Y0I-0.07J0
+        G03X0.133669Y0.02909I0.0699998916J-0.0000000236
+        G00X0.186331Y-0.02909
+        G01X-0.07Y0:LEADIN
+        G03X0.14Y0I0.07J0
+        G03X-0.133669Y-0.02909I-0.0699998916J0.0000000236
+        G00X0.063669Y0.52909
+        G01X-0.07Y0:LEADIN
+        G03X0.14Y0I0.07J0
+        G03X-0.133669Y-0.02909I-0.0699998916J0.0000000236
+        G00X-0.186331Y0.02909
+        G01X0Y-0.07:LEADIN
+        G03X0Y0.14I0J0.07
+        G03X0.02909Y-0.133669I-0.0000000236J-0.0699998916
+        G00X-1.35759Y-0.275331
+        G01X0Y-0.125:LEADIN
+        G01X0.4765Y0
+        G03X0Y0.428I0J0.214
+        G01X-0.953Y0
+        G03X0Y-0.428I0J-0.214
+        G01X0.5065Y0
+        G00X-0.3715Y-0.540904
+        G01X0.075Y0.129904:LEADIN
+        G01X-0.03Y0
+        G02X0Y1.25I0J0.625
+        G01X2.1875Y0
+        G02X0.0625Y-0.0625I0J-0.0625
+        G01X0Y-1.125
+        G02X-0.0625Y-0.0625I-0.0625J0
+        G01X-2.1375Y0
+        G01X0.03Y-0.051961:LEADOUT
+        """;
 
     [Fact]
     public void Rapid_CutoffTravelStillCrossesEarlierRealCuts()

@@ -279,6 +279,18 @@ internal static class PostVerificationGeometry
         /// <summary>Exact native distance from <paramref name="point"/> to this finite curve.</summary>
         internal double DistanceTo(Vector point) => nativeEntity.Value.ClosestPointTo(point).DistanceTo(point);
 
+        /// <summary>The native point of this finite curve closest to <paramref name="point"/>.</summary>
+        internal Vector ClosestPoint(Vector point) => nativeEntity.Value.ClosestPointTo(point);
+
+        /// <summary>
+        /// This curve from its start up to <paramref name="point"/>, which must be one of its own
+        /// interior points (see <see cref="ClosestPoint"/>); an arc keeps its center and radius.
+        /// </summary>
+        internal Curve Until(Vector point) => Center is { } center
+            ? new Curve(Start, point, center, Radius,
+                System.Math.Sign(Sweep) * Travel(System.Math.Atan2(point.Y - center.Y, point.X - center.X)))
+            : new Curve(Start, point, null, 0, 0);
+
         internal bool Contains(Vector point) => Contains(point, Epsilon);
 
         /// <summary>On-support test with an admitted positional allowance (see <see cref="SameSupport(Curve, double)"/>).</summary>

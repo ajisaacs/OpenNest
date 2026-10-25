@@ -159,7 +159,14 @@ public sealed class ReleasedContourState
                     // A rapid well clear of a contour's extent can neither cross nor touch it.
                     if (reach.IsClearOf(obstacle.Extent))
                         continue;
-                    if (PostVerificationGeometry.Crosses(start, move.End, obstacle.Curves, token))
+                    // A rapid leaving an overcut departs from its retraced tail, which lies on the first
+                    // cut only within the seam tolerance its arcs were matched at. Contact within that
+                    // much of the departure is the departure itself.
+                    var from = start;
+                    if (obstacle.OvercutEnd is { } tailEnd && tailEnd.DistanceTo(start) <= PostVerificationGeometry.Epsilon
+                        && start.DistanceTo(move.End) > PostVerificationGeometry.RaySeamTolerance)
+                        from = start + (move.End - start) * (PostVerificationGeometry.RaySeamTolerance / start.DistanceTo(move.End));
+                    if (PostVerificationGeometry.Crosses(from, move.End, obstacle.Curves, token))
                         Add(new(PostVerificationKind.RapidCrossing, plate, part, obstacle.Part,
                             $"Direct XY rapid crosses or touches completed untabbed contour {obstacle.Contour} " +
                             $"of part {obstacle.Part}.")
@@ -167,7 +174,7 @@ public sealed class ReleasedContourState
                             Location = (start + move.End) * 0.5,
                             RapidStart = start,
                             RapidEnd = move.End,
-                            ContactPoints = PostVerificationGeometry.ContactPoints(start, move.End, obstacle.Curves, token)
+                            ContactPoints = PostVerificationGeometry.ContactPoints(from, move.End, obstacle.Curves, token)
                         }, owned);
                 }
             }
@@ -233,6 +240,12 @@ public sealed class ReleasedContourState
                 // A completed contour becomes an obstacle immediately, not at part end.
                 if (PostVerificationGeometry.Closed(current.Curves))
                     Finish();
+                else if (OvercutClosure(current.Curves) is { } closing)
+                {
+                    current.OvercutEnd = current.Curves[^1].End;
+                    current.Curves[^1] = closing;
+                    Finish();
+                }
             }
         }
         Finish();
@@ -279,15 +292,40 @@ public sealed class ReleasedContourState
                 return;
             // A real uncut gap leaves the contour attached. CuttingParameters can be stale;
             // no flag or tab configuration is used as evidence of retention.
-            if (!cutoff && PostVerificationGeometry.Closed(current.Curves))
+            if (!cutoff && (current.OvercutEnd.HasValue || PostVerificationGeometry.Closed(current.Curves)))
             {
-                obstacles.Add(new(part, contourNumber, current.Curves.ToArray()));
+                obstacles.Add(new(part, contourNumber, current.Curves.ToArray(), current.OvercutEnd));
                 closed.Add(current);
             }
             else if (!cutoff)
                 unfinished.Add(current);
             current = new CutGroup();
         }
+    }
+
+    /// <summary>
+    /// The closing piece of a contour cut on past its own start along its first cut, as a source
+    /// CAM's seam overcut is (see <see cref="SeamOvercut"/> for the clean-contour form): the last
+    /// cut passes back through the start and its tail retraces the first cut. The tail encloses
+    /// nothing, so the contour is closed by the last cut up to its start. Null for any other shape.
+    /// Arcs of one circle may carry centers derived from their own rounded endpoints, so the seam
+    /// is matched at <see cref="PostVerificationGeometry.RaySeamTolerance"/>, the closure seam
+    /// ray parity already admits; the obstacle keeps that seam, never the retraced tail.
+    /// </summary>
+    private static PostVerificationGeometry.Curve OvercutClosure(IReadOnlyList<PostVerificationGeometry.Curve> curves)
+    {
+        if (curves.Count < 2)
+            return null;
+        const double tolerance = PostVerificationGeometry.RaySeamTolerance;
+        var first = curves[0];
+        var last = curves[^1];
+        if (!last.SameDirection(first, tolerance) || !last.Contains(first.Start, tolerance)
+            || !first.Contains(last.End, tolerance))
+            return null;
+        var seam = last.ClosestPoint(first.Start);
+        var along = last.DistanceAlong(seam);
+        var tail = last.Length - along;
+        return along > tolerance && tail > tolerance && tail <= first.Length + tolerance ? last.Until(seam) : null;
     }
 
     /// <summary>
@@ -431,6 +469,9 @@ public sealed class ReleasedContourState
         internal List<PostVerificationGeometry.Curve> Curves { get; } = new();
         internal List<PostVerificationGeometry.Curve> Leads { get; } = new();
         internal bool Fixed { get; set; }
+        // Where the cut really ended when OvercutClosure closed it: the retraced tail's end, on the
+        // first cut. Its last curve now ends at the seam instead.
+        internal Vector? OvercutEnd { get; set; }
     }
 
     private sealed class DisjointSet(int count)
@@ -447,7 +488,8 @@ public sealed class ReleasedContourState
         internal void Union(int a, int b) => parents[Find(a)] = Find(b);
     }
 
-    private sealed record Obstacle(int Part, int Contour, IReadOnlyList<PostVerificationGeometry.Curve> Curves)
+    private sealed record Obstacle(int Part, int Contour, IReadOnlyList<PostVerificationGeometry.Curve> Curves,
+        Vector? OvercutEnd)
     {
         internal PostVerificationGeometry.Extent Extent { get; } =
             Curves.Aggregate(PostVerificationGeometry.Extent.None, (extent, curve) => extent.Union(curve.Extent));
