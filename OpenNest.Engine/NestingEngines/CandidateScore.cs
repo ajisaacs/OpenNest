@@ -5,9 +5,11 @@ using OpenNest.Engine.Jobs;
 namespace OpenNest.Engine.NestingEngines;
 
 /// <summary>Ranks whole-job candidate results: a valid layout before an invalid one, then the
-/// fewest unplaced parts, then the lowest <see cref="NestJobCost"/>; remaining ties keep
-/// candidate order.</summary>
-internal sealed record CandidateScore(NestJobResult Result, bool Valid, int Unplaced, double Cost, int Order, bool Priced)
+/// fewest unplaced parts, then the lowest <see cref="NestJobCost"/>, then the largest
+/// <see cref="NestJobCost.CompactnessOffcut(NestJob, NestJobResult)"/> (without salvage credit every
+/// one-sheet layout costs the same); remaining ties keep candidate order.</summary>
+internal sealed record CandidateScore(
+    NestJobResult Result, bool Valid, int Unplaced, double Cost, double Offcut, int Order, bool Priced)
 {
     public static CandidateScore Of(NestJob job, NestJobResult result, int order)
     {
@@ -16,7 +18,8 @@ internal sealed record CandidateScore(NestJobResult Result, bool Valid, int Unpl
         var unplaced = System.Math.Max(0, job.Parts.Sum(p => p.Quantity) - placed);
         // Cost needs every placement to name a known part, which only a valid result guarantees.
         var cost = valid ? NestJobCost.Evaluate(job, result) : double.PositiveInfinity;
-        return new CandidateScore(result, valid, unplaced, cost, order, NestJobCost.UsesExplicitCosts(job));
+        var offcut = valid ? NestJobCost.CompactnessOffcut(job, result) : 0;
+        return new CandidateScore(result, valid, unplaced, cost, offcut, order, NestJobCost.UsesExplicitCosts(job));
     }
 
     public bool IsBetterThan(CandidateScore other)
@@ -30,6 +33,9 @@ internal sealed record CandidateScore(NestJobResult Result, bool Valid, int Unpl
         var scale = System.Math.Max(1, System.Math.Max(System.Math.Abs(Cost), System.Math.Abs(other.Cost)));
         if (double.IsFinite(Cost) && double.IsFinite(other.Cost) && System.Math.Abs(Cost - other.Cost) > 1e-9 * scale)
             return Cost < other.Cost;
+        var offcutScale = System.Math.Max(1, System.Math.Max(Offcut, other.Offcut));
+        if (System.Math.Abs(Offcut - other.Offcut) > 1e-9 * offcutScale)
+            return Offcut > other.Offcut;
         return Order < other.Order;
     }
 }

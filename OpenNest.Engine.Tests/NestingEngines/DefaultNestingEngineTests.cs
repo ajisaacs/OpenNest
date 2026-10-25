@@ -25,6 +25,9 @@ public class DefaultNestingEngineTests
     private static (double X, double Y)[] Sheet(params (double X, double Y)[] poses) => poses;
 
     private static NestJobResult OneSheet(NestJob job) => Layout(job, Sheet((0, 0), (5, 0)));
+    // Same 10 x 6 free strip as OneSheet, below the parts instead of above them.
+    private static NestJobResult OneSheetAtTop(NestJob job) => Layout(job, Sheet((0, 6), (5, 6)));
+    // Only a 10 x 5 strip left below the parts.
     private static NestJobResult OneSheetHigher(NestJob job) => Layout(job, Sheet((0, 5), (5, 5)));
     private static NestJobResult TwoSheets(NestJob job) => Layout(job, Sheet((0, 0)), Sheet((0, 0)));
     private static NestJobResult Overlapping(NestJob job) => Layout(job, Sheet((0, 0), (1, 0)));
@@ -82,10 +85,22 @@ public class DefaultNestingEngineTests
     {
         var job = SquaresJob();
         var low = OneSheet(job);
-        var high = OneSheetHigher(job);
+        var high = OneSheetAtTop(job);
 
         Assert.Same(low, Choose(job, Returns(_ => low), Returns(_ => high)));
         Assert.Same(high, Choose(job, Returns(_ => high), Returns(_ => low)));
+    }
+
+    [Fact]
+    public void LargerOffcutWinsAtEqualCostInEitherOrder()
+    {
+        var job = SquaresJob();
+        var compact = OneSheet(job);
+        var loose = OneSheetHigher(job);
+        Assert.Equal(NestJobCost.Evaluate(job, compact), NestJobCost.Evaluate(job, loose));
+
+        Assert.Same(compact, Choose(job, Returns(_ => loose), Returns(_ => compact)));
+        Assert.Same(compact, Choose(job, Returns(_ => compact), Returns(_ => loose)));
     }
 
     [Fact]

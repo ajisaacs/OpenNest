@@ -235,8 +235,10 @@ With prices, gross sheet cost is the supplied value. Salvage is still computed f
 the largest qualifying material-edge offcut; net cost is
 `Cost * (NetSheetArea / SheetArea)`. Set desktop salvage rate to zero for purchase-price
 comparisons. Entering prices preserves the selected salvage settings. MCP and API
-currently disable salvage. Without prices, scores retain their existing area units
-and tie ordering; fixed strategies retain their legacy no-salvage area tie-break.
+currently disable salvage. Without prices, scores retain their existing area units;
+whole-job engines break exact cost ties by the compactness offcut (see
+[cost basis](nesting-engines.md#cost-basis-and-heuristic-limits)), and fixed strategies retain
+their legacy no-salvage area tie-break.
 
 Desktop reports gross cost, estimated salvage credit and net score. MCP reports
 `basis`, each stock's used physical count, supplied cost and gross subtotal, plus

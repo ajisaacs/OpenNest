@@ -41,6 +41,28 @@ public class NestJobCostTests
     }
 
     [Theory]
+    [InlineData(0, 0, 247.5)]
+    [InlineData(0.5, 0, 247.5)]
+    [InlineData(0, 13.75, 247.5)]
+    [InlineData(0, 14, 0)]
+    public void CompactnessOffcutIgnoresSalvageRateButKeepsTheMinimum(double rate, double minimum, double expected)
+    {
+        var stock = new NestPlateStock("sheet", new Size(20, 20), partSpacing: 0.25,
+            edgeSpacing: new Spacing(1, 1, 1, 1));
+        var work = stock.WorkArea;
+        var part = new NestJobPart("part", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(18, 4)), 1);
+        var job = new NestJob(new[] { part }, new[] { stock },
+            new NestJobOptions(salvageRate: rate, minimumSalvageDimension: minimum));
+        var sheet = new NestJobPlateResult(0, stock,
+            new[] { new NestJobPlacement("part", 0, work.Left, work.Bottom, 0) });
+
+        // The strip above the part: full work width by 18 - 4 - 0.25 spacing.
+        Assert.Equal(expected, NestJobCost.CompactnessOffcut(job, sheet));
+        Assert.Equal(expected, NestJobCost.CompactnessOffcut(job.Options, stock, new Box(work.Left, work.Bottom, 18, 4)));
+        Assert.Equal(0, NestJobCost.CompactnessOffcut(job, new NestJobPlateResult(0, stock, Array.Empty<NestJobPlacement>())));
+    }
+
+    [Theory]
     [InlineData(0, 5, 100)]
     [InlineData(0.5, 0, 100)]
     [InlineData(0.5, 7, 100)]

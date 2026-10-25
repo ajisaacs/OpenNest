@@ -35,17 +35,19 @@ public class RectanglesClampZoneTests
     }
 
     [Theory]
-    // Pre-clamp baseline hashes, captured from the unchanged packer at commit a3f1124.
-    [InlineData("1FA61E933D2D0D6F1E3336FCEBBB21CEB7E7D1533FDB253F9D48E947217575CE")]
+    // Pre-clamp baseline hashes, captured from the unchanged packer at commit a3f1124 and
+    // re-captured when equal-cost sheet layouts began preferring the larger free offcut.
+    [InlineData("3D389D6B993B69634EB45FC2CB0309273DE1BCF57A7C2BD980C63B535667B0C6")]
     public void ZeroClampLayoutIsBitIdenticalToBaseline(string hash) =>
         Assert.Equal(hash, LayoutHash(Engine().Solve(Job(
             new[] { Part("rect", Rectangle(10, 5), 12) },
             new[] { Stock("sheet", 48, 96, spacing: 0.25) }))));
 
     [Theory]
-    // Two complete candidates tie here on cost and placed material; the tie must fall to
-    // enumeration order on every platform (hash identical on Windows and Linux).
-    [InlineData("BEEEDEC81A7F987720FB5F331873103AD2470C839D568CE587F230BC39D210CC")]
+    // Complete candidates tie here on cost and placed material; the tie must fall to the
+    // compactness offcut, then enumeration order, the same way on every platform (hash
+    // identical on Windows and Linux).
+    [InlineData("9B343B6C5CF2CE8753F2E04ACB0A9C4D5921F4ADC15AA2586AF466769C0F019B")]
     public void ZeroClampMixedShapeLayoutIsBitIdenticalToBaseline(string hash) =>
         Assert.Equal(hash, LayoutHash(Engine().Solve(Job(
             new[]
@@ -57,7 +59,7 @@ public class RectanglesClampZoneTests
             new[] { Stock("sheet", 40, 60, spacing: 0.5, edge: new Spacing(0.5, 0.5, 0.5, 0.5)) }))));
 
     [Theory]
-    [InlineData("DBF93C1684D85B5EE7EB24C96A84904D2BA0F9A8183631EFC61638CB8B9B935A")]
+    [InlineData("F848E4C6213888302A9EBAC2B9839879FB1A4B6D919ACB8932FA1639FF3508A9")]
     public void ZeroClampMultiSheetLayoutIsBitIdenticalToBaseline(string hash) =>
         Assert.Equal(hash, LayoutHash(Engine().Solve(Job(
             new[] { Part("square", Rectangle(10, 10), 30) },
@@ -280,6 +282,7 @@ public class RectanglesClampZoneTests
     [Theory]
     // Captured from the unchanged packer at ab50900 (see progress task-6.2 evidence):
     // non-inverted clamp spans must keep today's blocks and layouts bit-for-bit.
+    // KEEP_LARGE_SPACING was re-captured when equal-cost layouts began preferring the larger offcut.
     [InlineData("KEEP_LARGE_SPACING")]
     [InlineData("KEEP_BETWEEN_CLAMPS")]
     [InlineData("KEEP_BETWEEN_SPACED")]
@@ -288,7 +291,7 @@ public class RectanglesClampZoneTests
     {
         var hash = fixture switch
         {
-            "KEEP_LARGE_SPACING" => "F7E4691C085FFB2164CEFFFB9B082B5F271E56E8B8B3D2AE23ECF5646FD40450",
+            "KEEP_LARGE_SPACING" => "3F390B18E99C6625E06A19295145F01EA85FEB7089DA99ED093E683AC71F7D02",
             "KEEP_BETWEEN_CLAMPS" => "F09B878211EB7C49649647003410B20191F635E3CD8DED6E03BEA5BD63B17D61",
             "KEEP_BETWEEN_SPACED" => "F09B878211EB7C49649647003410B20191F635E3CD8DED6E03BEA5BD63B17D61",
             "KEEP_MID_RAIL_SMALL_SPACING" => "97868486E834CA0B1DB110FF717635E38537DB96DF5CDFBB2AFE37E4B1366B71",

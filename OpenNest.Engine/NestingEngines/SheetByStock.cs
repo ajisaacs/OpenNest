@@ -68,7 +68,7 @@ internal static class SheetByStock
                 break;
             }
 
-            var trials = new List<(SheetLayout Layout, double Net)>();
+            var trials = new List<(SheetLayout Layout, double Net, double Offcut)>();
             if (preferred != null)
                 Try(preferred, trials);
             if (trials.Count == 0)
@@ -119,7 +119,7 @@ internal static class SheetByStock
 
         return result.Build(reason);
 
-        void Try(NestPlateStock stock, List<(SheetLayout Layout, double Net)> trials)
+        void Try(NestPlateStock stock, List<(SheetLayout Layout, double Net, double Offcut)> trials)
         {
             token.ThrowIfCancellationRequested();
             if (stock.Quantity is int available && used[stock.Id] >= available)
@@ -128,7 +128,7 @@ internal static class SheetByStock
                 NestJobStage.EvaluatingCandidate, stock.Id, SheetsUsed(result, job), SheetsUsed(result, job), 0));
             foreach (var layout in pack(stock, remaining))
                 if (layout.Poses.Count > 0)
-                    trials.Add((layout, NetCost(job, layout)));
+                    trials.Add((layout, NetCost(job, layout), Offcut(job, layout)));
         }
     }
 
@@ -138,19 +138,22 @@ internal static class SheetByStock
     /// <summary>
     /// Picks the layout with the lowest estimated whole-job cost. Remaining demand is priced at the
     /// best net-cost-per-material ratio any candidate achieved, so a sheet that finishes the job
-    /// competes fairly with a denser partial one. Ties: more material placed, then enumeration order.
+    /// competes fairly with a denser partial one. Ties: more material placed, then the larger
+    /// compactness offcut (without salvage credit every layout on one stock costs the same), then
+    /// enumeration order.
     /// </summary>
     private static SheetLayout Choose(IReadOnlyList<SheetDemand> types, int[] remaining,
-        IReadOnlyDictionary<string, int> priority, List<(SheetLayout Layout, double Net)> trials)
+        IReadOnlyDictionary<string, int> priority, List<(SheetLayout Layout, double Net, double Offcut)> trials)
     {
         var demandArea = types.Sum(t => remaining[t.Index] * t.MaterialArea);
         var bestRatio = trials.Min(t => t.Net / System.Math.Max(t.Layout.MaterialArea, 1e-12));
         return trials
-            .Select((t, order) => (t.Layout, order,
+            .Select((t, order) => (t.Layout, t.Offcut, order,
                 Estimate: NestJobCost.RequireFinite(t.Net + System.Math.Max(0, demandArea - t.Layout.MaterialArea) * bestRatio)))
             .OrderBy(t => PriorityDebt(types, remaining, priority, t.Layout))
             .ThenBy(t => t.Estimate)
             .ThenByDescending(t => t.Layout.MaterialArea)
+            .ThenByDescending(t => t.Offcut)
             .ThenBy(t => t.order)
             .First()
             .Layout;
@@ -176,4 +179,9 @@ internal static class SheetByStock
         layout.Envelope is { } envelope
             ? NestJobCost.NetSheetCost(job.Options, layout.Stock, envelope)
             : NestJobCost.GrossSheetCost(layout.Stock);
+
+    private static double Offcut(NestJob job, SheetLayout layout) =>
+        layout.Envelope is { } envelope
+            ? NestJobCost.TieBreakKey(NestJobCost.CompactnessOffcut(job.Options, layout.Stock, envelope))
+            : 0;
 }

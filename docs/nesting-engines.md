@@ -11,7 +11,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 
 | Engine | Best for | Method |
 |---|---|---|
-| Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost; ties keep the earlier engine |
+| Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the earlier engine |
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; stock chosen sheet by sheet by salvage-credited look-ahead cost |
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
 | Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan |
@@ -414,3 +414,11 @@ consolidation. Default compares valid equally fulfilled results by generic job s
 Fixed Fill/Strip/remnant strategies rank priority fulfillment first, then net cost
 for priced stock (gross area for legacy unpriced stock), then existing stable ties.
 None guarantees globally optimal purchasing or explores every combination of patterns.
+
+Without salvage credit, which desktop Auto Nest applies only when offering several plate
+sizes, every complete layout on one stock costs the same. Default, Rectangles, Circles and
+Irregular then break exact cost ties by `NestJobCost.CompactnessOffcut`: the largest
+full-width or full-length edge offcut, measured as salvage measures it but whatever the
+salvage rate (it honors a positive minimum salvage dimension; with none, any offcut counts).
+Larger wins, summed over a job's sheets. It is never part of the cost, so it cannot outrank a
+cheaper layout or change a reported cost.

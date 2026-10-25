@@ -121,7 +121,8 @@ public sealed class IrregularNestingEngine : INestingEngine
         using var solver = new Solver(job, types, null, default, WorkBudget, DrawingFor, SheetPacked, BatchSelected, TailReplaced);
         var unplaced = job.Parts.Sum(p => p.Quantity) - physicalPlan.Sum(s => s.Parts.Count);
         var plan = new Plan(physicalPlan, physicalPlan.Sum(s => NetCost(job.Options, s)), unplaced,
-            unplaced == 0 ? NestJobStopReason.Completed : NestJobStopReason.NoPlacementFound, NestJobCost.UsesExplicitCosts(job));
+            unplaced == 0 ? NestJobStopReason.Completed : NestJobStopReason.NoPlacementFound, NestJobCost.UsesExplicitCosts(job),
+            job.Options);
         return BuildResult(job, types, solver.ImproveTail(plan, WorkBudget * 2), null, default);
     }
 
@@ -170,7 +171,8 @@ public sealed class IrregularNestingEngine : INestingEngine
             var reason = run.Reason;
             if (unplaced > 0 && reason == NestJobStopReason.Completed)
                 reason = NestJobStopReason.NoPlacementFound; // Demand no stock can hold.
-            return new Plan(run.Sheets, NestJobCost.RequireFinite(run.Net + unplaced * Penalty), unplaced, reason, NestJobCost.UsesExplicitCosts(job));
+            return new Plan(run.Sheets, NestJobCost.RequireFinite(run.Net + unplaced * Penalty), unplaced, reason,
+                NestJobCost.UsesExplicitCosts(job), job.Options);
         }
 
         /// <summary>
@@ -326,6 +328,7 @@ public sealed class IrregularNestingEngine : INestingEngine
                     .Select((t, order) => (t.Fill, t.Net, order, Estimate: NestJobCost.RequireFinite(t.Net + System.Math.Max(0, remainingArea - t.Fill.PartArea) * bestRatio)))
                     .OrderBy(t => t.Estimate)
                     .ThenByDescending(t => t.Fill.Parts.Count)
+                    .ThenByDescending(t => NestJobCost.TieBreakKey(Offcut(job.Options, t.Fill)))
                     .ThenBy(t => t.order)
                     .First();
 
@@ -387,17 +390,29 @@ public sealed class IrregularNestingEngine : INestingEngine
         return builder.Build(plan.Reason);
     }
 
-    private static double NetCost(NestJobOptions options, SheetFill fill)
+    private static double NetCost(NestJobOptions options, SheetFill fill) =>
+        fill.Parts.Count == 0 ? NestJobCost.GrossSheetCost(fill.Stock)
+            : NestJobCost.NetSheetCost(options, fill.Stock, Envelope(fill));
+
+    /// <summary>Equal-cost tie-break: the fill's <see cref="NestJobCost.CompactnessOffcut(NestJobOptions, NestPlateStock, OpenNest.Geometry.Box)"/>.</summary>
+    private static double Offcut(NestJobOptions options, SheetFill fill) =>
+        fill.Parts.Count == 0 ? 0 : NestJobCost.CompactnessOffcut(options, fill.Stock, Envelope(fill));
+
+    private static OpenNest.Geometry.Box Envelope(SheetFill fill)
     {
-        if (fill.Parts.Count == 0) return NestJobCost.GrossSheetCost(fill.Stock);
         var left = fill.Parts.Min(p => p.Left);
         var bottom = fill.Parts.Min(p => p.Bottom);
-        return NestJobCost.NetSheetCost(options, fill.Stock, new OpenNest.Geometry.Box(left, bottom,
-            fill.Parts.Max(p => p.Right) - left, fill.Parts.Max(p => p.Top) - bottom));
+        return new OpenNest.Geometry.Box(left, bottom,
+            fill.Parts.Max(p => p.Right) - left, fill.Parts.Max(p => p.Top) - bottom);
     }
 
-    private sealed record Plan(IReadOnlyList<SheetFill> Sheets, double Cost, int Unplaced, NestJobStopReason Reason, bool Priced)
+    /// <summary>Ranked by unplaced parts, cost, sheet count, then compactness offcut (without salvage
+    /// credit every one-sheet plan costs the same); full ties keep the incumbent.</summary>
+    private sealed record Plan(IReadOnlyList<SheetFill> Sheets, double Cost, int Unplaced, NestJobStopReason Reason,
+        bool Priced, NestJobOptions Options)
     {
+        private double Offcut => Sheets.Sum(s => IrregularNestingEngine.Offcut(Options, s));
+
         public bool IsBetterThan(Plan other)
         {
             if (Unplaced != other.Unplaced)
@@ -407,7 +422,11 @@ public sealed class IrregularNestingEngine : INestingEngine
             var scale = System.Math.Max(1, System.Math.Max(Cost, other.Cost));
             if (System.Math.Abs(Cost - other.Cost) > 1e-9 * scale)
                 return Cost < other.Cost;
-            return Sheets.Count < other.Sheets.Count;
+            if (Sheets.Count != other.Sheets.Count)
+                return Sheets.Count < other.Sheets.Count;
+            var offcut = Offcut;
+            var otherOffcut = other.Offcut;
+            return offcut - otherOffcut > 1e-9 * System.Math.Max(1, System.Math.Max(offcut, otherOffcut));
         }
     }
 }

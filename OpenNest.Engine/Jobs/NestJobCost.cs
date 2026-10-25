@@ -19,6 +19,45 @@ public static class NestJobCost
         var minimum = job.Options.MinimumSalvageDimension;
         if (job.Options.SalvageRate == 0 || minimum <= 0 || sheet.Placements.Count == 0)
             return area;
+        var (left, bottom, right, top) = MaterialEnvelope(job, sheet);
+        return NetSheetArea(job.Options, sheet.Stock, left, bottom, right, top);
+    }
+
+    /// <summary>
+    /// Tie-break for layouts of equal cost: the largest full-width/full-length edge offcut, as
+    /// salvage measures it but whatever the salvage rate. Offcuts must meet a positive
+    /// MinimumSalvageDimension; with none, any offcut counts. Larger is more compact. An empty
+    /// sheet has none. Never part of the cost, so it cannot outrank a cheaper layout.
+    /// </summary>
+    public static double CompactnessOffcut(NestJob job, NestJobPlateResult sheet)
+    {
+        if (sheet.Placements.Count == 0)
+            return 0;
+        var (left, bottom, right, top) = MaterialEnvelope(job, sheet);
+        return LargestOffcut(sheet.Stock, left, bottom, right, top,
+            System.Math.Max(0, job.Options.MinimumSalvageDimension));
+    }
+
+    /// <summary><see cref="CompactnessOffcut(NestJob, NestJobPlateResult)"/> from an existing
+    /// material-only placed-parts envelope.</summary>
+    public static double CompactnessOffcut(NestJobOptions options, NestPlateStock stock, Box partsEnvelope) =>
+        LargestOffcut(stock, partsEnvelope.Left, partsEnvelope.Bottom, partsEnvelope.Right, partsEnvelope.Top,
+            System.Math.Max(0, options.MinimumSalvageDimension));
+
+    /// <summary>
+    /// An offcut on a 1e-6 grid, for exact tie-break comparisons: differences below it are
+    /// envelope rounding, which must not decide a tie differently across platform math libraries.
+    /// </summary>
+    public static double TieBreakKey(double offcut) => System.Math.Round(offcut, 6);
+
+    /// <summary>Whole-job <see cref="CompactnessOffcut(NestJob, NestJobPlateResult)"/>, summed over sheets.</summary>
+    public static double CompactnessOffcut(NestJob job, NestJobResult result) =>
+        RequireFinite(result.Plates.Sum(sheet => CompactnessOffcut(job, sheet)));
+
+    /// <summary>Bounds of the sheet's rotated material contours; scribe/etch marks are excluded.</summary>
+    private static (double Left, double Bottom, double Right, double Top) MaterialEnvelope(
+        NestJob job, NestJobPlateResult sheet)
+    {
         var parts = job.Parts.ToDictionary(p => p.Id);
         var boxes = sheet
             .Placements.Select(p =>
@@ -30,8 +69,7 @@ public static class NestJobCost
                 return NestLayoutCheck.MaterialBounds(part);
             })
             .ToList();
-        return NetSheetArea(job.Options, sheet.Stock, boxes.Min(b => b.Left),
-            boxes.Min(b => b.Bottom), boxes.Max(b => b.Right), boxes.Max(b => b.Top));
+        return (boxes.Min(b => b.Left), boxes.Min(b => b.Bottom), boxes.Max(b => b.Right), boxes.Max(b => b.Top));
     }
 
     /// <summary>
@@ -50,6 +88,12 @@ public static class NestJobCost
         var minimum = options.MinimumSalvageDimension;
         if (options.SalvageRate == 0 || minimum <= 0)
             return area;
+        return area - options.SalvageRate * LargestOffcut(stock, left, bottom, right, top, minimum);
+    }
+
+    private static double LargestOffcut(
+        NestPlateStock stock, double left, double bottom, double right, double top, double minimum)
+    {
         var work = stock.WorkArea;
         var gap = stock.PartSpacing;
         var candidates = new[]
@@ -59,12 +103,11 @@ public static class NestJobCost
             (left - work.Left - gap, work.Width),
             (work.Right - right - gap, work.Width),
         };
-        var salvage = candidates
+        return candidates
             .Where(c => c.Item1 >= minimum && c.Item2 >= minimum)
             .Select(c => c.Item1 * c.Item2)
             .DefaultIfEmpty(0)
             .Max();
-        return area - options.SalvageRate * salvage;
     }
 
     public static bool UsesExplicitCosts(NestJob job) =>
