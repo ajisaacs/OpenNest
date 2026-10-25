@@ -51,7 +51,8 @@ public sealed class BenchmarkRunnerTests : IDisposable
         int requiredQuantity = 1,
         int partCount = 1,
         double partSpacing = 0,
-        double partRotation = 0
+        double partRotation = 0,
+        ClampRail clampRail = null
     )
     {
         var path = Path.Combine(_dir, name + ".nest");
@@ -72,6 +73,8 @@ public sealed class BenchmarkRunnerTests : IDisposable
         var nest = new Nest(name) { SalvageRate = salvageRate };
         nest.Drawings.Add(drawing);
         var plate = new Plate(10, 10) { Quantity = plateQuantity, PartSpacing = partSpacing };
+        if (clampRail != null)
+            plate.SetClampRail(clampRail);
         for (var index = 0; index < partCount; index++)
         {
             var part = Part.CreateAtOrigin(drawing);
@@ -112,6 +115,40 @@ public sealed class BenchmarkRunnerTests : IDisposable
 
         Assert.Equal(0.5, nestJob.Options.SalvageRate);
         Assert.Equal(0, nestJob.Options.MinimumSalvageDimension);
+    }
+
+    [Fact]
+    public void NestJobResolvesSourceClampRailForEveryCandidateSize()
+    {
+        var rail = new ClampRail(1, 0.5, new[] { 5.0, 15.0 });
+        var job = Assert.Single(
+            JobLoader.Load(
+                WriteBaselineNest("clamps", clampRail: rail),
+                new[] { new OpenNest.Geometry.Size(10, 10), new OpenNest.Geometry.Size(10, 20) }
+            )
+        );
+
+        var stock = job.BuildNestJob(maxPlates: 1).Plates;
+
+        // Clamps belong to the machine: the longer sheet reaches the second clamp.
+        Assert.Equal(new[] { 1, 2 }, stock.Select(sheet => sheet.ClampZones.Count));
+        Assert.Equal(4.5, stock[0].ClampZones[0].Bounds.X);
+    }
+
+    [Fact]
+    public void Run_RejectsBaselineLayoutOnAClamp()
+    {
+        var results = BenchmarkRunner.Run(
+            JobLoader.Load(
+                WriteBaselineNest("clamped-baseline", clampRail: new ClampRail(1, 0.5, new[] { 1.0 }))
+            ),
+            FakeEngines(new ConcurrencyProbe(), 0),
+            maxParallelism: 1
+        );
+
+        var baseline = Assert.Single(results.Where(result => result.EngineName == "Baseline"));
+        Assert.False(baseline.Valid);
+        Assert.Contains(baseline.Violations, violation => violation.Contains("clamp"));
     }
 
     [Fact]

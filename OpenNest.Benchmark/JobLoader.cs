@@ -74,6 +74,8 @@ namespace OpenNest.Benchmark
                         EdgeSpacing = template.EdgeSpacing,
                         PartSpacing = partSpacingOverride ?? template.PartSpacing,
                         Quadrant = template.Quadrant,
+                        ClampRail = template.ClampRail,
+                        ClampZones = template.ClampZones,
                         SalvageRate = nest.SalvageRate,
                         BaselinePlateRuns = BuildBaselinePlateRuns(nest, partSpacingOverride),
                         Requests = requests,
@@ -182,23 +184,45 @@ namespace OpenNest.Benchmark
                         plate.EdgeSpacing.Top
                     ),
                 };
+                // Clamps are part of the sheet the layout was made on.
+                if (plate.ClampRail != null)
+                    validationPlate.SetClampRail(plate.ClampRail, plate.RemovedClamps);
+                else
+                    foreach (var zone in plate.ClampZones)
+                        validationPlate.ClampZones.Add(zone);
                 for (var copy = 0; copy < plate.Quantity; copy++)
                     runs.Add((validationPlate, parts));
             }
             return runs.Count > 0 ? runs : null;
         }
 
-        private static (Spacing EdgeSpacing, double PartSpacing, int Quadrant) ResolvePlateTemplate(
-            Nest nest
-        )
+        private static (
+            Spacing EdgeSpacing,
+            double PartSpacing,
+            int Quadrant,
+            ClampRail ClampRail,
+            IReadOnlyList<ClampZone> ClampZones
+        ) ResolvePlateTemplate(Nest nest)
         {
             var source = nest.Plates?.FirstOrDefault();
 
             if (source != null)
-                return (source.EdgeSpacing, source.PartSpacing, source.Quadrant);
+                return (
+                    source.EdgeSpacing,
+                    source.PartSpacing,
+                    source.Quadrant,
+                    source.ClampRail,
+                    source.ClampRail == null ? source.ClampZones.ToList() : Array.Empty<ClampZone>()
+                );
 
             var defaults = nest.PlateDefaults;
-            return (defaults.EdgeSpacing, defaults.PartSpacing, defaults.Quadrant);
+            return (
+                defaults.EdgeSpacing,
+                defaults.PartSpacing,
+                defaults.Quadrant,
+                defaults.ClampRail,
+                Array.Empty<ClampZone>()
+            );
         }
 
         private static List<Size> ResolveSheetSizes(Nest nest)

@@ -126,14 +126,7 @@ namespace OpenNest.Benchmark
                     .BaselinePlateRuns.Select(
                         (run, index) =>
                         {
-                            var stock = new NestPlateStock(
-                                $"baseline-{index}",
-                                run.Plate.Size,
-                                1,
-                                run.Plate.PartSpacing,
-                                run.Plate.EdgeSpacing,
-                                run.Plate.Quadrant
-                            );
+                            var stock = DrawingJobMapper.FromPlate($"baseline-{index}", run.Plate, 1);
                             var placements = run
                                 .Parts.Select(part =>
                                 {

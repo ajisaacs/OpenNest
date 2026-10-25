@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -37,6 +38,12 @@ namespace OpenNest.Benchmark
         public double PartSpacing { get; init; }
         public int Quadrant { get; init; }
 
+        /// <summary>Source plate's machine clamp rail, resolved for each candidate size as Auto Nest does; null when none.</summary>
+        public ClampRail ClampRail { get; init; }
+
+        /// <summary>Source plate's explicit clamp zones when it has no rail, offered unchanged on every size.</summary>
+        public IReadOnlyList<ClampZone> ClampZones { get; init; } = Array.Empty<ClampZone>();
+
         /// <summary>Saved source-nest setting; manifests have no saved salvage rate and use zero.</summary>
         public double SalvageRate { get; init; }
 
@@ -60,7 +67,8 @@ namespace OpenNest.Benchmark
         /// (unlimited quantity - the engine under test decides how many of each
         /// size it actually uses, and how demand splits across plates). The
         /// engine owns its own multi-plate/size strategy; this harness no
-        /// longer picks plate sizes on the engine's behalf.
+        /// longer picks plate sizes on the engine's behalf. Stock comes from
+        /// the same template builder as desktop Auto Nest, so clamps match it.
         /// </summary>
         public NestJob BuildNestJob(
             int maxPlates,
@@ -71,14 +79,13 @@ namespace OpenNest.Benchmark
             var parts = Requests.Select(r =>
                 DrawingJobMapper.FromDrawing(r.Drawing.Id.ToString(), r.Drawing, r.Quantity)
             );
-            var stock = CandidateSizes.Select(size => new NestPlateStock(
-                size.ToString(1),
-                size,
-                null,
-                PartSpacing,
-                EdgeSpacing,
-                Quadrant
-            ));
+            // No options would make the builder offer the template itself; an empty pool stays empty.
+            var stock = CandidateSizes.Count == 0
+                ? Array.Empty<NestPlateStock>()
+                : NestStockBuilder.FromTemplate(
+                    StockTemplate(),
+                    CandidateSizes.Select(size => new PlateOption { Width = size.Width, Length = size.Length }).ToList()
+                );
             return new NestJob(
                 parts,
                 stock,
@@ -89,6 +96,23 @@ namespace OpenNest.Benchmark
                     minimumSalvageDimension ?? 0
                 )
             );
+        }
+
+        /// <summary>A plate carrying this job's spacing, quadrant and clamps, sized to the largest candidate.</summary>
+        private Plate StockTemplate()
+        {
+            var template = new Plate(CandidateSizes.MaxBy(size => size.Width * size.Length))
+            {
+                PartSpacing = PartSpacing,
+                EdgeSpacing = EdgeSpacing,
+                Quadrant = Quadrant,
+            };
+            if (ClampRail != null)
+                template.SetClampRail(ClampRail);
+            else
+                foreach (var zone in ClampZones)
+                    template.ClampZones.Add(zone);
+            return template;
         }
     }
 }
