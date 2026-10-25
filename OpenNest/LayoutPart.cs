@@ -118,6 +118,8 @@ namespace OpenNest
         internal void Draw(Graphics g, string id, bool muted)
         {
             Draw(g, muted);
+            if (id == null)
+                return;
 
             using var sf = new StringFormat
             {

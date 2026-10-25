@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Forms;
+using OpenNest.IO;
 
 namespace OpenNest.Controls
 {
@@ -15,9 +16,10 @@ namespace OpenNest.Controls
     /// Browses the server's drawing sets one bounded page at a time through
     /// <see cref="DrawingSetBrowseSession"/>, and creates, edits, archives or restores them and
     /// shows their history. <see cref="DrawingSetsForm"/> hosts it on its Sets tab to manage and
-    /// release sets, and shows a set's Releases on its Releases tab. New Set, Edit and Make Nests
-    /// are buttons; Archive/Restore, History and Releases, then Import BOM, are in the More menu,
-    /// which is also the list's right-click menu. In pick mode
+    /// release sets, and shows a set's Releases on its Releases tab. New Set, Edit, Preview and
+    /// Make Nests are buttons; Preview, Archive/Restore, History and Releases, then Import BOM,
+    /// are in the More menu, which is also the list's right-click menu. Preview shows all of a
+    /// set's drawings in one window at the same scale (<see cref="DrawingSetPreviewForm"/>). In pick mode
     /// (<see cref="ChooseDrawingSetForm"/>) only active sets are listed, and choosing a set or
     /// New Set raises <see cref="SetActivated"/> or <see cref="NewSetChosen"/> instead.
     /// </summary>
@@ -51,6 +53,9 @@ namespace OpenNest.Controls
         /// stored with the operator's consent), or null when cancelled; replaced by tests.
         /// </summary>
         internal Func<DrawingSetEditSession> ImportBom { get; set; }
+
+        /// <summary>Shows the same-scale preview of a set read with its members; replaced by tests.</summary>
+        internal Action<DrawingSetRecord> ShowPreview { get; set; }
 
         /// <summary>Shows the release dialog for a set read with its members; replaced by tests.</summary>
         internal Action<DrawingSetRecord> ShowRelease { get; set; }
@@ -121,6 +126,15 @@ namespace OpenNest.Controls
                 return form.ShowDialog(FindForm()) == DialogResult.OK ? form.Edit : null;
             };
             setGrid.ContextMenuStrip = pick ? null : moreMenu;
+            ShowPreview = set =>
+            {
+                using var form = new DrawingSetPreviewForm(set, async (record, token) =>
+                {
+                    var bytes = await library.GetRevisionPackageAsync(record.Id, record.Revision, token);
+                    return bytes == null ? null : await Task.Run(() => DrawingPackage.Read(bytes).Drawing, token);
+                });
+                form.ShowDialog(FindForm());
+            };
             ShowRelease = set =>
             {
                 using var form = new ReleaseSetForm(sets, library, nests, this.serverUrl, set, openNest) { IsNestOpen = isNestOpen };
@@ -132,6 +146,7 @@ namespace OpenNest.Controls
                 newButton.Text = "New Set";
                 showArchivedCheckBox.Visible = false;
                 editButton.Visible = false;
+                previewButton.Visible = false;
                 moreButton.Visible = false;
             }
 
@@ -246,6 +261,8 @@ namespace OpenNest.Controls
 
         private async void EditButton_Click(object sender, EventArgs e) => await EditSelectedAsync();
 
+        private async void PreviewButton_Click(object sender, EventArgs e) => await PreviewSelectedAsync();
+
         private async void ArchiveMenuItem_Click(object sender, EventArgs e) => await ToggleArchivedAsync();
 
         private void HistoryMenuItem_Click(object sender, EventArgs e)
@@ -330,6 +347,49 @@ namespace OpenNest.Controls
             }
 
             ShowRelease(current);
+        }
+
+        /// <summary>
+        /// Reads the selected set (archived or not) with its members' current drawings and
+        /// shows them all in one window at the same scale.
+        /// </summary>
+        internal async Task PreviewSelectedAsync()
+        {
+            var listed = SelectedSet;
+            if (session == null || listed == null || busy || pick)
+                return;
+
+            DrawingSetRecord current;
+            busy = true;
+            UpdateCommands();
+            statusLabel.Text = $"Reading set '{listed.Name}'...";
+            try
+            {
+                current = await sets.GetAsync(listed.Id);
+            }
+            catch (Exception ex) when (ex is IOException || ex is HttpRequestException || ex is TaskCanceledException)
+            {
+                Fail($"Could not read set '{listed.Name}': {ex.Message}");
+                return;
+            }
+            finally
+            {
+                busy = false;
+                if (!IsDisposed)
+                    UpdateCommands();
+            }
+
+            if (IsDisposed)
+                return;
+            statusLabel.Text = "";
+            if (current == null)
+            {
+                ShowMessage($"Set '{listed.Name}' no longer exists on the server.", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                await RunAsync(session.RefreshAsync);
+                return;
+            }
+
+            ShowPreview(current);
         }
 
         private void ActivateSelected()
@@ -494,12 +554,13 @@ namespace OpenNest.Controls
             var ready = session != null && !busy;
             newButton.Enabled = ready;
             editButton.Enabled = ready && selected is { Archived: false };
+            previewButton.Enabled = previewMenuItem.Enabled = ready && !pick && selected is { MemberCount: > 0 };
             archiveMenuItem.Enabled = ready && selected != null;
             archiveMenuItem.Text = selected is { Archived: true } ? "&Restore" : "&Archive";
             historyMenuItem.Enabled = ready && selected != null;
             releasesMenuItem.Enabled = ready && selected != null && ShowReleases != null;
             importBomMenuItem.Enabled = ready && !pick;
-            moreButton.Enabled = archiveMenuItem.Enabled || historyMenuItem.Enabled || releasesMenuItem.Enabled
+            moreButton.Enabled = previewMenuItem.Enabled || archiveMenuItem.Enabled || historyMenuItem.Enabled || releasesMenuItem.Enabled
                 || importBomMenuItem.Enabled;
             releaseButton.Enabled = ready && nests != null && selected is { Archived: false, MemberCount: > 0 };
         }

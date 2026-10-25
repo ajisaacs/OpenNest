@@ -42,6 +42,7 @@ namespace OpenNest.Controls
             summaryLabel = new System.Windows.Forms.Label();
             newButton = new System.Windows.Forms.Button();
             editButton = new System.Windows.Forms.Button();
+            previewButton = new System.Windows.Forms.Button();
             moreButton = new System.Windows.Forms.Button();
             releaseButton = new System.Windows.Forms.Button();
             statusLabel = new System.Windows.Forms.Label();
@@ -49,6 +50,7 @@ namespace OpenNest.Controls
             moreMenu = new System.Windows.Forms.ContextMenuStrip(components);
             archiveMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             historyMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            previewMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             releasesMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             importSeparator = new System.Windows.Forms.ToolStripSeparator();
             importBomMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -220,10 +222,11 @@ namespace OpenNest.Controls
             // bottomTable
             //
             bottomTable.AutoSize = true;
-            bottomTable.ColumnCount = 7;
+            bottomTable.ColumnCount = 8;
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
@@ -233,8 +236,9 @@ namespace OpenNest.Controls
             bottomTable.Controls.Add(summaryLabel, 2, 0);
             bottomTable.Controls.Add(newButton, 3, 0);
             bottomTable.Controls.Add(editButton, 4, 0);
-            bottomTable.Controls.Add(moreButton, 5, 0);
-            bottomTable.Controls.Add(releaseButton, 6, 0);
+            bottomTable.Controls.Add(previewButton, 5, 0);
+            bottomTable.Controls.Add(moreButton, 6, 0);
+            bottomTable.Controls.Add(releaseButton, 7, 0);
             bottomTable.Dock = System.Windows.Forms.DockStyle.Fill;
             bottomTable.Margin = new System.Windows.Forms.Padding(0, 6, 0, 0);
             bottomTable.Name = "bottomTable";
@@ -287,12 +291,22 @@ namespace OpenNest.Controls
             editButton.UseVisualStyleBackColor = true;
             editButton.Click += EditButton_Click;
             //
+            // previewButton
+            //
+            previewButton.AutoSize = true;
+            previewButton.Enabled = false;
+            previewButton.Name = "previewButton";
+            previewButton.TabIndex = 5;
+            previewButton.Text = "&Preview...";
+            previewButton.UseVisualStyleBackColor = true;
+            previewButton.Click += PreviewButton_Click;
+            //
             // moreButton
             //
             moreButton.AutoSize = true;
             moreButton.Enabled = false;
             moreButton.Name = "moreButton";
-            moreButton.TabIndex = 5;
+            moreButton.TabIndex = 6;
             moreButton.Text = "M&ore ▾";
             moreButton.UseVisualStyleBackColor = true;
             moreButton.Click += MoreButton_Click;
@@ -304,7 +318,7 @@ namespace OpenNest.Controls
             releaseButton.Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Bold);
             releaseButton.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
             releaseButton.Name = "releaseButton";
-            releaseButton.TabIndex = 6;
+            releaseButton.TabIndex = 7;
             releaseButton.Text = "&Make Nests...";
             releaseButton.UseVisualStyleBackColor = true;
             releaseButton.Visible = false;
@@ -326,9 +340,16 @@ namespace OpenNest.Controls
             //
             // moreMenu
             //
-            moreMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { archiveMenuItem, historyMenuItem, releasesMenuItem, importSeparator, importBomMenuItem });
+            moreMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { previewMenuItem, archiveMenuItem, historyMenuItem, releasesMenuItem, importSeparator, importBomMenuItem });
             moreMenu.Name = "moreMenu";
             moreMenu.Opening += MoreMenu_Opening;
+            //
+            // previewMenuItem
+            //
+            previewMenuItem.Enabled = false;
+            previewMenuItem.Name = "previewMenuItem";
+            previewMenuItem.Text = "&Preview...";
+            previewMenuItem.Click += PreviewButton_Click;
             //
             // archiveMenuItem
             //
@@ -405,6 +426,7 @@ namespace OpenNest.Controls
         private System.Windows.Forms.Label summaryLabel;
         private System.Windows.Forms.Button newButton;
         private System.Windows.Forms.Button editButton;
+        private System.Windows.Forms.Button previewButton;
         private System.Windows.Forms.Button moreButton;
         private System.Windows.Forms.Button releaseButton;
         private System.Windows.Forms.Label statusLabel;
@@ -412,6 +434,7 @@ namespace OpenNest.Controls
         private System.Windows.Forms.ContextMenuStrip moreMenu;
         private System.Windows.Forms.ToolStripMenuItem archiveMenuItem;
         private System.Windows.Forms.ToolStripMenuItem historyMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem previewMenuItem;
         private System.Windows.Forms.ToolStripMenuItem releasesMenuItem;
         private System.Windows.Forms.ToolStripSeparator importSeparator;
         private System.Windows.Forms.ToolStripMenuItem importBomMenuItem;
