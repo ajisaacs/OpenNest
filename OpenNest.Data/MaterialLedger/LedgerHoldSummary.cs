@@ -50,7 +50,7 @@ public sealed class LedgerHoldSummary
 
     public int OpenHolds { get; }
 
-    /// <summary>Holds in any other status: closed, cancelled, exception or unknown.</summary>
+    /// <summary>Holds in any other status: released, closed, cancelled, exception or unknown.</summary>
     public int ClosedHolds { get; }
 
     /// <summary>Sheets without an open hold.</summary>

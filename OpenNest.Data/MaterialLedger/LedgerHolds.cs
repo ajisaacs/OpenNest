@@ -30,13 +30,13 @@ public static class LedgerHoldStatuses
     public const string Exception = "Exception";
 
     /// <summary>
-    /// True for holds that still keep a sheet for the nest and need closing out. Closed,
-    /// cancelled, exception and unknown statuses are not open.
+    /// True for holds that still keep a sheet for the nest and need closing out: the statuses ML
+    /// counts against free stock. Released means the hold was let go, not sent to cutting, so it
+    /// is not open; nor are closed, cancelled, exception and unknown statuses.
     /// </summary>
     public static bool IsOpen(string? status) =>
         string.Equals(status, Proposed, StringComparison.OrdinalIgnoreCase)
         || string.Equals(status, Approved, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(status, Released, StringComparison.OrdinalIgnoreCase)
         || string.Equals(status, AwaitingCloseout, StringComparison.OrdinalIgnoreCase);
 }
 

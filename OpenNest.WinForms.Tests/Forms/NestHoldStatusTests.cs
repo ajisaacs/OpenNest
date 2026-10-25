@@ -47,7 +47,7 @@ public class NestHoldStatusTests
         var document = Bound(sheets: 4);
         var changes = 0;
         HttpRequestMessage seen = null;
-        var status = Status(document, databaseMode: true, request => { seen = request; return Holds("Approved", "Released"); });
+        var status = Status(document, databaseMode: true, request => { seen = request; return Holds("Approved", "Proposed", "Released"); });
         status.Changed += (_, _) => changes++;
 
         await status.RefreshAfterSaveAsync();
@@ -56,7 +56,7 @@ public class NestHoldStatusTests
         Assert.False(status.IsRefreshing);
         Assert.Equal("Ledger: 2 of 4 held, 2 short", status.Summary.Text);
         Assert.Contains(document.RemoteId.ToString("D"), seen.RequestUri!.Query);
-        Assert.Equal($"http://ledger:5000/Nests/{document.RemoteId:D}", status.LedgerNestUrl);
+        Assert.Equal($"http://ledger:5000/Nests/Details/{document.RemoteId:D}", status.LedgerNestUrl);
         Assert.Equal(2, changes); // Refreshing, then the answer.
 
         // An on-demand refresh counts the sheets of the last save, not unsaved edits.

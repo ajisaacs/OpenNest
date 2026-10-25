@@ -172,9 +172,11 @@ Each read uses `MaterialLedgerClient.GetHoldsAsync` (`GET /api/stock/holds?openN
 
 **Summary.** `LedgerHoldSummary` (`OpenNest.Data/MaterialLedger/`) compares the
 open holds with the sheets of the last open or save: the sum of plate quantities,
-skipping the trailing empty plate as `/sheets` does. Proposed, Approved, Released
-and AwaitingCloseout holds are open. Closed, cancelled, exception and unknown
-statuses are listed but not counted; unknown status strings are kept as sent.
+skipping the trailing empty plate as `/sheets` does. Proposed, Approved and
+AwaitingCloseout holds are open, the statuses ML counts against free stock. Released
+means the hold was let go, not sent to cutting, so it is listed but not counted, as
+are closed, cancelled, exception and unknown statuses; unknown status strings are kept
+as sent.
 
 | Holds | Label |
 |-------|-------|
@@ -189,7 +191,7 @@ nest's material label beside it.
 
 **Has Been Cut.** When Nest Info changes the status to Has Been Cut, the desktop
 rereads the holds. If any are still open, it shows a non-modal note, "Close out N holds
-in MaterialLedger", with a link to `{ledgerUrl}/Nests/{id}`. Closeout happens there.
+in MaterialLedger", with a link to `{ledgerUrl}/Nests/Details/{id}`. Closeout happens there.
 The note never blocks the dialog, save or post, and posting is not gated on holds.
 
 ### Generated nest names

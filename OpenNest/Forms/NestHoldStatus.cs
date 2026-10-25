@@ -60,7 +60,7 @@ namespace OpenNest.Forms
         public bool IsVisible => IsApplicable && (Summary != null || IsRefreshing);
 
         /// <summary>The nest's page in MaterialLedger, where its holds are closed out.</summary>
-        public string LedgerNestUrl => $"{ledgerSettings().BaseUrl.TrimEnd('/')}/Nests/{document.RemoteId:D}";
+        public string LedgerNestUrl => $"{ledgerSettings().BaseUrl.TrimEnd('/')}/Nests/Details/{document.RemoteId:D}";
 
         /// <summary>
         /// Rereads the holds after the nest was opened or saved, counting the sheets of the nest

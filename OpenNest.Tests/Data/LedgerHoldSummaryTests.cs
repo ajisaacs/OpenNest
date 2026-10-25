@@ -23,19 +23,20 @@ public class LedgerHoldSummaryTests
     [Fact]
     public void AllSheetsHeld()
     {
-        var summary = Summarize(4, Hold("Approved"), Hold("Released"), Hold("Proposed"), Hold("AwaitingCloseout"));
+        var summary = Summarize(4, Hold("Approved"), Hold("Approved"), Hold("Proposed"), Hold("AwaitingCloseout"));
         Assert.Equal(LedgerHoldState.Held, summary.State);
         Assert.Equal("Ledger: 4 of 4 sheets held", summary.Text);
         Assert.Equal(0, summary.ShortSheets);
     }
 
+    // ML's Release lets a hold go: the sheet is free stock again, so the nest is short of it.
     [Fact]
-    public void ClosedAndUnknownHoldsDoNotCountAsHeld()
+    public void ReleasedClosedAndUnknownHoldsDoNotCountAsHeld()
     {
-        var summary = Summarize(4, Hold("Approved"), Hold("Released"), Hold("ClosedConsumed"),
+        var summary = Summarize(4, Hold("Approved"), Hold("Proposed"), Hold("Released"), Hold("ClosedConsumed"),
             Hold("Cancelled"), Hold("Exception"), Hold("OnTruck"));
         Assert.Equal(LedgerHoldState.Short, summary.State);
-        Assert.Equal((2, 4, 2), (summary.OpenHolds, summary.ClosedHolds, summary.ShortSheets));
+        Assert.Equal((2, 5, 2), (summary.OpenHolds, summary.ClosedHolds, summary.ShortSheets));
         Assert.Equal("Ledger: 2 of 4 held, 2 short", summary.Text);
     }
 
