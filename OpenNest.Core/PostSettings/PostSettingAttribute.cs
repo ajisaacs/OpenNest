@@ -35,6 +35,16 @@ namespace OpenNest.PostSettings
 
         /// <summary>Column header for the value of a name/value table.</summary>
         public string ValueHeader { get; set; }
+
+        /// <summary>
+        /// For a text field: the record table property whose column, named by
+        /// <see cref="SuggestionsColumn"/>, lists the values offered in a drop-down.
+        /// The field still accepts any text.
+        /// </summary>
+        public string SuggestionsTable { get; set; }
+
+        /// <summary>The column of <see cref="SuggestionsTable"/> offered as suggestions.</summary>
+        public string SuggestionsColumn { get; set; }
     }
 
     /// <summary>Declares a settings section's order and description.</summary>

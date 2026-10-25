@@ -82,6 +82,12 @@ nest material, thickness within 0.001 and assist gas (`Nest.AssistGas`, else
 selection when nothing matches; it never substitutes another gas or thickness.
 A `SelectedLibrary` the operator then picks overrides auto-resolution.
 
+In the desktop app these settings open in the same sectioned editor as the CI
+Fiber post (Program output, Sheets, Libraries, Process, Kerf, Head raise,
+Feedrates, Sub-programs, Variables). The library and arc-feedrate lists are
+editable tables, a cleared box leaves an optional distance unset (null), and
+values are validated and saved only when OK is pressed.
+
 ## Feature blocks
 
 A "feature" is a single contour: lead-in → cut moves → lead-out. Each feature

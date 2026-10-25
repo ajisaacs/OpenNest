@@ -26,6 +26,8 @@ namespace OpenNest.Controls
         private readonly List<Label> wrapLabels = new();
         private readonly List<(PostSettingsField Field, int Section, Func<object> Read)> readers =
             new();
+        private readonly Dictionary<string, (PostSettingsField Field, DataGridView Grid)> tables =
+            new(StringComparer.Ordinal);
 
         public PostSettingsEditor(object config, IReadOnlyList<PostSettingsSection> sections)
         {
@@ -184,11 +186,40 @@ namespace OpenNest.Controls
                             TextAlign = HorizontalAlignment.Right,
                             ThousandsSeparator = false,
                         };
-                        number.Value = Clamp(number, Convert.ToDecimal(value, CultureInfo.InvariantCulture));
-                        input = number;
-                        read = field.Kind == PostSettingKind.Integer
+                        if (value != null)
+                            number.Value = Clamp(number, Convert.ToDecimal(value, CultureInfo.InvariantCulture));
+                        Func<object> readNumber = field.Kind == PostSettingKind.Integer
                             ? () => (object)(int)number.Value
                             : () => (object)(double)number.Value;
+
+                        if (!field.IsOptional)
+                        {
+                            input = number;
+                            read = readNumber;
+                            break;
+                        }
+
+                        // Optional number: the box turns the value on; cleared posts null.
+                        var enabled = new CheckBox
+                        {
+                            Checked = value != null,
+                            AutoSize = true,
+                            AccessibleName = field.Label + " enabled",
+                            Margin = new Padding(0, 3, 4, 0),
+                        };
+                        number.Enabled = enabled.Checked;
+                        number.Margin = new Padding(0);
+                        enabled.CheckedChanged += (_, _) => number.Enabled = enabled.Checked;
+                        var optional = new FlowLayoutPanel
+                        {
+                            AutoSize = true,
+                            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                            WrapContents = false,
+                        };
+                        optional.Controls.Add(enabled);
+                        optional.Controls.Add(number);
+                        input = optional;
+                        read = () => enabled.Checked ? readNumber() : null;
                         break;
                     }
                 case PostSettingKind.Choice:
@@ -204,7 +235,31 @@ namespace OpenNest.Controls
                 case PostSettingKind.StringMap:
                     AddMapField(grid, field, sectionIndex, value as IDictionary<string, string>);
                     return;
+                case PostSettingKind.Table:
+                    AddTableField(grid, field, sectionIndex, value as System.Collections.IEnumerable);
+                    return;
                 default:
+                    if (field.SuggestionsTable != null)
+                    {
+                        var suggest = new ComboBox
+                        {
+                            DropDownStyle = ComboBoxStyle.DropDown,
+                            Text = value as string ?? "",
+                            Width = 280,
+                        };
+                        // Offer the table's current rows, including unsaved edits.
+                        suggest.DropDown += (_, _) =>
+                        {
+                            var typed = suggest.Text;
+                            suggest.Items.Clear();
+                            suggest.Items.Add("");
+                            suggest.Items.AddRange(Suggestions(field).Cast<object>().ToArray());
+                            suggest.Text = typed;
+                        };
+                        input = suggest;
+                        read = () => suggest.Text.Trim();
+                        break;
+                    }
                     {
                         var text = new TextBox { Text = value as string ?? "", Width = 280 };
                         input = text;
@@ -242,27 +297,9 @@ namespace OpenNest.Controls
             IDictionary<string, string> map
         )
         {
-            var label = new Label
-            {
-                Text = field.Label,
-                AutoSize = true,
-                Font = new Font(Font, FontStyle.Bold),
-                Margin = new Padding(0, 12, 0, 2),
-            };
-            AddSpanning(grid, label);
-            AddHelp(grid, field.Description, spanning: true);
+            AddTableHeader(grid, field);
 
-            var table = GridStyle.Apply(new DataGridView
-            {
-                Dock = DockStyle.Fill,
-                Height = 200,
-                AllowUserToAddRows = true,
-                AllowUserToDeleteRows = true,
-                RowHeadersWidth = 28,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                MultiSelect = true,
-                Margin = new Padding(0, 4, 0, 0),
-            });
+            var table = NewTable(200);
             table.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = field.KeyHeader, Width = 260 });
             table.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = field.ValueHeader, Width = 140 });
 
@@ -273,23 +310,7 @@ namespace OpenNest.Controls
             }
 
             AddSpanning(grid, table);
-
-            var removeButton = new Button
-            {
-                Text = "Remove selected",
-                AutoSize = true,
-                Margin = new Padding(0, 4, 0, 0),
-            };
-            removeButton.Click += (_, _) =>
-            {
-                foreach (DataGridViewRow selected in table.SelectedRows)
-                {
-                    if (!selected.IsNewRow)
-                        table.Rows.Remove(selected);
-                }
-            };
-            AddSpanning(grid, removeButton);
-            AddHelp(grid, "Type in the empty last row to add an entry.", spanning: true);
+            AddTableFooter(grid, table);
 
             var comparer = (map as Dictionary<string, string>)?.Comparer ?? StringComparer.Ordinal;
             readers.Add(
@@ -310,6 +331,124 @@ namespace OpenNest.Controls
                     }
             )
             );
+        }
+
+        private void AddTableField(
+            TableLayoutPanel grid,
+            PostSettingsField field,
+            int sectionIndex,
+            System.Collections.IEnumerable items
+        )
+        {
+            AddTableHeader(grid, field);
+
+            var table = NewTable(280);
+            foreach (var column in field.Columns)
+            {
+                var numeric = column.Kind != PostSettingKind.Text;
+                var gridColumn = new DataGridViewTextBoxColumn
+                {
+                    HeaderText = column.Label,
+                    Width = numeric ? 110 : 160,
+                };
+                if (numeric)
+                    gridColumn.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                table.Columns.Add(gridColumn);
+            }
+
+            foreach (var item in items ?? Array.Empty<object>())
+            {
+                if (item == null)
+                    continue;
+                table.Rows.Add(
+                    field
+                        .Columns.Select(c => Convert.ToString(c.Property.GetValue(item), CultureInfo.CurrentCulture))
+                        .ToArray<object>()
+                );
+            }
+
+            AddSpanning(grid, table);
+            AddTableFooter(grid, table);
+            tables[field.Name] = (field, table);
+
+            readers.Add(
+                (field, sectionIndex, () => PostSettingsLayout.BuildList(field, TableRows(table), CultureInfo.CurrentCulture))
+            );
+        }
+
+        private IEnumerable<string> Suggestions(PostSettingsField field)
+        {
+            if (!tables.TryGetValue(field.SuggestionsTable, out var source))
+                return Array.Empty<string>();
+
+            var column = source.Field.Columns.ToList().FindIndex(c => c.Name == field.SuggestionsColumn);
+            if (column < 0)
+                return Array.Empty<string>();
+
+            return TableRows(source.Grid)
+                .Select(cells => cells[column]?.Trim())
+                .Where(s => !string.IsNullOrEmpty(s))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static IEnumerable<IReadOnlyList<string>> TableRows(DataGridView table)
+        {
+            table.EndEdit();
+            return table
+                .Rows.Cast<DataGridViewRow>()
+                .Where(r => !r.IsNewRow)
+                .Select(r => (IReadOnlyList<string>)r.Cells.Cast<DataGridViewCell>()
+                    .Select(c => c.Value?.ToString())
+                    .ToList())
+                .ToList();
+        }
+
+        private void AddTableHeader(TableLayoutPanel grid, PostSettingsField field)
+        {
+            var label = new Label
+            {
+                Text = field.Label,
+                AutoSize = true,
+                Font = new Font(Font, FontStyle.Bold),
+                Margin = new Padding(0, 12, 0, 2),
+            };
+            AddSpanning(grid, label);
+            AddHelp(grid, field.Description, spanning: true);
+        }
+
+        private static DataGridView NewTable(int height) =>
+            GridStyle.Apply(new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                Height = height,
+                AllowUserToAddRows = true,
+                AllowUserToDeleteRows = true,
+                RowHeadersWidth = 28,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = true,
+                Margin = new Padding(0, 4, 0, 0),
+            });
+
+        private void AddTableFooter(TableLayoutPanel grid, DataGridView table)
+        {
+            var removeButton = new Button
+            {
+                Text = "Remove selected",
+                AutoSize = true,
+                Margin = new Padding(0, 4, 0, 0),
+            };
+            removeButton.Click += (_, _) =>
+            {
+                foreach (DataGridViewRow selected in table.SelectedRows)
+                {
+                    if (!selected.IsNewRow)
+                        table.Rows.Remove(selected);
+                }
+            };
+            AddSpanning(grid, removeButton);
+            AddHelp(grid, "Type in the empty last row to add an entry.", spanning: true);
         }
 
         private void AddHelp(TableLayoutPanel grid, string text, bool spanning = false)

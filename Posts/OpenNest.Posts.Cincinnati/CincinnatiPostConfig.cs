@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using OpenNest.PostSettings;
 
 namespace OpenNest.Posts.Cincinnati
 {
@@ -69,181 +70,238 @@ namespace OpenNest.Posts.Cincinnati
     /// Configuration for Cincinnati post processor.
     /// Defines machine-specific parameters, output format, and cutting strategies.
     /// </summary>
+    [PostSettingsSection(
+        OutputSection,
+        0,
+        Description = "Which configuration the program names, its units and number format, and line numbering."
+    )]
+    [PostSettingsSection(
+        SheetsSection,
+        1,
+        Description = "When the pallet exchange is written around each sheet."
+    )]
+    [PostSettingsSection(
+        LibrariesSection,
+        2,
+        Description = "The G89 cut and etch libraries the program loads. They must exist on the machine."
+    )]
+    [PostSettingsSection(
+        ProcessSection,
+        3,
+        Description = "Assist gas defaults and the controller modes the program switches on."
+    )]
+    [PostSettingsSection(
+        KerfSection,
+        4,
+        Description = "Where kerf compensation is applied and on which side of the cut."
+    )]
+    [PostSettingsSection(
+        HeadRaiseSection,
+        5,
+        Description = "How the head is raised (M47) before each rapid, and the safety raise for long rapids over warped plate."
+    )]
+    [PostSettingsSection(
+        FeedratesSection,
+        6,
+        Description = "Feedrates for lead-ins, lead-outs, circles and small arcs, as fractions of the library feedrate (0.5 = 50%)."
+    )]
+    [PostSettingsSection(
+        SubprogramsSection,
+        7,
+        Description = "Sub-program numbers for sheets, variable declarations and repeated parts."
+    )]
+    [PostSettingsSection(
+        VariablesSection,
+        8,
+        Description = "Machine variable numbers the program declares and reads."
+    )]
     public sealed class CincinnatiPostConfig
     {
-        [Category("1. Output")]
-        [DisplayName("Configuration Name")]
-        [Description("Configuration name/identifier (e.g. CL940).")]
+        private const string OutputSection = "Program output";
+        private const string SheetsSection = "Sheets";
+        private const string LibrariesSection = "Libraries";
+        private const string ProcessSection = "Process";
+        private const string KerfSection = "Kerf";
+        private const string HeadRaiseSection = "Head raise";
+        private const string FeedratesSection = "Feedrates";
+        private const string SubprogramsSection = "Sub-programs";
+        private const string VariablesSection = "Variables";
+
+        [DisplayName("Configuration name")]
+        [Description("Configuration name/identifier written to the program (e.g. CL940).")]
+        [PostSetting(OutputSection, 0)]
         public string ConfigurationName { get; set; } = "CL940";
 
-        [Category("1. Output")]
-        [DisplayName("Posted Units")]
+        [DisplayName("Posted units")]
         [Description("Units for posted output (Inches or Millimeters).")]
+        [PostSetting(OutputSection, 1)]
         public Units PostedUnits { get; set; } = Units.Inches;
 
-        [Category("1. Output")]
-        [DisplayName("Decimal Accuracy")]
+        [DisplayName("Posted accuracy")]
         [Description("Number of decimal places for numeric output.")]
+        [PostSetting(OutputSection, 2, Minimum = 0, Maximum = 6)]
         public int PostedAccuracy { get; set; } = 4;
 
-        [Category("1. Output")]
-        [DisplayName("Use Line Numbers")]
-        [Description("Include line numbers in output.")]
+        [DisplayName("Use line numbers")]
+        [Description("Number the program's feature blocks (N numbers).")]
+        [PostSetting(OutputSection, 3)]
         public bool UseLineNumbers { get; set; } = true;
 
-        [Category("1. Output")]
-        [DisplayName("Feature Line Number Start")]
+        [DisplayName("Feature line number start")]
         [Description("Starting line number for features.")]
+        [PostSetting(OutputSection, 4, Minimum = 0, Maximum = 99999)]
         public int FeatureLineNumberStart { get; set; } = 1;
 
-        [Category("2. Subprograms")]
-        [DisplayName("Sheet Subprogram Start")]
-        [Description("Starting subprogram number for sheet operations.")]
+        [DisplayName("Sheet sub-program start")]
+        [Description("Starting sub-program number for sheet operations.")]
+        [PostSetting(SubprogramsSection, 0, Minimum = 0, Maximum = 99999)]
         public int SheetSubprogramStart { get; set; } = 101;
 
-        [Category("2. Subprograms")]
-        [DisplayName("Use Part Subprograms")]
+        [DisplayName("Use part sub-programs")]
         [Description(
             "Use M98 sub-programs for part geometry. Reduces output size for repeated parts."
         )]
+        [PostSetting(SubprogramsSection, 2)]
         public bool UsePartSubprograms { get; set; } = false;
 
-        [Category("2. Subprograms")]
-        [DisplayName("Part Subprogram Start")]
+        [DisplayName("Part sub-program start")]
         [Description("Starting sub-program number for part geometry sub-programs.")]
+        [PostSetting(SubprogramsSection, 3, Minimum = 0, Maximum = 99999)]
         public int PartSubprogramStart { get; set; } = 200;
 
-        [Category("2. Subprograms")]
-        [DisplayName("Variable Declaration Subprogram")]
-        [Description("Subprogram number for variable declarations.")]
+        [DisplayName("Variable declaration sub-program")]
+        [Description("Sub-program number for variable declarations.")]
+        [PostSetting(SubprogramsSection, 1, Minimum = 0, Maximum = 99999)]
         public int VariableDeclarationSubprogram { get; set; } = 100;
 
-        [Category("4. Process")]
-        [DisplayName("Default Assist Gas")]
-        [Description("Default assist gas when Nest.AssistGas is empty.")]
+        [DisplayName("Default assist gas")]
+        [Description("Assist gas used to pick the cut library when the nest names none.")]
+        [PostSetting(ProcessSection, 0)]
         public string DefaultAssistGas { get; set; } = "O2";
 
-        [Category("4. Process")]
-        [DisplayName("Default Etch Gas")]
-        [Description("Gas used for etch operations.")]
+        [DisplayName("Default etch gas")]
+        [Description("Gas used for etch operations; picks the etch library.")]
+        [PostSetting(ProcessSection, 1)]
         public string DefaultEtchGas { get; set; } = "N2";
 
-        [Category("4. Process")]
-        [DisplayName("Use Exact Stop Mode")]
+        [DisplayName("Use exact stop mode")]
         [Description("Enable exact stop mode (G61).")]
+        [PostSetting(ProcessSection, 2)]
         public bool UseExactStopMode { get; set; } = false;
 
-        [Category("4. Process")]
-        [DisplayName("Use Speed/Gas Commands")]
+        [DisplayName("Use speed/gas commands")]
         [Description("Enable speed/gas commands in output.")]
+        [PostSetting(ProcessSection, 3)]
         public bool UseSpeedGas { get; set; } = false;
 
-        [Category("4. Process")]
-        [DisplayName("Use Anti-Dive")]
+        [DisplayName("Use anti-dive")]
         [Description("Enable anti-dive functionality.")]
+        [PostSetting(ProcessSection, 4)]
         public bool UseAntiDive { get; set; } = true;
 
-        [Category("4. Process")]
-        [DisplayName("Use Smart Rapids")]
+        [DisplayName("Use smart rapids")]
         [Description("Enable smart rapids optimization.")]
+        [PostSetting(ProcessSection, 5)]
         public bool UseSmartRapids { get; set; } = false;
 
-        [Category("5. Kerf")]
-        [DisplayName("Kerf Compensation")]
-        [Description("Where kerf compensation is applied (ControllerSide or PreApplied).")]
+        [DisplayName("Kerf compensation")]
+        [Description("ControllerSide posts cutter compensation codes; PreApplied offsets the part geometry while posting.")]
+        [PostSetting(KerfSection, 0)]
         public KerfMode KerfCompensation { get; set; } = KerfMode.ControllerSide;
 
-        [Category("5. Kerf")]
-        [DisplayName("Default Kerf Side")]
+        [DisplayName("Default kerf side")]
         [Description("Default side for kerf compensation (Left or Right).")]
+        [PostSetting(KerfSection, 1)]
         public KerfSide DefaultKerfSide { get; set; } = KerfSide.Left;
 
-        [Category("6. M47 (Optional Stop)")]
         [DisplayName("Interior M47")]
         [Description("How M47 is posted after features other than a part's exterior, such as cutouts and etch.")]
+        [PostSetting(HeadRaiseSection, 0)]
         public M47Mode InteriorM47 { get; set; } = M47Mode.Always;
 
-        [Category("6. M47 (Optional Stop)")]
         [DisplayName("Exterior M47")]
         [Description(
             "How M47 is posted after a part's exterior: the cut contour spanning the part's cut extents, or a part sub-program call."
         )]
+        [PostSetting(HeadRaiseSection, 1)]
         public M47Mode ExteriorM47 { get; set; } = M47Mode.Always;
 
-        [Category("6. M47 (Optional Stop)")]
-        [DisplayName("M47 Override Distance Threshold")]
+        [DisplayName("M47 override distance")]
         [Description(
-            "Auto M47 mode: rapids to the next pierce longer than this get M47, shorter ones /M47. Program units. Null = Auto always posts M47."
+            "Auto M47 mode: rapids to the next pierce longer than this get M47, shorter ones /M47. Program units. Clear the box and Auto always posts M47."
         )]
+        [PostSetting(HeadRaiseSection, 2, Minimum = 0, Maximum = 10000, DecimalPlaces = 3)]
         public double? M47OverrideDistanceThreshold { get; set; } = null;
 
-        [Category("7. Safety")]
-        [DisplayName("Safety Headraise Distance")]
+        [DisplayName("Safety head raise distance")]
         [Description(
-            "Safety head raise distance in machine units, posted as M47 P<distance> before rapids longer than the safety headraise rapid distance. Null = disabled."
+            "Safety head raise distance in machine units, posted as M47 P<distance> before rapids longer than the safety head raise rapid distance. Clear the box to disable."
         )]
+        [PostSetting(HeadRaiseSection, 3, Minimum = 0, Maximum = 100000)]
         public int? SafetyHeadraiseDistance { get; set; } = 2000;
 
-        [Category("7. Safety")]
-        [DisplayName("Safety Headraise Rapid Distance")]
+        [DisplayName("Safety head raise rapid distance")]
         [Description(
-            "Rapids to the next pierce longer than this get the safety head raise instead of the M47 mode's raise, so the head clears warped plate. Program units. Null = disabled."
+            "Rapids to the next pierce longer than this get the safety head raise instead of the M47 mode's raise, so the head clears warped plate. Program units. Clear the box to disable."
         )]
+        [PostSetting(HeadRaiseSection, 4, Minimum = 0, Maximum = 10000, DecimalPlaces = 3)]
         public double? SafetyHeadraiseRapidDistance { get; set; } = 12.0;
 
-        [Category("7. Safety")]
-        [DisplayName("Head Height Lock Code")]
+        [DisplayName("Head height lock")]
         [Description(
-            "Block that locks the head height before a cut-off overcuts past the far sheet edge. Empty = not set: a nest with head-locked cut-offs is refused."
+            "Written before a cut-off overcuts past the far sheet edge. Blank = not set: a nest with head-locked cut-offs is refused."
         )]
+        [PostSetting(HeadRaiseSection, 5)]
         public string HeadHeightLockCode { get; set; } = "";
 
-        [Category("7. Safety")]
-        [DisplayName("Head Height Unlock Code")]
+        [DisplayName("Head height unlock")]
         [Description(
-            "Block that releases the head height lock after a cut-off's overcut. Empty = not set: a nest with head-locked cut-offs is refused."
+            "Written after a cut-off's overcut, back at the nominal sheet edge. Blank = not set: a nest with head-locked cut-offs is refused."
         )]
+        [PostSetting(HeadRaiseSection, 6)]
         public string HeadHeightUnlockCode { get; set; } = "";
 
         /// <summary>Whether both head-height lock blocks are set.</summary>
         public bool HasHeadHeightLockCodes() =>
             !string.IsNullOrWhiteSpace(HeadHeightLockCode) && !string.IsNullOrWhiteSpace(HeadHeightUnlockCode);
 
-        [Category("8. Pallet")]
-        [DisplayName("Pallet Exchange")]
-        [Description("When pallet exchange occurs (None, EndOfSheet, or StartAndEnd).")]
+        [DisplayName("Pallet exchange")]
+        [Description("When the pallet exchange is written: None, EndOfSheet, or StartAndEnd.")]
+        [PostSetting(SheetsSection, 0)]
         public PalletMode PalletExchange { get; set; } = PalletMode.EndOfSheet;
 
-        [Category("9. Feedrates")]
-        [DisplayName("Lead-In Feedrate %")]
-        [Description("Feedrate percentage for lead-in moves (e.g. 0.5 = 50%).")]
+        [DisplayName("Lead-in feedrate")]
+        [Description("Feedrate for lead-in moves (0.5 = 50%).")]
+        [PostSetting(FeedratesSection, 0, Minimum = 0, Maximum = 10, DecimalPlaces = 3)]
         public double LeadInFeedratePercent { get; set; } = 0.5;
 
-        [Category("9. Feedrates")]
-        [DisplayName("Lead-In Arc Line 2 Feedrate %")]
-        [Description("Feedrate percentage for lead-in arc-to-line moves.")]
+        [DisplayName("Lead-in arc feedrate")]
+        [Description("Feedrate for lead-in arc moves (0.5 = 50%).")]
+        [PostSetting(FeedratesSection, 1, Minimum = 0, Maximum = 10, DecimalPlaces = 3)]
         public double LeadInArcLine2FeedratePercent { get; set; } = 0.5;
 
-        [Category("9. Feedrates")]
-        [DisplayName("Lead-Out Feedrate %")]
-        [Description("Feedrate percentage for lead-out moves.")]
+        [DisplayName("Lead-out feedrate")]
+        [Description("Feedrate for lead-out moves (0.5 = 50%).")]
+        [PostSetting(FeedratesSection, 2, Minimum = 0, Maximum = 10, DecimalPlaces = 3)]
         public double LeadOutFeedratePercent { get; set; } = 0.5;
 
-        [Category("9. Feedrates")]
-        [DisplayName("Circle Feedrate Multiplier")]
-        [Description("Feedrate multiplier for circular cuts (e.g. 0.8 = 80%).")]
+        [DisplayName("Circle feedrate multiplier")]
+        [Description("Feedrate multiplier for circular cuts (0.8 = 80%).")]
+        [PostSetting(FeedratesSection, 3, Minimum = 0, Maximum = 10, DecimalPlaces = 3)]
         public double CircleFeedrateMultiplier { get; set; } = 0.8;
 
-        [Category("9. Feedrates")]
-        [DisplayName("Arc Feedrate Mode")]
-        [Description("Arc feedrate calculation mode (None, Percentages, or Variables).")]
+        [DisplayName("Arc feedrate mode")]
+        [Description(
+            "None slows only full circles. Percentages posts F [#148*fraction] and Variables posts F #variable for arcs, by the radius ranges below."
+        )]
+        [PostSetting(FeedratesSection, 4)]
         public ArcFeedrateMode ArcFeedrate { get; set; } = ArcFeedrateMode.None;
 
-        [Category("9. Feedrates")]
-        [DisplayName("Arc Feedrate Ranges")]
+        [DisplayName("Arc feedrate ranges")]
         [Description(
-            "Radius-based arc feedrate ranges. Matched from smallest to largest MaxRadius."
+            "An arc takes the first range, from smallest to largest maximum radius, that its radius fits. Feedrate is a fraction (0.25 = 25%); the variable is used in Variables mode."
         )]
+        [PostSetting(FeedratesSection, 5)]
         public List<ArcFeedrateRange> ArcFeedrateRanges { get; set; } =
             new()
             {
@@ -267,37 +325,42 @@ namespace OpenNest.Posts.Cincinnati
                 },
             };
 
-        [Category("A. Variables")]
-        [DisplayName("User Variable Start")]
+        [DisplayName("User variable start")]
         [Description("Starting variable number for user-defined variables (#200, #201, etc.).")]
+        [PostSetting(VariablesSection, 0, Minimum = 0, Maximum = 99999)]
         public int UserVariableStart { get; set; } = 200;
 
-        [Category("A. Variables")]
-        [DisplayName("Sheet Width Variable")]
+        [DisplayName("Sheet width variable")]
         [Description("Variable number for sheet width.")]
+        [PostSetting(VariablesSection, 1, Minimum = 0, Maximum = 99999)]
         public int SheetWidthVariable { get; set; } = 110;
 
-        [Category("A. Variables")]
-        [DisplayName("Sheet Length Variable")]
+        [DisplayName("Sheet length variable")]
         [Description("Variable number for sheet length.")]
+        [PostSetting(VariablesSection, 2, Minimum = 0, Maximum = 99999)]
         public int SheetLengthVariable { get; set; } = 111;
 
-        [Category("B. Libraries")]
-        [DisplayName("Material Libraries")]
+        [DisplayName("Material libraries")]
         [Description(
-            "Material-to-library mapping for cut operations. Maps (material, thickness, gas) to a G89 library file."
+            "Cut library (G89 file) for each material, thickness and assist gas. The first row matching the nest's material, thickness within 0.001 and gas is posted."
         )]
+        [PostSetting(LibrariesSection, 1)]
         public List<MaterialLibraryEntry> MaterialLibraries { get; set; } = new();
 
-        [Category("B. Libraries")]
-        [DisplayName("Etch Libraries")]
-        [Description("Gas-to-library mapping for etch operations.")]
+        [DisplayName("Etch libraries")]
+        [Description("Etch library (G89 file) for each etch gas.")]
+        [PostSetting(LibrariesSection, 2)]
         public List<EtchLibraryEntry> EtchLibraries { get; set; } = new();
 
-        [Category("B. Libraries")]
-        [DisplayName("Selected Library")]
+        [DisplayName("Selected library")]
         [Description(
-            "Overrides Material/Thickness/Gas auto-resolution. Pick an existing entry from Material Libraries, or leave blank to auto-resolve."
+            "The cut library this nest posts with: pre-selected from its material, thickness and gas. Pick another to override, or leave blank to resolve automatically."
+        )]
+        [PostSetting(
+            LibrariesSection,
+            0,
+            SuggestionsTable = nameof(MaterialLibraries),
+            SuggestionsColumn = nameof(MaterialLibraryEntry.Library)
         )]
         [TypeConverter(typeof(MaterialLibraryNameConverter))]
         public string SelectedLibrary { get; set; } = "";
@@ -338,12 +401,15 @@ namespace OpenNest.Posts.Cincinnati
     public class ArcFeedrateRange
     {
         /// <summary>Maximum radius for this range (inclusive).</summary>
+        [DisplayName("Max radius")]
         public double MaxRadius { get; set; }
 
         /// <summary>Feedrate as a fraction of process feedrate (e.g. 0.25 = 25%).</summary>
+        [DisplayName("Feedrate")]
         public double FeedratePercent { get; set; }
 
         /// <summary>Variable number for Variables mode (e.g. 123).</summary>
+        [DisplayName("Variable")]
         public int VariableNumber { get; set; }
     }
 }

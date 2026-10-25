@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 
@@ -14,6 +15,29 @@ namespace OpenNest.PostSettings
         Boolean,
         Choice,
         StringMap,
+        Table,
+    }
+
+    /// <summary>A column of a <see cref="PostSettingKind.Table"/> field: one property of its row type.</summary>
+    public sealed class PostSettingsColumn
+    {
+        internal PostSettingsColumn(PropertyInfo property, PostSettingKind kind)
+        {
+            Property = property;
+            Kind = kind;
+            Label =
+                property.GetCustomAttribute<DisplayNameAttribute>()?.DisplayName
+                ?? property.Name;
+        }
+
+        public PropertyInfo Property { get; }
+
+        public string Name => Property.Name;
+
+        /// <summary>Text, Integer or Decimal.</summary>
+        public PostSettingKind Kind { get; }
+
+        public string Label { get; }
     }
 
     public sealed class PostSettingsField
@@ -21,11 +45,17 @@ namespace OpenNest.PostSettings
         internal PostSettingsField(
             PropertyInfo property,
             PostSettingKind kind,
+            bool isOptional,
+            IReadOnlyList<PostSettingsColumn> columns,
             PostSettingAttribute setting
         )
         {
             Property = property;
             Kind = kind;
+            IsOptional = isOptional;
+            Columns = columns ?? Array.Empty<PostSettingsColumn>();
+            SuggestionsTable = setting?.SuggestionsTable;
+            SuggestionsColumn = setting?.SuggestionsColumn;
             Label =
                 property.GetCustomAttribute<DisplayNameAttribute>()?.DisplayName
                 ?? property.Name;
@@ -47,6 +77,17 @@ namespace OpenNest.PostSettings
         public string Name => Property.Name;
 
         public PostSettingKind Kind { get; }
+
+        /// <summary>A nullable number: the editor can leave it unset (null).</summary>
+        public bool IsOptional { get; }
+
+        /// <summary>The row type's columns for a <see cref="PostSettingKind.Table"/> field.</summary>
+        public IReadOnlyList<PostSettingsColumn> Columns { get; }
+
+        /// <summary>Table field whose <see cref="SuggestionsColumn"/> a text field offers; null for none.</summary>
+        public string SuggestionsTable { get; }
+
+        public string SuggestionsColumn { get; }
 
         public string Label { get; }
 
@@ -133,7 +174,7 @@ namespace OpenNest.PostSettings
             for (var i = 0; i < properties.Count; i++)
             {
                 var property = properties[i];
-                var kind = KindOf(property.PropertyType);
+                var kind = KindOf(property.PropertyType, out var isOptional, out var columns);
                 if (kind == null)
                     return null;
 
@@ -146,7 +187,7 @@ namespace OpenNest.PostSettings
                         section,
                         setting?.Order ?? int.MaxValue,
                         i,
-                        new PostSettingsField(property, kind.Value, setting)
+                        new PostSettingsField(property, kind.Value, isOptional, columns, setting)
                     )
                 );
             }
@@ -205,6 +246,126 @@ namespace OpenNest.PostSettings
             }
 
             return map;
+        }
+
+        /// <summary>
+        /// Builds a <see cref="PostSettingKind.Table"/> field's list from edited
+        /// rows of cell text, one entry per column, in row order. Cells are
+        /// trimmed and numbers parsed with <paramref name="culture"/>; fully blank
+        /// rows are skipped. Throws <see cref="FormatException"/> naming the
+        /// 1-based row and column for a missing or malformed number.
+        /// </summary>
+        public static object BuildList(
+            PostSettingsField field,
+            IEnumerable<IReadOnlyList<string>> rows,
+            IFormatProvider culture
+        )
+        {
+            if (field == null || field.Kind != PostSettingKind.Table)
+                throw new ArgumentException("A table field is required.", nameof(field));
+
+            var list = (System.Collections.IList)Activator.CreateInstance(field.Property.PropertyType);
+            var rowType = ElementType(field.Property.PropertyType);
+            var row = 0;
+
+            foreach (var cells in rows ?? Enumerable.Empty<IReadOnlyList<string>>())
+            {
+                row++;
+                var text = field
+                    .Columns.Select((_, c) => (cells != null && c < cells.Count ? cells[c] : null)?.Trim() ?? "")
+                    .ToList();
+                if (text.All(t => t.Length == 0))
+                    continue;
+
+                var item = Activator.CreateInstance(rowType);
+                for (var c = 0; c < field.Columns.Count; c++)
+                {
+                    var column = field.Columns[c];
+                    column.Property.SetValue(item, ParseCell(column, text[c], row, culture));
+                }
+                list.Add(item);
+            }
+
+            return list;
+        }
+
+        private static object ParseCell(PostSettingsColumn column, string text, int row, IFormatProvider culture)
+        {
+            if (column.Kind == PostSettingKind.Text)
+                return text;
+
+            if (text.Length == 0)
+                throw new FormatException($"Row {row}: {column.Label} is required.");
+
+            if (column.Kind == PostSettingKind.Integer)
+            {
+                if (int.TryParse(text, NumberStyles.Integer, culture, out var whole))
+                    return whole;
+            }
+            else if (double.TryParse(text, NumberStyles.Float, culture, out var number) && double.IsFinite(number))
+            {
+                return number;
+            }
+
+            throw new FormatException($"Row {row}: {column.Label} \"{text}\" is not a valid number.");
+        }
+
+        private static PostSettingKind? KindOf(
+            Type type,
+            out bool isOptional,
+            out IReadOnlyList<PostSettingsColumn> columns
+        )
+        {
+            isOptional = false;
+            columns = null;
+
+            var underlying = Nullable.GetUnderlyingType(type);
+            if (underlying == typeof(int) || underlying == typeof(double))
+            {
+                isOptional = true;
+                return KindOf(underlying);
+            }
+
+            var rowType = ElementType(type);
+            if (rowType != null)
+            {
+                columns = ColumnsOf(rowType);
+                return columns == null ? null : PostSettingKind.Table;
+            }
+
+            return KindOf(type);
+        }
+
+        private static Type ElementType(Type type) =>
+            type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>)
+                ? type.GetGenericArguments()[0]
+                : null;
+
+        /// <summary>
+        /// A row type's editable columns, or null when it is not a class with a
+        /// public parameterless constructor whose every public settable property
+        /// is text or a number.
+        /// </summary>
+        private static IReadOnlyList<PostSettingsColumn> ColumnsOf(Type rowType)
+        {
+            if (!rowType.IsClass || rowType == typeof(string) || rowType.GetConstructor(Type.EmptyTypes) == null)
+                return null;
+
+            var columns = new List<PostSettingsColumn>();
+            var properties = rowType
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(p => p.CanRead && p.GetSetMethod() != null && p.GetIndexParameters().Length == 0)
+                .OrderBy(p => p.MetadataToken);
+
+            foreach (var property in properties)
+            {
+                var kind = KindOf(property.PropertyType);
+                if (kind is not (PostSettingKind.Text or PostSettingKind.Integer or PostSettingKind.Decimal))
+                    return null;
+                columns.Add(new PostSettingsColumn(property, kind.Value));
+            }
+
+            return columns.Count == 0 ? null : columns;
         }
 
         private static PostSettingKind? KindOf(Type type)

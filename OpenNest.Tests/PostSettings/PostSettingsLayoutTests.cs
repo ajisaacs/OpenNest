@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
+using OpenNest.Posts.Cincinnati;
 using OpenNest.Posts.CincinnatiCIFiber;
 using OpenNest.PostSettings;
 using Xunit;
@@ -54,6 +56,132 @@ public class PostSettingsLayoutTests
             f => Assert.False(string.IsNullOrWhiteSpace(f.Description), f.Name)
         );
     }
+
+    [Fact]
+    public void CincinnatiConfig_BuildsOrderedSections_CoveringEveryEditableProperty()
+    {
+        var sections = PostSettingsLayout.TryBuild(typeof(CincinnatiPostConfig));
+
+        Assert.NotNull(sections);
+        Assert.Equal(
+            new[]
+            {
+                "Program output", "Sheets", "Libraries", "Process", "Kerf",
+                "Head raise", "Feedrates", "Sub-programs", "Variables",
+            },
+            sections.Select(s => s.Name)
+        );
+        Assert.All(sections, s => Assert.NotEmpty(s.Description));
+
+        var fields = sections.SelectMany(s => s.Fields).ToList();
+        var editable = typeof(CincinnatiPostConfig)
+            .GetProperties()
+            .Where(p => p.GetSetMethod() != null)
+            .Select(p => p.Name);
+        Assert.Equal(editable.OrderBy(n => n), fields.Select(f => f.Name).OrderBy(n => n));
+        Assert.All(fields, f => Assert.False(string.IsNullOrWhiteSpace(f.Description), f.Name));
+
+        var byName = fields.ToDictionary(f => f.Name);
+        Assert.True(byName["SafetyHeadraiseDistance"].IsOptional);
+        Assert.Equal(PostSettingKind.Integer, byName["SafetyHeadraiseDistance"].Kind);
+        Assert.True(byName["M47OverrideDistanceThreshold"].IsOptional);
+        Assert.Equal(PostSettingKind.Decimal, byName["M47OverrideDistanceThreshold"].Kind);
+        Assert.False(byName["PostedAccuracy"].IsOptional);
+
+        var libraries = byName["MaterialLibraries"];
+        Assert.Equal(PostSettingKind.Table, libraries.Kind);
+        Assert.Equal(new[] { "Material", "Thickness", "Gas", "Library" }, libraries.Columns.Select(c => c.Label));
+        Assert.Equal(PostSettingKind.Decimal, libraries.Columns[1].Kind);
+        Assert.Equal(
+            new[] { "Max radius", "Feedrate", "Variable" },
+            byName["ArcFeedrateRanges"].Columns.Select(c => c.Label)
+        );
+
+        var selected = byName["SelectedLibrary"];
+        Assert.Equal(PostSettingKind.Text, selected.Kind);
+        Assert.Equal("MaterialLibraries", selected.SuggestionsTable);
+        Assert.Contains(libraries.Columns, c => c.Name == selected.SuggestionsColumn);
+        Assert.Equal("SelectedLibrary", sections[2].Fields[0].Name);
+    }
+
+    [Fact]
+    public void BuildList_ParsesRowsInOrderAndSkipsBlankRows()
+    {
+        var field = CincinnatiField("ArcFeedrateRanges");
+
+        var list = Assert.IsType<List<ArcFeedrateRange>>(
+            PostSettingsLayout.BuildList(
+                field,
+                new[] { Cells(" 0.5 ", "0.25", "123"), Cells("", " ", null), Cells("2", "0.8", "124") },
+                CultureInfo.InvariantCulture
+            )
+        );
+
+        Assert.Equal(2, list.Count);
+        Assert.Equal(0.5, list[0].MaxRadius);
+        Assert.Equal(0.25, list[0].FeedratePercent);
+        Assert.Equal(123, list[0].VariableNumber);
+        Assert.Equal(2, list[1].MaxRadius);
+    }
+
+    [Fact]
+    public void BuildList_KeepsTextCellsAndUsesTheGivenCulture()
+    {
+        var field = CincinnatiField("MaterialLibraries");
+
+        var list = Assert.IsType<List<MaterialLibraryEntry>>(
+            PostSettingsLayout.BuildList(
+                field,
+                new[] { Cells(" Aluminum ", "0,125", "N2", "AL125N2") },
+                CultureInfo.GetCultureInfo("de-DE")
+            )
+        );
+
+        var entry = Assert.Single(list);
+        Assert.Equal("Aluminum", entry.Material);
+        Assert.Equal(0.125, entry.Thickness);
+        Assert.Equal("AL125N2", entry.Library);
+    }
+
+    [Fact]
+    public void BuildList_RejectsMissingAndMalformedNumbersByRow()
+    {
+        var field = CincinnatiField("ArcFeedrateRanges");
+
+        var malformed = Assert.Throws<FormatException>(() =>
+            PostSettingsLayout.BuildList(
+                field,
+                new[] { Cells("1", "0.5", "123"), Cells("x", "0.5", "124") },
+                CultureInfo.InvariantCulture
+            )
+        );
+        Assert.Contains("Row 2", malformed.Message);
+        Assert.Contains("Max radius", malformed.Message);
+
+        var missing = Assert.Throws<FormatException>(() =>
+            PostSettingsLayout.BuildList(field, new[] { Cells("1", "0.5", "") }, CultureInfo.InvariantCulture)
+        );
+        Assert.Contains("Row 1", missing.Message);
+        Assert.Contains("Variable", missing.Message);
+
+        Assert.Throws<FormatException>(() =>
+            PostSettingsLayout.BuildList(field, new[] { Cells("1", "0.5", "1.5") }, CultureInfo.InvariantCulture)
+        );
+    }
+
+    [Fact]
+    public void TableOfUnsupportedRowType_FallsBackToPropertyGrid()
+    {
+        Assert.Null(PostSettingsLayout.TryBuild(typeof(NestedListConfig)));
+    }
+
+    private static PostSettingsField CincinnatiField(string name) =>
+        PostSettingsLayout
+            .TryBuild(typeof(CincinnatiPostConfig))
+            .SelectMany(s => s.Fields)
+            .Single(f => f.Name == name);
+
+    private static IReadOnlyList<string> Cells(params string[] cells) => cells;
 
     [Fact]
     public void FieldsRoundTripValuesThroughTheConfig()
@@ -146,6 +274,12 @@ public class PostSettingsLayoutTests
         public string Name { get; set; } = "";
 
         public PlainConfig Child { get; set; } = new();
+    }
+
+    private sealed class NestedListConfig
+    {
+        [PostSetting("Main")]
+        public List<NestedConfig> Rows { get; set; } = new();
     }
 
     private enum Mode
