@@ -67,6 +67,14 @@ namespace OpenNest.Controls
         private static GraphicsPath CreateRoundedRect(Rectangle rect, int radius)
         {
             var path = new GraphicsPath();
+            // GDI+ refuses a zero-size arc, which a sliver of fill would need.
+            radius = System.Math.Min(radius, System.Math.Min(rect.Width, rect.Height) / 2);
+            if (radius <= 0)
+            {
+                path.AddRectangle(rect);
+                return path;
+            }
+
             var d = radius * 2;
             path.AddArc(rect.X, rect.Y, d, d, 180, 90);
             path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
