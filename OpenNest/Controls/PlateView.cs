@@ -1119,9 +1119,10 @@ namespace OpenNest.Controls
         {
             ClearHover();
             base.UpdateMatrix();
-            parts.ForEach(p => p.Update(this));
-            displayParts?.ForEach(p => p.Update(this));
-            previewManager.Update();
+            // Geometry is unchanged: map the cached paths to the new scale, not rebuild them.
+            parts.ForEach(p => p.UpdateView(this));
+            displayParts?.ForEach(p => p.UpdateView(this));
+            previewManager.UpdateView();
         }
     }
 }

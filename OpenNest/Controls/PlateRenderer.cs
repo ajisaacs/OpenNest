@@ -116,7 +116,7 @@ namespace OpenNest.Controls
                 var part = layoutParts[i];
 
                 if (part.IsDirty)
-                    part.Update(view);
+                    part.UpdateView(view);
 
                 if (!part.DisplayBounds.IntersectsWith(viewBounds))
                     continue;
@@ -142,7 +142,7 @@ namespace OpenNest.Controls
                 var part = previewParts[i];
 
                 if (part.IsDirty)
-                    part.Update(view);
+                    part.UpdateView(view);
 
                 var path = part.Path;
                 if (!part.DisplayBounds.IntersectsWith(viewBounds))
@@ -554,7 +554,7 @@ namespace OpenNest.Controls
                 var layoutPart = layoutParts[i];
 
                 if (layoutPart.IsDirty)
-                    layoutPart.Update(view);
+                    layoutPart.UpdateView(view);
 
                 layoutPart.UpdateOffset(view.DisplayPlate.PartSpacing, view.OffsetTolerance, view.Matrix);
 

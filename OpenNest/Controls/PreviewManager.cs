@@ -54,6 +54,11 @@ namespace OpenNest.Controls
             activeParts.ForEach(p => p.Update(view));
         }
 
+        public void UpdateView()
+        {
+            activeParts.ForEach(p => p.UpdateView(view));
+        }
+
         public void Clear()
         {
             activeParts.Clear();

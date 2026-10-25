@@ -20,6 +20,7 @@ namespace OpenNest
         [ThreadStatic] private static Pen selectedPen;
         [ThreadStatic] private static Brush selectedBrush;
         [ThreadStatic] private static Pen leadInPen;
+        [ThreadStatic] private static StringFormat labelFormat;
 
         private Color color;
         private Color? colorOverride;
@@ -35,6 +36,20 @@ namespace OpenNest
         private Vector? _labelPoint;
         private PointF _labelScreenPoint;
 
+        // Paths in the drawing's program frame, before placement. A zoom or a move only maps
+        // these to the screen again; rebuilding them from the program dominates for parts with
+        // hundreds of holes. They are rebuilt when the program, its rotation or its lead-ins change.
+        private GraphicsPath localCut;
+        private GraphicsPath localLead;
+        private GraphicsPath localEtch;
+        private GraphicsPath localFill;
+        private GraphicsPath localDisplay;
+        private CNC.Program localProgram;
+        private double localRotation;
+        private bool localManualLeadIns;
+        private bool needsRebuild;
+        private bool moved;
+
         public readonly Part BasePart;
 
         private LayoutPart(Part part)
@@ -47,7 +62,16 @@ namespace OpenNest
             SetDisplayColor(part.BaseDrawing.Color);
         }
 
-        internal bool IsDirty { get; set; }
+        /// <summary>Setting it rebuilds the paths from the program on the next update.</summary>
+        internal bool IsDirty
+        {
+            get => needsRebuild || moved;
+            set
+            {
+                needsRebuild = value;
+                moved = false;
+            }
+        }
 
         public bool IsSelected { get; set; }
 
@@ -119,18 +143,13 @@ namespace OpenNest
         {
             Draw(g, muted);
 
-            using var sf = new StringFormat
-            {
-                Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center,
-            };
             g.DrawString(
                 id,
                 ProgramIdFont,
                 muted ? Brushes.DimGray : Brushes.Black,
                 _labelScreenPoint.X,
                 _labelScreenPoint.Y,
-                sf
+                LabelFormat
             );
         }
 
@@ -152,6 +171,22 @@ namespace OpenNest
             DisplayPath = null;
             OffsetPath?.Dispose();
             OffsetPath = null;
+            ReleaseLocalPaths();
+        }
+
+        private void ReleaseLocalPaths()
+        {
+            localCut?.Dispose();
+            localCut = null;
+            localLead?.Dispose();
+            localLead = null;
+            localEtch?.Dispose();
+            localEtch = null;
+            localFill?.Dispose();
+            localFill = null;
+            localDisplay?.Dispose();
+            localDisplay = null;
+            localProgram = null;
         }
 
         public GraphicsPath OffsetPath { get; private set; }
@@ -188,7 +223,7 @@ namespace OpenNest
 
         // Display-only entities are kept in the drawing's program frame before rotation, so they
         // follow the part by its cumulative rotation about the program origin, then its location.
-        private GraphicsPath BuildDisplayPath(Matrix matrix)
+        private GraphicsPath BuildDisplayPath()
         {
             var entities = EntityRoles.DisplayGeometry(BasePart.BaseDrawing);
             if (entities.Count == 0)
@@ -198,11 +233,9 @@ namespace OpenNest
             foreach (var entity in entities)
             {
                 entity.Rotate(BasePart.Rotation);
-                entity.Offset(BasePart.Location);
                 using var figure = new Shape { Entities = new List<Entity> { entity } }.GetGraphicsPath();
                 path.AddPath(figure, false);
             }
-            path.Transform(matrix);
             return path;
         }
 
@@ -237,33 +270,79 @@ namespace OpenNest
             return PolyLabel.Find(outer, holes, PolyLabel.ThicknessPrecision(outer, holes));
         }
 
+        /// <summary>Rebuilds the part's paths from its program and maps them to the view.</summary>
         public void Update(DrawControl plateView)
+        {
+            BuildLocalPaths();
+            ApplyView(plateView);
+        }
+
+        /// <summary>
+        /// Maps the part to the view, rebuilding its paths only when <see cref="IsDirty"/> was set
+        /// or its program, rotation or lead-ins changed. Use after a zoom or a move.
+        /// </summary>
+        internal void UpdateView(DrawControl plateView)
+        {
+            if (needsRebuild
+                || localCut == null
+                || !ReferenceEquals(localProgram, BasePart.Program)
+                || localRotation != BasePart.Rotation
+                || localManualLeadIns != BasePart.HasManualLeadIns)
+                BuildLocalPaths();
+
+            ApplyView(plateView);
+        }
+
+        private void BuildLocalPaths()
+        {
+            ReleaseLocalPaths();
+            var program = BasePart.Program;
+            program.GetDisplayPaths(Vector.Zero,
+                out var cutPath, out var leadPath, out var etchPath, out var hasOpenCuts);
+            localCut = cutPath;
+            localEtch = etchPath;
+            // Only programs with break cuts or open (tabbed) cuts need a fill apart from the outline path.
+            if (hasOpenCuts || HasBreakCuts(program))
+                localFill = program.GetFillPath(Vector.Zero);
+            localLead = BasePart.HasManualLeadIns ? leadPath : null;
+            if (!BasePart.HasManualLeadIns)
+                leadPath.Dispose();
+            localDisplay = BuildDisplayPath();
+
+            localProgram = program;
+            localRotation = BasePart.Rotation;
+            localManualLeadIns = BasePart.HasManualLeadIns;
+            needsRebuild = false;
+        }
+
+        private static GraphicsPath Transformed(GraphicsPath path, Matrix matrix)
+        {
+            if (path == null)
+                return null;
+            var result = (GraphicsPath)path.Clone();
+            result.Transform(matrix);
+            return result;
+        }
+
+        private void ApplyView(DrawControl plateView)
         {
             colorScheme = (plateView as PlateView)?.ColorScheme ?? ColorScheme.Default;
             RefreshColors();
-            BasePart.Program.GetDisplayPaths(BasePart.Location,
-                out var cutPath, out var leadPath, out var etchPath, out var hasOpenCuts);
-            cutPath.Transform(plateView.Matrix);
-            leadPath.Transform(plateView.Matrix);
-            etchPath.Transform(plateView.Matrix);
+
+            // Place the program-frame paths, then map them to the screen.
+            using var matrix = plateView.Matrix.Clone();
+            matrix.Translate((float)BasePart.Location.X, (float)BasePart.Location.Y);
+
             Path?.Dispose();
             LeadInPath?.Dispose();
             EtchPath?.Dispose();
             FillPath?.Dispose();
-            FillPath = null;
-            // Only programs with break cuts or open (tabbed) cuts need a fill apart from the outline path.
-            if (hasOpenCuts || HasBreakCuts(BasePart.Program))
-            {
-                FillPath = BasePart.Program.GetFillPath(BasePart.Location);
-                FillPath.Transform(plateView.Matrix);
-            }
-            Path = cutPath;
-            EtchPath = etchPath;
             DisplayPath?.Dispose();
-            DisplayPath = BuildDisplayPath(plateView.Matrix);
-            LeadInPath = BasePart.HasManualLeadIns ? leadPath : null;
-            if (!BasePart.HasManualLeadIns)
-                leadPath.Dispose();
+            var cutPath = Path = Transformed(localCut, matrix);
+            var etchPath = EtchPath = Transformed(localEtch, matrix);
+            FillPath = Transformed(localFill, matrix);
+            LeadInPath = Transformed(localLead, matrix);
+            DisplayPath = Transformed(localDisplay, matrix);
 
             var bounds = cutPath.GetBounds();
             if (etchPath.PointCount > 0)
@@ -398,6 +477,12 @@ namespace OpenNest
 
         private static Pen LeadInPen => leadInPen ??= new Pen(Color.OrangeRed, 1.5f);
 
+        private static StringFormat LabelFormat => labelFormat ??= new StringFormat
+        {
+            Alignment = StringAlignment.Center,
+            LineAlignment = StringAlignment.Center,
+        };
+
         private static Brush SelectedBrush
         {
             get
@@ -433,7 +518,7 @@ namespace OpenNest
             set
             {
                 BasePart.Location = value;
-                IsDirty = true;
+                moved = true;
             }
         }
 
@@ -457,13 +542,13 @@ namespace OpenNest
         public void Offset(double x, double y)
         {
             BasePart.Offset(x, y);
-            IsDirty = true;
+            moved = true;
         }
 
         public void Offset(Vector voffset)
         {
             BasePart.Offset(voffset);
-            IsDirty = true;
+            moved = true;
         }
 
         public Box BoundingBox

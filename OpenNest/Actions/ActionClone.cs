@@ -88,7 +88,7 @@ namespace OpenNest.Actions
             {
                 parts.ForEach(p =>
                 {
-                    p.Update(plateView);
+                    p.UpdateView(plateView);
                     p.Draw(e.Graphics);
                 });
             }
@@ -97,7 +97,7 @@ namespace OpenNest.Actions
                 parts.ForEach(p =>
                 {
                     if (p.IsDirty)
-                        p.Update(plateView);
+                        p.UpdateView(plateView);
 
                     p.Draw(e.Graphics);
                 });
