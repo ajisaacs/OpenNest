@@ -1,7 +1,7 @@
 using OpenNest.Controls;
 using OpenNest.Data;
-using OpenNest.Forms;
 using OpenNest.Geometry;
+using OpenNest.Tests.Data;
 
 namespace OpenNest.WinForms.Tests.Controls;
 
@@ -89,56 +89,84 @@ public class DrawingSetPreviewTests
 
         view.ShowDrawings(drawings);
 
-        Assert.Equal(2, view.Parts.Count);
+        Assert.Equal(2, view.ShownParts.Count);
         Assert.Equal(2, view.Plate.Parts.Count);
-        var large = view.Parts[0].BoundingBox;
-        var small = view.Parts[1].BoundingBox;
+        var large = view.ShownParts[0].BoundingBox;
+        var small = view.ShownParts[1].BoundingBox;
         Assert.Equal((48, 20), (System.Math.Round(large.Length, 6), System.Math.Round(large.Width, 6)));
         Assert.Equal((2, 1), (System.Math.Round(small.Length, 6), System.Math.Round(small.Width, 6)));
         Assert.True(large.Right <= small.Left || small.Right <= large.Left || large.Top <= small.Bottom || small.Top <= large.Bottom);
-        Assert.Equal((float)view.Layout.Scale, view.ViewScale, 3);
+        Assert.Equal((float)view.PackedLayout.Scale, view.ViewScale, 3);
 
         // Resizing repacks to the new view; sizes never change.
         view.Size = new System.Drawing.Size(400, 900);
-        Assert.Equal(48, System.Math.Round(view.Parts[0].BoundingBox.Length, 6));
-        Assert.Equal((float)view.Layout.Scale, view.ViewScale, 3);
+        Assert.Equal(48, System.Math.Round(view.ShownParts[0].BoundingBox.Length, 6));
+        Assert.Equal((float)view.PackedLayout.Scale, view.ViewScale, 3);
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
 
     [Fact]
-    public void Form_LoadsEachMemberAndCountsTheMissingOnes() => StaTestThread.Run(() =>
+    public void Browser_PreviewsTheHighlightedSetBesideTheList() => StaTestThread.Run(() =>
     {
         var plate = new DrawingLibraryRecord { Id = Guid.NewGuid(), Name = "SYN-PLATE", Revision = 2 };
         var gone = new DrawingLibraryRecord { Id = Guid.NewGuid(), Name = "SYN-GONE", Revision = 1 };
-        var set = new DrawingSetRecord
+        var sets = new InMemoryDrawingSets();
+        Run(sets.CreateAsync(new DrawingSetRecord
         {
+            Id = Guid.NewGuid(),
             Name = "Synthetic kit",
-            Revision = 3,
             Members = new[]
             {
                 new DrawingSetMember { DrawingId = plate.Id, Quantity = 4, Drawing = plate },
                 new DrawingSetMember { DrawingId = gone.Id, Quantity = 1, Drawing = gone },
             },
-        };
+        }));
         var requested = new List<(Guid, int)>();
 
-        using var form = new DrawingSetPreviewForm(set, (record, _) =>
+        using var form = new System.Windows.Forms.Form { Size = new System.Drawing.Size(1000, 600) };
+        var browser = new DrawingSetBrowser { Dock = System.Windows.Forms.DockStyle.Fill };
+        form.Controls.Add(browser);
+        browser.Initialize(sets, new InMemoryDrawingLibrary(), "http://library.test:8090");
+        browser.LoadPreviewDrawing = (record, _) =>
         {
             requested.Add((record.Id, record.Revision));
             return Task.FromResult(record == plate ? Rectangle(record.Name, 10, 5) : null);
-        });
-        form.Preview.Size = new System.Drawing.Size(800, 600);
-        var load = form.LoadAsync();
+        };
+        form.Show();
+        var refresh = browser.RefreshAsync();
+        PumpUntil(() => refresh.IsCompleted && browser.SelectedSet != null);
+
+        // The pane beside the list keeps its width; the list takes the rest.
+        Assert.InRange(browser.PreviewBox.Width, 300, 440);
+        PumpUntil(() => browser.PreviewBox.ShownParts.Count == 1 && browser.PreviewLoad.IsCompleted);
+
+        Assert.True(browser.PreviewLoad.IsCompletedSuccessfully);
+        Assert.Equal(new[] { (plate.Id, 2), (gone.Id, 1) }, requested.OrderBy(r => r.Item1 == gone.Id));
+        Assert.Equal("SYN-PLATE", browser.PreviewBox.ShownParts[0].BaseDrawing.Name);
+        Assert.Equal(new[] { "2 drawings, 5 parts, one scale", "1 could not be loaded." }, browser.PreviewBox.InfoLines);
+
+        // Reading the list again keeps the shown preview and its cached drawings.
+        refresh = browser.RefreshAsync();
+        PumpUntil(() => refresh.IsCompleted);
+        Run(browser.LoadSelectedPreviewAsync());
+        Assert.Single(browser.PreviewBox.ShownParts);
+        Assert.Equal(2, requested.Count(r => r.Item1 == gone.Id) + requested.Count(r => r.Item1 == plate.Id));
+    }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
+
+    private static void Run(Task task)
+    {
+        PumpUntil(() => task.IsCompleted);
+        task.GetAwaiter().GetResult();
+    }
+
+    private static void PumpUntil(Func<bool> condition)
+    {
         var until = DateTime.UtcNow.AddSeconds(15);
-        while (!load.IsCompleted && DateTime.UtcNow < until)
+        while (!condition() && DateTime.UtcNow < until)
         {
             System.Windows.Forms.Application.DoEvents();
             Thread.Sleep(10);
         }
 
-        Assert.True(load.IsCompletedSuccessfully);
-
-        Assert.Equal(new[] { (plate.Id, 2), (gone.Id, 1) }, requested.OrderBy(r => r.Item1 == gone.Id));
-        Assert.Single(form.Preview.Parts);
-        Assert.Equal("SYN-PLATE", form.Preview.Parts[0].BaseDrawing.Name);
-    }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
+        Assert.True(condition(), "Timed out waiting for the browser.");
+    }
 }

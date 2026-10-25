@@ -191,9 +191,6 @@ namespace OpenNest.Controls
 
         public bool DrawBounds { get; set; }
 
-        /// <summary>Numbers each part with its position in the plate's sequence.</summary>
-        public bool DrawPartNumbers { get; set; } = true;
-
         public bool DrawOffset { get; set; }
 
         public bool DrawCutDirection { get; set; }

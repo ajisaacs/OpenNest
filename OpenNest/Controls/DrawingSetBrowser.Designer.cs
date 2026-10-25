@@ -34,6 +34,11 @@ namespace OpenNest.Controls
             savedColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             savedByColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             stateColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            splitContainer = new System.Windows.Forms.SplitContainer();
+            detailsTable = new System.Windows.Forms.TableLayoutPanel();
+            previewPanel = new System.Windows.Forms.Panel();
+            previewBox = new OpenNest.Controls.DrawingSetPreviewControl();
+            previewTimer = new System.Windows.Forms.Timer(components);
             notesGroup = new System.Windows.Forms.GroupBox();
             notesBox = new System.Windows.Forms.TextBox();
             bottomTable = new System.Windows.Forms.TableLayoutPanel();
@@ -42,7 +47,6 @@ namespace OpenNest.Controls
             summaryLabel = new System.Windows.Forms.Label();
             newButton = new System.Windows.Forms.Button();
             editButton = new System.Windows.Forms.Button();
-            previewButton = new System.Windows.Forms.Button();
             moreButton = new System.Windows.Forms.Button();
             releaseButton = new System.Windows.Forms.Button();
             statusLabel = new System.Windows.Forms.Label();
@@ -53,13 +57,18 @@ namespace OpenNest.Controls
             editSeparator = new System.Windows.Forms.ToolStripSeparator();
             archiveMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             historyMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            previewMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             releasesMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             importSeparator = new System.Windows.Forms.ToolStripSeparator();
             importBomMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             layoutTable.SuspendLayout();
             filterTable.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)setGrid).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
+            splitContainer.Panel1.SuspendLayout();
+            splitContainer.Panel2.SuspendLayout();
+            splitContainer.SuspendLayout();
+            detailsTable.SuspendLayout();
+            previewPanel.SuspendLayout();
             notesGroup.SuspendLayout();
             bottomTable.SuspendLayout();
             moreMenu.SuspendLayout();
@@ -70,18 +79,16 @@ namespace OpenNest.Controls
             layoutTable.ColumnCount = 1;
             layoutTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             layoutTable.Controls.Add(filterTable, 0, 0);
-            layoutTable.Controls.Add(setGrid, 0, 1);
-            layoutTable.Controls.Add(notesGroup, 0, 2);
-            layoutTable.Controls.Add(bottomTable, 0, 3);
-            layoutTable.Controls.Add(statusLabel, 0, 4);
+            layoutTable.Controls.Add(splitContainer, 0, 1);
+            layoutTable.Controls.Add(bottomTable, 0, 2);
+            layoutTable.Controls.Add(statusLabel, 0, 3);
             layoutTable.Dock = System.Windows.Forms.DockStyle.Fill;
             layoutTable.Location = new System.Drawing.Point(0, 0);
             layoutTable.Name = "layoutTable";
             layoutTable.Padding = new System.Windows.Forms.Padding(0);
-            layoutTable.RowCount = 5;
+            layoutTable.RowCount = 4;
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 80F));
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.Size = new System.Drawing.Size(904, 541);
@@ -202,6 +209,55 @@ namespace OpenNest.Controls
             stateColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             stateColumn.Width = 80;
             //
+            // splitContainer
+            //
+            splitContainer.Dock = System.Windows.Forms.DockStyle.Fill;
+            splitContainer.FixedPanel = System.Windows.Forms.FixedPanel.Panel2;
+            splitContainer.Margin = new System.Windows.Forms.Padding(0);
+            splitContainer.Name = "splitContainer";
+            splitContainer.Panel1.Controls.Add(setGrid);
+            splitContainer.Panel2.Controls.Add(detailsTable);
+            splitContainer.Size = new System.Drawing.Size(904, 440);
+            splitContainer.SplitterDistance = 480;
+            splitContainer.TabIndex = 1;
+            //
+            // detailsTable
+            //
+            detailsTable.ColumnCount = 1;
+            detailsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            detailsTable.Controls.Add(previewPanel, 0, 0);
+            detailsTable.Controls.Add(notesGroup, 0, 1);
+            detailsTable.Dock = System.Windows.Forms.DockStyle.Fill;
+            detailsTable.Margin = new System.Windows.Forms.Padding(0);
+            detailsTable.Name = "detailsTable";
+            detailsTable.Padding = new System.Windows.Forms.Padding(6, 0, 0, 0);
+            detailsTable.RowCount = 2;
+            detailsTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            detailsTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 104F));
+            detailsTable.TabIndex = 0;
+            //
+            // previewPanel
+            //
+            previewPanel.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            previewPanel.Controls.Add(previewBox);
+            previewPanel.Dock = System.Windows.Forms.DockStyle.Fill;
+            previewPanel.Margin = new System.Windows.Forms.Padding(0, 0, 0, 6);
+            previewPanel.MinimumSize = new System.Drawing.Size(0, 160);
+            previewPanel.Name = "previewPanel";
+            previewPanel.TabIndex = 0;
+            //
+            // previewBox
+            //
+            previewBox.Dock = System.Windows.Forms.DockStyle.Fill;
+            previewBox.Name = "previewBox";
+            previewBox.TabIndex = 0;
+            previewBox.TabStop = false;
+            //
+            // previewTimer
+            //
+            previewTimer.Interval = 150;
+            previewTimer.Tick += PreviewTimer_Tick;
+            //
             // notesGroup
             //
             notesGroup.Controls.Add(notesBox);
@@ -225,11 +281,10 @@ namespace OpenNest.Controls
             // bottomTable
             //
             bottomTable.AutoSize = true;
-            bottomTable.ColumnCount = 8;
+            bottomTable.ColumnCount = 7;
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             bottomTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
@@ -239,9 +294,8 @@ namespace OpenNest.Controls
             bottomTable.Controls.Add(summaryLabel, 2, 0);
             bottomTable.Controls.Add(newButton, 3, 0);
             bottomTable.Controls.Add(editButton, 4, 0);
-            bottomTable.Controls.Add(previewButton, 5, 0);
-            bottomTable.Controls.Add(moreButton, 6, 0);
-            bottomTable.Controls.Add(releaseButton, 7, 0);
+            bottomTable.Controls.Add(moreButton, 5, 0);
+            bottomTable.Controls.Add(releaseButton, 6, 0);
             bottomTable.Dock = System.Windows.Forms.DockStyle.Fill;
             bottomTable.Margin = new System.Windows.Forms.Padding(0, 6, 0, 0);
             bottomTable.Name = "bottomTable";
@@ -294,22 +348,12 @@ namespace OpenNest.Controls
             editButton.UseVisualStyleBackColor = true;
             editButton.Click += EditButton_Click;
             //
-            // previewButton
-            //
-            previewButton.AutoSize = true;
-            previewButton.Enabled = false;
-            previewButton.Name = "previewButton";
-            previewButton.TabIndex = 5;
-            previewButton.Text = "&Preview...";
-            previewButton.UseVisualStyleBackColor = true;
-            previewButton.Click += PreviewButton_Click;
-            //
             // moreButton
             //
             moreButton.AutoSize = true;
             moreButton.Enabled = false;
             moreButton.Name = "moreButton";
-            moreButton.TabIndex = 6;
+            moreButton.TabIndex = 5;
             moreButton.Text = "M&ore ▾";
             moreButton.UseVisualStyleBackColor = true;
             moreButton.Click += MoreButton_Click;
@@ -321,7 +365,7 @@ namespace OpenNest.Controls
             releaseButton.Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Bold);
             releaseButton.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
             releaseButton.Name = "releaseButton";
-            releaseButton.TabIndex = 7;
+            releaseButton.TabIndex = 6;
             releaseButton.Text = "&Add to Release";
             releaseButton.UseVisualStyleBackColor = true;
             releaseButton.Visible = false;
@@ -343,7 +387,7 @@ namespace OpenNest.Controls
             //
             // moreMenu
             //
-            moreMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { addToReleaseMenuItem, editMenuItem, previewMenuItem, editSeparator, archiveMenuItem, historyMenuItem, releasesMenuItem, importSeparator, importBomMenuItem });
+            moreMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { addToReleaseMenuItem, editMenuItem, editSeparator, archiveMenuItem, historyMenuItem, releasesMenuItem, importSeparator, importBomMenuItem });
             moreMenu.Name = "moreMenu";
             moreMenu.Opening += MoreMenu_Opening;
             //
@@ -365,13 +409,6 @@ namespace OpenNest.Controls
             // editSeparator
             //
             editSeparator.Name = "editSeparator";
-            //
-            // previewMenuItem
-            //
-            previewMenuItem.Enabled = false;
-            previewMenuItem.Name = "previewMenuItem";
-            previewMenuItem.Text = "&Preview...";
-            previewMenuItem.Click += PreviewButton_Click;
             //
             // archiveMenuItem
             //
@@ -417,6 +454,12 @@ namespace OpenNest.Controls
             filterTable.ResumeLayout(false);
             filterTable.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)setGrid).EndInit();
+            splitContainer.Panel1.ResumeLayout(false);
+            splitContainer.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)splitContainer).EndInit();
+            splitContainer.ResumeLayout(false);
+            detailsTable.ResumeLayout(false);
+            previewPanel.ResumeLayout(false);
             notesGroup.ResumeLayout(false);
             notesGroup.PerformLayout();
             bottomTable.ResumeLayout(false);
@@ -440,6 +483,11 @@ namespace OpenNest.Controls
         private System.Windows.Forms.DataGridViewTextBoxColumn savedColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn savedByColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn stateColumn;
+        private System.Windows.Forms.SplitContainer splitContainer;
+        private System.Windows.Forms.TableLayoutPanel detailsTable;
+        private System.Windows.Forms.Panel previewPanel;
+        private OpenNest.Controls.DrawingSetPreviewControl previewBox;
+        private System.Windows.Forms.Timer previewTimer;
         private System.Windows.Forms.GroupBox notesGroup;
         private System.Windows.Forms.TextBox notesBox;
         private System.Windows.Forms.TableLayoutPanel bottomTable;
@@ -448,7 +496,6 @@ namespace OpenNest.Controls
         private System.Windows.Forms.Label summaryLabel;
         private System.Windows.Forms.Button newButton;
         private System.Windows.Forms.Button editButton;
-        private System.Windows.Forms.Button previewButton;
         private System.Windows.Forms.Button moreButton;
         private System.Windows.Forms.Button releaseButton;
         private System.Windows.Forms.Label statusLabel;
@@ -459,7 +506,6 @@ namespace OpenNest.Controls
         private System.Windows.Forms.ToolStripSeparator editSeparator;
         private System.Windows.Forms.ToolStripMenuItem archiveMenuItem;
         private System.Windows.Forms.ToolStripMenuItem historyMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem previewMenuItem;
         private System.Windows.Forms.ToolStripMenuItem releasesMenuItem;
         private System.Windows.Forms.ToolStripSeparator importSeparator;
         private System.Windows.Forms.ToolStripMenuItem importBomMenuItem;

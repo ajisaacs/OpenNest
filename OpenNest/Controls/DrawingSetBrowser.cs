@@ -6,6 +6,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Data;
@@ -20,15 +21,25 @@ namespace OpenNest.Controls
     /// shows their history. <see cref="DrawingSetsForm"/> hosts it on its Sets tab beside its
     /// <see cref="ReleasePanel"/>, and shows a set's Releases on its Releases tab. Once release is
     /// enabled, a double-click or Enter adds the set to the release (Add to Release does so for
-    /// every selected set); Edit opens the set editor. New Set, Edit, Preview and Add to Release
-    /// are buttons; Add to Release, Edit Set, Preview, Archive/Restore, History and Releases, then
-    /// Import BOM, are in the More menu, which is also the list's right-click menu. Preview shows
-    /// all of a set's drawings in one window at the same scale (<see cref="DrawingSetPreviewForm"/>). In pick mode
+    /// every selected set); Edit opens the set editor. New Set, Edit and Add to Release are
+    /// buttons; Add to Release, Edit Set, Archive/Restore, History and Releases, then Import BOM,
+    /// are in the More menu, which is also the list's right-click menu. The details pane beside
+    /// the list shows the highlighted set's notes and all of its drawings at one scale
+    /// (<see cref="DrawingSetPreviewControl"/>), read shortly after the selection settles; drawings
+    /// are cached per revision for the control's lifetime. In pick mode
     /// (<see cref="ChooseDrawingSetForm"/>) only active sets are listed, and choosing a set or
     /// New Set raises <see cref="SetActivated"/> or <see cref="NewSetChosen"/> instead.
     /// </summary>
     public partial class DrawingSetBrowser : UserControl
     {
+        private const int DetailsWidth = 420;
+        private const int PreviewCacheLimit = 256;
+        private const int PreviewConcurrency = 4;
+
+        private readonly Dictionary<(Guid Id, int Revision), Drawing> previewDrawings = new();
+        private CancellationTokenSource previewCancel;
+        private (Guid Id, int Revision)? previewShown;
+        private bool detailsFitted;
         private IDrawingSetStore sets;
         private IDrawingLibraryStore library;
         private string serverUrl;
@@ -55,8 +66,16 @@ namespace OpenNest.Controls
         /// </summary>
         internal Func<DrawingSetEditSession> ImportBom { get; set; }
 
-        /// <summary>Shows the same-scale preview of a set read with its members; replaced by tests.</summary>
-        internal Action<DrawingSetRecord> ShowPreview { get; set; }
+        /// <summary>
+        /// Reads the drawing a record's package holds for the preview, or null when the
+        /// revision is gone; replaced by tests.
+        /// </summary>
+        internal Func<DrawingLibraryRecord, CancellationToken, Task<Drawing>> LoadPreviewDrawing { get; set; }
+
+        /// <summary>The preview read in flight or last finished; for tests.</summary>
+        internal Task PreviewLoad { get; private set; } = Task.CompletedTask;
+
+        internal DrawingSetPreviewControl PreviewBox => previewBox;
 
         /// <summary>Adds a set read with its members to the release; set by <see cref="EnableRelease"/>.</summary>
         internal Action<DrawingSetRecord> AddToRelease { get; private set; }
@@ -78,6 +97,31 @@ namespace OpenNest.Controls
             customerColumn.Tag = DrawingSetSortField.Customer;
             revisionColumn.Tag = DrawingSetSortField.Revision;
             savedColumn.Tag = DrawingSetSortField.SavedAt;
+            previewBox.SetInfo("Select a set to preview its drawings.");
+            Load += (_, _) => FitDetailsPane();
+            // Until the first fit takes, every resize retries it; after that the split is the user's.
+            splitContainer.Resize += (_, _) =>
+            {
+                if (!detailsFitted && IsHandleCreated)
+                    FitDetailsPane();
+            };
+            Disposed += (_, _) => previewCancel?.Cancel();
+        }
+
+        // The list takes the spare width; the details pane keeps its width as the window resizes.
+        // A container too narrow for both minimums (a tab not yet laid out) is left alone, since
+        // the split container refuses minimums it cannot honor.
+        internal void FitDetailsPane()
+        {
+            const int listMin = 320;
+            const int detailsMin = 300;
+            var available = splitContainer.Width - splitContainer.SplitterWidth;
+            if (available < listMin + detailsMin)
+                return;
+            splitContainer.Panel1MinSize = listMin;
+            splitContainer.SplitterDistance = System.Math.Clamp(available - DetailsWidth, listMin, available - detailsMin);
+            splitContainer.Panel2MinSize = detailsMin;
+            detailsFitted = true;
         }
 
         /// <summary>True once <see cref="Initialize"/> has run; the first <see cref="RefreshAsync"/> loads the list.</summary>
@@ -135,14 +179,10 @@ namespace OpenNest.Controls
                 return form.ShowDialog(FindForm()) == DialogResult.OK ? form.Edit : null;
             };
             setGrid.ContextMenuStrip = pick ? null : moreMenu;
-            ShowPreview = set =>
+            LoadPreviewDrawing = async (record, token) =>
             {
-                using var form = new DrawingSetPreviewForm(set, async (record, token) =>
-                {
-                    var bytes = await library.GetRevisionPackageAsync(record.Id, record.Revision, token);
-                    return bytes == null ? null : await Task.Run(() => DrawingPackage.Read(bytes).Drawing, token);
-                });
-                form.ShowDialog(FindForm());
+                var bytes = await library.GetRevisionPackageAsync(record.Id, record.Revision, token);
+                return bytes == null ? null : await Task.Run(() => DrawingPackage.Read(bytes).Drawing, token);
             };
             setGrid.MultiSelect = !pick;
             // Add to Release acts on every selected set.
@@ -153,7 +193,6 @@ namespace OpenNest.Controls
                 newButton.Text = "New Set";
                 showArchivedCheckBox.Visible = false;
                 editButton.Visible = false;
-                previewButton.Visible = false;
                 moreButton.Visible = false;
             }
 
@@ -217,8 +256,132 @@ namespace OpenNest.Controls
         private void SetGrid_CurrentCellChanged(object sender, EventArgs e)
         {
             notesBox.Text = SelectedSet?.Notes ?? "";
+            SchedulePreview();
             UpdateCommands();
             SelectedSetChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Clears the preview for a new highlighted set and starts the short timer that reads it,
+        /// so moving through the list does not read every set passed over.
+        /// </summary>
+        private void SchedulePreview()
+        {
+            var set = SelectedSet;
+            if (set != null && previewShown == (set.Id, set.Revision))
+                return;
+
+            previewTimer.Stop();
+            previewCancel?.Cancel();
+            previewShown = null;
+            previewBox.ShowDrawings(Array.Empty<(Drawing, string)>());
+            if (session == null || set == null)
+                previewBox.SetInfo("Select a set to preview its drawings.");
+            else if (set.MemberCount == 0)
+                previewBox.SetInfo("This set has no drawings.");
+            else
+            {
+                previewBox.SetInfo("Loading preview...");
+                previewTimer.Start();
+            }
+        }
+
+        private void PreviewTimer_Tick(object sender, EventArgs e) => PreviewLoad = LoadSelectedPreviewAsync();
+
+        /// <summary>
+        /// Reads the highlighted set with its members, then each member's current drawing (cached
+        /// per revision), and shows them all at one scale. A newer selection cancels it; a
+        /// failure only shows in the preview, as the preview is best-effort.
+        /// </summary>
+        internal async Task LoadSelectedPreviewAsync()
+        {
+            previewTimer.Stop();
+            var listed = SelectedSet;
+            if (session == null || listed == null || listed.MemberCount == 0)
+                return;
+
+            previewCancel?.Cancel();
+            var cancel = previewCancel = new CancellationTokenSource();
+            var token = cancel.Token;
+            DrawingSetRecord set;
+            Drawing[] drawings;
+            try
+            {
+                set = await sets.GetAsync(listed.Id, token);
+                drawings = set == null ? null : await LoadPreviewDrawingsAsync(set.Members, token);
+            }
+            catch (Exception) when (token.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                if (cancel == previewCancel && !IsDisposed)
+                    previewBox.SetInfo("Preview unavailable.", ex.Message);
+                return;
+            }
+
+            if (IsDisposed || cancel != previewCancel)
+                return;
+            if (set == null)
+            {
+                previewBox.SetInfo("This set is no longer on the server.");
+                return;
+            }
+
+            var members = set.Members;
+            previewBox.ShowDrawings(members.Select((member, i) => (drawings[i], $"{member.Drawing?.Name} ×{member.Quantity}")));
+            previewBox.SetInfo(PreviewInfo(members, drawings).ToArray());
+            previewShown = (listed.Id, listed.Revision);
+        }
+
+        private async Task<Drawing[]> LoadPreviewDrawingsAsync(IReadOnlyList<DrawingSetMember> members, CancellationToken token)
+        {
+            var drawings = new Drawing[members.Count];
+            using var gate = new SemaphoreSlim(PreviewConcurrency);
+            await Task.WhenAll(members.Select(async (member, i) =>
+            {
+                if (member.Drawing is not { } record)
+                    return;
+                var key = (record.Id, record.Revision);
+                if (previewDrawings.TryGetValue(key, out var cached))
+                {
+                    drawings[i] = cached;
+                    return;
+                }
+
+                await gate.WaitAsync(token);
+                try
+                {
+                    drawings[i] = await LoadPreviewDrawing(record, token);
+                }
+                catch (Exception) when (!token.IsCancellationRequested)
+                {
+                    // One drawing that fails to load is counted as missing; the rest still show.
+                    return;
+                }
+                finally
+                {
+                    gate.Release();
+                }
+
+                // Continuations resume on the UI thread, so the cache needs no lock.
+                if (previewDrawings.Count >= PreviewCacheLimit)
+                    previewDrawings.Clear();
+                previewDrawings[key] = drawings[i];
+            }));
+            return drawings;
+        }
+
+        private static IEnumerable<string> PreviewInfo(IReadOnlyList<DrawingSetMember> members, Drawing[] drawings)
+        {
+            var parts = members.Sum(m => m.Quantity);
+            yield return $"{members.Count} drawing{(members.Count == 1 ? "" : "s")}, {parts} part{(parts == 1 ? "" : "s")}, one scale";
+            if (members.Where(m => m.Drawing != null).Select(m => m.Drawing.Units).Distinct().Count() > 1)
+                yield return "Mixes inches and mm: those are not to scale.";
+            var missing = drawings.Count(d => !DrawingSetPreviewControl.CanShow(d));
+            if (missing > 0)
+                yield return $"{missing} could not be loaded.";
         }
 
         private async void SetGrid_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
@@ -268,8 +431,6 @@ namespace OpenNest.Controls
         private async void NewButton_Click(object sender, EventArgs e) => await NewSetAsync();
 
         private async void EditButton_Click(object sender, EventArgs e) => await EditSelectedAsync();
-
-        private async void PreviewButton_Click(object sender, EventArgs e) => await PreviewSelectedAsync();
 
         private async void ArchiveMenuItem_Click(object sender, EventArgs e) => await ToggleArchivedAsync();
 
@@ -368,49 +529,6 @@ namespace OpenNest.Controls
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 await RunAsync(session.RefreshAsync);
             }
-        }
-
-        /// <summary>
-        /// Reads the selected set (archived or not) with its members' current drawings and
-        /// shows them all in one window at the same scale.
-        /// </summary>
-        internal async Task PreviewSelectedAsync()
-        {
-            var listed = SelectedSet;
-            if (session == null || listed == null || busy || pick)
-                return;
-
-            DrawingSetRecord current;
-            busy = true;
-            UpdateCommands();
-            statusLabel.Text = $"Reading set '{listed.Name}'...";
-            try
-            {
-                current = await sets.GetAsync(listed.Id);
-            }
-            catch (Exception ex) when (ex is IOException || ex is HttpRequestException || ex is TaskCanceledException)
-            {
-                Fail($"Could not read set '{listed.Name}': {ex.Message}");
-                return;
-            }
-            finally
-            {
-                busy = false;
-                if (!IsDisposed)
-                    UpdateCommands();
-            }
-
-            if (IsDisposed)
-                return;
-            statusLabel.Text = "";
-            if (current == null)
-            {
-                ShowMessage($"Set '{listed.Name}' no longer exists on the server.", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                await RunAsync(session.RefreshAsync);
-                return;
-            }
-
-            ShowPreview(current);
         }
 
         private void ActivateSelected()
@@ -577,13 +695,12 @@ namespace OpenNest.Controls
             editButton.Enabled = ready && selected is { Archived: false };
             editMenuItem.Enabled = editButton.Enabled;
             editMenuItem.Visible = editSeparator.Visible = !pick;
-            previewButton.Enabled = previewMenuItem.Enabled = ready && !pick && selected is { MemberCount: > 0 };
             archiveMenuItem.Enabled = ready && selected != null;
             archiveMenuItem.Text = selected is { Archived: true } ? "&Restore" : "&Archive";
             historyMenuItem.Enabled = ready && selected != null;
             releasesMenuItem.Enabled = ready && selected != null && ShowReleases != null;
             importBomMenuItem.Enabled = ready && !pick;
-            moreButton.Enabled = previewMenuItem.Enabled || archiveMenuItem.Enabled || historyMenuItem.Enabled || releasesMenuItem.Enabled
+            moreButton.Enabled = archiveMenuItem.Enabled || historyMenuItem.Enabled || releasesMenuItem.Enabled
                 || importBomMenuItem.Enabled;
             releaseButton.Enabled = ready && AddToRelease != null
                 && SelectedSets().Any(s => !s.Archived && s.MemberCount > 0);

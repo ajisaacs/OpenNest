@@ -8,10 +8,10 @@ using OpenNest.Geometry;
 namespace OpenNest.Controls
 {
     /// <summary>
-    /// Shows every drawing of a set side by side at one scale, packed by
-    /// <see cref="DrawingSetPreviewLayout"/> with a label under each. The layout is repacked
-    /// to fit whenever the control is resized; the wheel zooms, the middle button pans and a
-    /// middle double-click fits the set again.
+    /// Shows every drawing of a set side by side at one scale, outlined without fill, packed by
+    /// <see cref="DrawingSetPreviewLayout"/> with a label under each and the info lines above.
+    /// The layout is repacked to fit whenever the control is resized; the wheel zooms, the
+    /// middle button pans and a middle double-click fits the set again.
     /// </summary>
     public class DrawingSetPreviewControl : PlateView
     {
@@ -19,13 +19,12 @@ namespace OpenNest.Controls
 
         private readonly List<(Part Part, string Label)> items = new();
         private DrawingSetPreviewLayout.Result layout;
-        private string[] infoLines;
+        private string[] infoLines = System.Array.Empty<string>();
 
         public DrawingSetPreviewControl()
         {
             DrawOrigin = false;
             DrawBounds = false;
-            DrawPartNumbers = false;
             AllowPan = true;
             AllowSelect = false;
             AllowZoom = true;
@@ -35,15 +34,25 @@ namespace OpenNest.Controls
             ViewScaleMin = 1e-5f;
         }
 
+        /// <summary>False for a drawing with no geometry to show; <see cref="ShowDrawings"/> skips it.</summary>
+        public static bool CanShow(Drawing drawing) => drawing?.Program?.Codes.Count > 0;
+
         /// <summary>The placed parts, in the order they were given.</summary>
-        internal IReadOnlyList<Part> Parts => items.Select(i => i.Part).ToList();
+        internal IReadOnlyList<Part> ShownParts => items.Select(i => i.Part).ToList();
 
-        internal DrawingSetPreviewLayout.Result Layout => layout;
+        internal DrawingSetPreviewLayout.Result PackedLayout => layout;
 
+        internal IReadOnlyList<string> InfoLines => infoLines;
+
+        /// <summary>Lines shown above the drawings; the drawings are fitted below them.</summary>
         public void SetInfo(params string[] lines)
         {
-            infoLines = lines;
-            Invalidate();
+            var before = InfoHeight;
+            infoLines = lines ?? System.Array.Empty<string>();
+            if (InfoHeight != before && items.Count > 0)
+                Arrange();
+            else
+                Invalidate();
         }
 
         /// <summary>Replaces the shown drawings; each is labeled with its text.</summary>
@@ -66,9 +75,6 @@ namespace OpenNest.Controls
             Arrange();
         }
 
-        /// <summary>False for a drawing with no geometry to show; <see cref="ShowDrawings"/> skips it.</summary>
-        public static bool CanShow(Drawing drawing) => drawing?.Program?.Codes.Count > 0;
-
         public override void ZoomToFit(bool redraw = true)
         {
             if (layout == null)
@@ -78,7 +84,14 @@ namespace OpenNest.Controls
                 return;
             }
 
-            ZoomToArea(0, -layout.Height, layout.Width, layout.Height, redraw);
+            // Centers the layout below the info lines; world Y 0 is the layout's top edge.
+            var top = InfoHeight;
+            ViewScale = (float)layout.Scale;
+            origin.X = (Width - LengthWorldToGui(layout.Width)) * 0.5f;
+            origin.Y = top + (Height - top - LengthWorldToGui(layout.Height)) * 0.5f;
+            UpdateMatrix();
+            if (redraw)
+                Invalidate();
         }
 
         protected override void OnResize(System.EventArgs e)
@@ -88,17 +101,21 @@ namespace OpenNest.Controls
                 Arrange();
         }
 
+        private int InfoHeight => infoLines.Count(l => !string.IsNullOrEmpty(l)) * (Font.Height + 1) + 4;
+
         private void Arrange()
         {
-            if (items.Count == 0 || Width <= BorderWidth || Height <= BorderWidth)
+            var top = InfoHeight;
+            if (items.Count == 0 || Width <= BorderWidth || Height <= BorderWidth + top)
             {
+                layout = null;
                 Invalidate();
                 return;
             }
 
             var sizes = items.Select(i => (i.Part.BoundingBox.Length, i.Part.BoundingBox.Width)).ToList();
             var labelPixels = Font.Height + 2;
-            layout = DrawingSetPreviewLayout.Arrange(sizes, Width - BorderWidth, Height - BorderWidth, labelPixels, MinCellPixels);
+            layout = DrawingSetPreviewLayout.Arrange(sizes, Width - BorderWidth, Height - BorderWidth - top, labelPixels, MinCellPixels);
 
             foreach (var placement in layout.Placements)
             {
@@ -119,12 +136,26 @@ namespace OpenNest.Controls
             e.Graphics.SmoothingMode = SmoothingMode.HighQuality;
 
             e.Graphics.TranslateTransform(origin.X, origin.Y);
-            Renderer.DrawPlate(e.Graphics);
-            Renderer.DrawParts(e.Graphics);
+            PaintOutlines(e.Graphics);
             PaintLabels(e.Graphics);
             e.Graphics.ResetTransform();
 
             PaintInfo(e.Graphics);
+        }
+
+        // Outlines only: cuts in black, etch marks dashed in gray.
+        private void PaintOutlines(Graphics g)
+        {
+            using var etchPen = new Pen(Color.Gray) { DashStyle = DashStyle.Dash };
+            foreach (var part in LayoutParts)
+            {
+                if (part.IsDirty)
+                    part.Update(this);
+                if (part.EtchPath?.PointCount > 0)
+                    g.DrawPath(etchPen, part.EtchPath);
+                if (part.Path?.PointCount > 0)
+                    g.DrawPath(Pens.Black, part.Path);
+            }
         }
 
         private void PaintLabels(Graphics g)
@@ -151,17 +182,19 @@ namespace OpenNest.Controls
 
         private void PaintInfo(Graphics g)
         {
-            if (infoLines == null)
-                return;
-
-            var lineHeight = Font.GetHeight(g) + 1;
+            var lineHeight = Font.Height + 1;
             var y = 4f;
+            using var format = new StringFormat
+            {
+                Trimming = StringTrimming.EllipsisCharacter,
+                FormatFlags = StringFormatFlags.NoWrap,
+            };
 
             foreach (var line in infoLines)
             {
                 if (string.IsNullOrEmpty(line))
                     continue;
-                g.DrawString(line, Font, Brushes.Black, 4, y);
+                g.DrawString(line, Font, Brushes.Black, new RectangleF(4, y, System.Math.Max(Width - 8, 1), lineHeight), format);
                 y += lineHeight;
             }
         }

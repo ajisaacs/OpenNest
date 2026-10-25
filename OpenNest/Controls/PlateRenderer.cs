@@ -127,7 +127,7 @@ namespace OpenNest.Controls
                     || view.MutedParts?.Contains(part.BasePart) == true;
                 var number = view.PreviewSequence != null
                     && view.PreviewSequence.TryGetValue(part.BasePart, out var preview) ? preview : i + 1;
-                part.Draw(g, view.DrawPartNumbers ? number.ToString() : null, muted);
+                part.Draw(g, number.ToString(), muted);
                 DrawBendLines(g, part.BasePart, muted);
                 DrawEtchMarks(g, part.BasePart, muted);
                 DrawGrainWarning(g, part.BasePart, muted);
