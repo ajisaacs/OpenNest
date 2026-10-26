@@ -24,6 +24,10 @@ namespace OpenNest
             string filePath
         );
 
+        /// <summary>The window with keyboard focus on this thread, or zero.</summary>
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetFocus();
+
         [DllImport("user32.dll")]
         public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
 

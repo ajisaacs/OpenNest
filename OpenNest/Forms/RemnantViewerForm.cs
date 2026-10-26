@@ -67,6 +67,9 @@ namespace OpenNest.Forms
             return base.ProcessDialogKey(keyData);
         }
 
+        /// <summary>The plate view whose plate's remnants are listed.</summary>
+        internal PlateView PlateView => plateView;
+
         public void LoadRemnants(RemnantFinder finder, double minDim, PlateView view)
         {
             plateView = view;

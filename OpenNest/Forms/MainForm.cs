@@ -98,6 +98,8 @@ namespace OpenNest.Forms
                 activeForm.PlateView.ProcessEscapeKey();
                 return true;
             }
+            if (ProcessUndoKeys(keyData))
+                return true;
 
             return base.ProcessCmdKey(ref msg, keyData);
         }
@@ -247,6 +249,7 @@ namespace OpenNest.Forms
 
             activeForm = ActiveMdiChild as EditNestForm;
             UpdateOverlapMenu();
+            BindUndoMenu(activeForm);
 
             EnableCheck();
             statusBar.Bind(activeForm);

@@ -17,6 +17,7 @@ using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Forms;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using OpenNest.Undo;
 using Timer = System.Timers.Timer;
 
 namespace OpenNest.Controls
@@ -173,6 +174,16 @@ namespace OpenNest.Controls
         /// no nest to edit (clamp edit mode then does nothing).
         /// </summary>
         internal Func<Nest> ClampNest { get; set; }
+
+        /// <summary>
+        /// Opens an undo scope in the nest document this view shows; null when the view is not a
+        /// nest window, and then <see cref="BeginChange"/> records nothing.
+        /// </summary>
+        internal Func<string, object, ChangeScope> BeginChangeHandler { get; set; }
+
+        /// <summary>Opens a scope that records one undoable edit of this view's nest.</summary>
+        internal ChangeScope BeginChange(string label, object coalesceKey = null) =>
+            BeginChangeHandler?.Invoke(label, coalesceKey) ?? ChangeScope.Detached();
 
         public bool AllowZoom { get; set; }
 
@@ -530,7 +541,8 @@ namespace OpenNest.Controls
 
                 var angle = Angle.ToRadians((e.Delta > 0 ? -increment : increment) * multiplier);
 
-                selection.RotateSelectedParts(angle);
+                // A turn of the wheel is many steps; they undo as one rotation.
+                selection.RotateSelectedParts(angle, coalesce: true);
             }
             else
             {
@@ -694,8 +706,7 @@ namespace OpenNest.Controls
                     break;
 
                 case Keys.Left:
-                    SelectedParts.ForEach(part => part.Offset(-OffsetIncrementDistance, 0));
-                    Invalidate();
+                    selection.NudgeSelected(-OffsetIncrementDistance, 0);
                     break;
 
                 case Keys.X:
@@ -719,18 +730,15 @@ namespace OpenNest.Controls
                     break;
 
                 case Keys.Right:
-                    SelectedParts.ForEach(part => part.Offset(OffsetIncrementDistance, 0));
-                    Invalidate();
+                    selection.NudgeSelected(OffsetIncrementDistance, 0);
                     break;
 
                 case Keys.Up:
-                    SelectedParts.ForEach(part => part.Offset(0, OffsetIncrementDistance));
-                    Invalidate();
+                    selection.NudgeSelected(0, OffsetIncrementDistance);
                     break;
 
                 case Keys.Down:
-                    SelectedParts.ForEach(part => part.Offset(0, -OffsetIncrementDistance));
-                    Invalidate();
+                    selection.NudgeSelected(0, -OffsetIncrementDistance);
                     break;
             }
 
@@ -871,7 +879,10 @@ namespace OpenNest.Controls
                 part.Location.Y - part.BoundingBox.Center.Y
             );
 
+            using var change = BeginChange("Add Part");
+            change.MarkChanged();
             Plate.Parts.Add(part);
+            change.Complete();
         }
 
         public void SetActiveParts(List<Part> parts) => previewManager.SetActiveParts(parts);

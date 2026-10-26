@@ -51,6 +51,9 @@ namespace OpenNest.Forms
             toolStripMenuItem3 = new System.Windows.Forms.ToolStripSeparator();
             mnuFileExit = new System.Windows.Forms.ToolStripMenuItem();
             mnuEdit = new System.Windows.Forms.ToolStripMenuItem();
+            mnuEditUndo = new System.Windows.Forms.ToolStripMenuItem();
+            mnuEditRedo = new System.Windows.Forms.ToolStripMenuItem();
+            mnuEditUndoSeparator = new System.Windows.Forms.ToolStripSeparator();
             mnuEditCut = new System.Windows.Forms.ToolStripMenuItem();
             mnuEditCopy = new System.Windows.Forms.ToolStripMenuItem();
             mnuEditPaste = new System.Windows.Forms.ToolStripMenuItem();
@@ -326,10 +329,34 @@ namespace OpenNest.Forms
             // 
             // mnuEdit
             // 
-            mnuEdit.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuEditCut, mnuEditCopy, mnuEditPaste, toolStripMenuItem4, mnuEditSelectAll });
+            mnuEdit.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuEditUndo, mnuEditRedo, mnuEditUndoSeparator, mnuEditCut, mnuEditCopy, mnuEditPaste, toolStripMenuItem4, mnuEditSelectAll });
             mnuEdit.Name = "mnuEdit";
             mnuEdit.Size = new System.Drawing.Size(39, 20);
             mnuEdit.Text = "&Edit";
+            mnuEdit.DropDownOpening += EditMenu_DropDownOpening;
+            //
+            // mnuEditUndo
+            //
+            mnuEditUndo.Enabled = false;
+            mnuEditUndo.Name = "mnuEditUndo";
+            mnuEditUndo.ShortcutKeyDisplayString = "Ctrl+Z";
+            mnuEditUndo.Size = new System.Drawing.Size(164, 22);
+            mnuEditUndo.Text = "Undo";
+            mnuEditUndo.Click += EditUndo_Click;
+            //
+            // mnuEditRedo
+            //
+            mnuEditRedo.Enabled = false;
+            mnuEditRedo.Name = "mnuEditRedo";
+            mnuEditRedo.ShortcutKeyDisplayString = "Ctrl+Y";
+            mnuEditRedo.Size = new System.Drawing.Size(164, 22);
+            mnuEditRedo.Text = "Redo";
+            mnuEditRedo.Click += EditRedo_Click;
+            //
+            // mnuEditUndoSeparator
+            //
+            mnuEditUndoSeparator.Name = "mnuEditUndoSeparator";
+            mnuEditUndoSeparator.Size = new System.Drawing.Size(161, 6);
             // 
             // mnuEditCut
             // 
@@ -1375,6 +1402,9 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem3;
         private System.Windows.Forms.ToolStripMenuItem mnuFileExit;
         private System.Windows.Forms.ToolStripMenuItem mnuEdit;
+        private System.Windows.Forms.ToolStripMenuItem mnuEditUndo;
+        private System.Windows.Forms.ToolStripMenuItem mnuEditRedo;
+        private System.Windows.Forms.ToolStripSeparator mnuEditUndoSeparator;
         private System.Windows.Forms.ToolStripMenuItem mnuEditCut;
         private System.Windows.Forms.ToolStripMenuItem mnuEditCopy;
         private System.Windows.Forms.ToolStripMenuItem mnuEditPaste;

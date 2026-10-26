@@ -244,6 +244,9 @@ namespace OpenNest.Controls
                 DrawingPickedUp?.Invoke(this, pressedDrawing);
         }
 
+        /// <summary>Forgets a drawing pressed but not yet dragged, e.g. when the nest is swapped.</summary>
+        internal void CancelPickup() => pressedDrawing = null;
+
         protected override void OnMouseUp(MouseEventArgs e)
         {
             pressedDrawing = null;

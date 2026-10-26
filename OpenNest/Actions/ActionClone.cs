@@ -5,6 +5,7 @@ using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
+using OpenNest.Undo;
 
 namespace OpenNest.Actions
 {
@@ -66,13 +67,7 @@ namespace OpenNest.Actions
                     break;
 
                 case Keys.Delete:
-                    foreach (var part in sourceParts)
-                        plateView.Plate.Parts.Remove(part);
-
-                    if (plateView.Plate.CutOffs.Count > 0)
-                        plateView.Plate.RegenerateCutOffs(plateView.CutOffSettings);
-
-                    plateView.Invalidate();
+                    DeleteSources();
                     break;
 
                 case Keys.F:
@@ -145,8 +140,25 @@ namespace OpenNest.Actions
             return false;
         }
 
+        private void DeleteSources()
+        {
+            using var change = plateView.BeginChange("Delete");
+            if (sourceParts.Any(plateView.Plate.Parts.Contains))
+                change.MarkChanged();
+            foreach (var part in sourceParts)
+                plateView.Plate.Parts.Remove(part);
+
+            if (plateView.Plate.CutOffs.Count > 0)
+                plateView.Plate.RegenerateCutOffs(plateView.CutOffSettings);
+
+            plateView.Invalidate();
+            change.Complete();
+        }
+
         public void Apply()
         {
+            using var change = plateView.BeginChange(parts.Count == 1 ? "Add Part" : "Add Parts");
+            change.MarkChanged();
             if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
             {
                 var movingParts = parts.Select(p => p.BasePart).ToList();
@@ -187,6 +199,7 @@ namespace OpenNest.Actions
 
             if (plateView.Plate.CutOffs.Count > 0)
                 plateView.Plate.RegenerateCutOffs(plateView.CutOffSettings);
+            change.Complete();
         }
 
         private void Fill()

@@ -255,6 +255,7 @@ namespace OpenNest.Forms
             storageModeMenu.Enabled = !storage.IsBusy;
             mnuToolsOptions.Enabled = !storage.IsBusy;
             EnableCheck();
+            UpdateUndoMenu();
         }
 
         private void StorageMode_Click(object sender, EventArgs e)

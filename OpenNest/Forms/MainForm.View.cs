@@ -22,8 +22,11 @@ namespace OpenNest.Forms
                 var partsToClone = selectedParts.Select(p => p.BasePart).ToList();
                 activeForm.PlateView.SetAction(typeof(ActionClone), partsToClone);
 
+                using var change = activeForm.BeginChange("Cut");
+                change.MarkChanged();
                 foreach (var part in partsToClone)
                     activeForm.PlateView.Plate.Parts.Remove(part);
+                change.Complete();
             }
         }
 

@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Geometry;
+using OpenNest.Undo;
 
 namespace OpenNest.Actions
 {
@@ -21,6 +22,9 @@ namespace OpenNest.Actions
         public Vector Point2;
 
         private Status status;
+
+        // Open from the press on a selected part to the release: a drag undoes as one move.
+        private ChangeScope drag;
 
         public ActionSelect(PlateView plateView)
             : base(plateView)
@@ -43,6 +47,7 @@ namespace OpenNest.Actions
 
         public override void DisconnectEvents()
         {
+            EndDrag();
             plateView.MouseDown -= plateView_MouseDown;
             plateView.MouseUp -= plateView_MouseUp;
             plateView.MouseMove -= plateView_MouseMove;
@@ -51,6 +56,8 @@ namespace OpenNest.Actions
 
         public override void CancelAction()
         {
+            // Parts already dragged stay where they are, so the move is recorded.
+            EndDrag();
             status = Status.SetFirstPoint;
 
             plateView.CutOffs.EndDrag();
@@ -62,6 +69,19 @@ namespace OpenNest.Actions
         {
             return status != Status.SetFirstPoint || plateView.SelectedParts.Count > 0
                 || plateView.Selection.SelectedCutOffs.Count > 0;
+        }
+
+        // A selection is not work in progress for undo; a part drag holds its own scope.
+        public override bool BlocksUndo => plateView.CutOffs.IsDragging;
+
+        private void EndDrag()
+        {
+            var scope = drag;
+            drag = null;
+            if (scope == null)
+                return;
+            scope.Complete();
+            scope.Dispose();
         }
 
         private void plateView_MouseMove(object sender, MouseEventArgs e)
@@ -81,6 +101,7 @@ namespace OpenNest.Actions
 
                 var offset = plateView.CurrentPoint - plateView.LastPoint;
 
+                drag?.MarkChanged();
                 foreach (var part in plateView.SelectedParts)
                     part.Offset(offset.X, offset.Y);
             }
@@ -104,7 +125,11 @@ namespace OpenNest.Actions
                 }
 
                 if (SelectPartAtCurrentPoint())
+                {
+                    EndDrag();
+                    drag = plateView.BeginChange("Move");
                     return;
+                }
 
                 if (status == Status.SetFirstPoint)
                 {
@@ -141,6 +166,8 @@ namespace OpenNest.Actions
                 if (plateView.Plate.CutOffs.Count > 0)
                     plateView.Plate.RegenerateCutOffs(plateView.CutOffSettings);
             }
+
+            EndDrag();
         }
 
         private void plateView_Paint(object sender, PaintEventArgs e)

@@ -42,5 +42,14 @@ namespace OpenNest.Actions
         public abstract void CancelAction();
 
         public abstract bool IsBusy();
+
+        /// <summary>Whether Undo and Redo must wait: by default, while the action is busy.</summary>
+        public virtual bool BlocksUndo => IsBusy();
+
+        /// <summary>
+        /// Steps back within the action, for Ctrl+Z before the whole-nest Undo; false when the
+        /// action has nothing of its own to step back.
+        /// </summary>
+        public virtual bool TryUndoStep() => false;
     }
 }

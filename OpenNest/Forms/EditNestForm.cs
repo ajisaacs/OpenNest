@@ -41,7 +41,8 @@ namespace OpenNest.Forms
             set => PlateView.OverlapDisplay = value;
         }
 
-        public readonly PlateManager PlateManager;
+        /// <summary>Navigates the current nest's plates; replaced whenever an undo swaps the nest.</summary>
+        public PlateManager PlateManager { get; private set; }
 
         public Nest Nest => Document.Nest;
 
@@ -440,6 +441,29 @@ namespace OpenNest.Forms
             HoldStatus = new NestHoldStatus(Document);
             HoldStatus.CloseoutNoteRequested += HoldStatus_CloseoutNoteRequested;
             FormClosed += (_, _) => HoldStatus.Dispose();
+
+            BindNest(nest);
+            PlateManager.LoadFirst();
+
+            drawingListBox1.DeleteRequested += drawingListBox1_DeleteRequested;
+            drawingListBox1.SaveToLibraryRequested += drawingListBox1_SaveToLibraryRequested;
+            drawingListBox1.AddToSetRequested += drawingListBox1_AddToSetRequested;
+            drawingListBox1.OpenInConverterRequested += drawingListBox1_OpenInConverterRequested;
+            drawingListBox1.DrawingPickedUp += drawingListBox1_DrawingPickedUp;
+            drawingListBox1.DrawingDropped += drawingListBox1_DrawingDropped;
+            Activated += (_, _) => UpdateDrawingLibraryCommand();
+            UpdateDrawingLibraryCommand();
+            PlateView.BeginChangeHandler = BeginChange;
+            InitializeHistory();
+        }
+
+        /// <summary>
+        /// Binds this window to <paramref name="nest"/>, the document's nest: the view's
+        /// per-nest settings, a plate manager for its plates and the plate and drawing lists.
+        /// Opening and undo share it; neither loads a plate yet.
+        /// </summary>
+        private void BindNest(Nest nest)
+        {
             // Units are read when each check starts, matching the manual command.
             PlateView.SetOverlapAutoCheck(() => Nest.Units);
             CutOffHeadLockDefaults.Load(PlateView.CutOffSettings, nest.Units);
@@ -455,18 +479,15 @@ namespace OpenNest.Forms
             UpdateDrawingList();
             UpdateRemovePlateButton();
 
-            PlateManager.LoadFirst();
-
             Text = Nest.Name;
             drawingListBox1.Units = Nest.Units;
-            drawingListBox1.DeleteRequested += drawingListBox1_DeleteRequested;
-            drawingListBox1.SaveToLibraryRequested += drawingListBox1_SaveToLibraryRequested;
-            drawingListBox1.AddToSetRequested += drawingListBox1_AddToSetRequested;
-            drawingListBox1.OpenInConverterRequested += drawingListBox1_OpenInConverterRequested;
-            drawingListBox1.DrawingPickedUp += drawingListBox1_DrawingPickedUp;
-            drawingListBox1.DrawingDropped += drawingListBox1_DrawingDropped;
-            Activated += (_, _) => UpdateDrawingLibraryCommand();
-            UpdateDrawingLibraryCommand();
+        }
+
+        private void UnbindNest()
+        {
+            PlateManager.CurrentPlateChanged -= PlateManager_CurrentPlateChanged;
+            PlateManager.PlateListChanged -= PlateManager_PlateListChanged;
+            PlateManager.Dispose();
         }
 
         public void UpdatePlateList()
@@ -958,9 +979,21 @@ namespace OpenNest.Forms
             Process.Start(path);
         }
 
+        public void AddPlate()
+        {
+            using var change = BeginChange("Add Plate");
+            change.MarkChanged();
+            Nest.CreatePlate();
+            change.Complete();
+        }
+
         public void RemoveCurrentPlate()
         {
+            using var change = BeginChange("Remove Plate");
+            if (PlateManager.Count >= 2)
+                change.MarkChanged();
             PlateManager.RemoveCurrent();
+            change.Complete();
         }
 
         public void ClearNest()
@@ -1147,7 +1180,7 @@ namespace OpenNest.Forms
 
         private void AddPlate_Click(object sender, EventArgs e)
         {
-            Nest.CreatePlate();
+            AddPlate();
         }
 
         private void EditSelectedPlate_Click(object sender, EventArgs e)

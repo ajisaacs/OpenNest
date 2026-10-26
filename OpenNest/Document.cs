@@ -5,12 +5,19 @@ using System.Threading.Tasks;
 using OpenNest.Data;
 using OpenNest.Engine.BestFit;
 using OpenNest.IO;
+using OpenNest.Undo;
 
 namespace OpenNest
 {
     public class Document
     {
         public Nest Nest { get; set; }
+
+        /// <summary>
+        /// This document's undo history: whole-nest states, reset with the first one when the
+        /// nest window opens. Saving marks a save point; it never clears the history.
+        /// </summary>
+        public UndoHistory<NestUndoState> History { get; } = new();
 
         public DateTime LastSaveDate { get; private set; }
 
@@ -53,6 +60,8 @@ namespace OpenNest
 
             var writer = new NestWriter(Nest) { BestFitStore = BestFitCacheStore.Shared };
             writer.Write(path);
+            if (History.Current != null)
+                History.MarkSaved();
         }
 
         /// <summary>Serializes the current nest to a .nest archive in memory.</summary>
@@ -69,9 +78,13 @@ namespace OpenNest
             CancellationToken cancellationToken = default)
         {
             var bytes = Serialize();
+            // The save point is the state serialized here, unless an edit was recorded since.
+            var state = History.Current;
             var saved = await remoteSession.SaveAsync(
                 repository, serverUrl, Nest, bytes, saveCopy, cancellationToken);
             LastSaveDate = DateTime.Now;
+            if (state != null && ReferenceEquals(History.Current, state))
+                History.MarkSaved();
             return saved;
         }
     }

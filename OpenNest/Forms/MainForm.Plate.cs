@@ -15,7 +15,7 @@ namespace OpenNest.Forms
         {
             if (activeForm == null)
                 return;
-            activeForm.Nest.CreatePlate();
+            activeForm.AddPlate();
             NavigationEnableCheck();
         }
 

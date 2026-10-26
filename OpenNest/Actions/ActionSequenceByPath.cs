@@ -155,6 +155,15 @@ namespace OpenNest.Actions
             }
         }
 
+        // The main window's Ctrl+Z reaches here first; with no line left it undoes the nest.
+        public override bool TryUndoStep()
+        {
+            if (lines.Count == 0)
+                return false;
+            RemoveLastLine();
+            return true;
+        }
+
         private void RemoveLastLine()
         {
             if (lines.Count == 0)

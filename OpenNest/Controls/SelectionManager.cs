@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using OpenNest.CNC;
 using OpenNest.Engine.Fill;
@@ -61,8 +62,11 @@ namespace OpenNest.Controls
 
         public void DeleteSelected()
         {
+            using var change = view.BeginChange("Delete");
             var regenerateCutOffs = view.Plate.CutOffs.Count > 0
                 && (selectedCutOffs.Count > 0 || selectedParts.Count > 0);
+            if (selectedCutOffs.Count > 0)
+                change.MarkChanged();
             foreach (var cutOff in selectedCutOffs)
                 view.Plate.CutOffs.Remove(cutOff);
 
@@ -71,15 +75,36 @@ namespace OpenNest.Controls
             RemoveSelectedParts();
             if (regenerateCutOffs)
                 view.Plate.RegenerateCutOffs(view.CutOffSettings);
+            change.Complete();
         }
 
         public void RemoveSelectedParts()
         {
+            using var change = view.BeginChange("Delete");
+            if (selectedParts.Count > 0)
+                change.MarkChanged();
             foreach (var part in selectedParts)
                 view.Plate.Parts.Remove(part.BasePart);
 
             DeselectAll();
             view.Invalidate();
+            change.Complete();
+        }
+
+        /// <summary>
+        /// Moves the selection by (<paramref name="dx"/>, <paramref name="dy"/>); repeated
+        /// nudges of the same selection undo as one move.
+        /// </summary>
+        public void NudgeSelected(double dx, double dy)
+        {
+            if (selectedParts.Count == 0)
+                return;
+
+            using var change = view.BeginChange("Nudge", new SelectionKey("Nudge", view.Plate, selectedParts));
+            change.MarkChanged();
+            selectedParts.ForEach(part => part.Offset(dx, dy));
+            view.Invalidate();
+            change.Complete();
         }
 
         public void AlignSelected(AlignType alignType)
@@ -92,6 +117,11 @@ namespace OpenNest.Controls
 
         public void AlignSelected(AlignType alignType, LayoutPart fixedPart)
         {
+            if (selectedParts.Count == 0)
+                return;
+
+            using var change = view.BeginChange("Align");
+            change.MarkChanged();
             switch (alignType)
             {
                 case AlignType.Bottom:
@@ -132,15 +162,28 @@ namespace OpenNest.Controls
                     );
                     break;
                 default:
+                    // An unknown alignment moves nothing; completing records nothing either.
+                    change.Complete();
                     return;
             }
 
             selectedParts.ForEach(p => p.IsDirty = true);
             view.Invalidate();
+            change.Complete();
         }
 
-        public void RotateSelectedParts(double angle)
+        /// <summary>
+        /// Rotates the selection by <paramref name="angle"/> about its centre, keeping its
+        /// lower-left corner; with <paramref name="coalesce"/>, quick repeats undo as one.
+        /// </summary>
+        public void RotateSelectedParts(double angle, bool coalesce = false)
         {
+            if (selectedParts.Count == 0)
+                return;
+
+            using var change = view.BeginChange("Rotate",
+                coalesce ? new SelectionKey("Rotate", view.Plate, selectedParts) : null);
+            change.MarkChanged();
             var parts = selectedParts.Select(p => p.BasePart).ToList();
             var bounds = parts.GetBoundingBox();
             var center = bounds.Center;
@@ -156,14 +199,21 @@ namespace OpenNest.Controls
 
             if (view.Plate.CutOffs.Count > 0)
                 view.Plate.RegenerateCutOffs(view.CutOffSettings);
+            change.Complete();
         }
 
         public void PushSelected(PushDirection direction)
         {
+            if (selectedParts.Count == 0)
+                return;
+
+            using var change = view.BeginChange("Push");
+            change.MarkChanged();
             var movingParts = selectedParts.Select(p => p.BasePart).ToList();
             Compactor.Push(movingParts, view.Plate, direction);
             selectedParts.ForEach(p => p.IsDirty = true);
             view.Invalidate();
+            change.Complete();
         }
 
         /// <summary>
@@ -186,14 +236,17 @@ namespace OpenNest.Controls
             Expander.Result Work(CancellationToken token) =>
                 Expander.Expand(movingParts, plate, null, token);
 
+            using var change = view.BeginChange("Expand Spacing");
             var result = run != null ? run(Work) : Work(CancellationToken.None);
 
             if (result.Cancelled)
             {
                 view.Status = "Expand Spacing cancelled - no parts were moved";
+                change.Complete();
                 return true;
             }
 
+            change.MarkChanged();
             selectedParts.ForEach(p => p.IsDirty = true);
 
             if (view.Plate.CutOffs.Count > 0)
@@ -205,6 +258,7 @@ namespace OpenNest.Controls
                 $"Expanded spacing to {result.AchievedSpacing:0.###}"
                 + (result.Violations.Count > 0 ? $" - {result.Violations.Count} blocked pairs" : "");
 
+            change.Complete();
             return true;
         }
 
@@ -351,6 +405,35 @@ namespace OpenNest.Controls
         {
             selectedParts.Clear();
             selectedCutOffs.Clear();
+        }
+
+        /// <summary>
+        /// Equal for the same edit of the same parts on the same plate, so repeated nudges or
+        /// wheel turns coalesce into one undo entry.
+        /// </summary>
+        private sealed class SelectionKey : IEquatable<SelectionKey>
+        {
+            private readonly string operation;
+            private readonly Plate plate;
+            private readonly Part[] parts;
+
+            public SelectionKey(string operation, Plate plate, IEnumerable<LayoutPart> selection)
+            {
+                this.operation = operation;
+                this.plate = plate;
+                parts = selection.Select(p => p.BasePart).ToArray();
+            }
+
+            public bool Equals(SelectionKey other) =>
+                other != null
+                && operation == other.operation
+                && ReferenceEquals(plate, other.plate)
+                && parts.Length == other.parts.Length
+                && parts.Zip(other.parts).All(pair => ReferenceEquals(pair.First, pair.Second));
+
+            public override bool Equals(object obj) => Equals(obj as SelectionKey);
+
+            public override int GetHashCode() => HashCode.Combine(operation, RuntimeHelpers.GetHashCode(plate), parts.Length);
         }
     }
 }

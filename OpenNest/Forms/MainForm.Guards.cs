@@ -60,6 +60,16 @@ namespace OpenNest.Forms
         private bool IsNestJobBusy() => IsJobRunning || storage.IsSaving;
 
         /// <summary>
+        /// The guard for Undo and Redo, which replace the whole nest: any nest job or background
+        /// save, a fill or a busy action on a view of the nest (a selection does not count), or
+        /// an edit still being recorded.
+        /// </summary>
+        internal bool IsUndoBusy(EditNestForm editForm) =>
+            IsNestJobBusy()
+            || editForm.IsChangeInProgress
+            || ViewsOf(editForm.Nest).Any(v => v.IsFillInProgress || v.Actions.CurrentAction?.BlocksUndo == true);
+
+        /// <summary>
         /// Refuses with <paramref name="message"/> while plate work on <paramref name="nest"/>
         /// is busy; otherwise returns every view of the nest to selection and returns true.
         /// </summary>
