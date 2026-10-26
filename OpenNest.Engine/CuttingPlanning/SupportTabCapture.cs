@@ -11,9 +11,11 @@ using OpenNest.Support;
 namespace OpenNest.Engine.CuttingPlanning;
 
 /// <summary>
-/// Capture-time support tabs for one regenerated part (docs/support-tabs.md): with a support
-/// bed and <see cref="CNC.CuttingStrategy.CuttingParameters.SupportTabs"/> on, a part the bed
-/// cannot hold level has its perimeter tabbed where the tab steadies it; a pinned perimeter
+/// Capture-time support tabs for one regenerated part (docs/support-tabs.md): with
+/// <see cref="CNC.CuttingStrategy.CuttingParameters.SupportTabs"/> on, a part the support bed
+/// cannot hold level, or on a plate with no bed a part in the no-bed width range
+/// (<see cref="SupportTabSettings.Analyze"/>), has its perimeter tabbed where the tab steadies
+/// it; a pinned perimeter
 /// keeps its pin (the drawing wins) and only carries the analysis for replay to review. A
 /// supported part, a missing tab configuration or material the analyzer cannot read leave the
 /// preparation as it was.
@@ -25,17 +27,17 @@ internal static class SupportTabCapture
     {
         var parameters = request.ConfirmedParameters;
         // A display perimeter is a supplied blank: it is never cut free, so it needs no tab.
-        if (prepared == null || !prepared.HasCutPerimeter || request.SupportBed == null || parameters?.SupportTabs != true
-            || parameters.TabConfig == null)
+        if (prepared == null || !prepared.HasCutPerimeter || parameters?.SupportTabs != true
+            || parameters.TabConfig == null || (request.SupportBed == null && !parameters.HasNoBedTabRange()))
             return prepared;
         token.ThrowIfCancellationRequested();
         // The clean program is the drawing's own, rotated as placed: its material at the
         // part's location is the material that drops onto the bed. The tab keeps clear of
         // inside corners by twice its size.
-        var support = SupportAnalyzer.Analyze(request.SupportBed, request.SupportQuadrant,
+        var support = SupportTabSettings.Analyze(parameters, request.SupportBed, request.SupportQuadrant,
             SupportMaterial.FromProgram(ownedClean, location),
             SupportAnalyzer.InsideCornerClearance(parameters.TabConfig.Size));
-        if (!support.IsComplete || support.IsSupported || support.BestTabPoint == null)
+        if (support is not { IsComplete: true, IsSupported: false } || support.BestTabPoint == null)
             return prepared;
         return prepared.WithSupportTab(support, location, parameters.TabConfig);
     }
@@ -77,7 +79,9 @@ internal static class SupportTabCapture
         if (prepared.PerimeterTabbed && support.IsSteadiedByTabAt(tab))
             return null;
         var part = source.SourceOrdinal + 1;
-        var held = support.Margin == double.NegativeInfinity
+        var held = !support.HasBed
+            ? FormattableString.Invariant($"is {support.Width:0.####} wide, in the width range tabbed without a support bed,")
+            : support.Margin == double.NegativeInfinity
             ? "rests on no support contact"
             : support.Margin < 0
                 ? FormattableString.Invariant($"has its center of gravity {-support.Margin:0.####} outside its support contacts")
@@ -89,8 +93,20 @@ internal static class SupportTabCapture
                 : support.TabCanSupport
                     ? "no lead-in fits at a point where its tab would steady the part"
                     : "no single tab can steady it";
+        var needs = support.HasBed ? FormattableString.Invariant($" (needs {support.RequiredMargin:0.####})") : "";
         return new CuttingPlanFinding(source.SourceOrdinal, source.SourcePart, null, null,
-            PostVerificationKind.PartSupport, FormattableString.Invariant(
-                $"Part {part} {held} (needs {support.RequiredMargin:0.####}) and {why}; it may tip once cut free."));
+            PostVerificationKind.PartSupport, $"Part {part} {held}{needs} and {why}; it may tip once cut free.");
+    }
+
+    /// <summary>
+    /// One plan note when support tabs are on but the plate has no support bed and the settings
+    /// set no no-bed width range, so no part was tabbed. Advisory, like <see cref="Notes"/>.
+    /// </summary>
+    internal static IEnumerable<CuttingPlanFinding> Skipped(CuttingPlanSnapshot snapshot)
+    {
+        if (snapshot.SupportTabsSkipped)
+            yield return new CuttingPlanFinding(null, null, null, null, null,
+                "Support tabs are on, but the plate has no support bed and no width range is set for "
+                + "plates without one, so no part was tabbed.");
     }
 }

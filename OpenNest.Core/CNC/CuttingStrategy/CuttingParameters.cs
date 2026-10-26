@@ -51,6 +51,32 @@ namespace OpenNest.CNC.CuttingStrategy
         /// </summary>
         public bool SupportTabs { get; set; }
 
+        /// <summary>
+        /// With <see cref="SupportTabs"/> on a plate that has no support bed, the narrowest part
+        /// width that is tabbed instead (see <see cref="TabsWithoutBedAt"/>).
+        /// </summary>
+        public double NoBedTabMinWidth { get; set; }
+
+        /// <summary>
+        /// With <see cref="SupportTabs"/> on a plate that has no support bed, the widest part
+        /// width that is tabbed instead; 0 turns the rule off, so nothing is tabbed without a bed.
+        /// </summary>
+        public double NoBedTabMaxWidth { get; set; }
+
+        /// <summary>Whether <see cref="NoBedTabMinWidth"/> to <see cref="NoBedTabMaxWidth"/> is a usable range.</summary>
+        public bool HasNoBedTabRange() =>
+            NoBedTabMaxWidth > 0 && double.IsFinite(NoBedTabMaxWidth)
+            && NoBedTabMinWidth >= 0 && NoBedTabMinWidth <= NoBedTabMaxWidth;
+
+        /// <summary>
+        /// Whether a part <paramref name="width"/> wide (the short side of its minimum-area
+        /// bounding rectangle) is tabbed when its plate has no support bed.
+        /// </summary>
+        public bool TabsWithoutBedAt(double width) =>
+            HasNoBedTabRange()
+            && width >= NoBedTabMinWidth - Math.Tolerance.Epsilon
+            && width <= NoBedTabMaxWidth + Math.Tolerance.Epsilon;
+
         public SequenceParameters Sequencing { get; set; } = new SequenceParameters();
         public AssignmentParameters Assignment { get; set; } = new AssignmentParameters();
     }

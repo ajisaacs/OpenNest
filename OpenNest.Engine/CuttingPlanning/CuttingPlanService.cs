@@ -6,6 +6,7 @@ using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
+using OpenNest.Support;
 
 namespace OpenNest.Engine.CuttingPlanning;
 
@@ -173,7 +174,10 @@ public static class CuttingPlanService
                 expansionObserver: request.ExpansionObserver, plateState: plateState,
                 ownedParameters: request.ConfirmedParameters == null ? null
                     : OwnedCuttingParameters.Copy(request.ConfirmedParameters),
-                dependencies: dependencies, findings: warnings, bestEffort: bestEffort);
+                dependencies: dependencies, findings: warnings, bestEffort: bestEffort)
+            {
+                SupportTabsSkipped = SupportTabSettings.SkipsWithoutBed(request.ConfirmedParameters, request.SupportBed),
+            };
         }
         catch (OperationCanceledException)
         {
@@ -460,7 +464,7 @@ public static class CuttingPlanService
         }
         token.ThrowIfCancellationRequested();
         // Support tabs that cannot hold their part level are noted, never refused.
-        var notes = order.SelectMany(SupportTabCapture.Notes).ToList();
+        var notes = order.SelectMany(SupportTabCapture.Notes).Concat(SupportTabCapture.Skipped(snapshot)).ToList();
         if (safestRoute && findings.Count != 0 && findings.All(f => f.Kind != PostVerificationKind.Incomplete))
             return new(CuttingPlanStatus.BestEffort, order, findings.Concat(warnings).Concat(notes).Distinct(),
                 expansions, distance)

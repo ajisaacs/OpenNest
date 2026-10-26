@@ -90,6 +90,24 @@ A support-tabbed perimeter's automatic entries are therefore limited to catalogu
 analysis accepts, plus the closest native point to its best tab point (`AutomaticEntryKind.SupportTab`,
 never on a reflex or cusp vertex). Ranking and lead checks are unchanged.
 
+## Plates without a support bed
+
+With no bed there are no contacts to judge a part by. Cutting Settings > Tabs > "No bed: tab
+widths" sets `CuttingParameters.NoBedTabMinWidth` to `NoBedTabMaxWidth`: on a plate with no
+support bed, support tabs then tab every part whose width (the short side of its outline's
+minimum-area bounding rectangle, `SupportAnalyzer.Width`) is in that range, bounds included. A
+maximum of 0 turns the rule off. `SupportTabSettings.Analyze` makes this choice for Plan Cutting,
+hand-placed lead-ins and the pre-post review alike; a plate with a bed never uses the range.
+
+`SupportAnalyzer.AnalyzeWithoutBed` gives such a part a `PartSupport` with `HasBed` false: no
+contacts, never supported, and every tab clear of inside corners steadies it, so the perimeter's
+automatic entries are every catalogue point clear of inside corners plus the best tab point, the
+clear outline point nearest the line through the center of gravity across the long side. Which
+of those wins is left to the usual ranking toward the next cut.
+
+With support tabs on, no bed and no range, nothing is tabbed and the plan carries one advisory
+note saying so; its status is unchanged.
+
 If none of those entries has a lead-in that fits, the part is still tabbed. The search falls
 back first to every catalogue entry clear of inside corners, then to every entry
 (`SupportEntries`), each ordered by how well the tab steadies the part; of the entries whose
@@ -118,12 +136,13 @@ result. Plan Cutting is the only automatic lead-in assignment.
 
 ## Pre-post review
 
-`PartSupportReview` runs in every pre-post verification and in Validate Nest. On a plate with a
-support bed, each part whose settings (its own, else the plate's) ask for support tabs and that
-the bed cannot hold level is checked, however its program was made. The tab is the gap between
+`PartSupportReview` runs in every pre-post verification and in Validate Nest. Each part whose
+settings (its own, else the plate's) ask for support tabs and that needs one (the plate's bed
+cannot hold it level or, with no bed, its width is in the no-bed range) is checked, however its
+program was made. The tab is the gap between
 the end and the start of the program's outside cut (the chain of cutting motions with the
-largest extent). A part with no such gap, or whose gap does not steady it, gets a
-`PartSupport` warning at its center of gravity naming the best tab point; posting needs
+largest extent). A part with no such gap, or whose gap does not steady it (without
+a bed any gap does), gets a `PartSupport` warning at its center of gravity naming the best tab point; posting needs
 consent as for every warning. A part whose material cannot be read is reported as not checked.
 
 Not covered yet:

@@ -107,12 +107,19 @@ public sealed class CuttingPlanSnapshot
     internal CuttingPlanStatus? Failure { get; }
     internal IReadOnlyList<CuttingPlanFinding> Findings { get; }
 
+    /// <summary>
+    /// Support tabs are on, but the request had no support bed and its settings set no no-bed
+    /// width range, so capture tabbed no part; the plan carries a note saying so.
+    /// </summary>
+    internal bool SupportTabsSkipped { get; init; }
+
     // A worker-only search variant over the same owned capture. Never recapture the live plate:
     // both proposals retain the identical freshness record and confirmed settings.
     internal CuttingPlanSnapshot WithSearchLimits(int expansionBudget, int maxEntries) =>
         new(Placements, StartPoint, expansionBudget, Failure, Findings, Regeneration,
             PreservePartOrder, maxEntries, ExpansionObserver, PlateState, OwnedParameters,
-            Dependencies, BestEffort);
+            Dependencies, BestEffort)
+        { SupportTabsSkipped = SupportTabsSkipped };
 }
 
 public sealed class FixedProgramPlacement

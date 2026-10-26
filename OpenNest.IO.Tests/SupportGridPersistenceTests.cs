@@ -141,4 +141,18 @@ public class SupportGridPersistenceTests
 
         Assert.True(restored.SupportTabs);
     }
+
+    [Fact]
+    public void NoBedTabRangeRoundTripsInCuttingParameters()
+    {
+        var parameters = new CuttingParameters { SupportTabs = true, NoBedTabMinWidth = 0.5, NoBedTabMaxWidth = 4 };
+
+        var restored = CuttingParametersSerializer.Deserialize(CuttingParametersSerializer.Serialize(parameters));
+        var snapshot = CuttingParametersSerializer.FromDto(CuttingParametersSerializer.ToDto(parameters));
+
+        Assert.Equal(0.5, restored.NoBedTabMinWidth);
+        Assert.Equal(4, restored.NoBedTabMaxWidth);
+        Assert.Equal(4, snapshot.NoBedTabMaxWidth);
+        Assert.Equal(0, CuttingParametersSerializer.Deserialize("{}").NoBedTabMaxWidth);
+    }
 }

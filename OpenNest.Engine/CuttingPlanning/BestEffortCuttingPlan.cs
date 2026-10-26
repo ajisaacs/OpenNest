@@ -86,6 +86,7 @@ internal static class BestEffortCuttingPlan
                 order.Add(proposal);
             }
             token.ThrowIfCancellationRequested();
+            findings.AddRange(SupportTabCapture.Skipped(snapshot));
             return new(CuttingPlanStatus.BestEffort, order, findings, rapidDistance: distance)
             { Snapshot = snapshot };
         }

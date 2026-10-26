@@ -34,6 +34,8 @@ namespace OpenNest.Controls
         private readonly NumericUpDown nudTabWidth;
         private readonly RadioButton rbTabAll;
         private readonly RadioButton rbSupportTab;
+        private readonly NumericUpDown nudNoBedTabMin;
+        private readonly NumericUpDown nudNoBedTabMax;
         private readonly NumericUpDown nudPierceClearance;
         private readonly NumericUpDown nudPierceDiameter;
 
@@ -110,7 +112,7 @@ namespace OpenNest.Controls
             {
                 HeaderText = "Tabs",
                 Dock = DockStyle.Top,
-                ExpandedHeight = 106,
+                ExpandedHeight = 132,
                 IsExpanded = false,
             };
 
@@ -155,17 +157,51 @@ namespace OpenNest.Controls
             };
             tabsPanel.ContentPanel.Controls.Add(rbSupportTab);
 
+            // A plate with no support bed tabs the parts whose narrow side is in this range;
+            // a maximum of 0 tabs none.
+            tabsPanel.ContentPanel.Controls.Add(
+                new Label
+                {
+                    Text = "No bed: tab widths",
+                    Location = new Point(44, 76),
+                    AutoSize = true,
+                }
+            );
+            nudNoBedTabMin = CreateNumeric(160, 74, 0, 0.25);
+            nudNoBedTabMin.Size = new Size(70, 22);
+            nudNoBedTabMin.Enabled = false;
+            tabsPanel.ContentPanel.Controls.Add(nudNoBedTabMin);
+            tabsPanel.ContentPanel.Controls.Add(
+                new Label
+                {
+                    Text = "to",
+                    Location = new Point(234, 76),
+                    AutoSize = true,
+                }
+            );
+            nudNoBedTabMax = CreateNumeric(254, 74, 0, 0.25);
+            nudNoBedTabMax.Size = new Size(70, 22);
+            nudNoBedTabMax.Enabled = false;
+            tabsPanel.ContentPanel.Controls.Add(nudNoBedTabMax);
+
             chkTabsEnabled.CheckedChanged += (s, e) =>
             {
                 var enabled = chkTabsEnabled.Checked;
                 nudTabWidth.Enabled = enabled;
                 rbTabAll.Enabled = enabled;
                 rbSupportTab.Enabled = enabled;
+                UpdateNoBedRange();
                 OnParametersChanged();
             };
 
             // The two choices toggle together, so one handler sees every change.
-            rbTabAll.CheckedChanged += (s, e) => OnParametersChanged();
+            rbTabAll.CheckedChanged += (s, e) =>
+            {
+                UpdateNoBedRange();
+                OnParametersChanged();
+            };
+            nudNoBedTabMin.ValueChanged += (s, e) => OnParametersChanged();
+            nudNoBedTabMax.ValueChanged += (s, e) => OnParametersChanged();
 
             // Pierce section
             var piercePanel = new CollapsiblePanel
@@ -257,6 +293,8 @@ namespace OpenNest.Controls
                 RoundLeadInAngles = chkRoundLeadInAngles.Checked,
                 LeadInAngleIncrement = (double)nudLeadInAngleIncrement.Value,
                 SupportTabs = chkTabsEnabled.Checked && rbSupportTab.Checked,
+                NoBedTabMinWidth = (double)nudNoBedTabMin.Value,
+                NoBedTabMaxWidth = (double)nudNoBedTabMax.Value,
             };
         }
 
@@ -274,6 +312,9 @@ namespace OpenNest.Controls
             rbTabAll.Checked = !p.SupportTabs;
             if (p.TabConfig != null)
                 nudTabWidth.Value = (decimal)p.TabConfig.Size;
+            nudNoBedTabMin.Value = Clamp(nudNoBedTabMin, p.NoBedTabMinWidth);
+            nudNoBedTabMax.Value = Clamp(nudNoBedTabMax, p.NoBedTabMaxWidth);
+            UpdateNoBedRange();
             nudPierceClearance.Value = (decimal)p.PierceClearance;
             nudPierceDiameter.Value = (decimal)p.PierceDiameter;
             chkRoundLeadInAngles.Checked = p.RoundLeadInAngles;
@@ -282,6 +323,18 @@ namespace OpenNest.Controls
 
             suppressEvents = false;
         }
+
+        private void UpdateNoBedRange()
+        {
+            var enabled = chkTabsEnabled.Checked && rbSupportTab.Checked;
+            nudNoBedTabMin.Enabled = enabled;
+            nudNoBedTabMax.Enabled = enabled;
+        }
+
+        private static decimal Clamp(NumericUpDown control, double value) =>
+            double.IsFinite(value)
+                ? System.Math.Clamp((decimal)value, control.Minimum, control.Maximum)
+                : control.Minimum;
 
         private void OnParametersChanged()
         {

@@ -71,6 +71,8 @@ public static class CuttingParametersSerializer
             RoundLeadInAngles = parameters.RoundLeadInAngles,
             LeadInAngleIncrement = parameters.LeadInAngleIncrement,
             SupportTabs = parameters.SupportTabs,
+            NoBedTabMinWidth = parameters.NoBedTabMinWidth,
+            NoBedTabMaxWidth = parameters.NoBedTabMaxWidth,
             Sequencing = ToSequenceDto(parameters.Sequencing),
             Assignment = ToAssignmentDto(parameters.Assignment),
         };
@@ -104,6 +106,8 @@ public static class CuttingParametersSerializer
             RoundLeadInAngles = dto.RoundLeadInAngles,
             LeadInAngleIncrement = dto.LeadInAngleIncrement,
             SupportTabs = dto.SupportTabs,
+            NoBedTabMinWidth = dto.NoBedTabMinWidth,
+            NoBedTabMaxWidth = dto.NoBedTabMaxWidth,
             Sequencing = FromSequenceDto(dto.Sequencing),
             Assignment = FromAssignmentDto(dto.Assignment),
         };
