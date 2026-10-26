@@ -1,31 +1,40 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Reflection;
 
 namespace OpenNest.Engine.Strategies
 {
+    /// <summary>
+    /// The built-in fill strategies in pipeline order, with one process-wide disabled set that the
+    /// desktop Options form sets. Every fill that runs the strategy pipeline reads it.
+    /// </summary>
     public static class FillStrategyRegistry
     {
-        private static readonly List<IFillStrategy> strategies = new();
+        // Pipeline order, ascending by each strategy's Order value.
+        private static readonly IReadOnlyList<IFillStrategy> builtIn = Array.AsReadOnly(
+            new IFillStrategy[]
+            {
+                new PairsFillStrategy(),
+                new RowFillStrategy(),
+                new ColumnFillStrategy(),
+                new RectBestFitStrategy(),
+                new ExtentsFillStrategy(),
+                new LinearFillStrategy(),
+                new TiltedRemnantStrategy(),
+            }
+        );
+
+        private static IReadOnlyList<IFillStrategy> strategies = builtIn;
         private static List<IFillStrategy> sorted;
         private static HashSet<string> enabledFilter;
         private static readonly HashSet<string> disabled = new(StringComparer.OrdinalIgnoreCase);
 
-        static FillStrategyRegistry()
-        {
-            LoadFrom(typeof(FillStrategyRegistry).Assembly);
-        }
-
         public static IReadOnlyList<IFillStrategy> Strategies => sorted ??= FilterStrategies();
 
         /// <summary>
-        /// Returns all registered strategies regardless of enabled/disabled state.
+        /// Returns all strategies regardless of enabled/disabled state.
         /// </summary>
-        public static IReadOnlyList<IFillStrategy> AllStrategies =>
-            strategies.OrderBy(s => s.Order).ToList();
+        public static IReadOnlyList<IFillStrategy> AllStrategies => strategies;
 
         /// <summary>
         /// Returns the names of all permanently disabled strategies.
@@ -38,11 +47,11 @@ namespace OpenNest.Engine.Strategies
                 enabledFilter != null
                     ? strategies.Where(s => enabledFilter.Contains(s.Name))
                     : strategies.Where(s => !disabled.Contains(s.Name));
-            return source.OrderBy(s => s.Order).ToList();
+            return source.ToList();
         }
 
         /// <summary>
-        /// Permanently disables strategies by name. They remain registered
+        /// Permanently disables strategies by name. They remain listed
         /// but are excluded from the default pipeline.
         /// </summary>
         public static void Disable(params string[] names)
@@ -75,79 +84,31 @@ namespace OpenNest.Engine.Strategies
             sorted = null;
         }
 
-        public static void LoadFrom(Assembly assembly)
+        /// <summary>
+        /// Replaces the built-in list, in the given order, until the result is disposed. For tests
+        /// that drive fills through a host that builds its own filler, such as the plate view.
+        /// </summary>
+        internal static IDisposable UseForTesting(IReadOnlyList<IFillStrategy> replacement)
         {
-            foreach (var type in assembly.GetTypes())
-            {
-                if (
-                    type.IsAbstract
-                    || type.IsInterface
-                    || !typeof(IFillStrategy).IsAssignableFrom(type)
-                )
-                    continue;
-
-                var ctor = type.GetConstructor(Type.EmptyTypes);
-                if (ctor == null)
-                {
-                    Debug.WriteLine(
-                        $"[FillStrategyRegistry] Skipping {type.Name}: no parameterless constructor"
-                    );
-                    continue;
-                }
-
-                try
-                {
-                    var instance = (IFillStrategy)ctor.Invoke(null);
-
-                    if (
-                        strategies.Any(s =>
-                            s.Name.Equals(instance.Name, StringComparison.OrdinalIgnoreCase)
-                        )
-                    )
-                    {
-                        Debug.WriteLine(
-                            $"[FillStrategyRegistry] Duplicate strategy '{instance.Name}' skipped"
-                        );
-                        continue;
-                    }
-
-                    strategies.Add(instance);
-                    Debug.WriteLine(
-                        $"[FillStrategyRegistry] Registered: {instance.Name} (Order={instance.Order})"
-                    );
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine(
-                        $"[FillStrategyRegistry] Failed to instantiate {type.Name}: {ex.Message}"
-                    );
-                }
-            }
-
+            var prior = strategies;
+            strategies = replacement;
             sorted = null;
+            return new Restore(prior);
         }
 
-        public static void LoadPlugins(string directory)
+        private sealed class Restore : IDisposable
         {
-            if (!Directory.Exists(directory))
-                return;
+            private IReadOnlyList<IFillStrategy> prior;
 
-            foreach (var dll in Directory.GetFiles(directory, "*.dll"))
+            public Restore(IReadOnlyList<IFillStrategy> prior) => this.prior = prior;
+
+            public void Dispose()
             {
-                try
-                {
-                    var assembly = Assembly.LoadFrom(dll);
-                    LoadFrom(assembly);
-                    Debug.WriteLine(
-                        $"[FillStrategyRegistry] Loaded plugin assembly: {Path.GetFileName(dll)}"
-                    );
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine(
-                        $"[FillStrategyRegistry] Failed to load {Path.GetFileName(dll)}: {ex.Message}"
-                    );
-                }
+                if (prior == null)
+                    return;
+                strategies = prior;
+                sorted = null;
+                prior = null;
             }
         }
     }

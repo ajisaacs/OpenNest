@@ -8,6 +8,7 @@
     <InternalsVisibleTo Include="OpenNest.Tests" />
     <InternalsVisibleTo Include="OpenNest.Benchmark" />
     <InternalsVisibleTo Include="OpenNest.Engine.Tests" />
+    <InternalsVisibleTo Include="OpenNest.WinForms.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />

@@ -168,8 +168,8 @@ public class PlateViewFillLifetimeTests
         });
     }
 
-    // Use the real strategy registry rather than a production-only injection hook.
-    public sealed class BlockingFillStrategy : IFillStrategy
+    // PlateView builds its own filler, so the registry's list is swapped for the test's strategy.
+    private sealed class BlockingFillStrategy : IFillStrategy
     {
         public string Name => "WinForms lifetime regression";
         public NestPhase Phase => NestPhase.Linear;
@@ -183,7 +183,7 @@ public class PlateViewFillLifetimeTests
         private readonly ManualResetEventSlim entered = new();
         private readonly ManualResetEventSlim release = new();
         private readonly BlockingFillStrategy strategy;
-        private readonly string[] priorStrategies;
+        private readonly IDisposable strategies;
         private readonly string priorEngine;
         private readonly SynchronizationContext? priorContext;
 
@@ -197,14 +197,10 @@ public class PlateViewFillLifetimeTests
 
         public FillRun()
         {
-            priorStrategies = FillStrategyRegistry.Strategies.Select(s => s.Name).ToArray();
             priorEngine = EngineSelection.EngineName;
-            FillStrategyRegistry.LoadFrom(typeof(BlockingFillStrategy).Assembly);
-            strategy = Assert.Single(FillStrategyRegistry.AllStrategies.OfType<BlockingFillStrategy>());
-            FillStrategyRegistry.Disable(strategy.Name);
-            FillStrategyRegistry.SetEnabled(strategy.Name);
+            strategy = new BlockingFillStrategy { Run = Fill };
+            strategies = FillStrategyRegistry.UseForTesting([strategy]);
             EngineSelection.EngineName = EngineSelection.DefaultEngineName;
-            strategy.Run = Fill;
 
             var program = new CNC.Program();
             program.Codes.Add(new RapidMove(0, 0));
@@ -260,7 +256,7 @@ public class PlateViewFillLifetimeTests
             finally
             {
                 strategy.Run = null;
-                FillStrategyRegistry.SetEnabled(priorStrategies);
+                strategies.Dispose();
                 EngineSelection.EngineName = priorEngine;
                 SynchronizationContext.SetSynchronizationContext(priorContext);
                 View.Dispose();

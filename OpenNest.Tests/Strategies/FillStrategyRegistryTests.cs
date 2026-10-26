@@ -6,20 +6,16 @@ namespace OpenNest.Tests.Strategies;
 public class FillStrategyRegistryTests
 {
     [Fact]
-    public void Registry_DiscoversBuiltInStrategies()
+    public void Registry_ListsBuiltInStrategiesInPipelineOrder()
     {
-        var strategies = FillStrategyRegistry.Strategies;
-
-        Assert.True(
-            strategies.Count >= 6,
-            $"Expected at least 6 built-in strategies, got {strategies.Count}"
+        Assert.Equal(
+            ["Pairs", "Row", "Column", "RectBestFit", "Extents", "Linear", "TiltedRemnant"],
+            FillStrategyRegistry.AllStrategies.Select(s => s.Name)
         );
-        Assert.Contains(strategies, s => s.Name == "Pairs");
-        Assert.Contains(strategies, s => s.Name == "RectBestFit");
-        Assert.Contains(strategies, s => s.Name == "Extents");
-        Assert.Contains(strategies, s => s.Name == "Linear");
-        Assert.Contains(strategies, s => s.Name == "Row");
-        Assert.Contains(strategies, s => s.Name == "Column");
+        Assert.Equal(
+            [100, 150, 160, 200, 300, 400, 500],
+            FillStrategyRegistry.AllStrategies.Select(s => s.Order)
+        );
     }
 
     [Fact]
