@@ -200,7 +200,7 @@ namespace OpenNest.Forms
             numQuantity.Location = new System.Drawing.Point(37, 6);
             numQuantity.Margin = new System.Windows.Forms.Padding(2, 0, 8, 0);
             numQuantity.Maximum = new decimal(new int[] { 9999, 0, 0, 0 });
-            numQuantity.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            numQuantity.Minimum = new decimal(new int[] { 0, 0, 0, 0 });
             numQuantity.Name = "numQuantity";
             numQuantity.Size = new System.Drawing.Size(50, 23);
             numQuantity.TabIndex = 1;
