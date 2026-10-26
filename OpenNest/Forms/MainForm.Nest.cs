@@ -96,12 +96,14 @@ namespace OpenNest.Forms
                 return;
             }
 
-            MachineSettings.AssignMachine(nest, machine);
-            foreach (var view in views)
+            editForm.RecordChange("Machine", () =>
             {
-                MachineSettings.ApplyCutOffDefaults(view, nest);
+                MachineSettings.AssignMachine(nest, machine);
+                foreach (var view in views)
+                    MachineSettings.ApplyCutOffDefaults(view, nest);
+            });
+            foreach (var view in views)
                 view.Invalidate();
-            }
             statusBar.UpdatePlate();
         }
 

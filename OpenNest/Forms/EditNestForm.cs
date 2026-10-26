@@ -821,9 +821,18 @@ namespace OpenNest.Forms
                 if (form.NestName != Nest.Name && !await ConfirmRenameAsync(form.NestName))
                     continue;
 
-                PlateManager.ChangePlateDefaults(() => form.SaveNestInfo(Nest));
-                // The material, thickness or units may have changed.
-                MachineSettings.ApplyCutOffDefaults(PlateView, Nest);
+                // The name, status, author and creation date stay as they are through undo, so
+                // an edit of only those records nothing.
+                using (var change = BeginChange("Nest Info"))
+                {
+                    var before = UndoableNestInfo();
+                    PlateManager.ChangePlateDefaults(() => form.SaveNestInfo(Nest));
+                    if (UndoableNestInfo() != before)
+                        change.MarkChanged();
+                    // The material, thickness or units may have changed.
+                    MachineSettings.ApplyCutOffDefaults(PlateView, Nest);
+                    change.Complete();
+                }
                 Text = Nest.Name;
                 drawingListBox1.Units = Nest.Units;
                 drawingListBox1.Invalidate();
@@ -831,6 +840,15 @@ namespace OpenNest.Forms
                     _ = HoldStatus.NoteCutAsync();
                 return;
             }
+        }
+
+        // What Nest Info edits that undo puts back: everything but the identity fields.
+        private string UndoableNestInfo()
+        {
+            var defaults = Nest.PlateDefaults;
+            return string.Join("|", Nest.Units, Nest.Notes, Nest.Customer, Nest.Thickness, Nest.Material?.Name,
+                Nest.Material?.Grade, defaults.Size, defaults.PartSpacing, defaults.EdgeSpacing.Left,
+                defaults.EdgeSpacing.Bottom, defaults.EdgeSpacing.Right, defaults.EdgeSpacing.Top, defaults.Quadrant);
         }
 
         private void HoldStatus_CloseoutNoteRequested(object sender, int openHolds)

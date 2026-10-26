@@ -485,6 +485,43 @@ public class UndoRecordingTests
         env.AssertOneUndoableEdit("Add Part", () => UndoTestEnv.Invoke(env.View, "OnDragDrop", drop));
     });
 
+    // Nest
+
+    [Fact]
+    public void AssigningAMachineRecordsOneEntry() => UndoTestEnv.Run(env =>
+    {
+        var machine = new Data.MachineConfig { Name = "Undo test laser" };
+        env.AssertOneUndoableEdit("Machine", () => UndoTestEnv.Invoke(env.Host, "AssignMachine", machine));
+        Assert.Equal(machine.Id, env.Nest.Machine!.Id);
+    });
+
+    [Fact]
+    public void EditingNestInfoRecordsOneEntry() => UndoTestEnv.Run(env =>
+    {
+        UndoTestEnv.AcceptWhenShown<EditNestInfoForm>(form =>
+        {
+            form.Notes = "edited";
+            form.Customer = "someone";
+        });
+        env.AssertOneUndoableEdit("Nest Info", () => Assert.True(env.Editor.ShowNestInfoEditorAsync().IsCompleted));
+        Assert.Equal("edited", env.Nest.Notes);
+    });
+
+    [Fact]
+    public void ANestInfoEditOfOnlyItsIdentityRecordsNothing() => UndoTestEnv.Run(env =>
+    {
+        UndoTestEnv.AcceptWhenShown<EditNestInfoForm>(form =>
+        {
+            form.Status = NestStatus.HasBeenCut;
+            form.MadeBy = "someone else";
+        });
+
+        Assert.True(env.Editor.ShowNestInfoEditorAsync().IsCompleted);
+
+        Assert.Equal(NestStatus.HasBeenCut, env.Nest.Status);
+        Assert.Equal(0, env.Editor.History.UndoCount);
+    });
+
     private static void Click(PlateView view, System.Drawing.Point at)
     {
         UndoTestEnv.Mouse(view, "OnMouseMove", MouseButtons.None, at);

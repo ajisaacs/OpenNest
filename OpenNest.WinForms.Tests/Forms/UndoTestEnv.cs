@@ -124,6 +124,7 @@ internal sealed record UndoTestEnv(MainForm Host, EditNestForm Editor)
         void Line(FormattableString line) => text.AppendLine(line.ToString(CultureInfo.InvariantCulture));
 
         Line($"machine {nest.Machine?.Id} support {nest.SupportBed != null} units {nest.Units}");
+        Line($"material {nest.Material?.Name} {nest.Material?.Grade} thickness {nest.Thickness} customer {nest.Customer} notes {nest.Notes}");
         Line($"defaults {nest.PlateDefaults.Size} {nest.PlateDefaults.PartSpacing} {nest.PlateDefaults.ClampRail != null}");
         Line($"options {nest.PlateOptions.Count} salvage {nest.SalvageRate} remnant {nest.MinimumRemnantDimension}");
         foreach (var drawing in nest.Drawings.OrderBy(d => d.Name))
@@ -155,9 +156,16 @@ internal sealed record UndoTestEnv(MainForm Host, EditNestForm Editor)
         (ToolStripMenuItem)typeof(MainForm).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host)!;
 
     /// <summary>Calls a private or internal instance method of <paramref name="target"/>.</summary>
-    public static object? Invoke(object target, string method, params object?[] args) =>
-        target.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!
-            .Invoke(target, args);
+    public static object? Invoke(object target, string method, params object?[] args)
+    {
+        for (var type = target.GetType(); type != null; type = type.BaseType)
+        {
+            var found = type.GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            if (found != null)
+                return found.Invoke(target, args);
+        }
+        throw new MissingMethodException(target.GetType().Name, method);
+    }
 
     /// <summary>Calls a MainForm menu handler with no sender.</summary>
     public void Click(string handler) =>
