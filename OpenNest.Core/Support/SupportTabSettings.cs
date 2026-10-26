@@ -15,7 +15,9 @@ namespace OpenNest.Support
     {
         /// <summary>
         /// The analysis that tabs a part, or null when support tabs are off or the part is
-        /// outside the rule: with a bed, the bed's analysis; without one, a no-bed analysis
+        /// outside the rule: with a bed, the bed's analysis, held by its tab alone
+        /// (<see cref="SupportAnalyzer.HeldByTab"/>) when the bed cannot hold it level and its
+        /// length is within <see cref="CuttingParameters.TabHoldsAt"/>; without one, a no-bed analysis
         /// (<see cref="SupportAnalyzer.AnalyzeWithoutBed"/>) of a part whose width is in
         /// <see cref="CuttingParameters.TabsWithoutBedAt"/>'s range. The part needs a tab when
         /// the result is complete and not supported; an incomplete result could not be read.
@@ -30,7 +32,13 @@ namespace OpenNest.Support
             if (parameters?.SupportTabs != true)
                 return null;
             if (bed != null)
-                return SupportAnalyzer.Analyze(bed, quadrant, material, insideCornerClearance);
+            {
+                var support = SupportAnalyzer.Analyze(bed, quadrant, material, insideCornerClearance);
+                return support is { IsComplete: true, IsSupported: false }
+                    && parameters.TabHoldsAt(SupportAnalyzer.Length(material))
+                    ? SupportAnalyzer.HeldByTab(support, material)
+                    : support;
+            }
             if (!parameters.HasNoBedTabRange())
                 return null;
             if (!material.IsComplete)

@@ -92,6 +92,7 @@ internal static class StateFingerprint
             Flag(p.SupportTabs);
             Number(p.NoBedTabMinWidth);
             Number(p.NoBedTabMaxWidth);
+            Number(p.TabHeldMaxLength);
             Sequence(p.Sequencing);
             Assignment(p.Assignment);
             text.Append('}');

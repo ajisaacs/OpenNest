@@ -39,7 +39,8 @@ var result = CuttingPlanService.Plan(snapshot, cancellationToken);
   the plate's own under `ForPlate`), each regenerated part the bed cannot hold level gets a
   tabbed perimeter whose automatic entries keep to points where the tab steadies it. A tab
   that still cannot hold its part level, or sits in an inside corner, is noted on the plan
-  without changing its status. Without a bed, the parts whose width is in
+  without changing its status. A part no longer than `TabHeldMaxLength` is held by its tab
+  alone, so any tab clear of inside corners steadies it. Without a bed, the parts whose width is in
   `NoBedTabMinWidth`..`NoBedTabMaxWidth` are tabbed instead, and with no range set the plan notes
   that nothing was tabbed; see [support tabs](support-tabs.md).
 - Parameters are caller-confirmed inputs. The service does not recover missing

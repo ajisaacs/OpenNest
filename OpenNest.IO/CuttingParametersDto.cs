@@ -35,6 +35,7 @@ public class CuttingParametersDto
     public bool SupportTabs { get; set; }
     public double NoBedTabMinWidth { get; set; }
     public double NoBedTabMaxWidth { get; set; }
+    public double TabHeldMaxLength { get; set; }
     public SequenceDto Sequencing { get; set; } = new();
     public AssignmentDto Assignment { get; set; } = new();
 

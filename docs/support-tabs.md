@@ -90,6 +90,20 @@ A support-tabbed perimeter's automatic entries are therefore limited to catalogu
 analysis accepts, plus the closest native point to its best tab point (`AutomaticEntryKind.SupportTab`,
 never on a reflex or cusp vertex). Ranking and lead checks are unchanged.
 
+## Parts the tab alone holds
+
+A tabbed part stays in the sheet on its tab, and a part short enough does not need the bed at
+all: the tab holds it wherever it goes. Cutting Settings > Tabs > "Tab alone holds parts up to"
+sets `CuttingParameters.TabHeldMaxLength`: on a plate with a support bed, a part the bed cannot
+hold level whose length (the long side of its outline's minimum-area bounding rectangle,
+`SupportAnalyzer.Length`) is at most that, bound included, is still tabbed, but
+`SupportAnalyzer.HeldByTab` marks its analysis `IsHeldByTab`: it keeps its contacts and margin,
+every tab clear of inside corners steadies it, and its best tab point is chosen as on a plate
+with no bed (below). A part the bed holds is not tabbed. 0 turns the rule off.
+`SupportTabSettings.Analyze` applies it for Plan Cutting, hand-placed lead-ins and the pre-post
+review alike, so such a part warns only when it is cut with no tab at all. View > Draw Support
+does not read cutting settings and still shows it red, since it would tip without its tab.
+
 ## Plates without a support bed
 
 With no bed there are no contacts to judge a part by. Cutting Settings > Tabs > "No bed: tab
@@ -142,7 +156,7 @@ cannot hold it level or, with no bed, its width is in the no-bed range) is check
 program was made. The tab is the gap between
 the end and the start of the program's outside cut (the chain of cutting motions with the
 largest extent). A part with no such gap, or whose gap does not steady it (without
-a bed any gap does), gets a `PartSupport` warning at its center of gravity naming the best tab point; posting needs
+a bed, or for a part its tab alone holds, any gap does), gets a `PartSupport` warning at its center of gravity naming the best tab point; posting needs
 consent as for every warning. A part whose material cannot be read is reported as not checked.
 
 Not covered yet:

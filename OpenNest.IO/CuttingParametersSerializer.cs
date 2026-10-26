@@ -73,6 +73,7 @@ public static class CuttingParametersSerializer
             SupportTabs = parameters.SupportTabs,
             NoBedTabMinWidth = parameters.NoBedTabMinWidth,
             NoBedTabMaxWidth = parameters.NoBedTabMaxWidth,
+            TabHeldMaxLength = parameters.TabHeldMaxLength,
             Sequencing = ToSequenceDto(parameters.Sequencing),
             Assignment = ToAssignmentDto(parameters.Assignment),
         };
@@ -108,6 +109,7 @@ public static class CuttingParametersSerializer
             SupportTabs = dto.SupportTabs,
             NoBedTabMinWidth = dto.NoBedTabMinWidth,
             NoBedTabMaxWidth = dto.NoBedTabMaxWidth,
+            TabHeldMaxLength = dto.TabHeldMaxLength,
             Sequencing = FromSequenceDto(dto.Sequencing),
             Assignment = FromAssignmentDto(dto.Assignment),
         };

@@ -103,10 +103,14 @@ internal static class PartSupportReview
 
     private static string Message(PartSupport support, Vector? tab)
     {
-        // Without a bed any tab steadies the part, so the only failure is no tab at all.
-        if (!support.HasBed)
-            return FormattableString.Invariant(
-                    $"The part is {support.Width:0.####} wide, in the width range tabbed without a support bed, ")
+        // Without a bed, or for a part its tab alone holds, any tab steadies the part, so the only
+        // failure is no tab at all.
+        if (!support.HasBed || support.IsHeldByTab)
+            return (support.HasBed
+                    ? FormattableString.Invariant(
+                        $"The part is {support.Length:0.####} long, short enough for its tab alone to hold, ")
+                    : FormattableString.Invariant(
+                        $"The part is {support.Width:0.####} wide, in the width range tabbed without a support bed, "))
                 + "and it has no tab; it may tip once cut free."
                 + (support.BestTabPoint is { } suggested
                     ? FormattableString.Invariant($" Tab it near ({suggested.X:0.####}, {suggested.Y:0.####}).")

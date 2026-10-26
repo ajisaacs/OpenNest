@@ -44,6 +44,7 @@ public class OwnedCuttingParameterTests
             SupportTabs = true,
             NoBedTabMinWidth = 0.5,
             NoBedTabMaxWidth = 4,
+            TabHeldMaxLength = 2,
             RoundLeadInAngles = true,
             LeadInAngleIncrement = 30,
             Sequencing = new SequenceParameters

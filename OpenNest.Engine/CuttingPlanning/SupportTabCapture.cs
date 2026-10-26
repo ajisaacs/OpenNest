@@ -81,6 +81,8 @@ internal static class SupportTabCapture
         var part = source.SourceOrdinal + 1;
         var held = !support.HasBed
             ? FormattableString.Invariant($"is {support.Width:0.####} wide, in the width range tabbed without a support bed,")
+            : support.IsHeldByTab
+            ? FormattableString.Invariant($"is {support.Length:0.####} long, short enough for its tab alone to hold,")
             : support.Margin == double.NegativeInfinity
             ? "rests on no support contact"
             : support.Margin < 0
@@ -93,7 +95,7 @@ internal static class SupportTabCapture
                 : support.TabCanSupport
                     ? "no lead-in fits at a point where its tab would steady the part"
                     : "no single tab can steady it";
-        var needs = support.HasBed ? FormattableString.Invariant($" (needs {support.RequiredMargin:0.####})") : "";
+        var needs = support.HasBed && !support.IsHeldByTab ? FormattableString.Invariant($" (needs {support.RequiredMargin:0.####})") : "";
         return new CuttingPlanFinding(source.SourceOrdinal, source.SourcePart, null, null,
             PostVerificationKind.PartSupport, $"Part {part} {held}{needs} and {why}; it may tip once cut free.");
     }

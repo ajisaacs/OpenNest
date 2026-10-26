@@ -44,6 +44,7 @@ internal static class OwnedCuttingParameters
             SupportTabs = source.SupportTabs,
             NoBedTabMinWidth = Dimension(source.NoBedTabMinWidth),
             NoBedTabMaxWidth = Dimension(source.NoBedTabMaxWidth),
+            TabHeldMaxLength = Dimension(source.TabHeldMaxLength),
             Sequencing = new SequenceParameters
             {
                 Method = sequence.Method,
