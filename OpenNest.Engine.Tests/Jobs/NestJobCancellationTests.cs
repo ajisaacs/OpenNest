@@ -85,7 +85,7 @@ public class NestJobCancellationTests
             new[] { part },
             new[] { new NestPlateStock("stock", new Size(20, 30), 1) }
         );
-        var runner = new NestJobRunner(_ => new DefaultPlateNester(plate => new ReportingFiller(
+        var runner = new NestJobRunner(_ => new PlateNester(plate => new ReportingFiller(
             plate
         )));
 

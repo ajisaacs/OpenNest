@@ -67,11 +67,37 @@ public class FillStrategyNameTests
         Assert.Equal(6, parts.Count);
     }
 
+    [Theory]
+    [InlineData("strip")]
+    [InlineData("HORIZONTAL REMNANT")]
+    [InlineData("default")]
+    public void FillServiceIgnoresCaseWhereTheJobFactoryDoesNot(string strategy)
+    {
+        var plate = new Plate(new Size(60, 80));
+        var drawing = new Drawing("part", TestDrawingFactory.Rectangle(6, 4));
+
+        var parts = PlateFillService.FillItem(strategy, plate,
+            new NestItem { Drawing = drawing, Quantity = 6 }, plate.WorkArea(), null, CancellationToken.None);
+
+        Assert.Equal(6, parts.Count);
+        Assert.Throws<NotSupportedException>(() => PlateNesterFactory.Create(strategy));
+    }
+
+    [Fact]
+    public void FillServiceRejectsUnknownNamesWithTheKnownList()
+    {
+        var error = Assert.Throws<NotSupportedException>(() => PlateFillService.FillItem("Mystery",
+            new Plate(new Size(60, 80)), new NestItem(), new Box(0, 0, 1, 1), null, CancellationToken.None));
+
+        Assert.Equal("Unknown placement strategy: Mystery. Known strategies: "
+            + "Fill, Strip, Vertical Remnant, Horizontal Remnant.", error.Message);
+    }
+
     [Fact]
     public void WholeJobRunnerAcceptsFillAndItsLegacyName()
     {
-        Assert.IsType<DefaultPlateNester>(PlateNesterFactory.Create("Fill"));
-        Assert.IsType<DefaultPlateNester>(PlateNesterFactory.Create("Default"));
+        Assert.IsType<PlateNester>(PlateNesterFactory.Create("Fill"));
+        Assert.IsType<PlateNester>(PlateNesterFactory.Create("Default"));
         Assert.Equal("Fill", new NestJobOptions().PlacementStrategy);
 
         var job = FiniteStockJobTests.Job(1);

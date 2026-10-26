@@ -5,22 +5,18 @@ namespace OpenNest.Engine.Jobs;
 
 /// <summary>
 /// Instance-scoped strategy resolution for the whole-job runner. All four built-in strategies
-/// resolve directly to filler-backed plate nesters. Selection is explicit per job; no shared
-/// mutable strategy setting is read or modified. Unknown keys reject.
+/// resolve to a filler-backed plate nester from <see cref="PlacementStrategies"/>. Selection is
+/// explicit per job; no shared mutable strategy setting is read or modified. Names match
+/// case-sensitively ("Default" is Fill's name in earlier releases); unknown keys reject.
 /// </summary>
 public static class PlateNesterFactory
 {
     public static IPlateNester Create(string strategy)
     {
         ArgumentNullException.ThrowIfNull(strategy);
-        return strategy switch
-        {
-            // "Default" is the strategy's name in earlier releases.
-            "Fill" or "Default" => new DefaultPlateNester(),
-            "Strip" => new StripPlateNester(),
-            "Vertical Remnant" => RemnantPlateNester.Vertical(),
-            "Horizontal Remnant" => RemnantPlateNester.Horizontal(),
-            _ => throw new NotSupportedException($"Unknown placement strategy: {strategy}."),
-        };
+        var entry =
+            PlacementStrategies.Find(strategy, StringComparison.Ordinal)
+            ?? throw new NotSupportedException($"Unknown placement strategy: {strategy}.");
+        return new PlateNester(entry.CreateFiller);
     }
 }

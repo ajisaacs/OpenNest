@@ -20,9 +20,6 @@ public static class PlateFillService
     /// <summary>Strategy used when a caller selection names none.</summary>
     public const string DefaultStrategy = "Fill";
 
-    /// <summary>Name of the Fill strategy in earlier releases; accepted as an alias.</summary>
-    private const string LegacyFillName = "Default";
-
     /// <summary>The four built-in strategy names, in registry display order.</summary>
     public static IReadOnlyList<string> BuiltInStrategies { get; } =
     [
@@ -414,30 +411,20 @@ public static class PlateFillService
             );
         }
 
-        if (strategy.Equals(LegacyFillName, StringComparison.OrdinalIgnoreCase))
-            return DefaultStrategy;
-        foreach (var candidate in BuiltInStrategies)
-        {
-            if (candidate.Equals(strategy, StringComparison.OrdinalIgnoreCase))
-                return candidate;
-        }
+        return Find(strategy).Name;
+    }
 
-        throw new NotSupportedException(
+    private static PlacementStrategies.Entry Find(string strategy) =>
+        PlacementStrategies.Find(strategy, StringComparison.OrdinalIgnoreCase)
+        ?? throw new NotSupportedException(
             $"Unknown placement strategy: {strategy}. Known strategies: {string.Join(", ", BuiltInStrategies)}."
         );
-    }
 
     /// <summary>Builds the filler for an optional strategy (null/empty = Fill).</summary>
     private static PlateFiller CreateFiller(string strategy, Plate plate)
     {
         ArgumentNullException.ThrowIfNull(plate);
-        return ResolveStrategy(strategy) switch
-        {
-            "Fill" => new PlateFiller(plate),
-            "Strip" => new PlateFiller(plate, PlateFillPolicy.Fill, PlateLayout.Strips),
-            "Vertical Remnant" => new PlateFiller(plate, PlateFillPolicy.VerticalRemnant),
-            _ => new PlateFiller(plate, PlateFillPolicy.HorizontalRemnant),
-        };
+        return Find(ResolveStrategy(strategy)).CreateFiller(plate);
     }
 
     /// <summary>Public operations require an explicit strategy name (null is an argument error).</summary>

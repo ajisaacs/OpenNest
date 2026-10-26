@@ -7,11 +7,11 @@ using OpenNest.Engine.Jobs.Placement.Fillers;
 namespace OpenNest.Engine.Jobs.Placement;
 
 /// <summary>
-/// Built-in placement strategy for the whole-job runner. Fills each candidate trial with a
-/// <see cref="PlateFiller"/> on a fresh private plate and owns its own run-scoped
-/// bookkeeping: remaining demand is read from the request and placement counts are derived from
-/// returned placements, so the filler's private <see cref="NestItem.Quantity"/> mutations never
-/// feed back into job accounting.
+/// Built-in placement strategy for the whole-job runner, for every entry in
+/// <see cref="PlacementStrategies"/>. Fills each candidate trial with a <see cref="PlateFiller"/>
+/// on a fresh private plate and owns its own run-scoped bookkeeping: remaining demand is read
+/// from the request and placement counts are derived from returned placements, so the filler's
+/// private <see cref="NestItem.Quantity"/> mutations never feed back into job accounting.
 /// </summary>
 /// <remarks>
 /// The identity/progress boundary mechanics live in <see cref="CandidatePlacementContext"/>: one
@@ -19,19 +19,17 @@ namespace OpenNest.Engine.Jobs.Placement;
 /// candidate trial (the runner reuses one <see cref="IPlateNester"/> instance per job). This is safe
 /// because the fillers mutate <see cref="NestItem.Quantity"/> (per-trial) and canonical-frame copies,
 /// never the shared <see cref="Drawing"/> or its <c>Quantity</c>. Identity is by Drawing reference,
-/// never by name. Each trial still gets a fresh private <see cref="Plate"/>.
+/// never by name. Each trial gets a fresh private <see cref="Plate"/> and filler, so learned angles
+/// never cross trials.
 /// </remarks>
-public sealed class DefaultPlateNester : IPlateNester
+internal sealed class PlateNester : IPlateNester
 {
     private readonly Func<Plate, PlateFiller> fillerFactory;
     private readonly OrderedPlateNester restrictedRotationNester = new();
     private readonly CandidatePlacementContext context = new();
 
-    public DefaultPlateNester()
-        : this(static plate => new PlateFiller(plate)) { }
-
-    /// <param name="fillerFactory">Injectable for tests; defaults to <see cref="PlateFiller"/>.</param>
-    internal DefaultPlateNester(Func<Plate, PlateFiller> fillerFactory)
+    /// <param name="fillerFactory">Builds the trial's filler; injectable for tests.</param>
+    internal PlateNester(Func<Plate, PlateFiller> fillerFactory)
     {
         this.fillerFactory =
             fillerFactory ?? throw new ArgumentNullException(nameof(fillerFactory));
@@ -46,10 +44,11 @@ public sealed class DefaultPlateNester : IPlateNester
         ArgumentNullException.ThrowIfNull(request);
         token.ThrowIfCancellationRequested();
 
-        // The Default fill pipeline cannot express a locked or bounded rotation (start == end == 0
-        // reads as "unconstrained") and its Pairs/RectBestFit strategies rotate freely, so it can
-        // return poses the requirement's RotationPolicy forbids. Restricted requirements go to the
-        // policy-aware ordered nester, which only proposes allowed angles and validates each pose.
+        // No filler can express a locked or bounded rotation (start == end == 0 reads as
+        // "unconstrained"): the Pairs/RectBestFit strategies rotate freely and the strip fills
+        // try two classification angles, so they can return poses the requirement's
+        // RotationPolicy forbids. Restricted requirements go to the policy-aware ordered nester,
+        // which only proposes allowed angles and validates each pose.
         if (request.Parts.Any(part => part.Rotation.Kind != RotationPolicyKind.Automatic))
             return restrictedRotationNester.Place(request, progress, token);
 

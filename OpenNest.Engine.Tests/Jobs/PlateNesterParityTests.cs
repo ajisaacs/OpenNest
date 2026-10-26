@@ -1,6 +1,7 @@
 using OpenNest.CNC;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Placement;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
 using Xunit;
 
@@ -59,7 +60,7 @@ public class PlateNesterParityTests
             ),
         };
 
-        var result = Solve(new DefaultPlateNester(), Job(parts));
+        var result = Solve(PlateNesterFactory.Create("Fill"), Job(parts));
 
         Assert.Equal(NestJobStatus.Complete, result.Status);
         Assert.Equal(4, ByPart(result)["a"].Placed);
@@ -86,7 +87,7 @@ public class PlateNesterParityTests
             ),
         };
 
-        var result = Solve(new StripPlateNester(), Job(parts, strategy: "Strip"));
+        var result = Solve(PlateNesterFactory.Create("Strip"), Job(parts, strategy: "Strip"));
 
         Assert.Equal(NestJobStatus.Complete, result.Status);
         Assert.Equal(4, ByPart(result)["a"].Placed);
@@ -97,11 +98,53 @@ public class PlateNesterParityTests
     [Fact]
     public void Builtins_AreResolvedByProductionFactory()
     {
-        Assert.IsType<DefaultPlateNester>(PlateNesterFactory.Create("Fill"));
-        Assert.IsType<StripPlateNester>(PlateNesterFactory.Create("Strip"));
-        Assert.IsType<RemnantPlateNester>(PlateNesterFactory.Create("Vertical Remnant"));
-        Assert.IsType<RemnantPlateNester>(PlateNesterFactory.Create("Horizontal Remnant"));
+        Assert.IsType<PlateNester>(PlateNesterFactory.Create("Fill"));
+        Assert.IsType<PlateNester>(PlateNesterFactory.Create("Strip"));
+        Assert.IsType<PlateNester>(PlateNesterFactory.Create("Vertical Remnant"));
+        Assert.IsType<PlateNester>(PlateNesterFactory.Create("Horizontal Remnant"));
         Assert.Throws<NotSupportedException>(() => PlateNesterFactory.Create("not registered"));
+    }
+
+    [Theory]
+    [InlineData("Fill", "Fill")]
+    [InlineData("Default", "Fill")]
+    [InlineData("Strip", "Strip")]
+    [InlineData("Vertical Remnant", "Vertical Remnant")]
+    [InlineData("Horizontal Remnant", "Horizontal Remnant")]
+    public void StrategyTable_MapsEachNameToItsFiller(string name, string canonical)
+    {
+        var entry = PlacementStrategies.Find(name, StringComparison.Ordinal);
+
+        Assert.NotNull(entry);
+        Assert.Equal(canonical, entry.Name);
+        var (policy, layout) = canonical switch
+        {
+            "Fill" => (PlateFillPolicy.Fill, PlateLayout.FillThenPack),
+            "Strip" => (PlateFillPolicy.Fill, PlateLayout.Strips),
+            "Vertical Remnant" => (PlateFillPolicy.VerticalRemnant, PlateLayout.FillThenPack),
+            _ => (PlateFillPolicy.HorizontalRemnant, PlateLayout.FillThenPack),
+        };
+        Assert.Same(policy, entry.Policy);
+        Assert.Equal(layout, entry.Layout);
+    }
+
+    [Fact]
+    public void StrategyTable_ListsTheBuiltInStrategiesInOrder() =>
+        Assert.Equal(
+            PlateFillService.BuiltInStrategies,
+            PlacementStrategies.Entries.Select(entry => entry.Name)
+        );
+
+    [Theory]
+    [InlineData("fill")]
+    [InlineData("default")]
+    [InlineData("STRIP")]
+    [InlineData("vertical remnant")]
+    [InlineData("")]
+    public void Factory_MatchesNamesCaseSensitively(string strategy)
+    {
+        var error = Assert.Throws<NotSupportedException>(() => PlateNesterFactory.Create(strategy));
+        Assert.Equal($"Unknown placement strategy: {strategy}.", error.Message);
     }
 
     [Fact]
@@ -126,7 +169,7 @@ public class PlateNesterParityTests
                 2
             ),
         };
-        var result = Solve(new DefaultPlateNester(), Job(parts));
+        var result = Solve(PlateNesterFactory.Create("Fill"), Job(parts));
 
         Assert.Equal(NestJobStatus.Complete, result.Status);
         Assert.Equal(3, ByPart(result)["l"].Placed);
@@ -162,7 +205,7 @@ public class PlateNesterParityTests
             new NestJobPart("holed", PartGeometrySnapshot.FromProgram(holed), 2),
             new NestJobPart("arc", PartGeometrySnapshot.FromProgram(arc), 2),
         };
-        var result = Solve(new DefaultPlateNester(), Job(parts));
+        var result = Solve(PlateNesterFactory.Create("Fill"), Job(parts));
 
         Assert.Equal(NestJobStatus.Complete, result.Status);
         Assert.Equal(2, ByPart(result)["holed"].Placed);
@@ -194,7 +237,7 @@ public class PlateNesterParityTests
             2,
             rotation: RotationPolicy.Fixed(0)
         );
-        var result = Solve(new DefaultPlateNester(), Job(new[] { part }));
+        var result = Solve(PlateNesterFactory.Create("Fill"), Job(new[] { part }));
 
         Assert.Equal(NestJobStatus.Complete, result.Status);
         var placements = result.Plates.SelectMany(p => p.Placements).ToList();
@@ -219,7 +262,7 @@ public class PlateNesterParityTests
             2,
             rotation: RotationPolicy.Fixed(0)
         );
-        var nester = new DefaultPlateNester(_ =>
+        var nester = new PlateNester(_ =>
             throw new InvalidOperationException("filler must not run for restricted rotation")
         );
 
@@ -243,7 +286,7 @@ public class PlateNesterParityTests
             2,
             rotation: RotationPolicy.Fixed(0)
         );
-        var nester = new RemnantPlateNester(_ =>
+        var nester = new PlateNester(_ =>
             throw new InvalidOperationException("filler must not run for restricted rotation")
         );
 
@@ -267,7 +310,7 @@ public class PlateNesterParityTests
             2,
             rotation: RotationPolicy.Fixed(0)
         );
-        var nester = new StripPlateNester(_ =>
+        var nester = new PlateNester(_ =>
             throw new InvalidOperationException("filler must not run for restricted rotation")
         );
 
@@ -289,7 +332,7 @@ public class PlateNesterParityTests
             new NestJobPart("first", PartGeometrySnapshot.FromProgram(program), 2),
             new NestJobPart("second", PartGeometrySnapshot.FromProgram(program), 1),
         };
-        var result = Solve(new DefaultPlateNester(), Job(parts));
+        var result = Solve(PlateNesterFactory.Create("Fill"), Job(parts));
 
         Assert.Equal(NestJobStatus.Complete, result.Status);
         Assert.Equal(2, ByPart(result)["first"].Placed);
@@ -311,7 +354,7 @@ public class PlateNesterParityTests
         program.LineTo(12, 7);
 
         var part = new NestJobPart("offset", PartGeometrySnapshot.FromProgram(program), 2);
-        var result = Solve(new DefaultPlateNester(), Job(new[] { part }));
+        var result = Solve(PlateNesterFactory.Create("Fill"), Job(new[] { part }));
 
         Assert.Equal(NestJobStatus.Complete, result.Status);
         Assert.Equal(2, ByPart(result)["offset"].Placed);
@@ -330,7 +373,7 @@ public class PlateNesterParityTests
             5
         );
         var stock = new NestPlateStock("stock", new Size(30, 20), 3);
-        var nester = new DefaultPlateNester();
+        var nester = PlateNesterFactory.Create("Fill");
         var result = new NestJobRunner(_ => nester).Solve(
             new NestJob(new[] { part }, new[] { stock })
         );
