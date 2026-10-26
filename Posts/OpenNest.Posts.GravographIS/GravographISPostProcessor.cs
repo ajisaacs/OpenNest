@@ -17,7 +17,7 @@ namespace OpenNest.Posts.GravographIS
     /// (Scribe) and a cut pass (Cut), each with its own feed/depth from <see cref="Config"/>.
     /// The cut pass pauses by default so the operator can swap/adjust the tool.
     /// </summary>
-    public sealed class GravographISPostProcessor : IConfigurablePostProcessor
+    public sealed class GravographISPostProcessor : IJsonConfigPostProcessor
     {
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -38,7 +38,7 @@ namespace OpenNest.Posts.GravographIS
 
         public bool AllowReverse { get; set; } = true;
 
-        public GravographISPostConfig Config { get; }
+        public GravographISPostConfig Config { get; private set; }
 
         object IConfigurablePostProcessor.Config => Config;
 
@@ -67,9 +67,16 @@ namespace OpenNest.Posts.GravographIS
         public void SaveConfig()
         {
             var configPath = GetConfigPath();
-            var json = JsonSerializer.Serialize(Config, JsonOptions);
+            var json = SerializeConfig();
             File.WriteAllText(configPath, json);
         }
+
+        public string SerializeConfig() => JsonSerializer.Serialize(Config, JsonOptions);
+
+        public void LoadConfig(string json) =>
+            Config =
+                JsonSerializer.Deserialize<GravographISPostConfig>(json, JsonOptions)
+                ?? throw new JsonException("The post settings are empty.");
 
         private static string GetConfigPath()
         {

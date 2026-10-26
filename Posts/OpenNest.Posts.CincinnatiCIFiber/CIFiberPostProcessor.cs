@@ -17,7 +17,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
     /// structure of the machine sample (see <see cref="CIFiberProgramWriter"/>).
     /// </summary>
     public sealed class CIFiberPostProcessor
-        : IConfigurablePostProcessor,
+        : IJsonConfigPostProcessor,
             IMultiFilePostProcessor,
             IPostVerificationSupport
     {
@@ -33,7 +33,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         public string Description =>
             "CI Fiber family laser (TF5200 / nLight CLX), e.g. CI Fiber 4020 8kW";
 
-        public CIFiberPostConfig Config { get; }
+        public CIFiberPostConfig Config { get; private set; }
 
         object IConfigurablePostProcessor.Config => Config;
 
@@ -62,9 +62,16 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         public void SaveConfig()
         {
             var configPath = GetConfigPath();
-            var json = JsonSerializer.Serialize(Config, JsonOptions);
+            var json = SerializeConfig();
             File.WriteAllText(configPath, json);
         }
+
+        public string SerializeConfig() => JsonSerializer.Serialize(Config, JsonOptions);
+
+        public void LoadConfig(string json) =>
+            Config =
+                JsonSerializer.Deserialize<CIFiberPostConfig>(json, JsonOptions)
+                ?? throw new JsonException("The post settings are empty.");
 
         private static string GetConfigPath()
         {

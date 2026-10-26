@@ -10,7 +10,7 @@ using OpenNest.CNC;
 namespace OpenNest.Posts.Cincinnati
 {
     public sealed class CincinnatiPostProcessor
-        : IConfigurablePostProcessor,
+        : IJsonConfigPostProcessor,
             IPostProcessorNestAware,
             IMaterialProvidingPostProcessor
     {
@@ -24,7 +24,7 @@ namespace OpenNest.Posts.Cincinnati
         public string Author => "OpenNest";
         public string Description => "Cincinnati CL-707/CL-800/CL-900/CL-940/CLX family";
 
-        public CincinnatiPostConfig Config { get; }
+        public CincinnatiPostConfig Config { get; private set; }
 
         object IConfigurablePostProcessor.Config => Config;
 
@@ -81,9 +81,16 @@ namespace OpenNest.Posts.Cincinnati
         public void SaveConfig()
         {
             var configPath = GetConfigPath();
-            var json = JsonSerializer.Serialize(Config, JsonOptions);
+            var json = SerializeConfig();
             File.WriteAllText(configPath, json);
         }
+
+        public string SerializeConfig() => JsonSerializer.Serialize(Config, JsonOptions);
+
+        public void LoadConfig(string json) =>
+            Config =
+                JsonSerializer.Deserialize<CincinnatiPostConfig>(json, JsonOptions)
+                ?? throw new JsonException("The post settings are empty.");
 
         private static string GetConfigPath()
         {
