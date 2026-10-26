@@ -9,8 +9,8 @@ namespace OpenNest.CNC.CuttingStrategy
     /// Pierces found by eroding a cutout: the part of it that keeps a clearance from its wall
     /// (see <see cref="ErodedPierce.Find"/>).
     /// </summary>
-    /// <param name="Pierces">Distinct pierces, the one nearest each target in turn.</param>
-    /// <param name="Clearance">How far the eroded region keeps every pierce from the wall.</param>
+    /// <param name="Pierces">The pierce for each target in turn, up to the maximum asked for.</param>
+    /// <param name="Clearance">The least any pierce keeps from the wall, at the erosion level that found it.</param>
     public sealed record ErodedPierces(IReadOnlyList<Vector> Pierces, double Clearance)
     {
         public static ErodedPierces None { get; } = new(System.Array.Empty<Vector>(), 0);
@@ -20,9 +20,11 @@ namespace OpenNest.CNC.CuttingStrategy
     /// The pierce search for cutouts too small for their configured lead-in (text, slots, small
     /// holes): erode the cutout inward, as a laser kerf offset would, and pierce in what is left.
     /// The erosion goes as deep as the pierce clearance when the cutout has room for it, else
-    /// almost to its pole of inaccessibility, so a slot or letter stroke is pierced on its
-    /// centre line, where the most clearance is. Each target, an entry the planner ranked, gets
-    /// the eroded point nearest it; the lead then runs straight from there to the wall.
+    /// almost to its pole of inaccessibility. Each target, an entry the planner ranked, gets the
+    /// nearest point of the deepest erosion that still reaches the wall beside it, stepping down to
+    /// half that depth: a letter stroke is pierced on its own centre line next to the entry, and
+    /// only a target with no stroke beside it falls back to the deepest place. The lead then runs
+    /// straight from the pierce to the wall.
     /// </summary>
     public static class ErodedPierce
     {
@@ -35,10 +37,15 @@ namespace OpenNest.CNC.CuttingStrategy
 
         private const int PoleSearchCells = 4096;
 
+        // Shallower erosion levels a target may fall back to, each a tenth of the deepest less.
+        private const int LevelCount = 6;
+        private const double LevelStep = 0.1;
+
         /// <summary>
-        /// Up to <paramref name="max"/> distinct pierces in the closed cutout <paramref name="hole"/>,
-        /// the eroded point nearest each of <paramref name="targets"/> in turn. A cutout too small to
-        /// erode is pierced at its pole alone. Nothing for an open or degenerate contour.
+        /// A pierce in the closed cutout <paramref name="hole"/> for each of the first
+        /// <paramref name="max"/> <paramref name="targets"/>: the eroded point nearest it. A cutout
+        /// too small to erode is pierced at its pole for every target. Nothing for an open or
+        /// degenerate contour.
         /// </summary>
         public static ErodedPierces Find(Shape hole, double clearance, IReadOnlyList<Vector> targets, int max)
         {
@@ -64,25 +71,46 @@ namespace OpenNest.CNC.CuttingStrategy
             var tolerance = System.Math.Max(depth / 100, System.Math.Pow(10, -ClipperBridge.Precision));
             var margin = 2 * tolerance + System.Math.Pow(10, -ClipperBridge.Precision);
             if (depth + margin >= inscribed - tolerance)
-                return new(new[] { pole }, inscribed);
+                return new(targets.Take(max).Select(_ => pole).ToArray(), inscribed);
 
             var polygon = ClipperBridge.Flatten(hole, tolerance, circumscribe: false);
-            var region = Clipper.InflatePaths(new PathsD { ClipperBridge.ToPath(polygon, positive: true) },
-                -(depth + margin), JoinType.Round, EndType.Polygon, 2.0, ClipperBridge.Precision, tolerance)
+            var path = new PathsD { ClipperBridge.ToPath(polygon, positive: true) };
+            var levels = new List<PathD>[LevelCount];
+            List<PathD> Level(int level) => levels[level] ??= Clipper.InflatePaths(path,
+                -(Depth(level) + margin), JoinType.Round, EndType.Polygon, 2.0, ClipperBridge.Precision, tolerance)
                 .Where(p => p.Count >= 3).ToList();
-            if (region.Count == 0)
-                return new(new[] { pole }, inscribed);
+            double Depth(int level) => depth * (1 - level * LevelStep);
+            if (Level(0).Count == 0)
+                return new(targets.Take(max).Select(_ => pole).ToArray(), inscribed);
 
+            // Each target gets the deepest level that reaches the wall beside it: a stroke
+            // narrower than the cutout's widest place is still pierced on its own centre line, near
+            // the entry, rather than only at the widest place.
             var pierces = new List<Vector>();
+            var shallowest = depth;
             foreach (var target in targets)
             {
-                var pierce = Nearest(region, target);
-                if (pierces.All(p => p.DistanceTo(pierce) > tolerance))
-                    pierces.Add(pierce);
+                var pierce = Nearest(Level(0), target);
+                var reached = 0;
+                for (var level = 0; level < LevelCount; level++)
+                {
+                    var region = Level(level);
+                    if (region.Count == 0)
+                        continue;
+                    var nearest = Nearest(region, target);
+                    if (nearest.DistanceTo(target) <= 2 * (Depth(level) + margin))
+                    {
+                        pierce = nearest;
+                        reached = level;
+                        break;
+                    }
+                }
+                pierces.Add(pierce);
+                shallowest = System.Math.Min(shallowest, Depth(reached));
                 if (pierces.Count == max)
                     break;
             }
-            return new(pierces, depth);
+            return new(pierces, shallowest);
         }
 
         // A hundredth of the smaller side: fine enough to find a thin cutout's pole.

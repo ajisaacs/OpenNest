@@ -58,11 +58,13 @@ public class ErodedPierceTests
         var holes = proposal.ContourChoices.Where(c => c.ContourOrdinal != snapshot.Placements[0].Prepared.PerimeterOrdinal).ToArray();
         Assert.Equal(2, holes.Length);
         Assert.All(holes, c => Assert.NotNull(c.Pierce));
-        // Each lead runs from the centre of its cutout to the nearest wall: no longer than the
-        // cutout is deep, and no lead-out follows.
+        // Each lead runs from near the centre line of its cutout to its entry: short, and no
+        // lead-out follows.
         var leads = proposal.Execution.Motions.Where(m => m.Layer == LayerType.Leadin).ToArray();
-        Assert.Equal(2, leads.Count(m => m.Length < 0.031));
+        Assert.Equal(2, leads.Count(m => m.Length < 0.05));
         Assert.DoesNotContain(proposal.Execution.Motions, m => m.Layer == LayerType.Leadout);
+        var slotPierce = holes.Single(c => c.Pierce!.Value.X < 3).Pierce!.Value;
+        Assert.InRange(slotPierce.Y, 1.0225, 1.0275);
         var circlePierce = holes.Single(c => c.Pierce!.Value.X > 4).Pierce!.Value;
         Assert.True(circlePierce.DistanceTo(new Vector(5, 1.5)) < 0.004);
     }
@@ -103,6 +105,27 @@ public class ErodedPierceTests
         var material = LeadMaterialSnapshot.Capture(program, Vector.Zero);
 
         Assert.True(material.IsComplete, material.Reason);
+    }
+
+    // Optional private input: never embed customer geometry or names in the repository.
+    // SmallFeatureLeadNestPath: a plate of serial-number tags whose 27 stencil-text cutouts are too
+    // narrow for the lead-in; only eroded pierces and a reading-order hole sweep cut them all.
+    [SkippableTheory]
+    [InlineData(0.125)]
+    [InlineData(0.5)]
+    public void TagPlate_PlansEveryCutoutInReadingOrder(double lead)
+    {
+        var path = TestConfig.GetExistingPath("SmallFeatureLeadNestPath");
+        Skip.If(path == null, "Configure SmallFeatureLeadNestPath in ignored test-config.json.");
+        var plate = new OpenNest.IO.NestReader(path!).Read().Plates.First(p => p.Parts.Count > 0);
+        var parameters = new CuttingParameters { InternalLeadIn = new LineLeadIn { Length = lead, ApproachAngle = 90 } };
+
+        var proposal = CuttingPlanBatch.Capture([plate], parameters, preservePartOrder: false).Plan();
+
+        Assert.True(proposal.CanApply, string.Join(Environment.NewLine, proposal.Describe("in")));
+        var planned = Assert.Single(proposal.Plates);
+        Assert.Equal(CuttingPlanStatus.Ready, planned.Result.Status);
+        Assert.Equal(plate.Parts.Count, planned.PartCount);
     }
 
     private static (CuttingPlanSnapshot, CuttingPlanResult) Plan(CuttingParameters parameters, params Part[] parts)

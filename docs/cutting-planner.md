@@ -165,7 +165,18 @@ alternative entries until a subsequent recovery/full pass needs them. It still
 checks emitted motions under the shared expansion budget and stall limit, and
 on failure the full entry/hole-order backtracking pass remains available. A failed
 preferred tour first gets a directed-contour recovery pass for parts with at most
-16 holes. It
+30 holes (a lone holed part gets it too, after its plain search). Recovery can
+sweep the holes in reading order, like text: along the way the holes spread
+furthest, toward the next cut, it orders them by their far side and leaves each
+from its far side (a hole whose next one overlaps it along the sweep, such as a
+stencil letter's two pieces, faces that next hole instead), so every hop runs on
+past the holes already cut. Each hole tries a few entries there, fitted with its
+lead-in or [pierced by erosion](geometry/lead-in-placement.md#cutouts-too-small-for-their-lead-in),
+with a little backtracking, and the sweep ends at the first fitting outside entry
+beyond every hole. It is held to a few expansions per hole. A part with more than 16
+holes, more than the search below was built for, sweeps first; any other part sweeps
+only after that search fails for every outside entry, so its plans are unchanged
+whenever the search finds one. The search
 tries native outside entries beyond the ranked shortlist, then builds a hole route
 from actual emitted pierces, checking each transition against already released
 contours. The part's scribes and other open cuts are checked once from the arrival,

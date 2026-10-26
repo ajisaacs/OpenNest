@@ -80,19 +80,22 @@ Plan Cutting has tried every entry of a cutout and none fits, it erodes the cuto
 2. The cutout is offset inward (`Clipper.InflatePaths`, negative) by the pierce clearance
    (`GetEffectivePierceClearance`) when it has room for it, else by nine tenths
    (`ErodedPierce.DepthFraction`) of its inscribed radius, plus a margin for flattening, round
-   joins and Clipper rounding. What survives keeps a letter stroke's pierces on its centre line
-   and finds the widest spot of a feature that tapers.
-3. For each of the cutout's ranked entries, the eroded point nearest it is a pierce. The entry
-   becomes the cutout's native point closest to that pierce, and the lead-in runs straight from
-   the pierce to it (`PreparedContours.ErodedPierceEntries`, a `ContourChoice` whose `Pierce` is
-   set). A cutout so pierced has no lead-out: a feature too small for its lead-in has no room for
-   one either.
-4. A cutout too small to erode is pierced at its pole alone.
-5. `LeadPathValidator` checks each candidate like any other planner-chosen entry, pierce zone
+   joins and Clipper rounding. Shallower levels, down to half that depth, back it up.
+3. Each of the cutout's ranked entries gets the nearest point of the deepest level that reaches
+   the wall beside it: a letter stroke narrower than the cutout's widest place is still pierced
+   on its own centre line next to the entry, so the route can enter and leave a letter where it
+   needs to.
+4. The lead-in runs straight from the pierce to that entry, or else to the cutout's native point
+   closest to the pierce (`PreparedContours.ErodedPierceEntries`, a `ContourChoice` whose `Pierce`
+   is set). A cutout so pierced has no lead-out: a feature too small for its lead-in has no room
+   for one either.
+5. A cutout too small to erode is pierced at its pole.
+6. `LeadPathValidator` checks each candidate like any other planner-chosen entry, pierce zone
    included. When none is clear, the "No tested lead-in fits" finding says why.
 
 Cutouts where a configured lead-in fits keep it, so plans of other parts are unchanged. Hole entry
-selection, the preferred hole path and contour recovery all use the fallback. Only Plan Cutting
+selection, the preferred hole path and contour recovery all use the fallback; recovery's
+reading-order sweep also pierces a letter this way at the side it leaves from. Only Plan Cutting
 uses it: the emitter's own automatic assignment and the manual lead-in preview keep the
 configured lead.
 
@@ -106,7 +109,8 @@ unchanged/fallback behavior. The perimeter tests cover every square corner under
 windings and a rotation, auto and manual placement from either edge, preview
 agreement, approach-angle handling, the flat-corner clearance fallback, reflex
 notches, and straight lead-outs. `ErodedPierceTests` covers the eroded pierces of a slot and a small round hole, a cutout that keeps
-its configured lead, and the containment of text cutouts that sit a micro-inch apart.
+its configured lead, the containment of text cutouts that sit a micro-inch apart and, with the
+optional `SmallFeatureLeadNestPath` input, a plate of stencil-text tags planned in reading order.
 `ArcLeadInTangentTests` checks curved-lead tangency, direction
 and sweep on perimeters and cutouts under both windings, and at every perimeter corner from
 either edge.

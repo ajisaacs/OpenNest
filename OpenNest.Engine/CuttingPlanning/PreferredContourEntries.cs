@@ -94,12 +94,12 @@ internal static class PreferredContourEntries
     /// <summary>
     /// The fallback for a cutout none of whose <paramref name="ranked"/> entries has a configured
     /// lead-in that fits: up to <paramref name="max"/> entries pierced where eroding the cutout
-    /// leaves room, the one nearest each ranked entry in turn (see
+    /// leaves room, nearest each ranked entry in turn (see
     /// <see cref="PreparedContours.ErodedPierceEntries"/>). Proposals only: the lead checks decide.
     /// </summary>
     internal static IReadOnlyList<ContourEntryCandidate> ErodedPierces(PreparedContours prepared, int contour,
         IReadOnlyList<ContourEntryCandidate> ranked, int max, CancellationToken token) =>
-        prepared.ErodedPierceEntries(contour, ranked.Select(c => c.Choice.Point).ToArray(), max, token)
+        prepared.ErodedPierceEntries(contour, ranked.Select(c => c.Choice).ToArray(), max, token)
             .Select(choice => new ContourEntryCandidate(choice, AutomaticEntryKind.ErodedPierce)).ToArray();
 
     /// <summary>

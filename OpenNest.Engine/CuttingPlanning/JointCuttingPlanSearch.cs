@@ -28,7 +28,9 @@ internal static class JointCuttingPlanSearch
     /// the contours are those of the blocked part and of the part cut just before it.
     /// </summary>
     internal const int StallExpansionsPerEntry = 8;
-    private const int MaximumRecoveryHoles = 16;
+    private const int MaximumRecoveryHoles = 30;
+    // The most holes recovery's search alone served; parts with more try the reading-order sweep first.
+    private const int SearchedRecoveryHoles = 16;
 
     /// <summary>LeadPrechecks counts S07 adapter evaluations — bounded work tracked separately from expansions.</summary>
     internal sealed record Outcome(CuttingPlanStatus Status, IReadOnlyList<FixedProgramPlacement> Order,
@@ -128,7 +130,8 @@ internal static class JointCuttingPlanSearch
                 {
                     // "Cut before" rules are a heuristic: a part blocked straight after another can
                     // still be reachable via a third. Search every order with what budget remains.
-                    if (preferEndpoints)
+                    // A lone holed part has no part order to learn: its holes still get recovery.
+                    if (preferEndpoints || maxContours > 1)
                     {
                         var recovery = walk.Follow(null, stall, null, contourRecovery: true);
                         if (recovery.Order != null)
@@ -686,7 +689,9 @@ internal static class JointCuttingPlanSearch
             else
                 // No outside to cut: one pass, complete once every hole is cut.
                 perimeters = [null];
-            var holes = Enumerable.Range(0, prepared.PerimeterOrdinal)
+            // Every hole's fitting entries, for the search; the sweep needs only a few of them.
+            ContourChoice[][] holes = null;
+            ContourChoice[][] Holes() => holes ??= Enumerable.Range(0, prepared.PerimeterOrdinal)
                 .Select(c =>
                 {
                     var catalogue = prepared.AutomaticEntryCandidatesWithFallbacks(c, token: token);
@@ -723,22 +728,59 @@ internal static class JointCuttingPlanSearch
                     prepared.EmitCandidateForValidation(choice), source.Location, null, token));
             }
             var centres = prepared.HoleCentres(token);
-            // Ranking hops reads every hole entry's motion: build them before the outside
-            // entries share what is left of the allowance.
-            foreach (var entry in holes.SelectMany(entries => entries))
+            var bounds = Enumerable.Range(0, prepared.PerimeterOrdinal).Select(prepared.ContourBounds).ToArray();
+            var sweepEntries = new Dictionary<(int Hole, int Next, Vector Direction), ContourChoice[]>();
+            // A hole's sweep entries: at its far side, its far corners and facing the next hole, each with the
+            // configured lead-in or pierced by erosion, in the order the sweep leaves it.
+            ContourChoice[] SweepEntries(int hole, int next, Vector direction)
             {
-                if (Expansions >= stop) yield break;
-                Motion(entry);
+                if (sweepEntries.TryGetValue((hole, next, direction), out var known))
+                    return known;
+                var box = bounds[hole];
+                var reach = box.Width + box.Length + 1;
+                var toward = next < 0 ? direction : Unit(bounds[next].Center - box.Center, direction);
+                var across = new Vector(-direction.Y, direction.X) * reach;
+                var catalogue = new[] { direction * reach, toward * reach, direction * reach + across, direction * reach - across }
+                    .Select(offset => prepared.ClosestEntry(hole, box.Center + offset)).Distinct()
+                    .Select(c => new ContourEntryCandidate(c, AutomaticEntryKind.TargetFacing)).ToArray();
+                var extra = catalogue.Concat(PreferredContourEntries.ErodedPierces(prepared, hole, catalogue, catalogue.Length, token))
+                    .Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear).Select(e => e.Choice);
+                // Stencil pieces overlap along the direction: leave toward the next piece.
+                var stacked = next >= 0 && Near(bounds[next], direction) < Far(box, direction) - OpenNest.Math.Tolerance.Epsilon;
+                double Leaving(ContourChoice c) => Dot(Motion(c).DeparturePoint - source.Location - box.Center, toward);
+                return sweepEntries[(hole, next, direction)] = extra.Distinct()
+                    .OrderByDescending(c => stacked ? Leaving(c)
+                        : System.Math.Round(Dot(Motion(c).DeparturePoint - source.Location, direction) / SweepRounding))
+                    .ThenByDescending(Leaving).Take(SweepEntriesPerHole).ToArray();
             }
-            for (var endpoint = 0; endpoint < perimeters.Length; endpoint++)
+            // Reading order: it needs no search when the holes are rows of text. A sweep ends at
+            // the outside, so each runs to the first fitting outside entry beyond every hole, along
+            // the way the holes spread furthest first and, of its two ways, toward the next cut.
+            // Each outside entry also gets the search. Parts with more holes than the search was
+            // built for sweep first; the others keep the search first and sweep only after it.
+            var sweeps = new List<(int Endpoint, Vector? Sweep)>();
+            var onward = target ?? node.RoutePosition - source.Location;
+            foreach (var direction in SweepDirections
+                .OrderByDescending(d => bounds.Length == 0 ? 0 : bounds.Max(b => Far(b, d)) + bounds.Max(b => Far(b, -1 * d)))
+                .ThenByDescending(d => Dot(onward, d)))
+            {
+                var ahead = Array.FindIndex(perimeters, p => p == null || bounds.All(b => Dot(p.Point, direction) >= Far(b, direction)));
+                if (ahead >= 0)
+                    sweeps.Add((ahead, direction));
+            }
+            var searches = Enumerable.Range(0, perimeters.Length).Select(e => (e, (Vector?)null)).ToArray();
+            List<(int Endpoint, Vector? Sweep)> tries = prepared.PerimeterOrdinal > SearchedRecoveryHoles
+                ? [.. sweeps, .. searches] : [.. searches, .. sweeps];
+            foreach (var (endpoint, sweep) in tries)
             {
                 token.ThrowIfCancellationRequested();
                 if (Expansions >= stop) yield break;
                 var outside = perimeters[endpoint];
                 // Share what is left between the outside entries still to try: one that no hole
-                // tour can reach must not spend the allowance of the entries after it.
-                var limit = System.Math.Min(stop, Expansions + System.Math.Max(
-                    (stop - Expansions) / (perimeters.Length - endpoint), (long)StallExpansionsPerEntry * prepared.Count));
+                // tour can reach must not spend the allowance of the entries after it. One sweep
+                // visits each hole about once: it gets a few expansions per hole instead.
+                var limit = System.Math.Min(stop, Expansions + (sweep != null ? (long)SweepExpansionsPerHole * prepared.Count
+                    : System.Math.Max((stop - Expansions) / (perimeters.Length - endpoint), (long)StallExpansionsPerEntry * prepared.Count)));
                 var chain = new List<ContourChoice>();
                 // This dominance heuristic is confined to recovery: emitted
                 // seams can differ for the same released subset. Never prune full DFS.
@@ -748,16 +790,31 @@ internal static class JointCuttingPlanSearch
                 // restarts the chain, so the order changes before entry combinations are retried.
                 // Rules only order candidates (a hole still waiting for one goes last); no hole is
                 // ever skipped. Until the first rule the chain is nearest-first, as before.
-                var prerequisites = holes.Select(_ => new HashSet<int>()).ToArray();
+                var prerequisites = Enumerable.Range(0, prepared.PerimeterOrdinal).Select(_ => new HashSet<int>()).ToArray();
                 var learnedNew = false;
-                bool solved;
-                do
+                var solved = sweep is { } sweepDirection && Sweep(sweepDirection);
+                if (sweep != null && !solved)
+                    continue;
+                if (!solved && holes == null)
+                {
+                    // Ranking hops reads every hole entry's motion: build them before the outside
+                    // entries share what is left of the allowance.
+                    foreach (var entry in Holes().SelectMany(entries => entries))
+                    {
+                        if (Expansions >= stop) yield break;
+                        Motion(entry);
+                    }
+                    limit = System.Math.Min(stop, Expansions + System.Math.Max(
+                        (stop - Expansions) / (perimeters.Length - endpoint), (long)StallExpansionsPerEntry * prepared.Count));
+                }
+                while (!solved)
                 {
                     learnedNew = false;
                     chain.Clear();
                     solved = Solve(0, start, released);
+                    if (!learnedNew || Expansions >= limit)
+                        break;
                 }
-                while (!solved && learnedNew && Expansions < limit);
                 if (!solved) continue;
                 var program = prepared.Emit(chain);
                 var execution = ExecutionMotionReader.Read(program, source.Location, node.Position, token);
@@ -828,6 +885,63 @@ internal static class JointCuttingPlanSearch
                     return false;
                 }
 
+                // Reading order along direction: the holes by their far side, each left from its
+                // far side, so every hop runs on past the holes already cut; a hole whose next
+                // overlaps it along the direction (a stencil letter's pieces) is left facing that
+                // next hole instead. Entries are tried in that order with backtracking, every hop
+                // checked as usual; a hole with no fitting entry there is pierced by erosion there.
+                bool Sweep(Vector direction)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var across = new Vector(-direction.Y, direction.X);
+                    var order = Enumerable.Range(0, prepared.PerimeterOrdinal)
+                        .OrderBy(c => Far(bounds[c], direction)).ThenBy(c => Dot(bounds[c].Center, across)).ToArray();
+                    chain.Clear();
+                    var blocked = false;
+                    return Step(0, start, released);
+
+                    bool Step(int index, Vector position, ReleasedContourState state)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        if (Expansions >= limit)
+                            return false;
+                        if (index == order.Length)
+                        {
+                            if (outside != null)
+                            {
+                                CountExpansion(source);
+                                // Other entries of the holes before cannot clear the way back
+                                // over them: this sweep is done.
+                                if (state.Copy().Check(Motion(outside), position, source.SourceOrdinal + 1, token).Count != 0)
+                                {
+                                    blocked = true;
+                                    return false;
+                                }
+                                chain.Add(outside);
+                            }
+                            return true;
+                        }
+                        var hole = order[index];
+                        var next = index + 1 < order.Length ? order[index + 1] : -1;
+                        foreach (var choice in SweepEntries(hole, next, direction))
+                        {
+                            if (Expansions >= limit)
+                                return false;
+                            CountExpansion(source);
+                            var after = state.Copy();
+                            if (after.Check(Motion(choice), position, source.SourceOrdinal + 1, token).Count != 0)
+                                continue;
+                            chain.Add(choice);
+                            if (Step(index + 1, Motion(choice).DeparturePoint, after))
+                                return true;
+                            chain.RemoveAt(chain.Count - 1);
+                            if (blocked)
+                                return false;
+                        }
+                        return false;
+                    }
+                }
+
                 // Rules from a hop that crossed holes of this chain; true when one is new.
                 bool Learn(int hole, Vector position, OwnedExecution execution)
                 {
@@ -863,6 +977,31 @@ internal static class JointCuttingPlanSearch
                         : target is { } next ? departure.DistanceTo(next + source.Location) : 0;
                 }
             }
+        }
+
+        // The reading-order sweeps recovery tries first, and how many entries of a hole each tries.
+        private static readonly Vector[] SweepDirections = [new(1, 0), new(-1, 0), new(0, 1), new(0, -1)];
+        private const int SweepEntriesPerHole = 4;
+        // A sweep's allowance per contour: building and checking its entries, with a little backtracking.
+        private const int SweepExpansionsPerHole = 40;
+        // Far sides within this along the sweep count as level: the hop's direction then decides.
+        private const double SweepRounding = 1e-3;
+
+        private static double Dot(Vector a, Vector b) => a.X * b.X + a.Y * b.Y;
+
+        private static double Far(Box box, Vector direction) =>
+            System.Math.Max(box.Left * direction.X, box.Right * direction.X)
+            + System.Math.Max(box.Bottom * direction.Y, box.Top * direction.Y);
+
+        private static double Near(Box box, Vector direction) =>
+            System.Math.Min(box.Left * direction.X, box.Right * direction.X)
+            + System.Math.Min(box.Bottom * direction.Y, box.Top * direction.Y);
+
+        // The unit vector of offset, or fallback when it has no length.
+        private static Vector Unit(Vector offset, Vector fallback)
+        {
+            var length = System.Math.Sqrt(Dot(offset, offset));
+            return length > OpenNest.Math.Tolerance.Epsilon ? offset * (1 / length) : fallback;
         }
 
         private static bool OnlyCrossings(IReadOnlyList<PostVerificationFinding> findings) =>

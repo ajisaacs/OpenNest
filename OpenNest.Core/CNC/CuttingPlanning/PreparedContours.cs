@@ -450,34 +450,47 @@ public sealed class PreparedContours
 
     /// <summary>
     /// Entries of cutout <paramref name="contourOrdinal"/> pierced where eroding it leaves room
-    /// (see <see cref="ErodedPierce"/>), the one nearest each of <paramref name="targets"/> (local
-    /// coordinates, usually its ranked entries) in turn: the planner's fallback when no configured
-    /// lead-in fits the cutout. Each enters at the native point of the cutout closest to its
-    /// pierce, along a straight lead-in, with no lead-out. Nothing for the perimeter or a pinned
+    /// (see <see cref="ErodedPierce"/>): the planner's fallback when no configured lead-in fits the
+    /// cutout. For each of the first <paramref name="max"/> <paramref name="targets"/> (its own
+    /// entries, usually ranked) the pierce is the eroded point nearest it, and the lead-in runs
+    /// straight from there to the target itself, then, as an alternative, to the cutout's native
+    /// point closest to the pierce. Neither has a lead-out. Nothing for the perimeter or a pinned
     /// cutout; the lead validator still checks each one.
     /// </summary>
-    internal IReadOnlyList<ContourChoice> ErodedPierceEntries(int contourOrdinal, IReadOnlyList<Vector> targets,
+    internal IReadOnlyList<ContourChoice> ErodedPierceEntries(int contourOrdinal, IReadOnlyList<ContourChoice> targets,
         int max, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
         var shape = GetShape(contourOrdinal);
         if (contourOrdinal == PerimeterOrdinal || pinned[contourOrdinal] != null)
             return Array.Empty<ContourChoice>();
-        var found = ErodedPierce.Find(shape, ParametersFor(contourOrdinal).GetEffectivePierceClearance(), targets, max);
+        targets = targets.Where(t => t.Owner == this && t.ContourOrdinal == contourOrdinal).Take(max).ToArray();
+        var found = ErodedPierce.Find(shape, ParametersFor(contourOrdinal).GetEffectivePierceClearance(),
+            targets.Select(t => t.Point).ToArray(), max);
         var entries = new List<ContourChoice>();
-        foreach (var pierce in found.Pierces)
+        for (var i = 0; i < found.Pierces.Count; i++)
         {
             token.ThrowIfCancellationRequested();
+            var pierce = found.Pierces[i];
+            Add(() => targets[i] with { Pierce = pierce });
+            Add(() => PiercedEntry(contourOrdinal, pierce));
+        }
+        return entries;
+
+        void Add(Func<ContourChoice> entry)
+        {
             try
             {
-                entries.Add(PiercedEntry(contourOrdinal, pierce));
+                var choice = entry();
+                ValidateChoice(choice);
+                if (!entries.Any(e => e.Point == choice.Point && e.Pierce == choice.Pierce))
+                    entries.Add(choice);
             }
             catch (ArgumentException)
             {
                 // A pierce on the wall itself has no lead; the others still stand.
             }
         }
-        return entries;
     }
 
     // A contour entry at the closest native point to a pierce off it, along a straight lead-in.
@@ -927,6 +940,9 @@ public sealed class PreparedContours
         }
         return centres;
     }
+
+    /// <summary>The bounding box of contour <paramref name="contourOrdinal"/>, local. A routing hint only.</summary>
+    internal Box ContourBounds(int contourOrdinal) => GetShape(contourOrdinal).BoundingBox;
 
     /// <summary>
     /// Whether <paramref name="point"/> lies inside the internal contour <paramref name="contourOrdinal"/>.
