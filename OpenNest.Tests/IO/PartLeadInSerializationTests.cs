@@ -26,7 +26,10 @@ public class PartLeadInSerializationTests
         Assert.Equal(expected.Location, actual.Location);
         Assert.Equal(expected.Rotation, actual.Rotation, 8);
         AssertBox(expected.BoundingBox, actual.BoundingBox);
-        Assert.Null(actual.CuttingParameters);
+        // The settings the leads were built with come back with them, as an owned copy.
+        Assert.NotSame(expected.CuttingParameters, actual.CuttingParameters);
+        Assert.Equal(CuttingParametersSerializer.Serialize(expected.CuttingParameters),
+            CuttingParametersSerializer.Serialize(actual.CuttingParameters));
         Assert.Same(loaded.Drawings.First(), actual.BaseDrawing);
         Assert.NotEmpty(actual.Program.SubPrograms);
         foreach (var call in actual.Program.Codes.OfType<SubProgramCall>())
@@ -242,7 +245,12 @@ public class PartLeadInSerializationTests
         Assert.Equal(0.875, Assert.IsType<ArcLeadIn>(loaded.Plates[1].CuttingParameters.ExternalLeadIn).Radius);
         Assert.NotSame(parameters, loaded.Plates[1].CuttingParameters);
         Assert.Equal(program, NestWriter.GetProgramText(loaded.Plates[0].Parts[0].Program));
-        Assert.Null(loaded.Plates[0].Parts[0].CuttingParameters);
+        // The part keeps the settings its leads were built with, not the plate's new ones.
+        var partParameters = loaded.Plates[0].Parts[0].CuttingParameters;
+        Assert.NotSame(parameters, partParameters);
+        Assert.Null(partParameters.MachineName);
+        Assert.Equal(CuttingParametersSerializer.Serialize(first.Parts[0].CuttingParameters),
+            CuttingParametersSerializer.Serialize(partParameters));
         Assert.False(loaded.Plates[1].Parts[0].HasManualLeadIns);
     }
 
