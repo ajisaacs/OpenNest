@@ -298,6 +298,7 @@ public class ContourCandidateEmissionTests
                 Q((m.Start ?? m.End).X - origin.X), Q((m.Start ?? m.End).Y - origin.Y),
                 Q(m.End.X - origin.X), Q(m.End.Y - origin.Y)))))));
 
-        static string Q(double value) => (value / 1e-9).ToString("F0", CultureInfo.InvariantCulture);
+        // Adding +0 drops the sign of an ulp-sized result, which would otherwise print "-0".
+        static string Q(double value) => (System.Math.Round(value / 1e-9) + 0.0).ToString("F0", CultureInfo.InvariantCulture);
     }
 }

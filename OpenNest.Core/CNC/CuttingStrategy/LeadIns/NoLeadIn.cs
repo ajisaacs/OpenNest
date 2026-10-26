@@ -14,7 +14,8 @@ namespace OpenNest.CNC.CuttingStrategy
             return new List<ICode> { new RapidMove(contourStartPoint) };
         }
 
-        public override Vector GetPiercePoint(Vector contourStartPoint, double contourNormalAngle)
+        public override Vector GetPiercePoint(Vector contourStartPoint, double contourNormalAngle,
+            RotationType winding = RotationType.CW)
         {
             return contourStartPoint;
         }

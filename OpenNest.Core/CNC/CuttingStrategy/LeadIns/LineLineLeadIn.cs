@@ -33,7 +33,8 @@ namespace OpenNest.CNC.CuttingStrategy
             };
         }
 
-        public override Vector GetPiercePoint(Vector contourStartPoint, double contourNormalAngle)
+        public override Vector GetPiercePoint(Vector contourStartPoint, double contourNormalAngle,
+            RotationType winding = RotationType.CW)
         {
             var secondAngle = contourNormalAngle - Angle.HalfPI + Angle.ToRadians(ApproachAngle1);
             var midX = contourStartPoint.X + Length2 * System.Math.Cos(secondAngle);

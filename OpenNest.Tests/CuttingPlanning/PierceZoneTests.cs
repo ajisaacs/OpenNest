@@ -63,11 +63,11 @@ public class PierceZoneTests
         var hole = Slot();
         var lead = new LineLeadIn { Length = 0.28, ApproachAngle = 90 };
 
-        Assert.Same(lead, ContourCuttingStrategy.ResolvePierceZone(hole, new Vector(2, 5), lead, 0, 0));
+        Assert.Same(lead, ContourCuttingStrategy.ResolvePierceZone(hole, new Vector(2, 5), lead, 0, 0, RotationType.CW));
         var none = new NoLeadIn();
-        Assert.Same(none, ContourCuttingStrategy.ResolvePierceZone(hole, new Vector(2, 5), none, 0, 0.25));
+        Assert.Same(none, ContourCuttingStrategy.ResolvePierceZone(hole, new Vector(2, 5), none, 0, 0.25, RotationType.CW));
         // A pierce 0.28 into the slot keeps 0.28 from its end and 0.3 from its sides.
-        Assert.Same(lead, ContourCuttingStrategy.ResolvePierceZone(hole, new Vector(2, 5), lead, 0, 0.25));
+        Assert.Same(lead, ContourCuttingStrategy.ResolvePierceZone(hole, new Vector(2, 5), lead, 0, 0.25, RotationType.CW));
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public class PierceZoneTests
         var point = new Vector(2, 5);
 
         var resolved = ContourCuttingStrategy.ResolvePierceZone(hole, point,
-            new LineLeadIn { Length = 0.1, ApproachAngle = 90 }, 0, 0.25);
+            new LineLeadIn { Length = 0.1, ApproachAngle = 90 }, 0, 0.25, RotationType.CW);
 
         // Toward the slot's pole, not all the way to it: 0.25 in from the end wall.
         var pierce = resolved.GetPiercePoint(point, 0);

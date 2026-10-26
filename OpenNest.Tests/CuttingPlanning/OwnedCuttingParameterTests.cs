@@ -5,17 +5,18 @@ namespace OpenNest.Tests.CuttingPlanning;
 
 public class OwnedCuttingParameterTests
 {
+    // Fresh instances per case: tests mutate them, and a shared lead would drift out of range.
     public static IEnumerable<object[]> Styles()
     {
-        foreach (var leadIn in new LeadIn[] { new NoLeadIn(), new LineLeadIn { Length = 0.3, ApproachAngle = 45 },
-            new ArcLeadIn { Radius = 0.2 }, new LineArcLeadIn { LineLength = 0.1, ArcRadius = 0.2, ApproachAngle = 120 },
-            new LineLineLeadIn { Length1 = 0.1, Length2 = 0.2, ApproachAngle1 = 40, ApproachAngle2 = -30 },
-            new CleanHoleLeadIn { LineLength = 0.1, ArcRadius = 0.2, Kerf = 0.01 } })
-            foreach (var leadOut in new LeadOut[] { new NoLeadOut(), new LineLeadOut { Length = 0.4, ApproachAngle = 80 }, new ArcLeadOut { Radius = 0.3 } })
-                foreach (var tab in new Tab[] { new NormalTab { Size = 0.2, CutoutMinWidth = 1, CutoutMaxWidth = 5, CutoutMinHeight = 2, CutoutMaxHeight = 6 },
-                    new BreakerTab { Size = 0.3, BreakerDepth = 0.1, BreakerLeadInLength = 0.2, BreakerAngle = 30 },
-                    new MachineTab { Size = 0.4, MachineTabId = 7 } })
-                    yield return [leadIn, leadOut, tab];
+        foreach (var leadIn in new Func<LeadIn>[] { () => new NoLeadIn(), () => new LineLeadIn { Length = 0.3, ApproachAngle = 45 },
+            () => new ArcLeadIn { Radius = 0.2, SweepAngle = 90 }, () => new LineArcLeadIn { LineLength = 0.1, ArcRadius = 0.2, ApproachAngle = 120 },
+            () => new LineLineLeadIn { Length1 = 0.1, Length2 = 0.2, ApproachAngle1 = 40, ApproachAngle2 = -30 },
+            () => new CleanHoleLeadIn { LineLength = 0.1, ArcRadius = 0.2, Kerf = 0.01 } })
+            foreach (var leadOut in new Func<LeadOut>[] { () => new NoLeadOut(), () => new LineLeadOut { Length = 0.4, ApproachAngle = 80 }, () => new ArcLeadOut { Radius = 0.3 } })
+                foreach (var tab in new Func<Tab>[] { () => new NormalTab { Size = 0.2, CutoutMinWidth = 1, CutoutMaxWidth = 5, CutoutMinHeight = 2, CutoutMaxHeight = 6 },
+                    () => new BreakerTab { Size = 0.3, BreakerDepth = 0.1, BreakerLeadInLength = 0.2, BreakerAngle = 30 },
+                    () => new MachineTab { Size = 0.4, MachineTabId = 7 } })
+                    yield return [leadIn(), leadOut(), tab()];
     }
 
     [Theory]
@@ -105,6 +106,8 @@ public class OwnedCuttingParameterTests
     [InlineData("null-tab")]
     [InlineData("dimension")]
     [InlineData("angle")]
+    [InlineData("sweep-zero")]
+    [InlineData("sweep-over")]
     [InlineData("increment")]
     [InlineData("enum")]
     [InlineData("tab-lead")]
@@ -127,6 +130,8 @@ public class OwnedCuttingParameterTests
             case "null-tab": source.TabsEnabled = true; break;
             case "dimension": source.PartSpacing = -1; break;
             case "angle": source.ExternalLeadIn = new LineLeadIn { ApproachAngle = double.NaN }; break;
+            case "sweep-zero": source.ExternalLeadIn = new ArcLeadIn { Radius = 0.2, SweepAngle = 0 }; break;
+            case "sweep-over": source.ExternalLeadIn = new ArcLeadIn { Radius = 0.2, SweepAngle = 181 }; break;
             case "increment": source.LeadInAngleIncrement = 0; break;
             case "enum": source.Assignment.Method = (SequenceMethod)6; break;
             case "tab-lead": source.TabConfig = new NormalTab { TabLeadIn = new ArcLeadIn { Radius = double.PositiveInfinity } }; break;

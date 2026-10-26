@@ -13,10 +13,11 @@ namespace OpenNest.CNC.CuttingStrategy
             Vector contourStartPoint,
             double contourNormalAngle,
             RotationType winding = RotationType.CW
-        ) => Approach(contourStartPoint, contourNormalAngle).ToCodes(contourStartPoint, winding);
+        ) => Approach(contourStartPoint, contourNormalAngle, winding).ToCodes(contourStartPoint, winding);
 
-        public override Vector GetPiercePoint(Vector contourStartPoint, double contourNormalAngle) =>
-            Approach(contourStartPoint, contourNormalAngle).PiercePoint;
+        public override Vector GetPiercePoint(Vector contourStartPoint, double contourNormalAngle,
+            RotationType winding = RotationType.CW) =>
+            Approach(contourStartPoint, contourNormalAngle, winding).PiercePoint;
 
         public override LeadIn Scale(double factor) =>
             new LineArcLeadIn
@@ -26,7 +27,7 @@ namespace OpenNest.CNC.CuttingStrategy
                 ApproachAngle = ApproachAngle,
             };
 
-        private LineArcApproach Approach(Vector contourStartPoint, double contourNormalAngle) =>
-            LineArcApproach.Create(contourStartPoint, contourNormalAngle, ArcRadius, ApproachAngle, LineLength);
+        private LineArcApproach Approach(Vector contourStartPoint, double contourNormalAngle, RotationType winding) =>
+            LineArcApproach.Create(contourStartPoint, contourNormalAngle, ArcRadius, ApproachAngle, LineLength, winding);
     }
 }

@@ -8,7 +8,7 @@ namespace OpenNest.CNC.CuttingStrategy
     /// A straight line into an arc that ends on the contour start, shared by
     /// <see cref="LineArcLeadIn"/> and <see cref="CleanHoleLeadIn"/>. The arc's center lies
     /// the arc radius along the contour normal; the line meets the arc at the approach angle
-    /// (degrees from the normal) and starts at the pierce point.
+    /// (degrees from the normal, on the side the arc turns from) and starts at the pierce point.
     /// </summary>
     internal readonly struct LineArcApproach
     {
@@ -26,12 +26,15 @@ namespace OpenNest.CNC.CuttingStrategy
         public Vector PiercePoint { get; }
 
         public static LineArcApproach Create(Vector contourStartPoint, double contourNormalAngle,
-            double arcRadius, double approachAngle, double lineLength)
+            double arcRadius, double approachAngle, double lineLength, RotationType winding)
         {
             var arcCenterX = contourStartPoint.X + arcRadius * System.Math.Cos(contourNormalAngle);
             var arcCenterY = contourStartPoint.Y + arcRadius * System.Math.Sin(contourNormalAngle);
 
-            var lineAngle = contourNormalAngle + Angle.ToRadians(approachAngle);
+            // The approach angle is measured back from the normal against the turn, so the arc
+            // runs the short way round to the contour point whichever way it turns.
+            var approach = Angle.ToRadians(approachAngle);
+            var lineAngle = contourNormalAngle + (winding == RotationType.CCW ? approach : -approach);
             var arcStartX = arcCenterX + arcRadius * System.Math.Cos(lineAngle);
             var arcStartY = arcCenterY + arcRadius * System.Math.Sin(lineAngle);
 

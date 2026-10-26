@@ -467,7 +467,7 @@ namespace OpenNest.CNC.CuttingStrategy
 
                 leadIn = ClampLeadInForCircle(leadIn, circle, point, normal,
                     Parameters.GetEffectivePierceClearance());
-                leadIn = ResolvePierceZone(shape, point, leadIn, normal, Parameters.GetPierceZoneRadius());
+                leadIn = ResolvePierceZone(shape, point, leadIn, normal, Parameters.GetPierceZoneRadius(), winding);
 
                 // Build hole sub-program relative to (0,0)
                 var holeCenter = circle.Center;
@@ -506,6 +506,7 @@ namespace OpenNest.CNC.CuttingStrategy
                 return;
             }
 
+            var turn = LeadTurn(contourType, winding);
             double leadInNormal;
             // A planner-placed scrap pierce replaces the configured lead-in with a straight one.
             if (scrapPierce is { } pierce)
@@ -515,9 +516,9 @@ namespace OpenNest.CNC.CuttingStrategy
                 leadIn = ResolveLeadIn(shape, point, entity, contourType, leadIn, winding,
                     Parameters.GetEffectivePierceClearance(), out leadInNormal);
                 if (contourType == ContourType.Internal)
-                    leadIn = ResolvePierceZone(shape, point, leadIn, leadInNormal, Parameters.GetPierceZoneRadius());
+                    leadIn = ResolvePierceZone(shape, point, leadIn, leadInNormal, Parameters.GetPierceZoneRadius(), turn);
             }
-            program.Codes.AddRange(leadIn.Generate(point, leadInNormal, winding));
+            program.Codes.AddRange(leadIn.Generate(point, leadInNormal, turn));
 
             var reindexedShape = shape.ReindexAt(point, entity);
 
@@ -548,8 +549,19 @@ namespace OpenNest.CNC.CuttingStrategy
             }
 
             program.Codes.AddRange(ConvertShapeToMoves(reindexedShape, point));
-            program.Codes.AddRange(leadOut.Generate(leadOutPoint, leadOutNormal, winding));
+            program.Codes.AddRange(leadOut.Generate(leadOutPoint, leadOutNormal, turn));
         }
+
+        /// <summary>
+        /// The direction a lead arc turns to meet a contour of <paramref name="winding"/>
+        /// tangentially, in the cut direction. Normals point away from the material, so the arc
+        /// center lies outside an outside perimeter (turning against its winding) and inside a
+        /// cutout (turning with it).
+        /// </summary>
+        public static RotationType LeadTurn(ContourType contourType, RotationType winding) =>
+            contourType == ContourType.External
+                ? winding == RotationType.CW ? RotationType.CCW : RotationType.CW
+                : winding;
 
         private void EmitScribeContours(Program program, List<Entity> scribeEntities)
         {
@@ -635,8 +647,10 @@ namespace OpenNest.CNC.CuttingStrategy
         /// <paramref name="pierceClearance"/> from the contour; the approach angle is
         /// ignored there. Otherwise it is perpendicular to the edge cut first, and at a
         /// reflex corner it bisects the notch. The result does not depend on which of
-        /// the two edges meeting at the corner was picked. Other styles and contour
-        /// types keep <see cref="ComputeLeadInNormal"/>.
+        /// the two edges meeting at the corner was picked. A curved lead-in at a convex
+        /// perimeter corner uses the normal of the edge cut first, so its arc meets that
+        /// edge tangentially. Other styles and contour types keep
+        /// <see cref="ComputeLeadInNormal"/>.
         /// </summary>
         public static LeadIn ResolveLeadIn(
             Shape shape,
@@ -650,8 +664,19 @@ namespace OpenNest.CNC.CuttingStrategy
         )
         {
             normal = ComputeLeadInNormal(shape, point, entity, contourType, leadIn, winding);
-            if (contourType != ContourType.External || leadIn is not LineLeadIn line
-                || !TryGetCorner(shape, point, entity, out var corner))
+            if (contourType != ContourType.External || !TryGetCorner(shape, point, entity, out var corner))
+                return leadIn;
+
+            if (leadIn is ArcLeadIn or LineArcLeadIn or CleanHoleLeadIn)
+            {
+                // The arc meets the edge cut first tangentially; its center sits off that edge,
+                // which at a convex corner keeps the whole arc clear of the part.
+                if (ClassifyCorner(corner, winding) is CornerKind.Convex or CornerKind.Smooth)
+                    normal = ComputeNormal(point, corner.Outgoing, contourType, winding);
+                return leadIn;
+            }
+
+            if (leadIn is not LineLeadIn line)
                 return leadIn;
 
             switch (ClassifyCorner(corner, winding))
@@ -681,7 +706,8 @@ namespace OpenNest.CNC.CuttingStrategy
         /// perimeter corner a <see cref="LineLeadOut"/> runs straight on past the corner
         /// along the edge cut last, when its end keeps <paramref name="clearance"/> from
         /// the contour; otherwise it is perpendicular to that edge. At a reflex corner it
-        /// bisects the notch. Other styles and contour types keep the entity normal.
+        /// bisects the notch. An <see cref="ArcLeadOut"/> at a convex corner uses the normal of
+        /// the edge cut last. Other styles and contour types keep the entity normal.
         /// </summary>
         public static LeadOut ResolveLeadOut(
             Shape shape,
@@ -695,8 +721,18 @@ namespace OpenNest.CNC.CuttingStrategy
         )
         {
             normal = ComputeNormal(point, entity, contourType, winding);
-            if (contourType != ContourType.External || leadOut is not LineLeadOut line
-                || !TryGetCorner(shape, point, entity, out var corner))
+            if (contourType != ContourType.External || !TryGetCorner(shape, point, entity, out var corner))
+                return leadOut;
+
+            if (leadOut is ArcLeadOut)
+            {
+                // The arc leaves the edge cut last tangentially.
+                if (ClassifyCorner(corner, winding) is CornerKind.Convex or CornerKind.Smooth)
+                    normal = ComputeNormal(point, corner.Incoming, contourType, winding);
+                return leadOut;
+            }
+
+            if (leadOut is not LineLeadOut line)
                 return leadOut;
 
             switch (ClassifyCorner(corner, winding))
@@ -964,7 +1000,7 @@ namespace OpenNest.CNC.CuttingStrategy
             if (leadIn is NoLeadIn || clearance <= 0)
                 return leadIn;
 
-            var piercePoint = leadIn.GetPiercePoint(contourPoint, normalAngle);
+            var piercePoint = leadIn.GetPiercePoint(contourPoint, normalAngle, circle.Rotation);
             var maxRadius = circle.Radius - clearance;
             if (maxRadius <= 0)
                 return leadIn;
@@ -1013,10 +1049,11 @@ namespace OpenNest.CNC.CuttingStrategy
         /// for the zone is pierced at the pole itself, its best clearance; the lead validator and
         /// pre-post review still report the shortfall. Reads only the hole's own geometry, so it
         /// knows nothing of parts nested inside the hole. Shared by program generation and the
-        /// manual placement preview.
+        /// manual placement preview. <paramref name="turn"/> is the hole's
+        /// <see cref="LeadTurn"/>, which places a curved lead's pierce.
         /// </summary>
         public static LeadIn ResolvePierceZone(Shape hole, Vector point, LeadIn leadIn, double normal,
-            double pierceRadius)
+            double pierceRadius, RotationType turn)
         {
             if (pierceRadius <= 0 || !double.IsFinite(pierceRadius) || leadIn is NoLeadIn
                 || !hole.IsClosed())
@@ -1026,7 +1063,7 @@ namespace OpenNest.CNC.CuttingStrategy
             var polygon = circle == null
                 ? hole.ToPolygonWithTolerance(System.Math.Max(pierceRadius / 100, Math.Tolerance.ChainTolerance))
                 : null;
-            if (Clear(leadIn.GetPiercePoint(point, normal)))
+            if (Clear(leadIn.GetPiercePoint(point, normal, turn)))
                 return leadIn;
 
             var pole = circle?.Center ?? PolyLabel.Find(polygon, null,
@@ -1368,7 +1405,7 @@ namespace OpenNest.CNC.CuttingStrategy
                     return mirrored;
             }
             // Reaching both ways, or tangent to an arc: pierce straight in from the same distance.
-            var pierce = leadIn.GetPiercePoint(entry, normal);
+            var pierce = leadIn.GetPiercePoint(entry, normal, winding);
             return new LineLeadIn { Length = pierce.DistanceTo(entry), ApproachAngle = 90 }.Generate(entry, normal, winding);
         }
 

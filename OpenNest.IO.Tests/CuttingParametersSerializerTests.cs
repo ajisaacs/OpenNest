@@ -170,6 +170,17 @@ public class CuttingParametersSerializerTests
     }
 
     [Fact]
+    public void Deserialize_ArcLeadInWithoutSweep_IsHalfCircle()
+    {
+        // Settings saved before arc lead-ins had a sweep.
+        var restored = CuttingParametersSerializer.Deserialize("{\"externalLeadIn\":{\"type\":\"Arc\",\"radius\":0.3}}");
+
+        var arc = Assert.IsType<ArcLeadIn>(restored.ExternalLeadIn);
+        Assert.Equal(0.3, arc.Radius);
+        Assert.Equal(180, arc.SweepAngle);
+    }
+
+    [Fact]
     public void Deserialize_JsonNull_ReturnsDomainDefaults()
     {
         AssertEquivalent(new CuttingParameters(), CuttingParametersSerializer.Deserialize("null"));
@@ -336,7 +347,7 @@ public class CuttingParametersSerializerTests
     private static LeadIn CreateLeadIn(string type) => type switch
     {
         "Line" => new LineLeadIn { Length = 0.37, ApproachAngle = 47 },
-        "Arc" => new ArcLeadIn { Radius = 0.53 },
+        "Arc" => new ArcLeadIn { Radius = 0.53, SweepAngle = 75 },
         "LineArc" => new LineArcLeadIn
         {
             LineLength = 0.43,

@@ -140,6 +140,7 @@ internal static class StateFingerprint
                     break;
                 case ArcLeadIn l when Begin(lead, typeof(ArcLeadIn)):
                     Number(l.Radius);
+                    Number(l.SweepAngle);
                     break;
                 case LineArcLeadIn l when Begin(lead, typeof(LineArcLeadIn)):
                     Number(l.LineLength);

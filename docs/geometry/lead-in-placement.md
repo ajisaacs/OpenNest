@@ -50,6 +50,26 @@ normal, so an arc lead-out starts on its own radius and the tab gap stays uncut.
 program generation and the manual preview share them. Other lead-in styles are
 unchanged.
 
+## Curved leads
+
+Every curved lead (Arc, Line + Arc, Clean Hole, the arc lead-out) meets the cut tangentially and
+in the cut direction. Its arc center lies along the contour normal, away from the material, so
+the arc turns with a cutout's winding and against an outside perimeter's;
+`ContourCuttingStrategy.LeadTurn` gives that direction, and program generation, the pierce-zone
+check and the manual preview all pass it to the lead. A Line + Arc approach angle is measured
+back from the normal on the side the arc turns from, so the arc takes the short way round
+under either winding.
+
+An Arc lead-in's `SweepAngle` (degrees, in (0, 180], default 180) sets how much of a circle it
+is: 90 is a quarter circle, 180 a half circle that pierces two radii out on the normal. Settings
+and cut pins saved before the sweep existed read as 180.
+
+At a convex corner of an outside perimeter, an Arc, Line + Arc or Clean Hole lead-in uses the
+normal of the edge cut first, and an Arc lead-out that of the edge cut last, whichever of the
+corner's edges was picked; the arc then lies wholly on the scrap side of that edge. Reflex
+corners and cutout corners keep the picked edge's normal: a tangent arc there would cross the
+part.
+
 ## Regression checks
 
 Run `dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter "FullyQualifiedName~CutoutCornerLeadInTests|FullyQualifiedName~PerimeterCornerLeadInTests"`.
@@ -59,7 +79,9 @@ and obtuse angles, reflex corners, line/arc corners, preview agreement, and
 unchanged/fallback behavior. The perimeter tests cover every square corner under both
 windings and a rotation, auto and manual placement from either edge, preview
 agreement, approach-angle handling, the flat-corner clearance fallback, reflex
-notches, and straight lead-outs.
+notches, and straight lead-outs. `ArcLeadInTangentTests` checks curved-lead tangency, direction
+and sweep on perimeters and cutouts under both windings, and at every perimeter corner from
+either edge.
 
 Windows manual check: import a part with small rectangular cutouts and use Plate >
 Plan Cutting. Confirm diagonal lead-ins at the cutout corners. Under Plate >

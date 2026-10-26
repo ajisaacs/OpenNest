@@ -121,7 +121,7 @@ public static class CuttingParametersSerializer
             Length = line.Length,
             ApproachAngle = line.ApproachAngle,
         },
-        ArcLeadIn arc => new LeadInDto { Type = "Arc", Radius = arc.Radius },
+        ArcLeadIn arc => new LeadInDto { Type = "Arc", Radius = arc.Radius, SweepAngle = arc.SweepAngle },
         LineArcLeadIn lineArc => new LeadInDto
         {
             Type = "LineArc",
@@ -150,7 +150,7 @@ public static class CuttingParametersSerializer
     internal static LeadIn FromLeadInDto(LeadInDto dto) => dto?.Type switch
     {
         "Line" => new LineLeadIn { Length = dto.Length, ApproachAngle = dto.ApproachAngle },
-        "Arc" => new ArcLeadIn { Radius = dto.Radius },
+        "Arc" => new ArcLeadIn { Radius = dto.Radius, SweepAngle = dto.SweepAngle },
         "LineArc" => new LineArcLeadIn
         {
             LineLength = dto.LineLength,

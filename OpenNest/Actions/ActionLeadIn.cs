@@ -323,11 +323,12 @@ namespace OpenNest.Actions
             if (snapContourType == ContourType.ArcCircle && snapEntity is Circle snapCircle)
                 leadIn = ContourCuttingStrategy.ClampLeadInForCircle(leadIn, snapCircle, snapPoint, snapNormal,
                     parameters.GetEffectivePierceClearance());
+            var turn = ContourCuttingStrategy.LeadTurn(snapContourType, hoveredContour.Winding);
             if (snapContourType is ContourType.Internal or ContourType.ArcCircle)
                 leadIn = ContourCuttingStrategy.ResolvePierceZone(hoveredContour.Shape, snapPoint, leadIn, snapNormal,
-                    parameters.GetPierceZoneRadius());
+                    parameters.GetPierceZoneRadius(), turn);
 
-            var piercePoint = leadIn.GetPiercePoint(snapPoint, snapNormal);
+            var piercePoint = leadIn.GetPiercePoint(snapPoint, snapNormal, turn);
             var pt1 = plateView.PointWorldToGraph(TransformToWorld(piercePoint));
             var pt2 = plateView.PointWorldToGraph(TransformToWorld(snapPoint));
 

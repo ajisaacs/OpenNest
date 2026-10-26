@@ -30,7 +30,7 @@ contours (internal covers full circles). Types map as follows:
 |---|---|
 | None | none |
 | Line | line (length, angle) |
-| Arc | arc (radius) |
+| Arc | arc (radius; the default 180-degree half-circle sweep) |
 | Line + Arc | line-arc (length, radius, angle) |
 | Clean Hole | clean hole (length, radius, the thickness's kerf), holes only: the external lead-in is kept |
 | Line + Line | not mapped (the configuration has no second segment): every lead-in is kept |

@@ -70,7 +70,8 @@ internal static class OwnedCuttingParameters
         NoLeadIn n when n.GetType() == typeof(NoLeadIn) => new NoLeadIn(),
         LineLeadIn n when n.GetType() == typeof(LineLeadIn) => new LineLeadIn
         { Length = Dimension(n.Length), ApproachAngle = Angle(n.ApproachAngle) },
-        ArcLeadIn n when n.GetType() == typeof(ArcLeadIn) => new ArcLeadIn { Radius = Dimension(n.Radius) },
+        ArcLeadIn n when n.GetType() == typeof(ArcLeadIn) => new ArcLeadIn
+        { Radius = Dimension(n.Radius), SweepAngle = Sweep(n.SweepAngle) },
         LineArcLeadIn n when n.GetType() == typeof(LineArcLeadIn) => new LineArcLeadIn
         { LineLength = Dimension(n.LineLength), ArcRadius = Dimension(n.ArcRadius), ApproachAngle = Angle(n.ApproachAngle) },
         LineLineLeadIn n when n.GetType() == typeof(LineLineLeadIn) => new LineLineLeadIn
@@ -136,4 +137,7 @@ internal static class OwnedCuttingParameters
     // Approach angles are degrees, not lengths. Signed and periodic angles are valid.
     private static double Angle(double value) => double.IsFinite(value)
         ? value : throw new ArgumentException("Angles must be finite.");
+
+    private static double Sweep(double value) => double.IsFinite(value) && value > 0 && value <= 180
+        ? value : throw new ArgumentException("Arc sweep must be in (0, 180] degrees.");
 }

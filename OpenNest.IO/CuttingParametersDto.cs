@@ -44,6 +44,8 @@ public class CuttingParametersDto
         public double Length { get; set; }
         public double ApproachAngle { get; set; }
         public double Radius { get; set; }
+        // Absent from files written before arc lead-ins had a sweep: they were half circles.
+        public double SweepAngle { get; set; } = ArcLeadIn.DefaultSweepAngle;
         public double LineLength { get; set; }
         public double ArcRadius { get; set; }
         public double Kerf { get; set; }

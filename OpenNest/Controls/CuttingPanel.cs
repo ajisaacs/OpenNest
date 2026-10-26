@@ -494,6 +494,9 @@ namespace OpenNest.Controls
                     break;
                 case 2:
                     AddNumericField(panel, "Radius:", 0.25, ref y, "Radius");
+                    // Degrees of arc: 90 is a quarter circle, 180 a half circle.
+                    AddNumericField(panel, "Sweep Angle:", ArcLeadIn.DefaultSweepAngle, ref y, "SweepAngle",
+                        increment: 15, minimum: 1, maximum: 180);
                     break;
                 case 3:
                     AddNumericField(panel, "Line Length:", 0.25, ref y, "LineLength");
@@ -536,7 +539,10 @@ namespace OpenNest.Controls
             string label,
             double defaultValue,
             ref int y,
-            string tag
+            string tag,
+            double increment = 0.0625,
+            double minimum = 0,
+            double maximum = 9999
         )
         {
             panel.Controls.Add(
@@ -548,7 +554,9 @@ namespace OpenNest.Controls
                 }
             );
 
-            var nud = CreateNumeric(130, y, defaultValue, 0.0625);
+            var nud = CreateNumeric(130, y, defaultValue, increment);
+            nud.Minimum = (decimal)minimum;
+            nud.Maximum = (decimal)maximum;
             nud.Tag = tag;
             nud.ValueChanged += (s, e) => OnParametersChanged();
             panel.Controls.Add(nud);
@@ -587,6 +595,7 @@ namespace OpenNest.Controls
                 case ArcLeadIn arc:
                     combo.SelectedIndex = 2;
                     SetParam(panel, "Radius", arc.Radius);
+                    SetParam(panel, "SweepAngle", arc.SweepAngle);
                     break;
                 case LineArcLeadIn lineArc:
                     combo.SelectedIndex = 3;
@@ -641,7 +650,11 @@ namespace OpenNest.Controls
                     Length = GetParam(panel, "Length", 0.25),
                     ApproachAngle = GetParam(panel, "ApproachAngle", 90),
                 },
-                2 => new ArcLeadIn { Radius = GetParam(panel, "Radius", 0.25) },
+                2 => new ArcLeadIn
+                {
+                    Radius = GetParam(panel, "Radius", 0.25),
+                    SweepAngle = GetParam(panel, "SweepAngle", ArcLeadIn.DefaultSweepAngle),
+                },
                 3 => new LineArcLeadIn
                 {
                     LineLength = GetParam(panel, "LineLength", 0.25),
@@ -685,7 +698,7 @@ namespace OpenNest.Controls
             {
                 if (c is NumericUpDown nud && (string)nud.Tag == tag)
                 {
-                    nud.Value = (decimal)value;
+                    nud.Value = System.Math.Clamp((decimal)value, nud.Minimum, nud.Maximum);
                     return;
                 }
             }
