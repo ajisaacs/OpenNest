@@ -11,6 +11,7 @@ using OpenNest.Data.MaterialLedger;
 using OpenNest.Engine;
 using OpenNest.Geometry;
 using OpenNest.Help;
+using OpenNest.Math;
 
 namespace OpenNest.Forms
 {
@@ -257,9 +258,9 @@ namespace OpenNest.Forms
                 nestItem.Drawing = gridItem.RefDrawing;
                 nestItem.Priority = gridItem.Priority;
                 nestItem.Quantity = gridItem.Quantity;
-                nestItem.RotationEnd = gridItem.RotationEnd;
-                nestItem.RotationStart = gridItem.RotationStart;
-                nestItem.StepAngle = gridItem.StepAngle;
+                nestItem.RotationEnd = gridItem.RotationEndRadians;
+                nestItem.RotationStart = gridItem.RotationStartRadians;
+                nestItem.StepAngle = gridItem.StepAngleRadians;
 
                 nestItems.Add(nestItem);
             }
@@ -880,9 +881,9 @@ namespace OpenNest.Forms
             item.RefDrawing = dwg;
             item.Quantity = dwg.Quantity.Remaining > 0 ? dwg.Quantity.Remaining : 0;
             item.Priority = dwg.Priority;
-            item.RotationStart = dwg.Constraints.StartAngle;
-            item.RotationEnd = dwg.Constraints.EndAngle;
-            item.StepAngle = dwg.Constraints.StepAngle;
+            item.RotationStartRadians = dwg.Constraints.StartAngle;
+            item.RotationEndRadians = dwg.Constraints.EndAngle;
+            item.StepAngleRadians = dwg.Constraints.StepAngle;
 
             return item;
         }
@@ -903,14 +904,35 @@ namespace OpenNest.Forms
 
             public int Priority { get; set; }
 
+            // Rotations are kept in radians and shown in degrees, so an unedited row passes
+            // the drawing's limits through without a conversion round trip.
+            internal double RotationStartRadians { get; set; }
+            internal double RotationEndRadians { get; set; }
+            internal double StepAngleRadians { get; set; }
+
             [DisplayName("Rot Start")]
-            public double RotationStart { get; set; }
+            public double RotationStart
+            {
+                get => ToDisplayDegrees(RotationStartRadians);
+                set => RotationStartRadians = Angle.ToRadians(value);
+            }
 
             [DisplayName("Rot End")]
-            public double RotationEnd { get; set; }
+            public double RotationEnd
+            {
+                get => ToDisplayDegrees(RotationEndRadians);
+                set => RotationEndRadians = Angle.ToRadians(value);
+            }
 
             [DisplayName("Step")]
-            public double StepAngle { get; set; }
+            public double StepAngle
+            {
+                get => ToDisplayDegrees(StepAngleRadians);
+                set => StepAngleRadians = Angle.ToRadians(value);
+            }
+
+            private static double ToDisplayDegrees(double radians) =>
+                System.Math.Round(Angle.ToDegrees(radians), 4);
         }
 
         private class PlateOptionItem
