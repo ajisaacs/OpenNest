@@ -687,8 +687,16 @@ internal static class JointCuttingPlanSearch
                 // No outside to cut: one pass, complete once every hole is cut.
                 perimeters = [null];
             var holes = Enumerable.Range(0, prepared.PerimeterOrdinal)
-                .Select(c => prepared.AutomaticEntryCandidatesWithFallbacks(c, token: token)
-                    .Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear).Select(e => e.Choice).ToArray()).ToArray();
+                .Select(c =>
+                {
+                    var catalogue = prepared.AutomaticEntryCandidatesWithFallbacks(c, token: token);
+                    var clear = catalogue.Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear).ToArray();
+                    // No configured lead-in fits the cutout: pierce where eroding it leaves room.
+                    if (clear.Length == 0)
+                        clear = PreferredContourEntries.ErodedPierces(prepared, c, catalogue, snapshot.MaxEntries, token)
+                            .Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear).ToArray();
+                    return clear.Select(e => e.Choice).ToArray();
+                }).ToArray();
             var motions = new Dictionary<ContourChoice, OwnedExecution>();
             var stop = Expansions + (long)StallExpansionsPerEntry * snapshot.MaxEntries * prepared.Count;
             // The part's scribes and other open cuts come once, before every contour; check
@@ -983,6 +991,19 @@ internal static class JointCuttingPlanSearch
                     selection = Steadiest(source.Prepared, ContourEntrySelection.Select(ordered,
                         candidate => Evaluate(source, candidate), snapshot.MaxEntries, token));
                 }
+            // No configured lead-in fits a cutout: pierce where eroding it leaves room.
+            string erodedReason = null;
+            if (contour != source.Prepared.PerimeterOrdinal && selection.Choices.Count == 0
+                && selection.UncertainChoices.Count == 0 && selection.Shortfall == ContourSelectionShortfall.Exhausted)
+            {
+                var eroded = ContourEntrySelection.Select(
+                    PreferredContourEntries.ErodedPierces(source.Prepared, contour, ordered, snapshot.MaxEntries, token),
+                    candidate => Evaluate(source, candidate), snapshot.MaxEntries, token);
+                if (eroded.Choices.Count != 0 || eroded.UncertainChoices.Count != 0)
+                    selection = eroded;
+                else
+                    erodedReason = eroded.Reason ?? "eroding the cutout leaves no room to pierce.";
+            }
             // No configured lead-in fits the perimeter: with a pierce diameter, try open scrap.
             string scrapReason = null;
             if (contour == source.Prepared.PerimeterOrdinal && selection.Choices.Count == 0
@@ -1002,6 +1023,7 @@ internal static class JointCuttingPlanSearch
                     + "Try reducing the lead-in length in Cutting Settings...; if nearby parts obstruct the lead-in, "
                     + "space the parts farther apart." + PierceZoneHint()
                     + (scrapReason == null ? "" : $" A pierce in open scrap was also tried: {scrapReason}")
+                    + (erodedReason == null ? "" : $" A pierce found by eroding the cutout was also tried: {erodedReason}")
                     + " Replan to check the changes."));
             // Uncertain candidates are NOT refused by the precheck: they reach the emitted-
             // prefix Check and complete replay, which remain the authority on them.

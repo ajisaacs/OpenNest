@@ -70,16 +70,44 @@ corner's edges was picked; the arc then lies wholly on the scrap side of that ed
 corners and cutout corners keep the picked edge's normal: a tangent arc there would cross the
 part.
 
+## Cutouts too small for their lead-in
+
+Text, narrow slots and small holes often have no entry where the configured lead-in fits. When
+Plan Cutting has tried every entry of a cutout and none fits, it erodes the cutout instead
+(`ErodedPierce`, OpenNest.Core):
+
+1. The cutout's pole of inaccessibility gives its inscribed radius, the deepest any erosion can go.
+2. The cutout is offset inward (`Clipper.InflatePaths`, negative) by the pierce clearance
+   (`GetEffectivePierceClearance`) when it has room for it, else by nine tenths
+   (`ErodedPierce.DepthFraction`) of its inscribed radius, plus a margin for flattening, round
+   joins and Clipper rounding. What survives keeps a letter stroke's pierces on its centre line
+   and finds the widest spot of a feature that tapers.
+3. For each of the cutout's ranked entries, the eroded point nearest it is a pierce. The entry
+   becomes the cutout's native point closest to that pierce, and the lead-in runs straight from
+   the pierce to it (`PreparedContours.ErodedPierceEntries`, a `ContourChoice` whose `Pierce` is
+   set). A cutout so pierced has no lead-out: a feature too small for its lead-in has no room for
+   one either.
+4. A cutout too small to erode is pierced at its pole alone.
+5. `LeadPathValidator` checks each candidate like any other planner-chosen entry, pierce zone
+   included. When none is clear, the "No tested lead-in fits" finding says why.
+
+Cutouts where a configured lead-in fits keep it, so plans of other parts are unchanged. Hole entry
+selection, the preferred hole path and contour recovery all use the fallback. Only Plan Cutting
+uses it: the emitter's own automatic assignment and the manual lead-in preview keep the
+configured lead.
+
 ## Regression checks
 
-Run `dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter "FullyQualifiedName~CutoutCornerLeadInTests|FullyQualifiedName~PerimeterCornerLeadInTests"`.
+Run `dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter "FullyQualifiedName~CutoutCornerLeadInTests|FullyQualifiedName~PerimeterCornerLeadInTests|FullyQualifiedName~ErodedPierceTests"`.
 The cutout tests exercise generated part programs, default automatic placement, every
 rectangular corner with both adjoining edges and windings, part rotation, acute
 and obtuse angles, reflex corners, line/arc corners, preview agreement, and
 unchanged/fallback behavior. The perimeter tests cover every square corner under both
 windings and a rotation, auto and manual placement from either edge, preview
 agreement, approach-angle handling, the flat-corner clearance fallback, reflex
-notches, and straight lead-outs. `ArcLeadInTangentTests` checks curved-lead tangency, direction
+notches, and straight lead-outs. `ErodedPierceTests` covers the eroded pierces of a slot and a small round hole, a cutout that keeps
+its configured lead, and the containment of text cutouts that sit a micro-inch apart.
+`ArcLeadInTangentTests` checks curved-lead tangency, direction
 and sweep on perimeters and cutouts under both windings, and at every perimeter corner from
 either edge.
 

@@ -449,6 +449,9 @@ namespace OpenNest.CNC.CuttingStrategy
 
             var leadIn = SelectLeadIn(contourType);
             var leadOut = SelectLeadOut(contourType);
+            // A cutout the planner pierced by erosion is too small for its configured leads.
+            if (scrapPierce != null && contourType != ContourType.External)
+                leadOut = new NoLeadOut();
 
             if (contourType == ContourType.ArcCircle && entity is Circle circle)
             {
@@ -465,9 +468,14 @@ namespace OpenNest.CNC.CuttingStrategy
                     );
                 }
 
-                leadIn = ClampLeadInForCircle(leadIn, circle, point, normal,
-                    Parameters.GetEffectivePierceClearance());
-                leadIn = ResolvePierceZone(shape, point, leadIn, normal, Parameters.GetPierceZoneRadius(), winding);
+                if (scrapPierce is { } holePierce)
+                    leadIn = StraightLeadIn(point, holePierce, out normal);
+                else
+                {
+                    leadIn = ClampLeadInForCircle(leadIn, circle, point, normal,
+                        Parameters.GetEffectivePierceClearance());
+                    leadIn = ResolvePierceZone(shape, point, leadIn, normal, Parameters.GetPierceZoneRadius(), winding);
+                }
 
                 // Build hole sub-program relative to (0,0)
                 var holeCenter = circle.Center;

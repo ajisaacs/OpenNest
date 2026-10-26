@@ -15,9 +15,11 @@ public sealed record ContourChoice(int ContourOrdinal, int EntityOrdinal, Vector
     internal PreparedContours Owner { get; init; }
 
     /// <summary>
-    /// A perimeter pierce the planner placed in open scrap for the pierce zone (see
-    /// <see cref="PreparedContours.ScrapPierceEntry"/>): the lead-in runs straight from here to
-    /// <see cref="Point"/> instead of the configured lead-in. Null for every other choice.
+    /// A pierce the planner placed off the contour: a perimeter's in open scrap for the pierce
+    /// zone (see <see cref="PreparedContours.ScrapPierceEntry"/>), or a cutout's where eroding it
+    /// leaves room (see <see cref="PreparedContours.ErodedPierceEntries"/>). The lead-in runs
+    /// straight from here to <see cref="Point"/> instead of the configured lead-in; a cutout so
+    /// pierced has no lead-out. Null for every other choice.
     /// </summary>
     public Vector? Pierce { get; internal init; }
 }
@@ -444,13 +446,48 @@ public sealed class PreparedContours
     /// emission reads only this choice and the perimeter, and the lead validator checks the
     /// lead as usual. A pinned perimeter keeps its pin's entry.
     /// </summary>
-    internal ContourChoice ScrapPierceEntry(Vector pierce)
+    internal ContourChoice ScrapPierceEntry(Vector pierce) => PiercedEntry(PerimeterOrdinal, pierce);
+
+    /// <summary>
+    /// Entries of cutout <paramref name="contourOrdinal"/> pierced where eroding it leaves room
+    /// (see <see cref="ErodedPierce"/>), the one nearest each of <paramref name="targets"/> (local
+    /// coordinates, usually its ranked entries) in turn: the planner's fallback when no configured
+    /// lead-in fits the cutout. Each enters at the native point of the cutout closest to its
+    /// pierce, along a straight lead-in, with no lead-out. Nothing for the perimeter or a pinned
+    /// cutout; the lead validator still checks each one.
+    /// </summary>
+    internal IReadOnlyList<ContourChoice> ErodedPierceEntries(int contourOrdinal, IReadOnlyList<Vector> targets,
+        int max, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+        var shape = GetShape(contourOrdinal);
+        if (contourOrdinal == PerimeterOrdinal || pinned[contourOrdinal] != null)
+            return Array.Empty<ContourChoice>();
+        var found = ErodedPierce.Find(shape, ParametersFor(contourOrdinal).GetEffectivePierceClearance(), targets, max);
+        var entries = new List<ContourChoice>();
+        foreach (var pierce in found.Pierces)
+        {
+            token.ThrowIfCancellationRequested();
+            try
+            {
+                entries.Add(PiercedEntry(contourOrdinal, pierce));
+            }
+            catch (ArgumentException)
+            {
+                // A pierce on the wall itself has no lead; the others still stand.
+            }
+        }
+        return entries;
+    }
+
+    // A contour entry at the closest native point to a pierce off it, along a straight lead-in.
+    private ContourChoice PiercedEntry(int contourOrdinal, Vector pierce)
     {
         PostVerificationGeometry.Validate(pierce);
-        var shape = GetShape(PerimeterOrdinal);
+        var shape = GetShape(contourOrdinal);
         var point = shape.ClosestPointTo(pierce, out var entity);
         point = SnapToVertex(shape, shape.Entities.IndexOf(entity), point);
-        var choice = new ContourChoice(PerimeterOrdinal, shape.Entities.IndexOf(entity), point)
+        var choice = new ContourChoice(contourOrdinal, shape.Entities.IndexOf(entity), point)
         {
             Owner = this,
             Pierce = pierce,
@@ -866,10 +903,8 @@ public sealed class PreparedContours
         if (choice.Pierce is { } pierce)
         {
             PostVerificationGeometry.Validate(pierce);
-            if (choice.ContourOrdinal != PerimeterOrdinal)
-                throw new ArgumentException("Only a perimeter entry can be pierced in scrap.");
             if (pierce.DistanceTo(choice.Point) <= PostVerificationGeometry.Epsilon)
-                throw new ArgumentException("A scrap pierce must lie off its contour.");
+                throw new ArgumentException("A planner-placed pierce must lie off its contour.");
         }
     }
 

@@ -42,6 +42,13 @@ internal enum AutomaticEntryKind
     /// perimeter tabbed for support has it (see <see cref="PreparedContours.WithSupportTab"/>).
     /// </summary>
     SupportTab = 8,
+
+    /// <summary>
+    /// A cutout entry pierced where eroding the cutout leaves room (see
+    /// <see cref="PreparedContours.ErodedPierceEntries"/>): only offered once no configured
+    /// lead-in of the cutout fits.
+    /// </summary>
+    ErodedPierce = 9,
 }
 
 /// <summary>

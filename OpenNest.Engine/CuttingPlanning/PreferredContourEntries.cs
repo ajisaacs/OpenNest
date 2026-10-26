@@ -73,6 +73,12 @@ internal static class PreferredContourEntries
             var catalogue = prepared.AutomaticEntryCandidatesWithFallbacks(contour, target, token);
             var ranked = catalogue.RankTowardNextCut(target, arrivalProxy).DepartingClear(prepared, target, token);
             var selection = ContourEntrySelection.Select(ranked, evaluate, 1, token);
+            if (selection.Choices.Count == 0 && selection.Shortfall == ContourSelectionShortfall.Exhausted)
+            {
+                var eroded = ContourEntrySelection.Select(ErodedPierces(prepared, contour, ranked, 1, token), evaluate, 1, token);
+                if (eroded.Choices.Count != 0)
+                    selection = eroded;
+            }
             if (selection.Choices.Count == 0)
                 return new(Array.Empty<ContourChoice>(), selection.Shortfall, contour,
                     $"Hole contour {contour} has no preferred lead-feasible entry: {selection.Reason}");
@@ -84,6 +90,17 @@ internal static class PreferredContourEntries
             throw new InvalidOperationException("Preferred hole resolution left a gap.");
         return new(choices, ContourSelectionShortfall.None, null, null);
     }
+
+    /// <summary>
+    /// The fallback for a cutout none of whose <paramref name="ranked"/> entries has a configured
+    /// lead-in that fits: up to <paramref name="max"/> entries pierced where eroding the cutout
+    /// leaves room, the one nearest each ranked entry in turn (see
+    /// <see cref="PreparedContours.ErodedPierceEntries"/>). Proposals only: the lead checks decide.
+    /// </summary>
+    internal static IReadOnlyList<ContourEntryCandidate> ErodedPierces(PreparedContours prepared, int contour,
+        IReadOnlyList<ContourEntryCandidate> ranked, int max, CancellationToken token) =>
+        prepared.ErodedPierceEntries(contour, ranked.Select(c => c.Choice.Point).ToArray(), max, token)
+            .Select(choice => new ContourEntryCandidate(choice, AutomaticEntryKind.ErodedPierce)).ToArray();
 
     /// <summary>
     /// Stable reordering of one hole's ranked entries: those whose straight rapid to

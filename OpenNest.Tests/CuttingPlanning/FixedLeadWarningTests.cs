@@ -97,8 +97,12 @@ public class FixedLeadWarningTests
     {
         var plate = new Nest().CreatePlate();
         plate.Parts.Add(new Part(new Drawing("tight", TightHole()), new Vector(1, 1)));
+        // The hole is eroded for a pierce when its lead-in does not fit; a pierce zone wider than
+        // the hole leaves even that pierce no room.
+        var parameters = ExplicitContourTests.Parameters();
+        parameters.PierceDiameter = 0.2;
 
-        var planned = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false).Plan().Plates[0];
+        var planned = CuttingPlanBatch.Capture([plate], parameters, false).Plan().Plates[0];
 
         Assert.False(planned.CanApplyWithWarnings);
         Assert.Empty(planned.Result.ProposedOrder);
