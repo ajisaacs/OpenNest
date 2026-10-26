@@ -830,14 +830,35 @@ namespace OpenNest.Forms
 
         private void SaveAll()
         {
-            foreach (var id in _pendingDeletes)
-                _provider.DeleteMachine(id);
-            _pendingDeletes.Clear();
-
-            foreach (TreeNode machineNode in _tree.Nodes)
+            try
             {
-                if (machineNode.Tag is MachineConfig machine)
-                    _provider.SaveMachine(machine);
+                foreach (var id in _pendingDeletes.ToList())
+                {
+                    _provider.DeleteMachine(id);
+                    _pendingDeletes.Remove(id);
+                }
+
+                foreach (TreeNode machineNode in _tree.Nodes)
+                {
+                    if (machineNode.Tag is MachineConfig machine)
+                        _provider.SaveMachine(machine);
+                }
+            }
+            catch (IOException ex)
+            {
+                // Shared machines: the server is unreachable or someone else saved first.
+                // Everything not yet saved stays pending.
+                MessageBox.Show(
+                    this,
+                    "The machine configurations could not all be saved.\n\n" + ex.Message
+                        + (ex is SharedSettingSaveConflictException
+                            ? "\n\nClose this window without saving and open it again to see their changes."
+                            : ""),
+                    "Save",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+                return;
             }
 
             _dirty = false;

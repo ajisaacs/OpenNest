@@ -17,7 +17,7 @@ namespace OpenNest.Forms;
 public sealed class ClampsForm : Form
 {
     private readonly ClampSettings machineDefaults;
-    private readonly string settingsPath;
+    private readonly Action<ClampSettings> saveDefaults;
     private readonly NumericUpDown widthBox;
     private readonly NumericUpDown depthBox;
     private readonly NumericUpDown removalMinutesBox;
@@ -30,10 +30,11 @@ public sealed class ClampsForm : Form
     private readonly CheckBox applyToNewNestsBox;
     private readonly Label savedLabel;
 
-    public ClampsForm(ClampRail rail, Units units, ClampSettings machineDefaults, string settingsPath = null)
+    /// <param name="saveDefaults">Saves the machine defaults; this PC's clamp settings file when omitted.</param>
+    public ClampsForm(ClampRail rail, Units units, ClampSettings machineDefaults, Action<ClampSettings> saveDefaults = null)
     {
         this.machineDefaults = machineDefaults ?? ClampSettings.Fallback;
-        this.settingsPath = settingsPath ?? ClampSettings.DefaultPath;
+        this.saveDefaults = saveDefaults ?? (settings => settings.Save(ClampSettings.DefaultPath));
         Editor = new ClampRailEditor(rail, units, this.machineDefaults.Enabled);
         var unit = UnitsHelper.GetShortString(units);
 
@@ -268,7 +269,7 @@ public sealed class ClampsForm : Form
         try
         {
             var settings = Editor.ToMachineDefaults();
-            settings.Save(settingsPath);
+            saveDefaults(settings);
             savedLabel.Text = settings.Enabled
                 ? $"Saved {DateTime.Now:t}: new nests get these {settings.ClampCount} clamps. Cancel does not undo this."
                 : $"Saved {DateTime.Now:t}: new nests get no clamps. Cancel does not undo this.";
@@ -277,7 +278,7 @@ public sealed class ClampsForm : Form
         {
             MessageBox.Show(
                 this,
-                $"The machine defaults could not be saved:\n{settingsPath}\n\n{ex.Message}",
+                $"The machine defaults could not be saved.\n\n{ex.Message}",
                 Text,
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error

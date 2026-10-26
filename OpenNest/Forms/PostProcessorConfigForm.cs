@@ -1,7 +1,9 @@
 using System;
+using System.IO;
 using System.Text.Json;
 using System.Windows.Forms;
 using OpenNest.Controls;
+using OpenNest.Data;
 using OpenNest.PostSettings;
 
 namespace OpenNest.Forms
@@ -10,6 +12,7 @@ namespace OpenNest.Forms
     {
         private readonly IConfigurablePostProcessor postProcessor;
         private readonly string configBackup;
+        private readonly string configBefore;
         private readonly PostSettingsEditor settingsEditor;
 
         public PostProcessorConfigForm(IConfigurablePostProcessor postProcessor)
@@ -18,6 +21,7 @@ namespace OpenNest.Forms
 
             this.postProcessor = postProcessor;
             this.Text = postProcessor.Name + " Settings";
+            configBefore = (postProcessor as IJsonConfigPostProcessor)?.SerializeConfig();
 
             var sections = PostSettingsLayout.TryBuild(postProcessor.Config.GetType());
             if (sections != null)
@@ -56,14 +60,36 @@ namespace OpenNest.Forms
                 return;
             }
 
-            postProcessor.SaveConfig();
+            try
+            {
+                SharedSettings.SavePostSettings(postProcessor, configBefore);
+            }
+            catch (SharedSettingSaveConflictException conflict)
+            {
+                // Post with the settings the other workstation saved, never a mix of both.
+                ((IJsonConfigPostProcessor)postProcessor).LoadConfig(conflict.Current.Json);
+                DialogResult = DialogResult.Cancel;
+                MessageBox.Show(this, conflict.Message + "\n\nTheir settings are now loaded and nothing was posted. "
+                    + "Post again to review them and make your change.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                DialogResult = DialogResult.None;
+                MessageBox.Show(this, "The post settings could not be saved.\n\n" + ex.Message
+                    + "\n\nCancel to post nothing and discard the changes.", Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void cancelButton_Click(object sender, EventArgs e)
         {
-            // The sectioned editor never wrote to the config.
+            // The sectioned editor writes to the config only on OK; an OK whose save failed is undone here.
             if (configBackup == null)
+            {
+                if (configBefore != null && postProcessor is IJsonConfigPostProcessor json
+                    && json.SerializeConfig() != configBefore)
+                    json.LoadConfig(configBefore);
                 return;
+            }
 
             // Restore config from backup
             var original = JsonSerializer.Deserialize(configBackup, postProcessor.Config.GetType());

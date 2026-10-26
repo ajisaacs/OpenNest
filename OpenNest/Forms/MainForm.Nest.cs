@@ -139,7 +139,7 @@ namespace OpenNest.Forms
             }
 
             var defaults = MachineSettings.LoadSavedClampSettings(out _);
-            using var form = new ClampsForm(nest.PlateDefaults.ClampRail, nest.Units, defaults);
+            using var form = new ClampsForm(nest.PlateDefaults.ClampRail, nest.Units, defaults, MachineSettings.SaveClampSettings);
             if (form.ShowDialog(this) != DialogResult.OK)
                 return;
 

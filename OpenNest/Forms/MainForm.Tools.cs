@@ -175,7 +175,20 @@ namespace OpenNest.Forms
             using (var form = new NestDefaultsForm(MachineSettings.LoadSavedNestDefaults(out _), MachineSettings.LoadMachines()))
             {
                 if (form.ShowDialog(this) == DialogResult.OK)
-                    form.GetDefaults().Save(NestDefaults.DefaultPath);
+                    SaveNestDefaults(form.GetDefaults());
+            }
+        }
+
+        private void SaveNestDefaults(NestDefaults defaults)
+        {
+            try
+            {
+                MachineSettings.SaveNestDefaults(defaults);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                MessageBox.Show(this, "The nest defaults could not be saved.\n\n" + ex.Message, "Nest Defaults",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -187,14 +200,18 @@ namespace OpenNest.Forms
             var defaults = NestDefaults.FromPlate(activeForm.Nest.Units, activeForm.PlateView.Plate);
             // The nest's machine becomes the default; a nest without one keeps the saved choice.
             defaults.MachineId = activeForm.Nest.Machine?.Id ?? MachineSettings.LoadSavedNestDefaults(out _).MachineId;
-            defaults.Save(NestDefaults.DefaultPath);
+            SaveNestDefaults(defaults);
         }
 
         private void MachineConfig_Click(object sender, EventArgs e)
         {
-            var provider = MachineSettings.CreateMachineProvider();
+            var provider = MachineSettings.CreateMachineProvider(refresh: true);
+            SharedSettings.WarnIfOffline(this);
             using (var form = new MachineConfigForm(provider))
             {
+                var source = SharedSettings.MachineSource(provider);
+                if (source.Length > 0)
+                    form.Text += $" ({source})";
                 form.ShowDialog(this);
             }
         }

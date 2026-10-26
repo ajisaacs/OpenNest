@@ -211,6 +211,9 @@ namespace OpenNest.Forms
             mnuNestPost.Visible = mnuNestPost.DropDownItems.Count > 0;
             postButton.Visible = postButton.DropDownItems.Count > 0;
 
+            // Database mode: offer this PC's settings to a server that has none yet.
+            Shown += (_, _) => SharedSettings.OfferUpload(this, posts.PostProcessors);
+
             if (posts.Failures.Count > 0)
                 Shown += (_, _) => MessageBox.Show(this,
                     "These post processors could not be loaded:\n\n" + string.Join("\n", posts.Failures),

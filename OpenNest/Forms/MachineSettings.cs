@@ -11,15 +11,26 @@ using OpenNest.IO;
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// The desktop entry points for the persisted machine clamp settings and nest defaults.
-    /// The warning variants report an unusable file once per session.
+    /// The desktop entry points for the persisted machines, machine clamp settings and nest
+    /// defaults. In Database mode each comes from the nest server once it holds a shared copy
+    /// (<see cref="SharedSettings"/>), otherwise from this PC's files. The warning variants
+    /// report unusable settings once per session.
     /// </summary>
     internal static class MachineSettings
     {
         private static bool clampSettingsWarned;
 
-        /// <summary>The machine configurations edited in Tools > Machine Configuration.</summary>
-        public static LocalJsonProvider CreateMachineProvider()
+        /// <summary>
+        /// The machine configurations edited in Tools > Machine Configuration: the server's when
+        /// it holds any, otherwise this PC's. <paramref name="refresh"/> re-reads the server first.
+        /// </summary>
+        public static IDataProvider CreateMachineProvider(bool refresh = false) =>
+            SharedSettings.Holding(SharedSettingKinds.Machine, refresh) is { } shared
+                ? new SharedMachineProvider(shared)
+                : CreateLocalMachineProvider();
+
+        /// <summary>This PC's machine configurations, under %APPDATA%\OpenNest\Machines.</summary>
+        private static LocalJsonProvider CreateLocalMachineProvider()
         {
             var provider = new LocalJsonProvider(Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -30,12 +41,17 @@ namespace OpenNest.Forms
         }
 
         /// <summary>Every readable machine configuration, for choosing acceleration limits.</summary>
-        public static List<MachineConfig> LoadMachines()
+        public static List<MachineConfig> LoadMachines() => ReadMachines(() => CreateMachineProvider());
+
+        /// <summary>Every readable machine configuration on this PC, shared or not, for uploading.</summary>
+        public static List<MachineConfig> LoadLocalMachines() => ReadMachines(CreateLocalMachineProvider);
+
+        private static List<MachineConfig> ReadMachines(Func<IDataProvider> createProvider)
         {
             var machines = new List<MachineConfig>();
             try
             {
-                var provider = CreateMachineProvider();
+                var provider = createProvider();
                 foreach (var summary in provider.GetMachines())
                 {
                     if (provider.GetMachine(summary.Id) is { } machine)
@@ -70,10 +86,11 @@ namespace OpenNest.Forms
                 var problem =
                     status == ClampSettingsStatus.Invalid
                         ? "could not be read, so new nests have no clamps"
-                        : "has invalid values that were ignored, so new nests may be missing clamps";
+                        : "have invalid values that were ignored, so new nests may be missing clamps";
+                var source = SharedClamps() != null ? "on the nest server" : ClampSettings.DefaultPath;
                 MessageBox.Show(
                     owner,
-                    $"The clamp settings file {problem}:\n{ClampSettings.DefaultPath}\n\nCheck the clamps in Nest > Clamps and use Save as Machine Defaults to rewrite the file.",
+                    $"The clamp settings {problem}:\n{source}\n\nCheck the clamps in Nest > Clamps and use Save as Machine Defaults to rewrite them.",
                     "Clamps",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning
@@ -174,7 +191,26 @@ namespace OpenNest.Forms
 
         /// <summary>The single desktop entry point for the persisted machine clamp settings.</summary>
         public static ClampSettings LoadSavedClampSettings(out ClampSettingsStatus status) =>
-            ClampSettings.Load(ClampSettings.DefaultPath, out status);
+            SharedClamps() is { } shared
+                ? ClampSettings.Parse(shared.Json, out status)
+                : ClampSettings.Load(ClampSettings.DefaultPath, out status);
+
+        /// <summary>
+        /// Saves the clamp settings new nests start from where they are read: the server once it
+        /// holds them, otherwise this PC's file. Throws <see cref="IOException"/> when the server
+        /// cannot take them.
+        /// </summary>
+        public static void SaveClampSettings(ClampSettings settings)
+        {
+            if (SharedSettings.Current() is { } current
+                && current.Get(SharedSettingKinds.Clamps, SharedSettingKinds.DefaultKey) != null)
+                current.Save(SharedSettingKinds.Clamps, SharedSettingKinds.DefaultKey, settings.ToJson());
+            else
+                settings.Save(ClampSettings.DefaultPath);
+        }
+
+        private static SharedSettingRecord SharedClamps() =>
+            SharedSettings.Find(SharedSettingKinds.Clamps, SharedSettingKinds.DefaultKey);
 
         /// <summary>
         /// Loads the persisted nest defaults (see <see cref="LoadSavedNestDefaults"/>);
@@ -187,8 +223,9 @@ namespace OpenNest.Forms
             if (status == NestDefaultsStatus.Invalid && !defaultsWarned)
             {
                 defaultsWarned = true;
+                var source = SharedNestDefaults() != null ? "on the nest server" : NestDefaults.DefaultPath;
                 MessageBox.Show(
-                    $"The nest defaults file could not be read:\n{NestDefaults.DefaultPath}\n\nBuilt-in defaults will be used. Re-save your defaults from Tools > Nest Defaults.",
+                    $"The nest defaults could not be read:\n{source}\n\nBuilt-in defaults will be used. Re-save your defaults from Tools > Nest Defaults.",
                     "Nest Defaults",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning
@@ -204,10 +241,28 @@ namespace OpenNest.Forms
         /// the defaults dialog always agree.
         /// </summary>
         public static NestDefaults LoadSavedNestDefaults(out NestDefaultsStatus status) =>
-            NestDefaults.Load(
-                NestDefaults.DefaultPath,
-                Properties.Settings.Default.DefaultUnit,
-                out status
-            );
+            SharedNestDefaults() is { } shared
+                ? NestDefaults.Parse(shared.Json, Properties.Settings.Default.DefaultUnit, out status)
+                : NestDefaults.Load(NestDefaults.DefaultPath, Properties.Settings.Default.DefaultUnit, out status);
+
+        /// <summary>This PC's own nest defaults, shared or not, for uploading.</summary>
+        public static NestDefaults LoadLocalNestDefaults() =>
+            NestDefaults.Load(NestDefaults.DefaultPath, Properties.Settings.Default.DefaultUnit, out _);
+
+        /// <summary>
+        /// Saves the nest defaults where they are read: the server once it holds them, otherwise
+        /// this PC's file. Throws <see cref="IOException"/> when the server cannot take them.
+        /// </summary>
+        public static void SaveNestDefaults(NestDefaults defaults)
+        {
+            if (SharedSettings.Current() is { } current
+                && current.Get(SharedSettingKinds.NestDefaults, SharedSettingKinds.DefaultKey) != null)
+                current.Save(SharedSettingKinds.NestDefaults, SharedSettingKinds.DefaultKey, defaults.ToJson());
+            else
+                defaults.Save(NestDefaults.DefaultPath);
+        }
+
+        private static SharedSettingRecord SharedNestDefaults() =>
+            SharedSettings.Find(SharedSettingKinds.NestDefaults, SharedSettingKinds.DefaultKey);
     }
 }

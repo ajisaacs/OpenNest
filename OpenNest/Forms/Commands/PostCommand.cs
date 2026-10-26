@@ -26,6 +26,10 @@ namespace OpenNest.Forms.Commands
 
         public void Run()
         {
+            // Every workstation posts with the same shared settings, re-read for each post.
+            if (!SharedSettings.LoadPostSettings(owner, postProcessor))
+                return;
+
             if (postProcessor is IPostProcessorNestAware nestAware)
                 nestAware.PrepareForNest(nest);
 
