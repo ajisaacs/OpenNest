@@ -107,10 +107,11 @@ shows the first three check categories, even when there are no findings:
   clean nesting material (leads excluded) tested exactly as Auto Nest's layout check tests
   it, with the shared `SpacingOutline` and `SpacingSlack`, so a layout Auto Nest accepted
   stays clear. That outline circumscribes arcs by more than the slack, so each candidate is
-  confirmed on its native contours flattened 20 times finer than the slack. The review warns
-  only when that gap falls short of the spacing by more than `SpacingSlack`, which lets
-  interactive fills that place arcs exactly at the spacing pass. On curves it is therefore
-  slightly more lenient than Auto Nest's check, never stricter. Zero spacing allows contact.
+  confirmed on its native contours flattened 20 times finer than the slack (Core's
+  `NativeContours`). The review warns only when that gap falls short of the spacing by more
+  than `SpacingSlack`, which lets interactive fills that place arcs exactly at the spacing
+  pass. Auto Nest's layout check and the whole-job runner's candidate validation confirm the
+  same way, so all three agree. Zero spacing allows contact.
   A part inside another's cutout is held to the spacing from the hole edge. Cut-offs, the
   plate edge and clamps are not spacing-checked. The finding gives the measured gap; this
   line appears in the summary only when there is such a finding.

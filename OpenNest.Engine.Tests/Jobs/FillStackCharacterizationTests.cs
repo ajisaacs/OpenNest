@@ -402,9 +402,7 @@ public class FillStackCharacterizationTests
             var job = IrregularJob();
             var result = new FixedStrategyNestingEngine(strategy).Solve(job);
             Assert.Equal(NestJobStatus.Complete, result.Status);
-            // Not LayoutAssert.Valid: today the Fill and Vertical Remnant layouts of this job
-            // fail NestLayoutCheck's arc-to-arc spacing check on an interlocked arc pair, though
-            // the runner's placement validator accepts them. These tests pin current behavior.
+            LayoutAssert.Valid(job, result);
             return Layout(result);
         });
 

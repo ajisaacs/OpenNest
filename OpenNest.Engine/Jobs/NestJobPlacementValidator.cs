@@ -9,9 +9,9 @@ namespace OpenNest.Engine.Jobs;
 internal static class NestJobPlacementValidator
 {
     private const double Epsilon = 0.0000001;
-    // Flattening for placement overlap/spacing checks: the same 0.001 the benchmark's
-    // NestValidator and Part.Intersects use. Arcs are inscribed, so a layout placed exactly at
-    // the spacing passes; outward arcs may come up to this much closer than the spacing.
+    // Flattening for the placement overlap check: the same 0.001 Part.Intersects uses. Part
+    // spacing is judged by NestLayoutCheck.KeepsSpacing instead, so this validator and the
+    // layout check accept exactly the same pairs.
     private const double PlacementChordTolerance = NestTolerances.ValidationOutline;
 
     internal static void ValidateCandidate(
@@ -25,6 +25,10 @@ internal static class NestJobPlacementValidator
             throw new InvalidOperationException("The plate nester returned a null candidate.");
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         var placed = new List<ShapeTopology>();
+        // Spacing outlines per placement, prepared only once a neighbour comes near.
+        var poses = new List<(JobPartGeometry Geometry, NestJobPlacement Pose)>();
+        var spaced = new List<NestLayoutCheck.PreparedPlacement>();
+        var geometries = new Dictionary<string, JobPartGeometry>(StringComparer.Ordinal);
         var sources = new Dictionary<string, ShapeTopology>(StringComparer.Ordinal);
         foreach (var placement in candidate.Placements)
         {
@@ -51,14 +55,22 @@ internal static class NestJobPlacementValidator
                 );
 
             if (!sources.TryGetValue(placement.PartId, out var source))
-                sources[placement.PartId] = source = CreateShape(part.Geometry);
+            {
+                var geometry = JobPartGeometry.Read(part.Geometry);
+                geometries[placement.PartId] = geometry;
+                sources[placement.PartId] = source = new ShapeTopology(geometry.Perimeter,
+                    new List<Shape>(geometry.Cutouts));
+            }
             var shape = Transform(source, placement);
             if (!FitsWorkArea(shape, stock))
                 throw new InvalidOperationException(
                     "Candidate placement falls outside the usable stock area."
                 );
-            foreach (var other in placed)
+            poses.Add((geometries[placement.PartId], placement));
+            spaced.Add(null);
+            for (var k = 0; k < placed.Count; k++)
             {
+                var other = placed[k];
                 // Analytic contour bounds give a conservative lower bound on clearance.
                 // Do not polygonize or compare every hole edge for distant placements.
                 if (BoundsDistance(shape.Perimeter.BoundingBox, other.Perimeter.BoundingBox)
@@ -66,8 +78,9 @@ internal static class NestJobPlacementValidator
                     continue;
                 if (Overlaps(shape, other))
                     throw new InvalidOperationException("Candidate placements overlap.");
+                // Earlier placement first, so ties inflate it as the layout check's sweep does.
                 if (stock.PartSpacing > 0
-                    && Distance(shape, other) < stock.PartSpacing - NestTolerances.SpacingSlack)
+                    && !NestLayoutCheck.KeepsSpacing(Spaced(k), Spaced(placed.Count)))
                     throw new InvalidOperationException(
                         "Candidate placements violate required part spacing."
                     );
@@ -76,12 +89,10 @@ internal static class NestJobPlacementValidator
             placed.Add(shape);
             counts[placement.PartId] = count + 1;
         }
-    }
 
-    private static ShapeTopology CreateShape(PartGeometrySnapshot geometry)
-    {
-        var shape = JobPartGeometry.Read(geometry);
-        return new ShapeTopology(shape.Perimeter, shape.Profile.Cutouts);
+        NestLayoutCheck.PreparedPlacement Spaced(int index) =>
+            spaced[index] ??= NestLayoutCheck.Prepare(poses[index].Geometry, poses[index].Pose,
+                stock.PartSpacing);
     }
 
     private static ShapeTopology Transform(ShapeTopology source, NestJobPlacement placement)
@@ -147,49 +158,6 @@ internal static class NestJobPlacementValidator
         return System.Math.Sqrt(x * x + y * y);
     }
 
-    private static double Distance(ShapeTopology left, ShapeTopology right)
-    {
-        var result = double.PositiveInfinity;
-        foreach (var leftContour in left.Contours)
-        foreach (var rightContour in right.Contours)
-            if (BoundsDistance(leftContour.Bounds, rightContour.Bounds) < result)
-                result = System.Math.Min(
-                    result,
-                    BoundaryDistance(leftContour.Lines, rightContour.Lines)
-                );
-        return result;
-    }
-
-    private static double BoundaryDistance(List<Line> left, List<Line> right)
-    {
-        var result = double.PositiveInfinity;
-        foreach (var leftLine in left)
-        {
-            foreach (var rightLine in right)
-            {
-                if (leftLine.Intersects(rightLine))
-                    return 0;
-                result = System.Math.Min(
-                    result,
-                    leftLine.ClosestPointTo(rightLine.StartPoint).DistanceTo(rightLine.StartPoint)
-                );
-                result = System.Math.Min(
-                    result,
-                    leftLine.ClosestPointTo(rightLine.EndPoint).DistanceTo(rightLine.EndPoint)
-                );
-                result = System.Math.Min(
-                    result,
-                    rightLine.ClosestPointTo(leftLine.StartPoint).DistanceTo(leftLine.StartPoint)
-                );
-                result = System.Math.Min(
-                    result,
-                    rightLine.ClosestPointTo(leftLine.EndPoint).DistanceTo(leftLine.EndPoint)
-                );
-            }
-        }
-        return result;
-    }
-
     private sealed class ShapeTopology(Shape perimeter, List<Shape> cutouts)
     {
         private Contour[] contours;
@@ -228,20 +196,16 @@ internal static class NestJobPlacementValidator
     }
 
     /// <summary>
-    /// A contour flattened once, at <see cref="PlacementChordTolerance"/>, for the overlap and
-    /// spacing checks against every other placement.
+    /// A contour flattened once, at <see cref="PlacementChordTolerance"/>, for the overlap check
+    /// against every other placement.
     /// </summary>
     private sealed class Contour
     {
         internal Contour(Shape shape)
         {
             Polygon = shape.ToPolygonWithTolerance(PlacementChordTolerance);
-            Bounds = Polygon.BoundingBox;
-            Lines = Polygon.ToLines();
         }
 
-        internal Box Bounds { get; }
         internal Polygon Polygon { get; }
-        internal List<Line> Lines { get; }
     }
 }

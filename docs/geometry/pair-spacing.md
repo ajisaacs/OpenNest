@@ -25,14 +25,14 @@ Measurements use raw material outlines tessellated at 1e-6 chord tolerance and i
 ## Remaining limitations — not a complete spacing fix
 
 - Other angled candidates remain physically too close. Of 568 kept candidates in the corrected real-DXF probe, 49 had boundary distance below 0.25 minus 2e-6, including 48 below the existing 0.2495 spacing-slack threshold. The worst measured boundary gap was about 0.205618. Their cause is not established by this repair; CPU projection filtering and missing arc/line interior contact are separate suspects.
-- The existing offset-based validator still reports 28 spacing violations in each corrected 70-part grid despite the independent fine-outline measurement above. Do not loosen validator tolerance or declare these reports resolved without isolating the discrepancy. This report verifies physical outline clearance for that fixture, not validator acceptance of the whole grid.
+- The offset-based layout check used to report 28 spacing violations in each corrected 70-part grid despite the independent fine-outline measurement above. The cause was its spacing outline, which circumscribes arcs by up to 0.001 each, more than the 0.0005 slack, so two arcs exactly at the spacing could overlap there. It now confirms each pair the outline flags on native contours flattened at a twentieth of the slack (`NativeContours`), as the pre-post review does, and both grids pass with no tolerance changed.
 - Across the complete candidate probe, 42 tessellated polygons were invalid. Their boundary distances were recorded without silently repairing them, but intersection-area verdicts were omitted for those invalid polygons. This caveat does not apply to the top pair or the two reported grids.
 - Kept-pair acceptance still checks raw overlap, not requested clearance. Interactive fill/group paths can trust an invalid seed. This repair does not add a final spacing gate or repair existing user placements.
 - Serialized best-fit results have no algorithm-version invalidation. Loading previously saved candidates can retain old poses. The measurements above use newly imported drawings/fresh computation, not restored caches. Reimport/recompute when evaluating this fix; existing nests and DXFs are not rewritten.
 - A zero-demand `PlateFillService.Nest` probe returns no parts and is **not** evidence of a valid whole-job nest. The nonempty cases verified here are pair generation, pair fill, interactive fill, and the quantity-two shortcut.
 - GPU behavior and Windows desktop execution were not verified on this Linux host.
 
-Next hardening should isolate the remaining angular contact defect with a first-contact regression, then address clearance-aware seed acceptance/cache compatibility and the grid-validator disagreement as separate changes. Do not conflate those with the unrelated unchanged-row validation-reuse performance work.
+Next hardening should isolate the remaining angular contact defect with a first-contact regression, then address clearance-aware seed acceptance and cache compatibility as separate changes. Do not conflate those with the unrelated unchanged-row validation-reuse performance work.
 
 ## Regression verification
 
@@ -41,7 +41,7 @@ dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug \
   --filter 'FullyQualifiedName~CurveContactDistanceTests|FullyQualifiedName~NativeUClearanceTests'
 ```
 
-The 36 targeted cases cover both callers, swapped curves, reflected/translated/rotated directions, both roots, arc-span rejection, external-circle contact, zero spacing, point/equal-radius degeneracies, the real-shaped closed U fixture, top cached-pair source materialization, and nonempty interactive fill with quantity zero/two. The test clearance oracle uses fine raw line segments and independent point/segment distances, plus overlap checks; it does not use native offset curves or the slide solver. The complete-grid validator result is logged, not represented as passing.
+The 36 targeted cases cover both callers, swapped curves, reflected/translated/rotated directions, both roots, arc-span rejection, external-circle contact, zero spacing, point/equal-radius degeneracies, the real-shaped closed U fixture, top cached-pair source materialization, and nonempty interactive fill with quantity zero/two. The test clearance oracle uses fine raw line segments and independent point/segment distances, plus overlap checks; it does not use native offset curves or the slide solver. The complete-grid layout check must report no violations.
 
 Baseline `bc5fd86996da3abb98bb3b1da5f81de82692bf5e` failed 18 of the original 22 geometry regression cases and all three integration cases before the repair. Final scoped formatter and `--verify-no-changes` runs succeeded with `EnableWindowsTargeting=true`; all suites below passed on the repaired tree:
 

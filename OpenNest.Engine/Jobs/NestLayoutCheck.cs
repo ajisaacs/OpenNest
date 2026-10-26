@@ -127,7 +127,7 @@ public static class NestLayoutCheck
     {
         var ap = Transform(a, pa.Rotation);
         var al = new Vector(pa.X, pa.Y);
-        return new PreparedPlacement(ap, al, Outline(ap, al, 0), InflationFor(spacing));
+        return new PreparedPlacement(ap, al, Outline(ap, al, 0), spacing);
     }
 
     /// <summary>Same answer as <c>Clears(a, pa, b, pb, spacing)</c> for the part and spacing
@@ -148,6 +148,25 @@ public static class NestLayoutCheck
             || !Overlaps(a.Inflated, br);
     }
 
+    /// <summary>
+    /// The layout check's spacing verdict for two prepared parts, prepared with the same positive
+    /// spacing: true unless the leftmost part's inflated outline overlaps the other's raw outline
+    /// (ties inflate <paramref name="a"/>) and their <see cref="NativeContours"/> confirm the gap
+    /// is short of the spacing by more than the slack. The whole-job runner validates candidates
+    /// with it, so it accepts exactly the pairs <see cref="Violations(NestJob, NestJobResult)"/>
+    /// accepts. Unlike <see cref="Clears(PreparedPlacement, JobPartGeometry, NestJobPlacement)"/>,
+    /// it does not reject arcs the outline alone puts too close.
+    /// </summary>
+    internal static bool KeepsSpacing(PreparedPlacement a, PreparedPlacement b)
+    {
+        var (left, right) = a.Raw.Perimeter.BoundingBox.Left > b.Raw.Perimeter.BoundingBox.Left
+            ? (b, a)
+            : (a, b);
+        return !BoxesTouch(left.Inflated.Perimeter.BoundingBox, right.Raw.Perimeter.BoundingBox)
+            || !Overlaps(left.Inflated, right.Raw)
+            || !left.Native.TooClose(right.Native, left.Spacing);
+    }
+
     /// <summary>A part at a pose with its outlines prepared once; see
     /// <see cref="Prepare(JobPartGeometry, NestJobPlacement, double)"/>.</summary>
     public sealed class PreparedPlacement
@@ -155,20 +174,25 @@ public static class NestLayoutCheck
         private readonly ShapeProfile profile;
         private readonly Vector location;
         private SpacingOutline inflated;
+        private NativeContours native;
 
-        internal PreparedPlacement(ShapeProfile profile, Vector location, SpacingOutline raw, double inflateBy)
+        internal PreparedPlacement(ShapeProfile profile, Vector location, SpacingOutline raw, double spacing)
         {
             this.profile = profile;
             this.location = location;
             Raw = raw;
-            InflateBy = inflateBy;
+            Spacing = spacing;
+            InflateBy = InflationFor(spacing);
         }
 
         internal SpacingOutline Raw { get; }
+        internal double Spacing { get; }
         internal double InflateBy { get; }
 
         internal SpacingOutline Inflated =>
             inflated ??= InflateBy > Tolerance.Epsilon ? Outline(profile, location, InflateBy) : Raw;
+
+        internal NativeContours Native => native ??= NativeContours.Of(profile, location);
     }
 
     private static ShapeProfile Transform(JobPartGeometry geometry, double rotation)
@@ -497,7 +521,8 @@ public static class NestLayoutCheck
     /// nested inside another part's cutout (part-in-part) is legal as long as
     /// it clears the cutout's edge by the spacing. Pairs are pruned with an
     /// X-sorted sweep over bounding boxes so only neighbours reach the
-    /// polygon clipper.
+    /// polygon clipper. A pair the outlines flag at a positive spacing is
+    /// reported only when <see cref="NativeContours"/> confirm it.
     /// </summary>
     private static void ValidateSpacing(
         List<Part> parts,
@@ -506,14 +531,21 @@ public static class NestLayoutCheck
         List<string> result
     )
     {
+        var profiles = new ShapeProfile[parts.Count];
         var raw = new SpacingOutline[parts.Count];
         var inflated = new SpacingOutline[parts.Count];
+        var native = new NativeContours[parts.Count];
         var inflateBy = InflationFor(spacing);
 
         for (var i = 0; i < parts.Count; i++)
         {
-            raw[i] = Outline(parts[i], 0);
-            inflated[i] = inflateBy > Tolerance.Epsilon ? Outline(parts[i], inflateBy) : raw[i];
+            profiles[i] = Profile(parts[i]);
+            if (profiles[i] == null)
+                continue;
+            raw[i] = Outline(profiles[i], parts[i].Location, 0);
+            inflated[i] = inflateBy > Tolerance.Epsilon
+                ? Outline(profiles[i], parts[i].Location, inflateBy)
+                : raw[i];
         }
 
         var order = Enumerable
@@ -542,12 +574,22 @@ public static class NestLayoutCheck
                 // Inflating one side by the full spacing covers both cases: part j
                 // inside part i's (shrunk) cutout, or part i's inflated outline
                 // inside part j's raw cutout.
-                if (Overlaps(inflated[i], raw[j]))
+                if (!Overlaps(inflated[i], raw[j]))
+                    continue;
+
+                // The outline circumscribes arcs by more than the slack, so confirm a spacing
+                // candidate on the native contours. Zero spacing has no gap to confirm.
+                if (inflateBy > Tolerance.Epsilon)
                 {
-                    result.Add(
-                        $"'{DisplayName(parts[i], requirements)}' and '{DisplayName(parts[j], requirements)}' are closer than the required spacing ({spacing:F3})"
-                    );
+                    native[i] ??= NativeContours.Of(profiles[i], parts[i].Location);
+                    native[j] ??= NativeContours.Of(profiles[j], parts[j].Location);
+                    if (!native[i].TooClose(native[j], spacing))
+                        continue;
                 }
+
+                result.Add(
+                    $"'{DisplayName(parts[i], requirements)}' and '{DisplayName(parts[j], requirements)}' are closer than the required spacing ({spacing:F3})"
+                );
             }
         }
     }
@@ -585,12 +627,22 @@ public static class NestLayoutCheck
     /// conservative, since it has no room for another part at the required
     /// spacing anyway. Arcs are flattened conservatively (perimeter arcs
     /// circumscribed, cutout arcs inscribed) but nothing is padded. Callers inflate
-    /// by the spacing less NestTolerances.SpacingSlack, so a layout exactly at the
-    /// spacing passes despite rounding; the only other leniency is the round-join
-    /// chord error at convex corners (SpacingOutline.ChordTolerance / 10).
+    /// by the spacing less NestTolerances.SpacingSlack, so straight edges exactly at
+    /// the spacing pass despite rounding; the only other leniency is the round-join
+    /// chord error at convex corners (SpacingOutline.ChordTolerance / 10). Arcs at
+    /// the spacing can overlap by up to twice the chord tolerance, so the spacing
+    /// check confirms what this outline flags on NativeContours.
     /// part.Program is already rotated; only a Location offset is needed.
     /// </summary>
     private static SpacingOutline Outline(Part part, double inflateBy)
+    {
+        var profile = Profile(part);
+        return profile == null ? null : Outline(profile, part.Location, inflateBy);
+    }
+
+    /// <summary>A part's clean nesting material, already rotated; null when it has no closed
+    /// perimeter.</summary>
+    private static ShapeProfile Profile(Part part)
     {
         var entities = ConvertProgram
             .ToGeometry(part.Program)
@@ -602,10 +654,7 @@ public static class NestLayoutCheck
 
         var profile = new ShapeProfile(entities);
 
-        if (profile.Perimeter == null)
-            return null;
-
-        return Outline(profile, part.Location, inflateBy);
+        return profile.Perimeter == null ? null : profile;
     }
 
     private static SpacingOutline Outline(ShapeProfile profile, Vector location, double inflateBy) =>

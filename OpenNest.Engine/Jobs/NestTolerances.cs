@@ -9,8 +9,9 @@ namespace OpenNest.Engine.Jobs;
 /// Scribe/etch marks never affect these checks or salvage envelopes, even outside the sheet.</summary>
 public static class NestTolerances
 {
-    /// <summary>Arc chord tolerance used by both validators. The layout check circumscribes
-    /// perimeter arcs and inscribes cutouts; the placement validator uses inscribed arcs.</summary>
+    /// <summary>Arc chord tolerance of the spacing outline (perimeter arcs circumscribed,
+    /// cutouts inscribed) and of the placement validator's overlap check (arcs inscribed).
+    /// Spacing candidates the outline flags are confirmed on <see cref="NativeContours"/>.</summary>
     public const double ValidationOutline = SpacingOutline.ChordTolerance;
 
     /// <summary>How far under the part spacing a gap may fall and still pass both validators

@@ -15,20 +15,16 @@ namespace OpenNest.Diagnostics;
 /// Nest's layout check finds them: each part's clean nesting material
 /// (<see cref="NestingMaterial.ForNesting"/>, leads excluded) outlined by <see cref="SpacingOutline"/>,
 /// the leftmost of a pair inflated by <see cref="SpacingOutline.InflationFor"/>. That outline
-/// circumscribes arcs by up to its chord tolerance, more than the slack, and engines add a margin
-/// for it; interactive fills place native arcs exactly at the spacing. So each candidate is
-/// confirmed on the native contours flattened at <see cref="FineTolerance"/> and reported only when
-/// that gap is short of the spacing by more than the slack. Zero spacing enforces nothing, so
-/// contact stays valid.
+/// circumscribes arcs by up to its chord tolerance, more than the slack, and interactive fills
+/// place native arcs exactly at the spacing. So each candidate is confirmed on
+/// <see cref="NativeContours"/>, as the layout check confirms it, and reported only when that gap
+/// is short of the spacing by more than the slack. Zero spacing enforces nothing, so contact stays
+/// valid.
 /// Pairs whose material already overlaps, and parts the overlap check could not read, are left to
 /// that check. The sheet edge and clamps are not spacing-checked here.
 /// </summary>
 internal static class PartSpacingReview
 {
-    /// <summary>Chord tolerance of the confirming measurement. Circumscribed on both sides, it
-    /// understates a gap by at most twice this, a tenth of <see cref="SpacingOutline.SpacingSlack"/>.</summary>
-    internal const double FineTolerance = SpacingOutline.SpacingSlack / 20;
-
     internal static void Add(Plate plate, int plateNumber, IReadOnlyList<Part> parts,
         IReadOnlyList<int> partNumbers, PlateOverlapReport overlap, List<PostVerificationFinding> findings,
         CancellationToken cancellationToken)
@@ -49,7 +45,7 @@ internal static class PartSpacingReview
         var overlapping = overlap.Pairs.Select(pair => Key(pair.PartAId, pair.PartBId)).ToHashSet();
         var profiles = new Dictionary<(Program, long), ShapeProfile>();
         var shapes = new ShapeProfile[parts.Count];
-        var fine = new FineRings[parts.Count];
+        var fine = new NativeContours[parts.Count];
         var raw = new SpacingOutline[parts.Count];
         var inflated = new SpacingOutline[parts.Count];
         for (var i = 0; i < parts.Count; i++)
@@ -99,9 +95,9 @@ internal static class PartSpacingReview
                 Vector marker;
                 try
                 {
-                    fine[i] ??= FineRings.Of(shapes[i], parts[i].Location);
-                    fine[j] ??= FineRings.Of(shapes[j], parts[j].Location);
-                    gap = Gap(fine[i], fine[j], spacing, out marker);
+                    fine[i] ??= NativeContours.Of(shapes[i], parts[i].Location);
+                    fine[j] ??= NativeContours.Of(shapes[j], parts[j].Location);
+                    gap = fine[i].GapTo(fine[j], spacing, out marker);
                 }
                 catch (Exception exception) when (IsInvalid(exception))
                 {
@@ -146,73 +142,6 @@ internal static class PartSpacingReview
             throw new ArgumentException("Part material has no closed perimeter.");
         profiles[key] = profile;
         return profile;
-    }
-
-    /// <summary>Closest boundary approach between two parts, including a part inside the other's
-    /// cutout; <paramref name="marker"/> is the middle of that gap. Only edges within
-    /// <paramref name="reach"/> of the other part's bounds can be closer than it, so the rest are
-    /// skipped. Infinity when no edges are that near.</summary>
-    private static double Gap(FineRings a, FineRings b, double reach, out Vector marker)
-    {
-        var best = double.PositiveInfinity;
-        var middle = a.Bounds.Center;
-        var perimeterA = Near(a.Perimeter, b.Bounds, reach);
-        var perimeterB = Near(b.Perimeter, a.Bounds, reach);
-        Measure(perimeterA, perimeterB);
-        foreach (var hole in a.Holes)
-            Measure(Near(hole, b.Bounds, reach), perimeterB);
-        foreach (var hole in b.Holes)
-            Measure(perimeterA, Near(hole, a.Bounds, reach));
-        marker = middle;
-        return best;
-
-        void Measure(List<Line> ringA, List<Line> ringB)
-        {
-            if (ringA.Count == 0 || ringB.Count == 0)
-                return;
-            var distance = Clearance.ClosestPoints(ringA, ringB, out var onA, out var onB);
-            if (distance < best)
-            {
-                best = distance;
-                middle = (onA + onB) * 0.5;
-            }
-        }
-    }
-
-    private static List<Line> Near(List<Line> lines, Box other, double reach) =>
-        lines.Where(line =>
-            System.Math.Min(line.StartPoint.X, line.EndPoint.X) <= other.Right + reach
-            && System.Math.Max(line.StartPoint.X, line.EndPoint.X) >= other.Left - reach
-            && System.Math.Min(line.StartPoint.Y, line.EndPoint.Y) <= other.Top + reach
-            && System.Math.Max(line.StartPoint.Y, line.EndPoint.Y) >= other.Bottom - reach).ToList();
-
-    /// <summary>A part's native contours in world space, flattened at <see cref="FineTolerance"/>.
-    /// Circumscribed, so the measured gap never exceeds the true one by more than rounding.</summary>
-    private sealed class FineRings
-    {
-        public List<Line> Perimeter { get; private init; }
-        public List<List<Line>> Holes { get; private init; }
-        public Box Bounds { get; private init; }
-
-        public static FineRings Of(ShapeProfile profile, Vector location)
-        {
-            var perimeter = World(profile.Perimeter, location, out var bounds);
-            return new FineRings
-            {
-                Perimeter = perimeter.ToLines(),
-                Holes = profile.Cutouts.Select(cutout => World(cutout, location, out _).ToLines()).ToList(),
-                Bounds = bounds,
-            };
-        }
-
-        private static Polygon World(Shape shape, Vector location, out Box bounds)
-        {
-            var polygon = ClipperBridge.Flatten(shape, FineTolerance, true);
-            polygon.Offset(location);
-            polygon.UpdateBounds();
-            bounds = polygon.BoundingBox;
-            return polygon;
-        }
     }
 
     private static (int, int) Key(int a, int b) => a < b ? (a, b) : (b, a);

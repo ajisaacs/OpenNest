@@ -62,11 +62,10 @@ public class NativeUClearanceTests
             new Dictionary<Drawing, (string Name, int Quantity)> { [drawing] = (drawing.Name, parts.Count) });
         output.WriteLine($"Validator violations={violations.Count}");
         AssertClearance(parts, plate.PartSpacing);
-        // The complete grid currently triggers offset-validator reports even though its
-        // independently measured raw boundaries clear. Do not change validator tolerance
-        // here: the fine-boundary oracle above checks EVERY nearby pair in either mode.
-        if (quantity == 2)
-            Assert.Empty(violations);
+        // The complete grid's arcs sit exactly at the spacing; the layout check confirms
+        // what its circumscribed outline flags on native contours, so it agrees with the
+        // fine-boundary oracle above.
+        Assert.Empty(violations);
     }
 
     private void AssertClearance(List<Part> parts, double spacing)
