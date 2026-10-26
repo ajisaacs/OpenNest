@@ -376,6 +376,9 @@ namespace OpenNest.IO
                             LeadInsLocked = part.LeadInsLocked,
                             Program = programName,
                             DrawingHash = programName == null ? null : drawingHashes[match.Key],
+                            CuttingParameters = programName == null
+                                ? null
+                                : CuttingParametersSerializer.ToDto(part.CuttingParameters),
                             DrawingPinsOff = part.DrawingPinsOff ? true : null,
                         }
                     );

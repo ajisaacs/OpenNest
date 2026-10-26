@@ -733,6 +733,14 @@ namespace OpenNest.IO
             public string DrawingHash { get; init; }
 
             /// <summary>
+            /// The cutting settings this part's saved program was built with. Written only with
+            /// <see cref="Program"/>; missing in older files and for clean parts, which read as
+            /// null so reviews fall back to the plate's settings.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public CuttingParametersDto CuttingParameters { get; init; }
+
+            /// <summary>
             /// True when this placement ignores its drawing's cut pins. Written only when true;
             /// missing means false. Any value other than a boolean reads as null, which the
             /// reader reports and treats as false.

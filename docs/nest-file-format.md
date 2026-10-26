@@ -45,8 +45,13 @@ The reader constructs and places a clean part first, then installs its saved
 program without rotating it again. The drawing reference remains authoritative
 for Remove Lead-ins: removing them restores the clean drawing at the saved pose.
 Successful restoration marks the part as carrying lead-ins and restores its
-`leadInsLocked` flag. The per-part `CuttingParameters` reference remains null;
-the saved program, not strategy regeneration, determines the cutting geometry.
+`leadInsLocked` flag. A placement with a `program` may also write
+`cuttingParameters` (the same DTO as the plate's): the settings that program was
+built with, read back as the part's `CuttingParameters` so lead and pierce-zone
+reviews judge it against them. The field is omitted when the part has none; older
+files and a program that fails to restore leave it null, and reviews fall back to
+the plate's settings. The saved program, not strategy regeneration, determines the
+cutting geometry.
 
 Missing `program` references in legacy files load clean and silently, even when
 old transient flags were true. A missing or mismatched drawing hash likewise

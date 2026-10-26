@@ -125,6 +125,8 @@ namespace OpenNest.IO
 
                 if (!part.RestoreLeadInProgram(program, dto.LeadInsLocked))
                     throw new InvalidDataException("The saved part program has no motion.");
+                // After the install, which clears it: the settings belong to this program.
+                part.CuttingParameters = CuttingParametersSerializer.FromDto(dto.CuttingParameters);
             }
             catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is FormatException
                 || ex is OverflowException || ex is ArgumentException || ex is InvalidOperationException)
