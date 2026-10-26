@@ -6,7 +6,7 @@ namespace OpenNest.Engine.Jobs.Placement;
 
 /// <summary>
 /// Built-in remnant placement strategy for the whole-job runner. Fills one candidate per trial with
-/// a <see cref="DefaultPlateFiller"/> with the vertical or horizontal remnant <see cref="PlateFillPolicy"/>. Placement is
+/// a <see cref="PlateFiller"/> with the vertical or horizontal remnant <see cref="PlateFillPolicy"/>. Placement is
 /// <see cref="DefaultPlateNester"/>'s with that filler: the same fresh private plate per trial and
 /// the same run-scoped identity, progress, and accounting boundaries.
 /// </summary>
@@ -18,7 +18,7 @@ public sealed class RemnantPlateNester : IPlateNester
 {
     private readonly DefaultPlateNester nester;
 
-    internal RemnantPlateNester(Func<Plate, DefaultPlateFiller> fillerFactory)
+    internal RemnantPlateNester(Func<Plate, PlateFiller> fillerFactory)
     {
         nester = new DefaultPlateNester(
             fillerFactory ?? throw new ArgumentNullException(nameof(fillerFactory)));
@@ -26,11 +26,11 @@ public sealed class RemnantPlateNester : IPlateNester
 
     /// <summary>Vertical-remnant policy: minimize X-extent, prefer horizontal placement.</summary>
     internal static RemnantPlateNester Vertical() =>
-        new(plate => new DefaultPlateFiller(plate, PlateFillPolicy.VerticalRemnant));
+        new(plate => new PlateFiller(plate, PlateFillPolicy.VerticalRemnant));
 
     /// <summary>Horizontal-remnant policy: minimize Y-extent, prefer vertical placement.</summary>
     internal static RemnantPlateNester Horizontal() =>
-        new(plate => new DefaultPlateFiller(plate, PlateFillPolicy.HorizontalRemnant));
+        new(plate => new PlateFiller(plate, PlateFillPolicy.HorizontalRemnant));
 
     public PlateCandidate Place(
         PlatePlacementRequest request,

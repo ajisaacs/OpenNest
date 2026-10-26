@@ -1,8 +1,8 @@
 using OpenNest.CNC;
-using OpenNest.Geometry;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Engine.Jobs.Placement.Fillers;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Tests.Jobs;
 
@@ -135,7 +135,7 @@ public class NestJobCancellationTests
         }
     }
 
-    private sealed class ReportingFiller(Plate plate) : DefaultPlateFiller(plate)
+    private sealed class ReportingFiller(Plate plate) : PlateFiller(plate)
     {
         public override List<Part> Nest(
             List<NestItem> items,

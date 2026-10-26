@@ -7,8 +7,9 @@ using OpenNest.Engine.Jobs.Placement.Fillers;
 namespace OpenNest.Engine.Jobs.Placement;
 
 /// <summary>
-/// Built-in placement strategy for the whole-job runner. Runs the <see cref="StripPlateFiller"/>
-/// iterative shrink-fill/pack geometry with the same run-scoped bookkeeping as
+/// Built-in placement strategy for the whole-job runner. Runs a <see cref="PlateFiller"/> with the
+/// <see cref="PlateLayout.Strips"/> layout (iterative shrink-fill strips, then a pack)
+/// with the same run-scoped bookkeeping as
 /// <see cref="DefaultPlateNester"/>: remaining demand is read from the request and placement counts
 /// are derived from returned placements.
 /// </summary>
@@ -20,15 +21,15 @@ namespace OpenNest.Engine.Jobs.Placement;
 /// </remarks>
 public sealed class StripPlateNester : IPlateNester
 {
-    private readonly Func<Plate, StripPlateFiller> fillerFactory;
+    private readonly Func<Plate, PlateFiller> fillerFactory;
     private readonly OrderedPlateNester restrictedRotationNester = new();
     private readonly CandidatePlacementContext context = new();
 
     public StripPlateNester()
-        : this(static plate => new StripPlateFiller(plate)) { }
+        : this(static plate => new PlateFiller(plate, PlateFillPolicy.Fill, PlateLayout.Strips)) { }
 
-    /// <param name="fillerFactory">Injectable for tests; defaults to <see cref="StripPlateFiller"/>.</param>
-    internal StripPlateNester(Func<Plate, StripPlateFiller> fillerFactory)
+    /// <param name="fillerFactory">Injectable for tests; defaults to the strip-layout <see cref="PlateFiller"/>.</param>
+    internal StripPlateNester(Func<Plate, PlateFiller> fillerFactory)
     {
         this.fillerFactory =
             fillerFactory ?? throw new ArgumentNullException(nameof(fillerFactory));

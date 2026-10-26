@@ -8,7 +8,7 @@ namespace OpenNest.Engine.Jobs.Placement;
 
 /// <summary>
 /// Built-in placement strategy for the whole-job runner. Fills each candidate trial with a
-/// <see cref="DefaultPlateFiller"/> on a fresh private plate and owns its own run-scoped
+/// <see cref="PlateFiller"/> on a fresh private plate and owns its own run-scoped
 /// bookkeeping: remaining demand is read from the request and placement counts are derived from
 /// returned placements, so the filler's private <see cref="NestItem.Quantity"/> mutations never
 /// feed back into job accounting.
@@ -23,15 +23,15 @@ namespace OpenNest.Engine.Jobs.Placement;
 /// </remarks>
 public sealed class DefaultPlateNester : IPlateNester
 {
-    private readonly Func<Plate, DefaultPlateFiller> fillerFactory;
+    private readonly Func<Plate, PlateFiller> fillerFactory;
     private readonly OrderedPlateNester restrictedRotationNester = new();
     private readonly CandidatePlacementContext context = new();
 
     public DefaultPlateNester()
-        : this(static plate => new DefaultPlateFiller(plate)) { }
+        : this(static plate => new PlateFiller(plate)) { }
 
-    /// <param name="fillerFactory">Injectable for tests; defaults to <see cref="DefaultPlateFiller"/>.</param>
-    internal DefaultPlateNester(Func<Plate, DefaultPlateFiller> fillerFactory)
+    /// <param name="fillerFactory">Injectable for tests; defaults to <see cref="PlateFiller"/>.</param>
+    internal DefaultPlateNester(Func<Plate, PlateFiller> fillerFactory)
     {
         this.fillerFactory =
             fillerFactory ?? throw new ArgumentNullException(nameof(fillerFactory));

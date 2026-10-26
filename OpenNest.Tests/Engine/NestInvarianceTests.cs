@@ -38,7 +38,7 @@ public class NestInvarianceTests
     private static int RunFillCount(Drawing drawing, Plate plate)
     {
         BestFitCache.Clear();
-        var filler = new DefaultPlateFiller(plate);
+        var filler = new PlateFiller(plate);
         var item = new NestItem { Drawing = drawing };
         var parts = filler.Fill(
             item,
@@ -72,7 +72,7 @@ public class NestInvarianceTests
         foreach (var theta in new[] { 0.0, 0.3, 0.8, 1.2 })
         {
             BestFitCache.Clear();
-            var filler = new DefaultPlateFiller(plate);
+            var filler = new PlateFiller(plate);
             var item = new NestItem { Drawing = MakeImportedAt(theta) };
             var parts = filler.Fill(item, workArea, progress: null, token: CancellationToken.None);
 

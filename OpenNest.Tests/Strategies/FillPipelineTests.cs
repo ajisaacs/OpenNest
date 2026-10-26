@@ -26,7 +26,7 @@ public class FillPipelineTests
     public void Pipeline_PopulatesPhaseResults()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate);
+        var filler = new PlateFiller(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
         filler.Fill(item, plate.WorkArea(), null, System.Threading.CancellationToken.None);
@@ -41,7 +41,7 @@ public class FillPipelineTests
     public void Pipeline_SetsWinnerPhase()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate);
+        var filler = new PlateFiller(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
         var parts = filler.Fill(
@@ -65,7 +65,7 @@ public class FillPipelineTests
     public void Pipeline_RespectsCancellation()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate);
+        var filler = new PlateFiller(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
         var cts = new System.Threading.CancellationTokenSource();
         cts.Cancel();
@@ -81,7 +81,7 @@ public class FillPipelineTests
     public void Pipeline_ReportsBoxLayoutBeforeBestFitPairs()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate);
+        var filler = new PlateFiller(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
         var reports = new List<NestProgress>();
 
@@ -97,7 +97,7 @@ public class FillPipelineTests
     public void Pipeline_ReportsStatusWhileComputingBestFitPairs()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate);
+        var filler = new PlateFiller(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
         var reports = new List<NestProgress>();
 
@@ -113,7 +113,7 @@ public class FillPipelineTests
     public void Pipeline_AcceptedBeforeBestFitPairs_ReturnsBoxLayout()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate);
+        var filler = new PlateFiller(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
         using var cts = new CancellationTokenSource();
         NestProgress first = null;
@@ -137,7 +137,7 @@ public class FillPipelineTests
     public void Pipeline_ShownLayoutNeverRegressesBelowBoxLayout()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate);
+        var filler = new PlateFiller(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
         var shown = new List<int>();
 

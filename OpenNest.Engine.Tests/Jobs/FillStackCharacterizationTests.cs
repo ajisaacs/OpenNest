@@ -328,7 +328,7 @@ public class FillStackCharacterizationTests
     {
         string Solve(bool fullSweep)
         {
-            var filler = new DefaultPlateFiller(MakePlate()) { ForceFullAngleSweep = fullSweep };
+            var filler = new PlateFiller(MakePlate()) { ForceFullAngleSweep = fullSweep };
             return Layout(filler.Nest(LearnedAngleItems(), null, CancellationToken.None));
         }
 

@@ -53,7 +53,7 @@ public static class PlateFillService
             demand, 1);
     }
 
-    private static List<Part> FillDroppingClampHits(PlateFillerBase filler, Plate plate,
+    private static List<Part> FillDroppingClampHits(PlateFiller filler, Plate plate,
         NestItem item, List<NestItem> demand, Box area, IProgress<NestProgress> progress,
         CancellationToken token)
     {
@@ -81,7 +81,7 @@ public static class PlateFillService
     /// spacing would, and keeps the better layout by the filler's own ranking; a tie keeps the
     /// first. Previews never fall below the layout already found.
     /// </summary>
-    private static List<Part> FillBesideClamps(PlateFillerBase filler, Plate plate, Box workArea,
+    private static List<Part> FillBesideClamps(PlateFiller filler, Plate plate, Box workArea,
         IProgress<NestProgress> progress, CancellationToken token,
         Func<Box, IProgress<NestProgress>, List<Part>> fill, List<NestItem> demand, int groupSize)
     {
@@ -428,20 +428,20 @@ public static class PlateFillService
     }
 
     /// <summary>Builds the filler for an optional strategy (null/empty = Fill).</summary>
-    private static PlateFillerBase CreateFiller(string strategy, Plate plate)
+    private static PlateFiller CreateFiller(string strategy, Plate plate)
     {
         ArgumentNullException.ThrowIfNull(plate);
         return ResolveStrategy(strategy) switch
         {
-            "Fill" => new DefaultPlateFiller(plate),
-            "Strip" => new StripPlateFiller(plate),
-            "Vertical Remnant" => new DefaultPlateFiller(plate, PlateFillPolicy.VerticalRemnant),
-            _ => new DefaultPlateFiller(plate, PlateFillPolicy.HorizontalRemnant),
+            "Fill" => new PlateFiller(plate),
+            "Strip" => new PlateFiller(plate, PlateFillPolicy.Fill, PlateLayout.Strips),
+            "Vertical Remnant" => new PlateFiller(plate, PlateFillPolicy.VerticalRemnant),
+            _ => new PlateFiller(plate, PlateFillPolicy.HorizontalRemnant),
         };
     }
 
     /// <summary>Public operations require an explicit strategy name (null is an argument error).</summary>
-    private static PlateFillerBase RequireFiller(string strategy, Plate plate)
+    private static PlateFiller RequireFiller(string strategy, Plate plate)
     {
         ArgumentNullException.ThrowIfNull(strategy);
         // An explicit empty string is an unknown strategy; only ResolveStrategy(string),

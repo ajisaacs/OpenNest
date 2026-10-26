@@ -18,10 +18,10 @@ public class EngineRefactorSmokeTests
     }
 
     [Fact]
-    public void DefaultPlateFiller_FillNestItem_ProducesResults()
+    public void PlateFiller_FillNestItem_ProducesResults()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate);
+        var filler = new PlateFiller(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
         var parts = filler.Fill(
@@ -31,14 +31,14 @@ public class EngineRefactorSmokeTests
             System.Threading.CancellationToken.None
         );
 
-        Assert.True(parts.Count > 0, "DefaultPlateFiller should fill parts");
+        Assert.True(parts.Count > 0, "PlateFiller should fill parts");
     }
 
     [Fact]
-    public void DefaultPlateFiller_FillGroupParts_ProducesResults()
+    public void PlateFiller_FillGroupParts_ProducesResults()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate);
+        var filler = new PlateFiller(plate);
         var drawing = MakeRectDrawing(20, 10);
         var groupParts = new List<Part> { new Part(drawing) };
 
@@ -49,14 +49,14 @@ public class EngineRefactorSmokeTests
             System.Threading.CancellationToken.None
         );
 
-        Assert.True(parts.Count > 0, "DefaultPlateFiller group fill should produce parts");
+        Assert.True(parts.Count > 0, "PlateFiller group fill should produce parts");
     }
 
     [Fact]
-    public void DefaultPlateFiller_ForceFullAngleSweep_StillWorks()
+    public void PlateFiller_ForceFullAngleSweep_StillWorks()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate);
+        var filler = new PlateFiller(plate);
         filler.ForceFullAngleSweep = true;
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
@@ -73,10 +73,10 @@ public class EngineRefactorSmokeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void DefaultPlateFiller_StopAtQuantity_StillDeliversExactlyTheQuantity(bool stopAtQuantity)
+    public void PlateFiller_StopAtQuantity_StillDeliversExactlyTheQuantity(bool stopAtQuantity)
     {
         var plate = new Plate(60, 120) { PartSpacing = 0.5 };
-        var filler = new DefaultPlateFiller(plate) { StopAtQuantity = stopAtQuantity };
+        var filler = new PlateFiller(plate) { StopAtQuantity = stopAtQuantity };
         var item = new NestItem { Drawing = MakeRectDrawing(7, 3), Quantity = 23 };
 
         var parts = filler.Fill(item, plate.WorkArea(), null, System.Threading.CancellationToken.None);
@@ -92,10 +92,10 @@ public class EngineRefactorSmokeTests
     }
 
     [Fact]
-    public void StripPlateFiller_Nest_ProducesResults()
+    public void StripLayout_Nest_ProducesResults()
     {
         var plate = new Plate(60, 120);
-        var filler = new StripPlateFiller(plate);
+        var filler = new PlateFiller(plate, PlateFillPolicy.Fill, PlateLayout.Strips);
         var items = new List<NestItem>
         {
             new NestItem { Drawing = MakeRectDrawing(20, 10, "large"), Quantity = 10 },
@@ -104,14 +104,14 @@ public class EngineRefactorSmokeTests
 
         var parts = filler.Nest(items, null, System.Threading.CancellationToken.None);
 
-        Assert.True(parts.Count > 0, "StripPlateFiller should nest parts");
+        Assert.True(parts.Count > 0, "Strip layout should nest parts");
     }
 
     [Fact]
-    public void DefaultPlateFiller_Nest_ProducesResults()
+    public void PlateFiller_Nest_ProducesResults()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate);
+        var filler = new PlateFiller(plate);
         var items = new List<NestItem>
         {
             new NestItem { Drawing = MakeRectDrawing(20, 10, "a"), Quantity = 5 },

@@ -1,9 +1,9 @@
 using OpenNest.CNC;
-using OpenNest.Geometry;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Engine.Jobs.Placement.Fillers;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Tests.Jobs;
 
@@ -119,34 +119,34 @@ public class NestJobIdentityTests
         Assert.Equal(new[] { 0, 0 }, new[] { items[0].Quantity, items[1].Quantity });
     }
 
-    /// <summary>Orchestrator probe whose fill/pack delegates run the Default filler.</summary>
-    private sealed class DefaultFillerProbe(Plate plate) : PlateFillerBase(plate)
+    /// <summary>Orchestrator probe whose fill/pack delegates each run a fresh Fill filler.</summary>
+    private sealed class DefaultFillerProbe(Plate plate) : PlateFiller(plate)
     {
         public override List<Part> Fill(
             NestItem item,
             Box workArea,
             IProgress<NestProgress> progress,
             CancellationToken token
-        ) => new DefaultPlateFiller(Plate).Fill(item, workArea, progress, token);
+        ) => new PlateFiller(Plate).Fill(item, workArea, progress, token);
 
         public override List<Part> Fill(
             List<Part> groupParts,
             Box workArea,
             IProgress<NestProgress> progress,
             CancellationToken token
-        ) => new DefaultPlateFiller(Plate).Fill(groupParts, workArea, progress, token);
+        ) => new PlateFiller(Plate).Fill(groupParts, workArea, progress, token);
 
         public override List<Part> PackArea(
             Box box,
             List<NestItem> items,
             IProgress<NestProgress> progress,
             CancellationToken token
-        ) => new DefaultPlateFiller(Plate).PackArea(box, items, progress, token);
+        ) => new PlateFiller(Plate).PackArea(box, items, progress, token);
     }
 
     /// <summary>Places exactly 2 parts from the first multi-quantity item and none from the
     /// rest, forcing the orchestrator's deduction to run on an asymmetric placement result.</summary>
-    private sealed class StarvingProbe(Plate plate) : PlateFillerBase(plate)
+    private sealed class StarvingProbe(Plate plate) : PlateFiller(plate)
     {
         private int _first = -1;
 
@@ -172,5 +172,12 @@ public class NestJobIdentityTests
             }
             return parts;
         }
+
+        public override List<Part> PackArea(
+            Box box,
+            List<NestItem> items,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        ) => new List<Part>();
     }
 }

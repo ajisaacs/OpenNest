@@ -1,7 +1,7 @@
+using OpenNest.Engine;
 using OpenNest.Engine.Fill;
 using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
-using OpenNest.Engine;
 
 namespace OpenNest.Tests.Fill;
 
@@ -28,7 +28,7 @@ public class ShrinkFillerTests
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
         {
             var plate = new Plate(b.Width, b.Length);
-            var filler = new DefaultPlateFiller(plate);
+            var filler = new PlateFiller(plate);
             return filler.Fill(ni, b, null, System.Threading.CancellationToken.None);
         };
 
@@ -50,7 +50,7 @@ public class ShrinkFillerTests
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
         {
             var plate = new Plate(b.Width, b.Length);
-            var filler = new DefaultPlateFiller(plate);
+            var filler = new PlateFiller(plate);
             return filler.Fill(ni, b, null, System.Threading.CancellationToken.None);
         };
 
@@ -151,6 +151,6 @@ public class ShrinkFillerTests
         var trimmed = ShrinkFiller.TrimToCount(parts, 1, ShrinkAxis.Width);
 
         Assert.Equal(originalCount, parts.Count);
-        Assert.Equal(1, trimmed.Count);
+        Assert.Single(trimmed);
     }
 }

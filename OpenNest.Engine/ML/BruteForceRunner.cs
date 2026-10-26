@@ -31,7 +31,7 @@ namespace OpenNest.Engine.ML
             bool forceFullAngleSweep = false
         )
         {
-            var filler = new DefaultPlateFiller(plate);
+            var filler = new PlateFiller(plate);
             filler.ForceFullAngleSweep = forceFullAngleSweep;
             var item = new NestItem { Drawing = drawing };
 

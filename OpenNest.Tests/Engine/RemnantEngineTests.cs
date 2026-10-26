@@ -23,7 +23,7 @@ public class RemnantEngineTests
     public void VerticalRemnantPlateFiller_UsesHorizontalPreferredDirection()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate, PlateFillPolicy.VerticalRemnant);
+        var filler = new PlateFiller(plate, PlateFillPolicy.VerticalRemnant);
         Assert.Equal(NestDirection.Horizontal, filler.PreferredDirection);
     }
 
@@ -31,7 +31,7 @@ public class RemnantEngineTests
     public void HorizontalRemnantPlateFiller_UsesVerticalPreferredDirection()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate, PlateFillPolicy.HorizontalRemnant);
+        var filler = new PlateFiller(plate, PlateFillPolicy.HorizontalRemnant);
         Assert.Equal(NestDirection.Vertical, filler.PreferredDirection);
     }
 
@@ -39,7 +39,7 @@ public class RemnantEngineTests
     public void VerticalRemnantPlateFiller_Fill_ProducesResults()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate, PlateFillPolicy.VerticalRemnant);
+        var filler = new PlateFiller(plate, PlateFillPolicy.VerticalRemnant);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
         var parts = filler.Fill(
@@ -56,7 +56,7 @@ public class RemnantEngineTests
     public void HorizontalRemnantPlateFiller_Fill_ProducesResults()
     {
         var plate = new Plate(60, 120);
-        var filler = new DefaultPlateFiller(plate, PlateFillPolicy.HorizontalRemnant);
+        var filler = new PlateFiller(plate, PlateFillPolicy.HorizontalRemnant);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
         var parts = filler.Fill(
@@ -83,8 +83,8 @@ public class RemnantEngineTests
         var drawing = MakeRectDrawing(20, 10);
         var item = new NestItem { Drawing = drawing };
 
-        var defaultFiller = new DefaultPlateFiller(plate);
-        var remnantFiller = new DefaultPlateFiller(plate, PlateFillPolicy.VerticalRemnant);
+        var defaultFiller = new PlateFiller(plate);
+        var remnantFiller = new PlateFiller(plate, PlateFillPolicy.VerticalRemnant);
 
         var defaultParts = defaultFiller.Fill(
             item,

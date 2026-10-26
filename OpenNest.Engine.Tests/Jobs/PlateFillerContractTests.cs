@@ -30,10 +30,10 @@ public class PlateFillerContractTests
     }
 
     [Fact]
-    public void DefaultPlateFiller_UsesOverriddenAngleSelection()
+    public void PlateFiller_UsesOverriddenAngleSelection()
     {
         var plate = new Plate(new Size(30, 50));
-        var filler = new AngleProbeDefaultPlateFiller(plate);
+        var filler = new AngleProbePlateFiller(plate);
 
         var parts = filler.Fill(
             new NestItem
@@ -51,12 +51,12 @@ public class PlateFillerContractTests
     }
 
     [Fact]
-    public void DefaultPlateFiller_Nest_UsesOverriddenFillAndPackArea()
+    public void PlateFiller_Nest_UsesOverriddenFillAndPackArea()
     {
         var plate = new Plate(new Size(100, 100));
         var fillDrawing = new Drawing("fill", TestDrawingFactory.Rectangle(10, 10));
         var packDrawing = new Drawing("pack", TestDrawingFactory.Rectangle(10, 10));
-        var filler = new FillAndPackProbeDefaultPlateFiller(plate, fillDrawing, packDrawing);
+        var filler = new FillAndPackProbePlateFiller(plate, fillDrawing, packDrawing);
 
         var parts = filler.Nest(
             new List<NestItem>
@@ -74,7 +74,7 @@ public class PlateFillerContractTests
     }
 
     [Fact]
-    public void StripPlateFiller_Nest_ReturnsPlacedPartsAndDeductsInput()
+    public void StripLayout_Nest_ReturnsPlacedPartsAndDeductsInput()
     {
         var plate = new Plate(new Size(30, 50));
         var items = new List<NestItem>
@@ -95,7 +95,7 @@ public class PlateFillerContractTests
                 Quantity = 3,
             },
         };
-        var filler = new StripPlateFiller(plate) { PlateNumber = 7 };
+        var filler = new PlateFiller(plate, PlateFillPolicy.Fill, PlateLayout.Strips) { PlateNumber = 7 };
 
         var parts = filler.Nest(items, null, CancellationToken.None);
 
@@ -105,11 +105,11 @@ public class PlateFillerContractTests
     }
 
     [Fact]
-    public void StripPlateFiller_Nest_UsesOverriddenPackArea()
+    public void StripLayout_Nest_UsesOverriddenPackArea()
     {
         var plate = new Plate(new Size(100, 100));
         var drawing = new Drawing("pack", TestDrawingFactory.Rectangle(10, 10));
-        var filler = new PackProbeStripPlateFiller(plate, drawing);
+        var filler = new PackProbeStripFiller(plate, drawing);
 
         var parts = filler.Nest(
             new List<NestItem> { new() { Drawing = drawing, Quantity = 1 } },
@@ -260,12 +260,12 @@ public class PlateFillerContractTests
         Assert.Equal(10, item.Quantity);
     }
 
-    private sealed class FillAndPackProbeDefaultPlateFiller : DefaultPlateFiller
+    private sealed class FillAndPackProbePlateFiller : PlateFiller
     {
         private readonly Drawing fillDrawing;
         private readonly Drawing packDrawing;
 
-        internal FillAndPackProbeDefaultPlateFiller(
+        internal FillAndPackProbePlateFiller(
             Plate plate,
             Drawing fillDrawing,
             Drawing packDrawing
@@ -308,9 +308,9 @@ public class PlateFillerContractTests
         }
     }
 
-    private sealed class AngleProbeDefaultPlateFiller : DefaultPlateFiller
+    private sealed class AngleProbePlateFiller : PlateFiller
     {
-        internal AngleProbeDefaultPlateFiller(Plate plate)
+        internal AngleProbePlateFiller(Plate plate)
             : base(plate) { }
 
         internal bool BuildAnglesCalled { get; private set; }
@@ -326,12 +326,12 @@ public class PlateFillerContractTests
         }
     }
 
-    private sealed class PackProbeStripPlateFiller : StripPlateFiller
+    private sealed class PackProbeStripFiller : PlateFiller
     {
         private readonly Drawing drawing;
 
-        internal PackProbeStripPlateFiller(Plate plate, Drawing drawing)
-            : base(plate)
+        internal PackProbeStripFiller(Plate plate, Drawing drawing)
+            : base(plate, PlateFillPolicy.Fill, PlateLayout.Strips)
         {
             this.drawing = drawing;
         }
@@ -351,11 +351,11 @@ public class PlateFillerContractTests
         }
     }
 
-    private static PlateFillerBase CreateFiller(string strategy, Plate plate) => strategy switch
+    private static PlateFiller CreateFiller(string strategy, Plate plate) => strategy switch
     {
-        "Fill" => new DefaultPlateFiller(plate),
-        "Vertical Remnant" => new DefaultPlateFiller(plate, PlateFillPolicy.VerticalRemnant),
-        "Horizontal Remnant" => new DefaultPlateFiller(plate, PlateFillPolicy.HorizontalRemnant),
+        "Fill" => new PlateFiller(plate),
+        "Vertical Remnant" => new PlateFiller(plate, PlateFillPolicy.VerticalRemnant),
+        "Horizontal Remnant" => new PlateFiller(plate, PlateFillPolicy.HorizontalRemnant),
         _ => throw new ArgumentOutOfRangeException(nameof(strategy)),
     };
 

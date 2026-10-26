@@ -32,7 +32,7 @@ internal static class PrivatePlateFill
         fits.AddRange(sorted);
         // A positive quantity lets supporting strategies avoid surplus rows. Zero still
         // fills the whole area (the cutout lattice caller requires an uncapped lattice).
-        var filler = new DefaultPlateFiller(plate) { StopAtQuantity = true };
+        var filler = new PlateFiller(plate) { StopAtQuantity = true };
         return filler.Fill(new NestItem
         {
             Drawing = drawing,

@@ -13,22 +13,64 @@ using OpenNest.Math;
 
 namespace OpenNest.Engine.Jobs.Placement.Fillers;
 
-internal class DefaultPlateFiller : PlateFillerBase
+/// <summary>How <see cref="PlateFiller.Nest"/> lays out a whole plate.</summary>
+internal enum PlateLayout
+{
+    /// <summary>Fill each multi-quantity item, pack the leftovers, then best-fit pairs.</summary>
+    FillThenPack,
+
+    /// <summary>
+    /// Iterative shrink-fill strips (each strip ranked by a fresh remnant filler), then pack the
+    /// leftovers into the first remnant.
+    /// </summary>
+    Strips,
+}
+
+/// <summary>
+/// The interactive and whole-job filler behind Fill, Strip and both Remnants. A
+/// <see cref="PlateLayout.FillThenPack"/> filler is reused for a whole <see cref="Nest"/> (and
+/// across clamp refills), so its learned angles carry over between items. A
+/// <see cref="PlateLayout.Strips"/> filler runs every single-area fill and pack on a fresh
+/// <see cref="PlateLayout.FillThenPack"/> filler, so nothing it learns or its
+/// <see cref="PlateNumber"/> reaches them.
+/// </summary>
+internal class PlateFiller
 {
     private readonly AngleCandidateBuilder angleBuilder = new();
     private readonly PlateFillPolicy policy;
+    private readonly PlateLayout layout;
+    private IFillComparer comparer;
 
-    internal DefaultPlateFiller(Plate plate, PlateFillPolicy policy = null)
-        : base(plate)
+    internal PlateFiller(
+        Plate plate,
+        PlateFillPolicy policy = null,
+        PlateLayout layout = PlateLayout.FillThenPack
+    )
     {
+        Plate = plate;
         this.policy = policy ?? PlateFillPolicy.Fill;
+        this.layout = layout;
     }
 
-    protected override IFillComparer CreateComparer() => policy.CreateComparer();
+    public Plate Plate { get; }
 
-    public override NestDirection? PreferredDirection => policy.PreferredDirection;
+    public int PlateNumber { get; set; }
 
-    public override ShrinkAxis TrimAxis => policy.TrimAxis;
+    public NestDirection NestDirection { get; set; }
+
+    public NestPhase WinnerPhase { get; private set; }
+
+    public List<PhaseResult> PhaseResults { get; } = new();
+
+    public List<AngleResult> AngleResults { get; } = new();
+
+    public NestDirection? PreferredDirection => policy.PreferredDirection;
+
+    public ShrinkAxis TrimAxis => policy.TrimAxis;
+
+    private IFillComparer Comparer => comparer ??= policy.CreateComparer();
+
+    private FillPolicy BuildPolicy() => new(Comparer, PreferredDirection);
 
     internal bool ForceFullAngleSweep
     {
@@ -43,7 +85,7 @@ internal class DefaultPlateFiller : PlateFillerBase
     /// </summary>
     internal bool StopAtQuantity { get; init; }
 
-    public override List<double> BuildAngles(
+    public virtual List<double> BuildAngles(
         NestItem item,
         ClassificationResult classification,
         Box workArea
@@ -52,18 +94,34 @@ internal class DefaultPlateFiller : PlateFillerBase
             ? angleBuilder.Build(item, classification, workArea)
             : policy.BuildFixedAngles(item, classification);
 
-    protected override void RecordProductiveAngles(List<AngleResult> angleResults)
+    internal bool IsBetterFill(List<Part> candidate, List<Part> current, Box workArea) =>
+        Comparer.IsBetter(candidate, current, workArea);
+
+    /// <summary>A strip layout's single-area work runs here, never on the strip filler itself.</summary>
+    private PlateFiller CreateInnerFiller() => new(Plate, policy);
+
+    private string BuildProgressSummary()
     {
-        angleBuilder.RecordProductive(angleResults);
+        if (PhaseResults.Count == 0)
+            return null;
+
+        var parts = new List<string>(PhaseResults.Count);
+        foreach (var result in PhaseResults)
+            parts.Add($"{result.Phase.ShortName()}: {result.PartCount}");
+
+        return string.Join(" | ", parts);
     }
 
-    public override List<Part> Fill(
+    public virtual List<Part> Fill(
         NestItem item,
         Box workArea,
         IProgress<NestProgress> progress,
         CancellationToken token
     )
     {
+        if (layout == PlateLayout.Strips)
+            return CreateInnerFiller().Fill(item, workArea, progress, token);
+
         PhaseResults.Clear();
         AngleResults.Clear();
 
@@ -366,13 +424,16 @@ internal class DefaultPlateFiller : PlateFillerBase
         return context.CurrentBest ?? new List<Part>();
     }
 
-    public override List<Part> Fill(
+    public virtual List<Part> Fill(
         List<Part> groupParts,
         Box workArea,
         IProgress<NestProgress> progress,
         CancellationToken token
     )
     {
+        if (layout == PlateLayout.Strips)
+            return CreateInnerFiller().Fill(groupParts, workArea, progress, token);
+
         if (groupParts == null || groupParts.Count == 0)
             return new List<Part>();
 
@@ -410,17 +471,123 @@ internal class DefaultPlateFiller : PlateFillerBase
         return best ?? new List<Part>();
     }
 
-    public override List<Part> PackArea(
+    public virtual List<Part> PackArea(
         Box box,
         List<NestItem> items,
         IProgress<NestProgress> progress,
         CancellationToken token
     )
     {
+        if (layout == PlateLayout.Strips)
+            return CreateInnerFiller().PackArea(box, items, progress, token);
+
         return AreaPacker.Pack(box, items, Plate.PartSpacing, Comparer, token, Plate.WorkArea());
     }
 
-    protected virtual void RunPipeline(FillContext context)
+    public virtual List<Part> Nest(
+        List<NestItem> items,
+        IProgress<NestProgress> progress,
+        CancellationToken token
+    )
+    {
+        if (layout == PlateLayout.Strips)
+            return NestStrips(items, progress, token);
+
+        return PlateFillOrchestrator.Nest(
+            Plate,
+            items,
+            Comparer,
+            (item, workArea, sink, cancellation) => Fill(item, workArea, sink, cancellation),
+            (workArea, packItems, sink, cancellation) =>
+                PackArea(workArea, packItems, sink, cancellation),
+            progress,
+            token
+        );
+    }
+
+    private List<Part> NestStrips(
+        List<NestItem> items,
+        IProgress<NestProgress> progress,
+        CancellationToken token
+    )
+    {
+        if (items == null || items.Count == 0)
+            return new List<Part>();
+
+        var workArea = Plate.WorkArea();
+        var fillItems = items
+            .Where(item => item.Quantity != 1)
+            .OrderBy(item => item.Priority)
+            .ThenByDescending(item => item.Drawing.Area)
+            .ToList();
+        var packItems = items.Where(item => item.Quantity == 1).ToList();
+        var allParts = new List<Part>();
+
+        if (fillItems.Count > 0)
+        {
+            // Each strip gets fresh remnant fillers: they run in parallel and carry no
+            // PlateNumber or learned angles.
+            Func<NestItem, Box, List<Part>> heightFillFunc = (item, box) =>
+            {
+                var inner = new PlateFiller(Plate, PlateFillPolicy.HorizontalRemnant);
+                return inner.Fill(item, box, progress, token);
+            };
+            Func<NestItem, Box, List<Part>> widthFillFunc = (item, box) =>
+            {
+                var inner = new PlateFiller(Plate, PlateFillPolicy.VerticalRemnant);
+                return inner.Fill(item, box, progress, token);
+            };
+
+            var shrinkResult = IterativeShrinkFiller.Fill(
+                fillItems,
+                workArea,
+                heightFillFunc,
+                Plate.PartSpacing,
+                token,
+                progress,
+                PlateNumber,
+                widthFillFunc
+            );
+
+            allParts.AddRange(shrinkResult.Parts);
+            Compactor.Settle(allParts, workArea, Plate.PartSpacing);
+            packItems.AddRange(shrinkResult.Leftovers);
+        }
+
+        packItems = packItems.Where(item => item.Quantity > 0).ToList();
+        if (packItems.Count > 0 && !token.IsCancellationRequested)
+        {
+            var packArea = workArea;
+            if (allParts.Count > 0)
+            {
+                var obstacles = allParts
+                    .Select(part => part.BoundingBox.Offset(Plate.PartSpacing))
+                    .ToList();
+                var finder = new RemnantFinder(workArea, obstacles);
+                var remnants = finder.FindRemnants();
+                packArea = remnants.Count > 0 ? remnants[0] : new Box(0, 0, 0, 0);
+            }
+
+            if (packArea.Width > 0 && packArea.Length > 0)
+            {
+                var packParts = PackArea(packArea, packItems, progress, token);
+                allParts.AddRange(packParts);
+            }
+        }
+
+        foreach (var item in items)
+        {
+            if (item.Quantity <= 0)
+                continue;
+
+            var placed = allParts.Count(part => ReferenceEquals(part.BaseDrawing, item.Drawing));
+            item.Quantity = System.Math.Max(0, item.Quantity - placed);
+        }
+
+        return allParts;
+    }
+
+    private void RunPipeline(FillContext context)
     {
         var classification = PartClassifier.Classify(context.Item.Drawing);
         context.PartType = classification.Type;
@@ -502,7 +669,7 @@ internal class DefaultPlateFiller : PlateFillerBase
             }
         }
 
-        RecordProductiveAngles(context.AngleResults);
+        angleBuilder.RecordProductive(context.AngleResults);
     }
 
     /// <summary>
