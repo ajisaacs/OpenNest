@@ -36,7 +36,7 @@ def create(directory):
                                  'madeBy', 'fileSize', 'savedAt'), fields))
             # Columns added by later migrations read back as their defaults.
             metadata.update(status='toBeCut', revision=1, deleted=False, restoredFromRevision=None,
-                            materialGrade='')
+                            materialGrade='', units='inches')
             archive = {'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)}
             expected.append({'current': metadata, 'archive': archive,
                              'revisions': [{'metadata': metadata, 'archive': archive}]})
