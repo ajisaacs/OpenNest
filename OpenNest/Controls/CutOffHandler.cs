@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using OpenNest.CNC;
 using OpenNest.Geometry;
+using OpenNest.Undo;
 
 namespace OpenNest.Controls
 {
@@ -8,6 +9,9 @@ namespace OpenNest.Controls
     {
         private readonly PlateView view;
         private Dictionary<Part, Geometry.Entity> dragPerimeterCache;
+
+        // Open from the press on a cut-off to the release: a drag undoes as one move.
+        private ChangeScope drag;
 
         public CutOffHandler(PlateView view)
         {
@@ -24,6 +28,7 @@ namespace OpenNest.Controls
 
             IsDragging = true;
             dragPerimeterCache = Plate.BuildPerimeterCache(view.Plate);
+            drag = view.BeginChange("Move Cut-Off");
             return hitCutOff;
         }
 
@@ -32,6 +37,7 @@ namespace OpenNest.Controls
             if (!IsDragging || cutOff == null)
                 return;
 
+            drag?.MarkChanged();
             if (cutOff.Axis == CutOffAxis.Vertical)
                 cutOff.Position = new Vector(currentPoint.X, cutOff.Position.Y);
             else
@@ -50,6 +56,11 @@ namespace OpenNest.Controls
             dragPerimeterCache = null;
             view.Plate.RegenerateCutOffs(view.CutOffSettings);
             view.Invalidate();
+
+            var scope = drag;
+            drag = null;
+            scope?.Complete();
+            scope?.Dispose();
         }
 
         public CutOff GetCutOffAtPoint(Vector point, double tolerance)

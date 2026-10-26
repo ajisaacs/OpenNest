@@ -327,7 +327,9 @@ public class CuttingInspectionPanelTests
         program.LineTo(2, 4); program.LineTo(2, 2);
         program.MoveTo(4, 2); program.LineTo(6, 2); program.LineTo(6, 4);
         program.LineTo(4, 4); program.LineTo(4, 2);
-        plate.Parts.Add(new Part(new Drawing("touching contours", program), new Vector(1, 1)));
+        var touching = new Drawing("touching contours", program);
+        editor.Nest.Drawings.Add(touching);
+        plate.Parts.Add(new Part(touching, new Vector(1, 1)));
         editor.Show();
         editor.PlateManager.LoadAt(0);
         editor.OpenCuttingInspection();
@@ -772,6 +774,8 @@ public class CuttingInspectionPanelTests
         Assert.False(Field<Control>(first, "existingWorkBanner").Visible);
         Field<Button>(first, "applyButton").PerformClick();
         Assert.All(plate.Parts, part => Assert.True(part.HasManualLeadIns));
+        Assert.Equal(1, editor.History.UndoCount);
+        Assert.Equal("Plan Cutting", editor.History.UndoLabel);
         plate.CutOffs.Add(new CutOff(new Vector(60, 0), CutOffAxis.Vertical));
         plate.RegenerateCutOffs(editor.PlateView.CutOffSettings);
         var real = plate.Parts.Where(p => !p.BaseDrawing.IsCutOff).ToArray();
@@ -787,7 +791,7 @@ public class CuttingInspectionPanelTests
         string? asked = null;
         panel.ConfirmClearExisting = message => { asked = message; return false; };
         Field<Button>(panel, "clearExistingButton").PerformClick();
-        Assert.Contains("cannot be undone", asked);
+        Assert.Contains("Locked and hand-placed lead-ins are removed too", asked);
         Assert.Single(plate.CutOffs);
         Assert.All(real, part => Assert.True(part.HasManualLeadIns));
 
@@ -798,6 +802,8 @@ public class CuttingInspectionPanelTests
         Assert.Empty(plate.CutOffs);
         Assert.Equal(real, plate.Parts);
         Assert.All(real, part => Assert.False(part.HasManualLeadIns));
+        // The clear is its own step, recorded before the replan (the hand-added cut-off before it).
+        Assert.Equal("Clear Lead-ins and Cut-offs", editor.History.UndoLabel);
         Assert.False(banner.Visible);
         Assert.True(panel.Proposal.CanApply);
         panel.RequestClose();
@@ -939,6 +945,8 @@ public class CuttingInspectionPanelTests
         plate.CuttingParameters = Parameters();
         plate.Parts.Add(Square("far", 12));
         plate.Parts.Add(Square("near", 1));
+        foreach (var part in plate.Parts)
+            nest.Drawings.Add(part.BaseDrawing);
         return new EditNestForm(nest);
     }
 

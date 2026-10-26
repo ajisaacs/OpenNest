@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Engine.Sequencing;
 using OpenNest.Geometry;
+using OpenNest.Undo;
 
 namespace OpenNest.Actions
 {
@@ -39,6 +40,10 @@ namespace OpenNest.Actions
         private List<Vector> drawing;
         private bool disconnecting;
         private IReadOnlySet<Part> muted;
+
+        // Open from the first resequence until the tool ends: the whole session undoes as one
+        // step, while Backspace or Ctrl+Z inside it still take back one line at a time.
+        private ChangeScope change;
 
         // Starting the tool again builds the new one before this one is cancelled and
         // disconnected, so this one must leave the view's muting to its successor.
@@ -184,6 +189,8 @@ namespace OpenNest.Actions
         private void Resequence()
         {
             var plate = plateView.Plate;
+            change ??= plateView.BeginChange("Sequence by Path");
+            change.MarkChanged();
             if (lines.Count > 0)
                 DrawnPathSequencing.Apply(plate, lines);
             else if (plate.Parts.Count == originalOrder.Count && originalOrder.All(plate.Parts.Contains))
@@ -241,6 +248,10 @@ namespace OpenNest.Actions
         public override void DisconnectEvents()
         {
             disconnecting = true;
+            var scope = change;
+            change = null;
+            scope?.Complete();
+            scope?.Dispose();
             plateView.MouseDown -= plateView_MouseDown;
             plateView.MouseMove -= plateView_MouseMove;
             plateView.MouseUp -= plateView_MouseUp;

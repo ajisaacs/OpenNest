@@ -66,9 +66,12 @@ namespace OpenNest.Actions
             var pt = plateView.CurrentPoint;
             var cutoff = new CutOff(pt, lockedAxis) { HeadLockOvercut = settings.NewCutOffHeadLockOvercut };
 
+            using var change = plateView.BeginChange("Add Cut-Off");
+            change.MarkChanged();
             plateView.Plate.CutOffs.Add(cutoff);
             plateView.Plate.RegenerateCutOffs(settings);
             plateView.Invalidate();
+            change.Complete();
         }
 
         private void OnKeyDown(object sender, KeyEventArgs e)

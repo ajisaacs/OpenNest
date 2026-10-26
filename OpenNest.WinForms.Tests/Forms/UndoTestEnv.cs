@@ -130,11 +130,18 @@ internal sealed record UndoTestEnv(MainForm Host, EditNestForm Editor)
         }
         foreach (var plate in nest.Plates)
         {
-            Line($"plate {plate.Size} x{plate.Quantity} spacing {plate.PartSpacing} edge {plate.EdgeSpacing.Left},{plate.EdgeSpacing.Bottom},{plate.EdgeSpacing.Right},{plate.EdgeSpacing.Top} quadrant {plate.Quadrant} params {plate.CuttingParameters != null}");
+            Line($"plate {plate.Size} x{plate.Quantity} spacing {plate.PartSpacing} edge {plate.EdgeSpacing.Left},{plate.EdgeSpacing.Bottom},{plate.EdgeSpacing.Right},{plate.EdgeSpacing.Top} quadrant {plate.Quadrant}");
+            Line($"  params {(plate.CuttingParameters == null ? "none" : IO.CuttingParametersSerializer.Serialize(plate.CuttingParameters))}");
             var clamps = plate.ClampZones.Select(z => FormattableString.Invariant($"{z.Id}@{z.Bounds.X:F4},{z.Bounds.Y:F4},{z.Bounds.Width:F4},{z.Bounds.Length:F4}"));
             Line($"  clamps [{string.Join(";", clamps)}] removed {plate.RemovedClamps.Count} support {plate.SupportBed != null} stock {string.Join(",", plate.StockItemCodes)}");
             foreach (var part in plate.Parts)
-                Line($"  part {part.BaseDrawing.Name} {part.Location.X:F4},{part.Location.Y:F4} r{part.Rotation:F6} leads {part.HasManualLeadIns} locked {part.LeadInsLocked} codes {part.Program.Length}");
+            {
+                // A cut-off's part is regenerated from its definition, listed below; only its place in the order counts.
+                if (part.BaseDrawing.IsCutOff)
+                    Line($"  cutoff part");
+                else
+                    Line($"  part {part.BaseDrawing.Name} {part.Location.X:F4},{part.Location.Y:F4} r{part.Rotation:F6} leads {part.HasManualLeadIns} locked {part.LeadInsLocked} codes {part.Program.Length}");
+            }
             foreach (var cutOff in plate.CutOffs)
                 Line($"  cutoff {cutOff.Axis} {cutOff.Position.X:F4},{cutOff.Position.Y:F4}");
         }

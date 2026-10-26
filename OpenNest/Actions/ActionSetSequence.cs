@@ -50,8 +50,17 @@ namespace OpenNest.Actions
             // Hit-test at the click, not at the previous mouse-move location.
             var hit = plateView.GetPartAtControlPoint(e.Location);
             var part = hit?.BasePart;
-            if (part == null || !ManualPartSequencing.Move(plateView.Plate, part, (int)sequenceForm.numericUpDown1.Value))
+            if (part == null)
                 return;
+            using (var change = plateView.BeginChange("Set Sequence"))
+            {
+                var moved = ManualPartSequencing.Move(plateView.Plate, part, (int)sequenceForm.numericUpDown1.Value);
+                if (moved)
+                    change.MarkChanged();
+                change.Complete();
+                if (!moved)
+                    return;
+            }
 
             if (sequenceForm.numericUpDown1.Value < sequenceForm.numericUpDown1.Maximum)
                 sequenceForm.numericUpDown1.Value++;

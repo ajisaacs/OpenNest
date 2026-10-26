@@ -1022,16 +1022,31 @@ namespace OpenNest.Forms
 
         public void AutoSequenceCurrentPlate()
         {
-            SequencePlate(PlateView.Plate);
+            var plate = PlateView.Plate;
+            using var change = BeginChange("Auto Sequence");
+            var before = CutOrder(plate).ToList();
+            SequencePlate(plate);
+            if (!CutOrder(plate).SequenceEqual(before))
+                change.MarkChanged();
+            change.Complete();
             PlateView.Invalidate();
         }
 
         public void AutoSequenceAllPlates()
         {
+            using var change = BeginChange("Auto Sequence All Plates");
+            var before = Nest.Plates.SelectMany(CutOrder).ToList();
             var parameters = new SequenceParameters { Method = SequenceMethod.LeastCode };
             PlateSequencing.ApplyAll(Nest.Plates, parameters);
+            if (!Nest.Plates.SelectMany(CutOrder).SequenceEqual(before))
+                change.MarkChanged();
+            change.Complete();
             PlateView.Invalidate();
         }
+
+        // Sequencing reorders parts and cut-offs; a plate already in order is left as it was.
+        private static IEnumerable<object> CutOrder(Plate plate) =>
+            plate.Parts.Cast<object>().Concat(plate.CutOffs);
 
         private static void SequencePlate(Plate plate)
         {
@@ -1224,21 +1239,21 @@ namespace OpenNest.Forms
                 return;
 
             var plate = PlateView.Plate;
-            var count = 0;
-
-            foreach (var part in plate.Parts)
-            {
-                if (part.HasManualLeadIns)
-                {
-                    part.RemoveLeadIns();
-                    count++;
-                }
-            }
-
-            if (count == 0)
+            if (!plate.Parts.Any(part => part.HasManualLeadIns))
                 return;
 
-            plate.CuttingParameters = null;
+            using (var change = BeginChange("Remove Lead-Ins"))
+            {
+                change.MarkChanged();
+                foreach (var part in plate.Parts)
+                {
+                    if (part.HasManualLeadIns)
+                        part.RemoveLeadIns();
+                }
+
+                plate.CuttingParameters = null;
+                change.Complete();
+            }
 
             // Rebuild all layout part graphics
             foreach (var lp in PlateView.Parts)
@@ -1255,15 +1270,21 @@ namespace OpenNest.Forms
             if (Nest == null)
                 return;
 
-            foreach (var plate in Nest.Plates)
+            using (var change = BeginChange("Remove Lead-Ins"))
             {
-                foreach (var part in plate.Parts)
+                if (Nest.Plates.Any(plate => plate.CuttingParameters != null || plate.Parts.Any(part => part.HasManualLeadIns)))
+                    change.MarkChanged();
+                foreach (var plate in Nest.Plates)
                 {
-                    if (part.HasManualLeadIns)
-                        part.RemoveLeadIns();
-                }
+                    foreach (var part in plate.Parts)
+                    {
+                        if (part.HasManualLeadIns)
+                            part.RemoveLeadIns();
+                    }
 
-                plate.CuttingParameters = null;
+                    plate.CuttingParameters = null;
+                }
+                change.Complete();
             }
 
             foreach (var lp in PlateView.Parts)
@@ -1280,11 +1301,8 @@ namespace OpenNest.Forms
             if (PlateView?.Plate == null)
                 return;
 
-            var plate = PlateView.Plate;
-
-            if (plate.CuttingParameters == null)
-                plate.CuttingParameters = MachineSettings.DefaultCuttingParameters(Nest);
-
+            // The tool's panel starts from the plate's parameters or the defaults; the plate
+            // takes them with its first lead-in, so opening the tool changes nothing.
             PlateView.SetAction(typeof(Actions.ActionLeadIn));
         }
 

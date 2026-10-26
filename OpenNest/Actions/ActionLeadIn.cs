@@ -39,6 +39,9 @@ namespace OpenNest.Actions
         private ShapeInfo lockedContour;
         private ContextMenuStrip contextMenu;
         private CuttingPanel cuttingPanel;
+
+        // The panel's parameters as loaded, to tell an edit from the panel's own round trip.
+        private string loadedParameters;
         private static readonly Brush grayOverlay = new SolidBrush(
             Color.FromArgb(160, 180, 180, 180)
         );
@@ -86,6 +89,9 @@ namespace OpenNest.Actions
 
         public override bool IsBusy() => selectedPart != null;
 
+        // A picked part is not work in progress for undo, which ends the tool.
+        public override bool BlocksUndo => false;
+
         // Escape closes the side panel; a second Escape must not reopen it.
         public override bool ResumeOnEscape => false;
 
@@ -101,6 +107,7 @@ namespace OpenNest.Actions
             // Load current parameters or defaults
             var plate = plateView.Plate;
             cuttingPanel.LoadFromParameters(plate?.CuttingParameters ?? MachineSettings.DefaultCuttingParameters(form.Nest));
+            loadedParameters = CuttingParametersSerializer.Serialize(cuttingPanel.BuildParameters());
 
             form.ShowSidePanel(cuttingPanel, "Place Lead-in");
         }
@@ -137,8 +144,16 @@ namespace OpenNest.Actions
             Properties.Settings.Default.CuttingParametersJson = json;
             Properties.Settings.Default.Save();
 
-            if (plateView.Plate != null)
-                plateView.Plate.CuttingParameters = parameters;
+            // A plate takes the tool's parameters with its first lead-in; after that an edit in
+            // the panel is a change of its own. Closing the tool otherwise changes nothing.
+            var plate = plateView.Plate;
+            if (plate?.CuttingParameters == null || json == loadedParameters
+                || CuttingParametersSerializer.Serialize(plate.CuttingParameters) == json)
+                return;
+            using var change = plateView.BeginChange("Cutting Parameters");
+            change.MarkChanged();
+            plate.CuttingParameters = parameters;
+            change.Complete();
         }
 
         private void OnToolParametersChanged(object sender, System.EventArgs e)
@@ -483,14 +498,18 @@ namespace OpenNest.Actions
 
         private void CommitLeadIn()
         {
+            using var change = plateView.BeginChange("Place Lead-In");
+            change.MarkChanged();
             if (selectedPart.HasManualLeadIns)
                 selectedPart.RemoveLeadIns();
 
+            plateView.Plate.CuttingParameters ??= GetCurrentParameters();
             // A part the support grid cannot hold level is tabbed at the clicked entry.
             var parameters = Support.SupportTabSettings.ForManualLeadIn(GetCurrentParameters(),
                 plateView.Plate, selectedPart);
             selectedPart.ApplySingleLeadIn(parameters, snapPoint, snapEntity, snapContourType);
             selectedPart.LeadInsLocked = true;
+            change.Complete();
 
             selectedLayoutPart.IsDirty = true;
             UnlockContour();
@@ -523,7 +542,12 @@ namespace OpenNest.Actions
             var removeItem = new ToolStripMenuItem("Remove All Lead-ins");
             removeItem.Click += (s, e) =>
             {
-                selectedPart.RemoveLeadIns();
+                using (var change = plateView.BeginChange("Remove Lead-Ins"))
+                {
+                    change.MarkChanged();
+                    selectedPart.RemoveLeadIns();
+                    change.Complete();
+                }
                 selectedLayoutPart.IsDirty = true;
                 selectedLayoutPart.Update();
                 DeselectPart();

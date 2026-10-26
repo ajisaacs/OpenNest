@@ -12,6 +12,7 @@ using OpenNest.Controls;
 using OpenNest.Diagnostics;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Engine.Sequencing;
+using OpenNest.Undo;
 
 namespace OpenNest.Forms;
 
@@ -98,6 +99,10 @@ internal sealed class CuttingInspectionPanel : UserControl
     // Last cut-off settings chosen here, per unit system, for the rest of this session.
     private static readonly System.Collections.Generic.Dictionary<Units, AutomaticCutOffOptions> lastCutOffOptions = new();
     private AutomaticCutOffStaging stagedCutOffs;
+
+    // Open from staging scrap cut-offs (or the apply) until the plan is applied or the staged
+    // cut-offs come back off: they become an edit only when the plan is applied.
+    private ChangeScope planChange;
     private readonly CheckBox acceptWarningsCheckBox = new() { Text = "Accept the unverified plan", AutoSize = true, Visible = false };
     private readonly Label settingsLabel = new()
     {
@@ -1107,12 +1112,15 @@ internal sealed class CuttingInspectionPanel : UserControl
         if (!applyButton.Enabled || IsPlanning || invalidated || Proposal == null)
             return;
         // This handler runs on the owner thread; Apply independently rechecks all captured plates.
+        BeginPlanChange();
         CommitResult = Proposal.Apply(acceptWarningsCheckBox.Checked);
         if (CommitResult.Status == CuttingCommitStatus.Applied)
         {
             // The plan was made with these cut-offs in place; applying it keeps them.
             stagedCutOffs?.Keep();
             stagedCutOffs = null;
+            planChange.MarkChanged();
+            EndPlanChange();
             Exception postApplyError = null;
             try
             {
@@ -1182,6 +1190,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             }
             if (stagedCutOffs != null)
                 return true;
+            BeginPlanChange();
             var staging = AutomaticCutOffBatch.Stage(plates, cutOffOptions, view.CutOffSettings);
             if (staging.IsBlocked)
             {
@@ -1218,11 +1227,24 @@ internal sealed class CuttingInspectionPanel : UserControl
     {
         var staged = stagedCutOffs;
         stagedCutOffs = null;
-        if (staged == null)
-            return;
-        staged.Revert();
-        if (!view.IsDisposed)
-            view.Invalidate();
+        if (staged != null)
+        {
+            staged.Revert();
+            if (!view.IsDisposed)
+                view.Invalidate();
+        }
+        EndPlanChange();
+    }
+
+    private void BeginPlanChange() => planChange ??= editor.BeginChange("Plan Cutting");
+
+    // Records the plan once it was marked applied; otherwise the plates are as they were.
+    private void EndPlanChange()
+    {
+        var change = planChange;
+        planChange = null;
+        change?.Complete();
+        change?.Dispose();
     }
 
     private void RefreshExistingWork()
@@ -1246,7 +1268,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         var message = $"Remove the applied lead-ins ({summary.LeadInParts} parts, {summary.LockedLeadInParts} locked) and "
             + $"{summary.CutOffs} cut-offs from plate(s) {string.Join(", ", summary.PlateNumbers)}?"
             + Environment.NewLine + Environment.NewLine
-            + "Locked and hand-placed lead-ins are removed too, and this cannot be undone. The plan is then recalculated.";
+            + "Locked and hand-placed lead-ins are removed too. The plan is then recalculated.";
         var confirmed = ConfirmClearExisting?.Invoke(message)
             ?? MessageBox.Show(editor, message, "Clear Lead-ins and Cut-offs", MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes;
@@ -1271,9 +1293,13 @@ internal sealed class CuttingInspectionPanel : UserControl
     private bool ClearAppliedWork()
     {
         ClearResult();
+        ChangeScope change = null;
         try
         {
             RevertStagedCutOffs();
+            // Recorded even when it stops part-way: the plates keep what was cleared.
+            change = editor.BeginChange("Clear Lead-ins and Cut-offs");
+            change.MarkChanged();
             AppliedCuttingWork.Clear(plates, plateNumbers);
         }
         catch (Exception ex)
@@ -1284,6 +1310,8 @@ internal sealed class CuttingInspectionPanel : UserControl
         }
         finally
         {
+            change?.Complete();
+            change?.Dispose();
             foreach (var part in view.Parts)
             {
                 part.IsDirty = true;
@@ -1346,6 +1374,8 @@ internal sealed class CuttingInspectionPanel : UserControl
             if (!view.IsDisposed)
                 view.InspectionCloseRequested = null;
             try { ownedScope?.Dispose(); }
+            catch (Exception ex) { restoreError ??= ex; }
+            try { EndPlanChange(); }
             catch (Exception ex) { restoreError ??= ex; }
             try { editor.FinishCuttingInspection(this); }
             catch (Exception ex) { restoreError ??= ex; }
