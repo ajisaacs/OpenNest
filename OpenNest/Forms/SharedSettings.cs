@@ -112,6 +112,19 @@ namespace OpenNest.Forms
             return store?.IsOffline == true ? "shared, read-only: the server cannot be reached" : "shared on the nest server";
         }
 
+        /// <summary>
+        /// Where Tools > Nest Defaults saves (the server once it holds them, as
+        /// <see cref="MachineSettings.SaveNestDefaults"/> does) and whether it can save there now.
+        /// </summary>
+        public static (string Text, bool ReadOnly) NestDefaultsSource()
+        {
+            if (Find(SharedSettingKinds.NestDefaults, SharedSettingKinds.DefaultKey) == null)
+                return (Current() == null ? "Saved on this PC." : "Saved on this PC only: not shared on the server yet.", false);
+            return store?.IsOffline == true
+                ? ("Shared, read-only: the server cannot be reached.", true)
+                : ("Shared with every workstation on the nest server.", false);
+        }
+
         /// <summary>The key of a post's shared settings.</summary>
         public static string PostKey(IPostProcessor postProcessor) => postProcessor.GetType().FullName;
 

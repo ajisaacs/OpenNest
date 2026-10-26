@@ -19,9 +19,11 @@ namespace OpenNest.Forms
         }
 
         private readonly Guid? savedMachineId;
+        private Units shownUnits;
 
         /// <param name="machines">The machines new nests can be assigned.</param>
-        public NestDefaultsForm(NestDefaults defaults, IEnumerable<MachineConfig> machines)
+        /// <param name="source">Where the defaults are saved, and whether they can be saved there now.</param>
+        public NestDefaultsForm(NestDefaults defaults, IEnumerable<MachineConfig> machines, (string Text, bool ReadOnly) source)
         {
             InitializeComponent();
 
@@ -33,24 +35,25 @@ namespace OpenNest.Forms
             machineCombo.SelectedItem = machineCombo.Items.Cast<MachineChoice>().FirstOrDefault(c => c.Machine == selected);
             machineCombo.Enabled = machineCombo.Items.Count > 0;
 
-            unitsCombo.SelectedIndex = defaults.Units == Units.Millimeters ? 1 : 0;
-            widthBox.Value = Clamp(widthBox, defaults.Size.Width);
-            lengthBox.Value = Clamp(lengthBox, defaults.Size.Length);
-            partSpacingBox.Value = Clamp(partSpacingBox, defaults.PartSpacing);
-            edgeLeftBox.Value = Clamp(edgeLeftBox, defaults.EdgeSpacing.Left);
-            edgeBottomBox.Value = Clamp(edgeBottomBox, defaults.EdgeSpacing.Bottom);
-            edgeRightBox.Value = Clamp(edgeRightBox, defaults.EdgeSpacing.Right);
-            edgeTopBox.Value = Clamp(edgeTopBox, defaults.EdgeSpacing.Top);
-            quadrantSelect1.Quadrant = defaults.Quadrant;
+            shownUnits = defaults.Units;
+            (defaults.Units == Units.Millimeters ? millimetersRadio : inchesRadio).Checked = true;
+            ShowValues(defaults);
+
+            sourceLabel.Text = source.Text;
+            saveButton.Enabled = !source.ReadOnly;
         }
 
-        public Units Units => unitsCombo.SelectedIndex == 1 ? Units.Millimeters : Units.Inches;
+        private NestDefaultsForm() => InitializeComponent();
 
-        public NestDefaults GetDefaults()
+        public Units Units => millimetersRadio.Checked ? Units.Millimeters : Units.Inches;
+
+        public NestDefaults GetDefaults() => ReadValues(Units);
+
+        private NestDefaults ReadValues(Units units)
         {
             return new NestDefaults
             {
-                Units = Units,
+                Units = units,
                 Size = new Size((double)widthBox.Value, (double)lengthBox.Value),
                 Quadrant = quadrantSelect1.Quadrant,
                 PartSpacing = (double)partSpacingBox.Value,
@@ -63,6 +66,33 @@ namespace OpenNest.Forms
                 // With no machines on file there is nothing to choose, so keep the saved choice.
                 MachineId = (machineCombo.SelectedItem as MachineChoice)?.Machine.Id ?? savedMachineId,
             };
+        }
+
+        private void ShowValues(NestDefaults defaults)
+        {
+            widthBox.Value = Clamp(widthBox, defaults.Size.Width);
+            lengthBox.Value = Clamp(lengthBox, defaults.Size.Length);
+            partSpacingBox.Value = Clamp(partSpacingBox, defaults.PartSpacing);
+            edgeLeftBox.Value = Clamp(edgeLeftBox, defaults.EdgeSpacing.Left);
+            edgeBottomBox.Value = Clamp(edgeBottomBox, defaults.EdgeSpacing.Bottom);
+            edgeRightBox.Value = Clamp(edgeRightBox, defaults.EdgeSpacing.Right);
+            edgeTopBox.Value = Clamp(edgeTopBox, defaults.EdgeSpacing.Top);
+            quadrantSelect1.Quadrant = defaults.Quadrant;
+            quadrantSelect1.Invalidate();
+
+            var suffix = defaults.Units == Units.Millimeters ? "mm" : "in";
+            foreach (var box in new[] { widthBox, lengthBox, partSpacingBox, edgeLeftBox, edgeBottomBox, edgeRightBox, edgeTopBox })
+                box.Suffix = suffix;
+        }
+
+        /// <summary>Switching units converts the values shown, so a 48 in plate stays 1219.2 mm.</summary>
+        private void UnitsChanged(object sender, EventArgs e)
+        {
+            if (Units == shownUnits)
+                return;
+
+            ShowValues(ReadValues(shownUnits).ConvertedTo(Units));
+            shownUnits = Units;
         }
 
         private static decimal Clamp(NumericUpDown box, double value)

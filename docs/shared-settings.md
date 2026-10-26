@@ -48,7 +48,8 @@ saved first the server refuses it and the desktop takes their copy:
 - Clamps, nest defaults, support grid: the save reports the conflict.
 
 The window title of Tools > Machine Configuration says whether it edits the shared machines,
-this PC's (not shared yet), or a read-only copy.
+this PC's (not shared yet), or a read-only copy. Tools > Nest Defaults says the same beside
+its buttons and disables Save while its shared copy is read-only.
 
 ## Server
 

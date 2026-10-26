@@ -172,7 +172,9 @@ namespace OpenNest.Forms
 
         private void NestDefaults_Click(object sender, EventArgs e)
         {
-            using (var form = new NestDefaultsForm(MachineSettings.LoadSavedNestDefaults(out _), MachineSettings.LoadMachines()))
+            var defaults = MachineSettings.LoadSavedNestDefaults(out _);
+            SharedSettings.WarnIfOffline(this);
+            using (var form = new NestDefaultsForm(defaults, MachineSettings.LoadMachines(), SharedSettings.NestDefaultsSource()))
             {
                 if (form.ShowDialog(this) == DialogResult.OK)
                     SaveNestDefaults(form.GetDefaults());
