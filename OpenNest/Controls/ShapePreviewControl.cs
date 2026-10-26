@@ -16,7 +16,7 @@ namespace OpenNest.Controls
             AllowSelect = false;
             AllowZoom = false;
             AllowDrop = false;
-            BackColor = Color.White;
+            BackColor = ColorScheme.Default.LibraryBackgroundColor;
         }
 
         public void SetInfo(params string[] lines)
@@ -55,7 +55,7 @@ namespace OpenNest.Controls
 
             e.Graphics.TranslateTransform(origin.X, origin.Y);
             Renderer.DrawPlate(e.Graphics);
-            Renderer.DrawParts(e.Graphics);
+            Renderer.DrawLibraryParts(e.Graphics, ColorScheme.Default);
             e.Graphics.ResetTransform();
 
             PaintInfo(e.Graphics);
@@ -68,12 +68,13 @@ namespace OpenNest.Controls
 
             var lineHeight = Font.GetHeight(g) + 1;
             var y = 4f;
+            using var text = new SolidBrush(ColorScheme.Default.LibraryOutlineColor);
 
             foreach (var line in infoLines)
             {
                 if (string.IsNullOrEmpty(line))
                     continue;
-                g.DrawString(line, Font, Brushes.Black, 4, y);
+                g.DrawString(line, Font, text, 4, y);
                 y += lineHeight;
             }
         }

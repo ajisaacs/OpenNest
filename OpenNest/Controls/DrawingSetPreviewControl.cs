@@ -8,7 +8,7 @@ using OpenNest.Geometry;
 namespace OpenNest.Controls
 {
     /// <summary>
-    /// Shows every drawing of a set side by side at one scale, outlined without fill, packed by
+    /// Shows every drawing of a set side by side at one scale in the library style, packed by
     /// <see cref="DrawingSetPreviewLayout"/> with a label under each and the info lines above.
     /// The layout is repacked to fit whenever the control is resized; the wheel zooms, the
     /// middle button pans and a middle double-click fits the set again.
@@ -29,7 +29,7 @@ namespace OpenNest.Controls
             AllowSelect = false;
             AllowZoom = true;
             AllowDrop = false;
-            BackColor = Color.White;
+            BackColor = ColorScheme.Default.LibraryBackgroundColor;
             // A large set in millimeters fits at well under the default floor of 0.3 px per unit.
             ViewScaleMin = 1e-5f;
         }
@@ -138,26 +138,11 @@ namespace OpenNest.Controls
             e.Graphics.SmoothingMode = SmoothingMode.HighQuality;
 
             e.Graphics.TranslateTransform(origin.X, origin.Y);
-            PaintOutlines(e.Graphics);
+            Renderer.DrawLibraryParts(e.Graphics, ColorScheme.Default);
             PaintLabels(e.Graphics);
             e.Graphics.ResetTransform();
 
             PaintInfo(e.Graphics);
-        }
-
-        // Outlines only: cuts in black, etch marks dashed in gray.
-        private void PaintOutlines(Graphics g)
-        {
-            using var etchPen = new Pen(Color.Gray) { DashStyle = DashStyle.Dash };
-            foreach (var part in LayoutParts)
-            {
-                if (part.IsDirty)
-                    part.Update(this);
-                if (part.EtchPath?.PointCount > 0)
-                    g.DrawPath(etchPen, part.EtchPath);
-                if (part.Path?.PointCount > 0)
-                    g.DrawPath(Pens.Black, part.Path);
-            }
         }
 
         private void PaintLabels(Graphics g)
@@ -172,13 +157,14 @@ namespace OpenNest.Controls
                 Trimming = StringTrimming.EllipsisCharacter,
                 FormatFlags = StringFormatFlags.NoWrap,
             };
+            using var text = new SolidBrush(ColorScheme.Default.LibraryOutlineColor);
 
             foreach (var placement in layout.Placements)
             {
                 var corner = PointWorldToGraph(placement.CellX, placement.LabelTop);
                 var rect = new RectangleF(corner.X, corner.Y + 1,
                     LengthWorldToGui(placement.CellWidth), System.Math.Max(LengthWorldToGui(layout.LabelHeight), Font.Height));
-                g.DrawString(items[placement.Index].Label, Font, Brushes.Black, rect, format);
+                g.DrawString(items[placement.Index].Label, Font, text, rect, format);
             }
         }
 
@@ -191,12 +177,13 @@ namespace OpenNest.Controls
                 Trimming = StringTrimming.EllipsisCharacter,
                 FormatFlags = StringFormatFlags.NoWrap,
             };
+            using var text = new SolidBrush(ColorScheme.Default.LibraryOutlineColor);
 
             foreach (var line in infoLines)
             {
                 if (string.IsNullOrEmpty(line))
                     continue;
-                g.DrawString(line, Font, Brushes.Black, new RectangleF(4, y, System.Math.Max(Width - 8, 1), lineHeight), format);
+                g.DrawString(line, Font, text, new RectangleF(4, y, System.Math.Max(Width - 8, 1), lineHeight), format);
                 y += lineHeight;
             }
         }

@@ -202,7 +202,6 @@ namespace OpenNest.Forms
             previewBox.AllowPan = false;
             previewBox.AllowSelect = false;
             previewBox.AllowZoom = false;
-            previewBox.BackColor = System.Drawing.Color.White;
             colorScheme1.BackgroundColor = System.Drawing.Color.DarkGray;
             colorScheme1.BoundingBoxColor = System.Drawing.Color.FromArgb(128, 128, 255);
             colorScheme1.EdgeSpacingColor = System.Drawing.Color.FromArgb(180, 180, 180);

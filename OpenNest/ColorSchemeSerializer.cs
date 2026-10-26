@@ -29,6 +29,11 @@ namespace OpenNest
                 PartOutlineColor = scheme.PartOutlineColor.IsEmpty ? null : ToHex(scheme.PartOutlineColor),
                 SelectedPartColor = scheme.SelectedPartColor.IsEmpty ? null : ToHex(scheme.SelectedPartColor),
                 EtchColor = ToHex(scheme.EtchColor),
+                LibraryBackgroundColor = ToHex(scheme.LibraryBackgroundColor),
+                LibraryFillColor = ToHex(scheme.LibraryFillColor),
+                LibraryOutlineColor = ToHex(scheme.LibraryOutlineColor),
+                LibraryEtchColor = ToHex(scheme.LibraryEtchColor),
+                LibraryBendColor = ToHex(scheme.LibraryBendColor),
                 PartColors = scheme.PartColors.Select(ToHex).ToArray(),
                 UseGoldenAngleColors = scheme.UseGoldenAngleColors,
             };
@@ -41,7 +46,7 @@ namespace OpenNest
                 JsonSerializer.Deserialize<ColorSchemeDto>(json, JsonOptions)
                 ?? throw new JsonException("ColorScheme JSON was null");
 
-            return new ColorScheme
+            var scheme = new ColorScheme
             {
                 Name = dto.Name ?? "Unnamed",
                 BackgroundColor = FromHex(dto.BackgroundColor),
@@ -58,7 +63,18 @@ namespace OpenNest
                 PartColors = (dto.PartColors ?? new string[0]).Select(FromHex).ToArray(),
                 UseGoldenAngleColors = dto.UseGoldenAngleColors,
             };
+
+            // Schemes saved before the library style keep its defaults.
+            scheme.LibraryBackgroundColor = FromHexOr(dto.LibraryBackgroundColor, scheme.LibraryBackgroundColor);
+            scheme.LibraryFillColor = FromHexOr(dto.LibraryFillColor, scheme.LibraryFillColor);
+            scheme.LibraryOutlineColor = FromHexOr(dto.LibraryOutlineColor, scheme.LibraryOutlineColor);
+            scheme.LibraryEtchColor = FromHexOr(dto.LibraryEtchColor, scheme.LibraryEtchColor);
+            scheme.LibraryBendColor = FromHexOr(dto.LibraryBendColor, scheme.LibraryBendColor);
+            return scheme;
         }
+
+        private static Color FromHexOr(string hex, Color fallback) =>
+            string.IsNullOrWhiteSpace(hex) ? fallback : FromHex(hex);
 
         private static string ToHex(Color c) =>
             "#" + c.R.ToString("X2") + c.G.ToString("X2") + c.B.ToString("X2");
@@ -102,6 +118,11 @@ namespace OpenNest
             public string PartOutlineColor { get; set; }
             public string SelectedPartColor { get; set; }
             public string EtchColor { get; set; }
+            public string LibraryBackgroundColor { get; set; }
+            public string LibraryFillColor { get; set; }
+            public string LibraryOutlineColor { get; set; }
+            public string LibraryEtchColor { get; set; }
+            public string LibraryBendColor { get; set; }
             public string[] PartColors { get; set; }
             public bool UseGoldenAngleColors { get; set; }
         }

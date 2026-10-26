@@ -29,6 +29,18 @@ namespace OpenNest
 
         public Color EtchColor { get; set; } = Color.Lime;
 
+        // Library previews (Shape Library, drawing library, drawing set preview) show drawings
+        // that are not in the nest yet, so they share one style instead of nest part colors.
+        public Color LibraryBackgroundColor { get; set; } = Color.White;
+
+        public Color LibraryFillColor { get; set; } = Color.FromArgb(214, 219, 226);
+
+        public Color LibraryOutlineColor { get; set; } = Color.FromArgb(64, 70, 80);
+
+        public Color LibraryEtchColor { get; set; } = Color.FromArgb(0, 150, 60);
+
+        public Color LibraryBendColor { get; set; } = Color.FromArgb(40, 100, 210);
+
         public Color GetPartOutlineColor(Color fill) =>
             PartOutlineColor.IsEmpty ? System.Windows.Forms.ControlPaint.Dark(fill) : PartOutlineColor;
 

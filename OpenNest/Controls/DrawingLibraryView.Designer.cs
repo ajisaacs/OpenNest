@@ -514,7 +514,6 @@ namespace OpenNest.Controls
             previewBox.AllowPan = false;
             previewBox.AllowSelect = false;
             previewBox.AllowZoom = false;
-            previewBox.BackColor = System.Drawing.Color.White;
             previewBox.Cursor = System.Windows.Forms.Cursors.Default;
             previewBox.Dock = System.Windows.Forms.DockStyle.Fill;
             previewBox.Name = "previewBox";

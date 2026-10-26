@@ -108,7 +108,8 @@ namespace OpenNest
             this Program pgm,
             System.Drawing.Size size,
             Pen pen,
-            Brush brush
+            Brush brush,
+            Color? etchColor = null
         )
         {
             var img = new Bitmap(size.Width, size.Height);
@@ -152,7 +153,7 @@ namespace OpenNest
             if (pen == null)
                 pen = Pens.Black;
 
-            using var etchPen = new Pen(ColorScheme.Default.EtchColor, 1.5f);
+            using var etchPen = new Pen(etchColor ?? ColorScheme.Default.EtchColor, 1.5f);
             graphics.DrawPath(etchPen, etchPath);
             // A coincident cut must remain visible over an etch.
             graphics.DrawPath(pen, path);

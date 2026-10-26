@@ -72,6 +72,11 @@ namespace OpenNest
             d.PartOutlineColor = scheme.PartOutlineColor;
             d.SelectedPartColor = scheme.SelectedPartColor;
             d.EtchColor = scheme.EtchColor;
+            d.LibraryBackgroundColor = scheme.LibraryBackgroundColor;
+            d.LibraryFillColor = scheme.LibraryFillColor;
+            d.LibraryOutlineColor = scheme.LibraryOutlineColor;
+            d.LibraryEtchColor = scheme.LibraryEtchColor;
+            d.LibraryBendColor = scheme.LibraryBendColor;
 
             Drawing.PartColors = scheme.PartColors;
             Drawing.UseGoldenAngleColors = scheme.UseGoldenAngleColors;
@@ -333,6 +338,11 @@ namespace OpenNest
                 OriginColor = Color.FromArgb(120, 120, 130),
                 EdgeSpacingColor = Color.FromArgb(90, 90, 100),
                 PreviewPartColor = Color.FromArgb(255, 170, 60),
+                LibraryBackgroundColor = Color.FromArgb(30, 30, 34),
+                LibraryFillColor = Color.FromArgb(70, 76, 86),
+                LibraryOutlineColor = Color.FromArgb(205, 210, 220),
+                LibraryEtchColor = Color.FromArgb(120, 230, 120),
+                LibraryBendColor = Color.FromArgb(100, 180, 255),
                 PartColors = new[]
                 {
                     Color.FromArgb(255, 85, 85), // Neon Red

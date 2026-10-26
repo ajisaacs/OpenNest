@@ -109,6 +109,22 @@ namespace OpenNest.Controls
             );
         }
 
+        /// <summary>
+        /// Draws every part in <paramref name="scheme"/>'s library style with its bend lines,
+        /// without ids, selection or validation states.
+        /// </summary>
+        public void DrawLibraryParts(Graphics g, ColorScheme scheme)
+        {
+            using var bendPen = new Pen(scheme.LibraryBendColor, 1.5f) { DashStyle = DashStyle.Dash };
+            foreach (var part in view.DisplayLayoutParts)
+            {
+                if (part.IsDirty)
+                    part.UpdateView(view);
+                part.DrawLibrary(g, scheme);
+                DrawBendLines(g, part.BasePart, bendPen);
+            }
+        }
+
         public void DrawParts(Graphics g)
         {
             var viewBounds = view.GetViewBounds();
@@ -439,6 +455,13 @@ namespace OpenNest.Controls
             {
                 DashStyle = System.Drawing.Drawing2D.DashStyle.Dash,
             };
+            DrawBendLines(g, part, bendPen);
+        }
+
+        private void DrawBendLines(Graphics g, Part part, Pen bendPen)
+        {
+            if (part.BaseDrawing.Bends == null)
+                return;
 
             foreach (var bend in part.BaseDrawing.Bends)
             {

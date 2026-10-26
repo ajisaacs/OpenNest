@@ -143,6 +143,23 @@ namespace OpenNest
                 g.DrawPath(muted ? Pens.Gray : LeadInPen, LeadInPath);
         }
 
+        /// <summary>
+        /// Draws the part in the scheme's library style, ignoring its drawing color: library
+        /// previews show drawings that are not in the nest yet.
+        /// </summary>
+        internal void DrawLibrary(Graphics g, ColorScheme scheme)
+        {
+            using var fill = new SolidBrush(scheme.LibraryFillColor);
+            using var outline = new Pen(scheme.LibraryOutlineColor);
+            using var etch = new Pen(scheme.LibraryEtchColor, 1.5f);
+            g.FillPath(fill, MaterialPath);
+            DrawDisplay(g, false);
+            if (EtchPath?.PointCount > 0)
+                g.DrawPath(etch, EtchPath);
+            // Keep real cuts visible even where an etch overlaps them.
+            g.DrawPath(outline, Path);
+        }
+
         public void Draw(Graphics g, string id) => Draw(g, id, false);
 
         internal void Draw(Graphics g, string id, bool muted)

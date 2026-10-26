@@ -27,9 +27,6 @@ namespace OpenNest.Forms
         private const int TileColumns = 3;
         private const int LVM_SETICONSPACING = 0x1000 + 53;
 
-        // The fill the preview gives a drawing without a color, so tiles match it.
-        private static readonly Color ThumbnailFill = Color.FromArgb(130, 204, 130);
-
         [DllImport("user32.dll")]
         private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
@@ -125,6 +122,8 @@ namespace OpenNest.Forms
                 ImageSize = new Size(ThumbnailSize, ThumbnailSize),
             };
             shapeListView.LargeImageList = images;
+            shapeListView.BackColor = ColorScheme.Default.LibraryBackgroundColor;
+            shapeListView.ForeColor = ColorScheme.Default.LibraryOutlineColor;
             shapeListView.HandleCreated += (_, _) => ApplyTileSpacing();
             Disposed += (_, _) => images.Dispose();
 
@@ -161,9 +160,10 @@ namespace OpenNest.Forms
                 // GetImage draws without antialiasing; render at twice the size and
                 // downsample so curved edges stay smooth at thumbnail scale.
                 var renderSize = new Size(ThumbnailSize * 2, ThumbnailSize * 2);
-                using var brush = new SolidBrush(ThumbnailFill);
-                using var pen = new Pen(ColorScheme.Default.GetPartOutlineColor(ThumbnailFill), 2f);
-                using var large = program.GetImage(renderSize, pen, brush);
+                var scheme = ColorScheme.Default;
+                using var brush = new SolidBrush(scheme.LibraryFillColor);
+                using var pen = new Pen(scheme.LibraryOutlineColor, 2f);
+                using var large = program.GetImage(renderSize, pen, brush, scheme.LibraryEtchColor);
                 using var graphics = Graphics.FromImage(thumbnail);
                 graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
                 graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
