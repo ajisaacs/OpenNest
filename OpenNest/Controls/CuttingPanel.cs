@@ -19,21 +19,33 @@ namespace OpenNest.Controls
 
         private static readonly string[] LeadOutTypes = { "None", "Line", "Arc" };
 
+        // Every field label shares this column so inputs line up across sections.
+        private const int LabelWidth = 150;
+        private const int FieldIndent = 16;
+        private const int InputWidth = 100;
+
+        private static readonly Color HintColor = SystemColors.GrayText;
+
+        private readonly TableLayoutPanel layout;
+        private readonly ToolTip toolTip = new ToolTip { AutoPopDelay = 15000 };
+
         private readonly TabControl tabControl;
         private readonly ComboBox cboExternalLeadIn,
             cboExternalLeadOut;
         private readonly ComboBox cboInternalLeadIn,
             cboInternalLeadOut;
 
-        private readonly Panel pnlExternalLeadIn,
+        private readonly TableLayoutPanel pnlExternalLeadIn,
             pnlExternalLeadOut;
-        private readonly Panel pnlInternalLeadIn,
+        private readonly TableLayoutPanel pnlInternalLeadIn,
             pnlInternalLeadOut;
 
         private readonly CheckBox chkTabsEnabled;
+        private readonly TableLayoutPanel tabOptions;
         private readonly NumericUpDown nudTabWidth;
         private readonly RadioButton rbTabAll;
         private readonly RadioButton rbSupportTab;
+        private readonly TableLayoutPanel noBedOptions;
         private readonly NumericUpDown nudNoBedTabMin;
         private readonly NumericUpDown nudNoBedTabMax;
         private readonly NumericUpDown nudPierceClearance;
@@ -80,13 +92,30 @@ namespace OpenNest.Controls
             AutoScroll = true;
             BackColor = Color.White;
 
-            // Tab control for contour types — wrapped in a fixed-height panel for Dock.Top
-            tabControl = new TabControl { Dock = DockStyle.Fill };
+            layout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 1,
+                Padding = new Padding(10, 2, 10, 10),
+            };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
-            var tabExternal = new TabPage("External") { Padding = new Padding(4) };
-            var tabInternal = new TabPage("Internal") { Padding = new Padding(4) };
+            // Leads: one tab per contour type, sized for the type with the most fields.
+            AddSection("Leads");
 
-            SetupTab(
+            tabControl = new TabControl
+            {
+                Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
+                Margin = new Padding(0, 2, 0, 6),
+            };
+
+            var tabExternal = new TabPage("Outside") { Padding = new Padding(6), UseVisualStyleBackColor = true };
+            var tabInternal = new TabPage("Holes") { Padding = new Padding(6), UseVisualStyleBackColor = true };
+            toolTip.SetToolTip(tabControl, "Outside: each part's perimeter. Holes: inner contours and circles.");
+
+            var externalContent = SetupTab(
                 tabExternal,
                 out cboExternalLeadIn,
                 out pnlExternalLeadIn,
@@ -103,93 +132,98 @@ namespace OpenNest.Controls
 
             tabControl.Controls.Add(tabExternal);
             tabControl.Controls.Add(tabInternal);
+            layout.Controls.Add(tabControl);
 
-            var tabWrapper = new Panel { Dock = DockStyle.Top, Height = 340 };
-            tabWrapper.Controls.Add(tabControl);
-
-            // Tabs section
-            var tabsPanel = new CollapsiblePanel
+            chkRoundLeadInAngles = new CheckBox
             {
-                HeaderText = "Tabs",
-                Dock = DockStyle.Top,
-                ExpandedHeight = 132,
-                IsExpanded = false,
+                Text = "Round lead-in angles to every",
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+                Margin = new Padding(0, 3, 0, 3),
             };
+            nudLeadInAngleIncrement = CreateNumeric(5, 1);
+            nudLeadInAngleIncrement.DecimalPlaces = 0;
+            nudLeadInAngleIncrement.Minimum = 1;
+            nudLeadInAngleIncrement.Maximum = 90;
+            nudLeadInAngleIncrement.Width = 56;
+            nudLeadInAngleIncrement.Enabled = false;
+            toolTip.SetToolTip(chkRoundLeadInAngles, "Snaps each lead-in's angle to a multiple of this many degrees.");
+            layout.Controls.Add(CreateInline(chkRoundLeadInAngles, nudLeadInAngleIncrement, CreateHint("°")));
+
+            chkRoundLeadInAngles.CheckedChanged += (s, e) =>
+            {
+                nudLeadInAngleIncrement.Enabled = chkRoundLeadInAngles.Checked;
+                OnParametersChanged();
+            };
+            nudLeadInAngleIncrement.ValueChanged += (s, e) => OnParametersChanged();
+
+            // Tabs
+            AddSection("Tabs");
 
             chkTabsEnabled = new CheckBox
             {
-                Text = "Enable Tabs",
-                Location = new Point(12, 4),
+                Text = "Add tabs to hold parts in the sheet",
                 AutoSize = true,
+                Margin = new Padding(0, 3, 0, 3),
             };
-            tabsPanel.ContentPanel.Controls.Add(chkTabsEnabled);
+            layout.Controls.Add(chkTabsEnabled);
 
-            tabsPanel.ContentPanel.Controls.Add(
-                new Label
-                {
-                    Text = "Tab Size:",
-                    Location = new Point(160, 6),
-                    AutoSize = true,
-                }
-            );
+            tabOptions = CreateGrid(FieldIndent);
+            tabOptions.Enabled = false;
 
-            nudTabWidth = CreateNumeric(225, 3, 0.25, 0.0625);
-            nudTabWidth.Enabled = false;
-            tabsPanel.ContentPanel.Controls.Add(nudTabWidth);
+            nudTabWidth = CreateNumeric(0.25, 0.0625);
+            AddRow(tabOptions, "Tab size:", nudTabWidth, FieldIndent);
 
             rbTabAll = new RadioButton
             {
-                Text = "Tab all parts",
-                Location = new Point(28, 28),
+                Text = "Tab every part",
                 AutoSize = true,
-                Enabled = false,
                 Checked = true,
+                Margin = new Padding(0, 4, 0, 0),
             };
-            tabsPanel.ContentPanel.Controls.Add(rbTabAll);
+            AddSpanningRow(tabOptions, rbTabAll);
 
             // Plan Cutting tabs only the parts the plate's support grid cannot hold level.
             rbSupportTab = new RadioButton
             {
-                Text = "Tab parts the support grid cannot hold level",
-                Location = new Point(28, 50),
+                Text = "Only tab parts the support grid can't hold level",
                 AutoSize = true,
-                Enabled = false,
+                Margin = new Padding(0, 2, 0, 0),
             };
-            tabsPanel.ContentPanel.Controls.Add(rbSupportTab);
+            toolTip.SetToolTip(rbSupportTab,
+                "Plan Cutting tabs each part that would tip once cut free, where it best keeps the part level.");
+            AddSpanningRow(tabOptions, rbSupportTab);
 
             // A plate with no support bed tabs the parts whose narrow side is in this range;
             // a maximum of 0 tabs none.
-            tabsPanel.ContentPanel.Controls.Add(
-                new Label
-                {
-                    Text = "No bed: tab widths",
-                    Location = new Point(44, 76),
-                    AutoSize = true,
-                }
+            noBedOptions = new TableLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 1,
+                Margin = new Padding(FieldIndent + 2, 0, 0, 0),
+            };
+            noBedOptions.Controls.Add(
+                CreateHint("On plates with no support bed, tab parts whose narrow side is:", new Padding(0, 4, 0, 2))
             );
-            nudNoBedTabMin = CreateNumeric(160, 74, 0, 0.25);
-            nudNoBedTabMin.Size = new Size(70, 22);
-            nudNoBedTabMin.Enabled = false;
-            tabsPanel.ContentPanel.Controls.Add(nudNoBedTabMin);
-            tabsPanel.ContentPanel.Controls.Add(
-                new Label
-                {
-                    Text = "to",
-                    Location = new Point(234, 76),
-                    AutoSize = true,
-                }
+            nudNoBedTabMin = CreateNumeric(0, 0.25);
+            nudNoBedTabMin.Width = 80;
+            nudNoBedTabMax = CreateNumeric(0, 0.25);
+            nudNoBedTabMax.Width = 80;
+            noBedOptions.Controls.Add(
+                CreateInline(
+                    nudNoBedTabMin,
+                    CreateHint("to", new Padding(4, 0, 4, 0)),
+                    nudNoBedTabMax,
+                    CreateHint("(0 = none)", new Padding(6, 0, 0, 0))
+                )
             );
-            nudNoBedTabMax = CreateNumeric(254, 74, 0, 0.25);
-            nudNoBedTabMax.Size = new Size(70, 22);
-            nudNoBedTabMax.Enabled = false;
-            tabsPanel.ContentPanel.Controls.Add(nudNoBedTabMax);
+            AddSpanningRow(tabOptions, noBedOptions);
+            layout.Controls.Add(tabOptions);
 
             chkTabsEnabled.CheckedChanged += (s, e) =>
             {
-                var enabled = chkTabsEnabled.Checked;
-                nudTabWidth.Enabled = enabled;
-                rbTabAll.Enabled = enabled;
-                rbSupportTab.Enabled = enabled;
+                tabOptions.Enabled = chkTabsEnabled.Checked;
                 UpdateNoBedRange();
                 OnParametersChanged();
             };
@@ -200,82 +234,42 @@ namespace OpenNest.Controls
                 UpdateNoBedRange();
                 OnParametersChanged();
             };
+            nudTabWidth.ValueChanged += (s, e) => OnParametersChanged();
             nudNoBedTabMin.ValueChanged += (s, e) => OnParametersChanged();
             nudNoBedTabMax.ValueChanged += (s, e) => OnParametersChanged();
 
-            // Pierce section
-            var piercePanel = new CollapsiblePanel
-            {
-                HeaderText = "Pierce",
-                Dock = DockStyle.Top,
-                ExpandedHeight = 116,
-                IsExpanded = true,
-            };
+            // Pierce
+            AddSection("Pierce");
 
-            piercePanel.ContentPanel.Controls.Add(
-                new Label
-                {
-                    Text = "Pierce Clearance:",
-                    Location = new Point(12, 6),
-                    AutoSize = true,
-                }
-            );
-
-            nudPierceClearance = CreateNumeric(130, 3, 0.0625, 0.0625);
-            piercePanel.ContentPanel.Controls.Add(nudPierceClearance);
+            var pierceGrid = CreateGrid(0);
+            nudPierceClearance = CreateNumeric(0.0625, 0.0625);
+            AddRow(pierceGrid, "Clearance from contour:", nudPierceClearance, 0);
+            toolTip.SetToolTip(nudPierceClearance, "How far each pierce stays from the contour it leads into.");
 
             // 0 turns the pierce zone off; see docs/geometry/pierce-zone.md.
-            piercePanel.ContentPanel.Controls.Add(
-                new Label
-                {
-                    Text = "Pierce Diameter:",
-                    Location = new Point(12, 32),
-                    AutoSize = true,
-                }
-            );
+            nudPierceDiameter = CreateNumeric(0, 0.0625);
+            AddRow(pierceGrid, "Pierce zone diameter:", nudPierceDiameter, 0, "0 = off");
+            toolTip.SetToolTip(nudPierceDiameter,
+                "Diameter of the crater a pierce blows through the plate. Each pierce keeps half of it from all part material.");
+            layout.Controls.Add(pierceGrid);
 
-            nudPierceDiameter = CreateNumeric(130, 29, 0, 0.0625);
+            nudPierceClearance.ValueChanged += (s, e) => OnParametersChanged();
             nudPierceDiameter.ValueChanged += (s, e) => OnParametersChanged();
-            piercePanel.ContentPanel.Controls.Add(nudPierceDiameter);
 
-            chkRoundLeadInAngles = new CheckBox
-            {
-                Text = "Round Lead-In Angles",
-                Location = new Point(12, 58),
-                AutoSize = true,
-            };
-            chkRoundLeadInAngles.CheckedChanged += (s, e) =>
-            {
-                nudLeadInAngleIncrement.Enabled = chkRoundLeadInAngles.Checked;
-                OnParametersChanged();
-            };
-            piercePanel.ContentPanel.Controls.Add(chkRoundLeadInAngles);
+            Controls.Add(layout);
 
-            piercePanel.ContentPanel.Controls.Add(
-                new Label
-                {
-                    Text = "Increment:",
-                    Location = new Point(175, 60),
-                    AutoSize = true,
-                }
-            );
-
-            nudLeadInAngleIncrement = CreateNumeric(245, 57, 5, 1);
-            nudLeadInAngleIncrement.DecimalPlaces = 0;
-            nudLeadInAngleIncrement.Minimum = 1;
-            nudLeadInAngleIncrement.Maximum = 90;
-            nudLeadInAngleIncrement.Enabled = false;
-            nudLeadInAngleIncrement.ValueChanged += (s, e) => OnParametersChanged();
-            piercePanel.ContentPanel.Controls.Add(nudLeadInAngleIncrement);
-
-            // Add in reverse order — Dock.Top stacks top-down
-            Controls.Add(piercePanel);
-            Controls.Add(tabsPanel);
-            Controls.Add(tabWrapper);
-
-            // Wire up change events
             PopulateDropdowns();
+            FitLeadTabs(externalContent);
             WireChangeEvents();
+        }
+
+        public override Size GetPreferredSize(Size proposedSize) => layout.GetPreferredSize(proposedSize);
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                toolTip.Dispose();
+            base.Dispose(disposing);
         }
 
         public CuttingParameters BuildParameters()
@@ -311,14 +305,15 @@ namespace OpenNest.Controls
             rbSupportTab.Checked = p.SupportTabs;
             rbTabAll.Checked = !p.SupportTabs;
             if (p.TabConfig != null)
-                nudTabWidth.Value = (decimal)p.TabConfig.Size;
+                nudTabWidth.Value = Clamp(nudTabWidth, p.TabConfig.Size);
             nudNoBedTabMin.Value = Clamp(nudNoBedTabMin, p.NoBedTabMinWidth);
             nudNoBedTabMax.Value = Clamp(nudNoBedTabMax, p.NoBedTabMaxWidth);
+            tabOptions.Enabled = chkTabsEnabled.Checked;
             UpdateNoBedRange();
-            nudPierceClearance.Value = (decimal)p.PierceClearance;
-            nudPierceDiameter.Value = (decimal)p.PierceDiameter;
+            nudPierceClearance.Value = Clamp(nudPierceClearance, p.PierceClearance);
+            nudPierceDiameter.Value = Clamp(nudPierceDiameter, p.PierceDiameter);
             chkRoundLeadInAngles.Checked = p.RoundLeadInAngles;
-            nudLeadInAngleIncrement.Value = (decimal)p.LeadInAngleIncrement;
+            nudLeadInAngleIncrement.Value = Clamp(nudLeadInAngleIncrement, p.LeadInAngleIncrement);
             nudLeadInAngleIncrement.Enabled = p.RoundLeadInAngles;
 
             suppressEvents = false;
@@ -326,9 +321,7 @@ namespace OpenNest.Controls
 
         private void UpdateNoBedRange()
         {
-            var enabled = chkTabsEnabled.Checked && rbSupportTab.Checked;
-            nudNoBedTabMin.Enabled = enabled;
-            nudNoBedTabMax.Enabled = enabled;
+            noBedOptions.Enabled = chkTabsEnabled.Checked && rbSupportTab.Checked;
         }
 
         private static decimal Clamp(NumericUpDown control, double value) =>
@@ -342,79 +335,69 @@ namespace OpenNest.Controls
                 ParametersChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        private static void SetupTab(
+        /// <summary>
+        /// Sizes the lead tabs for the lead-in and lead-out with the most fields, so picking a
+        /// type never clips its fields or moves the sections below.
+        /// </summary>
+        private void FitLeadTabs(Control content)
+        {
+            var tallestLeadIn = 0;
+            for (var i = 0; i < LeadInTypes.Length; i++)
+            {
+                BuildLeadInParamControls(pnlExternalLeadIn, i);
+                tallestLeadIn = System.Math.Max(tallestLeadIn, pnlExternalLeadIn.GetPreferredSize(Size.Empty).Height);
+            }
+
+            var tallestLeadOut = 0;
+            for (var i = 0; i < LeadOutTypes.Length; i++)
+            {
+                BuildLeadOutParamControls(pnlExternalLeadOut, i);
+                tallestLeadOut = System.Math.Max(tallestLeadOut, pnlExternalLeadOut.GetPreferredSize(Size.Empty).Height);
+            }
+
+            BuildLeadInParamControls(pnlExternalLeadIn, 0);
+            BuildLeadOutParamControls(pnlExternalLeadOut, 0);
+
+            var contentHeight = content.GetPreferredSize(Size.Empty).Height + tallestLeadIn + tallestLeadOut;
+            // Tab strip, page padding and borders.
+            tabControl.Height = contentHeight + Font.Height + 28;
+        }
+
+        private TableLayoutPanel SetupTab(
             TabPage tab,
             out ComboBox leadInCombo,
-            out Panel leadInPanel,
+            out TableLayoutPanel leadInPanel,
             out ComboBox leadOutCombo,
-            out Panel leadOutPanel
+            out TableLayoutPanel leadOutPanel
         )
         {
-            var grpLeadIn = new GroupBox
+            var content = new TableLayoutPanel
             {
-                Text = "Lead-In",
-                Location = new Point(4, 4),
-                Size = new Size(340, 148),
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 1,
             };
-            tab.Controls.Add(grpLeadIn);
 
-            grpLeadIn.Controls.Add(
-                new Label
-                {
-                    Text = "Type:",
-                    Location = new Point(8, 22),
-                    AutoSize = true,
-                }
-            );
+            leadInCombo = CreateCombo();
+            var leadInType = CreateGrid(0);
+            AddRow(leadInType, "Lead-in:", leadInCombo, 0, bold: true);
+            content.Controls.Add(leadInType);
 
-            leadInCombo = new ComboBox
-            {
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Location = new Point(90, 19),
-                Size = new Size(230, 24),
-            };
-            grpLeadIn.Controls.Add(leadInCombo);
+            leadInPanel = CreateGrid(FieldIndent);
+            content.Controls.Add(leadInPanel);
 
-            leadInPanel = new Panel
-            {
-                Location = new Point(8, 48),
-                Size = new Size(320, 92),
-                AutoScroll = true,
-            };
-            grpLeadIn.Controls.Add(leadInPanel);
+            leadOutCombo = CreateCombo();
+            var leadOutType = CreateGrid(0);
+            leadOutType.Margin = new Padding(0, 8, 0, 0);
+            AddRow(leadOutType, "Lead-out:", leadOutCombo, 0, bold: true);
+            content.Controls.Add(leadOutType);
 
-            var grpLeadOut = new GroupBox
-            {
-                Text = "Lead-Out",
-                Location = new Point(4, 156),
-                Size = new Size(340, 132),
-            };
-            tab.Controls.Add(grpLeadOut);
+            leadOutPanel = CreateGrid(FieldIndent);
+            content.Controls.Add(leadOutPanel);
 
-            grpLeadOut.Controls.Add(
-                new Label
-                {
-                    Text = "Type:",
-                    Location = new Point(8, 22),
-                    AutoSize = true,
-                }
-            );
-
-            leadOutCombo = new ComboBox
-            {
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Location = new Point(90, 19),
-                Size = new Size(230, 24),
-            };
-            grpLeadOut.Controls.Add(leadOutCombo);
-
-            leadOutPanel = new Panel
-            {
-                Location = new Point(8, 48),
-                Size = new Size(320, 76),
-                AutoScroll = true,
-            };
-            grpLeadOut.Controls.Add(leadOutPanel);
+            tab.Controls.Add(content);
+            return content;
         }
 
         private void PopulateDropdowns()
@@ -463,7 +446,7 @@ namespace OpenNest.Controls
             OnParametersChanged();
         }
 
-        private Panel GetLeadInPanel(ComboBox combo)
+        private TableLayoutPanel GetLeadInPanel(ComboBox combo)
         {
             if (combo == cboExternalLeadIn)
                 return pnlExternalLeadIn;
@@ -472,7 +455,7 @@ namespace OpenNest.Controls
             return null;
         }
 
-        private Panel GetLeadOutPanel(ComboBox combo)
+        private TableLayoutPanel GetLeadOutPanel(ComboBox combo)
         {
             if (combo == cboExternalLeadOut)
                 return pnlExternalLeadOut;
@@ -481,105 +464,222 @@ namespace OpenNest.Controls
             return null;
         }
 
-        private void BuildLeadInParamControls(Panel panel, int typeIndex)
+        private void BuildLeadInParamControls(TableLayoutPanel panel, int typeIndex)
         {
-            panel.Controls.Clear();
-            var y = 0;
+            ClearRows(panel);
 
             switch (typeIndex)
             {
                 case 1:
-                    AddNumericField(panel, "Length:", 0.25, ref y, "Length");
-                    AddNumericField(panel, "Approach Angle:", 90, ref y, "ApproachAngle");
+                    AddNumericField(panel, "Length:", 0.25, "Length");
+                    AddAngleField(panel, "Approach angle:", 90, "ApproachAngle");
                     break;
                 case 2:
-                    AddNumericField(panel, "Radius:", 0.25, ref y, "Radius");
+                    AddNumericField(panel, "Radius:", 0.25, "Radius");
                     // Degrees of arc: 90 is a quarter circle, 180 a half circle.
-                    AddNumericField(panel, "Sweep Angle:", ArcLeadIn.DefaultSweepAngle, ref y, "SweepAngle",
+                    AddAngleField(panel, "Sweep angle:", ArcLeadIn.DefaultSweepAngle, "SweepAngle",
                         increment: 15, minimum: 1, maximum: 180);
                     break;
                 case 3:
-                    AddNumericField(panel, "Line Length:", 0.25, ref y, "LineLength");
-                    AddNumericField(panel, "Arc Radius:", 0.125, ref y, "ArcRadius");
-                    AddNumericField(panel, "Approach Angle:", 135, ref y, "ApproachAngle");
+                    AddNumericField(panel, "Line length:", 0.25, "LineLength");
+                    AddNumericField(panel, "Arc radius:", 0.125, "ArcRadius");
+                    AddAngleField(panel, "Approach angle:", 135, "ApproachAngle");
                     break;
                 case 4:
-                    AddNumericField(panel, "Line Length:", 0.25, ref y, "LineLength");
-                    AddNumericField(panel, "Arc Radius:", 0.125, ref y, "ArcRadius");
-                    AddNumericField(panel, "Kerf:", 0.06, ref y, "Kerf");
+                    AddNumericField(panel, "Line length:", 0.25, "LineLength");
+                    AddNumericField(panel, "Arc radius:", 0.125, "ArcRadius");
+                    AddNumericField(panel, "Kerf:", 0.06, "Kerf");
                     break;
                 case 5:
-                    AddNumericField(panel, "Length 1:", 0.25, ref y, "Length1");
-                    AddNumericField(panel, "Angle 1:", 90, ref y, "Angle1");
-                    AddNumericField(panel, "Length 2:", 0.25, ref y, "Length2");
-                    AddNumericField(panel, "Angle 2:", 90, ref y, "Angle2");
+                    AddNumericField(panel, "First length:", 0.25, "Length1");
+                    AddAngleField(panel, "First angle:", 90, "Angle1");
+                    AddNumericField(panel, "Second length:", 0.25, "Length2");
+                    AddAngleField(panel, "Second angle:", 90, "Angle2");
                     break;
             }
         }
 
-        private void BuildLeadOutParamControls(Panel panel, int typeIndex)
+        private void BuildLeadOutParamControls(TableLayoutPanel panel, int typeIndex)
         {
-            panel.Controls.Clear();
-            var y = 0;
+            ClearRows(panel);
 
             switch (typeIndex)
             {
                 case 1:
-                    AddNumericField(panel, "Length:", 0.25, ref y, "Length");
-                    AddNumericField(panel, "Approach Angle:", 90, ref y, "ApproachAngle");
+                    AddNumericField(panel, "Length:", 0.25, "Length");
+                    AddAngleField(panel, "Approach angle:", 90, "ApproachAngle");
                     break;
                 case 2:
-                    AddNumericField(panel, "Radius:", 0.25, ref y, "Radius");
+                    AddNumericField(panel, "Radius:", 0.25, "Radius");
                     break;
             }
         }
 
-        private void AddNumericField(
-            Panel panel,
+        private void AddAngleField(
+            TableLayoutPanel panel,
             string label,
             double defaultValue,
-            ref int y,
+            string tag,
+            double increment = 5,
+            double minimum = 0,
+            double maximum = 360
+        ) => AddNumericField(panel, label, defaultValue, tag, increment, minimum, maximum, "°", 2);
+
+        private void AddNumericField(
+            TableLayoutPanel panel,
+            string label,
+            double defaultValue,
             string tag,
             double increment = 0.0625,
             double minimum = 0,
-            double maximum = 9999
+            double maximum = 9999,
+            string suffix = null,
+            int decimalPlaces = 4
         )
         {
-            panel.Controls.Add(
-                new Label
-                {
-                    Text = label,
-                    Location = new Point(0, y + 3),
-                    AutoSize = true,
-                }
-            );
-
-            var nud = CreateNumeric(130, y, defaultValue, increment);
+            var nud = CreateNumeric(defaultValue, increment);
             nud.Minimum = (decimal)minimum;
             nud.Maximum = (decimal)maximum;
+            nud.DecimalPlaces = decimalPlaces;
+            nud.Value = System.Math.Clamp((decimal)defaultValue, nud.Minimum, nud.Maximum);
             nud.Tag = tag;
             nud.ValueChanged += (s, e) => OnParametersChanged();
-            panel.Controls.Add(nud);
-
-            y += 30;
+            AddRow(panel, label, nud, FieldIndent, suffix);
         }
 
-        private static NumericUpDown CreateNumeric(
-            int x,
-            int y,
-            double defaultValue,
-            double increment
+        private void AddSection(string title)
+        {
+            var header = new Label
+            {
+                Text = title,
+                AutoSize = false,
+                Height = Font.Height + 10,
+                Anchor = AnchorStyles.Left | AnchorStyles.Right,
+                TextAlign = ContentAlignment.BottomLeft,
+                Font = new Font(Font, FontStyle.Bold),
+                Margin = new Padding(0, layout.Controls.Count == 0 ? 4 : 12, 0, 4),
+                Padding = new Padding(0, 0, 0, 3),
+            };
+            header.Paint += (s, e) =>
+                e.Graphics.DrawLine(SystemPens.ControlLight, 0, header.Height - 1, header.Width, header.Height - 1);
+            layout.Controls.Add(header);
+        }
+
+        /// <summary>A label / input / hint grid whose input column lines up with every other grid's.</summary>
+        private static TableLayoutPanel CreateGrid(int indent)
+        {
+            var grid = new TableLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 3,
+                Margin = new Padding(indent, 0, 0, 0),
+            };
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, LabelWidth - indent));
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            return grid;
+        }
+
+        private static void AddRow(
+            TableLayoutPanel grid,
+            string label,
+            Control input,
+            int indent,
+            string hint = null,
+            bool bold = false
         )
+        {
+            var row = NextRow(grid);
+            var text = new Label
+            {
+                Text = label,
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+                Margin = new Padding(0, 0, 4, 0),
+            };
+            if (bold)
+                text.Font = new Font(text.Font, FontStyle.Bold);
+            grid.Controls.Add(text, 0, row);
+
+            input.Anchor = AnchorStyles.Left;
+            input.Margin = new Padding(0, 2, 0, 2);
+            grid.Controls.Add(input, 1, row);
+
+            if (hint != null)
+                grid.Controls.Add(CreateHint(hint, new Padding(4, 0, 0, 0)), 2, row);
+        }
+
+        private static void AddSpanningRow(TableLayoutPanel grid, Control control)
+        {
+            var row = NextRow(grid);
+            grid.Controls.Add(control, 0, row);
+            grid.SetColumnSpan(control, grid.ColumnCount);
+        }
+
+        private static int NextRow(TableLayoutPanel grid)
+        {
+            var row = grid.RowCount;
+            grid.RowCount = row + 1;
+            grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            return row;
+        }
+
+        private static void ClearRows(TableLayoutPanel grid)
+        {
+            grid.SuspendLayout();
+            while (grid.Controls.Count > 0)
+                grid.Controls[0].Dispose();
+            grid.RowStyles.Clear();
+            grid.RowCount = 0;
+            grid.ResumeLayout();
+        }
+
+        private static FlowLayoutPanel CreateInline(params Control[] controls)
+        {
+            var flow = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = false,
+                Margin = new Padding(0),
+            };
+            foreach (var control in controls)
+            {
+                control.Anchor = AnchorStyles.Left;
+                flow.Controls.Add(control);
+            }
+            return flow;
+        }
+
+        private static Label CreateHint(string text, Padding? margin = null) =>
+            new Label
+            {
+                Text = text,
+                AutoSize = true,
+                ForeColor = HintColor,
+                Anchor = AnchorStyles.Left,
+                Margin = margin ?? new Padding(2, 0, 0, 0),
+            };
+
+        private static ComboBox CreateCombo() =>
+            new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Width = 150,
+            };
+
+        private static NumericUpDown CreateNumeric(double defaultValue, double increment)
         {
             return new NumericUpDown
             {
-                Location = new Point(x, y),
-                Size = new Size(120, 22),
+                Width = InputWidth,
                 DecimalPlaces = 4,
                 Increment = (decimal)increment,
                 Minimum = 0,
                 Maximum = 9999,
                 Value = (decimal)defaultValue,
+                TextAlign = HorizontalAlignment.Right,
             };
         }
 
@@ -698,7 +798,9 @@ namespace OpenNest.Controls
             {
                 if (c is NumericUpDown nud && (string)nud.Tag == tag)
                 {
-                    nud.Value = System.Math.Clamp((decimal)value, nud.Minimum, nud.Maximum);
+                    nud.Value = double.IsFinite(value)
+                        ? System.Math.Clamp((decimal)value, nud.Minimum, nud.Maximum)
+                        : nud.Minimum;
                     return;
                 }
             }
