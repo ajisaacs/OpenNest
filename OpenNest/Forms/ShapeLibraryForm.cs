@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
@@ -18,6 +20,18 @@ namespace OpenNest.Forms
             RegexOptions.None,
             TimeSpan.FromMilliseconds(100)
         );
+
+        private const int ThumbnailSize = 96;
+        private const int TileWidth = 124;
+        private const int TileHeight = 136;
+        private const int TileColumns = 3;
+        private const int LVM_SETICONSPACING = 0x1000 + 53;
+
+        // The fill the preview gives a drawing without a color, so tiles match it.
+        private static readonly Color ThumbnailFill = Color.FromArgb(130, 204, 130);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
@@ -40,18 +54,26 @@ namespace OpenNest.Forms
                     : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             InitializeComponent();
-            Load += (_, _) => DialogBounds.FitToOwnerScreen(this);
+            Load += (_, _) =>
+            {
+                DialogBounds.FitToOwnerScreen(this);
+                FitShapeGrid();
+            };
             DiscoverShapes();
             PopulateShapeList();
 
-            shapeListBox.DrawItem += ShapeListBox_DrawItem;
-            shapeListBox.SelectedIndexChanged += ShapeListBox_SelectedIndexChanged;
+            shapeListView.SelectedIndexChanged += ShapeListView_SelectedIndexChanged;
             configComboBox.SelectedIndexChanged += ConfigComboBox_SelectedIndexChanged;
             addButton.Click += AddButton_Click;
             closeButton.Click += (s, e) => Close();
 
-            if (shapeListBox.Items.Count > 0)
-                shapeListBox.SelectedIndex = 0;
+            if (shapeListView.Items.Count > 0)
+            {
+                shapeListView.Items[0].Selected = true;
+                shapeListView.Items[0].Focused = true;
+                // The list raises selection events only once its window exists.
+                ShowShape((ShapeEntry)shapeListView.Items[0].Tag);
+            }
         }
 
         public List<Drawing> GetDrawings() => addedDrawings;
@@ -97,43 +119,95 @@ namespace OpenNest.Forms
 
         private void PopulateShapeList()
         {
+            var images = new ImageList
+            {
+                ColorDepth = ColorDepth.Depth32Bit,
+                ImageSize = new Size(ThumbnailSize, ThumbnailSize),
+            };
+            shapeListView.LargeImageList = images;
+            shapeListView.HandleCreated += (_, _) => ApplyTileSpacing();
+            Disposed += (_, _) => images.Dispose();
+
             foreach (var entry in shapeEntries)
-                shapeListBox.Items.Add(entry);
+            {
+                images.Images.Add(CreateThumbnail(entry));
+
+                var text = entry.DisplayName;
+                if (entry.HasConfigurations)
+                    text += $" ({entry.Configurations.Count})";
+
+                shapeListView.Items.Add(
+                    new ListViewItem(text, images.Images.Count - 1) { Tag = entry }
+                );
+            }
         }
 
-        private void ShapeListBox_DrawItem(object sender, DrawItemEventArgs e)
+        private static Image CreateThumbnail(ShapeEntry entry)
         {
-            if (e.Index < 0)
-                return;
+            var thumbnail = new Bitmap(ThumbnailSize, ThumbnailSize);
 
-            e.DrawBackground();
-
-            var entry = (ShapeEntry)shapeListBox.Items[e.Index];
-            var textColor =
-                (e.State & DrawItemState.Selected) != 0
-                    ? SystemColors.HighlightText
-                    : SystemColors.ControlText;
-
-            var text = entry.DisplayName;
-            if (entry.HasConfigurations)
-                text += $"  ({entry.Configurations.Count})";
-
-            using (var brush = new SolidBrush(textColor))
+            try
             {
-                var format = new StringFormat { LineAlignment = StringAlignment.Center };
-                var rect = new RectangleF(8, e.Bounds.Y, e.Bounds.Width - 8, e.Bounds.Height);
-                e.Graphics.DrawString(text, e.Font, brush, rect, format);
+                var shape = entry.HasConfigurations
+                    ? entry.Configurations[0]
+                    : (ShapeDefinition)Activator.CreateInstance(entry.ShapeType);
+                if (!entry.HasConfigurations)
+                    shape.SetPreviewDefaults();
+
+                var program = shape.GetDrawing()?.Program;
+                if (program == null)
+                    return thumbnail;
+
+                // GetImage draws without antialiasing; render at twice the size and
+                // downsample so curved edges stay smooth at thumbnail scale.
+                var renderSize = new Size(ThumbnailSize * 2, ThumbnailSize * 2);
+                using var brush = new SolidBrush(ThumbnailFill);
+                using var pen = new Pen(ColorScheme.Default.GetPartOutlineColor(ThumbnailFill), 2f);
+                using var large = program.GetImage(renderSize, pen, brush);
+                using var graphics = Graphics.FromImage(thumbnail);
+                graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                graphics.DrawImage(large, 0, 0, ThumbnailSize, ThumbnailSize);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning(
+                    $"Shape thumbnail for '{entry.DisplayName}' failed: {ex.Message}"
+                );
             }
 
-            e.DrawFocusRectangle();
+            return thumbnail;
         }
 
-        private void ShapeListBox_SelectedIndexChanged(object sender, EventArgs e)
+        private void ApplyTileSpacing()
         {
-            if (shapeListBox.SelectedIndex < 0)
+            var spacing = (TileHeight << 16) | TileWidth;
+            SendMessage(shapeListView.Handle, LVM_SETICONSPACING, IntPtr.Zero, (IntPtr)spacing);
+        }
+
+        private void FitShapeGrid()
+        {
+            var width = TileWidth * TileColumns + SystemInformation.VerticalScrollBarWidth + 8;
+            splitContainer.SplitterDistance = System.Math.Min(
+                width,
+                splitContainer.Width - splitContainer.Panel2MinSize - splitContainer.SplitterWidth
+            );
+        }
+
+        private void ShapeListView_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            // Changing selection raises a deselect first; keep the current shape until the new one arrives.
+            if (shapeListView.SelectedItems.Count == 0)
                 return;
 
-            selectedEntry = (ShapeEntry)shapeListBox.SelectedItem;
+            var entry = (ShapeEntry)shapeListView.SelectedItems[0].Tag;
+            if (entry != selectedEntry)
+                ShowShape(entry);
+        }
+
+        private void ShowShape(ShapeEntry entry)
+        {
+            selectedEntry = entry;
             suppressPreview = true;
 
             var hasConfigs = selectedEntry.HasConfigurations;

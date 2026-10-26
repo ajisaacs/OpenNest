@@ -51,9 +51,7 @@ public class ShapeLibraryFormTests
     public void InvalidShapeInputClearsOldPreviewAndBlocksAddUntilCorrected() => ArchUnitsTests.RunSta(() =>
     {
         using var form = new ShapeLibraryForm();
-        var list = Find<ListBox>(form, "shapeListBox");
-        list.SelectedItem = list.Items.Cast<object>().Single(entry =>
-            (Type)entry.GetType().GetProperty("ShapeType")!.GetValue(entry)! == typeof(RectangleShape));
+        SelectShape(form, typeof(RectangleShape));
         var preview = Find<ShapePreviewControl>(form, "previewBox");
         var add = Find<Button>(form, "addButton");
         var input = Find<Panel>(form, "parametersPanel").Controls.OfType<TextBox>().First();
@@ -75,6 +73,55 @@ public class ShapeLibraryFormTests
         InvokeAdd(form);
         Assert.Single(form.GetDrawings());
     });
+
+    [Fact]
+    public void ShapeGridShowsAThumbnailForEveryShape() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        var grid = Find<ListView>(form, "shapeListView");
+        var shapeCount = typeof(ShapeDefinition).Assembly.GetTypes()
+            .Count(t => t.IsClass && !t.IsAbstract && typeof(ShapeDefinition).IsAssignableFrom(t));
+
+        Assert.Equal(shapeCount, grid.Items.Count);
+        Assert.Equal(shapeCount, grid.LargeImageList!.Images.Count);
+        foreach (ListViewItem item in grid.Items)
+        {
+            using var thumbnail = (Bitmap)grid.LargeImageList.Images[item.ImageIndex];
+            Assert.True(HasInk(thumbnail), $"'{item.Text}' has a blank thumbnail");
+        }
+    });
+
+    [Fact]
+    public void SelectingATileShowsThatShape() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        var name = Find<TextBox>(form, "nameTextBox");
+
+        SelectShape(form, typeof(CircleShape));
+        var circleName = name.Text;
+        SelectShape(form, typeof(RectangleShape));
+
+        Assert.NotEqual(circleName, name.Text);
+        Assert.NotEmpty(Find<ShapePreviewControl>(form, "previewBox").Plate.Parts);
+    });
+
+    private static void SelectShape(ShapeLibraryForm form, Type shapeType)
+    {
+        var grid = Find<ListView>(form, "shapeListView");
+        // Selection events come from the native list, so it needs a window.
+        _ = grid.Handle;
+        grid.Items.Cast<ListViewItem>().Single(item =>
+            (Type)item.Tag!.GetType().GetProperty("ShapeType")!.GetValue(item.Tag)! == shapeType).Selected = true;
+    }
+
+    private static bool HasInk(Bitmap bitmap)
+    {
+        for (var x = 0; x < bitmap.Width; x += 4)
+            for (var y = 0; y < bitmap.Height; y += 4)
+                if (bitmap.GetPixel(x, y).A > 0)
+                    return true;
+        return false;
+    }
 
     private static T Find<T>(Control form, string name) where T : Control =>
         Assert.IsType<T>(form.Controls.Find(name, true).Single());

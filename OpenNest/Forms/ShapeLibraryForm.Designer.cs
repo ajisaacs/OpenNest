@@ -23,7 +23,7 @@ namespace OpenNest.Forms
             Collections.ObservableList<CutOff> observableList_11 = new Collections.ObservableList<CutOff>();
             Collections.ObservableList<Part> observableList_12 = new Collections.ObservableList<Part>();
             splitContainer = new System.Windows.Forms.SplitContainer();
-            shapeListBox = new System.Windows.Forms.ListBox();
+            shapeListView = new System.Windows.Forms.ListView();
             layoutTable = new System.Windows.Forms.TableLayoutPanel();
             fieldsTable = new System.Windows.Forms.TableLayoutPanel();
             nameLabel = new System.Windows.Forms.Label();
@@ -58,7 +58,7 @@ namespace OpenNest.Forms
             // 
             // splitContainer.Panel1
             // 
-            splitContainer.Panel1.Controls.Add(shapeListBox);
+            splitContainer.Panel1.Controls.Add(shapeListView);
             // 
             // splitContainer.Panel2
             // 
@@ -67,18 +67,17 @@ namespace OpenNest.Forms
             splitContainer.SplitterDistance = 150;
             splitContainer.TabIndex = 0;
             // 
-            // shapeListBox
+            // shapeListView
             // 
-            shapeListBox.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            shapeListBox.Dock = System.Windows.Forms.DockStyle.Fill;
-            shapeListBox.DrawMode = System.Windows.Forms.DrawMode.OwnerDrawFixed;
-            shapeListBox.Font = new System.Drawing.Font("Segoe UI", 10F);
-            shapeListBox.IntegralHeight = false;
-            shapeListBox.ItemHeight = 32;
-            shapeListBox.Location = new System.Drawing.Point(0, 0);
-            shapeListBox.Name = "shapeListBox";
-            shapeListBox.Size = new System.Drawing.Size(150, 520);
-            shapeListBox.TabIndex = 0;
+            shapeListView.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            shapeListView.Dock = System.Windows.Forms.DockStyle.Fill;
+            shapeListView.HideSelection = false;
+            shapeListView.Location = new System.Drawing.Point(0, 0);
+            shapeListView.MultiSelect = false;
+            shapeListView.Name = "shapeListView";
+            shapeListView.Size = new System.Drawing.Size(150, 520);
+            shapeListView.TabIndex = 0;
+            shapeListView.UseCompatibleStateImageBehavior = false;
             // 
             // layoutTable
             // 
@@ -319,7 +318,7 @@ namespace OpenNest.Forms
         #endregion
 
         private System.Windows.Forms.SplitContainer splitContainer;
-        private System.Windows.Forms.ListBox shapeListBox;
+        private System.Windows.Forms.ListView shapeListView;
         private System.Windows.Forms.TableLayoutPanel layoutTable;
         private System.Windows.Forms.TableLayoutPanel fieldsTable;
         private System.Windows.Forms.Label nameLabel;
