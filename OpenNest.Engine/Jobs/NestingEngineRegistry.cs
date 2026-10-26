@@ -32,6 +32,8 @@ public static class NestingEngineRegistry
     {
         ["Opus55NestingEngine"] = "Irregular",
         ["RectanglesNestingEngine"] = "Rectangles",
+        // Retired: Default chooses stock at least as well on every benchmark job.
+        ["StockLadder"] = "Default",
     };
 
     static NestingEngineRegistry()
@@ -65,12 +67,6 @@ public static class NestingEngineRegistry
             "FlatBar",
             "Flat bar: parts cut in one row along each bar with the saw cut-list packer",
             () => new FlatBarNestingEngine()
-        );
-
-        Register(
-            "StockLadder",
-            "Caller-stock constrained-first fill and equivalent-demand area repacking",
-            () => new StockLadderNestingEngine()
         );
 
         Register(

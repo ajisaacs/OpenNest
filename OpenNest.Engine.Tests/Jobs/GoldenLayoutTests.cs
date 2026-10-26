@@ -1,6 +1,8 @@
 using System.Globalization;
 using OpenNest.CNC;
 using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
 using Xunit;
 
@@ -293,13 +295,18 @@ public class GoldenLayoutTests
 
     /// <summary>
     /// OrderedPlateNester has no legacy counterpart, so it is pinned with plain deterministic
-    /// poses (via its production wiring: StockLadderNestingEngine's default nester) instead of
-    /// a legacy-parity comparison.
+    /// poses instead of a legacy-parity comparison. Parts are requested largest first.
     /// </summary>
     [Fact]
-    public void OrderedViaStockLadder_MixedJob_GoldenLayout()
+    public void Ordered_MixedJob_GoldenLayout()
     {
-        var result = SolveStable(new StockLadderNestingEngine(), MixedJob("Fill"));
+        var mixed = MixedJob("Fill");
+        var job = new NestJob(
+            mixed.Parts.OrderByDescending(p => DrawingJobMapper.CreateDrawing(p).Area),
+            mixed.Plates,
+            mixed.Options
+        );
+        var result = SolveStable(new NestJobRunner(_ => new OrderedPlateNester()), job);
         Assert.Equal(NestJobStatus.Complete, result.Status);
         AssertGolden(
             result,
@@ -369,38 +376,6 @@ public class GoldenLayoutTests
             else
                 legacyPhases.Add(value.LegacyProgress.Phase.ToString());
         }
-    }
-
-    [Fact]
-    public void StockLadder_ProgressStream_GoldenSequence()
-    {
-        var stages = new List<AuthoritativeStage>();
-        var legacyPhases = new SortedSet<string>();
-        var result = new StockLadderNestingEngine().Solve(
-            ProgressJob(),
-            new StageCollector(stages, legacyPhases)
-        );
-
-        Assert.Equal(NestJobStatus.Complete, result.Status);
-        Assert.Equal(
-            new[]
-            {
-                new AuthoritativeStage(NestJobStage.EvaluatingCandidate, "small", 0, 0),
-                new AuthoritativeStage(NestJobStage.EvaluatingCandidate, "large", 0, 0),
-                new AuthoritativeStage(NestJobStage.EvaluatingCandidate, "small", 0, 0),
-                new AuthoritativeStage(NestJobStage.EvaluatingCandidate, "large", 0, 0),
-                new AuthoritativeStage(NestJobStage.EvaluatingCandidate, "small", 0, 0),
-                new AuthoritativeStage(NestJobStage.EvaluatingCandidate, "large", 0, 0),
-                new AuthoritativeStage(NestJobStage.PlateCommitted, "small", 1, 4),
-                new AuthoritativeStage(NestJobStage.EvaluatingCandidate, "small", 1, 4),
-                new AuthoritativeStage(NestJobStage.EvaluatingCandidate, "large", 1, 4),
-                new AuthoritativeStage(NestJobStage.PlateCommitted, "small", 2, 9),
-                new AuthoritativeStage(NestJobStage.EvaluatingCandidate, "small", 2, 9),
-            },
-            stages
-        );
-        // StockLadder evaluates its nester without a progress sink.
-        Assert.Empty(legacyPhases);
     }
 
     [Fact]

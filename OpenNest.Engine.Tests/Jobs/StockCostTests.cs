@@ -7,7 +7,7 @@ public class StockCostTests
 {
     public static IEnumerable<object[]> Engines()
     {
-        foreach (var engine in new[] { "Rectangles", "Irregular", "StockLadder", "Default", "Fill", "Strip", "Vertical Remnant", "Horizontal Remnant" })
+        foreach (var engine in new[] { "Rectangles", "Irregular", "Default", "Fill", "Strip", "Vertical Remnant", "Horizontal Remnant" })
             foreach (var factor in new[] { 1e-12, 1.0, 100.0 })
                 yield return new object[] { engine, factor };
     }
@@ -91,7 +91,6 @@ public class StockCostTests
     [Theory]
     [InlineData("Rectangles")]
     [InlineData("Irregular")]
-    [InlineData("StockLadder")]
     [InlineData("Default")]
     [InlineData("Fill")]
     public void SameSizeStockRetainsIndependentFiniteInventory(string engine)

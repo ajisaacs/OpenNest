@@ -35,9 +35,6 @@ public class NestJobCostTests
         Assert.Equal(expected, LegacyNestJobCost.EstimateNetArea(job, sheet));
         Assert.Equal(expected, NestJobCost.NetSheetArea(job, sheet));
         Assert.Equal(expected, NestJobCost.NetSheetArea(job.Options, stock, new Box(x, y, width, height)));
-#pragma warning disable CS0618 // Compatibility API must retain the old result.
-        Assert.Equal(expected, StockLadderNestingEngine.EstimateNetArea(job, sheet));
-#pragma warning restore CS0618
     }
 
     [Theory]
@@ -68,7 +65,7 @@ public class NestJobCostTests
     [InlineData(0.5, 7, 100)]
     [InlineData(0.5, 6, 70)]
     [InlineData(0.5, 5, 70)]
-    public void StockLadderFixtureRetainsThresholds(double rate, double minimum, double expected)
+    public void NetSheetAreaRetainsLegacyThresholds(double rate, double minimum, double expected)
     {
         var part = new NestJobPart("part", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(4, 4)), 1);
         var stock = new NestPlateStock("sheet", new Size(10, 10));

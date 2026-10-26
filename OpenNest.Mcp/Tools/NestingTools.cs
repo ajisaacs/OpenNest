@@ -34,7 +34,6 @@ namespace OpenNest.Mcp.Tools
             + "Fill: many copies of few drawings; lattice fill with pairs and rectangle best-fit. "
             + "Strip: Fill variant laying mixed drawings in strips. "
             + "Vertical Remnant, Horizontal Remnant: Fill variants keeping a right-side or top-side drop. "
-            + "StockLadder: constrained parts first, then area repacking; meant for several stock sizes. "
             + "Plug-ins loaded from Engines/ use their class name.";
 
         public NestingTools(NestSession session)

@@ -16,7 +16,6 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
 | Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
-| StockLadder | Caller-supplied stock ladders | Constrained-first fill with equivalent-demand area repacking |
 | Fill, Strip, Vertical Remnant, Horizontal Remnant | Single-strategy fills | The fixed placement strategies behind interactive fill; Fill is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder) |
 
 Neither Irregular nor Rectangles wins every job, even within its own lane, so Default runs both
@@ -48,7 +47,7 @@ progress sink.
   plans is offered the same way. When the chosen result is not the last plan reported (a
   candidate's plan can outscore every returned result), Default reports it last.
 
-Plug-ins may report plans the same way; FlatBar, StockLadder and the fixed-strategy engines do not.
+Plug-ins may report plans the same way; FlatBar and the fixed-strategy engines do not.
 
 Interactive Fill shows its rectangle best-fit (box packing) layout before the best-fit pair
 phase, whose first computation for a drawing can take a minute, so **Accept** is available at
@@ -368,11 +367,16 @@ desktop selections, scripts and API requests keep working:
 |---|---|
 | `Opus55NestingEngine` | Irregular |
 | `RectanglesNestingEngine` | Rectangles |
+| `StockLadder` | Default |
 
 In v0.3.0 and earlier, `Default` was the multi-phase fill engine now named Fill. `Default` now names the
 choosing engine above, so saved selections, scripts and API requests that name it get that
 engine. Fill-strategy calls (interactive fill, `PlateFillService`, console fill without
 `--autonest`, MCP fill tools) still read `Default` as Fill.
+
+StockLadder, a greedy constrained-first engine kept out of the desktop list, was retired
+because Default matched or beat it on every benchmark job, with and without salvage credit and
+mixed sheet sizes. Every whole-job engine chooses among the offered stock sizes.
 
 Gpt6Astra and Qwen38FlashNext are no longer shipped and have no alias. A saved selection of either
 falls back to the default engine with the usual status-bar warning.
@@ -403,14 +407,12 @@ Leftover Gpt6Astra or Qwen38FlashNext DLLs still load as ordinary plug-ins until
 
 `NestPlateStock.Cost` is nullable, immutable and per physical sheet. Every available
 stock must have a finite positive cost, or all must omit it. Omitted costs preserve
-area scoring. The original constructor and area-valued `NetSheetArea` and obsolete
-`EstimateNetArea` APIs retain their units. `NetSheetCost` applies proportional salvage
+area scoring. The original constructor and area-valued `NetSheetArea` retain their units. `NetSheetCost` applies proportional salvage
 to explicit costs; geometric area still controls fit, utilization and material ordering.
 
 Rectangles uses net cost in sheet trials and remaining-material estimates. Irregular
 uses it in look-ahead, strategy comparison and equivalent-demand tail replacement.
-StockLadder ranks net cost per placed material area and uses total net cost for
-consolidation. Default compares valid equally fulfilled results by generic job score.
+Default compares valid equally fulfilled results by generic job score.
 Fixed Fill/Strip/remnant strategies rank priority fulfillment first, then net cost
 for priced stock (gross area for legacy unpriced stock), then existing stable ties.
 None guarantees globally optimal purchasing or explores every combination of patterns.

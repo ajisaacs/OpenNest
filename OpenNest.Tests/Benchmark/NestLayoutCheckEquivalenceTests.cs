@@ -9,7 +9,6 @@ namespace OpenNest.Tests.Benchmark;
 public class NestLayoutCheckEquivalenceTests
 {
     [Theory]
-    [InlineData("StockLadder")]
     [InlineData("Fill")]
     [InlineData("Strip")]
     [InlineData("Vertical Remnant")]

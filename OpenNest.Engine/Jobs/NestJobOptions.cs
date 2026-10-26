@@ -25,7 +25,7 @@ public sealed class NestJobOptions
         MinimumSalvageDimension = minimumSalvageDimension;
     }
 
-    /// <summary>Fraction of eligible edge-offcut area credited by StockLadder (0..1).</summary>
+    /// <summary>Fraction of eligible edge-offcut area credited by <see cref="NestJobCost.NetSheetCost"/> (0..1).</summary>
     public double SalvageRate { get; }
 
     /// <summary>Both offcut dimensions must meet this caller-supplied minimum in job units.

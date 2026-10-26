@@ -13,14 +13,11 @@ namespace OpenNest.Forms
     /// App-scoped nesting-engine selection. The selected name addresses a whole-job
     /// INestingEngine resolved through NestingEngineRegistry at call time; single-plate
     /// interactive fill uses FillStrategy, which maps a built-in engine to its placement
-    /// strategy and falls back to Fill for jobs-only engines (StockLadder, plug-ins).
+    /// strategy and falls back to Fill for jobs-only engines and plug-ins.
     /// </summary>
     public static class EngineSelection
     {
         public const string DefaultEngineName = EngineSelectionSettings.DefaultEngineName;
-
-        /// <summary>Registered jobs engine deliberately kept out of the desktop combo.</summary>
-        public const string HiddenEngineName = "StockLadder";
 
         private static string engineName = DefaultEngineName;
 
@@ -59,12 +56,9 @@ namespace OpenNest.Forms
             return statusMessage ?? string.Empty;
         }
 
-        /// <summary>Desktop combo contents: registered jobs engines minus StockLadder.</summary>
+        /// <summary>Desktop combo contents: every registered jobs engine.</summary>
         public static IEnumerable<string> UiEngineNames =>
-            NestingEngineRegistry.AvailableEngines
-                .Where(e => !e.Name.Equals(HiddenEngineName, StringComparison.OrdinalIgnoreCase))
-                .Select(e => e.Name)
-                .ToList();
+            NestingEngineRegistry.AvailableEngines.Select(e => e.Name).ToList();
 
         /// <summary>Placement strategy for single-plate fill: the selection when it names a
         /// built-in strategy, otherwise Fill.</summary>
