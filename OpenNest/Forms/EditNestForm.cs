@@ -776,19 +776,19 @@ namespace OpenNest.Forms
 
         public void RotateCw()
         {
-            PlateView.Plate.Rotate90(RotationType.CW);
+            RecordChange("Rotate Plate", () => PlateView.Plate.Rotate90(RotationType.CW));
             PlateView.ZoomToFit();
         }
 
         public void RotateCcw()
         {
-            PlateView.Plate.Rotate90(RotationType.CCW);
+            RecordChange("Rotate Plate", () => PlateView.Plate.Rotate90(RotationType.CCW));
             PlateView.ZoomToFit();
         }
 
         public void Rotate180()
         {
-            PlateView.Plate.Rotate180();
+            RecordChange("Rotate Plate", () => PlateView.Plate.Rotate180());
             PlateView.ZoomToFit();
         }
 
@@ -881,7 +881,7 @@ namespace OpenNest.Forms
             {
                 SnapIncrement = Settings.Default.AutoSizePlateFactor,
             };
-            PlateView.Plate.SnapToStandardSize(options);
+            RecordChange("Resize Plate", () => PlateView.Plate.SnapToStandardSize(options));
             PlateView.ZoomToPlate();
             PlateView.Refresh();
             UpdatePlateList();
@@ -942,28 +942,33 @@ namespace OpenNest.Forms
             PlateView.Invalidate();
         }
 
-        public void SetCurrentPlateAsNestDefault()
-        {
-            PlateManager.ChangePlateDefaults(() => Nest.PlateDefaults.SetFromExisting(PlateView.Plate));
-        }
+        // The defaults are saved with the nest and the trailing empty plate follows them.
+        public void SetCurrentPlateAsNestDefault() =>
+            RecordChange("Set Nest Default Plate",
+                () => PlateManager.ChangePlateDefaults(() => Nest.PlateDefaults.SetFromExisting(PlateView.Plate)));
 
         public void EditPlate()
         {
-            var form = new EditPlateForm(PlateView.Plate);
+            // The dialog writes the plate when OK is clicked, so the scope spans it.
+            using var change = BeginChange("Edit Plate");
+            using var form = new EditPlateForm(PlateView.Plate);
             form.Units = Nest.Units;
 
             if (form.ShowDialog() == DialogResult.OK)
             {
+                change.MarkChanged();
                 PlateView.Invalidate();
                 FirePlateChanged(false);
                 UpdatePlateList();
+
+                // An empty plate's new settings become the nest's defaults.
+                if (PlateView.Plate.Parts.Count == 0)
+                    PlateManager.ChangePlateDefaults(() => Nest.PlateDefaults.SetFromExisting(PlateView.Plate));
             }
 
             Nest.UpdateDrawingQuantities();
             drawingListBox1.Refresh();
-
-            if (PlateView.Plate.Parts.Count == 0)
-                PlateManager.ChangePlateDefaults(() => Nest.PlateDefaults.SetFromExisting(PlateView.Plate));
+            change.Complete();
         }
 
         /// <summary>

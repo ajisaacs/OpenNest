@@ -52,6 +52,38 @@ internal sealed record UndoTestEnv(MainForm Host, EditNestForm Editor)
         Assert.Equal(after, Describe(Nest));
     }
 
+    /// <summary>
+    /// Once a <typeparamref name="TForm"/> dialog is shown, runs <paramref name="setup"/> on it
+    /// and clicks its accept button (or sets OK), so a command that shows it modally goes on.
+    /// </summary>
+    public static void AcceptWhenShown<TForm>(Action<TForm>? setup = null) where TForm : Form =>
+        WhenShown<TForm>(form =>
+        {
+            setup?.Invoke(form);
+            if (form.AcceptButton is { } accept)
+                accept.PerformClick();
+            else
+                form.DialogResult = DialogResult.OK;
+        });
+
+    /// <summary>Runs <paramref name="act"/> on the first visible <typeparamref name="TForm"/>.</summary>
+    public static void WhenShown<TForm>(Action<TForm> act) where TForm : Form
+    {
+        var timer = new System.Windows.Forms.Timer { Interval = 10 };
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        timer.Tick += (_, _) =>
+        {
+            var form = Application.OpenForms.OfType<TForm>().FirstOrDefault(f => f.Visible);
+            if (form == null && DateTime.UtcNow < deadline)
+                return;
+            timer.Stop();
+            timer.Dispose();
+            if (form != null)
+                act(form);
+        };
+        timer.Start();
+    }
+
     public static Nest BuildNest()
     {
         var nest = new Nest("undo");

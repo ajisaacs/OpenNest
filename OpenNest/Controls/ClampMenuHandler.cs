@@ -83,7 +83,12 @@ namespace OpenNest.Controls
                 return;
             }
 
-            if (!plate.SetClampRemoved(id, remove))
+            using var change = view.BeginChange(remove ? "Remove Clamp" : "Put Clamp Back");
+            var changed = plate.SetClampRemoved(id, remove);
+            if (changed)
+                change.MarkChanged();
+            change.Complete();
+            if (!changed)
                 return;
 
             view.Status = remove

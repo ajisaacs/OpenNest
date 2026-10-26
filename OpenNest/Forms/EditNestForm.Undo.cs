@@ -43,6 +43,16 @@ namespace OpenNest.Forms
             return openChange;
         }
 
+        /// <summary>Runs <paramref name="edit"/>, which changes the nest, as one undoable step.</summary>
+        public void RecordChange(string label, System.Action edit)
+        {
+            ArgumentNullException.ThrowIfNull(edit);
+            using var change = BeginChange(label);
+            change.MarkChanged();
+            edit();
+            change.Complete();
+        }
+
         /// <summary>Whether <see cref="Undo"/> would step back: no edit or inspection is open.</summary>
         public bool CanUndo => History.CanUndo && CanRestore;
 

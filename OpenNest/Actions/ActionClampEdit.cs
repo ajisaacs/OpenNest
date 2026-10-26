@@ -404,7 +404,7 @@ namespace OpenNest.Actions
         {
             if (Clamps.Contains(clamp))
                 return;
-            if (Commit(Clamps.Append(clamp), $"Added a clamp on {ClampEdgeText.Phrase(clamp.Edge)} at {Format(Measure(clamp.Center))}"))
+            if (Commit("Add Clamp", Clamps.Append(clamp), $"Added a clamp on {ClampEdgeText.Phrase(clamp.Edge)} at {Format(Measure(clamp.Center))}"))
                 selected = clamp;
         }
 
@@ -415,22 +415,23 @@ namespace OpenNest.Actions
                 plateView.Status = "A clamp is already at that position.";
                 return;
             }
-            if (Commit(Clamps.Where(c => c != from).Append(to),
+            if (Commit("Move Clamp", Clamps.Where(c => c != from).Append(to),
                 $"Moved the clamp to {Format(Measure(to.Center))} on {ClampEdgeText.Phrase(to.Edge)}"))
                 selected = to;
         }
 
         private void Delete(RailClamp clamp)
         {
-            if (Commit(Clamps.Where(c => c != clamp), $"Deleted the clamp at {Format(Measure(clamp.Center))} on {ClampEdgeText.Phrase(clamp.Edge)}"))
+            if (Commit("Delete Clamp", Clamps.Where(c => c != clamp), $"Deleted the clamp at {Format(Measure(clamp.Center))} on {ClampEdgeText.Phrase(clamp.Edge)}"))
                 selected = null;
         }
 
         /// <summary>
-        /// Makes <paramref name="clamps"/> the nest's rail (every sheet follows it). Refused
-        /// while a nest run or fill is using the clamps or a proposal is on display.
+        /// Makes <paramref name="clamps"/> the nest's rail (every sheet follows it), one undo
+        /// step named <paramref name="label"/>. Refused while a nest run or fill is using the
+        /// clamps or a proposal is on display.
         /// </summary>
-        private bool Commit(IEnumerable<RailClamp> clamps, string status)
+        private bool Commit(string label, IEnumerable<RailClamp> clamps, string status)
         {
             var nest = Nest;
             if (nest == null)
@@ -464,7 +465,10 @@ namespace OpenNest.Actions
 
             // A new rail puts back every clamp a sheet had removed, as the Clamps dialog does.
             var restored = nest.Plates.Count(p => p.RemovedClamps.Count > 0);
+            using var change = plateView.BeginChange(label);
+            change.MarkChanged();
             nest.SetClampRail(rail);
+            change.Complete();
             plateView.Status = restored == 0
                 ? status
                 : $"{status}; removed clamps were put back on {restored} sheet(s)";

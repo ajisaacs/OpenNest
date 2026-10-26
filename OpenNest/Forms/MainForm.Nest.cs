@@ -143,7 +143,8 @@ namespace OpenNest.Forms
             if (form.ShowDialog(this) != DialogResult.OK)
                 return;
 
-            form.Editor.ApplyTo(nest);
+            // Saving as machine defaults inside the dialog is not a nest edit; applying is.
+            editForm.RecordChange("Clamps", () => form.Editor.ApplyTo(nest));
             foreach (var view in views)
                 view.Invalidate();
         }
@@ -172,7 +173,7 @@ namespace OpenNest.Forms
             if (form.ShowDialog(this) != DialogResult.OK)
                 return;
 
-            nest.SetSupportBed(form.Bed);
+            editForm.RecordChange("Support Grid", () => nest.SetSupportBed(form.Bed));
             foreach (var view in views)
                 view.Invalidate();
         }
