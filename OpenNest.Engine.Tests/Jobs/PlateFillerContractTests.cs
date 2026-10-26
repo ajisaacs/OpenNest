@@ -354,8 +354,8 @@ public class PlateFillerContractTests
     private static PlateFillerBase CreateFiller(string strategy, Plate plate) => strategy switch
     {
         "Fill" => new DefaultPlateFiller(plate),
-        "Vertical Remnant" => new RemnantPlateFiller(plate, RemnantFillPolicy.Vertical),
-        "Horizontal Remnant" => new RemnantPlateFiller(plate, RemnantFillPolicy.Horizontal),
+        "Vertical Remnant" => new DefaultPlateFiller(plate, PlateFillPolicy.VerticalRemnant),
+        "Horizontal Remnant" => new DefaultPlateFiller(plate, PlateFillPolicy.HorizontalRemnant),
         _ => throw new ArgumentOutOfRangeException(nameof(strategy)),
     };
 

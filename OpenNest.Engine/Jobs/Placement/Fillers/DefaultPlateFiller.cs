@@ -16,11 +16,19 @@ namespace OpenNest.Engine.Jobs.Placement.Fillers;
 internal class DefaultPlateFiller : PlateFillerBase
 {
     private readonly AngleCandidateBuilder angleBuilder = new();
+    private readonly PlateFillPolicy policy;
 
-    internal DefaultPlateFiller(Plate plate)
-        : base(plate) { }
+    internal DefaultPlateFiller(Plate plate, PlateFillPolicy policy = null)
+        : base(plate)
+    {
+        this.policy = policy ?? PlateFillPolicy.Fill;
+    }
 
-    protected override IFillComparer CreateComparer() => new DefaultFillComparer();
+    protected override IFillComparer CreateComparer() => policy.CreateComparer();
+
+    public override NestDirection? PreferredDirection => policy.PreferredDirection;
+
+    public override ShrinkAxis TrimAxis => policy.TrimAxis;
 
     internal bool ForceFullAngleSweep
     {
@@ -39,7 +47,10 @@ internal class DefaultPlateFiller : PlateFillerBase
         NestItem item,
         ClassificationResult classification,
         Box workArea
-    ) => angleBuilder.Build(item, classification, workArea);
+    ) =>
+        policy.UsesAngleBuilder
+            ? angleBuilder.Build(item, classification, workArea)
+            : policy.BuildFixedAngles(item, classification);
 
     protected override void RecordProductiveAngles(List<AngleResult> angleResults)
     {

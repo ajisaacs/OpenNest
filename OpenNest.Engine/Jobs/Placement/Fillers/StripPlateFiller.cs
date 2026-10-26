@@ -68,12 +68,12 @@ internal class StripPlateFiller : PlateFillerBase
         {
             Func<NestItem, Box, List<Part>> heightFillFunc = (item, box) =>
             {
-                var inner = new RemnantPlateFiller(Plate, RemnantFillPolicy.Horizontal);
+                var inner = new DefaultPlateFiller(Plate, PlateFillPolicy.HorizontalRemnant);
                 return inner.Fill(item, box, progress, token);
             };
             Func<NestItem, Box, List<Part>> widthFillFunc = (item, box) =>
             {
-                var inner = new RemnantPlateFiller(Plate, RemnantFillPolicy.Vertical);
+                var inner = new DefaultPlateFiller(Plate, PlateFillPolicy.VerticalRemnant);
                 return inner.Fill(item, box, progress, token);
             };
 

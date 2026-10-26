@@ -2,42 +2,23 @@ using System;
 using System.Collections.Generic;
 using OpenNest.Engine;
 using OpenNest.Engine.Fill;
-using OpenNest.Geometry;
 using OpenNest.Math;
 
 namespace OpenNest.Engine.Jobs.Placement.Fillers;
 
-internal class RemnantPlateFiller : DefaultPlateFiller
-{
-    private readonly RemnantFillPolicy policy;
-
-    internal RemnantPlateFiller(Plate plate, RemnantFillPolicy policy)
-        : base(plate)
-    {
-        this.policy = policy;
-    }
-
-    protected override IFillComparer CreateComparer() => policy.CreateComparer();
-
-    public override NestDirection? PreferredDirection => policy.PreferredDirection;
-
-    public override ShrinkAxis TrimAxis => policy.TrimAxis;
-
-    public override List<double> BuildAngles(
-        NestItem item,
-        ClassificationResult classification,
-        Box workArea
-    ) => policy.BuildAngles(item, classification);
-}
-
-internal sealed class RemnantFillPolicy
+/// <summary>
+/// Filler-only settings that distinguish Fill from the remnant fills: how candidates are ranked,
+/// the preferred direction, the axis surplus parts are trimmed from, and how angles are chosen.
+/// Strategies see only the <see cref="Strategies.FillPolicy"/> the filler builds from it.
+/// </summary>
+internal sealed class PlateFillPolicy
 {
     private readonly Func<IFillComparer> comparerFactory;
     private readonly Func<NestItem, double, double> angleExtent;
 
-    private RemnantFillPolicy(
+    private PlateFillPolicy(
         Func<IFillComparer> comparerFactory,
-        NestDirection preferredDirection,
+        NestDirection? preferredDirection,
         ShrinkAxis trimAxis,
         Func<NestItem, double, double> angleExtent
     )
@@ -48,27 +29,47 @@ internal sealed class RemnantFillPolicy
         this.angleExtent = angleExtent;
     }
 
-    internal static RemnantFillPolicy Vertical { get; } = new(
+    /// <summary>Plain fill: default ranking and the filler's learned angle candidates.</summary>
+    internal static PlateFillPolicy Fill { get; } = new(
+        () => new DefaultFillComparer(),
+        null,
+        ShrinkAxis.Width,
+        null
+    );
+
+    /// <summary>Vertical remnant: minimize X-extent, prefer horizontal placement.</summary>
+    internal static PlateFillPolicy VerticalRemnant { get; } = new(
         () => new VerticalRemnantComparer(),
         NestDirection.Horizontal,
         ShrinkAxis.Width,
         RotatedWidth
     );
 
-    internal static RemnantFillPolicy Horizontal { get; } = new(
+    /// <summary>Horizontal remnant: minimize Y-extent, prefer vertical placement.</summary>
+    internal static PlateFillPolicy HorizontalRemnant { get; } = new(
         () => new HorizontalRemnantComparer(),
         NestDirection.Vertical,
         ShrinkAxis.Length,
         RotatedHeight
     );
 
-    internal NestDirection PreferredDirection { get; }
+    internal NestDirection? PreferredDirection { get; }
 
     internal ShrinkAxis TrimAxis { get; }
 
+    /// <summary>
+    /// True when the filler's <see cref="AngleCandidateBuilder"/> chooses the angles; false when
+    /// <see cref="BuildFixedAngles"/> replaces it entirely.
+    /// </summary>
+    internal bool UsesAngleBuilder => angleExtent == null;
+
     internal IFillComparer CreateComparer() => comparerFactory();
 
-    internal List<double> BuildAngles(NestItem item, ClassificationResult classification)
+    /// <summary>
+    /// The remnant angles: the primary angle and its quarter turn, narrowest extent first. No
+    /// circle case, sweep or learned angles, and the item's rotation range is ignored.
+    /// </summary>
+    internal List<double> BuildFixedAngles(NestItem item, ClassificationResult classification)
     {
         var baseAngles = new List<double>
         {

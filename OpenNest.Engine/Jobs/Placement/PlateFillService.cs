@@ -435,8 +435,8 @@ public static class PlateFillService
         {
             "Fill" => new DefaultPlateFiller(plate),
             "Strip" => new StripPlateFiller(plate),
-            "Vertical Remnant" => new RemnantPlateFiller(plate, RemnantFillPolicy.Vertical),
-            _ => new RemnantPlateFiller(plate, RemnantFillPolicy.Horizontal),
+            "Vertical Remnant" => new DefaultPlateFiller(plate, PlateFillPolicy.VerticalRemnant),
+            _ => new DefaultPlateFiller(plate, PlateFillPolicy.HorizontalRemnant),
         };
     }
 
