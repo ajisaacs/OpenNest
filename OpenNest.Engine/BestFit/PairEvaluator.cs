@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -31,17 +30,20 @@ namespace OpenNest.Engine.BestFit
             // This avoids cloning the full program (with all cutouts) for every candidate.
             var perimeterDrawing = CreatePerimeterDrawing(candidates[0].Drawing);
 
-            var resultBag = new ConcurrentBag<BestFitResult>();
+            // Results keep candidate order: callers sort stably, so ties must not depend on
+            // which worker finished first.
+            var results = new BestFitResult[candidates.Count];
 
-            Parallel.ForEach(
-                candidates,
-                c =>
+            Parallel.For(
+                0,
+                candidates.Count,
+                i =>
                 {
-                    resultBag.Add(Evaluate(c, perimeterDrawing));
+                    results[i] = Evaluate(candidates[i], perimeterDrawing);
                 }
             );
 
-            return resultBag.ToList();
+            return results.ToList();
         }
 
         public BestFitResult Evaluate(PairCandidate candidate)

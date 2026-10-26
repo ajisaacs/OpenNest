@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -90,17 +89,20 @@ namespace OpenNest.Engine.BestFit
             PerfCounters.CountFindBestFits();
             var strategies = BuildStrategies(drawing, spacing);
 
-            var candidateBags = new ConcurrentBag<List<PairCandidate>>();
+            // Slots in strategy (angle) order, so candidates keep generation order however the
+            // workers finish: the stable area sort then breaks ties the same way on every run.
+            var candidateLists = new List<PairCandidate>[strategies.Count];
 
-            Parallel.ForEach(
-                strategies,
-                strategy =>
+            Parallel.For(
+                0,
+                strategies.Count,
+                i =>
                 {
-                    candidateBags.Add(strategy.GenerateCandidates(drawing, spacing, stepSize));
+                    candidateLists[i] = strategies[i].GenerateCandidates(drawing, spacing, stepSize);
                 }
             );
 
-            var allCandidates = candidateBags.SelectMany(c => c).ToList();
+            var allCandidates = candidateLists.SelectMany(c => c).ToList();
 
             Debug.WriteLine(
                 $"[BestFitFinder] {strategies.Count} strategies, {allCandidates.Count} candidates"

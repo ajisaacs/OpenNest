@@ -117,7 +117,8 @@ keyed by the snapshot's exact content (mode and every motion value, bit for bit)
 so a repeated or re-tuned Auto Nest of the same drawings, a fresh engine instance, another engine
 or the cutout pre-pass skips the search and offers the same pairs. Candidates depend on the program
 geometry and spacing alone, so a pooled set is the set the search would produce and placements are
-unchanged. The pool keeps the 512 most recently used sets (`BestFitCache.SharedCapacity`), outlives
+unchanged. The search runs in parallel but keeps rotation and slide-offset order through its stable
+area sort, so equal-area candidates come out in the same order on every run. The pool keeps the 512 most recently used sets (`BestFitCache.SharedCapacity`), outlives
 the private drawings (`Invalidate` releases a drawing's entry, not the pool) and is in-memory only:
 the sets saved in a `.nest` file belong to the caller's drawings and are not consulted here.
 

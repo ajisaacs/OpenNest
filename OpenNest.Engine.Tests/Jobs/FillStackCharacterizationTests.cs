@@ -388,7 +388,7 @@ public class FillStackCharacterizationTests
 
     [Theory]
     [InlineData("Fill", 26, "64CE33B01B205978")]
-    [InlineData("Strip", 26, "A66602F707290A36")]
+    [InlineData("Strip", 26, "FD03A4529D37E32C")]
     [InlineData("Vertical Remnant", 26, "BDCA1DA111B396F0")]
     [InlineData("Horizontal Remnant", 26, "C356EC216CD56627")]
     public void FixedStrategyEngine_IrregularJob_PinnedLayout(
