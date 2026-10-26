@@ -38,6 +38,10 @@ namespace OpenNest
 
         internal PointF LabelScreenPoint => _labelScreenPoint;
 
+        // The font is fixed, so an id's screen size changes only with the id.
+        private string measuredLabel;
+        private SizeF measuredLabelSize;
+
         // Paths in the drawing's program frame, before placement. A zoom or a move only maps
         // these to the screen again; rebuilding them from the program dominates for parts with
         // hundreds of holes. They are rebuilt when the program, its rotation or its lead-ins change.
@@ -144,7 +148,8 @@ namespace OpenNest
         internal void Draw(Graphics g, string id, bool muted)
         {
             Draw(g, muted);
-            DrawLabel(g, id, muted);
+            if (LabelFits(MeasureLabel(g, id)))
+                DrawLabel(g, id, muted);
         }
 
         /// <summary>
@@ -153,11 +158,38 @@ namespace OpenNest
         /// </summary>
         internal void DrawLabel(Graphics g, string id, bool muted, Brush background)
         {
-            var size = g.MeasureString(id, ProgramIdFont, PointF.Empty, LabelFormat);
-            var diameter = System.Math.Max(size.Width, size.Height) + 2;
+            var size = MeasureLabel(g, id);
+            if (!LabelFits(size))
+                return;
+            var diameter = LabelDiscDiameter(size);
             g.FillEllipse(background,
                 _labelScreenPoint.X - diameter / 2, _labelScreenPoint.Y - diameter / 2, diameter, diameter);
             DrawLabel(g, id, muted);
+        }
+
+        private SizeF MeasureLabel(Graphics g, string id)
+        {
+            if (id != measuredLabel)
+            {
+                measuredLabelSize = g.MeasureString(id, ProgramIdFont, PointF.Empty, LabelFormat);
+                measuredLabel = id;
+            }
+            return measuredLabelSize;
+        }
+
+        private static float LabelDiscDiameter(SizeF label) => System.Math.Max(label.Width, label.Height) + 2;
+
+        // As the CAD converter numbers entities: an id shows only once the zoom makes the part big
+        // enough on screen to hold it, so zoomed out, small parts do not pile their ids on each other.
+        // A cut-off segment is a line; its length must hold the id's disc.
+        private bool LabelFits(SizeF label)
+        {
+            // DisplayBounds carries a pixel of stroke width on each side.
+            var width = DisplayBounds.Width - 2;
+            var height = DisplayBounds.Height - 2;
+            return BasePart.BaseDrawing.IsCutOff
+                ? System.Math.Max(width, height) >= LabelDiscDiameter(label)
+                : width >= label.Width && height >= label.Height;
         }
 
         private void DrawLabel(Graphics g, string id, bool muted)
