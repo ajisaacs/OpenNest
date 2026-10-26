@@ -110,15 +110,54 @@ internal static class PostVerificationGeometry
         // If there are no contacts except possibly departure, all open-segment points
         // have the same inside/outside status. A midpoint catches travel entirely inside
         // and departure into the interior, without flagging start-only outward contact.
-        var midpoint = start + delta * 0.5;
+        return Inside(start + delta * 0.5, curves, token);
+    }
+
+    /// <summary>
+    /// Ray parity of <paramref name="point"/> against closed <paramref name="curves"/>, cast at
+    /// <see cref="RayY"/> so no vertex of them lies on the ray.
+    /// </summary>
+    internal static bool Inside(Vector point, IReadOnlyList<Curve> curves, CancellationToken token)
+    {
+        var rayY = RayY(point, curves, token);
         var inside = false;
         foreach (var curve in curves)
         {
             token.ThrowIfCancellationRequested();
-            if (curve.CrossesRay(midpoint))
+            if (curve.CrossesRay(point, rayY))
                 inside = !inside;
         }
         return inside;
+    }
+
+    /// <summary>
+    /// The height a parity ray from <paramref name="point"/> runs at: just above it, by about
+    /// <see cref="RaySeamTolerance"/>, and clear of every vertex height of <paramref name="curves"/>.
+    /// The two copies of a seam vertex can differ in the last bits; a ray running between them
+    /// counts one edge and not the other, so a point that happens to sit a tolerance below another
+    /// contour's vertex (text baselines a micro-inch apart) would read as inside it.
+    /// </summary>
+    internal static double RayY(Vector point, IReadOnlyList<Curve> curves, CancellationToken token)
+    {
+        const int steps = 8;
+        const double band = RaySeamTolerance / (4 * steps);
+        for (var step = 0; step < steps; step++)
+        {
+            var rayY = point.Y + RaySeamTolerance * (1 + (double)step / steps);
+            var clear = true;
+            foreach (var curve in curves)
+            {
+                token.ThrowIfCancellationRequested();
+                if (curve.HasVertexNear(rayY, band))
+                {
+                    clear = false;
+                    break;
+                }
+            }
+            if (clear)
+                return rayY;
+        }
+        return point.Y + RaySeamTolerance;
     }
 
     internal static IReadOnlyList<Vector> ContactPoints(Vector start, Vector end,
@@ -467,7 +506,20 @@ internal static class PostVerificationGeometry
             }
         }
 
-        internal bool CrossesRay(Vector point)
+        /// <summary>
+        /// Whether an endpoint, or the top or bottom of an arc's circle, lies within
+        /// <paramref name="band"/> of height <paramref name="y"/>.
+        /// </summary>
+        internal bool HasVertexNear(double y, double band) =>
+            System.Math.Abs(Start.Y - y) <= band || System.Math.Abs(End.Y - y) <= band
+            || Center is { } center && (System.Math.Abs(center.Y + Radius - y) <= band
+                || System.Math.Abs(center.Y - Radius - y) <= band);
+
+        /// <summary>
+        /// Whether a ray running in +X from <paramref name="point"/>, at height
+        /// <paramref name="rayY"/> (see <see cref="RayY"/>), crosses this curve.
+        /// </summary>
+        internal bool CrossesRay(Vector point, double rayY)
         {
             // Ray parity needs both edges meeting at a shared vertex to agree which side of the ray
             // that vertex is on. Rings are only nominally closed: capture admits closure seams and
@@ -478,7 +530,6 @@ internal static class PostVerificationGeometry
             // edges; real features (notches, tabs, arc spans) are far larger than the tolerance and
             // still count. Containment of a point that itself lies within the tolerance of a
             // boundary edge stays ambiguous by design, exactly as it was before.
-            var rayY = point.Y + RaySeamTolerance;
             if (Center is not { } center)
                 return (Start.Y > rayY) != (End.Y > rayY)
                     && Start.X + (point.Y - Start.Y) * (End.X - Start.X) / (End.Y - Start.Y) > point.X;

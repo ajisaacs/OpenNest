@@ -353,15 +353,6 @@ public sealed class LeadMaterialSnapshot
         private int Row(double y) => (int)System.Math.Clamp(System.Math.Floor((y - whole.MinY) / height), 0, rows - 1);
     }
 
-    internal static bool Inside(Vector point, IReadOnlyList<PostVerificationGeometry.Curve> ring, CancellationToken token)
-    {
-        var inside = false;
-        foreach (var curve in ring)
-        {
-            token.ThrowIfCancellationRequested();
-            if (curve.CrossesRay(point))
-                inside = !inside;
-        }
-        return inside;
-    }
+    internal static bool Inside(Vector point, IReadOnlyList<PostVerificationGeometry.Curve> ring, CancellationToken token) =>
+        PostVerificationGeometry.Inside(point, ring, token);
 }
