@@ -56,7 +56,7 @@ internal sealed record UndoTestEnv(MainForm Host, EditNestForm Editor)
     /// Once a <typeparamref name="TForm"/> dialog is shown, runs <paramref name="setup"/> on it
     /// and clicks its accept button (or sets OK), so a command that shows it modally goes on.
     /// </summary>
-    public static void AcceptWhenShown<TForm>(Action<TForm>? setup = null) where TForm : Form =>
+    public static void AcceptWhenShown<TForm>(Action<TForm>? setup = null, Func<TForm, bool>? ready = null) where TForm : Form =>
         WhenShown<TForm>(form =>
         {
             setup?.Invoke(form);
@@ -64,16 +64,19 @@ internal sealed record UndoTestEnv(MainForm Host, EditNestForm Editor)
                 accept.PerformClick();
             else
                 form.DialogResult = DialogResult.OK;
-        });
+        }, ready);
 
-    /// <summary>Runs <paramref name="act"/> on the first visible <typeparamref name="TForm"/>.</summary>
-    public static void WhenShown<TForm>(Action<TForm> act) where TForm : Form
+    /// <summary>
+    /// Runs <paramref name="act"/> on the first visible <typeparamref name="TForm"/> once
+    /// <paramref name="ready"/> (if given) holds for it.
+    /// </summary>
+    public static void WhenShown<TForm>(Action<TForm> act, Func<TForm, bool>? ready = null) where TForm : Form
     {
         var timer = new System.Windows.Forms.Timer { Interval = 10 };
         var deadline = DateTime.UtcNow.AddSeconds(20);
         timer.Tick += (_, _) =>
         {
-            var form = Application.OpenForms.OfType<TForm>().FirstOrDefault(f => f.Visible);
+            var form = Application.OpenForms.OfType<TForm>().FirstOrDefault(f => f.Visible && ready?.Invoke(f) != false);
             if (form == null && DateTime.UtcNow < deadline)
                 return;
             timer.Stop();

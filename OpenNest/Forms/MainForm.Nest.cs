@@ -24,12 +24,7 @@ namespace OpenNest.Forms
             using var form = new ShapeLibraryForm(activeForm.Nest.Drawings.Select(d => d.Name));
             form.ShowDialog(this);
 
-            var drawings = form.GetDrawings();
-            if (drawings.Count == 0)
-                return;
-
-            drawings.ForEach(d => activeForm.Nest.Drawings.Add(d));
-            activeForm.UpdateDrawingList();
+            activeForm.AddDrawings("Shape Library", form.GetDrawings());
         }
 
         private void DrawingLibrary_Click(object sender, EventArgs e)

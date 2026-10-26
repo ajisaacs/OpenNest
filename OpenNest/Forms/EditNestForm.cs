@@ -591,17 +591,32 @@ namespace OpenNest.Forms
             if (dlg.ShowDialog() != DialogResult.OK)
                 return;
 
-            var converter = new CadConverterForm();
-            converter.AddFiles(dlg.FileNames);
+            ImportFiles(dlg.FileNames);
+        }
 
-            var result = converter.ShowDialog();
+        /// <summary>Converts <paramref name="files"/> in the CAD converter and adds the drawings it returns.</summary>
+        internal void ImportFiles(string[] files)
+        {
+            using var converter = new CadConverterForm();
+            converter.AddFiles(files);
 
-            if (result != DialogResult.OK)
+            if (converter.ShowDialog() != DialogResult.OK)
                 return;
 
-            var drawings = converter.GetDrawings();
-            drawings.ForEach(d => Nest.Drawings.Add(d));
+            AddDrawings("Import Drawings", converter.GetDrawings());
+        }
 
+        /// <summary>Adds <paramref name="drawings"/> to the nest as one undoable step.</summary>
+        public void AddDrawings(string label, IReadOnlyCollection<Drawing> drawings)
+        {
+            if (drawings.Count == 0)
+                return;
+
+            RecordChange(label, () =>
+            {
+                foreach (var drawing in drawings)
+                    Nest.Drawings.Add(drawing);
+            });
             UpdateDrawingList();
         }
 
@@ -1320,15 +1335,10 @@ namespace OpenNest.Forms
 
         private void ShapeLibrary_Click(object sender, EventArgs e)
         {
-            var form = new ShapeLibraryForm(Nest.Drawings.Select(d => d.Name));
+            using var form = new ShapeLibraryForm(Nest.Drawings.Select(d => d.Name));
             form.ShowDialog();
 
-            var drawings = form.GetDrawings();
-            if (drawings.Count == 0)
-                return;
-
-            drawings.ForEach(d => Nest.Drawings.Add(d));
-            UpdateDrawingList();
+            AddDrawings("Shape Library", form.GetDrawings());
         }
 
         private void DrawingLibrary_Click(object sender, EventArgs e)
@@ -1368,9 +1378,15 @@ namespace OpenNest.Forms
             // Released nests open in their own tabs beside this one.
             if (MdiParent is MainForm main)
                 form.EnableRelease(NestStorage.CreateRepository(), main.OpenServerNest, main.IsServerNestOpen);
+            // The dialog adds drawings and sets quantities as the operator works in it.
+            using var change = BeginChange("Drawing Library");
             form.ShowDialog(this);
             if (form.AddedDrawings.Count > 0 || form.QuantitiesChanged)
+            {
+                change.MarkChanged();
                 UpdateDrawingList();
+            }
+            change.Complete();
         }
 
         private void drawingListBox1_SaveToLibraryRequested(object sender, Drawing drawing)
@@ -1402,8 +1418,15 @@ namespace OpenNest.Forms
                 && Enum.IsDefined(cutType) ? cutType : CutType.Laser;
             using var form = new SaveToDrawingLibraryForm(library, NestStorage.Settings.ServerUrl, Nest, drawing,
                 lastCutType, Environment.UserName);
+            // The library itself is on the server; the drawing's link to it is saved with the nest.
+            using var change = BeginChange("Save to Drawing Library");
             if (form.ShowDialog(this) != DialogResult.OK || form.Result == null)
+            {
+                change.Complete();
                 return;
+            }
+            change.MarkChanged();
+            change.Complete();
 
             Properties.Settings.Default.DrawingLibraryCutType = form.Result.Saved.CutType.ToString();
             Properties.Settings.Default.Save();
@@ -1465,18 +1488,28 @@ namespace OpenNest.Forms
         {
             var editedDrawings = drawings.ToList();
 
-            // Capture before loading the editor: its conversion can mutate programs in place.
-            var snapshot = DrawingProgramSnapshot.Capture(
-                editedDrawings,
-                program => NestWriter.GetProgramText(program) + "\0" + NestWriter.GetSubProgramsText(program)
-            );
-            var converter = new CadConverterForm();
+            // Open before loading the editor: its conversion can mutate programs in place.
+            using var change = BeginChange("Edit Drawings");
+            static string ProgramText(CNC.Program program) =>
+                NestWriter.GetProgramText(program) + "\0" + NestWriter.GetSubProgramsText(program);
+            var snapshot = DrawingProgramSnapshot.Capture(editedDrawings, ProgramText);
+            var loaded = editedDrawings.Select(d => ProgramText(d.Program)).ToList();
+            using var converter = new CadConverterForm();
             // LoadDrawings can edit live programs even when the dialog is canceled.
             PlateView.InvalidateOverlapCheck();
             converter.LoadDrawings(editedDrawings);
 
             if (converter.ShowDialog() != DialogResult.OK)
+            {
+                // Cancel puts back any program the editor changed in place: a changed scope
+                // left incomplete rolls the nest back to before the editor opened.
+                if (!editedDrawings.Select(d => ProgramText(d.Program)).SequenceEqual(loaded))
+                    change.MarkChanged();
+                else
+                    change.Complete();
                 return;
+            }
+            change.MarkChanged();
 
             var newDrawings = converter.GetDrawings();
             var newByName = newDrawings.ToDictionary(d => d.Name);
@@ -1512,6 +1545,7 @@ namespace OpenNest.Forms
 
             UpdateDrawingList();
             PlateView.Invalidate();
+            change.Complete();
         }
 
         private void CleanUnusedDrawings_Click(object sender, EventArgs e)
@@ -1525,10 +1559,17 @@ namespace OpenNest.Forms
             );
 
             if (result == DialogResult.Yes)
-            {
-                Nest.Drawings.RemoveWhere(d => d.Quantity.Nested == 0);
-                UpdateDrawingList();
-            }
+                CleanUnusedDrawings();
+        }
+
+        /// <summary>Removes the drawings with no part on any plate.</summary>
+        public void CleanUnusedDrawings()
+        {
+            if (!Nest.Drawings.Any(d => d.Quantity.Nested == 0))
+                return;
+
+            RecordChange("Clean Unused Drawings", () => Nest.Drawings.RemoveWhere(d => d.Quantity.Nested == 0));
+            UpdateDrawingList();
         }
 
         private void HideNestedButton_CheckedChanged(object sender, EventArgs e)
@@ -1649,12 +1690,12 @@ namespace OpenNest.Forms
             if (drawing == null)
                 return;
 
-            var form = new EditDrawingForm();
+            using var form = new EditDrawingForm();
             form.LoadDrawing(drawing, Nest);
 
             if (form.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
-                form.SaveDrawing(drawing);
+                RecordChange("Drawing Properties", () => form.SaveDrawing(drawing));
 
                 RefreshDrawingColor(drawing);
 
@@ -1684,16 +1725,26 @@ namespace OpenNest.Forms
             if (result != DialogResult.Yes)
                 return;
 
-            foreach (var plate in Nest.Plates)
-            {
-                for (var i = plate.Parts.Count - 1; i >= 0; i--)
-                {
-                    if (plate.Parts[i].BaseDrawing == drawing)
-                        plate.Parts.RemoveAt(i);
-                }
-            }
+            DeleteDrawing(drawing);
+        }
 
-            Nest.Drawings.Remove(drawing);
+        /// <summary>Deletes <paramref name="drawing"/> and its parts from every plate.</summary>
+        public void DeleteDrawing(Drawing drawing)
+        {
+            RecordChange("Delete Drawing", () =>
+            {
+                // Emptying the last plates drops trailing empty ones, so walk a copy.
+                foreach (var plate in Nest.Plates.ToList())
+                {
+                    for (var i = plate.Parts.Count - 1; i >= 0; i--)
+                    {
+                        if (plate.Parts[i].BaseDrawing == drawing)
+                            plate.Parts.RemoveAt(i);
+                    }
+                }
+
+                Nest.Drawings.Remove(drawing);
+            });
             UpdateDrawingList();
             UpdatePlateList();
             PlateView.Invalidate();

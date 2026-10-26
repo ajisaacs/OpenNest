@@ -384,6 +384,107 @@ public class UndoRecordingTests
         return center;
     }
 
+    // Drawings
+
+    [Fact]
+    public void ImportingDrawingsRecordsOneEntry() => UndoTestEnv.Run(env =>
+    {
+        var directory = Directory.CreateTempSubdirectory("opennest-undo-");
+        try
+        {
+            var path = Path.Combine(directory.FullName, "plate.dxf");
+            var document = new ACadSharp.CadDocument();
+            var corners = new[] { (0.0, 0.0), (8.0, 0.0), (8.0, 4.0), (0.0, 4.0) };
+            for (var i = 0; i < corners.Length; i++)
+            {
+                var (x1, y1) = corners[i];
+                var (x2, y2) = corners[(i + 1) % corners.Length];
+                document.Entities.Add(new ACadSharp.Entities.Line(new CSMath.XYZ(x1, y1, 0), new CSMath.XYZ(x2, y2, 0)));
+            }
+            ACadSharp.IO.DxfWriter.Write(path, document, false);
+            UndoTestEnv.AcceptWhenShown<CadConverterForm>(ready: form => form.GetDrawings().Count > 0);
+
+            env.AssertOneUndoableEdit("Import Drawings", () => env.Editor.ImportFiles([path]));
+            Assert.Equal(2, env.Nest.Drawings.Count);
+        }
+        finally
+        {
+            directory.Delete(true);
+        }
+    });
+
+    [Fact]
+    public void AddingFromTheShapeLibraryRecordsOneEntry() => UndoTestEnv.Run(env =>
+    {
+        UndoTestEnv.WhenShown<ShapeLibraryForm>(form => UndoTestEnv.Invoke(form, "AddButton_Click", null, EventArgs.Empty));
+        env.AssertOneUndoableEdit("Shape Library", () => env.Click("ShapeLibrary_Click"));
+    });
+
+    [Fact]
+    public void EditingDrawingsInTheConverterRecordsOneEntry() => UndoTestEnv.Run(env =>
+    {
+        UndoTestEnv.AcceptWhenShown<CadConverterForm>(form =>
+            ((System.Windows.Forms.NumericUpDown)AllControls(form).Single(c => c.Name == "numQuantity")).Value = 7);
+        env.AssertOneUndoableEdit("Edit Drawings", () => UndoTestEnv.Invoke(env.Editor, "EditDrawingsInConverter", env.Nest.Drawings.ToList()));
+        Assert.Equal(7, env.Nest.Drawings.Single().Quantity.Required);
+    }, NestWithRequiredQuantity);
+
+    [Fact]
+    public void CancellingTheConverterRecordsNothing() => UndoTestEnv.Run(env =>
+    {
+        var before = UndoTestEnv.Describe(env.Nest);
+        UndoTestEnv.WhenShown<CadConverterForm>(form => form.DialogResult = DialogResult.Cancel);
+
+        UndoTestEnv.Invoke(env.Editor, "EditDrawingsInConverter", env.Nest.Drawings.ToList());
+
+        Assert.Equal(0, env.Editor.History.UndoCount);
+        Assert.Equal(before, UndoTestEnv.Describe(env.Nest));
+    }, NestWithRequiredQuantity);
+
+    // The converter's quantity box starts at 1, so it cannot load a drawing that requires none.
+    private static Nest NestWithRequiredQuantity()
+    {
+        var nest = UndoTestEnv.BuildNest();
+        nest.Drawings.Single().Quantity.Required = 5;
+        return nest;
+    }
+
+    [Fact]
+    public void DeletingADrawingRecordsOneEntry() => UndoTestEnv.Run(env =>
+        env.AssertOneUndoableEdit("Delete Drawing", () => env.Editor.DeleteDrawing(env.Nest.Drawings.Single())));
+
+    [Fact]
+    public void CleaningUnusedDrawingsRecordsOneEntry() => UndoTestEnv.Run(env =>
+        env.AssertOneUndoableEdit("Clean Unused Drawings", env.Editor.CleanUnusedDrawings), () =>
+    {
+        var nest = UndoTestEnv.BuildNest();
+        nest.Drawings.Add(new Drawing("unused", UndoTestEnv.Square(4)));
+        return nest;
+    });
+
+    [Fact]
+    public void EditingDrawingPropertiesRecordsOneEntry() => UndoTestEnv.Run(env =>
+    {
+        var list = (DrawingListBox)AllControls(env.Editor).Single(c => c is DrawingListBox);
+        list.SelectedItem = env.Nest.Drawings.Single();
+        UndoTestEnv.AcceptWhenShown<EditDrawingForm>(form =>
+            typeof(EditDrawingForm).GetProperty("Quantity", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(form, 9));
+
+        env.AssertOneUndoableEdit("Drawing Properties", () => UndoTestEnv.Invoke(env.Editor, "drawingListBox1_DoubleClick", list, EventArgs.Empty));
+        Assert.Equal(9, env.Nest.Drawings.Single().Quantity.Required);
+    });
+
+    [Fact]
+    public void DroppingADrawingOnThePlateRecordsOneEntry() => UndoTestEnv.Run(env =>
+    {
+        env.Editor.PlateManager.LoadAt(2);
+        env.View.ZoomToFit();
+        var at = env.View.PointToScreen(env.View.PointWorldToControl(new Vector(50, 50)));
+        var drop = new DragEventArgs(new DataObject(env.Nest.Drawings.Single()), 0, at.X, at.Y, DragDropEffects.Copy, DragDropEffects.Copy);
+
+        env.AssertOneUndoableEdit("Add Part", () => UndoTestEnv.Invoke(env.View, "OnDragDrop", drop));
+    });
+
     private static void Click(PlateView view, System.Drawing.Point at)
     {
         UndoTestEnv.Mouse(view, "OnMouseMove", MouseButtons.None, at);
