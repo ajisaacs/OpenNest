@@ -981,6 +981,14 @@ position, unique per drawing) and rebuilds `release_nest_items` with a nullable
 other table changes. A server older than v11 refuses to open a v11 database, so
 rolling back needs the pre-upgrade backup.
 
+## Shared settings endpoints
+
+`/api/settings` holds the machines, post settings, clamp settings and nest defaults every
+workstation shares in Database mode; see [shared settings](shared-settings.md) for the
+endpoints and how the desktop uses them. Schema v13 adds the empty `shared_settings` and
+`shared_setting_revisions` tables; no other table changes. A server older than v13 refuses
+to open a v13 database, so rolling back needs the pre-upgrade backup.
+
 ## Storage
 
 `OpenNest.Server.NestDatabase` uses SQLite (`Microsoft.Data.Sqlite`) with

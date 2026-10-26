@@ -2,7 +2,8 @@
 
 A nest's assigned machine (`Nest.Machine`, see [nest file format](nest-file-format.md))
 supplies the starting lead-ins, lead-outs, kerf and cut-off settings for the nest's
-material and thickness, from that machine's Tools > Machine Configuration entry.
+material and thickness, from that machine's Tools > Machine Configuration entry (in
+Database mode, the server's [shared machines](shared-settings.md) once it holds them).
 `MachineCuttingDefaults` (OpenNest.Data) holds the mapping; the desktop applies it.
 
 ## Lookup

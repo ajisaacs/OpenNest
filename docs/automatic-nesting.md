@@ -67,7 +67,8 @@ end along Y. **Nest > Clamps...** edits the current nest's rail as a list, and
 **Plate > Edit Clamps** edits it on the plate view (below). **OK** applies it to every plate of the nest (**Cancel** discards
 the edits); removing every center removes the clamps. **Load Machine Defaults**
 only fills the dialog. **Save as Machine Defaults** writes
-`%APPDATA%\OpenNest\clamps.json` immediately, with the clamps, their units and
+`%APPDATA%\OpenNest\clamps.json` (or, in Database mode once the server holds them, the
+[shared clamp settings](shared-settings.md)) immediately, with the clamps, their units and
 whether new nests receive them; Cancel does not undo that write. The dialog
 refuses to open while nesting or a plate action is running.
 
