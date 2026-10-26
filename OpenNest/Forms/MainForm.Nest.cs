@@ -177,7 +177,7 @@ namespace OpenNest.Forms
                 view.Invalidate();
         }
 
-        private void RemoveEmptyPlates_Click(object sender, EventArgs e) => WithActive(f => f.Nest.Plates.RemoveEmptyPlates());
+        private void RemoveEmptyPlates_Click(object sender, EventArgs e) => WithActive(f => f.RemoveEmptyPlates());
 
         private void ClearNest_Click(object sender, EventArgs e)
         {
@@ -197,7 +197,7 @@ namespace OpenNest.Forms
 
             var result = MessageBox.Show(
                 this,
-                "Remove all plates and parts from this nest?\nOne empty plate will remain. This cannot be undone.",
+                "Remove all plates and parts from this nest?\nOne empty plate will remain.",
                 "Clear Nest",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning,

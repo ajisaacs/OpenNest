@@ -889,8 +889,14 @@ namespace OpenNest.Controls
 
         public void ClearPreviewParts() => previewManager.ClearPreviewParts();
 
-        public void AcceptPreviewParts(List<Part> parts) =>
+        public void AcceptPreviewParts(List<Part> parts)
+        {
+            using var change = BeginChange("Fill");
+            if (parts?.Count > 0)
+                change.MarkChanged();
             previewManager.AcceptPreviewParts(parts);
+            change.Complete();
+        }
 
         // UI-thread state: closing the progress window only requests cancellation.
         public bool IsFillInProgress { get; private set; }
@@ -953,11 +959,14 @@ namespace OpenNest.Controls
 
                     if (parts.Count > 0 && (!cts.IsCancellationRequested || progressForm.Accepted))
                     {
+                        // Recorded at the commit: a stopped fill that keeps nothing records nothing.
+                        using var change = BeginChange("Fill");
                         SetActiveParts(parts);
                         AcceptPreviewParts(parts);
 
                         if (Plate.CutOffs.Count > 0)
                             Plate.RegenerateCutOffs(cutOffSettings);
+                        change.Complete();
 
                         sw.Stop();
                         Status = $"Fill: {parts.Count} parts in {sw.ElapsedMilliseconds} ms";

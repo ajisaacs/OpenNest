@@ -112,30 +112,38 @@ namespace OpenNest.Forms
                 if (form.ShowDialog(this) != DialogResult.OK || form.Result == null)
                     return;
 
-                var result = form.Result;
-
-                if (result.Target == PatternTileTarget.CurrentPlate)
-                {
-                    activeForm.PlateView.Plate.Parts.Clear();
-
-                    foreach (var part in result.Parts)
-                        activeForm.PlateView.Plate.Parts.Add(part);
-
-                    activeForm.PlateView.ZoomToFit();
-                }
-                else
-                {
-                    var plate = activeForm.Nest.CreatePlate();
-                    plate.Size = result.PlateSize;
-
-                    foreach (var part in result.Parts)
-                        plate.Parts.Add(part);
-
-                    activeForm.PlateManager.LoadLast();
-                }
-
-                activeForm.Nest.UpdateDrawingQuantities();
+                ApplyPatternTile(activeForm, form.Result);
             }
+        }
+
+        internal static void ApplyPatternTile(EditNestForm editForm, PatternTileResult result)
+        {
+            using var change = editForm.BeginChange("Pattern Tile");
+            change.MarkChanged();
+            if (result.Target == PatternTileTarget.CurrentPlate)
+            {
+                editForm.PlateView.Plate.Parts.Clear();
+
+                foreach (var part in result.Parts)
+                    editForm.PlateView.Plate.Parts.Add(part);
+
+                editForm.PlateView.ZoomToFit();
+            }
+            else
+            {
+                // The empty new-plate sentinel takes the pattern; a plate created beside it
+                // would be dropped as a second trailing empty plate before the parts arrive.
+                var plate = editForm.PlateManager.GetOrCreateEmpty();
+                plate.Size = result.PlateSize;
+
+                foreach (var part in result.Parts)
+                    plate.Parts.Add(part);
+
+                editForm.PlateManager.LoadAt(editForm.Nest.Plates.IndexOf(plate));
+            }
+
+            editForm.Nest.UpdateDrawingQuantities();
+            change.Complete();
         }
 
         private void SetOffsetIncrement_Click(object sender, EventArgs e)
@@ -246,10 +254,14 @@ namespace OpenNest.Forms
 
             var offset = view.Plate.OffsetToCenterPartsInWorkArea();
 
+            using var change = view.BeginChange("Center Parts");
+            if (offset.X != 0 || offset.Y != 0)
+                change.MarkChanged();
             foreach (var part in view.Parts)
                 part.Offset(offset);
 
             view.Invalidate();
+            change.Complete();
         }
     }
 }

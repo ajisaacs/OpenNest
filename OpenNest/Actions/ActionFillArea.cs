@@ -73,6 +73,7 @@ namespace OpenNest.Actions
             }
             else
             {
+                using var change = plateView.BeginChange("Fill Area");
                 var parts = PlateFillService.FillItem(
                     strategy,
                     plateView.Plate,
@@ -81,8 +82,11 @@ namespace OpenNest.Actions
                     null,
                     CancellationToken.None
                 );
+                if (parts.Count > 0)
+                    change.MarkChanged();
                 plateView.Plate.Parts.AddRange(parts);
                 plateView.Invalidate();
+                change.Complete();
             }
 
             Update();

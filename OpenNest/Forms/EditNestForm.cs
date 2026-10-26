@@ -998,7 +998,21 @@ namespace OpenNest.Forms
 
         public void ClearNest()
         {
+            using var change = BeginChange("Clear Nest");
+            if (PlateManager.CanClearAll)
+                change.MarkChanged();
             PlateManager.ClearAll();
+            change.Complete();
+        }
+
+        public void RemoveEmptyPlates()
+        {
+            using var change = BeginChange("Remove Empty Plates");
+            // The trailing empty plate comes back as the new-plate sentinel.
+            if (Nest.Plates.Count >= 2 && Nest.Plates.SkipLast(1).Any(plate => plate.Parts.Count == 0))
+                change.MarkChanged();
+            Nest.Plates.RemoveEmptyPlates();
+            change.Complete();
         }
 
         public void AutoSequenceCurrentPlate()

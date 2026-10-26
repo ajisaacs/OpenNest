@@ -50,7 +50,7 @@ namespace OpenNest.Forms
 
             // A merged draft's sheets are already gone; whatever the new nest started with goes too.
             if (tab.PlateManager.CanClearAll)
-                tab.PlateManager.ClearAll();
+                tab.ClearNest();
             nest.UpdateDrawingQuantities();
             var request = NestRenest.CreateRequest(nest, EngineSelection.EngineName, AutoNestForm.DefaultMinRemnantSize);
             if (request == null)
@@ -70,8 +70,14 @@ namespace OpenNest.Forms
             }
             cts.Token.ThrowIfCancellationRequested();
 
-            var kept = NestRenest.Keep(result,
-                r => NestPipelineCommit.ApplyToEmptyPlates(r, tab.PlateManager, token: cts.Token));
+            var kept = NestRenest.Keep(result, r =>
+            {
+                using var change = tab.BeginChange("Auto Nest");
+                change.MarkChanged();
+                var applied = NestPipelineCommit.ApplyToEmptyPlates(r, tab.PlateManager, token: cts.Token);
+                change.Complete();
+                return applied;
+            });
             if (kept.Nested)
                 tab.PlateManager.LoadFirst();
             tab.PlateView.ZoomToFit();

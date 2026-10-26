@@ -35,6 +35,10 @@ public class MainFormReleaseNestingTests
         Assert.StartsWith("Nested on 1 sheet", first.Note);
         Assert.Equal(6, saved.Plates.Sum(p => p.Parts.Count * p.Quantity));
         Assert.Equal(Guid.Empty, tab.Document.RemoteId);
+        // The kept layout is one undoable step in the tab; undo waits for the release.
+        Assert.Equal(1, tab.History.UndoCount);
+        Assert.Equal("Auto Nest", tab.History.UndoLabel);
+        Assert.False(main.TryUndo(tab));
         Run(host.RenestAsync(unsaved, CancellationToken.None));
         Assert.Equal(2, Tabs(main).Count);
 

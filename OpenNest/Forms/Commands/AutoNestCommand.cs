@@ -116,19 +116,26 @@ namespace OpenNest.Forms.Commands
                         return;
                 }
 
-                var applied = NestPipelineCommit.ApplyToEmptyPlates(result, target.PlateManager,
-                    allowInvalid, cts.Token);
-                AssignLedgerStock(result, applied);
-                if (applied.Count > 0)
-                    target.PlateManager.LoadAt(target.Nest.Plates.IndexOf(applied[0]));
-                if (plateOptions?.Count > 0)
+                IReadOnlyList<Plate> applied;
+                // Recorded from the commit only: a stopped or discarded run records nothing.
+                using (var change = target.BeginChange(Caption))
                 {
-                    // Ledger rows and quantities are request-local inventory; the nest keeps
-                    // only the hand-typed offers.
-                    if (savedOptions?.Count > 0)
-                        target.Nest.PlateOptions = savedOptions;
-                    target.Nest.SalvageRate = salvageRate;
-                    target.Nest.MinimumRemnantDimension = minRemnantSize;
+                    change.MarkChanged();
+                    applied = NestPipelineCommit.ApplyToEmptyPlates(result, target.PlateManager,
+                        allowInvalid, cts.Token);
+                    AssignLedgerStock(result, applied);
+                    if (applied.Count > 0)
+                        target.PlateManager.LoadAt(target.Nest.Plates.IndexOf(applied[0]));
+                    if (plateOptions?.Count > 0)
+                    {
+                        // Ledger rows and quantities are request-local inventory; the nest keeps
+                        // only the hand-typed offers.
+                        if (savedOptions?.Count > 0)
+                            target.Nest.PlateOptions = savedOptions;
+                        target.Nest.SalvageRate = salvageRate;
+                        target.Nest.MinimumRemnantDimension = minRemnantSize;
+                    }
+                    change.Complete();
                 }
                 target.PlateView.Invalidate();
                 if (allowInvalid)

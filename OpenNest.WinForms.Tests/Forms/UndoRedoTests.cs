@@ -3,8 +3,6 @@ using System.Reflection;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Forms;
-using OpenNest.Geometry;
-using Size = OpenNest.Geometry.Size;
 
 namespace OpenNest.WinForms.Tests.Forms;
 
@@ -346,62 +344,13 @@ public class UndoRedoTests
         Assert.True(redo.Enabled);
     });
 
-    private sealed record Env(MainForm Host, EditNestForm Editor);
+    private static void Run(Action<UndoTestEnv> body) => UndoTestEnv.Run(body);
 
-    private static void Run(Action<Env> body) => StaTestThread.Run(() =>
-    {
-        using var host = new Host();
-        host.Show();
-        using var editor = new EditNestForm(BuildNest()) { MdiParent = host };
-        editor.PlateView.SetOverlapAutoCheck(null);
-        editor.Show();
-        editor.Activate();
-        body(new Env(host, editor));
-    }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
-
-    private static Nest BuildNest()
-    {
-        var nest = new Nest("undo");
-        var square = new Drawing("square", Square());
-        nest.Drawings.Add(square);
-        int[] partsPerPlate = { 2, 2, 0, 1 };
-        foreach (var count in partsPerPlate)
-        {
-            var plate = nest.CreatePlate();
-            plate.Size = new Size(100, 100);
-            for (var i = 0; i < count; i++)
-                plate.Parts.Add(new Part(square, new Vector(5 + i * 20, 5)));
-        }
-        return nest;
-    }
-
-    private static ToolStripMenuItem MenuItem(MainForm host, string name) =>
-        (ToolStripMenuItem)typeof(MainForm).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host)!;
+    private static ToolStripMenuItem MenuItem(MainForm host, string name) => UndoTestEnv.MenuItem(host, name);
 
     private static void Mouse(PlateView view, string method, MouseButtons button, Point location) =>
-        typeof(PlateView).GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)!
-            .Invoke(view, new object[] { new MouseEventArgs(button, 1, location.X, location.Y, 0) });
+        UndoTestEnv.Mouse(view, method, button, location);
 
     private static void SetBackingField(object target, string property, object value) =>
-        target.GetType()
-            .GetField($"<{property}>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(target, value);
-
-    private static CNC.Program Square()
-    {
-        var program = new CNC.Program();
-        program.MoveTo(0, 0);
-        program.LineTo(0, 10);
-        program.LineTo(10, 10);
-        program.LineTo(10, 0);
-        program.LineTo(0, 0);
-        return program;
-    }
-
-    private sealed class Host : MainForm
-    {
-        // No startup migrations/automatic new document, and no settings save at close.
-        protected override void OnLoad(EventArgs e) { }
-        protected override void OnClosing(System.ComponentModel.CancelEventArgs e) { }
-    }
+        UndoTestEnv.SetBackingField(target, property, value);
 }
