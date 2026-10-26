@@ -37,6 +37,61 @@ public class GridStyleTests
         Assert.Equal(77, longColumn.Width);
     });
 
+    [Fact]
+    public void RowsFilledBeforeTheFormOpensArePaintedAtTheirFinalWidths() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new Form { Width = 1200, Height = 400, ShowInTaskbar = false };
+        var grid = GridStyle.Apply(new DataGridView { Dock = DockStyle.Fill });
+        var column = new DataGridViewTextBoxColumn { HeaderText = "Name", Width = 40 };
+        grid.Columns.Add(column);
+        for (var i = 0; i < 20; i++)
+            grid.Rows.Add(i == 10 ? "A fairly long drawing name" : "A");
+        form.Controls.Add(grid);
+        var firstPaintWidth = WidthAtFirstPaint(grid, column);
+
+        form.Show();
+        Application.DoEvents();
+        Pump(grid);
+
+        Assert.True(column.Width > 40);
+        Assert.Equal(column.Width, firstPaintWidth());
+    });
+
+    [Fact]
+    public void RowsAddedAfterTheFormOpensArePaintedAtTheirFinalWidths() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new Form { Width = 1200, Height = 400, ShowInTaskbar = false };
+        var grid = GridStyle.Apply(new DataGridView { Dock = DockStyle.Fill, AllowUserToAddRows = false });
+        var column = new DataGridViewTextBoxColumn { HeaderText = "Name", Width = 40 };
+        grid.Columns.Add(column);
+        form.Controls.Add(grid);
+        form.Show();
+        Pump(grid);
+
+        // One row at a time, as most grids fill: the long name is not the first row.
+        grid.Rows.Add("A");
+        grid.Rows.Add("A fairly long drawing name");
+        var firstPaintWidth = WidthAtFirstPaint(grid, column);
+        Application.DoEvents();
+        Pump(grid);
+
+        Assert.True(column.Width > 40);
+        Assert.Equal(column.Width, firstPaintWidth());
+    });
+
+    private static Func<int> WidthAtFirstPaint(DataGridView grid, DataGridViewColumn column)
+    {
+        var width = -1;
+        void OnPaint(object sender, PaintEventArgs e)
+        {
+            grid.Paint -= OnPaint;
+            width = column.Width;
+        }
+
+        grid.Paint += OnPaint;
+        return () => width;
+    }
+
     private static void Pump(Control control)
     {
         for (var i = 0; i < 5; i++)
