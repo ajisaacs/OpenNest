@@ -37,6 +37,12 @@ namespace OpenNest.IO
         /// </summary>
         public bool PreserveDateLastModified { get; init; }
 
+        /// <summary>
+        /// Snapshots only: writes every plate, empty ones included, so a restored snapshot
+        /// keeps the plate list and its indices. Files keep omitting empty plates.
+        /// </summary>
+        internal bool KeepEmptyPlates { get; init; }
+
         public NestWriter(Nest nest)
         {
             this.drawingDict = new Dictionary<int, Drawing>();
@@ -344,7 +350,8 @@ namespace OpenNest.IO
                 // sentinel to new defaults during an edit, so it remains omitted; configured
                 // nondefault clamp sheets are still written.
                 if (
-                    plate.Parts.Count(p => !p.BaseDrawing.IsCutOff) == 0
+                    !KeepEmptyPlates
+                    && plate.Parts.Count(p => !p.BaseDrawing.IsCutOff) == 0
                     && plate.CutOffs.Count == 0
                     && (
                         (plate.ClampZones.Count == 0 && plate.RemovedClamps.Count == 0)
@@ -570,22 +577,71 @@ namespace OpenNest.IO
         {
             foreach (var kvp in drawingDict.OrderBy(k => k.Key))
             {
-                var drawing = kvp.Value;
-                if (drawing.SourceEntities == null || drawing.SourceEntities.Count == 0)
+                var json = GetEntitiesJson(kvp.Value);
+                if (json == null)
                     continue;
-
-                var dto = EntitySerializer.ToDto(
-                    drawing.SourceEntities,
-                    drawing.SuppressedEntityIds,
-                    drawing.EntityRoles
-                );
-                var json = JsonSerializer.Serialize(dto, JsonOptions);
 
                 var entry = zipArchive.CreateEntry($"entities/entities-{kvp.Key}");
                 using var stream = entry.Open();
                 using var writer = new StreamWriter(stream, Encoding.UTF8);
                 writer.Write(json);
             }
+        }
+
+        private static string GetEntitiesJson(Drawing drawing)
+        {
+            if (drawing.SourceEntities == null || drawing.SourceEntities.Count == 0)
+                return null;
+
+            var dto = EntitySerializer.ToDto(
+                drawing.SourceEntities,
+                drawing.SuppressedEntityIds,
+                drawing.EntityRoles
+            );
+            return JsonSerializer.Serialize(dto, JsonOptions);
+        }
+
+        /// <summary>
+        /// One fingerprint per drawing of <paramref name="nest"/>, in order, over everything a
+        /// save writes for it: its <c>nest.json</c> entry (without the archive id), program,
+        /// hole sub-programs and source entities. Equal fingerprints mean equal saved content.
+        /// </summary>
+        internal static List<string> GetDrawingFingerprints(Nest nest)
+        {
+            var writer = new NestWriter(nest);
+            writer.SetDrawingIds();
+            var dtos = writer.BuildDrawingDtos();
+            var result = new List<string>(dtos.Count);
+            foreach (var dto in dtos)
+            {
+                var drawing = writer.drawingDict[dto.Id];
+                var node = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(dto, JsonOptions));
+                result.Add(GetDrawingFingerprint(
+                    node.AsObject(),
+                    GetProgramText(drawing.Program),
+                    GetSubProgramsText(drawing.Program),
+                    GetEntitiesJson(drawing)));
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Hashes a drawing's saved content. <paramref name="drawingJson"/> is its
+        /// <c>nest.json</c> entry as parsed from serializer output; its <c>id</c> is removed.
+        /// </summary>
+        internal static string GetDrawingFingerprint(System.Text.Json.Nodes.JsonObject drawingJson,
+            string programText, string subsText, string entitiesJson)
+        {
+            drawingJson.Remove("id");
+            using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            foreach (var part in new[] { drawingJson.ToJsonString(), programText, subsText, entitiesJson })
+            {
+                // Length-prefixed, so no part can run into the next one.
+                var text = part ?? "";
+                sha.AppendData(Encoding.UTF8.GetBytes(
+                    (part == null ? "-" : text.Length.ToString(CultureInfo.InvariantCulture)) + ":" + text));
+            }
+            return Convert.ToHexString(sha.GetHashAndReset());
         }
 
         /// <summary>Serializes a program in its current local frame, without transforming it.</summary>

@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using OpenNest.Bending;
 using OpenNest.BestFit;
 using OpenNest.Breakoffs;
@@ -34,6 +35,12 @@ namespace OpenNest.IO
         /// </summary>
         public IBestFitStore BestFitStore { get; init; }
 
+        /// <summary>
+        /// Snapshot restore only: live drawings by <see cref="NestWriter.GetDrawingFingerprints"/>,
+        /// used in place of saved drawings with the same fingerprint.
+        /// </summary>
+        internal IReadOnlyDictionary<string, Drawing> ReusableDrawings { get; init; }
+
         public NestReader(string file)
         {
             stream = new FileStream(file, FileMode.Open, FileAccess.Read);
@@ -51,9 +58,10 @@ namespace OpenNest.IO
             var nestJson = ReadEntry("nest.json");
             var dto = JsonSerializer.Deserialize<NestDto>(nestJson, JsonOptions);
 
-            var programs = ReadPrograms(dto.Drawings.Count);
-            var entitySets = ReadEntitySets(dto.Drawings.Count);
-            var drawingMap = BuildDrawings(dto, programs, entitySets);
+            var reused = MatchReusableDrawings(nestJson);
+            var programs = ReadPrograms(dto.Drawings.Count, reused);
+            var entitySets = ReadEntitySets(dto.Drawings.Count, reused);
+            var drawingMap = BuildDrawings(dto, programs, entitySets, reused);
             ReadBestFits(drawingMap);
             var nest = BuildNest(dto, drawingMap);
             // Nests converted from PEP kept etch marks only in the placed programs; give them
@@ -76,13 +84,50 @@ namespace OpenNest.IO
             return reader.ReadToEnd();
         }
 
-        private Dictionary<int, Program> ReadPrograms(int count)
+        /// <summary>
+        /// Matches saved drawings to <see cref="ReusableDrawings"/> by fingerprint. A matched
+        /// drawing is used as it is: its program and entities are not parsed, though its
+        /// program hash is still recorded so saved part programs restore against it.
+        /// </summary>
+        private Dictionary<int, Drawing> MatchReusableDrawings(string nestJson)
+        {
+            var reused = new Dictionary<int, Drawing>();
+            if (ReusableDrawings == null || ReusableDrawings.Count == 0)
+                return reused;
+
+            var drawings = JsonNode.Parse(nestJson)?["drawings"]?.AsArray();
+            if (drawings == null)
+                return reused;
+
+            foreach (var node in drawings)
+            {
+                var json = node.AsObject();
+                var id = json["id"].GetValue<int>();
+                var name = $"programs/program-{id}";
+                if (zipArchive.GetEntry(name) == null)
+                    continue;
+
+                var text = ReadEntry(name);
+                var subs = zipArchive.GetEntry(name + "-subs") == null ? "" : ReadEntry(name + "-subs");
+                var entitiesName = $"entities/entities-{id}";
+                var entities = zipArchive.GetEntry(entitiesName) == null ? null : ReadEntry(entitiesName);
+                var fingerprint = NestWriter.GetDrawingFingerprint(json, text, subs, entities);
+                if (ReusableDrawings.TryGetValue(fingerprint, out var live))
+                {
+                    reused[id] = live;
+                    drawingHashes[id] = NestWriter.GetDrawingHash(text, subs);
+                }
+            }
+            return reused;
+        }
+
+        private Dictionary<int, Program> ReadPrograms(int count, Dictionary<int, Drawing> reused)
         {
             var programs = new Dictionary<int, Program>();
             for (var i = 1; i <= count; i++)
             {
                 var name = $"programs/program-{i}";
-                if (zipArchive.GetEntry(name) == null)
+                if (reused.ContainsKey(i) || zipArchive.GetEntry(name) == null)
                     continue;
                 programs[i] = ReadProgram(name, out var hash);
                 drawingHashes[i] = hash;
@@ -190,14 +235,15 @@ namespace OpenNest.IO
         }
 
         private Dictionary<int, (List<Entity> entities, HashSet<Guid> suppressed, Dictionary<Guid, EntityRole> roles)> ReadEntitySets(
-            int count
+            int count,
+            Dictionary<int, Drawing> reused
         )
         {
             var result = new Dictionary<int, (List<Entity>, HashSet<Guid>, Dictionary<Guid, EntityRole>)>();
             for (var i = 1; i <= count; i++)
             {
                 var entry = zipArchive.GetEntry($"entities/entities-{i}");
-                if (entry == null)
+                if (entry == null || reused.ContainsKey(i))
                     continue;
 
                 using var entryStream = entry.Open();
@@ -213,12 +259,19 @@ namespace OpenNest.IO
         private Dictionary<int, Drawing> BuildDrawings(
             NestDto dto,
             Dictionary<int, Program> programs,
-            Dictionary<int, (List<Entity> entities, HashSet<Guid> suppressed, Dictionary<Guid, EntityRole> roles)> entitySets
+            Dictionary<int, (List<Entity> entities, HashSet<Guid> suppressed, Dictionary<Guid, EntityRole> roles)> entitySets,
+            Dictionary<int, Drawing> reused
         )
         {
             var map = new Dictionary<int, Drawing>();
             foreach (var d in dto.Drawings)
             {
+                if (reused.TryGetValue(d.Id, out var live))
+                {
+                    map[d.Id] = live;
+                    continue;
+                }
+
                 var drawing = new Drawing(d.Name);
                 drawing.Customer = d.Customer;
                 drawing.Color = Color.FromArgb(d.Color.A, d.Color.R, d.Color.G, d.Color.B);
