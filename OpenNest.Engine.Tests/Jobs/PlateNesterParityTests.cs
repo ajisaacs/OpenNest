@@ -256,6 +256,30 @@ public class PlateNesterParityTests
     }
 
     [Fact]
+    public void StripRestrictedRotation_NeverTouchesFiller()
+    {
+        // Same safety rule for Strip, whose shrink fills use two classification angles and
+        // ignore the requirement's rotation bounds. The throwing factory proves the filler is
+        // never constructed; completion at the locked angle proves OrderedPlateNester handled it.
+        var part = new NestJobPart(
+            "fixed",
+            PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(6, 4)),
+            2,
+            rotation: RotationPolicy.Fixed(0)
+        );
+        var nester = new StripPlateNester(_ =>
+            throw new InvalidOperationException("filler must not run for restricted rotation")
+        );
+
+        var result = Solve(nester, Job(new[] { part }, strategy: "Strip"));
+
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        var placements = result.Plates.SelectMany(p => p.Placements).ToList();
+        Assert.Equal(2, placements.Count);
+        Assert.All(placements, p => Assert.True(AnglesEqual(p.Rotation, 0)));
+    }
+
+    [Fact]
     public void RepeatedNames_KeepIndependentIdentity()
     {
         // Two distinct requirements sharing identical geometry (and, via the mapper, name) but different IDs.

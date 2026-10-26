@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 
 using OpenNest.Engine.Jobs.Adapters;
@@ -20,6 +21,7 @@ namespace OpenNest.Engine.Jobs.Placement;
 public sealed class StripPlateNester : IPlateNester
 {
     private readonly Func<Plate, StripPlateFiller> fillerFactory;
+    private readonly OrderedPlateNester restrictedRotationNester = new();
     private readonly CandidatePlacementContext context = new();
 
     public StripPlateNester()
@@ -40,6 +42,12 @@ public sealed class StripPlateNester : IPlateNester
     {
         ArgumentNullException.ThrowIfNull(request);
         token.ThrowIfCancellationRequested();
+
+        // The strip fills try two classification angles and ignore the requirement's rotation
+        // bounds, so they can return poses its RotationPolicy forbids. As in
+        // DefaultPlateNester, restricted requirements go to the policy-aware ordered nester.
+        if (request.Parts.Any(part => part.Rotation.Kind != RotationPolicyKind.Automatic))
+            return restrictedRotationNester.Place(request, progress, token);
 
         var plate = DrawingJobMapper.CreatePlate(request.Stock);
         var items = context.CreateItems(request.Parts);
