@@ -123,6 +123,49 @@ public class DrawingSetPreviewTests
         Assert.Equal((float)view.PackedLayout.Scale, view.ViewScale, 3);
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
 
+    [Theory]
+    [InlineData("4980 A111 PT01|4980 A111 PT12|4980 A111 BRKT", "4980 A111 ")]
+    [InlineData("4980-A111-P1|4980-A111-P12", "4980-A111-")]
+    [InlineData("4980 A111|4980 A111 P1", "4980 ")]
+    [InlineData("SYN 1 |SYN 1 B", "SYN ")]
+    [InlineData("PLATE|PLATES", "")]
+    [InlineData("A1|B1", "")]
+    [InlineData("4980 A111 P1", "")]
+    [InlineData("4980 A111 P1|", "")]
+    public void SharedNamePrefix_DropsOnlyWholeLeadingWordsEveryNameShares(string names, string expected) =>
+        Assert.Equal(expected, DrawingSetBrowser.SharedNamePrefix(names.Split('|')));
+
+    [Fact]
+    public void Browser_LabelsDrawingsWithoutTheirSharedPrefix() => StaTestThread.Run(() =>
+    {
+        var first = new DrawingLibraryRecord { Id = Guid.NewGuid(), Name = "SYN A1 PLATE", Revision = 1 };
+        var second = new DrawingLibraryRecord { Id = Guid.NewGuid(), Name = "SYN A1 GUSSET", Revision = 1 };
+        var sets = new InMemoryDrawingSets();
+        Run(sets.CreateAsync(new DrawingSetRecord
+        {
+            Id = Guid.NewGuid(),
+            Name = "Synthetic kit",
+            Members = new[]
+            {
+                new DrawingSetMember { DrawingId = first.Id, Quantity = 2, Drawing = first },
+                new DrawingSetMember { DrawingId = second.Id, Quantity = 3, Drawing = second },
+            },
+        }));
+
+        using var form = new System.Windows.Forms.Form { Size = new System.Drawing.Size(1000, 600) };
+        var browser = new DrawingSetBrowser { Dock = System.Windows.Forms.DockStyle.Fill };
+        form.Controls.Add(browser);
+        browser.Initialize(sets, new InMemoryDrawingLibrary(), "http://library.test:8090");
+        browser.LoadPreviewDrawing = (record, _) => Task.FromResult(Rectangle(record.Name, 10, 5));
+        form.Show();
+        var refresh = browser.RefreshAsync();
+        PumpUntil(() => refresh.IsCompleted && browser.SelectedSet != null);
+        PumpUntil(() => browser.PreviewBox.ShownParts.Count == 2 && browser.PreviewLoad.IsCompleted);
+
+        Assert.Equal(new[] { "PLATE ×2", "GUSSET ×3" }, browser.PreviewBox.ShownLabels);
+        Assert.Contains("Names start with \"SYN A1\".", browser.PreviewBox.InfoLines);
+    }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
+
     [Fact]
     public void Browser_PreviewsTheHighlightedSetBesideTheList() => StaTestThread.Run(() =>
     {
@@ -161,7 +204,8 @@ public class DrawingSetPreviewTests
         Assert.True(browser.PreviewLoad.IsCompletedSuccessfully);
         Assert.Equal(new[] { (plate.Id, 2), (gone.Id, 1) }, requested.OrderBy(r => r.Item1 == gone.Id));
         Assert.Equal("SYN-PLATE", browser.PreviewBox.ShownParts[0].BaseDrawing.Name);
-        Assert.Equal(new[] { "2 drawings, 5 parts, one scale", "1 could not be loaded." }, browser.PreviewBox.InfoLines);
+        Assert.Equal(new[] { "2 drawings, 5 parts, one scale", "Names start with \"SYN-\".", "1 could not be loaded." },
+            browser.PreviewBox.InfoLines);
 
         // Reading the list again keeps the shown preview and its cached drawings.
         refresh = browser.RefreshAsync();

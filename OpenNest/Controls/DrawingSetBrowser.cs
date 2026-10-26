@@ -330,8 +330,10 @@ namespace OpenNest.Controls
             }
 
             var members = set.Members;
-            previewBox.ShowDrawings(members.Select((member, i) => (drawings[i], $"{member.Drawing?.Name} ×{member.Quantity}")));
-            previewBox.SetInfo(PreviewInfo(members, drawings).ToArray());
+            var prefix = SharedNamePrefix(members.Select(m => m.Drawing?.Name).ToList());
+            previewBox.ShowDrawings(members.Select((member, i) =>
+                (drawings[i], $"{member.Drawing?.Name?.Substring(prefix.Length)} ×{member.Quantity}")));
+            previewBox.SetInfo(PreviewInfo(members, drawings, prefix).ToArray());
             previewShown = (listed.Id, listed.Revision);
         }
 
@@ -373,10 +375,46 @@ namespace OpenNest.Controls
             return drawings;
         }
 
-        private static IEnumerable<string> PreviewInfo(IReadOnlyList<DrawingSetMember> members, Drawing[] drawings)
+        /// <summary>
+        /// The leading words every name shares, ending at a space, '-', '_' or '.', so labels can
+        /// drop them. Empty unless there are two or more names and each keeps text after it.
+        /// </summary>
+        internal static string SharedNamePrefix(IReadOnlyList<string> names)
+        {
+            if (names.Count < 2 || names.Any(string.IsNullOrEmpty))
+                return "";
+
+            var length = names.Min(n => n.Length);
+            foreach (var name in names)
+            {
+                var i = 0;
+                while (i < length && name[i] == names[0][i])
+                    i++;
+                length = i;
+            }
+
+            // Back up to just past the last separator, so no word is split; a name the prefix
+            // would empty keeps its whole text.
+            while (length > 0 && !IsNameSeparator(names[0][length - 1]))
+                length--;
+            while (length > 0 && names.Any(n => n.Skip(length).All(IsNameSeparator)))
+            {
+                length--;
+                while (length > 0 && !IsNameSeparator(names[0][length - 1]))
+                    length--;
+            }
+
+            return names[0].Substring(0, length);
+        }
+
+        private static bool IsNameSeparator(char c) => c is ' ' or '-' or '_' or '.';
+
+        private static IEnumerable<string> PreviewInfo(IReadOnlyList<DrawingSetMember> members, Drawing[] drawings, string prefix)
         {
             var parts = members.Sum(m => m.Quantity);
             yield return $"{members.Count} drawing{(members.Count == 1 ? "" : "s")}, {parts} part{(parts == 1 ? "" : "s")}, one scale";
+            if (prefix.Length > 0)
+                yield return $"Names start with \"{prefix.TrimEnd()}\".";
             if (members.Where(m => m.Drawing != null).Select(m => m.Drawing.Units).Distinct().Count() > 1)
                 yield return "Mixes inches and mm: those are not to scale.";
             var missing = drawings.Count(d => !DrawingSetPreviewControl.CanShow(d));

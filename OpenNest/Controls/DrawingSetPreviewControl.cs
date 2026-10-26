@@ -40,6 +40,8 @@ namespace OpenNest.Controls
         /// <summary>The placed parts, in the order they were given.</summary>
         internal IReadOnlyList<Part> ShownParts => items.Select(i => i.Part).ToList();
 
+        internal IReadOnlyList<string> ShownLabels => items.Select(i => i.Label).ToList();
+
         internal DrawingSetPreviewLayout.Result PackedLayout => layout;
 
         internal IReadOnlyList<string> InfoLines => infoLines;
