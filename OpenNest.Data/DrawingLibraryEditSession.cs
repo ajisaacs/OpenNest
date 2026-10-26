@@ -99,6 +99,34 @@ public sealed class DrawingLibraryEditSession
         return matches.Where(m => m.Id != Listed.Id).ToList();
     }
 
+    /// <summary>
+    /// The drop-down choices for this edit: the customers, materials, grades and thicknesses
+    /// of the active library drawings (the newest <see cref="DrawingLibrarySaveSession.MaxScannedDrawings"/>
+    /// when there are more) and of the listed drawing, plus <paramref name="catalog"/>'s materials.
+    /// </summary>
+    public async Task<DrawingLibraryChoices> LoadChoicesAsync(IEnumerable<MaterialConfig>? catalog = null,
+        CancellationToken cancellationToken = default)
+    {
+        var records = new List<DrawingLibraryRecord>();
+        var offset = 0;
+        while (offset < DrawingLibrarySaveSession.MaxScannedDrawings)
+        {
+            var page = await _library.QueryAsync(new DrawingLibraryQuery
+            {
+                Sort = DrawingSortField.SavedAt,
+                Descending = true,
+                Offset = offset,
+                Limit = DrawingLibraryQuery.MaxLimit,
+            }, cancellationToken);
+            records.AddRange(page.Items);
+            offset += page.Items.Count;
+            if (page.Items.Count == 0 || offset >= page.Total)
+                break;
+        }
+        records.Add(Listed);
+        return DrawingLibraryChoices.From(records, Listed.Units, catalog);
+    }
+
     // The record with the edited details and the listed notes and settings, for identity checks.
     private DrawingLibraryRecord BuildDetails(DrawingLibraryDetails details) =>
         Build(details, Listed.Notes, Listed.Settings ?? new DrawingNestingSettings());

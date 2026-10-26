@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Data;
 
@@ -13,6 +15,7 @@ namespace OpenNest.Controls
     public class ThicknessComboBox : ComboBox
     {
         private Units units = Units.Inches;
+        private double[] usedValues = Array.Empty<double>();
 
         public ThicknessComboBox()
         {
@@ -55,6 +58,19 @@ namespace OpenNest.Controls
 
         public bool TryGetValue(out double value) => StandardThicknesses.TryParse(Text, units, out value);
 
+        /// <summary>
+        /// Lists <paramref name="values"/> (in <see cref="Units"/>, for example the thicknesses
+        /// already used for a material) ahead of the standard entries; the text is kept.
+        /// </summary>
+        public void SetUsedValues(IEnumerable<double> values)
+        {
+            var used = (values ?? Array.Empty<double>()).Where(v => double.IsFinite(v) && v > 0).ToArray();
+            if (used.SequenceEqual(usedValues))
+                return;
+            usedValues = used;
+            FillItems();
+        }
+
         protected override void OnEnter(EventArgs e)
         {
             base.OnEnter(e);
@@ -72,10 +88,20 @@ namespace OpenNest.Controls
         private void FillItems()
         {
             var text = Text;
+            BeginUpdate();
             Items.Clear();
+            var used = usedValues.Select(v => StandardThicknesses.Format(v, units)).Distinct().ToList();
+            foreach (var label in used)
+                Items.Add(label);
             foreach (var entry in StandardThicknesses.Entries)
-                Items.Add(StandardThicknesses.Label(entry, units));
-            Text = text;
+            {
+                var label = StandardThicknesses.Label(entry, units);
+                if (!used.Contains(label))
+                    Items.Add(label);
+            }
+            EndUpdate();
+            if (Text != text)
+                Text = text;
         }
     }
 }

@@ -406,6 +406,26 @@ rotation step/start/end (degrees), 180° equivalent and color, then the notes.
 Text is trimmed and thickness rounded as the server stores it; Save stays
 disabled until something changed and every value passes the library rules.
 
+Customer, material, grade and thickness are drop-downs that still accept any
+typed value (`OpenNest.Data.DrawingLibraryChoices`). They list what the newest
+5,000 active library drawings use, plus the machine configurations' and post
+processors' materials and grades; grades follow the typed material, and the
+thicknesses that material (and grade) already uses in the drawing's units are
+listed ahead of the standard gauges and fractions. A library that cannot be read
+leaves the catalog's lists.
+
+The color is **Custom** (the swatch opens the color picker) or **Automatic**
+(stored as 0), where each nest's color scheme picks the part color, so it
+changes with the scheme. **Reset** returns to the revision's stored color.
+
+The rotation dial beside the angle boxes shades the range counterclockwise from
+start (hollow handle) to end (solid handle), 0° at the right, and ticks each
+angle the nesting engines try (`RotationPolicy.FromLegacy`); allowed 180°
+equivalents are hatched. A zero step is the engines' automatic 0°/90°/180°/270°,
+so the range is drawn faded. Dragging a handle moves it in whole degrees (Shift:
+15°) within 0° ≤ start ≤ end ≤ 360°; the end can be dragged past 0° to a full
+turn. With focus, the arrow keys move a handle and Space switches handles.
+
 When the new details would give the drawing another identity (D4: normalized
 customer, name, material and grade, exact thickness, units and cut type), Save
 first looks up active library drawings that already have them and, if any do,

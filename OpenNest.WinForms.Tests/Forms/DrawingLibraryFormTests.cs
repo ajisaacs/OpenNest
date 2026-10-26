@@ -236,7 +236,7 @@ public class DrawingLibraryFormTests
                 form.View.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
                 form.View.EditDrawing = edit =>
                 {
-                    using var editor = new EditLibraryDrawingForm(edit);
+                    using var editor = new EditLibraryDrawingForm(edit) { LoadMaterialCatalog = Array.Empty<MaterialConfig> };
                     editor.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
                     editor.Show();
                     var save = Field<Button>(editor, "saveButton");
@@ -281,7 +281,7 @@ public class DrawingLibraryFormTests
                 form.View.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
                 form.View.EditDrawing = edit =>
                 {
-                    using var editor = new EditLibraryDrawingForm(edit);
+                    using var editor = new EditLibraryDrawingForm(edit) { LoadMaterialCatalog = Array.Empty<MaterialConfig> };
                     editor.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
                     editor.Show();
                     var save = Field<Button>(editor, "saveButton");
@@ -289,9 +289,9 @@ public class DrawingLibraryFormTests
                     Assert.Equal("in", Field<Label>(editor, "unitsLabel").Text);
                     Assert.False(save.Enabled);
                     Field<TextBox>(editor, "nameBox").Text = "SYN-405B";
-                    Field<TextBox>(editor, "materialBox").Text = "Synthetic Stainless";
-                    Field<TextBox>(editor, "gradeBox").Text = "304";
-                    Field<NumericUpDown>(editor, "thicknessBox").Value = 0.1875m;
+                    Field<ComboBox>(editor, "materialBox").Text = "Synthetic Stainless";
+                    Field<ComboBox>(editor, "gradeBox").Text = "304";
+                    Field<OpenNest.Controls.ThicknessComboBox>(editor, "thicknessBox").Value = 0.1875;
                     Field<ComboBox>(editor, "cutTypeBox").SelectedItem = "Waterjet";
                     Assert.True(save.Enabled);
                     Field<TextBox>(editor, "nameBox").Text = " ";
@@ -330,13 +330,16 @@ public class DrawingLibraryFormTests
                 var warnings = new List<string>();
                 var answer = DialogResult.Cancel;
 
-                using var editor = new EditLibraryDrawingForm(new DrawingLibraryEditSession(library, record, "Synthetic operator"));
+                using var editor = new EditLibraryDrawingForm(new DrawingLibraryEditSession(library, record, "Synthetic operator"))
+                {
+                    LoadMaterialCatalog = Array.Empty<MaterialConfig>,
+                };
                 editor.ShowMessage = (text, _, _) => { warnings.Add(text); return answer; };
                 editor.Show();
                 Field<TextBox>(editor, "nameBox").Text = "SYN-707";
-                Field<TextBox>(editor, "materialBox").Text = "Synthetic Steel";
-                Field<TextBox>(editor, "gradeBox").Text = "Grade A";
-                Field<NumericUpDown>(editor, "thicknessBox").Value = 6.35m;
+                Field<ComboBox>(editor, "materialBox").Text = "Synthetic Steel";
+                Field<ComboBox>(editor, "gradeBox").Text = "Grade A";
+                Field<OpenNest.Controls.ThicknessComboBox>(editor, "thicknessBox").Value = 6.35;
 
                 // The new details duplicate SYN-707: cancelling the warning saves nothing.
                 Run(editor.SaveAsync());
@@ -359,6 +362,136 @@ public class DrawingLibraryFormTests
             TestTimeout,
             "The edit drawing duplicate warning test did not complete.");
     }
+
+    [Fact]
+    public void EditDrawing_OffersTheLibrarysAndCatalogsValues_WithoutChangingTheEdit()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var record = library.Add("SYN-801", "Synthetic Steel", "Grade A", 0.25, Units.Inches, "");
+                library.Add("SYN-802", "synthetic  steel", "Grade B", 0.1875, Units.Inches, "");
+                library.Add("SYN-803", "Synthetic Brass", "", 3, Units.Millimeters, "");
+
+                using var editor = new EditLibraryDrawingForm(new DrawingLibraryEditSession(library, record, "Synthetic operator"))
+                {
+                    LoadMaterialCatalog = () => new[] { new MaterialConfig { Name = "Synthetic Steel", Grade = "Grade C" } },
+                };
+                editor.Show();
+                Run(editor.LoadChoicesAsync());
+
+                Assert.Contains("Synthetic customer", Field<ComboBox>(editor, "customerBox").Items.Cast<string>());
+                var materials = Field<ComboBox>(editor, "materialBox").Items.Cast<string>().ToList();
+                Assert.Contains("Synthetic Brass", materials);
+                Assert.Single(materials, m => SharedListNames.Key(m) == "SYNTHETIC STEEL");
+                Assert.Equal(new[] { "Grade A", "Grade B", "Grade C" }, Field<ComboBox>(editor, "gradeBox").Items.Cast<string>());
+                var thickness = Field<OpenNest.Controls.ThicknessComboBox>(editor, "thicknessBox");
+                Assert.Equal(StandardThicknesses.Format(0.25, Units.Inches), thickness.Items[0]);
+
+                // Without a grade the material's other thicknesses are listed first too; millimeter ones never are.
+                Field<ComboBox>(editor, "gradeBox").Text = "";
+                Assert.Equal(new object[] { StandardThicknesses.Format(0.1875, Units.Inches), StandardThicknesses.Format(0.25, Units.Inches) },
+                    thickness.Items.Cast<object>().Take(2));
+                Field<ComboBox>(editor, "gradeBox").Text = "Grade A";
+                Assert.False(Field<Button>(editor, "saveButton").Enabled);
+                Assert.Equal(record.Thickness, editor.ReadDetails().Thickness);
+            },
+            TestTimeout,
+            "The edit drawing choices test did not complete.");
+    }
+
+    [Fact]
+    public void EditDrawing_ColorCanBeMadeAutomatic_AndResetToTheStoredColor()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var record = library.Add("SYN-811", "Synthetic Steel", "Grade A", 0.25, Units.Inches, "");
+                var custom = System.Drawing.Color.FromArgb(255, 40, 50, 60).ToArgb();
+                record.Settings = new DrawingNestingSettings { ColorArgb = custom };
+
+                using var editor = new EditLibraryDrawingForm(new DrawingLibraryEditSession(library, record, "Synthetic operator"))
+                {
+                    LoadMaterialCatalog = Array.Empty<MaterialConfig>,
+                };
+                editor.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                editor.Show();
+                var save = Field<Button>(editor, "saveButton");
+                var automatic = Field<Button>(editor, "automaticColorButton");
+                var reset = Field<Button>(editor, "resetColorButton");
+                Assert.Equal((true, false), (automatic.Enabled, reset.Enabled));
+                Assert.StartsWith("Custom: #28323C", Field<Label>(editor, "colorModeLabel").Text);
+
+                automatic.PerformClick();
+                Assert.Equal(0, editor.ReadSettings().ColorArgb);
+                Assert.Equal((false, true, true), (automatic.Enabled, reset.Enabled, save.Enabled));
+                Assert.StartsWith("Automatic", Field<Label>(editor, "colorModeLabel").Text);
+
+                reset.PerformClick();
+                Assert.Equal(custom, editor.ReadSettings().ColorArgb);
+                Assert.Equal((true, false, false), (automatic.Enabled, reset.Enabled, save.Enabled));
+
+                automatic.PerformClick();
+                Run(editor.SaveAsync());
+                Assert.Equal(0, Assert.Single(library.MetadataUpdates).Record.Settings.ColorArgb);
+            },
+            TestTimeout,
+            "The edit drawing color test did not complete.");
+    }
+
+    [Fact]
+    public void EditDrawing_RotationDialAndAngleBoxesStayInStep()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var record = library.Add("SYN-821", "Synthetic Steel", "Grade A", 0.25, Units.Inches, "");
+                record.Settings = new DrawingNestingSettings
+                {
+                    StartAngle = 0,
+                    EndAngle = System.Math.PI / 2,
+                    StepAngle = OpenNest.Math.Angle.ToRadians(15),
+                };
+
+                using var editor = new EditLibraryDrawingForm(new DrawingLibraryEditSession(library, record, "Synthetic operator"))
+                {
+                    LoadMaterialCatalog = Array.Empty<MaterialConfig>,
+                };
+                editor.Show();
+                var dial = Field<OpenNest.Controls.RotationRangeDial>(editor, "rotationDial");
+                var summary = Field<Label>(editor, "rotationSummaryLabel");
+                Assert.Equal((0d, 90d, 15d), (dial.StartAngle, dial.EndAngle, dial.StepAngle));
+                Assert.Contains("tries 7 angles", summary.Text);
+                Assert.False(Field<Button>(editor, "saveButton").Enabled);
+
+                Field<NumericUpDown>(editor, "endBox").Value = 120;
+                Assert.Equal(120d, dial.EndAngle);
+
+                dial.ActiveHandle = OpenNest.Controls.DialHandle.Start;
+                dial.MoveActive(15);
+                Assert.Equal(15m, Field<NumericUpDown>(editor, "startBox").Value);
+                Assert.Equal(OpenNest.Math.Angle.ToRadians(15), editor.ReadSettings().StartAngle, 12);
+                Assert.Contains("15° to 120° every 15°: tries 8 angles", summary.Text);
+
+                Field<CheckBox>(editor, "allow180CheckBox").Checked = true;
+                Assert.True(dial.Allow180Equivalent);
+                Assert.Contains("tries 16 angles", summary.Text);
+                Assert.True(Field<Button>(editor, "saveButton").Enabled);
+            },
+            TestTimeout,
+            "The edit drawing rotation dial test did not complete.");
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0, false, "Automatic")]
+    [InlineData(90, 0, 15, false, "end is before the start")]
+    [InlineData(45, 45, 360, false, "Fixed at 45°: tries 1 angle.")]
+    [InlineData(0, 90, 45, true, "0° to 90° every 45°, and 180° from each: tries 6 angles.")]
+    public void DescribeRotation_SaysWhatTheEnginesTry(double start, double end, double step, bool allow180, string expected) =>
+        Assert.Contains(expected, EditLibraryDrawingForm.DescribeRotation(start, end, step, allow180));
 
     [Fact]
     public void WithoutANest_ListsEveryDrawing_HasNoAdd_AndEditsOnDoubleClick()
