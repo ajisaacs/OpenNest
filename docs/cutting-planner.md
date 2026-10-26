@@ -629,7 +629,8 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   enabled while a plan runs: confirming cancels that run, then clears once the cancellation
   lands (so the plates never change under the planner) and replans.
 - `Add scrap cut-offs` runs the automatic cut-off planner (defaults 35 in /
-  889 mm strips, half-strip minimum, 12 in / 304.8 mm tail) on every plate in scope
+  889 mm strips, half-strip minimum, 12 in / 304.8 mm tail, keeping a large band across
+  the top: see [automatic scrap cut-offs](automatic-scrap-cutoffs.md#keeping-a-band-across-the-top)) on every plate in scope
   *before* capture, so the cutting plan sequences the new lines like any
   other cut-off. Each segment of an added cut-off is moved in the part list to just before the
   first part in its span of the line (a sheet-separating one last, one that crosses nothing

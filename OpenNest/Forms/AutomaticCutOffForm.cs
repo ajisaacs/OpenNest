@@ -143,6 +143,7 @@ public partial class AutomaticCutOffForm : Form
             Spacing = spacing,
             MinimumStripLength = minimumStrip,
             MinimumTailLength = minimumTail,
+            KeepHorizontalRemnant = true,
         };
     }
 

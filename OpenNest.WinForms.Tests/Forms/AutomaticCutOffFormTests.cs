@@ -445,7 +445,10 @@ public class AutomaticCutOffFormTests
             Assert.Empty(PreviewParts(view));
             Invoke(form, "ApplyButton_Click", null, EventArgs.Empty);
             Assert.Equal(DialogResult.OK, form.DialogResult);
-            Assert.Equal(3, view.Plate.CutOffs.Count);
+            // With no minimum, the 7.5-wide band beyond Y 28 (675 sq in) beats the 9.5-long X tail
+            // (342 sq in): a horizontal separator keeps it, beside the X separator's corner piece.
+            Assert.Equal(4, view.Plate.CutOffs.Count);
+            Assert.Single(view.Plate.CutOffs, c => c.Axis == CutOffAxis.Horizontal);
         });
     }
 

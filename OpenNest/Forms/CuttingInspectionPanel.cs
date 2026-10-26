@@ -301,6 +301,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         Spacing = options.Spacing,
         MinimumStripLength = options.MinimumStripLength,
         MinimumTailLength = options.MinimumTailLength,
+        KeepHorizontalRemnant = options.KeepHorizontalRemnant,
     };
 
     private void ShowCutOffOptions()
@@ -387,6 +388,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             Spacing = spacing,
             MinimumStripLength = spacing / 2.0,
             MinimumTailLength = units == Units.Millimeters ? 304.8 : 12,
+            KeepHorizontalRemnant = true,
         };
     }
 

@@ -27,6 +27,14 @@ public sealed class AutomaticCutOffOptions
     /// Otherwise must be finite, greater than MinimumSpacing and no greater than Spacing.
     /// </summary>
     public double? MinimumStripLength { get; set; }
+
+    /// <summary>
+    /// Whether to propose a full-length horizontal separator that keeps the unused band beyond the
+    /// parts along Y (away from the origin) when that band is a larger piece than the X tail.
+    /// The band must be at least MinimumTailLength wide. False preserves vertical-only proposals.
+    /// An existing full-length horizontal cut-off clear of the parts is honored either way.
+    /// </summary>
+    public bool KeepHorizontalRemnant { get; set; }
 }
 
 public enum AutomaticCutOffDiagnosticCode
@@ -39,6 +47,8 @@ public enum AutomaticCutOffDiagnosticCode
     NoSafeTailSeparator,
     TailBelowMinimum,
     ShiftedCut,
+    HorizontalRemnant,
+    NoSafeHorizontalSeparator,
 }
 
 public sealed record AutomaticCutOffDiagnostic(
@@ -76,6 +86,15 @@ public sealed class AutomaticCutOffPlan
 
     /// <summary>True only for a verified full-width separator, never just a nominal boundary.</summary>
     public bool HasSeparatedTail => TailSeparatorX.HasValue;
+
+    /// <summary>
+    /// Signed Y coordinate of the new or existing full-length horizontal separator the vertical
+    /// lines stop at, keeping the band beyond it; null when the lines cross the full sheet width.
+    /// </summary>
+    public double? HorizontalSeparatorY { get; internal set; }
+
+    /// <summary>Width along Y of the band kept beyond HorizontalSeparatorY, otherwise zero.</summary>
+    public double HorizontalRemnantWidth { get; internal set; }
 
     /// <summary>Total cut length of proposed new strip lines (excludes the tail separator).</summary>
     public double StripCutLength { get; internal set; }
@@ -124,7 +143,9 @@ public static class AutomaticCutOffPlanner
             "Physical sheet bounds and overtravel must be finite.", nameof(plate));
 
         var sign = plate.Quadrant is 2 or 3 ? -1 : 1;
+        var ySign = plate.Quadrant is 3 or 4 ? -1 : 1;
         var occupied = 0.0;
+        var occupiedY = 0.0;
         var hasParts = false;
         foreach (var part in plate.Parts)
         {
@@ -132,7 +153,9 @@ public static class AutomaticCutOffPlanner
             if (part.BaseDrawing.IsCutOff)
                 continue;
 
-            occupied = System.Math.Max(occupied, ValidatePart(part, bounds, sign));
+            var (partX, partY) = ValidatePart(part, bounds, sign, ySign);
+            occupied = System.Math.Max(occupied, partX);
+            occupiedY = System.Math.Max(occupiedY, partY);
             hasParts = true;
         }
         if (!hasParts)
@@ -140,16 +163,62 @@ public static class AutomaticCutOffPlanner
 
         // Use distances from the coordinate origin, not the sheet's lower-left corner.
         var length = plate.Size.Length;
+        var width = plate.Size.Width;
         occupied = System.Math.Min(occupied, length);
-        var separator = occupied + System.Math.Max(plate.PartSpacing, settings.PartClearance)
-            + GeometryTolerance;
+        occupiedY = System.Math.Min(occupiedY, width);
+        var margin = System.Math.Max(plate.PartSpacing, settings.PartClearance) + GeometryTolerance;
+        var separator = occupied + margin;
         var hasTailCandidate = double.IsFinite(separator) && separator < length - GeometryTolerance;
+        var diagnostics = new List<AutomaticCutOffDiagnostic>();
+
+        // A band beyond the parts along Y is kept by a full-length horizontal separator; the
+        // vertical lines then stop at it instead of slicing the band. A user's line clear of the
+        // parts is honored; a new one is proposed only when its band beats the X tail.
+        var horizontalDistance = plate.CutOffs
+            .Where(c => c?.Axis == CutOffAxis.Horizontal && Finite(c.Position) && FullLengthLimits(c, bounds, settings))
+            .Select(c => ySign * c.Position.Y)
+            .Where(distance => distance > occupiedY + GeometryTolerance && distance < width - GeometryTolerance
+                && width - distance >= options.MinimumTailLength)
+            .Select(distance => (double?)distance)
+            .Min();
+        var horizontalExists = horizontalDistance.HasValue;
+        if (!horizontalExists && options.KeepHorizontalRemnant)
+        {
+            var proposed = occupiedY + margin;
+            var tailArea = hasTailCandidate && length - separator >= options.MinimumTailLength
+                ? (length - separator) * width : 0;
+            if (double.IsFinite(proposed) && proposed < width - GeometryTolerance
+                && width - proposed >= options.MinimumTailLength && (width - proposed) * length > tailArea)
+                horizontalDistance = proposed;
+        }
+        if (horizontalDistance.HasValue && !horizontalExists)
+        {
+            var y = ySign * horizontalDistance.Value;
+            var limited = plate.CutOffs.Any(c => c?.Axis == CutOffAxis.Horizontal && Near(c.Position.Y, y));
+            var clamp = clamps.FirstOrDefault(zone =>
+                y >= zone.Bounds.Bottom - plate.EdgeSpacing.Bottom && y <= zone.Bounds.Top + plate.EdgeSpacing.Bottom);
+            if (limited || clamp != null)
+            {
+                diagnostics.Add(new AutomaticCutOffDiagnostic(
+                    AutomaticCutOffDiagnosticCode.NoSafeHorizontalSeparator,
+                    (clamp != null ? $"A horizontal separator at Y = {y:G8} would cross clamp '{clamp.Id}'"
+                        : $"A same-line manual cut at Y = {y:G8} has different limits")
+                    + "; vertical lines cross the full sheet width instead."));
+                horizontalDistance = null;
+            }
+        }
+
         // A tail too short to keep stays attached to the skeleton, so the strip grid must
         // continue to the sheet end; stopping at the skipped separator would leave a final
-        // strip longer than the spacing.
-        var keepsTail = hasTailCandidate && length - separator >= options.MinimumTailLength;
+        // strip longer than the spacing. Beside a kept horizontal band the tail is a corner
+        // piece, which must also be wide enough to keep.
+        bool KeepsTail(double? band) => hasTailCandidate && length - separator >= options.MinimumTailLength
+            && (band == null || band.Value >= options.MinimumTailLength);
+        var keepsTail = KeepsTail(horizontalDistance);
         var usedSpan = keepsTail ? separator : length;
-        var candidateCount = System.Math.Ceiling(usedSpan / options.Spacing);
+        // Bound the count for either outcome: the horizontal separator is verified only below.
+        var candidateCount = System.Math.Ceiling(System.Math.Max(usedSpan, KeepsTail(null) ? separator : length)
+            / options.Spacing);
         Require(double.IsFinite(candidateCount) && candidateCount <= MaximumCandidateCount,
             $"Spacing would generate more than {MaximumCandidateCount} cut-off candidates.", nameof(options));
 
@@ -157,7 +226,31 @@ public static class AutomaticCutOffPlanner
         ValidateExisting(plate, bounds, settings);
         var cache = Plate.BuildPerimeterCache(plate);
         var definitions = new List<CutOff>();
-        var diagnostics = new List<AutomaticCutOffDiagnostic>();
+        CutOff horizontalSeparator = null;
+        if (horizontalDistance.HasValue && !horizontalExists)
+        {
+            horizontalSeparator = new CutOff(new Vector(0, ySign * horizontalDistance.Value), CutOffAxis.Horizontal);
+            horizontalSeparator.Regenerate(plate, settings, cache);
+            if (!HasUsableSegments(horizontalSeparator.Drawing.Program, false) ||
+                !IsFullSpanProgram(horizontalSeparator.Drawing.Program, false, bounds.Left, bounds.Right))
+            {
+                diagnostics.Add(new AutomaticCutOffDiagnostic(
+                    AutomaticCutOffDiagnosticCode.NoSafeHorizontalSeparator,
+                    "No full-length horizontal separator survives the current settings; "
+                    + "vertical lines cross the full sheet width instead."));
+                horizontalSeparator = null;
+                horizontalDistance = null;
+                keepsTail = KeepsTail(null);
+                usedSpan = keepsTail ? separator : length;
+                candidateCount = System.Math.Ceiling(usedSpan / options.Spacing);
+            }
+        }
+        // Vertical lines run from the origin-side edge up to a kept band's separator.
+        var horizontalY = horizontalDistance.HasValue ? ySign * horizontalDistance.Value : (double?)null;
+        var startLimit = ySign < 0 ? horizontalY : null;
+        var endLimit = ySign > 0 ? horizontalY : null;
+        var spanLow = startLimit ?? bounds.Bottom;
+        var spanHigh = endLimit ?? bounds.Top;
         var separated = false;
         var separatorX = (double?)null;
         var shifted = options.MinimumStripLength.HasValue && options.MinimumStripLength.Value < options.Spacing;
@@ -171,7 +264,7 @@ public static class AutomaticCutOffPlanner
             // Full-span definitions fix the strip boundaries, even when their emitted
             // programs are segmented. Partial cuts remain obstacles, not boundaries.
             var boundaries = plate.CutOffs
-                .Where(c => c.Axis == CutOffAxis.Vertical && FullSpanLimits(c, bounds, settings))
+                .Where(c => c.Axis == CutOffAxis.Vertical && Spans(c))
                 .Select(c => sign * c.Position.X)
                 .Where(distance => distance > GeometryTolerance && distance < usedSpan - GeometryTolerance)
                 .Distinct().OrderBy(distance => distance).Append(usedSpan);
@@ -221,6 +314,15 @@ public static class AutomaticCutOffPlanner
                 + "and strip lines continue to the sheet end. Existing cut-offs are unchanged. No retained tail is claimed.",
                 X: sign * separator));
 
+        if (horizontalSeparator != null)
+            definitions.Add(horizontalSeparator);
+        if (horizontalY.HasValue)
+            diagnostics.Add(new AutomaticCutOffDiagnostic(
+                AutomaticCutOffDiagnosticCode.HorizontalRemnant,
+                $"Vertical lines stop at the {(horizontalExists ? "existing" : "new")} horizontal separator at "
+                + $"Y = {horizontalY.Value:G8}, keeping a {width - horizontalDistance.Value:G8}-wide band "
+                + "along the sheet length."));
+
         if (diagnostics.Any(d => d.IsBlocking))
         {
             // A partial proposal must not accidentally be accepted around a manual conflict.
@@ -228,6 +330,7 @@ public static class AutomaticCutOffPlanner
             stripCutLength = 0;
             separated = false;
             separatorX = null;
+            horizontalY = null;
         }
         // The legacy placement loop stays untouched. Its detached programs are already
         // regenerated, so reporting their actual new strip cutting needs no new search.
@@ -256,7 +359,21 @@ public static class AutomaticCutOffPlanner
             TailSeparatorX = separatorX,
             StripCutLength = stripCutLength,
             FixedGridCutLength = fixedGridCutLength,
+            HorizontalSeparatorY = horizontalY,
+            HorizontalRemnantWidth = horizontalY.HasValue ? width - horizontalDistance.Value : 0,
         };
+
+        CutOff NewVertical(double x) => new(new Vector(x, 0), CutOffAxis.Vertical)
+        {
+            StartLimit = startLimit,
+            EndLimit = endLimit,
+        };
+
+        // A full-span line, or one with the limits this plan gives its own vertical lines.
+        bool Spans(CutOff cut) => FullSpanLimits(cut, bounds, settings) ||
+            horizontalY.HasValue &&
+            Near(cut.StartLimit ?? bounds.Bottom, startLimit ?? bounds.Bottom) &&
+            Near(cut.EndLimit ?? (bounds.Top + settings.Overtravel), endLimit ?? (bounds.Top + settings.Overtravel));
 
         void AddShiftedGap(double start, double end, int count, double step)
         {
@@ -310,8 +427,7 @@ public static class AutomaticCutOffPlanner
             RegisterCandidate(distance);
             if (!measurements.TryGetValue(distance, out var measured))
             {
-                measured = new CutOff(new Vector(sign * distance, 0), CutOffAxis.Vertical)
-                    .MeasureSegments(plate, settings, cache);
+                measured = NewVertical(sign * distance).MeasureSegments(plate, settings, cache);
                 measurements.Add(distance, measured);
             }
             return measured;
@@ -322,7 +438,7 @@ public static class AutomaticCutOffPlanner
             var matches = plate.CutOffs.Where(c => c.Axis == CutOffAxis.Vertical &&
                 Near(c.Position.X, x)).ToList();
 
-            if (matches.Any(c => !FullSpanLimits(c, bounds, settings)))
+            if (matches.Any(c => !Spans(c)))
             {
                 diagnostics.Add(new AutomaticCutOffDiagnostic(
                     AutomaticCutOffDiagnosticCode.LimitedCutOffConflict,
@@ -355,7 +471,7 @@ public static class AutomaticCutOffPlanner
             // drawing can be stale, and a tolerance-close line can intersect a part at the tail.
             var existing = matches.FirstOrDefault();
             var candidate = existing == null
-                ? new CutOff(new Vector(x, 0), CutOffAxis.Vertical)
+                ? NewVertical(x)
                 : new CutOff(existing.Position, existing.Axis)
                 { StartLimit = existing.StartLimit, EndLimit = existing.EndLimit };
             candidate.Regenerate(plate, settings, cache);
@@ -373,7 +489,7 @@ public static class AutomaticCutOffPlanner
 
             if (isSeparator)
             {
-                if (!usable || !IsFullSpanProgram(program, bounds))
+                if (!usable || !IsFullSpanProgram(program, true, spanLow, spanHigh))
                 {
                     WarnNoSeparator(x);
                     return;
@@ -381,7 +497,7 @@ public static class AutomaticCutOffPlanner
                 separated = true;
                 separatorX = candidate.Position.X;
             }
-            else if (usable && !IsFullSpanProgram(program, bounds))
+            else if (usable && !IsFullSpanProgram(program, true, spanLow, spanHigh))
                 diagnostics.Add(new AutomaticCutOffDiagnostic(
                     AutomaticCutOffDiagnosticCode.SegmentedCut,
                     "Part clearance or segment filtering interrupts this line; review scrap separation before relying on it.",
@@ -441,7 +557,7 @@ public static class AutomaticCutOffPlanner
             "Plate parts and cut-off collections are required.", nameof(plate));
     }
 
-    private static double ValidatePart(Part part, Box sheet, int sign)
+    private static (double X, double Y) ValidatePart(Part part, Box sheet, int sign, int ySign)
     {
         Require(Finite(part.Location) && double.IsFinite(part.Rotation),
             "Part pose must be finite.", "plate");
@@ -462,6 +578,7 @@ public static class AutomaticCutOffPlanner
         // Checking converted entities catches overflowing incremental moves and curve bounds.
         var hasMaterial = false;
         var occupied = sign > 0 ? box.Right : -box.Left;
+        var occupiedY = ySign > 0 ? box.Top : -box.Bottom;
         var roundoff = CutOff.GetBoundsRoundoff(part);
         var entities = ConvertProgram.ToGeometry(part.Program);
         var outline = entities.Where(e => e.Layer == SpecialLayers.DisplayPerimeter).ToList();
@@ -490,10 +607,11 @@ public static class AutomaticCutOffPlanner
                     entity.Layer == SpecialLayers.DisplayPerimeter ? DisplayPerimeterSheetAllowance : GeometryTolerance),
                 "Part geometry extends outside the physical sheet.", "plate");
             occupied = System.Math.Max(occupied, sign > 0 ? entityBox.Right : -entityBox.Left);
+            occupiedY = System.Math.Max(occupiedY, ySign > 0 ? entityBox.Top : -entityBox.Bottom);
             hasMaterial |= entityBox.Length > 0 || entityBox.Width > 0;
         }
         Require(hasMaterial, "Real parts must contain material geometry.", "plate");
-        return occupied;
+        return (occupied, occupiedY);
     }
 
     private static void ValidateProgram(Program program, HashSet<Program> path)
@@ -538,7 +656,7 @@ public static class AutomaticCutOffPlanner
         Near(cut.StartLimit ?? bounds.Bottom, bounds.Bottom) &&
         Near(cut.EndLimit ?? (bounds.Top + settings.Overtravel), bounds.Top + settings.Overtravel);
 
-    private static bool HasUsableSegments(Program program)
+    private static bool HasUsableSegments(Program program, bool vertical = true)
     {
         if (program.Codes.Count == 0 || program.Codes.Count % 2 != 0)
             return false;
@@ -546,21 +664,28 @@ public static class AutomaticCutOffPlanner
         {
             if (program.Codes[i] is not RapidMove from || program.Codes[i + 1] is not LinearMove to ||
                 !Finite(from.EndPoint) || !Finite(to.EndPoint) ||
-                !Near(from.EndPoint.X, to.EndPoint.X) ||
-                System.Math.Abs(from.EndPoint.Y - to.EndPoint.Y) <= GeometryTolerance)
+                (vertical ? !Near(from.EndPoint.X, to.EndPoint.X) : !Near(from.EndPoint.Y, to.EndPoint.Y)) ||
+                (vertical ? System.Math.Abs(from.EndPoint.Y - to.EndPoint.Y)
+                    : System.Math.Abs(from.EndPoint.X - to.EndPoint.X)) <= GeometryTolerance)
                 return false;
         }
         return true;
     }
 
-    private static bool IsFullSpanProgram(Program program, Box bounds)
+    private static bool FullLengthLimits(CutOff cut, Box bounds, CutOffSettings settings) =>
+        Near(cut.StartLimit ?? bounds.Left, bounds.Left) &&
+        Near(cut.EndLimit ?? (bounds.Right + settings.Overtravel), bounds.Right + settings.Overtravel);
+
+    private static bool IsFullSpanProgram(Program program, bool vertical, double low, double high)
     {
         // No gaps, bridges, or filtered middle segments can separate the tail.
         if (program.Codes.Count != 2 || program.Codes[0] is not RapidMove from ||
             program.Codes[1] is not LinearMove to)
             return false;
-        return System.Math.Min(from.EndPoint.Y, to.EndPoint.Y) <= bounds.Bottom + GeometryTolerance &&
-            System.Math.Max(from.EndPoint.Y, to.EndPoint.Y) >= bounds.Top - GeometryTolerance;
+        var start = vertical ? from.EndPoint.Y : from.EndPoint.X;
+        var end = vertical ? to.EndPoint.Y : to.EndPoint.X;
+        return System.Math.Min(start, end) <= low + GeometryTolerance &&
+            System.Math.Max(start, end) >= high - GeometryTolerance;
     }
 
     private static bool ValidBox(Box box) => box != null && Finite(box.Location) &&
