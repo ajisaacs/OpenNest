@@ -262,13 +262,13 @@ namespace OpenNest.Forms
             StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             Text = "Set History";
             Shown += DrawingSetHistoryForm_Shown;
-            layoutTable.ResumeLayout(false);
-            layoutTable.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)revisionGrid).EndInit();
-            membersGroup.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)memberGrid).EndInit();
+            membersGroup.ResumeLayout(false);
             bottomTable.ResumeLayout(false);
             bottomTable.PerformLayout();
+            layoutTable.ResumeLayout(false);
+            layoutTable.PerformLayout();
             ResumeLayout(false);
         }
 

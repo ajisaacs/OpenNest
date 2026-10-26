@@ -560,6 +560,8 @@ public class DrawingSetFormsTests
                 var members = Field<DataGridView>(form, "memberGrid");
                 PumpUntil(() => revisions.Rows.Count == 2 && members.Rows.Count == 1, "the history");
 
+                // The members grid fills its group from the first show, not only after a resize.
+                Assert.Equal(Field<GroupBox>(form, "membersGroup").DisplayRectangle.Size, members.Size);
                 Assert.Equal(new object[] { 2, 1 }, revisions.Rows.Cast<DataGridViewRow>().Select(r => r.Cells["revisionColumn"].Value));
                 Assert.Equal(("SYN-A", 6), (members.Rows[0].Cells["drawingColumn"].Value, members.Rows[0].Cells["quantityColumn"].Value));
                 revisions.CurrentCell = revisions.Rows[1].Cells[0];
