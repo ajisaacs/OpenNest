@@ -198,8 +198,8 @@ The note never blocks the dialog, save or post, and posting is not gated on hold
 ### Generated nest names
 
 **File > New** names a nest `N<yy>-<seq>` (`OpenNest.Data.NestNames`): the
-two-digit year and the year's sequence number in a base-30 alphabet without
-look-alike characters, padded to three digits (27,000 a year before a fourth
+two-digit year and the year's sequence number in a base-29 alphabet without
+look-alike characters (no S, which reads as 5), padded to three digits (24,389 a year before a fourth
 appears). The sequence runs for the whole year. In Database mode the desktop
 asks `POST /api/nest-names/next` for the number, so every PC shares one
 counter per year (`nest_sequences`, schema version 6). The server also keeps

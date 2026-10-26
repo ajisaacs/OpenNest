@@ -2,12 +2,13 @@ namespace OpenNest.Data;
 
 /// <summary>
 /// Generated nest names: "N" + two-digit year + "-" + the year's sequence number in an
-/// unambiguous base-30 alphabet, padded to three digits with its zero digit ('2').
-/// The sequence runs for the whole year; three digits cover 27,000 nests before a fourth appears.
+/// unambiguous base-29 alphabet, padded to three digits with its zero digit ('2').
+/// No S (it reads as 5). The sequence runs for the whole year; three digits cover 24,389 nests
+/// before a fourth appears.
 /// </summary>
 public static class NestNames
 {
-    private const string Base30Digits = "2345679ACDEFGHJKLMNPQRSTUVWXYZ";
+    private const string Base29Digits = "2345679ACDEFGHJKLMNPQRTUVWXYZ";
 
     /// <summary>Earliest and latest years a sequence may be allocated for.</summary>
     public const int MinYear = 2000, MaxYear = 2099;
@@ -15,7 +16,7 @@ public static class NestNames
     public static string Format(int year, int number)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(number);
-        var seq = ToBase30(number).PadLeft(3, Base30Digits[0]);
+        var seq = ToBase29(number).PadLeft(3, Base29Digits[0]);
         return $"N{year % 100:D2}-{seq}";
     }
 
@@ -33,10 +34,10 @@ public static class NestNames
         long value = 0;
         foreach (var c in name.AsSpan(prefix.Length))
         {
-            var digit = Base30Digits.IndexOf(c);
+            var digit = Base29Digits.IndexOf(c);
             if (digit < 0)
                 return false;
-            value = value * Base30Digits.Length + digit;
+            value = value * Base29Digits.Length + digit;
             if (value > int.MaxValue)
                 return false;
         }
@@ -45,16 +46,16 @@ public static class NestNames
         return Format(year, number) == name;
     }
 
-    private static string ToBase30(int value)
+    private static string ToBase29(int value)
     {
         if (value == 0)
-            return Base30Digits[0].ToString();
+            return Base29Digits[0].ToString();
 
         var result = "";
         while (value > 0)
         {
-            result = Base30Digits[value % Base30Digits.Length] + result;
-            value /= Base30Digits.Length;
+            result = Base29Digits[value % Base29Digits.Length] + result;
+            value /= Base29Digits.Length;
         }
         return result;
     }
