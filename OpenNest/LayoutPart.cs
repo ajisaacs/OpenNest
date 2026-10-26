@@ -36,6 +36,8 @@ namespace OpenNest
         private Vector? _labelPoint;
         private PointF _labelScreenPoint;
 
+        internal PointF LabelScreenPoint => _labelScreenPoint;
+
         // Paths in the drawing's program frame, before placement. A zoom or a move only maps
         // these to the screen again; rebuilding them from the program dominates for parts with
         // hundreds of holes. They are rebuilt when the program, its rotation or its lead-ins change.
@@ -360,20 +362,55 @@ namespace OpenNest
             // _labelPoint is computed from BaseDrawing.Program's current geometry, which already
             // carries BaseDrawing.Program.Rotation (nonzero for canonical-frame drawings, e.g. in
             // BestFitViewerForm). BasePart.Rotation is cumulative from that same baseline, so it
-            // must be re-applied net of the baseline already baked into _labelPoint — otherwise
+            // must be re-applied net of the baseline already baked into _labelPoint â€” otherwise
             // the baseline rotation is counted twice. Mirrors CanonicalFrame.RebindToOriginal.
-            _labelPoint ??= ComputeLabelPoint();
-            var baseRotation = BasePart.BaseDrawing.Program.Rotation;
-            var rotatedLabel = _labelPoint.Value.Rotate(BasePart.Rotation - baseRotation);
-            var labelPt = new PointF(
-                (float)(rotatedLabel.X + BasePart.Location.X),
-                (float)(rotatedLabel.Y + BasePart.Location.Y)
-            );
-            var pts = new[] { labelPt };
+            var label = CutOffSegmentLabelPoint() ?? PlacedLabelPoint();
+            var pts = new[] { new PointF((float)label.X, (float)label.Y) };
             plateView.Matrix.TransformPoints(pts);
             _labelScreenPoint = pts[0];
 
             IsDirty = false;
+        }
+
+        private Vector PlacedLabelPoint()
+        {
+            _labelPoint ??= ComputeLabelPoint();
+            var baseRotation = BasePart.BaseDrawing.Program.Rotation;
+            return _labelPoint.Value.Rotate(BasePart.Rotation - baseRotation) + BasePart.Location;
+        }
+
+        // Every segment of a cut-off is a part of the one cut-off drawing with its own trimmed
+        // program. Labelled from the drawing, all of them would stack on one point and the view's
+        // culling would decide which number shows; label each at the middle of its own cut.
+        private Vector? CutOffSegmentLabelPoint()
+        {
+            var program = BasePart.Program;
+            if (!BasePart.BaseDrawing.IsCutOff || program?.Mode != CNC.Mode.Absolute)
+                return null;
+
+            double minX = double.MaxValue, minY = double.MaxValue;
+            double maxX = double.MinValue, maxY = double.MinValue;
+            Vector? position = null;
+            foreach (var code in program.Codes)
+            {
+                if (code is not CNC.Motion motion)
+                    continue;
+                if (motion is not CNC.RapidMove && position is { } start)
+                {
+                    foreach (var point in new[] { start, motion.EndPoint })
+                    {
+                        minX = System.Math.Min(minX, point.X);
+                        minY = System.Math.Min(minY, point.Y);
+                        maxX = System.Math.Max(maxX, point.X);
+                        maxY = System.Math.Max(maxY, point.Y);
+                    }
+                }
+                position = motion.EndPoint;
+            }
+
+            if (minX > maxX)
+                return null;
+            return new Vector((minX + maxX) / 2, (minY + maxY) / 2) + BasePart.Location;
         }
 
         public void UpdateOffset(double spacing, double tolerance, Matrix matrix)
