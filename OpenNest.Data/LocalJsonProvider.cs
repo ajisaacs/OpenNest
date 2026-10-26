@@ -7,7 +7,7 @@ public class LocalJsonProvider : IDataProvider
 {
     private readonly string _directory;
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    internal static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

@@ -153,6 +153,7 @@ app.MapDrawingLibrary();
 app.MapDrawingSets();
 app.MapReleases();
 app.MapMaterials();
+app.MapSettings();
 
 app.Run();
 

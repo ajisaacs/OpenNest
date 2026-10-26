@@ -24,7 +24,7 @@ public sealed class MaterialListTests
 
         using var upgraded = new NestDatabase(factory.DatabasePath, pooling: false);
 
-        Assert.Equal(12L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+        Assert.Equal(13L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
         Assert.Empty(upgraded.ListMaterials());
         Assert.Equal((" Stainless ", "304"), (upgraded.Get(nest)!.Material, upgraded.Get(nest)!.MaterialGrade));
         Assert.Equal(drawing.MaterialName, upgraded.GetDrawing(drawing.Id)!.MaterialName);

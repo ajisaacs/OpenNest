@@ -95,26 +95,43 @@ public sealed class NestDefaults
         out NestDefaultsStatus status
     )
     {
-        var defaults = Fallback;
-        if (Enum.IsDefined(fallbackUnits))
-            defaults.Units = fallbackUnits;
-
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
             status = NestDefaultsStatus.Missing;
-            return defaults;
+            return WithUnits(Fallback, fallbackUnits);
         }
 
-        NestDefaultsDto? dto;
+        string json;
         try
         {
-            var json = File.ReadAllText(path);
-            dto = JsonSerializer.Deserialize<NestDefaultsDto>(json, JsonOptions);
+            json = File.ReadAllText(path);
         }
         catch (Exception ex) when (IsUnreadableFile(ex))
         {
             // A file that exists but cannot be read (locked, access-denied)
-            // or parsed must never block creating a nest.
+            // must never block creating a nest.
+            status = NestDefaultsStatus.Invalid;
+            return WithUnits(Fallback, fallbackUnits);
+        }
+        return Parse(json, fallbackUnits, out status);
+    }
+
+    /// <summary>
+    /// Reads defaults from <paramref name="json"/> (a file or the shared copy) the way
+    /// <see cref="Load(string, Units, out NestDefaultsStatus)"/> reads a file, never throwing.
+    /// </summary>
+    public static NestDefaults Parse(string json, Units fallbackUnits, out NestDefaultsStatus status)
+    {
+        var defaults = WithUnits(Fallback, fallbackUnits);
+
+        NestDefaultsDto? dto;
+        try
+        {
+            dto = JsonSerializer.Deserialize<NestDefaultsDto>(json ?? "", JsonOptions);
+        }
+        catch (Exception ex) when (IsUnreadableFile(ex))
+        {
+            // Defaults that cannot be parsed must never block creating a nest.
             status = NestDefaultsStatus.Invalid;
             return defaults;
         }
@@ -159,6 +176,13 @@ public sealed class NestDefaults
             && Guid.TryParse(machineId.GetString(), out var machine) && machine != Guid.Empty)
             defaults.MachineId = machine;
 
+        return defaults;
+    }
+
+    private static NestDefaults WithUnits(NestDefaults defaults, Units units)
+    {
+        if (Enum.IsDefined(units))
+            defaults.Units = units;
         return defaults;
     }
 
@@ -237,24 +261,7 @@ public sealed class NestDefaults
     /// </summary>
     public void Save(string path, int maxRetries = 3)
     {
-        var dto = new NestDefaultsDto
-        {
-            Version = CurrentVersion,
-            Units = JsonSerializer.SerializeToElement(Units.ToString().ToLowerInvariant()),
-            Size = new SizeDto { Width = Size.Width, Length = Size.Length },
-            Quadrant = Quadrant,
-            PartSpacing = PartSpacing,
-            EdgeSpacing = new SpacingDto
-            {
-                Left = EdgeSpacing.Left,
-                Bottom = EdgeSpacing.Bottom,
-                Right = EdgeSpacing.Right,
-                Top = EdgeSpacing.Top,
-            },
-            MachineId = MachineId is { } machineId ? JsonSerializer.SerializeToElement(machineId.ToString()) : null,
-        };
-
-        var json = JsonSerializer.Serialize(dto, JsonOptions);
+        var json = ToJson();
 
         var directory = Path.GetDirectoryName(Path.GetFullPath(path));
         if (!string.IsNullOrEmpty(directory))
@@ -272,6 +279,29 @@ public sealed class NestDefaults
                 Thread.Sleep(100);
             }
         }
+    }
+
+    /// <summary>The defaults as <see cref="Save"/> writes them, for the shared copy.</summary>
+    public string ToJson()
+    {
+        var dto = new NestDefaultsDto
+        {
+            Version = CurrentVersion,
+            Units = JsonSerializer.SerializeToElement(Units.ToString().ToLowerInvariant()),
+            Size = new SizeDto { Width = Size.Width, Length = Size.Length },
+            Quadrant = Quadrant,
+            PartSpacing = PartSpacing,
+            EdgeSpacing = new SpacingDto
+            {
+                Left = EdgeSpacing.Left,
+                Bottom = EdgeSpacing.Bottom,
+                Right = EdgeSpacing.Right,
+                Top = EdgeSpacing.Top,
+            },
+            MachineId = MachineId is { } machineId ? JsonSerializer.SerializeToElement(machineId.ToString()) : null,
+        };
+
+        return JsonSerializer.Serialize(dto, JsonOptions);
     }
 
     /// <summary>

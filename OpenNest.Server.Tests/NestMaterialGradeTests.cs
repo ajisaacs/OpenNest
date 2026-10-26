@@ -74,7 +74,7 @@ public sealed class NestMaterialGradeTests
         Assert.Equal("Stainless", record.Material);
         Assert.Equal("", record.MaterialGrade);
         Assert.Equal("", Assert.Single(upgraded.History(id, 0, 10)!.Items).MaterialGrade);
-        Assert.Equal(12L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+        Assert.Equal(13L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
     }
 
     private static NestRecord Record(string name, string material, string grade) => new()

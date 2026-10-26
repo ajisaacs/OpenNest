@@ -76,7 +76,7 @@ public sealed class NestUnitsTests
         Assert.Equal([Units.Millimeters, Units.Millimeters], upgraded.History(metric, 0, 10)!.Items.Select(r => r.Units));
         Assert.Equal(Units.Inches, upgraded.Get(inch)!.Units);
         Assert.Equal(Units.Inches, upgraded.Get(unreadable)!.Units);
-        Assert.Equal(12L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+        Assert.Equal(13L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
     }
 
     private static NestRecord Record(string name, Units units) => new()

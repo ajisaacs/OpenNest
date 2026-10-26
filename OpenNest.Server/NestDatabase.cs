@@ -342,7 +342,7 @@ public sealed partial class NestDatabase : IDisposable
             command.Transaction = transaction;
             command.CommandText = "PRAGMA user_version";
             var version = (long)command.ExecuteScalar()!;
-            if (version > 12) throw new InvalidOperationException("Database schema is newer than this server.");
+            if (version > 13) throw new InvalidOperationException("Database schema is newer than this server.");
             if (version == 0)
             {
                 command.CommandText = """
@@ -429,6 +429,12 @@ public sealed partial class NestDatabase : IDisposable
             }
             if (version < 12)
                 AddUnits(command);
+            if (version < 13)
+            {
+                // Settings every workstation shares, empty until a workstation uploads its own.
+                command.CommandText = SharedSettingSchema;
+                command.ExecuteNonQuery();
+            }
             transaction.Commit();
         }
     }

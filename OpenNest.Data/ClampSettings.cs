@@ -194,19 +194,39 @@ public sealed class ClampSettings
     /// </summary>
     public static ClampSettings Load(string path, out ClampSettingsStatus status)
     {
-        var settings = Fallback;
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
             status = ClampSettingsStatus.Missing;
-            return settings;
+            return Fallback;
         }
+
+        string json;
+        try
+        {
+            json = File.ReadAllText(path);
+        }
+        catch (Exception ex) when (IsUnreadableFile(ex))
+        {
+            status = ClampSettingsStatus.Invalid;
+            return Fallback;
+        }
+        return Parse(json, out status);
+    }
+
+    /// <summary>
+    /// Reads settings from <paramref name="json"/> (a file or the shared copy) the way
+    /// <see cref="Load(string, out ClampSettingsStatus)"/> reads a file, never throwing.
+    /// </summary>
+    public static ClampSettings Parse(string json, out ClampSettingsStatus status)
+    {
+        var settings = Fallback;
 
         // Read as a raw document so a missing field (fallback, Ok) is distinguishable from a
         // present but unusable one, including an explicit null (fallback, Partial).
         Dictionary<string, JsonElement> values;
         try
         {
-            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            using var document = JsonDocument.Parse(json ?? "");
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
                 status = ClampSettingsStatus.Invalid;
@@ -307,24 +327,7 @@ public sealed class ClampSettings
     /// </summary>
     public void Save(string path, int maxRetries = 3)
     {
-        var dto = new Dictionary<string, object>
-        {
-            ["version"] = CurrentVersion,
-            ["enabled"] = Enabled,
-            ["units"] = Units.ToString().ToLowerInvariant(),
-            ["width"] = Width,
-            ["depth"] = Depth,
-            ["removalMinutes"] = RemovalMinutes,
-            ["centers"] = Centers,
-        };
-        // Other edges are written only when used, so origin-side-only files stay unchanged.
-        if (FarSideCenters.Count > 0)
-            dto["farSideCenters"] = FarSideCenters;
-        if (OriginEndCenters.Count > 0)
-            dto["originEndCenters"] = OriginEndCenters;
-        if (FarEndCenters.Count > 0)
-            dto["farEndCenters"] = FarEndCenters;
-        var json = JsonSerializer.Serialize(dto, JsonOptions);
+        var json = ToJson();
 
         var directory = Path.GetDirectoryName(Path.GetFullPath(path));
         if (!string.IsNullOrEmpty(directory))
@@ -342,6 +345,29 @@ public sealed class ClampSettings
                 Thread.Sleep(100);
             }
         }
+    }
+
+    /// <summary>The settings as <see cref="Save"/> writes them, for the shared copy.</summary>
+    public string ToJson()
+    {
+        var dto = new Dictionary<string, object>
+        {
+            ["version"] = CurrentVersion,
+            ["enabled"] = Enabled,
+            ["units"] = Units.ToString().ToLowerInvariant(),
+            ["width"] = Width,
+            ["depth"] = Depth,
+            ["removalMinutes"] = RemovalMinutes,
+            ["centers"] = Centers,
+        };
+        // Other edges are written only when used, so origin-side-only files stay unchanged.
+        if (FarSideCenters.Count > 0)
+            dto["farSideCenters"] = FarSideCenters;
+        if (OriginEndCenters.Count > 0)
+            dto["originEndCenters"] = OriginEndCenters;
+        if (FarEndCenters.Count > 0)
+            dto["farEndCenters"] = FarEndCenters;
+        return JsonSerializer.Serialize(dto, JsonOptions);
     }
 
     private static double Scale(Units from, Units to) =>
