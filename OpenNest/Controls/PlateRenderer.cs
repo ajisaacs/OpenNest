@@ -14,6 +14,9 @@ namespace OpenNest.Controls
     {
         private readonly PlateView view;
 
+        // Cut-off segment ids from the last DrawParts, drawn by DrawCutOffs over the cut lines.
+        private readonly List<(LayoutPart Part, string Id, bool Muted)> cutOffLabels = new();
+
         public PlateRenderer(PlateView view)
         {
             this.view = view;
@@ -110,6 +113,7 @@ namespace OpenNest.Controls
         {
             var viewBounds = view.GetViewBounds();
             var layoutParts = view.DisplayLayoutParts;
+            cutOffLabels.Clear();
 
             for (var i = 0; i < layoutParts.Count; ++i)
             {
@@ -127,7 +131,13 @@ namespace OpenNest.Controls
                     || view.MutedParts?.Contains(part.BasePart) == true;
                 var number = view.PreviewSequence != null
                     && view.PreviewSequence.TryGetValue(part.BasePart, out var preview) ? preview : i + 1;
-                part.Draw(g, number.ToString(), muted);
+                if (part.BasePart.BaseDrawing.IsCutOff)
+                {
+                    part.Draw(g, muted);
+                    cutOffLabels.Add((part, number.ToString(), muted));
+                }
+                else
+                    part.Draw(g, number.ToString(), muted);
                 DrawBendLines(g, part.BasePart, muted);
                 DrawEtchMarks(g, part.BasePart, muted);
                 DrawGrainWarning(g, part.BasePart, muted);
@@ -252,6 +262,16 @@ namespace OpenNest.Controls
         private static readonly Color CutOffLineColor = Color.OrangeRed;
 
         public void DrawCutOffs(Graphics g)
+        {
+            DrawCutOffLines(g);
+
+            // Over the lines, on a disc of the plate's color, so the cut does not strike them through.
+            foreach (var (part, id, muted) in cutOffLabels)
+                part.DrawLabel(g, id, muted, view.ColorScheme.LayoutFillBrush);
+            cutOffLabels.Clear();
+        }
+
+        private void DrawCutOffLines(Graphics g)
         {
             var plate = view.DisplayPlate;
             if (view.HasProposalDisplay)

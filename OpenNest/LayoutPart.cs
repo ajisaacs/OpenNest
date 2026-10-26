@@ -123,7 +123,7 @@ namespace OpenNest
 
         public void Draw(Graphics g) => Draw(g, false);
 
-        private void Draw(Graphics g, bool muted)
+        internal void Draw(Graphics g, bool muted)
         {
             RefreshColors();
             using var schemeSelectionBrush = IsSelected && !colorScheme.SelectedPartColor.IsEmpty
@@ -144,7 +144,24 @@ namespace OpenNest
         internal void Draw(Graphics g, string id, bool muted)
         {
             Draw(g, muted);
+            DrawLabel(g, id, muted);
+        }
 
+        /// <summary>
+        /// Draws the id over a disc of <paramref name="background"/>, so a line drawn through the
+        /// label's point, such as a cut-off's own cut, does not strike through the number.
+        /// </summary>
+        internal void DrawLabel(Graphics g, string id, bool muted, Brush background)
+        {
+            var size = g.MeasureString(id, ProgramIdFont, PointF.Empty, LabelFormat);
+            var diameter = System.Math.Max(size.Width, size.Height) + 2;
+            g.FillEllipse(background,
+                _labelScreenPoint.X - diameter / 2, _labelScreenPoint.Y - diameter / 2, diameter, diameter);
+            DrawLabel(g, id, muted);
+        }
+
+        private void DrawLabel(Graphics g, string id, bool muted)
+        {
             g.DrawString(
                 id,
                 ProgramIdFont,
