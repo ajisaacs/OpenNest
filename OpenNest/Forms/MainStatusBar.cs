@@ -24,6 +24,9 @@ namespace OpenNest.Forms
         // Mouse-follow mode refreshes at most this often; each text change relayouts the strip.
         private const int LocationRefreshIntervalMs = 100;
 
+        // Once the mouse rests this long, the label shows its final point.
+        private const int LocationSettleMs = 30;
+
         private readonly ToolStripStatusLabel status;
         private readonly ToolStripStatusLabel location;
         private readonly ToolStripStatusLabel selection;
@@ -31,11 +34,11 @@ namespace OpenNest.Forms
         private readonly ToolStripStatusLabel material;
         private readonly ToolStripStatusLabel plateUtil;
         private readonly ToolStripStatusLabel ledger;
-        private readonly Timer locationTimer;
+        private readonly Timer locationSettleTimer;
 
         private EditNestForm form;
         private bool clickUpdatesLocation = !Settings.Default.StatusBarLocationFollowsMouse;
-        private bool locationPending;
+        private long lastLocationUpdate;
 
         public MainStatusBar(ToolStripStatusLabel status, ToolStripStatusLabel location,
             ToolStripStatusLabel selection, ToolStripStatusLabel machine, ToolStripStatusLabel material,
@@ -49,8 +52,8 @@ namespace OpenNest.Forms
             this.material = material;
             this.plateUtil = plateUtil;
 
-            locationTimer = new Timer { Interval = LocationRefreshIntervalMs };
-            locationTimer.Tick += LocationTimer_Tick;
+            locationSettleTimer = new Timer { Interval = LocationSettleMs };
+            locationSettleTimer.Tick += LocationSettleTimer_Tick;
         }
 
         /// <summary>
@@ -160,11 +163,13 @@ namespace OpenNest.Forms
                 return;
             }
 
-            location.Text = string.Format(
+            var text = string.Format(
                 "Location: [{0}, {1}]",
                 form.PlateView.CurrentPoint.X.ToString("n4"),
                 form.PlateView.CurrentPoint.Y.ToString("n4")
             );
+            if (location.Text != text)
+                location.Text = text;
         }
 
         public void UpdatePlate()
@@ -269,38 +274,36 @@ namespace OpenNest.Forms
         private void PlateView_PartRemoved(object sender, ItemRemovedEventArgs<Part> e) => UpdatePlate();
 
         /// <summary>
-        /// Throttles mouse-follow updates: the first move shows at once, later moves inside
-        /// the interval collapse into one trailing update so the label settles on the last point.
+        /// Throttles mouse-follow updates: moves refresh the label at most once per interval,
+        /// and a settle timer restarted by each skipped move shows the last point once the
+        /// mouse rests. Moves drive the throttle themselves because WM_TIMER is starved while
+        /// input and repaints are queued.
         /// </summary>
         private void PlateView_MouseMove(object sender, MouseEventArgs e)
         {
-            if (locationTimer.Enabled)
+            locationSettleTimer.Stop();
+            if (Environment.TickCount64 - lastLocationUpdate >= LocationRefreshIntervalMs)
             {
-                locationPending = true;
+                UpdateThrottledLocation();
                 return;
             }
 
-            UpdateLocation();
-            locationTimer.Start();
+            locationSettleTimer.Start();
         }
 
-        private void LocationTimer_Tick(object sender, EventArgs e)
+        private void LocationSettleTimer_Tick(object sender, EventArgs e)
         {
-            if (!locationPending)
-            {
-                locationTimer.Stop();
-                return;
-            }
-
-            locationPending = false;
-            UpdateLocation();
+            locationSettleTimer.Stop();
+            UpdateThrottledLocation();
         }
 
-        private void StopLocationThrottle()
+        private void UpdateThrottledLocation()
         {
-            locationTimer.Stop();
-            locationPending = false;
+            UpdateLocation();
+            lastLocationUpdate = Environment.TickCount64;
         }
+
+        private void StopLocationThrottle() => locationSettleTimer.Stop();
 
         private void PlateView_MouseClick(object sender, MouseEventArgs e)
         {
