@@ -42,12 +42,10 @@ if ($csprojContent -notmatch '<Version>(?<v>[\d.]+)</Version>') { throw "Could n
 $Version = $Matches.v
 Write-Host "Packaging OpenNest v$Version"
 
-# Ensure the vpk (Velopack) CLI is available
-if (-not (Get-Command vpk -ErrorAction SilentlyContinue)) {
-    Write-Host "Installing vpk CLI (dotnet tool)..."
-    dotnet tool install -g vpk
-    if ($LASTEXITCODE -ne 0) { throw "dotnet tool install vpk failed" }
-}
+# The vpk (Velopack) CLI is pinned in .config/dotnet-tools.json to match the Velopack package
+Push-Location $RepoRoot
+try { & dotnet tool restore } finally { Pop-Location }
+if ($LASTEXITCODE -ne 0) { throw "dotnet tool restore failed" }
 
 $PublishDir = Join-Path $RepoRoot 'OpenNest\bin\publish-tmp'
 $ReleasesDir = Join-Path $RepoRoot 'OpenNest\bin\releases'
@@ -61,7 +59,8 @@ $helpVersion = & (Join-Path $ScriptDir 'Install-Help.ps1') -Destination (Join-Pa
 Write-Host "Packaged help $helpVersion"
 
 Write-Host "Packing Velopack release v$Version..."
-& vpk pack -u OpenNest -v $Version -p $PublishDir -e OpenNest.exe -o $ReleasesDir
+Push-Location $RepoRoot
+try { & dotnet tool run vpk pack -u OpenNest -v $Version -p $PublishDir -e OpenNest.exe -o $ReleasesDir } finally { Pop-Location }
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed with exit code $LASTEXITCODE" }
 
 Write-Host "Pushing release feed to $FeedHost..."

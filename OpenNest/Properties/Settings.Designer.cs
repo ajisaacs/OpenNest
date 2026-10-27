@@ -296,8 +296,8 @@ namespace OpenNest.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
-        // Velopack update feed base URL (e.g. http://host:port). Blank disables
-        // update checks; each machine sets its own value via Options, never committed.
+        // Velopack update feed base URL (e.g. http://host:port). Blank uses GitHub
+        // Releases; each machine sets its own value via Options, never committed.
         public string UpdateFeedUrl {
             get {
                 return ((string)(this["UpdateFeedUrl"]));

@@ -267,7 +267,7 @@
             this.updateGroupBox.Size = new System.Drawing.Size(684, 60);
             this.updateGroupBox.TabIndex = 3;
             this.updateGroupBox.TabStop = false;
-            this.updateGroupBox.Text = "Auto-update feed URL (blank disables update checks; set per machine)";
+            this.updateGroupBox.Text = "Auto-update feed URL (blank uses GitHub Releases; set per machine)";
             //
             // updateFeedUrlBox
             //

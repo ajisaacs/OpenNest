@@ -27,7 +27,8 @@ pulls from GitHub every hour; it refuses pushes.
    (see [desktop help](desktop-help.md)), and `build-info.json` identifying the exact
    source commit and help version. The nesting engines
    are built into `OpenNest.Engine.dll`; no external engine repository or plug-in
-   DLL is packaged. `scripts/ReleaseSmoke` loads the packaged engine assembly and
+   DLL is packaged. Its `velopack/` folder holds the self-updating packages built
+   from the same folder; see [desktop auto-update](auto-update.md#release-packages). `scripts/ReleaseSmoke` loads the packaged engine assembly and
    checks that every built-in engine instantiates from it, that the renamed
    `Opus55NestingEngine` selection resolves to Irregular, and that an unknown
    engine name is rejected.
@@ -54,6 +55,11 @@ After the candidate passes, integrate the release tooling into the chosen branch
 create an annotated `vX.Y.Z` tag on the exact release commit and push it to
 GitHub. Use the successful **tag build's** artifacts
 for the GitHub Release; do not substitute packages built from another commit.
+Upload the plain ZIP, its `.sha256`, `OpenNest.vX.Y.Z.velopack.sha256` and all five
+files in `velopack/` as release assets, keeping their names. Installed copies update
+only from the newest full (non-pre-release) Release that carries
+`releases.win.json` and its `-full.nupkg`; a full Release without them leaves every
+installation on its current version.
 Verify the public asset names, sizes, download/checksum, and release status after
 upload. Do not overwrite an existing release/tag or asset silently.
 

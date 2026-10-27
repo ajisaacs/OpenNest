@@ -114,5 +114,32 @@ try {
     $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
     "$hash  $zipName" | Set-Content "$zip.sha256" -Encoding ascii
     Write-Host "Verified $zipName ($hash), source $commit"
+
+    # Velopack packages of the same verified folder: Setup.exe and the portable ZIP
+    # self-update from GitHub Releases; the plain ZIP above never does.
+    dotnet tool restore
+    if ($LASTEXITCODE -ne 0) { throw 'dotnet tool restore failed.' }
+    $velopack = Join-Path $output 'velopack'
+    dotnet tool run vpk pack -u OpenNest -v $Version -p $package -e OpenNest.exe -o $velopack --packTitle OpenNest
+    if ($LASTEXITCODE -ne 0) { throw 'vpk pack failed.' }
+
+    $assets = @('OpenNest-win-Setup.exe', 'OpenNest-win-Portable.zip', "OpenNest-$Version-full.nupkg", 'releases.win.json', 'RELEASES')
+    foreach ($file in $assets) {
+        if (-not (Test-Path (Join-Path $velopack $file) -PathType Leaf)) { throw "Velopack output missing $file" }
+    }
+    $feed = Get-Content (Join-Path $velopack 'releases.win.json') -Raw | ConvertFrom-Json
+    if (@($feed.Assets | Where-Object { $_.Version -eq $Version -and $_.Type -eq 'Full' }).Count -ne 1) {
+        throw "releases.win.json does not list the $Version full package."
+    }
+    $portable = Join-Path $output 'velopack-portable'
+    Expand-Archive -Path (Join-Path $velopack 'OpenNest-win-Portable.zip') -DestinationPath $portable
+    foreach ($file in @('Update.exe') + ($required | ForEach-Object { "current/$_" })) {
+        if (-not (Test-Path (Join-Path $portable $file) -PathType Leaf)) { throw "Portable ZIP missing $file" }
+    }
+    $sums = foreach ($file in $assets) {
+        "$((Get-FileHash (Join-Path $velopack $file) -Algorithm SHA256).Hash.ToLowerInvariant())  $file"
+    }
+    $sums | Set-Content (Join-Path $output "OpenNest.v$Version.velopack.sha256") -Encoding ascii
+    Write-Host "Packed Velopack release $Version"
 }
 finally { Pop-Location }
