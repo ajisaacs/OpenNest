@@ -8,6 +8,8 @@ namespace OpenNest.Forms
     /// Background update checks (GitHub Releases, or the per-machine feed URL from the
     /// Options dialog) and the status-bar item that announces a downloaded update. Never
     /// restarts on its own: it restarts only when the user clicks the item and confirms.
+    /// A download left unapplied installs at the next startup (Velopack's default
+    /// auto-apply in <see cref="MainApp"/>).
     /// </summary>
     internal sealed class UpdaterStatus : IDisposable
     {
