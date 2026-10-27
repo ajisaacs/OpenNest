@@ -68,7 +68,7 @@ jobs:
         # mini dump in TestResults, instead of holding the runner until the
         # job timeout.
         run: |
-          foreach ($project in @('OpenNest.Tests', 'OpenNest.Engine.Tests', 'OpenNest.IO.Tests', 'OpenNest.Server.Tests', 'OpenNest.WinForms.Tests', 'OpenNest.FrontEnd.Tests')) {
+          foreach ($project in @('OpenNest.Tests', 'OpenNest.Desktop.Tests', 'OpenNest.Engine.Tests', 'OpenNest.IO.Tests', 'OpenNest.Server.Tests', 'OpenNest.WinForms.Tests', 'OpenNest.FrontEnd.Tests')) {
             dotnet test "$project/$project.csproj" -c Release --no-build --blame-hang-timeout 5m --blame-hang-dump-type mini --logger "trx;LogFileName=$project.trx" --results-directory TestResults
             if ($LASTEXITCODE -ne 0) { throw "$project failed." }
           }

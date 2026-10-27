@@ -24,6 +24,7 @@ dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj -c Release
 dotnet test OpenNest.IO.Tests/OpenNest.IO.Tests.csproj -c Release
 dotnet test OpenNest.Desktop.Tests/OpenNest.Desktop.Tests.csproj -c Release
 dotnet test OpenNest.Server.Tests/OpenNest.Server.Tests.csproj -c Release
+dotnet test OpenNest.FrontEnd.Tests/OpenNest.FrontEnd.Tests.csproj -c Release
 
 # Windows runtime tests
 dotnet test OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj

@@ -37,7 +37,7 @@ dotnet run --project OpenNest/OpenNest.csproj                   # desktop app (W
 dotnet run --project OpenNest.Avalonia/OpenNest.Avalonia.csproj # cross-platform prototype
 ```
 
-`OpenNest.WinForms.Tests` (desktop-assembly tests) runs on Windows only; CI runs it and `OpenNest.FrontEnd.Tests` on a GitHub-hosted Windows runner for every master push and pull request.
+`OpenNest.WinForms.Tests` (desktop-assembly tests) runs on Windows only; CI runs it on a GitHub-hosted Windows runner, and `OpenNest.FrontEnd.Tests` on both Linux and Windows, for every master push and pull request.
 
 ### Quick start
 

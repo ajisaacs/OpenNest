@@ -23,6 +23,7 @@ jobs:
           - OpenNest.Engine.Tests
           - OpenNest.IO.Tests
           - OpenNest.Server.Tests
+          - OpenNest.FrontEnd.Tests
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -71,7 +72,7 @@ jobs:
 
   windows-desktop:
     # WinForms tests need a Windows desktop runtime; the Linux job can only
-    # cross-compile them. FrontEnd.Tests run here too, alongside the desktop.
+    # cross-compile them. FrontEnd.Tests also run here, beside the desktop build.
     runs-on: windows-2022
     timeout-minutes: 20
     defaults:
