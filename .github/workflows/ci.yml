@@ -19,6 +19,7 @@ jobs:
       matrix:
         project:
           - OpenNest.Tests
+          - OpenNest.Desktop.Tests
           - OpenNest.Engine.Tests
           - OpenNest.IO.Tests
           - OpenNest.Server.Tests

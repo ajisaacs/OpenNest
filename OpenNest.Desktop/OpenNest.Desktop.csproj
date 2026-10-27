@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Toolkit-neutral desktop logic shared by the WinForms and Avalonia front ends.
+       No UI toolkit: OpenNest.Desktop.Tests guards against WinForms, WindowsDesktop,
+       System.Drawing.Common and Avalonia references. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>OpenNest.Desktop</RootNamespace>
+    <AssemblyName>OpenNest.Desktop</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
+    <ProjectReference Include="..\OpenNest.Engine\OpenNest.Engine.csproj" />
+    <ProjectReference Include="..\OpenNest.IO\OpenNest.IO.csproj" />
+    <ProjectReference Include="..\OpenNest.Data\OpenNest.Data.csproj" />
+    <ProjectReference Include="..\OpenNest.Api\OpenNest.Api.csproj" />
+    <ProjectReference Include="..\OpenNest.Reporting\OpenNest.Reporting.csproj" />
+  </ItemGroup>
+</Project>

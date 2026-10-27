@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
     <ProjectReference Include="..\OpenNest.IO\OpenNest.IO.csproj" />
+    <ProjectReference Include="..\OpenNest.Desktop\OpenNest.Desktop.csproj" />
     <PackageReference Include="Avalonia" Version="11.3.0" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.0" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.0" />

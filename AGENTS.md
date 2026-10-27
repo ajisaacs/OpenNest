@@ -22,6 +22,7 @@ dotnet build OpenNest.sln
 dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release
 dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj -c Release
 dotnet test OpenNest.IO.Tests/OpenNest.IO.Tests.csproj -c Release
+dotnet test OpenNest.Desktop.Tests/OpenNest.Desktop.Tests.csproj -c Release
 dotnet test OpenNest.Server.Tests/OpenNest.Server.Tests.csproj -c Release
 
 # Windows runtime tests
@@ -39,6 +40,7 @@ Releases: follow [the release procedure](docs/releasing.md) and `scripts/Publish
 - Built-in whole-job engines live in `OpenNest.Engine/NestingEngines/<Name>/`, named for the jobs they suit; see [nesting engines](docs/nesting-engines.md). A change must beat that engine's current benchmark result with every layout valid. External plug-ins implement `INestingEngine` with a public parameterless constructor and load from `Engines/` beside the host; keep their projects out of this solution.
 - `OpenNest.IO`: ACadSharp import/export and ZIP-based `.nest` persistence; depends on Core only (an IO.Tests guard enforces it). Best fits persist only when callers pass `BestFitCacheStore.Shared` as `NestReader`/`NestWriter.BestFitStore`. All DXF-to-Drawing conversion goes through `CadImporter`: `Import` + `BuildDrawing` for editable/reporting flows, `ImportDrawing` for headless callers. Preserve source offsets, entity IDs, suppressed entities and bends. Bend repair is opt-in, requires explicit source units and may not alter cut geometry or unrelated marks.
 - `OpenNest`: WinForms UI (`Forms/`, `Controls/PlateView`, `Actions/`). `OpenNest.Data` holds cross-platform persistence; new-nest defaults live in `%APPDATA%\OpenNest\defaults.json` (in Database mode, the server's shared copy once it holds one). Posts live in `Posts/OpenNest.Posts.<Name>/` and deploy to the desktop output's `Posts/` directory. Desktop nest edits go through `BeginChange`/`RecordChange`; see [undo and redo](docs/undo-redo.md).
+- `OpenNest.Desktop` (net8.0): toolkit-neutral desktop logic shared by the WinForms app and `OpenNest.Avalonia`, the cross-platform desktop in progress. It must not reference WinForms/WindowsDesktop, `System.Drawing.Common` or Avalonia (`OpenNest.Desktop.Tests` guards this, including transitive packages); put toolkit-specific rendering, dialogs and settings behind adapters in the front ends.
 - `OpenNest.Console`, `OpenNest.Mcp`, `OpenNest.Api`: front ends; `OpenNest.Benchmark`: whole-job engine comparisons; `OpenNest.Gpu`: GPU evaluators; `OpenNest.Training`: ML data collection. Benchmark timing comparisons require `--parallel 1`; validate layouts and fulfillment, not just elapsed time.
 
 ## Geometry and ownership safeguards

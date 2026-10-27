@@ -18,7 +18,7 @@ A Windows desktop application for CNC nesting — imports DXF drawings, arranges
 
 ## Requirements
 
-- Windows 10+ for the desktop app; the console, API, and most test projects build on Linux/macOS too.
+- Windows 10+ for the desktop app; the console, API, shared desktop library (`OpenNest.Desktop`) and most test projects build on Linux/macOS too. `OpenNest.Avalonia` is an early cross-platform desktop prototype, not yet a usable replacement.
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) to build from source.
 
 Prebuilt Windows downloads are on [GitHub Releases](https://github.com/ajisaacs/OpenNest/releases), or [build from source](#build-test-run) to run the latest code. Release ZIPs are self-contained: extract the entire archive into a new folder and run `OpenNest.exe`; no separate .NET installation is needed. To update, close OpenNest and extract the new release into a new folder; ZIP releases do not auto-update (optional installer-based updates need a separately hosted [Velopack feed](docs/auto-update.md)). All nesting engines (Default, Rectangles, Irregular, Circles, FlatBar and the fill strategies) are built in; see [nesting engines](docs/nesting-engines.md).
@@ -31,8 +31,10 @@ cd OpenNest
 dotnet build OpenNest.sln                                       # full solution (Windows)
 dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj  # cross-platform engine tests
 dotnet test OpenNest.Tests/OpenNest.Tests.csproj                # core/engine/IO/API tests
+dotnet test OpenNest.Desktop.Tests/OpenNest.Desktop.Tests.csproj # shared desktop library tests
 dotnet test OpenNest.FrontEnd.Tests/OpenNest.FrontEnd.Tests.csproj # console/MCP/API integration
 dotnet run --project OpenNest/OpenNest.csproj                   # desktop app (Windows)
+dotnet run --project OpenNest.Avalonia/OpenNest.Avalonia.csproj # cross-platform prototype
 ```
 
 `OpenNest.WinForms.Tests` (desktop-assembly tests) runs on Windows only; CI runs it and `OpenNest.FrontEnd.Tests` on a GitHub-hosted Windows runner for every master push and pull request.
