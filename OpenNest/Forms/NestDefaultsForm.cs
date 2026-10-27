@@ -41,6 +41,9 @@ namespace OpenNest.Forms
 
             sourceLabel.Text = source.Text;
             saveButton.Enabled = !source.ReadOnly;
+            // Nothing typed here could be saved, so show the values without inviting edits.
+            foreach (var group in new Control[] { generalGroup, plateGroup, quadrantGroup, spacingGroup })
+                group.Enabled = !source.ReadOnly;
         }
 
         private NestDefaultsForm() => InitializeComponent();
