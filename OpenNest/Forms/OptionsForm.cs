@@ -82,6 +82,7 @@ namespace OpenNest.Forms
         {
             serverUrlBox.Text = NestStorage.Settings.ServerUrl;
             updateFeedUrlBox.Text = Settings.Default.UpdateFeedUrl;
+            includeDevBuildsBox.Checked = Settings.Default.UpdateIncludeDevBuilds;
             ledgerUrlBox.Text = MaterialLedgerStore.Settings.BaseUrl;
             ledgerKeyBox.Text = MaterialLedgerStore.Settings.ApiKey;
             checkBox1.Checked = Settings.Default.CreateNewNestOnOpen;
@@ -105,6 +106,7 @@ namespace OpenNest.Forms
         private void SaveSettings()
         {
             Settings.Default.CreateNewNestOnOpen = checkBox1.Checked;
+            Settings.Default.UpdateIncludeDevBuilds = includeDevBuildsBox.Checked;
             Settings.Default.AutoSizePlateFactor = (double)numericUpDown1.Value;
             Settings.Default.CuttingPlanEffort = (double)planningEffortBox.Value;
             Settings.Default.ActiveColorScheme =

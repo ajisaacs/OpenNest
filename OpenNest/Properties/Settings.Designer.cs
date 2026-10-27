@@ -309,6 +309,19 @@ namespace OpenNest.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        // Also offer the rolling dev-build pre-release from GitHub Releases.
+        public bool UpdateIncludeDevBuilds {
+            get {
+                return ((bool)(this["UpdateIncludeDevBuilds"]));
+            }
+            set {
+                this["UpdateIncludeDevBuilds"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("Laser")]
         // Cut type last chosen in Save to Drawing Library on this PC.
         public string DrawingLibraryCutType {

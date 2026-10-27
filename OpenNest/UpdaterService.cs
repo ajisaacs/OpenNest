@@ -16,7 +16,8 @@ namespace OpenNest
     /// </summary>
     /// <remarks>
     /// A blank <see cref="Settings.UpdateFeedUrl"/> (the default) checks the
-    /// public GitHub Releases for full, non-pre-release versions. A URL set in
+    /// public GitHub Releases for full versions, plus the rolling development
+    /// pre-release when <see cref="Settings.UpdateIncludeDevBuilds"/> is set. A URL set in
     /// the Options dialog points this machine at a self-hosted feed instead;
     /// that URL is operator infrastructure and never lives in source control.
     /// </remarks>
@@ -33,12 +34,12 @@ namespace OpenNest
         public event Action<string> UpdateReady;
 
         public UpdaterService()
-            : this(Settings.Default.UpdateFeedUrl) { }
+            : this(Settings.Default.UpdateFeedUrl, Settings.Default.UpdateIncludeDevBuilds) { }
 
-        public UpdaterService(string feedUrl)
+        public UpdaterService(string feedUrl, bool includeDevBuilds)
         {
             IUpdateSource source = string.IsNullOrWhiteSpace(feedUrl)
-                ? new GithubSource(GitHubRepositoryUrl, null, false)
+                ? new GithubSource(GitHubRepositoryUrl, null, includeDevBuilds)
                 : new SimpleWebSource(feedUrl);
             _manager = new UpdateManager(source);
         }

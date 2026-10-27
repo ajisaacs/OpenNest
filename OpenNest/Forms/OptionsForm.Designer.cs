@@ -49,6 +49,7 @@
             this.updateGroupBox = new System.Windows.Forms.GroupBox();
             this.updateFeedUrlBox = new System.Windows.Forms.TextBox();
             this.setUpdateFeedButton = new System.Windows.Forms.Button();
+            this.includeDevBuildsBox = new System.Windows.Forms.CheckBox();
             this.ledgerGroupBox = new System.Windows.Forms.GroupBox();
             this.ledgerUrlLabel = new System.Windows.Forms.Label();
             this.ledgerUrlBox = new System.Windows.Forms.TextBox();
@@ -203,7 +204,7 @@
             // strategyGroupBox
             //
             this.strategyGroupBox.Controls.Add(this.strategyGrid);
-            this.strategyGroupBox.Location = new System.Drawing.Point(12, 457);
+            this.strategyGroupBox.Location = new System.Drawing.Point(12, 485);
             this.strategyGroupBox.Name = "strategyGroupBox";
             this.strategyGroupBox.Size = new System.Drawing.Size(684, 180);
             this.strategyGroupBox.TabIndex = 2;
@@ -262,9 +263,10 @@
             //
             this.updateGroupBox.Controls.Add(this.updateFeedUrlBox);
             this.updateGroupBox.Controls.Add(this.setUpdateFeedButton);
+            this.updateGroupBox.Controls.Add(this.includeDevBuildsBox);
             this.updateGroupBox.Location = new System.Drawing.Point(12, 391);
             this.updateGroupBox.Name = "updateGroupBox";
-            this.updateGroupBox.Size = new System.Drawing.Size(684, 60);
+            this.updateGroupBox.Size = new System.Drawing.Size(684, 88);
             this.updateGroupBox.TabIndex = 3;
             this.updateGroupBox.TabStop = false;
             this.updateGroupBox.Text = "Auto-update feed URL (blank uses GitHub Releases; set per machine)";
@@ -286,6 +288,16 @@
             this.setUpdateFeedButton.Text = "Save Feed URL";
             this.setUpdateFeedButton.UseVisualStyleBackColor = true;
             this.setUpdateFeedButton.Click += new System.EventHandler(this.SetUpdateFeed_Click);
+            //
+            // includeDevBuildsBox
+            //
+            this.includeDevBuildsBox.AutoSize = true;
+            this.includeDevBuildsBox.Location = new System.Drawing.Point(12, 58);
+            this.includeDevBuildsBox.Name = "includeDevBuildsBox";
+            this.includeDevBuildsBox.Size = new System.Drawing.Size(460, 20);
+            this.includeDevBuildsBox.TabIndex = 2;
+            this.includeDevBuildsBox.Text = "Include development builds (latest master; takes effect after restart)";
+            this.includeDevBuildsBox.UseVisualStyleBackColor = true;
             //
             // ledgerGroupBox
             //
@@ -362,7 +374,7 @@
             this.AcceptButton = this.saveButton;
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.CancelButton = this.cancelButton;
-            this.ClientSize = new System.Drawing.Size(708, 697);
+            this.ClientSize = new System.Drawing.Size(708, 725);
             this.Controls.Add(this.strategyGroupBox);
             this.Controls.Add(this.updateGroupBox);
             this.Controls.Add(this.ledgerGroupBox);
@@ -415,6 +427,7 @@
         private System.Windows.Forms.GroupBox updateGroupBox;
         private System.Windows.Forms.TextBox updateFeedUrlBox;
         private System.Windows.Forms.Button setUpdateFeedButton;
+        private System.Windows.Forms.CheckBox includeDevBuildsBox;
         private System.Windows.Forms.GroupBox ledgerGroupBox;
         private System.Windows.Forms.Label ledgerUrlLabel;
         private System.Windows.Forms.TextBox ledgerUrlBox;

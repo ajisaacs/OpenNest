@@ -73,6 +73,6 @@ Read the relevant contract before changing its behavior:
 - [Cut-time estimates](docs/cut-time-estimates.md): simulator/Calculate Cut Time acceleration planner and placeholder machine limits
 - [Cincinnati CL](docs/cincinnati-post-output.md) and [CI Fiber](docs/cincinnati-ci-fiber-post-output.md)
 - [Fill verification](docs/performance/fill-verification.md): opt-in benchmarks, frozen oracles, Debug-only counters and predictor initialization. Zero Release counters do not prove work removal.
-- [Desktop auto-update](docs/auto-update.md): GitHub Releases by default, `UpdateFeedUrl` for a self-hosted feed, release Velopack assets and `Deploy-OpenNest.ps1`.
+- [Desktop auto-update](docs/auto-update.md): GitHub Releases by default, opt-in rolling `dev-build` pre-release from green master pushes, `UpdateFeedUrl` for a self-hosted feed, release Velopack assets and `Deploy-OpenNest.ps1`.
 - [Undo and Redo](docs/undo-redo.md): whole-nest history, the recording rule, what a restore rebuilds and what is excluded.
 - [Desktop help](docs/desktop-help.md): WebView2 help window, F1 topic IDs and the pinned help release both packaging scripts install.

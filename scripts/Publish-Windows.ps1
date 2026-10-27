@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidatePattern('^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$')]
+    # X.Y.Z for releases; X.Y.Z-dev.N for the automatic development build.
+    [ValidatePattern('^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-dev\.(0|[1-9]\d*))?$')]
     [string] $Version,
     [string] $OutputDirectory = 'artifacts',
     # A built opennest-help site/ folder to package instead of the release pinned in help.json.
@@ -67,7 +68,8 @@ try {
         if (-not (Test-Path (Join-Path $package $file) -PathType Leaf)) { throw "Package missing $file" }
     }
     $assemblyVersion = [Reflection.AssemblyName]::GetAssemblyName((Join-Path $package 'OpenNest.dll')).Version
-    if ($assemblyVersion.ToString() -ne "$Version.0") { throw "Wrong assembly version: $assemblyVersion" }
+    $numericVersion = $Version -replace '-.*$', ''
+    if ($assemblyVersion.ToString() -ne "$numericVersion.0") { throw "Wrong assembly version: $assemblyVersion" }
     $runtime = Get-Content (Join-Path $package 'OpenNest.runtimeconfig.json') -Raw | ConvertFrom-Json
     if (-not $runtime.runtimeOptions.includedFrameworks) { throw 'Package is not self-contained.' }
 

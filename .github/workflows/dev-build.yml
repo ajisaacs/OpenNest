@@ -1,0 +1,128 @@
+name: Development build
+
+# Every master push whose cross-platform tests pass becomes the rolling
+# `dev-build` pre-release: X.Y.Z-dev.N, where X.Y.Z is the minor after the
+# newest release tag and N the commit count. Installed copies take it only
+# with Tools > Options > Include development builds.
+on:
+  workflow_run:
+    workflows: ['Cross-platform tests']
+    types: [completed]
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-build
+  cancel-in-progress: true
+
+jobs:
+  package:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Resolve development version
+        id: version
+        run: |
+          $releases = git tag --list 'v*' | Where-Object { $_ -match '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$' } |
+            ForEach-Object { [version]$_.Substring(1) } | Sort-Object
+          if (-not $releases) { throw 'No vX.Y.Z release tag found.' }
+          $latest = @($releases)[-1]
+          $count = (git rev-list --count $env:SOURCE_SHA).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot count commits.' }
+          $version = "$($latest.Major).$($latest.Minor + 1).0-dev.$count"
+          Write-Host "Development version $version (after v$latest)"
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Publish and verify Windows package
+        run: ./scripts/Publish-Windows.ps1 -Version ${{ steps.version.outputs.version }}
+      - name: Upload development build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: OpenNest-dev-build
+          path: |
+            artifacts/*.zip
+            artifacts/*.sha256
+            artifacts/velopack/OpenNest-win-Setup.exe
+            artifacts/velopack/OpenNest-win-Portable.zip
+            artifacts/velopack/*-full.nupkg
+            artifacts/velopack/releases.win.json
+            artifacts/velopack/RELEASES
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+      VERSION: ${{ needs.package.outputs.version }}
+    steps:
+      - name: Skip if master has moved on
+        id: current
+        run: |
+          head=$(gh api "repos/$GH_REPO/commits/master" --jq .sha)
+          if [ "$head" != "$SOURCE_SHA" ]; then
+            echo "master is at $head; its own run publishes the newer build."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Download development build
+        if: steps.current.outputs.skip != 'true'
+        run: gh run download "$GITHUB_RUN_ID" -n OpenNest-dev-build -D dev
+      - name: Verify checksums
+        if: steps.current.outputs.skip != 'true'
+        working-directory: dev
+        run: |
+          sha256sum -c ./*.zip.sha256
+          (cd velopack && sha256sum -c "../OpenNest.v$VERSION.velopack.sha256")
+      - name: Replace the dev-build pre-release
+        if: steps.current.outputs.skip != 'true'
+        working-directory: dev
+        run: |
+          if gh release view dev-build >/dev/null 2>&1; then
+            gh release delete dev-build --cleanup-tag --yes
+          fi
+          cat > notes.md <<EOF
+          Automatic development build of master at $SOURCE_SHA.
+
+          It may contain unfinished features. Installed copies receive it only with
+          **Tools > Options > Include development builds**; full releases are unaffected.
+          EOF
+          gh release create dev-build ./*.zip ./*.sha256 velopack/* \
+            --target "$SOURCE_SHA" --prerelease --latest=false \
+            --title "OpenNest $VERSION (development build, ${SOURCE_SHA:0:8})" --notes-file notes.md
+      - name: Read back the pre-release
+        if: steps.current.outputs.skip != 'true'
+        run: |
+          gh release view dev-build --json isPrerelease,isDraft,tagName,assets \
+            --jq '"prerelease=\(.isPrerelease) draft=\(.isDraft) assets=\(.assets|length)"' | tee readback.txt
+          grep -qx 'prerelease=true draft=false assets=8' readback.txt
+          [ "$(gh api "repos/$GH_REPO/git/ref/tags/dev-build" --jq .object.sha)" = "$SOURCE_SHA" ]
