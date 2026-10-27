@@ -107,16 +107,18 @@ internal static class ContourEntryRanking
         if (target != null)
         {
             // Nearest side(s) of the candidate bounding rectangle (a corner belongs to two
-            // sides within tolerance); count how many of them are facing sides.
+            // sides within tolerance, a fillet's joint within its reach of the corner it
+            // rounds); count how many of them are facing sides.
             var left = p.X - minX;
             var right = maxX - p.X;
             var bottom = p.Y - minY;
             var top = maxY - p.Y;
             var min = System.Math.Min(System.Math.Min(left, right), System.Math.Min(bottom, top));
-            if (facingRight && right <= min + PostVerificationGeometry.Epsilon) facing++;
-            if (!facingRight && left <= min + PostVerificationGeometry.Epsilon) facing++;
-            if (facingTop && top <= min + PostVerificationGeometry.Epsilon) facing++;
-            if (!facingTop && bottom <= min + PostVerificationGeometry.Epsilon) facing++;
+            var near = min + PostVerificationGeometry.Epsilon + candidate.CornerReach;
+            if (facingRight && right <= near) facing++;
+            if (!facingRight && left <= near) facing++;
+            if (facingTop && top <= near) facing++;
+            if (!facingTop && bottom <= near) facing++;
         }
         var travel = (arrival != null ? arrival.Value.DistanceTo(p) : 0.0)
             + (target != null ? p.DistanceTo(target.Value) : 0.0);

@@ -20,7 +20,17 @@ public class MachineConfig
     /// </summary>
     public SupportGridSettings? SupportGrid { get; set; }
 
+    /// <summary>
+    /// The edge-clamp rail new nests assigned this machine receive, in <see cref="Units"/>; null
+    /// until set (the machine then gives nests no clamps).
+    /// </summary>
+    public MachineClamps? Clamps { get; set; }
+
     public MotionConfig GetMotionOrPlaceholder() => Motion ?? MotionConfig.Placeholder(Units);
+
+    /// <summary>The machine's clamps in its units; off, at the default clamp size, when it has none.</summary>
+    public ClampSettings GetClampSettings() =>
+        Clamps?.ToSettings(Units) ?? ClampSettings.FromRail(null, MachineClamps.UnitsOf(Units), enabled: false);
 
     public ThicknessConfig? GetParameters(string material, double thickness) =>
         GetParameters(material, null, thickness);

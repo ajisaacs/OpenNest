@@ -109,6 +109,65 @@ public class CutOffSegmentPlanningTests
         Assert.Equal(result.RapidDistance, kept.RapidDistance, 6);
     }
 
+    // A frame with two small holes on its left strip, one above the other, and a window,
+    // between a locked square A at the top left, cut before it, and a locked square B to its
+    // right, cut after it. A line through the frame's right strip stops halfway up, so its one
+    // segment runs from the bottom edge to just below the frame and is cut straight before it.
+    // Planned without the segment, from A, the frame would cut its upper hole first; the tool
+    // is really at the bottom, so it cuts the lower hole first instead of crossing its own
+    // rapid. Replanned with the order kept, the frame plans the same holes from the same point.
+    [Fact]
+    public void PartAfterSegment_PlansItsHolesFromTheSegmentsEnd()
+    {
+        var parameters = ExplicitContourTests.Parameters();
+        var nest = new Nest();
+        var plate = nest.CreatePlate();
+        plate.Size = new Size(60, 120);
+        plate.Parts.Add(LockedSquare("A", new Vector(2, 42), topLeft: false));
+        var frame = new Part(new Drawing("frame", Frame()), new Vector(30, 5));
+        plate.Parts.Add(frame);
+        plate.Parts.Add(LockedSquare("B", new Vector(80, 40), topLeft: false));
+        var cutOff = new CutOff(new Vector(65, 0), CutOffAxis.Vertical) { EndLimit = 25 };
+        plate.CutOffs.Add(cutOff);
+        plate.RegenerateCutOffs(new CutOffSettings());
+        PlateSequencing.PlaceCutOffs(plate, [cutOff]);
+        Assert.Single(CutOffSegments.Of(plate, cutOff));
+
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, confirmedParameters: parameters));
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready && result.IndependentlyReplayed, Describe(result));
+        var order = result.ProposedOrder.Select(o => o.SourcePart.BaseDrawing.IsCutOff ? "s" : o.SourcePart.BaseDrawing.Name);
+        Assert.Equal("A s frame B", string.Join(" ", order));
+        var planned = result.ProposedOrder[2];
+        var rapids = planned.Execution.Motions.Where(m => m.Rapid).Select(m => m.End).ToArray();
+        // Into the lower hole (y 14.5 to 15.1 on the sheet), then the upper one (34.5 to 35.1).
+        Assert.InRange(rapids[0].Y, 14, 16);
+        Assert.InRange(rapids[1].Y, 34, 36);
+
+        Assert.Equal(CuttingCommitStatus.Applied, CuttingPlanService.Apply([result]).Status);
+        var kept = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, confirmedParameters: parameters,
+            preservePartOrder: true));
+        Assert.True(kept.Status == CuttingPlanStatus.Ready && kept.IndependentlyReplayed, Describe(kept));
+        Assert.Equal(result.RapidDistance, kept.RapidDistance, 6);
+    }
+
+    // 40 x 40 with 0.6 square holes at (2.5, 9.5) and (2.5, 29.5) and an 18 x 30 window.
+    private static Program Frame()
+    {
+        var program = new Program();
+        void Loop(params Vector[] points)
+        {
+            program.MoveTo(points[0].X, points[0].Y);
+            foreach (var point in points.Skip(1).Append(points[0]))
+                program.LineTo(point.X, point.Y);
+        }
+        Loop(new(0, 0), new(0, 40), new(40, 40), new(40, 0));
+        foreach (var y in new[] { 29.5, 9.5 })
+            Loop(new(2.5, y), new(3.1, y), new(3.1, y + 0.6), new(2.5, y + 0.6));
+        Loop(new(12, 5), new(30, 5), new(30, 35), new(12, 35));
+        return program;
+    }
+
     private const double Gap = 0.25, Width = 10.6, Neck = 5.6, Height = 20, Margin = 0.25;
     // The slanted shoulders need more horizontal room than the gap.
     private const double Pitch = (Width + Neck) / 2 + 2 * Gap;

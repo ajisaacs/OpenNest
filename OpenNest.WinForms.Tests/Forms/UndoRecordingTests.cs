@@ -151,7 +151,7 @@ public class UndoRecordingTests
     {
         UndoTestEnv.AcceptWhenShown<SupportGridForm>(form =>
             AllControls(form).OfType<CheckBox>().First(box => box.Text.StartsWith("This nest's sheets")).Checked = true);
-        env.AssertOneUndoableEdit("Support Grid", () => env.Click("SupportGrid_Click"));
+        env.AssertOneUndoableEdit("Support Bed", () => env.Click("SupportGrid_Click"));
     });
 
     [Fact]
@@ -228,7 +228,7 @@ public class UndoRecordingTests
     {
         env.Editor.PlateManager.LoadAt(0);
         using var form = new AutomaticCutOffForm(env.View, env.Nest.Units);
-        env.AssertOneUndoableEdit("Automatic Cut-Offs", () => UndoTestEnv.Invoke(form, "ApplyButton_Click", null, EventArgs.Empty));
+        env.AssertOneUndoableEdit("Automatic Scrap Cutoffs", () => UndoTestEnv.Invoke(form, "ApplyButton_Click", null, EventArgs.Empty));
     });
 
     [Fact]

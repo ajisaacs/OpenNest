@@ -10,13 +10,13 @@ namespace OpenNest.Forms;
 /// <summary>
 /// Nest &gt; Clamps...: edits the current nest's machine clamp rail (identical clamps, each on
 /// one sheet edge with its center measured from the plate origin along it). OK applies the rail
-/// to every plate of this nest; Cancel discards those edits. Save as Machine Defaults writes
-/// clamps.json immediately and is not undone by Cancel. All decisions live in
+/// to every plate of this nest; Cancel discards those edits. Save as Machine Defaults writes the
+/// nest's machine configuration immediately and is not undone by Cancel. All decisions live in
 /// <see cref="ClampRailEditor"/>; this form only renders and forwards input.
 /// </summary>
 public sealed class ClampsForm : Form
 {
-    private readonly ClampSettings machineDefaults;
+    private ClampSettings machineDefaults;
     private readonly Action<ClampSettings> saveDefaults;
     private readonly NumericUpDown widthBox;
     private readonly NumericUpDown depthBox;
@@ -30,11 +30,17 @@ public sealed class ClampsForm : Form
     private readonly CheckBox applyToNewNestsBox;
     private readonly Label savedLabel;
 
-    /// <param name="saveDefaults">Saves the machine defaults; this PC's clamp settings file when omitted.</param>
-    public ClampsForm(ClampRail rail, Units units, ClampSettings machineDefaults, Action<ClampSettings> saveDefaults = null)
+    /// <param name="machineDefaults">The clamps of the nest's machine, in any units.</param>
+    /// <param name="machineName">The nest's machine, or null when none is assigned.</param>
+    /// <param name="saveDefaults">
+    /// Saves the clamps as the nest's machine's; null when the nest has no machine on file, which
+    /// disables saving.
+    /// </param>
+    public ClampsForm(ClampRail rail, Units units, ClampSettings machineDefaults, string machineName,
+        Action<ClampSettings> saveDefaults)
     {
         this.machineDefaults = machineDefaults ?? ClampSettings.Fallback;
-        this.saveDefaults = saveDefaults ?? (settings => settings.Save(ClampSettings.DefaultPath));
+        this.saveDefaults = saveDefaults;
         Editor = new ClampRailEditor(rail, units, this.machineDefaults.Enabled);
         var unit = UnitsHelper.GetShortString(units);
 
@@ -113,7 +119,7 @@ public sealed class ClampsForm : Form
 
         var defaultsGroup = new GroupBox
         {
-            Text = "Machine defaults (clamps.json)",
+            Text = string.IsNullOrEmpty(machineName) ? "Machine defaults (no machine assigned)" : $"Machine defaults ({machineName})",
             Dock = DockStyle.Top,
             AutoSize = true,
             Padding = new Padding(8),
@@ -140,10 +146,13 @@ public sealed class ClampsForm : Form
         {
             AutoSize = true,
             MaximumSize = new Size(430, 0),
-            Text =
-                "Save as Machine Defaults writes the file immediately; Cancel below does not undo "
-                + "it. OK and Cancel only affect this nest.",
+            Text = saveDefaults == null
+                ? "Assign this nest a machine on file in Nest > Machine to save its clamps."
+                : "Save as Machine Defaults writes the machine configuration immediately; Cancel below "
+                    + "does not undo it. OK and Cancel only affect this nest.",
         };
+        applyToNewNestsBox.Enabled = saveDefaults != null;
+        saveDefaultsButton.Enabled = saveDefaults != null;
         defaultsLayout.Controls.Add(applyToNewNestsBox);
         defaultsLayout.Controls.Add(defaultsButtons);
         defaultsLayout.Controls.Add(savedLabel);
@@ -270,6 +279,7 @@ public sealed class ClampsForm : Form
         {
             var settings = Editor.ToMachineDefaults();
             saveDefaults(settings);
+            machineDefaults = settings;
             savedLabel.Text = settings.Enabled
                 ? $"Saved {DateTime.Now:t}: new nests get these {settings.ClampCount} clamps. Cancel does not undo this."
                 : $"Saved {DateTime.Now:t}: new nests get no clamps. Cancel does not undo this.";

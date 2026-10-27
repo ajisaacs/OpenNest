@@ -135,7 +135,7 @@ namespace OpenNest.CNC
             if (HasDisplayPerimeterMotion(executed))
                 throw new InvalidOperationException(
                     $"{partName} has a display perimeter (a supplied blank's outline that is never cut) but no "
-                    + "cutting plan. Run Plan Cutting before posting so only its cutouts are cut.");
+                    + "cutting plan. Plan cutting first (Plate > Plan Cutting..., or --plan-cutting) so only its cutouts are cut.");
             return executed;
         }
 

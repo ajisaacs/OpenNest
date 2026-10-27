@@ -447,6 +447,8 @@ public sealed class CuttingPlanProposal
             Quadrant = source.Quadrant,
             PartSpacing = source.PartSpacing,
             EdgeSpacing = source.EdgeSpacing,
+            // View > Draw Support shows the proposal on the same bed.
+            SupportBed = source.SupportBed,
         };
         // Machine clamps stay visible while inspecting the proposal; zones are immutable.
         foreach (var zone in source.ClampZones)

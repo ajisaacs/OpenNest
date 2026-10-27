@@ -177,7 +177,7 @@ namespace OpenNest.Forms
         }
 
         /// <summary>
-        /// When the server holds none of this PC's machines, post settings, clamp settings or nest
+        /// When the server holds none of this PC's machines (with their clamps), post settings or nest
         /// defaults, offers to upload them so every workstation uses them. Documents the server
         /// already holds are never replaced.
         /// </summary>
@@ -200,10 +200,6 @@ namespace OpenNest.Forms
                 if (current.Get(SharedSettingKinds.Post, PostKey(post)) == null)
                     uploads.Add((SharedSettingKinds.Post, PostKey(post), post.SerializeConfig(), $"Post settings: {post.Name}"));
             }
-            if (current.Get(SharedSettingKinds.Clamps, SharedSettingKinds.DefaultKey) == null
-                && File.Exists(ClampSettings.DefaultPath))
-                uploads.Add((SharedSettingKinds.Clamps, SharedSettingKinds.DefaultKey,
-                    ClampSettings.Load(ClampSettings.DefaultPath).ToJson(), "Clamp settings"));
             if (current.Get(SharedSettingKinds.NestDefaults, SharedSettingKinds.DefaultKey) == null
                 && File.Exists(NestDefaults.DefaultPath))
                 uploads.Add((SharedSettingKinds.NestDefaults, SharedSettingKinds.DefaultKey,

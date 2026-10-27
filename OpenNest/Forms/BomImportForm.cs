@@ -408,9 +408,9 @@ namespace OpenNest.Forms
             var jobName = txtJobName.Text.Trim();
             var nestsCreated = 0;
             var importErrors = new List<string>();
-            // Read when the nests are created, warning (once per session) like New does.
-            var clamps = MachineSettings.LoadClampSettings(this);
+            // Read when the nests are created, like New does.
             var machine = MachineSettings.DefaultMachine(_defaults, MachineSettings.LoadMachines());
+            var clamps = MachineSettings.LoadClampSettings(machine);
 
             foreach (var group in groups)
             {

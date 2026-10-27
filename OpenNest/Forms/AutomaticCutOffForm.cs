@@ -377,7 +377,7 @@ public partial class AutomaticCutOffForm : Form
             // The batch service replans every plate before mutating any; never accept previews.
             Plate[] plates;
             IReadOnlyList<AutomaticCutOffPlan> plans;
-            using (var change = plateView.BeginChange("Automatic Cut-Offs"))
+            using (var change = plateView.BeginChange("Automatic Scrap Cutoffs"))
             {
                 (plates, plans) = Calculate(apply: true);
                 // A blocked batch changes nothing.

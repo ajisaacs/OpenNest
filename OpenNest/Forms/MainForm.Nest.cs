@@ -135,8 +135,12 @@ namespace OpenNest.Forms
                 return;
             }
 
-            var defaults = MachineSettings.LoadSavedClampSettings(out _);
-            using var form = new ClampsForm(nest.PlateDefaults.ClampRail, nest.Units, defaults, MachineSettings.SaveClampSettings);
+            var machine = MachineSettings.FindMachine(nest.Machine);
+            Action<ClampSettings> save = machine == null
+                ? null
+                : settings => MachineSettings.SaveClampSettings(machine.Id, settings);
+            using var form = new ClampsForm(nest.PlateDefaults.ClampRail, nest.Units, MachineSettings.LoadClampSettings(machine),
+                machine?.Name ?? nest.Machine?.Name, save);
             if (form.ShowDialog(this) != DialogResult.OK)
                 return;
 
@@ -170,7 +174,7 @@ namespace OpenNest.Forms
             if (form.ShowDialog(this) != DialogResult.OK)
                 return;
 
-            editForm.RecordChange("Support Grid", () => nest.SetSupportBed(form.Bed));
+            editForm.RecordChange("Support Bed", () => nest.SetSupportBed(form.Bed));
             foreach (var view in views)
                 view.Invalidate();
         }

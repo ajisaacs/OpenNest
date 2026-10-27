@@ -602,7 +602,7 @@ public sealed class PreparedContours
     /// <summary>Preferred tier: convex corners, straight midpoints, tangent joints.</summary>
     private List<ContourEntryCandidate> PreferredCandidates(Shape shape, int contourOrdinal, CancellationToken token)
         => CataloguePoints(shape, token)
-            .Select(p => new ContourEntryCandidate(Entry(contourOrdinal, p.EntityOrdinal, p.Point), p.Kind))
+            .Select(p => new ContourEntryCandidate(Entry(contourOrdinal, p.EntityOrdinal, p.Point), p.Kind, p.CornerReach))
             .ToList();
 
     /// <summary>
@@ -763,12 +763,14 @@ public sealed class PreparedContours
     /// <summary>
     /// The preferred catalogue points for one contour: for each entity, its convex corner
     /// (end vertex, classified from the contour's own winding) and its straight-edge midpoint,
-    /// plus tangent line/arc joints. Reflex, cusp and collinear-split vertices contribute
+    /// plus tangent line/arc joints. The joints of a corner fillet (see <see cref="FilletReach"/>)
+    /// are that corner's convex corners. Reflex, cusp and collinear-split vertices contribute
     /// nothing; a single whole circle yields no points at all.
     /// </summary>
-    private List<(int EntityOrdinal, Vector Point, AutomaticEntryKind Kind)> CataloguePoints(Shape shape, CancellationToken token)
+    private List<(int EntityOrdinal, Vector Point, AutomaticEntryKind Kind, double CornerReach)> CataloguePoints(
+        Shape shape, CancellationToken token)
     {
-        var found = new List<(int, Vector, AutomaticEntryKind)>();
+        var found = new List<(int, Vector, AutomaticEntryKind, double)>();
         var count = shape.Entities.Count;
         if (count == 1 && shape.Entities[0] is Circle)
         {
@@ -792,29 +794,65 @@ public sealed class PreparedContours
                 switch (corner.Kind)
                 {
                     case ContourCuttingStrategy.CornerKind.Convex:
-                        found.Add((i, vertex, AutomaticEntryKind.ConvexCorner));
+                        found.Add((i, vertex, AutomaticEntryKind.ConvexCorner, 0));
                         break;
                     case ContourCuttingStrategy.CornerKind.Smooth
                         when entity is Line && Next(i) is Arc:
                         // A line leaving into an arc: the tangent joint. The reverse travel
                         // order classifies the same joint from the arc, matched below.
-                        found.Add((i, vertex, AutomaticEntryKind.TangentJoint));
+                        found.Add(Joint(i, vertex, (i + 1) % count));
                         break;
                     // Reflex, cusp, collinear splits (smooth line→line) and arc→line joins
                     // of a plain straight edge are not preferred automatic starts here.
                     case ContourCuttingStrategy.CornerKind.Smooth
                         when entity is Arc && Next(i) is Line:
-                        found.Add((i, vertex, AutomaticEntryKind.TangentJoint));
+                        found.Add(Joint(i, vertex, i));
                         break;
                 }
             }
 
             if (entity is Line line)
-                found.Add((i, line.MidPoint, AutomaticEntryKind.StraightMidpoint));
+                found.Add((i, line.MidPoint, AutomaticEntryKind.StraightMidpoint, 0));
         }
         return found;
 
         Entity Next(int index) => shape.Entities[(index + 1) % count];
+
+        (int, Vector, AutomaticEntryKind, double) Joint(int entityOrdinal, Vector vertex, int arcOrdinal) =>
+            FilletReach(shape, arcOrdinal) is { } reach
+                ? (entityOrdinal, vertex, AutomaticEntryKind.ConvexCorner, reach)
+                : (entityOrdinal, vertex, AutomaticEntryKind.TangentJoint, 0);
+    }
+
+    /// <summary>
+    /// How far the joints of the arc at <paramref name="arcOrdinal"/> lie from the sharp corner it
+    /// rounds, when it is a corner fillet: tangent to straight edges at both ends, turning less
+    /// than a half circle the convex way, and reaching back along each edge no further than the
+    /// edge is long. A fillet's joints start the cut at the corner, where the mismatch when the
+    /// cut closes is least seen, instead of on a straight edge. Null for any other arc.
+    /// </summary>
+    private static double? FilletReach(Shape shape, int arcOrdinal)
+    {
+        var count = shape.Entities.Count;
+        if (shape.Entities[arcOrdinal] is not Arc arc
+            || shape.Entities[(arcOrdinal + count - 1) % count] is not Line before
+            || shape.Entities[(arcOrdinal + 1) % count] is not Line after)
+            return null;
+        var sweep = arc.SweepAngle();
+        if (sweep >= System.Math.PI - OpenNest.Math.Tolerance.Epsilon)
+            return null;
+        if (!IsSmooth(before.EndPoint, before) || !IsSmooth(arc.EndPoint(), arc))
+            return null;
+        var winding = ContourCuttingStrategy.DetermineWinding(shape);
+        if (ContourCuttingStrategy.ClassifyTurn((before.EndPoint - before.StartPoint).Normalize(),
+                (after.EndPoint - after.StartPoint).Normalize(), winding) != ContourCuttingStrategy.CornerKind.Convex)
+            return null;
+        var reach = arc.Radius * System.Math.Tan(sweep / 2);
+        return reach <= System.Math.Min(before.Length, after.Length) ? reach : null;
+
+        bool IsSmooth(Vector vertex, Entity entity) =>
+            ContourCuttingStrategy.TryClassifyAutomaticStartCorner(shape, vertex, entity, out var corner)
+            && corner.Kind == ContourCuttingStrategy.CornerKind.Smooth;
     }
 
     /// <summary>Emits every contour once in caller order, holes before perimeter, with scribes once.</summary>

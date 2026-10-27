@@ -698,11 +698,12 @@ class ImmutableTagCollisions(unittest.TestCase):
 
 
 class WorkflowBehavior(unittest.TestCase):
-    def test_prerelease_skips_ghcr_publish_but_stable_release_and_manual_dispatch_remain(self):
+    def test_only_a_manual_dispatch_from_master_publishes_to_ghcr(self):
         workflow = pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/server-image.yml"
         publish = workflow.read_text().split("\n  publish:\n", 1)[1].split("\n  verify-published:\n", 1)[0]
         condition = publish.split("    if: >-\n", 1)[1].split("    runs-on:", 1)[0]
-        self.assertIn("github.event_name == 'release' && github.event.release.prerelease == false", condition)
+        # Publishing a GitHub Release, stable or pre-release, never publishes the image.
+        self.assertNotIn("'release'", condition)
         self.assertIn("github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'", condition)
 
     def test_build_log_pipeline_preserves_docker_failure(self):

@@ -46,7 +46,7 @@ public sealed class DrawingLibraryBrowseSession : BrowseSession<DrawingLibraryPa
     public override string Summary =>
         PageSummary("drawings",
             Search.Length > 0 ? "No drawings match the search."
-            : IsFilteredToNest ? "No library drawings match this nest's material and thickness. Choose Show all to see every drawing."
+            : IsFilteredToNest ? "No library drawings match this nest's material and thickness. Tick Show all materials to see every drawing."
             : "No drawings in the library.");
 
     /// <summary>Lifts or restores the nest filter and returns to the first page.</summary>

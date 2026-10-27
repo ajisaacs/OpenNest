@@ -49,8 +49,10 @@ namespace OpenNest.Controls
             using var supportedPen = new Pen(SupportedColor, 2f);
             using var tippingPen = new Pen(TippingColor, 2f);
             using var tabBrush = new SolidBrush(TabColor);
-            // Tab points keep clear of inside corners as Plan Cutting's do.
-            var clearance = SupportAnalyzer.InsideCornerClearance(plate.CuttingParameters?.TabConfig?.Size ?? 0);
+            // Tab points keep clear of inside corners as Plan Cutting's do. A proposal preview has no
+            // parameters of its own, so it uses the live plate's.
+            var parameters = plate.CuttingParameters ?? view.Plate?.CuttingParameters;
+            var clearance = SupportAnalyzer.InsideCornerClearance(parameters?.TabConfig?.Size ?? 0);
             foreach (var part in plate.Parts)
             {
                 if (part?.BaseDrawing == null || part.BaseDrawing.IsCutOff)

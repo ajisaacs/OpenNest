@@ -66,18 +66,31 @@ the origin: the origin side and far side run along X, the origin end and far
 end along Y. **Nest > Clamps...** edits the current nest's rail as a list, and
 **Plate > Edit Clamps** edits it on the plate view (below). **OK** applies it to every plate of the nest (**Cancel** discards
 the edits); removing every center removes the clamps. **Load Machine Defaults**
-only fills the dialog. **Save as Machine Defaults** writes
-`%APPDATA%\OpenNest\clamps.json` (or, in Database mode once the server holds them, the
-[shared clamp settings](shared-settings.md)) immediately, with the clamps, their units and
-whether new nests receive them; Cancel does not undo that write. The dialog
+only fills the dialog with the clamps of the nest's machine (**Nest > Machine**).
+**Save as Machine Defaults** writes the clamps, and whether new nests receive them,
+into that machine's configuration immediately (in Database mode, the
+[shared machine](shared-settings.md) once the server holds it); Cancel does not undo
+that write. A nest without a machine on file cannot save its clamps. The dialog
 refuses to open while nesting or a plate action is running.
 
-Clamps are off by default. Until `clamps.json` is saved with clamps enabled and
-at least one center, New and BOM import create nests without clamps exactly as
-before. When enabled, a new nest gets the rail converted to its units. A missing
-file keeps clamps off; an unreadable file, or one with ignored invalid values
-(a bad clamp center is dropped), warns once per session that new nests may not
-match the machine.
+Clamps are physical fixtures of a machine, so each machine keeps its own rail on the
+**Clamps** tab of **Tools > Machine Configuration**: whether new nests get it, the
+clamp width and depth, the minutes to remove one clamp, and the clamp centers, all in
+the machine's units. New and BOM import give a new nest the rail of the machine they
+assign it (the **Tools > Nest Defaults** machine, or the first by name), converted to
+the nest's units. A nest keeps its own copy: editing a machine's clamps, or assigning a
+nest another machine, never moves the clamps of an existing nest; use **Load Machine
+Defaults** for that. Clamps are off by default: a machine without clamps, or with them
+switched off or without a center, gives new nests none. A stored size or removal time
+that is not valid falls back to the default and an invalid center is dropped.
+
+Before machines held clamps, one `%APPDATA%\OpenNest\clamps.json` (or the server's
+shared clamp settings) served every machine. At startup, while no machine has clamps of
+its own, OpenNest copies that rail once into the Nest Defaults machine, or the only
+machine, converted to the machine's units. With several machines and no default it asks
+which machine has those clamps (once per session; **Not Now** leaves new nests without
+clamps until a machine has some). Once any machine has clamps the old file is no longer
+read; it is left in place.
 
 Every plate follows the nest's rail at its own size and quadrant: clamps wholly
 beyond a shorter sheet are left off it, one still reaching onto the sheet keeps

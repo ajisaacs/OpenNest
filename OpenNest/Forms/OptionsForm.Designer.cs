@@ -300,7 +300,7 @@
             this.ledgerGroupBox.Size = new System.Drawing.Size(684, 92);
             this.ledgerGroupBox.TabIndex = 4;
             this.ledgerGroupBox.TabStop = false;
-            this.ledgerGroupBox.Text = "MaterialLedger (optional; Auto Nest loads stock from it; set per machine)";
+            this.ledgerGroupBox.Text = "MaterialLedger (optional; Auto Nest loads stock from it; saved for this Windows user)";
             //
             // ledgerUrlLabel
             //

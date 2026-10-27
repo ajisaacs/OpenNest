@@ -40,8 +40,9 @@ namespace OpenNest.Forms
             var defaults = MachineSettings.LoadNestDefaults();
             (units is { } converted ? defaults.ConvertedTo(converted) : defaults).ApplyTo(nest);
             // After the defaults so the rail and grid are converted to the new nest's units.
-            MachineSettings.LoadClampSettings(owner).ApplyToNewNest(nest);
-            MachineSettings.AssignMachine(nest, MachineSettings.DefaultMachine(defaults, MachineSettings.LoadMachines()));
+            var machine = MachineSettings.DefaultMachine(defaults, MachineSettings.LoadMachines());
+            MachineSettings.LoadClampSettings(machine).ApplyToNewNest(nest);
+            MachineSettings.AssignMachine(nest, machine);
             return nest;
         }
 

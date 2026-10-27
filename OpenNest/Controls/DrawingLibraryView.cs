@@ -509,7 +509,7 @@ namespace OpenNest.Controls
             {
                 ShowMessage(current == null
                     ? $"'{listed.Name}' is no longer in the library."
-                    : $"'{listed.Name}' was archived. Restore it to release it.", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    : $"'{listed.Name}' was archived, so it can't be released.", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 

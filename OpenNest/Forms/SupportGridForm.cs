@@ -77,7 +77,7 @@ public sealed class SupportGridForm : Form
                 + "first at the offset from the plate origin into the sheet; or slats, each a strip of "
                 + "the slat thickness running the full length or width of the table, one every pitch, "
                 + "the first centered at the offset. A part whose center of gravity is not inside its "
-                + "contacts by the stability margin can tip; with \"Tab parts the support grid cannot "
+                + "contacts by the stability margin can tip; with \"Only tab parts the support grid can't "
                 + "hold level\" in Cutting Settings, Plan Cutting tabs it where the tab steadies it. "
                 + "The registration tolerance allows for a sheet loaded off its place.",
         });

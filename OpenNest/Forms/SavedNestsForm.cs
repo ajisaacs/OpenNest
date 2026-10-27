@@ -307,18 +307,23 @@ public sealed class SavedNestsForm : Form
         findBar.Controls.Add(nextButton);
         findBar.Controls.Add(summaryLabel);
 
-        var bottom = new TableLayoutPanel
+        // The find bar sits between the Nests header and the grid it filters, and comes
+        // first in the tab order.
+        var findPanel = new TableLayoutPanel
         {
-            Dock = DockStyle.Bottom,
+            Dock = DockStyle.Top,
             AutoSize = true,
             ColumnCount = 1,
-            Padding = new Padding(3, 3, 3, 6),
+            Padding = new Padding(3, 0, 3, 3),
+            TabIndex = 0,
         };
-        bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        bottom.Controls.Add(findBar);
+        findPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        findPanel.Controls.Add(findBar);
+        nestGrid.TabIndex = 1;
+        split.Panel1.Controls.Add(findPanel);
+        split.Panel1.Controls.SetChildIndex(findPanel, 1);
 
         Controls.Add(split);
-        Controls.Add(bottom);
 
         Load += (_, _) =>
         {

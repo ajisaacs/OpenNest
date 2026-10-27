@@ -218,7 +218,10 @@ from the start point. Its 2-opt and Or-opt passes would grow with the square of 
 part count. Replans after a learned rule use the plain tour. If a part on that order cannot be
 reached without crossing parts already cut, the search learns "cut this part
 before those", backs up to just before the earliest of them and re-plans the rest
-from the tool position there; parts cut before that point are kept. The first pass
+from the tool position there; parts cut before that point are kept. When the part
+cannot come earlier (a sheet separator is cut after everything), it learns the other
+way round, "cut the part the approach left from before those", so the tool arrives
+from beyond them. The first pass
 along an order that teaches such a rule ends the round; the directed-recovery and
 full passes run only when the lighter pass taught nothing. An attempt
 stops backtracking after a stall of 8 x entries x contours expansions without
@@ -227,7 +230,8 @@ parts before it. The contours are the larger count of the blocked part and the p
 cut just before it, whose departure a retry changes, so one many-holed part elsewhere
 on the plate does not lengthen every stall. A cutoff is the exception: it is a fixed program and cutting it earlier never
 makes its own cut harder, so an approach into a non-separating cutoff that crosses parts already
-cut teaches "cut the cutoff before them" at once, without that stall. A rule that would contradict an order already required is skipped.
+cut teaches "cut the cutoff before them" at once, without that stall, and one into a sheet
+separator teaches its other-way-round rule at once. A rule that would contradict an order already required is skipped.
 "Cut before" rules are a heuristic (a part blocked straight after another may be
 reachable via a third), so once nothing new can be learned the remaining budget
 first tries sequence-free recovery, visiting dependency-ready parts lazily by
@@ -247,7 +251,14 @@ segment that must precede some part (`CutOffInsertion`) goes as late as it can b
 the first part in its span of the line, into the latest gap where both rapids cross
 nothing cut before that point: the part after it keeps the program it was planned with,
 and only its incoming rapid is checked again from the segment's end. Segments due in the
-same gap are chained in the order placed, latest-due first. This keeps cutting local:
+same gap are chained in the order placed, latest-due first. A holed part cut straight
+after a segment was planned from where the tool was before the segment, but the tool is
+at the segment's end, often across the part from there: its holes were routed toward the
+wrong side and the rapid onto its first hole could cross the rapids between the others.
+So once the segments are placed, each such part keeps its outside entry and its place in
+the order, and takes the hole route and preferred hole entries planned from the
+segment's end; it keeps its planned holes when that route has no preferred entry for
+every hole or fails the checks. This keeps cutting local:
 the segment below a row of parts is cut while the route passes it, not up front, and
 never before a part it need not precede unless the geometry allows nothing later (a
 segment whose pierce is walled off by every part cut after a point goes before that
@@ -258,8 +269,8 @@ separator or a line through open scrap precedes nothing and is planned like a pa
 separator after everything, the other at its tour position.
 
 Wherever a segment sits in an order, the search looks through it: the part before it
-faces the next part, not the segment, and the part after it ranks its entries and hole
-route from where the tool was before the segment, while every rapid is still checked
+faces the next part, not the segment, and the part after it ranks its outside entry
+from where the tool was before the segment, while its hole route and every rapid start
 from the segment's end. A kept order with segments where a plan put them (an applied
 plan replanned with `Keep the current part order`) therefore gets the entries and
 routes the plan had, and replays Ready again.
@@ -637,7 +648,7 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   plan keeps locked lead-ins and existing cut-offs unchanged. `Clear Lead-ins &
   Cut-offs...` asks first, then removes every applied lead-in (locked and hand-placed
   ones too), every cut-off and the plates' recorded cutting settings, keeping part
-  poses, order and quantities, and replans from scratch. There is no undo. The button stays
+  poses, order and quantities, and replans from scratch. To reverse it, close the panel and use Edit > Undo. The button stays
   enabled while a plan runs: confirming cancels that run, then clears once the cancellation
   lands (so the plates never change under the planner) and replans.
 - `Add scrap cut-offs` runs the automatic cut-off planner (defaults 35 in /

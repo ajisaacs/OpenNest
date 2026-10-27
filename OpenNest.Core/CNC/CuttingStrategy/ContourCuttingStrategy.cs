@@ -867,10 +867,18 @@ namespace OpenNest.CNC.CuttingStrategy
         /// A turn whose offset over the tangent is within chaining tolerance is smooth,
         /// not a corner.
         /// </summary>
-        private static CornerKind ClassifyCorner(ContourCorner corner, RotationType winding)
+        private static CornerKind ClassifyCorner(ContourCorner corner, RotationType winding) =>
+            ClassifyTurn(corner.TangentIn, corner.TangentOut, winding);
+
+        /// <summary>
+        /// The corner a contour of <paramref name="winding"/> would make turning from travel
+        /// direction <paramref name="tangentIn"/> to <paramref name="tangentOut"/>, classified
+        /// exactly as a shared vertex is (see <see cref="TryClassifyAutomaticStartCorner"/>).
+        /// </summary>
+        internal static CornerKind ClassifyTurn(Vector tangentIn, Vector tangentOut, RotationType winding)
         {
-            var cross = corner.TangentIn.X * corner.TangentOut.Y - corner.TangentIn.Y * corner.TangentOut.X;
-            var dot = corner.TangentIn.DotProduct(corner.TangentOut);
+            var cross = tangentIn.X * tangentOut.Y - tangentIn.Y * tangentOut.X;
+            var dot = tangentIn.DotProduct(tangentOut);
             var turn = winding == RotationType.CCW ? cross : -cross;
 
             if (System.Math.Abs(turn) <= Tolerance.Epsilon)
