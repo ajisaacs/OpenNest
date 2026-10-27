@@ -247,7 +247,14 @@ segment that must precede some part (`CutOffInsertion`) goes as late as it can b
 the first part in its span of the line, into the latest gap where both rapids cross
 nothing cut before that point: the part after it keeps the program it was planned with,
 and only its incoming rapid is checked again from the segment's end. Segments due in the
-same gap are chained in the order placed, latest-due first. This keeps cutting local:
+same gap are chained in the order placed, latest-due first. A holed part cut straight
+after a segment was planned from where the tool was before the segment, but the tool is
+at the segment's end, often across the part from there: its holes were routed toward the
+wrong side and the rapid onto its first hole could cross the rapids between the others.
+So once the segments are placed, each such part keeps its outside entry and its place in
+the order, and takes the hole route and preferred hole entries planned from the
+segment's end; it keeps its planned holes when that route has no preferred entry for
+every hole or fails the checks. This keeps cutting local:
 the segment below a row of parts is cut while the route passes it, not up front, and
 never before a part it need not precede unless the geometry allows nothing later (a
 segment whose pierce is walled off by every part cut after a point goes before that
@@ -258,8 +265,8 @@ separator or a line through open scrap precedes nothing and is planned like a pa
 separator after everything, the other at its tour position.
 
 Wherever a segment sits in an order, the search looks through it: the part before it
-faces the next part, not the segment, and the part after it ranks its entries and hole
-route from where the tool was before the segment, while every rapid is still checked
+faces the next part, not the segment, and the part after it ranks its outside entry
+from where the tool was before the segment, while its hole route and every rapid start
 from the segment's end. A kept order with segments where a plan put them (an applied
 plan replanned with `Keep the current part order`) therefore gets the entries and
 routes the plan had, and replays Ready again.

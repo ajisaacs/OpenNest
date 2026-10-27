@@ -52,7 +52,7 @@ internal static class JointCuttingPlanSearch
         {
             var inserted = CutOffInsertion.Insert(snapshot, outcome.Order, attached, walk.CountExpansion, token);
             if (inserted != null)
-                return walk.Ready(inserted);
+                return walk.Ready(walk.FollowSegments(inserted));
         }
         catch (BudgetExceededException)
         {
@@ -523,8 +523,9 @@ internal static class JointCuttingPlanSearch
                         CountExpansion(source);
                         var checker = node.Checker.Copy();
                         if (Check(cut, cut.Execution, node.Position, checker, attempt))
-                            // A segment is transparent: the part after it ranks its entries and hole route
-                            // from where the tool was before the segment, as planned without it.
+                            // A segment is transparent to the part after it: that part ranks its outside entry
+                            // from where the tool was before the segment, as planned without it. Its hole
+                            // route starts where the tool is, the segment's end, as FollowSegments plans it.
                             yield return new(new([.. node.Order, cut], cut.Execution.DeparturePoint, checker, null, node,
                                     IsSegment(cut) ? node.RoutePosition : null),
                                 cut.Execution.RapidDistanceFrom(node.Position), cut.SourceOrdinal, -1, -1);
@@ -559,7 +560,7 @@ internal static class JointCuttingPlanSearch
                 }
                 var preference = node.Active?.Preference;
                 if (node.Active?.Perimeter is { } outside && preference == null)
-                    preference = PlanHoles(node.Active, outside);
+                    preference = PlanHoles(node.Active.Source, node.Active.Boundary.Position, outside);
                 var choices = node.Active?.Choices ?? [];
                 var arrival = node.Active?.Arrival ?? node.Position;
                 var before = node.Active?.Before ?? node.Checker;
@@ -1216,12 +1217,13 @@ internal static class JointCuttingPlanSearch
             return ordered;
         }
 
-        private HolePreference PlanHoles(ActivePart active, ContourChoice perimeter)
+        // The hole route and preferred hole entries from the tool's global arrival onto the part,
+        // ending at the outside entry.
+        private HolePreference PlanHoles(FixedProgramPlacement source, Vector arrival, ContourChoice perimeter)
         {
-            var source = active.Source;
             var prepared = source.Prepared;
             var holes = Enumerable.Range(0, prepared.PerimeterOrdinal).ToArray();
-            var localArrival = active.Boundary.RoutePosition - source.Location;
+            var localArrival = arrival - source.Location;
             var centres = CuttingHoleOrder.Centres(prepared, localArrival, token);
             var endpoint = perimeter.Point;
             var entries = new Dictionary<int, ContourChoice>();
@@ -1253,6 +1255,72 @@ internal static class JointCuttingPlanSearch
                     $"Preferred hole path unavailable: {ex.Message}"));
             }
             return new(route, entries, pierces, endpoint);
+        }
+
+        /// <summary>
+        /// The order with segments placed, where each holed part cut straight after a segment
+        /// takes the hole route and entries planned from the segment's end, where the tool
+        /// really is. The free search planned the part as if the segment were not there, from
+        /// where the tool was before it. The part's outside entry and the order stay, so the
+        /// route is still the one planned without the lines; a kept order replanned later plans
+        /// the same holes from the same point. A part keeps its planned holes when the new
+        /// route has no preferred entry for every hole or does not pass the checks.
+        /// </summary>
+        internal IReadOnlyList<FixedProgramPlacement> FollowSegments(IReadOnlyList<FixedProgramPlacement> order)
+        {
+            var followed = order.ToArray();
+            var checker = new ReleasedContourState(reportMissingLeadIns: false);
+            var position = snapshot.StartPoint;
+            try
+            {
+                for (var index = 0; index < followed.Length; index++)
+                {
+                    if (index > 0 && IsSegment(followed[index - 1])
+                        && FromSegment(followed[index], position, checker) is { } replanned)
+                        followed[index] = replanned;
+                    var placement = followed[index];
+                    checker.Check(placement.Execution, position, placement.SourceOrdinal + 1, placement.IsCutOff,
+                        placement.FixedMotions(placement.Execution), token);
+                    position = placement.Execution.DeparturePoint;
+                }
+            }
+            catch (BudgetExceededException)
+            {
+                // The plan is complete without this refinement; keep it as placed.
+                return order;
+            }
+            return followed;
+        }
+
+        // The part re-planned from arrival with its outside entry kept, or null to keep it.
+        private FixedProgramPlacement FromSegment(FixedProgramPlacement placement, Vector arrival,
+            ReleasedContourState checker)
+        {
+            var source = snapshot.Placements[placement.SourceOrdinal];
+            var prepared = source.Prepared;
+            if (prepared is not { HasCutPerimeter: true } || prepared.PerimeterOrdinal == 0
+                || placement.ContourChoices.Count != prepared.Count
+                || placement.ContourChoices[^1].ContourOrdinal != prepared.PerimeterOrdinal)
+                return null;
+            var perimeter = placement.ContourChoices[^1];
+            var preference = PlanHoles(source, arrival, perimeter);
+            if (preference.Entries.Count != prepared.PerimeterOrdinal)
+                return null;
+            var choices = preference.Route.Select(hole => preference.Entries[hole]).Append(perimeter).ToArray();
+            Program program;
+            OwnedExecution execution;
+            try
+            {
+                CountExpansion(source);
+                program = prepared.Emit(choices);
+                execution = ExecutionMotionReader.Read(program, source.Location, arrival, token);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or ArithmeticException or NotSupportedException)
+            {
+                return null;
+            }
+            return Check(source, execution, arrival, checker.Copy(), new Attempt(null), choices)
+                ? source.Propose(program, execution, choices, token) : null;
         }
 
         // The placements cut at a node, and the excluded ones, which count as cut throughout.
@@ -1568,8 +1636,8 @@ internal static class JointCuttingPlanSearch
         ContourChoice Perimeter = null, HolePreference Preference = null);
     /// <summary>
     /// A search state; Previous links a whole-part boundary to the boundary before it. Anchor,
-    /// when set, is where the tool was before the cut-off segments cut last: entries and hole
-    /// routes rank from <see cref="RoutePosition"/>, every rapid is checked from Position.
+    /// when set, is where the tool was before the cut-off segments cut last: outside entries
+    /// rank from <see cref="RoutePosition"/>; hole routes and every rapid start from Position.
     /// </summary>
     private sealed record Node(FixedProgramPlacement[] Order, Vector Position, ReleasedContourState Checker,
         ActivePart Active, Node Previous, Vector? Anchor = null)
