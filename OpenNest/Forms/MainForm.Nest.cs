@@ -174,7 +174,7 @@ namespace OpenNest.Forms
             if (form.ShowDialog(this) != DialogResult.OK)
                 return;
 
-            editForm.RecordChange("Support Grid", () => nest.SetSupportBed(form.Bed));
+            editForm.RecordChange("Support Bed", () => nest.SetSupportBed(form.Bed));
             foreach (var view in views)
                 view.Invalidate();
         }

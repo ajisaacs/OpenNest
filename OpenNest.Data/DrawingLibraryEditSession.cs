@@ -30,7 +30,7 @@ public sealed class DrawingLibraryEditSession
         if (listed.Id == Guid.Empty || listed.Revision < 1)
             throw new ArgumentException("Choose a listed library drawing to edit.", nameof(listed));
         if (listed.Archived)
-            throw new ArgumentException("An archived library drawing cannot be edited. Restore it first.", nameof(listed));
+            throw new ArgumentException("An archived library drawing cannot be edited.", nameof(listed));
         SavedBy = savedBy ?? "";
     }
 

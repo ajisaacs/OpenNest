@@ -139,7 +139,7 @@ public static class PostVerificationAnalyzer
                     // perimeter left is an unplanned blank whose outline a post would refuse.
                     if (moves.Any(move => move.Layer == LayerType.DisplayPerimeter))
                         Incomplete("This part has a display perimeter (a supplied blank's outline that is never cut) "
-                            + "but no cutting plan; posts refuse it. Run Plan Cutting so only its cutouts are cut.");
+                            + "but no cutting plan; posts refuse it. Plan cutting first (Plate > Plan Cutting..., or --plan-cutting) so only its cutouts are cut.");
                     if (expectsCuts && !moves.Any(move => !move.Rapid
                         && move.Layer is LayerType.Cut or LayerType.Display
                         && move.Curve.Length > PostVerificationGeometry.Epsilon))

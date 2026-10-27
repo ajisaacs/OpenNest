@@ -638,7 +638,7 @@ namespace OpenNest.Controls
             }
             if (current.Archived)
             {
-                ShowMessage($"'{current.Name}' is archived in the library. Restore it there before editing it.",
+                ShowMessage($"'{current.Name}' is archived in the library, so it can't be edited.",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return false;
             }

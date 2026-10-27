@@ -100,7 +100,7 @@ public class DrawingLibraryBrowseSessionTests
     }
 
     [Theory]
-    [InlineData(false, "", "No library drawings match this nest's material and thickness. Choose Show all to see every drawing.")]
+    [InlineData(false, "", "No library drawings match this nest's material and thickness. Tick Show all materials to see every drawing.")]
     [InlineData(true, "", "No drawings in the library.")]
     [InlineData(false, "no such text", "No drawings match the search.")]
     public async Task Summary_ExplainsAnEmptyResult(bool showAll, string search, string expected)
