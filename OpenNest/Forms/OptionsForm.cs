@@ -252,14 +252,14 @@ namespace OpenNest.Forms
                 Settings.Default.UpdateFeedUrl = "";
                 Settings.Default.Save();
                 updateFeedUrlBox.Text = "";
-                MessageBox.Show(this, "Update feed URL cleared. Update checks are disabled.",
+                MessageBox.Show(this, "Update feed URL cleared. Updates will come from GitHub Releases after a restart.",
                     "Update Feed URL", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             if (!NestStorageSettings.TryNormalizeServerUrl(text, out var url))
             {
-                MessageBox.Show(this, "Enter a valid http or https feed URL, or clear the field to disable updates.",
+                MessageBox.Show(this, "Enter a valid http or https feed URL, or clear the field to update from GitHub Releases.",
                     "Update Feed URL", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }

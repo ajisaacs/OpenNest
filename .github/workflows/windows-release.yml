@@ -96,6 +96,11 @@ jobs:
           path: |
             artifacts/*.zip
             artifacts/*.sha256
+            artifacts/velopack/OpenNest-win-Setup.exe
+            artifacts/velopack/OpenNest-win-Portable.zip
+            artifacts/velopack/*-full.nupkg
+            artifacts/velopack/releases.win.json
+            artifacts/velopack/RELEASES
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
