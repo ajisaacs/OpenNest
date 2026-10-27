@@ -465,23 +465,23 @@ namespace OpenNest.Controls
 
             foreach (var bend in part.BaseDrawing.Bends)
             {
-                var start = bend.StartPoint;
-                var end = bend.EndPoint;
-
-                if (part.Rotation != 0)
-                {
-                    start = start.Rotate(part.Rotation);
-                    end = end.Rotate(part.Rotation);
-                }
-
-                start = start + part.Location;
-                end = end + part.Location;
-
-                var pt1 = view.PointWorldToGraph(start);
-                var pt2 = view.PointWorldToGraph(end);
+                var pt1 = view.PointWorldToGraph(BendToWorld(part, bend.StartPoint));
+                var pt2 = view.PointWorldToGraph(BendToWorld(part, bend.EndPoint));
 
                 g.DrawLine(bendPen, pt1, pt2);
             }
+        }
+
+        /// <summary>
+        /// Maps a bend point to world space. Bends stay in the drawing's source frame while the
+        /// program is moved by -<c>Source.Offset</c>, so the offset comes off before placing.
+        /// </summary>
+        internal static Vector BendToWorld(Part part, Vector point)
+        {
+            var local = point - part.BaseDrawing.Source.Offset;
+            if (part.Rotation != 0)
+                local = local.Rotate(part.Rotation);
+            return local + part.Location;
         }
 
         private void DrawEtchMarks(Graphics g, Part part, bool muted)
@@ -501,17 +501,8 @@ namespace OpenNest.Controls
                 if (bend.Direction != BendDirection.Up)
                     continue;
 
-                var start = bend.StartPoint;
-                var end = bend.EndPoint;
-
-                if (part.Rotation != 0)
-                {
-                    start = start.Rotate(part.Rotation);
-                    end = end.Rotate(part.Rotation);
-                }
-
-                start = start + part.Location;
-                end = end + part.Location;
+                var start = BendToWorld(part, bend.StartPoint);
+                var end = BendToWorld(part, bend.EndPoint);
 
                 var length = bend.Length;
                 var angle = bend.StartPoint.AngleTo(bend.EndPoint) + part.Rotation;
