@@ -70,9 +70,11 @@ internal enum SupportEntries
 /// <summary>
 /// One automatic start candidate: the owned contour choice plus its preference kind and a
 /// stable geometry tie key for deterministic ranking. The choice keeps this preparation as
-/// owner; nothing here exposes or mutates the underlying shape.
+/// owner; nothing here exposes or mutates the underlying shape. <paramref name="CornerReach"/>
+/// is how far a corner fillet's joint lies from the sharp corner it rounds (0 otherwise), so
+/// ranking can count it on both of that corner's sides.
 /// </summary>
-internal sealed record ContourEntryCandidate(ContourChoice Choice, AutomaticEntryKind Kind)
+internal sealed record ContourEntryCandidate(ContourChoice Choice, AutomaticEntryKind Kind, double CornerReach = 0)
 {
     /// <summary>
     /// Stable geometric tie key: the point quantized to the preparation epsilon grid, so

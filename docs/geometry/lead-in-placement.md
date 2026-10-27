@@ -50,6 +50,21 @@ normal, so an arc lead-out starts on its own radius and the tab gap stays uncut.
 program generation and the manual preview share them. Other lead-in styles are
 unchanged.
 
+## Rounded corners in Plan Cutting
+
+Plan Cutting prefers to start a contour at a convex corner. The tool returns to the start
+after it has put heat into the plate, so a start partway along a straight edge can leave a
+step. A start at a corner hides it. An edge midpoint is a fallback, used only when no corner on
+a side facing the next cut fits.
+
+A corner rounded by a small fillet counts as a corner. The fillet must be tangent to straight
+edges at both ends, turn convexly through less than a half circle, and have a reach
+(`radius * tan(sweep / 2)`) no longer than either edge. Each of its two tangent joints is then
+a convex corner entry (`PreparedContours.FilletReach`). Ranking counts the joint on both sides of
+the corner it rounds, as it would a sharp corner. Longer curves, half-circle ends and inside
+(reflex) fillets keep their tangent joints, which rank level with edge midpoints. The lead-in at
+a fillet's joint is the normal one for its edge, since emission still sees a smooth joint there.
+
 ## Curved leads
 
 Every curved lead (Arc, Line + Arc, Clean Hole, the arc lead-out) meets the cut tangentially and

@@ -93,6 +93,22 @@ public class ContourEntryRankingTests
         Assert.True(rightMid < bottomMid);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FilletedCorner_BeatsAFacingMidpointNearerTheRoute(bool clockwise)
+    {
+        // Travel favours the right edge's midpoint, but a long edge's middle is a last resort:
+        // the joints of the facing rounded corner count on both of its sides and lead.
+        var ranked = Catalogue(ContourEntryCandidateTests.RoundedSquare(clockwise))
+            .RankTowardNextCut(new Vector(14, 6), new Vector(12, 5)).ToList();
+
+        Assert.Equal(AutomaticEntryKind.ConvexCorner, ranked[0].Kind);
+        Assert.True(At(ranked[0], 10, 9.5) || At(ranked[0], 9.5, 10));
+        var rightMid = ranked.FindIndex(c => c.Kind == AutomaticEntryKind.StraightMidpoint && At(c, 10, 5));
+        Assert.True(ranked.FindIndex(c => At(c, 10, 0.5)) < rightMid);
+    }
+
     [Fact]
     public void TangentAndMidpoint_ShareARankTier()
     {

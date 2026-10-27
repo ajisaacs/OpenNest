@@ -67,6 +67,97 @@ public class ContourEntryCandidateTests
         Assert.Equal(8, forward.Count);
     }
 
+    /// <summary>Square 0..10 whose corners are 0.5-radius fillets, counterclockwise or clockwise.</summary>
+    internal static Program RoundedSquare(bool clockwise)
+    {
+        var p = new Program();
+        p.MoveTo(0.5, 0);
+        if (clockwise)
+        {
+            p.ArcTo(new Vector(0, 0.5), new Vector(0.5, 0.5), RotationType.CW);
+            p.LineTo(0, 9.5);
+            p.ArcTo(new Vector(0.5, 10), new Vector(0.5, 9.5), RotationType.CW);
+            p.LineTo(9.5, 10);
+            p.ArcTo(new Vector(10, 9.5), new Vector(9.5, 9.5), RotationType.CW);
+            p.LineTo(10, 0.5);
+            p.ArcTo(new Vector(9.5, 0), new Vector(9.5, 0.5), RotationType.CW);
+            p.LineTo(0.5, 0);
+            return p;
+        }
+        p.LineTo(9.5, 0);
+        p.ArcTo(new Vector(10, 0.5), new Vector(9.5, 0.5), RotationType.CCW);
+        p.LineTo(10, 9.5);
+        p.ArcTo(new Vector(9.5, 10), new Vector(9.5, 9.5), RotationType.CCW);
+        p.LineTo(0.5, 10);
+        p.ArcTo(new Vector(0, 9.5), new Vector(0.5, 9.5), RotationType.CCW);
+        p.LineTo(0, 0.5);
+        p.ArcTo(new Vector(0.5, 0), new Vector(0.5, 0.5), RotationType.CCW);
+        return p;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CornerFilletJoints_AreConvexCorners(bool clockwise)
+    {
+        var prepared = Capture(RoundedSquare(clockwise));
+
+        var candidates = prepared.AutomaticEntryCandidates(prepared.PerimeterOrdinal);
+
+        // Both joints of each fillet start the cut at its corner, one radius from the sharp corner.
+        var corners = candidates.Where(c => c.Kind == AutomaticEntryKind.ConvexCorner).ToList();
+        Assert.Equal(8, corners.Count);
+        Assert.All(corners, c => Assert.Equal(0.5, c.CornerReach, 9));
+        Assert.Contains(corners, c => Distance(c.Choice.Point, new Vector(10, 9.5)) < 1e-6);
+        Assert.Contains(corners, c => Distance(c.Choice.Point, new Vector(9.5, 10)) < 1e-6);
+        Assert.DoesNotContain(candidates, c => c.Kind == AutomaticEntryKind.TangentJoint);
+        Assert.Equal(4, candidates.Count(c => c.Kind == AutomaticEntryKind.StraightMidpoint));
+        Assert.All(candidates.Where(c => c.Kind == AutomaticEntryKind.StraightMidpoint),
+            c => Assert.Equal(0, c.CornerReach));
+    }
+
+    [Fact]
+    public void FilletLongerThanItsEdge_StaysATangentJoint()
+    {
+        // A 5-radius quarter arc after a 1-long bottom edge is a curve, not a rounded corner.
+        var p = new Program();
+        p.MoveTo(0, 0);
+        p.LineTo(1, 0);
+        p.ArcTo(new Vector(6, 5), new Vector(1, 5), RotationType.CCW);
+        p.LineTo(6, 6);
+        p.LineTo(0, 6);
+        p.LineTo(0, 0);
+        var prepared = Capture(p);
+
+        var candidates = prepared.AutomaticEntryCandidates(prepared.PerimeterOrdinal);
+
+        Assert.Equal(2, candidates.Count(c => c.Kind == AutomaticEntryKind.TangentJoint));
+        Assert.DoesNotContain(candidates, c => c.Kind == AutomaticEntryKind.ConvexCorner
+            && (Distance(c.Choice.Point, new Vector(1, 0)) < 1e-6 || Distance(c.Choice.Point, new Vector(6, 5)) < 1e-6));
+    }
+
+    [Fact]
+    public void InsideCornerFillet_StaysATangentJoint()
+    {
+        // An L whose inside corner is rounded: that fillet turns the reflex way.
+        var p = new Program();
+        p.MoveTo(0, 0);
+        p.LineTo(10, 0);
+        p.LineTo(10, 4);
+        p.LineTo(5, 4);
+        p.ArcTo(new Vector(4, 5), new Vector(5, 5), RotationType.CW);
+        p.LineTo(4, 10);
+        p.LineTo(0, 10);
+        p.LineTo(0, 0);
+        var prepared = Capture(p);
+
+        var candidates = prepared.AutomaticEntryCandidates(prepared.PerimeterOrdinal);
+
+        var joints = candidates.Where(c => c.Kind == AutomaticEntryKind.TangentJoint).ToList();
+        Assert.Contains(joints, c => Distance(c.Choice.Point, new Vector(5, 4)) < 1e-6);
+        Assert.Contains(joints, c => Distance(c.Choice.Point, new Vector(4, 5)) < 1e-6);
+    }
+
     [Fact]
     public void TangentLineArcJoint_IsTangentJoint_NotACorner()
     {
