@@ -1,0 +1,56 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:OpenNest.Avalonia.Controls"
+        xmlns:local="using:OpenNest.Avalonia"
+        x:Class="OpenNest.Avalonia.MainWindow"
+        Title="OpenNest (Avalonia prototype)"
+        Width="1400" Height="860">
+  <DockPanel>
+    <Menu DockPanel.Dock="Top">
+      <MenuItem Header="_File">
+        <MenuItem Header="_Open..." InputGesture="Ctrl+O" Click="OnOpen" />
+        <Separator />
+        <MenuItem Header="E_xit" Click="OnExit" />
+      </MenuItem>
+      <MenuItem Header="_View">
+        <MenuItem Header="Zoom to _Fit" InputGesture="F" Click="OnFit" />
+        <MenuItem Header="_Previous Plate" InputGesture="PageUp" Click="OnPreviousPlate" />
+        <MenuItem Header="_Next Plate" InputGesture="PageDown" Click="OnNextPlate" />
+      </MenuItem>
+    </Menu>
+
+    <Border DockPanel.Dock="Top" Padding="4" BorderThickness="0,0,0,1" BorderBrush="#D0D0D0">
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <Button Content="Open" Click="OnOpen" />
+        <Button Content="Fit" Click="OnFit" />
+        <Button Content="Previous" Click="OnPreviousPlate" />
+        <Button Content="Next" Click="OnNextPlate" />
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Padding="6,3" Background="#F0F0F0">
+      <TextBlock x:Name="Status" Text="Open a .nest file to begin." />
+    </Border>
+
+    <Grid ColumnDefinitions="260,4,*,4,320">
+      <DockPanel Grid.Column="0">
+        <TextBlock DockPanel.Dock="Top" Margin="6,6,6,2" FontWeight="SemiBold" Text="Plates" />
+        <ListBox x:Name="PlateList" SelectionChanged="OnPlateSelected" />
+      </DockPanel>
+      <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
+      <c:PlateCanvas Grid.Column="2" x:Name="Canvas" />
+      <GridSplitter Grid.Column="3" ResizeDirection="Columns" />
+      <DockPanel Grid.Column="4">
+        <TextBlock DockPanel.Dock="Top" Margin="6,6,6,2" FontWeight="SemiBold" Text="Drawings on plate" />
+        <DataGrid x:Name="DrawingGrid" x:DataType="local:DrawingRow" IsReadOnly="True"
+                  AutoGenerateColumns="False" GridLinesVisibility="Horizontal" CanUserSortColumns="True">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Drawing" Binding="{Binding Name}" Width="*" />
+            <DataGridTextColumn Header="Qty" Binding="{Binding Count}" />
+            <DataGridTextColumn Header="Size" Binding="{Binding Size}" />
+          </DataGrid.Columns>
+        </DataGrid>
+      </DockPanel>
+    </Grid>
+  </DockPanel>
+</Window>
