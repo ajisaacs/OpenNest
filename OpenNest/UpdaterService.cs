@@ -15,14 +15,15 @@ namespace OpenNest
     /// <see cref="ApplyAndRestart"/> once the user agrees to restart.
     /// </summary>
     /// <remarks>
-    /// The feed URL is never hard-coded: it is read from the per-machine
-    /// <see cref="Settings.UpdateFeedUrl"/> setting (Options dialog), which is
-    /// user-scoped and lives outside source control. A blank URL disables
-    /// update checks entirely, which is the default for every install.
+    /// A blank <see cref="Settings.UpdateFeedUrl"/> (the default) checks the
+    /// public GitHub Releases for full, non-pre-release versions. A URL set in
+    /// the Options dialog points this machine at a self-hosted feed instead;
+    /// that URL is operator infrastructure and never lives in source control.
     /// </remarks>
     public sealed class UpdaterService : IDisposable
     {
         private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(30);
+        private const string GitHubRepositoryUrl = "https://github.com/ajisaacs/OpenNest";
 
         private readonly UpdateManager _manager;
         private Timer _timer;
@@ -36,10 +37,10 @@ namespace OpenNest
 
         public UpdaterService(string feedUrl)
         {
-            if (string.IsNullOrWhiteSpace(feedUrl))
-                return;
-
-            _manager = new UpdateManager(new SimpleWebSource(feedUrl));
+            IUpdateSource source = string.IsNullOrWhiteSpace(feedUrl)
+                ? new GithubSource(GitHubRepositoryUrl, null, false)
+                : new SimpleWebSource(feedUrl);
+            _manager = new UpdateManager(source);
         }
 
         /// <summary>True once a downloaded update is waiting for <see cref="ApplyAndRestart"/>.</summary>
