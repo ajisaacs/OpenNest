@@ -5,8 +5,8 @@ using System.Windows.Forms;
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// Background update checks against the per-machine feed URL (Options dialog; blank
-    /// disables checks) and the status-bar item that announces a downloaded update. Never
+    /// Background update checks (GitHub Releases, or the per-machine feed URL from the
+    /// Options dialog) and the status-bar item that announces a downloaded update. Never
     /// restarts on its own: it restarts only when the user clicks the item and confirms.
     /// </summary>
     internal sealed class UpdaterStatus : IDisposable

@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using OpenNest.Properties;
 using Velopack;
+using Velopack.Locators;
 using Velopack.Sources;
 
 namespace OpenNest
@@ -38,6 +39,11 @@ namespace OpenNest
 
         public UpdaterService(string feedUrl, bool includeDevBuilds)
         {
+            // Only a process started through VelopackApp (MainApp) has a locator;
+            // test hosts and other embedders get no update checks.
+            if (!VelopackLocator.IsCurrentSet)
+                return;
+
             IUpdateSource source = string.IsNullOrWhiteSpace(feedUrl)
                 ? new GithubSource(GitHubRepositoryUrl, null, includeDevBuilds)
                 : new SimpleWebSource(feedUrl);
