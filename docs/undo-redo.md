@@ -28,7 +28,7 @@ Everything stored in the nest:
   cut-offs;
 - drawings: import, Shape Library, edit in the converter, drawing properties and quantities, delete, clean
   unused, Drawing Library adds, a drawing's library link after Save to Drawing Library;
-- the nest: its machine and the Nest Info fields other than identity (below).
+- the nest: its machine and the Nest > Edit fields other than identity (below).
 
 The Edit menu names the step: "Undo Rotate", "Redo Fill". `UndoRecordingTests` holds one test
 per recorded edit with its label.
@@ -43,7 +43,7 @@ Deliberately excluded:
   and post configuration, nest defaults;
 - view state: zoom, pan, view toggles, selection, the active side panel;
 - the nest's identity: `Name`, `Status`, `MadeBy` and `DateCreated`. A restore carries them
-  over from the live nest, so a Nest Info edit of only these records nothing. All `Document`
+  over from the live nest, so a Nest > Edit change of only these records nothing. All `Document`
   state (save path, server id and revision) stays too: the `Document` is never replaced.
 
 A save does not clear the history; it marks a save point (`UndoHistory.MarkSaved`,
@@ -152,7 +152,7 @@ when it has none does the nest undo.
 - 50 undo steps and 128 MB per open nest (`UndoHistory.DefaultMaxDepth`, `DefaultMaxBytes`);
   the oldest states are evicted first, never the current one.
 - Typical nests take a few kilobytes and a few milliseconds per state. Measured on the
-  heaviest production nests (E0323-02, 7000 parts; K0924-17, 101 drawings) with every part
+  heaviest production nests (one of about 7,000 parts, one with 101 drawings) with every part
   planned: capture about 350 ms and 2.2 MB, Undo about 1 s, most of it the plate reload
   (`LayoutPart.Create` per part, the same as switching to that plate). Opening a nest pays one
   capture for the history's first state.

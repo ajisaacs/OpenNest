@@ -29,7 +29,7 @@ The desktop app can save nests two ways:
   without binding an editable document, and **Download selected version...** saves
   its exact archived bytes.
   Select a nest and click **Nest Information...** above the list (or use the
-  row's right-click menu) to edit the same information as **Nest > Nest Info**,
+  row's right-click menu) to edit the same information as **Nest > Edit**,
   including the name, without opening the nest in the main editor. **OK** saves immediately to the
   same database ID as a new version, then refreshes the list, preview and history;
   **Cancel** makes no change. The dialog starts with the latest saved metadata.
@@ -222,7 +222,7 @@ allocate the year's next name and show it in an editable dialog: OK uploads
 under the chosen name, Cancel saves nothing. If the check or the allocation
 fails or takes longer than 3 seconds, the nest uploads under its current name.
 
-In Database mode the name can be edited in **Nest > Nest Info** (it uploads with
+In Database mode the name can be edited in **Nest > Edit** (it uploads with
 the next Save) and in the saved-nest browser's **Nest Information...** (saved
 immediately). In File mode it stays read-only, since the file name is the nest
 name. If another active nest already has the exact new name, a warning asks
@@ -426,7 +426,7 @@ so the range is drawn faded. Dragging a handle moves it in whole degrees (Shift:
 15°) within 0° ≤ start ≤ end ≤ 360°; the end can be dragged past 0° to a full
 turn. With focus, the arrow keys move a handle and Space switches handles.
 
-When the new details would give the drawing another identity (D4: normalized
+When the new details would give the drawing another identity (normalized
 customer, name, material and grade, exact thickness, units and cut type), Save
 first looks up active library drawings that already have them and, if any do,
 names them and asks before saving; a failed lookup also asks. Editing only notes
@@ -565,7 +565,7 @@ Add to Release as its only buttons; File > Import BOM stays the familiar way in.
    are kept: the drawing is stored with a blank material and thickness 0, and the
    set editor's note column leads to Edit Drawing to fix it before Make Nests.
 2. Each drawing is matched to the library (`OpenNest.Data.DrawingSetImport`) by
-   its identity (D4: normalized customer, name, material and grade, exact
+   its identity (normalized customer, name, material and grade, exact
    thickness, units and cut type; the name is the file name without extension,
    the grade blank, the units the new-nest default and the cut type the one last
    saved to the library on this PC) and its geometry:
