@@ -215,7 +215,7 @@ Response archive schema 5 adds `Unplaced`; earlier archives load it empty (not r
 
 ## Verification
 
-`dotnet test OpenNest.FrontEnd.Tests/OpenNest.FrontEnd.Tests.csproj` exercises Console, MCP and API rejection/override, cancellation, physical-sheet settings, response IDs and archive round-trips. Its current target matches MCP's `net8.0-windows` marker but does not use WindowsDesktop and executes on Linux as well as Windows. It is included in the solution and Windows test workflow. Desktop interaction tests remain in Windows-only `OpenNest.WinForms.Tests`.
+`dotnet test OpenNest.FrontEnd.Tests/OpenNest.FrontEnd.Tests.csproj` exercises Console, MCP and API rejection/override, cancellation, physical-sheet settings, response IDs and archive round-trips. It targets `net8.0` and runs on Linux, macOS and Windows. It is included in the solution and Windows test workflow. Desktop interaction tests remain in Windows-only `OpenNest.WinForms.Tests`.
 
 ## Stock costs
 
