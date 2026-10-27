@@ -72,16 +72,13 @@ or attestations (`--provenance=false --sbom=false`), and runs the real-client
 container persistence/backup/restore smoke. A Windows `v*` tag build alone never
 publishes a server image.
 
-Publication requires owner-approved release intent: a **published, non-prerelease GitHub Release**
-or an explicit `Server image` dispatch **from `master`**, naming an existing strict
-`vX.Y.Z` tag (no prerelease suffix, leading zero, or extra suffix). GitHub pre-releases
-publish only the Windows assets; they skip the server image publish and verification
-jobs. Changing a pre-release to a full release later is a separate publication
-decision. The tag must resolve to
-a full commit already on `master`. For a published Release, that peeled commit
-must also equal the event's full `GITHUB_SHA`; a retargeted tag is refused. Manual
-dispatch intentionally resolves the approved existing tag, not the workflow's
-`master` SHA. The job checks out that exact source, reruns all
+Publication requires an explicit, owner-approved `Server image` dispatch **from
+`master`**, naming an existing strict `vX.Y.Z` tag (no prerelease suffix, leading
+zero, or extra suffix). Publishing a GitHub Release, stable or pre-release, only
+validates the image; it never publishes it, so a desktop release and a server image
+release are separate decisions. The tag must resolve to a full commit already on
+`master`. The dispatch intentionally resolves the approved existing tag, not the
+workflow's `master` SHA. The job checks out that exact source, reruns all
 server/image gates, and pushes the *same smoked image* to
 `ghcr.io/ajisaacs/opennest-server:X.Y.Z` and `:sha-<full-commit>` only. Both tags must
 be absent; retries after even a partial upload stop instead of overwriting. There
