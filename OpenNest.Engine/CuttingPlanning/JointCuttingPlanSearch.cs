@@ -196,26 +196,35 @@ internal static class JointCuttingPlanSearch
     }
 
     // "Cut the blocked part before every part whose cut contour its approach crossed", unless that
-    // would contradict an order already required. False when nothing new was learned.
+    // would contradict an order already required. When every such rule would (a sheet separator
+    // is cut after everything), the blocked part cannot come earlier, so the tool must arrive
+    // from beyond those parts instead: "cut the part it left from before them". False when
+    // nothing new was learned.
     private static bool Learn(Attempt attempt, HashSet<int>[] prerequisites)
     {
-        if (attempt.Blocked is not int blocked)
-            return false;
-        var learned = false;
-        foreach (var crossed in attempt.Crossed.Order())
-        {
-            if (crossed == blocked || prerequisites[crossed].Contains(blocked) || Precedes(crossed, blocked, prerequisites))
-                continue;
-            prerequisites[crossed].Add(blocked);
-            learned = true;
-        }
-        return learned;
+        var rules = Rules(attempt, prerequisites).ToArray();
+        foreach (var (first, then) in rules)
+            prerequisites[then].Add(first);
+        return rules.Length != 0;
     }
 
     // True when a crossing of the blocked part's approach would teach a new order rule.
     private static bool CanLearn(Attempt attempt, HashSet<int>[] prerequisites) =>
-        attempt.Blocked is int blocked && attempt.Crossed.Any(crossed => crossed != blocked
-            && !prerequisites[crossed].Contains(blocked) && !Precedes(crossed, blocked, prerequisites));
+        Rules(attempt, prerequisites).Any();
+
+    // The rules Learn would add, as (cut first, cut then) pairs.
+    private static IEnumerable<(int First, int Then)> Rules(Attempt attempt, HashSet<int>[] prerequisites)
+    {
+        if (attempt.Blocked is not int blocked)
+            return [];
+        var before = New(blocked);
+        return before.Length != 0 || attempt.LastCut?.SourceOrdinal is not int departed ? before : New(departed);
+
+        (int, int)[] New(int first) => attempt.Crossed.Order()
+            .Where(crossed => crossed != blocked && crossed != first && !prerequisites[crossed].Contains(first)
+                && !Precedes(crossed, first, prerequisites))
+            .Select(crossed => (first, crossed)).ToArray();
+    }
 
     // True when 'first' must already come before 'second' through the prerequisite chain.
     private static bool Precedes(int first, int second, HashSet<int>[] prerequisites)
@@ -334,10 +343,10 @@ internal static class JointCuttingPlanSearch
                     }
                     // A cutoff is a fixed program cut the same way wherever it goes, so replanning
                     // the parts before it can only change where its approach starts. Cutting it
-                    // earlier never makes its own cut harder; learn that rather than stall here.
+                    // earlier never makes its own cut harder, and a sheet separator that cannot come
+                    // earlier needs the approach from elsewhere; learn that rather than stall here.
                     if (prerequisites != null && sequence != null && attempt.Blocked is int blocked
-                        && snapshot.Placements[blocked] is { IsCutOff: true, SeparatesSheet: false }
-                        && CanLearn(attempt, prerequisites))
+                        && snapshot.Placements[blocked].IsCutOff && CanLearn(attempt, prerequisites))
                         return attempt;
                     if (attempt.Advance(node))
                         progressExpansions = Expansions;

@@ -79,6 +79,43 @@ public class CuttingDependencyTests
             && f.Message.Contains("before the sheet is separated"));
     }
 
+    // A column of two wide parts under three narrow ones, beside a sheet separator at X 12.5
+    // pierced at (12.5, 0). Climbing the column ends at the top, where the straight approach to
+    // that pierce crosses the wide parts, and the separator cannot be cut any earlier. The search
+    // learns the other way round, the part the approach left from before the parts it crossed,
+    // and so finishes beside the pierce. It used to learn nothing and spend its whole budget.
+    [Fact]
+    public void Plan_ApproachIntoASeparatorCrossingCutParts_LearnsToLeaveFromBeyondThem()
+    {
+        var (plate, column, separator) = ColumnBesideSeparator();
+
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate,
+            confirmedParameters: ExplicitContourTests.Parameters()));
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        var order = result.ProposedOrder.Select(o => o.SourcePart).ToList();
+        Assert.Same(separator, order[^1]);
+        Assert.Contains(order[^2], column[..2]);
+        Assert.True(result.Expansions < 400, Describe(result));
+    }
+
+    private static (Plate, Part[] Column, Part Separator) ColumnBesideSeparator()
+    {
+        var nest = new Nest();
+        var plate = nest.CreatePlate();
+        plate.Size = new Size(100, 100);
+        Part[] column =
+        [
+            Rectangle(2, 2, 10, 10), Rectangle(2, 14, 10, 10),
+            Rectangle(2, 26, 5, 10), Rectangle(2, 38, 5, 10), Rectangle(2, 50, 5, 10),
+        ];
+        foreach (var part in column)
+            plate.Parts.Add(part);
+        plate.CutOffs.Add(new CutOff(new Vector(12.5, 0), CutOffAxis.Vertical));
+        plate.RegenerateCutOffs(new CutOffSettings());
+        return (plate, column, plate.Parts.Single(p => p.BaseDrawing.IsCutOff));
+    }
+
     // The tour cuts B, then the locked rectangle A (leaving right), then the cutoff pierced at
     // (10, 0) below-left of A: that approach crosses A. Replanning B's entries can never fix it,
     // so the search learns "cutoff first" at once instead of retrying each of B's entries.
