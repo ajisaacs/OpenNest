@@ -75,7 +75,8 @@ inside corner. Only when every outline point is too close does the clearance giv
 View > Draw Support shows the grid or the slats, cut off to the sheet (while its points or slats
 are at least 6 pixels apart), each part's
 contacts, and its center of gravity: green when supported, red when it can tip, with an orange
-diamond on a red part's best tab point (keeping the plate's tab-size clearance).
+diamond on a red part's best tab point (keeping the plate's tab-size clearance). While Plan
+Cutting inspects a proposal, the overlay shows the proposal's parts on the same bed.
 
 ## Support tabs in Plan Cutting
 
