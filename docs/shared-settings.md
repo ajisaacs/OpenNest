@@ -6,9 +6,9 @@ building nests and posts the same way:
 
 | Kind | Key | What it holds | This PC's own copy |
 |---|---|---|---|
-| `machine` | machine id | A Tools > Machine Configuration entry: materials, grades, thicknesses, leads, kerf, cut-offs, motion limits, plate sizes, support grid | `%APPDATA%\OpenNest\Machines\<id>.json` |
+| `machine` | machine id | A Tools > Machine Configuration entry: materials, grades, thicknesses, leads, kerf, cut-offs, motion limits, plate sizes, support grid, clamps | `%APPDATA%\OpenNest\Machines\<id>.json` |
 | `post` | post type name, e.g. `OpenNest.Posts.CincinnatiCIFiber.CIFiberPostProcessor` | A post's settings, as its JSON file holds them | `<post>.json` beside the post DLL in `Posts\` |
-| `clamps` | `default` | Machine clamp defaults (Save as Machine Defaults) | `%APPDATA%\OpenNest\clamps.json` |
+| `clamps` | `default` | Legacy clamp settings, read only to copy them onto a machine once (machines now hold their clamps) | `%APPDATA%\OpenNest\clamps.json` |
 | `nest-defaults` | `default` | Tools > Nest Defaults: units, sheet size, quadrant, spacing, default machine | `%APPDATA%\OpenNest\defaults.json` |
 
 File mode, the console, MCP and API front ends use only this PC's copies.
@@ -21,7 +21,7 @@ one), posts per post, clamps and nest defaults as single documents. Saves go whe
 settings were read, so editing a kind the server does not hold yet changes only this PC.
 
 When the desktop opens in Database mode and the server lacks any of this PC's machines (all
-of them, when it holds none), post settings, clamp settings or nest defaults, it lists them
+of them, when it holds none), post settings or nest defaults, it lists them
 and offers to upload them. The first workstation to answer Yes seeds the server; a document
 the server already holds is never replaced, so later workstations only add what is missing
 (a post installed on just one PC, for example). Declining keeps that PC on its own copies and
@@ -45,7 +45,8 @@ saved first the server refuses it and the desktop takes their copy:
   even though the Cincinnati post records the material library the nest selected.
 - Machine Configuration: the unsaved machines stay pending; reopen the window to see the
   other changes.
-- Clamps, nest defaults, support grid: the save reports the conflict.
+- Nest > Clamps and Nest > Support Grid machine defaults, nest defaults: the save reports
+  the conflict.
 
 The window title of Tools > Machine Configuration says whether it edits the shared machines,
 this PC's (not shared yet), or a read-only copy. Tools > Nest Defaults says the same beside

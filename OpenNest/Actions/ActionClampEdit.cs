@@ -84,9 +84,9 @@ namespace OpenNest.Actions
 
         private Units Units => Nest?.Units ?? Units.Inches;
 
-        // A nest without clamps takes its first clamp's size from the machine defaults.
+        // A nest without clamps takes its first clamp's size from its machine's clamps.
         private ClampSettings Defaults =>
-            defaults ??= MachineSettings.LoadSavedClampSettings(out _).ConvertedTo(Units);
+            defaults ??= MachineSettings.LoadClampSettings(MachineSettings.FindMachine(Nest?.Machine)).ConvertedTo(Units);
 
         private double ClampWidth => Rail?.Width ?? Defaults.Width;
 

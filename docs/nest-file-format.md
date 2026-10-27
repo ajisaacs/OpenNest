@@ -118,8 +118,9 @@ utilization, cut sequence or CNC output. Files without the key load with no
 zones, and an individually malformed entry (blank id, non-positive size) is
 dropped while the rest of the nest loads.
 
-`plateDefaults.clampRail` optionally stores the nest's machine clamp rail:
-`width` (along the edge), `depth` (into the sheet) and `centers` (X positions
+`plateDefaults.clampRail` optionally stores the nest's machine clamp rail, the nest's
+own copy (a new nest copies it from its `machine`'s clamps; later machine edits do not
+change it): `width` (along the edge), `depth` (into the sheet) and `centers` (X positions
 measured from the plate origin along the origin-side edge). Clamps on the other
 edges are listed in optional `farSideCenters` (X, along the edge across the
 sheet's width from the origin), `originEndCenters` (Y, along the edge through

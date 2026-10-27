@@ -11,15 +11,13 @@ using OpenNest.IO;
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// The desktop entry points for the persisted machines, machine clamp settings and nest
+    /// The desktop entry points for the persisted machines (with their clamps) and nest
     /// defaults. In Database mode each comes from the nest server once it holds a shared copy
     /// (<see cref="SharedSettings"/>), otherwise from this PC's files. The warning variants
     /// report unusable settings once per session.
     /// </summary>
     internal static class MachineSettings
     {
-        private static bool clampSettingsWarned;
-
         /// <summary>
         /// The machine configurations edited in Tools > Machine Configuration: the server's when
         /// it holds any, otherwise this PC's. <paramref name="refresh"/> re-reads the server first.
@@ -66,37 +64,100 @@ namespace OpenNest.Forms
         /// <summary>Every material and grade on file across the readable machine configurations.</summary>
         public static IEnumerable<MaterialConfig> LoadMaterials() =>
             LoadMachines().SelectMany(machine => machine.Materials);
+
         private static bool defaultsWarned;
+        private static bool clampMigrationAsked;
 
         /// <summary>
-        /// Loads the machine clamp settings for creating new nests (New, BOM import); an
-        /// unreadable or partly invalid file warns once per session, because the new nest's
-        /// clamps may not match the machine.
+        /// The clamps new nests assigned <paramref name="machine"/> receive (New, BOM import, Load
+        /// Machine Defaults); off when there is no machine or it has no clamps.
         /// </summary>
-        public static ClampSettings LoadClampSettings(IWin32Window owner)
-        {
-            var settings = LoadSavedClampSettings(out var status);
+        public static ClampSettings LoadClampSettings(MachineConfig machine) =>
+            machine?.GetClampSettings() ?? ClampSettings.Fallback;
 
-            if (
-                status is ClampSettingsStatus.Invalid or ClampSettingsStatus.Partial
-                && !clampSettingsWarned
-            )
+        /// <summary>Saves <paramref name="settings"/> as the clamps of the machine with <paramref name="machineId"/>.</summary>
+        public static void SaveClampSettings(Guid machineId, ClampSettings settings)
+        {
+            var provider = CreateMachineProvider();
+            var machine = provider.GetMachine(machineId)
+                ?? throw new IOException("The machine configuration is no longer on file.");
+            machine.Clamps = MachineClamps.FromSettings(settings, machine.Units);
+            provider.SaveMachine(machine);
+        }
+
+        /// <summary>
+        /// Copies the legacy clamps.json (or the server's shared copy) onto a machine once, while
+        /// no machine has clamps of its own: the nest defaults' machine, or the only machine. With
+        /// several machines and no default the user picks one, asked once per session.
+        /// </summary>
+        public static void MigrateLegacyClamps(IWin32Window owner)
+        {
+            try
             {
-                clampSettingsWarned = true;
-                var problem =
-                    status == ClampSettingsStatus.Invalid
-                        ? "could not be read, so new nests have no clamps"
-                        : "have invalid values that were ignored, so new nests may be missing clamps";
-                var source = SharedClamps() != null ? "on the nest server" : ClampSettings.DefaultPath;
-                MessageBox.Show(
-                    owner,
-                    $"The clamp settings {problem}:\n{source}\n\nCheck the clamps in Nest > Clamps and use Save as Machine Defaults to rewrite them.",
-                    "Clamps",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
+                var legacy = LoadLegacyClampSettings();
+                var provider = CreateMachineProvider();
+                var machines = ReadMachines(() => provider)
+                    .OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
+                if (!LegacyClampMigration.IsNeeded(legacy, machines))
+                    return;
+
+                var target = LegacyClampMigration.Target(machines, LoadSavedNestDefaults(out _).MachineId);
+                if (target == null)
+                {
+                    if (clampMigrationAsked)
+                        return;
+                    clampMigrationAsked = true;
+                    target = AskClampMachine(owner, machines);
+                    if (target == null)
+                        return;
+                }
+
+                LegacyClampMigration.Apply(legacy, target);
+                provider.SaveMachine(target);
             }
-            return settings;
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                MessageBox.Show(owner,
+                    $"The clamp settings could not be copied to a machine:\n\n{ex.Message}\n\n"
+                    + "New nests get no clamps until a machine has them (Tools > Machine Configuration).",
+                    "Clamps", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        // The pre-machine clamp settings: the server's shared copy once it holds one, otherwise
+        // this PC's clamps.json; null when neither exists.
+        private static ClampSettings LoadLegacyClampSettings()
+        {
+            if (SharedSettings.Find(SharedSettingKinds.Clamps, SharedSettingKinds.DefaultKey) is { } shared)
+                return ClampSettings.Parse(shared.Json, out _);
+            return File.Exists(ClampSettings.DefaultPath) ? ClampSettings.Load(ClampSettings.DefaultPath) : null;
+        }
+
+        private static MachineConfig AskClampMachine(IWin32Window owner, IReadOnlyList<MachineConfig> machines)
+        {
+            var page = new TaskDialogPage
+            {
+                Caption = "Clamps",
+                Heading = "Which machine are these clamps on?",
+                Text = "Clamps are now kept with each machine. Choose the machine that gets the clamps "
+                    + "saved before, or choose later in Tools > Machine Configuration. Until then new "
+                    + "nests get no clamps.",
+                Icon = TaskDialogIcon.Information,
+                AllowCancel = true,
+            };
+            foreach (var machine in machines)
+                page.RadioButtons.Add(new TaskDialogRadioButton(machine.Name) { Tag = machine });
+            page.RadioButtons[0].Checked = true;
+            var copy = new TaskDialogButton("Copy Clamps");
+            page.Buttons.Add(copy);
+            page.Buttons.Add(new TaskDialogButton("Not Now"));
+
+            var handle = owner?.Handle ?? IntPtr.Zero;
+            var result = handle == IntPtr.Zero ? TaskDialog.ShowDialog(page) : TaskDialog.ShowDialog(handle, page);
+            return result == copy
+                ? page.RadioButtons.FirstOrDefault(b => b.Checked)?.Tag as MachineConfig
+                : null;
         }
 
         /// <summary>
@@ -188,29 +249,6 @@ namespace OpenNest.Forms
             machine.SupportGrid = settings;
             provider.SaveMachine(machine);
         }
-
-        /// <summary>The single desktop entry point for the persisted machine clamp settings.</summary>
-        public static ClampSettings LoadSavedClampSettings(out ClampSettingsStatus status) =>
-            SharedClamps() is { } shared
-                ? ClampSettings.Parse(shared.Json, out status)
-                : ClampSettings.Load(ClampSettings.DefaultPath, out status);
-
-        /// <summary>
-        /// Saves the clamp settings new nests start from where they are read: the server once it
-        /// holds them, otherwise this PC's file. Throws <see cref="IOException"/> when the server
-        /// cannot take them.
-        /// </summary>
-        public static void SaveClampSettings(ClampSettings settings)
-        {
-            if (SharedSettings.Current() is { } current
-                && current.Get(SharedSettingKinds.Clamps, SharedSettingKinds.DefaultKey) != null)
-                current.Save(SharedSettingKinds.Clamps, SharedSettingKinds.DefaultKey, settings.ToJson());
-            else
-                settings.Save(ClampSettings.DefaultPath);
-        }
-
-        private static SharedSettingRecord SharedClamps() =>
-            SharedSettings.Find(SharedSettingKinds.Clamps, SharedSettingKinds.DefaultKey);
 
         /// <summary>
         /// Loads the persisted nest defaults (see <see cref="LoadSavedNestDefaults"/>);

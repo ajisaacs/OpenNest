@@ -23,9 +23,11 @@ public enum ClampSettingsStatus
 }
 
 /// <summary>
-/// The machine's fixed edge-clamp rail, persisted to a single JSON file (by default
-/// %APPDATA%\OpenNest\clamps.json). Off by default: until <see cref="Enabled"/> is set
-/// with at least one center, new nests get no clamps and behave exactly as before.
+/// An edge-clamp rail in given units, as a machine gives new nests (see
+/// <see cref="MachineConfig.GetClampSettings"/>) and as the legacy single
+/// %APPDATA%\OpenNest\clamps.json held it before each machine kept its own; that file is now
+/// read only to copy it onto a machine once (<see cref="LegacyClampMigration"/>). Off by default:
+/// until <see cref="Enabled"/> is set with at least one center, new nests get no clamps.
 /// Loading never throws; values are validated field by field.
 /// </summary>
 public sealed class ClampSettings

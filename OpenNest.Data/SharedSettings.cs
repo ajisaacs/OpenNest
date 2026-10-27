@@ -40,7 +40,10 @@ public static class SharedSettingKinds
     /// <summary>A post processor's settings, keyed by the post's type name.</summary>
     public const string Post = "post";
 
-    /// <summary>The <see cref="ClampSettings"/> new nests start from, under <see cref="DefaultKey"/>.</summary>
+    /// <summary>
+    /// The legacy <see cref="ClampSettings"/> new nests started from before each machine held its
+    /// clamps, under <see cref="DefaultKey"/>; read only to copy them onto a machine once.
+    /// </summary>
     public const string Clamps = "clamps";
 
     /// <summary>The <see cref="NestDefaults"/> new nests start from, under <see cref="DefaultKey"/>.</summary>

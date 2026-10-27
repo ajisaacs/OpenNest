@@ -250,8 +250,8 @@ namespace OpenNest.Forms
                     return;
 
                 var confirm = MessageBox.Show(
-                    "Changing units does not convert existing thickness, kerf, lead and "
-                        + "motion values — they will keep their current numbers. Continue?",
+                    "Changing units does not convert existing thickness, kerf, lead, "
+                        + "motion and clamp values — they will keep their current numbers. Continue?",
                     "Change Units",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning
@@ -267,9 +267,139 @@ namespace OpenNest.Forms
             AddField(layout, ref row, "Units:", unitsCombo);
 
             group.Controls.Add(layout);
+            var general = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
             // Docked to the top, so the last added sits first.
-            _detailPanel.Controls.Add(BuildMotionGroup(machine));
-            _detailPanel.Controls.Add(group);
+            general.Controls.Add(BuildMotionGroup(machine));
+            general.Controls.Add(group);
+
+            var tabs = new TabControl { Dock = DockStyle.Fill };
+            tabs.TabPages.Add(CreateTab("General", general));
+            tabs.TabPages.Add(CreateTab("Clamps", BuildClampsTab(machine)));
+
+            var host = new Panel { Dock = DockStyle.Fill, Height = 420 };
+            host.Controls.Add(tabs);
+            _detailPanel.Controls.Add(host);
+        }
+
+        // The machine's edge-clamp rail, which new nests assigned the machine copy. The first edit
+        // stores the shown values (the default clamp size, off, when it has none) with the change.
+        private Control BuildClampsTab(MachineConfig machine)
+        {
+            var shown = machine.GetClampSettings();
+            var editor = new ClampRailEditor(null, shown.Units, shown.Enabled);
+            editor.LoadMachineDefaults(shown);
+
+            MachineClamps Clamps() => machine.Clamps ??= new MachineClamps
+            {
+                Enabled = shown.Enabled,
+                Width = shown.Width,
+                Depth = shown.Depth,
+                RemovalMinutes = shown.RemovalMinutes,
+            };
+
+            void Set(Action<MachineClamps> apply)
+            {
+                var clamps = Clamps();
+                apply(clamps);
+                var edges = new ClampSettings();
+                edges.SetClamps(editor.Clamps);
+                clamps.Centers = edges.Centers.ToList();
+                clamps.FarSideCenters = edges.FarSideCenters.ToList();
+                clamps.OriginEndCenters = edges.OriginEndCenters.ToList();
+                clamps.FarEndCenters = edges.FarEndCenters.ToList();
+                MarkDirty();
+            }
+
+            var layout = CreateDetailLayout();
+            var row = 0;
+            var enabledBox = new CheckBox
+            {
+                Text = "Give new nests these clamps",
+                AutoSize = true,
+                Checked = shown.Enabled,
+            };
+            enabledBox.CheckedChanged += (s, e) => Set(c => c.Enabled = enabledBox.Checked);
+            AddField(layout, ref row, "New nests:", enabledBox);
+            AddField(layout, ref row, "Clamp width:",
+                CreateLabeledNumeric(shown.Width, v => Set(c => c.Width = v), 4, LengthUnitSuffix, 1000, 0.125m));
+            AddField(layout, ref row, "Clamp depth:",
+                CreateLabeledNumeric(shown.Depth, v => Set(c => c.Depth = v), 4, LengthUnitSuffix, 1000, 0.125m));
+            AddField(layout, ref row, "Removal time:",
+                CreateLabeledNumeric(shown.RemovalMinutes, v => Set(c => c.RemovalMinutes = v), 2, _ => "min per clamp", 1000, 0.5m));
+
+            var centersGroup = new GroupBox
+            {
+                Text = $"Clamp centers, measured from the plate origin ({LengthUnitSuffix(null)})",
+                Dock = DockStyle.Fill,
+                Padding = new Padding(8),
+            };
+            var centersList = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
+            var entry = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = false };
+            var edgeBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 120 };
+            foreach (var edge in ClampEdgeText.All)
+                edgeBox.Items.Add(ClampEdgeText.Name(edge));
+            edgeBox.SelectedIndex = 0;
+            var centerBox = CreateNumericBox(0, _ => { }, 4, 100000, 0.125m);
+            var addButton = new Button { Text = "Add", AutoSize = true };
+            var removeButton = new Button { Text = "Remove", AutoSize = true, Enabled = false };
+            entry.Controls.Add(edgeBox);
+            entry.Controls.Add(new Label { Text = "Center:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) });
+            entry.Controls.Add(centerBox);
+            entry.Controls.Add(addButton);
+            entry.Controls.Add(removeButton);
+            centersGroup.Controls.Add(centersList);
+            centersGroup.Controls.Add(entry);
+
+            void RefreshCenters()
+            {
+                centersList.BeginUpdate();
+                centersList.Items.Clear();
+                foreach (var clamp in editor.Clamps)
+                    centersList.Items.Add(
+                        $"{ClampEdgeText.Name(clamp.Edge)}:  {clamp.Center.ToString("0.####", System.Globalization.CultureInfo.CurrentCulture)}");
+                centersList.EndUpdate();
+                removeButton.Enabled = centersList.SelectedIndex >= 0;
+            }
+
+            addButton.Click += (s, e) =>
+            {
+                var clamp = new RailClamp(ClampEdgeText.All[edgeBox.SelectedIndex], (double)centerBox.Value);
+                if (!editor.TryAddClamp(clamp, out var error))
+                {
+                    MessageBox.Show(this, error, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                Set(_ => { });
+                RefreshCenters();
+            };
+            removeButton.Click += (s, e) =>
+            {
+                var index = centersList.SelectedIndex;
+                editor.RemoveCenterAt(index);
+                Set(_ => { });
+                RefreshCenters();
+                if (centersList.Items.Count > 0)
+                    centersList.SelectedIndex = System.Math.Min(index, centersList.Items.Count - 1);
+            };
+            centersList.SelectedIndexChanged += (s, e) => removeButton.Enabled = centersList.SelectedIndex >= 0;
+            RefreshCenters();
+
+            var note = new Label
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                MaximumSize = new Size(560, 0),
+                ForeColor = SystemColors.GrayText,
+                Padding = new Padding(4, 0, 0, 8),
+                Text = "New nests assigned this machine copy these clamps. Changing them here never "
+                    + "moves the clamps of existing nests; use Load Machine Defaults in Nest > Clamps for that.",
+            };
+
+            var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
+            panel.Controls.Add(centersGroup);
+            panel.Controls.Add(note);
+            panel.Controls.Add(layout);
+            return panel;
         }
 
         private GroupBox BuildMotionGroup(MachineConfig machine)

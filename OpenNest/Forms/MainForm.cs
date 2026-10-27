@@ -213,8 +213,13 @@ namespace OpenNest.Forms
             mnuNestPost.Visible = mnuNestPost.DropDownItems.Count > 0;
             postButton.Visible = postButton.DropDownItems.Count > 0;
 
-            // Database mode: offer this PC's settings to a server that has none yet.
-            Shown += (_, _) => SharedSettings.OfferUpload(this, posts.PostProcessors);
+            // Database mode: offer this PC's settings to a server that has none yet; then move
+            // the clamps saved before machines held them onto a machine, once.
+            Shown += (_, _) =>
+            {
+                SharedSettings.OfferUpload(this, posts.PostProcessors);
+                MachineSettings.MigrateLegacyClamps(this);
+            };
 
             if (posts.Failures.Count > 0)
                 Shown += (_, _) => MessageBox.Show(this,
