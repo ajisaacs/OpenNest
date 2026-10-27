@@ -771,10 +771,11 @@ namespace OpenNest.Controls
             {
                 renderer.DrawActiveWorkArea(e.Graphics);
                 renderer.DrawDebugRemnants(e.Graphics);
-                if (DrawSupport)
-                    supportOverlay.Draw(e.Graphics, this);
                 DrawOverlapOverlay(e.Graphics);
             }
+            // The support overlay follows the displayed plate, so it shows a proposal's tabbed parts too.
+            if (DrawSupport)
+                supportOverlay.Draw(e.Graphics, this);
             // Plan Cutting marks findings on its proposal as well as on the live plate.
             validationOverlay.Draw(e.Graphics);
             if (!HasProposalDisplay)
