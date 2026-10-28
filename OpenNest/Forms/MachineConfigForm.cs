@@ -8,6 +8,7 @@ using System.Text.Json.Serialization;
 using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Shapes;
+using OpenNest.Support;
 
 namespace OpenNest.Forms
 {
@@ -275,6 +276,7 @@ namespace OpenNest.Forms
             var tabs = new TabControl { Dock = DockStyle.Fill };
             tabs.TabPages.Add(CreateTab("General", general));
             tabs.TabPages.Add(CreateTab("Clamps", BuildClampsTab(machine)));
+            tabs.TabPages.Add(CreateTab("Support Bed", BuildSupportBedTab(machine)));
 
             var host = new Panel { Dock = DockStyle.Fill, Height = 420 };
             host.Controls.Add(tabs);
@@ -400,6 +402,111 @@ namespace OpenNest.Forms
             panel.Controls.Add(note);
             panel.Controls.Add(layout);
             return panel;
+        }
+
+        // The machine's support bed, which new nests assigned the machine receive. A machine without
+        // one shows the legacy shared support-grid.json; the first edit stores the shown values.
+        private Control BuildSupportBedTab(MachineConfig machine)
+        {
+            var shown = MachineSettings.LoadSupportGridSettings(machine)
+                .ConvertedTo(MachineClamps.UnitsOf(machine.Units));
+            string Suffix(object _) => shown.Units == Units.Millimeters ? "mm" : "in";
+
+            void Set(Action<SupportGridSettings> apply)
+            {
+                machine.SupportGrid ??= shown;
+                apply(machine.SupportGrid);
+                MarkDirty();
+            }
+
+            var layout = CreateDetailLayout();
+            var row = 0;
+            var enabledBox = new CheckBox
+            {
+                Text = "Give new nests this support bed",
+                AutoSize = true,
+                Checked = shown.Enabled,
+            };
+            enabledBox.CheckedChanged += (s, e) => Set(g => g.Enabled = enabledBox.Checked);
+            AddField(layout, ref row, "New nests:", enabledBox);
+
+            var kindCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = InputWidth };
+            kindCombo.Items.AddRange(new object[] { "Grid of points", "Slats" });
+            kindCombo.SelectedIndex = shown.UseSlats ? 1 : 0;
+            AddField(layout, ref row, "Bed:", kindCombo);
+
+            var gridFields = new List<Control>
+            {
+                AddSupportField(layout, ref row, "Pitch along X:",
+                    CreateLabeledNumeric(shown.PitchX, v => Set(g => g.PitchX = v), 4, Suffix, 100000, 0.125m, 0.0001m)),
+                AddSupportField(layout, ref row, "Pitch along Y:",
+                    CreateLabeledNumeric(shown.PitchY, v => Set(g => g.PitchY = v), 4, Suffix, 100000, 0.125m, 0.0001m)),
+                AddSupportField(layout, ref row, "First point, X from the origin:",
+                    CreateLabeledNumeric(shown.OffsetX, v => Set(g => g.OffsetX = v), 4, Suffix, 100000, 0.125m, -100000m)),
+                AddSupportField(layout, ref row, "First point, Y from the origin:",
+                    CreateLabeledNumeric(shown.OffsetY, v => Set(g => g.OffsetY = v), 4, Suffix, 100000, 0.125m, -100000m)),
+            };
+
+            var axisCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = InputWidth };
+            axisCombo.Items.AddRange(new object[] { "Along X (the full length)", "Along Y (the full width)" });
+            axisCombo.SelectedIndex = shown.SlatAxis == SlatAxis.X ? 0 : 1;
+            axisCombo.SelectedIndexChanged += (s, e) =>
+                Set(g => g.SlatAxis = axisCombo.SelectedIndex == 0 ? SlatAxis.X : SlatAxis.Y);
+            var slatFields = new List<Control>
+            {
+                AddSupportField(layout, ref row, "Slats run:", axisCombo),
+                AddSupportField(layout, ref row, "Pitch between slats:",
+                    CreateLabeledNumeric(shown.SlatPitch, v => Set(g => g.SlatPitch = v), 4, Suffix, 100000, 0.125m, 0.0001m)),
+                AddSupportField(layout, ref row, "Slat thickness:",
+                    CreateLabeledNumeric(shown.SlatThickness, v => Set(g => g.SlatThickness = v), 4, Suffix, 100000, 0.125m)),
+                AddSupportField(layout, ref row, "First slat's center from the origin:",
+                    CreateLabeledNumeric(shown.SlatOffset, v => Set(g => g.SlatOffset = v), 4, Suffix, 100000, 0.125m, -100000m)),
+            };
+
+            AddField(layout, ref row, "Registration tolerance:",
+                CreateLabeledNumeric(shown.RegistrationTolerance, v => Set(g => g.RegistrationTolerance = v), 4, Suffix, 100000, 0.125m));
+            AddField(layout, ref row, "Stability margin:",
+                CreateLabeledNumeric(shown.StabilityMargin, v => Set(g => g.StabilityMargin = v), 4, Suffix, 100000, 0.125m));
+
+            void UpdateEnabled()
+            {
+                foreach (var field in gridFields)
+                    field.Enabled = kindCombo.SelectedIndex == 0;
+                foreach (var field in slatFields)
+                    field.Enabled = kindCombo.SelectedIndex == 1;
+            }
+
+            kindCombo.SelectedIndexChanged += (s, e) =>
+            {
+                Set(g => g.UseSlats = kindCombo.SelectedIndex == 1);
+                UpdateEnabled();
+            };
+            UpdateEnabled();
+
+            var note = new Label
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                MaximumSize = new Size(560, 0),
+                ForeColor = SystemColors.GrayText,
+                Padding = new Padding(4, 0, 0, 8),
+                Text = "What cut parts rest on: a grid of contact points, one every pitch along X and Y, or "
+                    + "slats running the full length or width of the table, one every pitch. New nests "
+                    + "assigned this machine get this bed. Changing it here never changes the bed of "
+                    + "existing nests; use Load Machine Defaults in Nest > Support Bed for that.",
+            };
+
+            var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10), AutoScroll = true };
+            panel.Controls.Add(layout);
+            panel.Controls.Add(note);
+            return panel;
+        }
+
+        // Adds the row and returns its input, so the caller can enable it with the bed layout.
+        private static Control AddSupportField(TableLayoutPanel layout, ref int row, string label, Control control)
+        {
+            AddField(layout, ref row, label, control);
+            return control;
         }
 
         private GroupBox BuildMotionGroup(MachineConfig machine)
@@ -893,16 +1000,17 @@ namespace OpenNest.Forms
             Action<double> setter,
             int decimals,
             decimal max,
-            decimal increment
+            decimal increment,
+            decimal min = 0
         )
         {
             var numeric = new NumericUpDown
             {
                 DecimalPlaces = decimals,
-                Minimum = 0,
+                Minimum = min,
                 Maximum = max,
                 Increment = increment,
-                Value = System.Math.Clamp((decimal)value, 0, max),
+                Value = System.Math.Clamp((decimal)value, min, max),
                 Width = NumericWidth,
             };
             numeric.ValueChanged += (s, e) => setter((double)numeric.Value);
@@ -915,7 +1023,8 @@ namespace OpenNest.Forms
             int decimals,
             Func<object, string> suffix,
             decimal max,
-            decimal increment
+            decimal increment,
+            decimal min = 0
         )
         {
             var row = new TableLayoutPanel
@@ -927,7 +1036,7 @@ namespace OpenNest.Forms
             row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-            var numeric = CreateNumericBox(value, setter, decimals, max, increment);
+            var numeric = CreateNumericBox(value, setter, decimals, max, increment, min);
 
             var suffixLabel = new Label
             {

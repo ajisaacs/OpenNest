@@ -5,7 +5,8 @@ using OpenNest.Forms;
 namespace OpenNest.WinForms.Tests.Forms;
 
 /// <summary>
-/// Machine clamps in the desktop: the Clamps tab of Machine Configuration edits a machine's rail,
+/// Machine clamps and support beds in the desktop: the Clamps and Support Bed tabs of Machine
+/// Configuration edit a machine's rail and bed,
 /// and Nest &gt; Clamps saves its machine defaults to the nest's machine.
 /// </summary>
 public class MachineClampsFormsTests
@@ -43,6 +44,47 @@ public class MachineClampsFormsTests
                 Assert.Equal(new double[] { 24 }, shown.Clamps.Centers);
                 Assert.Equal(ClampSettings.DefaultWidth, shown.Clamps.Width);
                 Assert.NotNull(shown.GetClampSettings().RailFor(Units.Inches));
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        });
+    }
+
+    [Fact]
+    public void SupportBedTab_EditsTheMachineBed()
+    {
+        RunSta(() =>
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "OpenNestTests", Guid.NewGuid().ToString());
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var provider = new LocalJsonProvider(directory);
+                var machine = new MachineConfig
+                {
+                    Name = "Plasma",
+                    SupportGrid = new SupportGridSettings { PitchX = 3, SlatPitch = 4 },
+                };
+                provider.SaveMachine(machine);
+
+                using var form = new MachineConfigForm(provider);
+                var node = Find<TreeView>(form, "_tree").Nodes.Cast<TreeNode>().Single(n => n.Tag is MachineConfig);
+                typeof(MachineConfigForm)
+                    .GetMethod("Tree_AfterSelect", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .Invoke(form, new object[] { null, new TreeViewEventArgs(node) });
+                var shown = (MachineConfig)node.Tag;
+
+                var tab = All<TabControl>(form).Single().TabPages.Cast<TabPage>().Single(p => p.Text == "Support Bed");
+                All<CheckBox>(tab).Single(c => c.Text == "Give new nests this support bed").Checked = true;
+                All<ComboBox>(tab).Single(c => c.Items.Contains("Slats")).SelectedIndex = 1;
+
+                Assert.True(shown.SupportGrid!.Enabled);
+                Assert.True(shown.SupportGrid.UseSlats);
+                Assert.Equal(3, shown.SupportGrid.PitchX);
+                var slats = Assert.IsType<OpenNest.Support.SupportSlats>(shown.SupportGrid.BedFor(Units.Inches));
+                Assert.Equal(4, slats.Pitch);
             }
             finally
             {
