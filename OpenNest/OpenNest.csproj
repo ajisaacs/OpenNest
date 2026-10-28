@@ -6,6 +6,7 @@
     <AssemblyName>OpenNest</AssemblyName>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationHighDpiMode>DpiUnaware</ApplicationHighDpiMode>
+    <ApplicationIcon>Resources\OpenNest.ico</ApplicationIcon>
     <Version>0.4.0</Version>
   </PropertyGroup>
   <ItemGroup>

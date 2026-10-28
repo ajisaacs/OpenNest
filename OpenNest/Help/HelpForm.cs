@@ -33,7 +33,7 @@ namespace OpenNest.Help
         {
             pendingPage = page;
             Text = "OpenNest Help";
-            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            Icon = Properties.Resources.app_icon;
             StartPosition = FormStartPosition.Manual;
             var area = Screen.FromPoint(Cursor.Position).WorkingArea;
             Size = new Size(System.Math.Min(1100, area.Width), System.Math.Min(900, area.Height));

@@ -109,6 +109,7 @@ namespace OpenNest.Forms
             storage = new NestStorageController(this, text => statusLabel1.Text = text);
             storage.StateChanged += Storage_StateChanged;
             InitializeComponent();
+            Icon = Resources.app_icon;
             statusStrip1.Items.Insert(statusStrip1.Items.IndexOf(materialStatusLabel) + 1, ledgerStatusLabel);
             ledgerStatusLabel.Click += LedgerStatusLabel_Click;
             statusStrip1.ShowItemToolTips = true; // The hold list lives in the ledger label's tooltip.
