@@ -14,7 +14,10 @@ namespace OpenNest.Tests.CuttingPlanning;
 /// worse than its recorded baseline. A nest with a cut-off baseline is planned a second time with
 /// its applied lead-ins and cut-offs cleared and default scrap cut-offs added. A "checks:" comment
 /// line names the planner areas a nest guards; a run limited to some areas skips nests that guard
-/// none of them, and a nest without the line is always planned. Opt-in and private:
+/// none of them, and a nest without the line is always planned. A run touching the part order or
+/// entries plans every nest, since those change the search on every plate. Each plate's share of
+/// its expansion budget is reported, and plates near it are listed last: they are the ones a change
+/// to the search order tips into <see cref="CuttingPlanStatus.NoSolutionWithinBudget"/>. Opt-in and private:
 /// the nests and their baselines stay on the server, never in the repository. See docs/problem-nests.md.
 /// </summary>
 [Trait("Category", "ProblemNests")]
@@ -31,6 +34,15 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
 
     /// <summary>The planner areas a nest can guard; docs/problem-nests.md says which changes touch each.</summary>
     internal static readonly string[] Areas = ["part-order", "entries", "contours", "geometry-checks", "cut-offs", "grid"];
+
+    /// <summary>
+    /// Areas whose changes reorder the search on every plate, not just the nests tagged with them:
+    /// a run naming one plans the whole corpus.
+    /// </summary>
+    internal static readonly string[] WholeCorpusAreas = ["part-order", "entries"];
+
+    /// <summary>A plate whose strict search spent at least this share of its budget is near it.</summary>
+    internal const double NearBudget = 0.8;
     // A corpus is a handful of nests; more means the variable names a production archive.
     internal const int MaximumNests = 200;
 
@@ -44,9 +56,14 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
         var limit = TimeSpan.FromSeconds(int.TryParse(Environment.GetEnvironmentVariable(TimeoutVariable), out var seconds)
             && seconds > 0 ? seconds : 120);
         Assert.True(records.Count > 0, $"No nests on {server}.");
-        var wanted = Checks(Environment.GetEnvironmentVariable(ChecksVariable));
+        var named = Checks(Environment.GetEnvironmentVariable(ChecksVariable));
+        var wanted = Wanted(named);
+        if (wanted.Length != named.Length)
+            output.WriteLine($"{string.Join(", ", named.Intersect(WholeCorpusAreas))} change the search on every plate, "
+                + "so every nest is planned.");
 
         var failures = new List<string>();
+        var usage = new List<(string Plate, double Share)>();
         foreach (var record in records)
         {
             var guards = Checks(CommentLine(record.Comments, ChecksLine));
@@ -60,20 +77,32 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
             var bytes = await repository.GetFileAsync(record.Id)
                 ?? throw new InvalidOperationException($"'{record.Name}' has no file.");
             var baseline = Baseline(record.Comments);
-            var observed = PlanAll(record.Name, bytes, false, baseline, limit, failures);
+            var observed = PlanAll(record.Name, bytes, false, baseline, limit, failures, usage);
             if (baseline.Count == 0)
                 failures.Add($"{record.Name} has no baseline. Add this line to its comments: {Line(PlanningLine, observed)}");
             if (Environment.GetEnvironmentVariable(CutOffsVariable) == "1")
-                PlanAll(record.Name, bytes, true, [], limit, failures);
+                PlanAll(record.Name, bytes, true, [], limit, failures, usage);
             else if (Baseline(record.Comments, CutOffPlanningLine) is { Count: > 0 } withCutOffs)
-                PlanAll(record.Name, bytes, true, withCutOffs, limit, failures);
+                PlanAll(record.Name, bytes, true, withCutOffs, limit, failures, usage);
         }
+        ReportNearBudget(usage);
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+    }
+
+    // Plates near their budget pass today but are the first a reordered search pushes over it.
+    private void ReportNearBudget(List<(string Plate, double Share)> usage)
+    {
+        var near = usage.Where(u => u.Share >= NearBudget).OrderByDescending(u => u.Share).ToList();
+        output.WriteLine(near.Count == 0
+            ? $"No plate's search used {NearBudget:P0} of its budget."
+            : $"Near the budget ({near.Count}; a change that adds plates here or raises their share is a regression):");
+        foreach (var (plate, share) in near)
+            output.WriteLine($"  {plate}: {share:P0}");
     }
 
     // Plans each plate with parts and compares it with the baseline; plate number to outcome.
     private SortedDictionary<int, string> PlanAll(string name, byte[] bytes, bool cutOffs,
-        Dictionary<int, string> baseline, TimeSpan limit, List<string> failures)
+        Dictionary<int, string> baseline, TimeSpan limit, List<string> failures, List<(string Plate, double Share)> usage)
     {
         using var stream = new MemoryStream(bytes);
         var nest = new NestReader(stream).Read();
@@ -88,11 +117,18 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
             var watch = Stopwatch.StartNew();
             if (cutOffs)
                 AddScrapCutOffs(plate, number, nest.Units);
+            var budget = CuttingPlanBatch.PlateBudget(plate.Parts.Count);
             var (outcome, planned) = Plan(plate, number, limit);
             observed[number] = outcome;
             var expected = baseline.GetValueOrDefault(number);
+            var share = BudgetShare(planned, budget);
+            if (share is { } used)
+                usage.Add(($"{label} plate {number}", used));
             output.WriteLine($"{label} plate {number}: {outcome} (baseline {expected ?? "none"}), "
-                + $"{planned?.Result.Expansions ?? 0} expansions, {watch.Elapsed.TotalSeconds:0.0} s");
+                + $"{planned?.Result.Expansions ?? 0} of {budget} expansions"
+                + (share is { } shown ? $" ({shown:P0})" : "")
+                + (planned?.KeptCurrentOrder == true ? ", new order ran out" : "")
+                + $", {watch.Elapsed.TotalSeconds:0.0} s");
             if (expected == null)
                 continue;
             if (Rank(outcome) < Rank(expected))
@@ -183,9 +219,22 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
         return areas;
     }
 
+    /// <summary>The areas a run plans: none, meaning every nest, when one changes the search on every plate.</summary>
+    internal static string[] Wanted(string[] named) => named.Intersect(WholeCorpusAreas).Any() ? [] : named;
+
     // Every nest when no area is wanted; otherwise one guarding a wanted area, or one naming none.
     internal static bool Selected(IReadOnlyCollection<string> guards, IReadOnlyCollection<string> wanted) =>
         wanted.Count == 0 || guards.Count == 0 || guards.Intersect(wanted).Any();
+
+    /// <summary>
+    /// The share of the plate's budget its applied strict search spent; null when no strict search
+    /// found the route (a refusal, the safest-route fallback or the best-effort plan), since then
+    /// there is no margin left to measure.
+    /// </summary>
+    internal static double? BudgetShare(CuttingPlanPlateResult planned, int budget) =>
+        planned?.Result is { IsSafestRouteFallback: false, Expansions: > 0 } result && budget > 0
+            && result.Status is CuttingPlanStatus.Ready or CuttingPlanStatus.BestEffort
+            ? (double)result.Expansions / budget : null;
 
     // Ready means replayed and overlap-clear; a ready route with overlapping parts is still blocked.
     internal static string Outcome(CuttingPlanPlateResult planned) =>
@@ -247,6 +296,14 @@ public class ProblemNestBaselineTests
         Assert.False(ProblemNestRegressionTests.Selected(guards, ["grid"]));
         Assert.True(ProblemNestRegressionTests.Selected([], ["grid"]));
         Assert.Throws<ArgumentException>(() => ProblemNestRegressionTests.Checks("part-order, lead-ins"));
+    }
+
+    [Fact]
+    public void Wanted_PlansEveryNestForAreasThatReorderEveryPlate()
+    {
+        Assert.Equal(["cut-offs", "grid"], ProblemNestRegressionTests.Wanted(["cut-offs", "grid"]));
+        Assert.Empty(ProblemNestRegressionTests.Wanted(["cut-offs", "part-order"]));
+        Assert.Empty(ProblemNestRegressionTests.Wanted(["entries"]));
     }
 
     [Fact]

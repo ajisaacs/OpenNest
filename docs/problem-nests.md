@@ -9,7 +9,9 @@ posts and file formats never need it.
 ## Areas
 
 Each nest names the areas it guards in a `checks:` comment line. Pick every area a change touches;
-when a change spans the planner or you cannot tell, run the whole corpus.
+when a change spans the planner or you cannot tell, run the whole corpus. `part-order` and
+`entries` change the order the search tries things on every plate, so naming either plans every
+nest: a plate tagged with another area can still run out of budget after such a change.
 
 | Area | Change touches |
 |------|----------------|
@@ -51,6 +53,21 @@ Each plate is ranked: `Ready` (replayed with no overlaps) above `BestEffort` abo
 baseline, when a nest has no baseline, or when the baseline's plate numbers differ from the
 nest's. A different outcome at the same or a better rank is only reported. When it is
 intended, update the baseline.
+
+## Budget headroom
+
+The planner's budget counts search expansions, not time, so a plate's outcome is repeatable, but
+a plate that finds its route just inside the budget is fragile: any change to the order the
+search tries parts or entries can push it over, into `NoSolutionWithinBudget`, without touching
+the problem it guards. Each plate's line reports the expansions its applied strict search spent
+against the plate's budget (`12000 of 20000 expansions (60%)`), and whether the new order ran out
+before the current order was kept. Plates without a strict-search route (refusals, the
+safest-route fallback, best-effort plans) report no share.
+
+The run ends with the plates that spent at least 80% of their budget. They pass today and fail
+next. Compare that list with the same run on master: a change that adds plates to it or raises
+their share made the search worse, even when every plate still meets its baseline. Say so in the
+change, and fix it, or explain why the plate's search grew.
 
 A nest whose comments also carry a `planning with cut-offs: 1=Ready 2=BestEffort` line is
 planned a second time, as Plan Cutting does after **Clear Lead-ins & Cut-offs** and **Add scrap
