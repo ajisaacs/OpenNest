@@ -51,7 +51,12 @@ public sealed record LedgerStockMapping(
     public int Drops => Rows.Where(r => r.IsDrop).Sum(r => r.Quantity);
     public int SubstituteRows => Rows.Count(r => r.IsSubstitute);
 
-    /// <summary>E.g. "Ledger: 3 sheet sizes, 7 drops, 2 substitute rows (2 skipped: 2 unknown shape)".</summary>
+    /// <summary>Sheets and drops left out because other open nests are coded with them (<see cref="LedgerCodeFilter"/>).</summary>
+    public int OnOtherNests { get; init; }
+
+    /// <summary>
+    /// E.g. "Ledger: 3 sheet sizes, 7 drops, 2 substitute rows (3 on other nests) (2 skipped: 2 unknown shape)".
+    /// </summary>
     public string Summary
     {
         get
@@ -64,6 +69,8 @@ public sealed record LedgerStockMapping(
             var text = $"Ledger: {Plural(SheetRows, "sheet size")}, {Plural(Drops, "drop")}";
             if (SubstituteRows > 0)
                 text += $", {Plural(SubstituteRows, "substitute row")}";
+            if (OnOtherNests > 0)
+                text += $" ({OnOtherNests} on other nests)";
             return skipped.Count == 0
                 ? text
                 : $"{text} ({SkippedUnknownShape + SkippedTooSmall} skipped: {string.Join(", ", skipped)})";

@@ -162,6 +162,7 @@ public sealed partial class NestDatabase : IDisposable
                 """;
             AddRecordParameters(command, id, record, file, updateFile: true);
             command.ExecuteNonQuery();
+            WriteStockCodes(id, file, transaction);
             Snapshot(id, transaction);
             transaction.Commit();
             return Get(id) ?? throw new InvalidOperationException("Insert did not persist.");
@@ -220,6 +221,7 @@ public sealed partial class NestDatabase : IDisposable
         command.Parameters.AddWithValue("$revision", checked(currentRevision + 1));
         command.Parameters.AddWithValue("$source", (object?)sourceRevision ?? DBNull.Value);
         command.ExecuteNonQuery();
+        WriteStockCodes(id, file, transaction);
         Snapshot(id, transaction);
     }
 
@@ -342,7 +344,7 @@ public sealed partial class NestDatabase : IDisposable
             command.Transaction = transaction;
             command.CommandText = "PRAGMA user_version";
             var version = (long)command.ExecuteScalar()!;
-            if (version > 13) throw new InvalidOperationException("Database schema is newer than this server.");
+            if (version > 14) throw new InvalidOperationException("Database schema is newer than this server.");
             if (version == 0)
             {
                 command.CommandText = """
@@ -435,6 +437,8 @@ public sealed partial class NestDatabase : IDisposable
                 command.CommandText = SharedSettingSchema;
                 command.ExecuteNonQuery();
             }
+            if (version < 14)
+                AddStockCodes(command);
             transaction.Commit();
         }
     }

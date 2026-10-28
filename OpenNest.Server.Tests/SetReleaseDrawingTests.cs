@@ -151,7 +151,7 @@ public sealed class SetReleaseDrawingTests
 
         using var upgraded = new NestDatabase(factory.DatabasePath, pooling: false);
 
-        Assert.Equal(13L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+        Assert.Equal(14L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
         var kept = upgraded.GetRelease(releaseId)!;
         Assert.Empty(kept.Drawings);
         Assert.Equal(((Guid?)kit.Id, drawing, 2), (kept.Nests[0].Items.Single().SetId, kept.Nests[0].Items.Single().DrawingId, kept.Nests[0].Items.Single().Quantity));

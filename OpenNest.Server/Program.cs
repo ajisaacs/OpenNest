@@ -59,6 +59,11 @@ app.MapGet("/api/nests/{id:guid}/sheets", (Guid id, NestDatabase db) =>
         : Results.Ok(sheets);
 });
 
+// Ledger item codes on open nests' plates, so Auto Nest leaves them out until ML holds them.
+// The nest being edited passes its own id as exclude.
+app.MapGet("/api/nests/stock-item-codes", (Guid? exclude, NestDatabase db) =>
+    Results.Ok(db.StockCodesInUse(exclude)));
+
 // Next generated nest name for a year; one counter per year shared by every client.
 app.MapPost("/api/nest-names/next", (int year, NestDatabase db) =>
 {

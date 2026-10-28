@@ -306,14 +306,33 @@ namespace OpenNest.Forms
             editForm.OpenValidationInspection();
         }
 
-        private void PostProcessor_Click(object sender, EventArgs e)
+        private bool checkingPostLedgerCodes;
+
+        private async void PostProcessor_Click(object sender, EventArgs e)
         {
             var menuItem = (ToolStripMenuItem)sender;
             var postProcessor = menuItem.Tag as IPostProcessor;
 
             var editForm = activeForm;
-            if (postProcessor == null || editForm == null)
+            if (postProcessor == null || editForm == null || checkingPostLedgerCodes)
                 return;
+
+            // Item codes another nest took since Auto Nest are asked about on every post.
+            checkingPostLedgerCodes = true;
+            try
+            {
+                var recheck = new LedgerCodeRecheck(text =>
+                {
+                    if (!IsDisposed)
+                        statusLabel1.Text = text;
+                });
+                if (!await recheck.ConfirmAsync(this, editForm, "Post") || IsDisposed || editForm.IsDisposed)
+                    return;
+            }
+            finally
+            {
+                checkingPostLedgerCodes = false;
+            }
 
             // Closed progress windows can still have a fill awaiting its final commit.
             // Keep the nest stable throughout verification and all owned modal dialogs.

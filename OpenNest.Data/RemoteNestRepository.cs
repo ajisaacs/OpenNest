@@ -151,6 +151,19 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         return allocation.Number;
     }
 
+    public async Task<IReadOnlyList<NestStockCodeUse>> GetStockCodesInUseAsync(Guid excludeNestId,
+        CancellationToken cancellationToken = default)
+    {
+        var query = "api/nests/stock-item-codes" + (excludeNestId == Guid.Empty ? "" : "?exclude=" + excludeNestId.ToString("D"));
+        using var response = await _httpClient.GetAsync(Url(query), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            throw new NotSupportedException("This nest server does not list stock item codes (HTTP 404). Update the nest server.");
+        await NestServerHttp.EnsureSuccessAsync(response, "list stock item codes", cancellationToken);
+        var uses = await response.Content.ReadFromJsonAsync<List<NestStockCodeUse>>(NestServerHttp.JsonOptions, cancellationToken);
+        return uses?.Where(use => use != null && !string.IsNullOrWhiteSpace(use.ItemCode)).ToList()
+            ?? new List<NestStockCodeUse>();
+    }
+
     public async Task<NestRecord> UpdateFileAsync(
         Guid id, byte[] nestFile, NestRecord record, CancellationToken cancellationToken = default)
     {

@@ -87,7 +87,6 @@ internal static class NestArchive
             .OrderBy(p => p.Name, StringComparer.Ordinal)
             .ToList();
 
-        // NestReader: codes end at the first blank entry and at the plate's quantity.
         var platesOut = plates
             .Select((p, index) =>
             {
@@ -98,10 +97,7 @@ internal static class NestArchive
                     Width = System.Math.Min(size.Width, size.Length),
                     Length = System.Math.Max(size.Width, size.Length),
                     Quantity = p.Quantity,
-                    StockItemCodes = (p.StockItemCodes ?? new())
-                        .TakeWhile(code => !string.IsNullOrWhiteSpace(code))
-                        .Take(System.Math.Max(p.Quantity, 0))
-                        .ToList(),
+                    StockItemCodes = PlateCodes(p).ToList(),
                     ExpectedRemnant = ReadRemnant(p.ExpectedRemnant),
                 };
             })
@@ -120,6 +116,27 @@ internal static class NestArchive
         };
         return null;
     }
+
+    /// <summary>
+    /// The distinct ledger item codes the archive's plates are coded with, in plate order, by
+    /// the same rules as <see cref="ReadSheets"/>; empty when the bytes are unreadable.
+    /// </summary>
+    public static IReadOnlyList<string> ReadStockItemCodes(byte[] file)
+    {
+        if (Read(file, out var nest) is not null)
+            return Array.Empty<string>();
+        var drawingIds = (nest.Drawings ?? new()).Select(d => d.Id).ToHashSet();
+        return NestPlates(nest, drawingIds)
+            .SelectMany(p => PlateCodes(p))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
+
+    // NestReader: codes end at the first blank entry and at the plate's quantity.
+    private static IEnumerable<string> PlateCodes(PlateJson plate) =>
+        (plate.StockItemCodes ?? new())
+            .TakeWhile(code => !string.IsNullOrWhiteSpace(code))
+            .Take(System.Math.Max(plate.Quantity, 0));
 
     /// <summary>The archive's units, for backfilling records stored before they were kept; inches when unreadable.</summary>
     public static Units ReadUnits(byte[] file) => Read(file, out var nest) is null ? UnitsOf(nest) : Units.Inches;

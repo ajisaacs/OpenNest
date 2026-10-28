@@ -161,6 +161,54 @@ public class AutoNestFormLedgerStockTests
     });
 
     [Fact]
+    public void LoadLeavesOutCodesOnOtherOpenNests() => RunSta(() =>
+    {
+        var editing = Guid.NewGuid();
+        using var form = new LedgerTestForm
+        {
+            ServerNestId = editing,
+            InUse = LedgerCodesInUse.Known([Use("B-1", "2026-0042"), Use("D-1", "2026-0043")]),
+        };
+        GetGrid(form);
+
+        Assert.True(form.LoadLedgerStockAsync().IsCompleted);
+
+        Assert.Equal(editing, form.ExcludedNestId);
+        var row = Assert.Single(form.LedgerRows);
+        Assert.Equal(["D-2"], row.ItemCodes);
+        Assert.Equal(1, row.Quantity);
+        Assert.Equal("Ledger: 0 sheet sizes, 1 drop (4 on other nests)", Label(form).Text);
+    });
+
+    [Fact]
+    public void LoadWithoutOtherNests_OffersEverythingAndSaysSo() => RunSta(() =>
+    {
+        using var form = new LedgerTestForm { InUse = LedgerCodesInUse.Unknown("the nest server could not be reached") };
+        GetGrid(form);
+
+        Assert.True(form.LoadLedgerStockAsync().IsCompleted);
+
+        Assert.Equal(new[] { 3, 2 }, form.LedgerRows.Select(r => r.Quantity));
+        Assert.Equal("Ledger: 1 sheet size, 2 drops (other nests not checked: the nest server could not be reached)",
+            Label(form).Text);
+    });
+
+    [Fact]
+    public void EveryRowOnOtherNests_IsNotReportedAsNoStock() => RunSta(() =>
+    {
+        using var form = new LedgerTestForm
+        {
+            InUse = LedgerCodesInUse.Known([Use("B-1", "A"), Use("D-1", "A"), Use("D-2", "A")]),
+        };
+        GetGrid(form);
+
+        Assert.True(form.LoadLedgerStockAsync().IsCompleted);
+
+        Assert.Empty(form.LedgerRows);
+        Assert.Equal("Ledger: 0 sheet sizes, 0 drops (5 on other nests)", Label(form).Text);
+    });
+
+    [Fact]
     public void ClosingTheFormCancelsAPendingLoad() => RunSta(() =>
     {
         using var form = new LedgerTestForm { Pending = new TaskCompletionSource<LedgerStockResult>() };
@@ -277,6 +325,14 @@ public class AutoNestFormLedgerStockTests
         public TaskCompletionSource<LedgerStockResult>? Pending { get; set; }
         public List<(string, string, double)> Requests { get; } = new();
         public CancellationToken LastToken { get; private set; }
+        public LedgerCodesInUse InUse { get; set; } = LedgerCodesInUse.Known([]);
+        public Guid? ExcludedNestId { get; private set; }
+
+        internal override Task<LedgerCodesInUse> FetchCodesInUseAsync(Guid excludeNestId, CancellationToken cancellationToken)
+        {
+            ExcludedNestId = excludeNestId;
+            return Task.FromResult(InUse);
+        }
 
         internal override bool LedgerConfigured => Configured;
 
@@ -288,6 +344,9 @@ public class AutoNestFormLedgerStockTests
             return Pending?.Task ?? Task.FromResult(Reply);
         }
     }
+
+    private static OpenNest.Data.NestStockCodeUse Use(string code, string nest) =>
+        new() { ItemCode = code, NestId = Guid.NewGuid(), NestName = nest, Status = NestStatus.Quote };
 
     private static Nest LedgerNest() => new() { Material = new Material("Steel", "A36"), Thickness = 0.25 };
 

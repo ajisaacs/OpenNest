@@ -114,6 +114,7 @@ entry, never programs or geometry, and takes the archive-derived fields below fr
 | GET | `/api/nests/deleted/query` | — | Bounded deleted-record page; same query parameters as ordinary browsing |
 | GET | `/api/nests/deleted/{id}` / `/{id}/file` / `/{id}/revisions` / `/{id}/revisions/{revision}/file` | — | Recovery equivalents of current/history reads |
 | POST | `/api/nests/deleted/{id}/recover` | — | New nondeleted revision of the same ID |
+| GET | `/api/nests/stock-item-codes?exclude=` | — | `[{ "itemCode", "nestId", "nestName", "status" }]`: the ledger item codes on open nests' plates (see below); `exclude` (optional nest id) leaves that nest out; 400 for a malformed id |
 | POST | `/api/nest-names/next?year=` | — | `{ "year", "number", "name" }`: the year's next generated nest number (see below); 400 outside 2000–2099 |
 
 All existing-record mutations require `If-Match: "<current revision>"`.
@@ -153,11 +154,33 @@ desktop wrote at save (see [expected remnants](nest-file-format.md#expected-remn
 A file without it, or with a malformed or non-positive value or an unknown source,
 reports `null`.
 
+### Stock item codes in use
+
+`/stock-item-codes` lists the item codes on the plates of every non-deleted nest whose status
+is Draft, Quote or To Be Cut, one entry per code and nest (a bundle code used for several
+sheets appears once), ordered by code then nest name. A Has Been Cut nest's sheets are
+already cut, so its codes are not listed. Auto Nest leaves these codes out of its ledger
+stock, and save and post re-check a nest's own codes against them, passing the nest's id as
+`exclude` (see [stock from MaterialLedger](automatic-nesting.md#stock-from-materialledger)).
+
+The codes are read from each archive as `/sheets` reads them, but stored at write time in
+`nest_stock_codes` (schema v14), so a request reads no archive. Every write of a nest's
+current archive (create, file save, restore) replaces its rows; status and deletion come
+from the nest row at read time, so metadata edits, deletion and recovery need no update.
+Upgrading to v14 reads every current archive once, deleted ones included. The desktop
+client is `INestRepository.GetStockCodesInUseAsync`; `LedgerCodesInUse.ReadAsync` wraps it
+with a 5 s limit and turns File mode, an older server (404) or an unreachable one into an
+"unknown" answer rather than an exception.
+
 ### MaterialLedger holds (desktop)
 
 MaterialLedger creates one hold per physical sheet of a server nest, from
 `/sheets`, and stores the nest's ID. The desktop shows those holds read-only; it
-never creates, approves or closes them, and nothing waits on the ledger.
+never creates, approves or closes them, and nothing waits on the ledger. Holds are
+still created by hand in ML ("Reserve program sheets" on the nest's page): until then
+ML counts the nest's sheets as free, so the desktop guards against double-booking
+itself, by leaving [codes in use](#stock-item-codes-in-use) out of Auto Nest and
+re-checking codes before save and post.
 
 **Where.** A status bar label after the material label, only for a nest saved to
 the server in Database mode (`Document.RemoteId`, not a first save) while

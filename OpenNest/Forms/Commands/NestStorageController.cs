@@ -21,11 +21,17 @@ namespace OpenNest.Forms.Commands
 
         private readonly Form owner;
         private readonly Action<string> showStatus;
+        private readonly LedgerCodeRecheck ledgerRecheck;
 
         public NestStorageController(Form owner, Action<string> showStatus)
         {
             this.owner = owner;
             this.showStatus = showStatus;
+            ledgerRecheck = new LedgerCodeRecheck(text =>
+            {
+                if (!owner.IsDisposed)
+                    showStatus(text);
+            });
         }
 
         public event EventHandler StateChanged;
@@ -112,6 +118,9 @@ namespace OpenNest.Forms.Commands
                             : $"Found saved version {reconciled.Revision}. Review the current nest before saving again.");
                     return; // Never combine reconciliation with a write in the same click.
                 }
+                // Item codes another nest took since Auto Nest are asked about on every save.
+                if (!await ledgerRecheck.ConfirmAsync(owner, form, saveCopy ? "Save As" : "Save", asCopy: saveCopy))
+                    return;
                 if (copyName != null)
                     form.Nest.Name = copyName;
                 else if (!saveCopy && form.Document.IsFirstDatabaseSave(serverUrl)

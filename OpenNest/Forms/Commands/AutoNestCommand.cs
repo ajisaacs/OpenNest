@@ -53,7 +53,7 @@ namespace OpenNest.Forms.Commands
         /// </summary>
         public static AutoNestCommand Prompt(IWin32Window owner, EditNestForm target)
         {
-            using var form = new AutoNestForm(target.Nest);
+            using var form = new AutoNestForm(target.Nest) { ServerNestId = target.Document.RemoteId };
             if (target.Nest.PlateOptions.Count > 0)
                 form.LoadPlateOptions(target.Nest.PlateOptions, target.Nest.SalvageRate);
             if (target.Nest.MinimumRemnantDimension > 0)

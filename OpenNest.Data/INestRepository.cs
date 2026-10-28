@@ -79,6 +79,14 @@ public interface INestRepository
     Task<int> AllocateNestNumberAsync(int year, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("This repository does not allocate nest names.");
 
+    /// <summary>
+    /// The ledger item codes on the plates of every open (Draft, Quote or To Be Cut) nest,
+    /// except <paramref name="excludeNestId"/> when it is not empty.
+    /// </summary>
+    Task<IReadOnlyList<NestStockCodeUse>> GetStockCodesInUseAsync(Guid excludeNestId,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This repository does not list stock item codes.");
+
     /// <summary>Atomically replaces the current archive only at the expected revision.</summary>
     Task<NestRecord> UpdateFileAsync(Guid id, byte[] nestFile, NestRecord record, int expectedRevision,
         CancellationToken cancellationToken = default) =>

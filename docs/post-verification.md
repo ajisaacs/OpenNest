@@ -57,7 +57,9 @@ shared `PostVerificationAnalyzer` without an editor UI dependency.
 ## Posting workflow
 
 The desktop's **Nest > Post > (post processor)** workflow checks every plate after
-post settings are accepted and before asking where to save CNC output. The review
+post settings are accepted and before asking where to save CNC output. Before any of it,
+a nest whose plates carry MaterialLedger item codes has them
+[re-checked](automatic-nesting.md#stock-from-materialledger) with the same per-attempt consent. The review
 shows the first three check categories, even when there are no findings:
 
 - **Overlapping parts and clamps:** shared material between placed parts, including containment,

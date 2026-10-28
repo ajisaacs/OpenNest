@@ -337,6 +337,20 @@ hand-typed rows always have, and a number is passed as `PlateOption.Quantity` to
 "Ledger: 3 sheet sizes, 7 drops, 2 substitute rows (2 skipped: 2 unknown shape)", or the failure. An
 unmapped material clears the ledger rows. A failed request keeps them.
 
+**Codes on other nests.** ML's free counts drop only once someone reserves a nest's sheets
+there, so until then another nest's coded sheets still look free. The load therefore also
+reads the codes on every other open server nest (Draft, Quote or To Be Cut, not deleted)
+from [`/api/nests/stock-item-codes`](nest-storage.md#stock-item-codes-in-use), passing the
+nest being edited as `exclude` so its own codes stay offered. `LedgerCodeFilter`
+(`OpenNest.Data/MaterialLedger/`) takes each such code out of the mapped rows: every copy
+leaves the row's item codes and locations, its quantity drops by the copies removed (a
+bundle loses all its sheets), and a row left empty is dropped. The summary counts them, for
+example "Ledger: 2 sheet sizes, 5 drops (3 on other nests)". When the codes cannot be read
+(File mode, the nest server unreachable or too old) the stock loads whole and the summary
+ends "(other nests not checked: reason)"; the load never waits more than 5 s on the server.
+Gaps remain: a nest not yet saved on another PC, and stock taken in ML for other work, are
+not seen.
+
 **Persistence.** Ledger rows and quantities are request-local and are never written to
 `Nest.PlateOptions`. After a kept result, the nest saves the hand-typed rows with their
 typed costs, as before.
@@ -352,6 +366,30 @@ and `/api/nests/{id}/sheets` reports them per plate so MaterialLedger can hold t
 items. The plate list's tooltip shows "Stock: CODE (location)"; the location comes from
 this window's ledger load and is never saved. A re-nest builds new plates, so it drops codes.
 
+**Re-check before save and post.** Codes can be taken after Auto Nest: another nest is
+coded with the same sheet, or ML holds or consumes it. Before a nest with any
+`StockItemCodes` is saved to the server (Save or Save As in Database mode) or posted,
+`LedgerCodeRecheck` rereads the ledger's free stock for the nest's material, grade and
+thickness, the nest's own ML holds and the other open nests' codes (excluding this nest;
+a Save As excludes nothing, since the original keeps its codes). `LedgerCodeCheck` reports
+each code another open nest is coded with, and each code the ledger no longer has free for
+this nest: an open hold of this nest counts as its own sheet, and a bundle short of the
+sheets the nest cuts from it is reported with the count free. The **Ledger Stock Changed**
+dialog lists them by plate and offers:
+
+- **Save Anyway** / **Post Anyway**, enabled only once its acknowledgement box is ticked;
+- **Remove Codes and Save** / **Post**, which takes every copy of those codes off the plates
+  as one undoable edit ("Remove Ledger Codes") and keeps the layout; the uncoded sheets are
+  matched by size in ML;
+- **Cancel**, which stops this save or post.
+
+Like [pre-post verification](post-verification.md), the dialog is fresh on every attempt and
+its consent is never remembered. A PC without a ledger, a nest without a material or
+thickness, and a ledger that cannot be read (unreachable, key rejected, material unmapped)
+skip the check; the status bar says why it was skipped, and the save or post goes on. When
+only the other nests' codes cannot be read, the ledger is still checked and the status bar
+says other nests were not.
+
 **Cost.** Ledger rows load without cost. A ledger `CostPerUnit` is per lot unit, and a
 drop's is its source sheet's. While any ledger row is ticked, the run scores by area and
 hand-typed costs are ignored. The summary line says so, and the saved options keep
@@ -359,8 +397,8 @@ those costs. Pro-rating drop cost by area is a possible later change. Area scori
 not make drops preferred over full sheets; a stock priority would be a `NestJob` input
 with its own benchmark.
 
-MCP, Console and `OpenNest.Api` do not load ledger stock yet. The client and mapper live
-in `OpenNest.Data`, so these front ends can use them.
+MCP, Console and `OpenNest.Api` do not load ledger stock yet. The client, mapper and code
+filter live in `OpenNest.Data`, so these front ends can use them.
 
 The status bar shows a server nest's ledger holds and reminds you to close them out once
 the nest is cut; see [MaterialLedger holds](nest-storage.md#materialledger-holds-desktop).

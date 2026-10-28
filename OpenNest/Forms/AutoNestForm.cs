@@ -549,6 +549,16 @@ namespace OpenNest.Forms
             double thicknessIn, CancellationToken cancellationToken) =>
             MaterialLedgerStore.CreateClient().GetStockAsync(material, grade, thicknessIn, cancellationToken);
 
+        /// <summary>
+        /// The nest server id of the nest being nested, whose own codes stay offered; empty for
+        /// a nest not saved to the server.
+        /// </summary>
+        public Guid ServerNestId { get; set; }
+
+        /// <summary>Reads the codes on other open server nests; the form's tests replace it.</summary>
+        internal virtual Task<LedgerCodesInUse> FetchCodesInUseAsync(Guid excludeNestId, CancellationToken cancellationToken) =>
+            LedgerCodesOnOtherNests.ReadAsync(excludeNestId, cancellationToken);
+
         private string MaterialName => nest?.Material?.Name?.Trim() ?? "";
 
         internal void UpdateLedgerButton()
@@ -577,11 +587,14 @@ namespace OpenNest.Forms
             ledgerSummaryLabel.Text = "Loading stock from MaterialLedger...";
             try
             {
+                // Codes on other open nests are not held in ML yet, so they are left out here.
+                var inUseTask = FetchCodesInUseAsync(ServerNestId, token);
                 var result = await FetchLedgerStockAsync(MaterialName, nest.Material?.Grade?.Trim() ?? "",
                     LedgerStockMapper.ThicknessInches(nest.Thickness, nest.Units), token);
+                var inUse = await inUseTask;
                 if (token.IsCancellationRequested || IsDisposed)
                     return;
-                ApplyLedgerStock(result);
+                ApplyLedgerStock(result, inUse);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
@@ -600,17 +613,24 @@ namespace OpenNest.Forms
         /// <summary>
         /// Replaces the ledger rows with <paramref name="result"/>'s stock (an unmapped material
         /// clears them; a failed request keeps them) and reports the outcome under the grid.
+        /// Codes in <paramref name="inUse"/> are left out; when it is unknown the stock loads
+        /// whole and the summary says other nests were not checked.
         /// </summary>
-        internal void ApplyLedgerStock(LedgerStockResult result)
+        internal void ApplyLedgerStock(LedgerStockResult result, LedgerCodesInUse inUse = null)
         {
             switch (result)
             {
                 case LedgerStockResult.Ok ok:
                     var mapping = LedgerStockMapper.Map(ok.Items, nest.Units, PartEnvelopes(), ok.Specs);
+                    if (inUse is { IsKnown: true })
+                        mapping = LedgerCodeFilter.Exclude(mapping, inUse.Codes);
                     ReplaceLedgerRows(mapping.Rows);
-                    ledgerSummary = mapping.Rows.Count == 0 && mapping.SkippedUnknownShape + mapping.SkippedTooSmall == 0
+                    ledgerSummary = mapping.Rows.Count == 0
+                        && mapping.SkippedUnknownShape + mapping.SkippedTooSmall + mapping.OnOtherNests == 0
                         ? $"Ledger: no free stock of {DescribeMaterial()}."
                         : mapping.Summary;
+                    if (inUse is { IsKnown: false })
+                        ledgerSummary += $" (other nests not checked: {inUse.Unavailable})";
                     break;
                 case LedgerStockResult.Unmapped:
                     ReplaceLedgerRows(Array.Empty<LedgerStockRow>());
