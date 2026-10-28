@@ -31,11 +31,24 @@ requests per hour per IP address, ample for a 30-minute poll but shared by every
 machine behind one address). Pre-releases are offered only as the development
 build below.
 
+### Nest server mirror
+
+In Database mode an installed copy reads the nest server's mirror of the same feed first:
+`{ServerUrl}/updates/stable`, or `/updates/dev` with **Include development builds**. The
+server makes one GitHub check every 30 minutes for every workstation and downloads each
+package once, so a shop's machines do not share GitHub's per-address limit or each download
+the package over the internet (see [the mirror's endpoints](nest-storage.md#update-feed-mirror)).
+When the server cannot serve a feed (unreachable, a version without the mirror, mirroring
+turned off, or a channel it has not mirrored yet), that check goes to GitHub instead, and the
+package downloads from whichever source supplied the feed (`ServerFirstUpdateSource`). The
+source is chosen at startup, so changing storage mode or server takes effect after a restart.
+
 To use a self-hosted feed instead, set **Tools > Options > Auto-update feed URL**
 (`OpenNest.Properties.Settings.UpdateFeedUrl`, saved for the current Windows
 user) to the feed's base URL (`http://host:port`) and restart. A self-hosted
-feed URL is operator infrastructure and never belongs in source control; clearing
-the field returns to GitHub Releases.
+feed URL is operator infrastructure and never belongs in source control; it takes
+precedence over the nest server's mirror, and clearing the field returns to the mirror
+(Database mode) or GitHub Releases.
 
 These and the app's other `OpenNest.Properties.Settings` values live in
 `%APPDATA%\OpenNest\user-settings.json` (`AppDataSettingsProvider`), shared by every

@@ -1037,6 +1037,36 @@ endpoints and how the desktop uses them. Schema v13 adds the empty `shared_setti
 `shared_setting_revisions` tables; no other table changes. A server older than v13 refuses
 to open a v13 database, so rolling back needs the pre-upgrade backup.
 
+## Update feed mirror
+
+The server mirrors the desktop app's Velopack update feed so a shop's workstations share
+one GitHub check and one download; see [desktop auto-update](auto-update.md#nest-server-mirror)
+for the client side.
+
+- `GET /updates/{channel}/releases.win.json` (`stable` or `dev`): the feed Velopack wrote,
+  narrowed to the channel's newest full package. Velopack's query string is ignored. A
+  channel with nothing mirrored yet answers 503 and wakes a refresh; the client falls back to
+  GitHub for that check.
+- `GET /updates/{channel}/{FileName}`: the package that channel's feed names (range
+  requests supported); any other name is 404.
+- `GET /api/updates`: `{ stable, dev, lastChecked, lastError }`, the versions served and the
+  last refresh's outcome.
+
+`UpdateMirrorService` refreshes every 30 minutes with one unauthenticated GitHub API request
+(the ten newest releases), then reads the attached `releases.win.json` files. `stable` takes
+the newest full release; `dev` takes the higher of that and the newest pre-release with a feed
+(the rolling `dev-build`). A new package downloads once, is checked against the feed's size
+and SHA-256 before it is served, and replaces the channel's previous package, which is then
+deleted. A failed refresh keeps the current feeds. A channel is refreshed only while a client
+asked for it in the last 7 days (a restart counts as asking for channels already on disk), so
+a server whose workstations never take development builds never downloads one.
+
+Files live in `updates/` beside the database (`/app/data/updates` in the image): about 90 MB
+per mirrored channel. They are a cache; a restore or backup may leave them out. Set
+`OPENNEST_UPDATES=off` to stop mirroring; the routes then return 404 and clients use GitHub.
+The server needs outbound HTTPS to `api.github.com`, `github.com` and GitHub's release
+download host for the mirror; without it `/api/updates` shows the error and clients fall back.
+
 ## Storage
 
 `OpenNest.Server.NestDatabase` uses SQLite (`Microsoft.Data.Sqlite`) with
@@ -1125,7 +1155,8 @@ Runtime contract:
 - Runs as the .NET base image's non-root `app` user (UID/GID 1654). Application
   files are root-owned and read-only to it; within `/app` only `/app/data` is
   writable, and a fresh named volume inherits that directory's ownership. The
-  database stays `OPENNEST_DB=/app/data/nests.db`. The server also needs the
+  database stays `OPENNEST_DB=/app/data/nests.db`, and the
+  [update feed mirror](#update-feed-mirror) caches packages in `/app/data/updates`. The server also needs the
   container's writable `/tmp`: multipart uploads over 64 KiB are buffered there.
 - `HEALTHCHECK` runs `curl --fail http://127.0.0.1:8090/healthz` (interval 30 s,
   timeout 5 s, start period 10 s, retries 3, and a 2 s start interval during the

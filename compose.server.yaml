@@ -11,6 +11,8 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:8090
       OPENNEST_DB: /app/data/nests.db
+      # "off" stops mirroring the desktop update feed from GitHub (clients then check GitHub themselves).
+      OPENNEST_UPDATES: ${OPENNEST_UPDATES:-on}
     volumes:
       - opennest-data:/app/data
     security_opt:

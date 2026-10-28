@@ -4,6 +4,18 @@ namespace OpenNest.Server;
 public static class ServerOptions
 {
     public const string DatabaseVariable = "OPENNEST_DB";
+    public const string UpdatesVariable = "OPENNEST_UPDATES";
+
+    /// <summary>
+    /// True unless <c>OPENNEST_UPDATES</c> is <c>off</c>: the server mirrors the desktop
+    /// app's update feed from GitHub (see <see cref="UpdateMirror"/>).
+    /// </summary>
+    public static bool UpdatesEnabled(string? value) =>
+        !string.Equals(value?.Trim(), "off", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The mirrored update feed lives in an <c>updates</c> directory beside the database.</summary>
+    public static string UpdatesPath(string databasePath) =>
+        Path.Combine(Path.GetDirectoryName(Path.GetFullPath(databasePath))!, "updates");
 
     /// <summary>
     /// The database path: <c>--database=&lt;path&gt;</c> or <c>--database &lt;path&gt;</c>, then

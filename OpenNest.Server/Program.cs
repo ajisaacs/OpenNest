@@ -24,6 +24,14 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 var databasePath = ServerOptions.DatabasePath(args, Environment.GetEnvironmentVariable(ServerOptions.DatabaseVariable));
 builder.Services.AddSingleton(_ => new NestDatabase(databasePath));
 
+// Desktop update feed mirrored from GitHub beside the database; OPENNEST_UPDATES=off turns it off.
+var updatesEnabled = ServerOptions.UpdatesEnabled(Environment.GetEnvironmentVariable(ServerOptions.UpdatesVariable));
+if (updatesEnabled)
+{
+    builder.Services.AddSingleton(_ => new UpdateMirror(ServerOptions.UpdatesPath(databasePath), new HttpClient()));
+    builder.Services.AddHostedService<UpdateMirrorService>();
+}
+
 // Listen port: --urls or ASPNETCORE_URLS; Dockerfile defaults to 8090.
 var app = builder.Build();
 
@@ -159,6 +167,8 @@ app.MapDrawingSets();
 app.MapReleases();
 app.MapMaterials();
 app.MapSettings();
+if (updatesEnabled)
+    app.MapUpdates();
 
 app.Run();
 

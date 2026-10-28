@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenNest.Forms;
 using OpenNest.Properties;
 using Velopack;
 using Velopack.Locators;
@@ -22,6 +23,9 @@ namespace OpenNest
     /// pre-release when <see cref="Settings.UpdateIncludeDevBuilds"/> is set. A URL set in
     /// the Options dialog points this machine at a self-hosted feed instead;
     /// that URL is operator infrastructure and never lives in source control.
+    /// In Database mode without such a URL, the nest server's mirror of the same feed
+    /// (<c>{server}/updates/stable</c> or <c>/dev</c>) is read first, so a shop's workstations
+    /// share one GitHub check and one download; GitHub is the fallback when the server has none.
     /// </remarks>
     public sealed class UpdaterService : IDisposable
     {
@@ -51,19 +55,35 @@ namespace OpenNest
         public event Action<string> UpdateReady;
 
         public UpdaterService()
-            : this(Settings.Default.UpdateFeedUrl, Settings.Default.UpdateIncludeDevBuilds) { }
+            : this(Settings.Default.UpdateFeedUrl, Settings.Default.UpdateIncludeDevBuilds,
+                NestStorage.Settings.IsDatabaseMode ? NestStorage.Settings.ServerUrl : null)
+        { }
 
-        public UpdaterService(string feedUrl, bool includeDevBuilds)
+        public UpdaterService(string feedUrl, bool includeDevBuilds, string serverUrl = null)
         {
             // Only a process started through VelopackApp (MainApp) has a locator;
             // test hosts and other embedders get no update checks.
             if (!VelopackLocator.IsCurrentSet)
                 return;
 
-            IUpdateSource source = string.IsNullOrWhiteSpace(feedUrl)
-                ? new GithubSource(GitHubRepositoryUrl, null, includeDevBuilds)
-                : new SimpleWebSource(feedUrl);
-            _manager = new UpdateManager(source);
+            _manager = new UpdateManager(CreateSource(feedUrl, includeDevBuilds, serverUrl));
+        }
+
+        /// <summary>
+        /// A hand-set feed URL wins; otherwise a nest server (Database mode) is read first with
+        /// GitHub as its fallback; otherwise GitHub alone.
+        /// </summary>
+        internal static IUpdateSource CreateSource(string feedUrl, bool includeDevBuilds, string serverUrl)
+        {
+            if (!string.IsNullOrWhiteSpace(feedUrl))
+                return new SimpleWebSource(feedUrl);
+
+            var github = new GithubSource(GitHubRepositoryUrl, null, includeDevBuilds);
+            if (string.IsNullOrWhiteSpace(serverUrl))
+                return github;
+
+            var channel = includeDevBuilds ? "dev" : "stable";
+            return new ServerFirstUpdateSource(new SimpleWebSource($"{serverUrl.TrimEnd('/')}/updates/{channel}"), github);
         }
 
         /// <summary>True once a downloaded update is waiting for <see cref="ApplyAndRestart"/>.</summary>
