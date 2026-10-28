@@ -1,0 +1,8 @@
+# PyTorch: install the CUDA build first for GPU embedding, e.g.
+#   pip install torch --index-url https://download.pytorch.org/whl/cu124
+torch>=2.4
+transformers>=4.45
+numpy>=1.26
+pillow>=10.0
+scikit-image>=0.22
+ezdxf>=1.3
