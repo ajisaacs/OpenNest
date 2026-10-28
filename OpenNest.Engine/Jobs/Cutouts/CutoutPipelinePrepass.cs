@@ -57,6 +57,12 @@ internal sealed class CutoutPipelinePrepass
         // An insert's outline cannot fit a hole of smaller area; bolt holes skip the searches.
         var outline = original.Parts.ToDictionary(p => p.Id, p => geometry[p.Id] is { } g
             ? System.Math.Abs(g.Perimeter.Area()) : double.PositiveInfinity);
+        // Lattice and NFP placement read a part's holes as free space, so they take as inserts
+        // only parts whose holes no part of the job fits by area: no later insert can land in
+        // one. Proxies are never solid; their frames' holes hold reserved inserts.
+        var smallestOutline = outline.Values.DefaultIfEmpty(double.PositiveInfinity).Min();
+        var solid = original.Parts.ToDictionary(p => p.Id, p => geometry[p.Id] is { } g
+            && g.Cutouts.All(c => System.Math.Abs(c.Area()) < smallestOutline));
         var bundles = new Dictionary<string, Bundle>(StringComparer.Ordinal);
         var byFrame = new Dictionary<string, List<NestJobPart>>(StringComparer.Ordinal);
         // A proposal depends on the frame, the hole and the offered inserts with their local
@@ -104,10 +110,10 @@ internal sealed class CutoutPipelinePrepass
                             .Select(p => new NestJobPart(p.Id, p.Geometry, available[p.Id],
                                 p.Priority, LocalRotation(p.Rotation, angle)))
                             .ToArray();
-                        var flat = eligible.Where(p => geometry[p.Id] is { Cutouts.Count: 0 }).ToArray();
+                        var flat = eligible.Where(p => solid.GetValueOrDefault(p.Id)).ToArray();
                         var nested = CutoutCirclePacker.RoundHole(profile.Cutouts[hole]) == null
                             ? Array.Empty<NestJobPart>()
-                            : eligible.Where(p => round[p.Id] && geometry[p.Id]!.Cutouts.Count > 0).ToArray();
+                            : eligible.Where(p => round[p.Id] && !solid.GetValueOrDefault(p.Id)).ToArray();
                         if (flat.Length == 0 && nested.Length == 0)
                             continue;
                         foreach (var pose in Propose(frame, hole, flat, nested))

@@ -304,13 +304,15 @@ closed-cutout frames. It considers legal frame rotations without outer-perimeter
 reduction, shifts insert rotation policies into the local frame, and reserves certified router
 poses by original requirement ID. It can fill multiple holes and repeated/different frame
 requirements; inserts with a different priority stay independent, and a hole smaller in area than
-an insert's outline (a bolt hole) is not searched for it. Frames are bundled smallest
+an insert's outline (a bolt hole) is not searched for it. A part whose every cutout is smaller in
+area than the job's smallest part outline (a strap with bolt holes) is an ordinary insert: no part
+can land in its holes. Frames are bundled smallest
 first, so a larger frame's round cutout can take, through `CutoutCirclePacker` only, a round part
-with its own cutouts (a washer with an empty bore) or an earlier bundle as one insert: a flange
+with a cutout some part fits (a washer with an empty bore) or an earlier bundle as one insert: a flange
 holds a washer that holds a smaller washer that holds a slug. Chains stop at four parts deep
 (`CutoutPipelinePrepass.MaxLevels`). Lattice and NFP proposals never take such inserts, since they
 could seat a part in a ring's bore or over a nested bundle's reserved inserts; non-round frames
-with cutouts stay independent. A frame's proposals are compared by physical parts placed, a nested
+with such cutouts stay independent. A frame's proposals are compared by physical parts placed, a nested
 bundle counting its frame and contents, and ties keep the flat router's proposal. It uses the largest offered spacing for every bundle because the current
 job contract cannot condition insert demand on the stock selected later. Remaining demand is
 offered to the selected engine once. Only actually placed proxies expand, recursively, to original frame and
