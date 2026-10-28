@@ -38,20 +38,31 @@ public sealed class OwnedExecution
 public sealed class ExecutionMotion
 {
     internal ExecutionMotion(Vector? start, Vector end, bool rapid, LayerType layer,
-        PostVerificationGeometry.Curve curve)
+        PostVerificationGeometry.Curve curve, bool headRaised = false, int? code = null)
     {
         Start = start;
         End = end;
         Rapid = rapid;
         Layer = layer;
         Curve = curve;
+        HeadRaised = headRaised;
+        Code = code;
     }
 
     public Vector? Start { get; }
     public Vector End { get; }
     public bool Rapid { get; }
     public LayerType Layer { get; }
+
+    /// <summary>A rapid made with the head raised over parts already cut (<see cref="HeadRaise"/>).</summary>
+    public bool HeadRaised { get; }
+
+    /// <summary>
+    /// The index of the code this motion runs in the read program's own codes; null for a motion
+    /// inside a sub-program and for the rapid a program that opens with a cut is given.
+    /// </summary>
+    public int? Code { get; }
     public double Length => Curve?.Length ?? 0;
     internal PostVerificationGeometry.Curve Curve { get; }
-    internal ExecutionMotion WithStart(Vector? start) => new(start, End, Rapid, Layer, Curve);
+    internal ExecutionMotion WithStart(Vector? start) => new(start, End, Rapid, Layer, Curve, HeadRaised, Code);
 }

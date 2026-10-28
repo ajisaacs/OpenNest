@@ -187,6 +187,20 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         [PostSetting(MacrosSection, 8)]
         public string HeadHeightUnlockCode { get; set; } = "";
 
+        /// <summary>
+        /// Block that raises the head before a rapid Plan Cutting marked to pass over parts already
+        /// cut (<see cref="OpenNest.CNC.HeadRaise"/>).
+        /// </summary>
+        [DisplayName("Head raise")]
+        [Description(
+            "Written before a rapid that must pass over parts already cut with the head raised. Blank = not set: a nest with such rapids is refused."
+        )]
+        [PostSetting(MacrosSection, 9)]
+        public string HeadRaiseCode { get; set; } = "";
+
+        /// <summary>Whether the head-raise block is set.</summary>
+        public bool HasHeadRaiseCode() => !string.IsNullOrWhiteSpace(HeadRaiseCode);
+
         /// <summary>Whether both head-height lock blocks are set.</summary>
         public bool HasHeadHeightLockCodes() =>
             !string.IsNullOrWhiteSpace(HeadHeightLockCode) && !string.IsNullOrWhiteSpace(HeadHeightUnlockCode);

@@ -55,6 +55,12 @@ uses the Cincinnati machine-sample convention, not a generic TF5200 laser API:
   `G1` toward the origin. Both blocks are blank by default, and a nest with a
   head-locked cut-off is refused while either is blank. Whether `ZHSOFF` and the
   next contour's `L0` keep a locked head down for the rapid back is unconfirmed.
+- A rapid Plan Cutting marked to pass over parts already cut (see
+  [the cutting planner](cutting-planner.md#safest-route-fallback-when-the-search-runs-out))
+  writes the `Head raise` block just before its `G0`. The block is blank by default,
+  and a nest with a marked rapid is refused while it is blank. Which block raises the
+  head on the CI Fiber (whether `L "L0"` without block delete does) is unconfirmed;
+  enter and verify it on the machine.
 - Hole subprogram geometry is inlined. Suppressed moves and, by default,
   wholly scribe contours are omitted.
 - Files use UTF-8 without a BOM and CRLF lines. Default accuracy is three decimal

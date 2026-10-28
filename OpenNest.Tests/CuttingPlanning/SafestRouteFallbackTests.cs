@@ -9,9 +9,10 @@ namespace OpenNest.Tests.CuttingPlanning;
 public class SafestRouteFallbackTests
 {
     [Fact]
-    public void KeptOrderThroughAWall_OffersTheSafestRouteAsAnUnverifiedPlan()
+    public void KeptOrderThroughAWall_IntoALockedPart_OffersTheSafestRouteAsAnUnverifiedPlan()
     {
-        var plate = WalledPlate();
+        // The rapid into a locked program cannot be marked to raise the head, so it stays a finding.
+        var plate = WalledPlate(lockRight: true);
         var proposal = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), preservePartOrder: true).Plan();
 
         var planned = Assert.Single(proposal.Plates);
@@ -22,6 +23,7 @@ public class SafestRouteFallbackTests
         Assert.False(planned.HasOnlyFixedLeadWarnings);
         Assert.False(planned.SearchLimitReached);
         Assert.Equal(plate.Parts, planned.Result.ProposedOrder.Select(p => p.SourcePart));
+        Assert.Equal(0, planned.Result.HeadRaises);
         // Only the rapid from the left square to the right one has to cross the cut bar.
         var crossing = Assert.Single(planned.Result.Findings, f => f.Kind == PostVerificationKind.RapidCrossing);
         Assert.Equal(2, crossing.SourceOrdinal);
@@ -37,11 +39,11 @@ public class SafestRouteFallbackTests
     [Fact]
     public void SafestRoute_AppliesOnlyWithExplicitAcceptance()
     {
-        var plate = WalledPlate();
+        var plate = WalledPlate(lockRight: true);
         var proposal = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), preservePartOrder: true).Plan();
 
         Assert.Equal(CuttingCommitStatus.InvalidInput, proposal.Apply().Status);
-        Assert.All(plate.Parts, part => Assert.False(part.HasManualLeadIns));
+        Assert.All(plate.Parts.Take(2), part => Assert.False(part.HasManualLeadIns));
 
         Assert.Equal(CuttingCommitStatus.Applied, proposal.Apply(acceptWarnings: true).Status);
         Assert.All(plate.Parts, part => Assert.True(part.HasManualLeadIns));
@@ -55,6 +57,7 @@ public class SafestRouteFallbackTests
         var planned = Assert.Single(proposal.Plates);
         Assert.True(planned.IsReady);
         Assert.False(planned.Result.IsSafestRouteFallback);
+        Assert.Equal(0, planned.Result.HeadRaises);
     }
 
     [Fact]
@@ -104,13 +107,16 @@ public class SafestRouteFallbackTests
 
     // A tall bar between two squares, in the order bar, left, right: once the bar is cut every
     // straight rapid from the left square to the right one crosses it. Cut last, it crosses nothing.
-    private static Plate WalledPlate()
+    private static Plate WalledPlate(bool lockRight = false)
     {
         var plate = new Nest().CreatePlate();
         plate.Size = new Size(60, 60);
         plate.Parts.Add(new Part(new Drawing("bar", Rectangle(1, 50)), new Vector(25, 2)));
         plate.Parts.Add(new Part(new Drawing("left", ExplicitContourTests.Square(false)), new Vector(5, 20)));
-        plate.Parts.Add(new Part(new Drawing("right", ExplicitContourTests.Square(false)), new Vector(36, 20)));
+        var right = new Part(new Drawing("right", ExplicitContourTests.Square(false)), new Vector(36, 20));
+        if (lockRight)
+            Assert.True(right.RestoreLeadInProgram((Program)right.Program.Clone(), true));
+        plate.Parts.Add(right);
         return plate;
     }
 

@@ -816,9 +816,24 @@ motions into material, cut-order and nested-lead conflicts and incomplete checks
 rapids across cut contours, then everything else (missing lead-ins, pierce zones, support).
 It gets twice the plate's expansion budget, so the planning effort scales it too.
 
+Before replay, each rapid of the walk that still passes over parts already cut is marked to
+raise the head (`RaisedRapids`, `OpenNest.CNC.HeadRaise`): a `HEAD RAISE` comment directly
+before the rapid in the part's program, which saves with the nest. This is the only place a
+raise is added, so a plate the strict search can plan never gets one: it is the last resort for
+a route no search kept head-down, not a shortcut. Only rapids the planner chose in a
+regenerated program are marked; a rapid into or inside a locked program, a cut-off or a hole
+sub-program keeps its crossing as a finding. The checker sets a raised rapid's crossings apart
+instead of reporting them, in replay and in pre-post verification alike.
+
 The batch walks both the free order and the current order, replays each against its captured
-input with fresh checks, and keeps the one with the lower severity, then the shorter rapid
-travel. A route that passes every check on replay is an ordinary `Ready` proposal. Otherwise
+input with fresh checks, and keeps the one with the lower severity, then fewer head raises, then
+the shorter rapid travel; a route that passes every check without a raise is taken at once.
+A route that passes every check on replay is an ordinary `Ready` proposal. One with raises
+names them in its summary ("N rapids raise the head") and lists each as an advisory note naming
+the cut part it passes over (`CuttingPlanResult.HeadRaises`). Posts raise the head before every
+marked rapid: the Cincinnati CL post writes `M47` (or its safety raise for a long rapid) whatever
+the M47 mode, and the CI Fiber post writes its **Head raise** block, refusing a marked nest while
+that block is blank, as it does for the head-height lock. Otherwise
 the result is `BestEffort` with `IsSafestRouteFallback`, listing every violation; the summary
 calls it the safest route found, gives the number of checks it breaks and its rapid travel,
 and Apply requires explicit warning acceptance like any unverified plan. The fallback never

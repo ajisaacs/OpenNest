@@ -41,8 +41,10 @@ public static class ExecutionMotionReader
             var pos = frame;
             var first = true;
             var countBefore = moves.Count;
-            foreach (var code in current.Codes)
+            var raised = HeadRaise.RaisedMask(current.Codes);
+            for (var codeIndex = 0; codeIndex < current.Codes.Count; codeIndex++)
             {
+                var code = current.Codes[codeIndex];
                 token.ThrowIfCancellationRequested();
                 if (--budget < 0)
                     throw new ArgumentException("Program expansion exceeds the verification limit.");
@@ -106,7 +108,8 @@ public static class ExecutionMotionReader
                 var curve = rapid ? null : PostVerificationGeometry.Curve.Create(pos, end,
                     motion is ArcMove arcMove ? reference + arcMove.CenterPoint : null,
                     motion is ArcMove { Rotation: RotationType.CW });
-                moves.Add(new(start, end, rapid, layer, curve));
+                moves.Add(new(start, end, rapid, layer, curve, raised[codeIndex],
+                    ReferenceEquals(current, program) ? codeIndex : null));
                 pos = end;
                 first = false;
             }

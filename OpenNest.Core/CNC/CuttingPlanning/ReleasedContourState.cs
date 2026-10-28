@@ -54,9 +54,11 @@ public sealed class ReleasedContourState
     /// As <see cref="Check(OwnedExecution, Vector?, int, bool, CancellationToken)"/>, but a
     /// finding whose offending motion <paramref name="isFixed"/> owns (by motion index) is
     /// returned apart: a fixed emission is accepted as given and only reported. The checker
-    /// state advances exactly as it would without ownership.
+    /// state advances exactly as it would without ownership. Crossings made by a rapid with the
+    /// head raised are returned apart as well, as Raised: they are the raise's reason, not a fault.
     /// </summary>
-    internal (IReadOnlyList<PostVerificationFinding> Strict, IReadOnlyList<PostVerificationFinding> Fixed) Check(
+    internal (IReadOnlyList<PostVerificationFinding> Strict, IReadOnlyList<PostVerificationFinding> Fixed,
+        IReadOnlyList<PostVerificationFinding> Raised) Check(
         OwnedExecution execution, Vector? arrival, int partNumber, bool cutoff, Func<int, bool> isFixed,
         CancellationToken token)
     {
@@ -67,8 +69,10 @@ public sealed class ReleasedContourState
         moves[0] = moves[0].WithStart(arrival);
         var findings = new List<PostVerificationFinding>();
         var fixedFindings = new List<PostVerificationFinding>();
-        AnalyzeMoves(moves, cutoff, findings, 1, partNumber, token, isFixed, fixedFindings);
-        return (findings.AsReadOnly(), fixedFindings.AsReadOnly());
+        var raisedFindings = new List<PostVerificationFinding>();
+        AnalyzeMoves(moves, cutoff, findings, 1, partNumber, token, isFixed, fixedFindings,
+            raisedFindings: raisedFindings);
+        return (findings.AsReadOnly(), fixedFindings.AsReadOnly(), raisedFindings.AsReadOnly());
     }
 
     /// <summary>
@@ -97,7 +101,7 @@ public sealed class ReleasedContourState
     internal void AnalyzeMoves(IReadOnlyList<ExecutionMotion> moves, bool cutoff,
         List<PostVerificationFinding> findings, int plate, int part, CancellationToken token,
         Func<int, bool> isFixed = null, List<PostVerificationFinding> fixedFindings = null,
-        bool proveOpenCuts = false, int contoursBefore = 0)
+        bool proveOpenCuts = false, int contoursBefore = 0, List<PostVerificationFinding> raisedFindings = null)
     {
         var current = new CutGroup();
         var unfinished = new List<CutGroup>();
@@ -166,16 +170,22 @@ public sealed class ReleasedContourState
                     if (obstacle.OvercutEnd is { } tailEnd && tailEnd.DistanceTo(start) <= PostVerificationGeometry.Epsilon
                         && start.DistanceTo(move.End) > PostVerificationGeometry.RaySeamTolerance)
                         from = start + (move.End - start) * (PostVerificationGeometry.RaySeamTolerance / start.DistanceTo(move.End));
-                    if (PostVerificationGeometry.Crosses(from, move.End, obstacle.Curves, token))
-                        Add(new(PostVerificationKind.RapidCrossing, plate, part, obstacle.Part,
-                            $"Direct XY rapid crosses or touches completed untabbed contour {obstacle.Contour} " +
-                            $"of part {obstacle.Part}.")
-                        {
-                            Location = (start + move.End) * 0.5,
-                            RapidStart = start,
-                            RapidEnd = move.End,
-                            ContactPoints = PostVerificationGeometry.ContactPoints(from, move.End, obstacle.Curves, token)
-                        }, owned);
+                    if (!PostVerificationGeometry.Crosses(from, move.End, obstacle.Curves, token))
+                        continue;
+                    var crossing = new PostVerificationFinding(PostVerificationKind.RapidCrossing, plate, part,
+                        obstacle.Part, (move.HeadRaised ? "Head-raised" : "Direct") + " XY rapid crosses or touches "
+                        + $"completed untabbed contour {obstacle.Contour} of part {obstacle.Part}.")
+                    {
+                        Location = (start + move.End) * 0.5,
+                        RapidStart = start,
+                        RapidEnd = move.End,
+                        ContactPoints = PostVerificationGeometry.ContactPoints(from, move.End, obstacle.Curves, token)
+                    };
+                    // The head clears a cut part on a raised rapid; the crossing is the raise's reason.
+                    if (move.HeadRaised)
+                        raisedFindings?.Add(crossing);
+                    else
+                        Add(crossing, owned);
                 }
             }
             else if (move.Layer == LayerType.Leadin)

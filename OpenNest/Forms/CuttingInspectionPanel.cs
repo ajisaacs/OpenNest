@@ -909,7 +909,10 @@ internal sealed class CuttingInspectionPanel : UserControl
             var order = planned.KeptCurrentOrder ? "current order kept (no better order found)"
                 : planned.OrderChanged ? "new part order" : "part order unchanged";
             var rapid = planned.Result.RapidDistance.ToString("0.#", CultureInfo.CurrentCulture);
-            return $"{name}: {Count(planned.PartCount, "part")}, {order}, {rapid} {UnitsHelper.GetShortString(units)} of rapids.";
+            var raises = planned.Result.HeadRaises == 0 ? ""
+                : $" {Count(planned.Result.HeadRaises, "rapid")} must raise the head over cut parts (listed below).";
+            return $"{name}: {Count(planned.PartCount, "part")}, {order}, {rapid} {UnitsHelper.GetShortString(units)} of rapids."
+                + raises;
         }
         if (planned.CanApplyWithWarnings)
             return $"{name}: UNVERIFIED. Check its lead-ins and cut order before applying.";

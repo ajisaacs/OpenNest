@@ -104,6 +104,8 @@ namespace OpenNest.Posts.Cincinnati
         {
             // Refuse before writing anything: a head-locked overcut needs the lock codes.
             HeadHeightLock.EnsurePostable(nest, Config.HasHeadHeightLockCodes(), Name);
+            // M47 raises the head before a marked rapid; the markers must be well formed.
+            HeadRaise.EnsurePostable(nest, true, Name);
 
             // 1. Create variable manager and register standard variables
             var vars = CreateVariableManager();
@@ -263,6 +265,7 @@ namespace OpenNest.Posts.Cincinnati
             // Refuse before creating the file, so a refusal never empties an existing program.
             DisplayPerimeterTail.EnsurePostable(nest);
             HeadHeightLock.EnsurePostable(nest, Config.HasHeadHeightLockCodes(), Name);
+            HeadRaise.EnsurePostable(nest, true, Name);
             using var fs = new FileStream(outputFile, FileMode.Create, FileAccess.Write);
             Post(nest, fs);
         }

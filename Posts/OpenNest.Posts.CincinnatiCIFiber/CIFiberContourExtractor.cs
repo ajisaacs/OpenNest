@@ -42,6 +42,9 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         /// <c>Lock</c> is true and unlocking otherwise.
         /// </summary>
         public List<(int Before, bool Lock)> HeadLocks { get; } = new();
+
+        /// <summary>Whether the rapid to the pierce raises the head over parts already cut (<see cref="HeadRaise"/>).</summary>
+        public bool Raised { get; set; }
     }
 
     /// <summary>
@@ -95,6 +98,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             }
 
             CIFiberContour current = null;
+            var raise = false;
 
             void Flush()
             {
@@ -108,6 +112,13 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                 if (code is Motion suppressed && suppressed.Suppressed)
                     continue;
 
+                // A marker raises the head for the rapid straight after it.
+                if (HeadRaise.IsMarker(code))
+                {
+                    raise = true;
+                    continue;
+                }
+
                 if (HeadHeightLock.IsLock(code) || HeadHeightLock.IsUnlock(code))
                 {
                     current ??= new CIFiberContour { Pierce = origin };
@@ -119,7 +130,8 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                 {
                     case RapidMove rapid:
                         Flush();
-                        current = new CIFiberContour { Pierce = rapid.EndPoint + origin };
+                        current = new CIFiberContour { Pierce = rapid.EndPoint + origin, Raised = raise };
+                        raise = false;
                         break;
 
                     case SubProgramCall call:

@@ -350,10 +350,13 @@ public static class CuttingPlanService
 
     /// <summary>
     /// The safest route the greedy walk finds, independently replayed; null when there is none.
-    /// A route that passes every check is Ready. One that does not is an UNVERIFIED BestEffort
-    /// carrying every violation, applicable only with explicit acceptance. A route the replay
-    /// cannot check completely, or with any motion into material (a lead that does not fit,
-    /// a cut-order or nested-lead conflict), is never offered: the strict refusal stands.
+    /// Its planner-chosen rapids that still cross parts already cut raise the head
+    /// (<see cref="RaisedRapids"/>): only here, after the strict search found no route avoiding
+    /// them. A route that then passes every check is Ready, listing its raises. One that does not
+    /// is an UNVERIFIED BestEffort carrying every violation, applicable only with explicit
+    /// acceptance. A route the replay cannot check completely, or with any motion into material
+    /// (a lead that does not fit, a cut-order or nested-lead conflict), is never offered: the
+    /// strict refusal stands.
     /// </summary>
     internal static CuttingPlanResult PlanSafestRoute(CuttingPlanSnapshot snapshot, CancellationToken token)
     {
@@ -366,6 +369,14 @@ public static class CuttingPlanService
         var order = JointCuttingPlanSearch.SafestRoute(snapshot.WithSearchLimits(budget, snapshot.MaxEntries), token);
         if (order == null)
             return null;
+        try
+        {
+            order = RaisedRapids.Mark(snapshot, order, token);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+        {
+            // A route that cannot be read for marking keeps its crossings as findings.
+        }
         var result = ReplayPrograms(snapshot, order, 0, token, safestRoute: true);
         if (result.Status is not (CuttingPlanStatus.Ready or CuttingPlanStatus.BestEffort)
             || result.SafestRoute is { Severe: > 0 })
@@ -397,6 +408,9 @@ public static class CuttingPlanService
         // Violations inside fixed emissions: accepted as given, reported, never refused (D1a).
         // Capture adds the drawing pins it could not honour; their contours were planned normally.
         var warnings = new List<CuttingPlanFinding>(snapshot.Findings);
+        // Rapids that raise the head over cut parts are listed, never refused.
+        var raises = new List<CuttingPlanFinding>();
+        var raisedRapids = 0;
         var materialOwners = snapshot.Placements.Where(p => !p.IsCutOff).ToArray();
         var materials = materialOwners.Select(p => p.Material).ToArray();
         foreach (var proposal in order)
@@ -433,8 +447,10 @@ public static class CuttingPlanService
                     findings: [JointCuttingPlanSearch.Finding(source, PostVerificationKind.Incomplete, ex.Message)], expansions: expansions);
             }
             var isFixed = proposal.FixedMotions(execution);
-            var (strict, fixedFindings) = checker.Check(execution, position, source.SourceOrdinal + 1,
+            var (strict, fixedFindings, raised) = checker.Check(execution, position, source.SourceOrdinal + 1,
                 source.IsCutOff, isFixed, token);
+            raises.AddRange(RaisedRapids.Notes(snapshot, source, raised));
+            raisedRapids += RaisedRapids.Count(raised);
             findings.AddRange(JointCuttingPlanSearch.Map(snapshot, strict));
             warnings.AddRange(fixedFindings.Select(f => FixedLeadWarnings.FromChecker(snapshot, source, f)));
             var fixedLeads = new List<FixedLeadFailure>();
@@ -464,12 +480,14 @@ public static class CuttingPlanService
         }
         token.ThrowIfCancellationRequested();
         // Support tabs that cannot hold their part level are noted, never refused.
-        var notes = order.SelectMany(SupportTabCapture.Notes).Concat(SupportTabCapture.Skipped(snapshot)).ToList();
+        var notes = raises.Concat(order.SelectMany(SupportTabCapture.Notes))
+            .Concat(SupportTabCapture.Skipped(snapshot)).ToList();
         if (safestRoute && findings.Count != 0 && findings.All(f => f.Kind != PostVerificationKind.Incomplete))
             return new(CuttingPlanStatus.BestEffort, order, findings.Concat(warnings).Concat(notes).Distinct(),
                 expansions, distance)
             {
                 SafestRoute = RouteSeverity.Of(findings.Distinct().Select(f => f.Kind)),
+                HeadRaises = raisedRapids,
             };
         if (findings.Count != 0)
             return new(findings.Any(f => f.Kind == PostVerificationKind.Incomplete)
@@ -479,9 +497,11 @@ public static class CuttingPlanService
         // UNVERIFIED: never Ready, applicable only through explicit warning acceptance.
         if (warnings.Count != 0)
             return new(CuttingPlanStatus.BestEffort, order, warnings.Concat(notes).Distinct(), expansions,
-                distance, independentlyReplayed: true);
+                distance, independentlyReplayed: true)
+            { HeadRaises = raisedRapids };
         return new(CuttingPlanStatus.Ready, order, notes, expansions: expansions,
-            rapidDistance: distance, independentlyReplayed: true);
+            rapidDistance: distance, independentlyReplayed: true)
+        { HeadRaises = raisedRapids };
     }
 
     private static CuttingPlanFinding DependencyFinding(CuttingPlanSnapshot snapshot,

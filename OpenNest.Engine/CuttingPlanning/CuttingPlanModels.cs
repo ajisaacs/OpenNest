@@ -367,6 +367,12 @@ public sealed class CuttingPlanResult
     /// <summary>Whether this is a safest-route fallback rather than a route that passed every check.</summary>
     public bool IsSafestRouteFallback => SafestRoute != null;
 
+    /// <summary>
+    /// The rapids that raise the head over parts already cut, each listed in <see cref="Findings"/>.
+    /// Only a safest-route fallback marks them, when no search kept every rapid head-down.
+    /// </summary>
+    public int HeadRaises { get; init; }
+
     /// <summary>The captured input this result was planned from; binds Apply to its freshness record.</summary>
     internal CuttingPlanSnapshot Snapshot { get; set; }
 }

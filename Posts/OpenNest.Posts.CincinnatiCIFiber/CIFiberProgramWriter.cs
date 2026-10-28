@@ -74,6 +74,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                 throw new ArgumentNullException(nameof(nest));
 
             HeadHeightLock.EnsurePostable(nest, _config.HasHeadHeightLockCodes(), "Cincinnati CI Fiber");
+            HeadRaise.EnsurePostable(nest, _config.HasHeadRaiseCode(), "Cincinnati CI Fiber");
             Write(nest, PostedSheets(nest), 1, w);
         }
 
@@ -89,6 +90,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                 throw new ArgumentNullException(nameof(sheet));
 
             HeadHeightLock.EnsurePostable(nest, _config.HasHeadHeightLockCodes(), "Cincinnati CI Fiber");
+            HeadRaise.EnsurePostable(nest, _config.HasHeadRaiseCode(), "Cincinnati CI Fiber");
             Write(nest, new[] { sheet }, sheetNumber, w);
         }
 
@@ -239,12 +241,20 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             return contourNumber;
         }
 
+        // A rapid marked to pass over parts already cut is made with the head raised.
+        private void WriteRapidToPierce(CIFiberContour contour, TextWriter w)
+        {
+            if (contour.Raised)
+                CIFiberFormatter.Line(w, _config.HeadRaiseCode);
+            CIFiberFormatter.Line(w, $"G0X{Fmt(contour.Pierce.X)}Y{Fmt(contour.Pierce.Y)}");
+        }
+
         private void WriteContour(CIFiberContour contour, bool isExterior, int contourNumber, TextWriter w)
         {
             CIFiberFormatter.Line(w, $"N{contourNumber}:");
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerCancel));
             CIFiberFormatter.Line(w, $"V.E.R3={contourNumber}");
-            CIFiberFormatter.Line(w, $"G0X{Fmt(contour.Pierce.X)}Y{Fmt(contour.Pierce.Y)}");
+            WriteRapidToPierce(contour, w);
 
             if (contour.LeadIn == null)
                 throw new InvalidOperationException(
@@ -311,7 +321,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             CIFiberFormatter.Line(w, $"N{contourNumber}:");
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerCancel));
             CIFiberFormatter.Line(w, $"V.E.R3={contourNumber}");
-            CIFiberFormatter.Line(w, $"G0X{Fmt(contour.Pierce.X)}Y{Fmt(contour.Pierce.Y)}");
+            WriteRapidToPierce(contour, w);
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerExteriorLeadin));
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerCut));
 

@@ -1,3 +1,5 @@
+using OpenNest.CNC;
+
 namespace OpenNest.Posts.Cincinnati;
 
 /// <summary>
@@ -7,11 +9,18 @@ internal static class CincinnatiHeadRaise
 {
     /// <param name="isExterior">True when the feature just cut is a part exterior.</param>
     /// <param name="rapidDistance">Travel to the next pierce; null when unknown.</param>
+    /// <param name="raised">
+    /// True when Plan Cutting marked the rapid to raise the head over parts already cut
+    /// (<see cref="HeadRaise"/>): it always gets a raise the operator cannot skip.
+    /// </param>
     /// <returns>The block to write, or null for no head raise.</returns>
-    internal static string Line(CincinnatiPostConfig config, bool isExterior, double? rapidDistance)
+    internal static string Line(CincinnatiPostConfig config, bool isExterior, double? rapidDistance,
+        bool raised = false)
     {
         if (IsSafetyRapid(config, rapidDistance))
             return SafetyLine(config);
+        if (raised)
+            return "M47";
 
         var mode = isExterior ? config.ExteriorM47 : config.InteriorM47;
         return mode switch

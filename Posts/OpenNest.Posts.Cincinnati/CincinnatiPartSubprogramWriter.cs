@@ -97,6 +97,7 @@ public sealed class CincinnatiPartSubprogramWriter
                 RapidDistance = isLastFeature
                     ? null
                     : FeatureUtils.EndPoint(codes).DistanceTo(FeatureUtils.StartPoint(ordered[i + 1].codes)),
+                NextRapidRaised = !isLastFeature && FeatureUtils.IsRaised(ordered[i + 1].codes),
             };
 
             _featureWriter.Write(w, ctx);

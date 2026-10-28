@@ -30,8 +30,20 @@ public static class FeatureUtils
                 features.Add(new List<ICode> { code });
                 current = null;
             }
+            else if (HeadRaise.IsMarker(code))
+            {
+                // The marker opens the feature its rapid starts, so it stays with that rapid.
+                if (current != null)
+                    features.Add(current);
+                current = new List<ICode> { code };
+            }
             else if (code is RapidMove)
             {
+                if (current is [var marker] && HeadRaise.IsMarker(marker))
+                {
+                    current.Add(code);
+                    continue;
+                }
                 if (current != null)
                     features.Add(current);
                 current = new List<ICode> { code };
@@ -48,6 +60,9 @@ public static class FeatureUtils
 
         return features;
     }
+
+    /// <summary>Whether the rapid that starts <paramref name="feature"/> raises the head (<see cref="HeadRaise"/>).</summary>
+    public static bool IsRaised(List<ICode> feature) => feature.Count > 0 && HeadRaise.IsMarker(feature[0]);
 
     /// <summary>
     /// Classifies features as etch or cut and orders etch features before cut features.

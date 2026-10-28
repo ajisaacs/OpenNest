@@ -127,6 +127,9 @@ public sealed class CincinnatiSheetWriter
 
         /// <summary>Where the tool leaves from: back at the corner after a sub-program call.</summary>
         public Vector Exit { get; init; }
+
+        /// <summary>Whether the rapid into this item raises the head (<see cref="HeadRaise"/>).</summary>
+        public bool Raised { get; init; }
     }
 
     private static List<SheetItem> BuildItems(
@@ -159,6 +162,7 @@ public sealed class CincinnatiSheetWriter
                         Start = corner + FeatureUtils.StartPoint(subFeatures[0].codes),
                         End = corner + FeatureUtils.EndPoint(subFeatures[^1].codes),
                         Exit = corner,
+                        Raised = FeatureUtils.IsRaised(subFeatures[0].codes),
                     }
                 );
                 continue;
@@ -182,6 +186,7 @@ public sealed class CincinnatiSheetWriter
                         Start = start,
                         End = end,
                         Exit = end,
+                        Raised = FeatureUtils.IsRaised(codes),
                     }
                 );
             }
@@ -228,7 +233,8 @@ public sealed class CincinnatiSheetWriter
                     i,
                     partName,
                     rapidDistance,
-                    isLastFeature
+                    isLastFeature,
+                    next?.Raised == true
                 );
                 continue;
             }
@@ -266,6 +272,7 @@ public sealed class CincinnatiSheetWriter
                 CutDistance = FeatureUtils.ComputeCutDistance(codes),
                 SheetDiagonal = sheetDiagonal,
                 RapidDistance = rapidDistance,
+                NextRapidRaised = next?.Raised == true,
                 PartLocation = part.Location,
                 UserVariableMapping = userVarMapping,
                 DrawingId = part.BaseDrawing.Id,
@@ -294,7 +301,8 @@ public sealed class CincinnatiSheetWriter
         int index,
         string partName,
         double? rapidDistance,
-        bool isLastPart
+        bool isLastPart,
+        bool nextRaised
     )
     {
         var x = _fmt.FormatCoord(item.Entry.X);
@@ -321,7 +329,7 @@ public sealed class CincinnatiSheetWriter
 
         // One head raise covers the rapid back and the rapid on. The part is complete,
         // so the raise follows the exterior M47 mode.
-        var raise = CincinnatiHeadRaise.Line(_config, true, rapidDistance);
+        var raise = CincinnatiHeadRaise.Line(_config, true, rapidDistance, nextRaised);
         if (raise != null)
             w.WriteLine(raise);
 

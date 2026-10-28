@@ -31,6 +31,9 @@ public sealed class FeatureContext
     /// </summary>
     public double? RapidDistance { get; set; }
 
+    /// <summary>True when the rapid to the next pierce is marked to raise the head (<see cref="HeadRaise"/>).</summary>
+    public bool NextRapidRaised { get; set; }
+
     /// <summary>
     /// Part location on the plate. Added to all output X/Y coordinates
     /// so part-relative programs become plate-absolute under G90.
@@ -342,7 +345,7 @@ public sealed class CincinnatiFeatureWriter
 
     private void WriteM47(TextWriter writer, FeatureContext ctx)
     {
-        var line = CincinnatiHeadRaise.Line(_config, ctx.IsExteriorFeature, ctx.RapidDistance);
+        var line = CincinnatiHeadRaise.Line(_config, ctx.IsExteriorFeature, ctx.RapidDistance, ctx.NextRapidRaised);
         if (line != null)
             writer.WriteLine(line);
     }

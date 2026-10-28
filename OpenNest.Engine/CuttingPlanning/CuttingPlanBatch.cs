@@ -212,9 +212,10 @@ public sealed class CuttingPlanBatch
 
     /// <summary>
     /// Safest first, then fastest: the replayed safest route from the free order and from the
-    /// current order, whichever breaks fewer checks (most severe first), then has less rapid
-    /// travel. A route whose planner-chosen motions pass every check is taken at once, even
-    /// when fixed lead-ins still warn. Null when neither walk finds a route.
+    /// current order, whichever breaks fewer checks (most severe first), then raises the head
+    /// fewer times, then has less rapid travel. A route whose planner-chosen motions pass every
+    /// check head-down is taken at once, even when fixed lead-ins still warn. Null when neither
+    /// walk finds a route.
     /// </summary>
     private static (CuttingPlanResult Result, bool FreeOrder)? SafestRoute(Entry entry, CancellationToken token)
     {
@@ -225,10 +226,9 @@ public sealed class CuttingPlanBatch
             {
                 if (CuttingPlanService.PlanSafestRoute(snapshot, token) is not { } candidate)
                     continue;
-                if (!candidate.IsSafestRouteFallback)
+                if (!candidate.IsSafestRouteFallback && candidate.HeadRaises == 0)
                     return (candidate, freeOrder);
-                if (best is not { } known || candidate.SafestRoute < known.Result.SafestRoute
-                    || candidate.SafestRoute == known.Result.SafestRoute && candidate.RapidDistance < known.Result.RapidDistance)
+                if (best is not { } known || Safer(candidate, known.Result))
                     best = (candidate, freeOrder);
             }
         }
@@ -237,6 +237,17 @@ public sealed class CuttingPlanBatch
             return (new(CuttingPlanStatus.Cancelled), true);
         }
         return best;
+    }
+
+    // Fewer broken checks (a route that breaks none first), then fewer head raises, then less travel.
+    private static bool Safer(CuttingPlanResult candidate, CuttingPlanResult known)
+    {
+        var severity = (candidate.SafestRoute ?? default).CompareTo(known.SafestRoute ?? default);
+        if (severity != 0)
+            return severity < 0;
+        if (candidate.HeadRaises != known.HeadRaises)
+            return candidate.HeadRaises < known.HeadRaises;
+        return candidate.RapidDistance < known.RapidDistance;
     }
 
     internal static CuttingPlanResult PlanReorder(CuttingPlanSnapshot snapshot, CancellationToken token,
@@ -514,8 +525,11 @@ public sealed class CuttingPlanProposal
                 + $"regenerated, {kept} kept as is; rapid travel "
                 + $"{result.RapidDistance.ToString("0.##", CultureInfo.CurrentCulture)} {unit}. {order}"
                 + (plate.ReversedCutOffCount == 0 ? ""
-                    : $" {Count(plate.ReversedCutOffCount, "cutoff segment")} at the far edge change direction.");
-            // A ready plan's findings are advisory notes (support tabs that may not hold a part level).
+                    : $" {Count(plate.ReversedCutOffCount, "cutoff segment")} at the far edge change direction.")
+                + (result.HeadRaises == 0 ? ""
+                    : $" No route found keeps the head down over every cut part, so {Count(result.HeadRaises, "rapid")} "
+                        + $"{(result.HeadRaises == 1 ? "raises" : "raise")} the head; each is listed below.");
+            // A ready plan's findings are advisory notes (head raises, support tabs that may not hold a part level).
             foreach (var line in Limit(result.Findings.Select(DescribeFinding)))
                 yield return line;
             yield break;

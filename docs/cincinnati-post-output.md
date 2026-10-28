@@ -138,10 +138,15 @@ in this order (`CincinnatiHeadRaise`):
 
 1. `M47 P<SafetyHeadraiseDistance> (Safety Headraise)` when the rapid travel to
    the next pierce exceeds `SafetyHeadraiseRapidDistance` (program units, default
-   12) and both settings are set. Long rapids cross more of a warped sheet, so
-   the head goes higher; which part or drawing comes next does not matter.
-   Unknown travel (a hole call's rapid inside a part sub-program) never takes it.
-2. Otherwise the M47 mode for the feature just cut: `ExteriorM47` after a
+   12) and both settings are set. Long rapids cross more of a warped sheet, and
+   height sensing cannot follow it at rapid speed, so the head goes higher; which
+   part or drawing comes next does not matter. Unknown travel (a hole call's rapid
+   inside a part sub-program) never takes it.
+2. Otherwise `M47` when Plan Cutting marked the rapid to pass over parts already
+   cut (a `HEAD RAISE` comment before it; see
+   [the cutting planner](cutting-planner.md#safest-route-fallback-when-the-search-runs-out)),
+   whatever the M47 mode: block delete must not skip it.
+3. Otherwise the M47 mode for the feature just cut: `ExteriorM47` after a
    part's exterior, `InteriorM47` after anything else.
    - `Always`: `M47`.
    - `BlockDelete`: `/M47`; the operator can skip it with block delete (§5.6).
@@ -159,6 +164,11 @@ not vendor-documented behavior.
 
 Hole calls (see below) write `M47`, or the safety raise, after `G52 X0 Y0`
 regardless of the M47 mode.
+
+**Use smart rapids** (`G121`) is off by default. With it on, the control replaces
+each single `G0` between cuts with a blended high-feed move whose path is curved
+and may leave the straight line (§2.121), so Plan Cutting's and pre-post
+verification's straight-line rapid checks no longer describe the path cut.
 
 ## Sub-program call patterns
 
