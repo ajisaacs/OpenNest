@@ -37,6 +37,13 @@ user) to the feed's base URL (`http://host:port`) and restart. A self-hosted
 feed URL is operator infrastructure and never belongs in source control; clearing
 the field returns to GitHub Releases.
 
+These and the app's other `OpenNest.Properties.Settings` values live in
+`%APPDATA%\OpenNest\user-settings.json` (`AppDataSettingsProvider`), shared by every
+copy run by that Windows user. .NET's default `user.config` sat inside the Velopack
+install folder, which setup clears on a reinstall, and started empty at each new
+assembly version; the first run without the JSON file carries over any values that
+copy's `user.config` still holds.
+
 Velopack only applies updates to a Velopack installation (`UpdateManager.IsInstalled`):
 a copy installed with `OpenNest-win-Setup.exe` or extracted from
 `OpenNest-win-Portable.zip`. The plain `OpenNest.vX.Y.Z.win-x64.zip` and ordinary
