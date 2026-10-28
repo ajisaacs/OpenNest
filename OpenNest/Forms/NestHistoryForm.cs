@@ -39,6 +39,15 @@ public sealed class NestHistoryForm : Form
     public bool Changed { get; private set; }
     public event EventHandler HistoryChanged;
 
+    /// <summary>Raised when the highlighted version changes on a loaded history page.</summary>
+    public event EventHandler RevisionSelected;
+
+    /// <summary>The highlighted version when it is not the current one; otherwise null.</summary>
+    public NestRecord SelectedHistoricalRevision =>
+        session.Current != null && SelectedRevision is NestRecord record && record.Revision != session.Current.Revision
+            ? record
+            : null;
+
     public NestHistoryForm(INestRepository repository, string serverUrl, Guid id = default, bool embedded = false)
     {
         this.repository = repository;
@@ -74,7 +83,12 @@ public sealed class NestHistoryForm : Form
                 await ReadAsync(0);
             }
         };
-        revisions.SelectionChanged += (_, _) => UpdateButtons();
+        revisions.SelectionChanged += (_, _) =>
+        {
+            UpdateButtons();
+            if (!populating && session.Current != null)
+                RevisionSelected?.Invoke(this, EventArgs.Empty);
+        };
         var refresh = new Button { Text = "Refresh", AutoSize = true };
         refresh.Click += async (_, _) => { if (recovery) await ReadDeletedAsync(); else await ReadAsync(0); };
         previous.Click += async (_, _) => await ReadAsync(System.Math.Max(0, session.Page.Offset - NestHistorySession.PageSize));
@@ -191,18 +205,27 @@ public sealed class NestHistoryForm : Form
         try
         {
             if (!await task || IsDisposed || run != readGeneration) return;
-            foreach (var record in session.Page.Items)
+            populating = true;
+            try
             {
-                var row = revisions.Rows.Add(record.Revision,
-                    (record.Revision == session.Current.Revision ? "Current" : "Historical") + (record.Deleted ? " (deleted)" : ""),
-                    record.SavedAt.ToString("g"), record.Name, record.Status, record.Comments, record.RestoredFromRevision, record.FileSize);
-                revisions.Rows[row].Tag = record;
+                foreach (var record in session.Page.Items)
+                {
+                    var row = revisions.Rows.Add(record.Revision,
+                        (record.Revision == session.Current.Revision ? "Current" : "Historical") + (record.Deleted ? " (deleted)" : ""),
+                        record.SavedAt.ToString("g"), record.Name, record.Status, record.Comments, record.RestoredFromRevision, record.FileSize);
+                    revisions.Rows[row].Tag = record;
+                }
             }
+            finally { populating = false; }
+            RevisionSelected?.Invoke(this, EventArgs.Empty);
             status.Text = $"{serverUrl} — Nest {selectedId} — Current version {session.Current.Revision}; {session.Page.Total} versions. Displaying {offset + 1}–{offset + session.Page.Items.Count}.";
         }
         catch (Exception ex) { if (!IsDisposed && run == readGeneration) status.Text = ex.Message; }
         finally { if (!IsDisposed) UpdateButtons(); }
     }
+
+    /// <summary>Downloads one version on the displayed page; null when the page changed meanwhile.</summary>
+    public Task<byte[]> DownloadRevisionAsync(int revision) => session.DownloadAsync(revision, serverUrl, lifetime.Token);
 
     private async Task InspectAsync()
     {

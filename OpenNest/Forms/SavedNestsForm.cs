@@ -49,6 +49,11 @@ public sealed class SavedNestsForm : Form
     private readonly TabPage versionsTab;
     private NestHistoryForm historyView;
     private Guid? historyId;
+    // Historical version shown in the details and preview instead of the current one.
+    private int? previewRevision;
+    private int revisionGeneration;
+    private readonly Dictionary<int, NestDetails> revisionDetails = new();
+    private readonly Timer revisionTimer;
     private readonly SplitContainer detailsSplit;
     private readonly PlateView platePreview;
     private readonly Button previousPlateButton;
@@ -280,6 +285,12 @@ public sealed class SavedNestsForm : Form
             detailsTimer.Stop();
             if (SelectedNestId() is Guid id)
                 await ShowDetailsAsync(id);
+        };
+        revisionTimer = new Timer { Interval = 250 };
+        revisionTimer.Tick += async (_, _) =>
+        {
+            revisionTimer.Stop();
+            await ShowSelectedRevisionAsync();
         };
 
         var refreshButton = new Button { Text = "Refresh", AutoSize = true };
@@ -526,12 +537,16 @@ public sealed class SavedNestsForm : Form
         detailsTimer.Stop();
         var id = SelectedNestId();
         if (historyId != id)
-        {
-            historyView?.Dispose();
-            historyView = null;
-            historyId = null;
-        }
+            DropHistoryView();
         UpdateHistoryView();
+        if (historyView?.SelectedHistoricalRevision != null)
+        {
+            // The Versions tab has an earlier version highlighted: show that one, not the current.
+            revisionTimer.Stop();
+            revisionTimer.Start();
+            return;
+        }
+
         if (id == null)
         {
             details.Clear();
@@ -565,7 +580,7 @@ public sealed class SavedNestsForm : Form
     {
         try
         {
-            if (await details.LoadAsync(id) && !IsDisposed)
+            if (await details.LoadAsync(id) && !IsDisposed && previewRevision == null)
             {
                 PopulateDetails(details.Details);
                 PrefetchNearby(id);
@@ -713,9 +728,14 @@ public sealed class SavedNestsForm : Form
     {
         if (detailsTabs.SelectedTab != versionsTab || SelectedNestId() is not Guid id || historyId == id)
             return;
-        historyView?.Dispose();
+        DropHistoryView();
         historyView = new NestHistoryForm(repository, serverUrl, id, embedded: true);
         historyId = id;
+        historyView.RevisionSelected += (_, _) =>
+        {
+            revisionTimer.Stop();
+            revisionTimer.Start();
+        };
         historyView.HistoryChanged += (_, _) =>
         {
             // Let the history operation finish before refreshing the browse selection.
@@ -730,6 +750,75 @@ public sealed class SavedNestsForm : Form
         };
         versionsTab.Controls.Add(historyView);
         historyView.Show();
+    }
+
+    /// <summary>Disposes the embedded history and returns the details to the current version.</summary>
+    private void DropHistoryView()
+    {
+        historyView?.Dispose();
+        historyView = null;
+        historyId = null;
+        revisionTimer.Stop();
+        revisionGeneration++;
+        previewRevision = null;
+        revisionDetails.Clear();
+    }
+
+    /// <summary>
+    /// Shows the version highlighted in the Versions tab in the plates, drawings and preview.
+    /// The current version comes from <see cref="NestDetailsSession"/>; earlier versions are
+    /// downloaded once per embedded history view and kept, since saved versions never change.
+    /// </summary>
+    private async Task ShowSelectedRevisionAsync()
+    {
+        var view = historyView;
+        var record = view?.SelectedHistoricalRevision;
+        var run = ++revisionGeneration;
+        if (record == null)
+        {
+            if (previewRevision != null)
+            {
+                previewRevision = null;
+                ScheduleDetails();
+            }
+            return;
+        }
+
+        previewRevision = record.Revision;
+        if (revisionDetails.TryGetValue(record.Revision, out var cached))
+        {
+            PopulateRevision(record, cached);
+            return;
+        }
+
+        ShowDetailsMessage($"Loading version {record.Revision}...");
+        try
+        {
+            var bytes = await view.DownloadRevisionAsync(record.Revision);
+            if (bytes == null || IsDisposed || run != revisionGeneration)
+                return;
+            var nestDetails = await Task.Run(() =>
+            {
+                using var stream = new MemoryStream(bytes);
+                return NestDetails.FromNest(new NestReader(stream) { BestFitStore = BestFitCacheStore.Shared }.Read());
+            });
+            if (IsDisposed || run != revisionGeneration)
+                return;
+            revisionDetails[record.Revision] = nestDetails;
+            PopulateRevision(record, nestDetails);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            if (!IsDisposed && run == revisionGeneration)
+                ShowDetailsMessage($"Could not load version {record.Revision}: {ex.Message}");
+        }
+    }
+
+    private void PopulateRevision(NestRecord record, NestDetails nestDetails)
+    {
+        PopulateDetails(nestDetails);
+        detailsStatus.Text = $"Version {record.Revision} (historical) — {detailsStatus.Text}";
     }
 
     private async Task ShowDeletedAsync()
@@ -804,9 +893,7 @@ public sealed class SavedNestsForm : Form
             // Drop archive previews and embedded history, including prefetched snapshots.
             details.Dispose();
             details = new NestDetailsSession(LoadDetailsAsync);
-            historyView?.Dispose();
-            historyView = null;
-            historyId = null;
+            DropHistoryView();
             ShowDetailsMessage("");
             await RunAsync(session.RefreshAsync);
             foreach (DataGridViewRow row in nestGrid.Rows)
@@ -887,6 +974,7 @@ public sealed class SavedNestsForm : Form
         {
             searchTimer.Dispose();
             detailsTimer.Dispose();
+            revisionTimer.Dispose();
             session.Dispose();
             details.Dispose();
         }

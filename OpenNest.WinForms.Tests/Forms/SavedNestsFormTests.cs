@@ -60,6 +60,56 @@ public class SavedNestsFormTests
     }
 
     [Fact]
+    public void SelectingAHistoricalVersion_ShowsItsPlatesInTheDetailsAndPreview()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var job = Record("Versioned job");
+                var current = NestFile((Quantity: 1, Parts: 1));
+                var earlier = NestFile((Quantity: 1, Parts: 3), (Quantity: 1, Parts: 2));
+                job.Revision = 3;
+                job.FileSize = current.Length;
+                var repository = new FakeRepository(job);
+                repository.Files[job.Id] = current;
+                repository.RevisionFiles[(job.Id, 2)] = earlier;
+                repository.Revisions[job.Id] =
+                [
+                    new NestRecord { Id = job.Id, Revision = 3, Name = job.Name, FileSize = current.Length },
+                    new NestRecord { Id = job.Id, Revision = 2, Name = job.Name, FileSize = earlier.Length },
+                ];
+
+                using var form = new SavedNestsForm(repository);
+                form.Show();
+                var plates = Field<DataGridView>(form, "platesGrid");
+                var preview = Field<OpenNest.Controls.PlateView>(form, "platePreview");
+                var status = Field<Label>(form, "detailsStatus");
+                PumpUntil(() => plates.Rows.Count == 1, "the current version's plates");
+                var currentPlate = preview.Plate;
+
+                Field<TabControl>(form, "detailsTabs").SelectedIndex = 2;
+                NestHistoryForm? history = null;
+                PumpUntil(
+                    () => (history = Field<NestHistoryForm>(form, "historyView")) != null
+                        && Field<DataGridView>(history, "revisions").Rows.Count == 2,
+                    "the version history");
+                var revisions = Field<DataGridView>(history!, "revisions");
+
+                revisions.CurrentCell = revisions.Rows[1].Cells[0];
+                PumpUntil(() => plates.Rows.Count == 2 && status.Text.StartsWith("Version 2"), "version 2's plates");
+                Assert.NotSame(currentPlate, preview.Plate);
+                Assert.Equal(3, preview.Plate.Parts.Count);
+                Assert.True(preview.Visible);
+
+                revisions.CurrentCell = revisions.Rows[0].Cells[0];
+                PumpUntil(() => plates.Rows.Count == 1 && !status.Text.StartsWith("Version"), "the current version again");
+                Assert.Single(preview.Plate.Parts);
+            },
+            TestTimeout,
+            "The version preview test did not complete.");
+    }
+
+    [Fact]
     public void PlatePreview_StepsThroughThePlates_AndFollowsThePlatesTable()
     {
         StaTestThread.Run(
@@ -350,12 +400,18 @@ public class SavedNestsFormTests
         public int UpdateAttempts { get; private set; }
         public int ExpectedRevision { get; private set; }
         public Dictionary<Guid, byte[]> Files { get; } = new();
+        public Dictionary<(Guid Id, int Revision), byte[]> RevisionFiles { get; } = new();
+        public Dictionary<Guid, NestRecord[]> Revisions { get; } = new();
 
         public Task<byte[]?> GetRevisionFileAsync(Guid id, int revisionNumber, CancellationToken cancellationToken = default) =>
-            GetFileAsync(id, cancellationToken);
+            RevisionFiles.TryGetValue((id, revisionNumber), out var file)
+                ? Task.FromResult<byte[]?>(file)
+                : GetFileAsync(id, cancellationToken);
 
         public Task<NestRevisionPage> GetRevisionsAsync(Guid id, int offset = 0, int limit = 100, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new NestRevisionPage());
+            Task.FromResult(Revisions.TryGetValue(id, out var items)
+                ? new NestRevisionPage { Items = items, Total = items.Length, Offset = offset, Limit = limit }
+                : new NestRevisionPage());
 
         public async Task<NestRecord> UpdateFileAsync(Guid id, byte[] bytes, NestRecord metadata, int expectedRevision,
             CancellationToken cancellationToken = default)
