@@ -44,7 +44,8 @@ public enum LibraryInsertKind
 /// Decides how one library drawing revision enters a nest, before anything changes:
 /// a new exact copy carrying its library link, more quantity on the copy already there,
 /// or a refusal. Material, grade or thickness that differ from the nest still allow the
-/// add, but the drawing's cut pins are dropped (D3). Different units, a different revision
+/// add, but the drawing's cut pins are dropped (D3); a blank material or grade, or a zero
+/// thickness, on the record suits any nest and is never a difference. Different units, a different revision
 /// of the same drawing, or another drawing with the same name refuse it.
 /// </summary>
 public sealed class LibraryDrawingInsert
@@ -75,7 +76,7 @@ public sealed class LibraryDrawingInsert
 
     /// <summary>
     /// For a new copy, true when the library drawing's cut pins come with it: the library
-    /// material, grade and thickness match the nest's. Otherwise the copy has no pins. An
+    /// material, grade and thickness match the nest's or are unset. Otherwise the copy has no pins. An
     /// added quantity leaves the existing copy as it is.
     /// </summary>
     public bool KeepPins { get; }
@@ -140,7 +141,12 @@ public sealed class LibraryDrawingInsert
         var drawing = package.Drawing;
         drawing.Name = record.Name;
         drawing.Customer = record.Customer;
-        drawing.Material = new Material(record.MaterialName, record.MaterialGrade, drawing.Material?.Density ?? 0);
+        // A field the record leaves unset means any material, so the copy takes the nest's.
+        var nestMaterial = nest.Material ?? new Material();
+        drawing.Material = new Material(
+            IsSet(record.MaterialName) ? record.MaterialName : nestMaterial.Name,
+            IsSet(record.MaterialGrade) ? record.MaterialGrade : nestMaterial.Grade,
+            drawing.Material?.Density ?? 0);
         (record.Settings ?? new DrawingNestingSettings()).ApplyTo(drawing);
         drawing.Quantity.Required = quantity;
         drawing.Library = link;
@@ -177,20 +183,23 @@ public sealed class LibraryDrawingInsert
     private static LibraryDrawingInsert Refuse(Nest nest, string reason) =>
         new(nest, LibraryInsertKind.Refused, null, 0, keepPins: false, Array.Empty<string>(), reason);
 
+    // A blank material or grade, or a zero thickness, on the record suits any nest.
     private static List<string> Differences(Nest nest, DrawingLibraryRecord record)
     {
         var differences = new List<string>();
         var material = nest.Material ?? new Material();
-        if (SharedListNames.Key(record.MaterialName) != SharedListNames.Key(material.Name))
+        if (IsSet(record.MaterialName) && SharedListNames.Key(record.MaterialName) != SharedListNames.Key(material.Name))
             differences.Add($"material {Text(record.MaterialName)} (nest {Text(material.Name)})");
-        if (SharedListNames.Key(record.MaterialGrade) != SharedListNames.Key(material.Grade))
+        if (IsSet(record.MaterialGrade) && SharedListNames.Key(record.MaterialGrade) != SharedListNames.Key(material.Grade))
             differences.Add($"grade {Text(record.MaterialGrade)} (nest {Text(material.Grade)})");
         var thickness = DrawingLibraryRules.NormalizeThickness(record.Thickness);
         var nestThickness = DrawingLibraryRules.NormalizeThickness(nest.Thickness);
-        if (thickness != nestThickness)
+        if (thickness != 0 && thickness != nestThickness)
             differences.Add($"thickness {Number(thickness)} (nest {Number(nestThickness)})");
         return differences;
     }
+
+    private static bool IsSet(string? value) => SharedListNames.Key(value).Length > 0;
 
     private static string Describe(DrawingLibraryRecord record) =>
         string.IsNullOrWhiteSpace(record.Customer)

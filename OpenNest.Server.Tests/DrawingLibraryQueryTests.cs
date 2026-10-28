@@ -71,6 +71,36 @@ public sealed class DrawingLibraryQueryTests
     }
 
     [Theory]
+    [InlineData("materialName=Carbon%20Steel", "Any|Any thickness|Steel")]
+    [InlineData("materialName=Carbon%20Steel&materialGrade=A36&thickness=0.25", "Any|Any thickness|Steel")]
+    [InlineData("materialName=Stainless&thickness=0.25", "Any")]
+    [InlineData("materialName=Carbon%20Steel&thickness=0.1875", "Any|Any thickness")]
+    [InlineData("thickness=0", "Any|Any thickness")]
+    public async Task UnsetMaterialGradeOrThickness_MatchesAnyFilter(string query, string expected)
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        foreach (var (name, material, grade, thickness) in new[]
+        {
+            ("Any", "", "", 0.0),
+            ("Any thickness", "Carbon Steel", "", 0.0),
+            ("Steel", "Carbon Steel", "A36", 0.25),
+        })
+        {
+            var record = Record(name);
+            record.MaterialName = material;
+            record.MaterialGrade = grade;
+            record.Thickness = thickness;
+            await Upload(client, record, Package(name));
+        }
+
+        var page = await DrawingLibraryApiTests.Query(client, query + "&sort=name&order=asc");
+
+        Assert.Equal(expected, string.Join("|", page.Items.Select(r => r.Name)));
+        Assert.Equal(page.Items.Count, page.Total);
+    }
+
+    [Theory]
     [InlineData("name", false)]
     [InlineData("name", true)]
     [InlineData("customer", false)]

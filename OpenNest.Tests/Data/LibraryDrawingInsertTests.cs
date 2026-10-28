@@ -151,6 +151,41 @@ public class LibraryDrawingInsertTests
     }
 
     [Fact]
+    public void RecordWithoutMaterialOrThickness_SuitsAnyNestAndTakesItsMaterial()
+    {
+        var nest = new Nest("Other job") { Units = Units.Inches, Thickness = 0.1875, Material = new Material("Other Steel", "Grade B") };
+        var record = Record();
+        record.MaterialName = "";
+        record.MaterialGrade = " ";
+        record.Thickness = 0;
+
+        var insert = LibraryDrawingInsert.Plan(nest, Server, record, Package(), 1);
+
+        Assert.True(insert.KeepPins);
+        Assert.Empty(insert.Warnings);
+        insert.Apply();
+        var drawing = Assert.Single(nest.Drawings);
+        Assert.Single(drawing.CutPins);
+        Assert.Equal(("Other Steel", "Grade B"), (drawing.Material.Name, drawing.Material.Grade));
+        Assert.Equal((0.0, ""), (drawing.Library!.Thickness, drawing.Library.MaterialName));
+    }
+
+    [Fact]
+    public void RecordWithOnlyAMaterial_StillNamesAMaterialDifference()
+    {
+        var nest = new Nest("Other job") { Units = Units.Inches, Thickness = 0.1875, Material = new Material("Other Steel", "Grade B") };
+        var record = Record();
+        record.MaterialGrade = "";
+        record.Thickness = 0;
+
+        var warning = Assert.Single(LibraryDrawingInsert.Plan(nest, Server, record, Package(), 1).Warnings);
+
+        Assert.Contains("material Synthetic Steel (nest Other Steel)", warning);
+        Assert.DoesNotContain("grade", warning);
+        Assert.DoesNotContain("thickness", warning);
+    }
+
+    [Fact]
     public void EveryDifference_IsNamed()
     {
         var nest = new Nest("Other job") { Units = Units.Inches, Thickness = 0.1875, Material = new Material("Other Steel", "Grade B") };

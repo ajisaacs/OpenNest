@@ -349,7 +349,10 @@ each nest.
   customer or notes (`%`, `_`, `\` literal). `customer`, `materialName` and
   `materialGrade` match exactly after `SharedListNames.Key` normalization
   (trimmed, collapsed spaces, case-insensitive); blank means any. `thickness`
-  matches exactly after rounding to 4 decimals. `sort` is one of `savedAt`
+  matches exactly after rounding to 4 decimals. A drawing saved with a blank
+  material or grade, or a thickness of 0, suits any material, so it matches
+  every `materialName`, `materialGrade` or `thickness` filter (for example a
+  test square added to every nest). `sort` is one of `savedAt`
   (default), `name`, `customer`, `materialName`, `materialGrade`, `thickness`,
   `cutType`, `revision`; ties break by `id`. `cutFirst=true|false` keeps only
   drawings with that setting. Paging, `order` and the refusal of
@@ -387,7 +390,9 @@ plans the insert (`OpenNest.Data.LibraryDrawingInsert`) before changing anything
 
 - Material, grade or thickness differing from the nest: a warning names each
   difference and the operator confirms. The drawing is added, but its cut pins
-  will not apply; the nest's cutting settings do.
+  will not apply; the nest's cutting settings do. A blank material or grade, or
+  a thickness of 0, on the library drawing is never a difference: the copy keeps
+  its pins and takes the nest's material for whatever the library left blank.
 - Different units: refused (no conversion).
 - The same revision from the same server already in the nest: only the
   quantity is raised. A different revision of that drawing: refused; change

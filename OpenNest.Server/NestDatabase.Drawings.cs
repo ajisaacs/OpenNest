@@ -138,9 +138,10 @@ public sealed partial class NestDatabase
         if (!query.IncludeArchived) conditions.Add("archived=0");
         if (query.NormalizedSearch.Length > 0) conditions.Add("(" + DrawingSearchPredicate + ")");
         if (SharedListNames.Key(query.Customer).Length > 0) conditions.Add("customerKey=$customer");
-        if (SharedListNames.Key(query.MaterialName).Length > 0) conditions.Add("materialKey=$material");
-        if (SharedListNames.Key(query.MaterialGrade).Length > 0) conditions.Add("gradeKey=$grade");
-        if (query.Thickness is not null) conditions.Add("thickness=$thickness");
+        // A drawing saved without a material, grade or thickness (0) suits any, so it matches every filter value.
+        if (SharedListNames.Key(query.MaterialName).Length > 0) conditions.Add("(materialKey=$material OR materialKey='')");
+        if (SharedListNames.Key(query.MaterialGrade).Length > 0) conditions.Add("(gradeKey=$grade OR gradeKey='')");
+        if (query.Thickness is not null) conditions.Add("(thickness=$thickness OR thickness=0)");
         if (query.CutType is not null) conditions.Add("cutType=$cutType");
         if (query.CutFirst is not null) conditions.Add("cutFirst=$cutFirst");
         var where = conditions.Count == 0 ? "" : "WHERE " + string.Join(" AND ", conditions);
