@@ -1,8 +1,27 @@
 # Problem-nest regression corpus
 
 Real nests that once failed to plan are kept on a dedicated OpenNest server that holds nothing
-else, not in this repository: they carry customer geometry and names. After a change to planning, contour preparation or
-the geometry checks, plan them all and confirm that no plate got worse.
+else, not in this repository: they carry customer geometry and names. Every nest in it guards
+Plan Cutting, so only a change to the cutting planner calls for it: plan the nests that guard the
+areas the change touches and confirm that no plate got worse. Nesting engines, fills, the UI,
+posts and file formats never need it.
+
+## Areas
+
+Each nest names the areas it guards in a `checks:` comment line. Pick every area a change touches;
+when a change spans the planner or you cannot tell, run the whole corpus.
+
+| Area | Change touches |
+|------|----------------|
+| `part-order` | Whole-part order: learned order rules, stalls, budgets and the tours (`JointCuttingPlanSearch` order loop, `CuttingPartOrder`, `CuttingNestedOrder`, `CuttingDependencyGraph`, `CuttingPlanBatch`, the safest-route walk) |
+| `entries` | Where and how each contour is entered: entry candidates and ranking, hole order, lead-ins, pierce zones (`ContourEntry*`, `PreferredContourEntries`, `CuttingHoleOrder`, `ScrapPierceSearch`, `JointCuttingPlanSearch` entry and recovery code, lead-in builders) |
+| `contours` | Reading programs into contours: closure, seam overcuts, prepared contours (`ExecutionMotionReader`, `PreparedContours`, `IncrementalClosureDrift`, `SeamOvercut`, `NominalContourClosure`, `OwnedProgramCopy`) |
+| `geometry-checks` | The checks a route must pass: rapid crossings, lead and material paths, replay, overlaps (`ReleasedContourState`, `LeadPathValidator`, `LeadMaterialSnapshot`, `ContourProgramVerifier`, `PlateOverlapAnalyzer`) |
+| `cut-offs` | Cut-off segments in the plan (`CutOffInsertion`, `CutOffSegments`, `PlateSequencing` cut-off placement, automatic scrap cut-offs) |
+| `grid` | Large plates: the aligned-grid serpentine, or any work done once per part or per pair that would grow on thousands of parts (`CuttingGridOrder`, per-part capture and checks) |
+
+A new area goes in `ProblemNestRegressionTests.Areas` and this table together. A misspelt area,
+in a comment or the filter, fails the run rather than skipping nests.
 
 ## Running
 
@@ -13,7 +32,11 @@ OPENNEST_PROBLEM_NESTS_SERVER=http://<server>:<port> \
   --filter "Category=ProblemNests" --logger "console;verbosity=detailed"
 ```
 
-Without the variable the test skips, so routine runs never reach the network. With it, an
+To plan only the nests guarding some areas, add `OPENNEST_PROBLEM_NESTS_CHECKS=part-order,entries`.
+A nest guarding none of them is skipped and listed as skipped; a nest without a `checks:` line is
+always planned. Without the filter every nest is planned.
+
+Without the server variable the test skips, so routine runs never reach the network. With it, an
 unreachable server or an empty corpus fails instead of passing silently.
 `ProblemNestRegressionTests` downloads every nest on the server. A server holding more than 200
 nests is refused, since it is not a corpus. It plans each plate that has parts on its own, the way Plan Cutting
@@ -48,6 +71,7 @@ Plates use their own cutting parameters. A plate without them uses line lead-ins
 3. Add a baseline line to the comments, with plate numbers counted from the first plate:
    `planning: 1=NoSolutionWithinBudget 2=BestEffort`.
    To get the line, save without one and run the test: the failure prints the observed line.
+   Add a `checks:` line naming the [areas](#areas) the problem was in, such as `checks: part-order`.
 4. Save. Every save keeps the earlier versions, so a baseline change can be reviewed later.
 
 Record the outcome the code produces today, not the outcome you want. A nest that is still

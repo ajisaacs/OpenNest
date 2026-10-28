@@ -12,7 +12,9 @@ namespace OpenNest.Tests.CuttingPlanning;
 /// <summary>
 /// Plans every nest on a dedicated problem-nest OpenNest server and fails when a plate's outcome is
 /// worse than its recorded baseline. A nest with a cut-off baseline is planned a second time with
-/// its applied lead-ins and cut-offs cleared and default scrap cut-offs added. Opt-in and private:
+/// its applied lead-ins and cut-offs cleared and default scrap cut-offs added. A "checks:" comment
+/// line names the planner areas a nest guards; a run limited to some areas skips nests that guard
+/// none of them, and a nest without the line is always planned. Opt-in and private:
 /// the nests and their baselines stay on the server, never in the repository. See docs/problem-nests.md.
 /// </summary>
 [Trait("Category", "ProblemNests")]
@@ -21,9 +23,14 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
     internal const string ServerVariable = "OPENNEST_PROBLEM_NESTS_SERVER";
     internal const string TimeoutVariable = "OPENNEST_PROBLEM_NESTS_TIMEOUT";
     internal const string CutOffsVariable = "OPENNEST_PROBLEM_NESTS_CUTOFFS";
+    internal const string ChecksVariable = "OPENNEST_PROBLEM_NESTS_CHECKS";
     internal const string Timeout = "Timeout";
     internal const string PlanningLine = "planning:";
     internal const string CutOffPlanningLine = "planning with cut-offs:";
+    internal const string ChecksLine = "checks:";
+
+    /// <summary>The planner areas a nest can guard; docs/problem-nests.md says which changes touch each.</summary>
+    internal static readonly string[] Areas = ["part-order", "entries", "contours", "geometry-checks", "cut-offs", "grid"];
     // A corpus is a handful of nests; more means the variable names a production archive.
     internal const int MaximumNests = 200;
 
@@ -37,10 +44,19 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
         var limit = TimeSpan.FromSeconds(int.TryParse(Environment.GetEnvironmentVariable(TimeoutVariable), out var seconds)
             && seconds > 0 ? seconds : 120);
         Assert.True(records.Count > 0, $"No nests on {server}.");
+        var wanted = Checks(Environment.GetEnvironmentVariable(ChecksVariable));
 
         var failures = new List<string>();
         foreach (var record in records)
         {
+            var guards = Checks(CommentLine(record.Comments, ChecksLine));
+            if (!Selected(guards, wanted))
+            {
+                output.WriteLine($"{record.Name}: skipped, checks {string.Join(", ", guards)}");
+                continue;
+            }
+            if (guards.Length == 0)
+                output.WriteLine($"{record.Name}: no {ChecksLine} line, so always planned; add one naming the areas it guards.");
             var bytes = await repository.GetFileAsync(record.Id)
                 ?? throw new InvalidOperationException($"'{record.Name}' has no file.");
             var baseline = Baseline(record.Comments);
@@ -143,13 +159,33 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
     /// Plate number to outcome, from a "planning: 1=Ready 2=BestEffort" comment line, or from the
     /// line starting with <paramref name="prefix"/>.
     /// </summary>
-    internal static Dictionary<int, string> Baseline(string comments, string prefix = PlanningLine)
-    {
-        var line = (comments ?? "").Split('\n').Select(l => l.Trim())
-            .FirstOrDefault(l => l.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
-        return line == null ? []
+    internal static Dictionary<int, string> Baseline(string comments, string prefix = PlanningLine) =>
+        CommentLine(comments, prefix) is not { } line ? []
             : BaselineEntry().Matches(line).ToDictionary(m => int.Parse(m.Groups[1].Value), m => m.Groups[2].Value);
+
+    // The rest of the first comment line starting with the prefix; null when there is none.
+    private static string CommentLine(string comments, string prefix) =>
+        (comments ?? "").Split('\n').Select(l => l.Trim())
+            .FirstOrDefault(l => l.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))?[prefix.Length..];
+
+    /// <summary>
+    /// The areas in a comma- or space-separated list, such as "part-order, entries". An area not in
+    /// <see cref="Areas"/> throws, so a misspelt line or filter cannot quietly skip a nest.
+    /// </summary>
+    internal static string[] Checks(string list)
+    {
+        var areas = (list ?? "").Split([',', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(a => a.ToLowerInvariant()).Distinct().ToArray();
+        var unknown = areas.Except(Areas).ToArray();
+        if (unknown.Length != 0)
+            throw new ArgumentException(
+                $"Unknown problem-nest area {string.Join(", ", unknown)}; the areas are {string.Join(", ", Areas)}.");
+        return areas;
     }
+
+    // Every nest when no area is wanted; otherwise one guarding a wanted area, or one naming none.
+    internal static bool Selected(IReadOnlyCollection<string> guards, IReadOnlyCollection<string> wanted) =>
+        wanted.Count == 0 || guards.Count == 0 || guards.Intersect(wanted).Any();
 
     // Ready means replayed and overlap-clear; a ready route with overlapping parts is still blocked.
     internal static string Outcome(CuttingPlanPlateResult planned) =>
@@ -198,6 +234,19 @@ public class ProblemNestBaselineTests
             ProblemNestRegressionTests.Baseline(comments));
         Assert.Equal(new Dictionary<int, string> { [1] = "Ready", [2] = "Ready" },
             ProblemNestRegressionTests.Baseline(comments, ProblemNestRegressionTests.CutOffPlanningLine));
+    }
+
+    [Fact]
+    public void Checks_SelectNestsGuardingAWantedAreaAndThoseNamingNone()
+    {
+        var guards = ProblemNestRegressionTests.Checks(" Part-Order, entries ");
+
+        Assert.Equal(["part-order", "entries"], guards);
+        Assert.True(ProblemNestRegressionTests.Selected(guards, []));
+        Assert.True(ProblemNestRegressionTests.Selected(guards, ["entries", "grid"]));
+        Assert.False(ProblemNestRegressionTests.Selected(guards, ["grid"]));
+        Assert.True(ProblemNestRegressionTests.Selected([], ["grid"]));
+        Assert.Throws<ArgumentException>(() => ProblemNestRegressionTests.Checks("part-order, lead-ins"));
     }
 
     [Fact]
