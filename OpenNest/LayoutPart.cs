@@ -173,7 +173,7 @@ namespace OpenNest
         /// Draws the id over a disc of <paramref name="background"/>, so a line drawn through the
         /// label's point, such as a cut-off's own cut, does not strike through the number.
         /// </summary>
-        internal void DrawLabel(Graphics g, string id, bool muted, Brush background)
+        internal void DrawLabel(Graphics g, string id, Brush background, Brush text)
         {
             var size = MeasureLabel(g, id);
             if (!LabelFits(size))
@@ -181,7 +181,7 @@ namespace OpenNest
             var diameter = LabelDiscDiameter(size);
             g.FillEllipse(background,
                 _labelScreenPoint.X - diameter / 2, _labelScreenPoint.Y - diameter / 2, diameter, diameter);
-            DrawLabel(g, id, muted);
+            g.DrawString(id, ProgramIdFont, text, _labelScreenPoint.X, _labelScreenPoint.Y, LabelFormat);
         }
 
         private SizeF MeasureLabel(Graphics g, string id)

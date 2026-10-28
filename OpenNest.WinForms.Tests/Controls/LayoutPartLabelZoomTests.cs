@@ -54,7 +54,7 @@ public class LayoutPartLabelZoomTests
         using var image = new Bitmap(120, 120);
         using var g = Graphics.FromImage(image);
         g.Clear(Color.White);
-        layout.DrawLabel(g, "12", muted: false, Brushes.Yellow);
+        layout.DrawLabel(g, "12", Brushes.Yellow, Brushes.Black);
 
         Assert.Equal(shown, !IsBlank(image));
         layout.ReleaseDisplayResources();

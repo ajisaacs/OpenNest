@@ -281,9 +281,11 @@ namespace OpenNest.Controls
         {
             DrawCutOffLines(g);
 
-            // Over the lines, on a disc of the plate's color, so the cut does not strike them through.
+            // Over the lines, on a disc of the line's color so the cut does not strike them through.
+            // A disc of the plate's color read as a notch in any part edge the cut runs along.
+            using var disc = new SolidBrush(CutOffLineColor);
             foreach (var (part, id, muted) in cutOffLabels)
-                part.DrawLabel(g, id, muted, view.ColorScheme.LayoutFillBrush);
+                part.DrawLabel(g, id, muted ? Brushes.Gray : disc, Brushes.White);
             cutOffLabels.Clear();
         }
 
