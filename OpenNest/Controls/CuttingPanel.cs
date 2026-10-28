@@ -23,6 +23,8 @@ namespace OpenNest.Controls
         private const int LabelWidth = 150;
         private const int FieldIndent = 16;
         private const int InputWidth = 100;
+        // The lead preview's least height, below the type with the most fields.
+        private const int PreviewHeight = 110;
 
         private static readonly Color HintColor = SystemColors.GrayText;
 
@@ -39,6 +41,9 @@ namespace OpenNest.Controls
             pnlExternalLeadOut;
         private readonly TableLayoutPanel pnlInternalLeadIn,
             pnlInternalLeadOut;
+
+        private readonly LeadPreview externalPreview = new LeadPreview { Emphasis = ContourType.External };
+        private readonly LeadPreview internalPreview = new LeadPreview { Emphasis = ContourType.Internal };
 
         private readonly CheckBox chkTabsEnabled;
         private readonly TableLayoutPanel tabOptions;
@@ -118,6 +123,7 @@ namespace OpenNest.Controls
 
             var externalContent = SetupTab(
                 tabExternal,
+                externalPreview,
                 out cboExternalLeadIn,
                 out pnlExternalLeadIn,
                 out cboExternalLeadOut,
@@ -125,6 +131,7 @@ namespace OpenNest.Controls
             );
             SetupTab(
                 tabInternal,
+                internalPreview,
                 out cboInternalLeadIn,
                 out pnlInternalLeadIn,
                 out cboInternalLeadOut,
@@ -275,6 +282,7 @@ namespace OpenNest.Controls
             PopulateDropdowns();
             FitLeadTabs(externalContent);
             WireChangeEvents();
+            UpdatePreviews();
         }
 
         public override Size GetPreferredSize(Size proposedSize) => layout.GetPreferredSize(proposedSize);
@@ -333,6 +341,14 @@ namespace OpenNest.Controls
             nudLeadInAngleIncrement.Enabled = p.RoundLeadInAngles;
 
             suppressEvents = false;
+            UpdatePreviews();
+        }
+
+        private void UpdatePreviews()
+        {
+            var parameters = BuildParameters();
+            externalPreview.Parameters = parameters;
+            internalPreview.Parameters = parameters;
         }
 
         private void UpdateSupportTabOptions()
@@ -347,8 +363,10 @@ namespace OpenNest.Controls
 
         private void OnParametersChanged()
         {
-            if (!suppressEvents)
-                ParametersChanged?.Invoke(this, EventArgs.Empty);
+            if (suppressEvents)
+                return;
+            UpdatePreviews();
+            ParametersChanged?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>
@@ -374,13 +392,15 @@ namespace OpenNest.Controls
             BuildLeadInParamControls(pnlExternalLeadIn, 0);
             BuildLeadOutParamControls(pnlExternalLeadOut, 0);
 
-            var contentHeight = content.GetPreferredSize(Size.Empty).Height + tallestLeadIn + tallestLeadOut;
+            var contentHeight = content.GetPreferredSize(Size.Empty).Height + tallestLeadIn + tallestLeadOut
+                + PreviewHeight;
             // Tab strip, page padding and borders.
             tabControl.Height = contentHeight + Font.Height + 28;
         }
 
         private TableLayoutPanel SetupTab(
             TabPage tab,
+            LeadPreview preview,
             out ComboBox leadInCombo,
             out TableLayoutPanel leadInPanel,
             out ComboBox leadOutCombo,
@@ -412,7 +432,12 @@ namespace OpenNest.Controls
             leadOutPanel = CreateGrid(FieldIndent);
             content.Controls.Add(leadOutPanel);
 
+            // The preview fills whatever the fields leave, so it grows for types with fewer.
+            preview.Dock = DockStyle.Fill;
+            preview.Margin = new Padding(0, 6, 0, 0);
+            tab.Controls.Add(preview);
             tab.Controls.Add(content);
+            preview.BringToFront();
             return content;
         }
 
