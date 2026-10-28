@@ -21,7 +21,10 @@ namespace OpenNest.Forms
                 components.Dispose();
             }
             if (disposing)
+            {
                 updaterStatus?.Dispose();
+                statusStripToolTips?.Dispose();
+            }
             base.Dispose(disposing);
         }
 
