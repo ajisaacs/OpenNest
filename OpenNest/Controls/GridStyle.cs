@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Drawing;
+using System.Reflection;
 using System.Windows.Forms;
 
 namespace OpenNest.Controls;
@@ -49,7 +50,26 @@ public static class GridStyle
         grid.RowHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         if (sizeColumns)
             SizeColumnsOnceToContent(grid);
+        grid.HandleDestroyed += HideToolTipsOnDestroy;
         return grid;
+    }
+
+    private static readonly PropertyInfo KeyboardToolTipProperty = typeof(DataGridView).GetProperty(
+        "KeyboardToolTip", BindingFlags.Instance | BindingFlags.NonPublic);
+
+    /// <summary>
+    /// Hides the grid's keyboard tooltip while the grid's window still exists. WinForms does not
+    /// stop that tooltip's auto-pop timer when the grid is disposed, and the timer later hides the
+    /// tooltip through the disposed grid, which throws (as when the database browser drops its
+    /// embedded version history). Hiding it stops the timer. The tooltip is internal to WinForms,
+    /// so a runtime without it is left as it is.
+    /// </summary>
+    private static void HideToolTipsOnDestroy(object sender, EventArgs e)
+    {
+        var grid = (DataGridView)sender;
+        if (grid.RecreatingHandle || KeyboardToolTipProperty?.GetValue(grid) is not ToolTip toolTip)
+            return;
+        toolTip.Hide(grid);
     }
 
     /// <summary>

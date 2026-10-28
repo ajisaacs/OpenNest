@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Windows.Forms;
 using OpenNest.Controls;
 
@@ -77,6 +78,33 @@ public class GridStyleTests
 
         Assert.True(column.Width > 40);
         Assert.Equal(column.Width, firstPaintWidth());
+    });
+
+    [Fact]
+    public void DisposingAGridStopsItsShowingKeyboardToolTip() => ArchUnitsTests.RunSta(() =>
+    {
+        // WinForms leaves the keyboard tooltip's auto-pop timer running after the grid is
+        // disposed; when it fires it hides the tooltip through the disposed grid and throws.
+        const BindingFlags members = BindingFlags.Instance | BindingFlags.NonPublic;
+        using var form = new Form { Width = 600, Height = 300, ShowInTaskbar = false };
+        var grid = GridStyle.Apply(new DataGridView { Dock = DockStyle.Fill, AllowUserToAddRows = false });
+        grid.Columns.Add("Version", "Version");
+        grid.Rows.Add("2");
+        form.Controls.Add(grid);
+        form.Show();
+        Pump(grid);
+
+        // As when the keyboard moves to a cell in the embedded version history.
+        var toolTip = (ToolTip)typeof(DataGridView).GetProperty("KeyboardToolTip", members).GetValue(grid);
+        typeof(ToolTip).GetMethod("ShowKeyboardToolTip", members)
+            .Invoke(toolTip, new object[] { "2", grid.Rows[0].Cells[0], 3000 });
+        var timer = typeof(ToolTip).GetField("_timer", members);
+        Assert.NotNull(timer.GetValue(toolTip));
+
+        form.Controls.Remove(grid);
+        grid.Dispose();
+
+        Assert.Null(timer.GetValue(toolTip));
     });
 
     private static Func<int> WidthAtFirstPaint(DataGridView grid, DataGridViewColumn column)
