@@ -44,6 +44,10 @@ internal sealed record SheetFill(NestPlateStock Stock, IReadOnlyList<Placed> Par
 ///   2. Otherwise advance - place the part whose front advance per unit area^beta is smallest,
 ///      i.e. the one that buys the most material coverage for the sheet length it consumes.
 /// Parts are never placed in a sequence given up front; the sheet state decides what comes next.
+///
+/// Given a <see cref="PackBoundary"/>, the packer fills that outline instead of the stock's
+/// rectangular work area: each region starts from the orientation's inner-fit polygon of the
+/// boundary less the boundary's obstacles, and everything else is unchanged.
 /// </summary>
 internal sealed class FrontierPacker
 {
@@ -63,7 +67,10 @@ internal sealed class FrontierPacker
     private readonly WorkCounter counter;
     private readonly BlockCatalog? blocks;
     private readonly ClampObstacles? clamps;
+    private readonly PackBoundary? boundary;
 
+    /// <param name="boundary">Outline to fill instead of the stock's work area; it must be
+    /// fitted to <paramref name="nfps"/>.</param>
     public FrontierPacker(
         IReadOnlyList<PartType> types,
         NoFitCache nfps,
@@ -73,9 +80,12 @@ internal sealed class FrontierPacker
         double beta,
         WorkCounter counter,
         BlockCatalog? blocks = null,
-        ClampObstacles? clamps = null
+        ClampObstacles? clamps = null,
+        PackBoundary? boundary = null
     )
     {
+        if (boundary != null && !ReferenceEquals(boundary.Nfps, nfps))
+            throw new ArgumentException("The boundary is fitted to another no-fit cache.", nameof(boundary));
         this.blocks = blocks;
         this.clamps = stock.ClampZones.Count == 0 ? null : clamps ?? new ClampObstacles(stock);
         this.counter = counter;
@@ -85,8 +95,12 @@ internal sealed class FrontierPacker
         this.stock = stock;
         this.axis = axis;
         this.beta = beta;
-        work = stock.WorkArea;
+        this.boundary = boundary;
+        work = boundary?.Bounds ?? stock.WorkArea;
     }
+
+    private bool Fits(double width, double height) =>
+        boundary?.Fits(width, height) ?? stock.Fits(width, height);
 
     public SheetFill Fill(IReadOnlyList<int> remaining, CancellationToken token)
     {
@@ -97,9 +111,11 @@ internal sealed class FrontierPacker
         {
             if (byOrientation.ContainsKey(o))
                 return true;
-            if (!stock.Fits(o.Width, o.Height))
+            if (!Fits(o.Width, o.Height))
                 return false;
-            var region = new Region(o, work, single);
+            var region = boundary == null ? new Region(o, work, single) : new Region(o, boundary, single);
+            if (region.IsEmpty)
+                return false;
             if (clamps != null)
                 for (var i = 0; i < clamps.Count; i++)
                 {
@@ -109,6 +125,13 @@ internal sealed class FrontierPacker
                     region.Subtract(nfp, 0, 0);
                     counter.Add(1);
                     token.ThrowIfCancellationRequested();
+                }
+            if (boundary != null)
+                for (var i = 0; i < boundary.ObstacleCount; i++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    region.Subtract(nfps.Get(boundary.Obstacle(i), o), 0, 0);
+                    counter.Add(1);
                 }
             states.Add(region);
             byOrientation[o] = region;
@@ -126,7 +149,7 @@ internal sealed class FrontierPacker
             foreach (var pair in typePairs)
             {
                 // Members missing from the catalog get regions too, but only for pair placement.
-                if (stock.Fits(pair.Width, pair.Height) && Track(pair.A, single: false) && Track(pair.B, single: false))
+                if (Fits(pair.Width, pair.Height) && Track(pair.A, single: false) && Track(pair.B, single: false))
                     offered.Add(new PairState(pair, byOrientation[pair.A], byOrientation[pair.B]));
             }
         }
@@ -148,7 +171,7 @@ internal sealed class FrontierPacker
                         continue;
                     var width = members.Max(p => p.Right) - members.Min(p => p.Left);
                     var height = members.Max(p => p.Top) - members.Min(p => p.Bottom);
-                    if (!stock.Fits(width, height))
+                    if (!Fits(width, height))
                         continue;
                     foreach (var member in members)
                     {
@@ -341,6 +364,15 @@ internal sealed class FrontierPacker
         private RectD bounds;
 
         public Region(Orientation orientation, Box work, bool single)
+            : this(orientation, work, single, null) { }
+
+        /// <summary>Starts from the orientation's inner fit of the boundary. No fit slack: the
+        /// inner fit already lies within the bounds box, and an exact fit against a cutout wall
+        /// would fail the clearance check anyway.</summary>
+        public Region(Orientation orientation, PackBoundary boundary, bool single)
+            : this(orientation, boundary.Bounds, single, boundary.InnerFit(orientation)) { }
+
+        private Region(Orientation orientation, Box work, bool single, PathsD? seed)
         {
             Orientation = orientation;
             Single = single;
@@ -353,7 +385,7 @@ internal sealed class FrontierPacker
                 maxX = minX;
             if (maxY < minY)
                 maxY = minY;
-            free = new PathsD
+            free = seed ?? new PathsD
             {
                 new PathD
                 {
@@ -363,7 +395,8 @@ internal sealed class FrontierPacker
                     new(minX - FitSlack, maxY + FitSlack),
                 },
             };
-            bounds = Clipper.GetBounds(free);
+            free.RemoveAll(p => p.Count < 3);
+            bounds = free.Count == 0 ? default : Clipper.GetBounds(free);
         }
 
         public Orientation Orientation { get; }

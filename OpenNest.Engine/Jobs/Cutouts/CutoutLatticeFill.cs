@@ -7,6 +7,7 @@ using Clipper2Lib;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.Jobs.Placement;
+using OpenNest.Engine.NestingEngines.Irregular;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -189,13 +190,7 @@ internal static class CutoutLatticeFill
             .OrderByDescending(p => System.Math.Abs(Clipper.Area(p))).FirstOrDefault();
         if (grown == null || grown.Count < 3)
             return new PathsD();
-        var reflected = new PathD(grown.Select(p => new PointD(-p.x, -p.y)));
-        // Clipper.MinkowskiSum rounds to two decimals; pass the job precision explicitly.
-        var forbidden = Clipper.Union(Minkowski.Sum(reflected, hole, true, Precision),
-            new PathsD { Clipper.TranslatePath(reflected, hole[0].x, hole[0].y) }, FillRule.NonZero, Precision);
-        var anchor = grown[0];
-        return Clipper.Difference(new PathsD { Clipper.TranslatePath(hole, -anchor.x, -anchor.y) }, forbidden,
-            FillRule.NonZero, Precision);
+        return PackBoundary.InnerFit(grown, new PathsD { hole });
     }
 
     /// <summary>Drops copies that fail the production clearance check against the frame; any

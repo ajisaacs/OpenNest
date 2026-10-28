@@ -24,8 +24,9 @@ namespace OpenNest.Engine.NestingEngines.Irregular;
 /// </summary>
 public sealed class IrregularNestingEngine : INestingEngine
 {
-    /// <summary>Strategy variants, tried in order: (front direction, area exponent beta).</summary>
-    private static readonly (PackAxis Axis, double Beta)[] Variants =
+    /// <summary>Strategy variants, tried in order: (front direction, area exponent beta).
+    /// The cutout packer proposal tries the same variants on a cutout.</summary>
+    internal static readonly (PackAxis Axis, double Beta)[] Variants =
     {
         (PackAxis.X, 1.0),
         (PackAxis.Y, 1.0),

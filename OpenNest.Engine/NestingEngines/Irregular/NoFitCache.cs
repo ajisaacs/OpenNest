@@ -30,8 +30,12 @@ internal sealed class NoFitCache
 
     public NoFitCache(double clearance)
     {
+        Clearance = clearance;
         halfClearance = clearance / 2;
     }
+
+    /// <summary>The clearance two footprints together keep.</summary>
+    public double Clearance { get; }
 
     public PathD Footprint(Orientation o) =>
         footprints.GetOrAdd((o.TypeIndex, o.Index), _ => BuildFootprint(o));
