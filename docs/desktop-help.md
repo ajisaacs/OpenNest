@@ -9,7 +9,8 @@ holds only the code that shows that HTML and the pin of which help release ships
 - **Help > OpenNest Help** (F1 in the main window) opens the home topic;
   **Help > Your First Nest** opens the tutorial.
 - A dialog opts in to context help with `HelpTopics.Attach(this, HelpTopics.<Topic>)`;
-  F1 anywhere in it opens that topic. Auto Nest and the CAD Converter do this today.
+  F1 anywhere in it opens that topic. Auto Nest, the CAD Converter and Support Bed do this
+  today; Support Bed also links its topic in place of inline explanation.
 - `HelpForm` is a single WebView2 window on its own STA thread, so modal dialogs never
   disable it. It serves the help folder from the private virtual host
   `https://help.opennest.local/`; off-site links open in the default browser. WebView2

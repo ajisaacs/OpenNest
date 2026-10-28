@@ -3,6 +3,7 @@ using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 using OpenNest.Data;
+using OpenNest.Help;
 using OpenNest.Support;
 
 namespace OpenNest.Forms;
@@ -68,20 +69,6 @@ public sealed class SupportGridForm : Form
             WrapContents = false,
             Padding = new Padding(10),
         };
-        layout.Controls.Add(new Label
-        {
-            AutoSize = true,
-            MaximumSize = new Size(430, 0),
-            Padding = new Padding(0, 0, 0, 8),
-            Text = "What cut parts rest on: a grid of contact points, one every pitch along X and Y, the "
-                + "first at the offset from the plate origin into the sheet; or slats, each a strip of "
-                + "the slat thickness running the full length or width of the table, one every pitch, "
-                + "the first centered at the offset. A part whose center of gravity is not inside its "
-                + "contacts by the stability margin can tip; with \"Only tab parts the support grid can't "
-                + "hold level\" in Cutting Settings, Plan Cutting tabs it where the tab steadies it. "
-                + "The registration tolerance allows for a sheet loaded off its place.",
-        });
-
         useGridBox = new CheckBox { Text = "This nest's sheets rest on a support bed", AutoSize = true, Checked = bed != null };
         layout.Controls.Add(useGridBox);
 
@@ -163,14 +150,34 @@ public sealed class SupportGridForm : Form
         defaultsGroup.Controls.Add(defaultsLayout);
         layout.Controls.Add(defaultsGroup);
 
-        var buttons = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Anchor = AnchorStyles.Right };
+        // The help link sits left of OK/Cancel; the row stretches to the dialog's widest control.
+        var footer = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Anchor = AnchorStyles.Left | AnchorStyles.Right };
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        var helpLink = new LinkLabel
+        {
+            Text = "How the support bed works",
+            AutoSize = true,
+            Anchor = AnchorStyles.Left,
+        };
+        helpLink.LinkClicked += (_, _) => HelpTopics.Show(this, HelpTopics.SupportGrid);
+        var buttons = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false,
+            Anchor = AnchorStyles.Right,
+        };
         var cancel = new Button { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel };
         var ok = new Button { Text = "OK", AutoSize = true };
         buttons.Controls.Add(cancel);
         buttons.Controls.Add(ok);
-        layout.Controls.Add(buttons);
+        footer.Controls.Add(helpLink, 0, 0);
+        footer.Controls.Add(buttons, 1, 0);
+        layout.Controls.Add(footer);
 
         Controls.Add(layout);
+        HelpTopics.Attach(this, HelpTopics.SupportGrid);
         AcceptButton = ok;
         CancelButton = cancel;
 

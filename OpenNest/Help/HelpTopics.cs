@@ -18,6 +18,7 @@ namespace OpenNest.Help
         public const string ImportDrawings = "import-drawings";
         public const string AutoNest = "auto-nest";
         public const string Post = "post";
+        public const string SupportGrid = "support-grid";
 
         /// <summary>Overrides the help folder, e.g. a local opennest-help <c>site/</c> build.</summary>
         public const string DirectoryVariable = "OPENNEST_HELP_DIR";
