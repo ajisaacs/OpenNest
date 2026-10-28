@@ -41,6 +41,11 @@ namespace OpenNest.Geometry
         // the joint's tangents; otherwise the neighbour reads as a second boundary there.
         internal const double JointTolerance = 1e-6;
 
+        // Loops are recovered with ShapeBuilder's chaining tolerance: a source contour that
+        // closes within it (PEP rounding leaves 1e-6 gaps) is a loop everywhere else, and an
+        // unrecovered loop leaves every contact with the whole part unresolved and blocking.
+        internal const double ChainTolerance = Tolerance.ChainTolerance;
+
         private readonly List<Entity> entities;
         private readonly int[] loopOf;
         private readonly int[] previous;
@@ -373,7 +378,7 @@ namespace OpenNest.Geometry
             }
         }
 
-        private static bool Near(Vector a, Vector b) => a.DistanceTo(b) <= IncidenceTolerance;
+        private static bool Near(Vector a, Vector b) => a.DistanceTo(b) <= ChainTolerance;
 
         private static double SignedArea(List<Entity> entities, int first, int last)
         {

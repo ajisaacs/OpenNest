@@ -387,6 +387,39 @@ namespace OpenNest.Tests.Fill
                 AssertClearance(moving, frame, spacing);
         }
 
+        [Theory]
+        [InlineData(0)]
+        [InlineData(0.25)]
+        public void Push_RestingInHoleOfFrameWithUnclosedSourceContour_SlidesAwayFromFloor(
+            double spacing
+        )
+        {
+            // PEP-rounded contours can miss closing by 1e-6, inside ShapeBuilder's chaining
+            // tolerance. The slide classifier must chain them the same way, or the frame's
+            // material sides are unknown and the floor contact blocks every direction.
+            var program = new OpenNest.CNC.Program();
+            program.Codes.Add(new OpenNest.CNC.RapidMove(new Vector(0, 0)));
+            program.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(60, 0)));
+            program.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(60, 60)));
+            program.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(0, 60)));
+            program.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(0, 0.000001)));
+            program.Codes.Add(new OpenNest.CNC.RapidMove(new Vector(10, 10)));
+            program.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(50, 10)));
+            program.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(50, 50)));
+            program.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(10, 50)));
+            program.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(10, 10)));
+            var frame = new Part(new Drawing("frame", program));
+            var moving = MakeRectPart(10 + spacing, 10 + spacing, 5, 5);
+            var plate = new Plate(100, 100) { PartSpacing = spacing };
+            plate.Parts.Add(frame);
+            plate.Parts.Add(moving);
+
+            var distance = Compactor.Push(new List<Part> { moving }, plate, PushDirection.Up);
+
+            Assert.Equal(35 - 2 * spacing, distance, 7);
+            Assert.Equal(50 - spacing, moving.BoundingBox.Top, 7);
+        }
+
         private static void AssertClearance(Part moving, Part obstacle, double spacing)
         {
             var clearance = double.MaxValue;
