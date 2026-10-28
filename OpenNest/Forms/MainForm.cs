@@ -174,8 +174,15 @@ namespace OpenNest.Forms
             contents.Click += (_, _) => HelpTopics.Show(this, HelpTopics.Home);
             var firstNest = new ToolStripMenuItem("&Your First Nest");
             firstNest.Click += (_, _) => HelpTopics.Show(this, HelpTopics.FirstNest);
+            var checkForUpdates = new ToolStripMenuItem("Check for &Updates...");
+            checkForUpdates.Click += (_, _) => updaterStatus?.CheckForUpdates();
+            var about = new ToolStripMenuItem("&About OpenNest");
+            about.Click += (_, _) => updaterStatus?.ShowAbout();
             var help = new ToolStripMenuItem("&Help");
-            help.DropDownItems.AddRange(new ToolStripItem[] { contents, firstNest });
+            help.DropDownItems.AddRange(new ToolStripItem[]
+            {
+                contents, firstNest, new ToolStripSeparator(), checkForUpdates, about,
+            });
             menuStrip1.Items.Add(help);
         }
 

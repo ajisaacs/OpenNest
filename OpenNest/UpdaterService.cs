@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenNest.Properties;
@@ -28,8 +29,20 @@ namespace OpenNest
         private const string GitHubRepositoryUrl = "https://github.com/ajisaacs/OpenNest";
 
         private readonly UpdateManager _manager;
+        private readonly SemaphoreSlim _checkLock = new(1, 1);
         private Timer _timer;
         private UpdateInfo _pendingUpdate;
+
+        /// <summary>The outcome of <see cref="CheckNowAsync"/>.</summary>
+        public enum CheckResult
+        {
+            /// <summary>Not a Velopack installation, so this copy cannot update itself.</summary>
+            NotInstalled,
+            UpToDate,
+            /// <summary>A newer version is downloaded (now or earlier) and waits for <see cref="ApplyAndRestart"/>.</summary>
+            UpdateReady,
+            Failed,
+        }
 
         /// <summary>Raised on the thread pool once an update has finished downloading.</summary>
         public event Action<string> UpdateReady;
@@ -53,6 +66,38 @@ namespace OpenNest
         /// <summary>True once a downloaded update is waiting for <see cref="ApplyAndRestart"/>.</summary>
         public bool HasPendingUpdate => _pendingUpdate != null;
 
+        /// <summary>True when this copy can update itself (a Velopack installation).</summary>
+        public bool CanUpdate => _manager != null && _manager.IsInstalled;
+
+        /// <summary>The version of the downloaded update, or null when none is pending.</summary>
+        public string PendingVersion => _pendingUpdate?.TargetFullRelease.Version.ToString();
+
+        /// <summary>
+        /// The running version: Velopack's package version when installed, otherwise
+        /// the assembly's informational version without build metadata.
+        /// </summary>
+        public string CurrentVersion
+        {
+            get
+            {
+                if (CanUpdate && _manager.CurrentVersion != null)
+                    return _manager.CurrentVersion.ToString();
+
+                return DisplayVersion();
+            }
+        }
+
+        /// <summary>The assembly's informational version without the "+commit" build metadata.</summary>
+        public static string DisplayVersion()
+        {
+            var assembly = typeof(UpdaterService).Assembly;
+            var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                ?? assembly.GetName().Version?.ToString()
+                ?? "unknown";
+            var metadata = version.IndexOf('+');
+            return metadata < 0 ? version : version.Substring(0, metadata);
+        }
+
         public void Start()
         {
             if (_manager is null || !_manager.IsInstalled)
@@ -68,27 +113,63 @@ namespace OpenNest
                 _manager.ApplyUpdatesAndRestart(_pendingUpdate);
         }
 
+        /// <summary>
+        /// Checks the update source now and downloads a newer version if there is one,
+        /// raising <see cref="UpdateReady"/> as a background check would. Waits for a
+        /// background check already in progress instead of running a second one.
+        /// </summary>
+        public async Task<CheckResult> CheckNowAsync()
+        {
+            if (!CanUpdate)
+                return CheckResult.NotInstalled;
+
+            try
+            {
+                return await CheckAndDownloadAsync() ? CheckResult.UpdateReady : CheckResult.UpToDate;
+            }
+            catch
+            {
+                return CheckResult.Failed;
+            }
+        }
+
         public void Dispose() => _timer?.Dispose();
 
         private async Task TickAsync()
         {
-            if (_manager is null || _pendingUpdate != null)
-                return;
-
             try
             {
-                var newVersion = await _manager.CheckForUpdatesAsync();
-                if (newVersion == null)
-                    return;
-
-                await _manager.DownloadUpdatesAsync(newVersion);
-                _pendingUpdate = newVersion;
-                UpdateReady?.Invoke(newVersion.TargetFullRelease.Version.ToString());
+                await CheckAndDownloadAsync();
             }
             catch
             {
                 // Network hiccup or feed unreachable -- retry next tick.
             }
+        }
+
+        /// <returns>True when an update is downloaded and pending.</returns>
+        private async Task<bool> CheckAndDownloadAsync()
+        {
+            await _checkLock.WaitAsync();
+            try
+            {
+                if (_pendingUpdate != null)
+                    return true;
+
+                var newVersion = await _manager.CheckForUpdatesAsync();
+                if (newVersion == null)
+                    return false;
+
+                await _manager.DownloadUpdatesAsync(newVersion);
+                _pendingUpdate = newVersion;
+            }
+            finally
+            {
+                _checkLock.Release();
+            }
+
+            UpdateReady?.Invoke(_pendingUpdate.TargetFullRelease.Version.ToString());
+            return true;
         }
     }
 }
