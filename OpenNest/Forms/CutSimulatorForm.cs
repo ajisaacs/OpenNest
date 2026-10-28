@@ -225,7 +225,7 @@ namespace OpenNest.Forms
 
         // Fixed height so changing text never resizes the window.
         private Label StatusValue(int lines) =>
-            new()
+            new BufferedLabel
             {
                 AutoSize = false,
                 AutoEllipsis = true,
@@ -450,6 +450,15 @@ namespace OpenNest.Forms
                 overlay.Clear();
 
             base.OnFormClosed(e);
+        }
+
+        // Playback rewrites the status every frame; a plain label erases before it redraws, so it flashes.
+        private sealed class BufferedLabel : Label
+        {
+            public BufferedLabel()
+            {
+                DoubleBuffered = true;
+            }
         }
     }
 }
