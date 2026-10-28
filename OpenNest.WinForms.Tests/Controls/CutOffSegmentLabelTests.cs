@@ -67,19 +67,29 @@ public class CutOffSegmentLabelTests
             .Select(p => Point.Round(p.LabelScreenPoint) + new System.Drawing.Size(dx, dy)).ToList();
         Assert.Equal(2, labels.Count);
         Assert.True(CountOrange(image, dx + 48, dx + 52, dy, dy + 99) >= 10, "Expected the cut-off line outside its ids.");
+        // The id is drawn white on a disc of the line's color. Struck through, the 2px cut covers
+        // the id's strokes on its own columns with orange; drawn over the cut, some stay white.
         foreach (var label in labels)
-            Assert.Equal(0, CountOrange(image, label.X - 2, label.X + 2, label.Y - 4, label.Y + 4));
+        {
+            Assert.True(CountOrange(image, label.X - 6, label.X + 6, label.Y - 6, label.Y + 6) >= 10, "Expected the id's disc.");
+            Assert.True(CountWhite(image, label.X - 1, label.X, label.Y - 5, label.Y + 3) >= 3, "Expected the id over the cut-off line.");
+        }
     }, TimeSpan.FromMinutes(1), "Cut-off segment id background test timed out.");
 
-    private static int CountOrange(Bitmap image, int left, int right, int top, int bottom)
+    private static int CountOrange(Bitmap image, int left, int right, int top, int bottom) =>
+        Count(image, left, right, top, bottom, c => c.R >= 200 && c.G <= 120 && c.B <= 80);
+
+    private static int CountWhite(Bitmap image, int left, int right, int top, int bottom) =>
+        Count(image, left, right, top, bottom, c => c.R >= 230 && c.G >= 230 && c.B >= 230);
+
+    private static int Count(Bitmap image, int left, int right, int top, int bottom, Func<Color, bool> match)
     {
         var count = 0;
         for (var y = top; y <= bottom; y++)
         {
             for (var x = left; x <= right; x++)
             {
-                var c = image.GetPixel(x, y);
-                if (c.R >= 200 && c.G <= 120 && c.B <= 80)
+                if (match(image.GetPixel(x, y)))
                     count++;
             }
         }
