@@ -218,7 +218,11 @@ from the start point. Its 2-opt and Or-opt passes would grow with the square of 
 part count. Replans after a learned rule use the plain tour. If a part on that order cannot be
 reached without crossing parts already cut, the search learns "cut this part
 before those", backs up to just before the earliest of them and re-plans the rest
-from the tool position there; parts cut before that point are kept. When the part
+from the tool position there; parts cut before that point are kept. When the approach
+crossed the part cut just before the one it left from, the tool went on past that part
+and came back across it, so the search learns "cut those two the other way round"
+instead: the tool then leaves from the nearer one, as with two stacked strips cut far
+one first. When the part
 cannot come earlier (a sheet separator is cut after everything), it learns the other
 way round, "cut the part the approach left from before those", so the tool arrives
 from beyond them. The first pass

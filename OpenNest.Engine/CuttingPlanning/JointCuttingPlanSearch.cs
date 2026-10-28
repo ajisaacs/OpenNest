@@ -195,7 +195,10 @@ internal static class JointCuttingPlanSearch
         }, token);
     }
 
-    // "Cut the blocked part before every part whose cut contour its approach crossed", unless that
+    // When the approach crossed the part cut just before the one it left from, the tool went on
+    // past that part and came back across it: "cut those two the other way round", so the tool
+    // leaves from the nearer one (two stacked strips, cut far one first). Otherwise "cut the
+    // blocked part before every part whose cut contour its approach crossed", unless that
     // would contradict an order already required. When every such rule would (a sheet separator
     // is cut after everything), the blocked part cannot come earlier, so the tool must arrive
     // from beyond those parts instead: "cut the part it left from before them". False when
@@ -217,6 +220,10 @@ internal static class JointCuttingPlanSearch
     {
         if (attempt.Blocked is not int blocked)
             return [];
+        if (attempt.LastCut?.SourceOrdinal is int last && attempt.CutBeforeLast?.SourceOrdinal is int previous
+            && attempt.Crossed.Contains(previous) && !prerequisites[previous].Contains(last)
+            && !Precedes(previous, last, prerequisites))
+            return [(last, previous)];
         var before = New(blocked);
         return before.Length != 0 || attempt.LastCut?.SourceOrdinal is not int departed ? before : New(departed);
 
@@ -1580,6 +1587,9 @@ internal static class JointCuttingPlanSearch
 
         /// <summary>The part cut last before the deepest boundary, or null at the start point.</summary>
         internal FixedProgramPlacement LastCut => Deepest?.Order is { Length: > 0 } order ? order[^1] : null;
+
+        /// <summary>The part cut just before <see cref="LastCut"/>, or null.</summary>
+        internal FixedProgramPlacement CutBeforeLast => Deepest?.Order is { Length: > 1 } order ? order[^2] : null;
 
         /// <summary>The ordinal of the part the attempt could not get past, or null.</summary>
         internal int? Blocked => sequence == null || Deepest == null || Deepest.Order.Length >= sequence.Length ? null

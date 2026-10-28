@@ -119,6 +119,29 @@ public class ReorderSearchTests
     }
 
     [Fact]
+    public void FreeOrder_ApproachCrossesThePartCutJustBefore_SwapsThatPair()
+    {
+        // Two long bars, one above the other, and a small part off to the right below them. The
+        // shortest tour cuts the lower bar, the upper one, then the small part, whose approach
+        // from the upper bar's left side crosses the lower bar. Cutting the upper bar first lets
+        // the tool leave the lower bar below its corner instead; jumping the small part ahead of
+        // the lower bar would detour.
+        var lower = LeftLeadRectangle("lower", 0, 0, 19, 6, departure: new Vector(-0.25, -0.25));
+        var upper = LeftLeadRectangle("upper", 0, 7, 19, 6);
+        var small = LeftLeadRectangle("small", 28, -19, 4, 4);
+        var start = new Vector(9.5, -10);
+        Assert.Contains(Analyze(start, lower, upper, small).Findings, f => f.Kind == PostVerificationKind.RapidCrossing);
+
+        var result = CuttingPlanService.Plan(new CuttingPlanRequest([lower, upper, small], start,
+            confirmedParameters: ExplicitContourTests.Parameters()));
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.True(result.IndependentlyReplayed);
+        Assert.Equal(new[] { upper, lower, small }, result.ProposedOrder.Select(p => p.SourcePart));
+        Assert.Empty(Analyze(start, upper, lower, small).Findings);
+    }
+
+    [Fact]
     public void FreeOrder_LearnedOrderContradicts_FallsBackToTheFullSearch()
     {
         // Left leads on its left, right on its right: right straight after left crosses left, and
@@ -197,7 +220,9 @@ public class ReorderSearchTests
         return part;
     }
 
-    private static PostVerificationReport Analyze(params Part[] parts)
+    private static PostVerificationReport Analyze(params Part[] parts) => Analyze(Vector.Zero, parts);
+
+    private static PostVerificationReport Analyze(Vector start, params Part[] parts)
     {
         var nest = new Nest();
         var plate = nest.CreatePlate();
@@ -207,7 +232,7 @@ public class ReorderSearchTests
             Assert.True(copy.RestoreLeadInProgram((Program)source.Program.Clone(), source.LeadInsLocked));
             plate.Parts.Add(copy);
         }
-        return PostVerificationAnalyzer.Analyze(nest, Vector.Zero);
+        return PostVerificationAnalyzer.Analyze(nest, start);
     }
 
     private static string Describe(CuttingPlanResult r) =>
