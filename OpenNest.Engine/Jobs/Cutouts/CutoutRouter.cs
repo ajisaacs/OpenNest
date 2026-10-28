@@ -10,7 +10,8 @@ namespace OpenNest.Engine.Jobs.Cutouts;
 /// <remarks>Area ratio selects search order, not placement permission. The small-insert path
 /// prefers a shifted partial lattice; the middle compares it with occupied-aware NFP search;
 /// the large-insert path tries NFP first. A round hole whose inserts are all round gets only the
-/// circle-in-circle proposal for the whole list.
+/// circle-in-circle proposal for the whole list. Every other hole is also packed by
+/// <see cref="CutoutPackerProposal"/>, which wins with more copies or an equal count packed tighter.
 /// All accepted poses are clearance-checked.
 /// Fill's equal-score pose nondeterminism remains PM c98c21bd.</remarks>
 internal static class CutoutRouter
@@ -32,7 +33,8 @@ internal static class CutoutRouter
         Fill(frame, cutoutIndex, inserts, spacing, null, memo, token);
 
     /// <summary>Optional internal diagnostic receives only poses from the chosen proposal,
-    /// after indexing; true marks a retained lattice seed, false a residual NFP or circle-packer pose.</summary>
+    /// after indexing; true marks a retained lattice seed, false a residual NFP, circle-packer or
+    /// frontier-packer pose.</summary>
     internal static IReadOnlyList<NestJobPlacement> Fill(NestJobPart frame, int cutoutIndex,
         IReadOnlyList<NestJobPart> inserts, double spacing,
         Action<NestJobPlacement, bool>? observeAccepted, CancellationToken token = default) =>
@@ -66,9 +68,10 @@ internal static class CutoutRouter
         // NFP searches never placed more there, and they are slow on round inserts, most of all
         // when demand exceeds what fits (every surplus copy is searched for and not found).
         if (CutoutCirclePacker.Applies(hole, inserts))
-            return Circles(CutoutCirclePacker.Fill(frame, cutoutIndex, inserts, spacing, memo, token));
+            return Observe(CutoutCirclePacker.Fill(frame, cutoutIndex, inserts, spacing, memo, token));
 
         var accepted = new List<NestJobPlacement>();
+        var geometries = new Dictionary<string, JobPartGeometry>(StringComparer.Ordinal);
         var observed = new List<(NestJobPlacement Pose, bool Lattice)>();
         var occupied = new List<(JobPartGeometry Geometry, NestJobPlacement Pose)>();
         var holeArea = System.Math.Abs(hole.Area());
@@ -77,6 +80,7 @@ internal static class CutoutRouter
         {
             token.ThrowIfCancellationRequested();
             var geometry = JobPartGeometry.Read(part.Geometry);
+            geometries[part.Id] = geometry;
             var ratio = geometry.MaterialArea / holeArea;
             // Unsupported or degenerate material cannot establish a useful routing ratio;
             // NFP retains its own fail-closed checks and the bounded lattice is not tried.
@@ -148,11 +152,20 @@ internal static class CutoutRouter
             }
         }
         token.ThrowIfCancellationRequested();
+        // The frontier packer sees every requirement at once and settles parts against the
+        // walls and each other; it replaces the sampled proposal when it seats more copies, or
+        // the same number more compactly.
+        var packed = CutoutPackerProposal.Fill(frame, cutoutIndex, inserts, spacing,
+            Array.Empty<(JobPartGeometry Geometry, NestJobPlacement Pose)>(), memo, token);
+        if (packed.Count > accepted.Count
+            || (packed.Count == accepted.Count
+                && CutoutPackerProposal.Tighter(packed, accepted, id => geometries[id])))
+            return Observe(packed);
         foreach (var (pose, lattice) in observed)
             observeAccepted?.Invoke(pose, lattice);
         return accepted.ToArray();
 
-        IReadOnlyList<NestJobPlacement> Circles(IReadOnlyList<NestJobPlacement> poses)
+        IReadOnlyList<NestJobPlacement> Observe(IReadOnlyList<NestJobPlacement> poses)
         {
             foreach (var pose in poses)
                 observeAccepted?.Invoke(pose, false);

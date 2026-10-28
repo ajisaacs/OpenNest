@@ -91,8 +91,9 @@ Curved outlines retain conservative flattening-error padding. This does not rela
 footprints, no-fit polygons or layout validation tolerances; a part extending beyond the accepted
 work-area bounds remains invalid.
 
-Irregular fills gaps and open notches using outer profiles; it does not yet place parts inside
-enclosed cutouts. For a part with two or more copies it also offers its best-fit pairs (two copies
+Irregular fills gaps and open notches using outer profiles; as an engine it does not place parts
+inside enclosed cutouts, but its packer also fills one cutout for the pre-pass described under
+[Filling cutouts](#filling-cutouts). For a part with two or more copies it also offers its best-fit pairs (two copies
 interlocked, as the Best Fit viewer shows them) alongside the single copies, and places a pair
 where both members' free regions allow it. Each pair's internal spacing is re-checked with the
 layout check before it is offered, and only rotations the part's policy allows are used. A pair
@@ -290,6 +291,25 @@ NFP first, then Fill if demand remains, taking the higher-count valid proposal.
 An 0.20 NFP-only rule would lose a second 4-inch square in a 10-inch round hole.
 Six geometry-only, anonymized real-job probes and neutral ring fixtures informed
 the search-order hints; these limited cases are not a global density guarantee.
+
+Every such hole is also packed by `CutoutPackerProposal`: the Irregular engine's
+`FrontierPacker` run with the cutout as its boundary (`PackBoundary`) in place of a rectangular
+work area. Each insert orientation's free region starts from its inner-fit polygon of the
+inscribed, flattened cutout eroded by half the spacing (the orientation's clearance footprint
+carries the other half, so the frame keeps the full spacing exactly as another part would), less
+the no-fit polygons of inserts already seated in the hole; the inner fits are computed once per
+orientation per boundary. The packer then places every offered requirement at once under its
+usual gap-fill and least-advance rule, so copies settle against the wall and each other instead
+of at the first sampled point that clears. All six strategy variants pack the hole; the one
+seating the most copies wins, and ties go to the tighter layout (smaller bounding box of the
+placed inserts, then lower, then further left). Every pose is certified with
+`NestLayoutCheck.Clears` against the frame, the occupants and the other poses, as the lattice
+and NFP poses are; no tolerance is loosened. The router keeps the packer's proposal when it
+seats more copies than the lattice-and-NFP proposal, or the same number more compactly. Two
+bars with quantity two, which the lattice never tries and the sampled NFP search scattered
+across a tall window, now stand together against one wall. Without a boundary the packer is
+unchanged: rectangular stock still starts from the work-area inner-fit rectangle, so engine
+layouts are identical.
 
 When the cutout is one circle and every insert fills at least 0.8 of its enclosing circle
 (discs, washers, gears by their tip circle), `CutoutCirclePacker` first packs the whole insert

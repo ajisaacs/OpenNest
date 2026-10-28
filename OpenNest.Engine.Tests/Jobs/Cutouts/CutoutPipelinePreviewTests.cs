@@ -12,9 +12,10 @@ public sealed class CutoutPipelineRegistryCollection { }
 [Collection("Cutout pipeline registry")]
 public class CutoutPipelinePreviewTests
 {
-    private static NestPipelineRequest Request(string engine = "Irregular")
+    /// <param name="hole">Hole diameter: ten holds two 3 x 3 inserts, six holds exactly one.</param>
+    private static NestPipelineRequest Request(string engine = "Irregular", double hole = 10)
     {
-        var frame = new Drawing("frame", TestShapes.Ring(20, 10));
+        var frame = new Drawing("frame", TestShapes.Ring(20, hole));
         var insert = new Drawing("insert", TestShapes.Rectangle(3, 3));
         return new NestPipelineRequest(engine,
             new[] { new NestItem { Drawing = frame, Quantity = 1 },
@@ -112,7 +113,8 @@ public class CutoutPipelinePreviewTests
     [Fact]
     public void PartialBundleKeepsIndependentResidualByOriginalRequirement()
     {
-        var request = Request("stub");
+        // One insert is reserved in the hole; the other must stay an ordinary requirement.
+        var request = Request("stub", hole: 6);
         request.Items[1].Quantity = 2;
         request = request with { Stock = new[] { new NestPlateStock("sheet", new Size(26, 26), 1, 0.25) } };
         var result = NestPipeline.RunCutoutTrial(new Stub(job =>
@@ -171,7 +173,8 @@ public class CutoutPipelinePreviewTests
     [Fact]
     public void EnvelopeValidResidualInsideReservedHoleFailsAfterPhysicalExpansion()
     {
-        var request = Request("stub");
+        // One insert is reserved in the hole; the other must stay an ordinary requirement.
+        var request = Request("stub", hole: 6);
         request.Items[1].Quantity = 2;
         var result = NestPipeline.RunCutoutTrial(new Stub(job =>
         {
@@ -273,7 +276,8 @@ public class CutoutPipelinePreviewTests
     [Fact]
     public void SameDrawingInTwoRequirementRowsRetainsSeparateIds()
     {
-        var initial = Request("stub");
+        // One hole seat: the first requirement row fills it, the second row stays separate.
+        var initial = Request("stub", hole: 6);
         var request = initial with
         {
             Items = new[] { initial.Items[0], initial.Items[1],
