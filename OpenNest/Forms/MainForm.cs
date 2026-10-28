@@ -116,7 +116,7 @@ namespace OpenNest.Forms
             statusBar = new MainStatusBar(statusLabel1, locationStatusLabel, selectionStatusLabel,
                 machineStatusLabel, materialStatusLabel, plateUtilStatusLabel, ledgerStatusLabel);
             toolStrip1.Items.Add(CreateActionButton("btnCutPlanner", "Plan Cutting",
-                Resources.cut_planner, PlatePlanCutting_Click));
+                Resources.cut_planner, ToolbarPlanCutting_Click));
             toolStrip1.Items.Add(CreateActionButton("btnSimulateCutting", "Simulate Cutting",
                 Resources.cut_simulate, SimulateCutting_Click));
             toolStrip1.Items.Add(CreateActionButton("btnSequenceByPath", "Sequence by Path",

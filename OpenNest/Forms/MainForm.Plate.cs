@@ -111,6 +111,10 @@ namespace OpenNest.Forms
 
         private void NestPlanCutting_Click(object sender, EventArgs e) => ShowCuttingPlan(allPlates: true);
 
+        // The toolbar opens with the scope last chosen in the panel; the menus keep their own.
+        private void ToolbarPlanCutting_Click(object sender, EventArgs e) =>
+            ShowCuttingPlan(Properties.Settings.Default.CuttingPlanAllPlates);
+
         // Native tests capture this notice without opening a modal dialog in session zero.
         internal System.Action<string, string> CuttingPlanNotice { get; set; }
 

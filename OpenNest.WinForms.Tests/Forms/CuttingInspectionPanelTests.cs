@@ -188,6 +188,88 @@ public class CuttingInspectionPanelTests
     });
 
     [Fact]
+    public void ScopeSelectorReplansForAllPlatesAndBackAndRemembersTheChoice() => RunSta(() =>
+    {
+        using var editor = TwoPlateEditor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        var remembered = new List<bool>();
+        panel.RememberScope = remembered.Add;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        var scope = Field<ComboBox>(panel, "scopeSelector");
+        Assert.True(scope.Visible);
+        Assert.Equal(0, scope.SelectedIndex);
+        Assert.Equal("All plates (2)", scope.Items[1]);
+        Assert.Single(panel.Proposal.Plates);
+
+        scope.SelectedIndex = 1;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.True(panel.AllPlates);
+        Assert.Equal(2, panel.Proposal.Plates.Count);
+        Assert.True(Field<Button>(panel, "nextButton").Visible);
+        Assert.Contains("2 plates", Field<Label>(panel, "statusLabel").Text);
+
+        scope.SelectedIndex = 0;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.False(panel.AllPlates);
+        Assert.Single(panel.Proposal.Plates);
+        Assert.False(Field<Button>(panel, "nextButton").Visible);
+        Assert.Equal(new[] { true, false }, remembered);
+        panel.RequestClose();
+    });
+
+    [Fact]
+    public void ScopeChangedMidPlanReplansOnceTheRunningPlanCancels() => RunSta(() =>
+    {
+        using var editor = TwoPlateEditor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var runs = 0;
+        editor.CuttingBeforePlan = token =>
+        {
+            if (Interlocked.Increment(ref runs) > 1) return;
+            entered.Set();
+            release.Wait(TimeSpan.FromSeconds(30));
+            Assert.True(token.IsCancellationRequested);
+        };
+        try
+        {
+            editor.OpenCuttingInspection();
+            var panel = editor.CuttingInspection!;
+            panel.RememberScope = _ => { };
+            Assert.True(entered.Wait(TimeSpan.FromSeconds(30)));
+            Field<ComboBox>(panel, "scopeSelector").SelectedIndex = 1;
+            Assert.False(panel.AllPlates); // The running plan still reads the old scope.
+            release.Set();
+            PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+            Assert.True(panel.AllPlates);
+            Assert.Equal(2, panel.Proposal.Plates.Count);
+            panel.RequestClose();
+        }
+        finally
+        {
+            release.Set();
+        }
+    });
+
+    [Fact]
+    public void ScopeSelectorIsHiddenWhenOnlyOnePlateHasParts() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.False(Field<ComboBox>(panel, "scopeSelector").Visible);
+        panel.RequestClose();
+    });
+
+    [Fact]
     public void BlockedOverlapRowShadesTheOverlapOnTheLivePlate() => RunSta(() =>
     {
         using var editor = Editor();
@@ -948,6 +1030,16 @@ public class CuttingInspectionPanelTests
         foreach (var part in plate.Parts)
             nest.Drawings.Add(part.BaseDrawing);
         return new EditNestForm(nest);
+    }
+
+    private static EditNestForm TwoPlateEditor()
+    {
+        var editor = Editor();
+        var second = editor.Nest.Plates[^1]; // Fill the managed empty sentinel; a new one is appended.
+        second.Size = new OpenNest.Geometry.Size(100, 100);
+        second.Parts.Add(Square("left", 1));
+        second.Parts.Add(Square("right", 20));
+        return editor;
     }
 
     private static Part Square(string name, double x)

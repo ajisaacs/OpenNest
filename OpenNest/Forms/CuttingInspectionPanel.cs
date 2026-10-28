@@ -25,8 +25,8 @@ internal sealed class CuttingInspectionPanel : UserControl
     private readonly PlateView view;
     private readonly Plate plate;
     private CuttingParameters parameters;
-    private readonly Plate[] plates;
-    private readonly int[] plateNumbers;
+    private Plate[] plates;
+    private int[] plateNumbers;
     private int selectedPlate;
     private Plate preview;
     private bool populatingWarnings;
@@ -36,6 +36,7 @@ internal sealed class CuttingInspectionPanel : UserControl
     private readonly OverlapDisplayMode overlapDisplay;
     private CuttingProposalInspection inspection = new();
     private readonly ComboBox modeSelector = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
+    private readonly ComboBox scopeSelector = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
     private CancellationTokenSource validationCancellation;
     private bool closeRequested;
     private CuttingInspectionMode? pendingMode;
@@ -43,6 +44,8 @@ internal sealed class CuttingInspectionPanel : UserControl
     private bool pendingReplan;
     private bool pendingClear;
     private bool pendingCutOffSettings;
+    // A scope chosen while a plan ran; applied once that run's cancellation lands.
+    private bool? pendingScope;
     // The running plan's headline, re-shown each second with its elapsed time; null when not ticking.
     private string planningStatus;
     private readonly System.Diagnostics.Stopwatch planningClock = new();
@@ -94,7 +97,7 @@ internal sealed class CuttingInspectionPanel : UserControl
     };
     private readonly Button cutOffSettingsButton = new() { Text = "Cut-off Settings…", AutoSize = true };
     private readonly Units units;
-    private readonly bool allPlates;
+    private bool allPlates;
     private AutomaticCutOffOptions cutOffOptions;
     // Last cut-off settings chosen here, per unit system, for the rest of this session.
     private static readonly System.Collections.Generic.Dictionary<Units, AutomaticCutOffOptions> lastCutOffOptions = new();
@@ -155,12 +158,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         this.editor = editor;
         view = editor.PlateView;
         plate = view.Plate;
-        var all = editor.Nest.Plates.ToList();
-        plates = allPlates ? all.Where(p => p.Parts.Count > 0).ToArray() : [plate];
-        if (plates.Length == 0)
-            plates = [plate];
-        plateNumbers = plates.Select(p => all.IndexOf(p) + 1).ToArray();
-        selectedPlate = System.Math.Max(0, Array.IndexOf(plates, plate));
+        SetPlates(allPlates);
         this.parameters = CuttingParametersSerializer.Deserialize(CuttingParametersSerializer.Serialize(parameters));
         context = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
         viewport = view.CaptureViewport();
@@ -182,7 +180,11 @@ internal sealed class CuttingInspectionPanel : UserControl
         {
             if (!configuringMode) SwitchMode((CuttingInspectionMode)modeSelector.SelectedIndex);
         };
-        this.allPlates = allPlates;
+        toolTip.SetToolTip(scopeSelector, "Plan the plate on screen, or every plate with parts in one plan.");
+        scopeSelector.SelectedIndexChanged += (_, _) =>
+        {
+            if (!configuringMode) ChangeScope(scopeSelector.SelectedIndex == 1);
+        };
         units = editor.Nest.Units;
         cutOffOptions = lastCutOffOptions.TryGetValue(units, out var last) ? Copy(last) : DefaultCutOffOptions(units);
         ShowCutOffOptions();
@@ -197,7 +199,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         existingWorkLabel.Font = new Font(Font, FontStyle.Bold);
         existingWorkBanner.Controls.AddRange([existingWorkLabel, clearExistingButton]);
         existingWorkBanner.SetTone(Tone.Bad);
-        header.Controls.AddRange([modeSelector, existingWorkBanner, settingsRow, keepOrderCheckBox, cutOffRow,
+        header.Controls.AddRange([modeSelector, scopeSelector, existingWorkBanner, settingsRow, keepOrderCheckBox, cutOffRow,
             validationScopeLabel, buttons, acceptWarningsCheckBox, navigation, previewLabel, detailLabel]);
         statusBanner.Controls.Add(statusLabel);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
@@ -415,10 +417,11 @@ internal sealed class CuttingInspectionPanel : UserControl
 
     private void ConfigureMode()
     {
+        var planning = Mode == CuttingInspectionMode.Plan;
         configuringMode = true;
         modeSelector.SelectedIndex = (int)Mode;
+        ShowScope(planning);
         configuringMode = false;
-        var planning = Mode == CuttingInspectionMode.Plan;
         settingsButton.Visible = settingsLabel.Visible = keepOrderCheckBox.Visible = applyButton.Visible = planning;
         autoCutOffsCheckBox.Visible = cutOffSettingsButton.Visible = planning;
         RefreshExistingWork();
@@ -427,6 +430,89 @@ internal sealed class CuttingInspectionPanel : UserControl
         validationScopeLabel.Visible = !planning;
         planButton.Text = planning ? "Replan" : "Recheck all plates";
         previewLabel.Text = "No current preview.";
+    }
+
+    /// <summary>True when this panel plans every plate with parts rather than only the plate on screen.</summary>
+    internal bool AllPlates => allPlates;
+
+    /// <summary>Saves the scope chosen in the panel for the next toolbar open; tests replace it.</summary>
+    internal Action<bool> RememberScope { get; set; } = all =>
+    {
+        Properties.Settings.Default.CuttingPlanAllPlates = all;
+        Properties.Settings.Default.Save();
+    };
+
+    /// <summary>Scopes the panel to the plate on screen or to every plate with parts (that plate when none has).</summary>
+    private void SetPlates(bool all)
+    {
+        allPlates = all;
+        var nestPlates = editor.Nest.Plates.ToList();
+        var current = nestPlates.Contains(view.Plate) ? view.Plate : plate;
+        plates = ScopePlates(nestPlates, current, all);
+        plateNumbers = plates.Select(p => nestPlates.IndexOf(p) + 1).ToArray();
+        selectedPlate = System.Math.Max(0, Array.IndexOf(plates, current));
+    }
+
+    private static Plate[] ScopePlates(System.Collections.Generic.List<Plate> nestPlates, Plate current, bool all)
+    {
+        var scoped = all ? nestPlates.Where(p => p.Parts.Count > 0).ToArray() : [current];
+        return scoped.Length == 0 ? [current] : scoped;
+    }
+
+    // Shown only when the two scopes would plan different plates.
+    private void ShowScope(bool planning)
+    {
+        var nestPlates = editor.Nest.Plates.ToList();
+        var current = nestPlates.Contains(view.Plate) ? view.Plate : plate;
+        var everyPlate = ScopePlates(nestPlates, current, true);
+        scopeSelector.Items.Clear();
+        scopeSelector.Items.AddRange(["Current plate only", $"All plates ({everyPlate.Length})"]);
+        scopeSelector.SelectedIndex = allPlates ? 1 : 0;
+        scopeSelector.Visible = planning && (allPlates || everyPlate.Length > 1 || !ReferenceEquals(everyPlate[0], current));
+    }
+
+    /// <summary>Replans for the chosen scope; a running plan is cancelled first so the plates never change under it.</summary>
+    internal void ChangeScope(bool all)
+    {
+        if (closed || closeRequested || pendingMode != null || Mode != CuttingInspectionMode.Plan
+            || all == (pendingScope ?? allPlates))
+            return;
+        RememberScope?.Invoke(all);
+        if (IsPlanning)
+        {
+            pendingScope = all;
+            if (inspection.CloseRequested)
+                return; // Already finishing; the scope is applied when that lands.
+            pendingReplan = true;
+            ClearResult();
+            SetPlanning(true);
+            SetStatus(Tone.Neutral, "Restarting…");
+            inspection.RequestClose();
+            return;
+        }
+        if (ApplyScope(all))
+            StartPlanning();
+    }
+
+    // Takes the unapplied cut-offs off the old scope's plates before rescoping; false when they couldn't come off.
+    private bool ApplyScope(bool all)
+    {
+        ClearResult();
+        try
+        {
+            RevertStagedCutOffs();
+        }
+        catch (Exception ex)
+        {
+            SetStatus(Tone.Bad, "Couldn't remove the unapplied cut-offs.", ex.Message);
+            configuringMode = true;
+            ShowScope(true); // The plates stay in the old scope, so the selector does too.
+            configuringMode = false;
+            return false;
+        }
+        SetPlates(all);
+        ConfigureMode();
+        return true;
     }
 
     internal void SwitchMode(CuttingInspectionMode mode)
@@ -704,6 +790,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             if (closeRequested || pendingMode != null)
             {
                 pendingReplan = pendingClear = pendingCutOffSettings = false;
+                pendingScope = null;
                 FinishTransition();
                 return;
             }
@@ -717,6 +804,17 @@ internal sealed class CuttingInspectionPanel : UserControl
                     pendingClear = false; // The cancelled run no longer reads the plates.
                     if (!ClearAppliedWork())
                     {
+                        pendingScope = null;
+                        SetPlanning(false);
+                        return;
+                    }
+                }
+                if (pendingScope is { } scoped)
+                {
+                    pendingScope = null; // The clear above, if any, covered the scope it was confirmed for.
+                    if (!ApplyScope(scoped))
+                    {
+                        pendingCutOffSettings = false;
                         SetPlanning(false);
                         return;
                     }
@@ -875,7 +973,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         // unless closing or switching; validation still locks them while it runs.
         var replannable = !running || Mode == CuttingInspectionMode.Plan && !closeRequested && pendingMode == null;
         settingsButton.Enabled = keepOrderCheckBox.Enabled = planButton.Enabled = replannable;
-        cutOffSettingsButton.Enabled = clearExistingButton.Enabled = replannable;
+        cutOffSettingsButton.Enabled = clearExistingButton.Enabled = scopeSelector.Enabled = replannable;
         previousButton.Enabled = !running && selectedPlate > 0;
         nextButton.Enabled = !running && selectedPlate < plates.Length - 1;
         acceptWarningsCheckBox.Enabled = !running;

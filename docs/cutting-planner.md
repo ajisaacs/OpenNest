@@ -615,6 +615,10 @@ on an `Applied` result, not as a rollback.
 
 `Plate > Plan Cutting...` opens a cutting inspection panel beside the main plate canvas;
 `Nest > Plan Cutting (All Plates)...` opens the same panel for every occupied plate.
+The toolbar's Plan Cutting button opens it with the scope last chosen in the panel
+(`Settings.CuttingPlanAllPlates`, default all plates). When the two scopes differ, the
+panel's scope selector switches between **Current plate only** and **All plates**; a
+change takes the unapplied scrap cut-offs off first, cancels any running plan and replans.
 It captures scope on the editor thread, plans on a worker, and shows only a fresh,
 supported detached proposal in that canvas, including proposed part numbers and
 rapids. The live `Plate`, part order, programs and quantities remain unchanged

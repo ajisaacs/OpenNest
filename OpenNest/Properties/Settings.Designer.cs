@@ -374,6 +374,19 @@ namespace OpenNest.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        // The Plan Cutting toolbar button plans every plate; false plans only the plate on screen.
+        public bool CuttingPlanAllPlates {
+            get {
+                return ((bool)(this["CuttingPlanAllPlates"]));
+            }
+            set {
+                this["CuttingPlanAllPlates"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
         // New cut-offs lock the head height and overcut the far sheet edge.
         public bool CutOffLockHeadHeight {
