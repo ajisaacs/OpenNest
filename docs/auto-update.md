@@ -2,7 +2,7 @@
 
 The Windows desktop app (`OpenNest.exe`) can self-update via
 [Velopack](https://velopack.io): `OpenNest.UpdaterService` checks its update
-source 30 minutes after startup and every 30 minutes after that, and downloads
+source one minute after startup and every 30 minutes after that, and downloads
 a newer release in the background. Once a download finishes, a clickable
 status-bar item offers to restart into it; nothing restarts without that
 confirmation, so an open, unsaved nest is never discarded automatically.
@@ -11,7 +11,7 @@ A download the user does not restart for is applied the next time OpenNest
 starts: `VelopackApp.Build().Run()` in `MainApp` keeps Velopack's default
 `SetAutoApplyOnStartup(true)`, so launching after a download opens the new
 version. Nothing runs while OpenNest is closed (no service or scheduled task),
-and a session shorter than the first 30 minutes never checks.
+and a session shorter than the first minute never checks.
 
 **Help > Check for Updates** runs the same check immediately (waiting for a
 background check already in progress rather than starting a second one) and

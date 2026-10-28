@@ -25,6 +25,9 @@ namespace OpenNest
     /// </remarks>
     public sealed class UpdaterService : IDisposable
     {
+        // Short first delay: most sessions are far shorter than the interval and
+        // would otherwise never check; the delay keeps the check off startup.
+        private static readonly TimeSpan FirstCheckDelay = TimeSpan.FromMinutes(1);
         private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(30);
         private const string GitHubRepositoryUrl = "https://github.com/ajisaacs/OpenNest";
 
@@ -103,7 +106,7 @@ namespace OpenNest
             if (_manager is null || !_manager.IsInstalled)
                 return;
 
-            _timer = new Timer(_ => _ = TickAsync(), null, CheckInterval, CheckInterval);
+            _timer = new Timer(_ => _ = TickAsync(), null, FirstCheckDelay, CheckInterval);
         }
 
         /// <summary>Applies the downloaded update and restarts the process. Call only after the user agrees.</summary>
