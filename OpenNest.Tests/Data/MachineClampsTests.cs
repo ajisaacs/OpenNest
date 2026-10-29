@@ -227,4 +227,19 @@ public class MachineClampsTests : IDisposable
         Assert.Equal(new[] { 12.0, 24.0 }, rail.Clamps.Select(c => System.Math.Round(c.Center, 9)));
         Assert.Equal(new[] { 304.8, 609.6 }, machine.Clamps!.Centers.Select(c => System.Math.Round(c, 9)));
     }
+
+    [Fact]
+    public void ClearanceConvertsWithTheMachineAndAnInvalidOneKeepsTheEdgeSpacing()
+    {
+        var legacy = Legacy();
+        legacy.Clearance = 0.1;
+        Assert.Equal(0.1 * 25.4, MachineClamps.FromSettings(legacy, UnitSystem.Millimeters).Clearance!.Value, 9);
+
+        var clamps = Rail();
+        clamps.Clearance = 0.05;
+        Assert.Equal(0.05, clamps.ToSettings(UnitSystem.Inches).Clearance);
+
+        clamps.Clearance = double.NaN;
+        Assert.Null(clamps.ToSettings(UnitSystem.Inches).Clearance);
+    }
 }

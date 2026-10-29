@@ -495,4 +495,39 @@ public class ClampRailTests
         Assert.Null(plate.RailClampAt(new Vector(36, 0.7)));
         Assert.Equal("clamp-3", plate.RailClampAt(new Vector(36, 0.7), tolerance: 0.1)?.Id);
     }
+
+    [Theory]
+    [InlineData(-0.1)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void ClearanceMustBeFiniteAndZeroOrMore(double clearance)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ClampRail(1.5, 0.625, new[] { 6.0 }, clearance: clearance));
+    }
+
+    [Fact]
+    public void ClearanceIsPartOfTheRailAndSurvivesNewClamps()
+    {
+        var rail = new ClampRail(1.5, 0.625, new[] { 6.0 }, clearance: 0.05);
+
+        Assert.Equal(0.05, rail.Clearance);
+        Assert.Equal(0.05, rail.WithClamps(new[] { new RailClamp(ClampEdge.FarSide, 9) }).Clearance);
+        Assert.NotEqual(rail, new ClampRail(1.5, 0.625, new[] { 6.0 }));
+        Assert.Equal(rail, new ClampRail(1.5, 0.625, new[] { 6.0 }, clearance: 0.05));
+    }
+
+    [Fact]
+    public void PlateClampClearanceIsTheRailsOwnElseTheBottomEdgeSpacing()
+    {
+        var plate = Sheet(60, 120);
+        plate.EdgeSpacing = new Spacing(0.25, 0.5, 0.25, 0.25);
+        plate.PartSpacing = 1;
+        Assert.Equal(0.5, plate.ClampClearance);
+
+        plate.SetClampRail(Machine());
+        Assert.Equal(0.5, plate.ClampClearance);
+
+        plate.SetClampRail(new ClampRail(1.5, 0.625, MachineCenters, clearance: 0));
+        Assert.Equal(0, plate.ClampClearance);
+    }
 }

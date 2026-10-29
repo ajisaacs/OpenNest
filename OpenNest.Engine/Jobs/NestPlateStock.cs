@@ -94,6 +94,13 @@ public sealed class NestPlateStock
     /// </summary>
     internal ClampRail ClampRail { get; init; }
 
+    /// <summary>
+    /// The gap part material keeps from every clamp zone, as <see cref="Plate.ClampClearance"/>:
+    /// the rail's own clearance, else the bottom edge spacing (D6). Never part spacing.
+    /// </summary>
+    [JsonIgnore]
+    public double ClampClearance => System.Math.Max(0, ClampRail?.Clearance ?? EdgeSpacing.Bottom);
+
     /// <summary>Generic per-physical-sheet cost; null selects area scoring.</summary>
     public double? Cost { get; }
     public string Id { get; }

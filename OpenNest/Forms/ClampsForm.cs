@@ -21,6 +21,8 @@ public sealed class ClampsForm : Form
     private readonly NumericUpDown widthBox;
     private readonly NumericUpDown depthBox;
     private readonly NumericUpDown removalMinutesBox;
+    private readonly CheckBox ownClearanceBox;
+    private readonly NumericUpDown clearanceBox;
     private readonly NumericUpDown centerBox;
     private readonly ComboBox edgeBox;
     private readonly ListBox centersList;
@@ -46,8 +48,8 @@ public sealed class ClampsForm : Form
 
         Text = "Clamps";
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(480, 470);
-        MinimumSize = new Size(440, 460);
+        ClientSize = new Size(480, 500);
+        MinimumSize = new Size(440, 490);
         MinimizeBox = false;
         MaximizeBox = false;
         ShowInTaskbar = false;
@@ -73,9 +75,10 @@ public sealed class ClampsForm : Form
                 Padding = new Padding(0, 0, 0, 8),
                 Text =
                     "Fixed clamps on the plate edges, each centered a distance from the origin "
-                    + "along its edge. Auto Nest keeps parts clear of each clamp by the plate's "
-                    + "bottom edge spacing; clamps that do not reach a smaller plate are left off "
-                    + "it. Plate > Edit Clamps moves and adds clamps on the plate view.",
+                    + "along its edge. Parts keep the clamp clearance from each clamp (the plate's "
+                    + "bottom edge spacing unless set below; part spacing never applies); clamps "
+                    + "that do not reach a smaller plate are left off it. Plate > Edit Clamps moves "
+                    + "and adds clamps on the plate view.",
             }
         );
 
@@ -86,6 +89,19 @@ public sealed class ClampsForm : Form
         AddRow(size, "Clamp width (along the edge):", widthBox, unit);
         AddRow(size, "Clamp depth (into the plate):", depthBox, unit);
         AddRow(size, "Minutes to remove and replace one clamp:", removalMinutesBox, "min");
+        ownClearanceBox = new CheckBox
+        {
+            Text = "Clearance from parts:",
+            AutoSize = true,
+            Checked = Editor.Clearance.HasValue,
+            Padding = new Padding(0, 3, 6, 0),
+        };
+        clearanceBox = NewLengthBox(Editor.Clearance ?? 0, minimum: 0m);
+        clearanceBox.Enabled = ownClearanceBox.Checked;
+        ownClearanceBox.CheckedChanged += (_, _) => clearanceBox.Enabled = ownClearanceBox.Checked;
+        size.Controls.Add(ownClearanceBox);
+        size.Controls.Add(clearanceBox);
+        size.Controls.Add(new Label { Text = unit, AutoSize = true, Padding = new Padding(0, 6, 0, 0) });
         layout.Controls.Add(size);
 
         var centersGroup = new GroupBox
@@ -226,6 +242,7 @@ public sealed class ClampsForm : Form
         Editor.Width = (double)widthBox.Value;
         Editor.Depth = (double)depthBox.Value;
         Editor.RemovalMinutes = (double)removalMinutesBox.Value;
+        Editor.Clearance = ownClearanceBox.Checked ? (double)clearanceBox.Value : null;
         Editor.ApplyToNewNests = applyToNewNestsBox.Checked;
     }
 
@@ -268,6 +285,8 @@ public sealed class ClampsForm : Form
         widthBox.Value = ToBoxValue(widthBox, Editor.Width);
         depthBox.Value = ToBoxValue(depthBox, Editor.Depth);
         removalMinutesBox.Value = ToBoxValue(removalMinutesBox, Editor.RemovalMinutes);
+        ownClearanceBox.Checked = Editor.Clearance.HasValue;
+        clearanceBox.Value = ToBoxValue(clearanceBox, Editor.Clearance ?? 0);
         applyToNewNestsBox.Checked = Editor.ApplyToNewNests;
         RefreshCenters();
     }

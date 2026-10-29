@@ -274,6 +274,7 @@ namespace OpenNest.IO
                 double? removalMinutes = TryNumber(rail, "removalMinutes", out var minutes)
                     ? minutes
                     : null;
+                double? clearance = TryNumber(rail, "clearance", out var gap) ? gap : null;
                 return new ClampRailDto
                 {
                     Width = width,
@@ -283,6 +284,7 @@ namespace OpenNest.IO
                     OriginEndCenters = others[1],
                     FarEndCenters = others[2],
                     RemovalMinutes = removalMinutes,
+                    Clearance = clearance,
                 };
             }
 
@@ -329,6 +331,8 @@ namespace OpenNest.IO
                 WriteCenters(writer, OtherEdgeKeys[2], value.FarEndCenters);
                 if (value.RemovalMinutes is double removalMinutes)
                     writer.WriteNumber("removalMinutes", removalMinutes);
+                if (value.Clearance is double clearance)
+                    writer.WriteNumber("clearance", clearance);
                 writer.WriteEndObject();
             }
 
@@ -416,6 +420,12 @@ namespace OpenNest.IO
             /// files and readers fall back to <see cref="OpenNest.ClampRail.DefaultRemovalMinutes"/>.
             /// </summary>
             public double? RemovalMinutes { get; init; }
+
+            /// <summary>
+            /// The gap parts keep from every clamp (<see cref="OpenNest.ClampRail.Clearance"/>).
+            /// Omitted when the rail uses the sheet's bottom edge spacing, as older files do.
+            /// </summary>
+            public double? Clearance { get; init; }
         }
 
         public record DrawingDto

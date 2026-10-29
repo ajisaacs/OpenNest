@@ -194,6 +194,14 @@ namespace OpenNest
         public ClampRail ClampRail { get; private set; }
 
         /// <summary>
+        /// The gap part material keeps from every clamp zone: the rail's own
+        /// <see cref="OpenNest.ClampRail.Clearance"/>, else the bottom edge spacing (D6), never
+        /// negative. Part spacing never applies to clamps.
+        /// </summary>
+        public double ClampClearance =>
+            System.Math.Max(0, ClampRail?.Clearance ?? EdgeSpacing.Bottom);
+
+        /// <summary>
         /// The machine support bed this sheet rests on (its nest's, see
         /// <see cref="Nest.SetSupportBed"/>), or null for none. Display, analysis and support
         /// tabs only: never material, spacing or a keep-out.

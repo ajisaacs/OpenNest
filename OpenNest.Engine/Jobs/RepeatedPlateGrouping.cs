@@ -39,6 +39,7 @@ internal static class RepeatedPlateGrouping
         && Bits(a.EdgeSpacing.Right) == Bits(b.EdgeSpacing.Right)
         && Bits(a.EdgeSpacing.Top) == Bits(b.EdgeSpacing.Top)
         && Bits(a.EdgeSpacing.Bottom) == Bits(b.EdgeSpacing.Bottom)
+        && Bits(a.ClampClearance) == Bits(b.ClampClearance)
         && a.Quantity == b.Quantity
         && Equals(a.Outline, b.Outline)
         && a.Cost.HasValue == b.Cost.HasValue

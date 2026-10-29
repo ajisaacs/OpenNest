@@ -65,6 +65,12 @@ public sealed class ClampSettings
     /// </summary>
     public double RemovalMinutes { get; set; } = ClampRail.DefaultRemovalMinutes;
 
+    /// <summary>
+    /// The gap parts keep from every clamp, in <see cref="Units"/>; null uses each sheet's
+    /// bottom edge spacing (<see cref="ClampRail.Clearance"/>).
+    /// </summary>
+    public double? Clearance { get; set; }
+
     /// <summary>Origin-side clamp centers along X, measured from the plate origin.</summary>
     public IReadOnlyList<double> Centers { get; set; } = Array.Empty<double>();
 
@@ -133,6 +139,7 @@ public sealed class ClampSettings
             Width = rail?.Width ?? ConvertDefault(DefaultWidth, units),
             Depth = rail?.Depth ?? ConvertDefault(DefaultDepth, units),
             RemovalMinutes = rail?.RemovalMinutes ?? ClampRail.DefaultRemovalMinutes,
+            Clearance = rail?.Clearance,
         };
         if (rail != null)
             settings.SetClamps(rail.Clamps);
@@ -150,11 +157,12 @@ public sealed class ClampSettings
             return null;
 
         var converted = ConvertedTo(units);
-        return new ClampRail(converted.Width, converted.Depth, converted.Clamps, converted.RemovalMinutes);
+        return new ClampRail(converted.Width, converted.Depth, converted.Clamps, converted.RemovalMinutes,
+            converted.Clearance);
     }
 
     /// <summary>
-    /// A copy with width, depth and centers expressed in <paramref name="units"/>
+    /// A copy with width, depth, clearance and centers expressed in <paramref name="units"/>
     /// (inches and millimeters convert at 25.4); <see cref="Enabled"/> and
     /// <see cref="RemovalMinutes"/> (a time, not a length) are kept unscaled.
     /// </summary>
@@ -168,6 +176,7 @@ public sealed class ClampSettings
             Width = Width * scale,
             Depth = Depth * scale,
             RemovalMinutes = RemovalMinutes,
+            Clearance = Clearance * scale,
             Centers = Centers.Select(c => c * scale).ToArray(),
             FarSideCenters = FarSideCenters.Select(c => c * scale).ToArray(),
             OriginEndCenters = OriginEndCenters.Select(c => c * scale).ToArray(),
@@ -290,6 +299,15 @@ public sealed class ClampSettings
                 ignored = true;
         }
 
+        // Missing or null keeps the bottom edge spacing; anything else must be a length.
+        if (values.TryGetValue("clearance", out var clearance) && clearance.ValueKind != JsonValueKind.Null)
+        {
+            if (TryLength(clearance, out var value) && value >= 0)
+                settings.Clearance = value;
+            else
+                ignored = true;
+        }
+
         if (values.TryGetValue("centers", out var centers))
             settings.Centers = ReadCenters(centers, ref ignored);
         if (values.TryGetValue("farSideCenters", out var farSide))
@@ -362,6 +380,8 @@ public sealed class ClampSettings
             ["removalMinutes"] = RemovalMinutes,
             ["centers"] = Centers,
         };
+        if (Clearance is double clearance)
+            dto["clearance"] = clearance;
         // Other edges are written only when used, so origin-side-only files stay unchanged.
         if (FarSideCenters.Count > 0)
             dto["farSideCenters"] = FarSideCenters;

@@ -150,6 +150,12 @@ the saved `clamps` load either way. A plate that follows a rail other than the n
 saves it in its own optional `clampRail` (same shape), so its removal state and
 time survive a reload; plates following the default rail omit it.
 
+The rail's optional `clearance` is the gap parts keep from every clamp footprint,
+separate from part spacing, so a clamp drawn as a support block under the sheet can
+use close to zero. It is omitted when the rail uses the sheet's bottom edge
+spacing, which is also what a missing, negative or non-finite value (and an older
+reader) uses.
+
 An empty plate (no parts, no cut-offs) is omitted from the file unless that
 would lose clamp zones: it is omitted like any other empty plate only when a
 new plate from the saved defaults would recreate it (same size, quadrant, edge

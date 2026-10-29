@@ -527,7 +527,8 @@ namespace OpenNest.IO
         /// <summary>
         /// The saved machine clamp rail, or null when absent, empty or malformed (a bad rail
         /// is ignored rather than failing the nest; each plate's saved zones still load). A
-        /// missing or invalid removal-minutes value falls back to <see cref="ClampRail.DefaultRemovalMinutes"/>.
+        /// missing or invalid removal-minutes value falls back to <see cref="ClampRail.DefaultRemovalMinutes"/>,
+        /// and a missing or invalid clearance to the sheet's bottom edge spacing.
         /// </summary>
         /// <summary>The saved support bed, or null when absent or invalid (a bad bed never fails the nest).</summary>
         /// <summary>
@@ -602,7 +603,8 @@ namespace OpenNest.IO
                 var minutes = dto.RemovalMinutes is double m && double.IsFinite(m) && m >= 0
                     ? m
                     : ClampRail.DefaultRemovalMinutes;
-                return new ClampRail(dto.Width, dto.Depth, clamps, minutes);
+                double? clearance = dto.Clearance is double c && double.IsFinite(c) && c >= 0 ? c : null;
+                return new ClampRail(dto.Width, dto.Depth, clamps, minutes, clearance);
             }
             catch (ArgumentException)
             {

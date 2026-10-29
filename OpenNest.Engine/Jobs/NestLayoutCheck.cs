@@ -241,8 +241,8 @@ public static class NestLayoutCheck
     }
 
     /// <summary>
-    /// C1/C5: no part material may enter a clamp zone inflated by the plate's bottom-edge
-    /// spacing (D6) - the same clearance the part owes the sheet edge, enforced with the
+    /// C1/C5: no part material may enter a clamp zone inflated by the plate's clamp
+    /// clearance (the rail's own, else the bottom-edge spacing, D6), enforced with the
     /// shared spacing slack so exact engine placements are not reddened by rounding.
     /// </summary>
     private static void ValidateClamps(
@@ -252,7 +252,7 @@ public static class NestLayoutCheck
         List<string> result
     )
     {
-        var inflateBy = InflationFor(plate.EdgeSpacing.Bottom);
+        var inflateBy = InflationFor(plate.ClampClearance);
 
         // Plate zones are stored in sheet coordinates; parts are in the placement frame.
         foreach (var zone in ClampZoneFrame.ToPlacement(plate))
@@ -394,6 +394,7 @@ public static class NestLayoutCheck
             && expected.EdgeSpacing.Right.IsEqualTo(actual.EdgeSpacing.Right)
             && expected.EdgeSpacing.Top.IsEqualTo(actual.EdgeSpacing.Top)
             && expected.EdgeSpacing.Bottom.IsEqualTo(actual.EdgeSpacing.Bottom)
+            && expected.ClampClearance.IsEqualTo(actual.ClampClearance)
             && expected.Quadrant == actual.Quadrant
             && Equals(expected.Outline, actual.Outline)
             && SameZones(expected.ClampZones, actual.ClampZones)

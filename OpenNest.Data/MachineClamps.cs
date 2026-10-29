@@ -19,6 +19,9 @@ public sealed class MachineClamps
     /// <summary>Minutes to remove one clamp and put it back after cutting; never scaled.</summary>
     public double RemovalMinutes { get; set; } = ClampRail.DefaultRemovalMinutes;
 
+    /// <summary>The gap parts keep from every clamp; null uses each sheet's bottom edge spacing.</summary>
+    public double? Clearance { get; set; }
+
     /// <summary>Origin-side clamp centers along X, measured from the plate origin.</summary>
     public List<double> Centers { get; set; } = new();
 
@@ -49,6 +52,7 @@ public sealed class MachineClamps
             Width = converted.Width,
             Depth = converted.Depth,
             RemovalMinutes = converted.RemovalMinutes,
+            Clearance = converted.Clearance,
             Centers = converted.Centers.ToList(),
             FarSideCenters = converted.FarSideCenters.ToList(),
             OriginEndCenters = converted.OriginEndCenters.ToList(),
@@ -58,7 +62,8 @@ public sealed class MachineClamps
 
     /// <summary>
     /// The rail as clamp settings in the machine's <paramref name="units"/>. An invalid size or
-    /// removal time falls back to the default, and an invalid center is dropped, as when
+    /// removal time falls back to the default, an invalid clearance to the bottom edge spacing,
+    /// and an invalid center is dropped, as when
     /// <see cref="ClampSettings.Parse"/> reads a file.
     /// </summary>
     public ClampSettings ToSettings(UnitSystem units)
@@ -70,6 +75,8 @@ public sealed class MachineClamps
             defaults.Depth = Depth;
         if (IsLength(RemovalMinutes) && RemovalMinutes >= 0)
             defaults.RemovalMinutes = RemovalMinutes;
+        if (Clearance is double clearance && IsLength(clearance) && clearance >= 0)
+            defaults.Clearance = clearance;
         defaults.Centers = Valid(Centers);
         defaults.FarSideCenters = Valid(FarSideCenters);
         defaults.OriginEndCenters = Valid(OriginEndCenters);

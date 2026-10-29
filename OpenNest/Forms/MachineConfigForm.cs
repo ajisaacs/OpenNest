@@ -297,6 +297,7 @@ namespace OpenNest.Forms
                 Width = shown.Width,
                 Depth = shown.Depth,
                 RemovalMinutes = shown.RemovalMinutes,
+                Clearance = shown.Clearance,
             };
 
             void Set(Action<MachineClamps> apply)
@@ -328,6 +329,7 @@ namespace OpenNest.Forms
                 CreateLabeledNumeric(shown.Depth, v => Set(c => c.Depth = v), 4, LengthUnitSuffix, 1000, 0.125m));
             AddField(layout, ref row, "Removal time:",
                 CreateLabeledNumeric(shown.RemovalMinutes, v => Set(c => c.RemovalMinutes = v), 2, _ => "min per clamp", 1000, 0.5m));
+            AddField(layout, ref row, "Clearance:", CreateClampClearance(shown.Clearance, Set));
 
             var centersGroup = new GroupBox
             {
@@ -1015,6 +1017,37 @@ namespace OpenNest.Forms
             };
             numeric.ValueChanged += (s, e) => setter((double)numeric.Value);
             return numeric;
+        }
+
+        // Unchecked keeps each sheet's bottom edge spacing (a null clearance), as before clamps
+        // had their own.
+        private Control CreateClampClearance(double? clearance, Action<Action<MachineClamps>> set)
+        {
+            var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.Left };
+            var ownBox = new CheckBox
+            {
+                Text = "Own clearance from parts",
+                AutoSize = true,
+                Checked = clearance.HasValue,
+                Margin = new Padding(0, 5, 6, 0),
+            };
+            var numeric = CreateNumericBox(clearance ?? 0, v => set(c => c.Clearance = ownBox.Checked ? v : null),
+                4, 1000, 0.0625m);
+            numeric.Enabled = ownBox.Checked;
+            ownBox.CheckedChanged += (s, e) =>
+            {
+                numeric.Enabled = ownBox.Checked;
+                set(c => c.Clearance = ownBox.Checked ? (double)numeric.Value : null);
+            };
+            row.Controls.Add(ownBox);
+            row.Controls.Add(numeric);
+            row.Controls.Add(new Label
+            {
+                AutoSize = true,
+                Margin = new Padding(6, 6, 0, 0),
+                Text = LengthUnitSuffix(null),
+            });
+            return row;
         }
 
         private Control CreateLabeledNumeric(

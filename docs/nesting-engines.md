@@ -185,8 +185,9 @@ obstacle, so a plug-in that ignores the outline is caught as any other invalid l
 ## Rectangular clamp zones
 
 Whole-job Rectangles and Irregular exclude each stock's rectangular clamp zones,
-expanded on all sides by its bottom edge spacing. Part spacing is not added to clamp
-clearance. Default runs and validates both lanes as usual. Empty clamp collections
+expanded on all sides by its clamp clearance (`NestPlateStock.ClampClearance`: the rail's
+own `Clearance`, else the bottom edge spacing). Part spacing is not added to clamp
+clearance; interactive fills, pushes and the layout check use the same clearance. Default runs and validates both lanes as usual. Empty clamp collections
 leave the existing packing path unchanged; clamps never become requested or placed parts.
 
 Every `Plate`, including plates the engine builds from stock, stores clamp zones relative
@@ -258,7 +259,7 @@ reporting progress, and Default discards it at almost no cost. Holes are not use
 rings come from the cutout pre-pass, which hands the engine each nested chain as its outer frame.
 
 Each disc goes, lower priority number first and then largest first, to the best feasible center
-tangent to two of: the work-area walls, placed discs, and clamp zones grown by the bottom-edge
+tangent to two of: the work-area walls, placed discs, and clamp zones grown by the clamp
 clearance (square-cornered, as the layout check grows them). Discs keep the part spacing plus
 twice `NestTolerances.ValidationOutline` between them. Bottom-left fills rows and left-bottom
 fills columns; each also runs seeded with a hexagonal lattice of the type with the most remaining

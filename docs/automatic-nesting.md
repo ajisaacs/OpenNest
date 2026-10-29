@@ -64,7 +64,16 @@ A nest can carry the machine's fixed clamp rail: identical rectangular clamps
 center measured from the plate origin along that edge. The edges are named from
 the origin: the origin side and far side run along X, the origin end and far
 end along Y. **Nest > Clamps...** edits the current nest's rail as a list, and
-**Plate > Edit Clamps** edits it on the plate view (below). **OK** applies it to every plate of the nest (**Cancel** discards
+**Plate > Edit Clamps** edits it on the plate view (below).
+
+Parts keep the rail's **clamp clearance** from every clamp, never the part spacing.
+Leave **Clearance from parts** unchecked to use each sheet's bottom edge spacing
+(the behavior before clamps had their own clearance); check it to set a gap of its
+own, such as close to zero for a support block drawn under the sheet, where the only
+need is that the laser does not cut or pierce over it. The same clearance governs
+Auto Nest's engines, interactive fill, pack and push, the layout check and automatic
+cut-off placement; Check Overlaps and pre-post verification still flag only parts
+or cuts actually on a clamp. **OK** applies it to every plate of the nest (**Cancel** discards
 the edits); removing every center removes the clamps. **Load Machine Defaults**
 only fills the dialog with the clamps of the nest's machine (**Nest > Machine**).
 **Save as Machine Defaults** writes the clamps, and whether new nests receive them,
@@ -75,14 +84,16 @@ refuses to open while nesting or a plate action is running.
 
 Clamps are physical fixtures of a machine, so each machine keeps its own rail on the
 **Clamps** tab of **Tools > Machine Configuration**: whether new nests get it, the
-clamp width and depth, the minutes to remove one clamp, and the clamp centers, all in
+clamp width and depth, the minutes to remove one clamp, the clamp clearance and the
+clamp centers, all in
 the machine's units. New and BOM import give a new nest the rail of the machine they
 assign it (the **Tools > Nest Defaults** machine, or the first by name), converted to
 the nest's units. A nest keeps its own copy: editing a machine's clamps, or assigning a
 nest another machine, never moves the clamps of an existing nest; use **Load Machine
 Defaults** for that. Clamps are off by default: a machine without clamps, or with them
 switched off or without a center, gives new nests none. A stored size or removal time
-that is not valid falls back to the default and an invalid center is dropped.
+that is not valid falls back to the default, an invalid clearance to the bottom edge
+spacing, and an invalid center is dropped.
 
 Before machines held clamps, one `%APPDATA%\OpenNest\clamps.json` (or the server's
 shared clamp settings) served every machine. At startup, while no machine has clamps of

@@ -519,4 +519,17 @@ public class ClampRailPersistenceTests
                 return false;
         }
     }
+
+    [Fact]
+    public void RailClearanceRoundTripsAndIsOmittedWhenUnset()
+    {
+        var nest = RailNest(withEmptyTail: false);
+        nest.SetClampRail(new ClampRail(1.5, 0.625, MachineCenters, clearance: 0.05));
+
+        var reopened = RoundTrip(nest);
+
+        Assert.Equal(0.05, reopened.PlateDefaults.ClampRail.Clearance);
+        Assert.Equal(0.05, Assert.Single(reopened.Plates).ClampClearance);
+        Assert.Null(RoundTrip(RailNest(withEmptyTail: false)).PlateDefaults.ClampRail.Clearance);
+    }
 }

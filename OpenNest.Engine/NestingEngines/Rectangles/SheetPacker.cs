@@ -93,7 +93,7 @@ internal static class SheetPacker
     /// Blocks every clamp keep-out into the sheet's free list before packing. In the
     /// inflated-box model an item at position p covers material [p, p + size] plus a trailing
     /// part-spacing tail; blocking bin-local [zone - clearance + s, zone + clearance] per axis
-    /// therefore means exactly: item material keeps at least the bottom-edge clearance from
+    /// therefore means exactly: item material keeps at least the clamp clearance from
     /// every clamp side, without paying any extra part-spacing tax there. When s exceeds the
     /// inflated span the interval inverts (decision D11): block a zero-extent line at the
     /// clamp edge facing the sheet interior — at (zone max + clearance) when the zone center
@@ -109,7 +109,7 @@ internal static class SheetPacker
         if (stock.ClampZones.Count == 0)
             return;
 
-        var clearance = System.Math.Max(0, stock.EdgeSpacing.Bottom);
+        var clearance = stock.ClampClearance;
         foreach (var zone in stock.ClampZones)
         {
             var b = zone.Bounds; // placement frame -> bin-local packing coordinates

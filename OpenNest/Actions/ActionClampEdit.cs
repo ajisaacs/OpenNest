@@ -455,7 +455,8 @@ namespace OpenNest.Actions
             {
                 rail = list.Count == 0
                     ? null
-                    : new ClampRail(ClampWidth, ClampDepth, list, Rail?.RemovalMinutes ?? Defaults.RemovalMinutes);
+                    : new ClampRail(ClampWidth, ClampDepth, list, Rail?.RemovalMinutes ?? Defaults.RemovalMinutes,
+                        Rail != null ? Rail.Clearance : Defaults.Clearance);
             }
             catch (ArgumentException ex)
             {

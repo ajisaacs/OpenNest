@@ -6,7 +6,7 @@ namespace OpenNest.Engine.NestingEngines.Irregular;
 
 /// <summary>
 /// Static, clearance-inflated rectangles prepared once per stock per solve. Kept out of
-/// the part catalog and its spacing cache: clamp clearance is bottom edge spacing, not
+/// the part catalog and its spacing cache: clamp clearance is the stock's clamp clearance, not
 /// part spacing, and two stocks at the same part spacing may have different clamps.
 /// </summary>
 internal sealed class ClampObstacles
@@ -17,7 +17,7 @@ internal sealed class ClampObstacles
     public ClampObstacles(NestPlateStock stock)
     {
         rectangles = new Orientation[stock.ClampZones.Count];
-        var clearance = System.Math.Max(0, stock.EdgeSpacing.Bottom);
+        var clearance = stock.ClampClearance;
         for (var i = 0; i < rectangles.Length; i++)
         {
             var box = stock.ClampZones[i].Bounds;

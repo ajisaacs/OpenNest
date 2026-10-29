@@ -323,6 +323,7 @@ namespace OpenNest.IO
                     OriginEndCenters = CentersOn(rail, ClampEdge.OriginEnd),
                     FarEndCenters = CentersOn(rail, ClampEdge.FarEnd),
                     RemovalMinutes = rail.RemovalMinutes,
+                    Clearance = rail.Clearance,
                 };
 
         private static List<double> CentersOn(ClampRail rail, ClampEdge edge) =>

@@ -19,6 +19,7 @@ public sealed class ClampRailEditor
         Width = initial.Width;
         Depth = initial.Depth;
         RemovalMinutes = initial.RemovalMinutes;
+        Clearance = initial.Clearance;
         _clamps.AddRange(initial.Clamps.Order());
     }
 
@@ -34,6 +35,9 @@ public sealed class ClampRailEditor
     /// <summary>Minutes to remove one clamp and put it back after cutting (D9); not a
     /// length, so it is never converted between units.</summary>
     public double RemovalMinutes { get; set; }
+
+    /// <summary>The gap parts keep from every clamp; null uses each sheet's bottom edge spacing.</summary>
+    public double? Clearance { get; set; }
 
     /// <summary>Whether saved machine defaults give new nests these clamps.</summary>
     public bool ApplyToNewNests { get; set; }
@@ -91,6 +95,7 @@ public sealed class ClampRailEditor
         Width = converted.Width;
         Depth = converted.Depth;
         RemovalMinutes = converted.RemovalMinutes;
+        Clearance = converted.Clearance;
         ApplyToNewNests = settings.Enabled;
         _clamps.Clear();
         _clamps.AddRange(converted.Clamps.Distinct().Order());
@@ -99,10 +104,10 @@ public sealed class ClampRailEditor
     /// <summary>
     /// The edited rail, or null when no clamp is listed. Throws
     /// <see cref="ArgumentOutOfRangeException"/> for a non-positive width or depth, or a
-    /// negative/non-finite removal time.
+    /// negative/non-finite removal time or clearance.
     /// </summary>
     public ClampRail? BuildRail() =>
-        _clamps.Count == 0 ? null : new ClampRail(Width, Depth, _clamps, RemovalMinutes);
+        _clamps.Count == 0 ? null : new ClampRail(Width, Depth, _clamps, RemovalMinutes, Clearance);
 
     /// <summary>The dialog's OK: makes the edited rail the nest's, re-resolving every plate.</summary>
     public void ApplyTo(Nest nest)
@@ -128,6 +133,11 @@ public sealed class ClampRailEditor
                 nameof(RemovalMinutes),
                 "Clamp removal time must be finite and zero or more."
             );
+        if (Clearance is double clearance && (!double.IsFinite(clearance) || clearance < 0))
+            throw new ArgumentOutOfRangeException(
+                nameof(Clearance),
+                "Clamp clearance must be finite and zero or more."
+            );
         var settings = new ClampSettings
         {
             Enabled = ApplyToNewNests && _clamps.Count > 0,
@@ -135,6 +145,7 @@ public sealed class ClampRailEditor
             Width = Width,
             Depth = Depth,
             RemovalMinutes = RemovalMinutes,
+            Clearance = Clearance,
         };
         settings.SetClamps(_clamps);
         return settings;

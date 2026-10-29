@@ -338,9 +338,9 @@ public class FillStackCharacterizationTests
     // --- interactive fill beside clamps ---
 
     [Theory]
-    [InlineData("Fill", 40, "9B3EFF9B72243576")]
-    [InlineData("Strip", 40, "9B3EFF9B72243576")]
-    [InlineData("Vertical Remnant", 40, "039C0D607166D805")]
+    [InlineData("Fill", 40, "9BF5FC7FC47364A9")]
+    [InlineData("Strip", 40, "9BF5FC7FC47364A9")]
+    [InlineData("Vertical Remnant", 40, "9BF5FC7FC47364A9")]
     [InlineData("Horizontal Remnant", 40, "C1E81564A620302A")]
     public void FillItem_WithClampZones_PinnedLayout(
         string strategy,

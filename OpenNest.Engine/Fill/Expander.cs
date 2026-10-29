@@ -603,7 +603,7 @@ namespace OpenNest.Engine.Fill
                 var movers = new List<Part>(selected);
                 var walls = plate.Parts.Where(p => !movers.Contains(p)).ToList();
                 var clampStart = movers.Count + walls.Count;
-                // Clamp walls include the bottom-edge clearance envelope.
+                // Clamp walls include the clamp clearance envelope.
                 var clampBoxes = Jobs.InteractiveClamps.ClearanceRectangles(plate);
                 walls.AddRange(Jobs.InteractiveClamps.WallParts(plate));
                 if (clampBoxes.Count != walls.Count + movers.Count - clampStart)

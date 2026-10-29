@@ -196,7 +196,7 @@ public static class AutomaticCutOffPlanner
             var y = ySign * horizontalDistance.Value;
             var limited = plate.CutOffs.Any(c => c?.Axis == CutOffAxis.Horizontal && Near(c.Position.Y, y));
             var clamp = clamps.FirstOrDefault(zone =>
-                y >= zone.Bounds.Bottom - plate.EdgeSpacing.Bottom && y <= zone.Bounds.Top + plate.EdgeSpacing.Bottom);
+                y >= zone.Bounds.Bottom - plate.ClampClearance && y <= zone.Bounds.Top + plate.ClampClearance);
             if (limited || clamp != null)
             {
                 diagnostics.Add(new AutomaticCutOffDiagnostic(
@@ -460,7 +460,7 @@ public static class AutomaticCutOffPlanner
             {
                 diagnostics.Add(new AutomaticCutOffDiagnostic(
                     AutomaticCutOffDiagnosticCode.ClampBlockedCut,
-                    $"The proposed cut crosses clamp '{blocked.Id}' (including bottom-edge clearance); it was skipped.",
+                    $"The proposed cut crosses clamp '{blocked.Id}' (including its clearance); it was skipped.",
                     X: x));
                 if (isSeparator)
                     WarnNoSeparator(x);
@@ -522,7 +522,7 @@ public static class AutomaticCutOffPlanner
         // Share the exact placement-frame predicate with candidate exclusion and final
         // certification. Infeasible gaps still use nominal lines through AddCandidate.
         bool CrossesClamp(ClampZone zone, double x) =>
-            x >= zone.Bounds.Left - plate.EdgeSpacing.Bottom && x <= zone.Bounds.Right + plate.EdgeSpacing.Bottom;
+            x >= zone.Bounds.Left - plate.ClampClearance && x <= zone.Bounds.Right + plate.ClampClearance;
 
         void WarnNoSeparator(double x) => diagnostics.Add(new AutomaticCutOffDiagnostic(
             AutomaticCutOffDiagnosticCode.NoSafeTailSeparator,
@@ -548,8 +548,8 @@ public static class AutomaticCutOffPlanner
         Require(plate.Outline == null, "Automatic cut-offs need a rectangular sheet; this plate has an outline.", nameof(plate));
         Require(Nonnegative(plate.PartSpacing), "Part spacing must be finite and nonnegative.", nameof(plate));
         Require(plate.ClampZones != null && (plate.ClampZones.Count == 0 ||
-            Nonnegative(plate.EdgeSpacing.Bottom)),
-            "Clamp zones and bottom-edge clearance must be finite and valid.", nameof(plate));
+            Nonnegative(plate.ClampClearance)),
+            "Clamp zones and clamp clearance must be finite and valid.", nameof(plate));
         Require(Nonnegative(settings.PartClearance) && Nonnegative(settings.MinSegmentLength) &&
             Nonnegative(settings.Overtravel), "Cut-off settings must be finite and nonnegative.", nameof(settings));
         Require(!settings.LockHeadHeight || double.IsFinite(settings.HeadLockOvercut) && settings.HeadLockOvercut > 0,

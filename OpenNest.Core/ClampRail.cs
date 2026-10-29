@@ -26,14 +26,16 @@ namespace OpenNest
             double width,
             double depth,
             IEnumerable<double> centers,
-            double removalMinutes = DefaultRemovalMinutes
+            double removalMinutes = DefaultRemovalMinutes,
+            double? clearance = null
         )
             : this(
                 width,
                 depth,
                 (centers ?? throw new ArgumentNullException(nameof(centers)))
                     .Select(c => new RailClamp(ClampEdge.OriginSide, c)),
-                removalMinutes
+                removalMinutes,
+                clearance
             )
         { }
 
@@ -41,7 +43,8 @@ namespace OpenNest
             double width,
             double depth,
             IEnumerable<RailClamp> clamps,
-            double removalMinutes = DefaultRemovalMinutes
+            double removalMinutes = DefaultRemovalMinutes,
+            double? clearance = null
         )
         {
             ArgumentNullException.ThrowIfNull(clamps);
@@ -60,6 +63,11 @@ namespace OpenNest
                     nameof(removalMinutes),
                     "Clamp removal time must be finite and zero or more."
                 );
+            if (clearance is double c && (!double.IsFinite(c) || c < 0))
+                throw new ArgumentOutOfRangeException(
+                    nameof(clearance),
+                    "Clamp clearance must be finite and zero or more."
+                );
 
             var sorted = new SortedSet<RailClamp>();
             foreach (var clamp in clamps)
@@ -77,6 +85,7 @@ namespace OpenNest
             Width = width;
             Depth = depth;
             RemovalMinutes = removalMinutes;
+            Clearance = clearance;
             Clamps = sorted.ToArray();
             Centers = Clamps.Where(c => c.Edge == ClampEdge.OriginSide).Select(c => c.Center).ToArray();
         }
@@ -94,6 +103,14 @@ namespace OpenNest
         public double RemovalMinutes { get; }
 
         /// <summary>
+        /// The gap parts keep from every clamp footprint, independent of part spacing; null
+        /// keeps the sheet's bottom edge spacing (D6), the clearance before clamps had their
+        /// own. A clamp drawn as a support block under the sheet can use close to zero, so the
+        /// laser only stays off it. See <see cref="Plate.ClampClearance"/>.
+        /// </summary>
+        public double? Clearance { get; }
+
+        /// <summary>
         /// Distinct clamps ordered by edge, then center. A clamp's position in this list
         /// gives its <c>clamp-N</c> id, so a rail with only origin-side clamps keeps the ids
         /// it had before clamps could sit on other edges.
@@ -103,9 +120,9 @@ namespace OpenNest
         /// <summary>Centers of the origin-side clamps, ascending; see <see cref="Clamps"/> for all.</summary>
         public IReadOnlyList<double> Centers { get; }
 
-        /// <summary>A copy with the same size and removal time and these clamps.</summary>
+        /// <summary>A copy with the same size, removal time and clearance and these clamps.</summary>
         public ClampRail WithClamps(IEnumerable<RailClamp> clamps) =>
-            new(Width, Depth, clamps, RemovalMinutes);
+            new(Width, Depth, clamps, RemovalMinutes, Clearance);
 
         /// <summary>The <c>clamp-N</c> id of the clamp at <paramref name="index"/> in <see cref="Clamps"/>.</summary>
         public static string IdOf(int index) => $"clamp-{index + 1}";
@@ -225,20 +242,22 @@ namespace OpenNest
             && Width.Equals(other.Width)
             && Depth.Equals(other.Depth)
             && RemovalMinutes.Equals(other.RemovalMinutes)
+            && Nullable.Equals(Clearance, other.Clearance)
             && Clamps.SequenceEqual(other.Clamps);
 
         public override bool Equals(object obj) => Equals(obj as ClampRail);
 
         public override int GetHashCode()
         {
-            var hash = HashCode.Combine(Width, Depth, RemovalMinutes, Clamps.Count);
+            var hash = HashCode.Combine(Width, Depth, RemovalMinutes, Clearance, Clamps.Count);
             foreach (var clamp in Clamps)
                 hash = HashCode.Combine(hash, clamp);
             return hash;
         }
 
         public override string ToString() =>
-            $"ClampRail {Width:R} x {Depth:R} at [{string.Join(", ", Clamps.Select(Describe))}]";
+            $"ClampRail {Width:R} x {Depth:R} at [{string.Join(", ", Clamps.Select(Describe))}]"
+            + (Clearance is double clearance ? $" clearance {clearance:R}" : "");
 
         private static string Describe(RailClamp clamp) =>
             clamp.Edge == ClampEdge.OriginSide

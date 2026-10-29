@@ -42,7 +42,7 @@ internal enum DiscSeed
 /// seeds the sheet before the greedy pass fills the rest.
 /// </summary>
 /// <remarks>Every disc keeps the part spacing plus <see cref="Margin"/> from every other disc, and
-/// its radius from the work-area edges and from every clamp zone grown by the bottom-edge
+/// its radius from the work-area edges and from every clamp zone grown by the stock's clamp
 /// clearance. Radii are <see cref="Item.Radius"/>, which covers the layout check's outward flattening,
 /// so packing is never more lenient than the check. Deterministic.</remarks>
 internal static class DiscPacker
@@ -145,9 +145,9 @@ internal static class DiscPacker
         {
             this.stock = stock;
             work = stock.WorkArea;
-            // The layout check grows each zone by the bottom-edge clearance as a box, square
+            // The layout check grows each zone by the clamp clearance as a box, square
             // corners included, so discs keep their radius from that grown box.
-            var clearance = System.Math.Max(0, stock.EdgeSpacing.Bottom);
+            var clearance = stock.ClampClearance;
             clamps = stock.ClampZones.Select(z => z.Bounds.Offset(clearance)).ToArray();
             Gap = stock.PartSpacing + Margin;
             // Any disc within reach of a new one lies in the adjacent cells.

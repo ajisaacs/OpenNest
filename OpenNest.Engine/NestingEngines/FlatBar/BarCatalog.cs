@@ -157,7 +157,7 @@ internal sealed class BarStock
     /// Free runs of the bar's length. A clamp zone whose clearance-expanded cross extent
     /// reaches the bar's row blocks its clearance-expanded axis interval for the whole row:
     /// parts in a bar span its width, so none can pass beside a clamp. Clearance is the
-    /// stock's bottom edge spacing, as in the other engines; part spacing is not added.
+    /// stock's clamp clearance, as in the other engines; part spacing is not added.
     /// </summary>
     private static IReadOnlyList<BarSegment> FreeRuns(NestPlateStock stock, Box work, bool alongX)
     {
@@ -165,7 +165,7 @@ internal sealed class BarStock
         var end = alongX ? work.Right : work.Top;
         var crossLow = alongX ? work.Bottom : work.Left;
         var crossHigh = alongX ? work.Top : work.Right;
-        var clearance = System.Math.Max(0, stock.EdgeSpacing.Bottom);
+        var clearance = stock.ClampClearance;
         var blocked = new List<(double Low, double High)>();
         foreach (var zone in stock.ClampZones)
         {

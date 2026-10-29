@@ -34,20 +34,20 @@ internal static class InteractiveClamps
     }
 
     /// <summary>
-    /// Placement keep-outs inflated by the full bottom-edge clearance (D6) - the same
+    /// Placement keep-outs inflated by the full <see cref="Plate.ClampClearance"/> - the same
     /// convention the Rectangles lane blocks and engines honour, so fill and pack produce
     /// placements with at least that clearance from the raw zone.
     /// </summary>
     public static IReadOnlyList<Box> ClearanceRectangles(Plate plate) =>
-        InflateZones(plate, System.Math.Max(0, plate.EdgeSpacing.Bottom));
+        InflateZones(plate, plate.ClampClearance);
 
     /// <summary>
-    /// The validator's exact C1 rectangle (NestLayoutCheck: bottom spacing less the shared
+    /// The validator's exact C1 rectangle (NestLayoutCheck: clamp clearance less the shared
     /// spacing slack). Used by the service safety net so flush engine-clear placements are
     /// never filtered by rounding.
     /// </summary>
     public static IReadOnlyList<Box> ValidationKeepOuts(Plate plate) =>
-        InflateZones(plate, System.Math.Max(0, plate.EdgeSpacing.Bottom - NestTolerances.SpacingSlack));
+        InflateZones(plate, System.Math.Max(0, plate.ClampClearance - NestTolerances.SpacingSlack));
 
     private static IReadOnlyList<Box> InflateZones(Plate plate, double clearance)
     {
@@ -61,19 +61,18 @@ internal static class InteractiveClamps
     }
 
     /// <summary>
-    /// Static obstacle parts for the directional push kernels. The kernel enforces
-    /// part-spacing between every obstacle pair, so the rectangles carry only the
-    /// clearance the kernel would otherwise miss: max(0, bottom spacing - part spacing).
-    /// Final material clearance from a raw zone is then at least max(bottom, partSpacing),
-    /// never below the C1 keep-out.
+    /// Static obstacle parts for the directional push kernels: each zone grown square by
+    /// <see cref="Plate.ClampClearance"/>, the layout check's keep-out, which the kernels then
+    /// hold at zero spacing (never the part spacing). A round spacing offset would let a part
+    /// tuck into the keep-out's corners.
     /// </summary>
     public static List<Part> ObstacleParts(Plate plate) =>
-        ObstaclePartsFor(ZoneRectangles(plate), System.Math.Max(0, plate.EdgeSpacing.Bottom - plate.PartSpacing));
+        ObstaclePartsFor(ZoneRectangles(plate), plate.ClampClearance);
 
-    /// <summary>Expander walls use the bottom-edge clearance as a fixed floor,
+    /// <summary>Expander walls use the clamp clearance as a fixed floor,
     /// independent of the separation target or its final achieved spacing.</summary>
     public static List<Part> WallParts(Plate plate) =>
-        ObstaclePartsFor(ZoneRectangles(plate), System.Math.Max(0, plate.EdgeSpacing.Bottom));
+        ObstaclePartsFor(ZoneRectangles(plate), plate.ClampClearance);
 
     private static List<Part> ObstaclePartsFor(IReadOnlyList<Box> rectangles, double inflate)
     {

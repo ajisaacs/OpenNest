@@ -405,4 +405,30 @@ public class ClampSettingsTests : IDisposable
             return false;
         }
     }
+
+    [Fact]
+    public void ClearanceRoundTripsConvertsAndReachesTheRail()
+    {
+        var settings = Machine();
+        settings.Clearance = 0.05;
+
+        var read = ClampSettings.Parse(settings.ToJson(), out var status);
+
+        Assert.Equal(ClampSettingsStatus.Ok, status);
+        Assert.Equal(0.05, read.Clearance);
+        Assert.Equal(0.05 * 25.4, read.ConvertedTo(Units.Millimeters).Clearance!.Value, 9);
+        Assert.Equal(0.05, read.RailFor(Units.Inches)!.Clearance);
+        Assert.Equal(0.05, ClampSettings.FromRail(read.RailFor(Units.Inches), Units.Inches, true).Clearance);
+    }
+
+    [Fact]
+    public void MissingClearanceKeepsTheBottomEdgeSpacingAndABadOneIsIgnored()
+    {
+        Assert.DoesNotContain("clearance", Machine().ToJson());
+        Assert.Null(ClampSettings.Parse(Machine().ToJson(), out _).RailFor(Units.Inches)!.Clearance);
+
+        var read = ClampSettings.Parse("{\"enabled\": true, \"centers\": [6], \"clearance\": -1}", out var status);
+        Assert.Equal(ClampSettingsStatus.Partial, status);
+        Assert.Null(read.Clearance);
+    }
 }
