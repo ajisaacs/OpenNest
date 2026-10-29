@@ -326,11 +326,13 @@ namespace OpenNest
         public void RegenerateCutOffs(CutOffSettings settings)
         {
             var saved = new Dictionary<CutOff, List<(int Index, double Start, double End)>>();
+            var places = new List<int>();
             for (var i = Parts.Count - 1; i >= 0; i--)
             {
                 if (!Parts[i].BaseDrawing.IsCutOff)
                     continue;
 
+                places.Add(i);
                 var cutoff = CutOffs.FirstOrDefault(c => ReferenceEquals(c.Drawing, Parts[i].BaseDrawing));
                 if (cutoff != null)
                 {
@@ -366,7 +368,7 @@ namespace OpenNest
                     indices[k] = previous = best >= 0 ? best : previous;
                 }
                 return indices;
-            });
+            }, _ => places);
         }
 
         /// <summary>
@@ -376,38 +378,78 @@ namespace OpenNest
         /// from it are added at the end. Callers must remove existing cut-off parts first.
         /// </summary>
         public void RegenerateCutOffs(CutOffSettings settings, IReadOnlyDictionary<CutOff, int> sequence) =>
-            RegenerateCutOffs(settings, (cutoff, extents) =>
-                sequence != null && sequence.TryGetValue(cutoff, out var index)
-                    ? Enumerable.Range(index, extents.Count).ToArray() : null);
+            RegenerateCutOffs(settings, null, sequence);
 
         /// <summary>
         /// As <see cref="RegenerateCutOffs(CutOffSettings, IReadOnlyDictionary{CutOff, int})"/>,
         /// but each cut-off lists one index per segment in ascending order along its axis. A list
         /// whose length differs from the regenerated segment count places the segments
-        /// consecutively from its smallest index.
+        /// consecutively at its smallest index.
         /// </summary>
         public void RegenerateCutOffs(CutOffSettings settings, IReadOnlyDictionary<CutOff, IReadOnlyList<int>> sequence) =>
+            RegenerateCutOffs(settings, sequence, null);
+
+        /// <summary>
+        /// Places each cut-off's regenerated segments where its saved segments were, among the
+        /// parts saved around them: <paramref name="places"/> lists every saved segment's place;
+        /// <paramref name="firstPlaces"/> gives only the first, for files that recorded no more
+        /// (their segments were consecutive, but how many is unknown). Settings other than the
+        /// saved ones can regenerate a different number of segments; the parts keep their
+        /// places relative to the cut-offs either way. Where only a first place is known the
+        /// count is a guess, so a cut-off that splits the sheet goes last, as sequencing puts it.
+        /// </summary>
+        public void RegenerateCutOffs(CutOffSettings settings, IReadOnlyDictionary<CutOff, IReadOnlyList<int>> places,
+            IReadOnlyDictionary<CutOff, int> firstPlaces) =>
             RegenerateCutOffs(settings, (cutoff, extents) =>
             {
-                if (sequence == null || !sequence.TryGetValue(cutoff, out var indices) || indices == null || indices.Count == 0)
-                    return null;
-                if (indices.Count != extents.Count)
-                    return Enumerable.Range(indices.Min(), extents.Count).ToArray();
-                // Program order can run toward the origin; the file lists segments ascending.
-                var ascending = Enumerable.Range(0, extents.Count).OrderBy(k => extents[k].Start).ToArray();
-                var result = new int[extents.Count];
-                for (var rank = 0; rank < ascending.Length; rank++)
-                    result[ascending[rank]] = indices[rank];
-                return result;
-            });
+                if (places != null && places.TryGetValue(cutoff, out var indices) && indices is { Count: > 0 })
+                {
+                    if (indices.Count != extents.Count)
+                        return Enumerable.Repeat(indices.Min(), extents.Count).ToArray();
+                    // Program order can run toward the origin; the file lists segments ascending.
+                    var ascending = Enumerable.Range(0, extents.Count).OrderBy(k => extents[k].Start).ToArray();
+                    var result = new int[extents.Count];
+                    for (var rank = 0; rank < ascending.Length; rank++)
+                        result[ascending[rank]] = indices[rank];
+                    return result;
+                }
+                return firstPlaces != null && firstPlaces.TryGetValue(cutoff, out var first)
+                    ? Enumerable.Repeat(first, extents.Count).ToArray() : null;
+            }, counts =>
+            {
+                var saved = new HashSet<int>();
+                foreach (var list in places?.Values ?? [])
+                    saved.UnionWith(list ?? []);
+                if (firstPlaces == null)
+                    return saved;
+                // A cut-off saved by its first place alone held consecutive places, as many as it
+                // has segments now unless that runs into the next cut-off's first place.
+                var starts = saved.Concat(firstPlaces.Values).Distinct().Order().ToArray();
+                foreach (var (cutoff, first) in firstPlaces)
+                {
+                    var next = starts.FirstOrDefault(start => start > first, int.MaxValue);
+                    var count = System.Math.Max(1, System.Math.Min(counts.GetValueOrDefault(cutoff, 1), next - first));
+                    saved.UnionWith(Enumerable.Range(first, count));
+                }
+                return saved;
+            }, cutoff => firstPlaces != null && firstPlaces.ContainsKey(cutoff));
 
-        // sequence gives a cut-off's segment indices in program order from its segments' extents
-        // along its axis (NaN when unmeasurable), or null to append them.
+        // sequence gives a cut-off's saved place for each segment in program order, from its
+        // segments' extents along its axis (NaN when unmeasurable), or null to append them.
+        // savedPlaces gives every place cut-off segments held in the saved order, from each
+        // cut-off's regenerated segment count; the parts held the others, in their order.
+        // separateLast says which cut-offs go after everything when they split the sheet.
         private void RegenerateCutOffs(CutOffSettings settings,
-            Func<CutOff, IReadOnlyList<(double Start, double End)>, IReadOnlyList<int>> sequence)
+            Func<CutOff, IReadOnlyList<(double Start, double End)>, IReadOnlyList<int>> sequence,
+            Func<IReadOnlyDictionary<CutOff, int>, IEnumerable<int>> savedPlaces,
+            Func<CutOff, bool> separateLast = null)
         {
             var cache = BuildPerimeterCache(this);
+            var sheet = BoundingBox(includeParts: false);
             var placed = new List<(int Index, int Order, Part Part)>();
+            var separating = new List<Part>();
+            var counts = new Dictionary<CutOff, int>();
+            var partCount = Parts.Count;
 
             // Regenerate and materialize each cut-off's segments
             foreach (var cutoff in CutOffs)
@@ -422,20 +464,34 @@ namespace OpenNest
                 var parts = programs.Select(program => new Part(cutoff.Drawing, program)).ToArray();
                 var extents = parts.Select(part => CutOffSegments.Extent(part, vertical) ?? (double.NaN, double.NaN)).ToArray();
                 var indices = sequence?.Invoke(cutoff, extents);
+                counts[cutoff] = parts.Length;
                 for (var k = 0; k < parts.Length; k++)
                 {
-                    if (indices != null && k < indices.Count)
+                    // A line splitting the sheet comes after every part and every other cut-off.
+                    if (separateLast?.Invoke(cutoff) == true && CutOff.SeparatesSheet(parts[k], cutoff, sheet))
+                        separating.Add(parts[k]);
+                    else if (indices != null && k < indices.Count)
                         placed.Add((indices[k], placed.Count, parts[k]));
                     else
                         Parts.Add(parts[k]);
                 }
             }
 
-            // Lowest index first: each insert then lands on its saved index, because every part
-            // sequenced before it is already in place. Segments sharing an index keep their
-            // program order (a later insert at the same index lands before an earlier one).
-            foreach (var (index, _, part) in placed.OrderBy(p => p.Index).ThenByDescending(p => p.Order))
-                Parts.Insert(System.Math.Clamp(index, 0, Parts.Count), part);
+            // Saved places count every cut-off segment then on the plate, which may now be more or
+            // fewer. A segment goes after the parts saved before it and the segments placed before
+            // it, so a changed count never shifts a later cut-off or part. Segments sharing a place
+            // keep their program order.
+            var saved = (savedPlaces?.Invoke(counts) ?? []).Distinct().Order().ToArray();
+            var inserted = 0;
+            foreach (var (index, _, part) in placed.OrderBy(p => p.Index).ThenBy(p => p.Order))
+            {
+                var savedBefore = Array.BinarySearch(saved, index);
+                savedBefore = savedBefore < 0 ? ~savedBefore : savedBefore;
+                var partsBefore = System.Math.Clamp(index - savedBefore, 0, partCount);
+                Parts.Insert(partsBefore + inserted++, part);
+            }
+            foreach (var part in separating)
+                Parts.Add(part);
         }
 
         /// <summary>

@@ -82,12 +82,14 @@ parts the definition materializes. Loading regenerates each definition with the
 reader's default cut-off settings and makes one part per trimmed segment. `sequence`
 is the zero-based place of the first segment (by position along the line); null or
 absent in older files, which load the cut-off at the end. `segments` lists the place
-of every segment in ascending order along the line and is written only when the
-segments are not consecutive, as after Plan Cutting cuts a strip line in pieces where
-the route passes them. Readers without `segments` place the segments consecutively
-from `sequence`, which is still a dependency-safe order. A `segments` list whose length
-differs from the regenerated segment count (nondefault cut-off settings, a moved part)
-places the segments consecutively from its smallest entry. `headLockOvercut`
+of every segment in ascending order along the line; it is always written (files from
+before it was, which wrote it only when the segments were not consecutive, carry
+`sequence` alone). Its length is how many places the saved segments held: a list whose
+length differs from the regenerated segment count (nondefault cut-off settings, a moved
+part) places the segments together at its smallest entry, and every other part and
+cut-off keeps its place relative to them. With `sequence` alone the count is unknown:
+the reader takes the regenerated count, short of the next cut-off's first place, and
+loads a sheet-separating cut-off last. `headLockOvercut`
 (model units) and `farEdgeFirst` record a head-locked overcut past the far sheet
 edge and whether its segment starts at that edge (see
 [automatic cutoffs](automatic-scrap-cutoffs.md#head-locked-overcut-at-the-far-edge));

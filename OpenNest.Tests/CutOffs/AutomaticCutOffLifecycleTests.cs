@@ -327,9 +327,11 @@ public class AutomaticCutOffLifecycleTests
             Assert.Equal(realParts[i].Location.Y, savedParts[i].GetProperty("y").GetDouble());
         }
         var cuts = savedPlate.GetProperty("cutOffs").EnumerateArray().ToArray();
-        // The line through the second part has two consecutive segments at 4 and 5.
+        // The line through the second part has two consecutive segments at 4 and 5. Every place
+        // is written, so a reload that regenerates a different count knows how many there were.
         Assert.Equal(new[] { 1, 3, 4, 6 }, cuts.Select(c => c.GetProperty("sequence").GetInt32()));
-        Assert.All(cuts, c => Assert.False(c.TryGetProperty("segments", out _)));
+        Assert.Equal(new[] { "1", "3", "4,5", "6" }, cuts.Select(c =>
+            string.Join(",", c.GetProperty("segments").EnumerateArray().Select(e => e.GetInt32()))));
     }
 
     private static (Vector From, Vector To)[] Segments(Part part)

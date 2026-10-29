@@ -396,12 +396,12 @@ namespace OpenNest.IO
                 foreach (var cutoff in plate.CutOffs)
                 {
                     // Each trimmed segment is its own part with its own place in the sequence.
+                    // Every place is written, so a reader regenerating a different number of
+                    // segments still knows how many places the saved ones held.
                     var segments = CutOffSegments.Of(plate, cutoff)
                         .Select(segment => plate.Parts.IndexOf(segment.Part))
                         .Where(index => index >= 0)
                         .ToArray();
-                    var consecutive = segments.Length == 0
-                        || segments.SequenceEqual(Enumerable.Range(segments.Min(), segments.Length));
 
                     cutoffs.Add(
                         new CutOffDto
@@ -412,7 +412,7 @@ namespace OpenNest.IO
                             StartLimit = cutoff.StartLimit,
                             EndLimit = cutoff.EndLimit,
                             Sequence = segments.Length > 0 ? segments.Min() : null,
-                            Segments = consecutive ? null : segments,
+                            Segments = segments.Length > 0 ? segments : null,
                             HeadLockOvercut = cutoff.HeadLockOvercut,
                             FarEdgeFirst = cutoff.FarEdgeFirst,
                         }

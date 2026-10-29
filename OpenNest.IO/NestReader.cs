@@ -747,7 +747,8 @@ namespace OpenNest.IO
                 // Cut-offs
                 if (p.CutOffs != null)
                 {
-                    var sequence = new Dictionary<CutOff, IReadOnlyList<int>>();
+                    var places = new Dictionary<CutOff, IReadOnlyList<int>>();
+                    var firstPlaces = new Dictionary<CutOff, int>();
 
                     foreach (var cutoffDto in p.CutOffs)
                     {
@@ -767,12 +768,12 @@ namespace OpenNest.IO
                         plate.CutOffs.Add(cutoff);
 
                         if (cutoffDto.Segments is { Length: > 0 } segments)
-                            sequence[cutoff] = segments;
+                            places[cutoff] = segments;
                         else if (cutoffDto.Sequence is int index)
-                            sequence[cutoff] = [index];
+                            firstPlaces[cutoff] = index;
                     }
 
-                    plate.RegenerateCutOffs(new CutOffSettings(), sequence);
+                    plate.RegenerateCutOffs(new CutOffSettings(), places, firstPlaces);
                 }
 
                 nest.Plates.Add(plate);

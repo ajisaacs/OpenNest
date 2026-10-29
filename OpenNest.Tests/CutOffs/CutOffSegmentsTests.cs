@@ -129,6 +129,57 @@ public class CutOffSegmentsTests
     }
 
     [Fact]
+    public void RegenerateCutOffs_MoreSegmentsThanSaved_KeepTheLaterPartsAndCutOffsInPlace()
+    {
+        // Saved with settings that left one segment of the line (place 1) before the upper part
+        // (place 2) and a second cut-off (place 3); the reader's settings regenerate three.
+        var lower = TestHelpers.MakePartAt(10, 10, 10);
+        var upper = TestHelpers.MakePartAt(10, 30, 10);
+        var plate = TestHelpers.MakePlate(60, 120, lower, upper);
+        var line = new CutOff(new Vector(15, 0), CutOffAxis.Vertical);
+        var clear = new CutOff(new Vector(40, 0), CutOffAxis.Vertical) { EndLimit = 50 };
+        plate.CutOffs.Add(line);
+        plate.CutOffs.Add(clear);
+
+        plate.RegenerateCutOffs(new CutOffSettings(), new Dictionary<CutOff, IReadOnlyList<int>>
+        {
+            [line] = [1],
+            [clear] = [3],
+        });
+
+        var segments = CutOffSegments.Of(plate, line).Select(s => s.Part).ToArray();
+        Assert.Equal(3, segments.Length);
+        var other = Assert.Single(CutOffSegments.Of(plate, clear)).Part;
+        Assert.Equal(new[] { lower, segments[0], segments[1], segments[2], upper, other }, plate.Parts);
+    }
+
+    [Fact]
+    public void RegenerateCutOffs_FirstPlacesOnly_KeepTheSheetSeparatorLast()
+    {
+        // An older file recorded first places only. The line held one place when saved, before
+        // the upper part and the separator; three segments now would put the separator's place
+        // before the upper part, so a line splitting the sheet goes last instead.
+        var lower = TestHelpers.MakePartAt(10, 10, 10);
+        var upper = TestHelpers.MakePartAt(10, 30, 10);
+        var plate = TestHelpers.MakePlate(60, 120, lower, upper);
+        var line = new CutOff(new Vector(15, 0), CutOffAxis.Vertical) { EndLimit = 50 };
+        var separator = new CutOff(new Vector(0, 50), CutOffAxis.Horizontal);
+        plate.CutOffs.Add(line);
+        plate.CutOffs.Add(separator);
+
+        plate.RegenerateCutOffs(new CutOffSettings(), null, new Dictionary<CutOff, int>
+        {
+            [line] = 1,
+            [separator] = 3,
+        });
+
+        var segments = CutOffSegments.Of(plate, line).Select(s => s.Part).ToArray();
+        Assert.Equal(3, segments.Length);
+        var last = Assert.Single(CutOffSegments.Of(plate, separator)).Part;
+        Assert.Equal(new[] { lower, segments[0], segments[1], segments[2], upper, last }, plate.Parts);
+    }
+
+    [Fact]
     public void RegenerateCutOffs_IndexOverload_PlacesSegmentsConsecutively()
     {
         var lower = TestHelpers.MakePartAt(10, 10, 10);
