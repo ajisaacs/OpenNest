@@ -3,12 +3,12 @@ using OpenNest.CNC.CuttingStrategy;
 namespace OpenNest.Data;
 
 /// <summary>
-/// The lead-in, lead-out, kerf and cut-off a machine configuration has on file for a nest's
-/// material and thickness, converted to the nest's units. A machine has one lead-in and one
-/// lead-out per thickness, so they apply to external, internal and arc/circle contours alike;
-/// a Clean Hole lead-in is for holes only and leaves the external lead-in as it was, and a
-/// Line + Line lead-in, whose second segment the configuration does not hold, leaves every
-/// lead-in as it was.
+/// The lead-ins, lead-outs, kerf and cut-off a machine configuration has on file for a nest's
+/// material and thickness, converted to the nest's units. Outside cuts take the thickness's
+/// lead-in and lead-out; inside cuts (circles included) take its inside ones, or the outside
+/// ones when it has none. A Clean Hole lead-in is for holes only, so on outside cuts it leaves
+/// the external lead-in as it was, and a Line + Line lead-in, whose second segment the
+/// configuration does not hold, leaves the lead-in it would set as it was.
 /// </summary>
 public static class MachineCuttingDefaults
 {
@@ -55,22 +55,38 @@ public static class MachineCuttingDefaults
             return false;
 
         var scale = Scale(machine!.Units, nest.Units);
-        var kerf = settings.Kerf * scale;
-        // Each lead set gets its own instance, as the cutting panel builds them.
-        if (ToLeadIn(settings.LeadIn, scale, kerf) is { } leadIn)
-        {
-            if (leadIn is not CleanHoleLeadIn)
-                parameters.ExternalLeadIn = leadIn;
-            parameters.InternalLeadIn = ToLeadIn(settings.LeadIn, scale, kerf);
-        }
-        parameters.ExternalLeadOut = ToLeadOut(settings.LeadOut, scale);
-        parameters.InternalLeadOut = ToLeadOut(settings.LeadOut, scale);
-        parameters.Kerf = kerf;
+        ApplyLeads(parameters, settings, scale);
+        parameters.Kerf = settings.Kerf * scale;
         parameters.MachineName = machine.Name;
         parameters.MaterialName = nest.Material.Name;
         parameters.Grade = nest.Material.Grade;
         parameters.Thickness = nest.Thickness;
         return true;
+    }
+
+    /// <summary>
+    /// The leads <paramref name="settings"/> give, in the machine's units, for previewing them:
+    /// a lead the machine leaves as it was (Line + Line, or Clean Hole on outside cuts) is none.
+    /// </summary>
+    public static CuttingParameters LeadsOf(ThicknessConfig settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        var parameters = new CuttingParameters { ExternalLeadIn = new NoLeadIn(), InternalLeadIn = new NoLeadIn() };
+        ApplyLeads(parameters, settings, 1);
+        parameters.Kerf = settings.Kerf;
+        return parameters;
+    }
+
+    private static void ApplyLeads(CuttingParameters parameters, ThicknessConfig settings, double scale)
+    {
+        var kerf = settings.Kerf * scale;
+        // Each lead set gets its own instance, as the cutting panel builds them.
+        if (ToLeadIn(settings.LeadIn, scale, kerf) is { } leadIn and not CleanHoleLeadIn)
+            parameters.ExternalLeadIn = leadIn;
+        if (ToLeadIn(settings.InsideLeadIn ?? settings.LeadIn, scale, kerf) is { } insideLeadIn)
+            parameters.InternalLeadIn = insideLeadIn;
+        parameters.ExternalLeadOut = ToLeadOut(settings.LeadOut, scale);
+        parameters.InternalLeadOut = ToLeadOut(settings.InsideLeadOut ?? settings.LeadOut, scale);
     }
 
     /// <summary>
@@ -111,6 +127,71 @@ public static class MachineCuttingDefaults
             settings.CutDirection = direction;
         return true;
     }
+
+    /// <summary>
+    /// The lead-in <paramref name="lead"/> describes, in the machine's units, with
+    /// <paramref name="kerf"/> for a clean hole; null for a type it cannot build (Line + Line).
+    /// </summary>
+    public static LeadIn? LeadInOf(LeadConfig lead, double kerf) => ToLeadIn(lead, 1, kerf);
+
+    /// <summary>The lead-out <paramref name="lead"/> describes, in the machine's units.</summary>
+    public static LeadOut LeadOutOf(LeadConfig lead) => ToLeadOut(lead, 1);
+
+    /// <summary>
+    /// The machine configuration's form of <paramref name="leadIn"/>; what it cannot hold (an
+    /// arc's sweep, a clean hole's kerf, a second line) is left out. Unset fields keep
+    /// <paramref name="previous"/>'s values.
+    /// </summary>
+    public static LeadConfig ToConfig(LeadIn leadIn, LeadConfig? previous = null)
+    {
+        var config = Copy(previous);
+        switch (leadIn)
+        {
+            case LineLeadIn line:
+                (config.Type, config.Length, config.Angle) = ("Line", line.Length, line.ApproachAngle);
+                break;
+            case ArcLeadIn arc:
+                (config.Type, config.Radius) = ("Arc", arc.Radius);
+                break;
+            case LineArcLeadIn lineArc:
+                (config.Type, config.Length, config.Radius, config.Angle) =
+                    ("Line + Arc", lineArc.LineLength, lineArc.ArcRadius, lineArc.ApproachAngle);
+                break;
+            case CleanHoleLeadIn cleanHole:
+                (config.Type, config.Length, config.Radius) = ("Clean Hole", cleanHole.LineLength, cleanHole.ArcRadius);
+                break;
+            case LineLineLeadIn lineLine:
+                (config.Type, config.Length, config.Angle) = ("Line + Line", lineLine.Length1, lineLine.ApproachAngle1);
+                break;
+            default:
+                config.Type = "None";
+                break;
+        }
+        return config;
+    }
+
+    /// <summary>The machine configuration's form of <paramref name="leadOut"/>.</summary>
+    public static LeadConfig ToConfig(LeadOut leadOut, LeadConfig? previous = null)
+    {
+        var config = Copy(previous);
+        switch (leadOut)
+        {
+            case LineLeadOut line:
+                (config.Type, config.Length, config.Angle) = ("Line", line.Length, line.ApproachAngle);
+                break;
+            case ArcLeadOut arc:
+                (config.Type, config.Radius) = ("Arc", arc.Radius);
+                break;
+            default:
+                config.Type = "None";
+                break;
+        }
+        return config;
+    }
+
+    private static LeadConfig Copy(LeadConfig? lead) => lead == null
+        ? new LeadConfig()
+        : new LeadConfig { Type = lead.Type, Length = lead.Length, Angle = lead.Angle, Radius = lead.Radius };
 
     // Lead types are the names Tools > Machine Configuration offers; null when one cannot be built.
     private static LeadIn? ToLeadIn(LeadConfig? lead, double scale, double kerf) => lead?.Type switch

@@ -8,24 +8,10 @@ namespace OpenNest.Controls
 {
     public class CuttingPanel : Panel
     {
-        private static readonly string[] LeadInTypes =
-        {
-            "None",
-            "Line",
-            "Arc",
-            "Line + Arc",
-            "Clean Hole",
-            "Line + Line",
-        };
-
-        private static readonly string[] LeadOutTypes = { "None", "Line", "Arc" };
-
         // Every field label shares this column so inputs line up across sections.
         private const int LabelWidth = 150;
         private const int FieldIndent = 16;
         private const int InputWidth = 100;
-        // The lead preview's least height, below the type with the most fields.
-        private const int PreviewHeight = 110;
 
         private static readonly Color HintColor = SystemColors.GrayText;
 
@@ -33,18 +19,8 @@ namespace OpenNest.Controls
         private readonly ToolTip toolTip = new ToolTip { AutoPopDelay = 15000 };
 
         private readonly TabControl tabControl;
-        private readonly ComboBox cboExternalLeadIn,
-            cboExternalLeadOut;
-        private readonly ComboBox cboInternalLeadIn,
-            cboInternalLeadOut;
-
-        private readonly TableLayoutPanel pnlExternalLeadIn,
-            pnlExternalLeadOut;
-        private readonly TableLayoutPanel pnlInternalLeadIn,
-            pnlInternalLeadOut;
-
-        private readonly LeadPreview externalPreview = new LeadPreview { Emphasis = ContourType.External };
-        private readonly LeadPreview internalPreview = new LeadPreview { Emphasis = ContourType.Internal };
+        private readonly LeadsEditor externalLeads = new LeadsEditor { Emphasis = ContourType.External };
+        private readonly LeadsEditor internalLeads = new LeadsEditor { Emphasis = ContourType.Internal };
 
         private readonly CheckBox chkTabsEnabled;
         private readonly TableLayoutPanel tabOptions;
@@ -124,22 +100,13 @@ namespace OpenNest.Controls
             var tabInternal = new TabPage("Holes") { Padding = new Padding(6), UseVisualStyleBackColor = true };
             toolTip.SetToolTip(tabControl, "Outside: each part's perimeter. Holes: inner contours and circles.");
 
-            var externalContent = SetupTab(
-                tabExternal,
-                externalPreview,
-                out cboExternalLeadIn,
-                out pnlExternalLeadIn,
-                out cboExternalLeadOut,
-                out pnlExternalLeadOut
-            );
-            SetupTab(
-                tabInternal,
-                internalPreview,
-                out cboInternalLeadIn,
-                out pnlInternalLeadIn,
-                out cboInternalLeadOut,
-                out pnlInternalLeadOut
-            );
+            foreach (var (tab, leads) in new[] { (tabExternal, externalLeads), (tabInternal, internalLeads) })
+            {
+                leads.Dock = DockStyle.Fill;
+                leads.LeadInChanged += (s, e) => OnParametersChanged();
+                leads.LeadOutChanged += (s, e) => OnParametersChanged();
+                tab.Controls.Add(leads);
+            }
 
             tabControl.Controls.Add(tabExternal);
             tabControl.Controls.Add(tabInternal);
@@ -282,9 +249,9 @@ namespace OpenNest.Controls
 
             Controls.Add(layout);
 
-            PopulateDropdowns();
-            FitLeadTabs(externalContent);
-            WireChangeEvents();
+            // Sized for the type with the most fields, so picking one never moves the sections below;
+            // the tab strip, page padding and borders take the rest.
+            tabControl.Height = externalLeads.GetTallestHeight() + Font.Height + 28;
             UpdatePreviews();
         }
 
@@ -303,10 +270,10 @@ namespace OpenNest.Controls
         {
             var parameters = loaded == null ? new CuttingParameters()
                 : CuttingParametersSerializer.Deserialize(CuttingParametersSerializer.Serialize(loaded));
-            parameters.ExternalLeadIn = BuildLeadIn(cboExternalLeadIn, pnlExternalLeadIn);
-            parameters.ExternalLeadOut = BuildLeadOut(cboExternalLeadOut, pnlExternalLeadOut);
-            parameters.InternalLeadIn = BuildLeadIn(cboInternalLeadIn, pnlInternalLeadIn);
-            parameters.InternalLeadOut = BuildLeadOut(cboInternalLeadOut, pnlInternalLeadOut);
+            parameters.ExternalLeadIn = externalLeads.LeadIn;
+            parameters.ExternalLeadOut = externalLeads.LeadOut;
+            parameters.InternalLeadIn = internalLeads.LeadIn;
+            parameters.InternalLeadOut = internalLeads.LeadOut;
             parameters.TabsEnabled = chkTabsEnabled.Checked && rbTabAll.Checked;
             parameters.TabConfig = new NormalTab { Size = (double)nudTabWidth.Value };
             parameters.PierceClearance = (double)nudPierceClearance.Value;
@@ -325,10 +292,10 @@ namespace OpenNest.Controls
             suppressEvents = true;
             loaded = CuttingParametersSerializer.Deserialize(CuttingParametersSerializer.Serialize(p));
 
-            LoadLeadIn(cboExternalLeadIn, pnlExternalLeadIn, p.ExternalLeadIn);
-            LoadLeadOut(cboExternalLeadOut, pnlExternalLeadOut, p.ExternalLeadOut);
-            LoadLeadIn(cboInternalLeadIn, pnlInternalLeadIn, p.InternalLeadIn);
-            LoadLeadOut(cboInternalLeadOut, pnlInternalLeadOut, p.InternalLeadOut);
+            externalLeads.LeadIn = p.ExternalLeadIn;
+            externalLeads.LeadOut = p.ExternalLeadOut;
+            internalLeads.LeadIn = p.InternalLeadIn;
+            internalLeads.LeadOut = p.InternalLeadOut;
 
             chkTabsEnabled.Checked = p.TabsEnabled || p.SupportTabs;
             rbSupportTab.Checked = p.SupportTabs;
@@ -353,8 +320,8 @@ namespace OpenNest.Controls
         private void UpdatePreviews()
         {
             var parameters = BuildParameters();
-            externalPreview.Parameters = parameters;
-            internalPreview.Parameters = parameters;
+            externalLeads.PreviewParameters = parameters;
+            internalLeads.PreviewParameters = parameters;
         }
 
         private void UpdateSupportTabOptions()
@@ -373,225 +340,6 @@ namespace OpenNest.Controls
                 return;
             UpdatePreviews();
             ParametersChanged?.Invoke(this, EventArgs.Empty);
-        }
-
-        /// <summary>
-        /// Sizes the lead tabs for the lead-in and lead-out with the most fields, so picking a
-        /// type never clips its fields or moves the sections below.
-        /// </summary>
-        private void FitLeadTabs(Control content)
-        {
-            var tallestLeadIn = 0;
-            for (var i = 0; i < LeadInTypes.Length; i++)
-            {
-                BuildLeadInParamControls(pnlExternalLeadIn, i);
-                tallestLeadIn = System.Math.Max(tallestLeadIn, pnlExternalLeadIn.GetPreferredSize(Size.Empty).Height);
-            }
-
-            var tallestLeadOut = 0;
-            for (var i = 0; i < LeadOutTypes.Length; i++)
-            {
-                BuildLeadOutParamControls(pnlExternalLeadOut, i);
-                tallestLeadOut = System.Math.Max(tallestLeadOut, pnlExternalLeadOut.GetPreferredSize(Size.Empty).Height);
-            }
-
-            BuildLeadInParamControls(pnlExternalLeadIn, 0);
-            BuildLeadOutParamControls(pnlExternalLeadOut, 0);
-
-            var contentHeight = content.GetPreferredSize(Size.Empty).Height + tallestLeadIn + tallestLeadOut
-                + PreviewHeight;
-            // Tab strip, page padding and borders.
-            tabControl.Height = contentHeight + Font.Height + 28;
-        }
-
-        private TableLayoutPanel SetupTab(
-            TabPage tab,
-            LeadPreview preview,
-            out ComboBox leadInCombo,
-            out TableLayoutPanel leadInPanel,
-            out ComboBox leadOutCombo,
-            out TableLayoutPanel leadOutPanel
-        )
-        {
-            var content = new TableLayoutPanel
-            {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                ColumnCount = 1,
-            };
-
-            leadInCombo = CreateCombo();
-            var leadInType = CreateGrid(0);
-            AddRow(leadInType, "Lead-in:", leadInCombo, 0, bold: true);
-            content.Controls.Add(leadInType);
-
-            leadInPanel = CreateGrid(FieldIndent);
-            content.Controls.Add(leadInPanel);
-
-            leadOutCombo = CreateCombo();
-            var leadOutType = CreateGrid(0);
-            leadOutType.Margin = new Padding(0, 8, 0, 0);
-            AddRow(leadOutType, "Lead-out:", leadOutCombo, 0, bold: true);
-            content.Controls.Add(leadOutType);
-
-            leadOutPanel = CreateGrid(FieldIndent);
-            content.Controls.Add(leadOutPanel);
-
-            // The preview fills whatever the fields leave, so it grows for types with fewer.
-            preview.Dock = DockStyle.Fill;
-            preview.Margin = new Padding(0, 6, 0, 0);
-            tab.Controls.Add(preview);
-            tab.Controls.Add(content);
-            preview.BringToFront();
-            return content;
-        }
-
-        private void PopulateDropdowns()
-        {
-            foreach (
-                var combo in new[] { cboExternalLeadIn, cboInternalLeadIn }
-            )
-            {
-                combo.Items.AddRange(LeadInTypes);
-                combo.SelectedIndex = 0;
-            }
-
-            foreach (
-                var combo in new[] { cboExternalLeadOut, cboInternalLeadOut }
-            )
-            {
-                combo.Items.AddRange(LeadOutTypes);
-                combo.SelectedIndex = 0;
-            }
-        }
-
-        private void WireChangeEvents()
-        {
-            cboExternalLeadIn.SelectedIndexChanged += OnLeadInTypeChanged;
-            cboInternalLeadIn.SelectedIndexChanged += OnLeadInTypeChanged;
-
-            cboExternalLeadOut.SelectedIndexChanged += OnLeadOutTypeChanged;
-            cboInternalLeadOut.SelectedIndexChanged += OnLeadOutTypeChanged;
-        }
-
-        private void OnLeadInTypeChanged(object sender, EventArgs e)
-        {
-            var combo = (ComboBox)sender;
-            var panel = GetLeadInPanel(combo);
-            if (panel != null)
-                BuildLeadInParamControls(panel, combo.SelectedIndex);
-            OnParametersChanged();
-        }
-
-        private void OnLeadOutTypeChanged(object sender, EventArgs e)
-        {
-            var combo = (ComboBox)sender;
-            var panel = GetLeadOutPanel(combo);
-            if (panel != null)
-                BuildLeadOutParamControls(panel, combo.SelectedIndex);
-            OnParametersChanged();
-        }
-
-        private TableLayoutPanel GetLeadInPanel(ComboBox combo)
-        {
-            if (combo == cboExternalLeadIn)
-                return pnlExternalLeadIn;
-            if (combo == cboInternalLeadIn)
-                return pnlInternalLeadIn;
-            return null;
-        }
-
-        private TableLayoutPanel GetLeadOutPanel(ComboBox combo)
-        {
-            if (combo == cboExternalLeadOut)
-                return pnlExternalLeadOut;
-            if (combo == cboInternalLeadOut)
-                return pnlInternalLeadOut;
-            return null;
-        }
-
-        private void BuildLeadInParamControls(TableLayoutPanel panel, int typeIndex)
-        {
-            ClearRows(panel);
-
-            switch (typeIndex)
-            {
-                case 1:
-                    AddNumericField(panel, "Length:", 0.25, "Length");
-                    AddAngleField(panel, "Approach angle:", 90, "ApproachAngle");
-                    break;
-                case 2:
-                    AddNumericField(panel, "Radius:", 0.25, "Radius");
-                    // Degrees of arc: 90 is a quarter circle, 180 a half circle.
-                    AddAngleField(panel, "Sweep angle:", ArcLeadIn.DefaultSweepAngle, "SweepAngle",
-                        increment: 15, minimum: 1, maximum: 180);
-                    break;
-                case 3:
-                    AddNumericField(panel, "Line length:", 0.25, "LineLength");
-                    AddNumericField(panel, "Arc radius:", 0.125, "ArcRadius");
-                    AddAngleField(panel, "Approach angle:", 135, "ApproachAngle");
-                    break;
-                case 4:
-                    AddNumericField(panel, "Line length:", 0.25, "LineLength");
-                    AddNumericField(panel, "Arc radius:", 0.125, "ArcRadius");
-                    AddNumericField(panel, "Kerf:", 0.06, "Kerf");
-                    break;
-                case 5:
-                    AddNumericField(panel, "First length:", 0.25, "Length1");
-                    AddAngleField(panel, "First angle:", 90, "Angle1");
-                    AddNumericField(panel, "Second length:", 0.25, "Length2");
-                    AddAngleField(panel, "Second angle:", 90, "Angle2");
-                    break;
-            }
-        }
-
-        private void BuildLeadOutParamControls(TableLayoutPanel panel, int typeIndex)
-        {
-            ClearRows(panel);
-
-            switch (typeIndex)
-            {
-                case 1:
-                    AddNumericField(panel, "Length:", 0.25, "Length");
-                    AddAngleField(panel, "Approach angle:", 90, "ApproachAngle");
-                    break;
-                case 2:
-                    AddNumericField(panel, "Radius:", 0.25, "Radius");
-                    break;
-            }
-        }
-
-        private void AddAngleField(
-            TableLayoutPanel panel,
-            string label,
-            double defaultValue,
-            string tag,
-            double increment = 5,
-            double minimum = 0,
-            double maximum = 360
-        ) => AddNumericField(panel, label, defaultValue, tag, increment, minimum, maximum, "°", 2);
-
-        private void AddNumericField(
-            TableLayoutPanel panel,
-            string label,
-            double defaultValue,
-            string tag,
-            double increment = 0.0625,
-            double minimum = 0,
-            double maximum = 9999,
-            string suffix = null,
-            int decimalPlaces = 4
-        )
-        {
-            var nud = CreateNumeric(defaultValue, increment);
-            nud.Minimum = (decimal)minimum;
-            nud.Maximum = (decimal)maximum;
-            nud.DecimalPlaces = decimalPlaces;
-            nud.Value = System.Math.Clamp((decimal)defaultValue, nud.Minimum, nud.Maximum);
-            nud.Tag = tag;
-            nud.ValueChanged += (s, e) => OnParametersChanged();
-            AddRow(panel, label, nud, FieldIndent, suffix);
         }
 
         private void AddSection(string title)
@@ -633,8 +381,7 @@ namespace OpenNest.Controls
             string label,
             Control input,
             int indent,
-            string hint = null,
-            bool bold = false
+            string hint = null
         )
         {
             var row = NextRow(grid);
@@ -645,8 +392,6 @@ namespace OpenNest.Controls
                 Anchor = AnchorStyles.Left,
                 Margin = new Padding(0, 0, 4, 0),
             };
-            if (bold)
-                text.Font = new Font(text.Font, FontStyle.Bold);
             grid.Controls.Add(text, 0, row);
 
             input.Anchor = AnchorStyles.Left;
@@ -670,16 +415,6 @@ namespace OpenNest.Controls
             grid.RowCount = row + 1;
             grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             return row;
-        }
-
-        private static void ClearRows(TableLayoutPanel grid)
-        {
-            grid.SuspendLayout();
-            while (grid.Controls.Count > 0)
-                grid.Controls[0].Dispose();
-            grid.RowStyles.Clear();
-            grid.RowCount = 0;
-            grid.ResumeLayout();
         }
 
         private static FlowLayoutPanel CreateInline(params Control[] controls)
@@ -709,13 +444,6 @@ namespace OpenNest.Controls
                 Margin = margin ?? new Padding(2, 0, 0, 0),
             };
 
-        private static ComboBox CreateCombo() =>
-            new ComboBox
-            {
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Width = 150,
-            };
-
         private static NumericUpDown CreateNumeric(double defaultValue, double increment)
         {
             return new NumericUpDown
@@ -728,139 +456,6 @@ namespace OpenNest.Controls
                 Value = (decimal)defaultValue,
                 TextAlign = HorizontalAlignment.Right,
             };
-        }
-
-        private static void LoadLeadIn(ComboBox combo, Panel panel, LeadIn leadIn)
-        {
-            switch (leadIn)
-            {
-                case LineLeadIn line:
-                    combo.SelectedIndex = 1;
-                    SetParam(panel, "Length", line.Length);
-                    SetParam(panel, "ApproachAngle", line.ApproachAngle);
-                    break;
-                case ArcLeadIn arc:
-                    combo.SelectedIndex = 2;
-                    SetParam(panel, "Radius", arc.Radius);
-                    SetParam(panel, "SweepAngle", arc.SweepAngle);
-                    break;
-                case LineArcLeadIn lineArc:
-                    combo.SelectedIndex = 3;
-                    SetParam(panel, "LineLength", lineArc.LineLength);
-                    SetParam(panel, "ArcRadius", lineArc.ArcRadius);
-                    SetParam(panel, "ApproachAngle", lineArc.ApproachAngle);
-                    break;
-                case CleanHoleLeadIn cleanHole:
-                    combo.SelectedIndex = 4;
-                    SetParam(panel, "LineLength", cleanHole.LineLength);
-                    SetParam(panel, "ArcRadius", cleanHole.ArcRadius);
-                    SetParam(panel, "Kerf", cleanHole.Kerf);
-                    break;
-                case LineLineLeadIn lineLine:
-                    combo.SelectedIndex = 5;
-                    SetParam(panel, "Length1", lineLine.Length1);
-                    SetParam(panel, "Angle1", lineLine.ApproachAngle1);
-                    SetParam(panel, "Length2", lineLine.Length2);
-                    SetParam(panel, "Angle2", lineLine.ApproachAngle2);
-                    break;
-                default:
-                    combo.SelectedIndex = 0;
-                    break;
-            }
-        }
-
-        private static void LoadLeadOut(ComboBox combo, Panel panel, LeadOut leadOut)
-        {
-            switch (leadOut)
-            {
-                case LineLeadOut line:
-                    combo.SelectedIndex = 1;
-                    SetParam(panel, "Length", line.Length);
-                    SetParam(panel, "ApproachAngle", line.ApproachAngle);
-                    break;
-                case ArcLeadOut arc:
-                    combo.SelectedIndex = 2;
-                    SetParam(panel, "Radius", arc.Radius);
-                    break;
-                default:
-                    combo.SelectedIndex = 0;
-                    break;
-            }
-        }
-
-        private static LeadIn BuildLeadIn(ComboBox combo, Panel panel)
-        {
-            return combo.SelectedIndex switch
-            {
-                1 => new LineLeadIn
-                {
-                    Length = GetParam(panel, "Length", 0.25),
-                    ApproachAngle = GetParam(panel, "ApproachAngle", 90),
-                },
-                2 => new ArcLeadIn
-                {
-                    Radius = GetParam(panel, "Radius", 0.25),
-                    SweepAngle = GetParam(panel, "SweepAngle", ArcLeadIn.DefaultSweepAngle),
-                },
-                3 => new LineArcLeadIn
-                {
-                    LineLength = GetParam(panel, "LineLength", 0.25),
-                    ArcRadius = GetParam(panel, "ArcRadius", 0.125),
-                    ApproachAngle = GetParam(panel, "ApproachAngle", 135),
-                },
-                4 => new CleanHoleLeadIn
-                {
-                    LineLength = GetParam(panel, "LineLength", 0.25),
-                    ArcRadius = GetParam(panel, "ArcRadius", 0.125),
-                    Kerf = GetParam(panel, "Kerf", 0.06),
-                },
-                5 => new LineLineLeadIn
-                {
-                    Length1 = GetParam(panel, "Length1", 0.25),
-                    ApproachAngle1 = GetParam(panel, "Angle1", 90),
-                    Length2 = GetParam(panel, "Length2", 0.25),
-                    ApproachAngle2 = GetParam(panel, "Angle2", 90),
-                },
-                _ => new NoLeadIn(),
-            };
-        }
-
-        private static LeadOut BuildLeadOut(ComboBox combo, Panel panel)
-        {
-            return combo.SelectedIndex switch
-            {
-                1 => new LineLeadOut
-                {
-                    Length = GetParam(panel, "Length", 0.25),
-                    ApproachAngle = GetParam(panel, "ApproachAngle", 90),
-                },
-                2 => new ArcLeadOut { Radius = GetParam(panel, "Radius", 0.25) },
-                _ => new NoLeadOut(),
-            };
-        }
-
-        private static void SetParam(Panel panel, string tag, double value)
-        {
-            foreach (Control c in panel.Controls)
-            {
-                if (c is NumericUpDown nud && (string)nud.Tag == tag)
-                {
-                    nud.Value = double.IsFinite(value)
-                        ? System.Math.Clamp((decimal)value, nud.Minimum, nud.Maximum)
-                        : nud.Minimum;
-                    return;
-                }
-            }
-        }
-
-        private static double GetParam(Panel panel, string tag, double defaultValue)
-        {
-            foreach (Control c in panel.Controls)
-            {
-                if (c is NumericUpDown nud && (string)nud.Tag == tag)
-                    return (double)nud.Value;
-            }
-            return defaultValue;
         }
     }
 }

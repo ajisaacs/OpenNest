@@ -14,18 +14,6 @@ namespace OpenNest.Forms
 {
     public partial class MachineConfigForm : Form
     {
-        private static readonly string[] LeadInTypes =
-        {
-            "None",
-            "Line",
-            "Arc",
-            "Line + Arc",
-            "Clean Hole",
-            "Line + Line",
-        };
-
-        private static readonly string[] LeadOutTypes = { "None", "Line", "Arc" };
-
         private static readonly string[] AssistGasOptions = { "O2", "N2", "Air" };
 
         private static readonly string[] CutOffDirectionOptions = Enum.GetNames<CutDirection>();
@@ -630,12 +618,8 @@ namespace OpenNest.Forms
         {
             var tabs = new TabControl { Dock = DockStyle.Fill };
             tabs.TabPages.Add(CreateTab("General", BuildThicknessGeneralTab(thickness, node)));
-            tabs.TabPages.Add(
-                CreateTab("Lead In", BuildLeadTab(thickness.LeadIn, LeadInTypes))
-            );
-            tabs.TabPages.Add(
-                CreateTab("Lead Out", BuildLeadTab(thickness.LeadOut, LeadOutTypes))
-            );
+            tabs.TabPages.Add(CreateTab("Outside Cuts", BuildOutsideCutsTab(thickness)));
+            tabs.TabPages.Add(CreateTab("Inside Cuts", BuildInsideCutsTab(thickness)));
             tabs.TabPages.Add(CreateTab("Cut Off", BuildCutOffTab(thickness.CutOff)));
             tabs.TabPages.Add(CreateTab("Plate Sizes", BuildPlateSizesTab(thickness)));
             RememberTab(tabs, _thicknessTab, t => _thicknessTab = t);
@@ -717,81 +701,129 @@ namespace OpenNest.Forms
             return panel;
         }
 
-        private Control BuildLeadTab(LeadConfig lead, string[] typeOptions)
+        private Control BuildOutsideCutsTab(ThicknessConfig thickness)
         {
-            var layout = CreateDetailLayout();
-            var row = 0;
-
-            var typeCombo = new ComboBox
+            var editor = CreateLeadsEditor(CNC.CuttingStrategy.ContourType.External);
+            // Clean Hole is for holes only, so outside cuts do not offer it.
+            editor.AllowCleanHole = false;
+            ShowLeads(editor, thickness, thickness.LeadIn, thickness.LeadOut);
+            editor.LeadInChanged += (s, e) =>
             {
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Width = InputWidth,
+                thickness.LeadIn = MachineCuttingDefaults.ToConfig(editor.LeadIn, thickness.LeadIn);
+                LeadsEdited(editor, thickness);
             };
-            typeCombo.Items.AddRange(typeOptions);
-            typeCombo.SelectedItem = typeOptions.Contains(lead.Type) ? lead.Type : typeOptions[0];
-            typeCombo.SelectedIndexChanged += (s, e) =>
+            editor.LeadOutChanged += (s, e) =>
             {
-                lead.Type = typeCombo.SelectedItem?.ToString() ?? typeOptions[0];
-                MarkDirty();
+                thickness.LeadOut = MachineCuttingDefaults.ToConfig(editor.LeadOut, thickness.LeadOut);
+                LeadsEdited(editor, thickness);
             };
-            AddField(layout, ref row, "Type:", typeCombo);
+            editor.VisibleChanged += (s, e) =>
+            {
+                if (editor.Visible)
+                    ShowLeads(editor, thickness, thickness.LeadIn, thickness.LeadOut);
+            };
 
-            AddField(
-                layout,
-                ref row,
-                "Length:",
-                CreateLabeledNumeric(
-                    lead.Length,
-                    v =>
-                    {
-                        lead.Length = v;
-                        MarkDirty();
-                    },
-                    4,
-                    LengthUnitSuffix,
-                    50,
-                    0.001m
-                )
-            );
-            AddField(
-                layout,
-                ref row,
-                "Angle:",
-                CreateLabeledNumeric(
-                    lead.Angle,
-                    v =>
-                    {
-                        lead.Angle = v;
-                        MarkDirty();
-                    },
-                    1,
-                    _ => "°",
-                    360,
-                    0.1m
-                )
-            );
-            AddField(
-                layout,
-                ref row,
-                "Radius:",
-                CreateLabeledNumeric(
-                    lead.Radius,
-                    v =>
-                    {
-                        lead.Radius = v;
-                        MarkDirty();
-                    },
-                    4,
-                    LengthUnitSuffix,
-                    50,
-                    0.001m
-                )
-            );
-
-            var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
-            panel.Controls.Add(layout);
-            return panel;
+            var page = new Panel { Dock = DockStyle.Fill, BackColor = Color.White };
+            page.Controls.Add(editor);
+            page.Controls.Add(CreateTabNote("Part perimeters. Inside cuts use these too unless given their own."));
+            return page;
         }
+
+        // Inside cuts (cutouts and holes) follow the outside cuts until they get leads of their
+        // own, which start as a copy of the outside ones.
+        private Control BuildInsideCutsTab(ThicknessConfig thickness)
+        {
+            var editor = CreateLeadsEditor(CNC.CuttingStrategy.ContourType.Internal);
+            var sameBox = new CheckBox
+            {
+                Text = "Same as outside cuts",
+                AutoSize = true,
+                Dock = DockStyle.Top,
+                Padding = new Padding(10, 0, 0, 0),
+                Checked = thickness.InsideLeadIn == null && thickness.InsideLeadOut == null,
+            };
+
+            void Show()
+            {
+                ShowLeads(editor, thickness, thickness.InsideLeadIn ?? thickness.LeadIn,
+                    thickness.InsideLeadOut ?? thickness.LeadOut);
+                editor.FieldsEnabled = !sameBox.Checked;
+            }
+
+            sameBox.CheckedChanged += (s, e) =>
+            {
+                thickness.InsideLeadIn = sameBox.Checked ? null : Copy(thickness.LeadIn);
+                thickness.InsideLeadOut = sameBox.Checked ? null : Copy(thickness.LeadOut);
+                MarkDirty();
+                Show();
+            };
+            editor.LeadInChanged += (s, e) =>
+            {
+                thickness.InsideLeadIn = MachineCuttingDefaults.ToConfig(editor.LeadIn, thickness.InsideLeadIn);
+                LeadsEdited(editor, thickness);
+            };
+            editor.LeadOutChanged += (s, e) =>
+            {
+                thickness.InsideLeadOut = MachineCuttingDefaults.ToConfig(editor.LeadOut, thickness.InsideLeadOut);
+                LeadsEdited(editor, thickness);
+            };
+            // Shown again on each visit, so following the outside cuts shows their current values.
+            editor.VisibleChanged += (s, e) =>
+            {
+                if (editor.Visible)
+                    Show();
+            };
+            Show();
+
+            var page = new Panel { Dock = DockStyle.Fill, BackColor = Color.White };
+            page.Controls.Add(editor);
+            page.Controls.Add(sameBox);
+            page.Controls.Add(CreateTabNote("Cutouts and holes, full circles included."));
+            return page;
+        }
+
+        // The machine holds no arc sweep (leads are half circles) and takes a clean hole's kerf
+        // from the thickness; Line + Line is never applied from it, so it is not offered.
+        private Controls.LeadsEditor CreateLeadsEditor(CNC.CuttingStrategy.ContourType emphasis)
+        {
+            return new Controls.LeadsEditor
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(10, 0, 10, 10),
+                Emphasis = emphasis,
+                AllowLineLine = false,
+                ShowArcSweep = false,
+                ShowCleanHoleKerf = false,
+                LengthUnit = LengthUnitSuffix(null),
+            };
+        }
+
+        private static void ShowLeads(Controls.LeadsEditor editor, ThicknessConfig thickness, LeadConfig leadIn, LeadConfig leadOut)
+        {
+            editor.LeadIn = MachineCuttingDefaults.LeadInOf(leadIn, thickness.Kerf) ?? new CNC.CuttingStrategy.NoLeadIn();
+            editor.LeadOut = MachineCuttingDefaults.LeadOutOf(leadOut);
+            editor.PreviewParameters = MachineCuttingDefaults.LeadsOf(thickness);
+        }
+
+        private void LeadsEdited(Controls.LeadsEditor editor, ThicknessConfig thickness)
+        {
+            editor.PreviewParameters = MachineCuttingDefaults.LeadsOf(thickness);
+            MarkDirty();
+        }
+
+        private static LeadConfig Copy(LeadConfig lead) =>
+            new() { Type = lead.Type, Length = lead.Length, Angle = lead.Angle, Radius = lead.Radius };
+
+        private static Label CreateTabNote(string text) =>
+            new()
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                MaximumSize = new Size(560, 0),
+                ForeColor = SystemColors.GrayText,
+                Padding = new Padding(10, 8, 0, 6),
+                Text = text,
+            };
 
         private Control BuildCutOffTab(CutOffConfig cutOff)
         {

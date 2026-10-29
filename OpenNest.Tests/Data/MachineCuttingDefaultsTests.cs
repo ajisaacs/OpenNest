@@ -147,6 +147,23 @@ public class MachineCuttingDefaultsTests
     }
 
     [Fact]
+    public void InsideLeads_GoToInternalContoursOnly()
+    {
+        var parameters = new CuttingParameters();
+        var machine = Machine(LineArc);
+        var thickness = machine.Materials[0].Thicknesses[0];
+        thickness.InsideLeadIn = new LeadConfig { Type = "Clean Hole", Length = 0.1, Radius = 0.05 };
+        thickness.InsideLeadOut = new LeadConfig { Type = "Arc", Radius = 0.04 };
+
+        Assert.True(MachineCuttingDefaults.ApplyTo(parameters, machine, NestOf(0.25)));
+
+        Assert.IsType<LineArcLeadIn>(parameters.ExternalLeadIn);
+        Assert.IsType<LineLeadOut>(parameters.ExternalLeadOut);
+        Assert.Equal(0.05, Assert.IsType<CleanHoleLeadIn>(parameters.InternalLeadIn).ArcRadius);
+        Assert.Equal(0.04, Assert.IsType<ArcLeadOut>(parameters.InternalLeadOut).Radius);
+    }
+
+    [Fact]
     public void LineLineLeadIn_KeepsTheLeadInsButStillSetsLeadOuts()
     {
         var parameters = new CuttingParameters();

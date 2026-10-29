@@ -27,8 +27,13 @@ soon as its settings dialog is accepted, not only on Apply. A plate that already
 parameters keeps them: changing the machine, material or thickness does not rewrite leads
 the plate was planned with.
 
-The machine holds one lead-in and one lead-out per thickness; both go to external and internal
-contours (internal covers full circles). Types map as follows:
+Each thickness holds a lead-in and lead-out for outside cuts (the Outside Cuts tab, external
+contours) and, optionally, its own pair for inside cuts (the Inside Cuts tab, internal contours,
+full circles included). Inside cuts use the outside pair until "Same as outside cuts" is cleared,
+which starts them from a copy of it; configurations saved before the split have no inside pair
+and keep applying one pair to both. Both tabs use the shared `LeadsEditor` control that Cutting
+Settings uses, without the fields the configuration cannot hold (an arc's sweep; a clean hole's kerf,
+which comes from the thickness). Types map as follows:
 
 | Machine type | Lead-in |
 |---|---|
@@ -36,8 +41,8 @@ contours (internal covers full circles). Types map as follows:
 | Line | line (length, angle) |
 | Arc | arc (radius; the default 180-degree half-circle sweep) |
 | Line + Arc | line-arc (length, radius, angle) |
-| Clean Hole | clean hole (length, radius, the thickness's kerf), holes only: the external lead-in is kept |
-| Line + Line | not mapped (the configuration has no second segment): every lead-in is kept |
+| Clean Hole | clean hole (length, radius, the thickness's kerf), inside cuts only; an outside Clean Hole (older configurations) keeps the external lead-in |
+| Line + Line | not offered; an older configuration's is not mapped (it has no second segment): the lead-in it would set is kept |
 
 Lead-outs map None, Line (length, angle) and Arc (radius); any other type is none.
 
