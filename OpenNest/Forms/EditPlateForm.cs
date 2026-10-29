@@ -186,6 +186,9 @@ namespace OpenNest.Forms
             Outline = plate.Outline;
         }
 
+        /// <summary>Writes the dialog's values to the plate, as Done does.</summary>
+        internal void Apply() => Save();
+
         private void Save()
         {
             // The outline carries its own size; a parsed size would drop it.

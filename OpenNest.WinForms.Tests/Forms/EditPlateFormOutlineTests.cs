@@ -20,7 +20,6 @@ public class EditPlateFormOutlineTests
         using var form = new EditPlateForm(plate);
         var size = (TextBox)form.Controls.Find("textBoxSize", true)[0];
         var clear = (Button)form.Controls.Find("buttonClearOutline", true)[0];
-        var done = (Button)form.Controls.Find("applyButton", true)[0];
         Assert.False(size.ReadOnly);
         Assert.False(clear.Enabled);
 
@@ -30,9 +29,9 @@ public class EditPlateFormOutlineTests
         Assert.True(clear.Enabled);
         Assert.Equal(new Size(48, 96).ToString(), form.SizeString);
         Assert.Contains("6 vertices", ((Label)form.Controls.Find("labelOutline", true)[0]).Text);
-        Assert.True(done.Enabled);
+        Assert.True(((Button)form.Controls.Find("applyButton", true)[0]).Enabled);
 
-        done.PerformClick();
+        form.Apply();
         Assert.Equal(Ell(), plate.Outline);
         Assert.Equal(48, plate.Size.Width);
         Assert.Equal(96, plate.Size.Length);
@@ -46,9 +45,10 @@ public class EditPlateFormOutlineTests
         var size = (TextBox)form.Controls.Find("textBoxSize", true)[0];
         Assert.True(size.ReadOnly);
 
-        ((Button)form.Controls.Find("buttonClearOutline", true)[0]).PerformClick();
+        form.Outline = null; // what Clear does
         Assert.False(size.ReadOnly);
-        ((Button)form.Controls.Find("applyButton", true)[0]).PerformClick();
+        Assert.False(((Button)form.Controls.Find("buttonClearOutline", true)[0]).Enabled);
+        form.Apply();
 
         Assert.Null(plate.Outline);
         Assert.Equal(48, plate.Size.Width);
