@@ -98,12 +98,35 @@ namespace OpenNest
                 // A turned sheet is the same sheet; any other size is no longer the coded item.
                 if (stockItemCodes.Count > 0 && !SameSheet(size, value))
                     stockItemCodes = Array.Empty<string>();
+                // An outline is a particular sheet; any other size is a rectangle again.
+                if (outline != null && (outline.Size.Width != value.Width || outline.Size.Length != value.Length))
+                    outline = null;
                 size = value;
                 ResolveClampRail();
             }
         }
 
         private Size size;
+
+        /// <summary>
+        /// The sheet's material when it is not a rectangle (see <see cref="SheetOutline"/>), in
+        /// plate coordinates; null for a rectangular sheet. Setting one makes <see cref="Size"/> its
+        /// bounding box, and setting any other size drops it. Only the Irregular whole-job engine
+        /// nests on an outlined sheet; cut-offs are trimmed to it, automatic cut-offs refuse it, and
+        /// <see cref="Area"/> is its material area.
+        /// </summary>
+        public SheetOutline Outline
+        {
+            get { return outline; }
+            set
+            {
+                outline = value;
+                if (value != null)
+                    Size = value.Size;
+            }
+        }
+
+        private SheetOutline outline;
 
         private static bool SameSheet(Size a, Size b) =>
             a.Width == b.Width && a.Length == b.Length || a.Width == b.Length && a.Length == b.Width;
@@ -526,7 +549,9 @@ namespace OpenNest
         {
             const double oneAndHalfPI = System.Math.PI * 1.5;
 
+            var turned = Outline?.Rotated90(rotationDirection);
             Size = new Size(Size.Length, Size.Width);
+            Outline = turned;
 
             // After Size swap above, new Size.Width = old Length (old X extent),
             // new Size.Length = old Width (old Y extent).
@@ -632,10 +657,12 @@ namespace OpenNest
                 }
 
                 Rotate(System.Math.PI, centerpt);
+                Outline = Outline?.Rotated180();
             }
             else
             {
                 Rotate(System.Math.PI);
+                Outline = Outline?.Rotated180();
                 Quadrant = (Quadrant + 2) % 4;
 
                 if (Quadrant == 0)
@@ -841,7 +868,8 @@ namespace OpenNest
         /// </example>
         public void AutoSize(double roundingFactor = 1.0)
         {
-            if (Parts.Count == 0)
+            // An outlined sheet is a particular piece of material; it cannot be resized to fit.
+            if (Parts.Count == 0 || Outline != null)
                 return;
 
             var bounds = Parts.GetBoundingBox();
@@ -890,7 +918,7 @@ namespace OpenNest
         /// </summary>
         public PlateSizeResult SnapToStandardSize(PlateSizeOptions options = null)
         {
-            if (Parts.Count == 0)
+            if (Parts.Count == 0 || Outline != null)
                 return default;
 
             var bounds = Parts.GetBoundingBox();
@@ -942,12 +970,13 @@ namespace OpenNest
         }
 
         /// <summary>
-        /// Gets the area of the top surface of the plate.
+        /// Gets the area of the top surface of the plate: the material inside its
+        /// <see cref="Outline"/> when it has one, otherwise the whole rectangle.
         /// </summary>
         /// <returns></returns>
         public double Area()
         {
-            return Size.Width * Size.Length;
+            return Outline?.Area ?? Size.Width * Size.Length;
         }
 
         /// <summary>

@@ -133,6 +133,7 @@ namespace OpenNest
             var followsDefaults = trailing != null
                 && trailing.Parts.Count == 0
                 && trailing.CutOffs.Count == 0
+                && trailing.Outline == null
                 && trailing.Size.Width == defaults.Size.Width
                 && trailing.Size.Length == defaults.Size.Length
                 && trailing.Quadrant == defaults.Quadrant

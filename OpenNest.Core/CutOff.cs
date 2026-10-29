@@ -262,7 +262,8 @@ namespace OpenNest
         {
             var bounds = plate.BoundingBox(includeParts: false);
             // A head-locked overcut replaces the overtravel at the high edge when that is the far edge.
-            var overtravel = LockedFarEdge(plate) is { High: true } ? 0 : settings.Overtravel;
+            var lockedFarEdge = LockedFarEdge(plate);
+            var overtravel = lockedFarEdge is { High: true } ? 0 : settings.Overtravel;
 
             double lineStart,
                 lineEnd,
@@ -280,6 +281,13 @@ namespace OpenNest
                 lineStart = StartLimit ?? bounds.X;
                 lineEnd = EndLimit ?? (bounds.X + bounds.Length + overtravel);
             }
+
+            // An outlined sheet is cut only where the line crosses material: each crossing is a
+            // span of its own, started at the material's edge and overtravelled past the far
+            // one, within the user's limits.
+            var spans = plate.Outline == null
+                ? new List<(double Start, double End)> { (lineStart, lineEnd) }
+                : MaterialSpans(plate, cutPosition, lineStart, lineEnd, settings.Overtravel, lockedFarEdge);
 
             var exclusions = new List<(double Start, double End)>();
 
@@ -325,25 +333,69 @@ namespace OpenNest
             }
 
             var segments = new List<(double Start, double End)>();
-            var current = lineStart;
-
-            foreach (var ex in merged)
+            foreach (var (spanStart, spanEnd) in spans)
             {
-                var clampedStart = System.Math.Max(ex.Start, lineStart);
-                var clampedEnd = System.Math.Min(ex.End, lineEnd);
+                var current = spanStart;
 
-                if (clampedStart > current)
-                    segments.Add((current, clampedStart));
+                foreach (var ex in merged)
+                {
+                    var clampedStart = System.Math.Max(ex.Start, spanStart);
+                    var clampedEnd = System.Math.Min(ex.End, spanEnd);
 
-                current = System.Math.Max(current, clampedEnd);
+                    if (clampedStart > current)
+                        segments.Add((current, clampedStart));
+
+                    current = System.Math.Max(current, clampedEnd);
+                }
+
+                if (current < spanEnd)
+                    segments.Add((current, spanEnd));
             }
-
-            if (current < lineEnd)
-                segments.Add((current, lineEnd));
 
             segments = segments.Where(s => (s.End - s.Start) >= settings.MinSegmentLength).ToList();
 
             return segments;
+        }
+
+        /// <summary>
+        /// Where the line at <paramref name="cutPosition"/> crosses the sheet's outlined material,
+        /// in ascending order along the axis and clipped to the line's limits. Each span starts at
+        /// the material edge and runs <paramref name="overtravel"/> past the far one unless a limit
+        /// or a head-locked far edge ends it there.
+        /// </summary>
+        private List<(double Start, double End)> MaterialSpans(Plate plate, double cutPosition,
+            double lineStart, double lineEnd, double overtravel, (double Edge, bool High)? lockedFarEdge)
+        {
+            var vertical = Axis == CutOffAxis.Vertical;
+            var crossings = new List<double>();
+            foreach (var path in plate.Outline.Material(plate.Outline.PlacementOrigin(plate.Quadrant)))
+            {
+                for (var i = 0; i < path.Count; i++)
+                {
+                    var a = path[i];
+                    var b = path[(i + 1) % path.Count];
+                    var (aAcross, aAlong) = vertical ? (a.x, a.y) : (a.y, a.x);
+                    var (bAcross, bAlong) = vertical ? (b.x, b.y) : (b.y, b.x);
+                    // Half-open on the across axis, so a line through a vertex counts one edge.
+                    if (aAcross <= cutPosition == bAcross <= cutPosition)
+                        continue;
+                    crossings.Add(aAlong + (bAlong - aAlong) * (cutPosition - aAcross) / (bAcross - aAcross));
+                }
+            }
+            crossings.Sort();
+
+            var spans = new List<(double Start, double End)>();
+            for (var i = 0; i + 1 < crossings.Count; i += 2)
+            {
+                var start = System.Math.Max(crossings[i], lineStart);
+                var end = crossings[i + 1];
+                var limited = EndLimit != null && end >= EndLimit.Value
+                    || lockedFarEdge is var (edge, high) && high && end == edge;
+                end = System.Math.Min(limited ? end : end + overtravel, lineEnd);
+                if (end > start)
+                    spans.Add((start, end));
+            }
+            return spans;
         }
 
         private static readonly List<(double Start, double End)> EmptyExclusions = new();

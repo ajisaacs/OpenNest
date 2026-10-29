@@ -544,6 +544,8 @@ public static class AutomaticCutOffPlanner
             double.IsFinite(plate.Size.Width) && plate.Size.Width > 0,
             "Sheet length and width must be positive and finite.", nameof(plate));
         Require(plate.Quadrant is >= 1 and <= 4, "Quadrant must be 1 through 4.", nameof(plate));
+        // Strips are planned across a rectangle's known span; an outlined sheet gets manual cut-offs only.
+        Require(plate.Outline == null, "Automatic cut-offs need a rectangular sheet; this plate has an outline.", nameof(plate));
         Require(Nonnegative(plate.PartSpacing), "Part spacing must be finite and nonnegative.", nameof(plate));
         Require(plate.ClampZones != null && (plate.ClampZones.Count == 0 ||
             Nonnegative(plate.EdgeSpacing.Bottom)),

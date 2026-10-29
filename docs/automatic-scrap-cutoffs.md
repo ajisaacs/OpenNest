@@ -51,6 +51,15 @@ Each trimmed segment of a cut-off is materialized as a part of its own with its 
 - Internal-hole scrap is not processed. This command reuses the outside-skeleton behavior of manual cutoffs; it does not force cuts through parts or remove clearance to guarantee separation.
 - Review the preview and posted NC using the normal machine-review process before production cutting.
 
+## Outlined sheets
+
+A plate with a sheet outline (see [irregular stock](irregular-stock.md)) gets manual cut-offs
+only: the planner refuses it ("Automatic cut-offs need a rectangular sheet"), and a batch with
+such a plate is blocked like any invalid plate. A manual cut-off on it is cut only where its
+line crosses material: each crossing is a segment of its own that starts at the material's edge
+and overtravels past the far one, trimmed around parts as usual and within the user's limits.
+The head-locked overcut applies only to a span that reaches the bounding box's far edge.
+
 ## Head-locked overcut at the far edge
 
 A cut-off starts only where an edge is certain. The origin-side edge always is. Stock often arrives up to 1.5 in wider than nominal, so the far edge (the one away from the plate's origin, by quadrant) may still have material past it. Without a head-height lock a cut-off never starts at the far edge, and Plan Cutting never reverses one.

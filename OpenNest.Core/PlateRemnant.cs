@@ -38,10 +38,14 @@ public sealed class PlateRemnant
     /// (no limit short of either sheet edge) with no part material beyond it defines the drop: the
     /// sheet past its nominal position, less the plate's kerf for each bounding cut-off line. It
     /// wins over a larger edge offcut. Otherwise the drop is the largest edge offcut that
-    /// <see cref="LargestOffcut"/> finds. Material bounds ignore cut-off parts and marks.
+    /// <see cref="LargestOffcut"/> finds. Material bounds ignore cut-off parts and marks. A plate
+    /// with an <see cref="Plate.Outline"/> reports none.
     /// </summary>
     public static PlateRemnant Expected(Plate plate, double minimumDimension)
     {
+        // No rectangular strip is guaranteed inside an outlined sheet.
+        if (plate.Outline != null)
+            return null;
         // A part with no material (marks only) bounds nothing.
         var bounds = plate.Parts
             .Where(p => !p.BaseDrawing.IsCutOff && p.Program != null)
