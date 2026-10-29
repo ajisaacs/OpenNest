@@ -149,6 +149,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         private const int MaxTail = 3;
         private readonly Dictionary<double, NoFitCache> caches = new();
         private readonly Dictionary<NestPlateStock, ClampObstacles> clamps = new();
+        private readonly Dictionary<NestPlateStock, PackBoundary?> boundaries = new();
         private readonly Dictionary<double, IReadOnlyDictionary<int, IReadOnlyList<PairPose>>> pairs = new();
         private readonly Dictionary<double, BlockCatalog> blocks = new();
         private readonly IReadOnlyDictionary<string, NestJobPart> parts = job.Parts.ToDictionary(p => p.Id, StringComparer.Ordinal);
@@ -230,6 +231,18 @@ public sealed class IrregularNestingEngine : INestingEngine
             return cache;
         }
 
+        /// <summary>An outlined sheet's usable material as the packer's boundary, built once per
+        /// stock per solve; null for a rectangular sheet, which keeps the work-area path.</summary>
+        private PackBoundary? BoundaryFor(NestPlateStock stock)
+        {
+            if (stock.Outline == null)
+                return null;
+            if (!boundaries.TryGetValue(stock, out var found))
+                boundaries[stock] = found = new PackBoundary(stock.Outline.Material(stock.PlacementOrigin),
+                    stock.OutlineInset, stock.WorkArea, CacheFor(stock));
+            return found;
+        }
+
         private ClampObstacles? ClampsFor(NestPlateStock stock)
         {
             if (stock.ClampZones.Count == 0)
@@ -307,7 +320,7 @@ public sealed class IrregularNestingEngine : INestingEngine
                         continue;
                     progress?.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stock.Id, sheets.Count, 0, 0));
                     var packer = new FrontierPacker(types, CacheFor(stock), PairsFor(stock), stock, axis, beta, Work,
-                        BlocksFor(stock), ClampsFor(stock));
+                        BlocksFor(stock), ClampsFor(stock), BoundaryFor(stock));
                     var fill = packer.Fill(remaining, token);
                     sheetPacked?.Invoke();
                     if (fill.Parts.Count > 0)

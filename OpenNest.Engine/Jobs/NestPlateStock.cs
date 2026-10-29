@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Clipper2Lib;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Jobs;
@@ -22,16 +23,19 @@ public sealed class NestPlateStock
 
     public NestPlateStock(string id, Size size, int? quantity, double partSpacing,
         Spacing edgeSpacing, int quadrant, double? cost,
-        IReadOnlyList<ClampZone> clampZones = null)
+        IReadOnlyList<ClampZone> clampZones = null, SheetOutline outline = null)
     {
         if (cost.HasValue && (!double.IsFinite(cost.Value) || cost.Value <= 0))
             throw new ArgumentOutOfRangeException(nameof(cost), $"Stock {id}: cost must be finite and positive, or null.");
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         if (quantity < 0)
             throw new ArgumentOutOfRangeException(nameof(quantity));
+        if (outline != null && (outline.Size.Width != size.Width || outline.Size.Length != size.Length))
+            throw new ArgumentException($"Stock {id}: the outline's bounds ({outline.Size}) must be the sheet size ({size}).", nameof(outline));
         Cost = cost;
         Id = id;
         Size = size;
+        Outline = outline;
         Quantity = quantity;
         PartSpacing = partSpacing;
         EdgeSpacing = edgeSpacing;
@@ -92,7 +96,45 @@ public sealed class NestPlateStock
     /// <summary>Generic per-physical-sheet cost; null selects area scoring.</summary>
     public double? Cost { get; }
     public string Id { get; }
+
+    /// <summary>The sheet's bounding box; the whole sheet when <see cref="Outline"/> is null.</summary>
     public Size Size { get; }
+
+    /// <summary>
+    /// The sheet's material when it is not a rectangle, in plate coordinates (the sheet's
+    /// lower-left frame, as <see cref="SheetClampZones"/>); null for a rectangular sheet. Its
+    /// bounds are <see cref="Size"/>. Only engines that fill an outline nest on such stock;
+    /// the others place nothing on it. Parts keep <see cref="OutlineInset"/> from its edges
+    /// and obstacles.
+    /// </summary>
+    public SheetOutline Outline { get; }
+
+    /// <summary>
+    /// The clearance a part keeps from an outlined sheet's edges and obstacles: the largest of
+    /// the four edge spacings, so no side of the outline is closer than the rectangle's would be.
+    /// </summary>
+    public double OutlineInset =>
+        System.Math.Max(0, System.Math.Max(System.Math.Max(EdgeSpacing.Left, EdgeSpacing.Right),
+            System.Math.Max(EdgeSpacing.Top, EdgeSpacing.Bottom)));
+
+    /// <summary>The sheet's lower-left corner in the placement frame: the translation
+    /// <see cref="WorkArea"/> and <see cref="ClampZones"/> were given.</summary>
+    public Vector PlacementOrigin => new(workArea.X - EdgeSpacing.Left, workArea.Y - EdgeSpacing.Bottom);
+
+    /// <summary>
+    /// Where a part may lie on an outlined sheet, in the placement frame: the outline less its
+    /// obstacles, eroded by <see cref="OutlineInset"/>. Null for a rectangular sheet, whose
+    /// <see cref="WorkArea"/> is the answer. A fresh copy on every call.
+    /// </summary>
+    public PathsD UsableOutline() => Outline?.Usable(OutlineInset, PlacementOrigin);
+
+    /// <summary>
+    /// Whether <paramref name="region"/> (outer paths positive, holes negative, in the placement
+    /// frame) lies within the outlined sheet's usable area, allowing <paramref name="slack"/>
+    /// outside it. True for a rectangular sheet: its box is checked by the callers.
+    /// </summary>
+    public bool OutlineHolds(PathsD region, double slack) =>
+        Outline == null || Outline.Holds(region, OutlineInset, PlacementOrigin, slack);
 
     /// <summary>Available physical sheets: null is unlimited, zero is legal but unavailable.</summary>
     public int? Quantity { get; }
@@ -106,8 +148,9 @@ public sealed class NestPlateStock
     /// </summary>
     public Box WorkArea => new(workArea.X, workArea.Y, workArea.Length, workArea.Width);
 
-    /// <summary>Full sheet area before edge spacing is removed.</summary>
-    public double Area => Size.Width * Size.Length;
+    /// <summary>Full sheet area before edge spacing is removed: the material inside the
+    /// <see cref="Outline"/> when there is one.</summary>
+    public double Area => Outline?.Area ?? Size.Width * Size.Length;
 
     /// <summary>True when a width (X) by height (Y) envelope fits the work area within epsilon.</summary>
     public bool Fits(double width, double height, double epsilon = 1e-9) =>

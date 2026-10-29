@@ -90,6 +90,8 @@ internal static class DiscPacker
     /// <summary>True when the disc fits the work area in both directions.</summary>
     public static bool Fits(NestPlateStock stock, DiscType type)
     {
+        if (stock.Outline != null)
+            return false; // The lattice fills rectangles only.
         var work = stock.WorkArea;
         return 2 * type.Radius <= work.Right - work.Left + Epsilon
             && 2 * type.Radius <= work.Top - work.Bottom + Epsilon;

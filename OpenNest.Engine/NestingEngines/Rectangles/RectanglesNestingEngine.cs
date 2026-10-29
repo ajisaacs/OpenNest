@@ -76,6 +76,8 @@ public sealed class RectanglesNestingEngine : INestingEngine
 
     private static bool FitsStock(NestPlateStock stock, BoxOrientation o)
     {
+        if (stock.Outline != null)
+            return false; // Boxes pack rectangles only.
         var work = stock.WorkArea;
         return o.Width <= work.Right - work.Left + SheetPacker.OverhangAllowance
             && o.Height <= work.Top - work.Bottom + SheetPacker.OverhangAllowance;

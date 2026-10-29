@@ -89,6 +89,7 @@ public static class NestPipelineCommit
                 continue;
             var plate = nextPlate();
             plate.Size = proposed.Stock.Size;
+            plate.Outline = proposed.Stock.Outline;
             plate.PartSpacing = proposed.Stock.PartSpacing;
             plate.EdgeSpacing = proposed.Stock.EdgeSpacing;
             plate.Quadrant = proposed.Stock.Quadrant;

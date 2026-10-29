@@ -69,11 +69,12 @@ internal static class SheetByStock
             }
 
             var trials = new List<(SheetLayout Layout, double Net, double Offcut)>();
-            if (preferred != null)
+            // Box and disc packers fill rectangles only; an outlined sheet is left to engines that fill outlines.
+            if (preferred != null && preferred.Outline == null)
                 Try(preferred, trials);
             if (trials.Count == 0)
                 foreach (var stock in job.Plates)
-                    if (!ReferenceEquals(stock, preferred))
+                    if (!ReferenceEquals(stock, preferred) && stock.Outline == null)
                         Try(stock, trials);
 
             if (trials.Count == 0)

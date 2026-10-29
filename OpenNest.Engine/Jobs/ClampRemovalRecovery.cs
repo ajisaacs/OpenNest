@@ -377,8 +377,9 @@ internal static class ClampRemovalRecovery
         var e = stock.EdgeSpacing;
         var zones = string.Join(",", stock.SheetClampZones.Select(z =>
             FormattableString.Invariant($"{z.Id}:{z.Bounds.X:R}/{z.Bounds.Y:R}/{z.Bounds.Length:R}/{z.Bounds.Width:R}")));
+        var outline = stock.Outline == null ? "" : FormattableString.Invariant($"|o{stock.Outline.GetHashCode():X}");
         return FormattableString.Invariant(
-            $"{stock.Size.Width:R}x{stock.Size.Length:R}|q{stock.Quadrant}|{stock.PartSpacing:R}|{e.Left:R},{e.Bottom:R},{e.Right:R},{e.Top:R}|{zones}");
+            $"{stock.Size.Width:R}x{stock.Size.Length:R}|q{stock.Quadrant}|{stock.PartSpacing:R}|{e.Left:R},{e.Bottom:R},{e.Right:R},{e.Top:R}|{zones}{outline}");
     }
 
     private sealed class ProbeBudget(int solves)
@@ -428,7 +429,8 @@ internal static class ClampRemovalRecovery
             stock.EdgeSpacing,
             stock.Quadrant,
             stock.Cost,
-            sheetZones
+            sheetZones,
+            stock.Outline
         )
         { ClampRail = stock.ClampRail };
     }

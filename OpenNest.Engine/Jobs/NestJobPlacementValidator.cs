@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Clipper2Lib;
 using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
 
@@ -120,7 +121,12 @@ internal static class NestJobPlacementValidator
         foreach (var cutout in shape.Cutouts)
             if (!FitsWorkArea(cutout, workArea))
                 return false;
-        return true;
+        if (stock.Outline == null)
+            return true;
+        // The circumscribed perimeter must lie in the outline's usable area; holes are inside it.
+        var perimeter = ClipperBridge.ToPath(
+            ClipperBridge.Flatten(shape.Perimeter, NestTolerances.ValidationOutline, circumscribe: true), positive: true);
+        return stock.OutlineHolds(new PathsD { perimeter }, Epsilon);
     }
 
     private static bool FitsWorkArea(Shape contour, Box workArea)

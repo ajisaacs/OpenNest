@@ -131,9 +131,12 @@ internal sealed class BarStock
         var lengths = new double[types.Count];
         for (var t = 0; t < types.Count; t++)
         {
-            var fitting = types[t].Orientations
-                .Where(o => (alongX ? o.Height : o.Width) <= crossExtent + BarPacker.OverhangAllowance)
-                .ToList();
+            // A bar is a rectangle; an outlined sheet is left to engines that fill outlines.
+            var fitting = stock.Outline != null
+                ? new List<BarOrientation>()
+                : types[t].Orientations
+                    .Where(o => (alongX ? o.Height : o.Width) <= crossExtent + BarPacker.OverhangAllowance)
+                    .ToList();
             if (fitting.Count == 0)
             {
                 fits[t] = Array.Empty<BarOrientation>();

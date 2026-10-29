@@ -15,7 +15,7 @@ public static class NestJobCost
     /// </summary>
     public static double NetSheetArea(NestJob job, NestJobPlateResult sheet)
     {
-        var area = sheet.Stock.Size.Width * sheet.Stock.Size.Length;
+        var area = sheet.Stock.Area;
         var minimum = job.Options.MinimumSalvageDimension;
         if (job.Options.SalvageRate == 0 || minimum <= 0 || sheet.Placements.Count == 0)
             return area;
@@ -84,16 +84,18 @@ public static class NestJobCost
     private static double NetSheetArea(
         NestJobOptions options, NestPlateStock stock, double left, double bottom, double right, double top)
     {
-        var area = stock.Size.Width * stock.Size.Length;
+        var area = stock.Area;
         var minimum = options.MinimumSalvageDimension;
         if (options.SalvageRate == 0 || minimum <= 0)
             return area;
         return area - options.SalvageRate * LargestOffcut(stock, left, bottom, right, top, minimum);
     }
 
+    // No rectangular edge strip is guaranteed inside an outlined sheet, so it earns no credit.
     private static double LargestOffcut(
         NestPlateStock stock, double left, double bottom, double right, double top, double minimum) =>
-        PlateRemnant.LargestOffcut(stock.WorkArea, stock.PartSpacing, left, bottom, right, top, minimum)
+        stock.Outline == null
+        && PlateRemnant.LargestOffcut(stock.WorkArea, stock.PartSpacing, left, bottom, right, top, minimum)
             is { } offcut ? offcut.Length * offcut.Width : 0;
 
     public static bool UsesExplicitCosts(NestJob job) =>

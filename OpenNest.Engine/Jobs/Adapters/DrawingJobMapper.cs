@@ -58,7 +58,8 @@ public static class DrawingJobMapper
             plate.EdgeSpacing,
             plate.Quadrant,
             cost: null,
-            clampZones: new List<ClampZone>(plate.ClampZones)
+            clampZones: new List<ClampZone>(plate.ClampZones),
+            outline: plate.Outline
         )
         { ClampRail = plate.ClampRail };
     }
@@ -126,6 +127,7 @@ public static class DrawingJobMapper
         // them into the placement frame through ClampZoneFrame, exactly as the stock did.
         foreach (var zone in stock.SheetClampZones)
             plate.ClampZones.Add(new ClampZone(zone.Id, zone.Bounds));
+        plate.Outline = stock.Outline;
         return plate;
     }
 }

@@ -63,6 +63,8 @@ public sealed class NestJobRunner : INestingEngine
                 var stock = job.Plates[index];
                 if (stock.Quantity is int quantity && used[stock.Id] >= quantity)
                     continue;
+                if (stock.Outline != null)
+                    continue; // Single-plate fill strategies fill rectangles only.
                 hasAvailableStock = true;
                 var request = new PlatePlacementRequest(
                     stock,

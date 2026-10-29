@@ -64,6 +64,25 @@ internal sealed class PackBoundary
         }
     }
 
+    /// <summary>
+    /// A sheet's material as the boundary: <paramref name="material"/> is its outline less its
+    /// obstacles (outer paths positive, holes negative) in the placement frame, and parts keep
+    /// <paramref name="edgeClearance"/> from every edge and obstacle, as they keep the edge
+    /// spacing from a rectangular sheet's edges. The outline is eroded by the edge clearance
+    /// less the half clearance the footprints already carry (grown when that is negative), plus
+    /// the margin; <paramref name="bounds"/> is the packer's work area and front origin.
+    /// </summary>
+    public PackBoundary(PathsD material, double edgeClearance, Box bounds, NoFitCache nfps)
+    {
+        Nfps = nfps;
+        Bounds = bounds;
+        var inset = edgeClearance - nfps.Clearance / 2 + Margin;
+        eroded = Clipper.InflatePaths(material, -inset, JoinType.Round, EndType.Polygon, 2.0,
+            NoFitCache.Precision, ArcTolerance);
+        eroded.RemoveAll(p => p.Count < 3);
+        obstacles = System.Array.Empty<Orientation>();
+    }
+
     public NoFitCache Nfps { get; }
 
     /// <summary>Bounds of the outline: the packer's work area and front origin.</summary>

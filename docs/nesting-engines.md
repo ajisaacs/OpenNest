@@ -171,6 +171,17 @@ Limits: one part per position across the width, so narrow parts waste the rest o
 that reach the row block their whole clearance-expanded length; FlatBar is not a Default
 candidate and must be selected by name.
 
+## Irregular stock
+
+A stock whose `NestPlateStock.Outline` is set (see [irregular stock](irregular-stock.md)) is
+filled only by Irregular: its usable material (the outline less obstacles, eroded by the largest
+edge spacing) becomes the `FrontierPacker`'s `PackBoundary`, built once per stock per solve on
+the stock's spacing cache, with the rectangular work area as the packer's bounds. Rectangles,
+Circles and FlatBar place nothing on it (`SheetByStock` skips it, their fit tests say no), the
+single-plate fill strategies skip it in the runner, and Default keeps Irregular's layout when
+it is the only valid one. The layout check rejects a part outside the outline or over an
+obstacle, so a plug-in that ignores the outline is caught as any other invalid layout.
+
 ## Rectangular clamp zones
 
 Whole-job Rectangles and Irregular exclude each stock's rectangular clamp zones,

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Clipper2Lib;
 using OpenNest.Converters;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Geometry;
@@ -394,6 +395,7 @@ public static class NestLayoutCheck
             && expected.EdgeSpacing.Top.IsEqualTo(actual.EdgeSpacing.Top)
             && expected.EdgeSpacing.Bottom.IsEqualTo(actual.EdgeSpacing.Bottom)
             && expected.Quadrant == actual.Quadrant
+            && Equals(expected.Outline, actual.Outline)
             && SameZones(expected.ClampZones, actual.ClampZones)
         );
 
@@ -465,6 +467,7 @@ public static class NestLayoutCheck
     )
     {
         var workArea = plate.WorkArea();
+        var stock = plate.Outline == null ? null : DrawingJobMapper.FromPlate("plate", plate, null);
 
         foreach (var part in parts)
         {
@@ -480,6 +483,19 @@ public static class NestLayoutCheck
                 result.Add(
                     $"'{DisplayName(part, requirements)}' at ({part.Location.X:F2},{part.Location.Y:F2}) falls outside the work area "
                         + $"of a {plate.Size} plate"
+                );
+                continue;
+            }
+
+            // An outlined sheet: the circumscribed material must lie in the usable area, which
+            // keeps the largest edge spacing from every edge and obstacle, within the same slack.
+            if (stock != null && Outline(part, 0) is { } material
+                && !stock.OutlineHolds(new PathsD { ClipperBridge.ToPath(material.Perimeter, positive: true) },
+                    NestTolerances.WorkAreaSlack))
+            {
+                result.Add(
+                    $"'{DisplayName(part, requirements)}' at ({part.Location.X:F2},{part.Location.Y:F2}) falls outside the outline "
+                        + $"of a {plate.Size} plate or over one of its obstacles"
                 );
             }
         }
@@ -501,7 +517,9 @@ public static class NestLayoutCheck
     )
     {
         var workArea = plate.WorkArea();
-        var budget = workArea.Width * workArea.Length;
+        var budget = plate.Outline == null
+            ? workArea.Width * workArea.Length
+            : DrawingJobMapper.FromPlate("plate", plate, null).UsableOutline().Sum(Clipper.Area);
         var placedArea = parts.Sum(p => p.BaseDrawing.Area);
 
         if (placedArea > budget + Tolerance.Epsilon)

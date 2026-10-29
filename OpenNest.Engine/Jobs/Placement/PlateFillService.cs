@@ -431,6 +431,11 @@ public static class PlateFillService
     private static PlateFiller RequireFiller(string strategy, Plate plate)
     {
         ArgumentNullException.ThrowIfNull(strategy);
+        ArgumentNullException.ThrowIfNull(plate);
+        // Every filler lays parts out in a rectangle; only Auto Nest's Irregular engine honors an outline.
+        if (plate.Outline != null)
+            throw new InvalidOperationException(
+                "Fill strategies need a rectangular sheet. Nest an outlined sheet with Auto Nest and the Irregular engine.");
         // An explicit empty string is an unknown strategy; only ResolveStrategy(string),
         // used for caller selections, maps null/empty to Fill.
         ResolveStrategy(strategy, allowEmpty: false);
