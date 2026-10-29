@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using Clipper2Lib;
 using OpenNest.Geometry;
 
@@ -105,20 +106,24 @@ public sealed class NestPlateStock
     /// lower-left frame, as <see cref="SheetClampZones"/>); null for a rectangular sheet. Its
     /// bounds are <see cref="Size"/>. Only engines that fill an outline nest on such stock;
     /// the others place nothing on it. Parts keep <see cref="OutlineInset"/> from its edges
-    /// and obstacles.
+    /// and obstacles. Omitted from serialized results when null, so rectangular stock
+    /// serializes exactly as before.
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SheetOutline Outline { get; }
 
     /// <summary>
     /// The clearance a part keeps from an outlined sheet's edges and obstacles: the largest of
     /// the four edge spacings, so no side of the outline is closer than the rectangle's would be.
     /// </summary>
+    [JsonIgnore]
     public double OutlineInset =>
         System.Math.Max(0, System.Math.Max(System.Math.Max(EdgeSpacing.Left, EdgeSpacing.Right),
             System.Math.Max(EdgeSpacing.Top, EdgeSpacing.Bottom)));
 
     /// <summary>The sheet's lower-left corner in the placement frame: the translation
     /// <see cref="WorkArea"/> and <see cref="ClampZones"/> were given.</summary>
+    [JsonIgnore]
     public Vector PlacementOrigin => new(workArea.X - EdgeSpacing.Left, workArea.Y - EdgeSpacing.Bottom);
 
     /// <summary>
