@@ -37,6 +37,11 @@ namespace OpenNest.Forms
         private TreeNode _currentMachineNode;
         private bool _dirty;
 
+        // The tab last shown for each kind of node, so moving between thicknesses (or machines)
+        // keeps the same tab open.
+        private string _machineTab;
+        private string _thicknessTab;
+
         private MachineConfigForm()
         {
             InitializeComponent();
@@ -90,6 +95,7 @@ namespace OpenNest.Forms
                 _tree.Nodes.Add(BuildMachineNode(machine));
             }
 
+            _tree.ExpandAll();
             if (_tree.Nodes.Count > 0)
                 _tree.SelectedNode = _tree.Nodes[0];
         }
@@ -127,8 +133,11 @@ namespace OpenNest.Forms
         private static TreeNode BuildThicknessNode(ThicknessConfig thickness) =>
             new(ThicknessLabel(thickness)) { Tag = thickness };
 
-        private static string ThicknessLabel(ThicknessConfig thickness) =>
-            thickness.Value.ToString("0.####");
+        private static string ThicknessLabel(ThicknessConfig thickness)
+        {
+            var value = thickness.Value.ToString("0.####");
+            return string.IsNullOrWhiteSpace(thickness.Name) ? value : $"{value} ({thickness.Name.Trim()})";
+        }
 
         private void Tree_AfterSelect(object sender, TreeViewEventArgs e)
         {
@@ -277,6 +286,7 @@ namespace OpenNest.Forms
             tabs.TabPages.Add(CreateTab("General", general));
             tabs.TabPages.Add(CreateTab("Clamps", BuildClampsTab(machine)));
             tabs.TabPages.Add(CreateTab("Support Bed", BuildSupportBedTab(machine)));
+            RememberTab(tabs, _machineTab, t => _machineTab = t);
 
             var host = new Panel { Dock = DockStyle.Fill, Height = 420 };
             host.Controls.Add(tabs);
@@ -628,6 +638,7 @@ namespace OpenNest.Forms
             );
             tabs.TabPages.Add(CreateTab("Cut Off", BuildCutOffTab(thickness.CutOff)));
             tabs.TabPages.Add(CreateTab("Plate Sizes", BuildPlateSizesTab(thickness)));
+            RememberTab(tabs, _thicknessTab, t => _thicknessTab = t);
 
             var host = new Panel { Dock = DockStyle.Fill, Height = 420 };
             host.Controls.Add(tabs);
@@ -657,6 +668,17 @@ namespace OpenNest.Forms
                     0.001m
                 )
             );
+            var nameBox = CreateTextBox(
+                thickness.Name,
+                v =>
+                {
+                    thickness.Name = v;
+                    node.Text = ThicknessLabel(thickness);
+                    MarkDirty();
+                }
+            );
+            nameBox.PlaceholderText = "e.g. 16 ga";
+            AddField(layout, ref row, "Name / Gauge:", nameBox);
             AddField(
                 layout,
                 ref row,
@@ -924,6 +946,14 @@ namespace OpenNest.Forms
             var page = new TabPage(text) { Padding = new Padding(0) };
             page.Controls.Add(content);
             return page;
+        }
+
+        private static void RememberTab(TabControl tabs, string lastTab, Action<string> store)
+        {
+            var page = tabs.TabPages.Cast<TabPage>().FirstOrDefault(p => p.Text == lastTab);
+            if (page is not null)
+                tabs.SelectedTab = page;
+            tabs.SelectedIndexChanged += (s, e) => store(tabs.SelectedTab?.Text);
         }
 
         private static TableLayoutPanel CreateDetailLayout()

@@ -49,6 +49,7 @@ public class LocalJsonProviderTests : IDisposable
                         new()
                         {
                             Value = 0.250,
+                            Name = "3 ga",
                             Kerf = 0.012,
                             AssistGas = "O2",
                             LeadIn = new LeadConfig
@@ -90,6 +91,7 @@ public class LocalJsonProviderTests : IDisposable
 
         var thick = mat.Thicknesses[0];
         Assert.Equal(0.250, thick.Value);
+        Assert.Equal("3 ga", thick.Name);
         Assert.Equal(0.012, thick.Kerf);
         Assert.Equal("O2", thick.AssistGas);
         Assert.Equal("Arc", thick.LeadIn.Type);
