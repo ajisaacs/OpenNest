@@ -294,13 +294,25 @@ public static class LeadPathValidator
             if (--budget < 0)
                 throw new NotSupportedException("Lead validation exceeds the native query limit.");
             var contacts = curve.Contacts(boundary, out var overlap);
-            if (overlap || contacts.Any(p => permittedJoint is not { } joint
-                || p.DistanceTo(joint) > PostVerificationGeometry.Epsilon))
+            if (overlap || contacts.Any(p => permittedJoint is not { } joint || !AtJoint(p, joint, boundary)))
                 return $"boundary; allowed={permittedJoint}; contacts={string.Join(";", contacts)}; overlap={overlap}";
         }
         // With all other boundary contacts excluded, the connected open path
         // has constant material membership. Use the native arc midpoint, not
         // the chord midpoint or endpoints (which can both lie in scrap).
         return !allowInterior && material.ContainsMaterial(curve.Midpoint, token) ? "interior" : null;
+
+        // A lead tangent to the boundary it joins (an arc lead-in meeting a straight edge) has a
+        // double root at the joint that rounding splits into two contacts a few 1e-8 apart; one
+        // within JointTolerance of a joint the boundary itself passes through is still the joint.
+        static bool AtJoint(Vector point, Vector joint, PostVerificationGeometry.Curve boundary)
+        {
+            var distance = point.DistanceTo(joint);
+            return distance <= PostVerificationGeometry.Epsilon
+                || distance <= JointTolerance && boundary.Contains(joint);
+        }
     }
+
+    // As SlideContact's: far below any kerf, far above a tangent root's rounding drift.
+    private const double JointTolerance = 1e-6;
 }

@@ -46,6 +46,30 @@ public class LeadPathValidationTests
         AssertUnsafe(straight, target);
     }
 
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(69.833896, 18.839189)] // A rotated part's window edge, as N26-27U's.
+    [InlineData(-14.2733, 31.610594)]
+    public void ArcLeadTangentToAWindowEdge_TouchesOnlyAtItsJoint(double dx, double dy)
+    {
+        // The semicircle's double root at the joint rounds into two contacts a few 1e-8 apart.
+        var clean = Rectangle(20 + dx, 10 + dy, 40 + dx, 40 + dy);
+        clean.Codes.AddRange(Rectangle(25.1 + dx, 17.776689 + dy, 38.378 + dx, 30.026689 + dy).Codes);
+        var target = LeadMaterialSnapshot.Capture(clean, Vector.Zero);
+        Assert.True(target.IsComplete, target.Reason);
+        for (var joint = 17.901689; joint < 30; joint += 1.37)
+        {
+            var radius = 0.0625;
+            var lead = new Program();
+            lead.MoveTo(38.378 - 2 * radius + dx, joint + dy);
+            lead.Codes.Add(new ArcMove(new Vector(38.378 + dx, joint + dy), new Vector(38.378 - radius + dx, joint + dy),
+                RotationType.CW)
+            { Layer = LayerType.Leadin });
+            lead.LineTo(38.378 + dx, 17.776689 + dy);
+            AssertClear(lead, target);
+        }
+    }
+
     [Fact]
     public void OtherHoleIsScrap_AndLineArcTangenciesReject()
     {

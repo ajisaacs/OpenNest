@@ -79,10 +79,12 @@ public class PinnedContourTests
         Assert.True(pinnedResult.IndependentlyReplayed);
         var choices = Assert.Single(pinnedResult.ProposedOrder).ContourChoices;
         Assert.Equal(new Vector(4, 3), Assert.Single(choices, c => c.ContourOrdinal == 0).Point);
-        // The other hole and the outside are chosen exactly as for the same drawing without pins.
+        // The outside is chosen exactly as for the same drawing without pins. The other hole stays
+        // automatic, entered nearest where the pinned hole is left: (6, 3), facing the pin at (4, 3).
         var plain = Assert.Single(plainResult.ProposedOrder).ContourChoices;
-        Assert.Equal(plain.Where(c => c.ContourOrdinal != 0).Select(c => (c.ContourOrdinal, c.EntityOrdinal, c.Point)),
-            choices.Where(c => c.ContourOrdinal != 0).Select(c => (c.ContourOrdinal, c.EntityOrdinal, c.Point)));
+        Assert.Equal(plain.Where(c => c.ContourOrdinal == 2).Select(c => (c.ContourOrdinal, c.EntityOrdinal, c.Point)),
+            choices.Where(c => c.ContourOrdinal == 2).Select(c => (c.ContourOrdinal, c.EntityOrdinal, c.Point)));
+        Assert.True(Assert.Single(choices, c => c.ContourOrdinal == 1).Point.DistanceTo(new Vector(6, 3)) < 1e-6);
         // The pinned hole uses the pin's straight lead; the others use the nest's arc lead-ins.
         var leadIns = ExecutionMotionReader.Read(pinnedResult.ProposedOrder[0].CopyProgram(), Vector.Zero, null, default)
             .Motions.Where(m => m.Layer == LayerType.Leadin).ToArray();

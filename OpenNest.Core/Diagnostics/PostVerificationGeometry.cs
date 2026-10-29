@@ -397,9 +397,9 @@ internal static class PostVerificationGeometry
                     points.Add(point);
             // Existing exact line/ray contact semantics guard native queries which
             // suppress very short or nearly parallel intersections. Uncertainty refuses.
-            if (Center is null && !SameSupport(other) && nativeContactCount == 0 && ExactLineContact(this, other))
+            if (Center is null && !SameSupport(other) && nativeContactCount == 0 && ExactLineContact(this, other, points))
                 throw new NotSupportedException("Native contact query is numerically uncertain.");
-            if (other.Center is null && Center.HasValue && nativeContactCount == 0 && ExactLineContact(other, this))
+            if (other.Center is null && Center.HasValue && nativeContactCount == 0 && ExactLineContact(other, this, points))
                 throw new NotSupportedException("Native contact query is numerically uncertain.");
             return points;
 
@@ -415,16 +415,35 @@ internal static class PostVerificationGeometry
         /// endpoint (both stop half-way when both endpoints are contained): a line meeting a
         /// tangent arc at their shared vertex is otherwise rediscovered there as a contact the
         /// native query missed, because rounding can drop the tangent root of its quadratic.
+        /// For the same reason a ray hit within <see cref="RaySeamTolerance"/> of a
+        /// <paramref name="recorded"/> contact is that contact: an arc lead ending tangent on a
+        /// straight edge, mid-edge, has its end recorded and its double root dropped.
         /// </summary>
-        private static bool ExactLineContact(Curve line, Curve curve)
+        private static bool ExactLineContact(Curve line, Curve curve, IReadOnlyList<Vector> recorded)
         {
             var direction = (line.End - line.Start) * (1 / line.Length);
             var startRecorded = curve.Contains(line.Start);
             var endRecorded = curve.Contains(line.End);
             var forward = endRecorded ? startRecorded ? line.Length / 2 : 0 : line.Length;
             var backward = startRecorded ? endRecorded ? line.Length / 2 : 0 : line.Length;
-            return (forward > 0 && curve.ContactAfterStart(line.Start, direction, forward))
-                || (backward > 0 && curve.ContactAfterStart(line.End, direction * -1, backward));
+            return (forward > 0 && Unrecorded(line.Start, direction, forward))
+                || (backward > 0 && Unrecorded(line.End, direction * -1, backward));
+
+            bool Unrecorded(Vector origin, Vector ray, double length)
+            {
+                var hits = new List<double>();
+                curve.ContactAfterStart(origin, ray, length, hits);
+                foreach (var distance in hits)
+                {
+                    var hit = origin + ray * distance;
+                    var known = false;
+                    foreach (var point in recorded)
+                        known |= point.DistanceTo(hit) <= RaySeamTolerance;
+                    if (!known)
+                        return true;
+                }
+                return false;
+            }
         }
 
 
