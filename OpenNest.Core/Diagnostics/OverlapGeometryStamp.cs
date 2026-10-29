@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using OpenNest.CNC;
 
 namespace OpenNest.Diagnostics;
@@ -12,7 +13,9 @@ public sealed class OverlapGeometryStamp
     private readonly Plate plate;
     private readonly Entry[] entries;
     private readonly (string Id, long X, long Y, long Length, long Width)[] zones;
-    private readonly (CutOff Definition, CutOffAxis Axis, long X, long Y, long? Start, long? End, long Overcut)[] cutoffs;
+    // Gaps are replaced, never edited in place, so their reference stands for their content.
+    private readonly (CutOff Definition, CutOffAxis Axis, long X, long Y, long? Start, long? End,
+        IReadOnlyList<CutOffGap> Gaps, long Overcut)[] cutoffs;
     private readonly (long Width, long Length, int Quadrant) sheet;
 
     private OverlapGeometryStamp(Plate plate)
@@ -25,7 +28,7 @@ public sealed class OverlapGeometryStamp
         zones = new (string, long, long, long, long)[plate.ClampZones.Count];
         for (var i = 0; i < zones.Length; i++)
             zones[i] = ZoneState(plate.ClampZones[i]);
-        cutoffs = new (CutOff, CutOffAxis, long, long, long?, long?, long)[plate.CutOffs.Count];
+        cutoffs = new (CutOff, CutOffAxis, long, long, long?, long?, IReadOnlyList<CutOffGap>, long)[plate.CutOffs.Count];
         for (var i = 0; i < cutoffs.Length; i++)
             cutoffs[i] = CutOffState(plate.CutOffs[i]);
     }
@@ -36,12 +39,12 @@ public sealed class OverlapGeometryStamp
         zone?.Bounds is not { } box ? default
             : (zone.Id, Bits(box.X), Bits(box.Y), Bits(box.Length), Bits(box.Width));
 
-    private static (CutOff, CutOffAxis, long, long, long?, long?, long) CutOffState(CutOff cut) =>
+    private static (CutOff, CutOffAxis, long, long, long?, long?, IReadOnlyList<CutOffGap>, long) CutOffState(CutOff cut) =>
         cut == null ? default
             : (cut, cut.Axis, Bits(cut.Position.X), Bits(cut.Position.Y),
                 cut.StartLimit.HasValue ? Bits(cut.StartLimit.Value) : null,
                 cut.EndLimit.HasValue ? Bits(cut.EndLimit.Value) : null,
-                Bits(cut.HeadLockOvercut));
+                cut.Gaps, Bits(cut.HeadLockOvercut));
 
     private static long Bits(double value) => BitConverter.DoubleToInt64Bits(value);
 

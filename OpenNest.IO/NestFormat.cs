@@ -936,6 +936,20 @@ namespace OpenNest.IO
             /// </summary>
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
             public bool FarEdgeFirst { get; init; }
+
+            /// <summary>
+            /// Stretches of the line between its limits left uncut (<c>CutOff.Gaps</c>), in
+            /// ascending order along its axis. Omitted when there are none; older readers ignore
+            /// it and cut through the gaps.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public CutOffGapDto[] Gaps { get; init; }
+        }
+
+        public record CutOffGapDto
+        {
+            public double Start { get; init; }
+            public double End { get; init; }
         }
 
         public record SizeDto

@@ -33,15 +33,21 @@ public static class ClampCutDiagnostics
             var farHigh = CutOff.FarEdgeIsHigh(cut.Axis, plate.Quadrant);
             var low = farHigh ? 0 : overcut;
             var high = farHigh ? overcut : 0;
-            var start = cut.Axis == CutOffAxis.Vertical
-                ? new Vector(cut.Position.X, cut.StartLimit ?? sheet.Bottom - low)
-                : new Vector(cut.StartLimit ?? sheet.Left - low, cut.Position.Y);
-            var end = cut.Axis == CutOffAxis.Vertical
-                ? new Vector(cut.Position.X, cut.EndLimit ?? sheet.Top + high)
-                : new Vector(cut.EndLimit ?? sheet.Right + high, cut.Position.Y);
+            var vertical = cut.Axis == CutOffAxis.Vertical;
+            var from = cut.StartLimit ?? (vertical ? sheet.Bottom : sheet.Left) - low;
+            var to = cut.EndLimit ?? (vertical ? sheet.Top : sheet.Right) + high;
+            // A clamp wholly inside a gap meets no cut.
             foreach (var zone in zones)
-                if (Intersects(start, end, zone.Bounds, out var location))
-                    findings.Add(new CutOffClampFinding(index, zone.Id, location));
+                foreach (var (pieceStart, pieceEnd) in cut.Pieces(from, to))
+                {
+                    var start = vertical ? new Vector(cut.Position.X, pieceStart) : new Vector(pieceStart, cut.Position.Y);
+                    var end = vertical ? new Vector(cut.Position.X, pieceEnd) : new Vector(pieceEnd, cut.Position.Y);
+                    if (Intersects(start, end, zone.Bounds, out var location))
+                    {
+                        findings.Add(new CutOffClampFinding(index, zone.Id, location));
+                        break;
+                    }
+                }
         }
         return findings.AsReadOnly();
     }

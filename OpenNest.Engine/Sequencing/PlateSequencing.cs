@@ -70,7 +70,7 @@ namespace OpenNest.Engine.Sequencing
                 }
                 var target = order.FindIndex(other => !other.BaseDrawing.IsCutOff
                     && CuttingDependencyGraph.CutOffCrosses(definition.Axis, definition.Position,
-                        segment.SpanStart, segment.SpanEnd, other.BoundingBox, bounds));
+                        segment.SpanStart, segment.SpanEnd, other.BoundingBox, bounds, definition.Gaps));
                 if (target < 0)
                     target = order.FindIndex(other => other.BaseDrawing.IsCutOff && !movingParts.Contains(other)
                         && existing.TryGetValue(other.BaseDrawing, out var cut) && CutOff.SeparatesSheet(other, cut, bounds));
@@ -149,7 +149,7 @@ namespace OpenNest.Engine.Sequencing
                         if (!definitions.TryGetValue(cut.Part.BaseDrawing, out var definition)
                             || !spans.TryGetValue(cut.Part, out var span)
                             || CuttingDependencyGraph.CutOffCrosses(definition.Axis, definition.Position,
-                                span.Start, span.End, part.BoundingBox, bounds))
+                                span.Start, span.End, part.BoundingBox, bounds, definition.Gaps))
                         {
                             result.Add(cut.Part);
                             emitted[cut.Index] = true;

@@ -98,7 +98,8 @@ internal sealed class CuttingDependencyGraph
             {
                 token.ThrowIfCancellationRequested();
                 if (!nodes[part].IsCutOff && (definition == null || CutOffCrosses(definition.Axis,
-                    definition.Position, definition.StartLimit, definition.EndLimit, nodes[part].PlacedBounds, plate)))
+                    definition.Position, definition.StartLimit, definition.EndLimit, nodes[part].PlacedBounds, plate,
+                    definition.Gaps)))
                     edges[part].Add(cut);
             }
         }
@@ -164,10 +165,11 @@ internal sealed class CuttingDependencyGraph
     /// Whether a cutoff's nominal line crosses a part's bounds within the cutoff's span. Uses the
     /// nominal line, not its trimmed cutting segments (which deliberately skip the parts). Bounds
     /// conservatively include edge contacts and concave recesses; limits prevent unrelated
-    /// dependencies beyond the cutoff's span. Negative coordinates need no special case.
+    /// dependencies beyond the cutoff's span. A part wholly inside one of the line's
+    /// <paramref name="gaps"/> is not crossed. Negative coordinates need no special case.
     /// </summary>
     internal static bool CutOffCrosses(CutOffAxis axis, Vector cutOffPosition, double? startLimit,
-        double? endLimit, Box part, Box plate)
+        double? endLimit, Box part, Box plate, IReadOnlyList<CutOffGap> gaps = null)
     {
         var vertical = axis == CutOffAxis.Vertical;
         var position = vertical ? cutOffPosition.X : cutOffPosition.Y;
@@ -177,10 +179,10 @@ internal sealed class CuttingDependencyGraph
         var alongMax = vertical ? part.Top : part.Right;
         var start = startLimit ?? (vertical ? plate.Bottom : plate.Left);
         var end = endLimit ?? (vertical ? plate.Top : plate.Right);
-        return !(position < acrossMin - Tolerance.Epsilon
-            || position > acrossMax + Tolerance.Epsilon
-            || System.Math.Max(start, end) < alongMin - Tolerance.Epsilon
-            || System.Math.Min(start, end) > alongMax + Tolerance.Epsilon);
+        if (position < acrossMin - Tolerance.Epsilon || position > acrossMax + Tolerance.Epsilon)
+            return false;
+        return CutOff.Pieces(start, end, gaps ?? Array.Empty<CutOffGap>()).Any(piece =>
+            !(piece.End < alongMin - Tolerance.Epsilon || piece.Start > alongMax + Tolerance.Epsilon));
     }
 
     // True when the inner part's perimeter lies strictly inside one cutout of the host. Any
@@ -196,7 +198,8 @@ internal sealed class CuttingDependencyGraph
 }
 
 /// <summary>Owned copy of a cutoff definition's nominal line.</summary>
-internal sealed record CutOffDefinition(CutOffAxis Axis, Vector Position, double? StartLimit, double? EndLimit);
+internal sealed record CutOffDefinition(CutOffAxis Axis, Vector Position, double? StartLimit, double? EndLimit,
+    IReadOnlyList<CutOffGap> Gaps);
 
 /// <summary>Owned per-placement dependency input; material is captured only when a pair needs it.</summary>
 internal sealed class DependencyNode

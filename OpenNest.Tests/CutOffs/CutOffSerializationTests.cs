@@ -47,6 +47,40 @@ public class CutOffSerializationTests
     }
 
     [Fact]
+    public void RoundTrip_GapsAreKeptAndWrittenOnlyWhenPresent()
+    {
+        var nest = new Nest();
+        var plate = TestHelpers.MakePlate(48, 96);
+        nest.Plates.Add(plate);
+        var gapped = new CutOff(new Vector(0, 20), CutOffAxis.Horizontal) { Gaps = [new CutOffGap(35, 68.6)] };
+        var plain = new CutOff(new Vector(35, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(gapped);
+        plate.CutOffs.Add(plain);
+        plate.RegenerateCutOffs(new CutOffSettings());
+
+        using var stream = new MemoryStream();
+        Assert.True(new NestWriter(nest) { KeepEmptyPlates = true }.Write(stream));
+        stream.Position = 0;
+        using (var archive = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Read, leaveOpen: true))
+        using (var reader = new StreamReader(archive.GetEntry("nest.json")!.Open()))
+        using (var json = System.Text.Json.JsonDocument.Parse(reader.ReadToEnd()))
+        {
+            var saved = Assert.Single(json.RootElement.GetProperty("plates").EnumerateArray())
+                .GetProperty("cutOffs").EnumerateArray().ToArray();
+            var gap = Assert.Single(saved[0].GetProperty("gaps").EnumerateArray());
+            Assert.Equal(35, gap.GetProperty("start").GetDouble());
+            Assert.Equal(68.6, gap.GetProperty("end").GetDouble());
+            Assert.False(saved[1].TryGetProperty("gaps", out _));
+        }
+        stream.Position = 0;
+        var loaded = Assert.Single(new NestReader(stream).Read().Plates);
+
+        Assert.Equal(new[] { new CutOffGap(35, 68.6) }, loaded.CutOffs[0].Gaps);
+        Assert.Empty(loaded.CutOffs[1].Gaps);
+        Assert.Equal(2, CutOffSegments.Of(loaded, loaded.CutOffs[0]).Count);
+    }
+
+    [Fact]
     public void RoundTrip_CutOffsPreserved()
     {
         var nest = new Nest();

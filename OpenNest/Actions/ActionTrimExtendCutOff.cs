@@ -10,7 +10,8 @@ namespace OpenNest.Actions
 {
     /// <summary>
     /// Trims or extends a cut-off against the cut-offs that cross it (see <see cref="CutOffTrim"/>).
-    /// Trim removes the clicked piece; Extend grows the end nearer the click. Tab switches mode.
+    /// Trim removes the clicked piece, leaving a gap when it lies between two crossing lines;
+    /// Extend closes the gap or grows the end nearer the click. Tab switches mode.
     /// </summary>
     [DisplayName("Trim/Extend Cut-Off")]
     public class ActionTrimExtendCutOff : Action
@@ -53,7 +54,7 @@ namespace OpenNest.Actions
         public override bool IsBusy() => false;
 
         public override string Hint => message ?? (extend
-            ? "click near the end of a cut-off to extend it, Tab switches to Trim, Esc finishes, F1 for help"
+            ? "click near the end of a cut-off to extend it or close a gap, Tab switches to Trim, Esc finishes, F1 for help"
             : "click the piece of a cut-off to remove, Tab switches to Extend, Esc finishes, F1 for help");
 
         public override string HelpTopic => HelpTopics.TrimExtendCutOff;
@@ -128,16 +129,13 @@ namespace OpenNest.Actions
             var width = 2f / plateView.ViewScale;
             using var removed = new Pen(Color.FromArgb(200, 220, 20, 60), width) { DashStyle = DashStyle.Dash };
             using var added = new Pen(Color.FromArgb(200, 34, 139, 34), width) { DashStyle = DashStyle.Dash };
-            var sheet = plateView.Plate.BoundingBox(includeParts: false);
             foreach (var change in preview.Changes)
             {
-                var cutOff = change.CutOff;
-                var vertical = cutOff.Axis == CutOffAxis.Vertical;
-                var (oldStart, oldEnd) = CutOffTrim.NominalSpan(plateView.Plate, cutOff);
-                var newStart = change.StartLimit ?? (vertical ? sheet.Bottom : sheet.Left);
-                var newEnd = change.EndLimit ?? (vertical ? sheet.Top : sheet.Right);
-                DrawPiece(e.Graphics, cutOff, oldStart, newStart, newStart > oldStart ? removed : added);
-                DrawPiece(e.Graphics, cutOff, oldEnd, newEnd, newEnd < oldEnd ? removed : added);
+                var (removedPieces, addedPieces) = CutOffTrim.Difference(plateView.Plate, change);
+                foreach (var (from, to) in removedPieces)
+                    DrawPiece(e.Graphics, change.CutOff, from, to, removed);
+                foreach (var (from, to) in addedPieces)
+                    DrawPiece(e.Graphics, change.CutOff, from, to, added);
             }
         }
 

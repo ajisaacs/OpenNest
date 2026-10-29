@@ -5,7 +5,8 @@ using OpenNest.Geometry;
 namespace OpenNest.Tests.CutOffs;
 
 /// <summary>
-/// Trim, Extend and Swap Through-Cut change only a cut-off's start and end limits: a trim stops on
+/// Trim, Extend and Swap Through-Cut at a line's ends change only its start and end limits (gaps
+/// are in <see cref="CutOffGapTests"/>): a trim stops on
 /// the crossing line's centre, an extend runs to the next crossing line or the sheet edge, and a
 /// swap makes the stopped line run through while the through line loses its far side.
 /// </summary>
@@ -112,15 +113,15 @@ public class CutOffTrimTests
     }
 
     [Fact]
-    public void Trim_RefusesTheMiddlePiece()
+    public void Trim_RefusalChangesNothing()
     {
-        var (plate, _, horizontal) = N26264();
+        var plate = new Plate(48, 96);
+        var lone = new CutOff(new Vector(40, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(lone);
 
-        var edit = CutOffTrim.Trim(plate, horizontal, new Vector(50, SeparatorY), Settings);
-
-        Assert.Equal(CutOffTrim.MiddlePiece, edit.Refusal);
-        Assert.Empty(edit.Changes);
-        Assert.Throws<InvalidOperationException>(edit.Apply);
+        var refused = CutOffTrim.Trim(plate, lone, new Vector(40, 10), Settings);
+        Assert.Empty(refused.Changes);
+        Assert.Throws<InvalidOperationException>(refused.Apply);
     }
 
     [Fact]

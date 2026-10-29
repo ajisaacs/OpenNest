@@ -416,6 +416,8 @@ namespace OpenNest.IO
                             Segments = segments.Length > 0 ? segments : null,
                             HeadLockOvercut = cutoff.HeadLockOvercut,
                             FarEdgeFirst = cutoff.FarEdgeFirst,
+                            Gaps = cutoff.Gaps.Count == 0 ? null
+                                : cutoff.Gaps.Select(gap => new CutOffGapDto { Start = gap.Start, End = gap.End }).ToArray(),
                         }
                     );
                 }

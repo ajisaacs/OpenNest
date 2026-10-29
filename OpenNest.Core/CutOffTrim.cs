@@ -5,13 +5,21 @@ using OpenNest.Math;
 
 namespace OpenNest
 {
-    /// <summary>The limits one cut-off takes when a <see cref="CutOffEdit"/> is applied.</summary>
-    public sealed record CutOffLimitChange(CutOff CutOff, double? StartLimit, double? EndLimit);
+    /// <summary>
+    /// The limits and gaps one cut-off takes when a <see cref="CutOffEdit"/> is applied; null
+    /// <paramref name="Gaps"/> keeps the cut-off's gaps.
+    /// </summary>
+    public sealed record CutOffLimitChange(CutOff CutOff, double? StartLimit, double? EndLimit,
+        IReadOnlyList<CutOffGap> Gaps = null)
+    {
+        /// <summary>The gaps the cut-off has once the change is applied.</summary>
+        public IReadOnlyList<CutOffGap> NewGaps => Gaps ?? CutOff.Gaps;
+    }
 
     /// <summary>
-    /// A worked-out trim, extend or swap: the new limits of each cut-off it changes, or why it was
-    /// refused. Nothing changes until <see cref="Apply"/>; the caller then regenerates the plate's
-    /// cut-offs and places their segments in the cutting order.
+    /// A worked-out trim, extend or swap: the new limits and gaps of each cut-off it changes, or
+    /// why it was refused. Nothing changes until <see cref="Apply"/>; the caller then regenerates
+    /// the plate's cut-offs and places their segments in the cutting order.
     /// </summary>
     public sealed class CutOffEdit
     {
@@ -44,31 +52,37 @@ namespace OpenNest
             {
                 change.CutOff.StartLimit = change.StartLimit;
                 change.CutOff.EndLimit = change.EndLimit;
+                if (change.Gaps != null)
+                    change.CutOff.Gaps = change.Gaps;
             }
         }
     }
 
     /// <summary>
     /// Trims and extends cut-offs against the cut-offs that cross them, by changing only their
-    /// start and end limits (see docs/automatic-scrap-cutoffs.md, "Trim and extend"). A trim stops
-    /// on the crossing line's centre, inside its kerf; an extend runs to the next crossing line
-    /// beyond the current end, or to the sheet edge, which clears the limit.
+    /// start and end limits and their gaps (see docs/automatic-scrap-cutoffs.md, "Trim and
+    /// extend"). A trim stops on the crossing line's centre, inside its kerf; trimming a piece
+    /// between two crossing lines leaves a gap from one centre to the other. An extend closes the
+    /// gap at the picked end, or runs the line's end to the next crossing line beyond it, or to
+    /// the sheet edge, which clears the limit.
     /// </summary>
     public static class CutOffTrim
     {
         public const string NotOnPlate = "That cut-off is not on this plate.";
         public const string NothingToTrimTo = "No cut-off crosses this line to trim it to; delete it instead.";
-        public const string MiddlePiece = "Trimming the middle piece would split the line in two; trim an end piece instead.";
+        public const string InGap = "That stretch of the line is already uncut.";
         public const string TooShort = "Trimming here would leave a line shorter than the minimum segment length.";
         public const string AtSheetEdge = "This end already runs to the sheet edge.";
         public const string NotAJunction = "These cut-offs do not meet with one running through and the other stopping at it.";
+        public const string GapAtJunction = "A gap in one of these lines meets the junction; extend to close it before swapping.";
         public const string OvercutOff = "The head-locked overcut is off while this line stops short of the far edge.";
         public const string OvercutOn = "The head-locked overcut is back on at the far edge.";
 
         /// <summary>
         /// Removes the piece of <paramref name="target"/> picked at <paramref name="pick"/>, between
-        /// the crossing cut-offs on either side of it (or the line's end): the limit on that side
-        /// moves to the crossing line.
+        /// the crossing cut-offs on either side of it, or a gap or the line's end where there is no
+        /// crossing on that side. An end piece moves that end's limit; a piece between two crossing
+        /// lines becomes a gap, merged with any gap it touches.
         /// </summary>
         public static CutOffEdit Trim(Plate plate, CutOff target, Vector pick, CutOffSettings settings)
         {
@@ -76,30 +90,40 @@ namespace OpenNest
                 return CutOffEdit.Refused(NotOnPlate);
             var (start, end) = NominalSpan(plate, target);
             var at = System.Math.Clamp(Along(target, pick), start, end);
+            var pieces = target.Pieces(start, end);
+            var piece = pieces.Where(p => at >= p.Start - Tolerance.Epsilon && at <= p.End + Tolerance.Epsilon)
+                .Cast<(double Start, double End)?>().FirstOrDefault();
+            if (piece is not var (pieceStart, pieceEnd))
+                return CutOffEdit.Refused(InGap);
+
             var crossings = Crossings(plate, target)
-                .Where(c => c > start + Tolerance.Epsilon && c < end - Tolerance.Epsilon)
+                .Where(c => c > pieceStart + Tolerance.Epsilon && c < pieceEnd - Tolerance.Epsilon)
                 .ToList();
-            if (crossings.Count == 0)
+            var low = crossings.Where(c => c <= at).DefaultIfEmpty(pieceStart).Max();
+            var high = crossings.Where(c => c > at).DefaultIfEmpty(pieceEnd).Min();
+            if (pieces.Count == 1 && low == start && high == end)
                 return CutOffEdit.Refused(NothingToTrimTo);
 
-            var below = crossings.Where(c => c <= at).DefaultIfEmpty(double.NaN).Max();
-            var above = crossings.Where(c => c > at).DefaultIfEmpty(double.NaN).Min();
-            if (!double.IsNaN(below) && !double.IsNaN(above))
-                return CutOffEdit.Refused(MiddlePiece);
-
-            var (newStart, newEnd) = double.IsNaN(above)
-                ? (target.StartLimit, (double?)below)
-                : ((double?)above, target.EndLimit);
-            var remaining = double.IsNaN(above) ? below - start : end - above;
-            if (remaining < System.Math.Max(settings?.MinSegmentLength ?? 0, Tolerance.Epsilon))
+            var remaining = new List<(double Start, double End)>();
+            foreach (var (from, to) in pieces)
+            {
+                if (from < low)
+                    remaining.Add((from, System.Math.Min(to, low)));
+                if (to > high)
+                    remaining.Add((System.Math.Max(from, high), to));
+            }
+            var minimum = System.Math.Max(settings?.MinSegmentLength ?? 0, Tolerance.Epsilon);
+            if (remaining.Count == 0
+                || remaining.Any(p => (p.End == low || p.Start == high) && p.End - p.Start < minimum))
                 return CutOffEdit.Refused(TooShort);
-            return Single(plate, target, newStart, newEnd);
+            return Single(plate, Change(target, start, end, remaining));
         }
 
         /// <summary>
-        /// Lengthens the end of <paramref name="target"/> nearer <paramref name="pick"/> to the next
-        /// crossing cut-off beyond it, or to the sheet edge when there is none. A cut-off sitting at
-        /// the current end is skipped, so picking again extends one more step.
+        /// Lengthens <paramref name="target"/> at the end of the piece nearer <paramref name="pick"/>:
+        /// a gap there closes; the line's own end runs to the next crossing cut-off beyond it, or to
+        /// the sheet edge when there is none. A cut-off sitting at the current end is skipped, so
+        /// picking again extends one more step. A pick inside a gap closes that gap.
         /// </summary>
         public static CutOffEdit Extend(Plate plate, CutOff target, Vector pick)
         {
@@ -107,10 +131,25 @@ namespace OpenNest
                 return CutOffEdit.Refused(NotOnPlate);
             var (start, end) = NominalSpan(plate, target);
             var at = Along(target, pick);
-            var high = System.Math.Abs(at - end) <= System.Math.Abs(at - start);
-            return ExtendEnd(plate, target, high, out var limit)
-                ? Single(plate, target, high ? target.StartLimit : limit, high ? limit : target.EndLimit)
-                : CutOffEdit.Refused(AtSheetEdge);
+            var gaps = target.Gaps;
+            var inside = gaps.Where(g => at > g.Start && at < g.End).ToList();
+            if (inside.Count == 0)
+            {
+                var pieces = target.Pieces(start, end);
+                var piece = pieces.OrderBy(p => Distance(at, p)).First();
+                var high = System.Math.Abs(at - piece.End) <= System.Math.Abs(at - piece.Start);
+                var edge = high ? piece.End : piece.Start;
+                inside = gaps.Where(g => System.Math.Abs((high ? g.Start : g.End) - edge) <= Tolerance.Epsilon).ToList();
+                if (inside.Count == 0)
+                {
+                    return ExtendEnd(plate, target, high, out var limit)
+                        ? Single(plate, new CutOffLimitChange(target,
+                            high ? target.StartLimit : limit, high ? limit : target.EndLimit))
+                        : CutOffEdit.Refused(AtSheetEdge);
+                }
+            }
+            return Single(plate, new CutOffLimitChange(target, target.StartLimit, target.EndLimit,
+                gaps.Except(inside).ToList()));
         }
 
         /// <summary>
@@ -135,31 +174,40 @@ namespace OpenNest
             if (remaining < System.Math.Max(settings?.MinSegmentLength ?? 0, Tolerance.Epsilon))
                 return CutOffEdit.Of(System.Array.Empty<CutOffLimitChange>(), null);
             return startsHigh
-                ? Single(plate, target, stop, target.EndLimit)
-                : Single(plate, target, target.StartLimit, stop);
+                ? Single(plate, new CutOffLimitChange(target, stop, target.EndLimit))
+                : Single(plate, new CutOffLimitChange(target, target.StartLimit, stop));
         }
 
         /// <summary>
         /// Swaps which of two meeting cut-offs runs through: the one that stopped at the junction
         /// extends past it (as <see cref="Extend"/> does), and the one that ran through is trimmed
-        /// there, losing the side away from the plate's origin. Only the origin-side sheet edge is
-        /// certain, so the trimmed line keeps starting there.
+        /// there, losing the side away from the plate's origin and any gaps on it. Only the
+        /// origin-side sheet edge is certain, so the trimmed line keeps starting there. Refused when
+        /// a gap in either line meets the junction.
         /// </summary>
         public static CutOffEdit Swap(Plate plate, CutOff first, CutOff second, CutOffSettings settings)
         {
             if (!plate.CutOffs.Contains(first) || !plate.CutOffs.Contains(second))
                 return CutOffEdit.Refused(NotOnPlate);
+            if (first != second && first.Axis != second.Axis
+                && (TouchesGap(first, Line(second)) || TouchesGap(second, Line(first))))
+                return CutOffEdit.Refused(GapAtJunction);
             if (Junction(plate, first, second) is not var (through, stopper, point))
                 return CutOffEdit.Refused(NotAJunction);
 
             var (start, end) = NominalSpan(plate, through);
             var farHigh = CutOff.FarEdgeIsHigh(through.Axis, plate.Quadrant);
-            var remaining = farHigh ? point - start : end - point;
-            if (remaining < System.Math.Max(settings?.MinSegmentLength ?? 0, Tolerance.Epsilon))
+            var kept = through.Pieces(start, end)
+                .Select(p => farHigh ? (p.Start, System.Math.Min(p.End, point)) : (System.Math.Max(p.Start, point), p.End))
+                .Where(p => p.Item2 > p.Item1)
+                .ToList();
+            var adjacent = kept.FirstOrDefault(p => (farHigh ? p.Item2 : p.Item1) == point);
+            if (kept.Count == 0
+                || adjacent.Item2 - adjacent.Item1 < System.Math.Max(settings?.MinSegmentLength ?? 0, Tolerance.Epsilon))
                 return CutOffEdit.Refused(TooShort);
             var throughChange = farHigh
-                ? new CutOffLimitChange(through, through.StartLimit, point)
-                : new CutOffLimitChange(through, point, through.EndLimit);
+                ? new CutOffLimitChange(through, through.StartLimit, point, GapsBetween(kept))
+                : new CutOffLimitChange(through, point, through.EndLimit, GapsBetween(kept));
 
             var (stopStart, stopEnd) = NominalSpan(plate, stopper);
             var stopperPoint = Line(through);
@@ -203,7 +251,8 @@ namespace OpenNest
 
         /// <summary>
         /// Where <paramref name="cutOff"/>'s line runs along its axis: its limits, or the sheet
-        /// edges where it has none. Overtravel is not part of the nominal line.
+        /// edges where it has none. Overtravel is not part of the nominal line, and neither does it
+        /// take out the gaps (see <see cref="CutOff.Pieces(double, double)"/>).
         /// </summary>
         public static (double Start, double End) NominalSpan(Plate plate, CutOff cutOff)
         {
@@ -213,12 +262,49 @@ namespace OpenNest
                 cutOff.EndLimit ?? (vertical ? sheet.Top : sheet.Right));
         }
 
+        /// <summary>
+        /// The stretches of the nominal line a change removes and adds, along the axis, in ascending
+        /// order: what a preview marks.
+        /// </summary>
+        public static (IReadOnlyList<(double Start, double End)> Removed, IReadOnlyList<(double Start, double End)> Added)
+            Difference(Plate plate, CutOffLimitChange change)
+        {
+            var cutOff = change.CutOff;
+            var sheet = plate.BoundingBox(includeParts: false);
+            var vertical = cutOff.Axis == CutOffAxis.Vertical;
+            var before = cutOff.Pieces(NominalSpan(plate, cutOff).Start, NominalSpan(plate, cutOff).End);
+            var after = CutOff.Pieces(change.StartLimit ?? (vertical ? sheet.Bottom : sheet.Left),
+                change.EndLimit ?? (vertical ? sheet.Top : sheet.Right), change.NewGaps);
+            return (Subtract(before, after), Subtract(after, before));
+        }
+
+        private static List<(double Start, double End)> Subtract(
+            IReadOnlyList<(double Start, double End)> from, IReadOnlyList<(double Start, double End)> remove)
+        {
+            var result = new List<(double Start, double End)>();
+            foreach (var piece in from)
+            {
+                var current = piece.Start;
+                foreach (var (start, end) in remove.Where(r => r.End > piece.Start && r.Start < piece.End))
+                {
+                    if (start > current + Tolerance.Epsilon)
+                        result.Add((current, start));
+                    current = System.Math.Max(current, end);
+                }
+                if (piece.End > current + Tolerance.Epsilon)
+                    result.Add((current, piece.End));
+            }
+            return result;
+        }
+
         private static (CutOff Through, CutOff Stopper, double Point)? Junction(Plate plate, CutOff first, CutOff second)
         {
             if (first == second || first.Axis == second.Axis)
                 return null;
             var firstAt = Line(second);
             var secondAt = Line(first);
+            if (TouchesGap(first, firstAt) || TouchesGap(second, secondAt))
+                return null;
             var (firstStart, firstEnd) = NominalSpan(plate, first);
             var (secondStart, secondEnd) = NominalSpan(plate, second);
             if (!Within(firstAt, firstStart, firstEnd) || !Within(secondAt, secondStart, secondEnd))
@@ -229,6 +315,10 @@ namespace OpenNest
                 return null;
             return firstStops ? (second, first, secondAt) : (first, second, firstAt);
         }
+
+        // Whether one of the cut-off's gaps contains or ends at the value along its axis.
+        private static bool TouchesGap(CutOff cutOff, double along) =>
+            cutOff.Gaps.Any(g => Within(along, g.Start, g.End));
 
         // The limit an end takes when extended: the next crossing line beyond it, or null for the
         // sheet edge. False when that end already runs to the sheet edge.
@@ -252,7 +342,7 @@ namespace OpenNest
             return true;
         }
 
-        // Where the perpendicular cut-offs whose lines reach this one cross it, along its axis.
+        // Where the perpendicular cut-offs whose cut pieces reach this one cross it, along its axis.
         private static List<double> Crossings(Plate plate, CutOff target)
         {
             var line = Line(target);
@@ -261,17 +351,36 @@ namespace OpenNest
                 .Where(other =>
                 {
                     var (start, end) = NominalSpan(plate, other);
-                    return Within(line, start, end);
+                    return other.Pieces(start, end).Any(p => Within(line, p.Start, p.End));
                 })
                 .Select(Line)
                 .ToList();
         }
 
-        private static CutOffEdit Single(Plate plate, CutOff target, double? start, double? end)
+        // The change that leaves exactly the given pieces of the nominal line from start to end: a
+        // limit stays null while its end stays at the sheet edge.
+        private static CutOffLimitChange Change(CutOff target, double start, double end,
+            IReadOnlyList<(double Start, double End)> pieces)
         {
-            var change = new CutOffLimitChange(target, start, end);
-            return CutOffEdit.Of(new[] { change }, Notice(plate, change));
+            var first = pieces[0].Start;
+            var last = pieces[^1].End;
+            return new CutOffLimitChange(target,
+                target.StartLimit == null && first == start ? null : first,
+                target.EndLimit == null && last == end ? null : last,
+                GapsBetween(pieces));
         }
+
+        private static List<CutOffGap> GapsBetween(IReadOnlyList<(double Start, double End)> pieces)
+        {
+            var gaps = new List<CutOffGap>();
+            for (var i = 1; i < pieces.Count; i++)
+                if (pieces[i].Start > pieces[i - 1].End)
+                    gaps.Add(new CutOffGap(pieces[i - 1].End, pieces[i].Start));
+            return gaps;
+        }
+
+        private static CutOffEdit Single(Plate plate, CutOffLimitChange change) =>
+            CutOffEdit.Of(new[] { change }, Notice(plate, change));
 
         private static string Notice(Plate plate, CutOffLimitChange change)
         {
@@ -290,6 +399,9 @@ namespace OpenNest
 
         private static double Along(CutOff cutOff, Vector point) =>
             cutOff.Axis == CutOffAxis.Vertical ? point.Y : point.X;
+
+        private static double Distance(double value, (double Start, double End) piece) =>
+            value < piece.Start ? piece.Start - value : value > piece.End ? value - piece.End : 0;
 
         private static bool Within(double value, double start, double end) =>
             value >= start - Tolerance.Epsilon && value <= end + Tolerance.Epsilon;

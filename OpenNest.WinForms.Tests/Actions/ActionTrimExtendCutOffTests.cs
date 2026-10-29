@@ -52,7 +52,7 @@ public class ActionTrimExtendCutOffTests
         Assert.True(IsInputKey(view, Keys.Tab));
 
         PressKey(view, Keys.Tab);
-        Assert.StartsWith("Trim/Extend Cut-Off: click near the end of a cut-off to extend it, Tab switches to Trim",
+        Assert.StartsWith("Trim/Extend Cut-Off: click near the end of a cut-off to extend it or close a gap, Tab switches to Trim",
             view.Status);
 
         PressKey(view, Keys.Escape);

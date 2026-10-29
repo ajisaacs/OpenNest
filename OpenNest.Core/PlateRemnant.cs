@@ -152,8 +152,8 @@ public sealed class PlateRemnant
     }
 
     /// <summary>
-    /// Whether the nominal line runs edge to edge. A head-locked overcut only extends the
-    /// program past the far edge, so the nominal limits decide.
+    /// Whether the nominal line runs edge to edge with no gap on the sheet. A head-locked
+    /// overcut only extends the program past the far edge, so the nominal limits decide.
     /// </summary>
     private static bool SpansSheet(CutOff cutOff, Box sheet)
     {
@@ -161,7 +161,8 @@ public sealed class PlateRemnant
         var alongMin = vertical ? sheet.Bottom : sheet.Left;
         var alongMax = vertical ? sheet.Top : sheet.Right;
         return (cutOff.StartLimit is not double start || start <= alongMin + Tolerance.Epsilon)
-            && (cutOff.EndLimit is not double end || end >= alongMax - Tolerance.Epsilon);
+            && (cutOff.EndLimit is not double end || end >= alongMax - Tolerance.Epsilon)
+            && !cutOff.Gaps.Any(gap => gap.End > alongMin + Tolerance.Epsilon && gap.Start < alongMax - Tolerance.Epsilon);
     }
 
     private static bool Reaches(Box material, bool vertical, double from, double to)

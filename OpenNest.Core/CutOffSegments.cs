@@ -8,9 +8,9 @@ namespace OpenNest
     /// One placed cutting segment of a cut-off: the part that cuts it, where its cut runs along
     /// the cut-off's axis, and the span of the nominal line it stands for, from the end of the
     /// segment before it (or the line's start) to the start of the one after it (or the line's
-    /// end). The parts the nominal line passes through lie in the gaps between segments, so each
-    /// is inside the span of the segment on either side of it; a segment is cut before exactly
-    /// those parts.
+    /// end), stopping short of a <see cref="CutOff.Gaps">gap</see> between them. The parts the
+    /// nominal line passes through lie in the gaps between segments, so each is inside the span
+    /// of the segment on either side of it; a segment is cut before exactly those parts.
     /// </summary>
     public sealed record CutOffSegment(Part Part, double Start, double End, double SpanStart, double SpanEnd);
 
@@ -55,6 +55,14 @@ namespace OpenNest
                 var (part, start, end) = measured[i];
                 var spanStart = i == 0 ? System.Math.Min(low, start) : measured[i - 1].End;
                 var spanEnd = i == measured.Count - 1 ? System.Math.Max(high, end) : measured[i + 1].Start;
+                // A gap between two segments belongs to neither: each span stops at its edge.
+                foreach (var gap in definition.Gaps)
+                {
+                    if (i > 0 && gap.End <= start + Math.Tolerance.Epsilon && gap.End > spanStart)
+                        spanStart = gap.End;
+                    if (i < measured.Count - 1 && gap.Start >= end - Math.Tolerance.Epsilon && gap.Start < spanEnd)
+                        spanEnd = gap.Start;
+                }
                 result.Add(new CutOffSegment(part, start, end, spanStart, spanEnd));
             }
             result.AddRange(whole);

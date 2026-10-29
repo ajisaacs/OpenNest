@@ -11,15 +11,79 @@ namespace OpenNest
         Vertical,
     }
 
+    /// <summary>A stretch of a cut-off's line, along its axis, left uncut.</summary>
+    public readonly record struct CutOffGap(double Start, double End);
+
     public class CutOff
     {
         private const double OffsetTolerance = 0.001;
+        private IReadOnlyList<CutOffGap> gaps = System.Array.Empty<CutOffGap>();
 
         public Vector Position { get; set; }
         public CutOffAxis Axis { get; set; }
         public double? StartLimit { get; set; }
         public double? EndLimit { get; set; }
         public Drawing Drawing { get; private set; }
+
+        /// <summary>
+        /// Stretches between the limits left uncut, so the line splits into pieces as it does
+        /// around a part; a trim of a middle piece makes one from crossing line to crossing line
+        /// (<see cref="CutOffTrim"/>). Kept sorted along the axis, with touching gaps merged and
+        /// empty or nonfinite ones dropped.
+        /// </summary>
+        public IReadOnlyList<CutOffGap> Gaps
+        {
+            get => gaps;
+            set => gaps = Normalize(value);
+        }
+
+        /// <summary>
+        /// The nominal line from <paramref name="start"/> to <paramref name="end"/> with its gaps
+        /// taken out, in ascending order: the pieces a consumer of the limits treats as cut.
+        /// </summary>
+        public IReadOnlyList<(double Start, double End)> Pieces(double start, double end) =>
+            Pieces(start, end, gaps);
+
+        internal static IReadOnlyList<(double Start, double End)> Pieces(double start, double end,
+            IReadOnlyList<CutOffGap> gaps)
+        {
+            var (low, high) = (System.Math.Min(start, end), System.Math.Max(start, end));
+            var pieces = new List<(double Start, double End)>();
+            if (gaps.Count == 0)
+            {
+                pieces.Add((low, high));
+                return pieces;
+            }
+            var current = low;
+            foreach (var gap in gaps)
+            {
+                if (gap.End <= current || gap.Start >= high)
+                    continue;
+                if (gap.Start > current)
+                    pieces.Add((current, gap.Start));
+                current = System.Math.Max(current, gap.End);
+            }
+            if (current < high)
+                pieces.Add((current, high));
+            return pieces;
+        }
+
+        private static IReadOnlyList<CutOffGap> Normalize(IEnumerable<CutOffGap> value)
+        {
+            var sorted = (value ?? Enumerable.Empty<CutOffGap>())
+                .Where(g => double.IsFinite(g.Start) && double.IsFinite(g.End) && g.End > g.Start)
+                .OrderBy(g => g.Start)
+                .ToList();
+            var merged = new List<CutOffGap>();
+            foreach (var gap in sorted)
+            {
+                if (merged.Count > 0 && gap.Start <= merged[^1].End + Math.Tolerance.Epsilon)
+                    merged[^1] = merged[^1] with { End = System.Math.Max(merged[^1].End, gap.End) };
+                else
+                    merged.Add(gap);
+            }
+            return merged.Count == 0 ? System.Array.Empty<CutOffGap>() : merged.AsReadOnly();
+        }
 
         /// <summary>
         /// How far past the nominal far sheet edge (the edge away from the plate's origin) the
@@ -321,6 +385,8 @@ namespace OpenNest
                 );
                 exclusions.AddRange(partExclusions);
             }
+            foreach (var gap in gaps)
+                exclusions.Add((gap.Start, gap.End));
 
             exclusions.Sort((a, b) => a.Start.CompareTo(b.Start));
             var merged = new List<(double Start, double End)>();

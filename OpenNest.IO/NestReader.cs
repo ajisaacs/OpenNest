@@ -766,6 +766,9 @@ namespace OpenNest.IO
                             HeadLockOvercut = double.IsFinite(cutoffDto.HeadLockOvercut)
                                 && cutoffDto.HeadLockOvercut > 0 ? cutoffDto.HeadLockOvercut : 0,
                             FarEdgeFirst = cutoffDto.FarEdgeFirst,
+                            // Nonfinite or empty gaps are dropped; overlapping ones merge.
+                            Gaps = cutoffDto.Gaps?.Where(gap => gap != null)
+                                .Select(gap => new CutOffGap(gap.Start, gap.End)).ToList(),
                         };
                         plate.CutOffs.Add(cutoff);
 

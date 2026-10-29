@@ -95,6 +95,14 @@ edge and whether its segment starts at that edge (see
 [automatic cutoffs](automatic-scrap-cutoffs.md#head-locked-overcut-at-the-far-edge));
 both are omitted when zero or false, and older files load without them.
 
+`gaps`, an array of `{ "start", "end" }` objects in model units along the cut-off's
+axis, lists the stretches between the limits left uncut (`CutOff.Gaps`, made by trimming
+a middle piece; see [automatic cutoffs](automatic-scrap-cutoffs.md#trim-and-extend)).
+It is omitted when there are none. The reader sorts the gaps, merges overlapping ones
+and drops empty or nonfinite ones. Versions before it ignore the array and would cut
+straight through every gap, so a nest with gaps must not be opened and posted from an
+older version.
+
 ## Plate cutting parameters
 
 Each plate's optional `cuttingParameters` stores the settings used by Assign

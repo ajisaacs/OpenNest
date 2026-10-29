@@ -371,7 +371,7 @@ public static class AutomaticCutOffPlanner
 
         // A full-span line, or one with the limits this plan gives its own vertical lines.
         bool Spans(CutOff cut) => FullSpanLimits(cut, bounds, settings) ||
-            horizontalY.HasValue &&
+            horizontalY.HasValue && cut.Gaps.Count == 0 &&
             Near(cut.StartLimit ?? bounds.Bottom, startLimit ?? bounds.Bottom) &&
             Near(cut.EndLimit ?? (bounds.Top + settings.Overtravel), endLimit ?? (bounds.Top + settings.Overtravel));
 
@@ -473,7 +473,7 @@ public static class AutomaticCutOffPlanner
             var candidate = existing == null
                 ? NewVertical(x)
                 : new CutOff(existing.Position, existing.Axis)
-                { StartLimit = existing.StartLimit, EndLimit = existing.EndLimit };
+                { StartLimit = existing.StartLimit, EndLimit = existing.EndLimit, Gaps = existing.Gaps };
             candidate.Regenerate(plate, settings, cache);
             var program = candidate.Drawing.Program;
             var usable = HasUsableSegments(program);
@@ -654,7 +654,9 @@ public static class AutomaticCutOffPlanner
         }
     }
 
+    // A gapped line never runs full span, whatever its limits.
     private static bool FullSpanLimits(CutOff cut, Box bounds, CutOffSettings settings) =>
+        cut.Gaps.Count == 0 &&
         Near(cut.StartLimit ?? bounds.Bottom, bounds.Bottom) &&
         Near(cut.EndLimit ?? (bounds.Top + settings.Overtravel), bounds.Top + settings.Overtravel);
 
@@ -675,6 +677,7 @@ public static class AutomaticCutOffPlanner
     }
 
     private static bool FullLengthLimits(CutOff cut, Box bounds, CutOffSettings settings) =>
+        cut.Gaps.Count == 0 &&
         Near(cut.StartLimit ?? bounds.Left, bounds.Left) &&
         Near(cut.EndLimit ?? (bounds.Right + settings.Overtravel), bounds.Right + settings.Overtravel);
 

@@ -95,8 +95,9 @@ public static class CuttingPlanService
                                 segments[segment.Part] = (segment.SpanStart, segment.SpanEnd);
                         }
                         nominal = segments.TryGetValue(source, out var span)
-                            ? new(definition.Axis, definition.Position, span.Start, span.End)
-                            : new(definition.Axis, definition.Position, definition.StartLimit, definition.EndLimit);
+                            ? new(definition.Axis, definition.Position, span.Start, span.End, definition.Gaps)
+                            : new(definition.Axis, definition.Position, definition.StartLimit, definition.EndLimit,
+                                definition.Gaps);
                     }
                     nodes.Add(new(true, nominal, source.BoundingBox, null, null, separates));
                     // A head-locked far-edge segment may be cut from either end (docs/automatic-scrap-cutoffs.md).
