@@ -110,6 +110,9 @@ namespace OpenNest.Actions
 
         public override bool SurvivesPlateChange => true;
 
+        // F1 sets the part in place, as it always has; help stays on the Help menu.
+        public override bool HandlesF1 => true;
+
         public override void OnPlateChanged() => SelectPreviews();
 
         public override void ConnectEvents()

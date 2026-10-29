@@ -60,4 +60,21 @@ public class ActionCloneTests
         Assert.Empty(plate.Parts);
         Assert.True(Assert.Single(view.SelectedParts).IsSelected);
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
+
+    [Fact]
+    public void F1SetsThePartInPlaceInsteadOfOpeningHelp() => StaTestThread.Run(() =>
+    {
+        var plate = new Plate(48, 96);
+        using var view = new PlateView { Plate = plate, Size = new System.Drawing.Size(600, 600) };
+        view.ZoomToFit();
+        view.SetAction(typeof(ActionClone), Square("new"));
+
+        Assert.True(view.ActionHandlesF1);
+        Raise(view, "OnKeyDown", new KeyEventArgs(Keys.F1));
+
+        Assert.Single(plate.Parts);
+
+        view.SetAction(typeof(ActionSelect));
+        Assert.False(view.ActionHandlesF1);
+    }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
 }
