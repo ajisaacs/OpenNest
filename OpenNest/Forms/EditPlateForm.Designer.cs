@@ -44,6 +44,9 @@
             this.cancelButton = new System.Windows.Forms.Button();
             this.bottomPanel1 = new OpenNest.Controls.BottomPanel();
             this.quadrantSelect1 = new OpenNest.Controls.QuadrantSelect();
+            this.labelOutline = new System.Windows.Forms.Label();
+            this.buttonImportOutline = new System.Windows.Forms.Button();
+            this.buttonClearOutline = new System.Windows.Forms.Button();
             this.numericUpDownEdgeSpacingLeft = new OpenNest.Controls.NumericUpDown();
             this.numericUpDownEdgeSpacingTop = new OpenNest.Controls.NumericUpDown();
             this.numericUpDownEdgeSpacingRight = new OpenNest.Controls.NumericUpDown();
@@ -251,6 +254,36 @@
             this.bottomPanel1.Size = new System.Drawing.Size(550, 50);
             this.bottomPanel1.TabIndex = 7;
             // 
+            // labelOutline
+            // 
+            this.labelOutline.AutoSize = true;
+            this.labelOutline.Location = new System.Drawing.Point(21, 131);
+            this.labelOutline.Name = "labelOutline";
+            this.labelOutline.Size = new System.Drawing.Size(103, 16);
+            this.labelOutline.TabIndex = 8;
+            this.labelOutline.Text = "Rectangular sheet";
+            // 
+            // buttonImportOutline
+            // 
+            this.buttonImportOutline.Location = new System.Drawing.Point(130, 125);
+            this.buttonImportOutline.Name = "buttonImportOutline";
+            this.buttonImportOutline.Size = new System.Drawing.Size(70, 28);
+            this.buttonImportOutline.TabIndex = 9;
+            this.buttonImportOutline.Text = "Outline...";
+            this.buttonImportOutline.UseVisualStyleBackColor = true;
+            this.buttonImportOutline.Click += new System.EventHandler(this.buttonImportOutline_Click);
+            // 
+            // buttonClearOutline
+            // 
+            this.buttonClearOutline.Enabled = false;
+            this.buttonClearOutline.Location = new System.Drawing.Point(204, 125);
+            this.buttonClearOutline.Name = "buttonClearOutline";
+            this.buttonClearOutline.Size = new System.Drawing.Size(56, 28);
+            this.buttonClearOutline.TabIndex = 10;
+            this.buttonClearOutline.Text = "Clear";
+            this.buttonClearOutline.UseVisualStyleBackColor = true;
+            this.buttonClearOutline.Click += new System.EventHandler(this.buttonClearOutline_Click);
+            // 
             // quadrantSelect1
             // 
             this.quadrantSelect1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
@@ -361,6 +394,9 @@
             this.Controls.Add(this.groupBox2);
             this.Controls.Add(this.groupBox1);
             this.Controls.Add(this.tableLayoutPanel1);
+            this.Controls.Add(this.labelOutline);
+            this.Controls.Add(this.buttonImportOutline);
+            this.Controls.Add(this.buttonClearOutline);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
@@ -392,6 +428,9 @@
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
         private System.Windows.Forms.Label labelSize;
         private System.Windows.Forms.Button applyButton;
+        private System.Windows.Forms.Label labelOutline;
+        private System.Windows.Forms.Button buttonImportOutline;
+        private System.Windows.Forms.Button buttonClearOutline;
         private System.Windows.Forms.TextBox textBoxSize;
         private System.Windows.Forms.GroupBox groupBox1;
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanel2;

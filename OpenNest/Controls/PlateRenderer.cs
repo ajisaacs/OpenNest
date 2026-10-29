@@ -25,6 +25,12 @@ namespace OpenNest.Controls
         public void DrawPlate(Graphics g)
         {
             var plate = view.DisplayPlate;
+            if (plate.Outline != null)
+            {
+                DrawOutlinedPlate(g, plate);
+                return;
+            }
+
             var plateRect = new RectangleF
             {
                 Width = view.LengthWorldToGui(plate.Size.Length),
@@ -234,6 +240,50 @@ namespace OpenNest.Controls
                 g.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
             }
         }
+
+        private static readonly Color ObstacleHatchColor = Color.FromArgb(170, 120, 60, 60);
+        private static readonly Color ObstacleBackColor = Color.FromArgb(60, 200, 80, 80);
+
+        /// <summary>
+        /// An irregular sheet: its outline filled as the sheet, obstacles hatched, and the
+        /// usable area (the outline eroded by the largest edge spacing) in the edge-spacing pen,
+        /// all placed in the plate's quadrant like the rectangle.
+        /// </summary>
+        private void DrawOutlinedPlate(Graphics g, Plate plate)
+        {
+            var outline = plate.Outline;
+            var origin = outline.PlacementOrigin(plate.Quadrant);
+
+            using var sheet = new GraphicsPath(FillMode.Alternate);
+            sheet.AddPolygon(ToGraph(outline.Points, origin));
+            foreach (var obstacle in outline.Obstacles)
+                sheet.AddPolygon(ToGraph(obstacle, origin));
+            g.FillPath(view.ColorScheme.LayoutFillBrush, sheet);
+
+            if (outline.Obstacles.Count > 0)
+            {
+                using var hatch = new HatchBrush(HatchStyle.WideUpwardDiagonal, ObstacleHatchColor, ObstacleBackColor);
+                using var pen = new Pen(ObstacleHatchColor, 1.5f);
+                foreach (var obstacle in outline.Obstacles)
+                {
+                    var points = ToGraph(obstacle, origin);
+                    g.FillPolygon(hatch, points);
+                    g.DrawPolygon(pen, points);
+                }
+            }
+
+            var edge = System.Math.Max(System.Math.Max(plate.EdgeSpacing.Left, plate.EdgeSpacing.Right),
+                System.Math.Max(plate.EdgeSpacing.Top, plate.EdgeSpacing.Bottom));
+            if (edge > 0)
+                foreach (var path in outline.Usable(edge, origin))
+                    g.DrawPolygon(view.ColorScheme.EdgeSpacingPen,
+                        path.Select(p => view.PointWorldToGraph(p.x, p.y)).ToArray());
+
+            g.DrawPath(view.ColorScheme.LayoutOutlinePen, sheet);
+        }
+
+        private PointF[] ToGraph(IReadOnlyList<Vector> points, Vector origin) =>
+            points.Select(p => view.PointWorldToGraph(p.X + origin.X, p.Y + origin.Y)).ToArray();
 
         // D8: a clamp taken off this sheet, by Auto Nest as a last resort or by hand (right-click).
         // Distinct from an active clamp - a

@@ -1,5 +1,7 @@
 using System;
+using System.IO;
 using System.Windows.Forms;
+using OpenNest.IO;
 using Timer = System.Windows.Forms.Timer;
 
 namespace OpenNest.Forms
@@ -10,6 +12,7 @@ namespace OpenNest.Forms
         private readonly Timer timer;
 
         private Units units;
+        private SheetOutline outline;
 
         public EditPlateForm(Plate plate)
         {
@@ -123,6 +126,28 @@ namespace OpenNest.Forms
             set { quadrantSelect1.Quadrant = value; }
         }
 
+        /// <summary>
+        /// The sheet outline the plate gets when the dialog is accepted: the plate's own until
+        /// one is imported or cleared. An outlined sheet's size is its outline's bounds, so the
+        /// size box is read-only while there is one.
+        /// </summary>
+        public SheetOutline Outline
+        {
+            get { return outline; }
+            set
+            {
+                outline = value;
+                textBoxSize.ReadOnly = value != null;
+                buttonClearOutline.Enabled = value != null;
+                if (value != null)
+                    textBoxSize.Text = value.Size.ToString();
+                labelOutline.Text = value == null
+                    ? "Rectangular sheet"
+                    : $"{value.Points.Count} vertices" + (value.Obstacles.Count == 0 ? "" : $", {value.Obstacles.Count} obstacle(s)");
+                EnableCheck();
+            }
+        }
+
         public void EnableCheck()
         {
             OpenNest.Geometry.Size size;
@@ -158,11 +183,18 @@ namespace OpenNest.Forms
             PartSpacing = plate.PartSpacing;
             Quantity = plate.Quantity;
             Quadrant = plate.Quadrant;
+            Outline = plate.Outline;
         }
 
         private void Save()
         {
-            plate.Size = OpenNest.Geometry.Size.Parse(SizeString);
+            // The outline carries its own size; a parsed size would drop it.
+            if (Outline != null)
+                plate.Outline = Outline;
+            else
+                plate.Size = OpenNest.Geometry.Size.Parse(SizeString);
+            if (Outline == null)
+                plate.Outline = null;
             plate.EdgeSpacing.Left = LeftSpacing;
             plate.EdgeSpacing.Top = TopSpacing;
             plate.EdgeSpacing.Right = RightSpacing;
@@ -186,6 +218,35 @@ namespace OpenNest.Forms
         private void spacing_ValueChanged(object sender, EventArgs e)
         {
             EnableCheck();
+        }
+
+        /// <summary>
+        /// Reads a sheet outline from a CAD file: the largest closed contour is the sheet and
+        /// every other closed contour an obstacle, in the file's units (as drawings import).
+        /// </summary>
+        private void buttonImportOutline_Click(object sender, EventArgs e)
+        {
+            using var dialog = new OpenFileDialog
+            {
+                Title = "Import Sheet Outline",
+                Filter = "CAD Files (*.dxf;*.dwg)|*.dxf;*.dwg|DXF Files (*.dxf)|*.dxf|DWG Files (*.dwg)|*.dwg",
+            };
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+                return;
+            try
+            {
+                Outline = SheetOutline.FromGeometry(CadImporter.Import(dialog.FileName).Entities);
+            }
+            catch (Exception exception) when (exception is ArgumentException or IOException or InvalidOperationException)
+            {
+                MessageBox.Show(this, $"The file does not hold a sheet outline: {exception.Message}",
+                    "Import Sheet Outline", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void buttonClearOutline_Click(object sender, EventArgs e)
+        {
+            Outline = null;
         }
     }
 }
