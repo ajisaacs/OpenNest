@@ -120,6 +120,13 @@ public sealed class CuttingPlanSnapshot
             PreservePartOrder, maxEntries, ExpansionObserver, PlateState, OwnedParameters,
             Dependencies, BestEffort)
         { SupportTabsSkipped = SupportTabsSkipped };
+
+    /// <summary>The same capture planned along its current part order.</summary>
+    internal CuttingPlanSnapshot WithPreservedOrder() =>
+        new(Placements, StartPoint, ExpansionBudget, Failure, Findings, Regeneration,
+            preservePartOrder: true, MaxEntries, ExpansionObserver, PlateState, OwnedParameters,
+            Dependencies, BestEffort)
+        { SupportTabsSkipped = SupportTabsSkipped };
 }
 
 public sealed class FixedProgramPlacement

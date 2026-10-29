@@ -68,6 +68,10 @@ internal static class PostVerificationGeometry
             return IsClearOf(other, ClearMargin + reach + SpanRounding * span);
         }
 
+        /// <summary>True when <paramref name="point"/> lies within the extent, its edges included.</summary>
+        internal bool Contains(Vector point) =>
+            point.X >= MinX && point.X <= MaxX && point.Y >= MinY && point.Y <= MaxY;
+
         /// <summary>True when <paramref name="y"/> lies more than <see cref="ClearMargin"/> outside the Y range.</summary>
         internal bool IsClearOfRow(double y) => IsWellConditioned && System.Math.Abs(y) <= WellConditionedLimit
             && (y > MaxY + ClearMargin || y < MinY - ClearMargin);

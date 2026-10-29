@@ -31,11 +31,17 @@ internal sealed record OverlapMaterial(Polygon Outer, List<Polygon> Holes)
         }
         // Sampling can hide a crossing or tangency between curves. Reject native
         // contour contact before asking the polygon approximation about containment.
+        // A contact lies within both entities' bounds, so shapes whose bounds are clear by more
+        // than any native query's allowance cannot touch: a part with thousands of holes does
+        // not query every pair.
+        var boxes = shapes.Select(shape => shape.BoundingBox).ToList();
         for (var i = 0; i < shapes.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             for (var j = 0; j < i; j++)
             {
+                if (ClearOfNativeQueries(boxes[i], boxes[j]))
+                    continue;
                 shapes[i].Intersects(shapes[j], out var intersections);
                 if (intersections.Count > 0)
                     throw new ArgumentException("Native material contours cross or touch.");
@@ -44,22 +50,69 @@ internal sealed record OverlapMaterial(Polygon Outer, List<Polygon> Holes)
         var ordered = polygons.OrderByDescending(polygon => Area(polygon.Vertices)).ToList();
         var outer = ordered[0];
         var holes = ordered.Skip(1).ToList();
+        var outerBounds = BoundsOf(outer);
+        var holeBounds = holes.Select(BoundsOf).ToList();
         for (var i = 0; i < holes.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (BoundariesTouch(outer, holes[i], cancellationToken)
-                || !Inside(outer, holes[i].Vertices[0]))
+            if (BoundariesTouch(outer, outerBounds, holes[i], holeBounds[i], cancellationToken)
+                || !Inside(outer, outerBounds, holes[i].Vertices[0]))
                 throw new ArgumentException("Contours must have one outer with strictly internal holes.");
             for (var j = 0; j < i; j++)
             {
-                if (BoundariesTouch(holes[i], holes[j], cancellationToken)
-                    || Inside(holes[i], holes[j].Vertices[0])
-                    || Inside(holes[j], holes[i].Vertices[0]))
+                // Exact polygon tests: holes whose vertex bounds are apart can neither touch
+                // nor contain each other's vertices.
+                if (!Overlap(holeBounds[i], holeBounds[j]))
+                    continue;
+                if (BoundariesTouch(holes[i], holeBounds[i], holes[j], holeBounds[j], cancellationToken)
+                    || Inside(holes[i], holeBounds[i], holes[j].Vertices[0])
+                    || Inside(holes[j], holeBounds[j], holes[i].Vertices[0]))
                     throw new ArgumentException("Intersecting holes and nested material islands are unsupported.");
             }
         }
         return new OverlapMaterial(outer, holes);
     }
+
+    /// <summary>
+    /// The gap beyond which no native intersection query counts two entities as touching: ten
+    /// times the 0.00001 bounding-box allowance of native intersections, as the planner's
+    /// <c>PostVerificationGeometry.Extent.ClearMargin</c>.
+    /// </summary>
+    private const double NativeClearMargin = 1e-3;
+
+    // True only when both boxes are finite and apart by more than the native allowance on some axis.
+    private static bool ClearOfNativeQueries(Box a, Box b) =>
+        IsFinite(a) && IsFinite(b)
+        && (a.Right + NativeClearMargin < b.Left || b.Right + NativeClearMargin < a.Left
+            || a.Top + NativeClearMargin < b.Bottom || b.Top + NativeClearMargin < a.Bottom);
+
+    private static bool IsFinite(Box box) => double.IsFinite(box.Left) && double.IsFinite(box.Right)
+        && double.IsFinite(box.Bottom) && double.IsFinite(box.Top);
+
+    /// <summary>Exact vertex bounds of a sampled polygon, for skipping segment and winding tests.</summary>
+    private readonly record struct Bounds(double MinX, double MinY, double MaxX, double MaxY)
+    {
+        internal bool Contains(Vector point) =>
+            point.X >= MinX && point.X <= MaxX && point.Y >= MinY && point.Y <= MaxY;
+    }
+
+    private static Bounds BoundsOf(Polygon polygon)
+    {
+        double minX = double.PositiveInfinity, minY = double.PositiveInfinity,
+            maxX = double.NegativeInfinity, maxY = double.NegativeInfinity;
+        foreach (var vertex in polygon.Vertices)
+        {
+            minX = System.Math.Min(minX, vertex.X);
+            minY = System.Math.Min(minY, vertex.Y);
+            maxX = System.Math.Max(maxX, vertex.X);
+            maxY = System.Math.Max(maxY, vertex.Y);
+        }
+        return new(minX, minY, maxX, maxY);
+    }
+
+    // Closed-interval overlap: two segments that touch share a point inside both bounds.
+    private static bool Overlap(Bounds a, Bounds b) =>
+        a.MaxX >= b.MinX && b.MaxX >= a.MinX && a.MaxY >= b.MinY && b.MaxY >= a.MinY;
 
     internal OverlapMaterial Transform(double rotation, Vector offset) =>
         new(TransformPolygon(Outer, rotation, offset),
@@ -171,13 +224,23 @@ internal sealed record OverlapMaterial(Polygon Outer, List<Polygon> Holes)
             throw new ArgumentException("Material contour could not be completely triangulated.");
     }
 
-    private static bool BoundariesTouch(Polygon a, Polygon b, CancellationToken cancellationToken)
+    // Exact: a segment of a whose bounds are clear of b's bounds touches no segment of b.
+    private static bool BoundariesTouch(Polygon a, Bounds aBounds, Polygon b, Bounds bBounds,
+        CancellationToken cancellationToken)
     {
+        if (!Overlap(aBounds, bBounds))
+            return false;
         for (var i = 0; i + 1 < a.Vertices.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var start = a.Vertices[i];
+            var end = a.Vertices[i + 1];
+            var segment = new Bounds(System.Math.Min(start.X, end.X), System.Math.Min(start.Y, end.Y),
+                System.Math.Max(start.X, end.X), System.Math.Max(start.Y, end.Y));
+            if (!Overlap(segment, bBounds))
+                continue;
             for (var j = 0; j + 1 < b.Vertices.Count; j++)
-                if (SegmentsTouch(a.Vertices[i], a.Vertices[i + 1], b.Vertices[j], b.Vertices[j + 1]))
+                if (SegmentsTouch(start, end, b.Vertices[j], b.Vertices[j + 1]))
                     return true;
         }
         return false;
@@ -200,6 +263,10 @@ internal sealed record OverlapMaterial(Polygon Outer, List<Polygon> Holes)
         && point.Y >= System.Math.Min(a.Y, b.Y) && point.Y <= System.Math.Max(a.Y, b.Y);
 
     // Boundary contact is rejected before this winding-number test is used for topology.
+    // A point outside the polygon's vertex bounds has winding zero.
+    private static bool Inside(Polygon polygon, Bounds bounds, Vector point) =>
+        bounds.Contains(point) && Inside(polygon, point);
+
     private static bool Inside(Polygon polygon, Vector point)
     {
         var winding = 0;

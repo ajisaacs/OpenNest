@@ -121,11 +121,14 @@ public sealed class CuttingPlanBatch
         {
             var plate = plates[index];
             var budget = PlateBudget(plate.Parts.Count, budgetMultiplier);
-            var keepOrder = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
+            // One capture serves both searches: the order flag and budget are search settings
+            // over the same owned geometry, programs and freshness record.
+            var captured = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
                 expansionBudget: budget, confirmedParameters: confirmedParameters,
-                preservePartOrder: true), token);
-            var reorder = preservePartOrder ? null : CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
-                expansionBudget: reorderBudget ?? budget, confirmedParameters: confirmedParameters), token);
+                preservePartOrder: preservePartOrder), token);
+            var keepOrder = preservePartOrder ? captured : captured.WithPreservedOrder();
+            var reorder = preservePartOrder ? null
+                : reorderBudget is { } reorderLimit ? captured.WithSearchLimits(reorderLimit, captured.MaxEntries) : captured;
             var overlap = PlateOverlapAnalyzer.Capture(plate.Parts.ToArray(), token);
             var fallback = reorder ?? keepOrder;
             if (fallback.Failure == CuttingPlanStatus.UnsupportedGeometry)

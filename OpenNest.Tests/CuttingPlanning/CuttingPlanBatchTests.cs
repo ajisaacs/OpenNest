@@ -228,6 +228,48 @@ public class CuttingPlanBatchTests
     }
 
     [Fact]
+    public void Plan_FreeSearchOutOfBudget_RetriesTheSameCaptureAlongTheCurrentOrder()
+    {
+        var nest = new Nest();
+        var plate = Plate(nest, Grid(4));
+
+        var proposal = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false, null,
+            reorderBudget: 50, CancellationToken.None).Plan();
+
+        // One capture serves both searches: the kept-order retry plans the placements the
+        // free search planned, with their freshness record, under the plate budget.
+        var planned = Assert.Single(proposal.Plates);
+        Assert.True(planned.KeptCurrentOrder);
+        Assert.Same(planned.ReorderAttempt!.Snapshot!.PlateState, planned.Result.Snapshot!.PlateState);
+        Assert.Equal(CuttingPlanBatch.PlateBudget(plate.Parts.Count), planned.Result.Snapshot.ExpansionBudget);
+        Assert.Equal(50, planned.ReorderAttempt.Snapshot!.ExpansionBudget);
+        Assert.True(planned.Result.Snapshot.PreservePartOrder);
+        Assert.False(planned.ReorderAttempt.Snapshot.PreservePartOrder);
+        Assert.Equal(planned.ReorderAttempt.Snapshot.Placements, planned.Result.Snapshot.Placements,
+            ReferenceEqualityComparer.Instance);
+    }
+
+    [Fact]
+    public void WithPreservedOrder_SharesTheCaptureAndFixesTheOrder()
+    {
+        var nest = new Nest();
+        var plate = Plate(nest, Clean("a", 1, 1), Clean("b", 12, 1));
+        var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
+            confirmedParameters: ExplicitContourTests.Parameters(), expansionBudget: 123));
+
+        var kept = snapshot.WithPreservedOrder();
+
+        Assert.False(snapshot.PreservePartOrder);
+        Assert.True(kept.PreservePartOrder);
+        Assert.Equal(snapshot.Placements, kept.Placements, ReferenceEqualityComparer.Instance);
+        Assert.Same(snapshot.PlateState, kept.PlateState);
+        Assert.Same(snapshot.Dependencies, kept.Dependencies);
+        Assert.Same(snapshot.OwnedParameters, kept.OwnedParameters);
+        Assert.Equal(123, kept.ExpansionBudget);
+        Assert.Equal(snapshot.MaxEntries, kept.MaxEntries);
+    }
+
+    [Fact]
     public void Plan_PreservedOrder_DoesNotSearchForANewOrder()
     {
         var nest = new Nest();

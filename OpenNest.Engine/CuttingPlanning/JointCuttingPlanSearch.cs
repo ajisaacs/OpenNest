@@ -28,6 +28,14 @@ internal static class JointCuttingPlanSearch
     /// the contours are those of the blocked part and of the part cut just before it.
     /// </summary>
     internal const int StallExpansionsPerEntry = 8;
+
+    /// <summary>
+    /// Stalls' worth of expansions each search that backtracks without a stall limit (the full
+    /// pass along a kept order, and the sequence-free recovery and full passes once an order
+    /// teaches nothing) may spend before it ends. Beyond that they only retry entry combinations
+    /// of parts already cut, so the budget they would take goes to the lighter fallbacks instead.
+    /// </summary>
+    internal const int FallbackStalls = 2;
     private const int MaximumRecoveryHoles = 30;
     // The most holes recovery's search alone served; parts with more try the reading-order sweep first.
     private const int SearchedRecoveryHoles = 16;
@@ -71,6 +79,10 @@ internal static class JointCuttingPlanSearch
         var count = snapshot.Placements.Count;
         var maxContours = snapshot.Placements.Max(p => p.Prepared?.Count ?? 1);
         var stall = StallExpansionsPerEntry * snapshot.MaxEntries * maxContours;
+        // Fixed programs have no entries to retry, so their search space is small and running
+        // it out is a genuine refusal; only a search that regenerates programs is bounded.
+        int? FallbackLimit() => snapshot.Placements.Any(p => p.Prepared != null)
+            ? (int)System.Math.Min(int.MaxValue, walk.Expansions + (long)FallbackStalls * stall) : null;
         var preferEndpoints = count > 1 && maxContours > 1;
         // A supplied blank alone on its sheet (its holes are the whole part) goes to contour
         // recovery first; any other lone part keeps the plain search, whose routes are shorter.
@@ -91,7 +103,7 @@ internal static class JointCuttingPlanSearch
                     if (recovered.Order != null)
                         return walk.Ready(recovered.Order);
                 }
-                var kept = walk.Follow(keptSequence, null, null);
+                var kept = walk.Follow(keptSequence, null, null, expansionLimit: FallbackLimit());
                 return kept.Order != null ? walk.Ready(kept.Order) : walk.Exhausted();
             }
 
@@ -133,11 +145,12 @@ internal static class JointCuttingPlanSearch
                     // A lone holed part has no part order to learn: its holes still get recovery.
                     if (preferEndpoints || maxContours > 1)
                     {
-                        var recovery = walk.Follow(null, stall, null, contourRecovery: true);
+                        var recovery = walk.Follow(null, stall, null, contourRecovery: true,
+                            expansionLimit: FallbackLimit());
                         if (recovery.Order != null)
                             return walk.Ready(recovery.Order);
                     }
-                    var full = walk.Follow(null, null, null);
+                    var full = walk.Follow(null, null, null, expansionLimit: FallbackLimit());
                     return full.Order != null ? walk.Ready(full.Order) : walk.Exhausted();
                 }
                 // Back up to just before the earliest part the blocked approach crossed, keep the
@@ -327,9 +340,10 @@ internal static class JointCuttingPlanSearch
         /// further along the order; it never backtracks behind its starting node.
         /// With <paramref name="prerequisites"/>, an approach into a cutoff that crosses parts
         /// already cut ends the attempt at once when that teaches "cut it before them".
+        /// With <paramref name="expansionLimit"/>, the attempt ends once the walk's expansions reach it.
         /// </summary>
         internal Attempt Follow(int[] sequence, int? stall, Node resume, bool preferredOnly = false, bool contourRecovery = false,
-            HashSet<int>[] prerequisites = null)
+            HashSet<int>[] prerequisites = null, int? expansionLimit = null)
         {
             var root = resume ?? new Node([], snapshot.StartPoint, new ReleasedContourState(reportMissingLeadIns: false), null, null);
             var attempt = new Attempt(sequence);
@@ -348,6 +362,9 @@ internal static class JointCuttingPlanSearch
                         attempt.Order = node.Order;
                         return attempt;
                     }
+                    // A pass held to a share of the budget ends there, as a stalled one does.
+                    if (expansionLimit is int end && Expansions >= end)
+                        return attempt;
                     // A cutoff is a fixed program cut the same way wherever it goes, so replanning
                     // the parts before it can only change where its approach starts. Cutting it
                     // earlier never makes its own cut harder, and a sheet separator that cannot come

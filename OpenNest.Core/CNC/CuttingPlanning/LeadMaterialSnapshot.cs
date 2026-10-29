@@ -121,11 +121,16 @@ public sealed class LeadMaterialSnapshot
                         ? "A display perimeter must enclose every other contour."
                         : $"Material boundaries overlap, touch or self-intersect ({r}:{i}, {s}:{j}, overlap={overlap}).");
             }
+            // A ring encloses a point only inside the union of its curves' extents (each at least
+            // the curve's own reach), so a part with thousands of holes asks parity only where it can hold.
+            var ringExtents = rings.Select(ring => ring.Aggregate(PostVerificationGeometry.Extent.None,
+                (extent, curve) => extent.Union(curve.Extent))).ToArray();
+            bool Encloses(int ring, Vector point) => ringExtents[ring].Contains(point) && Inside(point, rings[ring], token);
             var outer = -1;
             for (var i = 0; i < rings.Count; i++)
             {
                 token.ThrowIfCancellationRequested();
-                if (Enumerable.Range(0, rings.Count).All(j => i == j || Inside(rings[j][0].Start, rings[i], token)))
+                if (Enumerable.Range(0, rings.Count).All(j => i == j || Encloses(i, rings[j][0].Start)))
                 {
                     if (outer >= 0)
                         throw new ArgumentException("Material perimeter is ambiguous.");
@@ -142,10 +147,11 @@ public sealed class LeadMaterialSnapshot
                 throw new ArgumentException("A display perimeter must enclose every other contour.");
             if (ringDisplay[outer] && rings.Count == 1)
                 throw new ArgumentException("A display perimeter with no cutouts has nothing to cut.");
-            var holes = rings.Where((_, i) => i != outer).ToArray();
-            for (var i = 0; i < holes.Length; i++)
-                for (var j = i + 1; j < holes.Length; j++)
-                    if (Inside(holes[i][0].Start, holes[j], token) || Inside(holes[j][0].Start, holes[i], token))
+            var holeRings = Enumerable.Range(0, rings.Count).Where(i => i != outer).ToArray();
+            var holes = holeRings.Select(i => rings[i]).ToArray();
+            for (var i = 0; i < holeRings.Length; i++)
+                for (var j = i + 1; j < holeRings.Length; j++)
+                    if (Encloses(holeRings[j], holes[i][0].Start) || Encloses(holeRings[i], holes[j][0].Start))
                         throw new ArgumentException("Nested cutouts are not supported material.");
             return new LeadMaterialSnapshot(new[] { rings[outer] }.Concat(holes).ToArray(),
                 new[] { ringTabs[outer] }.Concat(ringTabs.Where((_, i) => i != outer)).ToArray(), null, ringDisplay[outer]);

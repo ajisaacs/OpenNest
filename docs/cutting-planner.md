@@ -241,10 +241,15 @@ reachable via a third), so once nothing new can be learned the remaining budget
 first tries sequence-free recovery, visiting dependency-ready parts lazily by
 material-centre distance. When a branch stalls, it disposes the deeper search
 frames and resumes alternatives at the root instead of spending the remainder
-on that branch's completed prefix. Any budget left then goes to the retained full
-search. Recovery shares the original total expansion budget; exhausting it still
-returns a refusal from the service, never a best-effort upgrade. Only the batch then
-looks for the separate [safest route](#safest-route-fallback-when-the-search-runs-out).
+on that branch's completed prefix. The retained full search runs after it. Each of
+these two passes, and the full pass along a kept order, is held to two stalls' worth
+of expansions (`JointCuttingPlanSearch.FallbackStalls`): past that they only retry entry
+combinations of parts already cut (on 140 production plates neither found a plan the
+order passes had missed), so the rest of the budget is left unspent rather than taken
+from the kept-order retry and the safest route. Recovery shares the original total
+expansion budget; exhausting it still returns a refusal from the service, never a
+best-effort upgrade. Only the batch then looks for the separate
+[safest route](#safest-route-fallback-when-the-search-runs-out).
 
 ### Cutoff segments
 
@@ -699,7 +704,8 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   attempt. The current-order retry still uses its original 16-entry budget.
   Returned expansion counts describe the retained attempt, not a discarded
   short pass plus its full-cap retry.
-- Every plate is captured on the UI thread and checked and planned on a worker. Clean part
+- Every plate is captured on the UI thread, once (the free-order and kept-order searches plan
+  the same owned capture), and checked and planned on a worker. Clean part
   material is checked for overlaps with the pre-post overlap analyzer; known overlapping parts
   still block that plate whatever its route. Incomplete checks remain visible warnings, never
   a clear result (see [pre-post verification](post-verification.md)). A free-order search that ends
