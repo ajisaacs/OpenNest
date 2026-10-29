@@ -19,7 +19,11 @@ machine's units to the nest's.
 
 A plate with no cutting parameters of its own (Plan Cutting, Place Lead-in) starts from the
 last applied parameters, as before, with the machine's leads and kerf laid over them and the
-machine, material, grade and thickness recorded on the parameters. A plate that already has
+machine, material, grade and thickness recorded on the parameters. When the last parameters
+already record the same machine, material, grade and thickness, the machine's settings are not
+laid over them again, so lead and tab edits made for that job stick; the cutting panel keeps the
+record (and the kerf) through an edit. Plan Cutting saves its settings as the last parameters as
+soon as its settings dialog is accepted, not only on Apply. A plate that already has
 parameters keeps them: changing the machine, material or thickness does not rewrite leads
 the plate was planned with.
 

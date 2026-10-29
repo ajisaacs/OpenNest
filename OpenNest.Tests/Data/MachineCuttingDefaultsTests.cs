@@ -42,6 +42,19 @@ public class MachineCuttingDefaultsTests
     private static readonly LeadConfig LineArc = new() { Type = "Line + Arc", Length = 0.125, Angle = 90, Radius = 0.0625 };
 
     [Fact]
+    public void IsRecordedFor_KeepsLeadsEditedAfterTheMachineSettingsWereTaken()
+    {
+        var parameters = new CuttingParameters();
+        Assert.True(MachineCuttingDefaults.ApplyTo(parameters, Machine(LineArc), NestOf(0.25, "A36")));
+        parameters.ExternalLeadOut = new NoLeadOut();
+
+        Assert.True(MachineCuttingDefaults.IsRecordedFor(parameters, Machine(LineArc), NestOf(0.2505, "A36")));
+        Assert.False(MachineCuttingDefaults.IsRecordedFor(parameters, Machine(LineArc), NestOf(0.25, "A572")));
+        Assert.False(MachineCuttingDefaults.IsRecordedFor(parameters, Machine(LineArc), NestOf(0.5, "A36")));
+        Assert.False(MachineCuttingDefaults.IsRecordedFor(new CuttingParameters(), Machine(LineArc), NestOf(0.25, "A36")));
+    }
+
+    [Fact]
     public void ApplyTo_GivesEveryContourTheMachineLeadsAndStampsTheSource()
     {
         var parameters = new CuttingParameters { PierceClearance = 0.1 };

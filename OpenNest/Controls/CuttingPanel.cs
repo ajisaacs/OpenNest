@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.IO;
 
 namespace OpenNest.Controls
 {
@@ -56,6 +57,8 @@ namespace OpenNest.Controls
         private readonly NumericUpDown nudTabHeldMax;
         private readonly NumericUpDown nudPierceClearance;
         private readonly NumericUpDown nudPierceDiameter;
+
+        private CuttingParameters loaded;
 
         private readonly CheckBox chkRoundLeadInAngles;
         private readonly NumericUpDown nudLeadInAngleIncrement;
@@ -294,30 +297,33 @@ namespace OpenNest.Controls
             base.Dispose(disposing);
         }
 
+        // Settings the panel has no field for (kerf, the machine/material/thickness stamp,
+        // sequencing) come back unchanged from the parameters last loaded.
         public CuttingParameters BuildParameters()
         {
-            return new CuttingParameters
-            {
-                ExternalLeadIn = BuildLeadIn(cboExternalLeadIn, pnlExternalLeadIn),
-                ExternalLeadOut = BuildLeadOut(cboExternalLeadOut, pnlExternalLeadOut),
-                InternalLeadIn = BuildLeadIn(cboInternalLeadIn, pnlInternalLeadIn),
-                InternalLeadOut = BuildLeadOut(cboInternalLeadOut, pnlInternalLeadOut),
-                TabsEnabled = chkTabsEnabled.Checked && rbTabAll.Checked,
-                TabConfig = new NormalTab { Size = (double)nudTabWidth.Value },
-                PierceClearance = (double)nudPierceClearance.Value,
-                PierceDiameter = (double)nudPierceDiameter.Value,
-                RoundLeadInAngles = chkRoundLeadInAngles.Checked,
-                LeadInAngleIncrement = (double)nudLeadInAngleIncrement.Value,
-                SupportTabs = chkTabsEnabled.Checked && rbSupportTab.Checked,
-                NoBedTabMinWidth = (double)nudNoBedTabMin.Value,
-                NoBedTabMaxWidth = (double)nudNoBedTabMax.Value,
-                TabHeldMaxLength = (double)nudTabHeldMax.Value,
-            };
+            var parameters = loaded == null ? new CuttingParameters()
+                : CuttingParametersSerializer.Deserialize(CuttingParametersSerializer.Serialize(loaded));
+            parameters.ExternalLeadIn = BuildLeadIn(cboExternalLeadIn, pnlExternalLeadIn);
+            parameters.ExternalLeadOut = BuildLeadOut(cboExternalLeadOut, pnlExternalLeadOut);
+            parameters.InternalLeadIn = BuildLeadIn(cboInternalLeadIn, pnlInternalLeadIn);
+            parameters.InternalLeadOut = BuildLeadOut(cboInternalLeadOut, pnlInternalLeadOut);
+            parameters.TabsEnabled = chkTabsEnabled.Checked && rbTabAll.Checked;
+            parameters.TabConfig = new NormalTab { Size = (double)nudTabWidth.Value };
+            parameters.PierceClearance = (double)nudPierceClearance.Value;
+            parameters.PierceDiameter = (double)nudPierceDiameter.Value;
+            parameters.RoundLeadInAngles = chkRoundLeadInAngles.Checked;
+            parameters.LeadInAngleIncrement = (double)nudLeadInAngleIncrement.Value;
+            parameters.SupportTabs = chkTabsEnabled.Checked && rbSupportTab.Checked;
+            parameters.NoBedTabMinWidth = (double)nudNoBedTabMin.Value;
+            parameters.NoBedTabMaxWidth = (double)nudNoBedTabMax.Value;
+            parameters.TabHeldMaxLength = (double)nudTabHeldMax.Value;
+            return parameters;
         }
 
         public void LoadFromParameters(CuttingParameters p)
         {
             suppressEvents = true;
+            loaded = CuttingParametersSerializer.Deserialize(CuttingParametersSerializer.Serialize(p));
 
             LoadLeadIn(cboExternalLeadIn, pnlExternalLeadIn, p.ExternalLeadIn);
             LoadLeadOut(cboExternalLeadOut, pnlExternalLeadOut, p.ExternalLeadOut);

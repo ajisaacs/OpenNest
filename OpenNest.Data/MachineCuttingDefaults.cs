@@ -74,6 +74,25 @@ public static class MachineCuttingDefaults
     }
 
     /// <summary>
+    /// Whether <paramref name="parameters"/> are stamped with the machine, material, grade and
+    /// thickness <see cref="ApplyTo(CuttingParameters, MachineConfig?, Nest)"/> would record for
+    /// the nest: they started from the machine's settings for it, and any lead edits since are
+    /// the user's choice for that same job, which the machine's settings must not replace.
+    /// </summary>
+    public static bool IsRecordedFor(CuttingParameters parameters, MachineConfig? machine, Nest nest)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        ArgumentNullException.ThrowIfNull(nest);
+        if (Find(machine, nest) == null)
+            return false;
+        var tolerance = ThicknessToleranceInches * Scale(Units.Inches, nest.Units);
+        return string.Equals(parameters.MachineName, machine!.Name, StringComparison.Ordinal)
+            && string.Equals(parameters.MaterialName, nest.Material.Name, StringComparison.Ordinal)
+            && string.Equals(parameters.Grade ?? "", nest.Material.Grade ?? "", StringComparison.Ordinal)
+            && System.Math.Abs(parameters.Thickness - nest.Thickness) <= tolerance;
+    }
+
+    /// <summary>
     /// Replaces the part clearance, overtravel, minimum segment and direction of
     /// <paramref name="settings"/> with the machine's for the nest; the head-lock choice is kept.
     /// Returns false, changing nothing, when the machine has no settings for the nest.

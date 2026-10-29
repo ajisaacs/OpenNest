@@ -1258,6 +1258,8 @@ internal sealed class CuttingInspectionPanel : UserControl
         dialog.LoadParameters(parameters);
         if (dialog.ShowDialog(this) != DialogResult.OK || closed || closeRequested) return;
         parameters = dialog.GetParameters();
+        // Saved now, not only on Apply: a plate that will not plan must not lose the edit.
+        EditNestForm.SaveCuttingParameters(parameters);
         ShowSettings();
         RestartPlanning();
     }

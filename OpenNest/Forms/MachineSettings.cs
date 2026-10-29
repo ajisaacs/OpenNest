@@ -198,12 +198,16 @@ namespace OpenNest.Forms
         /// <summary>
         /// The cutting parameters a plate of <paramref name="nest"/> without its own starts from:
         /// the last ones applied (or the built-in defaults), with the lead-ins, lead-outs and kerf
-        /// of the nest's machine for its material and thickness when the machine has them.
+        /// of the nest's machine for its material and thickness when the machine has them. Last
+        /// parameters already taken from that machine, material and thickness keep the user's
+        /// edits to them.
         /// </summary>
         public static CuttingParameters DefaultCuttingParameters(Nest nest)
         {
             var parameters = LastCuttingParameters();
-            MachineCuttingDefaults.ApplyTo(parameters, FindMachine(nest.Machine), nest);
+            var machine = FindMachine(nest.Machine);
+            if (!MachineCuttingDefaults.IsRecordedFor(parameters, machine, nest))
+                MachineCuttingDefaults.ApplyTo(parameters, machine, nest);
             return parameters;
         }
 

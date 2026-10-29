@@ -1356,7 +1356,7 @@ namespace OpenNest.Forms
             PlateView.SetAction(typeof(Actions.ActionLeadIn));
         }
 
-        private static void SaveCuttingParameters(CuttingParameters parameters)
+        internal static void SaveCuttingParameters(CuttingParameters parameters)
         {
             var json = CuttingParametersSerializer.Serialize(parameters);
             Properties.Settings.Default.CuttingParametersJson = json;
