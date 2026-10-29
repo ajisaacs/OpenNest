@@ -107,7 +107,7 @@ namespace OpenNest.Forms
                 return;
             }
 
-            using (var form = new PatternTileForm(activeForm.Nest))
+            using (var form = new PatternTileForm(activeForm.Nest, activeForm.PlateView.Plate))
             {
                 if (form.ShowDialog(this) != DialogResult.OK || form.Result == null)
                     return;

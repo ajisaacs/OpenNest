@@ -209,6 +209,12 @@ static class NestConsole
             ApplyTemplate(plate, options);
             ApplyOverrides(plate, options);
 
+            if (!options.AutoNest && PlateFillService.Refusal(plate) is { } refusal)
+            {
+                Console.Error.WriteLine($"Error: {refusal} Use --autonest.");
+                return 2;
+            }
+
             var drawing = ResolveDrawing(nest, options);
 
             if (drawing == null)

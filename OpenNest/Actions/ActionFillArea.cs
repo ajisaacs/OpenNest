@@ -48,6 +48,14 @@ namespace OpenNest.Actions
 
         private async void FillArea()
         {
+            // Nothing may throw out of this async void: the service's refusal is shown instead.
+            if (PlateFillService.Refusal(plateView.Plate) is { } refusal)
+            {
+                plateView.Status = refusal;
+                onFillComplete?.Invoke(new List<Part>());
+                return;
+            }
+
             var strategy = EngineSelection.FillStrategy;
             if (progress != null && cts != null)
             {

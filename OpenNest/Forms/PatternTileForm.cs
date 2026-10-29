@@ -2,22 +2,30 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Engine;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
 using GeoSize = OpenNest.Geometry.Size;
-using OpenNest.Engine;
 
 namespace OpenNest.Forms
 {
     public partial class PatternTileForm : Form
     {
         private readonly Nest nest;
+        private readonly Plate currentPlate;
 
         public PatternTileResult Result { get; private set; }
 
         public PatternTileForm(Nest nest)
+            : this(nest, null) { }
+
+        /// <param name="currentPlate">The plate "Current plate" would replace; a sheet with an
+        /// outline cannot take the rectangular tiling, so only a new plate is offered.</param>
+        public PatternTileForm(Nest nest, Plate currentPlate)
         {
             this.nest = nest;
+            this.currentPlate = currentPlate;
             InitializeComponent();
 
             // Hide plate outline via zero-size plate
@@ -323,13 +331,31 @@ namespace OpenNest.Forms
             else
                 applyDirection = NestDirection.Horizontal; // tie-break
 
-            var choice = MessageBox.Show(
-                $"Apply {applyDirection} pattern ({(applyDirection == NestDirection.Horizontal ? hCount : vCount)} parts) to current plate?"
-                    + "\n\nYes = Current plate (clears existing parts)\nNo = New plate",
-                "Apply Pattern",
-                MessageBoxButtons.YesNoCancel,
-                MessageBoxIcon.Question
-            );
+            var count = applyDirection == NestDirection.Horizontal ? hCount : vCount;
+            var refusal = PlateFillService.Refusal(currentPlate);
+            DialogResult choice;
+            if (refusal == null)
+            {
+                choice = MessageBox.Show(
+                    $"Apply {applyDirection} pattern ({count} parts) to current plate?"
+                        + "\n\nYes = Current plate (clears existing parts)\nNo = New plate",
+                    "Apply Pattern",
+                    MessageBoxButtons.YesNoCancel,
+                    MessageBoxIcon.Question
+                );
+            }
+            else
+            {
+                // The tiling is rectangular, so an outlined current plate cannot take it.
+                var newPlate = MessageBox.Show(
+                    $"Apply {applyDirection} pattern ({count} parts) to a new plate?"
+                        + $"\n\nThe current plate has a sheet outline. {refusal}",
+                    "Apply Pattern",
+                    MessageBoxButtons.OKCancel,
+                    MessageBoxIcon.Question
+                );
+                choice = newPlate == DialogResult.OK ? DialogResult.No : DialogResult.Cancel;
+            }
 
             if (choice == DialogResult.Cancel)
                 return;

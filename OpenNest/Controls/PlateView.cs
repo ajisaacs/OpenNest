@@ -914,6 +914,13 @@ namespace OpenNest.Controls
             if (IsFillInProgress)
                 return;
 
+            // The service would throw this; the status bar tells the user why nothing happened.
+            if (PlateFillService.Refusal(Plate) is { } refusal)
+            {
+                Status = refusal;
+                return;
+            }
+
             IsFillInProgress = true;
             var operationActive = true;
             try

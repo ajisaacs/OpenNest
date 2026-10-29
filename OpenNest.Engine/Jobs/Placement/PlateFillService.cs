@@ -29,6 +29,16 @@ public static class PlateFillService
         "Horizontal Remnant",
     ];
 
+    /// <summary>Why no strategy fills a plate with a sheet outline (see <see cref="Refusal"/>).</summary>
+    public const string OutlinedSheetMessage =
+        "Fill strategies need a rectangular sheet. Nest an outlined sheet with Auto Nest and the Irregular engine.";
+
+    /// <summary>
+    /// Why the fill strategies cannot fill <paramref name="plate"/>, or null when they can. Callers
+    /// show it to the user instead of calling an operation that would throw it.
+    /// </summary>
+    public static string Refusal(Plate plate) => plate?.Outline == null ? null : OutlinedSheetMessage;
+
     public static List<Part> FillItem(
         string strategy,
         Plate plate,
@@ -433,9 +443,8 @@ public static class PlateFillService
         ArgumentNullException.ThrowIfNull(strategy);
         ArgumentNullException.ThrowIfNull(plate);
         // Every filler lays parts out in a rectangle; only Auto Nest's Irregular engine honors an outline.
-        if (plate.Outline != null)
-            throw new InvalidOperationException(
-                "Fill strategies need a rectangular sheet. Nest an outlined sheet with Auto Nest and the Irregular engine.");
+        if (Refusal(plate) is { } refusal)
+            throw new InvalidOperationException(refusal);
         // An explicit empty string is an unknown strategy; only ResolveStrategy(string),
         // used for caller selections, maps null/empty to Fill.
         ResolveStrategy(strategy, allowEmpty: false);

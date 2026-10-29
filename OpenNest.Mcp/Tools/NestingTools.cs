@@ -66,6 +66,8 @@ namespace OpenNest.Mcp.Tools
             var strategy = ResolveStrategy(engine);
             if (strategy == null)
                 return EngineError(engine);
+            if (PlateFillService.Refusal(plate) is { } refusal)
+                return $"Error: {refusal} Nothing committed.";
 
             var countBefore = plate.Parts.Count;
             var item = new NestItem { Drawing = drawing, Quantity = quantity };
@@ -121,6 +123,8 @@ namespace OpenNest.Mcp.Tools
             var strategy = ResolveStrategy(engine);
             if (strategy == null)
                 return EngineError(engine);
+            if (PlateFillService.Refusal(plate) is { } refusal)
+                return $"Error: {refusal} Nothing committed.";
 
             var countBefore = plate.Parts.Count;
             var item = new NestItem { Drawing = drawing, Quantity = quantity };
@@ -173,6 +177,8 @@ namespace OpenNest.Mcp.Tools
             var strategy = ResolveStrategy(engine);
             if (strategy == null)
                 return EngineError(engine);
+            if (PlateFillService.Refusal(plate) is { } refusal)
+                return $"Error: {refusal} Nothing committed.";
 
             var finder = RemnantFinder.FromPlate(plate);
             var remnants = finder.FindRemnants();
@@ -240,6 +246,8 @@ namespace OpenNest.Mcp.Tools
             var strategy = ResolveStrategy(engine);
             if (strategy == null)
                 return EngineError(engine);
+            if (PlateFillService.Refusal(plate) is { } refusal)
+                return $"Error: {refusal} Nothing committed.";
 
             var parsed = ParseItems(drawingNames, quantities);
             if (parsed.error != null)

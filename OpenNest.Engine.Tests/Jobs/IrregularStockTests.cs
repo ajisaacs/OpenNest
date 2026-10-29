@@ -229,6 +229,11 @@ public class IrregularStockTests
         var exception = Assert.Throws<InvalidOperationException>(() =>
             PlateFillService.FillItem("Fill", plate, item, plate.WorkArea(), null, default));
         Assert.Contains("rectangular", exception.Message);
+
+        // Callers check the refusal first and show it instead of catching the exception.
+        Assert.Equal(exception.Message, PlateFillService.Refusal(plate));
+        Assert.Null(PlateFillService.Refusal(new Plate(48, 96)));
+        Assert.Null(PlateFillService.Refusal(null));
     }
 
     [Fact]
