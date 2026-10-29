@@ -132,11 +132,23 @@ static class NestConsole
 
         if (options.NoFill && (options.AutoNest || options.KeepParts || options.DrawingName != null
             || options.Quantity != 0 || options.Spacing.HasValue || options.PlateSize.HasValue
-            || options.TemplateFile != null || options.InputFiles.Any(IsCadFile)))
+            || options.OutlineFile != null || options.TemplateFile != null || options.InputFiles.Any(IsCadFile)))
         {
             Console.Error.WriteLine(
-                "Error: --no-fill keeps the nest as loaded; it cannot be combined with CAD inputs, --autonest, --keep-parts, --drawing, --quantity, --spacing, --size or --template."
+                "Error: --no-fill keeps the nest as loaded; it cannot be combined with CAD inputs, --autonest, --keep-parts, --drawing, --quantity, --spacing, --size, --outline or --template."
             );
+            return 1;
+        }
+
+        if (options.OutlineFile != null && !options.AutoNest)
+        {
+            Console.Error.WriteLine("Error: --outline needs --autonest; single-plate fill strategies fill rectangles only.");
+            return 1;
+        }
+
+        if (options.OutlineFile != null && !File.Exists(options.OutlineFile))
+        {
+            Console.Error.WriteLine($"Error: Outline file not found: {options.OutlineFile}");
             return 1;
         }
 
@@ -275,6 +287,9 @@ static class NestConsole
                 case "--size" when i + 1 < args.Length:
                     if (Size.TryParse(args[++i], out var sz))
                         o.PlateSize = sz;
+                    break;
+                case "--outline" when i + 1 < args.Length:
+                    o.OutlineFile = args[++i];
                     break;
                 case "--check-overlaps":
                     o.CheckOverlaps = true;
@@ -526,6 +541,13 @@ static class NestConsole
 
         if (options.PlateSize.HasValue && !hasDxfOnly)
             plate.Size = options.PlateSize.Value;
+
+        if (options.OutlineFile != null)
+        {
+            // The outline is the sheet: its bounds replace any size given.
+            plate.Outline = SheetOutline.FromGeometry(CadImporter.Import(options.OutlineFile).Entities);
+            Console.WriteLine($"Outline: {options.OutlineFile} ({plate.Outline})");
+        }
     }
 
     static Drawing ResolveDrawing(Nest nest, Options options)
@@ -996,6 +1018,9 @@ static class NestConsole
               --quantity <n>          Max parts to place (default: 0 = unlimited)
               --spacing <value>      Override part spacing
               --size <WxL>           Override plate size (e.g. 60x120); required for DXF-only mode
+              --outline <dxf>        Make the plate an irregular sheet: the file's largest closed contour is
+                                     the sheet, other closed contours are obstacles; sets the size. Only
+                                     --autonest with the Irregular (or Default) engine nests on it
               --output <path>        Output nest file path (default: <input>-result.nest)
               --template <path>      Nest template for plate defaults (thickness, quadrant, material, spacing)
               --autonest             Validated whole-job nesting (one sheet unless --max-sheets); replaces only after acceptance
@@ -1037,6 +1062,7 @@ static class NestConsole
         public int Quantity;
         public double? Spacing;
         public Size? PlateSize;
+        public string OutlineFile;
         public bool CheckOverlaps;
         public bool NoSave;
         public bool KeepParts;
