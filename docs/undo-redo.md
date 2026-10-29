@@ -10,10 +10,10 @@ once its entry point records it.
 |---|---|
 | History engine (states, cursor, limits, coalescing, save point) | `OpenNest.Data/UndoHistory.cs` |
 | State codec | `OpenNest.IO/NestSnapshot.cs` |
-| Recording scope, fingerprint, history state | `OpenNest/Undo/` |
+| Recording scope, fingerprint, history state | `OpenNest.Desktop/Undo/` (shared with `OpenNest.Avalonia`) |
 | Recording, restore, safety net | `OpenNest/Forms/EditNestForm.Undo.cs` |
 | Menu, keys, guards | `OpenNest/Forms/MainForm.Undo.cs`, `MainForm.Guards.cs` (`IsUndoBusy`) |
-| Tests | `OpenNest.WinForms.Tests/Forms/UndoRedoTests.cs`, `UndoRecordingTests.cs` |
+| Tests | `OpenNest.WinForms.Tests/Forms/UndoRedoTests.cs`, `UndoRecordingTests.cs`; scope and fingerprint on Linux in `OpenNest.Desktop.Tests/Undo/` |
 
 ## What is undoable
 
