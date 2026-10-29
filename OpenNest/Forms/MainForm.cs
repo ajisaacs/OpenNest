@@ -99,6 +99,12 @@ namespace OpenNest.Forms
             }
             if (ProcessUndoKeys(keyData))
                 return true;
+            // F1 opens the active tool's topic before the Help menu's general help.
+            if (keyData == Keys.F1 && activeForm?.PlateView?.ActionHelpTopic is { } topic)
+            {
+                HelpTopics.Show(this, topic);
+                return true;
+            }
 
             return base.ProcessCmdKey(ref msg, keyData);
         }

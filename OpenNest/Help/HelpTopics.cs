@@ -19,6 +19,7 @@ namespace OpenNest.Help
         public const string AutoNest = "auto-nest";
         public const string Post = "post";
         public const string SupportGrid = "support-grid";
+        public const string SheetCutOff = "sheet-cutoff";
 
         /// <summary>Overrides the help folder, e.g. a local opennest-help <c>site/</c> build.</summary>
         public const string DirectoryVariable = "OPENNEST_HELP_DIR";

@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using OpenNest.CNC;
 using OpenNest.Controls;
 using OpenNest.Geometry;
+using OpenNest.Help;
 
 namespace OpenNest.Actions
 {
@@ -50,6 +51,17 @@ namespace OpenNest.Actions
 
         public override bool IsBusy() => false;
 
+        public override string Hint =>
+            $"click to add a {AxisName(lockedAxis)} line, Space turns it {AxisName(OtherAxis(lockedAxis))}, Esc finishes, F1 for help";
+
+        public override string HelpTopic => HelpTopics.SheetCutOff;
+
+        private static CutOffAxis OtherAxis(CutOffAxis axis) =>
+            axis == CutOffAxis.Vertical ? CutOffAxis.Horizontal : CutOffAxis.Vertical;
+
+        private static string AxisName(CutOffAxis axis) =>
+            axis == CutOffAxis.Vertical ? "vertical" : "horizontal";
+
         private void OnMouseMove(object sender, MouseEventArgs e)
         {
             var pt = plateView.CurrentPoint;
@@ -78,8 +90,8 @@ namespace OpenNest.Actions
         {
             if (e.KeyCode == Keys.Space)
             {
-                lockedAxis =
-                    lockedAxis == CutOffAxis.Vertical ? CutOffAxis.Horizontal : CutOffAxis.Vertical;
+                lockedAxis = OtherAxis(lockedAxis);
+                plateView.RefreshActionStatus();
 
                 if (previewCutOff != null)
                 {
@@ -126,6 +138,22 @@ namespace OpenNest.Actions
                     e.Graphics.DrawLine(pen, pt1, pt2);
                 }
             }
+
+            DrawRotateTag(e.Graphics);
+        }
+
+        // The status bar is easy to miss, so the cursor says how to turn the line.
+        private void DrawRotateTag(Graphics g)
+        {
+            var text = $"Space: turn {AxisName(OtherAxis(lockedAxis))}";
+            var cursor = plateView.PointWorldToGraph(plateView.CurrentPoint);
+            var size = g.MeasureString(text, plateView.Font);
+            var rect = new RectangleF(cursor.X + 16f, cursor.Y + 16f, size.Width + 6, size.Height + 4);
+
+            using (var background = new SolidBrush(Color.FromArgb(230, Color.White)))
+                g.FillRectangle(background, rect);
+            g.DrawRectangle(Pens.DimGray, rect.X, rect.Y, rect.Width, rect.Height);
+            g.DrawString(text, plateView.Font, Brushes.Black, rect.X + 3, rect.Y + 2);
         }
     }
 }

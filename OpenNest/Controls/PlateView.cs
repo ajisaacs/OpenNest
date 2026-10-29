@@ -866,6 +866,12 @@ namespace OpenNest.Controls
         public void SetAction(Type type, params object[] args) =>
             actionManager.SetAction(type, args);
 
+        /// <summary>Shows the current action's name and hint again after the hint changed.</summary>
+        public void RefreshActionStatus() => actionManager.RefreshStatus();
+
+        /// <summary>The help topic for the current action, or null when it has none.</summary>
+        public string ActionHelpTopic => actionManager.CurrentAction?.HelpTopic;
+
         public void AlignSelected(AlignType alignType) => selection.AlignSelected(alignType);
 
         public void AlignSelected(AlignType alignType, LayoutPart fixedPart) =>

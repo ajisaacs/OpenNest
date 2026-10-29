@@ -33,6 +33,12 @@ namespace OpenNest.Actions
         /// </summary>
         public virtual bool ResumeOnEscape => true;
 
+        /// <summary>Status bar guidance shown after the action's name, or null for the name alone.</summary>
+        public virtual string Hint => null;
+
+        /// <summary>The help topic F1 opens while this action is active, or null for the general help.</summary>
+        public virtual string HelpTopic => null;
+
         public virtual void OnPlateChanged() { }
 
         public virtual void ConnectEvents() { }

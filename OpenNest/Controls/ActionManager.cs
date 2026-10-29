@@ -40,7 +40,7 @@ namespace OpenNest.Controls
             }
 
             currentAction = action;
-            view.Status = GetDisplayName(type);
+            RefreshStatus();
         }
 
         public void SetAction(Type type, params object[] args)
@@ -63,7 +63,7 @@ namespace OpenNest.Controls
                 return;
 
             currentAction = action;
-            view.Status = GetDisplayName(type);
+            RefreshStatus();
         }
 
         public void ProcessEscapeKey()
@@ -98,7 +98,7 @@ namespace OpenNest.Controls
             action.ConnectEvents();
             currentAction = action;
 
-            view.Status = GetDisplayName(action.GetType());
+            RefreshStatus();
         }
 
         public void OnPlateChanged()
@@ -117,6 +117,14 @@ namespace OpenNest.Controls
                 currentAction.DisconnectEvents();
                 currentAction = null;
             }
+        }
+
+        /// <summary>Shows the current action's name and hint in the status bar.</summary>
+        public void RefreshStatus()
+        {
+            var name = GetDisplayName(currentAction.GetType());
+            var hint = currentAction.Hint;
+            view.Status = string.IsNullOrEmpty(hint) ? name : $"{name}: {hint}";
         }
 
         private string GetDisplayName(Type type)
