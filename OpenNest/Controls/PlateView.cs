@@ -37,6 +37,7 @@ namespace OpenNest.Controls
         private SelectionManager selection;
         private CutOffHandler cutOffHandler;
         private readonly ClampMenuHandler clampMenu;
+        private readonly CutOffMenuHandler cutOffMenu;
         private PreviewManager previewManager;
         protected List<LayoutPart> parts;
         private Point middleMouseDownPoint;
@@ -77,6 +78,7 @@ namespace OpenNest.Controls
         internal SelectionManager Selection => selection;
         internal CutOffHandler CutOffs => cutOffHandler;
         internal ClampMenuHandler ClampMenu => clampMenu;
+        internal CutOffMenuHandler CutOffMenu => cutOffMenu;
         internal ActionManager Actions => actionManager;
         internal PreviewManager Previews => previewManager;
 
@@ -116,6 +118,7 @@ namespace OpenNest.Controls
             selection = new SelectionManager(this);
             cutOffHandler = new CutOffHandler(this);
             clampMenu = new ClampMenuHandler(this);
+            cutOffMenu = new CutOffMenuHandler(this);
             previewManager = new PreviewManager(this);
 
             redrawTimer = new Timer()
@@ -520,7 +523,10 @@ namespace OpenNest.Controls
             }
 
             if (e.Button == MouseButtons.Right)
-                clampMenu.TryShow(e.Location, 3.0 / ViewScale);
+            {
+                if (!clampMenu.TryShow(e.Location, 3.0 / ViewScale))
+                    cutOffMenu.TryShow(e.Location, 5.0 / ViewScale);
+            }
 
             base.OnMouseUp(e);
         }
@@ -649,6 +655,10 @@ namespace OpenNest.Controls
                 return true;
             return base.ProcessCmdKey(ref msg, keyData);
         }
+
+        // Trim/Extend switches mode with Tab, which would otherwise move focus off the view.
+        protected override bool IsInputKey(Keys keyData) =>
+            keyData == Keys.Tab && actionManager.CurrentAction is ActionTrimExtendCutOff || base.IsInputKey(keyData);
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
@@ -830,6 +840,7 @@ namespace OpenNest.Controls
                     plate.ClampZonesChanged -= plate_ClampZonesChanged;
                 }
                 clampMenu?.Dispose();
+                cutOffMenu?.Dispose();
                 CanEditClamps = null;
                 ClampNest = null;
                 overlapOverlay?.Dispose();

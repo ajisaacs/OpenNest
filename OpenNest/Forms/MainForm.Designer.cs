@@ -166,6 +166,7 @@ namespace OpenNest.Forms
             toolStripMenuItem20 = new System.Windows.Forms.ToolStripSeparator();
             mnuPlateViewInCad = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateCutOff = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateTrimExtendCutOff = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateEditClamps = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateAutomaticCutOff = new System.Windows.Forms.ToolStripMenuItem();
             mnuWindow = new System.Windows.Forms.ToolStripMenuItem();
@@ -195,6 +196,7 @@ namespace OpenNest.Forms
             btnShowRemnants = new System.Windows.Forms.ToolStripButton();
             toolStripSeparator5 = new System.Windows.Forms.ToolStripSeparator();
             btnCutOff = new System.Windows.Forms.ToolStripButton();
+            btnTrimExtendCutOff = new System.Windows.Forms.ToolStripButton();
             pEPToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             openNestToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             menuStrip1.SuspendLayout();
@@ -825,7 +827,7 @@ namespace OpenNest.Forms
             //
             // mnuPlate
             //
-            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateCutOff, mnuPlateAutomaticCutOff, mnuPlateEditClamps, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateArrange, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, mnuPlateSimulateCutting, toolStripMenuItem21, mnuPlatePlanCutting, mnuPlatePlaceLeadIn, mnuPlateRemoveLeadIns, toolStripMenuItem20, mnuPlateViewInCad });
+            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateCutOff, mnuPlateTrimExtendCutOff, mnuPlateAutomaticCutOff, mnuPlateEditClamps, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateArrange, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, mnuPlateSimulateCutting, toolStripMenuItem21, mnuPlatePlanCutting, mnuPlatePlaceLeadIn, mnuPlateRemoveLeadIns, toolStripMenuItem20, mnuPlateViewInCad });
             mnuPlate.Name = "mnuPlate";
             mnuPlate.Size = new System.Drawing.Size(45, 20);
             mnuPlate.Text = "&Plate";
@@ -876,6 +878,13 @@ namespace OpenNest.Forms
             mnuPlateCutOff.Size = new System.Drawing.Size(177, 22);
             mnuPlateCutOff.Text = "Sheet Cut-Off";
             mnuPlateCutOff.Click += CutOff_Click;
+            //
+            // mnuPlateTrimExtendCutOff
+            //
+            mnuPlateTrimExtendCutOff.Name = "mnuPlateTrimExtendCutOff";
+            mnuPlateTrimExtendCutOff.Size = new System.Drawing.Size(177, 22);
+            mnuPlateTrimExtendCutOff.Text = "Trim/Extend Cut-Off";
+            mnuPlateTrimExtendCutOff.Click += TrimExtendCutOff_Click;
             //
             // mnuPlateEditClamps
             //
@@ -1240,7 +1249,7 @@ namespace OpenNest.Forms
             // toolStrip1
             // 
             toolStrip1.AutoSize = false;
-            toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { btnNew, btnOpen, btnSave, btnSaveAs, toolStripSeparator1, engineLabel, engineComboBox, btnAutoNest, btnShowRemnants, toolStripSeparator5, btnCutOff });
+            toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { btnNew, btnOpen, btnSave, btnSaveAs, toolStripSeparator1, engineLabel, engineComboBox, btnAutoNest, btnShowRemnants, toolStripSeparator5, btnCutOff, btnTrimExtendCutOff });
             toolStrip1.Location = new System.Drawing.Point(0, 24);
             toolStrip1.Name = "toolStrip1";
             toolStrip1.Size = new System.Drawing.Size(1281, 40);
@@ -1347,6 +1356,17 @@ namespace OpenNest.Forms
             btnCutOff.Size = new System.Drawing.Size(38, 37);
             btnCutOff.Text = "Sheet Cut-Off";
             btnCutOff.Click += CutOff_Click;
+            //
+            // btnTrimExtendCutOff
+            //
+            btnTrimExtendCutOff.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            btnTrimExtendCutOff.Image = Properties.Resources.cutoff_trim;
+            btnTrimExtendCutOff.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
+            btnTrimExtendCutOff.Name = "btnTrimExtendCutOff";
+            btnTrimExtendCutOff.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
+            btnTrimExtendCutOff.Size = new System.Drawing.Size(38, 37);
+            btnTrimExtendCutOff.Text = "Trim/Extend Cut-Off";
+            btnTrimExtendCutOff.Click += TrimExtendCutOff_Click;
             //
             // pEPToolStripMenuItem
             // 
@@ -1541,6 +1561,8 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator5;
         private System.Windows.Forms.ToolStripButton btnCutOff;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateCutOff;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateTrimExtendCutOff;
+        private System.Windows.Forms.ToolStripButton btnTrimExtendCutOff;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateAutomaticCutOff;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem21;
         private System.Windows.Forms.ToolStripMenuItem mnuPlatePlanCutting;

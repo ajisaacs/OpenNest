@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using OpenNest.CNC;
+using OpenNest.Engine.Sequencing;
 using OpenNest.Geometry;
 using OpenNest.Undo;
 
@@ -61,6 +63,26 @@ namespace OpenNest.Controls
             drag = null;
             scope?.Complete();
             scope?.Dispose();
+        }
+
+        /// <summary>
+        /// Applies a trim, extend or swap as one undoable change: the new limits, regenerated
+        /// cut-offs, and the changed cut-offs' segments placed where the cut-off rules need them.
+        /// False, changing nothing, when the edit was refused.
+        /// </summary>
+        public bool Apply(CutOffEdit edit, string label)
+        {
+            if (edit == null || !edit.Succeeded)
+                return false;
+
+            using var change = view.BeginChange(label);
+            change.MarkChanged();
+            edit.Apply();
+            view.Plate.RegenerateCutOffs(view.CutOffSettings);
+            PlateSequencing.PlaceCutOffs(view.Plate, edit.Changes.Select(c => c.CutOff));
+            view.Invalidate();
+            change.Complete();
+            return true;
         }
 
         public CutOff GetCutOffAtPoint(Vector point, double tolerance)
