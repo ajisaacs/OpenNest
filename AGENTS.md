@@ -51,6 +51,7 @@ Releases: follow [the release procedure](docs/releasing.md) and `scripts/Publish
 - `FillLinear` geometry caches are per public call, keyed by `Program` reference identity; never share them across calls/threads. `PartOverlapChecker` is per check; parts/programs must not mutate during its lifetime.
 - `FillScore` ranks count, utilization, compactness; exact ties keep the current layout. Custom comparers remain authoritative. Preserve extents' negative/nonfinite-input fallback, pair preparation and adjusted-column overlap checks. Do not remove bounds recomputations without threshold/rounding characterization.
 - `ObservableList` events own drawing/plate quantity tracking; avoid double accounting. Cutoff parts are excluded from quantity, utilization and overlap checks.
+- `Plate.Outline`/`NestPlateStock.Outline` (`SheetOutline`) make a sheet irregular; `Size` stays its bounding box. Only Irregular fills it (`PackBoundary` eroded by the largest edge spacing); every other engine and fill strategy must place nothing on it, validation must reject parts outside it or over its obstacles, and automatic cut-offs refuse it. See [irregular stock](docs/irregular-stock.md).
 - Cutoffs persist as definitions on `Plate.CutOffs`; apply through `RegenerateCutOffs`, never preview parts. Preserve sequence positions. Batch planning must finish before mutation and roll back on failure. Use `PlateSequencing.Apply` for automatic cutoff dependencies, with nominal spans/reference identity rather than trimmed geometry/names.
 - A cutoff starts only at the origin-side edge: stock can be oversize, so the far edge is unknown. Only a head-locked overcut (`CutOff.HeadLockOvercut`, `HeadHeightLock` markers) may start its far-edge segment there; posts refuse it without lock codes.
 - Fixed emissions (locked programs, drawing-pinned contours) are accepted as given: their violations warn on an UNVERIFIED proposal and never steer the search, while every planner-chosen motion stays strict. Plates without them must keep the `PlanningCharacterizationTests` digests.
@@ -61,6 +62,7 @@ Releases: follow [the release procedure](docs/releasing.md) and `scripts/Publish
 Read the relevant contract before changing its behavior:
 
 - [Nest file format](docs/nest-file-format.md)
+- [Irregular stock](docs/irregular-stock.md): outlined sheets, what honors the outline and what refuses it
 - [Directional slides](docs/geometry/directional-slides.md) and [pair-spacing limits](docs/geometry/pair-spacing.md)
 - [Lead-in placement](docs/geometry/lead-in-placement.md) (including the planner's eroded pierce for cutouts too small for their lead-in) and [pierce zones](docs/geometry/pierce-zone.md): opt-in `PierceDiameter` clearance, the hole pole fallback and the planner's perimeter scrap fallback
 - [Breakoffs](docs/breakoffs.md): tabbed scrap; `Break`-layer open cuts that are cut but are not material
