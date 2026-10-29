@@ -17,7 +17,10 @@ namespace OpenNest.Avalonia
                 var args = desktop.Args ?? System.Array.Empty<string>();
                 if (args.Length > 0)
                     window.OpenNest(args[0]);
-                // --snapshot <png> [plate]: render the window to an image and exit, for checking the drawing.
+                // --auto-nest: run Auto Nest on the opened nest (with --snapshot, before rendering).
+                if (System.Array.IndexOf(args, "--auto-nest") >= 0)
+                    window.AutoNestOnOpen();
+                // --snapshot <png> [plate]: render the window to an image (status line in <png>.txt) and exit.
                 var snapshot = System.Array.IndexOf(args, "--snapshot");
                 if (snapshot >= 0 && snapshot + 1 < args.Length)
                     window.SaveSnapshotAndClose(args[snapshot + 1],

@@ -8,9 +8,12 @@
   <DockPanel>
     <Menu DockPanel.Dock="Top">
       <MenuItem Header="_File">
-        <MenuItem Header="_Open..." InputGesture="Ctrl+O" Click="OnOpen" />
+        <MenuItem x:Name="OpenMenuItem" Header="_Open..." InputGesture="Ctrl+O" Click="OnOpen" />
         <Separator />
         <MenuItem Header="E_xit" Click="OnExit" />
+      </MenuItem>
+      <MenuItem Header="_Nest">
+        <MenuItem x:Name="AutoNestMenuItem" Header="_Auto Nest" Click="OnAutoNest" />
       </MenuItem>
       <MenuItem Header="_View">
         <MenuItem Header="Zoom to _Fit" InputGesture="F" Click="OnFit" />
@@ -21,10 +24,11 @@
 
     <Border DockPanel.Dock="Top" Padding="4" BorderThickness="0,0,0,1" BorderBrush="#D0D0D0">
       <StackPanel Orientation="Horizontal" Spacing="4">
-        <Button Content="Open" Click="OnOpen" />
+        <Button x:Name="OpenButton" Content="Open" Click="OnOpen" />
         <Button Content="Fit" Click="OnFit" />
         <Button Content="Previous" Click="OnPreviousPlate" />
         <Button Content="Next" Click="OnNextPlate" />
+        <Button x:Name="AutoNestButton" Content="Auto Nest" Click="OnAutoNest" />
       </StackPanel>
     </Border>
 
