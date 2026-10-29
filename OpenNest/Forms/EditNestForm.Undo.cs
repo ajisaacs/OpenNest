@@ -179,8 +179,18 @@ namespace OpenNest.Forms
                 Document.Nest = restored;
                 BindNest(restored);
                 // Reading regenerates cut-offs with default settings; the view's apply here.
-                foreach (var plate in restored.Plates.Where(plate => plate.CutOffs.Count > 0))
-                    plate.RegenerateCutOffs(PlateView.CutOffSettings);
+                // Regenerating empties a cut-off-only plate for a moment, so the batch keeps
+                // the new-plate sentinel from adding or dropping plates until all are done.
+                PlateManager.BeginBatch();
+                try
+                {
+                    foreach (var plate in restored.Plates.Where(plate => plate.CutOffs.Count > 0).ToArray())
+                        plate.RegenerateCutOffs(PlateView.CutOffSettings);
+                }
+                finally
+                {
+                    PlateManager.EndBatch();
+                }
                 ColorSchemeRegistry.RecolorDrawings(restored);
 
                 // Loading a plate zooms to fit; an undo keeps the view where it was.

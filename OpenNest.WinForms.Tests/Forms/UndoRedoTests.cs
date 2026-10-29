@@ -324,6 +324,38 @@ public class UndoRedoTests
     });
 
     [Fact]
+    public void UndoRestoresAPlateThatHoldsOnlyCutOffs() => UndoTestEnv.Run(env =>
+    {
+        // Regenerating a restored cut-off-only plate empties it for a moment, which once made
+        // the new-plate sentinel drop a plate while the restore was still walking the plates.
+        var editor = env.Editor;
+        editor.PlateManager.LoadAt(0);
+        for (var i = 1; i <= 3; i++)
+        {
+            var x = i * 25;
+            editor.RecordChange("Add Cut-Off", () =>
+            {
+                editor.PlateView.Plate.CutOffs.Add(new CutOff(new Geometry.Vector(x, 0), CutOffAxis.Vertical));
+                editor.PlateView.Plate.RegenerateCutOffs(editor.PlateView.CutOffSettings);
+            });
+        }
+        Assert.Equal(2, editor.Nest.Plates.Count);
+
+        Assert.True(env.Host.TryUndo(editor));
+
+        Assert.Equal(2, editor.Nest.Plates[0].CutOffs.Count);
+        Assert.Equal(2, editor.Nest.Plates[0].Parts.Count(p => p.BaseDrawing.IsCutOff));
+        Assert.Equal(2, editor.Nest.Plates.Count);
+        Assert.Empty(editor.Nest.Plates[1].Parts);
+        Assert.Same(editor.Nest.Plates[0], editor.PlateView.Plate);
+    }, () =>
+    {
+        var nest = new Nest("cut-offs");
+        nest.CreatePlate().Size = new Geometry.Size(100, 100);
+        return nest;
+    });
+
+    [Fact]
     public void TheEditMenuNamesTheNextUndoAndRedo() => Run(env =>
     {
         var editor = env.Editor;
