@@ -13,8 +13,10 @@ namespace OpenNest.Avalonia
 
     public partial class MainWindow : Window
     {
-        private Nest nest;
+        private Document document;
         private string fileName;
+
+        private Nest nest => document?.Nest;
 
         public MainWindow()
         {
@@ -33,7 +35,7 @@ namespace OpenNest.Avalonia
         {
             try
             {
-                nest = new NestReader(path).Read();
+                document = new Document { Nest = new NestReader(path).Read() };
             }
             catch (Exception ex)
             {
