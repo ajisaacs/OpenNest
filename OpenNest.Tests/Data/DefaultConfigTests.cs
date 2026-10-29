@@ -24,7 +24,7 @@ public class DefaultConfigTests : IDisposable
         provider.EnsureDefaults();
         var machines = provider.GetMachines();
         Assert.Single(machines);
-        Assert.Equal("CL-980", machines[0].Name);
+        Assert.Equal("Generic Laser", machines[0].Name);
     }
 
     [Fact]
@@ -69,6 +69,41 @@ public class DefaultConfigTests : IDisposable
                 Assert.NotNull(thickness.LeadIn);
                 Assert.NotNull(thickness.LeadOut);
                 Assert.NotNull(thickness.CutOff);
+            }
+        }
+    }
+
+    [Fact]
+    public void DefaultConfig_HasSensibleValues()
+    {
+        var provider = new LocalJsonProvider(_testDir);
+        provider.EnsureDefaults();
+        var config = provider.GetMachine(provider.GetMachines()[0].Id);
+
+        foreach (var material in config.Materials)
+        {
+            Assert.True(material.Density > 0);
+            var thicknesses = material.Thicknesses.OrderBy(t => t.Value).ToList();
+            for (var i = 0; i < thicknesses.Count; i++)
+            {
+                var thickness = thicknesses[i];
+                var label = $"{material.Name} {thickness.Value}";
+                Assert.False(string.IsNullOrWhiteSpace(thickness.Name), label);
+                Assert.True(thickness.Kerf < thickness.Value / 4, label);
+                Assert.True(thickness.CutOff.PartClearance > thickness.Kerf, label);
+                Assert.True(thickness.CutOff.Overtravel > 0, label);
+                Assert.True(thickness.CutOff.MinSegmentLength > 0, label);
+                Assert.Equal("Arc", thickness.LeadIn.Type);
+                Assert.True(thickness.LeadIn.Radius >= thickness.Kerf * 4, label);
+                Assert.NotEmpty(thickness.PlateSizes);
+                Assert.All(thickness.PlateSizes, s => Assert.True(OpenNest.Shapes.PlateSizes.TryGet(s, out _), s));
+
+                if (i == 0)
+                    continue;
+                var thinner = thicknesses[i - 1];
+                Assert.True(thickness.Value > thinner.Value, label);
+                Assert.True(thickness.Kerf >= thinner.Kerf, label);
+                Assert.True(thickness.LeadIn.Radius >= thinner.LeadIn.Radius, label);
             }
         }
     }

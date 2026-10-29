@@ -10,6 +10,6 @@
     <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Defaults\CL-980.json" />
+    <EmbeddedResource Include="Defaults\Generic-Laser.json" />
   </ItemGroup>
 </Project>

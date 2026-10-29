@@ -1130,7 +1130,7 @@ Listens on `ASPNETCORE_URLS` (default Kestrel ports) unless overridden.
 Docker must be built from the repository root: the server references
 `OpenNest.Data`, which references `OpenNest.Core`. The Dockerfile copies all three
 project files before restore and their source/resources before publish, including
-Data's embedded `Defaults/CL-980.json`. The allowlist `.dockerignore` excludes
+Data's embedded `Defaults/Generic-Laser.json`. The allowlist `.dockerignore` excludes
 other projects, host `bin`/`obj`, local databases, environment files, and launch
 settings. The server image uses the .NET 8 SDK to build and the .NET 8 ASP.NET
 runtime to run; IO/Engine are used only by the host-side smoke tool, not the image.

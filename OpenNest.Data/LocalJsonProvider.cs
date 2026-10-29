@@ -79,7 +79,7 @@ public class LocalJsonProvider : IDataProvider
         var assembly = typeof(LocalJsonProvider).Assembly;
         var resourceName = assembly
             .GetManifestResourceNames()
-            .FirstOrDefault(n => n.EndsWith("CL-980.json"));
+            .FirstOrDefault(n => n.EndsWith("Generic-Laser.json"));
 
         if (resourceName is null)
             return;
