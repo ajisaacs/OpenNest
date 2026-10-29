@@ -535,10 +535,13 @@ namespace OpenNest
 
                 // Leads are cutting paths in scrap, not boundary edges. Chaining them
                 // into the outline can make a closed part appear open and replace its
-                // recesses with a convex hull. Keep the full geometry for the existing
-                // conservative fallback when the material contour really is open.
+                // recesses with a convex hull. A cut-off may cross a lead, so the open-
+                // contour hull also leaves them out: hulling a lead's pierce point would
+                // stop cut-offs far short of the part.
                 var outline = entities.Where(e => e.Layer != SpecialLayers.Leadin &&
                     e.Layer != SpecialLayers.Leadout).ToList();
+                if (outline.Count == 0)
+                    return null;
                 var profile = new Geometry.ShapeProfile(outline);
 
                 if (profile.Perimeter.IsClosed())
@@ -548,7 +551,7 @@ namespace OpenNest
                     return perimeter;
                 }
 
-                var points = entities.CollectPoints();
+                var points = outline.CollectPoints();
                 if (points.Count < 3)
                     return null;
 

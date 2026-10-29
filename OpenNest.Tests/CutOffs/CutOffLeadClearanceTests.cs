@@ -138,4 +138,28 @@ public class CutOffLeadClearanceTests
         Assert.True(Assert.IsType<LinearMove>(codes[1]).EndPoint.Y <= 19.98);
         Assert.True(Assert.IsType<RapidMove>(codes[2]).EndPoint.Y >= 25.02);
     }
+
+    [Fact]
+    public void OpenContour_FallbackHullIgnoresLeads()
+    {
+        // A tab gap leaves the outline open. The fallback hull must follow the material,
+        // not run from the lead-in's pierce point, or a cut-off passing the part stops far short.
+        var program = new Program();
+        program.MoveTo(50, -5);
+        program.Codes.Add(new LinearMove(40, 5) { Layer = LayerType.Leadin });
+        program.LineTo(40, 15);
+        program.LineTo(0, 20);
+        program.LineTo(0, 0);
+        program.LineTo(39, 4.875);
+        var plate = new Plate(100, 100);
+        var part = new Part(new Drawing("open-tapered", program), new Vector(20, 20));
+        plate.Parts.Add(part);
+        var cutoff = new CutOff(new Vector(50, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(cutoff);
+        plate.RegenerateCutOffs(new CutOffSettings());
+        var codes = cutoff.Drawing.Program.Codes;
+        Assert.Equal(4, codes.Count);
+        // The material's bottom edge crosses x = 50 at y = 23.75.
+        Assert.InRange(Assert.IsType<LinearMove>(codes[1]).EndPoint.Y, 23, 23.75 - 0.02);
+    }
 }
