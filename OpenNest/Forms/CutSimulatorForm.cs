@@ -10,6 +10,8 @@ namespace OpenNest.Forms
     /// <summary>
     /// Playback controls for a <see cref="CutSimulationOverlay"/> on a nest's plate view. Follows
     /// the current plate and rebuilds the timeline when parts are added, removed or resequenced.
+    /// While it is open the nest is view-only, as in Plan Cutting: the canvas pans and zooms and
+    /// plates can be stepped through, but nothing that edits is enabled.
     /// </summary>
     public sealed class CutSimulatorForm : Form
     {
@@ -26,6 +28,7 @@ namespace OpenNest.Forms
         private readonly NumericUpDown feedBox, holeFeedBox, rapidBox, pierceBox;
         private readonly CheckBox skipEtchBox;
         private readonly CutTimeMachineBox machineBox;
+        private readonly ValidationInspectionScope scope;
         private Plate plate;
         private bool updatingTrack;
         private bool rebuildQueued;
@@ -184,6 +187,9 @@ namespace OpenNest.Forms
             nestForm.FormClosed += NestForm_FormClosed;
             AttachPlate(nestForm.PlateView.Plate);
             Rebuild();
+
+            scope = new ValidationInspectionScope(nestForm, Close, nestForm.PlateNavigation);
+            nestForm.PlateView.InspectionCloseRequested = Close;
         }
 
         private static NumericUpDown NewNumber(decimal value, decimal min, decimal max, int decimals, string suffix) =>
@@ -447,9 +453,16 @@ namespace OpenNest.Forms
             nestForm.FormClosed -= NestForm_FormClosed;
             AttachPlate(null);
             if (!nestForm.PlateView.IsDisposed)
+            {
                 overlay.Clear();
+                nestForm.PlateView.InspectionCloseRequested = null;
+            }
 
             base.OnFormClosed(e);
+
+            // Unlock after the editor has forgotten this form, then finish a close it held up.
+            scope.Dispose();
+            scope.ResumeHostClose();
         }
 
         // Playback rewrites the status every frame; a plain label erases before it redraws, so it flashes.

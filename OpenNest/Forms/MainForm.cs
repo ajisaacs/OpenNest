@@ -75,13 +75,12 @@ namespace OpenNest.Forms
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
-            var inspection = MdiChildren.OfType<EditNestForm>()
-                .Select(form => form.CuttingInspection).FirstOrDefault(panel => panel != null);
-            if (inspection != null)
+            var inspected = MdiChildren.OfType<EditNestForm>().FirstOrDefault(form => form.IsInspecting);
+            if (inspected != null)
             {
                 if (keyData == Keys.Escape)
                 {
-                    inspection.RequestClose();
+                    inspected.EndInspection();
                     return true;
                 }
                 // Standard inspection navigation reaches the canvas/panel; menu shortcuts cannot mutate.

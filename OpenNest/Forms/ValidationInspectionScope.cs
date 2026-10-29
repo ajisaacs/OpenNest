@@ -6,7 +6,11 @@ using OpenNest.Controls;
 
 namespace OpenNest.Forms;
 
-/// <summary>Keep live validation inputs stable while allowing navigation of the main canvas.</summary>
+/// <summary>
+/// Keep live validation inputs stable while allowing navigation of the main canvas. Locks the
+/// canvas to viewing and disables every other control of the main window except
+/// <c>keepLive</c> and the zoom buttons.
+/// </summary>
 internal sealed class ValidationInspectionScope : IDisposable
 {
     private readonly List<(Control Control, bool Enabled)> controls = new();
@@ -18,11 +22,11 @@ internal sealed class ValidationInspectionScope : IDisposable
     private Form closingHost;
     private readonly bool previousInspection;
 
-    public ValidationInspectionScope(EditNestForm editor, Control inspector, Control header, Action close)
+    public ValidationInspectionScope(EditNestForm editor, Action close, params Control[] keepLive)
     {
         view = editor.PlateView;
         // The header zoom buttons only change the viewport, like the canvas wheel.
-        live = new[] { view, inspector, header }.Concat(editor.ZoomControls).Where(control => control != null).ToArray();
+        live = keepLive.Prepend(view).Concat(editor.ZoomControls).Where(control => control != null).ToArray();
         this.close = close;
         previousInspection = view.InspectionOnly;
         view.InspectionOnly = true;

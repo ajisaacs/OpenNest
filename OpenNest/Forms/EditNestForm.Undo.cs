@@ -58,7 +58,7 @@ namespace OpenNest.Forms
 
         public bool CanRedo => History.CanRedo && CanRestore;
 
-        private bool CanRestore => !IsChangeInProgress && CuttingInspection == null;
+        private bool CanRestore => !IsChangeInProgress && !IsInspecting;
 
         public void Undo()
         {

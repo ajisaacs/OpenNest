@@ -176,6 +176,7 @@ namespace OpenNest.Forms
             plateButtons.Controls.AddRange(
                 new Control[] { btnFirstPlate, btnPreviousPlate, btnNextPlate, btnLastPlate });
             ZoomControls = [zoomOutButton, zoomInButton, zoomToFitButton];
+            PlateNavigation = plateButtons;
 
             zoomOutButton.Location = new Point(btnSize.Width * 4 + 8, 0);
             zoomInButton.Location = new Point(btnSize.Width * 5 + 8, 0);
@@ -281,7 +282,20 @@ namespace OpenNest.Forms
 
         internal Control SidePanelHeader { get; private set; }
         internal Control[] ZoomControls { get; private set; }
+        internal Control PlateNavigation { get; private set; }
         internal CuttingInspectionPanel CuttingInspection { get; private set; }
+
+        /// <summary>True while Plan Cutting or the Cut Simulator holds the nest view-only.</summary>
+        internal bool IsInspecting => CuttingInspection != null || cutSimulatorForm != null;
+
+        internal void EndInspection()
+        {
+            if (CuttingInspection != null)
+                CuttingInspection.RequestClose();
+            else
+                cutSimulatorForm?.Close();
+        }
+
         private bool disposeAfterCuttingInspection;
         private bool closeAfterCuttingInspection;
         internal bool DeferCuttingDisposal()
@@ -1118,7 +1132,10 @@ namespace OpenNest.Forms
                 cutSimulatorForm.Activate();
                 return;
             }
+            if (CuttingInspection != null)
+                return;
 
+            PlateView.EndAction();
             cutSimulatorForm = new CutSimulatorForm(this);
             cutSimulatorForm.FormClosed += (_, _) => cutSimulatorForm = null;
             var owner = MdiParent ?? (Form)this;

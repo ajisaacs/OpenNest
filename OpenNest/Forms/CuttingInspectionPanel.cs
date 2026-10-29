@@ -401,7 +401,7 @@ internal sealed class CuttingInspectionPanel : UserControl
 
     internal void Open()
     {
-        scope = new ValidationInspectionScope(editor, this, editor.SidePanelHeader, RequestClose);
+        scope = new ValidationInspectionScope(editor, RequestClose, this, editor.SidePanelHeader);
         view.InspectionCloseRequested = RequestClose;
         view.OverlapDisplay = OverlapDisplayMode.Off;
         view.ClearValidationFinding();

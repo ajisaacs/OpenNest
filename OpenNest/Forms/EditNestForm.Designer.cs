@@ -16,6 +16,9 @@
             // A planning worker owns a captured inspection until its owner-thread join.
             if (disposing && DeferCuttingDisposal())
                 return;
+            // The simulator's lock disables the main window until it closes.
+            if (disposing)
+                cutSimulatorForm?.Close();
             if (disposing && (components != null))
             {
                 components.Dispose();
