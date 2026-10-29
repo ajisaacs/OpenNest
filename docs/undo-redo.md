@@ -21,8 +21,8 @@ Everything stored in the nest:
 
 - parts: add, delete, cut, move, drag, nudge, rotate, align, push, center, expand spacing, clone;
 - placement: fill, fill area, pattern tile, best-fit placement, Auto Nest, Clear Nest;
-- plates: add, remove, remove empty plates, Edit Plate, rotate, resize, cutting parameters,
-  clamps and clamp rail, the support grid, the nest's default plate;
+- plates: add, remove, remove empty plates, Edit Plate (its sheet outline included), rotate,
+  resize, cutting parameters, clamps and clamp rail, the support grid, the nest's default plate;
 - cutting: manual and automatic cut-offs and their drags, Auto Sequence, Set Sequence,
   Sequence by Path, placing and removing lead-ins, Plan Cutting's Apply, clearing lead-ins and
   cut-offs;

@@ -696,6 +696,145 @@ namespace OpenNest.IO
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             [JsonConverter(typeof(WriteOnlyConverter<ExpectedRemnantDto>))]
             public ExpectedRemnantDto ExpectedRemnant { get; init; }
+
+            /// <summary>
+            /// The sheet's material when it is not a rectangle (<see cref="SheetOutline"/>), in
+            /// plate coordinates; omitted for a rectangular sheet, which is every sheet in older
+            /// files. Read leniently: a wrongly shaped value loads as a rectangle with a reader
+            /// warning (see <see cref="NestReader.Warnings"/>).
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            [JsonConverter(typeof(LenientSheetOutlineConverter))]
+            public SheetOutlineDto Outline { get; init; }
+        }
+
+        /// <summary>A non-rectangular sheet: its vertices and the vertices of each obstacle.</summary>
+        public record SheetOutlineDto
+        {
+            public List<PointDto> Points { get; init; } = new();
+
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public List<List<PointDto>> Obstacles { get; init; }
+
+            /// <summary>Why the value could not be read, when it was malformed; never written.</summary>
+            [JsonIgnore]
+            public string Problem { get; init; }
+        }
+
+        public record PointDto
+        {
+            public double X { get; init; }
+            public double Y { get; init; }
+        }
+
+        /// <summary>
+        /// Reads a sheet outline leniently: a value that is not an object, a missing or non-array
+        /// <c>points</c>, or a vertex that is not an object with numeric <c>x</c> and <c>y</c>
+        /// yields a DTO carrying the <see cref="SheetOutlineDto.Problem"/> instead of failing the
+        /// file; a non-array obstacle list or entry is reported the same way. Geometry is not
+        /// checked here: <see cref="SheetOutline"/> does that when the plate is built.
+        /// </summary>
+        public sealed class LenientSheetOutlineConverter : JsonConverter<SheetOutlineDto>
+        {
+            public override SheetOutlineDto Read(
+                ref Utf8JsonReader reader,
+                Type typeToConvert,
+                JsonSerializerOptions options
+            )
+            {
+                using var document = JsonDocument.ParseValue(ref reader);
+                var root = document.RootElement;
+                if (root.ValueKind == JsonValueKind.Null)
+                    return null;
+                if (root.ValueKind != JsonValueKind.Object)
+                    return new SheetOutlineDto { Problem = "it is not an object" };
+                if (!root.TryGetProperty("points", out var list))
+                    return new SheetOutlineDto { Problem = "'points' is missing" };
+                if (!TryPointList(list, out var points, out var problem))
+                    return new SheetOutlineDto { Problem = problem };
+                List<List<PointDto>> obstacles = null;
+                if (root.TryGetProperty("obstacles", out var entries) && entries.ValueKind != JsonValueKind.Null)
+                {
+                    if (entries.ValueKind != JsonValueKind.Array)
+                        return new SheetOutlineDto { Problem = "'obstacles' is not an array" };
+                    obstacles = new List<List<PointDto>>();
+                    var index = 0;
+                    foreach (var entry in entries.EnumerateArray())
+                    {
+                        index++;
+                        if (!TryPointList(entry, out var obstacle, out problem))
+                            return new SheetOutlineDto { Problem = $"obstacle {index}: {problem}" };
+                        obstacles.Add(obstacle);
+                    }
+                }
+                return new SheetOutlineDto { Points = points, Obstacles = obstacles };
+            }
+
+            private static bool TryPointList(JsonElement list, out List<PointDto> points, out string problem)
+            {
+                points = null;
+                problem = null;
+                if (list.ValueKind != JsonValueKind.Array)
+                {
+                    problem = "the vertex list is not an array";
+                    return false;
+                }
+                points = new List<PointDto>();
+                foreach (var element in list.EnumerateArray())
+                {
+                    if (element.ValueKind != JsonValueKind.Object
+                        || !TryNumber(element, "x", out var x)
+                        || !TryNumber(element, "y", out var y))
+                    {
+                        problem = $"vertex {points.Count + 1} is not an object with numeric x and y";
+                        return false;
+                    }
+                    points.Add(new PointDto { X = x, Y = y });
+                }
+                return true;
+            }
+
+            public override void Write(
+                Utf8JsonWriter writer,
+                SheetOutlineDto value,
+                JsonSerializerOptions options
+            )
+            {
+                writer.WriteStartObject();
+                writer.WriteStartArray("points");
+                foreach (var point in value.Points)
+                    WritePoint(writer, point);
+                writer.WriteEndArray();
+                if (value.Obstacles is { Count: > 0 })
+                {
+                    writer.WriteStartArray("obstacles");
+                    foreach (var obstacle in value.Obstacles)
+                    {
+                        writer.WriteStartArray();
+                        foreach (var point in obstacle)
+                            WritePoint(writer, point);
+                        writer.WriteEndArray();
+                    }
+                    writer.WriteEndArray();
+                }
+                writer.WriteEndObject();
+            }
+
+            private static bool TryNumber(JsonElement point, string name, out double value)
+            {
+                value = 0;
+                return point.TryGetProperty(name, out var element)
+                    && element.ValueKind == JsonValueKind.Number
+                    && element.TryGetDouble(out value);
+            }
+
+            private static void WritePoint(Utf8JsonWriter writer, PointDto point)
+            {
+                writer.WriteStartObject();
+                writer.WriteNumber("x", point.X);
+                writer.WriteNumber("y", point.Y);
+                writer.WriteEndObject();
+            }
         }
 
         /// <summary>A plate's expected rectangular drop, with <see cref="Width"/> the shorter side.</summary>

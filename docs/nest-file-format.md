@@ -203,6 +203,23 @@ records the minimum remnant size it last used, and older files load 12). A cut-o
 drop below it falls through to the offcut. Interior holes and irregular leftovers
 are not reported.
 
+## Sheet outline
+
+A plate that is not a rectangle (see [irregular stock](irregular-stock.md)) carries an
+optional `outline`: `points`, the vertices of its material as `{ "x", "y" }` objects in plate
+coordinates (the sheet's lower-left frame, as `clamps`), counterclockwise from the lowest-left
+vertex, and optional `obstacles`, a list of such vertex lists for areas inside it that must stay
+empty (omitted when there are none). The plate's `size` is still written and is the outline's
+bounding box. The key is omitted for a rectangular sheet, so files without outlines are
+unchanged, and older readers ignore it and load the rectangle of the saved size.
+
+Read leniently: a value that is not an object, a missing or non-array `points`, a vertex that is
+not an object with numeric `x` and `y`, a non-array `obstacles`, or a polygon `SheetOutline`
+refuses (fewer than three distinct vertices, no area, self-crossing) loads the plate as a
+rectangle of its saved size and adds a `NestReader.Warnings` entry naming the plate; the rest
+of the nest loads. An empty plate with an outline is always written: new-plate defaults cannot
+recreate it. `expectedRemnant` is never written for an outlined plate.
+
 ## Support grid
 
 `plateDefaults.supportBed` optionally stores the machine support bed every sheet of

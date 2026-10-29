@@ -353,6 +353,7 @@ namespace OpenNest.IO
                     !KeepEmptyPlates
                     && plate.Parts.Count(p => !p.BaseDrawing.IsCutOff) == 0
                     && plate.CutOffs.Count == 0
+                    && plate.Outline == null
                     && (
                         (plate.ClampZones.Count == 0 && plate.RemovedClamps.Count == 0)
                         || DefaultsRecreateClamps(plate)
@@ -461,11 +462,25 @@ namespace OpenNest.IO
                             : ToDto(plate.ClampRail),
                         StockItemCodes = plate.StockItemCodes.Count == 0 ? null : plate.StockItemCodes.ToList(),
                         ExpectedRemnant = ToDto(PlateRemnant.Expected(plate, nest.MinimumRemnantDimension)),
+                        Outline = ToDto(plate.Outline),
                     }
                 );
             }
             return list;
         }
+
+        private static SheetOutlineDto ToDto(SheetOutline outline) =>
+            outline == null
+                ? null
+                : new SheetOutlineDto
+                {
+                    Points = outline.Points.Select(p => new PointDto { X = p.X, Y = p.Y }).ToList(),
+                    Obstacles = outline.Obstacles.Count == 0
+                        ? null
+                        : outline.Obstacles
+                            .Select(o => o.Select(p => new PointDto { X = p.X, Y = p.Y }).ToList())
+                            .ToList(),
+                };
 
         private static ExpectedRemnantDto ToDto(PlateRemnant remnant) =>
             remnant == null

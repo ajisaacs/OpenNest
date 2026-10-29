@@ -530,6 +530,33 @@ namespace OpenNest.IO
         /// missing or invalid removal-minutes value falls back to <see cref="ClampRail.DefaultRemovalMinutes"/>.
         /// </summary>
         /// <summary>The saved support bed, or null when absent or invalid (a bad bed never fails the nest).</summary>
+        /// <summary>
+        /// The plate's sheet outline, or null (a rectangle) when the file has none or the value
+        /// is malformed or not a simple polygon; the latter adds a warning naming the plate.
+        /// </summary>
+        private SheetOutline ReadOutline(SheetOutlineDto dto, int plateId)
+        {
+            if (dto == null)
+                return null;
+            string problem = dto.Problem;
+            if (problem == null)
+            {
+                try
+                {
+                    return new SheetOutline(
+                        dto.Points.Select(p => new Vector(p.X, p.Y)),
+                        dto.Obstacles?.Select(o => o.Select(p => new Vector(p.X, p.Y))));
+                }
+                catch (ArgumentException exception)
+                {
+                    problem = exception.Message;
+                }
+            }
+            warnings.Add($"Plate {plateId}: its sheet outline could not be read ({problem}); "
+                + "the plate loads as a rectangle of its saved size.");
+            return null;
+        }
+
         private static SupportBed ReadSupportBed(SupportBedDto dto)
         {
             if (dto == null)
@@ -666,6 +693,7 @@ namespace OpenNest.IO
                 );
                 plate.GrainAngle = p.GrainAngle;
                 plate.CuttingParameters = CuttingParametersSerializer.FromDto(p.CuttingParameters);
+                plate.Outline = ReadOutline(p.Outline, p.Id);
 
                 // Clamp zones: older files have no key at all; an individually invalid
                 // entry is dropped rather than poisoning the whole nest.
