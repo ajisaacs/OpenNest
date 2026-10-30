@@ -24,6 +24,7 @@
   "HeadHeightLockCode": "",
   "HeadHeightUnlockCode": "",
   "PalletExchange": "EndOfSheet",
+  "UseLowerPalletFunction": false,
   "LeadInFeedratePercent": 0.5,
   "LeadInArcLine2FeedratePercent": 0.5,
   "LeadOutFeedratePercent": 0.5,

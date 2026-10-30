@@ -115,6 +115,42 @@ public class CincinnatiPreambleWriterTests
     }
 
     [Fact]
+    public void WriteMainProgram_WrapsSheetsInM43M44_WhenLowerPalletFunction()
+    {
+        var config = new CincinnatiPostConfig
+        {
+            UseLowerPalletFunction = true,
+            PalletExchange = PalletMode.StartAndEnd,
+        };
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var writer = new CincinnatiPreambleWriter(config);
+
+        writer.WriteMainProgram(sw, "Test", "", new List<Plate> { new(48, 96), new(48, 96) }, "");
+
+        var lines = sb.ToString().Split(Environment.NewLine);
+        var m43 = Array.IndexOf(lines, "M43 (LOWER PALLET FUNCTION ON)");
+        var m44 = Array.IndexOf(lines, "M44 (LOWER PALLET FUNCTION OFF)");
+        Assert.True(m43 > Array.IndexOf(lines, "M50"));
+        Assert.True(m43 < Array.IndexOf(lines, "GOTO1 (GOTO SHEET NUMBER)"));
+        Assert.True(m44 > Array.IndexOf(lines, "N2 M98 P102 (LAYOUT 2)"));
+        Assert.True(m44 < Array.IndexOf(lines, "M30 (END OF MAIN)"));
+    }
+
+    [Fact]
+    public void WriteMainProgram_OmitsM43M44_ByDefault()
+    {
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var writer = new CincinnatiPreambleWriter(new CincinnatiPostConfig());
+
+        writer.WriteMainProgram(sw, "Test", "", new List<Plate> { new(48, 96) }, "");
+
+        Assert.DoesNotContain("M43", sb.ToString());
+        Assert.DoesNotContain("M44", sb.ToString());
+    }
+
+    [Fact]
     public void WriteMainProgram_EmitsG61_WhenExactStop()
     {
         var config = new CincinnatiPostConfig { UseExactStopMode = true };

@@ -78,7 +78,7 @@ namespace OpenNest.Posts.Cincinnati
     [PostSettingsSection(
         SheetsSection,
         1,
-        Description = "When the pallet exchange is written around each sheet."
+        Description = "When the pallet exchange is written around each sheet, and the lower pallet function."
     )]
     [PostSettingsSection(
         LibrariesSection,
@@ -269,6 +269,13 @@ namespace OpenNest.Posts.Cincinnati
         [Description("When the pallet exchange is written: None, EndOfSheet, or StartAndEnd.")]
         [PostSetting(SheetsSection, 0)]
         public PalletMode PalletExchange { get; set; } = PalletMode.EndOfSheet;
+
+        [DisplayName("Lower pallet function")]
+        [Description(
+            "For lasers with the Lower Pallet Special Function option: M43 turns it on before the program's first move and M44 turns it off at the end."
+        )]
+        [PostSetting(SheetsSection, 1)]
+        public bool UseLowerPalletFunction { get; set; } = false;
 
         [DisplayName("Lead-in feedrate")]
         [Description("Feedrate for lead-in moves (0.5 = 50%).")]

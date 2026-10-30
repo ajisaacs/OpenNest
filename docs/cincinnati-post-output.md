@@ -23,7 +23,12 @@ A generated file contains, in order:
 
 1. **Main program** (`CincinnatiPreambleWriter.WriteMainProgram`)
    Preamble, unit/mode setup, initial library, variable-declaration call, one
-   `M98 P<sheetSubNum>` call per plate quantity, and `M30` to end.
+   `M98 P<sheetSubNum>` call per plate quantity, and `M30` to end. With
+   **Lower pallet function** on, `M43` is written before `GOTO1` (so it runs
+   before the first move, even when the operator restarts at a sheet) and
+   `M44` after the last sheet call. The nesting software manual (Common
+   Posting Options 2, p. 24) only posts `M43`; the closing `M44` is a shop
+   choice so the mode is not left on after the program.
 
 2. **Variable declaration sub-program** (`CincinnatiPreambleWriter.WriteVariableDeclaration`)
    Machine variables (`#number = value`) used across the nest, terminated
@@ -300,6 +305,7 @@ next time the post is edited.
 | --- | --- | --- |
 | `M35` | Beam off | §3.35 |
 | `M42` | Retract Z-axis | §3.42 |
+| `M43` / `M44` | Lower Pallet Special Function on / off (optional machine feature) | Nesting software manual p. 24 |
 | `M47 [P<dist>]` | Raise Z-axis, optionally by a distance | §3.47 |
 | `M50` | Switch pallets | §3.50 |
 | `M130` | Anti-dive off | §3.130 |

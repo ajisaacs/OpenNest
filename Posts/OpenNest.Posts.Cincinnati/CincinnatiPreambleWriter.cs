@@ -65,6 +65,10 @@ public sealed class CincinnatiPreambleWriter
         if (_config.PalletExchange == PalletMode.StartAndEnd)
             w.WriteLine("M50");
 
+        // Before GOTO1, so restarting at a sheet still runs in lower pallet mode.
+        if (_config.UseLowerPalletFunction)
+            w.WriteLine("M43 (LOWER PALLET FUNCTION ON)");
+
         w.WriteLine("GOTO1 (GOTO SHEET NUMBER)");
 
         for (var i = 0; i < plates.Count; i++)
@@ -77,6 +81,9 @@ public sealed class CincinnatiPreambleWriter
                 qty > 1 ? $"LAYOUT {layoutNumber} - {qty} SHEETS" : $"LAYOUT {layoutNumber}";
             w.WriteLine($"N{layoutNumber} M98 P{subNum}{lParam} ({sheetLabel})");
         }
+
+        if (_config.UseLowerPalletFunction)
+            w.WriteLine("M44 (LOWER PALLET FUNCTION OFF)");
 
         w.WriteLine("M42");
         w.WriteLine("M30 (END OF MAIN)");
