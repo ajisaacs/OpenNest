@@ -275,6 +275,9 @@ static class NestConsole
                         _ => BendRepairUnits.Unspecified,
                     };
                     break;
+                case "--svg-units-per-inch" when i + 1 < args.Length:
+                    o.SvgUnitsPerInch = double.Parse(args[++i], CultureInfo.InvariantCulture);
+                    break;
                 case "--drawing" when i + 1 < args.Length:
                     o.DrawingName = args[++i];
                     break;
@@ -405,9 +408,10 @@ static class NestConsole
         return stock;
     }
 
-    static bool IsCadFile(string path) =>
-        path.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
-        || path.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase);
+    static bool IsCadFile(string path) => CadFormats.IsCadFile(path);
+
+    static Units DrawingUnits(Options options) =>
+        options.CadUnits == BendRepairUnits.Millimeters ? Units.Millimeters : Units.Inches;
 
     static Nest LoadOrCreateNest(Options options)
     {
@@ -453,7 +457,7 @@ static class NestConsole
         // DXF-only mode: create a fresh nest.
         if (dxfFiles.Count == 0)
         {
-            Console.Error.WriteLine("Error: no nest (.nest) or CAD (.dxf/.dwg) files specified");
+            Console.Error.WriteLine("Error: no nest (.nest) or CAD (.dxf/.dwg/.svg) files specified");
             return null;
         }
 
@@ -500,8 +504,12 @@ static class NestConsole
                             MaxEndpointMovementMillimeters = options.RepairBendsMillimeters.Value,
                         }
                         : null,
+                    DrawingUnits = DrawingUnits(options),
+                    SvgUserUnitsPerInch = options.SvgUnitsPerInch,
                 }
             );
+            foreach (var warning in result.Warnings)
+                Console.Error.WriteLine($"Warning: {Path.GetFileName(path)}: {warning}");
             foreach (var report in result.BendRepairReports)
                 Console.WriteLine(
                     $"Bend repair {Path.GetFileName(path)} #{report.BendIndex + 1}: {report.Status}: {report.Reason} ({report.OriginalStart} -> {report.Start}; {report.OriginalEnd} -> {report.End})"
@@ -551,7 +559,16 @@ static class NestConsole
         if (options.OutlineFile != null)
         {
             // The outline is the sheet: its bounds replace any size given.
-            plate.Outline = SheetOutline.FromGeometry(CadImporter.Import(options.OutlineFile).Entities);
+            plate.Outline = SheetOutline.FromGeometry(
+                CadImporter.Import(
+                    options.OutlineFile,
+                    new CadImportOptions
+                    {
+                        DrawingUnits = DrawingUnits(options),
+                        SvgUserUnitsPerInch = options.SvgUnitsPerInch,
+                    }
+                ).Entities
+            );
             Console.WriteLine($"Outline: {options.OutlineFile} ({plate.Outline})");
         }
     }
@@ -1009,7 +1026,7 @@ static class NestConsole
             Usage: OpenNest.Console <input-files...> [options]
 
             Arguments:
-              input-files            One or more .nest nest files or .dxf/.dwg drawing files
+              input-files            One or more .nest nest files or .dxf/.dwg/.svg drawing files
 
             Modes:
               <nest.nest>             Load nest and fill (existing behavior)
@@ -1018,7 +1035,9 @@ static class NestConsole
 
             Options:
               --repair-bends-mm <n>   Opt-in endpoint/tick repair, limit >0.001 to 3.175 physical mm
-              --cad-units inches|mm  Explicit source coordinate units required for bend repair
+              --cad-units inches|mm  Explicit source coordinate units required for bend repair;
+                                     also the units SVGs import in (default inches)
+              --svg-units-per-inch N SVG units per inch, for a file without a real-world size
               --drawing <name>       Drawing name to fill with (default: first drawing)
               --plate <index>        Plate index to fill (default: 0)
               --quantity <n>          Max parts to place (default: 0 = unlimited)
@@ -1091,5 +1110,6 @@ static class NestConsole
         public bool AllPlates;
         public double? RepairBendsMillimeters;
         public BendRepairUnits CadUnits;
+        public double? SvgUnitsPerInch;
     }
 }

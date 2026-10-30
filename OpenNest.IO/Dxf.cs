@@ -217,7 +217,7 @@ namespace OpenNest.IO
             string.Equals(name, "ETCH", StringComparison.OrdinalIgnoreCase)
             || string.Equals(name, "SCRIBE", StringComparison.OrdinalIgnoreCase);
 
-        private static bool IsNonCutLayer(string layerName)
+        internal static bool IsNonCutLayer(string layerName)
         {
             // Etch/scribe marks are never cut geometry — drop them on default import.
             return string.Equals(layerName, "BEND", StringComparison.OrdinalIgnoreCase)

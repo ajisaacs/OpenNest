@@ -48,5 +48,10 @@ namespace OpenNest.IO
         /// that need access to non-geometry entities (e.g., text annotations).
         /// </summary>
         public CadDocument Document { get; set; }
+
+        /// <summary>
+        /// Source content the import left out, worded for the user.
+        /// </summary>
+        public List<string> Warnings { get; set; } = new List<string>();
     }
 }

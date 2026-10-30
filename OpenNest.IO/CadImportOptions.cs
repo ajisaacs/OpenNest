@@ -35,6 +35,18 @@ namespace OpenNest.IO
         public string Customer { get; set; }
 
         /// <summary>
+        /// The units of the drawing being built. An SVG's real-world size is converted to
+        /// these; DXF and DWG numbers are taken as they are.
+        /// </summary>
+        public Units DrawingUnits { get; set; } = Units.Inches;
+
+        /// <summary>
+        /// How many of an SVG's user units make an inch, used only when the file does not state
+        /// its real-world size. Null makes such a file fail rather than guess its scale.
+        /// </summary>
+        public double? SvgUserUnitsPerInch { get; set; }
+
+        /// <summary>
         /// Returns a default options instance.
         /// </summary>
         public static CadImportOptions Default => new CadImportOptions();

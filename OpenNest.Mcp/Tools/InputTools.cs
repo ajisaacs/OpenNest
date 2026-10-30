@@ -110,11 +110,13 @@ namespace OpenNest.Mcp.Tools
         }
 
         [McpServerTool(Name = "import_dxf")]
-        [Description("Import a DXF file as a new drawing. Returns drawing name and bounding box.")]
+        [Description("Import a DXF, DWG or SVG file as a new drawing. Returns drawing name and bounding box.")]
         public string ImportDxf(
-            [Description("Absolute path to the DXF file")] string path,
+            [Description("Absolute path to the drawing file")] string path,
             [Description("Name for the drawing (defaults to filename without extension)")]
-                string name = null
+                string name = null,
+            [Description("How many of an SVG's units make an inch; required only when the file does not state its real-world size")]
+                double? svgUnitsPerInch = null
         )
         {
             if (!File.Exists(path))
@@ -122,7 +124,15 @@ namespace OpenNest.Mcp.Tools
 
             try
             {
-                var drawing = CadImporter.ImportDrawing(path, new CadImportOptions { Name = name });
+                var drawing = CadImporter.ImportDrawing(
+                    path,
+                    new CadImportOptions
+                    {
+                        Name = name,
+                        DrawingUnits = _session.Nest?.Units ?? default,
+                        SvgUserUnitsPerInch = svgUnitsPerInch,
+                    }
+                );
                 _session.Drawings.Add(drawing);
 
                 var bbox = drawing.Program.BoundingBox();

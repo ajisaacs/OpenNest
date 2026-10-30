@@ -232,15 +232,18 @@ namespace OpenNest.Forms
             using var dialog = new OpenFileDialog
             {
                 Title = "Import Sheet Outline",
-                Filter = "CAD Files (*.dxf;*.dwg)|*.dxf;*.dwg|DXF Files (*.dxf)|*.dxf|DWG Files (*.dwg)|*.dwg",
+                Filter = CadFormats.OpenFileFilter,
             };
             if (dialog.ShowDialog(this) != DialogResult.OK)
                 return;
             try
             {
-                Outline = SheetOutline.FromGeometry(CadImporter.Import(dialog.FileName).Entities);
+                var options = new CadImportOptions { DrawingUnits = Units };
+                if (!SvgScaleForm.TryResolve(this, dialog.FileName, options))
+                    return;
+                Outline = SheetOutline.FromGeometry(CadImporter.Import(dialog.FileName, options).Entities);
             }
-            catch (Exception exception) when (exception is ArgumentException or IOException or InvalidOperationException)
+            catch (Exception exception) when (exception is ArgumentException or IOException or InvalidOperationException or InvalidDataException)
             {
                 MessageBox.Show(this, $"The file does not hold a sheet outline: {exception.Message}",
                     "Import Sheet Outline", MessageBoxButtons.OK, MessageBoxIcon.Warning);

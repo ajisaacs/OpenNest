@@ -8,5 +8,6 @@ namespace OpenNest.IO
     {
         public List<Entity> Entities { get; set; } = new();
         public CadDocument Document { get; set; }
+        public List<string> Warnings { get; set; } = new();
     }
 }

@@ -29,7 +29,9 @@ namespace OpenNest.IO
         {
             options ??= CadImportOptions.Default;
 
-            var dxf = Dxf.Import(path, preserveRepairMarks: options.BendRepair != null);
+            var dxf = Svg.IsSvg(path)
+                ? Svg.Import(path, options)
+                : Dxf.Import(path, preserveRepairMarks: options.BendRepair != null);
 
             var cleanup =
                 options.BendRepair == null
@@ -91,6 +93,7 @@ namespace OpenNest.IO
                 SourcePath = path,
                 Name = options.Name ?? Path.GetFileNameWithoutExtension(path),
                 Document = dxf.Document,
+                Warnings = dxf.Warnings,
             };
         }
 

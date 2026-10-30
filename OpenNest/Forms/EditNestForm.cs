@@ -599,8 +599,7 @@ namespace OpenNest.Forms
         {
             var dlg = new OpenFileDialog();
             dlg.Multiselect = true;
-            dlg.Filter =
-                "CAD Files (*.dxf;*.dwg)|*.dxf;*.dwg|DXF Files (*.dxf)|*.dxf|DWG Files (*.dwg)|*.dwg";
+            dlg.Filter = CadFormats.OpenFileFilter;
 
             if (dlg.ShowDialog() != DialogResult.OK)
                 return;
@@ -611,7 +610,7 @@ namespace OpenNest.Forms
         /// <summary>Converts <paramref name="files"/> in the CAD converter and adds the drawings it returns.</summary>
         internal void ImportFiles(string[] files)
         {
-            using var converter = new CadConverterForm();
+            using var converter = new CadConverterForm { DrawingUnits = Nest.Units };
             converter.AddFiles(files);
 
             if (converter.ShowDialog() != DialogResult.OK)
@@ -650,7 +649,8 @@ namespace OpenNest.Forms
             {
                 Filter = "DXF file (*.dxf)|*.dxf|"
                     + "Image as displayed (*.jpg)|*.jpg|"
-                    + "Locations and rotations (*.txt)|*.txt",
+                    + "Locations and rotations (*.txt)|*.txt|"
+                    + "SVG file (*.svg)|*.svg",
                 FileName = suggestedFileName,
                 AddExtension = true,
                 DefaultExt = ".",
@@ -705,6 +705,9 @@ namespace OpenNest.Forms
                             );
                         }
                     }
+                    break;
+                case 4:
+                    Svg.ExportPlate(plate, destination, Nest.Units);
                     break;
                 default:
                     throw new ArgumentException("Unsupported plate export format.", nameof(filterIndex));
@@ -1529,7 +1532,7 @@ namespace OpenNest.Forms
                 NestWriter.GetProgramText(program) + "\0" + NestWriter.GetSubProgramsText(program);
             var snapshot = DrawingProgramSnapshot.Capture(editedDrawings, ProgramText);
             var loaded = editedDrawings.Select(d => ProgramText(d.Program)).ToList();
-            using var converter = new CadConverterForm();
+            using var converter = new CadConverterForm { DrawingUnits = Nest.Units };
             // LoadDrawings can edit live programs even when the dialog is canceled.
             PlateView.InvalidateOverlapCheck();
             converter.LoadDrawings(editedDrawings);

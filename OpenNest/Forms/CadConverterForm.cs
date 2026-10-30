@@ -93,18 +93,25 @@ namespace OpenNest.Forms
 
         #region File Import
 
-        public void AddFile(string file) => AddFile(file, 0, null);
+        /// <summary>The units of the nest receiving the drawings; SVGs import in these.</summary>
+        internal Units DrawingUnits { get; set; }
 
-        private void AddFile(string file, int detectorIndex, string detectorName)
+        public void AddFile(string file) => AddFile(file, NewImportOptions(0, null));
+
+        private CadImportOptions NewImportOptions(int detectorIndex, string detectorName) =>
+            new CadImportOptions
+            {
+                BendDetectorName = detectorIndex == 0 ? null : detectorName,
+                DrawingUnits = DrawingUnits,
+            };
+
+        private void AddFile(string file, CadImportOptions options)
         {
             try
             {
-                var options = new CadImportOptions
-                {
-                    BendDetectorName = detectorIndex == 0 ? null : detectorName,
-                };
-
                 var result = CadImporter.Import(file, options);
+                if (result.Warnings.Count > 0)
+                    ReportImportWarnings(file, result.Warnings);
                 if (result.Entities.Count == 0)
                     return;
 
@@ -142,16 +149,41 @@ namespace OpenNest.Forms
             MessageBox.Show($"Error importing \"{file}\": {error.Message}");
         }
 
+        internal virtual void ReportImportWarnings(string file, IReadOnlyList<string> warnings)
+        {
+            MessageBox.Show($"\"{Path.GetFileName(file)}\" was only partly imported:\n\n{string.Join("\n", warnings)}");
+        }
+
+        /// <summary>Asks for any SVG's scale; false skips the file.</summary>
+        internal virtual bool ResolveScale(string file, CadImportOptions options) =>
+            // Files can arrive before this form is shown, and a hidden owner cannot host a dialog.
+            SvgScaleForm.TryResolve(Visible ? this : null, file, options);
+
         public void AddFiles(IEnumerable<string> files)
         {
-            var fileArray = files.ToArray();
-            // Capture UI state on main thread before entering parallel loop
+            // Capture UI state and ask about scale on the main thread before the parallel loop
             var detectorIndex = cboBendDetector.SelectedIndex;
             var detectorName = cboBendDetector.SelectedItem?.ToString();
+            var imports = new List<(string File, CadImportOptions Options)>();
+            foreach (var file in files)
+            {
+                var options = NewImportOptions(detectorIndex, detectorName);
+                try
+                {
+                    if (!ResolveScale(file, options))
+                        continue;
+                }
+                catch (InvalidDataException ex)
+                {
+                    ReportImportFailure(file, ex);
+                    continue;
+                }
+                imports.Add((file, options));
+            }
 
             System.Threading.Tasks.Task.Run(() =>
             {
-                Parallel.ForEach(fileArray, file => AddFile(file, detectorIndex, detectorName));
+                Parallel.ForEach(imports, import => AddFile(import.File, import.Options));
             });
         }
 
@@ -1085,14 +1117,9 @@ namespace OpenNest.Forms
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                var dxfFiles = files
-                    .Where(f =>
-                        f.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
-                        || f.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)
-                    )
-                    .ToArray();
-                if (dxfFiles.Length > 0)
-                    AddFiles(dxfFiles);
+                var cadFiles = files.Where(CadFormats.IsCadFile).ToArray();
+                if (cadFiles.Length > 0)
+                    AddFiles(cadFiles);
             }
         }
 
@@ -1160,6 +1187,8 @@ namespace OpenNest.Forms
             entityView1.Invalidate();
         }
 
+        private const int SvgExportFilterIndex = 8;
+
         private void OnExportDxfClick(object sender, EventArgs e)
         {
             var item = CurrentItem;
@@ -1175,12 +1204,19 @@ namespace OpenNest.Forms
                     + "DXF 2007 (*.dxf)|*.dxf|"
                     + "DXF 2004 (*.dxf)|*.dxf|"
                     + "DXF 2000 (*.dxf)|*.dxf|"
-                    + "DXF R14 (*.dxf)|*.dxf",
+                    + "DXF R14 (*.dxf)|*.dxf|"
+                    + "SVG (*.svg)|*.svg",
                 FileName = Path.ChangeExtension(item.Name, ".dxf"),
             };
 
             if (dlg.ShowDialog() != DialogResult.OK)
                 return;
+
+            if (dlg.FilterIndex == SvgExportFilterIndex)
+            {
+                Svg.ExportEntities(item.Entities, Path.ChangeExtension(dlg.FileName, ".svg"), DrawingUnits);
+                return;
+            }
 
             var version = dlg.FilterIndex switch
             {
