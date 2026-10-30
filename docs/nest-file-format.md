@@ -105,9 +105,11 @@ older version.
 
 ## Plate cutting parameters
 
-Each plate's optional `cuttingParameters` stores the settings used by Assign
-Lead-ins and Place Lead-in. Missing settings stay null, preserving the old default
-selection behavior. `OpenNest.IO.CuttingParametersSerializer` owns the shared
+Each plate's optional `cuttingParameters` stores the settings last applied to it.
+The desktop starts Plan Cutting and Place Lead-in from the user's settings and falls
+back to these only when it has none (see
+[machine cutting defaults](machine-cutting-defaults.md)). Missing settings stay null,
+preserving the old default selection behavior. `OpenNest.IO.CuttingParametersSerializer` owns the shared
 cross-platform DTO mapping; the desktop settings serializer delegates to it so
 existing saved settings keep their JSON contract. Settings are independent of
 the saved part programs: restoring settings never regenerates those programs.

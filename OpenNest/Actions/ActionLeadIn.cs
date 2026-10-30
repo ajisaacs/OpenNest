@@ -104,9 +104,7 @@ namespace OpenNest.Actions
             cuttingPanel = new CuttingPanel();
             cuttingPanel.ParametersChanged += OnToolParametersChanged;
 
-            // Load current parameters or defaults
-            var plate = plateView.Plate;
-            cuttingPanel.LoadFromParameters(plate?.CuttingParameters ?? MachineSettings.DefaultCuttingParameters(form.Nest));
+            cuttingPanel.LoadFromParameters(MachineSettings.CuttingParametersFor(plateView.Plate, form.Nest));
             loadedParameters = CuttingParametersSerializer.Serialize(cuttingPanel.BuildParameters());
 
             form.ShowSidePanel(cuttingPanel, "Place Lead-in");

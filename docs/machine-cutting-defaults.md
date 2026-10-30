@@ -17,15 +17,16 @@ machine's units to the nest's.
 
 ## Lead-ins and lead-outs
 
-A plate with no cutting parameters of its own (Plan Cutting, Place Lead-in) starts from the
-last applied parameters, as before, with the machine's leads and kerf laid over them and the
-machine, material, grade and thickness recorded on the parameters. When the last parameters
+Plan Cutting and Place Lead-in start from the user's last applied parameters, with the machine's
+leads and kerf laid over them and the machine, material, grade and thickness recorded on the
+parameters. A plate's own parameters are used only when no user parameters are saved or readable,
+so an edit reaches nests already planned. When the last parameters
 already record the same machine, material, grade and thickness, the machine's settings are not
 laid over them again, so lead and tab edits made for that job stick; the cutting panel keeps the
 record (and the kerf) through an edit. Plan Cutting saves its settings as the last parameters as
-soon as its settings dialog is accepted, not only on Apply. A plate that already has
-parameters keeps them: changing the machine, material or thickness does not rewrite leads
-the plate was planned with.
+soon as its settings dialog is accepted, not only on Apply. Changing the settings, machine,
+material or thickness does not rewrite the leads a plate was planned with: its programs and
+stored parameters stay until a plan is applied.
 
 Each thickness holds a lead-in and lead-out for outside cuts (the Outside Cuts tab, external
 contours) and, optionally, its own pair for inside cuts (the Inside Cuts tab, internal contours,

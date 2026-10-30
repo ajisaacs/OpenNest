@@ -341,7 +341,7 @@ namespace OpenNest.Forms
             if (CuttingInspection != null)
                 return;
             PlateView.EndAction();
-            var panel = new CuttingInspectionPanel(this, PlateView.Plate.CuttingParameters ?? MachineSettings.DefaultCuttingParameters(Nest), allPlates, mode)
+            var panel = new CuttingInspectionPanel(this, MachineSettings.CuttingParametersFor(PlateView.Plate, Nest), allPlates, mode)
             {
                 BeforePlan = CuttingBeforePlan
             };
@@ -1351,8 +1351,8 @@ namespace OpenNest.Forms
             if (PlateView?.Plate == null)
                 return;
 
-            // The tool's panel starts from the plate's parameters or the defaults; the plate
-            // takes them with its first lead-in, so opening the tool changes nothing.
+            // The tool's panel starts from the user's parameters; the plate takes them with
+            // its first lead-in, so opening the tool changes nothing.
             PlateView.SetAction(typeof(Actions.ActionLeadIn));
         }
 

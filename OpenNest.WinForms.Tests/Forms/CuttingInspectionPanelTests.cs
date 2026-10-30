@@ -568,6 +568,37 @@ public class CuttingInspectionPanelTests
     });
 
     [Fact]
+    public void UserSettingsWinOverThePlatesOwn() => RunSta(() =>
+    {
+        using var editor = Editor();
+        var user = new CuttingParameters { ExternalLeadIn = new LineLeadIn { Length = 0.7 } };
+        WithUserSettings(CuttingParametersSerializer.Serialize(user), () =>
+        {
+            editor.Show();
+            editor.PlateManager.LoadAt(0);
+            editor.OpenCuttingInspection();
+            var panel = Assert.IsType<CuttingInspectionPanel>(editor.CuttingInspection);
+            var opened = Field<CuttingParameters>(panel, "parameters");
+            Assert.Equal(0.7, ((LineLeadIn)opened.ExternalLeadIn).Length);
+            panel.RequestClose();
+            PumpUntil(() => panel.IsDisposed);
+        });
+    });
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("{not json")]
+    public void ThePlatesOwnSettingsAreTheFallback(string json) => RunSta(() =>
+    {
+        using var editor = Editor();
+        WithUserSettings(json, () =>
+        {
+            var plate = editor.Nest.Plates[0];
+            Assert.Same(plate.CuttingParameters, MachineSettings.CuttingParametersFor(plate, editor.Nest));
+        });
+    });
+
+    [Fact]
     public void EmptySentinelIsNotNumberedAsAnOccupiedPlate() => RunSta(() =>
     {
         using var editor = Editor();
@@ -1021,6 +1052,8 @@ public class CuttingInspectionPanelTests
 
     private static EditNestForm Editor()
     {
+        // The plate's own settings below apply only while the user has none.
+        OpenNest.Properties.Settings.Default.CuttingParametersJson = "";
         var nest = new Nest();
         var plate = nest.CreatePlate();
         plate.Size = new OpenNest.Geometry.Size(100, 100);
@@ -1070,6 +1103,21 @@ public class CuttingInspectionPanelTests
             Thread.Sleep(10);
         }
         Assert.True(condition(), "Timed out waiting for cutting inspection.");
+    }
+
+    private static void WithUserSettings(string json, System.Action action)
+    {
+        var settings = OpenNest.Properties.Settings.Default;
+        var saved = settings.CuttingParametersJson;
+        settings.CuttingParametersJson = json;
+        try
+        {
+            action();
+        }
+        finally
+        {
+            settings.CuttingParametersJson = saved;
+        }
     }
 
     private static void RunSta(System.Action action) =>

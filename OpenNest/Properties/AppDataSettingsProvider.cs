@@ -26,7 +26,7 @@ namespace OpenNest.Properties
         private readonly Func<SettingsProvider> _legacyProvider;
 
         public AppDataSettingsProvider()
-            : this(DefaultPath, () => new LocalFileSettingsProvider()) { }
+            : this(DefaultPath, PathOverride == null ? () => new LocalFileSettingsProvider() : null) { }
 
         /// <param name="path">The settings file.</param>
         /// <param name="legacyProvider">Supplies values to carry over when <paramref name="path"/> does not exist; null for none.</param>
@@ -36,8 +36,11 @@ namespace OpenNest.Properties
             _legacyProvider = legacyProvider;
         }
 
+        /// <summary>Replaces <see cref="DefaultPath"/>, so test runs never write the user's settings.</summary>
+        internal static string PathOverride { get; set; }
+
         /// <summary>%APPDATA%\OpenNest\user-settings.json.</summary>
-        public static string DefaultPath => Path.Combine(
+        public static string DefaultPath => PathOverride ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "OpenNest", "user-settings.json");
 

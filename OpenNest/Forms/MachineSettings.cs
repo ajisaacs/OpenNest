@@ -211,8 +211,21 @@ namespace OpenNest.Forms
             return parameters;
         }
 
+        /// <summary>
+        /// The cutting parameters to plan or place lead-ins on <paramref name="plate"/> with: the
+        /// user's (see <see cref="DefaultCuttingParameters"/>), so an edit reaches nests already
+        /// planned. The plate's own are used only when no user settings are saved or readable.
+        /// </summary>
+        public static CuttingParameters CuttingParametersFor(Plate plate, Nest nest) =>
+            plate?.CuttingParameters != null && ReadLastCuttingParameters() == null
+                ? plate.CuttingParameters
+                : DefaultCuttingParameters(nest);
+
         /// <summary>The cutting parameters last applied, or the built-in defaults when none are saved or readable.</summary>
-        public static CuttingParameters LastCuttingParameters()
+        public static CuttingParameters LastCuttingParameters() =>
+            ReadLastCuttingParameters() ?? new CuttingParameters();
+
+        private static CuttingParameters ReadLastCuttingParameters()
         {
             var json = Properties.Settings.Default.CuttingParametersJson;
             if (!string.IsNullOrEmpty(json))
@@ -225,7 +238,7 @@ namespace OpenNest.Forms
                 { /* fall through */
                 }
             }
-            return new CuttingParameters();
+            return null;
         }
 
         /// <summary>
