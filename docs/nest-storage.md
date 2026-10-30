@@ -535,7 +535,7 @@ shown, and Releases re-reads its page each time it is shown again. Sets lists se
 (`OpenNest.Data.DrawingSetBrowseSession`): search by name, customer or notes,
 sort by name, customer, revision or saved time, and **Show archived**. Selecting
 a set shows its notes. A double-click or Enter adds the set to the release at
-one kit (again adds another kit). Below the list are **New Set...**, **Edit...**,
+a quantity of 1 (again adds 1 more). Below the list are **New Set...**, **Edit...**,
 **More ▾** and **Add to Release** in bold, which adds every selected set
 (Ctrl- or Shift-click selects several). **More ▾**, also the list's right-click
 menu (the menu key or Shift+F10 opens it from the keyboard), holds **Add to
@@ -657,12 +657,12 @@ review and Save; nothing is stored before then.
 The release panel (`OpenNest.Controls.ReleasePanel`) sits beside the Library and
 Sets tabs and holds one release in progress for both. Adding is a double-click
 (or Enter) in either list: a set is read with its members' current drawings and
-listed at one kit; a library drawing is read afresh and listed on its own at the
+listed at a quantity of 1; a library drawing is read afresh and listed on its own at the
 Library tab's **Quantity**. Adding a set or drawing already listed adds to its
-quantity instead, so double-clicking a set twice makes it ×2 kits. An archived
+quantity instead, so double-clicking a set twice makes it ×2. An archived
 set or drawing is refused. Each line shows its name, its quantity (edited in
-place: 1 to 1000 kits of a set, multiplying its quantities, or 1 to 100,000
-pieces of a drawing) and **kits** or **pcs**; **✕** (or Delete) removes it. A
+place: 1 to 1000 of a set, multiplying its quantities, or 1 to 100,000
+pieces of a drawing) and **sets** or **pcs**; **✕** (or Delete) removes it. A
 drawing that a set also lists becomes one item with both quantities. Above the
 lines, the heading reads as a sentence of what is listed, such as "Release set
 'Frame kit' ×2", or the first few lines when there are several. Below them are

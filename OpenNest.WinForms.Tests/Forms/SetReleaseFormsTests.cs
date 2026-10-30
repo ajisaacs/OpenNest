@@ -46,9 +46,9 @@ public class SetReleaseFormsTests
                 Assert.True(Field<CheckBox>(panel, "includeArchivedCheckBox").Visible);
                 Assert.Equal("Synthetic customer", Field<Label>(panel, "customerValue").Text);
                 var lines = Field<DataGridView>(panel, "lineGrid");
-                Assert.Equal(new object[] { "Synthetic kit", "1", "kit" }, lines.Rows[0].Cells.Cast<DataGridViewCell>().Take(3).Select(c => c.Value));
+                Assert.Equal(new object[] { "Synthetic kit", "1", "set" }, lines.Rows[0].Cells.Cast<DataGridViewCell>().Take(3).Select(c => c.Value));
                 lines.Rows[0].Cells["lineQuantityColumn"].Value = "3";
-                Assert.Equal("kits", lines.Rows[0].Cells["lineUnitColumn"].Value);
+                Assert.Equal("sets", lines.Rows[0].Cells["lineUnitColumn"].Value);
                 Assert.Equal(new object[] { 12, 9 }, grid.Rows.Cast<DataGridViewRow>().Select(r => r.Cells["partsColumn"].Value));
                 Assert.Equal("Synthetic Aluminum Grade A 0.25 in, Laser", grid.Rows[0].Cells["groupColumn"].Value);
                 Assert.Equal(("Make Nests (2)", true), (release.Text, release.Enabled));
@@ -737,7 +737,7 @@ public class SetReleaseFormsTests
                 Assert.Equal("Added 1 drawing and 1 more of 1 listed.", picker.Status);
 
                 var lines = Field<DataGridView>(panel, "lineGrid");
-                Assert.Equal(new object[] { "kit", "pcs", "pcs", "pc" },
+                Assert.Equal(new object[] { "set", "pcs", "pcs", "pc" },
                     lines.Rows.Cast<DataGridViewRow>().Select(r => r.Cells["lineUnitColumn"].Value));
                 lines.Rows[2].Cells["lineQuantityColumn"].Value = "40";
                 Assert.Equal(new[] { ("SYN-A", 5), ("SYN-C", 40), ("SYN-B", 1) }, panel.DrawingLines().Select(l => (l.Drawing.Name, l.Quantity)));

@@ -294,9 +294,9 @@ namespace OpenNest.Controls
             populating = false;
         }
 
-        // "kits" for a set, "pcs" for a drawing on its own.
+        // "sets" for a set, "pcs" for a drawing on its own.
         private static string Unit(object tag, int quantity) =>
-            tag is DrawingSetRecord ? (quantity == 1 ? "kit" : "kits") : (quantity == 1 ? "pc" : "pcs");
+            tag is DrawingSetRecord ? (quantity == 1 ? "set" : "sets") : (quantity == 1 ? "pc" : "pcs");
 
         private static int Quantity(DataGridViewRow row) =>
             int.TryParse(Convert.ToString(row.Cells["lineQuantityColumn"].Value, CultureInfo.CurrentCulture), NumberStyles.Integer,

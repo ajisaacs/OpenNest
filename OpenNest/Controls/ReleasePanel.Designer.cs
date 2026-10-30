@@ -145,7 +145,7 @@ namespace OpenNest.Controls
             lineQuantityColumn.HeaderText = "Qty";
             lineQuantityColumn.Name = "lineQuantityColumn";
             lineQuantityColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            lineQuantityColumn.ToolTipText = "Kits of a set (every quantity in it is multiplied) or pieces of a drawing.";
+            lineQuantityColumn.ToolTipText = "How many of a set (every quantity in it is multiplied) or pieces of a drawing.";
             lineQuantityColumn.Width = 55;
             //
             // lineUnitColumn
