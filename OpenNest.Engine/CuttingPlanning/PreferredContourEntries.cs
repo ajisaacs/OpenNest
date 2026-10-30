@@ -73,7 +73,8 @@ internal static class PreferredContourEntries
             var catalogue = prepared.AutomaticEntryCandidatesWithFallbacks(contour, target, token);
             var ranked = catalogue.RankTowardNextCut(target, arrivalProxy).DepartingClear(prepared, target, token);
             var selection = ContourEntrySelection.Select(ranked, evaluate, 1, token);
-            if (selection.Choices.Count == 0 && selection.Shortfall == ContourSelectionShortfall.Exhausted)
+            if (selection.Choices.Count == 0
+                && selection.Shortfall is ContourSelectionShortfall.Exhausted or ContourSelectionShortfall.Incomplete)
             {
                 var eroded = ContourEntrySelection.Select(ErodedPierces(prepared, contour, ranked, 1, token), evaluate, 1, token);
                 if (eroded.Choices.Count != 0)

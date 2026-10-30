@@ -128,6 +128,29 @@ public class ErodedPierceTests
         Assert.Equal(plate.Parts.Count, planned.PartCount);
     }
 
+    // Optional private input: never embed customer geometry or names in the repository.
+    // ArcTextNestPath: a column of tags with engraved-style arc text, where a letter's one fitting
+    // lead faces away from the route, or leads tangent to its walls check as uncertain. Only
+    // recovery's widened tries, with each part's exit held to face the next part, cut them all.
+    [SkippableFact]
+    public void ArcTextPlate_PlansWithItsPartsLeftTowardTheNext()
+    {
+        var path = TestConfig.GetExistingPath("ArcTextNestPath");
+        Skip.If(path == null, "Configure ArcTextNestPath in ignored test-config.json.");
+        var plate = new OpenNest.IO.NestReader(path!).Read().Plates.First(p => p.Parts.Count > 0);
+        var parameters = new CuttingParameters
+        {
+            ExternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 60 },
+            ExternalLeadOut = new LineLeadOut { Length = 0.08, ApproachAngle = 60 },
+            InternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 },
+        };
+
+        var proposal = CuttingPlanBatch.Capture([plate], parameters, preservePartOrder: false).Plan();
+
+        Assert.True(proposal.CanApply, string.Join(Environment.NewLine, proposal.Describe("in")));
+        Assert.Equal(CuttingPlanStatus.Ready, Assert.Single(proposal.Plates).Result.Status);
+    }
+
     private static (CuttingPlanSnapshot, CuttingPlanResult) Plan(CuttingParameters parameters, params Part[] parts)
     {
         var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest(parts, Start,

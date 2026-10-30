@@ -108,11 +108,26 @@ Plan Cutting has tried every entry of a cutout and none fits, it erodes the cuto
 6. `LeadPathValidator` checks each candidate like any other planner-chosen entry, pierce zone
    included. When none is clear, the "No tested lead-in fits" finding says why.
 
+A configured lead-in that could not be settled counts as no fit: text outlines are full of leads
+tangent to a wall, which the check reports as numerically uncertain, and a clear eroded pierce
+outranks them.
+
 Cutouts where a configured lead-in fits keep it, so plans of other parts are unchanged. Hole entry
 selection, the preferred hole path and contour recovery all use the fallback; recovery's
 reading-order sweep also pierces a letter this way at the side it leaves from. Only Plan Cutting
 uses it: the emitter's own automatic assignment and the manual lead-in preview keep the
 configured lead.
+
+The one exception is a part recovery cannot finish well. A letter can have a single fitting lead
+facing the wrong way, which either stops the hole tour or sends the outside cut round to the side
+the next part cannot be reached from without crossing this one. Recovery therefore holds back a
+route that ends facing away from the next cut (in part order, its straight line to that cut
+crosses the part's own perimeter) and tries the outside entries ranked ahead of the first it
+reached again, this time adding the eroded pierces of every cutout that refused any configured
+lead. Held routes are offered after those. These tries get their own allowance, since the
+ordinary search may have spent all of its share on the outside entries. A lead tangent to a wall
+can check clear alone and still touch in the whole part, where rounding moves it by about 1e-15:
+a widened try drops such an entry and repeats that outside entry instead of rebuilding the chain.
 
 ## Regression checks
 

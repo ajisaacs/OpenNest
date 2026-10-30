@@ -706,6 +706,18 @@ internal static class JointCuttingPlanSearch
         private IEnumerable<Edge> RecoverPart(Node node, int[] sequence,
             FixedProgramPlacement source, Attempt attempt, bool arrivalMayCross = false)
         {
+            var heldBack = new List<Edge>();
+            foreach (var edge in RecoverPart(node, sequence, source, attempt, arrivalMayCross, heldBack))
+                yield return edge;
+            foreach (var edge in heldBack)
+                yield return edge;
+        }
+
+        // heldBack receives the routes that end facing away from the next cut. The search follows
+        // the first edge it is given, so those go last, after the widened tries below.
+        private IEnumerable<Edge> RecoverPart(Node node, int[] sequence, FixedProgramPlacement source,
+            Attempt attempt, bool arrivalMayCross, List<Edge> heldBack)
+        {
             var prepared = source.Prepared;
             var target = LookAheadCentre(node, sequence, source) - source.Location;
             ContourChoice[] perimeters;
@@ -725,15 +737,18 @@ internal static class JointCuttingPlanSearch
                 perimeters = [null];
             // Every hole's fitting entries, for the search; the sweep needs only a few of them.
             ContourChoice[][] holes = null;
+            // Set for the last tries below: entries that fit can all sit on the wrong side.
+            var widened = false;
             ContourChoice[][] Holes() => holes ??= Enumerable.Range(0, prepared.PerimeterOrdinal)
                 .Select(c =>
                 {
                     var catalogue = prepared.AutomaticEntryCandidatesWithFallbacks(c, token: token);
                     var clear = catalogue.Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear).ToArray();
                     // No configured lead-in fits the cutout: pierce where eroding it leaves room.
-                    if (clear.Length == 0)
-                        clear = PreferredContourEntries.ErodedPierces(prepared, c, catalogue, snapshot.MaxEntries, token)
-                            .Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear).ToArray();
+                    // A widened try adds those pierces to a cutout that refused some of its leads.
+                    if (clear.Length == 0 || widened && clear.Length < catalogue.Count)
+                        clear = [.. clear, .. PreferredContourEntries.ErodedPierces(prepared, c, catalogue, snapshot.MaxEntries, token)
+                            .Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear)];
                     return clear.Select(e => e.Choice).ToArray();
                 }).ToArray();
             var motions = new Dictionary<ContourChoice, OwnedExecution>();
@@ -761,6 +776,8 @@ internal static class JointCuttingPlanSearch
                 return motions[choice] = WithoutScribes(ExecutionMotionReader.Read(
                     prepared.EmitCandidateForValidation(choice), source.Location, null, token));
             }
+            PostVerificationGeometry.Curve[] CutCurves(ContourChoice choice) => Motion(choice).Motions
+                .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display).Select(m => m.Curve).ToArray();
             var centres = prepared.HoleCentres(token);
             var bounds = Enumerable.Range(0, prepared.PerimeterOrdinal).Select(prepared.ContourBounds).ToArray();
             var sweepEntries = new Dictionary<(int Hole, int Next, Vector Direction), ContourChoice[]>();
@@ -805,9 +822,31 @@ internal static class JointCuttingPlanSearch
             var searches = Enumerable.Range(0, perimeters.Length).Select(e => (e, (Vector?)null)).ToArray();
             List<(int Endpoint, Vector? Sweep)> tries = prepared.PerimeterOrdinal > SearchedRecoveryHoles
                 ? [.. sweeps, .. searches] : [.. searches, .. sweeps];
-            foreach (var (endpoint, sweep) in tries)
+            // Last, the same search with every cutout's eroded pierces, for the outside entries
+            // ranked ahead of the first that was reached: a letter whose one fitting lead faces
+            // away can then be left the way the route goes, and the part need not end on a side
+            // the next rapid must cross it from. A plan reached from its best entry keeps its entries.
+            var firstWidened = tries.Count;
+            tries.AddRange(searches);
+            var firstReached = int.MaxValue;
+            for (var attemptIndex = 0; attemptIndex < tries.Count; attemptIndex++)
             {
                 token.ThrowIfCancellationRequested();
+                // The allowance can run out on the outside entries before any hole tour settles.
+                if (attemptIndex < firstWidened && Expansions >= stop)
+                    attemptIndex = firstWidened;
+                var (endpoint, sweep) = tries[attemptIndex];
+                if (attemptIndex >= firstWidened && endpoint >= firstReached)
+                    yield break;
+                if (attemptIndex == firstWidened && !widened)
+                {
+                    widened = true;
+                    holes = null;
+                    // The pierces are built whatever they cost: the allowance is for routing them.
+                    foreach (var entry in Holes().SelectMany(entries => entries))
+                        Motion(entry);
+                    stop = Expansions + (long)StallExpansionsPerEntry * snapshot.MaxEntries * prepared.Count;
+                }
                 if (Expansions >= stop) yield break;
                 var outside = perimeters[endpoint];
                 // Share what is left between the outside entries still to try: one that no hole
@@ -855,10 +894,54 @@ internal static class JointCuttingPlanSearch
                 var checker = node.Checker.Copy();
                 CountExpansion(source);
                 if (arrivalMayCross ? Score(source, execution, node.Position, checker, chain) is not { Severe: 0, Minor: 0 }
-                    : !Check(source, execution, node.Position, checker, attempt, chain)) continue;
+                    : !Check(source, execution, node.Position, checker, attempt, chain))
+                {
+                    // The search would only rebuild this chain: try again without what refused it.
+                    if (attemptIndex >= firstWidened && DropTouchingLeads(execution))
+                        attemptIndex--;
+                    continue;
+                }
                 var proposal = source.Propose(program, execution, chain, token);
-                yield return new(new([.. node.Order, proposal], execution.DeparturePoint, checker, null, node),
+                if (!widened)
+                    firstReached = System.Math.Min(firstReached, endpoint);
+                var reached = new Edge(new([.. node.Order, proposal], execution.DeparturePoint, checker, null, node),
                     execution.RapidDistanceFrom(node.Position), source.SourceOrdinal, -1, endpoint, endpoint);
+                if (!widened && outside != null && target is { } next && PostVerificationGeometry.Crosses(
+                    execution.DeparturePoint, next + source.Location, CutCurves(outside), token))
+                    heldBack.Add(reached);
+                else
+                    yield return reached;
+
+                // A lead tangent to a wall of its own cutout can check clear alone and touch in the
+                // whole part, where rounding moves it by 1e-15. True when such entries were dropped.
+                bool DropTouchingLeads(OwnedExecution emitted)
+                {
+                    var dropped = false;
+                    foreach (var choice in chain.Where(c => c.ContourOrdinal < holes.Length))
+                    {
+                        var joint = choice.Point + source.Location;
+                        var lead = emitted.Motions.FirstOrDefault(m => !m.Rapid && m.Layer == LayerType.Leadin
+                            && m.End.DistanceTo(joint) <= PostVerificationGeometry.Epsilon);
+                        if (lead?.Curve == null || !Touches(lead))
+                            continue;
+                        holes[choice.ContourOrdinal] = holes[choice.ContourOrdinal].Where(e => e != choice).ToArray();
+                        dropped = true;
+                    }
+                    return dropped;
+
+                    bool Touches(ExecutionMotion lead)
+                    {
+                        var budget = 1000000;
+                        try
+                        {
+                            return LeadPathValidator.MaterialContact(lead.Curve, source.Material, lead.End, ref budget, token) != null;
+                        }
+                        catch (NotSupportedException)
+                        {
+                            return true;
+                        }
+                    }
+                }
 
                 bool Solve(int mask, Vector position, ReleasedContourState released)
                 {
@@ -984,8 +1067,7 @@ internal static class JointCuttingPlanSearch
                     var pierce = execution.Motions[0].End;
                     foreach (var cut in chain)
                     {
-                        var curves = Motion(cut).Motions.Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display)
-                            .Select(m => m.Curve).ToArray();
+                        var curves = CutCurves(cut);
                         if (curves.Length == 0 || !PostVerificationGeometry.Crosses(position, pierce, curves, token))
                             continue;
                         var crossed = cut.ContourOrdinal;
@@ -1166,15 +1248,16 @@ internal static class JointCuttingPlanSearch
                 }
             // No configured lead-in fits a cutout: pierce where eroding it leaves room.
             string erodedReason = null;
+            // Entries the check could not settle are no fit either: a clear pierce outranks them.
             if (contour != source.Prepared.PerimeterOrdinal && selection.Choices.Count == 0
-                && selection.UncertainChoices.Count == 0 && selection.Shortfall == ContourSelectionShortfall.Exhausted)
+                && selection.Shortfall is ContourSelectionShortfall.Exhausted or ContourSelectionShortfall.Incomplete)
             {
                 var eroded = ContourEntrySelection.Select(
                     PreferredContourEntries.ErodedPierces(source.Prepared, contour, ordered, snapshot.MaxEntries, token),
                     candidate => Evaluate(source, candidate), snapshot.MaxEntries, token);
-                if (eroded.Choices.Count != 0 || eroded.UncertainChoices.Count != 0)
+                if (eroded.Choices.Count != 0 || eroded.UncertainChoices.Count != 0 && selection.UncertainChoices.Count == 0)
                     selection = eroded;
-                else
+                else if (selection.UncertainChoices.Count == 0)
                     erodedReason = eroded.Reason ?? "eroding the cutout leaves no room to pierce.";
             }
             // No configured lead-in fits the perimeter: with a pierce diameter, try open scrap.
