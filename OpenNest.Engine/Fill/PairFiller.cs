@@ -44,6 +44,13 @@ namespace OpenNest.Engine.Fill
         private const int EarlyExitStaleLimit = 10;
 
         /// <summary>
+        /// Candidates evaluated together, against the best count and work area from before the
+        /// batch. Fixed rather than scaled to the processor count, because it decides which
+        /// candidates are tried and so which layout wins: every machine must nest alike.
+        /// </summary>
+        private const int CandidateBatchSize = 8;
+
+        /// <summary>
         /// Defines the plate
         /// </summary>
         private readonly Plate plate;
@@ -174,7 +181,6 @@ namespace OpenNest.Engine.Fill
             List<Part> best = null;
             var sinceImproved = 0;
             var effectiveWorkArea = workArea;
-            var batchSize = System.Math.Max(2, Environment.ProcessorCount);
 
             var maxUtilization = candidates.Count > 0 ? candidates.Max(c => c.Utilization) : 1.0;
             var partBox = drawing.Program.BoundingBox();
@@ -182,11 +188,11 @@ namespace OpenNest.Engine.Fill
 
             try
             {
-                for (var batchStart = 0; batchStart < candidates.Count; batchStart += batchSize)
+                for (var batchStart = 0; batchStart < candidates.Count; batchStart += CandidateBatchSize)
                 {
                     token.ThrowIfCancellationRequested();
 
-                    var batchEnd = System.Math.Min(batchStart + batchSize, candidates.Count);
+                    var batchEnd = System.Math.Min(batchStart + CandidateBatchSize, candidates.Count);
                     var results = EvaluateBatch(
                         candidates,
                         drawing,
@@ -242,6 +248,16 @@ namespace OpenNest.Engine.Fill
         )
         {
             var batchCount = batchEnd - batchStart;
+
+            // Claimed in candidate order before the parallel loop: when two candidates share a
+            // grid, the earlier one must get it however the threads are scheduled.
+            var claims = new List<(Pattern Pattern, NestDirection Dir)>[batchCount];
+            for (var j = 0; j < batchCount; j++)
+            {
+                token.ThrowIfCancellationRequested();
+                claims[j] = ClaimGrids(candidates[batchStart + j], drawing, workArea);
+            }
+
             var results = new List<Part>[batchCount];
             Parallel.For(
                 0,
@@ -250,7 +266,7 @@ namespace OpenNest.Engine.Fill
                 j =>
                 {
                     results[j] = EvaluateCandidate(
-                        candidates[batchStart + j],
+                        claims[j],
                         drawing,
                         workArea,
                         minCountToBeat,
@@ -355,9 +371,40 @@ namespace OpenNest.Engine.Fill
         }
 
         /// <summary>
-        /// The EvaluateCandidate
+        /// Builds the candidate's tiling patterns and claims the grids no earlier candidate took.
         /// </summary>
         /// <param name="candidate">The candidate<see cref="BestFitResult"/></param>
+        /// <param name="drawing">The drawing<see cref="Drawing"/></param>
+        /// <param name="workArea">The workArea<see cref="Box"/></param>
+        /// <returns>The patterns and directions left for this candidate to fill</returns>
+        private List<(Pattern Pattern, NestDirection Dir)> ClaimGrids(
+            BestFitResult candidate,
+            Drawing drawing,
+            Box workArea
+        )
+        {
+            var claimed = new List<(Pattern Pattern, NestDirection Dir)>();
+            var pairParts = candidate.BuildParts(drawing);
+            foreach (var angle in BuildTilingAngles(candidate))
+            {
+                var pattern = FillHelpers.BuildRotatedPattern(pairParts, angle);
+                if (pattern.Parts.Count == 0)
+                    continue;
+
+                foreach (var dir in new[] { NestDirection.Horizontal, NestDirection.Vertical })
+                {
+                    if (dedup.TryAdd(pattern.BoundingBox, workArea, dir))
+                        claimed.Add((pattern, dir));
+                }
+            }
+
+            return claimed;
+        }
+
+        /// <summary>
+        /// The EvaluateCandidate
+        /// </summary>
+        /// <param name="claimed">The grids this candidate claimed</param>
         /// <param name="drawing">The drawing<see cref="Drawing"/></param>
         /// <param name="workArea">The workArea<see cref="Box"/></param>
         /// <param name="minCountToBeat">The minCountToBeat<see cref="int"/></param>
@@ -366,7 +413,7 @@ namespace OpenNest.Engine.Fill
         /// <param name="token">The token<see cref="CancellationToken"/></param>
         /// <returns>The <see cref="List{Part}"/></returns>
         private List<Part> EvaluateCandidate(
-            BestFitResult candidate,
+            List<(Pattern Pattern, NestDirection Dir)> claimed,
             Drawing drawing,
             Box workArea,
             int minCountToBeat,
@@ -375,28 +422,16 @@ namespace OpenNest.Engine.Fill
             CancellationToken token
         )
         {
-            var pairParts = candidate.BuildParts(drawing);
-            var angles = BuildTilingAngles(candidate);
-
             // Phase 1: evaluate all grids (fast)
             var grids = new List<(List<Part> Parts, NestDirection Dir)>();
-            foreach (var angle in angles)
+            var engine = new FillLinear(workArea, partSpacing) { Label = "Pairs" };
+            foreach (var (pattern, dir) in claimed)
             {
                 token.ThrowIfCancellationRequested();
-                var pattern = FillHelpers.BuildRotatedPattern(pairParts, angle);
-                if (pattern.Parts.Count == 0)
-                    continue;
 
-                var engine = new FillLinear(workArea, partSpacing) { Label = "Pairs" };
-                foreach (var dir in new[] { NestDirection.Horizontal, NestDirection.Vertical })
-                {
-                    if (!dedup.TryAdd(pattern.BoundingBox, workArea, dir))
-                        continue;
-
-                    var gridParts = engine.Fill(pattern, dir);
-                    if (gridParts != null && gridParts.Count > 0)
-                        grids.Add((gridParts, dir));
-                }
+                var gridParts = engine.Fill(pattern, dir);
+                if (gridParts != null && gridParts.Count > 0)
+                    grids.Add((gridParts, dir));
             }
 
             if (grids.Count == 0)

@@ -22,7 +22,9 @@ namespace OpenNest.Engine.Tests.Jobs;
 /// <remarks>
 /// Captured on Windows/.NET 8 without the optional ML angle model, so irregular parts take the
 /// 5-degree sweep; each case gave one layout over 5 test processes of 2 solves each, and every
-/// case solves twice in-process and must agree. The whole-plate Fill nests fill several
+/// case solves twice in-process and must agree. A digest that differs between machines means
+/// a layout decision depends on the machine (as <c>PairFiller</c>'s batches once followed the
+/// processor count); fix that rather than repinning. The whole-plate Fill nests fill several
 /// irregular drawings with one filler, so later items use the angles
 /// <c>AngleCandidateBuilder.RecordProductive</c> learned from earlier ones.
 /// Not pinned: richer mixes that pair parallelogram, chevron or tee parts at oblique angles
