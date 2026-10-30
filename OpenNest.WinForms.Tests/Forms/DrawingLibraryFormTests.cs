@@ -33,7 +33,7 @@ public class DrawingLibraryFormTests
                 var notes = Field<TextBox>(form, "notesBox");
                 var quantity = Field<NumericUpDown>(form, "quantityBox");
 
-                PumpUntil(() => grid.Rows.Count == 1, "the library page");
+                PumpUntilListed(grid, "the library page");
                 var query = Assert.Single(library.Queries);
                 Assert.Equal(("Synthetic Steel", "Grade A", (double?)0.25), (query.MaterialName, query.MaterialGrade, query.Thickness));
                 Assert.Equal("SYN-101", grid.Rows[0].Cells["nameColumn"].Value);
@@ -72,7 +72,7 @@ public class DrawingLibraryFormTests
                 var grid = Field<DataGridView>(form, "drawingGrid");
                 var preview = Field<OpenNest.Controls.ShapePreviewControl>(form, "previewBox");
 
-                PumpUntil(() => grid.Rows.Count == 1, "the library page");
+                PumpUntilListed(grid, "the library page");
                 Assert.Equal("SYN-505", Field<Label>(form, "detailNameLabel").Text);
                 Assert.Equal("Synthetic Steel Grade A", Field<Label>(form, "materialValue").Text);
                 Assert.Equal("0.25 in", Field<Label>(form, "thicknessValue").Text);
@@ -119,7 +119,7 @@ public class DrawingLibraryFormTests
                 Assert.Equal("LOCAL-1", Assert.Single(nestGrid.Rows.Cast<DataGridViewRow>()).Cells["nestNameColumn"].Value);
                 Assert.Equal("Not from the library", nestGrid.Rows[0].Cells["nestLibraryColumn"].Value);
 
-                PumpUntil(() => grid.Rows.Count == 1, "the library page");
+                PumpUntilListed(grid, "the library page");
                 Field<NumericUpDown>(form, "quantityBox").Value = 2;
                 Run(form.View.AddSelectedAsync());
                 Assert.Equal("In This Nest (2)", nestTab.Text);
@@ -179,7 +179,7 @@ public class DrawingLibraryFormTests
                 var showAll = Field<CheckBox>(form, "showAllCheckBox");
 
                 showAll.Checked = true;
-                PumpUntil(() => grid.Rows.Count == 1, "the unfiltered page");
+                PumpUntilListed(grid, "the unfiltered page");
                 Assert.Equal(("", "", (double?)null), (library.Queries[^1].MaterialName, library.Queries[^1].MaterialGrade, library.Queries[^1].Thickness));
 
                 Run(form.View.AddSelectedAsync());
@@ -211,7 +211,7 @@ public class DrawingLibraryFormTests
                 form.Show();
                 var grid = Field<DataGridView>(form, "drawingGrid");
 
-                PumpUntil(() => grid.Rows.Count == 1, "the library page");
+                PumpUntilListed(grid, "the library page");
                 Run(form.View.AddSelectedAsync());
 
                 Assert.Contains("millimeters", Assert.Single(messages));
@@ -248,7 +248,7 @@ public class DrawingLibraryFormTests
                 };
                 form.Show();
                 var grid = Field<DataGridView>(form, "drawingGrid");
-                PumpUntil(() => grid.Rows.Count == 1, "the library page");
+                PumpUntilListed(grid, "the library page");
                 Assert.Equal("", grid.Rows[0].Cells["cutFirstColumn"].Value);
 
                 Run(form.View.EditSelectedAsync());
@@ -260,6 +260,7 @@ public class DrawingLibraryFormTests
                 Assert.Equal("Test square", update.Record.Notes);
                 Assert.Equal("Yes", grid.Rows[0].Cells["cutFirstColumn"].Value);
 
+                SelectFirstRow(grid);
                 Run(form.View.AddSelectedAsync());
                 Assert.True(Assert.Single(nest.Drawings).CutFirst);
             },
@@ -302,7 +303,7 @@ public class DrawingLibraryFormTests
                 };
                 form.Show();
                 var grid = Field<DataGridView>(form, "drawingGrid");
-                PumpUntil(() => grid.Rows.Count == 1, "the library page");
+                PumpUntilListed(grid, "the library page");
 
                 Run(form.View.EditSelectedAsync());
                 PumpUntil(() => Equals(grid.Rows[0].Cells["nameColumn"].Value, "SYN-405B"), "the reloaded page");
@@ -515,7 +516,7 @@ public class DrawingLibraryFormTests
                 };
                 form.Show();
                 var grid = Field<DataGridView>(form, "drawingGrid");
-                PumpUntil(() => grid.Rows.Count == 1, "the library page");
+                PumpUntilListed(grid, "the library page");
 
                 var query = Assert.Single(library.Queries);
                 Assert.Equal(("", "", (double?)null), (query.MaterialName, query.MaterialGrade, query.Thickness));
@@ -543,13 +544,31 @@ public class DrawingLibraryFormTests
         Material = new Material("Synthetic Steel", "Grade A"),
     };
 
-    private static void Run(Task task) => PumpUntil(() => task.IsCompleted, "the add to finish");
+    // A faulted task rethrows here, so a failed step reports its own error instead of a later timeout.
+    private static void Run(Task task)
+    {
+        PumpUntil(() => task.IsCompleted, "the add to finish");
+        task.GetAwaiter().GetResult();
+    }
 
     private static T Run<T>(Task<T> task)
     {
         Run((Task)task);
         return task.Result;
     }
+
+    /// <summary>
+    /// Waits for the one-row page, then makes that row current. The grid only picks a current
+    /// row on its own when the row is already laid out as displayed, which a CI desktop does not
+    /// guarantee; without one every Add/Edit is a silent no-op.
+    /// </summary>
+    private static void PumpUntilListed(DataGridView grid, string what)
+    {
+        PumpUntil(() => grid.Rows.Count == 1, what);
+        SelectFirstRow(grid);
+    }
+
+    private static void SelectFirstRow(DataGridView grid) => grid.CurrentCell = grid.Rows[0].Cells["nameColumn"];
 
     private static void PumpUntil(Func<bool> condition, string what)
     {
