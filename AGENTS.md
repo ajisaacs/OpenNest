@@ -30,6 +30,8 @@ dotnet test OpenNest.FrontEnd.Tests/OpenNest.FrontEnd.Tests.csproj -c Release
 dotnet test OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj
 ```
 
+On Windows, prefer `scripts/Test-Hidden.ps1 <dotnet test args>` for WinForms tests: it runs them on a hidden desktop so no windows appear or take focus; see [hidden-desktop tests](docs/hidden-desktop-tests.md).
+
 Only Plan Cutting changes need the [problem-nest corpus](docs/problem-nests.md) (`Category=ProblemNests`, opt-in via `OPENNEST_PROBLEM_NESTS_SERVER`); never run it for nesting engines, fills, UI, posts or file formats. Limit it to the areas the change touches with `OPENNEST_PROBLEM_NESTS_CHECKS` (table in that doc); `part-order` and `entries` plan every nest. No plate may rank below its baseline, and none may join or climb the near-budget list compared with master's run. Keep desktop-dependent tests in `OpenNest.WinForms.Tests`, never add a WinForms reference to `OpenNest.Tests`. Optional CHR fixtures use local `OpenNest.Tests/test-config.json` and skip when absent. On Linux, build Windows projects with `-p:EnableWindowsTargeting=true`; this is not Windows runtime verification. The headless console builds independently with `dotnet build OpenNest.Console/OpenNest.Console.csproj`.
 
 Releases: follow [the release procedure](docs/releasing.md) and `scripts/Publish-Windows.ps1`; workflow artifacts are candidates, not published releases. GitHub (`ajisaacs/OpenNest`) is the primary repository; Gitea is a read-only backup mirror.
