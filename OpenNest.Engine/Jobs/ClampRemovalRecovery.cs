@@ -245,7 +245,7 @@ internal static class ClampRemovalRecovery
             if (!CanRemoveClamps(stock))
                 continue;
             token.ThrowIfCancellationRequested();
-            // Placement-frame X is signed from the origin, so |centre X| is the distance
+            // Placement-frame X is signed from the origin, so |center X| is the distance
             // along the edge in every quadrant.
             var zones = stock.ClampZones
                 .OrderBy(z => System.Math.Abs(z.Bounds.X + z.Bounds.Length / 2))
@@ -272,7 +272,7 @@ internal static class ClampRemovalRecovery
             searches.Add((stock, zones, fitting, mandatory));
         }
 
-        // Then the fewest clamps overall (any set, not only neighbours: a notch can leave a
+        // Then the fewest clamps overall (any set, not only neighbors: a notch can leave a
         // middle clamp in place), size by size across stocks in offered order; within a stock
         // the optional additions nearest the origin first.
         var maxSize = searches.Count == 0 ? 0 : searches.Max(c => c.Zones.Count);

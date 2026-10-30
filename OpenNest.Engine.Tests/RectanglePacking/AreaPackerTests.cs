@@ -243,7 +243,7 @@ public class AreaPackerTests
     }
 
     [Fact]
-    public void Pack_CancelledTokenStillReturnsFirstValidLayout()
+    public void Pack_CanceledTokenStillReturnsFirstValidLayout()
     {
         var area = new Box(0, 0, 30, 20);
         var items = new List<NestItem> { Item("a", 6, 4, 5), Item("b", 4, 3, 4) };

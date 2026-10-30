@@ -35,7 +35,7 @@ static class NestConsole
         }
         catch (OperationCanceledException)
         {
-            Console.Error.WriteLine("Nesting cancelled; nothing saved.");
+            Console.Error.WriteLine("Nesting canceled; nothing saved.");
             return 2;
         }
         catch (Exception ex)

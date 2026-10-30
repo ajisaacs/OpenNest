@@ -480,7 +480,7 @@ namespace OpenNest.Mcp.Tools
             }
             // Reserve physical copies separately from display-layout targets. Do this
             // only after mapping every layout, so a repeat cannot steal a residual's
-            // target. A rejected/cancelled proposal reserves nothing and deletes nothing.
+            // target. A rejected/canceled proposal reserves nothing and deletes nothing.
             var reservations = new List<List<Plate>>();
             foreach (var proposed in result.Plates)
             {

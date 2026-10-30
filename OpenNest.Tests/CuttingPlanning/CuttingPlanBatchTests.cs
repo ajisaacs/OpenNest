@@ -188,7 +188,7 @@ public class CuttingPlanBatchTests
     }
 
     [Fact]
-    public void PlanReorder_CancelledDuringShortPass_DoesNotRetryOrMutate()
+    public void PlanReorder_CanceledDuringShortPass_DoesNotRetryOrMutate()
     {
         var plate = Plate(new Nest(), Clean("first", 1, 1), Clean("second", 12, 1));
         using var cancellation = new CancellationTokenSource();
@@ -199,7 +199,7 @@ public class CuttingPlanBatchTests
 
         var result = CuttingPlanBatch.PlanReorder(snapshot, cancellation.Token);
 
-        Assert.Equal(CuttingPlanStatus.Cancelled, result.Status);
+        Assert.Equal(CuttingPlanStatus.Canceled, result.Status);
         Assert.Equal(1, observations);
         Assert.Empty(result.ProposedOrder);
         Assert.All(plate.Parts, part => Assert.False(part.HasManualLeadIns));
@@ -304,7 +304,7 @@ public class CuttingPlanBatchTests
     }
 
     [Fact]
-    public void Plan_Cancelled_OffersNothingToApply()
+    public void Plan_Canceled_OffersNothingToApply()
     {
         var nest = new Nest();
         var plate = Plate(nest, Clean("a", 1, 1));
@@ -314,9 +314,9 @@ public class CuttingPlanBatchTests
 
         var proposal = batch.Plan(token: cancellation.Token);
 
-        Assert.True(proposal.IsCancelled);
+        Assert.True(proposal.IsCanceled);
         Assert.False(proposal.CanApply);
-        Assert.Equal("Planning was cancelled. Nothing has changed.", proposal.Describe("in")[0]);
+        Assert.Equal("Planning was canceled. Nothing has changed.", proposal.Describe("in")[0]);
         Assert.Equal(CuttingCommitStatus.InvalidInput, proposal.Apply().Status);
         Assert.False(plate.Parts[0].HasManualLeadIns);
         Assert.Null(plate.CuttingParameters);

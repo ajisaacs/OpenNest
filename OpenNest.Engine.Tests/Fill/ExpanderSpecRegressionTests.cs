@@ -56,7 +56,7 @@ public class ExpanderSpecRegressionTests
         var result = Expander.Separate(new List<Part> { a, b }, plate, spacing: 3);
         Assert.False(result.Converged);
         Assert.True(result.Positions[1].X + 2 <= 12 + 1e-6,
-            $"native disk crossed third wall: centre={result.Positions[1].X:R}");
+            $"native disk crossed third wall: center={result.Positions[1].X:R}");
         Assert.Equal(9, b.Location.X);
         Assert.Equal(12, wall.Location.X);
     }

@@ -44,7 +44,7 @@ namespace OpenNest.Geometry
         /// <summary>
         /// Aligns <paramref name="newProgram"/> onto <paramref name="oldProgram"/>.
         /// Both programs are treated as read-only. Throws
-        /// <see cref="OperationCanceledException"/> only when cancelled before any
+        /// <see cref="OperationCanceledException"/> only when canceled before any
         /// measurable work; work limits reached mid-run are reported as reasons on
         /// the result instead.
         /// </summary>

@@ -387,7 +387,7 @@ public class AutoNestFormLedgerStockTests
     private static object GetValue(object row, string property) =>
         TypeDescriptor.GetProperties(row)[property]!.GetValue(row)!;
 
-    /// <summary>The fore colour the grid's CellFormatting handlers give a cell.</summary>
+    /// <summary>The fore color the grid's CellFormatting handlers give a cell.</summary>
     private static System.Drawing.Color FormattedForeColor(DataGridView grid, int column, int row)
     {
         var args = new DataGridViewCellFormattingEventArgs(column, row, grid[column, row].Value, typeof(string),

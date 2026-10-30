@@ -65,7 +65,7 @@ public class CutOffSegmentPlanningTests
         Assert.Equal(expected, string.Join(" ", result.ProposedOrder.Select(o => Name(o.SourcePart))));
     }
 
-    // Two rows of interlocking parts (each column's neck sits beside its neighbours' bodies)
+    // Two rows of interlocking parts (each column's neck sits beside its neighbors' bodies)
     // with lines through two columns and a tail separator. The parts keep the route they get
     // without the lines; each segment precedes the parts beside it and nothing else.
     [Fact]

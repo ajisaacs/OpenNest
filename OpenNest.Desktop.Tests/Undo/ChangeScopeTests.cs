@@ -38,7 +38,7 @@ public class ChangeScopeTests
 
         using (ChangeScope.Nested(root))
         {
-            // Left incomplete, as when the nested edit throws or is cancelled.
+            // Left incomplete, as when the nested edit throws or is canceled.
         }
 
         root.MarkChanged();

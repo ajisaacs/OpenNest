@@ -9,7 +9,7 @@ namespace OpenNest.Controls;
 /// The shared look of every <see cref="DataGridView"/> in the desktop app, taken from the
 /// database nest browser: flat light headers, faint grid lines, a soft blue selection and
 /// fixed row heights. Columns size once to their first content, before it is first painted,
-/// and are then the user's to resize. Other behaviour (editing, selection mode) stays with each grid.
+/// and are then the user's to resize. Other behavior (editing, selection mode) stays with each grid.
 /// </summary>
 public static class GridStyle
 {

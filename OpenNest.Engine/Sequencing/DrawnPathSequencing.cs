@@ -77,7 +77,7 @@ namespace OpenNest.Engine.Sequencing
                 return (0, double.PositiveInfinity);
 
             var best = (Along: 0.0, Distance: point.DistanceTo(path[0]));
-            var travelled = 0.0;
+            var traveled = 0.0;
             for (var i = 1; i < path.Count; i++)
             {
                 var start = path[i - 1];
@@ -94,8 +94,8 @@ namespace OpenNest.Engine.Sequencing
                 var nearest = new Vector(start.X + dx * t, start.Y + dy * t);
                 var distance = point.DistanceTo(nearest);
                 if (distance < best.Distance - Tolerance.Epsilon)
-                    best = (travelled + length * t, distance);
-                travelled += length;
+                    best = (traveled + length * t, distance);
+                traveled += length;
             }
             return best;
         }

@@ -42,7 +42,7 @@ public class CutSimulationOverlayTests
         var sim = CutSimulation.Build(view.Plate, Parameters);
         overlay.Load(sim);
 
-        Assert.True(overlay.IsPartPending(0)); // still travelling to the first part
+        Assert.True(overlay.IsPartPending(0)); // still traveling to the first part
         var firstCut = sim.Steps.First(s => s.Kind == CutSimulationStepKind.Cut);
         overlay.Time = firstCut.StartTime + firstCut.Duration / 2;
         Assert.False(overlay.IsPartPending(0));

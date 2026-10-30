@@ -16,7 +16,7 @@ internal enum ContourSelectionShortfall
     None,
 
     /// <summary>
-    /// The finite catalogue was fully evaluated and the selection is all there is. With an
+    /// The finite catalog was fully evaluated and the selection is all there is. With an
     /// empty selection this is exactly the sentence "no tested lead-in fits on part N,
     /// contour M" — and ONLY here may that sentence be spoken.
     /// </summary>
@@ -31,7 +31,7 @@ internal enum ContourSelectionShortfall
 
 /// <summary>
 /// Outcome of one bounded selection: selected choices in global rank order, how many
-/// distinct candidates were evaluated, which ones (in catalogue order, for cost tests),
+/// distinct candidates were evaluated, which ones (in catalog order, for cost tests),
 /// which evaluated uncertain (never refused — the caller's full check stays the authority
 /// on those), and why the selection stopped.
 /// </summary>
@@ -45,7 +45,7 @@ internal sealed record ContourSelectionResult(
 
 /// <summary>
 /// Bounded, lazy selection of lead-feasible entry candidates for ONE contour. Greedy global
-/// rank order until the cap (default 16) fills or the finite catalogue ends — rejected and
+/// rank order until the cap (default 16) fills or the finite catalog ends — rejected and
 /// incomplete candidates never consume a slot. When the cap can afford it (4+), one
 /// corrective scan makes sure every side of the candidate bounding rectangle that HAS a
 /// feasible candidate is represented, replacing the worst selected candidate only when
@@ -65,7 +65,7 @@ internal static class ContourEntrySelection
 
     /// <summary>
     /// Selects up to <paramref name="maxEntries"/> feasible choices from one contour's
-    /// globally ranked catalogue. <paramref name="evaluate"/> is the S07 adapter verdict,
+    /// globally ranked catalog. <paramref name="evaluate"/> is the S07 adapter verdict,
     /// called lazily at most once per distinct candidate.
     /// </summary>
     internal static ContourSelectionResult Select(
@@ -111,7 +111,7 @@ internal static class ContourEntrySelection
             return known;
         }
 
-        // Phase 1: greedy global order until the cap fills or the catalogue ends.
+        // Phase 1: greedy global order until the cap fills or the catalog ends.
         for (; index < candidates.Count && selected.Count < maxEntries; index++)
         {
             var verdict = Verdict(candidates[index]);
@@ -128,7 +128,7 @@ internal static class ContourEntrySelection
                 selected.Add(candidates[index]);
         }
 
-        // Phase 2: reconsider the globally ranked catalogue for each missing side, reusing
+        // Phase 2: reconsider the globally ranked catalog for each missing side, reusing
         // verdicts passed while chasing earlier sides and evaluating the tail lazily.
         // A clear candidate on that side is appended when
         // a slot remains, otherwise it replaces the worst selected candidate whose removal
@@ -182,10 +182,10 @@ internal static class ContourEntrySelection
         }
         else
         {
-            // Unreachable: phase 1 ends at cap or catalogue end and phase 2 chases every
+            // Unreachable: phase 1 ends at cap or catalog end and phase 2 chases every
             // side to the end; a cancellation throws before this point.
             shortfall = ContourSelectionShortfall.Incomplete;
-            reason = "Selection stopped before the catalogue ended.";
+            reason = "Selection stopped before the catalog ended.";
         }
 
         var ordered = selected

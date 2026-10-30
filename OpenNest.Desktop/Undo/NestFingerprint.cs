@@ -8,7 +8,7 @@ namespace OpenNest.Undo
     /// cut-offs, and the drawings with their required quantities. Two equal fingerprints do not
     /// prove two nests equal; a differing one means the nest changed since it was taken. Objects
     /// count by reference, so compare fingerprints of one live nest, never across a restore.
-    /// Derived values (nested counts, colours, the modified date) are left out.
+    /// Derived values (nested counts, colors, the modified date) are left out.
     /// </summary>
     internal static class NestFingerprint
     {

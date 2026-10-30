@@ -39,7 +39,7 @@ namespace OpenNest.Controls
         private readonly SolidBrush textBrush = new SolidBrush(Color.FromArgb(180, 200, 200, 200));
 
         public event EventHandler<Line> LinePicked;
-        public event EventHandler PickCancelled;
+        public event EventHandler PickCanceled;
         public event EventHandler<CadText> TextConvertRequested;
 
         private bool isPickingBendLine;
@@ -263,7 +263,7 @@ namespace OpenNest.Controls
                 IsPickingBendLine = false;
                 IsPickingBreakoff = false;
                 IsPickingTabbedCutout = false;
-                PickCancelled?.Invoke(this, EventArgs.Empty);
+                PickCanceled?.Invoke(this, EventArgs.Empty);
             }
         }
 

@@ -161,7 +161,7 @@ public class SideCoverageRegressionTests
     }
 
     [Fact]
-    public void CorrectiveRescan_HonoursCancellationBeforeReusingCachedVerdict()
+    public void CorrectiveRescan_HonorsCancellationBeforeReusingCachedVerdict()
     {
         var candidates = CorrectiveCandidates();
         using var cancellation = new CancellationTokenSource();

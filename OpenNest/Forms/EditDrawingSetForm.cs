@@ -17,7 +17,7 @@ namespace OpenNest.Forms
     /// customer, notes and the members with a quantity each. The drawing library is
     /// browsed in the left pane (every active drawing, a page at a time through
     /// <see cref="DrawingLibraryBrowseSession"/>); Add to Set, a double-click or Enter adds the
-    /// selected drawings at the entered quantity, and a drawing already in the set is greyed
+    /// selected drawings at the entered quantity, and a drawing already in the set is grayed
     /// and not added twice. Edit Drawing (a double-click on a member, its right-click menu or
     /// the button) reads the member's current library record and edits its details there, so
     /// a drawing without a material or thickness can be fixed in place. History lists a saved
@@ -358,7 +358,7 @@ namespace OpenNest.Forms
             UpdateAddCommand();
         }
 
-        // Greys the library rows already in the set, so what is left to add stands out.
+        // Grays the library rows already in the set, so what is left to add stands out.
         private void MarkMembersInLibrary()
         {
             var members = session.Members.Select(m => m.DrawingId).ToHashSet();

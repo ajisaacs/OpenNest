@@ -26,7 +26,7 @@ public class OperationProgressFormTests
 
             Assert.True(form.CancelRequested);
             Assert.False(form.CancelEnabled);
-            Assert.StartsWith("Cancelling", form.StatusText);
+            Assert.StartsWith("Canceling", form.StatusText);
             PumpFor(TimeSpan.FromMilliseconds(200));
             Assert.False(form.IsDisposed, "Cancel closed the window while the worker was still running.");
             Assert.True(form.Visible);
@@ -87,21 +87,21 @@ public class OperationProgressFormTests
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
 
     [Fact]
-    public void CancelledExpandMovesNoPartAndReportsIt() => StaTestThread.Run(() =>
+    public void CanceledExpandMovesNoPartAndReportsIt() => StaTestThread.Run(() =>
     {
         using var view = TwoPartView();
         var before = view.Plate.Parts.Select(p => p.Location).ToArray();
 
         var handled = view.ExpandSelected(work =>
         {
-            using var cancelled = new CancellationTokenSource();
-            cancelled.Cancel();
-            return work(cancelled.Token);
+            using var canceled = new CancellationTokenSource();
+            canceled.Cancel();
+            return work(canceled.Token);
         });
 
         Assert.True(handled);
         Assert.Equal(before, view.Plate.Parts.Select(p => p.Location).ToArray());
-        Assert.Contains("cancelled", view.Status);
+        Assert.Contains("canceled", view.Status);
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
 
     [Fact]

@@ -36,7 +36,7 @@ Drawing an outline in the plate view and taking the leftover of a cut plate are 
 | Support bed | Unchanged: it is fixed to the machine and reports contacts under material |
 | Area, utilization, cost | `Plate.Area` and `NestPlateStock.Area` are the material area (outline less obstacles); area-based cost prices that area and utilization divides by it |
 | Salvage and remnants | No salvage credit and no `expectedRemnant`: no rectangular edge strip is guaranteed inside an outline |
-| Manual cut-offs | A line is cut only where it crosses material: each crossing is a segment of its own, started at the material's edge and overtravelled past the far one, within the user's limits and the usual part clearance. The head-locked overcut applies only to a span that reaches the bounding box's far edge |
+| Manual cut-offs | A line is cut only where it crosses material: each crossing is a segment of its own, started at the material's edge and overtraveled past the far one, within the user's limits and the usual part clearance. The head-locked overcut applies only to a span that reaches the bounding box's far edge |
 | Automatic cut-offs | Refused: `AutomaticCutOffPlanner` rejects an outlined plate ("Automatic cut-offs need a rectangular sheet") |
 | AutoSize, Snap to Standard Size | Leave an outlined plate unchanged: the outline is a particular piece of material |
 | Rotate 90/180 | Turn the outline with the sheet |

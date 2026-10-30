@@ -660,7 +660,7 @@ internal class PlateFiller
         }
         catch (OperationCanceledException)
         {
-            Debug.WriteLine("[RunPipeline] Cancelled, returning current best");
+            Debug.WriteLine("[RunPipeline] Canceled, returning current best");
             if (context.ProvisionalLeads(context.CurrentBest))
             {
                 context.CurrentBest = context.Provisional;

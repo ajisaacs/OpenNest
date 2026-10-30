@@ -311,7 +311,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
 
         /// <summary>
         /// Cut-offs are open straight lines with no lead-in: the line is the
-        /// beam centreline (CutOffSettings clearance already allows for kerf)
+        /// beam centerline (CutOffSettings clearance already allows for kerf)
         /// and an open line has no inside/outside, so no G41/G42 is selected
         /// and the §13.2.4.1 linear-lead-in rule does not apply. The exterior
         /// lead layer still runs so the pierce sequence matches a perimeter.

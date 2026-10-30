@@ -169,10 +169,10 @@ public class NearbyMaterialCheckTests
             var span = length + 2 * size;
             var gap = (PostVerificationGeometry.Extent.ClearMargin + PostVerificationGeometry.Extent.SpanRounding * span)
                 * (1 + random.NextDouble()) + size;
-            var centre = start + direction * along + normal * (random.Next(4) == 0 ? 0 : gap);
+            var center = start + direction * along + normal * (random.Next(4) == 0 ? 0 : gap);
             var program = random.Next(2) == 0
-                ? Circle(centre, size)
-                : LeadPathValidationTests.Rectangle(centre.X - size, centre.Y - size, centre.X + size, centre.Y + size);
+                ? Circle(center, size)
+                : LeadPathValidationTests.Rectangle(center.X - size, center.Y - size, center.X + size, center.Y + size);
             var material = LeadMaterialSnapshot.Capture(program, Vector.Zero);
             if (!material.IsComplete || !lead.Extent.IsClearOfQueriesFrom(material.Extent))
                 continue;
@@ -182,11 +182,11 @@ public class NearbyMaterialCheckTests
         }
         Assert.True(skipped > 1000, $"Only {skipped} cases were skipped.");
 
-        static Program Circle(Vector centre, double radius)
+        static Program Circle(Vector center, double radius)
         {
             var p = new Program();
-            p.MoveTo(centre.X + radius, centre.Y);
-            p.Codes.Add(new ArcMove(new Vector(centre.X + radius, centre.Y), centre, RotationType.CCW));
+            p.MoveTo(center.X + radius, center.Y);
+            p.Codes.Add(new ArcMove(new Vector(center.X + radius, center.Y), center, RotationType.CCW));
             return p;
         }
     }
@@ -194,7 +194,7 @@ public class NearbyMaterialCheckTests
     [Fact]
     public void RapidJustOutsideASmallCompletedCircle_IsStillACrossing()
     {
-        // A circle of radius 0.001 counts as touched up to sqrt(r^2 + 1e-8) from its centre, beyond
+        // A circle of radius 0.001 counts as touched up to sqrt(r^2 + 1e-8) from its center, beyond
         // its radius; the rapid passes 0.000002 outside the radius, inside that band.
         var state = new ReleasedContourState();
         Assert.Empty(state.Check(Read(Circle(0.001)), Vector.Zero, 1)

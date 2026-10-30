@@ -152,7 +152,7 @@ public class BenchmarkScoringTests
     }
 
     [Fact]
-    public void Run_OverlappingNeighbours_AreStillCaughtBySweep()
+    public void Run_OverlappingNeighbors_AreStillCaughtBySweep()
     {
         var job = Job(0.5, (Rect(10, 5), 3));
 
@@ -245,7 +245,7 @@ public class BenchmarkScoringTests
         return new Drawing("rect", pgm);
     }
 
-    /// <summary>20x20 square with a 10x10 cutout centred in it.</summary>
+    /// <summary>20x20 square with a 10x10 cutout centerd in it.</summary>
     private static Drawing Frame()
     {
         var pgm = new OpenNest.CNC.Program();

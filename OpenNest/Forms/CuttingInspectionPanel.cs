@@ -330,14 +330,14 @@ internal sealed class CuttingInspectionPanel : UserControl
             return;
         if (IsPlanning)
         {
-            // The dialog changes the live plates, so it opens once the running plan has cancelled.
+            // The dialog changes the live plates, so it opens once the running plan has canceled.
             if (pendingCutOffSettings || pendingClear)
                 return;
             pendingCutOffSettings = true;
             pendingReplan = true;
             ClearResult();
             SetPlanning(true);
-            SetStatus(Tone.Neutral, "Cancelling the plan to edit the cut-off settings…");
+            SetStatus(Tone.Neutral, "Canceling the plan to edit the cut-off settings…");
             if (!inspection.CloseRequested)
                 inspection.RequestClose();
             return;
@@ -471,7 +471,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         scopeSelector.Visible = planning && (allPlates || everyPlate.Length > 1 || !ReferenceEquals(everyPlate[0], current));
     }
 
-    /// <summary>Replans for the chosen scope; a running plan is cancelled first so the plates never change under it.</summary>
+    /// <summary>Replans for the chosen scope; a running plan is canceled first so the plates never change under it.</summary>
     internal void ChangeScope(bool all)
     {
         if (closed || closeRequested || pendingMode != null || Mode != CuttingInspectionMode.Plan
@@ -582,7 +582,7 @@ internal sealed class CuttingInspectionPanel : UserControl
                 if (!task.IsCompletedSuccessfully)
                 {
                     if (task.IsCanceled)
-                        SetStatus(Tone.Neutral, "Validation cancelled.", "Recheck to review this nest.");
+                        SetStatus(Tone.Neutral, "Validation canceled.", "Recheck to review this nest.");
                     else
                         SetStatus(Tone.Bad, "Validation failed. Recheck to review this nest.",
                             task.Exception?.GetBaseException().Message);
@@ -683,7 +683,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             size = System.Math.Max(size, start.DistanceTo(end) * 1.5);
         view.ZoomToArea(point.X - size / 2, point.Y - size / 2, size, size);
         // A narrow docked canvas can put a contact at its edge after zoom.
-        // Centre a typed witness, never infer one from the diagnostic text.
+        // Center a typed witness, never infer one from the diagnostic text.
         var focus = finding.Kind == PostVerificationKind.RapidCrossing
             && finding.ContactPoints.Any(contact => double.IsFinite(contact.X) && double.IsFinite(contact.Y))
             ? finding.ContactPoints.First(contact => double.IsFinite(contact.X) && double.IsFinite(contact.Y))
@@ -801,7 +801,7 @@ internal sealed class CuttingInspectionPanel : UserControl
                 inspection = new CuttingProposalInspection();
                 if (pendingClear)
                 {
-                    pendingClear = false; // The cancelled run no longer reads the plates.
+                    pendingClear = false; // The canceled run no longer reads the plates.
                     if (!ClearAppliedWork())
                     {
                         pendingScope = null;
@@ -821,7 +821,7 @@ internal sealed class CuttingInspectionPanel : UserControl
                 }
                 if (pendingCutOffSettings)
                 {
-                    pendingCutOffSettings = false; // The cancelled run no longer reads the plates.
+                    pendingCutOffSettings = false; // The canceled run no longer reads the plates.
                     SetPlanning(false);
                     EditCutOffSettings(); // Replans when the dialog closes.
                     return;
@@ -839,7 +839,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             }
             if (work.IsCanceled)
             {
-                SetStatus(Tone.Neutral, "Planning cancelled. Nothing changed.");
+                SetStatus(Tone.Neutral, "Planning canceled. Nothing changed.");
                 return;
             }
             invalidated = false;
@@ -883,8 +883,8 @@ internal sealed class CuttingInspectionPanel : UserControl
     private void ShowPlanStatus()
     {
         var issues = warningGrid.Rows.Count;
-        if (Proposal.IsCancelled)
-            SetStatus(Tone.Neutral, "Planning cancelled. Nothing changed.");
+        if (Proposal.IsCanceled)
+            SetStatus(Tone.Neutral, "Planning canceled. Nothing changed.");
         else if (Proposal.CanApply)
             SetStatus(Tone.Good, plates.Length > 1 ? $"Ready to apply to {Count(plates.Length, "plate")}." : "Ready to apply.");
         else if (Proposal.RequiresWarningAcceptance)
@@ -934,7 +934,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             CuttingPlanStatus.UnsupportedGeometry => "unsupported geometry",
             CuttingPlanStatus.InvalidInput => "invalid input",
             CuttingPlanStatus.NoSolutionWithinBudget => "no plan found within the search limit",
-            CuttingPlanStatus.Cancelled => "cancelled",
+            CuttingPlanStatus.Canceled => "canceled",
             var status => status.ToString(),
         };
     }
@@ -972,7 +972,7 @@ internal sealed class CuttingInspectionPanel : UserControl
 
     private void SetPlanning(bool running)
     {
-        // Planning inputs change mid-plan by cancelling the run and replanning, so they stay enabled
+        // Planning inputs change mid-plan by canceling the run and replanning, so they stay enabled
         // unless closing or switching; validation still locks them while it runs.
         var replannable = !running || Mode == CuttingInspectionMode.Plan && !closeRequested && pendingMode == null;
         settingsButton.Enabled = keepOrderCheckBox.Enabled = planButton.Enabled = replannable;
@@ -1383,7 +1383,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             pendingReplan = true;
             ClearResult();
             SetPlanning(true);
-            SetStatus(Tone.Neutral, "Cancelling the plan to clear lead-ins and cut-offs…");
+            SetStatus(Tone.Neutral, "Canceling the plan to clear lead-ins and cut-offs…");
             if (!inspection.CloseRequested)
                 inspection.RequestClose();
             return;

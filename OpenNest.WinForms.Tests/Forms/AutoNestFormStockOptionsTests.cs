@@ -134,7 +134,7 @@ public class AutoNestFormStockOptionsTests
     }
 
     [Fact]
-    public void BlankAndCancelledRowsDoNotBecomeStockOptions()
+    public void BlankAndCanceledRowsDoNotBecomeStockOptions()
     {
         RunSta(() =>
         {

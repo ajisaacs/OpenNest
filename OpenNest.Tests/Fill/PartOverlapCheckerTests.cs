@@ -44,7 +44,7 @@ public class PartOverlapCheckerTests
             var grid = filler.Fill(drawing, angle, direction);
             Assert.NotEmpty(grid);
             AssertMatchesLegacy(grid);
-            // Nudge copies onto their neighbours so overlapping verdicts are exercised too.
+            // Nudge copies onto their neighbors so overlapping verdicts are exercised too.
             foreach (var shift in new[] { 0.05, 1e-9, -1e-9 })
                 AssertMatchesLegacy(Shifted(grid, shift));
         }
@@ -286,7 +286,7 @@ public class PartOverlapCheckerTests
 
     private static List<Part> WorkGrid(string kind)
     {
-        // Rotated grids: neighbouring boxes overlap but parts do not, so every box-overlapping
+        // Rotated grids: neighboring boxes overlap but parts do not, so every box-overlapping
         // pair reaches an exact test and there is no early exit.
         var filler = new FillLinear(new Box(3.1, 5.3, 96, 48), 0.5);
         if (kind == "single")

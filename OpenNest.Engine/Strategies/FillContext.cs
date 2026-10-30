@@ -39,7 +39,7 @@ namespace OpenNest.Engine.Strategies
         /// <summary>
         /// A cheap layout shown before the slow strategies run, so it can be accepted early. It
         /// never becomes <see cref="CurrentBest"/> while strategies run, so they pick the same
-        /// winner as without it; the pipeline returns it only when cancelled while it still leads.
+        /// winner as without it; the pipeline returns it only when canceled while it still leads.
         /// </summary>
         public List<Part> Provisional { get; set; }
 

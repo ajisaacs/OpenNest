@@ -189,12 +189,12 @@ public class JointCuttingPlanTests
         Assert.Equal(CuttingPlanStatus.NoSolutionWithinBudget, budget.Status);
         Assert.Equal(1, budget.Expansions); Assert.Equal(1, observed); Assert.Empty(budget.ProposedOrder);
         using var cancellation = new CancellationTokenSource();
-        var cancelled = CuttingPlanService.Plan(new CuttingPlanRequest([part], confirmedParameters: parameters)
+        var canceled = CuttingPlanService.Plan(new CuttingPlanRequest([part], confirmedParameters: parameters)
         {
             ExpansionObserver = n => { if (n == 3) cancellation.Cancel(); }
         }, cancellation.Token);
-        Assert.Equal(CuttingPlanStatus.Cancelled, cancelled.Status);
-        Assert.Equal(3, cancelled.Expansions); Assert.Empty(cancelled.ProposedOrder);
+        Assert.Equal(CuttingPlanStatus.Canceled, canceled.Status);
+        Assert.Equal(3, canceled.Expansions); Assert.Empty(canceled.ProposedOrder);
         unchanged();
     }
 
@@ -344,7 +344,7 @@ public class JointCuttingPlanTests
             snapshot.Placements.Select(p => p.Material).ToArray());
         Assert.True(direct.IsComplete); Assert.False(direct.IsClear);
         Assert.Contains("another placed material", direct.Reason);
-        // The not-yet-cut neighbour is still material: replay names it as the obstacle.
+        // The not-yet-cut neighbor is still material: replay names it as the obstacle.
         var result = CuttingPlanService.Plan(snapshot);
         Assert.Equal(CuttingPlanStatus.BestEffort, result.Status);
         Assert.True(result.IndependentlyReplayed);

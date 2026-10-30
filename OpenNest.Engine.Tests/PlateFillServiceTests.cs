@@ -130,7 +130,7 @@ public class PlateFillServiceTests
 
     [Theory]
     [MemberData(nameof(StrategiesData))]
-    public void FillItem_ReturnsNoParts_WhenTokenIsAlreadyCancelled(string strategy)
+    public void FillItem_ReturnsNoParts_WhenTokenIsAlreadyCanceled(string strategy)
     {
         // Quantity > 2 keeps the request off the qty 1-2 fast path so the cancellation
         // check inside the strategy pipeline is actually reached.

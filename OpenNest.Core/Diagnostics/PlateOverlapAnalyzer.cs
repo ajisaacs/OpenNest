@@ -348,10 +348,10 @@ public static class PlateOverlapAnalyzer
             new Vector(zone.Right, zone.Top), new Vector(zone.Left, zone.Top),
             new Vector(zone.Left, zone.Bottom), // Regions repeat their closing vertex exactly.
         };
-        var centre = new Vector((zone.Left + zone.Right) / 2, (zone.Bottom + zone.Top) / 2);
+        var center = new Vector((zone.Left + zone.Right) / 2, (zone.Bottom + zone.Top) / 2);
         return new PlateOverlapPair(part.Input.Id, ClampFindingSlot.IdFor(clamp.Ordinal), part.Input.Name,
-            $"Clamp '{clamp.Id}'", new List<PlateOverlapRegion> { new(corners, zone.Length * zone.Width) }, centre,
-            centre);
+            $"Clamp '{clamp.Id}'", new List<PlateOverlapRegion> { new(corners, zone.Length * zone.Width) }, center,
+            center);
     }
 
     private static Polygon RectanglePolygon(Box box, Vector offset)

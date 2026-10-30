@@ -52,7 +52,7 @@ internal sealed record BarPlan(IReadOnlyList<PackedBar> Bars, IReadOnlyList<BarI
 /// <summary>
 /// One-dimensional cut-list packer, ported from CutList.Core (the saw cut-list optimizer).
 /// Lengths are "inflated": every item carries one part spacing and every segment's capacity
-/// gets one spacing back, so a run of items needs spacing between neighbours but none after the
+/// gets one spacing back, so a run of items needs spacing between neighbors but none after the
 /// last, exactly like a saw kerf in CutList's <c>Bin</c>.
 ///
 /// Small jobs (at most <see cref="ExhaustiveItemLimit"/> items, one free run per bar, unlimited

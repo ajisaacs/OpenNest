@@ -49,10 +49,10 @@ public class IncrementalClosureDriftTests
 
         var arc = Assert.IsType<ArcMove>(program.Codes[^1]);
         var start = new Vector(14, 7);
-        var centre = start + arc.CenterPoint;
+        var center = start + arc.CenterPoint;
         var end = start + arc.EndPoint;
         Assert.True(end.DistanceTo(new Vector(14, 3)) <= 1e-12);
-        Assert.True(System.Math.Abs(centre.DistanceTo(start) - centre.DistanceTo(end)) <= 1e-12);
+        Assert.True(System.Math.Abs(center.DistanceTo(start) - center.DistanceTo(end)) <= 1e-12);
         var material = LeadMaterialSnapshot.Capture(program, Vector.Zero);
         Assert.True(material.IsComplete, material.Reason);
     }

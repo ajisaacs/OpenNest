@@ -31,7 +31,7 @@ namespace OpenNest.IO
         /// <summary>
         /// Reads the copy back as a new nest. Each drawing of <paramref name="live"/> whose saved
         /// content equals a drawing in the copy is used in its place, so caches keyed by the
-        /// drawing (best fits, fill results), its colour and its id survive; a drawing whose
+        /// drawing (best fits, fill results), its color and its id survive; a drawing whose
         /// content changed comes from the copy. Reused drawings' nested counts then follow the
         /// returned nest, which replaces <paramref name="live"/>.
         /// </summary>

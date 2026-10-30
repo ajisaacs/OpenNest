@@ -160,7 +160,7 @@ internal static class SeamOvercut
         return true;
     }
 
-    /// <summary>The angle travelled around <paramref name="center"/> from one point to another, in [0, 2pi).</summary>
+    /// <summary>The angle traveled around <paramref name="center"/> from one point to another, in [0, 2pi).</summary>
     private static double Travel(Vector center, Vector from, Vector to, bool clockwise)
     {
         var start = System.Math.Atan2(from.Y - center.Y, from.X - center.X);

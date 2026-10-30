@@ -49,7 +49,7 @@ public class NestJobRunnerTests
     }
 
     [Fact]
-    public void PreCancelledEmptyJobThrows()
+    public void PreCanceledEmptyJobThrows()
     {
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();

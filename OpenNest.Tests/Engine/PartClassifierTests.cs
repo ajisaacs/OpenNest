@@ -60,7 +60,7 @@ public class PartClassifierTests
     [Fact]
     public void Classify_RectWithSmallNotches_ReturnsRectangle()
     {
-        // 100x50 rectangle with a 5x2 notch cut into the bottom edge near the centre.
+        // 100x50 rectangle with a 5x2 notch cut into the bottom edge near the center.
         // The notch is small relative to the overall perimeter so both metrics still pass.
         var pgm = new OpenNest.CNC.Program();
         pgm.Codes.Add(new RapidMove(new Vector(0, 0)));

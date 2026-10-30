@@ -132,7 +132,7 @@ public class PolyLabelTests
 
         var result = PolyLabel.Find(p, null, PolyLabel.ThicknessPrecision(p));
 
-        // Any height along the bar is equally clear; its centreline is not.
+        // Any height along the bar is equally clear; its centerline is not.
         Assert.Equal(0.3, result.X, 0.02);
         Assert.InRange(result.Y, 0.3, 1.2);
     }

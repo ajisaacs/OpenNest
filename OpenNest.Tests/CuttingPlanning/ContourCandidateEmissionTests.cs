@@ -253,7 +253,7 @@ public class ContourCandidateEmissionTests
     /// One hash per emitted contour block: cut/lead motion runs in emission order, split at
     /// each first lead-in that follows cut motion (every lead style in Parameters() emits
     /// lead-in motions; scribe motions precede all blocks and are excluded). Each block is
-    /// normalised to its own first motion's start and quantised to 1e-9 because the emitted
+    /// normalized to its own first motion's start and quantized to 1e-9 because the emitted
     /// programs are incremental — the reader resolves absolute positions by accumulating
     /// from the program head, so the same code chain differs from a fresh head by ulps.
     /// </summary>

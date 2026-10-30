@@ -77,7 +77,7 @@ public sealed class DefaultNestingEngine : INestingEngine
             }
             catch (Exception ex)
             {
-                // A cancelled solve is rethrown by the token checks around each candidate.
+                // A canceled solve is rethrown by the token checks around each candidate.
                 firstFailure ??= ExceptionDispatchInfo.Capture(ex);
                 continue;
             }

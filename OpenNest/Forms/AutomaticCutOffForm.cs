@@ -25,7 +25,7 @@ public partial class AutomaticCutOffForm : Form
     private bool settingMinimumStrip;
     private bool settingsOnly;
 
-    /// <summary>In settings mode, the options chosen with OK; null otherwise or when cancelled.</summary>
+    /// <summary>In settings mode, the options chosen with OK; null otherwise or when canceled.</summary>
     internal AutomaticCutOffOptions SelectedOptions { get; private set; }
 
     /// <summary>

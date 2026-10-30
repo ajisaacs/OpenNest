@@ -66,8 +66,8 @@ public class CutOffRoundoffTests
         Assert.Empty(AutomaticCutOffPlanner.Create(loadedPlate, options, settings).Definitions);
     }
 
-    // A pie slice whose arc ends 2d further from its centre than it starts. ConvertProgram
-    // only refits centres beyond Tolerance.Epsilon, so it rebuilds the start point ~2d past
+    // A pie slice whose arc ends 2d further from its center than it starts. ConvertProgram
+    // only refits centers beyond Tolerance.Epsilon, so it rebuilds the start point ~2d past
     // the cached bounds, as rotated imported arcs do at d = 2.5e-11.
     private static Plate MakeSlicePlate(double d)
     {

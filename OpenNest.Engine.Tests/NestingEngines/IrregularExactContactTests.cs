@@ -38,7 +38,7 @@ public class IrregularExactContactTests
     [InlineData(8.5, 3.501)]
     [InlineData(8.501, 3.5)]
     [InlineData(8.52, 3.52)] // Generator smoke stock: a looser control, not exact-contact acceptance.
-    public void LargerNeighbouringStockStillPlacesThePart(double width, double length)
+    public void LargerNeighboringStockStillPlacesThePart(double width, double length)
     {
         var job = RectangleJob(width, length, 1, RotationPolicy.Automatic);
 

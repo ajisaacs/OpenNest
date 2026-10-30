@@ -130,7 +130,7 @@ namespace OpenNest.Forms.Commands
                     if (chosen is null)
                     {
                         if (!owner.IsDisposed)
-                            showStatus("Save cancelled");
+                            showStatus("Save canceled");
                         return;
                     }
                     renamed = chosen != originalName;

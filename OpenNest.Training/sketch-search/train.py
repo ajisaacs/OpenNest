@@ -3,7 +3,7 @@
 Each step pairs fresh synthetic sketches with their drawings' renderings and trains
 the model to pick each sketch's own drawing out of the batch (symmetric InfoNCE).
 Held-out drawings (sketch_common.is_holdout) and near-duplicate renderings, which
-would be false negatives within a batch, are left out. No hand labelling is needed.
+would be false negatives within a batch, are left out. No hand labeling is needed.
 
   python train.py --index C:\\SketchIndex --out C:\\SketchIndex\\model
   python build_index.py --index C:\\SketchIndex --server http://barge.lan:8091 --model C:\\SketchIndex\\model

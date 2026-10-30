@@ -94,10 +94,10 @@ public class NestNameConflictsTests
     public async Task Timeout_KeepsTheCurrentName()
     {
         var repository = new NamedRepository("Job");
-        using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
 
-        Assert.Null(await NestNameConflicts.FindReplacementAsync(repository, "Job", 2026, cancelled.Token));
+        Assert.Null(await NestNameConflicts.FindReplacementAsync(repository, "Job", 2026, canceled.Token));
     }
 
     private sealed class NamedRepository : INestRepository

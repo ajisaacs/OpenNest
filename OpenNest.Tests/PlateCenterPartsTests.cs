@@ -30,7 +30,7 @@ public class PlateCenterPartsTests
         part.Offset(plate.OffsetToCenterPartsInWorkArea());
 
         var box = part.BoundingBox;
-        // Work area is X 0.25..99.75, Y 0.75..99.75, so the centre sits 0.25 above the plate's.
+        // Work area is X 0.25..99.75, Y 0.75..99.75, so the center sits 0.25 above the plate's.
         Assert.Equal(50, box.Center.X, 6);
         Assert.Equal(50.25, box.Center.Y, 6);
         Assert.Equal(box.Left - 0.25, 99.75 - box.Right, 6);

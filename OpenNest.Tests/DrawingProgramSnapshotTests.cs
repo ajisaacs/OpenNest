@@ -100,7 +100,7 @@ public class DrawingProgramSnapshotTests
         var snapshot = DrawingProgramSnapshot.Capture(new[] { drawing }, Fingerprint);
 
         var hole = drawing.Program.SubPrograms[7];
-        // The incremental circle's centre changes without replacing either program.
+        // The incremental circle's center changes without replacing either program.
         var arc = Assert.IsType<ArcMove>(hole.Codes[1]);
         arc.CenterPoint = new Vector(-1.5, 0);
         var updated = snapshot.UpdateChangedParts(new[] { MakePlate(part) });

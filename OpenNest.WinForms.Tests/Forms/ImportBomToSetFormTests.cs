@@ -33,7 +33,7 @@ public sealed class ImportBomToSetFormTests : IDisposable
     }
 
     [Fact]
-    public void ImportBom_OpensTheEditorPrefilled_AndCancellingItStoresNoSet()
+    public void ImportBom_OpensTheEditorPrefilled_AndCancelingItStoresNoSet()
     {
         StaTestThread.Run(
             () =>
@@ -104,7 +104,7 @@ public sealed class ImportBomToSetFormTests : IDisposable
     }
 
     [Fact]
-    public void DecliningTheLibraryWrites_OrCancelling_StoresNothing()
+    public void DecliningTheLibraryWrites_OrCanceling_StoresNothing()
     {
         StaTestThread.Run(
             () =>

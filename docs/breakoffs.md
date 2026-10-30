@@ -29,7 +29,7 @@ against the entities being cut:
   short connecting line is added between arcs), because the planner closes contours within
   1e-6 and the program is re-chained from any entity.
 - The joining line between consecutive tabs becomes open cuts on the `Break` layer
-  (`LayerType.Break`, `SpecialLayers.Break`), each travelling with the scrap on its
+  (`LayerType.Break`, `SpecialLayers.Break`), each traveling with the scrap on its
   left. The joining line itself is not cut at the tabs; end tabs keep cuts off the
   outline.
 

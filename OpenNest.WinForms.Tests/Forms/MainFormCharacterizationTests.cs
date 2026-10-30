@@ -5,7 +5,7 @@ using OpenNest.Geometry;
 
 namespace OpenNest.WinForms.Tests.Forms;
 
-// Pins MainForm behaviour that its refactor must preserve: the deliberately different
+// Pins MainForm behavior that its refactor must preserve: the deliberately different
 // busy guards. Reads Application.OpenForms, so it must not overlap fill-lifetime tests.
 [Collection("Fill operation lifetime")]
 public class MainFormCharacterizationTests

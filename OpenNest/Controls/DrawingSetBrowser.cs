@@ -62,7 +62,7 @@ namespace OpenNest.Controls
 
         /// <summary>
         /// Shows Import BOM and returns the new set it prefilled (its library drawings already
-        /// stored with the operator's consent), or null when cancelled; replaced by tests.
+        /// stored with the operator's consent), or null when canceled; replaced by tests.
         /// </summary>
         internal Func<DrawingSetEditSession> ImportBom { get; set; }
 

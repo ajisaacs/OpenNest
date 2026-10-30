@@ -28,7 +28,7 @@ namespace OpenNest.TabbedCutouts
         public double Length { get; internal set; }
 
         /// <summary>
-        /// One open cut per span of the contour between tabs, in contour order, travelling
+        /// One open cut per span of the contour between tabs, in contour order, traveling
         /// counterclockwise (the slug on the left).
         /// </summary>
         public IReadOnlyList<IReadOnlyList<Entity>> Pieces { get; internal set; }
@@ -65,7 +65,7 @@ namespace OpenNest.TabbedCutouts
 
         /// <summary>
         /// <paramref name="center"/> for tab <paramref name="index"/> limited so the tab keeps a
-        /// gap from its neighbours around the contour and does not pass the contour's start
+        /// gap from its neighbors around the contour and does not pass the contour's start
         /// (which would reorder the tabs).
         /// </summary>
         public double ClampTabCenter(int index, double center)

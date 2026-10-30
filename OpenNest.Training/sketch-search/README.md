@@ -40,7 +40,7 @@ python search.py --index C:\SketchIndex photo.jpg --photo --size 10x4.5
 - **Photos and scans:** pass `--photo` to use local thresholding, which handles
   uneven lighting. Crop to the sketch and take the photo square-on.
 - **`--size WxL`:** keeps only drawings of that overall size (either
-  orientation, inches or millimetres, default ±15%). The size is a hard filter,
+  orientation, inches or millimeters, default ±15%). The size is a hard filter,
   so use it only when the sketch's dimensions are reliable.
 - **Leave out text and small details:** draw the outline and the holes.
   Rotation and mirroring do not matter.
@@ -71,7 +71,7 @@ sketches are the result that decides whether the approach works.
 1. Each drawing's cut geometry is rasterized: G-code from the server, or DXF
    entities. Scribe, etch and break motions are skipped.
 2. Drawings and sketches share one `normalize()` step. It reduces the ink to
-   1px centre lines (a filled silhouette becomes its boundary), crops and scales
+   1px center lines (a filled silhouette becomes its boundary), crops and scales
    the result into a 224×224 canvas, and redraws it at a fixed stroke width.
 3. DINOv2 embeds the image: the CLS token joined with the mean patch token.
 4. The query is embedded in all 8 rotations and mirrors, and each drawing scores
@@ -81,7 +81,7 @@ sketches are the result that decides whether the approach works.
 ## Fine-tune
 
 The pretrained model alone is weak on a 40k-drawing library. Training it on
-synthetic sketches of the library itself needs no labelling:
+synthetic sketches of the library itself needs no labeling:
 
 ```sh
 python train.py --index C:\SketchIndex --out C:\SketchIndex\model

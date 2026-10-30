@@ -15,12 +15,12 @@ public class PierceZoneTests
     public void Validator_RadiusZeroChecksPathsOnly_PositiveRadiusRejectsNearbyMaterial()
     {
         var target = Snapshot(Rectangle(0, 0, 10, 10));
-        var neighbour = Snapshot(Rectangle(-6, 0, -4, 10)); // 1 from the pierce at (-3, 5)
+        var neighbor = Snapshot(Rectangle(-6, 0, -4, 10)); // 1 from the pierce at (-3, 5)
         var lead = Read(ExternalLead());
 
-        Assert.True(LeadPathValidator.Check(lead, target, [target, neighbour]).IsClear);
-        AssertClear(LeadPathValidator.Check(lead, target, [target, neighbour], 0.9));
-        var near = LeadPathValidator.Check(lead, target, [target, neighbour], 1.2);
+        Assert.True(LeadPathValidator.Check(lead, target, [target, neighbor]).IsClear);
+        AssertClear(LeadPathValidator.Check(lead, target, [target, neighbor], 0.9));
+        var near = LeadPathValidator.Check(lead, target, [target, neighbor], 1.2);
         Assert.True(near.IsComplete, near.Reason);
         Assert.False(near.IsClear);
         Assert.Contains("another placed part", near.Reason);
@@ -47,10 +47,10 @@ public class PierceZoneTests
     public void Validator_FixedPierceFailureIsCollectedNotReturned()
     {
         var target = Snapshot(Rectangle(0, 0, 10, 10));
-        var neighbour = Snapshot(Rectangle(-6, 0, -4, 10));
+        var neighbor = Snapshot(Rectangle(-6, 0, -4, 10));
         var failures = new List<FixedLeadFailure>();
 
-        var result = LeadPathValidator.Check(Read(ExternalLead()), target, [target, neighbour], _ => true,
+        var result = LeadPathValidator.Check(Read(ExternalLead()), target, [target, neighbor], _ => true,
             failures, default, pierceRadius: 1.2);
 
         AssertClear(result);
@@ -104,7 +104,7 @@ public class PierceZoneTests
     }
 
     [Fact]
-    public void RoundHole_ShortLeadPiercesAtTheZoneEdge_TooSmallHolePiercesAtItsCentre()
+    public void RoundHole_ShortLeadPiercesAtTheZoneEdge_TooSmallHolePiercesAtItsCenter()
     {
         var clean = Rectangle(0, 0, 10, 10);
         clean.Codes.AddRange(Circle(3, 5, 2).Codes);
@@ -127,10 +127,10 @@ public class PierceZoneTests
         var host = Rectangle(0, 0, 10, 10);
         host.Codes.AddRange(Rectangle(3, 3, 7, 7).Codes);
         var part = new Part(new Drawing("host", host));
-        var neighbour = new Part(new Drawing("neighbour", Rectangle(0, 0, 2, 2)), new Vector(10.6, 4));
+        var neighbor = new Part(new Drawing("neighbor", Rectangle(0, 0, 2, 2)), new Vector(10.6, 4));
         var parameters = Parameters(1);
 
-        var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest([part, neighbour], Start,
+        var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest([part, neighbor], Start,
             confirmedParameters: parameters, preservePartOrder: true));
         var result = CuttingPlanService.Plan(snapshot);
 
@@ -253,7 +253,7 @@ public class PierceZoneTests
         var nest = new Nest();
         var plate = nest.CreatePlate();
         plate.Parts.Add(LeadPart(new Vector(0, 0), leadStart: new Vector(-0.5, 5)));
-        plate.Parts.Add(new Part(new Drawing("neighbour", Rectangle(0, 0, 2, 10)), new Vector(-2.7, 0)));
+        plate.Parts.Add(new Part(new Drawing("neighbor", Rectangle(0, 0, 2, 10)), new Vector(-2.7, 0)));
 
         Assert.DoesNotContain(PostVerificationAnalyzer.Analyze(nest).Findings,
             f => f.Kind == PostVerificationKind.PierceZone);

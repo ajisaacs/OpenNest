@@ -7,7 +7,7 @@ namespace OpenNest.Geometry
     /// <summary>
     /// Polygon overlap test with hole subtraction, used by engine and validation per-pair
     /// checks. It was written as the reference for a GPU kernel; that port is on hold in
-    /// favour of Clipper2, starting with the material-overlap diagnostic. Engine callers
+    /// favor of Clipper2, starting with the material-overlap diagnostic. Engine callers
     /// stay on this kernel until a Clipper2 near-contact differential and the layout gate
     /// pass.
     /// <para>

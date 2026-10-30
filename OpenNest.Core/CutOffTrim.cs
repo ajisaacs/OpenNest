@@ -61,8 +61,8 @@ namespace OpenNest
     /// <summary>
     /// Trims and extends cut-offs against the cut-offs that cross them, by changing only their
     /// start and end limits and their gaps (see docs/automatic-scrap-cutoffs.md, "Trim and
-    /// extend"). A trim stops on the crossing line's centre, inside its kerf; trimming a piece
-    /// between two crossing lines leaves a gap from one centre to the other. An extend closes the
+    /// extend"). A trim stops on the crossing line's center, inside its kerf; trimming a piece
+    /// between two crossing lines leaves a gap from one center to the other. An extend closes the
     /// gap at the picked end, or runs the line's end to the next crossing line beyond it, or to
     /// the sheet edge, which clears the limit.
     /// </summary>

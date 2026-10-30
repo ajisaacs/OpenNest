@@ -121,7 +121,7 @@ public class PinnedContourTests
     }
 
     [Fact]
-    public void PinnedTabOnAHole_IsNotHonouredAndWarns()
+    public void PinnedTabOnAHole_IsNotHonoredAndWarns()
     {
         var drawing = new Drawing("holes", PreparedContourTests.Holes());
         drawing.CutPins.Add(new ContourCutPin(new Vector(4, 3), new LineLeadIn { Length = 0.2, ApproachAngle = 90 },

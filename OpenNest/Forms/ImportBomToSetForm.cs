@@ -196,7 +196,7 @@ namespace OpenNest.Forms
             };
             var left = plan.Count(DrawingSetImportAction.Skip) + drawings.Skipped.Count;
             if (left > 0)
-                parts.Add($"{left} not imported (greyed).");
+                parts.Add($"{left} not imported (grayed).");
             var bare = plan.Entries.Where((e, i) => e.Action != DrawingSetImportAction.Skip && drawings.Drawings[i].NeedsDetails).Count();
             if (bare > 0)
                 parts.Add($"{bare} {(bare == 1 ? "has" : "have")} no material or thickness; fix {(bare == 1 ? "it" : "them")} with Edit Drawing in the set editor before making nests.");

@@ -343,7 +343,7 @@ public sealed class ReleasedContourState
     /// contour with its own leads already encloses whatever it releases and counts as one node.
     /// Open cuts may touch any cut only at their own ends, and must form no loop through those
     /// nodes or each other: a forest of open paths separates no region of the sheet. Kerf and
-    /// tab strength are not modelled, exactly as for a single open contour.
+    /// tab strength are not modeled, exactly as for a single open contour.
     /// </summary>
     private const double JointTolerance = 1e-5;
 

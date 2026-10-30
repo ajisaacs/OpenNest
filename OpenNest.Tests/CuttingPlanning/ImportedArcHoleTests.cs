@@ -7,7 +7,7 @@ using OpenNest.Geometry;
 namespace OpenNest.Tests.CuttingPlanning;
 
 // A 0.277 in mounting hole imported from PEP (a panel door): two half circles whose stored
-// centre sits 5e-8 beside the chord's midpoint. The closest entry to an approach from straight
+// center sits 5e-8 beside the chord's midpoint. The closest entry to an approach from straight
 // below lands on the hole's lowest point, 5e-8 along the first arc from its start. Emission
 // splits the contour there with the 1e-5 endpoint tolerance, so the contour starts at the vertex;
 // the entry must start there too, or the 5e-8 between them is never cut and the plan's own
@@ -42,10 +42,10 @@ public class ImportedArcHoleTests
             p.ArcTo(new Vector(1 + offset, 0.3), new Vector(1 + offset, 0.2), RotationType.CCW);
             p.ArcTo(new Vector(1 + offset, 0.1), new Vector(1 + offset, 0.2), RotationType.CCW);
         }
-        var centre = new Vector(1 + offset, (Bottom.Y + Top.Y) / 2);
+        var center = new Vector(1 + offset, (Bottom.Y + Top.Y) / 2);
         p.MoveTo(Bottom.X, Bottom.Y);
-        p.ArcTo(Top, centre, RotationType.CCW);
-        p.ArcTo(Bottom, centre, RotationType.CCW);
+        p.ArcTo(Top, center, RotationType.CCW);
+        p.ArcTo(Bottom, center, RotationType.CCW);
         return p;
     }
 

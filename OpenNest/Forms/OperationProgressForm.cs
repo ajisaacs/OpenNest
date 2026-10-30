@@ -10,7 +10,7 @@ namespace OpenNest.Forms;
 /// <summary>
 /// Small "working" window with a Cancel button for a long plate operation that
 /// runs on a worker thread. Cancel, Escape and the close box only request
-/// cancellation: the window stays open showing "Cancelling..." until the worker
+/// cancellation: the window stays open showing "Canceling..." until the worker
 /// has actually stopped, so the caller never continues while it is still running.
 /// </summary>
 internal sealed class OperationProgressForm : Form
@@ -188,7 +188,7 @@ internal sealed class OperationProgressForm : Form
         var elapsed = stopwatch.Elapsed;
         var time = $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:00}";
         statusLabel.Text = cts.IsCancellationRequested
-            ? $"Cancelling... waiting for the current step to stop ({time})"
+            ? $"Canceling... waiting for the current step to stop ({time})"
             : $"Elapsed {time}";
     }
 }

@@ -49,7 +49,7 @@ public class NestValidationFormTests
     }
 
     [Fact]
-    public void CompletionClosesWithoutCancellingSuccessfulJob()
+    public void CompletionClosesWithoutCancelingSuccessfulJob()
     {
         RunSta(() =>
         {

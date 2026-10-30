@@ -126,9 +126,9 @@ public class RemoteNestHistoryTests
     }
 
     [Fact]
-    public async Task CancelledHistoryAndDownload_PropagateCancellation()
+    public async Task CanceledHistoryAndDownload_PropagateCancellation()
     {
-        using var http = new HttpClient(new Handler(_ => throw new InvalidOperationException("Cancelled HTTP must not run")));
+        using var http = new HttpClient(new Handler(_ => throw new InvalidOperationException("Canceled HTTP must not run")));
         using var repository = new RemoteNestRepository(http, "http://shop/");
         using var source = new CancellationTokenSource();
         source.Cancel();

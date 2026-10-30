@@ -60,7 +60,7 @@ namespace OpenNest.Forms
         /// <summary>
         /// True when <paramref name="action"/> ("Save" or "Post") may go on: no codes, nothing
         /// to check, nothing taken, or the programmer chose to go on or to remove the codes.
-        /// False when they cancelled or the window closed meanwhile. A Save As
+        /// False when they canceled or the window closed meanwhile. A Save As
         /// (<paramref name="asCopy"/>) is a new nest: the original's codes and holds count as
         /// another nest's.
         /// </summary>
@@ -125,7 +125,7 @@ namespace OpenNest.Forms
                     showStatus($"Removed {codes.Count} ledger item code{(codes.Count == 1 ? "" : "s")} from {removed} sheet{(removed == 1 ? "" : "s")}");
                     return true;
                 default:
-                    showStatus($"{action} cancelled");
+                    showStatus($"{action} canceled");
                     return false;
             }
         }

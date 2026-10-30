@@ -17,7 +17,7 @@ namespace OpenNest.Geometry
         /// <summary>
         /// Bounded search for callers that cannot afford refinement along a long thin shape:
         /// stops after about <paramref name="maxCells"/> distance evaluations and returns the best
-        /// cell centre so far. When the starting grid would exceed a quarter of the budget it is
+        /// cell center so far. When the starting grid would exceed a quarter of the budget it is
         /// coarsened so the whole shape is sampled first. The result can lie outside a shape
         /// thinner than the remaining refinement, so callers must check it.
         /// </summary>
@@ -157,7 +157,7 @@ namespace OpenNest.Geometry
 
                 halfCell = cell.HalfSize / 2;
 
-                // Far from the origin a half-step may no longer move the centre; such a cell
+                // Far from the origin a half-step may no longer move the center; such a cell
                 // cannot be split, and its identical children would multiply without end.
                 if (cell.X - halfCell == cell.X || cell.X + halfCell == cell.X
                     || cell.Y - halfCell == cell.Y || cell.Y + halfCell == cell.Y)

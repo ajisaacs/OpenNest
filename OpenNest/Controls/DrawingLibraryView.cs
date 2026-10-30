@@ -67,7 +67,7 @@ namespace OpenNest.Controls
         internal Func<DrawingLibraryEditSession, DrawingLibraryRecord> EditDrawing { get; set; }
 
         /// <summary>
-        /// Chooses the set for Add to Set: Ok false when cancelled, otherwise the listed set or
+        /// Chooses the set for Add to Set: Ok false when canceled, otherwise the listed set or
         /// null for a new one; replaced by tests.
         /// </summary>
         internal Func<(bool Ok, DrawingSetRecord Listed)> ChooseSet { get; set; }

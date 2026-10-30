@@ -53,7 +53,7 @@ public class LedgerCodeRecheckTests
         Assert.False(Confirm(fake, env, "Save"));
 
         Assert.Equal(before, UndoTestEnv.Describe(env.Nest));
-        Assert.Equal("Save cancelled", fake.Status);
+        Assert.Equal("Save canceled", fake.Status);
     }, CodedNest);
 
     [Fact]

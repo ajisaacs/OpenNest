@@ -146,9 +146,9 @@ public class CutoutNfpProposalTests
     {
         var frame = JobBuilder.Part("frame", TestShapes.Ring(20, 10), 1);
         var insert = JobBuilder.Rectangle("insert", 6, 6, 1);
-        using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
         Assert.Throws<OperationCanceledException>(() => CutoutNfpProposal.Find(frame, 0, insert, Spacing,
-            cancelled.Token));
+            canceled.Token));
     }
 }

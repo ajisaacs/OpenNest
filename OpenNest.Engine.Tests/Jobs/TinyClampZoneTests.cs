@@ -201,7 +201,7 @@ public class TinyClampZoneTests
 
     private static Program DiskProgram()
     {
-        // Radius 2 centred at (10, 10), two absolute CCW half circles.
+        // Radius 2 centerd at (10, 10), two absolute CCW half circles.
         var program = new Program();
         program.MoveTo(12, 10);
         program.ArcTo(8, 10, 10, 10, RotationType.CCW);
@@ -273,8 +273,8 @@ public class TinyClampZoneTests
         var arc = new ShapeProfile(OpenNest.Converters.ConvertProgram.ToGeometry(program))
             .Perimeter.Entities.OfType<Arc>().Single();
         var native = arc.ToPoints(arc.SegmentsForTolerance(Tiny / 4)).First(v => v.X > 11.9 && v.Y < 19.5);
-        var centre = new Vector(10, 20);
-        var outward = centre + (native - centre) / 2 * (2 + 6e-7);
+        var center = new Vector(10, 20);
+        var outward = center + (native - center) / 2 * (2 + 6e-7);
         return (program, new Box(outward.X - Tiny, outward.Y, Tiny, Tiny));
     }
 

@@ -20,12 +20,12 @@ public class PreferredContourEntriesTests
 {
     private static readonly Vector Arrival = new(0, 5);
 
-    private static Program CirclesProgram(params (double X, double Y)[] centres)
+    private static Program CirclesProgram(params (double X, double Y)[] centers)
     {
         var p = ExplicitContourTests.Square(false);
-        foreach (var (x, y) in centres)
+        foreach (var (x, y) in centers)
         {
-            // Unit circle centred at (x, y): two half-arcs, CCW.
+            // Unit circle centerd at (x, y): two half-arcs, CCW.
             p.MoveTo(x + 1, y);
             p.ArcTo(new Vector(x - 1, y), new Vector(x, y), RotationType.CCW);
             p.ArcTo(new Vector(x + 1, y), new Vector(x, y), RotationType.CCW);
@@ -83,11 +83,11 @@ public class PreferredContourEntriesTests
         Assert.True(At(perimeterEntry.Point, 10, 5));
 
         // Route: arrival (0,5) -> left circle -> right circle -> the outside entry.
-        var centres = new[] { new Vector(3, 3), new Vector(7, 3), new Vector(5, 5) };
-        var route = CuttingHoleOrder.Plan(new[] { 0, 1 }, centres, Arrival,
+        var centers = new[] { new Vector(3, 3), new Vector(7, 3), new Vector(5, 5) };
+        var route = CuttingHoleOrder.Plan(new[] { 0, 1 }, centers, Arrival,
             Pierce(prepared, perimeterEntry));
         var proposal = PreferredContourEntries.TryPlan(prepared, perimeterEntry, route,
-            centres, Arrival, c => feasibility.Check(c.Choice));
+            centers, Arrival, c => feasibility.Check(c.Choice));
 
         Assert.True(proposal.IsPreferred, proposal.Reason);
         Assert.Equal(new[] { 0, 1 }, proposal.HoleChoices.Select(c => c.ContourOrdinal));
@@ -115,12 +115,12 @@ public class PreferredContourEntriesTests
         var clean = RectHolesProgram((3, 3, 5, 5), (7, 3, 9, 5));
         var (prepared, _) = Capture(clean, Vector.Zero);
         var perimeterEntry = prepared.Entry(2, 2, new Vector(10, 4));
-        var centres = new[] { new Vector(4, 4), new Vector(8, 4), new Vector(5, 5) };
+        var centers = new[] { new Vector(4, 4), new Vector(8, 4), new Vector(5, 5) };
 
         // All-clear evaluation isolates pure ranking: a corner on a facing side wins over
         // any midpoint, walking backward from the perimeter entry.
         var proposal = PreferredContourEntries.TryPlan(prepared, perimeterEntry, new[] { 0, 1 },
-            centres, Arrival, _ => new(ContourFeasibilityStatus.Clear, null));
+            centers, Arrival, _ => new(ContourFeasibilityStatus.Clear, null));
 
         Assert.True(proposal.IsPreferred, proposal.Reason);
         // Right hole faces the perimeter: a RIGHT-edge corner of the (7,3)-(9,5) hole,
@@ -141,7 +141,7 @@ public class PreferredContourEntriesTests
         var clean = CirclesProgram((3, 3), (7, 3));
         var (prepared, feasibility) = Capture(clean, Vector.Zero);
         var perimeterEntry = prepared.Entry(2, 2, new Vector(10, 5));
-        var centres = new[] { new Vector(3, 3), new Vector(7, 3), new Vector(5, 5) };
+        var centers = new[] { new Vector(3, 3), new Vector(7, 3), new Vector(5, 5) };
 
         // The ideal east compass point of the right circle is refused: fall back to its
         // next-ranked candidate rather than fail or skip the hole.
@@ -149,8 +149,8 @@ public class PreferredContourEntriesTests
             c.Choice.ContourOrdinal == 1 && At(c.Choice.Point, 8, 3)
                 ? new(ContourFeasibilityStatus.Blocked, "test block")
                 : feasibility.Check(c.Choice);
-        var route = CuttingHoleOrder.Plan(new[] { 0, 1 }, centres, Arrival, Pierce(prepared, perimeterEntry));
-        var proposal = PreferredContourEntries.TryPlan(prepared, perimeterEntry, route, centres, Arrival, Evaluate);
+        var route = CuttingHoleOrder.Plan(new[] { 0, 1 }, centers, Arrival, Pierce(prepared, perimeterEntry));
+        var proposal = PreferredContourEntries.TryPlan(prepared, perimeterEntry, route, centers, Arrival, Evaluate);
 
         Assert.True(proposal.IsPreferred, proposal.Reason);
         Assert.Equal(1, proposal.HoleChoices[1].ContourOrdinal); // never skipped or swapped
@@ -165,14 +165,14 @@ public class PreferredContourEntriesTests
         var clean = CirclesProgram((3, 3), (7, 3));
         var (prepared, _) = Capture(clean, Vector.Zero);
         var perimeterEntry = prepared.Entry(2, 2, new Vector(10, 5));
-        var centres = new[] { new Vector(3, 3), new Vector(7, 3), new Vector(5, 5) };
+        var centers = new[] { new Vector(3, 3), new Vector(7, 3), new Vector(5, 5) };
 
         ContourFeasibilityVerdict Evaluate(ContourEntryCandidate c) =>
             c.Choice.ContourOrdinal == 0
                 ? new(ContourFeasibilityStatus.Blocked, "nothing fits")
                 : new(ContourFeasibilityStatus.Clear, null);
         var proposal = PreferredContourEntries.TryPlan(prepared, perimeterEntry, new[] { 0, 1 },
-            centres, Arrival, Evaluate);
+            centers, Arrival, Evaluate);
 
         Assert.False(proposal.IsPreferred);
         Assert.Empty(proposal.HoleChoices);
@@ -186,13 +186,13 @@ public class PreferredContourEntriesTests
         var clean = CirclesProgram((2.5, 3), (5, 3), (7.5, 3));
         var (prepared, feasibility) = Capture(clean, Vector.Zero);
         var perimeterEntry = prepared.Entry(3, 2, new Vector(10, 5)); // perimeter is last
-        var centres = new[]
+        var centers = new[]
         {
             new Vector(2.5, 3), new Vector(5, 3), new Vector(7.5, 3), new Vector(5, 5),
         };
-        var route = CuttingHoleOrder.Plan(new[] { 0, 1, 2 }, centres, Arrival, Pierce(prepared, perimeterEntry));
+        var route = CuttingHoleOrder.Plan(new[] { 0, 1, 2 }, centers, Arrival, Pierce(prepared, perimeterEntry));
 
-        var proposal = PreferredContourEntries.TryPlan(prepared, perimeterEntry, route, centres, Arrival,
+        var proposal = PreferredContourEntries.TryPlan(prepared, perimeterEntry, route, centers, Arrival,
             c => feasibility.Check(c.Choice));
 
         Assert.True(proposal.IsPreferred, proposal.Reason);
@@ -205,16 +205,16 @@ public class PreferredContourEntriesTests
     public void ScribesDoNotBecomeTheDownstreamPierceTarget()
     {
         var clean = RectHolesProgram((3, 3, 5, 5), (7, 3, 9, 5));
-        var centres = new[] { new Vector(4, 4), new Vector(8, 4), new Vector(5, 5) };
+        var centers = new[] { new Vector(4, 4), new Vector(8, 4), new Vector(5, 5) };
         var prepared = PreparedContours.Capture(clean, ExplicitContourTests.Parameters());
         var entry = prepared.Entry(2, 2, new Vector(10, 4));
         var baseline = PreferredContourEntries.TryPlan(prepared, entry, new[] { 0, 1 },
-            centres, Arrival, _ => new(ContourFeasibilityStatus.Clear, null));
+            centers, Arrival, _ => new(ContourFeasibilityStatus.Clear, null));
         clean.MoveTo(-20, -20);
         clean.Codes.Add(new LinearMove(-19, -19) { Layer = LayerType.Scribe });
         var marked = PreparedContours.Capture(clean, ExplicitContourTests.Parameters());
         var actual = PreferredContourEntries.TryPlan(marked, marked.Entry(2, 2, new Vector(10, 4)),
-            new[] { 0, 1 }, centres, Arrival, _ => new(ContourFeasibilityStatus.Clear, null));
+            new[] { 0, 1 }, centers, Arrival, _ => new(ContourFeasibilityStatus.Clear, null));
         Assert.True(actual.IsPreferred, actual.Reason);
         Assert.Equal(baseline.HoleChoices.Select(c => c.Point), actual.HoleChoices.Select(c => c.Point));
     }
@@ -228,12 +228,12 @@ public class PreferredContourEntriesTests
         var clean = CirclesProgram((3, 3), (7.4, 4.6));
         var (prepared, feasibility) = Capture(clean, Vector.Zero);
         var perimeterEntry = prepared.Entry(2, 2, new Vector(10, 5));
-        var centres = new[] { new Vector(3, 3), new Vector(7.4, 4.6), new Vector(5, 5) };
+        var centers = new[] { new Vector(3, 3), new Vector(7.4, 4.6), new Vector(5, 5) };
 
         var proposal = PreferredContourEntries.TryPlan(prepared, perimeterEntry, new[] { 0, 1 },
-            centres, Arrival, c => feasibility.Check(c.Choice));
+            centers, Arrival, c => feasibility.Check(c.Choice));
         var again = PreferredContourEntries.TryPlan(prepared, perimeterEntry, new[] { 0, 1 },
-            centres, Arrival, c => feasibility.Check(c.Choice));
+            centers, Arrival, c => feasibility.Check(c.Choice));
 
         Assert.True(proposal.IsPreferred, proposal.Reason);
         Assert.Equal(proposal.HoleChoices.Select(c => c.Point), again.HoleChoices.Select(c => c.Point));
@@ -256,13 +256,13 @@ public class PreferredContourEntriesTests
     {
         var (prepared, feasibility) = Capture(CirclesProgram((3, 3), (7, 3)), Vector.Zero);
         var perimeterEntry = prepared.Entry(2, 2, new Vector(10, 5));
-        using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
 
         Assert.ThrowsAny<OperationCanceledException>(() => PreferredContourEntries.TryPlan(
             prepared, perimeterEntry, new[] { 0, 1 },
             new[] { new Vector(3, 3), new Vector(7, 3), new Vector(5, 5) }, Arrival,
-            c => feasibility.Check(c.Choice), cancelled.Token));
+            c => feasibility.Check(c.Choice), canceled.Token));
     }
 
     [Fact]
@@ -272,10 +272,10 @@ public class PreferredContourEntriesTests
         var before = ExplicitContourTests.Fingerprint(clean);
         var (prepared, feasibility) = Capture(clean, Vector.Zero);
         var perimeterEntry = prepared.Entry(2, 2, new Vector(10, 5));
-        var centres = new[] { new Vector(3, 3), new Vector(7, 3), new Vector(5, 5) };
+        var centers = new[] { new Vector(3, 3), new Vector(7, 3), new Vector(5, 5) };
 
         var proposal = PreferredContourEntries.TryPlan(prepared, perimeterEntry, new[] { 0, 1 },
-            centres, Arrival, c => feasibility.Check(c.Choice));
+            centers, Arrival, c => feasibility.Check(c.Choice));
 
         Assert.True(proposal.IsPreferred, proposal.Reason);
         Assert.Equal(before, ExplicitContourTests.Fingerprint(clean)); // caller program untouched

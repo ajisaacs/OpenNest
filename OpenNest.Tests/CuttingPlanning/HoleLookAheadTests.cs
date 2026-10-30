@@ -61,9 +61,9 @@ public class HoleLookAheadTests
     {
         // Calibrated for next-facing circle entries: the preferred rapid from hole 1
         // to hole 2 touches already-cut hole 3; retain checked entry backtracking.
-        var centres = new[] { new Vector(3, 3), new Vector(6, 15), new Vector(3, 7), new Vector(3, 11) };
+        var centers = new[] { new Vector(3, 3), new Vector(6, 15), new Vector(3, 7), new Vector(3, 11) };
         var clean = LeadPathValidationTests.Rectangle(0, 0, 18, 18);
-        foreach (var c in centres)
+        foreach (var c in centers)
         {
             clean.MoveTo(c.X + 1.75, c.Y);
             clean.ArcTo(c.X + 1.75, c.Y, c.X, c.Y, RotationType.CCW);
@@ -78,9 +78,9 @@ public class HoleLookAheadTests
         var adapter = new ContourEntryFeasibility(prepared, source.Location, source.Material, []);
         var outside = ContourEntrySelection.Select(prepared.AutomaticEntryCandidatesWithFallbacks(4)
             .RankTowardNextCut(null, start), c => adapter.Check(c.Choice)).Choices[0];
-        var route = CuttingHoleOrder.Plan(new[] { 0, 1, 2, 3 }, centres, start,
+        var route = CuttingHoleOrder.Plan(new[] { 0, 1, 2, 3 }, centers, start,
             PreferredContourEntries.Pierce(prepared, outside, default));
-        var preferred = PreferredContourEntries.TryPlan(prepared, outside, route, centres, start,
+        var preferred = PreferredContourEntries.TryPlan(prepared, outside, route, centers, start,
             c => adapter.Check(c.Choice));
         Assert.True(preferred.IsPreferred, preferred.Reason);
         var unsafeChoices = preferred.HoleChoices.Append(outside).ToArray();
@@ -112,7 +112,7 @@ public class HoleLookAheadTests
         var first = new Part(new Drawing("holes", MixedHoles()));
         var nextClean = LeadPathValidationTests.Rectangle(0, 0, 2, 2);
         // The fixed next program starts above-left, then moves above the first part before
-        // cutting on the right. Its material centre alone cannot predict that approach.
+        // cutting on the right. Its material center alone cannot predict that approach.
         nextClean.MoveTo(-22, 10);
         nextClean.Codes.Add(new LinearMove(-21, 10) { Layer = LayerType.Scribe });
         nextClean.MoveTo(0, 10);
@@ -130,10 +130,10 @@ public class HoleLookAheadTests
             snapshot.Placements.Select(p => p.Material).ToArray());
         var preferredOutside = ContourEntrySelection.Select(prepared.AutomaticEntryCandidatesWithFallbacks(2, new Vector(21, 3))
             .RankTowardNextCut(new Vector(21, 3), Start), c => adapter.Check(c.Choice)).Choices[0];
-        var centres = prepared.HoleCentres().Select(c => c ?? Vector.Zero).ToArray();
-        var route = CuttingHoleOrder.Plan(new[] { 0, 1 }, centres, Start,
+        var centers = prepared.HoleCenters().Select(c => c ?? Vector.Zero).ToArray();
+        var route = CuttingHoleOrder.Plan(new[] { 0, 1 }, centers, Start,
             PreferredContourEntries.Pierce(prepared, preferredOutside, default));
-        var preferred = PreferredContourEntries.TryPlan(prepared, preferredOutside, route, centres, Start,
+        var preferred = PreferredContourEntries.TryPlan(prepared, preferredOutside, route, centers, Start,
             c => adapter.Check(c.Choice));
         Assert.True(preferred.IsPreferred, preferred.Reason);
         var firstExecution = ExecutionMotionReader.Read(prepared.Emit(

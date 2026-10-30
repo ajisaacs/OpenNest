@@ -303,7 +303,7 @@ namespace OpenNest.Forms
             error = null;
 
             // CellValidating cancels an unparsable size and leaves the cell in edit mode;
-            // calling EndEdit() on that cancelled edit hangs/throws instead of returning
+            // calling EndEdit() on that canceled edit hangs/throws instead of returning
             // false for it. Catch an unparsable pending edit ourselves first so EndEdit()
             // is never asked to commit or discard it.
             if (
@@ -748,7 +748,7 @@ namespace OpenNest.Forms
             var ledger = ItemAt(e.RowIndex)?.LedgerRow;
             if (ledger == null)
                 return;
-            // A substitute's source stays in full colour so it stands out from the preferred stock.
+            // A substitute's source stays in full color so it stands out from the preferred stock.
             if (property == "Source" && ledger.IsSubstitute)
                 e.CellStyle.ForeColor = SubstituteColor;
             else if (property is "Size" or "Cost" or "Source")

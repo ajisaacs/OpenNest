@@ -139,9 +139,9 @@ public class PolygonAreaMomentsTests
     [InlineData(0)]
     [InlineData(1000000000)]
     [InlineData(-1000000000)]
-    public void TrySubtract_OffCentreHoleShiftsCentroidAway(double offset)
+    public void TrySubtract_OffCenterHoleShiftsCentroidAway(double offset)
     {
-        // 4x4 square minus a 1x1 hole centred at (1, 1): area 15, centroid (16*2 - 1)/15 = 2 + 1/15.
+        // 4x4 square minus a 1x1 hole centerd at (1, 1): area 15, centroid (16*2 - 1)/15 = 2 + 1/15.
         Assert.True(PolygonAreaMoments.TryCompute(Rectangle(offset, offset, 4, 4), out var outline));
         Assert.True(PolygonAreaMoments.TryCompute(Rectangle(offset + 0.5, offset + 0.5, 1, 1), out var hole));
 

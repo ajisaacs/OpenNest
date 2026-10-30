@@ -63,7 +63,7 @@ change.Complete();
 ```
 
 - Dispose after `Complete()` commits one history entry. A scope that never called
-  `MarkChanged()` records nothing, so a cancelled dialog or an edit that changed nothing does not
+  `MarkChanged()` records nothing, so a canceled dialog or an edit that changed nothing does not
   add an entry.
 - A scope disposed without `Complete()` (an exception, a cancellation) rolls a changed nest back
   to the last recorded state.
@@ -82,7 +82,7 @@ change.Complete();
 The window keeps a fingerprint (`NestFingerprint`: plate sizes and parts, poses, programs,
 cut-offs, drawings and required quantities, objects by reference) of the last recorded state.
 Before a scope opens and before Undo or Redo, a changed fingerprint means an edit bypassed
-recording; it is committed as an entry labelled "Change", so it is never discarded. The
+recording; it is committed as an entry labeled "Change", so it is never discarded. The
 fingerprint is a cheap hash, so this is best effort and no excuse to skip recording. In DEBUG
 builds an `Application.Idle` check writes a `Debug.WriteLine` warning when the nest changed
 outside a scope; watch the output window when adding an edit.
@@ -98,7 +98,7 @@ outside a scope; watch the output window when adding an edit.
 
 `snapshot.Restore(live)` reads the copy and reuses each live `Drawing` whose saved content is
 unchanged (matched by `NestWriter.GetDrawingFingerprints`), so `BestFitCache`,
-`FillResultCache`, colours and `Drawing.Id` survive. A changed drawing, a quantity edit
+`FillResultCache`, colors and `Drawing.Id` survive. A changed drawing, a quantity edit
 included, comes from the copy. Restore then recomputes nested quantities.
 
 Never compare snapshots byte for byte to detect a change: two writes of one nest can differ in
@@ -116,7 +116,7 @@ derived values (`expectedRemnant` around 1e-10). The scope's `MarkChanged` flag 
 5. Unbinds the old nest, replaces `Document.Nest` and binds the new one through the same path
    the constructor uses (`PlateManager`, sentinel, units, cut-off defaults, overlap check).
 6. Regenerates each plate's cut-offs with `PlateView.CutOffSettings` (reading uses defaults)
-   and recolours drawings with the current scheme, as Open does.
+   and recolors drawings with the current scheme, as Open does.
 7. Loads the same plate index (clamped), restores the viewport instead of zooming to fit, and
    reselects by part index when the plate's part count is unchanged.
 8. Refreshes the plate list and header, then raises `NestRestored`; the main window closes a

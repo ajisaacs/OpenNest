@@ -446,7 +446,7 @@ namespace OpenNest
         }
 
         // Every segment of a cut-off is a part of the one cut-off drawing with its own trimmed
-        // program. Labelled from the drawing, all of them would stack on one point and the view's
+        // program. Labeled from the drawing, all of them would stack on one point and the view's
         // culling would decide which number shows; label each at the middle of its own cut.
         private Vector? CutOffSegmentLabelPoint()
         {

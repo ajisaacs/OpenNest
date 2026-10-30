@@ -10,17 +10,17 @@ namespace OpenNest.Engine.CuttingPlanning;
 /// Proposes a whole-part order for plates with parts nested inside other parts' cutouts. A host
 /// is cut after everything inside it, so the tool reaches it from whichever inner part was cut
 /// last; from the middle of a crowded cutout every straight approach crosses a finished
-/// neighbour. Each host's inner parts are therefore toured as one run that ends beside the
+/// neighbor. Each host's inner parts are therefore toured as one run that ends beside the
 /// host's own contours, immediately before the host. Plates without nested parts get exactly
 /// <see cref="CuttingPartOrder"/>'s order. Like that order, this is only a proposal.
 /// </summary>
 internal static class CuttingNestedOrder
 {
-    /// <param name="Centres">One representative point per part ordinal.</param>
+    /// <param name="Centers">One representative point per part ordinal.</param>
     /// <param name="Prerequisites">Ordinals that must come before each part, learned rules included.</param>
     /// <param name="Inside">Per part ordinal, the parts nested inside its cutouts at any depth.</param>
     /// <param name="HostEntry">The point on a host's contours nearest a tool position.</param>
-    internal sealed record Context(IReadOnlyList<Vector> Centres,
+    internal sealed record Context(IReadOnlyList<Vector> Centers,
         IReadOnlyList<IReadOnlyCollection<int>> Prerequisites, IReadOnlyList<IReadOnlyCollection<int>> Inside,
         Func<int, Vector, Vector> HostEntry, CancellationToken Token);
 
@@ -44,7 +44,7 @@ internal static class CuttingNestedOrder
                 rootOf[inner] = outer;
         var roots = parts.Where(p => !rootOf.ContainsKey(p)).ToArray();
         // A rule between parts of two groups orders the groups.
-        var groupRules = context.Centres.Select(_ => new HashSet<int>()).ToArray();
+        var groupRules = context.Centers.Select(_ => new HashSet<int>()).ToArray();
         foreach (var part in parts)
         {
             var group = rootOf.GetValueOrDefault(part, part);
@@ -63,13 +63,13 @@ internal static class CuttingNestedOrder
         int[] rootOrder;
         try
         {
-            rootOrder = CuttingPartOrder.Plan(roots, context.Centres, start, hostsLast, context.Token, endpoint);
+            rootOrder = CuttingPartOrder.Plan(roots, context.Centers, start, hostsLast, context.Token, endpoint);
         }
         catch (InvalidOperationException)
         {
             try
             {
-                rootOrder = CuttingPartOrder.Plan(roots, context.Centres, start, groupRules, context.Token, endpoint);
+                rootOrder = CuttingPartOrder.Plan(roots, context.Centers, start, groupRules, context.Token, endpoint);
             }
             catch (InvalidOperationException)
             {
@@ -84,7 +84,7 @@ internal static class CuttingNestedOrder
             if (inner.Length != 0)
                 order.AddRange(Plan(inner, position, context, context.HostEntry(root, position)));
             order.Add(root);
-            position = context.Centres[root];
+            position = context.Centers[root];
         }
         var placed = new HashSet<int>();
         foreach (var part in order)
@@ -95,6 +95,6 @@ internal static class CuttingNestedOrder
         }
         return order.ToArray();
 
-        int[] Flat() => CuttingPartOrder.Plan(parts, context.Centres, start, context.Prerequisites, context.Token, endpoint);
+        int[] Flat() => CuttingPartOrder.Plan(parts, context.Centers, start, context.Prerequisites, context.Token, endpoint);
     }
 }

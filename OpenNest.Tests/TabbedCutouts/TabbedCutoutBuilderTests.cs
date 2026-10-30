@@ -55,7 +55,7 @@ public class TabbedCutoutBuilderTests
         Assert.All(layout.Tabs, tab => Assert.Equal(W, tab.Sum(e => e.Length), 9));
         Assert.All(layout.Tabs.SelectMany(t => t), e => Assert.Same(SpecialLayers.Tab, e.Layer));
         Assert.All(layout.Pieces.SelectMany(p => p), e => Assert.NotSame(SpecialLayers.Tab, e.Layer));
-        // The first tab is centred on the bottom edge's midpoint, the second on the top edge's.
+        // The first tab is centerd on the bottom edge's midpoint, the second on the top edge's.
         Assert.Equal(new Vector(5 + W / 2, 3), Start(layout.Pieces[0][0]));
         Assert.Equal(new Vector(5 + W / 2, 7), End(layout.Pieces[0][^1]));
         // Each tab follows its piece, so pieces and tabs close the hole exactly.

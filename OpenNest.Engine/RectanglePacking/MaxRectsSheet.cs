@@ -73,7 +73,7 @@ internal sealed class MaxRectsSheet
         foreach (var f in free)
         {
             // Clamp only at the bin's allowed plate boundaries. Internal free edges still
-            // use Eps, and real sizes are retained there to preserve neighbour spacing.
+            // use Eps, and real sizes are retained there to preserve neighbor spacing.
             var packW = w > f.W && w <= f.W + rightSlack && System.Math.Abs(f.Right - Width) <= Eps
                 ? f.W : w;
             var packH = h > f.H && h <= f.H + topSlack && System.Math.Abs(f.Top - Height) <= Eps

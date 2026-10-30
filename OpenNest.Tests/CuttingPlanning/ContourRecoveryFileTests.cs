@@ -62,9 +62,9 @@ public class ContourRecoveryFileTests
         }
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        var cancelled = CuttingPlanBatch.Capture(plates, parameters, false).Plan(token: cancellation.Token);
-        Assert.True(cancelled.IsCancelled);
-        Assert.False(cancelled.CanApplyWithWarnings);
+        var canceled = CuttingPlanBatch.Capture(plates, parameters, false).Plan(token: cancellation.Token);
+        Assert.True(canceled.IsCanceled);
+        Assert.False(canceled.CanApplyWithWarnings);
         Assert.Equal(parts, plates.SelectMany(p => p.Parts));
         Assert.Equal(programs, parts.Select(p => ExplicitContourTests.Fingerprint(p.Program)));
         Assert.Equal(poses, parts.Select(p => (p.Location, p.Rotation, p.LeadInsLocked)));

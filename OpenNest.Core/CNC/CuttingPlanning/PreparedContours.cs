@@ -180,7 +180,7 @@ public sealed class PreparedContours
     /// <summary>False when the outside is a display perimeter that is never cut: all contours are holes.</summary>
     public bool HasCutPerimeter => hasCutPerimeter;
 
-    /// <summary>Resolved pins this preparation could not honour: a tab on an internal contour.</summary>
+    /// <summary>Resolved pins this preparation could not honor: a tab on an internal contour.</summary>
     public IReadOnlyList<CutPinResolution> RejectedPins { get; } = Array.Empty<CutPinResolution>();
 
     /// <summary>True when a drawing pin fixes this contour's entry, leads and tab.</summary>
@@ -512,7 +512,7 @@ public sealed class PreparedContours
     }
 
     /// <summary>
-    /// The uncapped preferred automatic start catalogue for one contour, in preference then
+    /// The uncapped preferred automatic start catalog for one contour, in preference then
     /// contour-travel order: convex corners of the contour's own winding, then straight-edge
     /// midpoints, then tangent line/arc joints. Reflex and cusp vertices, collinear
     /// line/line splits, circles and interior points never appear; each geometric point is
@@ -528,12 +528,12 @@ public sealed class PreparedContours
         if (pinned[contourOrdinal] is { } pin)
             return new[] { new ContourEntryCandidate(pin, AutomaticEntryKind.Pinned) };
         if (IsSingleCircle(shape))
-            throw new ArgumentException("Circles have no preferred corners or joints; use the fallback catalogue.");
+            throw new ArgumentException("Circles have no preferred corners or joints; use the fallback catalog.");
         return SupportFiltered(contourOrdinal, PreferredCandidates(shape, contourOrdinal, token), SupportEntries.Steadying);
     }
 
     /// <summary>
-    /// The complete uncapped automatic start catalogue: the preferred points of
+    /// The complete uncapped automatic start catalog: the preferred points of
     /// <see cref="AutomaticEntryCandidates"/> followed by tier-3 fallbacks — native arc
     /// midpoints, near-convex-corner points on straight edges, the eight compass points of a
     /// whole circle, and the exact target-facing closest point toward
@@ -541,7 +541,7 @@ public sealed class PreparedContours
     /// A pure-circle contour therefore yields compass points instead of refusing. Every
     /// fallback passes the same reflex/cusp exclusion and geometric duplicate merge as the
     /// preferred tier; fallbacks never replace a preferred point at the same geometry. A
-    /// pinned contour's catalogue is its pinned entry alone: nothing may relocate it.
+    /// pinned contour's catalog is its pinned entry alone: nothing may relocate it.
     /// </summary>
     internal IReadOnlyList<ContourEntryCandidate> AutomaticEntryCandidatesWithFallbacks(
         int contourOrdinal,
@@ -562,7 +562,7 @@ public sealed class PreparedContours
 
     /// <summary>
     /// Whether this preparation tabs its perimeter for support (see <see cref="WithSupportTab"/>):
-    /// its automatic catalogue then keeps to steadying points unless asked for a fallback.
+    /// its automatic catalog then keeps to steadying points unless asked for a fallback.
     /// </summary>
     internal bool HasSupportTab => support != null && !IsPinned(PerimeterOrdinal);
 
@@ -603,7 +603,7 @@ public sealed class PreparedContours
 
     /// <summary>Preferred tier: convex corners, straight midpoints, tangent joints.</summary>
     private List<ContourEntryCandidate> PreferredCandidates(Shape shape, int contourOrdinal, CancellationToken token)
-        => CataloguePoints(shape, token)
+        => CatalogPoints(shape, token)
             .Select(p => new ContourEntryCandidate(Entry(contourOrdinal, p.EntityOrdinal, p.Point), p.Kind, p.CornerReach))
             .ToList();
 
@@ -649,7 +649,7 @@ public sealed class PreparedContours
         // endpoint and so never lands on the reflex/cusp vertex at the far end.
         if (lead > 0 && !(count == 1 && shape.Entities[0] is Circle))
         {
-            foreach (var corner in CataloguePoints(shape, token)
+            foreach (var corner in CatalogPoints(shape, token)
                          .Where(p => p.Kind == AutomaticEntryKind.ConvexCorner))
             {
                 token.ThrowIfCancellationRequested();
@@ -763,13 +763,13 @@ public sealed class PreparedContours
         };
 
     /// <summary>
-    /// The preferred catalogue points for one contour: for each entity, its convex corner
+    /// The preferred catalog points for one contour: for each entity, its convex corner
     /// (end vertex, classified from the contour's own winding) and its straight-edge midpoint,
     /// plus tangent line/arc joints. The joints of a corner fillet (see <see cref="FilletReach"/>)
     /// are that corner's convex corners. Reflex, cusp and collinear-split vertices contribute
     /// nothing; a single whole circle yields no points at all.
     /// </summary>
-    private List<(int EntityOrdinal, Vector Point, AutomaticEntryKind Kind, double CornerReach)> CataloguePoints(
+    private List<(int EntityOrdinal, Vector Point, AutomaticEntryKind Kind, double CornerReach)> CatalogPoints(
         Shape shape, CancellationToken token)
     {
         var found = new List<(int, Vector, AutomaticEntryKind, double)>();
@@ -787,7 +787,7 @@ public sealed class PreparedContours
             token.ThrowIfCancellationRequested();
             var entity = shape.Entities[i];
 
-            // Vertex reached by travelling along entity i (its end point), reported under
+            // Vertex reached by traveling along entity i (its end point), reported under
             // entity i. The closed contour guarantees every vertex appears exactly once
             // this way; each is classified from the contour's own winding.
             var vertex = End(entity);
@@ -965,20 +965,20 @@ public sealed class PreparedContours
         ? throw new ArgumentException("Foreign contour ordinal.") : shapes[ordinal];
 
     /// <summary>
-    /// Representative POINTS per contour ordinal (bounding-box centre) for hole routing
+    /// Representative POINTS per contour ordinal (bounding-box center) for hole routing
     /// only — the S10 <c>CuttingHoleOrder</c> proxy. The perimeter has no entry; it is the
     /// route's fixed endpoint, not a stop. These are ordering proxies, never cut points.
     /// </summary>
-    internal IReadOnlyList<Vector?> HoleCentres(CancellationToken token = default)
+    internal IReadOnlyList<Vector?> HoleCenters(CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
-        var centres = new Vector?[Count];
+        var centers = new Vector?[Count];
         for (var contour = 0; contour < PerimeterOrdinal; contour++)
         {
             token.ThrowIfCancellationRequested();
-            centres[contour] = GetShape(contour).BoundingBox.Center;
+            centers[contour] = GetShape(contour).BoundingBox.Center;
         }
-        return centres;
+        return centers;
     }
 
     /// <summary>The bounding box of contour <paramref name="contourOrdinal"/>, local. A routing hint only.</summary>
@@ -1000,7 +1000,7 @@ public sealed class PreparedContours
     /// which treat a point within <see cref="OpenNest.Math.Tolerance.Epsilon"/> of an endpoint as that endpoint and
     /// start the contour there. An entry that close to a vertex is that vertex, so the lead-in ends
     /// where the contour starts: otherwise the span between them (5e-8 in on imported arcs whose
-    /// stored centre sits beside the chord's midpoint) is never cut.
+    /// stored center sits beside the chord's midpoint) is never cut.
     /// </summary>
     private static Vector SnapToVertex(Shape shape, int entityOrdinal, Vector point)
     {

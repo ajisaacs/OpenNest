@@ -39,7 +39,7 @@ class SketchIndex:
         self._aspects = None
 
     def size_mask(self, size, tolerance):
-        """Drawings whose extents match size (either orientation, inches or millimetres)."""
+        """Drawings whose extents match size (either orientation, inches or millimeters)."""
         want = np.sort(np.array(size, dtype=np.float64))
         have = np.sort(np.array([[it["width"], it["height"]] for it in self.items]), axis=1)
         ok = np.zeros(len(self.items), bool)

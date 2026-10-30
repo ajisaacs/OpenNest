@@ -11,7 +11,7 @@ namespace OpenNest.Controls
     /// <summary>
     /// Sectioned settings editor for a post-processor config described by
     /// <see cref="PostSettingsLayout"/>. Edits are held in the controls and
-    /// written to the config only by <see cref="TryApply"/>, so cancelling
+    /// written to the config only by <see cref="TryApply"/>, so canceling
     /// leaves the config untouched.
     /// </summary>
     public sealed class PostSettingsEditor : UserControl

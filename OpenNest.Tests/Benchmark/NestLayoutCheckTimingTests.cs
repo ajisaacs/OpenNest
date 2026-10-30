@@ -27,7 +27,7 @@ public class NestLayoutCheckTimingTests
         var job = new NestJob(new[] { part }, new[] { stock });
         var builder = new NestJobResultBuilder(job);
         // Dense bounding-box candidates exercise the pair gate; both overlapping and
-        // disjoint diagonal neighbours occur. Violations are deliberate and compared.
+        // disjoint diagonal neighbors occur. Violations are deliberate and compared.
         builder.AddSheet(stock, Enumerable.Range(0, count)
             .Select(i => (part.Id, 2 + (i % 10) * 1.5, 2 + (i / 10) * 1.5, 0.0)));
         var result = builder.Build(NestJobStopReason.Completed);

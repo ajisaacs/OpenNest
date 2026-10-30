@@ -184,7 +184,7 @@ public class IrregularClampZoneTests
     }
 
     [Fact]
-    public void CancelledClampPackingDoesNotReturnAnEmptySuccess()
+    public void CanceledClampPackingDoesNotReturnAnEmptySuccess()
     {
         var stock = Stock("sheet", 4, 5, clampZones: [new("rail", new Box(0, 0, 5, 1))]);
         var job = Job([Rectangle("part", 2, 2, 1)], [stock]);

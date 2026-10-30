@@ -45,7 +45,7 @@ namespace OpenNest.Actions
         // step, while Backspace or Ctrl+Z inside it still take back one line at a time.
         private ChangeScope change;
 
-        // Starting the tool again builds the new one before this one is cancelled and
+        // Starting the tool again builds the new one before this one is canceled and
         // disconnected, so this one must leave the view's muting to its successor.
         private bool OwnsView => ReferenceEquals(plateView.MutedParts, muted);
 

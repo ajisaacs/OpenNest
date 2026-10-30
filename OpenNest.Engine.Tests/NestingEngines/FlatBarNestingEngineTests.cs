@@ -54,7 +54,7 @@ public class FlatBarNestingEngineTests
     public void MitredEndsInterlockByTurningAlternateParts()
     {
         // 45-degree mitres: a 23-long box, but turned copies nest 20 apart. Five fit on a
-        // 105 bar only when every other part is turned and slid into its neighbour.
+        // 105 bar only when every other part is turned and slid into its neighbor.
         var trapezoid = Part("mitre", Polyline((0, 0), (23, 0), (20, 3), (3, 3)), 5, RotationPolicy.Automatic);
         var job = Job([trapezoid], [Stock("bar", 3, 105, spacing: 0.25)]);
 

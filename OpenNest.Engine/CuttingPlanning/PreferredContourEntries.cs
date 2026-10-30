@@ -36,7 +36,7 @@ internal static class PreferredContourEntries
     /// Resolves one preferred entry per hole on <paramref name="holeRoute"/> (cut order,
     /// from <see cref="CuttingHoleOrder"/>), ending at <paramref name="perimeterChoice"/>.
     /// Arrival proxies avoid circularity: the actual (local) part arrival for the first
-    /// hole, otherwise the previous hole's centre. Facing target (the downstream actual
+    /// hole, otherwise the previous hole's center. Facing target (the downstream actual
     /// pierce) and tier still rank first. <paramref name="evaluate"/> is the S07 adapter
     /// verdict; candidates it refuses or leaves uncertain are not preferred.
     /// </summary>
@@ -44,7 +44,7 @@ internal static class PreferredContourEntries
         PreparedContours prepared,
         ContourChoice perimeterChoice,
         IReadOnlyList<int> holeRoute,
-        IReadOnlyList<Vector> centresByOrdinal,
+        IReadOnlyList<Vector> centersByOrdinal,
         Vector arrival,
         Func<ContourEntryCandidate, ContourFeasibilityVerdict> evaluate,
         CancellationToken token = default)
@@ -53,8 +53,8 @@ internal static class PreferredContourEntries
             throw new ArgumentException("Prepared contours are required.", nameof(prepared));
         if (perimeterChoice == null || !ReferenceEquals(perimeterChoice.Owner, prepared))
             throw new ArgumentException("The perimeter choice must belong to this preparation.", nameof(perimeterChoice));
-        if (holeRoute == null || centresByOrdinal == null || evaluate == null)
-            throw new ArgumentException("Hole route, centres and evaluation are required.");
+        if (holeRoute == null || centersByOrdinal == null || evaluate == null)
+            throw new ArgumentException("Hole route, centers and evaluation are required.");
         token.ThrowIfCancellationRequested();
         if (holeRoute.Count == 0)
             return new(Array.Empty<ContourChoice>(), ContourSelectionShortfall.Exhausted, null, null);
@@ -67,11 +67,11 @@ internal static class PreferredContourEntries
         {
             token.ThrowIfCancellationRequested();
             var contour = holeRoute[index];
-            var arrivalProxy = index == 0 ? arrival : centresByOrdinal[holeRoute[index - 1]];
-            // The S04 merged catalogue: preferred kinds when present, fallback kinds
+            var arrivalProxy = index == 0 ? arrival : centersByOrdinal[holeRoute[index - 1]];
+            // The S04 merged catalog: preferred kinds when present, fallback kinds
             // (compass points, arc midpoints, ...) otherwise — pure circles included.
-            var catalogue = prepared.AutomaticEntryCandidatesWithFallbacks(contour, target, token);
-            var ranked = catalogue.RankTowardNextCut(target, arrivalProxy).DepartingClear(prepared, target, token);
+            var catalog = prepared.AutomaticEntryCandidatesWithFallbacks(contour, target, token);
+            var ranked = catalog.RankTowardNextCut(target, arrivalProxy).DepartingClear(prepared, target, token);
             var selection = ContourEntrySelection.Select(ranked, evaluate, 1, token);
             if (selection.Choices.Count == 0
                 && selection.Shortfall is ContourSelectionShortfall.Exhausted or ContourSelectionShortfall.Incomplete)

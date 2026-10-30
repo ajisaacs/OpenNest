@@ -94,14 +94,14 @@ public class CuttingPlanMessageTests
         Assert.Same(program, part.Program);
     }
     [Fact]
-    public void Describe_LockedLeadHitsNeighbour_WarnsWithAdviceAndNeedsAcceptance()
+    public void Describe_LockedLeadHitsNeighbor_WarnsWithAdviceAndNeedsAcceptance()
     {
         var settings = ExplicitContourTests.Parameters();
         var clean = LeadPathValidationTests.Rectangle(0, 0, 10, 10);
         var prepared = PreparedContours.Capture(clean, settings);
         var part = new Part(new Drawing("lead blocked", clean));
         Assert.True(part.RestoreLeadInProgram(prepared.Emit([prepared.ClosestEntry(0, new Vector(-1, 5))]), true));
-        var obstacle = new Part(new Drawing("neighbour", LeadPathValidationTests.Rectangle(-0.3, 4.5, -0.1, 5.5)));
+        var obstacle = new Part(new Drawing("neighbor", LeadPathValidationTests.Rectangle(-0.3, 4.5, -0.1, 5.5)));
         var plate = new Nest().CreatePlate();
         plate.Parts.Add(part);
         plate.Parts.Add(obstacle);
@@ -117,7 +117,7 @@ public class CuttingPlanMessageTests
         Assert.Contains("Plate 1: unverified: fixed lead-ins need review.", text);
         Assert.Contains("- Part 1 (lead blocked): Locked lead on cutting contour 1 contacts or enters another "
             + "part's material. The locked program is kept as given. Increase spacing, or edit or unlock "
-            + "this part's lead-ins and replan. (with part 2 (neighbour))", text);
+            + "this part's lead-ins and replan. (with part 2 (neighbor))", text);
         Assert.DoesNotContain("other than None", text);
         Assert.Equal(CuttingCommitStatus.InvalidInput, proposal.Apply().Status);
         Assert.True(ProgramContent.Equal(original, part.Program));
@@ -171,7 +171,7 @@ public class CuttingPlanMessageTests
 
     [Theory]
     [InlineData(CuttingPlanStatus.UnsupportedGeometry)]
-    [InlineData(CuttingPlanStatus.Cancelled)]
+    [InlineData(CuttingPlanStatus.Canceled)]
     public void Describe_KeptOrderRefusalAMoreEffortCannotFix_OmitsTheSearchLimitHint(CuttingPlanStatus status)
     {
         var attempt = new CuttingPlanResult(CuttingPlanStatus.NoSolutionWithinBudget);

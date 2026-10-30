@@ -10,16 +10,16 @@ namespace OpenNest.Engine.CuttingPlanning;
 /// <summary>
 /// Proposes a serpentine whole-part order for large plates whose parts sit in aligned rows and
 /// columns: each row in turn, alternating direction, starting from the corner nearest the tool.
-/// Part centres are binned into rows by Y and columns by X within a quarter of the smallest part
-/// extent; a plate is a grid when every gap between neighbouring rows and columns is wider than
+/// Part centers are binned into rows by Y and columns by X within a quarter of the smallest part
+/// extent; a plate is a grid when every gap between neighboring rows and columns is wider than
 /// that, no two parts share a cell and the cells are at least a quarter occupied (interleaved
 /// rows fill half). Rows run along whichever axis gives the shorter route. It replaces the
-/// travelling-salesman improvement, whose passes grow with the square of the part count, and,
+/// traveling-salesman improvement, whose passes grow with the square of the part count, and,
 /// like that order, is only a proposal: the forward search still checks every rapid and lead.
 /// </summary>
 internal static class CuttingGridOrder
 {
-    /// <summary>Smaller plates keep the travelling-salesman order, which is fast enough there.</summary>
+    /// <summary>Smaller plates keep the traveling-salesman order, which is fast enough there.</summary>
     internal const int MinimumParts = 200;
 
     /// <summary>The bin tolerance as a fraction of the smallest part extent on that axis.</summary>
@@ -36,10 +36,10 @@ internal static class CuttingGridOrder
         var count = extents.Count;
         if (count < MinimumParts)
             return null;
-        var centres = extents.Select(box => box.Center).ToArray();
-        var rows = Bins(centres.Select(c => c.Y).ToArray(),
+        var centers = extents.Select(box => box.Center).ToArray();
+        var rows = Bins(centers.Select(c => c.Y).ToArray(),
             BinFraction * extents.Min(box => box.Top - box.Bottom), token);
-        var columns = Bins(centres.Select(c => c.X).ToArray(),
+        var columns = Bins(centers.Select(c => c.X).ToArray(),
             BinFraction * extents.Min(box => box.Right - box.Left), token);
         if (rows == null || columns == null)
             return null;
@@ -60,7 +60,7 @@ internal static class CuttingGridOrder
                 foreach (var reverseFirst in new[] { false, true })
                 {
                     var order = Serpentine(lines, along, reverseLines, reverseFirst);
-                    var length = Length(order, centres, start);
+                    var length = Length(order, centers, start);
                     if (length < bestLength)
                     {
                         best = order;
@@ -116,11 +116,11 @@ internal static class CuttingGridOrder
         return order.ToArray();
     }
 
-    private static double Length(int[] order, Vector[] centres, Vector start)
+    private static double Length(int[] order, Vector[] centers, Vector start)
     {
-        var length = start.DistanceTo(centres[order[0]]);
+        var length = start.DistanceTo(centers[order[0]]);
         for (var i = 1; i < order.Length; i++)
-            length += centres[order[i - 1]].DistanceTo(centres[order[i]]);
+            length += centers[order[i - 1]].DistanceTo(centers[order[i]]);
         return length;
     }
 }

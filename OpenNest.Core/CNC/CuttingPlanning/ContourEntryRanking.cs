@@ -7,7 +7,7 @@ using OpenNest.Geometry;
 namespace OpenNest.CNC.CuttingPlanning;
 
 /// <summary>
-/// Pure deterministic ordering of the automatic entry catalogue toward the next cut:
+/// Pure deterministic ordering of the automatic entry catalog toward the next cut:
 /// circles rank by outgoing distance; other contours use facing sides, tier and travel,
 /// then a stable geometric key. It adds no
 /// candidates, mutates nothing, runs no lead checks and applies no cap — feasibility
@@ -62,12 +62,12 @@ internal static class ContourEntryRanking
             if (p.Y > maxY) maxY = p.Y;
         }
 
-        // Facing sides from the target relative to the centre, matching the source plan:
-        // horizontal right when the target is right of centre else left; vertical likewise.
-        var centreX = minX + (maxX - minX) * 0.5;
-        var centreY = minY + (maxY - minY) * 0.5;
-        var facingRight = target != null && target.Value.X > centreX;
-        var facingTop = target != null && target.Value.Y > centreY;
+        // Facing sides from the target relative to the center, matching the source plan:
+        // horizontal right when the target is right of center else left; vertical likewise.
+        var centerX = minX + (maxX - minX) * 0.5;
+        var centerY = minY + (maxY - minY) * 0.5;
+        var facingRight = target != null && target.Value.X > centerX;
+        var facingTop = target != null && target.Value.Y > centerY;
 
         return candidates
             .Select(c => (Candidate: c, Score: Score(c, minX, minY, maxX, maxY, facingRight, facingTop, target, arrival)))

@@ -295,7 +295,7 @@ public enum CuttingPlanStatus
     UnsupportedGeometry,
     InvalidInput,
     NoSolutionWithinBudget,
-    Cancelled,
+    Canceled,
     /// <summary>Usable owned programs, but geometric safety checks did not pass. Never Ready.</summary>
     BestEffort
 }

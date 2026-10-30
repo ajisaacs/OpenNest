@@ -26,7 +26,7 @@ internal static class NestJobPlacementValidator
             throw new InvalidOperationException("The plate nester returned a null candidate.");
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         var placed = new List<ShapeTopology>();
-        // Spacing outlines per placement, prepared only once a neighbour comes near.
+        // Spacing outlines per placement, prepared only once a neighbor comes near.
         var poses = new List<(JobPartGeometry Geometry, NestJobPlacement Pose)>();
         var spaced = new List<NestLayoutCheck.PreparedPlacement>();
         var geometries = new Dictionary<string, JobPartGeometry>(StringComparer.Ordinal);

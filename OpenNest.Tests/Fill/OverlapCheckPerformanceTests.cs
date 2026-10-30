@@ -68,7 +68,7 @@ public class OverlapCheckPerformanceTests
         output.WriteLine(
             $"overlap-check: area=(3.1,5.3,96,48), spacing=0.5, Horizontal. grid-single = FillLinear.Fill(arc fixture, 0.37) "
             + $"({arcGrid.Count} parts, one shared Program); grid-pair = FillLinear.Fill(BuildRotatedPattern(concave 0/PI pair, 0.37)) "
-            + $"({pairGrid.Count} parts); polygon-pairs = Collision.HasOverlap over the {pairs.Length} box-overlapping neighbour "
+            + $"({pairGrid.Count} parts); polygon-pairs = Collision.HasOverlap over the {pairs.Length} box-overlapping neighbor "
             + "pairs of both grids (timed per full sweep), each polygon prepared once up front with Part.Intersects' recipe "
             + "(material entities, chord 0.001, world offset); Part.Intersects itself prepares per call. All verdicts clear. "
             + $"warmup=2 x {warmupCalls} calls/mode; measured={repetitions} x {callsPerBatch}; mode order rotates per batch. "

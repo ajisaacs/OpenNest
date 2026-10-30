@@ -10,10 +10,10 @@ public class CircleNextCutTests
     private static Program WithHoles()
     {
         var program = LeadPathValidationTests.Rectangle(0, 0, 16, 12);
-        foreach (var centre in new[] { new Vector(3, 3), new Vector(9, 4), new Vector(11, 8) })
+        foreach (var center in new[] { new Vector(3, 3), new Vector(9, 4), new Vector(11, 8) })
         {
-            program.MoveTo(centre.X + 1, centre.Y);
-            program.ArcTo(centre.X + 1, centre.Y, centre.X, centre.Y, RotationType.CCW);
+            program.MoveTo(center.X + 1, center.Y);
+            program.ArcTo(center.X + 1, center.Y, center.X, center.Y, RotationType.CCW);
         }
         return program;
     }
@@ -27,14 +27,14 @@ public class CircleNextCutTests
     {
         var prepared = PreparedContours.Capture(WithHoles(), HoleLookAheadTests.Parameters());
         var target = new Vector(x, y);
-        var catalogue = prepared.AutomaticEntryCandidatesWithFallbacks(0, target);
-        var ranked = catalogue.RankTowardNextCut(target, new Vector(-4, -3));
+        var catalog = prepared.AutomaticEntryCandidatesWithFallbacks(0, target);
+        var ranked = catalog.RankTowardNextCut(target, new Vector(-4, -3));
         var expected = prepared.ClosestEntry(0, target).Point;
 
         Assert.True(ranked[0].Choice.Point.DistanceTo(expected) < 1e-8,
             $"Expected next-facing {expected}, got {ranked[0].Choice.Point}");
-        Assert.Equal(catalogue.Count, ranked.Count);
-        Assert.All(catalogue, candidate => Assert.Contains(candidate, ranked));
+        Assert.Equal(catalog.Count, ranked.Count);
+        Assert.All(catalog, candidate => Assert.Contains(candidate, ranked));
         for (var angle = 0; angle < 8; angle++)
         {
             var point = new Vector(3, 3) + new Vector(System.Math.Cos(angle * System.Math.PI / 4),
@@ -48,8 +48,8 @@ public class CircleNextCutTests
     {
         var prepared = PreparedContours.Capture(WithHoles(), HoleLookAheadTests.Parameters());
         var target = new Vector(13, 4);
-        var catalogue = prepared.AutomaticEntryCandidatesWithFallbacks(0, target);
-        var ranked = catalogue.RankTowardNextCut(target, new Vector(-4, -3));
+        var catalog = prepared.AutomaticEntryCandidatesWithFallbacks(0, target);
+        var ranked = catalog.RankTowardNextCut(target, new Vector(-4, -3));
         var exact = prepared.ClosestEntry(0, target).Point;
         var material = LeadMaterialSnapshot.Capture(WithHoles(), Vector.Zero);
         var feasibility = new ContourEntryFeasibility(prepared, Vector.Zero, material, []);
@@ -88,10 +88,10 @@ public class CircleNextCutTests
         Assert.True(result.IndependentlyReplayed);
         var proposed = result.ProposedOrder[0];
         var runs = HoleLookAheadTests.CutRuns(proposed.Execution);
-        var centres = new[] { new Vector(3, 3), new Vector(9, 4), new Vector(11, 8) };
+        var centers = new[] { new Vector(3, 3), new Vector(9, 4), new Vector(11, 8) };
         for (var i = 0; i < 3; i++)
         {
-            var radial = runs[i].End - centres[proposed.ContourChoices[i].ContourOrdinal];
+            var radial = runs[i].End - centers[proposed.ContourChoices[i].ContourOrdinal];
             var steps = System.Math.Atan2(radial.Y, radial.X) * 180 / System.Math.PI / increment;
             Assert.True(System.Math.Abs(steps - System.Math.Round(steps)) < 1e-8);
         }

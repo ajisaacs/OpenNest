@@ -57,7 +57,7 @@ public class CIFiberSampleRegressionTests
             // OpenNest's own short perpendicular linear leads; circles take the
             // internal lead. TF5200 13.2.4.1 requires a LINEAR
             // first motion block after G41/G42, so holes must have linear
-            // leads. (The sample itself pierces holes at their centre and
+            // leads. (The sample itself pierces holes at their center and
             // uses 0.125 in perimeter leads; see the saved-lead-in test.)
             InternalLeadIn = new LineLeadIn { Length = 0.075, ApproachAngle = 90 },
             ExternalLeadIn = new LineLeadIn { Length = 0.075, ApproachAngle = 90 },

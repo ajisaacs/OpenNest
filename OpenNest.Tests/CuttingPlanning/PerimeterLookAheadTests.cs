@@ -81,7 +81,7 @@ public class PerimeterLookAheadTests
 
         var first = result.ProposedOrder[0];
         var entry = Assert.Single(first.ContourChoices).Point + first.Location;
-        // Facing the next part (centre 15.5, 5) means the +X side of the first sheet,
+        // Facing the next part (center 15.5, 5) means the +X side of the first sheet,
         // not the legacy arrival-nearest lower-left corner.
         Assert.True(entry.X >= 10.0 - 1e-9, $"first entry {entry} faces away from the next part");
     }
@@ -90,7 +90,7 @@ public class PerimeterLookAheadTests
     public void ManyVertices_FacingCornerSurvivesBeyondTheDrawingOrderEntryCap()
     {
         // Start at the leftmost vertex and travel clockwise. The initial sixteen
-        // drawing-order catalogue entries only cover the upper-left part of the ring;
+        // drawing-order catalog entries only cover the upper-left part of the ring;
         // the useful lower-right corner appears later and must survive until ranking.
         var source = new Program();
         var vertices = Enumerable.Range(0, 32).Select(i =>
@@ -142,7 +142,7 @@ public class PerimeterLookAheadTests
         Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
         var ordered = result.ProposedOrder.OrderBy(p => p.SourceOrdinal).ToArray();
         var secondEntry = Assert.Single(ordered[1].ContourChoices).Point + ordered[1].Location;
-        // Facing the third part (centre 26.0, 5): +X side of the middle sheet.
+        // Facing the third part (center 26.0, 5): +X side of the middle sheet.
         Assert.True(secondEntry.X >= 10.5 + 10.0 - 1e-9, $"second entry {secondEntry} faces away from the third part");
         // Last part: no target — its entry is chosen near the arrival point, never pulled
         // toward the plate origin.
@@ -238,7 +238,7 @@ public class PerimeterLookAheadTests
     public void NoCandidateFits_SurfacesContourFindingNotBudget()
     {
         // Shrink-wrap material 0.05 around part 1: every external lead enters it, so the
-        // finite candidate catalogue PROVES no lead-in fits; the search must say that, not
+        // finite candidate catalog PROVES no lead-in fits; the search must say that, not
         // hide behind the expansion budget.
         var parameters = Parameters();
         var wrap = new Part(new Drawing("wrap", LeadPathValidationTests.Rectangle(-0.05, -0.05, 10.05, 10.05)),
@@ -272,7 +272,7 @@ public class PerimeterLookAheadTests
     }
 
     [Fact]
-    public void CancellationIsHonouredMidSearch()
+    public void CancellationIsHonoredMidSearch()
     {
         var parameters = Parameters();
         var parts = Enumerable.Range(0, 6).Select(i => Square(i * 10.5, parameters)).ToArray();
@@ -281,7 +281,7 @@ public class PerimeterLookAheadTests
 
         var result = CuttingPlanService.Plan(Request(parts, parameters), cancel.Token);
 
-        Assert.Equal(CuttingPlanStatus.Cancelled, result.Status);
+        Assert.Equal(CuttingPlanStatus.Canceled, result.Status);
     }
 
     [Fact]
@@ -318,7 +318,7 @@ public class PerimeterLookAheadTests
         var first = result.ProposedOrder[0];
         Assert.Equal(0, first.SourceOrdinal);
         var entry = first.ContourChoices.Single().Point + first.Location;
-        // Facing the next part (centre 15.5, 5) means the -X side of the x=21 sheet.
+        // Facing the next part (center 15.5, 5) means the -X side of the x=21 sheet.
         Assert.True(entry.X <= 21.0 + 1e-9, $"first entry {entry} faces away from the next part");
 
         // Last part (x=0..10): no target — arrival-nearest means its +X side (the tool
@@ -348,19 +348,19 @@ public class PerimeterLookAheadTests
         for (var i = 0; i < sequence.Length - 1; i++)
         {
             var entry = result.ProposedOrder[i].ContourChoices.Single().Point + result.ProposedOrder[i].Location;
-            var nextCentre = Centre(result.ProposedOrder[i + 1]);
+            var nextCenter = Center(result.ProposedOrder[i + 1]);
             var here = result.ProposedOrder[i].Location;
             // The opposite side of the current sheet from the next part: the facing check
-            // is "entry is closer to the next centre than the wrong-side point is".
-            var wrongSide = nextCentre.X >= here.X + 5
+            // is "entry is closer to the next center than the wrong-side point is".
+            var wrongSide = nextCenter.X >= here.X + 5
                 ? new Vector(here.X - 5, here.Y + 5)
                 : new Vector(here.X + 15, here.Y + 5);
-            Assert.True(entry.DistanceTo(nextCentre) < wrongSide.DistanceTo(nextCentre),
-                $"order slot {i} entry {entry} faces away from next centre {nextCentre}");
+            Assert.True(entry.DistanceTo(nextCenter) < wrongSide.DistanceTo(nextCenter),
+                $"order slot {i} entry {entry} faces away from next center {nextCenter}");
         }
     }
 
-    private static Vector Centre(FixedProgramPlacement placement)
+    private static Vector Center(FixedProgramPlacement placement)
     {
         var cuts = placement.Execution.Motions
             .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display && m.Curve != null)

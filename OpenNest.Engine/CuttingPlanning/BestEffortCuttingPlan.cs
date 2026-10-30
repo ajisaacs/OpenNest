@@ -46,10 +46,10 @@ internal static class BestEffortCuttingPlan
                     var choices = new List<ContourChoice>();
                     var approach = position - source.Location;
                     // Source order is not a route: tour the holes from the arrival (the same
-                    // nearest-neighbour + 2-opt proposal the search uses) so the rapids between
+                    // nearest-neighbor + 2-opt proposal the search uses) so the rapids between
                     // them do not double back across each other. The perimeter is still last.
                     var holes = Enumerable.Range(0, prepared.PerimeterOrdinal).ToArray();
-                    var route = CuttingHoleOrder.Plan(holes, CuttingHoleOrder.Centres(prepared, approach, token),
+                    var route = CuttingHoleOrder.Plan(holes, CuttingHoleOrder.Centers(prepared, approach, token),
                         approach, null, token);
                     foreach (var contour in prepared.HasCutPerimeter ? route.Append(prepared.PerimeterOrdinal) : route)
                     {
@@ -92,7 +92,7 @@ internal static class BestEffortCuttingPlan
         }
         catch (OperationCanceledException)
         {
-            return new(CuttingPlanStatus.Cancelled);
+            return new(CuttingPlanStatus.Canceled);
         }
         catch (Exception exception) when (exception is ArgumentException or NotSupportedException
             or InvalidOperationException or ArithmeticException)

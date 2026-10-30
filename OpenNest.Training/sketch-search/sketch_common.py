@@ -1,7 +1,7 @@
 """Shared geometry reading, image normalization and embedding for sketch search.
 
 Drawings and sketches go through the same normalize() so the model compares like
-with like: ink is reduced to 1px centre lines, cropped, scaled to fit a square
+with like: ink is reduced to 1px center lines, cropped, scaled to fit a square
 canvas and re-stroked at a fixed width.
 """
 import math
@@ -191,7 +191,7 @@ def aspect(mask):
 
 
 def normalize(mask):
-    """Crops, centre-lines, scales and re-strokes an ink mask; returns a CANVAS x CANVAS RGB image."""
+    """Crops, center-lines, scales and re-strokes an ink mask; returns a CANVAS x CANVAS RGB image."""
     ys, xs = np.nonzero(mask)
     if len(xs) == 0:
         raise ValueError("No ink found.")

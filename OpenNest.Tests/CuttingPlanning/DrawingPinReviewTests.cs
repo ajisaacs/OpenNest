@@ -74,7 +74,7 @@ public class DrawingPinReviewTests
     }
 
     [Fact]
-    public void PrePost_PinnedLeadIntoNeighbour_IsReportedAgainAfterAcceptance()
+    public void PrePost_PinnedLeadIntoNeighbor_IsReportedAgainAfterAcceptance()
     {
         var nest = new Nest();
         var plate = nest.CreatePlate();
@@ -82,18 +82,18 @@ public class DrawingPinReviewTests
         drawing.CutPins.Add(new ContourCutPin(new Vector(10, 5), new LineLeadIn { Length = 1.0, ApproachAngle = 90 },
             new NoLeadOut()));
         plate.Parts.Add(new Part(drawing, Vector.Zero));
-        plate.Parts.Add(new Part(new Drawing("neighbour", LeadPathValidationTests.Rectangle(0, 0, 2, 2)), new Vector(10.3, 4)));
+        plate.Parts.Add(new Part(new Drawing("neighbor", LeadPathValidationTests.Rectangle(0, 0, 2, 2)), new Vector(10.3, 4)));
         var proposal = CuttingPlanBatch.Capture([plate], PinnedContourTests.NestSettings(), false).Plan();
         Assert.Equal(CuttingCommitStatus.Applied, proposal.Apply(acceptWarnings: true).Status);
         var pinned = plate.Parts.Single(p => p.BaseDrawing == drawing);
-        var neighbour = plate.Parts.Single(p => p.BaseDrawing != drawing);
+        var neighbor = plate.Parts.Single(p => p.BaseDrawing != drawing);
 
         var finding = Assert.Single(PostVerificationAnalyzer.Analyze(nest).Findings, f => f.Kind == PostVerificationKind.FixedLead);
 
-        Assert.Equal((plate.Parts.IndexOf(pinned) + 1, plate.Parts.IndexOf(neighbour) + 1),
+        Assert.Equal((plate.Parts.IndexOf(pinned) + 1, plate.Parts.IndexOf(neighbor) + 1),
             (finding.PartNumber!.Value, finding.OtherPartNumber!.Value));
         Assert.Equal($"Drawing pin 1 lead on cutting contour 1 contacts or enters the material of part "
-            + $"{plate.Parts.IndexOf(neighbour) + 1}. Planning kept it as given; review it before posting.", finding.Message);
+            + $"{plate.Parts.IndexOf(neighbor) + 1}. Planning kept it as given; review it before posting.", finding.Message);
     }
 
     [Fact]

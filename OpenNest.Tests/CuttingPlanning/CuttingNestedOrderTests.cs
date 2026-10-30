@@ -7,7 +7,7 @@ namespace OpenNest.Tests.CuttingPlanning;
 public class CuttingNestedOrderTests
 {
     // Host 0 with a cutout holding parts 1-4 in a row, and loose parts 5 and 6 beside the host.
-    private static readonly Vector[] Centres =
+    private static readonly Vector[] Centers =
     [
         new(50, 50), new(20, 50), new(40, 50), new(60, 50), new(80, 50), new(120, 10), new(120, 90),
     ];
@@ -15,18 +15,18 @@ public class CuttingNestedOrderTests
     [Fact]
     public void WithoutNestedParts_TheOrderIsThePlainTour()
     {
-        var parts = Enumerable.Range(0, Centres.Length).ToArray();
-        var none = Centres.Select(_ => (IReadOnlyCollection<int>)Array.Empty<int>()).ToArray();
+        var parts = Enumerable.Range(0, Centers.Length).ToArray();
+        var none = Centers.Select(_ => (IReadOnlyCollection<int>)Array.Empty<int>()).ToArray();
 
         var order = CuttingNestedOrder.Plan(parts, Vector.Zero, Context(none, none));
 
-        Assert.Equal(CuttingPartOrder.Plan(parts, Centres, Vector.Zero, none, default), order);
+        Assert.Equal(CuttingPartOrder.Plan(parts, Centers, Vector.Zero, none, default), order);
     }
 
     [Fact]
     public void InnerParts_AreCutAsOneRunEndingBesideTheHost_AfterThePartsAroundIt()
     {
-        var parts = Enumerable.Range(0, Centres.Length).ToArray();
+        var parts = Enumerable.Range(0, Centers.Length).ToArray();
         var (prerequisites, inside) = Nested();
 
         var order = CuttingNestedOrder.Plan(parts, Vector.Zero, Context(prerequisites, inside));
@@ -43,7 +43,7 @@ public class CuttingNestedOrderTests
     [Fact]
     public void LearnedRule_AcrossTheGroupStillHolds()
     {
-        var parts = Enumerable.Range(0, Centres.Length).ToArray();
+        var parts = Enumerable.Range(0, Centers.Length).ToArray();
         var (prerequisites, inside) = Nested();
         // "Cut inner part 2 before loose part 5": the host group can no longer simply go last.
         prerequisites[5] = [2];
@@ -102,8 +102,8 @@ public class CuttingNestedOrderTests
 
     private static (IReadOnlyCollection<int>[] Prerequisites, IReadOnlyCollection<int>[] Inside) Nested()
     {
-        var prerequisites = Centres.Select(_ => (IReadOnlyCollection<int>)Array.Empty<int>()).ToArray();
-        var inside = Centres.Select(_ => (IReadOnlyCollection<int>)Array.Empty<int>()).ToArray();
+        var prerequisites = Centers.Select(_ => (IReadOnlyCollection<int>)Array.Empty<int>()).ToArray();
+        var inside = Centers.Select(_ => (IReadOnlyCollection<int>)Array.Empty<int>()).ToArray();
         prerequisites[0] = [1, 2, 3, 4];
         inside[0] = [1, 2, 3, 4];
         return (prerequisites, inside);
@@ -112,6 +112,6 @@ public class CuttingNestedOrderTests
     // The host's cutout spans x 5..95 at y 50; its nearest point to a position is that position's x clamped.
     private static CuttingNestedOrder.Context Context(IReadOnlyCollection<int>[] prerequisites,
         IReadOnlyCollection<int>[] inside) =>
-        new(Centres, prerequisites, inside,
+        new(Centers, prerequisites, inside,
             (_, position) => new Vector(System.Math.Clamp(position.X, 5, 95), 50), default);
 }

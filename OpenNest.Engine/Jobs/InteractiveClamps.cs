@@ -35,7 +35,7 @@ internal static class InteractiveClamps
 
     /// <summary>
     /// Placement keep-outs inflated by the full <see cref="Plate.ClampClearance"/> - the same
-    /// convention the Rectangles lane blocks and engines honour, so fill and pack produce
+    /// convention the Rectangles lane blocks and engines honor, so fill and pack produce
     /// placements with at least that clearance from the raw zone.
     /// </summary>
     public static IReadOnlyList<Box> ClearanceRectangles(Plate plate) =>

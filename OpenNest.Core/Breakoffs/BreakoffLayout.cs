@@ -49,7 +49,7 @@ namespace OpenNest.Breakoffs
 
         /// <summary>
         /// <paramref name="center"/> for tab <paramref name="index"/> limited so the tab stays on the
-        /// joining line and keeps a gap from its neighbours.
+        /// joining line and keeps a gap from its neighbors.
         /// </summary>
         public double ClampTabCenter(int index, double center)
         {

@@ -7,13 +7,13 @@ namespace OpenNest.WinForms.Tests.Controls;
 
 /// <summary>
 /// Each segment of a cut-off is its own part of the one cut-off drawing. Its sequence label must
-/// sit on its own cut: labelled from the whole drawing, every segment stacked its number on one
+/// sit on its own cut: labeled from the whole drawing, every segment stacked its number on one
 /// point, and the view's culling decided which one showed as the user zoomed.
 /// </summary>
 public class CutOffSegmentLabelTests
 {
     [Fact]
-    public void EachSegmentIsLabelledAtTheMiddleOfItsOwnCut() => StaTestThread.Run(() =>
+    public void EachSegmentIsLabeledAtTheMiddleOfItsOwnCut() => StaTestThread.Run(() =>
     {
         using var view = new PlateView(ColorSchemeRegistry.Get("Workshop"));
         view.Matrix = new Matrix();

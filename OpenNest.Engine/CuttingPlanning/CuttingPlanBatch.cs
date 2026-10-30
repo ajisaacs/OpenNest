@@ -159,7 +159,7 @@ public sealed class CuttingPlanBatch
     /// Checks and plans every plate from its captured snapshots. Safe on a worker: live plates are
     /// not read. Overlapping material blocks a plate whatever its route. A free search that ends
     /// without a complete plan within its budget is retried with the current order; the proposal
-    /// reports that it kept the order. Incomplete geometry also gets a separately labelled,
+    /// reports that it kept the order. Incomplete geometry also gets a separately labeled,
     /// unverified fallback when supported closed contours can still be emitted.
     /// </summary>
     public CuttingPlanProposal Plan(IProgress<CuttingPlanProgress> progress = null,
@@ -177,7 +177,7 @@ public sealed class CuttingPlanBatch
             }
             catch (OperationCanceledException)
             {
-                plans[index] = new(entry.Plate, entry.Number, new(CuttingPlanStatus.Cancelled), null, null);
+                plans[index] = new(entry.Plate, entry.Number, new(CuttingPlanStatus.Canceled), null, null);
                 continue;
             }
 
@@ -237,7 +237,7 @@ public sealed class CuttingPlanBatch
         }
         catch (OperationCanceledException)
         {
-            return (new(CuttingPlanStatus.Cancelled), true);
+            return (new(CuttingPlanStatus.Canceled), true);
         }
         return best;
     }
@@ -265,7 +265,7 @@ public sealed class CuttingPlanBatch
             // A replayed proposal whose only warnings are fixed emissions passed every strict
             // check; fixed emissions never steer the search, so the full pass cannot improve it.
             if (first.IndependentlyReplayed && first.Status is CuttingPlanStatus.Ready or CuttingPlanStatus.BestEffort
-                || first.Status == CuttingPlanStatus.Cancelled)
+                || first.Status == CuttingPlanStatus.Canceled)
                 return first;
         }
         return CuttingPlanService.Plan(snapshot, token);
@@ -277,7 +277,7 @@ public sealed class CuttingPlanBatch
             return strict;
         var fallback = BestEffortCuttingPlan.Plan(entry.Fallback, token);
         if (fallback.Status != CuttingPlanStatus.BestEffort)
-            return fallback.Status == CuttingPlanStatus.Cancelled ? fallback : strict;
+            return fallback.Status == CuttingPlanStatus.Canceled ? fallback : strict;
         return new(CuttingPlanStatus.BestEffort, fallback.ProposedOrder,
             strict.Findings.Concat(fallback.Findings).Distinct(), rapidDistance: fallback.RapidDistance)
         { Snapshot = entry.Fallback };
@@ -310,7 +310,7 @@ public sealed class CuttingPlanPlateResult
     /// <summary>The free-order attempt that ran out of budget before the current order was kept; else null.</summary>
     public CuttingPlanResult ReorderAttempt { get; }
 
-    /// <summary>The clean-material overlap check (part ids are current part positions); null if cancelled first.</summary>
+    /// <summary>The clean-material overlap check (part ids are current part positions); null if canceled first.</summary>
     public PlateOverlapReport Overlap { get; }
 
     public bool KeptCurrentOrder => ReorderAttempt != null;
@@ -331,7 +331,7 @@ public sealed class CuttingPlanPlateResult
     /// </summary>
     public bool SearchLimitReached => !CanApplyWithWarnings && !IsRouteReady
         && (Result.Status == CuttingPlanStatus.NoSolutionWithinBudget || KeptCurrentOrder
-            && Result.Status is not (CuttingPlanStatus.Cancelled or CuttingPlanStatus.UnsupportedGeometry
+            && Result.Status is not (CuttingPlanStatus.Canceled or CuttingPlanStatus.UnsupportedGeometry
                 or CuttingPlanStatus.InvalidInput));
 
     /// <summary>
@@ -374,13 +374,13 @@ public sealed class CuttingPlanProposal
 
     public IReadOnlyList<CuttingPlanPlateResult> Plates { get; }
 
-    public bool IsCancelled => Plates.Any(p => p.Result.Status == CuttingPlanStatus.Cancelled);
+    public bool IsCanceled => Plates.Any(p => p.Result.Status == CuttingPlanStatus.Canceled);
 
-    public bool CanApply => Plates.Count > 0 && !IsCancelled && ownedParameters != null
+    public bool CanApply => Plates.Count > 0 && !IsCanceled && ownedParameters != null
         && Plates.All(p => p.IsReady);
 
     /// <summary>All plates have usable output, possibly requiring explicit warning acceptance.</summary>
-    public bool CanApplyWithWarnings => Plates.Count > 0 && !IsCancelled && ownedParameters != null
+    public bool CanApplyWithWarnings => Plates.Count > 0 && !IsCanceled && ownedParameters != null
         && Plates.All(p => p.CanApplyWithWarnings);
 
     public bool RequiresWarningAcceptance => CanApplyWithWarnings && !CanApply;
@@ -483,8 +483,8 @@ public sealed class CuttingPlanProposal
     {
         var lines = new List<string>();
         var blocked = Plates.Count(p => !p.CanApplyWithWarnings);
-        if (IsCancelled)
-            lines.Add("Planning was cancelled. Nothing has changed.");
+        if (IsCanceled)
+            lines.Add("Planning was canceled. Nothing has changed.");
         else if (CanApply)
             lines.Add($"Ready to apply to {Count(Plates.Count, "plate")}: "
                 + $"{Count(Plates.Count(p => p.OrderChanged), "plate")} with a new part order, "
@@ -557,7 +557,7 @@ public sealed class CuttingPlanProposal
             yield break;
         }
 
-        var missingLead = !plate.IsRouteReady && result.Status != CuttingPlanStatus.Cancelled
+        var missingLead = !plate.IsRouteReady && result.Status != CuttingPlanStatus.Canceled
             && result.Findings.Any(f => f.Kind == PostVerificationKind.MissingLeadIn);
         yield return heading + (plate.IsRouteReady
             ? "blocked: parts overlap or could not be checked for overlap."
@@ -613,7 +613,7 @@ public sealed class CuttingPlanProposal
         CuttingPlanStatus.UnsupportedGeometry => "blocked: unsupported geometry or an incomplete check.",
         CuttingPlanStatus.InvalidInput => "blocked: invalid input.",
         CuttingPlanStatus.NoSolutionWithinBudget => "no complete plan was found within the search limit.",
-        CuttingPlanStatus.Cancelled => "cancelled.",
+        CuttingPlanStatus.Canceled => "canceled.",
         _ => status.ToString(),
     };
 

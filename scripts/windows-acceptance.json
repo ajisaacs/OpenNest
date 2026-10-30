@@ -61,12 +61,12 @@
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.ImportBomToSetFormTests.ImportBom_OpensTheEditorPrefilled_AndCancellingItStoresNoSet",
+          "method": "OpenNest.WinForms.Tests.Forms.ImportBomToSetFormTests.ImportBom_OpensTheEditorPrefilled_AndCancelingItStoresNoSet",
           "minimum_cases": 1
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.ImportBomToSetFormTests.DecliningTheLibraryWrites_OrCancelling_StoresNothing",
+          "method": "OpenNest.WinForms.Tests.Forms.ImportBomToSetFormTests.DecliningTheLibraryWrites_OrCanceling_StoresNothing",
           "minimum_cases": 1
         }
       ],
@@ -170,12 +170,12 @@
         },
         {
           "project": "OpenNest.FrontEnd.Tests",
-          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Console_CancelledOrdinaryFillDoesNotOverwriteOutput",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Console_CanceledOrdinaryFillDoesNotOverwriteOutput",
           "minimum_cases": 1
         },
         {
           "project": "OpenNest.FrontEnd.Tests",
-          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Console_CancelledSolveDoesNotSave",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Console_CanceledSolveDoesNotSave",
           "minimum_cases": 1
         },
         {
@@ -230,7 +230,7 @@
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.AutoNestFormStockOptionsTests.BlankAndCancelledRowsDoNotBecomeStockOptions",
+          "method": "OpenNest.WinForms.Tests.Forms.AutoNestFormStockOptionsTests.BlankAndCanceledRowsDoNotBecomeStockOptions",
           "minimum_cases": 1
         },
         {
@@ -270,7 +270,7 @@
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.NestValidationFormTests.CompletionClosesWithoutCancellingSuccessfulJob",
+          "method": "OpenNest.WinForms.Tests.Forms.NestValidationFormTests.CompletionClosesWithoutCancelingSuccessfulJob",
           "minimum_cases": 1
         },
         {
@@ -983,7 +983,7 @@
       "required_tests": [
         {
           "project": "OpenNest.FrontEnd.Tests",
-          "method": "OpenNest.FrontEnd.Tests.McpEngineHarnessProcessTests.AlreadyCancelled_DoesNotStartChild",
+          "method": "OpenNest.FrontEnd.Tests.McpEngineHarnessProcessTests.AlreadyCanceled_DoesNotStartChild",
           "minimum_cases": 1
         },
         {

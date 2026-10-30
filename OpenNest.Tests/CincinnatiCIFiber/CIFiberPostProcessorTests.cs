@@ -17,7 +17,7 @@ namespace OpenNest.Tests.CincinnatiCIFiber;
 /// <summary>
 /// Output-contract tests for the Cincinnati CI Fiber post, checked against the
 /// structure of a Cincinnati machine sample NC: header block,
-/// restart jump, N-labelled contour blocks with /L macro lines, G41
+/// restart jump, N-labeled contour blocks with /L macro lines, G41
 /// selection, trimmed coordinate format and the M50/M30/% tail.
 /// </summary>
 public class CIFiberPostProcessorTests
@@ -44,7 +44,7 @@ public class CIFiberPostProcessorTests
 
         var pgm = new Program(Mode.Absolute);
 
-        // Hole sub-program: CCW full circle r=0.5 centred on the call offset,
+        // Hole sub-program: CCW full circle r=0.5 centerd on the call offset,
         // linear lead-in from below, left absolute then flipped to
         // incremental — exactly what ContourCuttingStrategy emits for a hole.
         var hole = new Program(Mode.Absolute);
@@ -125,7 +125,7 @@ public class CIFiberPostProcessorTests
         Assert.Equal("G0X6Y6.4", lines[21]); // pierce = part(1,2) + hole(5,5) + (0,-0.6)
         Assert.Equal("/L \"L2\"", lines[22]);
         Assert.Equal("G41", lines[23]);
-        Assert.Equal("G1X6Y6.5", lines[24]); // contour start = hole centre + (0,-0.5)
+        Assert.Equal("G1X6Y6.5", lines[24]); // contour start = hole center + (0,-0.5)
         Assert.Equal("/L \"L6\"", lines[25]);
         Assert.Equal("G3X6Y6.5I0J0.5", lines[26]); // I/J incremental from arc start
         Assert.Equal("/L \"ZHSOFF\"", lines[27]);
@@ -221,7 +221,7 @@ public class CIFiberPostProcessorTests
                 var radial = new Vector(
                     -double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture),
                     -double.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture)
-                ); // centre -> start
+                ); // center -> start
                 travel = cut.StartsWith("G3")
                     ? new Vector(-radial.Y, radial.X)
                     : new Vector(radial.Y, -radial.X);
@@ -265,8 +265,8 @@ public class CIFiberPostProcessorTests
         Assert.Equal("G0X-6.4Y6", lines[21]);
         // Contour start local (0,-0.5) -> (0.5,0) = (-6.5,6).
         Assert.Equal("G1X-6.5Y6", lines[24]);
-        // Full CCW circle, centre local (0,0.5) from the start -> (-0.5,0):
-        // centre at (-7,6), so I=-0.5 J=0.
+        // Full CCW circle, center local (0,0.5) from the start -> (-0.5,0):
+        // center at (-7,6), so I=-0.5 J=0.
         Assert.Equal("G3X-6.5Y6I-0.5J0", lines[26]);
         // Perimeter corner local (0,10) -> (-10,0): pierce (-2,1)+(0.5,0)...
         // pierce local (0,-0.5)->(0.5,0) = (-1.5,1); corner (-10,1)... check

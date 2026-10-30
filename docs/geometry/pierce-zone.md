@@ -24,13 +24,13 @@ clean material, so marks (scribes, rapids) are not material, and cutoffs are not
 emitter cuts, and for the manual lead-in preview:
 
 1. A configured lead-in whose pierce already keeps the zone from the hole wall is kept as is.
-2. Otherwise the pierce moves straight in from the wall to the hole's centre line, the centre of
+2. Otherwise the pierce moves straight in from the wall to the hole's center line, the center of
    a round hole, or the lead's own length in when that comes first (see
-   [leads stop at the centre line](lead-in-placement.md#leads-stop-at-the-centre-line)). The lead
+   [leads stop at the center line](lead-in-placement.md#leads-stop-at-the-center-line)). The lead
    becomes a straight line from there to the entry.
 3. If that point cannot keep the zone, the entry sits too close to another wall or the lead is
    shorter than the zone. The pierce moves toward the nearest eroded point beside the entry
-   (`ErodedPierce`), on the stroke's centre line when the lead reaches that far, else the hole's
+   (`ErodedPierce`), on the stroke's center line when the lead reaches that far, else the hole's
    pole of inaccessibility (`PolyLabel`). A lead shorter than the zone stops at the first point
    that keeps the zone: in a convex hole clearance grows steadily along that line, so this is
    the shortest clear straight lead from that entry.

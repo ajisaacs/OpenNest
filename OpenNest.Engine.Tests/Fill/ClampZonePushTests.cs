@@ -143,7 +143,7 @@ public class ClampZonePushTests
         var upper = AddSquare(plate, 4, 5, 2);
         var lower = AddSquare(plate, 4, 3.1, 2);
         var result = Expander.Expand(new List<Part> { upper, lower }, plate);
-        Assert.False(result.Cancelled);
+        Assert.False(result.Canceled);
         Assert.True(lower.BoundingBox.Bottom >= 3 - 1e-6,
             $"Achieved={result.AchievedSpacing}, lower at {lower.Location.Y}");
     }
@@ -159,7 +159,7 @@ public class ClampZonePushTests
 
         var result = Expander.Expand(new List<Part> { upper, lower }, plate);
 
-        Assert.False(result.Cancelled);
+        Assert.False(result.Canceled);
         AssertClear(plate, upper, lower);
     }
 
@@ -172,7 +172,7 @@ public class ClampZonePushTests
 
         var result = Expander.Expand(new List<Part> { straddler, clear }, plate);
 
-        Assert.False(result.Cancelled);
+        Assert.False(result.Canceled);
         // The clear member must not be driven into any clamp while its partner is stuck.
         AssertClear(plate, clear);
     }
@@ -189,7 +189,7 @@ public class ClampZonePushTests
 
         var result = Expander.Expand(new List<Part> { a, b, c }, plate);
 
-        Assert.False(result.Cancelled);
+        Assert.False(result.Canceled);
         // Whatever the achieved spacing or reported violations, no clear member may
         // end inside a clamp keep-out.
         AssertClear(plate, a, b, c);

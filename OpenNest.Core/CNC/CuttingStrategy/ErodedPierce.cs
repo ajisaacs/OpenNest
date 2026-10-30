@@ -20,9 +20,9 @@ namespace OpenNest.CNC.CuttingStrategy
     /// The pierce search for cutouts too small for their configured lead-in (text, slots, small
     /// holes): erode the cutout inward, as a laser kerf offset would, and pierce in what is left.
     /// The erosion goes as deep as the caller asks when the cutout has room for it, else almost
-    /// to its pole of inaccessibility; a round hole is pierced at its centre. Each target, an entry the planner ranked, gets the
+    /// to its pole of inaccessibility; a round hole is pierced at its center. Each target, an entry the planner ranked, gets the
     /// nearest point of the deepest erosion that still reaches the wall beside it, stepping down to
-    /// half that depth: a letter stroke is pierced on its own centre line next to the entry, and
+    /// half that depth: a letter stroke is pierced on its own center line next to the entry, and
     /// only a target with no stroke beside it falls back to the deepest place. The lead then runs
     /// straight from the pierce to the wall.
     /// </summary>
@@ -30,7 +30,7 @@ namespace OpenNest.CNC.CuttingStrategy
     {
         /// <summary>
         /// The share of a cutout's inscribed radius the erosion keeps when the full clearance does
-        /// not fit: deep enough to stay near the centre line, with room for every place the
+        /// not fit: deep enough to stay near the center line, with room for every place the
         /// cutout is about as wide as its widest.
         /// </summary>
         public const double DepthFraction = 0.9;
@@ -86,7 +86,7 @@ namespace OpenNest.CNC.CuttingStrategy
                 return new(targets.Take(max).Select(_ => pole).ToArray(), inscribed);
 
             // Each target gets the deepest level that reaches the wall beside it: a stroke
-            // narrower than the cutout's widest place is still pierced on its own centre line, near
+            // narrower than the cutout's widest place is still pierced on its own center line, near
             // the entry, rather than only at the widest place.
             var pierces = new List<Vector>();
             var shallowest = depth;

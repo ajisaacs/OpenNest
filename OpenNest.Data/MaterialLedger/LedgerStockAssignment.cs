@@ -2,7 +2,7 @@ namespace OpenNest.Data.MaterialLedger;
 
 /// <summary>
 /// Gives the plates Auto Nest committed on ledger stock their item codes. Runs only after the
-/// proposal was validated, kept and committed, so a rejected or cancelled one never changes
+/// proposal was validated, kept and committed, so a rejected or canceled one never changes
 /// codes. Codes are hand-off data for MaterialLedger holds, not inventory accounting.
 /// </summary>
 public static class LedgerStockAssignment

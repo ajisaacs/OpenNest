@@ -203,7 +203,7 @@ public class ConvertedEtchMarkTests
         }
     }
 
-    // Turn-independent samples: line ends, and each circle's centre and radius.
+    // Turn-independent samples: line ends, and each circle's center and radius.
     private static List<Vector> MarkSamples(Program program, Vector location) =>
         ConvertProgram.ToGeometry(program)
             .Where(entity => entity.Layer == SpecialLayers.Scribe)

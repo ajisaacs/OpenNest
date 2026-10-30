@@ -298,7 +298,7 @@ public class RepeatedPlateGroupingTests
     }
 
     [Fact]
-    public void CancelledGroupingAndCommitLeaveInputsUntouched()
+    public void CanceledGroupingAndCommitLeaveInputsUntouched()
     {
         using var source = new CancellationTokenSource();
         source.Cancel();

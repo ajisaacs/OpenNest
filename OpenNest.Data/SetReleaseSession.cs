@@ -148,7 +148,7 @@ public sealed class SetReleaseResult
 /// matches its record, units the new nest does not use, an insert refusal) creates
 /// nothing, and so does a server too old to record drawings released on their own, which is
 /// checked first. Uploads then run in order; the first failure stops them, and cancellation is
-/// honoured between uploads, never during one. Nests already uploaded stay as ordinary
+/// honored between uploads, never during one. Nests already uploaded stay as ordinary
 /// nests and are listed in the result; the release is posted only when every chosen group
 /// was created. Nothing is rolled back.
 /// </para>

@@ -67,7 +67,7 @@ namespace OpenNest.Forms
             entityView1.TabbedCutoutPicked += OnTabbedCutoutPicked;
             entityView1.CutoutTabDragged += OnCutoutTabDragged;
             entityView1.LinePicked += OnLinePicked;
-            entityView1.PickCancelled += OnPickCancelled;
+            entityView1.PickCanceled += OnPickCanceled;
             entityView1.TextConvertRequested += OnTextConvertRequested;
             entityView1.EntityActionRequested += OnEntityActionRequested;
             btnSplit.Click += OnSplitClicked;
@@ -543,7 +543,7 @@ namespace OpenNest.Forms
             entityView1.Invalidate();
         }
 
-        private void OnPickCancelled(object sender, EventArgs e)
+        private void OnPickCanceled(object sender, EventArgs e)
         {
             entityView1.IsPickingBendLine = false;
             filterPanel.SetPickMode(false);

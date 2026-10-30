@@ -49,7 +49,7 @@ namespace OpenNest.Forms.Commands
 
         /// <summary>
         /// Shows the Auto Nest dialog for <paramref name="target"/>. Returns null when it is
-        /// cancelled, nothing has a quantity, or the plate-size options are invalid.
+        /// canceled, nothing has a quantity, or the plate-size options are invalid.
         /// </summary>
         public static AutoNestCommand Prompt(IWin32Window owner, EditNestForm target)
         {
@@ -82,7 +82,7 @@ namespace OpenNest.Forms.Commands
         }
 
         /// <summary>
-        /// Solves and commits the job. Cancelling <paramref name="cts"/> discards the whole
+        /// Solves and commits the job. Canceling <paramref name="cts"/> discards the whole
         /// proposal; failures are reported to the user rather than thrown.
         /// </summary>
         public async Task RunAsync(CancellationTokenSource cts)

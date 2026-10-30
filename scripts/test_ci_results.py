@@ -27,7 +27,7 @@ class CIResultsTests(unittest.TestCase):
     def test_synthetic_failure_blocks_aggregate(self):
         self.assertNotEqual(self.check("success", "failure").returncode, 0)
 
-    def test_cancelled_dependency_blocks_aggregate(self):
+    def test_canceled_dependency_blocks_aggregate(self):
         for results in [("cancelled", "success"), ("success", "cancelled")]:
             with self.subTest(results=results):
                 self.assertNotEqual(self.check(*results).returncode, 0)

@@ -18,7 +18,7 @@ namespace OpenNest.Engine.Fill
         /// <summary>
         /// <paramref name="boxObstacles"/> are kept-out rectangles (e.g. inflated clamp
         /// zones) treated like occupied space: they are excluded from the remnant areas
-        /// every fill attempt sees. Null keeps today's behaviour exactly.
+        /// every fill attempt sees. Null keeps today's behavior exactly.
         /// </summary>
         public RemnantFiller(Box workArea, double spacing, IEnumerable<Box> boxObstacles = null)
         {

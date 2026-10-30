@@ -130,7 +130,7 @@ public class DrawingSetFormsTests
     }
 
     [Fact]
-    public void EditorLibraryPane_ListsEveryDrawing_AddsTheSelectionInListOrder_AndGreysMembers()
+    public void EditorLibraryPane_ListsEveryDrawing_AddsTheSelectionInListOrder_AndGraysMembers()
     {
         StaTestThread.Run(
             () =>

@@ -58,7 +58,7 @@ public class SeamClosureReplayTests
     private static OwnedExecution Read(Program program) => ExecutionMotionReader.Read(program, Vector.Zero, null, default);
 
     [Theory]
-    [InlineData(0.0)]       // exactly closed: unchanged behaviour
+    [InlineData(0.0)]       // exactly closed: unchanged behavior
     [InlineData(5e-7)]      // admitted closure seam
     [InlineData(1e-6)]      // inclusive closure boundary that capture already accepts
     public void AdmittedClosureSeam_StillReplays(double seam)

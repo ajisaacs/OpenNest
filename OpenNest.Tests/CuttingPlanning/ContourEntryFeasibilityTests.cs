@@ -57,12 +57,12 @@ public class ContourEntryFeasibilityTests
     }
 
     [Fact]
-    public void NeighbourContactRejectsKeepingReason()
+    public void NeighborContactRejectsKeepingReason()
     {
         var (prepared, choice, own) = PreparedSquare();
-        // A neighbouring sheet covering the lead-in approach region.
-        var neighbour = Box(-1.5, 4.4, -0.05, 5.6);
-        var feasibility = new ContourEntryFeasibility(prepared, At, own, [neighbour]);
+        // A neighboring sheet covering the lead-in approach region.
+        var neighbor = Box(-1.5, 4.4, -0.05, 5.6);
+        var feasibility = new ContourEntryFeasibility(prepared, At, own, [neighbor]);
 
         var verdict = feasibility.Check(choice);
 
@@ -161,9 +161,9 @@ public class ContourEntryFeasibilityTests
         Assert.True(adapter.Check(choice).IsClear);
         Assert.True(adapter.Check(choice with { }).IsClear);
         Assert.Equal(1, adapter.EvaluationCount);
-        using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
-        Assert.ThrowsAny<OperationCanceledException>(() => adapter.Check(foreign, token: cancelled.Token));
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Assert.ThrowsAny<OperationCanceledException>(() => adapter.Check(foreign, token: canceled.Token));
         Assert.True(adapter.Check(choice).IsClear);
         Assert.Equal(1, adapter.EvaluationCount);
     }
@@ -190,10 +190,10 @@ public class ContourEntryFeasibilityTests
     {
         var (prepared, choice, own) = PreparedSquare();
         var feasibility = new ContourEntryFeasibility(prepared, At, own, []);
-        using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
 
-        Assert.ThrowsAny<OperationCanceledException>(() => feasibility.Check(choice, token: cancelled.Token));
+        Assert.ThrowsAny<OperationCanceledException>(() => feasibility.Check(choice, token: canceled.Token));
         Assert.Equal(0, feasibility.EvaluationCount);
         Assert.True(feasibility.Check(choice).IsClear);
     }

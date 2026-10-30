@@ -80,7 +80,7 @@ public class CollisionOverlapOnlyTests
             {
                 // Offsets gives contact/containment placements within each (A, B) pair. Pulling
                 // every pair into one ~8-unit window makes most cross-pair tests reach clipping
-                // too, so each cached triangulation is reused against many near neighbours.
+                // too, so each cached triangulation is reused against many near neighbors.
                 var (ax, ay, bx, by) = Offsets(random, shapeA, shapeB, sample);
                 var dx = random.NextDouble() * 4 - ax;
                 var dy = random.NextDouble() * 4 - ay;

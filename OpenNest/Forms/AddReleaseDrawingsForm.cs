@@ -15,7 +15,7 @@ namespace OpenNest.Forms
     /// set editor's library pane does (<see cref="DrawingLibraryBrowseSession"/>, never filtered
     /// to a nest), and adds the selected drawings to the release dialog at the entered quantity.
     /// It stays open so several drawings can be added at different quantities; a drawing the
-    /// release already lists is greyed.
+    /// release already lists is grayed.
     /// </summary>
     public partial class AddReleaseDrawingsForm : Form
     {
@@ -159,7 +159,7 @@ namespace OpenNest.Forms
             UpdateAddCommand();
         }
 
-        // Greys the drawings the release already lists, so what is left to add stands out.
+        // Grays the drawings the release already lists, so what is left to add stands out.
         private void MarkListed()
         {
             foreach (DataGridViewRow row in libraryGrid.Rows)

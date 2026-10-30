@@ -68,7 +68,7 @@ internal static class JointCuttingPlanSearch
         }
         catch (OperationCanceledException)
         {
-            return new(CuttingPlanStatus.Cancelled, [], [], walk.Expansions, walk.LeadPrechecks);
+            return new(CuttingPlanStatus.Canceled, [], [], walk.Expansions, walk.LeadPrechecks);
         }
         return Run(snapshot, token, new Walk(snapshot, token, [], walk.Expansions, walk.LeadPrechecks), []);
     }
@@ -107,11 +107,11 @@ internal static class JointCuttingPlanSearch
                 return kept.Order != null ? walk.Ready(kept.Order) : walk.Exhausted();
             }
 
-            var centres = snapshot.Placements.Select(Centre).ToArray();
+            var centers = snapshot.Placements.Select(Center).ToArray();
             var prerequisites = Enumerable.Range(0, count)
                 .Select(i => new HashSet<int>(snapshot.Dependencies.PrerequisitesOf(i).Except(excluded))).ToArray();
 
-            var nesting = NestedOrder(snapshot, centres, prerequisites, token);
+            var nesting = NestedOrder(snapshot, centers, prerequisites, token);
             // A large aligned grid with no required order is toured row by row; anything else,
             // and every replan after a learned rule, gets the general order.
             var extents = snapshot.Placements.Select(CutExtent).ToArray();
@@ -166,7 +166,7 @@ internal static class JointCuttingPlanSearch
         }
         catch (OperationCanceledException)
         {
-            return new(CuttingPlanStatus.Cancelled, [], [], walk.Expansions, walk.LeadPrechecks);
+            return new(CuttingPlanStatus.Canceled, [], [], walk.Expansions, walk.LeadPrechecks);
         }
     }
 
@@ -191,19 +191,19 @@ internal static class JointCuttingPlanSearch
     }
 
     // Captured containment (never learned rules) and each host's placed cut contours.
-    private static CuttingNestedOrder.Context NestedOrder(CuttingPlanSnapshot snapshot, Vector[] centres,
+    private static CuttingNestedOrder.Context NestedOrder(CuttingPlanSnapshot snapshot, Vector[] centers,
         HashSet<int>[] prerequisites, CancellationToken token)
     {
         var inside = snapshot.Placements.Select((placement, host) => placement.IsCutOff ? []
             : snapshot.Dependencies.PrerequisitesOf(host).Where(p => !snapshot.Placements[p].IsCutOff).ToArray()).ToArray();
         var contours = new Dictionary<int, Entity[]>();
-        return new(centres, prerequisites, inside, (host, position) =>
+        return new(centers, prerequisites, inside, (host, position) =>
         {
             if (!contours.TryGetValue(host, out var entities))
                 contours[host] = entities = snapshot.Placements[host].Execution.Motions
                     .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display && m.Curve != null)
                     .Select(m => m.Curve.ToEntity()).ToArray();
-            return entities.Length == 0 ? centres[host]
+            return entities.Length == 0 ? centers[host]
                 : entities.Select(e => e.ClosestPointTo(position)).MinBy(point => point.DistanceTo(position));
         }, token);
     }
@@ -263,8 +263,8 @@ internal static class JointCuttingPlanSearch
         return false;
     }
 
-    // The centre of the part's placed cut material, for ordering only.
-    private static Vector Centre(FixedProgramPlacement placement) =>
+    // The center of the part's placed cut material, for ordering only.
+    private static Vector Center(FixedProgramPlacement placement) =>
         CutExtent(placement)?.Center ?? placement.Execution.DeparturePoint;
 
     // The extent of the part's placed cut material, or null when it has none.
@@ -398,7 +398,7 @@ internal static class JointCuttingPlanSearch
             }
             finally
             {
-                // Ready, stalled, cancelled and budget-exhausted searches can all leave
+                // Ready, stalled, canceled and budget-exhausted searches can all leave
                 // suspended siblings. Release their captured prefixes on every exit.
                 foreach (var frame in stack)
                     frame.Children?.Dispose();
@@ -419,7 +419,7 @@ internal static class JointCuttingPlanSearch
         }
 
         /// <summary>
-        /// The NEXT cut's centre that the outside entry should face, or null for the last
+        /// The NEXT cut's center that the outside entry should face, or null for the last
         /// part. Supplied order: the next not-yet-finished part in that order (the sequence
         /// is re-read after every learned-order replan). Sequence-free fallback: nearest
         /// dependency-ready remaining part once the current part counts as finished, stable
@@ -428,7 +428,7 @@ internal static class JointCuttingPlanSearch
         /// should face, so a kept order with segments gets the entries planned without them.
         /// Global coordinates.
         /// </summary>
-        private Vector? LookAheadCentre(Node node, int[] sequence, FixedProgramPlacement source) =>
+        private Vector? LookAheadCenter(Node node, int[] sequence, FixedProgramPlacement source) =>
             NextCut(node, sequence, source) is { } next ? Facing(source, next) : null;
 
         private FixedProgramPlacement NextCut(Node node, int[] sequence, FixedProgramPlacement source)
@@ -439,7 +439,7 @@ internal static class JointCuttingPlanSearch
                 for (var i = node.Order.Length + 1; i < sequence.Length; i++)
                     if (!finished.Contains(sequence[i]) && !IsSegment(snapshot.Placements[sequence[i]]))
                         return snapshot.Placements[sequence[i]];
-            var from = Centre(source);
+            var from = Center(source);
             FixedProgramPlacement best = null;
             var bestDistance = double.PositiveInfinity;
             foreach (var candidate in snapshot.Placements
@@ -447,7 +447,7 @@ internal static class JointCuttingPlanSearch
                              && snapshot.Dependencies.IsReady(p.SourceOrdinal, finished))
                          .OrderBy(p => p.SourceOrdinal))
             {
-                var distance = Centre(candidate).DistanceTo(from);
+                var distance = Center(candidate).DistanceTo(from);
                 if (distance < bestDistance - 1e-9)
                 {
                     bestDistance = distance;
@@ -472,26 +472,26 @@ internal static class JointCuttingPlanSearch
             var cuts = next.Execution.Motions
                 .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display && m.Curve != null)
                 .Select(m => m.Curve.ToEntity().BoundingBox).ToList();
-            if (cuts.Count == 0 || facing != Centre(next))
+            if (cuts.Count == 0 || facing != Center(next))
                 return [facing];
             var box = cuts.GetBoundingBox();
             return [facing, new(box.Left, box.Bottom), new(box.Right, box.Bottom), new(box.Left, box.Top), new(box.Right, box.Top)];
         }
 
-        // The next cut as seen from the current part. A host's centre lies in the middle of
+        // The next cut as seen from the current part. A host's center lies in the middle of
         // its cutout, among the parts nested there; a part inside it leaves toward the
         // nearest of the host's own contours instead.
         private Vector Facing(FixedProgramPlacement source, FixedProgramPlacement next)
         {
             if (source.IsCutOff || next.IsCutOff
                 || !snapshot.Dependencies.PrerequisitesOf(next.SourceOrdinal).Contains(source.SourceOrdinal))
-                return Centre(next);
+                return Center(next);
             if (!hostContours.TryGetValue(next.SourceOrdinal, out var contours))
                 hostContours[next.SourceOrdinal] = contours = next.Execution.Motions
                     .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display && m.Curve != null)
                     .Select(m => m.Curve.ToEntity()).ToArray();
-            var from = Centre(source);
-            return contours.Length == 0 ? Centre(next)
+            var from = Center(source);
+            return contours.Length == 0 ? Center(next)
                 : contours.Select(c => c.ClosestPointTo(from)).MinBy(point => point.DistanceTo(from));
         }
 
@@ -506,7 +506,7 @@ internal static class JointCuttingPlanSearch
             // source. Expand already yields its contour/entry rank order, so emit and
             // validate a sibling only when DFS reaches it. Free whole-part selection
             // still needs every source's distances before it can rank them. Recovery
-            // instead visits dependency-ready sources lazily by their material centres.
+            // instead visits dependency-ready sources lazily by their material centers.
             if (sequence != null || node.Active != null || contourRecovery)
                 return Expand(node, sequence, attempt, preferredOnly, contourRecovery);
             var edges = Expand(node, sequence, attempt, preferredOnly, contourRecovery).ToList();
@@ -542,7 +542,7 @@ internal static class JointCuttingPlanSearch
                         ? [snapshot.Placements[sequence[node.Order.Length]]] : [];
             }
             if (contourRecovery)
-                sources = sources.OrderBy(p => Centre(p).DistanceTo(node.Position)).ThenBy(p => p.SourceOrdinal);
+                sources = sources.OrderBy(p => Center(p).DistanceTo(node.Position)).ThenBy(p => p.SourceOrdinal);
             foreach (var source in sources)
             {
                 token.ThrowIfCancellationRequested();
@@ -587,7 +587,7 @@ internal static class JointCuttingPlanSearch
                         var state = new ActivePart(source, [], node.Position, node.Checker, 0, node,
                             perimeters[index]);
                         yield return new(new(node.Order, node.Position, node.Checker, state, null),
-                            Centre(source).DistanceTo(node.Position), source.SourceOrdinal, -1, index, index);
+                            Center(source).DistanceTo(node.Position), source.SourceOrdinal, -1, index, index);
                     }
                     continue;
                 }
@@ -699,7 +699,7 @@ internal static class JointCuttingPlanSearch
             source.Prepared.HasCutPerimeter || source.Material is { IsComplete: true, HasDisplayPerimeter: true };
 
         // Recovery only: solve directed contour transitions rather than assuming
-        // that a centre-to-centre hole tour can cross the already released material.
+        // that a center-to-center hole tour can cross the already released material.
         // One complete checked chain per outside endpoint; original DFS remains fallback.
         // arrivalMayCross (safest route only): the rapid onto the part may cross cut contours;
         // every other motion of the part stays strict.
@@ -719,12 +719,12 @@ internal static class JointCuttingPlanSearch
             Attempt attempt, bool arrivalMayCross, List<Edge> heldBack)
         {
             var prepared = source.Prepared;
-            var target = LookAheadCentre(node, sequence, source) - source.Location;
+            var target = LookAheadCenter(node, sequence, source) - source.Location;
             ContourChoice[] perimeters;
             if (prepared.HasCutPerimeter)
             {
                 // Placement origins are authored program coordinates, not a downstream cut.
-                // Use the same material-centre look-ahead as the retained entry search.
+                // Use the same material-center look-ahead as the retained entry search.
                 var ranked = prepared.AutomaticEntryCandidatesWithFallbacks(prepared.PerimeterOrdinal, token: token)
                     .OrderBy(c => c.Choice.Point.DistanceTo(target ?? node.RoutePosition - source.Location)).ToArray();
                 perimeters = ranked.Where(c => Evaluate(source, c).Status == ContourFeasibilityStatus.Clear)
@@ -742,12 +742,12 @@ internal static class JointCuttingPlanSearch
             ContourChoice[][] Holes() => holes ??= Enumerable.Range(0, prepared.PerimeterOrdinal)
                 .Select(c =>
                 {
-                    var catalogue = prepared.AutomaticEntryCandidatesWithFallbacks(c, token: token);
-                    var clear = catalogue.Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear).ToArray();
+                    var catalog = prepared.AutomaticEntryCandidatesWithFallbacks(c, token: token);
+                    var clear = catalog.Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear).ToArray();
                     // No configured lead-in fits the cutout: pierce where eroding it leaves room.
                     // A widened try adds those pierces to a cutout that refused some of its leads.
-                    if (clear.Length == 0 || widened && clear.Length < catalogue.Count)
-                        clear = [.. clear, .. PreferredContourEntries.ErodedPierces(prepared, c, catalogue, snapshot.MaxEntries, token)
+                    if (clear.Length == 0 || widened && clear.Length < catalog.Count)
+                        clear = [.. clear, .. PreferredContourEntries.ErodedPierces(prepared, c, catalog, snapshot.MaxEntries, token)
                             .Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear)];
                     return clear.Select(e => e.Choice).ToArray();
                 }).ToArray();
@@ -778,7 +778,7 @@ internal static class JointCuttingPlanSearch
             }
             PostVerificationGeometry.Curve[] CutCurves(ContourChoice choice) => Motion(choice).Motions
                 .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display).Select(m => m.Curve).ToArray();
-            var centres = prepared.HoleCentres(token);
+            var centers = prepared.HoleCenters(token);
             var bounds = Enumerable.Range(0, prepared.PerimeterOrdinal).Select(prepared.ContourBounds).ToArray();
             var sweepEntries = new Dictionary<(int Hole, int Next, Vector Direction), ContourChoice[]>();
             // A hole's sweep entries: at its far side, its far corners and facing the next hole, each with the
@@ -791,10 +791,10 @@ internal static class JointCuttingPlanSearch
                 var reach = box.Width + box.Length + 1;
                 var toward = next < 0 ? direction : Unit(bounds[next].Center - box.Center, direction);
                 var across = new Vector(-direction.Y, direction.X) * reach;
-                var catalogue = new[] { direction * reach, toward * reach, direction * reach + across, direction * reach - across }
+                var catalog = new[] { direction * reach, toward * reach, direction * reach + across, direction * reach - across }
                     .Select(offset => prepared.ClosestEntry(hole, box.Center + offset)).Distinct()
                     .Select(c => new ContourEntryCandidate(c, AutomaticEntryKind.TargetFacing)).ToArray();
-                var extra = catalogue.Concat(PreferredContourEntries.ErodedPierces(prepared, hole, catalogue, catalogue.Length, token))
+                var extra = catalog.Concat(PreferredContourEntries.ErodedPierces(prepared, hole, catalog, catalog.Length, token))
                     .Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear).Select(e => e.Choice);
                 // Stencil pieces overlap along the direction: leave toward the next piece.
                 var stacked = next >= 0 && Near(bounds[next], direction) < Far(box, direction) - OpenNest.Math.Tolerance.Epsilon;
@@ -1084,8 +1084,8 @@ internal static class JointCuttingPlanSearch
                 {
                     var onward = double.PositiveInfinity;
                     foreach (var other in remaining)
-                        if (other != hole && centres[other] is { } centre)
-                            onward = System.Math.Min(onward, departure.DistanceTo(centre + source.Location));
+                        if (other != hole && centers[other] is { } center)
+                            onward = System.Math.Min(onward, departure.DistanceTo(center + source.Location));
                     if (!double.IsPositiveInfinity(onward))
                         return onward;
                     // The last hole: toward the outside entry, or with none, toward the next part.
@@ -1136,9 +1136,9 @@ internal static class JointCuttingPlanSearch
 
         /// <summary>
         /// The S03-S08 pipeline for one outside contour, in prepared LOCAL coordinates
-        /// converted exactly once: rank the (fallback-complemented) catalogue toward the
+        /// converted exactly once: rank the (fallback-complemented) catalog toward the
         /// next cut, lazily filter through the shared validator adapter, cap at MaxEntries
-        /// with side coverage. Empty ONLY when the finite catalogue was fully evaluated and
+        /// with side coverage. Empty ONLY when the finite catalog was fully evaluated and
         /// nothing fits — then the honest part/contour finding is recorded once.
         /// </summary>
         private IReadOnlyList<ContourChoice> AutomaticEntries(Node node, int[] sequence,
@@ -1147,7 +1147,7 @@ internal static class JointCuttingPlanSearch
             var prepared = source.Prepared!;
             var arrival = node.RoutePosition - source.Location;
             // One global->local conversion of target and arrival; geometry is already rotated.
-            Vector? local = LookAheadCentre(node, sequence, source) is { } target
+            Vector? local = LookAheadCenter(node, sequence, source) is { } target
                 ? target - source.Location : null;
             return SelectEntries(source, contour, local, arrival, SightTargets(node, sequence, source));
         }
@@ -1303,7 +1303,7 @@ internal static class JointCuttingPlanSearch
             };
         }
 
-        // One contour's automatic catalogue ranked toward the next cut, before lead checks. A
+        // One contour's automatic catalog ranked toward the next cut, before lead checks. A
         // support fallback leads with the entries whose tab steadies the part most.
         private IReadOnlyList<ContourEntryCandidate> RankedEntries(FixedProgramPlacement source, int contour,
             Vector? target, Vector arrival, Vector[] sightTargets, SupportEntries supportEntries)
@@ -1311,9 +1311,9 @@ internal static class JointCuttingPlanSearch
             // Last contour has no downstream target, but still needs its exact native
             // closest-arrival fallback. Keep target null in the ranker: arrival is not
             // a next cut and must not acquire facing-side priority.
-            var catalogue = source.Prepared.AutomaticEntryCandidatesWithFallbacks(contour, target ?? arrival, token,
+            var catalog = source.Prepared.AutomaticEntryCandidatesWithFallbacks(contour, target ?? arrival, token,
                 supportEntries);
-            var ordered = catalogue.RankTowardNextCut(target, arrival);
+            var ordered = catalog.RankTowardNextCut(target, arrival);
             // With no lead-out the tool leaves the part from its outside entry. From inside a
             // slot or pocket the straight way to the next cut runs back over the part just
             // cut, so entries with the clearest way out lead. Order only: every entry stays.
@@ -1340,17 +1340,17 @@ internal static class JointCuttingPlanSearch
             var prepared = source.Prepared;
             var holes = Enumerable.Range(0, prepared.PerimeterOrdinal).ToArray();
             var localArrival = arrival - source.Location;
-            var centres = CuttingHoleOrder.Centres(prepared, localArrival, token);
+            var centers = CuttingHoleOrder.Centers(prepared, localArrival, token);
             var endpoint = perimeter.Point;
             var entries = new Dictionary<int, ContourChoice>();
-            var pierces = holes.ToDictionary(h => h, h => centres[h]);
+            var pierces = holes.ToDictionary(h => h, h => centers[h]);
             var route = holes;
             try
             {
                 CountExpansion(source);
                 endpoint = PreferredContourEntries.Pierce(prepared, perimeter, token);
-                route = CuttingHoleOrder.Plan(holes, centres, localArrival, endpoint, token).ToArray();
-                var proposal = PreferredContourEntries.TryPlan(prepared, perimeter, route, centres,
+                route = CuttingHoleOrder.Plan(holes, centers, localArrival, endpoint, token).ToArray();
+                var proposal = PreferredContourEntries.TryPlan(prepared, perimeter, route, centers,
                     localArrival, candidate => Evaluate(source, candidate), token);
                 if (proposal.IsPreferred)
                     foreach (var choice in proposal.HoleChoices)
@@ -1476,7 +1476,7 @@ internal static class JointCuttingPlanSearch
                 var ready = (snapshot.PreservePartOrder ? [snapshot.Placements[node.Order.Length]]
                         : snapshot.Placements.Where(p => !finished.Contains(p.SourceOrdinal)
                             && snapshot.Dependencies.IsReady(p.SourceOrdinal, finished)))
-                    .OrderBy(p => Centre(p).DistanceTo(node.Position)).ThenBy(p => p.SourceOrdinal).ToArray();
+                    .OrderBy(p => Center(p).DistanceTo(node.Position)).ThenBy(p => p.SourceOrdinal).ToArray();
                 // Nearest first, the first part with a route that passes every check wins. When
                 // none of the nearby parts has one, the least unsafe of them is cut.
                 SafestStep best = null;
@@ -1532,9 +1532,9 @@ internal static class JointCuttingPlanSearch
             // the fewest violations to the part's route, nearest along the tour on a tie.
             var approach = arrival - source.Location;
             var holes = Enumerable.Range(0, prepared.PerimeterOrdinal).ToArray();
-            var centres = CuttingHoleOrder.Centres(prepared, approach, token);
-            var remaining = CuttingHoleOrder.Plan(holes, centres, approach, null, token).ToList();
-            var onward = LookAheadCentre(node, KeptSequence, source) - source.Location;
+            var centers = CuttingHoleOrder.Centers(prepared, approach, token);
+            var remaining = CuttingHoleOrder.Plan(holes, centers, approach, null, token).ToList();
+            var onward = LookAheadCenter(node, KeptSequence, source) - source.Location;
             var choices = new List<ContourChoice>();
             Program program = null;
             OwnedExecution execution = null;
@@ -1551,7 +1551,7 @@ internal static class JointCuttingPlanSearch
                     // Leave each hole toward the next one along the tour, so its exit rapid does
                     // not run back across it; the perimeter faces the next part.
                     var next = remaining.FirstOrDefault(h => h != contour, -1);
-                    var entries = SelectEntries(source, contour, next >= 0 ? centres[next] : onward, local);
+                    var entries = SelectEntries(source, contour, next >= 0 ? centers[next] : onward, local);
                     if (entries.Count == 0)
                         entries = [prepared.ClosestEntry(contour, local)];
                     foreach (var entry in entries)

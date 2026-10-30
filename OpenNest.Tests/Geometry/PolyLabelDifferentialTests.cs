@@ -83,7 +83,7 @@ public class PolyLabelDifferentialTests
         Assert.InRange(unbounded.Y, 0, 1);
     }
 
-    // Delta review: past the grid, refining a cell whose half-step no longer moves its centre
+    // Delta review: past the grid, refining a cell whose half-step no longer moves its center
     // made four identical children per level, so a fine unbounded search exhausted memory.
     [Fact]
     public async Task Find_UnboundedRefinementFinishesWhenSplitsStopAdvancing()

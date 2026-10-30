@@ -173,7 +173,7 @@ namespace OpenNest.Controls
         }
 
         /// <summary>
-        /// Rotates the selection by <paramref name="angle"/> about its centre, keeping its
+        /// Rotates the selection by <paramref name="angle"/> about its center, keeping its
         /// lower-left corner; with <paramref name="coalesce"/>, quick repeats undo as one.
         /// </summary>
         public void RotateSelectedParts(double angle, bool coalesce = false)
@@ -220,7 +220,7 @@ namespace OpenNest.Controls
         /// Grows the part-to-part spacing of the selection as far as the plate
         /// allows (Expander). <paramref name="run"/> executes the search and may
         /// cancel it through its token (the desktop shows a Cancel window); by
-        /// default it runs synchronously. A cancelled run moves no part. Returns
+        /// default it runs synchronously. A canceled run moves no part. Returns
         /// false only when fewer than two parts are selected.
         /// </summary>
         public bool ExpandSelected(
@@ -239,9 +239,9 @@ namespace OpenNest.Controls
             using var change = view.BeginChange("Expand Spacing");
             var result = run != null ? run(Work) : Work(CancellationToken.None);
 
-            if (result.Cancelled)
+            if (result.Canceled)
             {
-                view.Status = "Expand Spacing cancelled - no parts were moved";
+                view.Status = "Expand Spacing canceled - no parts were moved";
                 change.Complete();
                 return true;
             }

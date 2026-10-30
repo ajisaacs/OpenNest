@@ -182,7 +182,7 @@ public static class CuttingPlanService
         }
         catch (OperationCanceledException)
         {
-            return Failure(CuttingPlanStatus.Cancelled, "Capture cancelled.");
+            return Failure(CuttingPlanStatus.Canceled, "Capture canceled.");
         }
         catch (CuttingDependencyException exception)
         {
@@ -260,7 +260,7 @@ public static class CuttingPlanService
     private static CuttingPlanResult PlanCaptured(CuttingPlanSnapshot snapshot, CancellationToken token)
     {
         if (token.IsCancellationRequested)
-            return new(CuttingPlanStatus.Cancelled);
+            return new(CuttingPlanStatus.Canceled);
         if (snapshot == null)
             return new(CuttingPlanStatus.InvalidInput);
         if (snapshot.Failure is { } failure)
@@ -300,7 +300,7 @@ public static class CuttingPlanService
             if (snapshot.Regeneration)
             {
                 var joint = JointCuttingPlanSearch.Run(snapshot, token);
-                // Capture warnings (drawing pins that could not be honoured) stay visible on a refusal.
+                // Capture warnings (drawing pins that could not be honored) stay visible on a refusal.
                 if (joint.Status != CuttingPlanStatus.Ready)
                     return new(joint.Status, findings: snapshot.Findings.Concat(joint.Findings), expansions: joint.Expansions);
                 return ReplayPrograms(snapshot, joint.Order, joint.Expansions, token);
@@ -312,7 +312,7 @@ public static class CuttingPlanService
         }
         catch (OperationCanceledException)
         {
-            return new(CuttingPlanStatus.Cancelled);
+            return new(CuttingPlanStatus.Canceled);
         }
     }
 
@@ -407,7 +407,7 @@ public static class CuttingPlanService
         var distance = 0.0;
         var findings = new List<CuttingPlanFinding>();
         // Violations inside fixed emissions: accepted as given, reported, never refused (D1a).
-        // Capture adds the drawing pins it could not honour; their contours were planned normally.
+        // Capture adds the drawing pins it could not honor; their contours were planned normally.
         var warnings = new List<CuttingPlanFinding>(snapshot.Findings);
         // Rapids that raise the head over cut parts are listed, never refused.
         var raises = new List<CuttingPlanFinding>();

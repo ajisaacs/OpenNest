@@ -66,8 +66,8 @@ namespace OpenNest.Engine.Fill
             /// </summary>
             public double AchievedSpacing;
 
-            /// <summary>True when the run was cancelled; no positions were changed.</summary>
-            public bool Cancelled;
+            /// <summary>True when the run was canceled; no positions were changed.</summary>
+            public bool Canceled;
 
             /// <summary>Pairs still below the attempted spacing and invalid
             /// work-area poses, including unresolved negative clearances when no
@@ -136,7 +136,7 @@ namespace OpenNest.Engine.Fill
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                result.Cancelled = true;
+                result.Canceled = true;
                 return result;
             }
             var entry = context.Positions(); // all parts; movers are [0, count)
@@ -148,14 +148,14 @@ namespace OpenNest.Engine.Fill
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                result.Cancelled = true;
+                result.Canceled = true;
                 return result;
             }
             result.AchievedSpacing = System.Math.Max(0, sMin);
 
             if (token.IsCancellationRequested)
             {
-                result.Cancelled = true;
+                result.Canceled = true;
                 return result;
             }
 
@@ -192,14 +192,14 @@ namespace OpenNest.Engine.Fill
 
                 if (token.IsCancellationRequested)
                 {
-                    result.Cancelled = true;
+                    result.Canceled = true;
                     return result;
                 }
 
                 var probe = Probe(s);
                 if (token.IsCancellationRequested)
                 {
-                    result.Cancelled = true;
+                    result.Canceled = true;
                     return result;
                 }
 
@@ -225,7 +225,7 @@ namespace OpenNest.Engine.Fill
                 {
                     if (token.IsCancellationRequested)
                     {
-                        result.Cancelled = true;
+                        result.Canceled = true;
                         return result;
                     }
 
@@ -233,7 +233,7 @@ namespace OpenNest.Engine.Fill
                     var midProbe = Probe(mid);
                     if (token.IsCancellationRequested)
                     {
-                        result.Cancelled = true;
+                        result.Canceled = true;
                         return result;
                     }
                     if (midProbe.Converged)
@@ -253,7 +253,7 @@ namespace OpenNest.Engine.Fill
             observer?.Invoke(Checkpoint.BeforeApply);
             if (token.IsCancellationRequested)
             {
-                result.Cancelled = true;
+                result.Canceled = true;
                 return result;
             }
 
@@ -270,12 +270,12 @@ namespace OpenNest.Engine.Fill
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                result.Cancelled = true;
+                result.Canceled = true;
                 return result;
             }
             if (token.IsCancellationRequested)
             {
-                result.Cancelled = true;
+                result.Canceled = true;
                 return result;
             }
             Apply(selected, entry, positions);
@@ -1090,7 +1090,7 @@ namespace OpenNest.Engine.Fill
                 if (TryNativeDisk(moving, out var movingCenter, out var movingRadius) &&
                     TryNativeDisk(stationary, out var fixedCenter, out var fixedRadius))
                 {
-                    // Full circles are convex. The relative centre distance
+                    // Full circles are convex. The relative center distance
                     // must increase from the start; its ray intersects the
                     // summed-radius disk at most once in forward travel.
                     var relative = movingCenter + movePos - fixedCenter - fixedPos;

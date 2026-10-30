@@ -79,7 +79,7 @@ internal static class IncrementalClosureDrift
         var endPoint = last.EndPoint + correction;
         if (last is ArcMove arc)
         {
-            // Keep the arc's centre (relative to its start) equidistant from its moved end.
+            // Keep the arc's center (relative to its start) equidistant from its moved end.
             var chord = endPoint.DistanceTo(new Vector());
             if (chord <= Tolerance.Epsilon)
                 return false;

@@ -70,7 +70,7 @@ public class FillPipelineTests
         var cts = new System.Threading.CancellationTokenSource();
         cts.Cancel();
 
-        // Pre-cancelled token should return empty or partial results without throwing
+        // Pre-canceled token should return empty or partial results without throwing
         var parts = filler.Fill(item, plate.WorkArea(), null, cts.Token);
 
         // Should not throw — graceful degradation

@@ -142,7 +142,7 @@ public class SupportTabPlanningTests
     }
 
     [Fact]
-    public void FallbackCatalogue_KeepsClearOfInsideCornersBeforeOfferingEveryEntry()
+    public void FallbackCatalog_KeepsClearOfInsideCornersBeforeOfferingEveryEntry()
     {
         var bed = new SupportGrid(2, 4, 0, 0.25, stabilityMargin: 0.1);
         var program = BumpedStrip();

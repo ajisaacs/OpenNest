@@ -44,7 +44,7 @@ uses the Cincinnati machine-sample convention, not a generic TF5200 laser API:
   the parts. Each segment is an open
   line with no lead-in: rapid to its start, `/L "L4"`, `/L "L6"`, the `G1`,
   and `/L "ZHSOFF"`. No `G41`/`G42` is selected, because the line is the beam
-  centreline and has no inside or outside. Whether the `L4` macro runs
+  centerline and has no inside or outside. Whether the `L4` macro runs
   correctly without a following lead-in move has not been confirmed on the
   machine.
 - A head-locked cut-off overcut (see

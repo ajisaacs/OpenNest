@@ -146,7 +146,7 @@ row along it, so it is a one-dimensional cut list. Each part's length is its mat
 the shortest rotation whose cross extent fits the bar's width; a part that fits no bar is
 unplaced. Lengths carry one part spacing each, like a saw kerf.
 
-Parts with shaped ends nest into their neighbours. FlatBar measures each part's self-nesting
+Parts with shaped ends nest into their neighbors. FlatBar measures each part's self-nesting
 gain once per stock by laying three copies the way the layout pass will and averaging the two
 joints (so a part that only nests every other copy is not over-credited), and packs each copy at
 its length less that gain; the first copy of each run pays the gain back.

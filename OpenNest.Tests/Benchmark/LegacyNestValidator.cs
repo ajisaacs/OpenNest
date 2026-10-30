@@ -238,7 +238,7 @@ namespace OpenNest.Tests.Benchmark
         /// material, with holes subtracted on both sides - so a small part
         /// nested inside another part's cutout (part-in-part) is legal as long as
         /// it clears the cutout's edge by the spacing. Pairs are pruned with an
-        /// X-sorted sweep over bounding boxes so only neighbours reach the
+        /// X-sorted sweep over bounding boxes so only neighbors reach the
         /// polygon clipper.
         /// </summary>
         private static void ValidateSpacing(

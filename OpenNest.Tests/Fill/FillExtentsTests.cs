@@ -234,7 +234,7 @@ public class FillExtentsTests
     }
 
     [Fact]
-    public void Fill_PreCancelled_MatchesFrozenLegacyRatherThanThrowing()
+    public void Fill_PreCanceled_MatchesFrozenLegacyRatherThanThrowing()
     {
         var drawing = MakeFixture("triangle");
         var before = Snapshot(drawing);

@@ -16,10 +16,10 @@ public class HoleEndpointBudgetTests
     {
         var parameters = HoleLookAheadTests.Parameters();
         var clean = HoleLookAheadTests.MixedHoles();
-        foreach (var centre in new[] { new Vector(4, 8), new Vector(8, 8) })
+        foreach (var center in new[] { new Vector(4, 8), new Vector(8, 8) })
         {
-            clean.MoveTo(centre.X + 0.75, centre.Y);
-            clean.ArcTo(centre.X + 0.75, centre.Y, centre.X, centre.Y, RotationType.CCW);
+            clean.MoveTo(center.X + 0.75, center.Y);
+            clean.ArcTo(center.X + 0.75, center.Y, center.X, center.Y, RotationType.CCW);
         }
         var first = new Part(new Drawing("four holes", clean));
         var nextClean = LeadPathValidationTests.Rectangle(0, 0, 2, 2);
@@ -42,10 +42,10 @@ public class HoleEndpointBudgetTests
         var target = new Vector(21, 3);
         var outside = ContourEntrySelection.Select(prepared.AutomaticEntryCandidatesWithFallbacks(4, target)
             .RankTowardNextCut(target, start), c => adapter.Check(c.Choice)).Choices[0];
-        var centres = prepared.HoleCentres().Select(c => c ?? Vector.Zero).ToArray();
-        var route = CuttingHoleOrder.Plan(new[] { 0, 1, 2, 3 }, centres, start,
+        var centers = prepared.HoleCenters().Select(c => c ?? Vector.Zero).ToArray();
+        var route = CuttingHoleOrder.Plan(new[] { 0, 1, 2, 3 }, centers, start,
             PreferredContourEntries.Pierce(prepared, outside, default));
-        var preferred = PreferredContourEntries.TryPlan(prepared, outside, route, centres, start,
+        var preferred = PreferredContourEntries.TryPlan(prepared, outside, route, centers, start,
             c => adapter.Check(c.Choice));
         Assert.True(preferred.IsPreferred, preferred.Reason);
         var execution = ExecutionMotionReader.Read(prepared.Emit(preferred.HoleChoices.Append(outside).ToArray()),
@@ -83,9 +83,9 @@ public class HoleEndpointBudgetTests
         Assert.Equal(1, bounded.Expansions);
         Assert.Empty(bounded.ProposedOrder);
         Assert.False(bounded.IndependentlyReplayed);
-        using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
-        Assert.Equal(CuttingPlanStatus.Cancelled, CuttingPlanService.Plan(snapshot, cancelled.Token).Status);
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Assert.Equal(CuttingPlanStatus.Canceled, CuttingPlanService.Plan(snapshot, canceled.Token).Status);
         Assert.Equal(before, new[] { first, next }.Select(p => ExplicitContourTests.Fingerprint(p.Program)));
     }
 }

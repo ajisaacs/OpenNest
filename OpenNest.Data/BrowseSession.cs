@@ -17,7 +17,7 @@ public interface IBrowsePage
 /// <summary>
 /// Browse state shared by the paged server lists: the requested search, sort and page, and the
 /// last page applied. Every change issues one bounded server query. A response that a later
-/// request superseded is discarded (and the earlier request is cancelled), so an older result
+/// request superseded is discarded (and the earlier request is canceled), so an older result
 /// can never replace a newer one. Call from one thread (the UI thread).
 /// </summary>
 public abstract class BrowseSession<TPage, TSort> : IDisposable
@@ -130,7 +130,7 @@ public abstract class BrowseSession<TPage, TSort> : IDisposable
     private async Task<bool> RunAsync()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        // Supersede before cancelling: a request that completes synchronously when cancelled
+        // Supersede before canceling: a request that completes synchronously when canceled
         // must already see itself as superseded. Each source is released by its own request.
         var previous = _pending;
         using var cancellation = new CancellationTokenSource();

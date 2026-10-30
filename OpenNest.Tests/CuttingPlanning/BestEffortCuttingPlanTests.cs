@@ -110,7 +110,7 @@ public class BestEffortCuttingPlanTests
     }
 
     [Fact]
-    public void MixedBatch_StaleOrCancelledChangesNothing()
+    public void MixedBatch_StaleOrCanceledChangesNothing()
     {
         var imperfect = TouchingContours();
         var clean = new Part(new Drawing("clean", ExplicitContourTests.Square(false)), new Vector(1, 1));
@@ -119,10 +119,10 @@ public class BestEffortCuttingPlanTests
         var batch = CuttingPlanBatch.Capture(plates, ExplicitContourTests.Parameters(), false);
         var proposal = batch.Plan();
         Assert.True(proposal.RequiresWarningAcceptance);
-        using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
-        Assert.Equal(CuttingCommitStatus.Cancelled, proposal.Apply(true, cancelled.Token).Status);
-        Assert.False(batch.Plan(token: cancelled.Token).CanApplyWithWarnings);
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Assert.Equal(CuttingCommitStatus.Canceled, proposal.Apply(true, canceled.Token).Status);
+        Assert.False(batch.Plan(token: canceled.Token).CanApplyWithWarnings);
         imperfect.Offset(1, 0);
         Assert.Null(proposal.BuildPreview(1));
         Assert.Equal(CuttingCommitStatus.Stale, proposal.Apply(acceptWarnings: true).Status);
@@ -202,7 +202,7 @@ public class BestEffortCuttingPlanTests
     }
 
     [Fact]
-    public void ProvenNestedPart_PrecedesItsHostEvenWithAnImperfectNeighbour()
+    public void ProvenNestedPart_PrecedesItsHostEvenWithAnImperfectNeighbor()
     {
         var hostProgram = ExplicitContourTests.Square(false);
         hostProgram.MoveTo(2, 2); hostProgram.LineTo(8, 2); hostProgram.LineTo(8, 8);

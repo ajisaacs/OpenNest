@@ -8,7 +8,7 @@ using OpenNest.Geometry;
 
 namespace OpenNest.WinForms.Tests.Forms;
 
-// Each desktop edit records one labelled undo entry and Undo puts the nest back. Reads
+// Each desktop edit records one labeled undo entry and Undo puts the nest back. Reads
 // Application.OpenForms through the busy guards, so it must not overlap fill-lifetime tests.
 [Collection("Fill operation lifetime")]
 public class UndoRecordingTests
@@ -119,7 +119,7 @@ public class UndoRecordingTests
     });
 
     [Fact]
-    public void CancellingEditPlateRecordsNothing() => UndoTestEnv.Run(env =>
+    public void CancelingEditPlateRecordsNothing() => UndoTestEnv.Run(env =>
     {
         env.Editor.PlateManager.LoadAt(2);
         UndoTestEnv.WhenShown<EditPlateForm>(form => form.DialogResult = DialogResult.Cancel);
@@ -430,7 +430,7 @@ public class UndoRecordingTests
     }, NestWithRequiredQuantity);
 
     [Fact]
-    public void CancellingTheConverterRecordsNothing() => UndoTestEnv.Run(env =>
+    public void CancelingTheConverterRecordsNothing() => UndoTestEnv.Run(env =>
     {
         var before = UndoTestEnv.Describe(env.Nest);
         UndoTestEnv.WhenShown<CadConverterForm>(form => form.DialogResult = DialogResult.Cancel);

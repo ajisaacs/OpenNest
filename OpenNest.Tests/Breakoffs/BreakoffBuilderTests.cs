@@ -45,7 +45,7 @@ public class BreakoffBuilderTests
     private static Breakoff On(params Entity[] join) => new() { EdgeIds = join.Select(e => e.Id).ToList() };
 
     [Fact]
-    public void Layout_CutsTheJoiningLineBetweenTabs_TravellingWithTheScrapOnTheLeft()
+    public void Layout_CutsTheJoiningLineBetweenTabs_TravelingWithTheScrapOnTheLeft()
     {
         var (entities, join) = Chord();
 

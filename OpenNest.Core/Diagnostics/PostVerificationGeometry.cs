@@ -49,7 +49,7 @@ internal static class PostVerificationGeometry
         /// <summary>
         /// The relative rounding allowance of native line/circle intersections. Their discriminant
         /// b^2 - 4ac cancels: its absolute error stays below about 30 units of roundoff times
-        /// |d1|^2 (|d2|^2 + r^2) (d1 the line, d2 from the circle's centre to the line's start), so a
+        /// |d1|^2 (|d2|^2 + r^2) (d1 the line, d2 from the circle's center to the line's start), so a
         /// spurious root can lie at most about 1e-7 times the span of both extents beyond the true
         /// distance between line and circle (about 2e-9 is seen in practice). A long lead beside a
         /// small circle needs the full check; a short lead beside a nearby part does not.
@@ -473,11 +473,11 @@ internal static class PostVerificationGeometry
             point.X - Center.Value.X)) <= System.Math.Abs(Sweep) + Epsilon / Radius
             || point.DistanceTo(Start) <= Epsilon || point.DistanceTo(End) <= Epsilon;
 
-        // How far past r^2 a squared distance from the centre still counts as touching the arc.
+        // How far past r^2 a squared distance from the center still counts as touching the arc.
         // For small arcs this band reaches well beyond the radius (sqrt(1e-8) = 1e-4 as r -> 0).
         private double ContactSlack => Epsilon * System.Math.Max(1, Radius * 2);
 
-        // The largest distance from the centre that ContactAfterStart can count as contact.
+        // The largest distance from the center that ContactAfterStart can count as contact.
         private double ContactReach => System.Math.Sqrt(Radius * Radius + ContactSlack);
 
         internal bool ContactAfterStart(Vector origin, Vector direction, double length,

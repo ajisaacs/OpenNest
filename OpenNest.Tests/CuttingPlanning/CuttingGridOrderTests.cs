@@ -63,7 +63,7 @@ public class CuttingGridOrderTests
     public void DriftingRows_AreNotAGrid()
     {
         // The rows slope upward by 0.1 per unit of X: no gap separates one row from the next.
-        var extents = Interleaved(12, 20).Select(centre => Extent(centre + new Vector(0, centre.X * 0.1))).ToArray();
+        var extents = Interleaved(12, 20).Select(center => Extent(center + new Vector(0, center.X * 0.1))).ToArray();
 
         Assert.Null(CuttingGridOrder.Plan(extents, Vector.Zero, default));
     }
@@ -71,10 +71,10 @@ public class CuttingGridOrderTests
     [Fact]
     public void TwoPartsInOneCell_AreNotAGrid()
     {
-        var centres = Interleaved(12, 20).ToList();
-        centres[5] = centres[4] + new Vector(0.1, 0.1);
+        var centers = Interleaved(12, 20).ToList();
+        centers[5] = centers[4] + new Vector(0.1, 0.1);
 
-        Assert.Null(CuttingGridOrder.Plan(centres.Select(Extent).ToArray(), Vector.Zero, default));
+        Assert.Null(CuttingGridOrder.Plan(centers.Select(Extent).ToArray(), Vector.Zero, default));
     }
 
     [Fact]
@@ -84,8 +84,8 @@ public class CuttingGridOrderTests
         var plate = nest.CreatePlate();
         plate.Size = new Size(30, 30);
         var drawing = new Drawing("washer", Washer());
-        foreach (var centre in Interleaved(12, 20))
-            plate.Parts.Add(new Part(drawing, centre - new Vector(Diameter / 2, Diameter / 2)));
+        foreach (var center in Interleaved(12, 20))
+            plate.Parts.Add(new Part(drawing, center - new Vector(Diameter / 2, Diameter / 2)));
         var parameters = new CuttingParameters
         {
             ExternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 },
@@ -108,8 +108,8 @@ public class CuttingGridOrderTests
         Enumerable.Range(0, rows).SelectMany(row => Enumerable.Range(0, perRow)
             .Select(column => new Vector(1 + (2 * column + row % 2) * 1.03, 1 + row * 0.6)));
 
-    private static Box Extent(Vector centre) =>
-        new(centre.X - Diameter / 2, centre.Y - Diameter / 2, Diameter, Diameter);
+    private static Box Extent(Vector center) =>
+        new(center.X - Diameter / 2, center.Y - Diameter / 2, Diameter, Diameter);
 
     private static Program Washer()
     {

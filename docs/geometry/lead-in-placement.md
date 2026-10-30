@@ -99,13 +99,13 @@ Plan Cutting has tried every entry of a cutout and none fits, it erodes the cuto
    joins and Clipper rounding. Shallower levels, down to half that depth, back it up.
 3. Each of the cutout's ranked entries gets the nearest point of the deepest level that reaches
    the wall beside it: a letter stroke narrower than the cutout's widest place is still pierced
-   on its own centre line next to the entry, so the route can enter and leave a letter where it
+   on its own center line next to the entry, so the route can enter and leave a letter where it
    needs to.
 4. The lead-in runs straight from the pierce to that entry, or else to the cutout's native point
    closest to the pierce (`PreparedContours.ErodedPierceEntries`, a `ContourChoice` whose `Pierce`
    is set). A cutout so pierced has no lead-out: a feature too small for its lead-in has no room
    for one either.
-5. A cutout too small to erode is pierced at its pole, and a round hole at its centre.
+5. A cutout too small to erode is pierced at its pole, and a round hole at its center.
 6. `LeadPathValidator` checks each candidate like any other planner-chosen entry, pierce zone
    included. When none is clear, the "No tested lead-in fits" finding says why.
 
@@ -130,16 +130,16 @@ ordinary search may have spent all of its share on the outside entries. A lead t
 can check clear alone and still touch in the whole part, where rounding moves it by about 1e-15:
 a widened try drops such an entry and repeats that outside entry instead of rebuilding the chain.
 
-## Leads stop at the centre line
+## Leads stop at the center line
 
-In a cut Plan Cutting chooses, a lead-in stays out of the far half of a small feature. The centre
+In a cut Plan Cutting chooses, a lead-in stays out of the far half of a small feature. The center
 line is where the walls meet as the cutout erodes: straight in from an entry, the distance to the
 wall grows steadily until a second wall is as near, then levels off along a stroke or falls
-(`ContourCuttingStrategy.StopAtCentreLine`).
+(`ContourCuttingStrategy.StopAtCenterLine`).
 
 A lead longer than that depth, or one whose own line gets closer to a wall again, becomes a straight
-lead normal to the wall (the bisector at a corner). It runs from the centre line, or from the lead's
-own length in when that comes first; a round hole's centre is its centre line. So a round hole
+lead normal to the wall (the bisector at a corner). It runs from the center line, or from the lead's
+own length in when that comes first; a round hole's center is its center line. So a round hole
 smaller than its lead is pierced in the middle, at any approach angle, and a letter stroke at a
 shallow approach angle gets a short lead across the stroke instead of a full one along it.
 
@@ -158,7 +158,7 @@ unchanged/fallback behavior. The perimeter tests cover every square corner under
 windings and a rotation, auto and manual placement from either edge, preview
 agreement, approach-angle handling, the flat-corner clearance fallback, reflex
 notches, and straight lead-outs. `ErodedPierceTests` covers the eroded pierces of a slot and a small round hole, leads stopped at a
-centre line, a cutout that keeps its configured lead, the containment of text cutouts that sit a micro-inch apart and, with the
+center line, a cutout that keeps its configured lead, the containment of text cutouts that sit a micro-inch apart and, with the
 optional `SmallFeatureLeadNestPath` input, a plate of stencil-text tags planned in reading order.
 `ArcLeadInTangentTests` checks curved-lead tangency, direction
 and sweep on perimeters and cutouts under both windings, and at every perimeter corner from

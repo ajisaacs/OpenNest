@@ -30,10 +30,10 @@ public class HoleDepartureTests
         return clean;
     }
 
-    private static void Circle(Program program, Vector centre, double radius)
+    private static void Circle(Program program, Vector center, double radius)
     {
-        program.MoveTo(centre.X + radius, centre.Y);
-        program.ArcTo(centre.X + radius, centre.Y, centre.X, centre.Y, RotationType.CCW);
+        program.MoveTo(center.X + radius, center.Y);
+        program.ArcTo(center.X + radius, center.Y, center.X, center.Y, RotationType.CCW);
     }
 
     // The saved settings this regression came from: 0.15 line lead-ins at 90 degrees, no lead-outs.
@@ -61,9 +61,9 @@ public class HoleDepartureTests
         var adapter = new ContourEntryFeasibility(prepared, source.Location, source.Material, []);
         var outside = ContourEntrySelection.Select(prepared.AutomaticEntryCandidatesWithFallbacks(prepared.PerimeterOrdinal)
             .RankTowardNextCut(null, Start), c => adapter.Check(c.Choice)).Choices[0];
-        var centres = prepared.HoleCentres().Select(c => c ?? Vector.Zero).ToArray();
+        var centers = prepared.HoleCenters().Select(c => c ?? Vector.Zero).ToArray();
         var route = new[] { 0, 1, 2, 3 };
-        var preferred = PreferredContourEntries.TryPlan(prepared, outside, route, centres, Start,
+        var preferred = PreferredContourEntries.TryPlan(prepared, outside, route, centers, Start,
             c => adapter.Check(c.Choice));
         Assert.True(preferred.IsPreferred, preferred.Reason);
 

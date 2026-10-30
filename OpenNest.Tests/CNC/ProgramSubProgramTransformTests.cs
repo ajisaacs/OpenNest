@@ -12,7 +12,7 @@ public class ProgramSubProgramTransformTests
 {
     private const double QuarterTurn = System.Math.PI / 2;
 
-    /// <summary>Incremental hole sub-program: a lead-in from the hole centre to
+    /// <summary>Incremental hole sub-program: a lead-in from the hole center to
     /// (1, 0), then a full radius-1 circle.</summary>
     private static Program MakeHoleSub()
     {
@@ -58,7 +58,7 @@ public class ProgramSubProgramTransformTests
         pgm.Rotate(QuarterTurn);
 
         // (5, 5) -> (-5, 5) and (15, 5) -> (-5, 15); each lead-in ends one unit along
-        // the rotated +X axis, i.e. at +Y from its centre.
+        // the rotated +X axis, i.e. at +Y from its center.
         var ends = LeadInEnds(pgm);
         Assert.Equal(2, ends.Count);
         AssertPoint(-5, 6, ends[0]);

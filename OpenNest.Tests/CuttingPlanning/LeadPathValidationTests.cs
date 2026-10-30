@@ -188,7 +188,7 @@ public class LeadPathValidationTests
     public void LegacyTabbedArcFromNominalClosure_IsRefusedNotRefit()
     {
         // Former emitter output: the cut stops at the tab (0,4.8), but the arc lead-out was
-        // generated about the nominal entry (0,5). Never recentre the arc or bridge the gap.
+        // generated about the nominal entry (0,5). Never recenter the arc or bridge the gap.
         var p = new Program();
         p.MoveTo(-1, 5);
         p.Codes.Add(new LinearMove(0, 5) { Layer = LayerType.Leadin });

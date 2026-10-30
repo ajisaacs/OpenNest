@@ -33,7 +33,7 @@ internal sealed record BarType(
 /// validation-aware bounds as the Rectangles lane so box contact passes the layout check.
 /// Unlike Rectangles, all rotations are kept: a bar accepts any rotation whose cross extent
 /// fits its width, and the compaction pass may prefer a different rotation of the same length
-/// (a part turned 180 degrees so its mitred end nests against its neighbour).
+/// (a part turned 180 degrees so its mitred end nests against its neighbor).
 /// </summary>
 internal static class BarCatalog
 {

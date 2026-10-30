@@ -91,7 +91,7 @@ straight move and cuts the arc as drawn, rather than starting the arc off its ow
 such bridge, since a lead-in must join the contour itself. Native intersections,
 executed-motion checks and pre-post verification retain their existing tolerances.
 
-Arcs of one circle whose centres were each derived from their own endpoints agree only
+Arcs of one circle whose centers were each derived from their own endpoints agree only
 within the 1e-8 support tolerance, not bit for bit. Their spans are compared at the
 1e-6 seam tolerance: arcs that share a span still refuse as overlap, while arcs that
 only meet at a joint, or lie apart on the circle (a notched ring), do not.
@@ -125,7 +125,7 @@ the final replay enforce them:
   when its placed program is one continuous straight cut on its own line spanning
   the sheet from edge to edge (`CutOff.SeparatesSheet`). A line trimmed around parts,
   limited short of an edge, on the sheet edge, stale after a move or in an
-  unrecognised program form does not qualify and keeps the crossing rule above.
+  unrecognized program form does not qualify and keeps the crossing rule above.
   Being continuous, a separating line passes through no part. A kept order that cuts
   it earlier is a constraint conflict naming the separating cutoff.
 - A drawing's break cuts (`LayerType.Break`, see [breakoffs](breakoffs.md)) are open
@@ -160,7 +160,7 @@ revisit an earlier entry when a later part cannot be reached safely. For multi-p
 requests containing regenerated holes, it first tries one ranked hole chain for
 each outside endpoint. This lets a later blocked approach change the previous
 part's departure without first exhausting combinations of its earlier holes.
-This preferred pass uses the hole centres to propose an order and checks only the
+This preferred pass uses the hole centers to propose an order and checks only the
 one previously lead-feasible entry selected for each hole; it does not prepare
 alternative entries until a subsequent recovery/full pass needs them. It still
 checks emitted motions under the shared expansion budget and stall limit, and
@@ -196,12 +196,12 @@ cutoff segments that must precede some part are left out of the search: the part
 planned as if the segments were not there, so a plate's route does not change because
 strip lines were added, and the segments are placed into that plan afterwards (see
 [cutoff segments](#cutoff-segments) below). The order is an open
-travelling-salesman path over part centres from the start point: nearest neighbour,
+traveling-salesman path over part centers from the start point: nearest neighbor,
 then 2-opt reversals and Or-opt moves of one to three parts, never placing a part
 before a cutoff or nested-part prerequisite. A part with other parts nested in its
 cutouts (a host) is cut after all of them, so the tool reaches it from whichever was
 cut last, and from the middle of a crowded cutout every straight approach crosses a
-finished neighbour. The nested parts of each host are therefore toured as one run,
+finished neighbor. The nested parts of each host are therefore toured as one run,
 immediately before the host, ending beside the point of the host's contours nearest
 the tool position at the start of the run; nested hosts apply the same rule inside
 the run. Host groups follow the parts beside them, because a finished host is a large
@@ -209,8 +209,8 @@ obstacle that can only be left across its own outside edge. Learned rules win ov
 both: a rule between parts of two groups orders the groups, and rules that cannot
 keep a group whole fall back to the plain tour. Plates without nested parts get the
 plain tour unchanged, except a large grid: a plate of at least 200 parts with no
-cutoffs or prerequisites, whose part centres bin into rows by Y and columns by X
-within a quarter of the smallest part extent (every gap between neighbouring bins
+cutoffs or prerequisites, whose part centers bin into rows by Y and columns by X
+within a quarter of the smallest part extent (every gap between neighboring bins
 wider than that, no two parts in one cell, at least a quarter of the cells filled,
 as interleaved rows fill half), is toured as a serpentine: line by line, alternating
 direction, along whichever axis and from whichever corner gives the shortest route
@@ -239,7 +239,7 @@ separator teaches its other-way-round rule at once. A rule that would contradict
 "Cut before" rules are a heuristic (a part blocked straight after another may be
 reachable via a third), so once nothing new can be learned the remaining budget
 first tries sequence-free recovery, visiting dependency-ready parts lazily by
-material-centre distance. When a branch stalls, it disposes the deeper search
+material-center distance. When a branch stalls, it disposes the deeper search
 frames and resumes alternatives at the root instead of spending the remainder
 on that branch's completed prefix. The retained full search runs after it. Each of
 these two passes, and the full pass along a kept order, is held to two stalls' worth
@@ -286,7 +286,7 @@ routes the plan had, and replays Ready again.
 
 Candidates use native closest points, vertices, midpoints and circle angles in
 stable order. `maxEntries` caps the normal ranked shortlist, not the recovery
-catalogue: recovery may inspect the remaining finite native entries, with every
+catalog: recovery may inspect the remaining finite native entries, with every
 precheck and visited transition charged to the same expansion budget. Circle
 rounding, clamping, corner resolution
 and tab trimming happen during emission. Validation uses the actual emitted
@@ -344,7 +344,7 @@ tangent arc at a shared vertex, such as a fillet, is an ordinary joint: an exact
 contact that the native query rounds away is not uncertain at a line endpoint the
 other curve already touches, while a contact anywhere else on the line still refuses.
 
-Source parts rank by modeled travel (material-centre distance at a holed-part
+Source parts rank by modeled travel (material-center distance at a holed-part
 boundary); within a part, preferred contour order and facing-entry rank precede
 travel. Ties use stable source/contour/entry ordinals. Hash values and drawing names
 are not tie breakers.
@@ -354,12 +354,12 @@ search generates and checks contour alternatives on demand in contour/entry rank
 order. It does not emit every sibling before trying the first. Backtracking still
 visits the remaining alternatives when needed; none is pruned. The retained full whole-part
 fallback still evaluates all ready sources before ranking their travel distances;
-sequence-free recovery instead uses lazy centre-distance order.
+sequence-free recovery instead uses lazy center-distance order.
 
 The expansion budget counts evaluated candidates and frontier ranking, including
 rejections, before emission; it is not a wall-clock timeout. An unvisited sibling
 consumes no additional DFS-prefix emission work or per-sibling expansion charge;
-entry-catalogue prechecks still emit isolated contours and consume budget.
+entry-catalog prechecks still emit isolated contours and consume budget.
 Consequently a bounded search can
 reach a different frontier and report different rejected approaches than eager
 expansion did. All visited candidates retain their lead/rapid checks, and a selected
@@ -369,11 +369,11 @@ a refusal, not an unranked fallback or proof of geometric impossibility.
 ## Automatic outside entries and look-ahead
 
 An unlocked part's outside entry is chosen automatically toward the NEXT cut: the ranker orders the native candidate
-catalogue by the facing side(s) of the next part's placed-material centre, and
+catalog by the facing side(s) of the next part's placed-material center, and
 the shared lead validator certifies each emitted lead lazily until up to
 `maxEntries` feasible candidates remain. At caps of four or more, a corrective
 scan reconsiders memoized clear candidates for each missing side before evaluating
-more of the catalogue; a later side cannot lose a usable point merely because
+more of the catalog; a later side cannot lose a usable point merely because
 an earlier side's scan passed it. Replacements preserve other covered sides and
 global rank, never exceed the cap, and stop evaluating the tail once coverage
 settles. Smaller caps retain rank priority rather than promising all-side coverage.
@@ -383,14 +383,14 @@ candidate on its selected entity when a joined contour has an accepted rounding 
 no entry-membership or lead-clearance tolerance is widened.
 
 With no lead-out the tool leaves a part from its outside entry. An entry inside a slot
-or pocket can only be left back over the part just cut, so within the ranked catalogue
+or pocket can only be left back over the part just cut, so within the ranked catalog
 entries are ordered by how many straight sight lines to the next cut clear the part's
 own perimeter: the look-ahead point and, for an ordinary next part, the four corners
 of its cut extent. This is a stable reordering before the lead checks; no entry is
 dropped, and every emitted rapid is still checked.
 
 When the next cut is the host whose cutout the part sits in, the look-ahead point is
-the nearest point of the host's own contours, not its centre (which lies in the middle
+the nearest point of the host's own contours, not its center (which lies in the middle
 of the cutout, among the other nested parts).
 
 The next cut is the next unfinished part in a supplied order — recomputed
@@ -403,17 +403,17 @@ Uncertain (numerically incomplete) validator answers are not geometric refusals:
 those candidates can fill remaining retained slots for emitted-prefix checking and
 complete replay. The normal ranked entry count stays within `maxEntries`; directed recovery can
 inspect additional native entries as described above. A
-part/contour with no fitting lead in its fully evaluated catalogue is reported
+part/contour with no fitting lead in its fully evaluated catalog is reported
 as "No tested lead-in fits on part N, contour M"; budget exhaustion stays a
 budget finding and incomplete checks are never presented as geometric
 impossibility. Lead prechecks are reported separately and their requests also consume
 the shared expansion budget before native work.
 
 For a holed part, the search chooses an outside endpoint before cutting any hole.
-Each endpoint branch builds an open hole-centre route from the original arrival to
-that endpoint, using bounded nearest-neighbour, 2-opt and Or-opt improvement.
+Each endpoint branch builds an open hole-center route from the original arrival to
+that endpoint, using bounded nearest-neighbor, 2-opt and Or-opt improvement.
 A cutout that contains the arrival point (the tool comes from a part nested in it) is
-routed from the arrival point itself, not its centre, so it is cut first, before a
+routed from the arrival point itself, not its center, so it is cut first, before a
 later hop to it would have to cross the other parts nested there.
 On a part with at least 64 contours, a middle step of that route (neither the first
 contour, which also cuts the part's scribes and open cuts, nor the last) checks only the
@@ -489,7 +489,7 @@ on its own fresh replay: that is an ordinary replayed `Ready` proposal.
   geometry, empty input, invalid eligibility or nonpositive bounds.
 - `NoSolutionWithinBudget`: the bounded/capped search found no complete proposal;
   it does not prove no possible geometric route exists.
-- `Cancelled`: capture, search or replay cancelled without live mutation.
+- `Canceled`: capture, search or replay canceled without live mutation.
 
 Malformed original executed graphs are refused, not salvaged. Valid but incomplete
 old programs can regenerate from clean geometry. Regenerated programs retain genuine
@@ -539,7 +539,7 @@ plate's settings. Capture resolves each regenerated part's pins against its own 
 clean contours with `CutPinResolver` and prepares them with
 `PreparedContours.Capture(program, parameters, pins)`:
 
-- A pinned contour has exactly one entry, the pin's; every candidate catalogue returns it
+- A pinned contour has exactly one entry, the pin's; every candidate catalog returns it
   alone and emission refuses any other entry for that contour, so the search can never move
   it. It is emitted through the same emitter with the pin's own lead-in and lead-out for
   every contour type, the pin's tab (or none) and angle rounding off; the emitter's own
@@ -551,7 +551,7 @@ clean contours with `CutPinResolver` and prepares them with
   contour with another pin, or cannot be placed on the program leaves its contour automatic
   and adds a `FixedLead` warning naming the pin (`FixedLeadWarning.PinNumber`), for example
   "Drawing pin 2 no longer matches the geometry; planned with nest settings.", which makes the
-  plate UNVERIFIED. A tab pinned on an internal contour is not honoured either: only the
+  plate UNVERIFIED. A tab pinned on an internal contour is not honored either: only the
   outside is tabbed.
 - A pinned contour's lead-in, cut, lead-out and tab are a fixed emission like a locked program
   (see [fixed emissions](#fixed-emissions-warn)): a pinned lead that meets another part's
@@ -692,7 +692,7 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   missing-lead warning remains available for operator review; a ready plan does not
   waive posting checks.
   When a lead hits another part, the finding suggests more spacing or a shorter lead;
-  when no tested entry fits, it suggests reducing lead-in length and, if neighbours
+  when no tested entry fits, it suggests reducing lead-in length and, if neighbors
   obstruct it, spacing the parts farther apart. These are suggestions, not guaranteed
   fixes: replanning runs the same strict checks; an unverified fallback requires
   separate warning acceptance and is not approval to post or cut.
@@ -748,7 +748,7 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   editor numbers them. The panel shows the selected plate detached from the nest (quantity
   zero, so drawing quantities do not change) in the proposed order with the proposed
   programs. Ready and best-effort proposals can be previewed only while the plate still
-  matches capture. Best-effort previews are labelled `UNVERIFIED`. Refused program graphs
+  matches capture. Best-effort previews are labeled `UNVERIFIED`. Refused program graphs
   are never copied, and changed plates require replanning.
 - Apply requires usable output for every plate and remains all or nothing. The outcome line
   counts best-effort proposals as usable when reporting how many plates block Apply;
@@ -761,7 +761,7 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   Both use the same owned-program, freshness and rollback boundary. After it applies, each plate keeps its own copy of the
   confirmed settings, which also become the saved defaults. `Stale` keeps the panel open
   and asks for a replan; nothing changes.
-- Closing or cancelling while planning cancels the worker and keeps the panel locked until
+- Closing or canceling while planning cancels the worker and keeps the panel locked until
   it stops. Planning and Apply refuse to start while a nesting or plate operation runs.
   The panel plans with its own copy of the settings, and posts progress and results to
   the thread it was created on rather than to whichever context is current.
@@ -780,7 +780,7 @@ or numerically uncertain material boundaries need not prevent lead-in generation
 closed executable contours are readable. The fallback reuses the existing contour emitter:
 internal contours first, the largest bounding perimeter last, nearest entry from the preceding
 departure, with the confirmed lead styles. The internal contours follow the same open
-nearest-neighbour + 2-opt/Or-opt tour over hole centres that the strict search proposes, not
+nearest-neighbor + 2-opt/Or-opt tour over hole centers that the strict search proposes, not
 source order, so their rapids do not cross each other. It retains source part order except to satisfy
 proven cutoff and nested-part prerequisites. `Keep the current part order` still refuses an
 order that contradicts a proven prerequisite. Uncertain containment is named as a warning.
@@ -863,7 +863,7 @@ plates' own saved settings, which must be identical across the plates in scope. 
   sheet `--autonest` added) after filling and before saving or posting; `--no-fill` plans a
   loaded `.nest` as it is, and `--all-plates` widens the scope to every occupied plate.
   `--cutting-params <path>` supplies settings and `--keep-part-order` fixes whole-part order.
-  A blocked or cancelled plan exits 2 and saves or posts nothing. An unverified plan is
+  A blocked or canceled plan exits 2 and saves or posts nothing. An unverified plan is
   applied only with `--accept-unverified-plan` for that invocation; posting still runs its own
   verification and needs `--acknowledge-post-risks` separately.
 - MCP: `plan_cutting(plateIndex = -1, keepPartOrder, cuttingParametersPath)` reports the

@@ -182,14 +182,14 @@ public class CutPinFrameLifecycleTests
     {
         var shapes = ShapeBuilder.GetShapes(
             ConvertProgram.ToGeometry(part.Program).Where(e => SpecialLayers.IsMaterial(e.Layer)));
-        var big = HoleCentre(shapes, BigRadius) + part.Location;
-        var small = HoleCentre(shapes, SmallRadius) + part.Location;
+        var big = HoleCenter(shapes, BigRadius) + part.Location;
+        var small = HoleCenter(shapes, SmallRadius) + part.Location;
         var turn = Direction(small - big) - Direction(SmallHole - BigHole);
         return source => (source - BigHole).Rotate(turn) + big;
     }
 
-    // A circle's bounding box is centred on it at any rotation.
-    private static Vector HoleCentre(List<Shape> shapes, double radius)
+    // A circle's bounding box is centerd on it at any rotation.
+    private static Vector HoleCenter(List<Shape> shapes, double radius)
     {
         var box = Assert.Single(shapes.Select(s => s.Entities.GetBoundingBox()),
             b => System.Math.Abs(b.Width - 2 * radius) < 1e-6 && System.Math.Abs(b.Length - 2 * radius) < 1e-6);

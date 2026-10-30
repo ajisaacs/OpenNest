@@ -77,7 +77,7 @@ GitHub's cross-platform workflow runs both the checker tests and the six-fixture
 in a separate job, concurrently with four independent unit-suite jobs (main, Engine,
 IO and Server). Unit jobs retain the default Debug configuration and do not cancel
 siblings on failure. The final `tests` check requires the entire unit matrix and
-synthetic job to succeed; failed, cancelled or skipped dependencies cannot produce
+synthetic job to succeed; failed, canceled or skipped dependencies cannot produce
 a green final check. This preserves the existing check name without changing branch
 protection or removing tests. `python3 scripts/test_ci_results.py -v` exercises the
 same fail-closed aggregate command used by CI. The six-minute step limit and

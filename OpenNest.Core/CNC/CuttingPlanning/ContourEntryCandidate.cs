@@ -53,7 +53,7 @@ internal enum AutomaticEntryKind
 
 /// <summary>
 /// Which automatic entries a perimeter tabbed for support offers (see
-/// <see cref="PreparedContours.WithSupportTab"/>); every other contour offers its whole catalogue.
+/// <see cref="PreparedContours.WithSupportTab"/>); every other contour offers its whole catalog.
 /// </summary>
 internal enum SupportEntries
 {

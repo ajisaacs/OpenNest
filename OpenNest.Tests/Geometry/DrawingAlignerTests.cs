@@ -441,7 +441,7 @@ public class DrawingAlignerTests
     // ---------- cancellation fails closed ----------
 
     [Fact]
-    public void Align_CancelledUpFront_FailsClosed()
+    public void Align_CanceledUpFront_FailsClosed()
     {
         var oldPgm = BuildProgram(AsymmetricOuter(), HoleAt(3, 3, 1));
         using var cts = new CancellationTokenSource();
@@ -451,7 +451,7 @@ public class DrawingAlignerTests
 
         Assert.True(
             result.FailureMessage != null || !result.Converged,
-            $"a cancelled run must not report a confident success; reasons={result.Reasons}"
+            $"a canceled run must not report a confident success; reasons={result.Reasons}"
         );
     }
 

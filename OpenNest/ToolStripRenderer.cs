@@ -426,7 +426,7 @@ namespace OpenNest
             }
         }
 
-        // The only purpose of this override is to change the arrow colour.
+        // The only purpose of this override is to change the arrow color.
         // It's OK to just draw over the default arrow since we also pass down arrow drawing to the system renderer.
         protected override void OnRenderSplitButtonBackground(ToolStripItemRenderEventArgs e)
         {
@@ -435,7 +435,7 @@ namespace OpenNest
                 ToolStripSplitButton sb = (ToolStripSplitButton)e.Item;
                 base.OnRenderSplitButtonBackground(e);
 
-                // It doesn't matter what colour of arrow we tell it to draw. OnRenderArrow will compute it from the item anyway.
+                // It doesn't matter what color of arrow we tell it to draw. OnRenderArrow will compute it from the item anyway.
                 OnRenderArrow(
                     new ToolStripArrowRenderEventArgs(
                         e.Graphics,
@@ -589,7 +589,7 @@ namespace OpenNest
         protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
         {
             // The default renderer will draw an arrow for us (the UXTheme API seems not to have one for all directions),
-            // but it will get the colour wrong in many cases. The text colour is probably the best colour to use.
+            // but it will get the color wrong in many cases. The text color is probably the best color to use.
             if (EnsureRenderer())
                 e.ArrowColor = GetItemTextColor(e.Item);
             base.OnRenderArrow(e);

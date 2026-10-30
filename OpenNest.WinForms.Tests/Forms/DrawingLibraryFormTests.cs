@@ -342,7 +342,7 @@ public class DrawingLibraryFormTests
                 Field<ComboBox>(editor, "gradeBox").Text = "Grade A";
                 Field<OpenNest.Controls.ThicknessComboBox>(editor, "thicknessBox").Value = 6.35;
 
-                // The new details duplicate SYN-707: cancelling the warning saves nothing.
+                // The new details duplicate SYN-707: canceling the warning saves nothing.
                 Run(editor.SaveAsync());
                 Assert.Contains("'SYN-707'", Assert.Single(warnings));
                 Assert.Empty(library.MetadataUpdates);

@@ -8,7 +8,7 @@ namespace OpenNest.Breakoffs
 {
     /// <summary>
     /// Resolves and applies <see cref="Breakoff"/>s: the joining line becomes open cuts on the
-    /// break layer between tabs, each travelling with the scrap on its left so the cutting
+    /// break layer between tabs, each traveling with the scrap on its left so the cutting
     /// strategies pierce and lead in from the scrap.
     /// </summary>
     public static class BreakoffBuilder

@@ -23,7 +23,7 @@ keep their full-area behavior.
 
 This can change which private block candidate wins; it is not a promise of identical
 Irregular layouts. Verify fulfillment, bounds, spacing and rotation policy through
-the full pipeline, rather than treating a faster cancelled run as acceptance.
+the full pipeline, rather than treating a faster canceled run as acceptance.
 
 ```sh
 dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \

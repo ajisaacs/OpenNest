@@ -178,16 +178,16 @@ public class CuttingPlanServiceTests
     }
 
     [Fact]
-    public void Plan_CancelledCaptureAndWorkerHaveNoMutation()
+    public void Plan_CanceledCaptureAndWorkerHaveNoMutation()
     {
         var parts = Fixture();
         var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest(parts));
         var unchanged = Unchanged(parts);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        Assert.Equal(CuttingPlanStatus.Cancelled,
+        Assert.Equal(CuttingPlanStatus.Canceled,
             CuttingPlanService.Plan(new CuttingPlanRequest(parts), cancellation.Token).Status);
-        Assert.Equal(CuttingPlanStatus.Cancelled, CuttingPlanService.Plan(snapshot, cancellation.Token).Status);
+        Assert.Equal(CuttingPlanStatus.Canceled, CuttingPlanService.Plan(snapshot, cancellation.Token).Status);
         unchanged();
     }
 

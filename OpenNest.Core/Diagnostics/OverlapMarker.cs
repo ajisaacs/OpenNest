@@ -48,13 +48,13 @@ internal static class OverlapMarker
         point = default;
         var minY = outline.Min(vertex => vertex.Y);
         var maxY = outline.Max(vertex => vertex.Y);
-        var centre = (minY + maxY) / 2;
+        var center = (minY + maxY) / 2;
         double below = minY, above = maxY;
         foreach (var vertex in outline.Concat(holes.SelectMany(hole => hole)))
         {
-            if (vertex.Y <= centre && vertex.Y > below)
+            if (vertex.Y <= center && vertex.Y > below)
                 below = vertex.Y;
-            else if (vertex.Y > centre && vertex.Y < above)
+            else if (vertex.Y > center && vertex.Y < above)
                 above = vertex.Y;
         }
         var y = (below + above) / 2;

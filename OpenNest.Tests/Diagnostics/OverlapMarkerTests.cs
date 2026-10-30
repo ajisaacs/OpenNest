@@ -15,7 +15,7 @@ public class OverlapMarkerTests
     {
         var marker = OverlapMarker.Find(Frame, FrameHole, 12, new Vector(2, 2));
 
-        // The frame's bars are 1 wide: the pole sits on a bar's centre line.
+        // The frame's bars are 1 wide: the pole sits on a bar's center line.
         Assert.True(Inside(marker), $"{marker.X:R}, {marker.Y:R}");
         var depth = new[] { marker.X, 4 - marker.X, marker.Y, 4 - marker.Y }.Min();
         Assert.InRange(depth, 0.4, 0.6);
@@ -24,7 +24,7 @@ public class OverlapMarkerTests
     [Fact]
     public void ExhaustedSearchFallsBackToAnInteriorScanLinePoint()
     {
-        // One cell of budget: the search cannot leave the hole-centred bounding-box cell.
+        // One cell of budget: the search cannot leave the hole-centerd bounding-box cell.
         var marker = OverlapMarker.Find(Frame, FrameHole, 12, new Vector(2, 2), maxCells: 1);
 
         Assert.True(Inside(marker), $"{marker.X:R}, {marker.Y:R}");

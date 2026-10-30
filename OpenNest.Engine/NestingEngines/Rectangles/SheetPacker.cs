@@ -44,7 +44,7 @@ internal static class SheetPacker
     /// <summary>
     /// Packing size along one axis: a box that exceeds the sheet by no more than
     /// <see cref="OverhangAllowance"/> packs as exactly the sheet's size. It then spans the whole
-    /// axis, so it has no neighbour there and the overhang lands only past the work-area edge.
+    /// axis, so it has no neighbor there and the overhang lands only past the work-area edge.
     /// </summary>
     public static double PackSize(double size, double sheet) =>
         size > sheet && size <= sheet + OverhangAllowance ? sheet : size;

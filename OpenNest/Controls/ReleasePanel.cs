@@ -577,7 +577,7 @@ namespace OpenNest.Controls
 
         /// <summary>
         /// Opens Edit Drawing, one after another, on each drawing the selected group is refused
-        /// for, or the first refused group's when a releasable one is selected; cancelling one
+        /// for, or the first refused group's when a releasable one is selected; canceling one
         /// stops. The plan is rebuilt after each save.
         /// </summary>
         internal async Task FixSelectedGroupAsync()

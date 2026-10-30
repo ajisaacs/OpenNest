@@ -54,7 +54,7 @@ public class BestFitCacheTests
     }
 
     [Fact]
-    public async Task GetOrCompute_Cancelled_StopsWaitingAndCachesBackgroundResult()
+    public async Task GetOrCompute_Canceled_StopsWaitingAndCachesBackgroundResult()
     {
         var drawing = MakeRotatedTShape();
         var canonical = CanonicalFrame.AsCanonicalCopy(drawing);

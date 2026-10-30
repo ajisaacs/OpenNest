@@ -198,7 +198,7 @@ but no crosshair.
 A clamp narrower than the 0.001 chord tolerance is judged tolerance-free against
 finely re-read material rather than by Clipper2. Any material entering it is reported,
 even below the area threshold. The finding's region is then the whole clamp
-rectangle, and its centroid and marker are the clamp's centre: within half the
+rectangle, and its centroid and marker are the clamp's center: within half the
 clamp's size (under 0.0005) of the material, though not necessarily on it.
 
 `PolygonAreaMoments` evaluates signed moments about local origins. The analyzer

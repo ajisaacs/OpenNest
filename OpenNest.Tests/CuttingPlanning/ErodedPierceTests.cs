@@ -11,7 +11,7 @@ public class ErodedPierceTests
     private static readonly Vector Start = new(-2, 1.5);
 
     [Fact]
-    public void Find_SlotIsPiercedOnItsCentreLineNearEachTarget()
+    public void Find_SlotIsPiercedOnItsCenterLineNearEachTarget()
     {
         var slot = Shape(Rectangle(2, 1, 2.4, 1.05));
 
@@ -58,7 +58,7 @@ public class ErodedPierceTests
         var holes = proposal.ContourChoices.Where(c => c.ContourOrdinal != snapshot.Placements[0].Prepared.PerimeterOrdinal).ToArray();
         Assert.Equal(2, holes.Length);
         Assert.All(holes, c => Assert.NotNull(c.Pierce));
-        // Each lead runs from near the centre line of its cutout to its entry: short, and no
+        // Each lead runs from near the center line of its cutout to its entry: short, and no
         // lead-out follows.
         var leads = proposal.Execution.Motions.Where(m => m.Layer == LayerType.Leadin).ToArray();
         Assert.Equal(2, leads.Count(m => m.Length < 0.05));
@@ -86,7 +86,7 @@ public class ErodedPierceTests
     [Theory]
     [InlineData(90)]
     [InlineData(60)]
-    public void Planner_RoundHoleSmallerThanItsLeadIsPiercedAtItsCentre(double approach)
+    public void Planner_RoundHoleSmallerThanItsLeadIsPiercedAtItsCenter(double approach)
     {
         var program = new Program();
         program.Merge(Circle(2, 1.5, 0.09));
@@ -110,7 +110,7 @@ public class ErodedPierceTests
     [Theory]
     [InlineData(0)]
     [InlineData(0.03)]
-    public void Planner_LeadStopsAtTheCentreLineOfANarrowStroke(double pierceDiameter)
+    public void Planner_LeadStopsAtTheCenterLineOfANarrowStroke(double pierceDiameter)
     {
         // A slot 0.06 wide: the 0.15 lead would fit along it at a shallow angle.
         var program = new Program();
@@ -143,22 +143,22 @@ public class ErodedPierceTests
     }
 
     [Fact]
-    public void StopAtCentreLine_LeadThatStaysOnItsOwnSideKeepsItsShape()
+    public void StopAtCenterLine_LeadThatStaysOnItsOwnSideKeepsItsShape()
     {
         var hole = Shape(Rectangle(0, 0, 2, 2));
         var lead = new LineLeadIn { Length = 0.15, ApproachAngle = 60 };
 
-        Assert.Same(lead, ContourCuttingStrategy.StopAtCentreLine(hole, new Vector(1, 0), lead,
+        Assert.Same(lead, ContourCuttingStrategy.StopAtCenterLine(hole, new Vector(1, 0), lead,
             System.Math.PI / 2, RotationType.CW));
     }
 
     [Fact]
-    public void StopAtCentreLine_LeadLeavingACutoutIsLeftForTheLeadCheck()
+    public void StopAtCenterLine_LeadLeavingACutoutIsLeftForTheLeadCheck()
     {
         var hole = Shape(Rectangle(0, 0, 1, 0.06));
         var lead = new LineLeadIn { Length = 0.5, ApproachAngle = 90 };
 
-        Assert.Same(lead, ContourCuttingStrategy.StopAtCentreLine(hole, new Vector(0.5, 0), lead,
+        Assert.Same(lead, ContourCuttingStrategy.StopAtCenterLine(hole, new Vector(0.5, 0), lead,
             System.Math.PI / 2, RotationType.CW));
     }
 

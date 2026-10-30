@@ -253,7 +253,7 @@ namespace OpenNest
         /// True when <paramref name="part"/>, the placed part of <paramref name="definition"/>, cuts
         /// one continuous straight line on the definition's axis across the whole sheet, so it
         /// splits the sheet in two. Anything else (gaps around parts, limits short of an edge, a
-        /// line on the sheet edge, a stale or unrecognised program) does not separate the sheet.
+        /// line on the sheet edge, a stale or unrecognized program) does not separate the sheet.
         /// </summary>
         internal static bool SeparatesSheet(Part part, CutOff definition, Box sheet)
         {
@@ -347,7 +347,7 @@ namespace OpenNest
             }
 
             // An outlined sheet is cut only where the line crosses material: each crossing is a
-            // span of its own, started at the material's edge and overtravelled past the far
+            // span of its own, started at the material's edge and overtraveled past the far
             // one, within the user's limits.
             var spans = plate.Outline == null
                 ? new List<(double Start, double End)> { (lineStart, lineEnd) }

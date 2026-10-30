@@ -31,7 +31,7 @@ public class TabbedLeadOutTests
         Assert.Equal(end, leadout.Start!.Value);
         var arc = Assert.IsType<Arc>(leadout.Curve.ToEntity());
         Assert.Equal(LeadRadius, arc.Radius, 9);
-        // Centred on the actual end's outward normal, so it touches the edge only where it starts.
+        // Centerd on the actual end's outward normal, so it touches the edge only where it starts.
         Assert.Equal(-LeadRadius, arc.Center.X, 9);
         Assert.Equal(end.Y, arc.Center.Y, 9);
     }
@@ -45,16 +45,16 @@ public class TabbedLeadOutTests
         var execution = Emit(clean, new Vector(5, -2), new ArcLeadOut { Radius = LeadRadius }, tabs: true);
         var (cuts, leadout) = Split(execution);
 
-        var centre = new Vector(5, 5);
+        var center = new Vector(5, 5);
         var end = cuts[^1].End;
-        Assert.Equal(5, end.DistanceTo(centre), 9);
+        Assert.Equal(5, end.DistanceTo(center), 9);
         Assert.Equal(TabSize, end.DistanceTo(new Vector(5, 0)), 9);
         Assert.Equal(end, leadout.Start!.Value);
         var arc = Assert.IsType<Arc>(leadout.Curve.ToEntity());
         Assert.Equal(LeadRadius, arc.Radius, 9);
-        // Externally tangent to the perimeter at the actual end: centre on its radial line.
-        Assert.Equal(5 + LeadRadius, arc.Center.DistanceTo(centre), 9);
-        var radial = end - centre;
+        // Externally tangent to the perimeter at the actual end: center on its radial line.
+        Assert.Equal(5 + LeadRadius, arc.Center.DistanceTo(center), 9);
+        var radial = end - center;
         var offset = arc.Center - end;
         Assert.Equal(0, radial.X * offset.Y - radial.Y * offset.X, 9);
     }

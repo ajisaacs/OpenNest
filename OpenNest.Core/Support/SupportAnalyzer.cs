@@ -360,19 +360,19 @@ namespace OpenNest.Support
                 yield break;
 
             var step = perimeter / TabSamples;
-            var travelled = 0.0;
+            var traveled = 0.0;
             var next = step;
             for (var i = 0; i < outline.Count; i++)
             {
                 var a = outline[i];
                 var b = outline[(i + 1) % outline.Count];
                 var length = a.DistanceTo(b);
-                while (length > 0 && next < travelled + length)
+                while (length > 0 && next < traveled + length)
                 {
-                    yield return a + (b - a) * ((next - travelled) / length);
+                    yield return a + (b - a) * ((next - traveled) / length);
                     next += step;
                 }
-                travelled += length;
+                traveled += length;
             }
         }
     }

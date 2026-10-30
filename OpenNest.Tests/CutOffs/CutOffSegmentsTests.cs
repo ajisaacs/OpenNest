@@ -5,14 +5,14 @@ namespace OpenNest.Tests.CutOffs;
 
 /// <summary>
 /// A cut-off's trimmed segments are materialized as one part each, with its own place in the
-/// cut sequence; each stands for the span of the line between its neighbouring segments.
+/// cut sequence; each stands for the span of the line between its neighboring segments.
 /// </summary>
 public class CutOffSegmentsTests
 {
     private const double Clearance = 0.02;
 
     [Fact]
-    public void Of_GivesEachSegmentTheSpanBetweenItsNeighbours()
+    public void Of_GivesEachSegmentTheSpanBetweenItsNeighbors()
     {
         var (plate, cutOff, _, _) = ThreeSegments();
 

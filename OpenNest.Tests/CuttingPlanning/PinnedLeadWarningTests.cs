@@ -14,9 +14,9 @@ namespace OpenNest.Tests.CuttingPlanning;
 public class PinnedLeadWarningTests
 {
     [Fact]
-    public void PinnedLeadIntoNeighbour_IsUnverifiedWithTheRestPlannedAndTheEntryKept()
+    public void PinnedLeadIntoNeighbor_IsUnverifiedWithTheRestPlannedAndTheEntryKept()
     {
-        var (plate, pinned, neighbour) = NeighbourFixture(pins: true);
+        var (plate, pinned, neighbor) = NeighborFixture(pins: true);
 
         var proposal = CuttingPlanBatch.Capture([plate], PinnedContourTests.NestSettings(), false).Plan();
 
@@ -25,19 +25,19 @@ public class PinnedLeadWarningTests
         var warning = Assert.Single(planned.Result.Findings);
         Assert.Equal(PostVerificationKind.FixedLead, warning.Kind);
         Assert.Same(pinned, warning.SourcePart);
-        Assert.Same(neighbour, warning.OtherSourcePart);
+        Assert.Same(neighbor, warning.OtherSourcePart);
         Assert.Equal(new FixedLeadWarning(1, 1, 1), warning.FixedLead);
         Assert.Equal("Drawing pin 1 lead on cutting contour 1 contacts or enters another part's material. "
             + "The pinned contour is cut exactly as its drawing says. Increase spacing or move this part away "
             + "from the part it meets, then replan.", warning.Message);
-        // The search never relocates the pinned entry, and the neighbour is planned normally.
+        // The search never relocates the pinned entry, and the neighbor is planned normally.
         var proposed = planned.Result.ProposedOrder;
         var placement = Assert.Single(proposed, p => ReferenceEquals(p.SourcePart, pinned));
         Assert.Equal(new Vector(10, 5), Assert.Single(placement.ContourChoices).Point);
         var lead = ExecutionMotionReader.Read(placement.CopyProgram(), pinned.Location, null, default).Motions
             .Single(m => m.Layer == LayerType.Leadin);
         Assert.Equal(1.0, lead.Length, 9); // Not shortened to fit.
-        Assert.True(Assert.Single(proposed, p => ReferenceEquals(p.SourcePart, neighbour)).IsRegenerated);
+        Assert.True(Assert.Single(proposed, p => ReferenceEquals(p.SourcePart, neighbor)).IsRegenerated);
         Assert.Equal(CuttingCommitStatus.InvalidInput, proposal.Apply().Status);
         Assert.Equal(CuttingCommitStatus.Applied, proposal.Apply(acceptWarnings: true).Status);
     }
@@ -45,7 +45,7 @@ public class PinnedLeadWarningTests
     [Fact]
     public void UnpinnedControl_IsReady()
     {
-        var (plate, _, _) = NeighbourFixture(pins: false);
+        var (plate, _, _) = NeighborFixture(pins: false);
 
         var proposal = CuttingPlanBatch.Capture([plate], PinnedContourTests.NestSettings(), false).Plan();
 
@@ -55,7 +55,7 @@ public class PinnedLeadWarningTests
     [Fact]
     public void PinsOffOnThePinnedPart_IsReady()
     {
-        var (plate, pinned, _) = NeighbourFixture(pins: true);
+        var (plate, pinned, _) = NeighborFixture(pins: true);
         pinned.DrawingPinsOff = true;
 
         var proposal = CuttingPlanBatch.Capture([plate], PinnedContourTests.NestSettings(), false).Plan();
@@ -118,7 +118,7 @@ public class PinnedLeadWarningTests
     [Fact]
     public void FeasibilityProbe_AcceptsAPinnedEntryAsGiven()
     {
-        var (plate, pinned, _) = NeighbourFixture(pins: true);
+        var (plate, pinned, _) = NeighborFixture(pins: true);
         var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
             confirmedParameters: PinnedContourTests.NestSettings()));
         var source = snapshot.Placements.Single(p => ReferenceEquals(p.SourcePart, pinned));
@@ -133,20 +133,20 @@ public class PinnedLeadWarningTests
 
     /// <summary>
     /// A 10 x 10 square pinned at its right edge midpoint with a 1.0 straight lead, and a
-    /// 2 x 2 neighbour 0.3 to its right that the lead runs through.
+    /// 2 x 2 neighbor 0.3 to its right that the lead runs through.
     /// </summary>
-    private static (Plate Plate, Part Pinned, Part Neighbour) NeighbourFixture(bool pins)
+    private static (Plate Plate, Part Pinned, Part Neighbor) NeighborFixture(bool pins)
     {
         var drawing = new Drawing("pinned", ExplicitContourTests.Square(false));
         if (pins)
             drawing.CutPins.Add(new ContourCutPin(new Vector(10, 5), new LineLeadIn { Length = 1.0, ApproachAngle = 90 },
                 new NoLeadOut()));
         var pinned = new Part(drawing, Vector.Zero);
-        var neighbour = new Part(new Drawing("neighbour", LeadPathValidationTests.Rectangle(0, 0, 2, 2)),
+        var neighbor = new Part(new Drawing("neighbor", LeadPathValidationTests.Rectangle(0, 0, 2, 2)),
             new Vector(10.3, 4));
         var plate = new Nest().CreatePlate();
         plate.Parts.Add(pinned);
-        plate.Parts.Add(neighbour);
-        return (plate, pinned, neighbour);
+        plate.Parts.Add(neighbor);
+        return (plate, pinned, neighbor);
     }
 }

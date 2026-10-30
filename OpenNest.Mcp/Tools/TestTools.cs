@@ -123,7 +123,7 @@ namespace OpenNest.Mcp.Tools
                 var error = $"Error running test harness: {ex.Message}";
                 if (ex is OperationCanceledException)
                 {
-                    var reason = cancellationToken.IsCancellationRequested ? "cancelled" : "timed out";
+                    var reason = cancellationToken.IsCancellationRequested ? "canceled" : "timed out";
                     error = $"Error running test harness: {reason}.";
                 }
                 if (started)

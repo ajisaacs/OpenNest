@@ -169,7 +169,7 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
         {
             var planned = CuttingPlanBatch.Capture([plate], plate.CuttingParameters ?? DefaultParameters(),
                 preservePartOrder: false, [number], cancellation.Token).Plan(token: cancellation.Token).Plates[0];
-            return (planned.Result.Status == CuttingPlanStatus.Cancelled ? Timeout : Outcome(planned), planned);
+            return (planned.Result.Status == CuttingPlanStatus.Canceled ? Timeout : Outcome(planned), planned);
         }
         catch (OperationCanceledException)
         {

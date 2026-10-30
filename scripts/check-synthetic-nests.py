@@ -174,7 +174,7 @@ def main(argv=None):
         print("PASS: exactly six Irregular results, all valid and fully placed")
         return 0
     except KeyboardInterrupt:
-        print("FAIL: cancelled; owned subprocess tree terminated", file=sys.stderr)
+        print("FAIL: canceled; owned subprocess tree terminated", file=sys.stderr)
         return 130
     except (GateError, OSError, ValueError, KeyError, zipfile.BadZipFile,
             subprocess.SubprocessError) as error:

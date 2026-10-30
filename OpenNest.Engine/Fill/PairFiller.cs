@@ -228,7 +228,7 @@ namespace OpenNest.Engine.Fill
             }
             catch (OperationCanceledException)
             {
-                Debug.WriteLine("[PairFiller] Cancelled mid-phase, using results so far");
+                Debug.WriteLine("[PairFiller] Canceled mid-phase, using results so far");
             }
 
             Debug.WriteLine($"[PairFiller] Best pair result: {best?.Count ?? 0} parts");

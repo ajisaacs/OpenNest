@@ -89,7 +89,7 @@ tabbed perimeter (`PreparedContours.WithSupportTab`), using `TabConfig` for the 
 other parts keep the plate settings, so supported parts are not tabbed.
 
 The emitter tabs a perimeter at its entry: the cut stops short of the entry by the tab size.
-A support-tabbed perimeter's automatic entries are therefore limited to catalogue points the
+A support-tabbed perimeter's automatic entries are therefore limited to catalog points the
 analysis accepts, plus the closest native point to its best tab point (`AutomaticEntryKind.SupportTab`,
 never on a reflex or cusp vertex). Ranking and lead checks are unchanged.
 
@@ -118,7 +118,7 @@ hand-placed lead-ins and the pre-post review alike; a plate with a bed never use
 
 `SupportAnalyzer.AnalyzeWithoutBed` gives such a part a `PartSupport` with `HasBed` false: no
 contacts, never supported, and every tab clear of inside corners steadies it, so the perimeter's
-automatic entries are every catalogue point clear of inside corners plus the best tab point, the
+automatic entries are every catalog point clear of inside corners plus the best tab point, the
 clear outline point nearest the line through the center of gravity across the long side. Which
 of those wins is left to the usual ranking toward the next cut.
 
@@ -126,10 +126,10 @@ With support tabs on, no bed and no range, nothing is tabbed and the plan carrie
 note saying so; its status is unchanged.
 
 If none of those entries has a lead-in that fits, the part is still tabbed. The search falls
-back first to every catalogue entry clear of inside corners, then to every entry
+back first to every catalog entry clear of inside corners, then to every entry
 (`SupportEntries`), each ordered by how well the tab steadies the part; of the entries whose
 lead-in fits, it keeps every one that holds the part level, or else only the steadiest. The
-open-scrap pierce fallback then tries the last of those catalogues.
+open-scrap pierce fallback then tries the last of those catalogs.
 
 A drawing pin on the perimeter wins: its entry, leads and tab are kept as pinned, and the
 analysis is only carried for review. Replay and best-effort plans (`SupportTabCapture.Review`)

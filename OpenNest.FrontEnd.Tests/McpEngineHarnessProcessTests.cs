@@ -91,7 +91,7 @@ public class McpEngineHarnessProcessTests(McpEngineHarnessChildFixture fixture)
             descendant = McpEngineHarnessChildFixture.GetProcess(root, "child");
             await cancellation.CancelAsync();
             var result = await run.WaitAsync(Watchdog);
-            Assert.Contains("cancelled", result, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("canceled", result, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Cleanup failed", result);
             await parent.WaitForExitAsync().WaitAsync(Watchdog);
             await descendant.WaitForExitAsync().WaitAsync(Watchdog);
@@ -142,12 +142,12 @@ public class McpEngineHarnessProcessTests(McpEngineHarnessChildFixture fixture)
     }
 
     [Fact]
-    public async Task AlreadyCancelled_DoesNotStartChild()
+    public async Task AlreadyCanceled_DoesNotStartChild()
     {
         var root = fixture.NewRun();
         var result = await fixture.Tool().TestEngine(root,
             cancellationToken: new CancellationToken(true)).WaitAsync(Watchdog);
-        Assert.Contains("cancelled", result, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("canceled", result, StringComparison.OrdinalIgnoreCase);
         Assert.False(File.Exists(root + ".parent"));
     }
 

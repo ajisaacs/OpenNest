@@ -139,8 +139,8 @@ namespace OpenNest.Mcp.Tools
                     + "acceptWarnings=true to apply it. Nothing changed.";
 
             var commit = proposal.Apply(acceptWarnings, cancellationToken);
-            if (commit.Status == CuttingCommitStatus.Cancelled)
-                return "Apply cancelled. Nothing changed.";
+            if (commit.Status == CuttingCommitStatus.Canceled)
+                return "Apply canceled. Nothing changed.";
 
             // Applied or refused, a proposal is used at most once.
             _session.CuttingProposal = null;

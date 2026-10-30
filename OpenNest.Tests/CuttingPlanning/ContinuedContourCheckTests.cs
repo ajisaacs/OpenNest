@@ -31,7 +31,7 @@ public class ContinuedContourCheckTests
         {
             var choice = prepared.ClosestEntry(hole, position);
             choices.Add(choice);
-            position = prepared.HoleCentres()[hole]!.Value;
+            position = prepared.HoleCenters()[hole]!.Value;
         }
 
         ReleasedContourState continued = null;

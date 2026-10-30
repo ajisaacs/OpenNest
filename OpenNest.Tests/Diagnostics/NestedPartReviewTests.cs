@@ -48,7 +48,7 @@ public class NestedPartReviewTests
     [InlineData(Mode.Incremental)]
     public void HoleLeadCrossingTheInsert_WarnsAtItsSubprogramPose(Mode mode)
     {
-        // The hole is a subprogram call; its lead-in starts at the hole centre, inside the insert.
+        // The hole is a subprogram call; its lead-in starts at the hole center, inside the insert.
         var report = Analyze(Inner(), Host(new Vector(10, 10), mode));
 
         var finding = Assert.Single(Find(report, PostVerificationKind.NestedLead));
@@ -128,7 +128,7 @@ public class NestedPartReviewTests
         return nest;
     }
 
-    // A 20x20 square host with a radius-5 cutout centred at (10, 10). Its placed program cuts the
+    // A 20x20 square host with a radius-5 cutout centerd at (10, 10). Its placed program cuts the
     // hole first through a subprogram call (lead-in from holeLead to (15, 10)), then the perimeter.
     private static Part Host(Vector holeLead, Mode mode = Mode.Absolute)
     {

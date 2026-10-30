@@ -37,8 +37,8 @@ namespace OpenNest.Geometry
         internal const double IncidenceTolerance = 1e-7;
 
         // Drawing data fixes arc centers to finite precision, so a tangent joint's arc end
-        // can sit a little past its neighbour's end. A contact this close to a joint takes
-        // the joint's tangents; otherwise the neighbour reads as a second boundary there.
+        // can sit a little past its neighbor's end. A contact this close to a joint takes
+        // the joint's tangents; otherwise the neighbor reads as a second boundary there.
         internal const double JointTolerance = 1e-6;
 
         // Loops are recovered with ShapeBuilder's chaining tolerance: a source contour that

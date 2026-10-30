@@ -95,7 +95,7 @@ public sealed class PlateOverlapPair
     /// its pole of inaccessibility, or an interior scan-line point when a thin island defeats
     /// the bounded pole search. Markers, hit testing and inspection rings use this point.
     /// A tolerance-free tiny-clamp finding (a clamp narrower than the chord tolerance) keeps
-    /// its conservative whole-clamp region, so its marker is the clamp's centre, within half
+    /// its conservative whole-clamp region, so its marker is the clamp's center, within half
     /// the clamp's size of the material. Returned by value.
     /// </summary>
     public Vector Marker { get; }

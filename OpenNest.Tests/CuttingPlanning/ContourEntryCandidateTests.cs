@@ -5,7 +5,7 @@ using OpenNest.Geometry;
 namespace OpenNest.Tests.CuttingPlanning;
 
 /// <summary>
-/// The uncapped preferred automatic start catalogue: convex corners first, then straight
+/// The uncapped preferred automatic start catalog: convex corners first, then straight
 /// midpoints, then line/arc tangent joints — from the contour's own winding, geometrically
 /// deduplicated, never reflex/cusp vertices or collinear splits, and owned immutably.
 /// </summary>
@@ -35,7 +35,7 @@ public class ContourEntryCandidateTests
         return p;
     }
 
-    // --- positive catalogue -------------------------------------------------------
+    // --- positive catalog -------------------------------------------------------
 
     [Fact]
     public void Square_ExposesFourCornersThenFourMidpoints()
@@ -57,13 +57,13 @@ public class ContourEntryCandidateTests
     [InlineData(true)]
     public void ReversedWinding_SameCornersAndMidpoints(bool reversed)
     {
-        static List<(AutomaticEntryKind Kind, double X, double Y)> Catalogue(Program program) =>
+        static List<(AutomaticEntryKind Kind, double X, double Y)> Catalog(Program program) =>
             Capture(program).AutomaticEntryCandidates(0)
                 .Select(c => (Kind: c.Kind, X: System.Math.Round(c.Choice.Point.X, 6), Y: System.Math.Round(c.Choice.Point.Y, 6)))
                 .OrderBy(x => x.Kind).ThenBy(x => x.X).ThenBy(x => x.Y).ToList();
 
-        var forward = Catalogue(ExplicitContourTests.Square(false));
-        Assert.Equal(forward, Catalogue(ExplicitContourTests.Square(reversed)));
+        var forward = Catalog(ExplicitContourTests.Square(false));
+        Assert.Equal(forward, Catalog(ExplicitContourTests.Square(reversed)));
         Assert.Equal(8, forward.Count);
     }
 
@@ -239,7 +239,7 @@ public class ContourEntryCandidateTests
     }
 
     [Fact]
-    public void Circle_HasNoPreferredCatalogue()
+    public void Circle_HasNoPreferredCatalog()
     {
         var p = new Program();
         p.MoveTo(5, 3);
@@ -270,7 +270,7 @@ public class ContourEntryCandidateTests
     }
 
     [Fact]
-    public void MutatingSourceProgramAfterCapture_CannotChangeTheCatalogue()
+    public void MutatingSourceProgramAfterCapture_CannotChangeTheCatalog()
     {
         var source = ExplicitContourTests.Square(false);
         var prepared = Capture(source);
@@ -285,18 +285,18 @@ public class ContourEntryCandidateTests
     }
 
     [Fact]
-    public void CancelledToken_Throws()
+    public void CanceledToken_Throws()
     {
         var prepared = Capture(ExplicitContourTests.Square(false));
-        using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
 
         Assert.Throws<OperationCanceledException>(() =>
-            prepared.AutomaticEntryCandidates(prepared.PerimeterOrdinal, cancelled.Token));
+            prepared.AutomaticEntryCandidates(prepared.PerimeterOrdinal, canceled.Token));
     }
 
     [Fact]
-    public void CatalogueCandidates_BelongToThisPreparation_AndEmit()
+    public void CatalogCandidates_BelongToThisPreparation_AndEmit()
     {
         var prepared = Capture(ExplicitContourTests.Square(false));
         var corner = prepared.AutomaticEntryCandidates(prepared.PerimeterOrdinal)
@@ -336,10 +336,10 @@ public class ContourEntryCandidateTests
         p.MoveTo(5, 3);
         p.ArcTo(5, 3, 3, 3, RotationType.CCW); // end (5,3), center (3,3), radius 2
 
-        // The preferred catalogue still refuses a whole circle...
+        // The preferred catalog still refuses a whole circle...
         Assert.Throws<ArgumentException>(() => Capture(p).AutomaticEntryCandidates(0));
 
-        // ...but the fallback catalogue makes it usable: the eight native compass points.
+        // ...but the fallback catalog makes it usable: the eight native compass points.
         var plain = WithFallbacks(p);
         Assert.Equal(8, plain.Count);
         Assert.All(plain, c => Assert.Equal(AutomaticEntryKind.CircleCompass, c.Kind));
@@ -380,7 +380,7 @@ public class ContourEntryCandidateTests
         var mid = Assert.Single(withFallbacks, c => c.Kind == AutomaticEntryKind.ArcMidpoint);
         Assert.Equal(5, mid.Choice.Point.X, 9);
         Assert.Equal(15, mid.Choice.Point.Y, 9);
-        // Tier 3: strictly after every preferred kind in catalogue order.
+        // Tier 3: strictly after every preferred kind in catalog order.
         var lastPreferred = withFallbacks.Select(c => c.Kind).ToList()
             .FindLastIndex(k => k <= AutomaticEntryKind.TangentJoint);
         var midpointIndex = withFallbacks.ToList().IndexOf(mid);
@@ -463,7 +463,7 @@ public class ContourEntryCandidateTests
     {
         // Boundary notch 0.6 deep — exactly 2 x lead-in. The inset from each convex
         // opening corner lands exactly on the reflex inner corner, so neither inner
-        // corner may appear in the automatic catalogue at all.
+        // corner may appear in the automatic catalog at all.
         var p = ClosedContour(new[]
         {
             new Vector(0, 0), new Vector(10, 0), new Vector(10, 10), new Vector(0, 10),
@@ -492,7 +492,7 @@ public class ContourEntryCandidateTests
         // The forbidden closest point is dropped entirely...
         Assert.DoesNotContain(candidates, c => Distance(c.Choice.Point, reflex) < 1e-9);
         Assert.DoesNotContain(candidates, c => c.Kind == AutomaticEntryKind.TargetFacing);
-        // ...and the catalogue stays usable through the other fallbacks.
+        // ...and the catalog stays usable through the other fallbacks.
         Assert.Contains(candidates, c => c.Kind == AutomaticEntryKind.NearCorner);
     }
 
@@ -509,9 +509,9 @@ public class ContourEntryCandidateTests
     }
 
     [Fact]
-    public void FallbackCatalogue_IsNonEmptyForEveryShape_AndHonoursCancellation()
+    public void FallbackCatalog_IsNonEmptyForEveryShape_AndHonorsCancellation()
     {
-        // All-rounded contour (bump square) stays usable; cancellation is honoured.
+        // All-rounded contour (bump square) stays usable; cancellation is honored.
         var bump = new Program();
         bump.MoveTo(0, 0);
         bump.LineTo(10, 0);
@@ -521,10 +521,10 @@ public class ContourEntryCandidateTests
         Assert.NotEmpty(WithFallbacks(bump));
 
         var prepared = PreparedContours.Capture(ExplicitContourTests.Square(false), ExplicitContourTests.Parameters());
-        using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
         Assert.Throws<OperationCanceledException>(() =>
-            prepared.AutomaticEntryCandidatesWithFallbacks(0, new Vector(1, 1), cancelled.Token));
+            prepared.AutomaticEntryCandidatesWithFallbacks(0, new Vector(1, 1), canceled.Token));
     }
 
     [Theory]

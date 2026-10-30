@@ -143,7 +143,7 @@ public class NestPipelineCommitTests
     }
 
     [Fact]
-    public void CancelledCommitDoesNotCreateAnyPlate()
+    public void CanceledCommitDoesNotCreateAnyPlate()
     {
         var drawing = new Drawing("part", TestDrawingFactory.Rectangle());
         var nest = new Nest();

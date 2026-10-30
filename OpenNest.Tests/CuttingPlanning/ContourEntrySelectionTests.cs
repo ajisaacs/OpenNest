@@ -203,7 +203,7 @@ public class ContourEntrySelectionTests
     }
 
     [Fact]
-    public void EmptyCatalogueIsExhaustedWithoutEvaluation()
+    public void EmptyCatalogIsExhaustedWithoutEvaluation()
     {
         var result = ContourEntrySelection.Select(Array.Empty<ContourEntryCandidate>(), _ => null!);
 
@@ -215,13 +215,13 @@ public class ContourEntrySelectionTests
     [Fact]
     public void CancellationStopsBeforeAnyEvaluation()
     {
-        using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
         var candidates = new[] { Cand(0, 0) };
 
         Assert.ThrowsAny<OperationCanceledException>(() =>
             ContourEntrySelection.Select(candidates, _ => new(ContourFeasibilityStatus.Clear, null),
-                token: cancelled.Token));
+                token: canceled.Token));
     }
 
     [Fact]

@@ -26,13 +26,13 @@ public static class LedgerHoldStatuses
     public const string AwaitingCloseout = "AwaitingCloseout";
     public const string ClosedConsumed = "ClosedConsumed";
     public const string ClosedReturned = "ClosedReturned";
-    public const string Cancelled = "Cancelled";
+    public const string Canceled = "Cancelled";
     public const string Exception = "Exception";
 
     /// <summary>
     /// True for holds that still keep a sheet for the nest and need closing out: the statuses ML
     /// counts against free stock. Released means the hold was let go, not sent to cutting, so it
-    /// is not open; nor are closed, cancelled, exception and unknown statuses.
+    /// is not open; nor are closed, canceled, exception and unknown statuses.
     /// </summary>
     public static bool IsOpen(string? status) =>
         string.Equals(status, Proposed, StringComparison.OrdinalIgnoreCase)

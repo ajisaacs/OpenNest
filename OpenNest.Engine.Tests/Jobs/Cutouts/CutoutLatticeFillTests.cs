@@ -38,7 +38,7 @@ public class CutoutLatticeFillTests
 
     [Theory]
     [InlineData(7.0)] // diagonal 9.90: wider than the cutout less its wall spacing
-    [InlineData(6.75)] // corners 4.773 from the centre; the usable radius is 4.75
+    [InlineData(6.75)] // corners 4.773 from the center; the usable radius is 4.75
     public void InsertThatCannotClearTheCutoutWallIsNeverPlaced(double side)
     {
         Assert.Empty(CutoutLatticeFill.Fill(Ring(), 0, Squares(side, 4), 4, Spacing));

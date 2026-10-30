@@ -81,9 +81,9 @@ public class NestDetailsSessionTests
             if (++calls > 1)
                 return Task.FromResult(latestDetails);
 
-            var cancelled = new TaskCompletionSource<NestDetails>();
-            token.Register(() => cancelled.SetCanceled(token));
-            return cancelled.Task;
+            var canceled = new TaskCompletionSource<NestDetails>();
+            token.Register(() => canceled.SetCanceled(token));
+            return canceled.Task;
         });
 
         var superseded = session.LoadAsync(Guid.NewGuid());
@@ -205,7 +205,7 @@ public class NestDetailsSessionTests
         Assert.True(loads.Tokens[0].IsCancellationRequested);
         loads.Results[0].SetResult(new NestDetails());
 
-        // Whether or not the cancelled prefetch's continuation has run yet, it must not have
+        // Whether or not the canceled prefetch's continuation has run yet, it must not have
         // populated the cache, so loading the same nest issues a fresh request.
         var fresh = new NestDetails();
         var load = session.LoadAsync(nestId);

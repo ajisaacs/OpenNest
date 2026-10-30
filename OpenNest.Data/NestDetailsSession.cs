@@ -49,7 +49,7 @@ public sealed class NestDetailsSession : IDisposable
     public async Task<bool> LoadAsync(Guid id)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        // Supersede before cancelling: a load that completes synchronously when cancelled
+        // Supersede before canceling: a load that completes synchronously when canceled
         // must already see itself as superseded. Each source is released by its own load.
         var cancellation = Supersede();
         var generation = _generation;

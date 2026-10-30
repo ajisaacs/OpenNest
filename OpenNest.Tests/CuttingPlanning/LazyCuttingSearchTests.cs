@@ -42,13 +42,13 @@ public class LazyCuttingSearchTests
         Assert.Empty(bounded.ProposedOrder);
         Assert.False(bounded.IndependentlyReplayed);
         using var cancellation = new CancellationTokenSource();
-        var cancelled = CuttingPlanService.Plan(new CuttingPlanRequest(parts, new Vector(-2, -2),
+        var canceled = CuttingPlanService.Plan(new CuttingPlanRequest(parts, new Vector(-2, -2),
             confirmedParameters: parameters, preservePartOrder: preserveOrder)
         { ExpansionObserver = n => { if (n == 10) cancellation.Cancel(); } }, cancellation.Token);
-        Assert.Equal(CuttingPlanStatus.Cancelled, cancelled.Status);
-        Assert.Equal(10, cancelled.Expansions);
-        Assert.Empty(cancelled.ProposedOrder);
-        Assert.False(cancelled.IndependentlyReplayed);
+        Assert.Equal(CuttingPlanStatus.Canceled, canceled.Status);
+        Assert.Equal(10, canceled.Expansions);
+        Assert.Empty(canceled.ProposedOrder);
+        Assert.False(canceled.IndependentlyReplayed);
         Assert.Equal(programs, parts.Select(p => p.Program));
     }
 

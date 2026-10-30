@@ -103,7 +103,7 @@ namespace OpenNest.Engine.BestFit
         }
 
         /// <summary>
-        /// Like <see cref="GetOrCompute(Drawing, double, double, double)"/>, but cancelling stops
+        /// Like <see cref="GetOrCompute(Drawing, double, double, double)"/>, but canceling stops
         /// the wait, not the computation: it finishes in the background and caches its result.
         /// Callers must pass a drawing nothing else mutates, such as a canonical copy.
         /// </summary>

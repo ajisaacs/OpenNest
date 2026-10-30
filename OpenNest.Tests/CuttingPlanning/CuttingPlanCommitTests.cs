@@ -284,7 +284,7 @@ public class CuttingPlanCommitTests
     }
 
     [Fact]
-    public void Apply_CancelledBeforeCommit_ChangesNothing()
+    public void Apply_CanceledBeforeCommit_ChangesNothing()
     {
         var (_, plate, parts) = FixedPlate();
         var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate));
@@ -295,7 +295,7 @@ public class CuttingPlanCommitTests
 
         var commit = CuttingPlanService.Apply([result], cancel.Token);
 
-        Assert.Equal(CuttingCommitStatus.Cancelled, commit.Status);
+        Assert.Equal(CuttingCommitStatus.Canceled, commit.Status);
         Assert.Equal(parts, plate.Parts);
         Assert.True(state.IsCurrent(), state.Difference());
         Assert.Equal((0, 0, 0), events());

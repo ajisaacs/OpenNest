@@ -199,7 +199,7 @@ open holds with the sheets of the last open or save: the sum of plate quantities
 skipping the trailing empty plate as `/sheets` does. Proposed, Approved and
 AwaitingCloseout holds are open, the statuses ML counts against free stock. Released
 means the hold was let go, not sent to cutting, so it is listed but not counted, as
-are closed, cancelled, exception and unknown statuses; unknown status strings are kept
+are closed, canceled, exception and unknown statuses; unknown status strings are kept
 as sent.
 
 | Holds | Label |
@@ -552,7 +552,7 @@ and **Releases...** for the selected set, then **Import BOM...**
   every active drawing (never filtered to a nest), searched, sorted and paged
   like the Drawing Library dialog. Select one or several and choose **Add to Set**,
   double-click or press Enter to add them at the entered **Qty per set**.
-  Drawings already in the set are greyed; one picked again is skipped and
+  Drawings already in the set are grayed; one picked again is skipped and
   named, so there is one member per drawing. Quantities are edited
   in the grid (1 to 100,000) and **Remove** drops a member. Members stay in
   the order they were added (and stored in that order); nothing a release
@@ -589,7 +589,7 @@ Add to Release as its only buttons; File > Import BOM stays the familiar way in.
    the same material (ignoring case) and thickness are one drawing needing their
    total quantity, which becomes its quantity per set (`BomSetDrawings`). Rows
    with no file name, no drawing file or a quantity below 1, and files that fail
-   to import, are listed greyed and left out. Rows with no material or thickness
+   to import, are listed grayed and left out. Rows with no material or thickness
    are kept: the drawing is stored with a blank material and thickness 0, and the
    set editor's note column leads to Edit Drawing to fix it before Make Nests.
 2. Each drawing is matched to the library (`OpenNest.Data.DrawingSetImport`) by
@@ -616,7 +616,7 @@ Add to Release as its only buttons; File > Import BOM stays the familiar way in.
    against), and then the set editor opens with a new, unsaved set holding
    every imported drawing at its BOM quantity, named and with the customer as
    entered and notes naming the BOM file. The set is stored only by the editor's
-   **Save**; cancelling the editor leaves the confirmed library drawings and no
+   **Save**; canceling the editor leaves the confirmed library drawings and no
    set. A failed write stops the import, names what was already stored and
    leaves the set unchanged; Read BOM again then reuses those drawings, so
    importing twice never stores a drawing twice.
@@ -961,7 +961,7 @@ it, and nothing is built or saved.
    without plates and a note, and the release goes on. A refusal or a download
    failure stops here, so nothing is uploaded. The factory may already have
    allocated nest numbers.
-2. **Upload in order** under client-allocated ids, never cancelling an upload in
+2. **Upload in order** under client-allocated ids, never canceling an upload in
    flight; cancellation is checked between uploads. A failed upload is checked by
    its id, so one stored before its reply was lost still counts as created. A
    merged draft is saved with the revision it was chosen at as `If-Match`; a

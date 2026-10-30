@@ -9,7 +9,7 @@ namespace OpenNest.Engine.Tests.Jobs;
 /// <summary>
 /// Slice 6 task 6.4: regressions for the independent Slice 3b reviews of last-resort clamp
 /// removal (D8/D9, C10-C13). Geometry: a 23"-long, 3"-wide sheet with 1.5 x 0.625 clamps
-/// centred at X = 6 and X = 21 (clamp-1 spans X [5.25, 6.75], clamp-2 [20.25, 21.75]); a
+/// centerd at X = 6 and X = 21 (clamp-1 spans X [5.25, 6.75], clamp-2 [20.25, 21.75]); a
 /// 3"-tall part always crosses the clamp band, a 14"-wide part fits only with one clamp
 /// removed, a 22"-wide part only with both removed.
 /// </summary>
@@ -359,10 +359,10 @@ public class ClampRemovalRepairTests
         Assert.Equal(8, outcome.Result.Plates.Count);
         Assert.All(outcome.Result.Plates, sheet => Assert.Empty(sheet.Stock.ClampZones));
     }
-    // PM 3df03af2 (C11/D8 "the fewest clamps"): the minimal set need not be neighbours. The
+    // PM 3df03af2 (C11/D8 "the fewest clamps"): the minimal set need not be neighbors. The
     // notch over the middle clamp lets it stay while the two outer clamps come off.
     [Fact]
-    public void FewestClampsNeedNotBeNeighbours()
+    public void FewestClampsNeedNotBeNeighbors()
     {
         var program = new OpenNest.CNC.Program();
         program.MoveTo(0, 0);

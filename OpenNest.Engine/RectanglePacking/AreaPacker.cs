@@ -31,8 +31,8 @@ internal static class AreaPacker
 
     /// <summary>
     /// Returns the packed parts. Items and the area grow by <paramref name="spacing"/> on their
-    /// right/top sides, so neighbouring parts are one spacing apart and the last may touch the
-    /// area's edge. A cancelled token stops between candidates and keeps the best layout so far.
+    /// right/top sides, so neighboring parts are one spacing apart and the last may touch the
+    /// area's edge. A canceled token stops between candidates and keeps the best layout so far.
     /// </summary>
     /// <param name="workArea">Plate work area, when known. Only matching right/top boundaries
     /// receive the existing work-area overhang allowance; internal areas remain strict.</param>

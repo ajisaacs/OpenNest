@@ -19,7 +19,7 @@ public static class MaximalRectangles
     /// <remarks>
     /// The grid has a line through every vertex coordinate plus <paramref name="divisions"/>
     /// evenly spaced lines per axis. A cell is free only when no edge passes through its
-    /// interior and its centre is inside the region, so results are exact for regions whose
+    /// interior and its center is inside the region, so results are exact for regions whose
     /// edges are all horizontal or vertical. Slanted and curved edges are followed as a
     /// staircase: results stay inside, but can fall short of the true maximum by up to about
     /// one cell on each side. Rotate the region to search other rectangle angles.
@@ -64,9 +64,9 @@ public static class MaximalRectangles
         var crossings = new List<double>();
         for (var r = 0; r < rows; r++)
         {
-            // Even-odd scan along the row's centre line. No vertex lies on it, and an edge that
+            // Even-odd scan along the row's center line. No vertex lies on it, and an edge that
             // meets it strictly inside a cell has already marked that cell crossed, so each
-            // uncrossed cell is on the same side as its centre.
+            // uncrossed cell is on the same side as its center.
             var y = (ys[r] + ys[r + 1]) / 2;
             crossings.Clear();
             foreach (var path in paths)

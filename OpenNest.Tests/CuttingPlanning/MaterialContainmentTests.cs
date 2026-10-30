@@ -80,7 +80,7 @@ public class MaterialContainmentTests
     public void SeamJogBetweenLineAndArc_KeepsDistantExteriorPointExterior()
     {
         // Rounded-left-edge material whose semicircular edge meets the bottom line 1e-7 apart:
-        // an admitted closure seam sitting exactly on a datum Y shared with neighbours.
+        // an admitted closure seam sitting exactly on a datum Y shared with neighbors.
         var center = new Vector(1, 23.38000005);
         var rings = Ring(
             Line((1, 0.6), (41.2, 0.6)),

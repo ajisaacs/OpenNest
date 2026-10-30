@@ -183,7 +183,7 @@ public class NestJobValidationTests
     public void EtchMarksAreLeftOutOfNestingGeometry()
     {
         // The etch tick sticks 0.5 past the right edge. As material it would be open geometry
-        // leaving the part and would overlap the neighbour placed 0.2 away; as a mark it is ignored.
+        // leaving the part and would overlap the neighbor placed 0.2 away; as a mark it is ignored.
         var job = new NestJob(
             new[] { new NestJobPart("part", PartGeometrySnapshot.FromProgram(RectangleWithEtch(LayerType.Scribe)), 2) },
             new[] { new NestPlateStock("stock", new Size(30, 30), 1) }

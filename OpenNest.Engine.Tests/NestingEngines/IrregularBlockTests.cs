@@ -133,13 +133,13 @@ public class IrregularBlockTests
         var type = PartCatalog.Build(job)[0];
         var drawing = new Drawing("box", program);
         using var cancellation = new CancellationTokenSource();
-        var members = new CancellingMembers(Enumerable.Range(0, 3)
+        var members = new CancelingMembers(Enumerable.Range(0, 3)
             .Select(i => new OpenNest.Part(drawing) { Location = new Vector(i * 3, 0) }).ToArray(), cancellation);
         Assert.Throws<OperationCanceledException>(() => BlockCatalog.Resolve(type, members,
             type.Orientations.ToList(), 0.25, cancellation.Token));
     }
 
-    private sealed class CancellingMembers(OpenNest.Part[] parts, CancellationTokenSource cancellation)
+    private sealed class CancelingMembers(OpenNest.Part[] parts, CancellationTokenSource cancellation)
         : IReadOnlyList<OpenNest.Part>
     {
         public int Count => parts.Length;

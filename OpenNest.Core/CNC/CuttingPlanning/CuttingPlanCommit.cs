@@ -62,7 +62,7 @@ public enum CuttingCommitStatus
     Applied,
     Stale,
     InvalidInput,
-    Cancelled,
+    Canceled,
     Failed
 }
 
@@ -107,7 +107,7 @@ internal static class CuttingPlanCommit
         Action<Plate, Part> beforeInstall)
     {
         if (token.IsCancellationRequested)
-            return new(CuttingCommitStatus.Cancelled, "Cancelled before commit.");
+            return new(CuttingCommitStatus.Canceled, "Canceled before commit.");
         var scope = plans?.ToArray();
         if (scope == null || scope.Length == 0 || scope.Any(p => p?.Expected == null || p.Order == null))
             return Invalid(null, "A nonempty set of captured plate plans is required.");
@@ -126,7 +126,7 @@ internal static class CuttingPlanCommit
             }
             catch (OperationCanceledException)
             {
-                return new(CuttingCommitStatus.Cancelled, "Cancelled before commit.");
+                return new(CuttingCommitStatus.Canceled, "Canceled before commit.");
             }
             if (difference != null)
                 return new(CuttingCommitStatus.Stale, difference, plan.Expected.Plate);
@@ -200,7 +200,7 @@ internal static class CuttingPlanCommit
 
         // Last cancellation point. The boundary below has no await, search or geometry work.
         if (token.IsCancellationRequested)
-            return new(CuttingCommitStatus.Cancelled, "Cancelled before commit.");
+            return new(CuttingCommitStatus.Canceled, "Canceled before commit.");
 
         var undo = new List<(Plate Plate, Part[] Order, (Part Part, PartCuttingState State)[] States,
             (CutOff CutOff, bool FarEdgeFirst, Program Program)[] CutOffs)>();

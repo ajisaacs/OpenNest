@@ -204,7 +204,7 @@ namespace OpenNest.IO
             return root.ToJsonString(NestFormat.JsonOptions);
         }
 
-        // StreamReader honours the byte-order mark the nest writer emits.
+        // StreamReader honors the byte-order mark the nest writer emits.
         private static string ReadText(ZipArchiveEntry entry)
         {
             using var stream = entry.Open();

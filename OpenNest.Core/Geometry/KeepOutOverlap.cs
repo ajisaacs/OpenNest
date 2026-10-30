@@ -69,7 +69,7 @@ public static class KeepOutOverlap
     /// <summary>
     /// True when the material (perimeter minus holes) shares positive area with the open
     /// rectangle: some boundary edge runs through its interior, or its interior lies wholly
-    /// inside the material (tested at its centre).
+    /// inside the material (tested at its center).
     /// </summary>
     public static bool MaterialEnters(Polygon perimeter, IReadOnlyList<Polygon> holes, Box box)
     {
@@ -80,12 +80,12 @@ public static class KeepOutOverlap
                 if (RingEnters(hole, box))
                     return true;
 
-        var centre = new Vector((box.Left + box.Right) / 2, (box.Bottom + box.Top) / 2);
-        if (!Contains(perimeter, centre))
+        var center = new Vector((box.Left + box.Right) / 2, (box.Bottom + box.Top) / 2);
+        if (!Contains(perimeter, center))
             return false;
         if (holes != null)
             foreach (var hole in holes)
-                if (Contains(hole, centre))
+                if (Contains(hole, center))
                     return false;
         return true;
     }

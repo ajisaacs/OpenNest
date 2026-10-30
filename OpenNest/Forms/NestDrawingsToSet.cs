@@ -24,7 +24,7 @@ namespace OpenNest.Forms
         /// <summary>Shows a message and returns the operator's answer; replaced by tests.</summary>
         internal Func<string, MessageBoxButtons, MessageBoxIcon, DialogResult> ShowMessage { get; set; }
 
-        /// <summary>Chooses the set: Ok false when cancelled, otherwise the listed set or null for a new one; replaced by tests.</summary>
+        /// <summary>Chooses the set: Ok false when canceled, otherwise the listed set or null for a new one; replaced by tests.</summary>
         internal Func<(bool Ok, DrawingSetRecord Listed)> ChooseSet { get; set; }
 
         /// <summary>Shows the set editor and returns the saved record, or null; replaced by tests.</summary>

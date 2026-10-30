@@ -168,7 +168,7 @@ public sealed class FlatBarNestingEngine : INestingEngine
 
     /// <summary>
     /// Prices the demand as one stock's plan, using its packed envelopes: the cheaper of the
-    /// cut-list plan and repeated best fills, so the estimate does not favour bars that leave
+    /// cut-list plan and repeated best fills, so the estimate does not favor bars that leave
     /// first-fit-decreasing an awkward remainder.
     /// </summary>
     private static Estimate EstimatePlan(NestJob job, BarStock bar, IReadOnlyList<BarType> types, BarLayout layout,

@@ -175,18 +175,18 @@ internal sealed class BarLayout
             boxStart = segment.Start;
 
         (BarPart Part, Part Shape)? best = null;
-        var neighbours = laid.Skip(first).ToList();
-        var slide = neighbours.Count > 0 && !(Boxy(type, bar) && neighbours.All(n => Boxy(n.Part.Type, bar)));
+        var neighbors = laid.Skip(first).ToList();
+        var slide = neighbors.Count > 0 && !(Boxy(type, bar) && neighbors.All(n => Boxy(n.Part.Type, bar)));
         foreach (var orientation in bar.Fits[type.Index].Take(slide ? MaxSlideOrientations : 1))
         {
             var start = boxStart;
             var shape = Shape(bar, type, orientation, start);
             if (slide)
             {
-                var travel = Slide(bar, shape, neighbours, segment, start);
+                var travel = Slide(bar, shape, neighbors, segment, start);
                 if (travel > 0)
                 {
-                    start = Confirm(bar, type, orientation, start, travel, neighbours);
+                    start = Confirm(bar, type, orientation, start, travel, neighbors);
                     shape = Shape(bar, type, orientation, start);
                 }
             }
@@ -200,7 +200,7 @@ internal sealed class BarLayout
     }
 
     /// <summary>How far the part can slide back before its offset outline meets a laid part.</summary>
-    private static double Slide(BarStock bar, Part shape, List<(BarPart Part, Part Shape)> neighbours,
+    private static double Slide(BarStock bar, Part shape, List<(BarPart Part, Part Shape)> neighbors,
         BarSegment segment, double start)
     {
         var room = start - segment.Start;
@@ -208,7 +208,7 @@ internal sealed class BarLayout
             return 0;
         var direction = bar.AlongX ? new Vector(-1, 0) : new Vector(0, -1);
         var huge = new Box(-1e9, -1e9, 2e9, 2e9);
-        var obstacles = neighbours.Select(n => n.Shape).ToList();
+        var obstacles = neighbors.Select(n => n.Shape).ToList();
         var travel = Compactor.Push(new List<Part> { shape }, obstacles, huge, bar.Spacing, direction);
         return System.Math.Clamp(travel, 0, room);
     }
@@ -218,7 +218,7 @@ internal sealed class BarLayout
     /// laid part the new one can reach; falls back to the box-to-box start.
     /// </summary>
     private double Confirm(BarStock bar, BarType type, BarOrientation orientation, double boxStart, double travel,
-        List<(BarPart Part, Part Shape)> neighbours)
+        List<(BarPart Part, Part Shape)> neighbors)
     {
         if (type.Geometry == null)
             return boxStart;
@@ -229,7 +229,7 @@ internal sealed class BarLayout
                 break;
             var start = boxStart - slid;
             var pose = Placement(bar, type, orientation, start);
-            var clear = neighbours
+            var clear = neighbors
                 .Where(n => n.Part.AxisEnd + bar.Spacing + 1e-6 > start)
                 .All(n => n.Part.Type.Geometry != null && NestLayoutCheck.Clears(
                     type.Geometry, pose, n.Part.Type.Geometry,

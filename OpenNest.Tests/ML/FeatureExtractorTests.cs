@@ -159,7 +159,7 @@ public class FeatureExtractorTests
     [Fact]
     public void RectangleBitmap_CoversEveryCell()
     {
-        // The material fills the bounding box, so all 32x32 sample centres are interior points.
+        // The material fills the bounding box, so all 32x32 sample centers are interior points.
         var features = FeatureExtractor.Extract(new RectangleShape { Length = 10, Width = 20 }.GetDrawing());
 
         Assert.NotNull(features?.Bitmask);

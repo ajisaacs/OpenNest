@@ -55,7 +55,7 @@ public class LedgerCodeCheckTests
         [
             Hold("S-1", LedgerHoldStatuses.Approved),
             Hold("B-1", LedgerHoldStatuses.Proposed),
-            Hold("B-1", LedgerHoldStatuses.Cancelled),
+            Hold("B-1", LedgerHoldStatuses.Canceled),
         ];
 
         var conflicts = LedgerCodeCheck.Find(plates, [Item("B-1", 1)], holds, LedgerCodesInUse.Known([]));

@@ -57,15 +57,15 @@ public class InterlockingHoleRouteTests
         Assert.Empty(bounded.ProposedOrder);
         using var cancellation = new CancellationTokenSource();
         var cancelAt = result.Expansions - 1;
-        var cancelled = CuttingPlanService.Plan(new CuttingPlanRequest(parts,
+        var canceled = CuttingPlanService.Plan(new CuttingPlanRequest(parts,
             confirmedParameters: parameters, preservePartOrder: keep)
         {
             ExpansionObserver = n => { if (n == cancelAt) cancellation.Cancel(); }
         }, cancellation.Token);
-        Assert.Equal(CuttingPlanStatus.Cancelled, cancelled.Status);
-        Assert.Equal(cancelAt, cancelled.Expansions);
-        Assert.Empty(cancelled.ProposedOrder);
-        Assert.False(cancelled.IndependentlyReplayed);
+        Assert.Equal(CuttingPlanStatus.Canceled, canceled.Status);
+        Assert.Equal(cancelAt, canceled.Expansions);
+        Assert.Empty(canceled.ProposedOrder);
+        Assert.False(canceled.IndependentlyReplayed);
         Assert.Equal(before, parts.Select(p => ExplicitContourTests.Fingerprint(p.Program)));
     }
 

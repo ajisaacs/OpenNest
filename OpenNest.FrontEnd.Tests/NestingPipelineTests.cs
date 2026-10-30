@@ -126,7 +126,7 @@ public class NestingPipelineTests : IDisposable
     }
 
     [Fact]
-    public void Console_CancelledSolveDoesNotSave()
+    public void Console_CanceledSolveDoesNotSave()
     {
         var input = Path.Combine(directory, "input.nest");
         var output = Path.Combine(directory, "output.nest");
@@ -412,7 +412,7 @@ public class NestingPipelineTests : IDisposable
     }
 
     [Fact]
-    public void Console_CancelledOrdinaryFillDoesNotOverwriteOutput()
+    public void Console_CanceledOrdinaryFillDoesNotOverwriteOutput()
     {
         var input = Path.Combine(directory, "input.nest");
         var output = Path.Combine(directory, "output.nest");

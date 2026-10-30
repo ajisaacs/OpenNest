@@ -485,7 +485,7 @@ public class ClampRailTests
     }
 
     [Fact]
-    public void RailClampAtHonoursTheToleranceAndNeedsARail()
+    public void RailClampAtHonorsTheToleranceAndNeedsARail()
     {
         var plate = Sheet(48, 120);
         Assert.Null(plate.RailClampAt(new Vector(36, 0.3))); // no rail

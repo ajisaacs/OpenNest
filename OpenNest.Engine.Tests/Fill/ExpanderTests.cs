@@ -173,7 +173,7 @@ public class ExpanderTests
     }
 
     [Fact]
-    public void Expand_CancelledBeforeRun_LeavesEverythingInPlace()
+    public void Expand_CanceledBeforeRun_LeavesEverythingInPlace()
     {
         var plate = MakePlate(24, 24);
         var a = AddSquare(plate, 6, 10);
@@ -187,7 +187,7 @@ public class ExpanderTests
             token: cts.Token
         );
 
-        Assert.True(result.Cancelled);
+        Assert.True(result.Canceled);
         Assert.Equal(6, a.Location.X, 6);
         Assert.Equal(14, b.Location.X, 6);
     }
@@ -529,7 +529,7 @@ public class ExpanderTests
 
         var result = Expander.Expand(new List<Part> { insert, other }, plate,
             new Expander.Options { MaxSpacing = 1 });
-        Assert.False(result.Cancelled);
+        Assert.False(result.Canceled);
         Assert.True(result.AchievedSpacing >= 0.99);
         Assert.InRange(insert.Location.X, 6 - 1e-4, 12 + 1e-4);
         Assert.False(MateriallyOverlaps(insert, host));
@@ -610,7 +610,7 @@ public class ExpanderTests
             }, cts.Token);
 
         Assert.True(seen, $"checkpoint {cancelAt} was not reached");
-        Assert.True(result.Cancelled);
+        Assert.True(result.Canceled);
         foreach (var state in before)
         {
             Assert.Same(state.Program, state.Part.Program);

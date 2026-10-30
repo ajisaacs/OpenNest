@@ -185,7 +185,7 @@ public class CutPinResolverTests
     [Fact]
     public void CanonicalCopy_CarriesNoPins()
     {
-        // A canonical copy's program is rotated about its centre, so source-frame pins would
+        // A canonical copy's program is rotated about its center, so source-frame pins would
         // not map onto it; its parts are rebound to the original drawing, which keeps them.
         var drawing = Bracket(Source(10, 6));
 

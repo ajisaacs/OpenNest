@@ -185,7 +185,7 @@ public class SettingsFreshnessTests
     }
 
     [Fact]
-    public void Fingerprint_TextFieldsCannotShiftIntoNeighbours()
+    public void Fingerprint_TextFieldsCannotShiftIntoNeighbors()
     {
         var a = new CuttingParameters { MachineName = "a;", MaterialName = "b" };
         var b = new CuttingParameters { MachineName = "a", MaterialName = ";b" };

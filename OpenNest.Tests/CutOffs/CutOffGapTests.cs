@@ -9,7 +9,7 @@ using OpenNest.Shapes;
 namespace OpenNest.Tests.CutOffs;
 
 /// <summary>
-/// Trimming a piece between two crossing lines leaves a gap from one crossing centre to the other,
+/// Trimming a piece between two crossing lines leaves a gap from one crossing center to the other,
 /// and the line splits into segments as it does around a part. Extend closes a gap; every consumer
 /// of a cut-off's limits treats a gap as uncut.
 /// </summary>
@@ -43,7 +43,7 @@ public class CutOffGapTests
     }
 
     [Fact]
-    public void Trim_MiddlePiece_LeavesAGapBetweenTheCrossingCentres()
+    public void Trim_MiddlePiece_LeavesAGapBetweenTheCrossingCenters()
     {
         var (plate, horizontal) = Gapped();
 

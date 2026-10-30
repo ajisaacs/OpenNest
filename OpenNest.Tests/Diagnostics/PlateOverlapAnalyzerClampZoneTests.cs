@@ -229,10 +229,10 @@ public class PlateOverlapAnalyzerClampZoneTests
         Assert.Equal(5, region.Vertices.Count);
         Assert.Equal(region.Vertices[0], region.Vertices[^1]);
         Assert.Equal(4, region.Vertices.Take(4).Distinct().Count());
-        // Documented exception: a tiny clamp keeps its whole-clamp region and marks its centre.
-        var centre = new Vector(8 + 0.5e-5, 0.5e-5);
-        Assert.Equal(centre, finding.Marker);
-        Assert.Equal(centre, finding.Centroid);
+        // Documented exception: a tiny clamp keeps its whole-clamp region and marks its center.
+        var center = new Vector(8 + 0.5e-5, 0.5e-5);
+        Assert.Equal(center, finding.Marker);
+        Assert.Equal(center, finding.Centroid);
     }
 
     // PM 407f5eb7: real material, not the 0.001 arc flattening, decides a tiny clamp.
@@ -292,8 +292,8 @@ public class PlateOverlapAnalyzerClampZoneTests
         var arc = new ShapeProfile(OpenNest.Converters.ConvertProgram.ToGeometry(program))
             .Perimeter.Entities.OfType<Arc>().Single();
         var native = arc.ToPoints(arc.SegmentsForTolerance(1e-5 / 4)).First(v => v.X > 11.9 && v.Y < 19.5);
-        var centre = new Vector(10, 20);
-        var outward = centre + (native - centre) / 2 * (2 + 6e-7);
+        var center = new Vector(10, 20);
+        var outward = center + (native - center) / 2 * (2 + 6e-7);
         var zone = new ClampZone("tiny", new Box(outward.X - 1e-5, outward.Y, 1e-5, 1e-5));
 
         var report = PlateOverlapAnalyzer.Analyze(PlateOverlapAnalyzer.Capture(
