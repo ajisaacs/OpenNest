@@ -152,6 +152,12 @@ namespace OpenNest
         public List<TabbedCutouts.TabbedCutout> TabbedCutouts { get; set; } = new List<TabbedCutouts.TabbedCutout>();
 
         /// <summary>
+        /// Annotations shown in the CAD Converter. They store placement only, are measured from the
+        /// geometry when shown and never affect <see cref="Program"/>.
+        /// </summary>
+        public List<Dimensions.DrawingDimension> Dimensions { get; set; } = new List<Dimensions.DrawingDimension>();
+
+        /// <summary>
         /// Complete set of source entities with stable GUIDs.
         /// Null when the drawing was created from G-code or an older nest file.
         /// </summary>

@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using OpenNest.Bending;
 using OpenNest.Breakoffs;
 using OpenNest.Converters;
+using OpenNest.Dimensions;
 using OpenNest.Geometry;
 using OpenNest.IO.Bending;
 using OpenNest.Math;
@@ -177,6 +178,7 @@ namespace OpenNest.IO
         /// Per-entity role overrides keyed by source entity ID, applied before breakoffs and kept
         /// on the drawing; display-only entities stay out of the program.
         /// </param>
+        /// <param name="dimensions">Dimensions to keep on the drawing; they never affect the program.</param>
         public static Drawing BuildDrawing(
             CadImportResult result,
             IEnumerable<Entity> entities,
@@ -186,7 +188,8 @@ namespace OpenNest.IO
             OpenNest.CNC.Program editedProgram,
             IReadOnlyList<Breakoff> breakoffs = null,
             IReadOnlyList<TabbedCutout> tabbedCutouts = null,
-            IReadOnlyDictionary<System.Guid, EntityRole> entityRoles = null
+            IReadOnlyDictionary<System.Guid, EntityRole> entityRoles = null,
+            IReadOnlyList<DrawingDimension> dimensions = null
         )
         {
             var visible = entityRoles is { Count: > 0 }
@@ -225,6 +228,7 @@ namespace OpenNest.IO
             drawing.Bends.AddRange(bendList);
             drawing.Breakoffs = breakoffs?.Select(b => b.Clone()).ToList() ?? new List<Breakoff>();
             drawing.TabbedCutouts = tabbedCutouts?.Select(c => c.Clone()).ToList() ?? new List<TabbedCutout>();
+            drawing.Dimensions = dimensions?.Select(d => d.Clone()).ToList() ?? new List<DrawingDimension>();
             drawing.Program = editedProgram ?? pgm;
 
             var bendSources = new HashSet<Entity>(
@@ -301,6 +305,7 @@ namespace OpenNest.IO
             existing.Bends.AddRange(edited.Bends);
             existing.Breakoffs = edited.Breakoffs;
             existing.TabbedCutouts = edited.TabbedCutouts;
+            existing.Dimensions = edited.Dimensions;
         }
 
         private static bool IsRepairMark(Entity e) =>

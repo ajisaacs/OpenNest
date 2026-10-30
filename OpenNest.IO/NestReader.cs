@@ -12,6 +12,7 @@ using OpenNest.Breakoffs;
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Converters;
+using OpenNest.Dimensions;
 using OpenNest.Geometry;
 using OpenNest.Support;
 using OpenNest.TabbedCutouts;
@@ -343,6 +344,7 @@ namespace OpenNest.IO
                 drawing.CutPins = ReadCutPins(d);
                 drawing.Breakoffs = ReadBreakoffs(d);
                 drawing.TabbedCutouts = ReadTabbedCutouts(d);
+                drawing.Dimensions = ReadDimensions(d);
                 map[d.Id] = drawing;
             }
             return map;
@@ -453,6 +455,29 @@ namespace OpenNest.IO
                 }
             }
             return cutouts;
+        }
+
+        // Dimensions are annotations: a dropped one never changes what is cut.
+        private List<DrawingDimension> ReadDimensions(DrawingDto d)
+        {
+            var dimensions = new List<DrawingDimension>();
+            if (d.Dimensions == null)
+                return dimensions;
+
+            for (var i = 0; i < d.Dimensions.Count; i++)
+            {
+                var dto = d.Dimensions[i];
+                if (dto != null && TryParseName<DimensionKind>(dto.Kind, out var kind)
+                    && dto.Offset != 0 && double.IsFinite(dto.Offset))
+                {
+                    dimensions.Add(new DrawingDimension { Kind = kind, Offset = dto.Offset });
+                }
+                else
+                {
+                    warnings.Add($"Drawing '{d.Name}': dimension {i + 1} could not be read; skipped it.");
+                }
+            }
+            return dimensions;
         }
 
         private bool ReadPinsOff(PartDto dto, int plateId, int partIndex, Part part)

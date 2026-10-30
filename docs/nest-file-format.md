@@ -312,8 +312,8 @@ fixed archive timestamps and dates, and no best-fit entries, so equal content ha
 equal bytes and SHA-256. The server stores each distinct package once by that hash.
 
 A package holds geometry and geometry-bound data only: program, source entities and
-offset, suppressed entity IDs, entity roles, bends, cut pins, breakoffs, tabbed cutouts and material
-density. Fields
+offset, suppressed entity IDs, entity roles, bends, cut pins, breakoffs, tabbed cutouts, dimensions
+and material density. Fields
 the server's library record owns are written as their defaults, so editing them never
 changes the hash:
 
@@ -394,6 +394,15 @@ warning; the drawing and its program load unchanged, only the cutout stops being
 
 Tab spans are saved as motions tagged `:TAB`. They bound material but are never cut;
 versions without tabbed cutout support read them as ordinary cut motions.
+
+## Drawing dimensions
+
+A drawing may carry a `dimensions` array, omitted when empty. Each entry has `kind`
+(`OverallHorizontal` or `OverallVertical`) and `offset`, the signed distance from the part's
+extents to the dimension line (positive is above or right); see [dimensions](dimensions.md).
+Values are not stored: they are measured when shown. An entry with an unknown kind or an
+offset that is zero or not finite is dropped with a reader warning; the drawing and its
+program are unaffected.
 
 ## Drawing entity roles
 

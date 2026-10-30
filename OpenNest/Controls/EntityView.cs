@@ -164,6 +164,7 @@ namespace OpenNest.Controls
 
             DrawSelection(e.Graphics);
             DrawTexts(e.Graphics);
+            DrawDimensions(e.Graphics);
 
             if (ShowEntityLabels)
                 DrawEntityLabels(e.Graphics);
@@ -515,6 +516,7 @@ namespace OpenNest.Controls
                 ClearPenCache();
                 gridPen.Dispose();
                 labelFont.Dispose();
+                dimensionFont.Dispose();
                 labelBrush.Dispose();
                 labelBackBrush.Dispose();
                 textBrush.Dispose();
@@ -674,7 +676,7 @@ namespace OpenNest.Controls
 
         public void ZoomToFit(bool redraw = true)
         {
-            ZoomToArea(Entities.GetBoundingBox(), redraw);
+            ZoomToArea(WithDimensions(Entities.GetBoundingBox()), redraw);
         }
     }
 }

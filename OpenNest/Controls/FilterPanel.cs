@@ -28,6 +28,9 @@ namespace OpenNest.Controls
         private readonly ListBox cutoutsList;
         private readonly LinkLabel cutoutAddLink;
         private bool loadingCutouts;
+        private readonly CollapsiblePanel dimensionsPanel;
+        private readonly ListBox dimensionsList;
+        private bool loadingDimensions;
 
         private List<Entity> currentEntities;
         private List<Bend> currentBends;
@@ -46,6 +49,9 @@ namespace OpenNest.Controls
         public event EventHandler<int> TabbedCutoutEdited;
         public event EventHandler<int> TabbedCutoutRemoved;
         public event EventHandler AddTabbedCutoutClicked;
+        public event EventHandler<int> DimensionSelected;
+        public event EventHandler<int> DimensionRemoved;
+        public event EventHandler AddDimensionsClicked;
 
         public FilterPanel()
         {
@@ -166,6 +172,48 @@ namespace OpenNest.Controls
 
             cutoutsPanel.ContentPanel.Controls.Add(cutoutsList);
             cutoutsPanel.ContentPanel.Controls.Add(cutoutLinksPanel);
+
+            // Dimensions
+            dimensionsPanel = new CollapsiblePanel
+            {
+                HeaderText = "Dimensions (0)",
+                Dock = DockStyle.Top,
+                ExpandedHeight = 90,
+                IsExpanded = false,
+            };
+            dimensionsList = new ListBox
+            {
+                Dock = DockStyle.Fill,
+                BorderStyle = BorderStyle.None,
+                Font = new Font("Segoe UI", 9f),
+            };
+            dimensionsList.SelectedIndexChanged += (s, e) =>
+            {
+                if (!loadingDimensions)
+                    DimensionSelected?.Invoke(this, dimensionsList.SelectedIndex);
+            };
+
+            var dimensionAddLink = new LinkLabel { Text = "Add Overall Dimensions", AutoSize = true, Font = new Font("Segoe UI", 8f) };
+            dimensionAddLink.LinkClicked += (s, e) => AddDimensionsClicked?.Invoke(this, EventArgs.Empty);
+            var dimensionRemoveLink = new LinkLabel { Text = "Remove", AutoSize = true, Font = new Font("Segoe UI", 8f) };
+            dimensionRemoveLink.LinkClicked += (s, e) =>
+            {
+                if (dimensionsList.SelectedIndex >= 0)
+                    DimensionRemoved?.Invoke(this, dimensionsList.SelectedIndex);
+            };
+
+            var dimensionLinksPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 20,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+            };
+            dimensionLinksPanel.Controls.Add(dimensionAddLink);
+            dimensionLinksPanel.Controls.Add(dimensionRemoveLink);
+
+            dimensionsPanel.ContentPanel.Controls.Add(dimensionsList);
+            dimensionsPanel.ContentPanel.Controls.Add(dimensionLinksPanel);
 
             // Bend Lines
             bendLinesPanel = new CollapsiblePanel
@@ -301,6 +349,7 @@ namespace OpenNest.Controls
             layersPanel.ContentPanel.Controls.Add(checkAllPanel);
 
             // Add panels in reverse order (Dock.Top stacks top-down)
+            Controls.Add(dimensionsPanel);
             Controls.Add(cutoutsPanel);
             Controls.Add(breakoffsPanel);
             Controls.Add(bendLinesPanel);
@@ -530,6 +579,29 @@ namespace OpenNest.Controls
             cutoutsPanel.HeaderText = $"Tabbed Cutouts ({labels.Count})";
             if (added)
                 cutoutsPanel.IsExpanded = true;
+        }
+
+        /// <summary>Shows one line per dimension with <paramref name="selected"/> selected, without raising selection events.</summary>
+        public void LoadDimensions(IReadOnlyList<string> labels, int selected)
+        {
+            var added = labels.Count > dimensionsList.Items.Count;
+            loadingDimensions = true;
+            try
+            {
+                dimensionsList.BeginUpdate();
+                dimensionsList.Items.Clear();
+                foreach (var label in labels)
+                    dimensionsList.Items.Add(label);
+                dimensionsList.SelectedIndex = selected >= 0 && selected < labels.Count ? selected : -1;
+                dimensionsList.EndUpdate();
+            }
+            finally
+            {
+                loadingDimensions = false;
+            }
+            dimensionsPanel.HeaderText = $"Dimensions ({labels.Count})";
+            if (added)
+                dimensionsPanel.IsExpanded = true;
         }
     }
 

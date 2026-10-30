@@ -485,6 +485,16 @@ namespace OpenNest.IO
             /// </summary>
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             public List<TabbedCutoutDto> TabbedCutouts { get; init; }
+
+            /// <summary>Dimension placements; values are measured when shown. Omitted when there are none.</summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public List<DimensionDto> Dimensions { get; init; }
+        }
+
+        public record DimensionDto
+        {
+            public string Kind { get; init; }
+            public double Offset { get; init; }
         }
 
         public record TabbedCutoutDto

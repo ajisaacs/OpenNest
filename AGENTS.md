@@ -70,6 +70,7 @@ Read the relevant contract before changing its behavior:
 - [Lead-in placement](docs/geometry/lead-in-placement.md) (including the planner's eroded pierce for cutouts too small for their lead-in and the stop at a feature's center line) and [pierce zones](docs/geometry/pierce-zone.md): opt-in `PierceDiameter` clearance, the hole pole fallback and the planner's perimeter scrap fallback
 - [Breakoffs](docs/breakoffs.md): tabbed scrap; `Break`-layer open cuts that are cut but are not material
 - [Tabbed cutouts](docs/tabbed-cutouts.md): holes cut in pieces around `Tab`-layer spans that are material but never cut; nesting reads material through `NestingMaterial.ForNesting`, so nothing nests in them
+- [Dimensions](docs/dimensions.md): CAD Converter annotations that store placement only, are measured from the cut geometry when shown and never affect the program
 - [Support tabs](docs/support-tabs.md): the nest's support grid, the center-of-gravity check, and Plan Cutting's tab placement for parts the grid cannot hold level
 - [Material-overlap diagnostics](docs/geometry/visual-overlap-check.md)
 - [Automatic cutoffs and sequencing](docs/automatic-scrap-cutoffs.md)

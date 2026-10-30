@@ -21,6 +21,7 @@ namespace OpenNest.Controls
         public List<Bend> Bends { get; set; } = new();
         public List<Breakoffs.Breakoff> Breakoffs { get; set; } = new();
         public List<TabbedCutouts.TabbedCutout> TabbedCutouts { get; set; } = new();
+        public List<Dimensions.DrawingDimension> Dimensions { get; set; } = new();
         public HashSet<Guid> SuppressedEntityIds { get; set; }
 
         /// <summary>Entities the user excluded one by one; they stay excluded whatever the filters show.</summary>

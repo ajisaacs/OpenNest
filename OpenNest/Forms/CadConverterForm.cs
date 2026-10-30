@@ -12,6 +12,7 @@ using OpenNest.Breakoffs;
 using OpenNest.CNC;
 using OpenNest.Controls;
 using OpenNest.Converters;
+using OpenNest.Dimensions;
 using OpenNest.Geometry;
 using OpenNest.Help;
 using OpenNest.IO;
@@ -68,6 +69,10 @@ namespace OpenNest.Forms
             entityView1.CutoutTabDragged += OnCutoutTabDragged;
             entityView1.LinePicked += OnLinePicked;
             entityView1.PickCanceled += OnPickCanceled;
+            filterPanel.AddDimensionsClicked += OnAddDimensionsClicked;
+            filterPanel.DimensionSelected += OnDimensionSelected;
+            filterPanel.DimensionRemoved += OnDimensionRemoved;
+            entityView1.DimensionDragged += OnDimensionDragged;
             entityView1.TextConvertRequested += OnTextConvertRequested;
             entityView1.EntityActionRequested += OnEntityActionRequested;
             btnSplit.Click += OnSplitClicked;
@@ -228,6 +233,7 @@ namespace OpenNest.Forms
             }
             entityView1.SelectedBreakoffIndex = -1;
             entityView1.SelectedTabbedCutoutIndex = -1;
+            entityView1.SelectedDimensionIndex = -1;
             entityView1.OriginalEntities = chkShowOriginal.Checked ? item.OriginalEntities : null;
             entityView1.Entities.Clear();
             entityView1.Entities.AddRange(item.Entities);
@@ -315,6 +321,7 @@ namespace OpenNest.Forms
             lblDimensions.Text = "";
             lblEntityCount.Text = "";
             entityView1.Entities.Clear();
+            entityView1.DimensionLayouts = Array.Empty<DimensionLayout>();
             entityView1.Invalidate();
         }
 
@@ -387,6 +394,7 @@ namespace OpenNest.Forms
             entityView1.Bends = item.Bends;
             entityView1.SelectedBendIndex = -1;
             filterPanel.LoadItem(item.Entities, item.Bends);
+            RefreshDimensions(item);
             entityView1.Invalidate();
         }
 
@@ -572,6 +580,7 @@ namespace OpenNest.Forms
             entityView1.Entities.AddRange(item.Entities);
             entityView1.Bends = item.Bends;
             filterPanel.LoadItem(item.Entities, item.Bends);
+            RefreshDimensions(item);
             entityView1.Invalidate();
         }
 
@@ -602,6 +611,7 @@ namespace OpenNest.Forms
                     ? $"Breakoff {i + 1}: {l.TabCenters.Count} tabs"
                     : $"Breakoff {i + 1} (not applied): {l.Error}")
                 .ToList(), entityView1.SelectedBreakoffIndex);
+            RefreshDimensions(item);
             entityView1.Invalidate();
         }
 
@@ -833,6 +843,7 @@ namespace OpenNest.Forms
                     ? $"Cutout {i + 1}: {l.TabCenters.Count} tab{(l.TabCenters.Count == 1 ? "" : "s")}"
                     : $"Cutout {i + 1} (not applied): {l.Error}")
                 .ToList(), entityView1.SelectedTabbedCutoutIndex);
+            RefreshDimensions(item);
             entityView1.Invalidate();
         }
 
@@ -973,6 +984,77 @@ namespace OpenNest.Forms
             staleProgram = true;
         }
 
+        // Dimensions measure the entities as they will be cut: breakoffs and tabbed cutouts applied.
+        private static List<Entity> DimensionedEntities(FileListItem item) =>
+            TabbedCutoutBuilder.Apply(CutoutEntities(item), item.TabbedCutouts, out _);
+
+        private void RefreshDimensions(FileListItem item)
+        {
+            var entities = item.Dimensions.Count > 0 ? DimensionedEntities(item) : new List<Entity>();
+            var layouts = item.Dimensions.Select(d => DimensionBuilder.Layout(entities, d)).ToList();
+            entityView1.DimensionLayouts = layouts;
+            filterPanel.LoadDimensions(layouts
+                .Select(l => DimensionLabel(l))
+                .ToList(), entityView1.SelectedDimensionIndex);
+        }
+
+        private static string DimensionLabel(DimensionLayout layout)
+        {
+            var name = layout.Kind == DimensionKind.OverallHorizontal ? "Horizontal" : "Vertical";
+            return layout.IsValid ? $"{name}: {layout.ValueText}" : $"{name} (not shown): {layout.Error}";
+        }
+
+        private void OnAddDimensionsClicked(object sender, EventArgs e)
+        {
+            var item = CurrentItem;
+            if (item == null)
+                return;
+
+            var entities = DimensionedEntities(item);
+            if (DimensionBuilder.Extents(entities) == null)
+            {
+                ShowDimensionMessage("There is no cut geometry to dimension.");
+                return;
+            }
+
+            item.Dimensions.AddRange(DimensionBuilder.MissingOverall(entities, item.Dimensions));
+            RefreshDimensions(item);
+            entityView1.ZoomToFit();
+        }
+
+        private void OnDimensionRemoved(object sender, int index)
+        {
+            var item = CurrentItem;
+            if (item == null || index < 0 || index >= item.Dimensions.Count)
+                return;
+
+            item.Dimensions.RemoveAt(index);
+            entityView1.SelectedDimensionIndex = -1;
+            RefreshDimensions(item);
+            entityView1.Invalidate();
+        }
+
+        private void OnDimensionSelected(object sender, int index)
+        {
+            entityView1.SelectedDimensionIndex = index;
+            entityView1.Invalidate();
+        }
+
+        private void OnDimensionDragged(object sender, DimensionDragEventArgs e)
+        {
+            var item = CurrentItem;
+            if (item == null || e.Dimension >= item.Dimensions.Count)
+                return;
+
+            item.Dimensions[e.Dimension].Offset = e.Offset;
+            entityView1.SelectedDimensionIndex = e.Dimension;
+            RefreshDimensions(item);
+            entityView1.Invalidate();
+        }
+
+        internal virtual void ShowDimensionMessage(string message) =>
+            MessageBox.Show(this, message, "Dimensions", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
         internal virtual bool AskTabbedCutoutSettings(TabbedCutoutDialog dialog) =>
             dialog.ShowDialog(this) == DialogResult.OK;
 
@@ -1043,6 +1125,7 @@ namespace OpenNest.Forms
             entityView1.Entities.AddRange(item.Entities);
             entityView1.Texts = item.Texts;
             filterPanel.LoadItem(item.Entities, item.Bends);
+            RefreshDimensions(item);
             entityView1.Invalidate();
             staleProgram = true;
             lblEntityCount.Text = $"{item.EntityCount} entities";
@@ -1168,6 +1251,7 @@ namespace OpenNest.Forms
                 item.Entities = entities;
                 item.EntityCount = entities.Count;
                 item.Bounds = entities.GetBoundingBox();
+                RefreshDimensions(item);
             }
 
             lblEntityCount.Text = $"{entities.Count} entities";
@@ -1301,6 +1385,7 @@ namespace OpenNest.Forms
                     Bends = drawing.Bends?.ToList() ?? new List<Bend>(),
                     Breakoffs = drawing.Breakoffs?.Select(b => b.Clone()).ToList() ?? new List<Breakoff>(),
                     TabbedCutouts = drawing.TabbedCutouts?.Select(c => c.Clone()).ToList() ?? new List<TabbedCutout>(),
+                    Dimensions = drawing.Dimensions?.Select(d => d.Clone()).ToList() ?? new List<DrawingDimension>(),
                     SuppressedEntityIds =
                         drawing.SuppressedEntityIds.Count > 0
                             ? new HashSet<Guid>(drawing.SuppressedEntityIds)
@@ -1355,7 +1440,8 @@ namespace OpenNest.Forms
                     editedProgram,
                     item.Breakoffs,
                     item.TabbedCutouts,
-                    item.EntityRoles
+                    item.EntityRoles,
+                    item.Dimensions
                 );
 
                 drawings.Add(drawing);

@@ -264,6 +264,13 @@ namespace OpenNest.IO
                                 TabCenters = c.TabCenters.ToList(),
                             }).ToList()
                             : null,
+                        Dimensions = d.Dimensions?.Count > 0
+                            ? d.Dimensions.Select(m => new DimensionDto
+                            {
+                                Kind = m.Kind.ToString(),
+                                Offset = m.Offset,
+                            }).ToList()
+                            : null,
                     }
                 );
             }
