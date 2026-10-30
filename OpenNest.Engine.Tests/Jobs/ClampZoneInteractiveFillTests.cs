@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using OpenNest.CNC;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
 using Xunit;
@@ -186,6 +187,45 @@ public class ClampZoneInteractiveFillTests
         Assert.Contains(parts, part => ReferenceEquals(part.BaseDrawing, frame));
         Assert.Contains(parts, part => ReferenceEquals(part.BaseDrawing, insert));
         Assert.Equal(0, parts.Count % 2);
+    }
+
+    /// <summary>An interlocked pair of crescents, their arcs exactly <c>0.25</c> apart at
+    /// <paramref name="nudge"/> zero. Faceting those arcs at 0.001 reads about 0.2493.</summary>
+    private static List<Part> InterlockedCrescents(double nudge = 0)
+    {
+        var program = new Program();
+        program.MoveTo(0, 0);
+        program.ArcTo(new Vector(-7.3094835341, 0), new Vector(-3.6547417671, 2.625426178),
+            RotationType.CCW);
+        program.ArcTo(new Vector(0, 0), new Vector(-3.6547417671, 3.4121639199), RotationType.CW);
+        var drawing = new Drawing("crescent", program);
+
+        var flipped = new Part(drawing);
+        flipped.Rotate(System.Math.PI);
+        flipped.Offset(new Vector(17.790933720357735 + nudge, 41.393296427203666));
+        return [new Part(drawing, new Vector(23.975496771940087, 35.352829360961906)), flipped];
+    }
+
+    [Fact]
+    public void FillGroupKeepsAnArcPairInterlockedExactlyAtThePartSpacing()
+    {
+        var plate = new Plate(new Size(60, 120)) { PartSpacing = 0.25 };
+        plate.ClampZones.Add(new ClampZone("front", new Box(19.25, 0, 1.5, 0.625)));
+
+        var parts = PlateFillService.FillGroup("Fill", plate, InterlockedCrescents(),
+            plate.WorkArea(), null, CancellationToken.None);
+
+        Assert.True(parts.Count >= 100, $"expected a full sheet of pairs, got {parts.Count}");
+    }
+
+    [Fact]
+    public void MaterialsTooCloseMeasuresArcsRatherThanTheirFacets()
+    {
+        var atSpacing = InterlockedCrescents();
+        Assert.False(InteractiveClamps.MaterialsTooClose(atSpacing[0], atSpacing[1], 0.25));
+
+        var tooClose = InterlockedCrescents(nudge: -0.01);
+        Assert.True(InteractiveClamps.MaterialsTooClose(tooClose[0], tooClose[1], 0.25));
     }
 
     [Fact]

@@ -124,16 +124,10 @@ internal static class InteractiveClamps
             return true;
         if (spacing <= NestTolerances.SpacingSlack)
             return false;
-        var ringsA = new List<Polygon> { outerA };
-        var ringsB = new List<Polygon> { outerB };
-        if (holesA != null) ringsA.AddRange(holesA);
-        if (holesB != null) ringsB.AddRange(holesB);
-        foreach (var ringA in ringsA)
-            foreach (var ringB in ringsB)
-                if (Clearance.BoundaryDistance(ringA, ringB).Distance
-                    < spacing - NestTolerances.SpacingSlack)
-                    return true;
-        return false;
+        // The profiles are already in world space. Facets at the polygons' tolerance understate
+        // an arc gap by more than the slack, which would reject a pair placed at the spacing.
+        return NativeContours.Of(a, new Vector(0, 0))
+            .TooClose(NativeContours.Of(b, new Vector(0, 0)), spacing);
     }
 
     private static List<Polygon> HolePolygons(ShapeProfile profile)
