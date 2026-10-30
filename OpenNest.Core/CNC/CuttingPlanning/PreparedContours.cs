@@ -465,7 +465,9 @@ public sealed class PreparedContours
         if (contourOrdinal == PerimeterOrdinal || pinned[contourOrdinal] != null)
             return Array.Empty<ContourChoice>();
         targets = targets.Where(t => t.Owner == this && t.ContourOrdinal == contourOrdinal).Take(max).ToArray();
-        var found = ErodedPierce.Find(shape, ParametersFor(contourOrdinal).GetEffectivePierceClearance(),
+        var depth = System.Math.Max(ParametersFor(contourOrdinal).GetEffectivePierceClearance(),
+            ApplicableLeadInLength(contourOrdinal));
+        var found = ErodedPierce.Find(shape, depth,
             targets.Select(t => t.Point).ToArray(), max);
         var entries = new List<ContourChoice>();
         for (var i = 0; i < found.Pierces.Count; i++)

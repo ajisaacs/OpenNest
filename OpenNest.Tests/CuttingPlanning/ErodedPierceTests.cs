@@ -83,6 +83,85 @@ public class ErodedPierceTests
         Assert.All(Assert.Single(result.ProposedOrder).ContourChoices, c => Assert.Null(c.Pierce));
     }
 
+    [Theory]
+    [InlineData(90)]
+    [InlineData(60)]
+    public void Planner_RoundHoleSmallerThanItsLeadIsPiercedAtItsCentre(double approach)
+    {
+        var program = new Program();
+        program.Merge(Circle(2, 1.5, 0.09));
+        program.Merge(Rectangle(0, 0, 4, 3));
+        var part = new Part(new Drawing("plate", program));
+        var parameters = new CuttingParameters
+        {
+            InternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = approach },
+            InternalLeadOut = new NoLeadOut(),
+            PierceClearance = 0.0625,
+            PierceDiameter = 0.03,
+        };
+
+        var (_, result) = Plan(parameters, part);
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        var lead = Assert.Single(Assert.Single(result.ProposedOrder).Execution.Motions, m => m.Layer == LayerType.Leadin);
+        Assert.True(lead.Start!.Value.DistanceTo(new Vector(2, 1.5)) < 1e-6);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(0.03)]
+    public void Planner_LeadStopsAtTheCentreLineOfANarrowStroke(double pierceDiameter)
+    {
+        // A slot 0.06 wide: the 0.15 lead would fit along it at a shallow angle.
+        var program = new Program();
+        program.Merge(Rectangle(1, 1, 2, 1.06));
+        program.Merge(Rectangle(0, 0, 4, 3));
+        var part = new Part(new Drawing("plate", program));
+        var parameters = new CuttingParameters
+        {
+            InternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 15 },
+            InternalLeadOut = new NoLeadOut(),
+            PierceDiameter = pierceDiameter,
+        };
+
+        var (_, result) = Plan(parameters, part);
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        var lead = Assert.Single(Assert.Single(result.ProposedOrder).Execution.Motions, m => m.Layer == LayerType.Leadin);
+        Assert.InRange(lead.Start!.Value.Y, 1.029, 1.031);
+        Assert.True(lead.Length < 0.05, $"Lead length {lead.Length}");
+    }
+
+    [Fact]
+    public void Intersects_RadialLineInASmallCircleHitsOnlyItsWall()
+    {
+        var circle = new Circle(new Vector(5, 1.5), 0.03);
+
+        Assert.True(circle.Intersects(new Line(new Vector(5, 1.5), new Vector(5.03, 1.5)), out var points));
+
+        Assert.Equal(5.03, Assert.Single(points).X, 9);
+    }
+
+    [Fact]
+    public void StopAtCentreLine_LeadThatStaysOnItsOwnSideKeepsItsShape()
+    {
+        var hole = Shape(Rectangle(0, 0, 2, 2));
+        var lead = new LineLeadIn { Length = 0.15, ApproachAngle = 60 };
+
+        Assert.Same(lead, ContourCuttingStrategy.StopAtCentreLine(hole, new Vector(1, 0), lead,
+            System.Math.PI / 2, RotationType.CW));
+    }
+
+    [Fact]
+    public void StopAtCentreLine_LeadLeavingACutoutIsLeftForTheLeadCheck()
+    {
+        var hole = Shape(Rectangle(0, 0, 1, 0.06));
+        var lead = new LineLeadIn { Length = 0.5, ApproachAngle = 90 };
+
+        Assert.Same(lead, ContourCuttingStrategy.StopAtCentreLine(hole, new Vector(0.5, 0), lead,
+            System.Math.PI / 2, RotationType.CW));
+    }
+
     [Fact]
     public void Capture_CutoutJustBelowAnotherSeamVertexIsNotNestedInIt()
     {

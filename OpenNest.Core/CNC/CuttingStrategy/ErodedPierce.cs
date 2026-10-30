@@ -19,8 +19,8 @@ namespace OpenNest.CNC.CuttingStrategy
     /// <summary>
     /// The pierce search for cutouts too small for their configured lead-in (text, slots, small
     /// holes): erode the cutout inward, as a laser kerf offset would, and pierce in what is left.
-    /// The erosion goes as deep as the pierce clearance when the cutout has room for it, else
-    /// almost to its pole of inaccessibility. Each target, an entry the planner ranked, gets the
+    /// The erosion goes as deep as the caller asks when the cutout has room for it, else almost
+    /// to its pole of inaccessibility; a round hole is pierced at its centre. Each target, an entry the planner ranked, gets the
     /// nearest point of the deepest erosion that still reaches the wall beside it, stepping down to
     /// half that depth: a letter stroke is pierced on its own centre line next to the entry, and
     /// only a target with no stroke beside it falls back to the deepest place. The lead then runs
@@ -47,10 +47,10 @@ namespace OpenNest.CNC.CuttingStrategy
         /// too small to erode is pierced at its pole for every target. Nothing for an open or
         /// degenerate contour.
         /// </summary>
-        public static ErodedPierces Find(Shape hole, double clearance, IReadOnlyList<Vector> targets, int max)
+        public static ErodedPierces Find(Shape hole, double depth, IReadOnlyList<Vector> targets, int max)
         {
             if (hole == null || !hole.IsClosed() || targets == null || targets.Count == 0 || max <= 0
-                || !double.IsFinite(clearance))
+                || !double.IsFinite(depth))
                 return ErodedPierces.None;
 
             // The inscribed radius, from the true wall: the deepest any erosion can go.
@@ -64,10 +64,12 @@ namespace OpenNest.CNC.CuttingStrategy
             var inscribed = hole.ClosestPointTo(pole, out _).DistanceTo(pole);
             if (!(inscribed > 0))
                 return ErodedPierces.None;
+            if (hole.Entities.Count == 1 && hole.Entities[0] is Circle circle)
+                return new(targets.Take(max).Select(_ => circle.Center).ToArray(), circle.Radius);
 
             // Inscribed flattening can stand off a concave arc, and round joins cut their arcs,
             // each by the tolerance; Clipper rounds to its precision. Erode past both.
-            var depth = System.Math.Min(System.Math.Max(clearance, 0), inscribed * DepthFraction);
+            depth = System.Math.Min(System.Math.Max(depth, 0), inscribed * DepthFraction);
             var tolerance = System.Math.Max(depth / 100, System.Math.Pow(10, -ClipperBridge.Precision));
             var margin = 2 * tolerance + System.Math.Pow(10, -ClipperBridge.Precision);
             if (depth + margin >= inscribed - tolerance)

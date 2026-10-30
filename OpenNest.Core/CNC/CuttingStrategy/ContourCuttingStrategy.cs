@@ -314,7 +314,8 @@ namespace OpenNest.CNC.CuttingStrategy
                     var shape = shapes[choice.ContourOrdinal];
                     EmitContour(result, shape, choice.Point, shape.Entities[choice.EntityOrdinal],
                         choice.ContourOrdinal == perimeterOrdinal ? ContourType.External : null,
-                        exactCirclePrograms: true, scrapPierce: choice.Pierce);
+                        exactCirclePrograms: true, scrapPierce: choice.Pierce,
+                        stopAtCentreLine: contourParameters?[choice.ContourOrdinal] == null);
                 }
             }
             finally
@@ -440,7 +441,8 @@ namespace OpenNest.CNC.CuttingStrategy
             Entity entity,
             ContourType? forceType = null,
             bool exactCirclePrograms = false,
-            Vector? scrapPierce = null
+            Vector? scrapPierce = null,
+            bool stopAtCentreLine = false
         )
         {
             var contourType = forceType ?? DetectContourType(shape);
@@ -472,6 +474,8 @@ namespace OpenNest.CNC.CuttingStrategy
                     leadIn = StraightLeadIn(point, holePierce, out normal);
                 else
                 {
+                    if (stopAtCentreLine)
+                        leadIn = StopAtCentreLine(shape, point, leadIn, normal, winding);
                     leadIn = ClampLeadInForCircle(leadIn, circle, point, normal,
                         Parameters.GetEffectivePierceClearance());
                     leadIn = ResolvePierceZone(shape, point, leadIn, normal, Parameters.GetPierceZoneRadius(), winding);
@@ -524,7 +528,11 @@ namespace OpenNest.CNC.CuttingStrategy
                 leadIn = ResolveLeadIn(shape, point, entity, contourType, leadIn, winding,
                     Parameters.GetEffectivePierceClearance(), out leadInNormal);
                 if (contourType == ContourType.Internal)
+                {
+                    if (stopAtCentreLine)
+                        leadIn = StopAtCentreLine(shape, point, leadIn, leadInNormal, turn);
                     leadIn = ResolvePierceZone(shape, point, leadIn, leadInNormal, Parameters.GetPierceZoneRadius(), turn);
+                }
             }
             program.Codes.AddRange(leadIn.Generate(point, leadInNormal, turn));
 
@@ -1058,10 +1066,13 @@ namespace OpenNest.CNC.CuttingStrategy
         /// <summary>
         /// Keeps a hole's lead-in pierce <paramref name="pierceRadius"/> clear of the hole wall.
         /// A lead-in whose pierce already keeps it, or that pierces on the contour itself, is
-        /// returned as given. Otherwise the pierce moves onto the line from
-        /// <paramref name="point"/> toward the hole's pole of inaccessibility (the centre of a
-        /// round hole), as close to the contour as the zone allows, and the lead becomes a
-        /// straight line from there, generated with <paramref name="normal"/>. A hole too small
+        /// returned as given. Otherwise the pierce moves straight in from the wall to the hole's
+        /// centre line, or the lead's own length in when that comes first (see
+        /// <see cref="StopAtCentreLine"/>). A lead that cannot keep the zone there moves onto the
+        /// line from <paramref name="point"/> toward the nearest point that keeps it (see
+        /// <see cref="ErodedPierce"/>) or else the hole's pole of inaccessibility (the centre of a
+        /// round hole), as close to the contour as the zone allows. Either way the lead becomes
+        /// a straight line from there, generated with <paramref name="normal"/>. A hole too small
         /// for the zone is pierced at the pole itself, its best clearance; the lead validator and
         /// pre-post review still report the shortfall. Reads only the hole's own geometry, so it
         /// knows nothing of parts nested inside the hole. Shared by program generation and the
@@ -1079,29 +1090,42 @@ namespace OpenNest.CNC.CuttingStrategy
             var polygon = circle == null
                 ? hole.ToPolygonWithTolerance(System.Math.Max(pierceRadius / 100, Math.Tolerance.ChainTolerance))
                 : null;
-            if (Clear(leadIn.GetPiercePoint(point, normal, turn)))
+            var configured = leadIn.GetPiercePoint(point, normal, turn);
+            if (Clear(configured))
                 return leadIn;
+
+            var depth = CentreLineDepth(hole, point, normal, configured.DistanceTo(point));
+            if (depth > Math.Tolerance.Epsilon && Clear(point + Inward(normal) * depth))
+                return new LineLeadIn { Length = depth, ApproachAngle = 90 };
 
             var pole = circle?.Center ?? PolyLabel.Find(polygon, null,
                 System.Math.Max(pierceRadius / 100, Math.Tolerance.ChainTolerance), PoleSearchCells);
             if (!Inside(pole))
                 return leadIn;
 
-            // Clearance grows monotonically toward the pole of a convex hole, so the bisection
+            // The pole of a letter can be a stroke away: head for the stroke beside the entry, on
+            // its centre line when the lead reaches that far.
+            var reach = configured.DistanceTo(point);
+            var toward = pole;
+            if (circle == null && ErodedPierce.Find(hole, System.Math.Max(pierceRadius, reach), new[] { point }, 1)
+                .Pierces is [var eroded] && Clear(eroded))
+                toward = eroded;
+
+            // Clearance grows monotonically along this line in a convex hole, so the bisection
             // finds the shortest clear lead; in other holes it still ends on a clear point.
-            var pierce = pole;
-            if (Clear(pole))
+            var pierce = toward;
+            if (Clear(toward) && (reach < pierceRadius || toward == pole))
             {
                 double low = 0, high = 1;
                 for (var i = 0; i < 40; i++)
                 {
                     var middle = (low + high) / 2;
-                    if (Clear(point + (pole - point) * middle))
+                    if (Clear(point + (toward - point) * middle))
                         high = middle;
                     else
                         low = middle;
                 }
-                pierce = point + (pole - point) * high;
+                pierce = point + (toward - point) * high;
             }
 
             var length = pierce.DistanceTo(point);
@@ -1123,6 +1147,97 @@ namespace OpenNest.CNC.CuttingStrategy
         }
 
         /// <summary>
+        /// Keeps a cutout's lead-in out of the cutout's far half. A lead longer than the cutout is
+        /// deep at its entry, measured straight in from the wall to the centre line where the walls
+        /// meet as the cutout erodes, reaches past the centre line or runs along a narrow stroke, as
+        /// does one whose own line gets closer to a wall again. It becomes a straight one, generated
+        /// with <paramref name="normal"/>, from that centre line (the centre of a round hole) or
+        /// from the lead's own length in when that comes first. Any other lead keeps its shape, and
+        /// one that leaves a cutout other than a round hole is left for the lead check to refuse.
+        /// </summary>
+        public static LeadIn StopAtCentreLine(Shape hole, Vector point, LeadIn leadIn, double normal, RotationType turn)
+        {
+            if (leadIn is NoLeadIn || !hole.IsClosed())
+                return leadIn;
+            var pierce = leadIn.GetPiercePoint(point, normal, turn);
+            var length = pierce.DistanceTo(point);
+            if (!double.IsFinite(length) || length <= Math.Tolerance.Epsilon)
+                return leadIn;
+
+            var circle = hole.Entities.Count == 1 ? hole.Entities[0] as Circle : null;
+            var along = pierce - point;
+            var inward = Inward(normal);
+            // A pierce as far from every wall as it is deep has not come near another wall.
+            var inside = circle == null || pierce.DistanceTo(circle.Center) < circle.Radius;
+            if (inside && Clearance(hole, pierce) >= along.X * inward.X + along.Y * inward.Y - Math.Tolerance.Epsilon)
+                return leadIn;
+
+            var depth = CentreLineDepth(hole, point, normal, length);
+            if (depth <= Math.Tolerance.Epsilon
+                || inside && depth >= length - Math.Tolerance.Epsilon && !PeaksBeforeItsEnd(hole, point, along))
+                return leadIn;
+            if (circle == null)
+            {
+                var polygon = hole.ToPolygonWithTolerance(Math.Tolerance.ChainTolerance);
+                for (var i = 1; i <= CentreLineSteps; i++)
+                    if (!polygon.ContainsPoint(point + along * ((double)i / CentreLineSteps)))
+                        return leadIn;
+            }
+            return new LineLeadIn { Length = depth, ApproachAngle = 90 };
+        }
+
+        // How far a straight line in from the wall runs, up to maxDepth, before it reaches the
+        // centre line: the distance to the wall grows at a steady rate until a second wall is as
+        // near, then levels off along a stroke or falls.
+        private static double CentreLineDepth(Shape hole, Vector point, double normal, double maxDepth)
+        {
+            if (hole.Entities.Count == 1 && hole.Entities[0] is Circle circle)
+                return System.Math.Min(maxDepth, circle.Radius);
+
+            var inward = Inward(normal);
+            var step = maxDepth / CentreLineSteps;
+            var rate = Clearance(hole, point + inward * step) / step;
+            // A corner's curved lead keeps an edge's normal, which runs along the other edge.
+            if (rate < MinimumCentreLineRate)
+                return maxDepth;
+            bool Rising(double depth) => Clearance(hole, point + inward * (depth + step / CentreLineSteps))
+                - Clearance(hole, point + inward * depth) >= rate / 2 * (step / CentreLineSteps);
+            for (var i = 1; i < CentreLineSteps; i++)
+            {
+                if (Rising(step * i))
+                    continue;
+                double low = step * (i - 1), high = step * i;
+                for (var refine = 0; refine < CentreLineRefinements; refine++)
+                {
+                    var middle = (low + high) / 2;
+                    if (Rising(middle))
+                        low = middle;
+                    else
+                        high = middle;
+                }
+                return low;
+            }
+            return maxDepth;
+        }
+
+        private static bool PeaksBeforeItsEnd(Shape hole, Vector point, Vector along)
+        {
+            var peak = 0.0;
+            for (var i = 1; i <= CentreLineSteps; i++)
+            {
+                var clearance = Clearance(hole, point + along * ((double)i / CentreLineSteps));
+                if (clearance < peak - Math.Tolerance.Epsilon)
+                    return true;
+                peak = System.Math.Max(peak, clearance);
+            }
+            return false;
+        }
+
+        private static double Clearance(Shape hole, Vector point) => hole.ClosestPointTo(point, out _).DistanceTo(point);
+
+        private static Vector Inward(double normal) => new(System.Math.Cos(normal), System.Math.Sin(normal));
+
+        /// <summary>
         /// A straight lead-in from <paramref name="pierce"/> to <paramref name="point"/>, with the
         /// normal to generate it with.
         /// </summary>
@@ -1134,6 +1249,11 @@ namespace OpenNest.CNC.CuttingStrategy
 
         // Bounds the pole search on long, thin holes; the result is checked before use.
         private const int PoleSearchCells = 4096;
+
+        // Samples along a lead when looking for the centre line, then the steps narrowing in on it.
+        private const int CentreLineSteps = 64;
+        private const int CentreLineRefinements = 16;
+        private const double MinimumCentreLineRate = 0.01;
 
         private LeadIn SelectLeadIn(ContourType contourType)
         {

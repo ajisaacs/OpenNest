@@ -192,7 +192,10 @@ namespace OpenNest.Geometry
             double t;
             pts = new List<Vector>();
 
-            if (det.IsEqualTo(0))
+            // A small circle's whole discriminant is tiny: tangent also means the line stays at its rim.
+            var halfChord = det / (4 * a);
+            var depth = circle.Radius - System.Math.Sqrt(System.Math.Max(circle.Radius * circle.Radius - halfChord, 0));
+            if (det.IsEqualTo(0) && depth <= Tolerance.Epsilon)
             {
                 t = -b / (2 * a);
                 var pt1 = new Vector(line.StartPoint.X + t * d1.X, line.StartPoint.Y + t * d1.Y);
