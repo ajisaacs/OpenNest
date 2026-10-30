@@ -114,6 +114,32 @@ namespace OpenNest
         }
 
         /// <summary>
+        /// Stops a new <paramref name="target"/> at the first crossing cut-off from its start edge,
+        /// the origin side unless <paramref name="settings"/> cut toward the origin. It stays full
+        /// length, with no changes, when nothing crosses it or the line left would be shorter than
+        /// the minimum segment length. <paramref name="target"/> need not be on the plate yet.
+        /// </summary>
+        public static CutOffEdit StopAtFirstCrossing(Plate plate, CutOff target, CutOffSettings settings)
+        {
+            var (start, end) = NominalSpan(plate, target);
+            var crossings = Crossings(plate, target)
+                .Where(c => c > start + Tolerance.Epsilon && c < end - Tolerance.Epsilon)
+                .ToList();
+            if (crossings.Count == 0)
+                return CutOffEdit.Of(System.Array.Empty<CutOffLimitChange>(), null);
+
+            var towardOrigin = settings?.CutDirection == CutDirection.TowardOrigin;
+            var startsHigh = towardOrigin == CutOff.FarEdgeIsHigh(target.Axis, plate.Quadrant);
+            var stop = startsHigh ? crossings.Max() : crossings.Min();
+            var remaining = startsHigh ? end - stop : stop - start;
+            if (remaining < System.Math.Max(settings?.MinSegmentLength ?? 0, Tolerance.Epsilon))
+                return CutOffEdit.Of(System.Array.Empty<CutOffLimitChange>(), null);
+            return startsHigh
+                ? Single(plate, target, stop, target.EndLimit)
+                : Single(plate, target, target.StartLimit, stop);
+        }
+
+        /// <summary>
         /// Swaps which of two meeting cut-offs runs through: the one that stopped at the junction
         /// extends past it (as <see cref="Extend"/> does), and the one that ran through is trimmed
         /// there, losing the side away from the plate's origin. Only the origin-side sheet edge is

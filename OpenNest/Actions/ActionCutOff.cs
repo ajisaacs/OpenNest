@@ -17,6 +17,7 @@ namespace OpenNest.Actions
         private CutOffSettings settings;
         private CutOffAxis lockedAxis = CutOffAxis.Vertical;
         private Dictionary<Part, Entity> perimeterCache;
+        private string notice;
 
         public ActionCutOff(PlateView plateView)
             : base(plateView)
@@ -44,6 +45,7 @@ namespace OpenNest.Actions
 
             previewCutOff = null;
             perimeterCache = null;
+            notice = null;
             plateView.Invalidate();
         }
 
@@ -51,10 +53,20 @@ namespace OpenNest.Actions
 
         public override bool IsBusy() => false;
 
-        public override string Hint =>
-            $"click to add a {AxisName(lockedAxis)} line, Space turns it {AxisName(OtherAxis(lockedAxis))}, Esc finishes, F1 for help";
+        public override string Hint
+        {
+            get
+            {
+                var hint = FullLength
+                    ? $"click to add a full-length {AxisName(lockedAxis)} line, Space turns it {AxisName(OtherAxis(lockedAxis))}, Tab stops it at the first crossing, Esc finishes, F1 for help"
+                    : $"click to add a {AxisName(lockedAxis)} line stopped at the first crossing, Space turns it {AxisName(OtherAxis(lockedAxis))}, Tab makes it full length, Esc finishes, F1 for help";
+                return notice == null ? hint : $"{notice} {hint}";
+            }
+        }
 
         public override string HelpTopic => HelpTopics.SheetCutOff;
+
+        private bool FullLength => plateView.CutOffs.FullLengthNewLines;
 
         private static CutOffAxis OtherAxis(CutOffAxis axis) =>
             axis == CutOffAxis.Vertical ? CutOffAxis.Horizontal : CutOffAxis.Vertical;
@@ -62,21 +74,35 @@ namespace OpenNest.Actions
         private static string AxisName(CutOffAxis axis) =>
             axis == CutOffAxis.Vertical ? "vertical" : "horizontal";
 
-        private void OnMouseMove(object sender, MouseEventArgs e)
+        private CutOff NewCutOff(Vector point)
         {
-            var pt = plateView.CurrentPoint;
-            previewCutOff = new CutOff(pt, lockedAxis) { HeadLockOvercut = settings.NewCutOffHeadLockOvercut };
+            var cutOff = new CutOff(point, lockedAxis) { HeadLockOvercut = settings.NewCutOffHeadLockOvercut };
+            var edit = FullLength ? null : CutOffTrim.StopAtFirstCrossing(plateView.Plate, cutOff, settings);
+            edit?.Apply();
+
+            if (notice != edit?.Notice)
+            {
+                notice = edit?.Notice;
+                plateView.RefreshActionStatus();
+            }
+            return cutOff;
+        }
+
+        private void UpdatePreview()
+        {
+            previewCutOff = NewCutOff(plateView.CurrentPoint);
             previewCutOff.Regenerate(plateView.Plate, settings, perimeterCache);
             plateView.Invalidate();
         }
+
+        private void OnMouseMove(object sender, MouseEventArgs e) => UpdatePreview();
 
         private void OnMouseDown(object sender, MouseEventArgs e)
         {
             if (e.Button != MouseButtons.Left)
                 return;
 
-            var pt = plateView.CurrentPoint;
-            var cutoff = new CutOff(pt, lockedAxis) { HeadLockOvercut = settings.NewCutOffHeadLockOvercut };
+            var cutoff = NewCutOff(plateView.CurrentPoint);
 
             using var change = plateView.BeginChange("Add Cut-Off");
             change.MarkChanged();
@@ -94,14 +120,16 @@ namespace OpenNest.Actions
                 plateView.RefreshActionStatus();
 
                 if (previewCutOff != null)
-                {
-                    previewCutOff = new CutOff(plateView.CurrentPoint, lockedAxis)
-                    {
-                        HeadLockOvercut = settings.NewCutOffHeadLockOvercut,
-                    };
-                    previewCutOff.Regenerate(plateView.Plate, settings, perimeterCache);
-                    plateView.Invalidate();
-                }
+                    UpdatePreview();
+            }
+            else if (e.KeyCode == Keys.Tab)
+            {
+                plateView.CutOffs.FullLengthNewLines = !FullLength;
+                plateView.RefreshActionStatus();
+
+                if (previewCutOff != null)
+                    UpdatePreview();
+                e.Handled = true;
             }
             else if (e.KeyCode == Keys.Escape)
             {
@@ -145,7 +173,7 @@ namespace OpenNest.Actions
         // The status bar is easy to miss, so the cursor says how to turn the line.
         private void DrawRotateTag(Graphics g)
         {
-            var text = $"Space: turn {AxisName(OtherAxis(lockedAxis))}";
+            var text = $"Space: turn {AxisName(OtherAxis(lockedAxis))}\nTab: {(FullLength ? "stop at first crossing" : "full length")}";
             var cursor = plateView.PointWorldToGraph(plateView.CurrentPoint);
             var size = g.MeasureString(text, plateView.Font);
             var rect = new RectangleF(cursor.X + 16f, cursor.Y + 16f, size.Width + 6, size.Height + 4);

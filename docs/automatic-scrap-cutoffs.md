@@ -103,6 +103,8 @@ Saving `.nest` retains ordinary cutoff positions, axes, limits, head-locked over
 
 ## Trim and extend
 
+**Sheet Cut-Off** stops a new line at the first crossing cut-off from its start edge: the origin side, or the far edge when the cut direction is `TowardOrigin`, in any plate quadrant. Clicking past that crossing still draws the line from the start edge, as the preview shows. The line runs full length when nothing crosses it or what remains would be shorter than the minimum segment length. Tab switches to full-length lines and back, and the choice lasts until the nest is closed. Only the new line's limits are set (`CutOffTrim.StopAtFirstCrossing`); existing lines are not changed. A head-locked line stopped short of the far edge loses its overcut, and the status bar says so.
+
 **Plate > Trim/Extend Cut-Off** (and the toolbar button beside **Sheet Cut-Off**) edits a cut-off against the cut-offs that cross it, AutoCAD-style. Tab switches between Trim and Extend; Esc finishes. Both change only the cut-off's start and end limits (`CutOffTrim` in Core), so nothing new is saved and Plan Cutting sees the change like any other limit change.
 
 - **Trim**: click the piece to remove. The crossing cut-offs on either side of the click (or the line's end) bound the piece, and the limit on that side moves to the crossing line's centre, where half the crossing cut's kerf still overlaps the trimmed end. A crossing line counts when its own span reaches the target, including a line that stops on it.

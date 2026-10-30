@@ -656,9 +656,10 @@ namespace OpenNest.Controls
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        // Trim/Extend switches mode with Tab, which would otherwise move focus off the view.
+        // The cut-off tools switch mode with Tab, which would otherwise move focus off the view.
         protected override bool IsInputKey(Keys keyData) =>
-            keyData == Keys.Tab && actionManager.CurrentAction is ActionTrimExtendCutOff || base.IsInputKey(keyData);
+            keyData == Keys.Tab && actionManager.CurrentAction is ActionTrimExtendCutOff or ActionCutOff
+            || base.IsInputKey(keyData);
 
         protected override void OnKeyDown(KeyEventArgs e)
         {

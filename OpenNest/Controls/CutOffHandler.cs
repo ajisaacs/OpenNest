@@ -22,6 +22,9 @@ namespace OpenNest.Controls
 
         public bool IsDragging { get; private set; }
 
+        /// <summary>Whether Sheet Cut-Off draws full-length lines instead of stopping at the first crossing.</summary>
+        public bool FullLengthNewLines { get; set; }
+
         public CutOff TryStartDrag(Vector point, double tolerance)
         {
             var hitCutOff = GetCutOffAtPoint(point, tolerance);
