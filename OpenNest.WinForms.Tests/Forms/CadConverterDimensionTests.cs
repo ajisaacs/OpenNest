@@ -162,6 +162,56 @@ public class CadConverterDimensionTests
     });
 
     [Fact]
+    public void DraggingARadiusByItsValue_KeepsTheValueUnderThePointer() => ArchUnitsTests.RunSta(() =>
+    {
+        var part = Part();
+        var hole = new Circle(5, 3, 1) { Layer = part.SourceEntities![0].Layer };
+        part.SourceEntities.Add(hole);
+
+        using var form = new DimensionTestForm();
+        Show(form);
+        form.LoadDrawings([part]);
+        var view = Field<EntityView>(form, "entityView1");
+        var item = Field<FileListControl>(form, "fileList").SelectedItem!;
+        Invoke(form, "OnEntityActionRequested", null, new EntityActionEventArgs(EntityAction.AddRadiusDimension, [hole]));
+
+        // A press just past the value is empty space: it grabs nothing.
+        var label = LabelInControl(view, 0);
+        var outside = new Point((int)label.Right + 4, (int)(label.Top + label.Height / 2));
+        Mouse(view, "OnMouseDown", outside);
+        Assert.Null(typeof(EntityView).GetField("draggedDimension", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(view));
+        Mouse(view, "OnMouseUp", outside);
+        var before = item.Dimensions[0].Offset;
+
+        // Grab the value 5 px right of its center and drag it to straight left of the hole.
+        var grip = new Point((int)(label.Left + label.Width / 2) + 5, (int)(label.Top + label.Height / 2));
+        var release = view.PointWorldToControl(new Vector(1.5, 3));
+        Mouse(view, "OnMouseDown", grip);
+        Mouse(view, "OnMouseMove", release);
+        Mouse(view, "OnMouseUp", release);
+
+        var moved = LabelInControl(view, 0);
+        Assert.InRange(moved.Left + moved.Width / 2 + 5 - release.X, -2, 2);
+        Assert.InRange(moved.Top + moved.Height / 2 - release.Y, -2, 2);
+        Assert.InRange(view.DimensionLayouts[0].ArrowPoint.X, 3.99, 4.01);
+        Assert.NotEqual(before, item.Dimensions[0].Offset);
+        form.Close();
+    });
+
+    // The dimension's value box in control coordinates, as the view draws it.
+    private static RectangleF LabelInControl(EntityView view, int index)
+    {
+        var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        var g = typeof(EntityView).GetMethod("MeasureGraphics", flags)!.Invoke(view, null);
+        var box = (RectangleF)typeof(EntityView).GetMethod("DimensionLabelAt", flags)!
+            .Invoke(view, [g, view.DimensionLayouts[index]])!;
+        var corner = view.PointGraphToWorld(box.Location);
+        var control = view.PointWorldToControl(corner);
+        return new RectangleF(control.X, control.Y, box.Width, box.Height);
+    }
+
+    [Fact]
     public void DisplayOnlyCircle_ExplainsHowToDimensionIt() => ArchUnitsTests.RunSta(() =>
     {
         var part = Part();

@@ -65,9 +65,8 @@ namespace OpenNest.Controls
             draggedTab = HitTestTab(e.Location);
             if (draggedTab == null)
                 draggedCutoutTab = HitTestCutoutTab(e.Location);
-            if (draggedTab == null && draggedCutoutTab == null)
-                draggedDimension = HitTestDimension(e.Location);
-            if (draggedTab == null && draggedCutoutTab == null && draggedDimension == null)
+            var dimension = draggedTab == null && draggedCutoutTab == null && BeginDimensionDrag(e.Location);
+            if (draggedTab == null && draggedCutoutTab == null && !dimension)
                 BeginWindowSelect(e);
             else
                 suppressNextClick = true; // A tab press or drag does not change the selection.
@@ -79,7 +78,7 @@ namespace OpenNest.Controls
             if (e.Button != MouseButtons.Left)
                 return;
             EndWindowSelect(e);
-            draggedDimension = null;
+            EndDimensionDrag();
             if (draggedCutoutTab is { } cutoutTab)
             {
                 draggedCutoutTab = null;

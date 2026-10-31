@@ -517,6 +517,7 @@ namespace OpenNest.Controls
                 gridPen.Dispose();
                 labelFont.Dispose();
                 dimensionFont.Dispose();
+                DisposeDimensionMeasuring();
                 labelBrush.Dispose();
                 labelBackBrush.Dispose();
                 textBrush.Dispose();

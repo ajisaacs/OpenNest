@@ -42,6 +42,12 @@ namespace OpenNest.Controls
         private readonly Font dimensionFont = new Font("Segoe UI", 9f);
         private int? draggedDimension;
 
+        // A press on a dimension's value: the label's center minus the pressed point, so the label
+        // keeps its place under the pointer. Null when the dimension line itself was pressed.
+        private Vector? draggedDimensionLabelGrab;
+        private Graphics measureGraphics;
+        private Bitmap measureBitmap;
+
         /// <summary>Resolved dimensions to draw, in dimension order; invalid entries are not drawn.</summary>
         public IReadOnlyList<DimensionLayout> DimensionLayouts { get; set; } = Array.Empty<DimensionLayout>();
 
@@ -56,6 +62,8 @@ namespace OpenNest.Controls
                 return;
             var point = PointControlToWorld(location);
             var minimum = LengthGuiToWorld(DimensionMinimumPixels);
+            if (draggedDimensionLabelGrab is { } grab)
+                point = LeaderEndForLabelAt(layout, point + grab);
             if (layout.IsRadial)
             {
                 var (radialOffset, angle) = layout.RadialPlacementAt(point, minimum);
@@ -66,8 +74,61 @@ namespace OpenNest.Controls
             DimensionDragged?.Invoke(this, new DimensionDragEventArgs(index, offset));
         }
 
+        /// <summary>Starts dragging the dimension under <paramref name="location"/>, by its value or its line.</summary>
+        private bool BeginDimensionDrag(Point location)
+        {
+            draggedDimensionLabelGrab = null;
+            draggedDimension = HitTestDimensionLabel(location);
+            if (draggedDimension is { } index)
+            {
+                var label = DimensionLabelAt(MeasureGraphics(), DimensionLayouts[index]);
+                draggedDimensionLabelGrab = PointGraphToWorld(new PointF(label.Left + label.Width / 2f, label.Top + label.Height / 2f)) - PointControlToWorld(location);
+                return true;
+            }
+            draggedDimension = HitTestDimension(location);
+            return draggedDimension != null;
+        }
+
+        private void EndDimensionDrag()
+        {
+            draggedDimension = null;
+            draggedDimensionLabelGrab = null;
+        }
+
+        // The overall dimension line runs through its label; a radial label sits past the leader's
+        // end, so the leader ends that label reach short of the label's center.
+        private Vector LeaderEndForLabelAt(DimensionLayout layout, Vector labelCenter)
+        {
+            if (!layout.IsRadial)
+                return labelCenter;
+            var dx = labelCenter.X - layout.Center.X;
+            var dy = labelCenter.Y - layout.Center.Y;
+            var distance = System.Math.Sqrt(dx * dx + dy * dy);
+            if (distance <= 0)
+                return labelCenter;
+            var size = MeasureGraphics().MeasureString(layout.DisplayText, dimensionFont);
+            var reach = LengthGuiToWorld(RadialLabelReach(size, System.Math.Atan2(dy, dx)));
+            var leader = System.Math.Max(0, distance - reach);
+            return new Vector(layout.Center.X + dx / distance * leader, layout.Center.Y + dy / distance * leader);
+        }
+
+        private int? HitTestDimensionLabel(Point location)
+        {
+            var point = PointControlToGraph(location);
+            var g = MeasureGraphics();
+            for (var i = DimensionLayouts.Count - 1; i >= 0; i--)
+            {
+                var layout = DimensionLayouts[i];
+                if (layout is { IsValid: true } && DimensionLabelAt(g, layout).Contains(point))
+                    return i;
+            }
+            return null;
+        }
+
         private int? HitTestDimension(Point location)
         {
+            if (HitTestDimensionLabel(location) is { } label)
+                return label;
             var point = PointControlToWorld(location);
             var tolerance = LengthGuiToWorld(DimensionHitPixels);
             for (var i = 0; i < DimensionLayouts.Count; i++)
@@ -159,13 +220,13 @@ namespace OpenNest.Controls
             DrawArrow(g, brush, to, new PointF(-along.X, -along.Y));
 
             var mid = PointWorldToGraph(layout.MidPoint);
-            var size = g.MeasureString(layout.ValueText, dimensionFont);
+            var size = g.MeasureString(layout.DisplayText, dimensionFont);
             var state = g.Save();
             g.TranslateTransform(mid.X, mid.Y);
             if (layout.Kind == DimensionKind.OverallVertical)
                 g.RotateTransform(-90f);
             g.FillRectangle(labelBackBrush, -size.Width / 2f, -size.Height / 2f, size.Width, size.Height);
-            g.DrawString(layout.ValueText, dimensionFont, brush, -size.Width / 2f, -size.Height / 2f);
+            g.DrawString(layout.DisplayText, dimensionFont, brush, -size.Width / 2f, -size.Height / 2f);
             g.Restore(state);
         }
 
@@ -194,16 +255,58 @@ namespace OpenNest.Controls
                 g.DrawLine(pen, center.X, center.Y - CenterMarkPixels, center.X, center.Y + CenterMarkPixels);
             }
 
-            // The label sits past the leader's end, on the side away from the curve's center.
-            var text = layout.DisplayText;
-            var size = g.MeasureString(text, dimensionFont);
-            var dx = System.Math.Cos(layout.Angle);
-            var dy = -System.Math.Sin(layout.Angle); // Screen Y runs down.
-            var reach = (float)(System.Math.Abs(dx) * size.Width / 2 + System.Math.Abs(dy) * size.Height / 2) + 2;
-            var cx = label.X + (float)dx * reach;
-            var cy = label.Y + (float)dy * reach;
-            g.FillRectangle(labelBackBrush, cx - size.Width / 2f, cy - size.Height / 2f, size.Width, size.Height);
-            g.DrawString(text, dimensionFont, brush, cx - size.Width / 2f, cy - size.Height / 2f);
+            var box = DimensionLabelAt(g, layout);
+            g.FillRectangle(labelBackBrush, box);
+            g.DrawString(layout.DisplayText, dimensionFont, brush, box.Left, box.Top);
+        }
+
+        /// <summary>
+        /// Where a dimension's value is drawn, in graph coordinates (a vertical overall dimension's
+        /// value is turned a quarter, so its box is too). A radial label sits past the leader's end,
+        /// on the side away from the curve's center.
+        /// </summary>
+        private RectangleF DimensionLabelAt(Graphics g, DimensionLayout layout)
+        {
+            var size = g.MeasureString(layout.DisplayText, dimensionFont);
+            if (!layout.IsRadial)
+            {
+                var mid = PointWorldToGraph(layout.MidPoint);
+                if (layout.Kind == DimensionKind.OverallVertical)
+                    size = new SizeF(size.Height, size.Width);
+                return new RectangleF(mid.X - size.Width / 2f, mid.Y - size.Height / 2f, size.Width, size.Height);
+            }
+
+            var end = PointWorldToGraph(layout.LineEnd);
+            var reach = RadialLabelReach(size, layout.Angle);
+            var cx = end.X + (float)System.Math.Cos(layout.Angle) * reach;
+            var cy = end.Y - (float)System.Math.Sin(layout.Angle) * reach; // Screen Y runs down.
+            return new RectangleF(cx - size.Width / 2f, cy - size.Height / 2f, size.Width, size.Height);
+        }
+
+        // How far past the leader's end a radial label's center sits, in pixels.
+        private static float RadialLabelReach(SizeF size, double angle) =>
+            (float)(System.Math.Abs(System.Math.Cos(angle)) * size.Width / 2
+                + System.Math.Abs(System.Math.Sin(angle)) * size.Height / 2) + 2;
+
+        // Hit-testing measures labels the way painting does, without waiting for a paint.
+        private Graphics MeasureGraphics()
+        {
+            if (measureGraphics == null || measureGraphics.DpiX != DeviceDpi)
+            {
+                DisposeDimensionMeasuring();
+                measureBitmap = new Bitmap(1, 1);
+                measureBitmap.SetResolution(DeviceDpi, DeviceDpi);
+                measureGraphics = Graphics.FromImage(measureBitmap);
+            }
+            return measureGraphics;
+        }
+
+        private void DisposeDimensionMeasuring()
+        {
+            measureGraphics?.Dispose();
+            measureBitmap?.Dispose();
+            measureGraphics = null;
+            measureBitmap = null;
         }
 
         // An arrow with its tip at tip and its tail toward toward.
