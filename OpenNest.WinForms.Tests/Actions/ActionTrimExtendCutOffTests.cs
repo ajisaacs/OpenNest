@@ -60,6 +60,29 @@ public class ActionTrimExtendCutOffTests
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
 
     [Fact]
+    public void DraggingACutOffTakesTheLinesThatMeetIt() => StaTestThread.Run(() =>
+    {
+        var plate = new Plate(60, 120);
+        var vertical = new CutOff(new Vector(30, 0), CutOffAxis.Vertical);
+        var horizontal = new CutOff(new Vector(0, 20), CutOffAxis.Horizontal) { EndLimit = 30 };
+        plate.CutOffs.Add(vertical);
+        plate.CutOffs.Add(horizontal);
+        plate.RegenerateCutOffs(new CutOffSettings());
+        using var view = new PlateView { Plate = plate };
+
+        var dragged = view.CutOffs.TryStartDrag(new Vector(30, 40), Tolerance);
+        Assert.Same(vertical, dragged);
+        view.CutOffs.UpdateDrag(new Vector(34, 40), dragged);
+        Assert.Equal(34, horizontal.EndLimit);
+        Assert.Equal(34, horizontal.Drawing.Program.BoundingBox().Right, 6);
+        view.CutOffs.UpdateDrag(new Vector(26, 40), dragged);
+        view.CutOffs.EndDrag();
+
+        Assert.Equal(26, horizontal.EndLimit);
+        Assert.Equal(26, horizontal.Drawing.Program.BoundingBox().Right, 6);
+    }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
+
+    [Fact]
     public void ApplyRegeneratesAndRefusalsChangeNothing() => StaTestThread.Run(() =>
     {
         var (plate, vertical, horizontal) = Junction();

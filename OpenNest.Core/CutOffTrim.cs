@@ -59,6 +59,58 @@ namespace OpenNest
     }
 
     /// <summary>
+    /// The perpendicular lines that meet a cut-off as a drag of it starts: their limits or gap
+    /// edges sit on its center, where a trim or extend left them. <see cref="MoveTo"/> takes those
+    /// stops along, so each line is extended or trimmed to keep meeting it. Every move works from
+    /// the lines as they were at the start, so a stop held back partway is restored on the way
+    /// back. A stop never passes the next one on its line: it stays a minimum segment short of it,
+    /// or of the sheet edge.
+    /// </summary>
+    public sealed class CutOffJoints
+    {
+        private readonly List<(CutOff CutOff, double? StartLimit, double? EndLimit, IReadOnlyList<CutOffGap> Gaps)> joined;
+        private readonly double from;
+        private readonly double sheetLow;
+        private readonly double sheetHigh;
+        private readonly double minimum;
+
+        internal CutOffJoints(IEnumerable<CutOff> lines, double from, double sheetLow, double sheetHigh, double minimum)
+        {
+            joined = lines.Select(c => (c, c.StartLimit, c.EndLimit, c.Gaps)).ToList();
+            this.from = from;
+            this.sheetLow = sheetLow;
+            this.sheetHigh = sheetHigh;
+            this.minimum = minimum;
+        }
+
+        /// <summary>The lines that follow the cut-off.</summary>
+        public IReadOnlyList<CutOff> Lines => joined.Select(j => j.CutOff).ToList();
+
+        /// <summary>Moves the joined stops to <paramref name="line"/>, the cut-off's new center.</summary>
+        public void MoveTo(double line)
+        {
+            foreach (var (cutOff, startLimit, endLimit, gaps) in joined)
+            {
+                var stops = gaps.SelectMany(g => new[] { g.Start, g.End })
+                    .Append(startLimit ?? sheetLow)
+                    .Append(endLimit ?? sheetHigh)
+                    .ToList();
+                var below = stops.Where(s => s < from - Tolerance.Epsilon).DefaultIfEmpty(sheetLow).Max();
+                var above = stops.Where(s => s > from + Tolerance.Epsilon).DefaultIfEmpty(sheetHigh).Min();
+                var at = System.Math.Clamp(line,
+                    System.Math.Min(below + minimum, from), System.Math.Max(above - minimum, from));
+
+                cutOff.StartLimit = startLimit is double start ? Follow(start, at) : null;
+                cutOff.EndLimit = endLimit is double end ? Follow(end, at) : null;
+                cutOff.Gaps = gaps.Select(g => new CutOffGap(Follow(g.Start, at), Follow(g.End, at))).ToList();
+            }
+        }
+
+        private double Follow(double stop, double at) =>
+            System.Math.Abs(stop - from) <= Tolerance.Epsilon ? at : stop;
+    }
+
+    /// <summary>
     /// Trims and extends cut-offs against the cut-offs that cross them, by changing only their
     /// start and end limits and their gaps (see docs/automatic-scrap-cutoffs.md, "Trim and
     /// extend"). A trim stops on the crossing line's center, inside its kerf; trimming a piece
@@ -176,6 +228,42 @@ namespace OpenNest
             return startsHigh
                 ? Single(plate, new CutOffLimitChange(target, stop, target.EndLimit))
                 : Single(plate, new CutOffLimitChange(target, target.StartLimit, stop));
+        }
+
+        /// <summary>
+        /// The lines that meet <paramref name="moved"/> and follow it when it moves: perpendicular
+        /// cut-offs with a limit or gap edge on its center, where its own cut pieces reach them. A
+        /// line that only ends level with it, past its end or in one of its gaps, stays put.
+        /// </summary>
+        public static CutOffJoints Joints(Plate plate, CutOff moved, CutOffSettings settings)
+        {
+            var at = Line(moved);
+            var (movedStart, movedEnd) = NominalSpan(plate, moved);
+            var pieces = moved.Pieces(movedStart, movedEnd);
+            var lines = plate.CutOffs
+                .Where(other => other != moved && other.Axis != moved.Axis)
+                .Where(other => pieces.Any(p => Within(Line(other), p.Start, p.End)))
+                .Where(other => Stops(other).Any(stop => System.Math.Abs(stop - at) <= Tolerance.Epsilon));
+
+            var sheet = plate.BoundingBox(includeParts: false);
+            var horizontal = moved.Axis == CutOffAxis.Vertical;
+            return new CutOffJoints(lines, at, horizontal ? sheet.Left : sheet.Bottom,
+                horizontal ? sheet.Right : sheet.Top,
+                System.Math.Max(settings?.MinSegmentLength ?? 0, Tolerance.Epsilon));
+        }
+
+        // Where the cut-off's own limits and gaps stop it, not counting the sheet edges.
+        private static IEnumerable<double> Stops(CutOff cutOff)
+        {
+            if (cutOff.StartLimit is double start)
+                yield return start;
+            if (cutOff.EndLimit is double end)
+                yield return end;
+            foreach (var gap in cutOff.Gaps)
+            {
+                yield return gap.Start;
+                yield return gap.End;
+            }
         }
 
         /// <summary>

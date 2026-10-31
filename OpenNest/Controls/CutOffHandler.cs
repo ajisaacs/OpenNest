@@ -15,6 +15,10 @@ namespace OpenNest.Controls
         // Open from the press on a cut-off to the release: a drag undoes as one move.
         private ChangeScope drag;
 
+        // The lines that meet the dragged cut-off and follow it.
+        private CutOffJoints joints;
+        private bool moved;
+
         public CutOffHandler(PlateView view)
         {
             this.view = view;
@@ -33,6 +37,8 @@ namespace OpenNest.Controls
 
             IsDragging = true;
             dragPerimeterCache = Plate.BuildPerimeterCache(view.Plate);
+            joints = CutOffTrim.Joints(view.Plate, hitCutOff, view.CutOffSettings);
+            moved = false;
             drag = view.BeginChange("Move Cut-Off");
             return hitCutOff;
         }
@@ -49,6 +55,10 @@ namespace OpenNest.Controls
                 cutOff.Position = new Vector(cutOff.Position.X, currentPoint.Y);
 
             cutOff.Regenerate(view.Plate, view.CutOffSettings, dragPerimeterCache);
+            moved = true;
+            joints?.MoveTo(cutOff.Axis == CutOffAxis.Vertical ? cutOff.Position.X : cutOff.Position.Y);
+            foreach (var line in joints?.Lines ?? new List<CutOff>())
+                line.Regenerate(view.Plate, view.CutOffSettings, dragPerimeterCache);
             view.Invalidate();
         }
 
@@ -60,6 +70,9 @@ namespace OpenNest.Controls
             IsDragging = false;
             dragPerimeterCache = null;
             view.Plate.RegenerateCutOffs(view.CutOffSettings);
+            if (moved && joints != null)
+                PlateSequencing.PlaceCutOffs(view.Plate, joints.Lines);
+            joints = null;
             view.Invalidate();
 
             var scope = drag;
