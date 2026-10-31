@@ -22,36 +22,75 @@ namespace OpenNest.Engine.NestingEngines.Default;
 /// cheap, valid fallback for the rest. Circles bids only when every part is round, and otherwise
 /// returns everything unplaced at once.
 /// A candidate that throws or returns no result is skipped; when every candidate throws, the
-/// first exception is rethrown. Cancellation stops the search. Candidates' plate commits are not forwarded; the chosen
-/// result's commits are reported once it is selected.
+/// exception of the first in tie-break order is rethrown. Cancellation stops the search.
+/// Candidates' plate commits are not forwarded; the chosen result's commits are reported once it
+/// is selected.
 ///
 /// Candidates' whole-job plans (<see cref="NestJobStage.PlanImproved"/>) are scored the same way
 /// and reported only when one beats every plan reported so far, so a later candidate never shows a
 /// worse plan after a better one. A candidate result that beats them is reported too, and the
 /// chosen result is always the last plan reported.
 ///
+/// Rectangles, the quick and always-valid fallback, runs first, then Irregular, then Circles, so
+/// a caller that stops the search early, such as <see cref="DeadlineNestingEngine"/>, already
+/// holds a valid plan. Ties still break by candidate (tie-break) order, so for these three
+/// candidates the run order does not change the choice.
+///
 /// Deterministic: candidates run one after another and the choice uses no clock.
 /// </summary>
 public sealed class DefaultNestingEngine : INestingEngine
 {
     private readonly IReadOnlyList<Func<INestingEngine>> candidates;
+    private readonly IReadOnlyList<int> runOrder;
 
     public DefaultNestingEngine()
-        : this(new Func<INestingEngine>[]
-        {
-            () => new IrregularNestingEngine(), () => new RectanglesNestingEngine(), () => new CirclesNestingEngine(),
-        })
+        : this(
+            new Func<INestingEngine>[]
+            {
+                () => new IrregularNestingEngine(),
+                () => new RectanglesNestingEngine(),
+                () => new CirclesNestingEngine(),
+            },
+            new[] { 1, 0, 2 })
     {
     }
 
-    /// <summary>Test seam: candidate engines in tie-break order.</summary>
+    /// <summary>Test seam: candidate engines in tie-break order, run in that order.</summary>
     internal DefaultNestingEngine(IReadOnlyList<Func<INestingEngine>> candidates)
+        : this(candidates, Enumerable.Range(0, candidates?.Count ?? 0).ToArray())
+    {
+    }
+
+    /// <summary>Test seam: candidate engines in tie-break order, and the order to run them in
+    /// (a permutation of their indexes). Cost comparison has a relative tolerance, so with three
+    /// or more near-tied candidates the run order can matter.</summary>
+    internal DefaultNestingEngine(
+        IReadOnlyList<Func<INestingEngine>> candidates,
+        IReadOnlyList<int> runOrder
+    )
     {
         ArgumentNullException.ThrowIfNull(candidates);
+        ArgumentNullException.ThrowIfNull(runOrder);
         if (candidates.Count == 0)
-            throw new ArgumentException("At least one candidate engine is required.", nameof(candidates));
+            throw new ArgumentException(
+                "At least one candidate engine is required.",
+                nameof(candidates)
+            );
+        if (
+            runOrder.Count != candidates.Count
+            || runOrder.Distinct().Count() != candidates.Count
+            || runOrder.Any(i => i < 0 || i >= candidates.Count)
+        )
+            throw new ArgumentException(
+                "The run order must list every candidate index once.",
+                nameof(runOrder)
+            );
         this.candidates = candidates;
+        this.runOrder = runOrder;
     }
+
+    /// <summary>Candidate indexes in the order they run.</summary>
+    internal IReadOnlyList<int> RunOrder => runOrder;
 
     public NestJobResult Solve(
         NestJob job,
@@ -64,8 +103,9 @@ public sealed class DefaultNestingEngine : INestingEngine
         var forward = progress == null ? null : new PlanFilter(job, progress, token);
         CandidateScore? best = null;
         ExceptionDispatchInfo? firstFailure = null;
+        var firstFailureOrder = int.MaxValue;
 
-        for (var order = 0; order < candidates.Count; order++)
+        foreach (var order in runOrder)
         {
             token.ThrowIfCancellationRequested();
             NestJobResult? result;
@@ -78,7 +118,11 @@ public sealed class DefaultNestingEngine : INestingEngine
             catch (Exception ex)
             {
                 // A canceled solve is rethrown by the token checks around each candidate.
-                firstFailure ??= ExceptionDispatchInfo.Capture(ex);
+                if (order < firstFailureOrder)
+                {
+                    firstFailure = ExceptionDispatchInfo.Capture(ex);
+                    firstFailureOrder = order;
+                }
                 continue;
             }
             if (result == null)

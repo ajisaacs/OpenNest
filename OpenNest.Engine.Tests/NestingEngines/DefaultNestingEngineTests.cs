@@ -33,6 +33,62 @@ public class DefaultNestingEngineTests
     private static NestJobResult Overlapping(NestJob job) => Layout(job, Sheet((0, 0), (1, 0)));
     private static NestJobResult OnePlaced(NestJob job) => Layout(job, Sheet((0, 0)));
 
+    [Fact]
+    public void BuiltInDefaultRunsRectanglesBeforeIrregular()
+    {
+        // Rectangles is the cheap, always-valid fallback: under a limit it must have reported
+        // its plan before the slower Irregular search starts. Candidates stay in tie-break
+        // order Irregular, Rectangles, Circles.
+        Assert.Equal(new[] { 1, 0, 2 }, new DefaultNestingEngine().RunOrder);
+    }
+
+    [Fact]
+    public void DefaultsRunOrderNeverChangesTheChoice()
+    {
+        // Equal layouts keep tie-break (candidate) order whichever candidate runs first.
+        var job = SquaresJob();
+        var first = OneSheet(job);
+        var second = OneSheet(job);
+        Func<INestingEngine>[] candidates =
+        [
+            () => new Stub((_, _, _) => first),
+            () => new Stub((_, _, _) => second),
+        ];
+
+        Assert.Same(first, new DefaultNestingEngine(candidates, new[] { 0, 1 }).Solve(job));
+        Assert.Same(first, new DefaultNestingEngine(candidates, new[] { 1, 0 }).Solve(job));
+    }
+
+    [Fact]
+    public void DefaultRejectsARunOrderThatIsNotAPermutation()
+    {
+        Func<INestingEngine>[] candidates =
+        [
+            () => new Stub((_, _, _) => null!),
+            () => new Stub((_, _, _) => null!),
+        ];
+
+        Assert.Throws<ArgumentException>(() => new DefaultNestingEngine(candidates, new[] { 0, 0 }));
+        Assert.Throws<ArgumentException>(() => new DefaultNestingEngine(candidates, new[] { 0 }));
+        Assert.Throws<ArgumentException>(() => new DefaultNestingEngine(candidates, new[] { 0, 2 }));
+    }
+
+    [Fact]
+    public void WhenEveryCandidateThrowsTheFirstInTieBreakOrderIsRethrown()
+    {
+        Func<INestingEngine>[] candidates =
+        [
+            () => new Stub((_, _, _) => throw new InvalidOperationException("first")),
+            () => new Stub((_, _, _) => throw new InvalidOperationException("second")),
+        ];
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            new DefaultNestingEngine(candidates, new[] { 1, 0 }).Solve(SquaresJob())
+        );
+
+        Assert.Equal("first", error.Message);
+    }
+
     private sealed class Stub(Func<NestJob, IProgress<NestJobProgress>?, CancellationToken, NestJobResult> solve) : INestingEngine
     {
         public NestJobResult Solve(NestJob job, IProgress<NestJobProgress>? progress = null, CancellationToken token = default) =>

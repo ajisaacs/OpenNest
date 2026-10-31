@@ -11,7 +11,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 
 | Engine | Best for | Method |
 |---|---|---|
-| Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the earlier engine |
+| Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the engine listed first here (whichever runs first) |
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; stock chosen sheet by sheet by salvage-credited look-ahead cost |
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
 | Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan |
@@ -20,7 +20,10 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 
 Neither Irregular nor Rectangles wins every job, even within its own lane, so Default runs both
 rather than choosing by part shape; Rectangles adds little time and is also the fallback when an
-Irregular layout fails the check. A candidate that throws is skipped. Default routes the whole job:
+Irregular layout fails the check. Default runs Rectangles first, then Irregular, then Circles, so
+a search stopped early already holds a valid plan; ties still go to the earlier engine in the
+table order (Irregular, Rectangles, Circles), so the run order does not change the choice. A
+candidate that throws is skipped. Default routes the whole job:
 engines cannot share a sheet, so a job mixing plain and irregular parts goes to both engines whole.
 Circles is a third candidate that bids only on round jobs (see below), so a job mixing round and
 other parts goes to Irregular and Rectangles.
@@ -48,6 +51,18 @@ progress sink.
   candidate's plan can outscore every returned result), Default reports it last.
 
 Plug-ins may report plans the same way; FlatBar and the fixed-strategy engines do not.
+
+### Time limits
+
+`DeadlineNestingEngine` wraps any engine with a wall-clock limit. An engine that finishes in time
+keeps its result, as does one that ignores cancellation and returns a result late. At the limit the search is cancelled and the best reported plan that passes the
+layout check is returned instead (ranked like Default ranks candidates, a tie going to the later
+plan), so the result may leave parts unplaced; with no valid plan the solve fails with a
+`TimeoutException`. The caller's own cancellation still cancels. A limited solve depends on the
+clock, so it is not reproducible, and it can overrun the limit by however long the engine takes to
+notice cancellation. A limit can be any positive time up to about 49.7 days (the cancellation timer's range).
+Desktop, Console and MCP do not apply a limit yet; Console can solve a job twice (with and without
+cutouts), so a limit there needs one deadline shared across both solves.
 
 Interactive Fill shows its rectangle best-fit (box packing) layout before the best-fit pair
 phase, whose first computation for a drawing can take a minute, so **Accept** is available at
