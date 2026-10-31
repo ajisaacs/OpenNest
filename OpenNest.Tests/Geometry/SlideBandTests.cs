@@ -13,19 +13,25 @@ public class SlideBandTests
     private static readonly (double X, double Y)[] AxisDirections = { (1, 0), (-1, 0), (0, 1), (0, -1) };
 
     [Theory]
-    [InlineData(1.0)]
-    [InlineData(250.0)]
-    [InlineData(100000.0)]
-    [InlineData(30000000.0)]
-    public void RandomShapes_EmitTheSameEventsAsTheUnfilteredEnumeration(double scale)
+    [InlineData(1.0, 3, 12)]
+    [InlineData(250.0, 3, 12)]
+    [InlineData(100000.0, 3, 12)]
+    [InlineData(30000000.0, 3, 12)]
+    [InlineData(1.0, 24, 160)]
+    [InlineData(250.0, 24, 160)]
+    [InlineData(100000.0, 24, 160)]
+    [InlineData(30000000.0, 24, 160)]
+    public void RandomShapes_EmitTheSameEventsAsTheUnfilteredEnumeration(double scale, int minSides, int maxSides)
     {
-        var random = new Random(20261031 + (int)scale);
+        // Boundaries of 24 or more entities go through the bucket index; smaller ones scan.
+        var random = new Random(20261031 + (int)scale + maxSides);
         var compared = 0;
         var nonEmpty = 0;
-        for (var trial = 0; trial < 150; trial++)
+        var trials = maxSides > SlideBandIndex.MinimumEntities ? 25 : 150;
+        for (var trial = 0; trial < trials; trial++)
         {
-            var stationary = RandomBoundary(random, scale);
-            var moving = RandomBoundary(random, scale);
+            var stationary = RandomBoundary(random, scale, minSides, maxSides);
+            var moving = RandomBoundary(random, scale, minSides, maxSides);
             foreach (var (dirX, dirY) in AxisDirections)
             {
                 foreach (var (dx, dy) in Offsets(random, moving, stationary, dirX, dirY, scale))
@@ -41,10 +47,15 @@ public class SlideBandTests
     }
 
     [Theory]
-    [InlineData(0.5)]
-    [InlineData(-0.5)]
-    [InlineData(0.99)]
-    public void VertexJustPastASegmentEnd_WithinTheRayTolerance_StillEmits(double fractionOfTolerance)
+    [InlineData(0.5, false)]
+    [InlineData(-0.5, false)]
+    [InlineData(0.99, false)]
+    [InlineData(0.5, true)]
+    [InlineData(-0.99, true)]
+    public void VertexJustPastASegmentEnd_WithinTheRayTolerance_StillEmits(
+        double fractionOfTolerance,
+        bool indexed
+    )
     {
         // RayLine accepts a segment parameter up to Eps past either end, so a ray that misses
         // the segment's extent by less than Eps of its span still reports a hit.
@@ -55,54 +66,68 @@ public class SlideBandTests
             : fractionOfTolerance * Tolerance.Epsilon * span;
         var moving = new List<Entity> { new Line(new Vector(0, y), new Vector(-5, y)) };
 
-        var events = CompareEvents(moving, stationary, 0, 0, 1, 0);
+        var events = CompareEvents(Pad(moving, indexed), Pad(stationary, indexed), 0, 0, 1, 0);
 
         Assert.True(events > 0, "the legacy kernel must report this tolerance hit");
     }
 
     [Theory]
-    [InlineData(1e-9)]
-    [InlineData(1e-3)]
-    [InlineData(5.0)]
-    public void RayGrazingAFarCircle_KeepsEveryRoundingHit(double radius)
+    [InlineData(1e-9, false, false)]
+    [InlineData(1e-3, false, false)]
+    [InlineData(5.0, false, false)]
+    [InlineData(1e-9, true, false)]
+    [InlineData(5.0, true, false)]
+    [InlineData(5.0, true, true)]
+    [InlineData(1e-9, true, true)]
+    public void RayGrazingAFarCircle_KeepsEveryRoundingHit(double radius, bool indexed, bool offset)
     {
         // Far along the ray the discriminant cancels catastrophically; sweep the band around
-        // the circle's edge and require identical events, including any rounding hits.
-        var stationary = new List<Entity> { new Circle(new Vector(90000, 37), radius) };
+        // the circle's edge and require identical events, including any rounding hits. With
+        // `offset` the distance comes from the moving translation rather than the geometry.
+        var center = offset ? 0.0 : 90000.0;
+        var dx = offset ? -90000.0 : 0.0;
+        var stationary = Pad(new List<Entity> { new Circle(new Vector(center, 37), radius) }, indexed);
         var hits = 0;
         for (var k = -400; k <= 400; k++)
         {
-            var y = 37 + radius + k * 1e-9 * System.Math.Max(1, radius);
-            var moving = new List<Entity> { new Line(new Vector(0, y), new Vector(-1, y)) };
-            hits += CompareEvents(moving, stationary, 0, 0, 1, 0) > 0 ? 1 : 0;
+            // Tiny radii widen the rounding band to about √(ulp(ox²)); sweep it coarsely.
+            var step = radius < 1e-6 && offset ? 1e-6 : 1e-9 * System.Math.Max(1, radius);
+            var y = 37 + radius + k * step;
+            var moving = Pad(new List<Entity> { new Line(new Vector(0, y), new Vector(-1, y)) }, indexed);
+            hits += CompareEvents(moving, stationary, dx, 0, 1, 0) > 0 ? 1 : 0;
         }
         Assert.True(hits > 0, "the sweep must include hits");
     }
 
-    [Fact]
-    public void TangentCurvesAcrossTheBandEdge_EmitTheSameEvents()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TangentCurvesAcrossTheBandEdge_EmitTheSameEvents(bool indexed)
     {
-        var stationary = new List<Entity> { new Arc(new Vector(0, 0), 3, 0, Angle.TwoPI * 0.75, false) };
+        var arc = new Arc(new Vector(0, 0), 3, 0, Angle.TwoPI * 0.75, false);
+        var stationary = Pad(new List<Entity> { arc }, indexed);
         var emitted = 0;
         for (var k = -200; k <= 200; k++)
         {
             var dy = 3 + 2 + k * 1e-10;
-            var moving = new List<Entity> { new Circle(new Vector(-50, 0), 2) };
+            var moving = Pad(new List<Entity> { new Circle(new Vector(-50, 0), 2) }, indexed);
             emitted += CompareEvents(moving, stationary, 0, dy, 1, 0) > 0 ? 1 : 0;
         }
         Assert.True(emitted > 0, "the sweep must include tangent contacts");
     }
 
     [Theory]
-    [InlineData(0.0)]
-    [InlineData(2e-5)]
-    public void ArcAgainstANearlyParallelLine_AtTheBandEdge_EmitsTheSameEvents(double end)
+    [InlineData(0.0, false)]
+    [InlineData(2e-5, false)]
+    [InlineData(0.0, true)]
+    [InlineData(2e-5, true)]
+    public void ArcAgainstANearlyParallelLine_AtTheBandEdge_EmitsTheSameEvents(double end, bool indexed)
     {
         // ArcToLine samples the circle where its tangent is parallel to the line. For a line
         // nearly parallel to the push that point is the circle's top or bottom, so sweeping
         // the circle across either end of the line's tiny perpendicular span walks the
         // arc-to-line band edge, including RayLine's Eps·span tolerance past the end.
-        var stationary = new List<Entity> { new Line(new Vector(0, 0), new Vector(1000, 2e-5)) };
+        var stationary = Pad(new List<Entity> { new Line(new Vector(0, 0), new Vector(1000, 2e-5)) }, indexed);
         var radius = 5.0;
         var hits = 0;
         for (var k = -60; k <= 60; k++)
@@ -111,7 +136,7 @@ public class SlideBandTests
             {
                 // side -1 puts the circle above the line (bottom point), +1 below (top point).
                 var cy = end - side * radius + k * 1e-11;
-                var moving = new List<Entity> { new Circle(new Vector(-50, cy), radius) };
+                var moving = Pad(new List<Entity> { new Circle(new Vector(-50, cy), radius) }, indexed);
                 hits += CompareEvents(moving, stationary, 0, 0, 1, 0, vertices: false) > 0 ? 1 : 0;
             }
         }
@@ -154,6 +179,20 @@ public class SlideBandTests
         Assert.True(CompareVertexEvents(new[] { new Vector(-7e153, 1e150) }, circle, 0, 0) > 0);
     }
 
+    [Theory]
+    [InlineData(double.NegativeInfinity)]
+    [InlineData(-3e150)]
+    public void LargeBoundary_WithAVertexBeyondTheLimitAlongThePush_KeepsTheKernelsEvents(double x)
+    {
+        // Enough entities to build an index; the far vertex must switch it off, because the
+        // kernels can emit against lines whose band the vertex misses.
+        var stationary = Enumerable.Range(0, 40)
+            .Select(i => (Entity)new Line(new Vector(i, 0), new Vector(i + 0.5, 1)))
+            .ToList();
+        var events = CompareVertexEvents(new[] { new Vector(x, 0.5) }, stationary, 0, 0);
+        Assert.True(events > 0);
+    }
+
     [Fact]
     public void InfiniteLineEnd_KeepsArcToLineEvents()
     {
@@ -192,6 +231,76 @@ public class SlideBandTests
         Assert.False(SlideBand.RayMayHit(SlideBand.Axis.PerpendicularY, 5, 3, new Circle(new Vector(0, 0), 1), 0, 0));
         Assert.False(SlideBand.CirclesMayTouch(SlideBand.Axis.PerpendicularX, 10, 0, 1, 0, 0, 1));
         Assert.False(SlideBand.CircleMayReachLine(SlideBand.Axis.PerpendicularY, 0, 10, 1, 5, 0, 6, 2));
+    }
+
+    [Fact]
+    public void Index_ReturnsEveryAcceptedEntity_InAscendingOrder()
+    {
+        var random = new Random(7);
+        foreach (var axis in new[] { SlideBand.Axis.PerpendicularY, SlideBand.Axis.PerpendicularX })
+        {
+            for (var trial = 0; trial < 40; trial++)
+            {
+                var scale = new[] { 1.0, 300.0, 1e6 }[trial % 3];
+                var entities = RandomBoundary(random, scale, 24, 200);
+                var vertices = SpatialQuery.ExtractEntityVertices(entities);
+                double along = 0, perpendicular = 0;
+                SlideBandIndex.Measure(axis, entities, vertices, 0, 0, ref along, ref perpendicular);
+                var reach = SlideBandIndex.Reach(along, perpendicular);
+                var index = SlideBandIndex.Build(axis, entities, 0, 0, reach, SlideBandIndex.Kind.All);
+                Assert.NotNull(index);
+                var range = new List<int>();
+                for (var q = 0; q < 300; q++)
+                {
+                    var v = vertices[random.Next(vertices.Length)];
+                    var nudge = (random.NextDouble() - 0.5) * 1e-4 * scale * (q % 2);
+                    var vx = v.X + (axis == SlideBand.Axis.PerpendicularX ? nudge : 0);
+                    var vy = v.Y + (axis == SlideBand.Axis.PerpendicularY ? nudge : 0);
+                    var expected = Enumerable.Range(0, entities.Count)
+                        .Where(j => entities[j] is Line or Arc or Circle && SlideBand.RayMayHit(axis, vx, vy, entities[j], 0, 0))
+                        .ToList();
+                    Assert.True(index!.TryPoint(SlideBand.Perp(axis, vx, vy), out var first, out var last));
+                    var found = Enumerable.Range(first, last - first).Select(index.Item).ToList();
+                    Assert.Equal(found.OrderBy(j => j), found);
+                    Assert.Empty(expected.Except(found));
+
+                    var p = SlideBand.Perp(axis, vx, vy);
+                    Assert.True(index.TryRange(p - scale * 0.05, p + scale * 0.05, range));
+                    Assert.Equal(range.Distinct().OrderBy(j => j), range);
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void Index_RefusesNonfiniteGeometry()
+    {
+        var entities = Enumerable.Range(0, 30)
+            .Select(i => (Entity)new Line(new Vector(i, 0), new Vector(i, 1)))
+            .Append(new Line(new Vector(0, double.NaN), new Vector(1, 1)))
+            .ToList();
+        Assert.Null(SlideBandIndex.Build(SlideBand.Axis.PerpendicularY, entities, 0, 0, 0, SlideBandIndex.Kind.All));
+        Assert.Null(SlideBandIndex.Build(SlideBand.Axis.PerpendicularY, entities.Take(30).ToList(), 0, 0, double.NaN, SlideBandIndex.Kind.All));
+        Assert.True(double.IsNaN(SlideBandIndex.Reach(2e150, 0)));
+        Assert.True(double.IsNaN(SlideBandIndex.Reach(0, double.PositiveInfinity)));
+        var index = SlideBandIndex.Build(SlideBand.Axis.PerpendicularY, entities.Take(30).ToList(), 0, 0, 0, SlideBandIndex.Kind.All);
+        Assert.NotNull(index);
+        Assert.False(index!.TryPoint(double.NaN, out _, out _));
+        Assert.False(index.TryRange(0, double.PositiveInfinity, new List<int>()));
+    }
+
+    /// <summary>
+    /// With <paramref name="indexed"/>, appends far-off decoy lines parallel to the push so the
+    /// list reaches the size that builds a band index; they never emit.
+    /// </summary>
+    private static List<Entity> Pad(List<Entity> entities, bool indexed)
+    {
+        if (!indexed)
+            return entities;
+        var padded = new List<Entity>(entities);
+        for (var i = 0; padded.Count < SlideBandIndex.MinimumEntities + 6; i++)
+            padded.Add(new Line(new Vector(0, 1e4 + i), new Vector(1, 1e4 + i)));
+        return padded;
     }
 
     /// <summary>Asserts identical event sequences and slide results; returns the event count.</summary>
@@ -269,10 +378,10 @@ public class SlideBandTests
     private static long Bits(double value) => double.IsNaN(value) ? 0x7FF8000000000000 : BitConverter.DoubleToInt64Bits(value);
 
     /// <summary>A closed boundary of lines and arcs around a random star, sometimes with a hole circle.</summary>
-    private static List<Entity> RandomBoundary(Random random, double scale)
+    private static List<Entity> RandomBoundary(Random random, double scale, int minSides, int maxSides)
     {
         var entities = new List<Entity>();
-        var count = random.Next(3, 12);
+        var count = random.Next(minSides, maxSides);
         var cx = (random.NextDouble() - 0.5) * scale;
         var cy = (random.NextDouble() - 0.5) * scale;
         var points = new List<Vector>();

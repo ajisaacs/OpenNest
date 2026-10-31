@@ -34,13 +34,13 @@ namespace OpenNest.Geometry
         // No absolute slack is needed: the kernels translate entities with the same
         // expressions as these tests, and a circle point c + r·sinθ rounds monotonically, so
         // it never lies outside fl(c ± r).
-        private const double SpanSlack = 2 * Math.Tolerance.Epsilon;
+        internal const double SpanSlack = 2 * Math.Tolerance.Epsilon;
 
         // SolveRayCircle accepts a nonnegative discriminant b² − 4ac. For an axis ray that is
         // 4(r² − oy²) up to rounding of terms of size ox² + oy² + r², so a hit is possible when
         // oy² ≤ r² + ε(1 + ox² + oy² + r²). This ε is hundreds of ulps; the absolute 1 is a
         // floor for squares that underflow.
-        private const double QuadraticSlack = 1e-13;
+        internal const double QuadraticSlack = 1e-13;
 
         public static Axis For(double dirX, double dirY)
         {
@@ -208,10 +208,10 @@ namespace OpenNest.Geometry
         /// <summary>False for NaN, infinities and magnitudes beyond the coordinate limit.</summary>
         private static bool Bounded(double value) => System.Math.Abs(value) <= CoordinateLimit;
 
-        private static double Perp(Axis axis, double x, double y) =>
+        internal static double Perp(Axis axis, double x, double y) =>
             axis == Axis.PerpendicularY ? y : x;
 
-        private static double Para(Axis axis, double x, double y) =>
+        internal static double Para(Axis axis, double x, double y) =>
             axis == Axis.PerpendicularY ? x : y;
     }
 }

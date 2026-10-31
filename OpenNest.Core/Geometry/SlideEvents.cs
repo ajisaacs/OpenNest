@@ -229,7 +229,9 @@ namespace OpenNest.Geometry
             double rayX,
             double rayY,
             bool arcMoves,
-            SlideBand.Axis band
+            SlideBand.Axis band,
+            SlideBandIndex lineIndex,
+            List<int> candidates
         )
             where TSink : struct, ISlideEventSink
         {
@@ -242,8 +244,19 @@ namespace OpenNest.Geometry
                 var cx = localCx + arcDx;
                 var cy = localCy + arcDy;
 
-                for (var j = 0; j < lineEntities.Count; j++)
+                // With an index, visit only the lines CircleMayReachLine can accept, ascending.
+                var indexed = false;
+                if (lineIndex != null)
                 {
+                    var c = SlideBand.Perp(band, cx, cy);
+                    var radius = System.Math.Abs(r);
+                    indexed = lineIndex.TryRange(c - radius, c + radius, candidates);
+                }
+
+                var count = indexed ? candidates.Count : lineEntities.Count;
+                for (var n = 0; n < count; n++)
+                {
+                    var j = indexed ? candidates[n] : n;
                     if (lineEntities[j] is not Line line)
                         continue;
 
@@ -487,13 +500,48 @@ namespace OpenNest.Geometry
             // An axis-aligned push only meets entities whose perpendicular extent can hold the
             // ray. The band tests skip only pairs whose kernels cannot emit and keep the
             // surviving pairs in their original order, so the emitted events are unchanged.
+            // For larger boundaries, bucket indexes over those extents limit each query to a
+            // superset of the accepted entities, still visited in ascending order.
             var band = SlideBand.For(dirX, dirY);
+            var indexes = band == SlideBand.Axis.None
+                ? null
+                : SlideBandIndexes.Build(
+                    band,
+                    moving,
+                    movingVertices,
+                    movingDx,
+                    movingDy,
+                    stationary,
+                    stationaryVertices,
+                    arcToLine
+                );
 
             // Phase 1: moving vertices along the push against stationary entities.
             for (var v = 0; v < movingVertices.Length; v++)
             {
                 var vx = movingVertices[v].X + movingDx;
                 var vy = movingVertices[v].Y + movingDy;
+
+                if (
+                    indexes?.Stationary != null
+                    && indexes.Stationary.TryPoint(
+                        SlideBand.Perp(band, vx, vy),
+                        out var first,
+                        out var last
+                    )
+                )
+                {
+                    for (var k = first; k < last; k++)
+                    {
+                        var j = indexes.Stationary.Item(k);
+                        if (!SlideBand.RayMayHit(band, vx, vy, stationary[j], 0, 0))
+                            continue;
+                        SlideEvents.Ray(ref sink, vx, vy, stationary[j], 0, 0, dirX, dirY, true);
+                        if (sink.IsDone)
+                            return;
+                    }
+                    continue;
+                }
 
                 for (var j = 0; j < stationary.Count; j++)
                 {
@@ -513,6 +561,37 @@ namespace OpenNest.Geometry
             {
                 var vx = stationaryVertices[v].X;
                 var vy = stationaryVertices[v].Y;
+
+                if (
+                    indexes?.Moving != null
+                    && indexes.Moving.TryPoint(
+                        SlideBand.Perp(band, vx, vy),
+                        out var first,
+                        out var last
+                    )
+                )
+                {
+                    for (var k = first; k < last; k++)
+                    {
+                        var j = indexes.Moving.Item(k);
+                        if (!SlideBand.RayMayHit(band, vx, vy, moving[j], movingDx, movingDy))
+                            continue;
+                        SlideEvents.Ray(
+                            ref sink,
+                            vx,
+                            vy,
+                            moving[j],
+                            movingDx,
+                            movingDy,
+                            -dirX,
+                            -dirY,
+                            false
+                        );
+                        if (sink.IsDone)
+                            return;
+                    }
+                    continue;
+                }
 
                 for (var j = 0; j < moving.Count; j++)
                 {
@@ -551,7 +630,9 @@ namespace OpenNest.Geometry
                     dirX,
                     dirY,
                     true,
-                    band
+                    band,
+                    indexes?.StationaryLines,
+                    indexes?.Candidates
                 );
                 if (sink.IsDone)
                     return;
@@ -566,7 +647,9 @@ namespace OpenNest.Geometry
                     -dirX,
                     -dirY,
                     false,
-                    band
+                    band,
+                    indexes?.MovingLines,
+                    indexes?.Candidates
                 );
                 if (sink.IsDone)
                     return;
@@ -578,8 +661,22 @@ namespace OpenNest.Geometry
                 if (!SlideEvents.TryGetCurve(moving[i], out var mcx, out var mcy, out var mr))
                     continue;
 
-                for (var j = 0; j < stationary.Count; j++)
+                var indexed = false;
+                if (indexes?.StationaryCurves != null)
                 {
+                    var c = SlideBand.Perp(band, mcx + movingDx, mcy + movingDy);
+                    var reach = SlideBandIndex.CurveReach(mr);
+                    indexed = indexes.StationaryCurves.TryRange(
+                        c - reach,
+                        c + reach,
+                        indexes.Candidates
+                    );
+                }
+
+                var count = indexed ? indexes.Candidates.Count : stationary.Count;
+                for (var n = 0; n < count; n++)
+                {
+                    var j = indexed ? indexes.Candidates[n] : n;
                     if (!SlideEvents.TryGetCurve(stationary[j], out var scx, out var scy, out var sr))
                         continue;
 
