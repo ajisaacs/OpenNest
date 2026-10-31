@@ -32,6 +32,7 @@ namespace OpenNest.Forms
             btnSplit = new System.Windows.Forms.Button();
             btnSimplify = new System.Windows.Forms.Button();
             btnExportDxf = new System.Windows.Forms.Button();
+            btnHoleTable = new System.Windows.Forms.Button();
             chkShowOriginal = new System.Windows.Forms.CheckBox();
             chkLabels = new System.Windows.Forms.CheckBox();
             lblDetect = new System.Windows.Forms.Label();
@@ -171,6 +172,7 @@ namespace OpenNest.Forms
             detailBar.Controls.Add(btnSplit);
             detailBar.Controls.Add(btnSimplify);
             detailBar.Controls.Add(btnExportDxf);
+            detailBar.Controls.Add(btnHoleTable);
             detailBar.Controls.Add(chkShowOriginal);
             detailBar.Controls.Add(chkLabels);
             detailBar.Controls.Add(lblDetect);
@@ -285,6 +287,19 @@ namespace OpenNest.Forms
             btnExportDxf.TabIndex = 8;
             btnExportDxf.Text = "Export DXF";
             btnExportDxf.Click += OnExportDxfClick;
+            // 
+            // btnHoleTable
+            // 
+            btnHoleTable.AutoSize = true;
+            btnHoleTable.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            btnHoleTable.Font = new System.Drawing.Font("Segoe UI", 9F);
+            btnHoleTable.Location = new System.Drawing.Point(530, 6);
+            btnHoleTable.Margin = new System.Windows.Forms.Padding(0, 0, 10, 0);
+            btnHoleTable.Name = "btnHoleTable";
+            btnHoleTable.Size = new System.Drawing.Size(60, 27);
+            btnHoleTable.TabIndex = 8;
+            btnHoleTable.Text = "Holes...";
+            btnHoleTable.Click += OnHoleTableClick;
             // 
             // chkShowOriginal
             // 
@@ -431,6 +446,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Button btnSplit;
         private System.Windows.Forms.Button btnSimplify;
         private System.Windows.Forms.Button btnExportDxf;
+        private System.Windows.Forms.Button btnHoleTable;
         private System.Windows.Forms.CheckBox chkShowOriginal;
         private System.Windows.Forms.CheckBox chkLabels;
         private System.Windows.Forms.ComboBox cboBendDetector;

@@ -142,7 +142,7 @@ namespace OpenNest.Controls
                     simplifierHighlightSet != null && simplifierHighlightSet.Contains(entity);
                 var pen = isHighlighted
                     ? GetEntityPen(Color.FromArgb(60, entity.Color))
-                    : GetEntityPen(entity.Color);
+                    : HolePen(entity) ?? GetEntityPen(entity.Color);
                 DrawEntity(e.Graphics, entity, pen);
             }
 
@@ -514,6 +514,7 @@ namespace OpenNest.Controls
             if (disposing)
             {
                 ClearPenCache();
+                DisposeHolePens();
                 gridPen.Dispose();
                 labelFont.Dispose();
                 dimensionFont.Dispose();

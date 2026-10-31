@@ -263,6 +263,7 @@ namespace OpenNest.Forms
 
             entityView1.ZoomToFit();
             CheckSimplifiable(item);
+            RefreshHoleTable();
         }
 
         private void CheckSimplifiable(FileListItem item)
@@ -323,6 +324,7 @@ namespace OpenNest.Forms
             entityView1.Entities.Clear();
             entityView1.DimensionLayouts = Array.Empty<DimensionLayout>();
             entityView1.Invalidate();
+            RefreshHoleTable();
         }
 
         private void OnFilterChanged(object sender, EventArgs e)
@@ -337,6 +339,7 @@ namespace OpenNest.Forms
             SyncSuppressedState(item);
             RefreshBreakoffs(item);
             RefreshTabbedCutouts(item);
+            RefreshHoleTable();
             staleProgram = true;
         }
 
@@ -1287,6 +1290,42 @@ namespace OpenNest.Forms
 
             lblEntityCount.Text = $"{entities.Count} entities";
             ResetSimplifyButton();
+            RefreshHoleTable();
+        }
+
+        private HoleTableForm holeTable;
+
+        private void OnHoleTableClick(object sender, EventArgs e)
+        {
+            if (holeTable == null || holeTable.IsDisposed)
+            {
+                holeTable = new HoleTableForm();
+                var corner = entityView1.PointToScreen(new Point(entityView1.Width, 0));
+                holeTable.Location = new Point(corner.X - holeTable.Width - 12, corner.Y + 12);
+                holeTable.FormClosed += (_, _) =>
+                {
+                    holeTable = null;
+                    entityView1.HoleColors = null;
+                };
+                holeTable.Show(this);
+            }
+            else
+            {
+                holeTable.Activate();
+            }
+
+            RefreshHoleTable();
+        }
+
+        // Lists the current drawing's round holes as they will be cut and colors them on the view.
+        private void RefreshHoleTable()
+        {
+            if (holeTable == null || holeTable.IsDisposed)
+                return;
+
+            var item = CurrentItem;
+            var sizes = item == null ? Array.Empty<HoleSize>() : HoleTable.Build(VisibleEntities(item));
+            entityView1.HoleColors = holeTable.ShowSizes(sizes, item?.Name);
         }
 
         private void OnShowOriginalChanged(object sender, EventArgs e)

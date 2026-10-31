@@ -50,4 +50,23 @@ they do not appear on plates, in PDFs or in DXF export.
   with an `R` prefix and diameter labels with `Ø`.
 - Split pieces start with no dimensions, like breakoffs and tabbed cutouts.
 
+## Hole table
+
+**Holes...** in the CAD Converter's bottom bar opens a small Hole Table window beside the
+view. It lists the drawing's round holes by diameter, smallest first, with the quantity of
+each and a color swatch. While it is open, every hole on the view is drawn in its size's color
+with a heavier line; closing the window restores the normal colors. The table follows the
+selected file and updates when entities are cut, etched, set to display, excluded or
+simplified.
+
+- A round hole is a cut circle, or a closed contour made only of arcs on one center and
+  radius, that lies inside another cut contour. The outline of a round part is not a hole.
+  Slots and other shapes are not listed.
+- Holes are read from the entities as they will be cut (visible, with roles applied), before
+  breakoffs and tabbed cutouts. Etched, display-only, excluded and hidden circles are not
+  listed.
+- Diameters are rounded to four decimals, in the drawing's units; holes that agree to four
+  decimals share a row. `HoleTable` (`OpenNest.Core/Dimensions`) builds the rows.
+- The table is a view only: it stores nothing in the drawing and never affects the program.
+
 File format: see [drawing dimensions](nest-file-format.md#drawing-dimensions).
