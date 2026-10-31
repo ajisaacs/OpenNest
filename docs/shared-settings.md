@@ -13,6 +13,10 @@ building nests and posts the same way:
 
 File mode, the console, MCP and API front ends use only this PC's copies.
 
+Nest defaults are saved by Tools > Nest Defaults, Tools > Save Current Plate as Defaults,
+Plate > Set as Default, and Nest > Edit's Defaults tab with "Use these defaults for new nests"
+checked. Without that check the tab changes only the open nest.
+
 ## Which copy is used
 
 Each kind is read from the server once the server holds it, and from this PC's copy until

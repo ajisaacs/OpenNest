@@ -242,6 +242,14 @@ namespace OpenNest.Forms
         }
 
         /// <summary>
+        /// Saves a Nest Info dialog to <paramref name="nest"/>: a changed material or thickness
+        /// takes the machine's spacing, and an untouched trailing sheet follows the new defaults.
+        /// </summary>
+        public static void SaveNestInfo(PlateManager manager, EditNestInfoForm form, Nest nest) =>
+            manager.ChangePlateDefaults(() => MachineCuttingDefaults.ApplySpacingAfter(
+                nest, FindMachine(nest.Machine), () => form.SaveNestInfo(nest)));
+
+        /// <summary>
         /// Gives <paramref name="view"/> the cut-off clearance, overtravel, minimum segment and
         /// direction of the nest's machine for its material and thickness, when the machine has
         /// them; otherwise the view keeps its settings. Existing cut-offs follow them the next time
@@ -315,6 +323,30 @@ namespace OpenNest.Forms
                 current.Save(SharedSettingKinds.NestDefaults, SharedSettingKinds.DefaultKey, defaults.ToJson());
             else
                 defaults.Save(NestDefaults.DefaultPath);
+        }
+
+        /// <summary>Saves the nest defaults, telling the user when they could not be saved.</summary>
+        public static void SaveNestDefaults(IWin32Window owner, NestDefaults defaults)
+        {
+            try
+            {
+                SaveNestDefaults(defaults);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                MessageBox.Show(owner, "The nest defaults could not be saved.\n\n" + ex.Message, "Nest Defaults",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Makes values taken from an open nest the defaults new nests start from. The nest's
+        /// machine becomes the default; a nest without one keeps the saved choice.
+        /// </summary>
+        public static void SaveNestDefaults(IWin32Window owner, NestDefaults defaults, NestMachine machine)
+        {
+            defaults.MachineId = machine?.Id ?? LoadSavedNestDefaults(out _).MachineId;
+            SaveNestDefaults(owner, defaults);
         }
 
         private static SharedSettingRecord SharedNestDefaults() =>

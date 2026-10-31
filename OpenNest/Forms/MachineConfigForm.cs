@@ -621,6 +621,7 @@ namespace OpenNest.Forms
             tabs.TabPages.Add(CreateTab("Outside Cuts", BuildOutsideCutsTab(thickness)));
             tabs.TabPages.Add(CreateTab("Inside Cuts", BuildInsideCutsTab(thickness)));
             tabs.TabPages.Add(CreateTab("Cut Off", BuildCutOffTab(thickness.CutOff)));
+            tabs.TabPages.Add(CreateTab("Spacing", BuildSpacingTab(thickness)));
             tabs.TabPages.Add(CreateTab("Plate Sizes", BuildPlateSizesTab(thickness)));
             RememberTab(tabs, _thicknessTab, t => _thicknessTab = t);
 
@@ -695,6 +696,76 @@ namespace OpenNest.Forms
                     allowCustom: true
                 )
             );
+
+            var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
+            panel.Controls.Add(layout);
+            return panel;
+        }
+
+        // Unchecked leaves the spacing to the nest defaults, so a thickness need not set both.
+        private Control BuildSpacingTab(ThicknessConfig thickness)
+        {
+            var layout = CreateDetailLayout();
+            var row = 0;
+
+            var partBox = new CheckBox
+            {
+                Text = "Use for this thickness",
+                AutoSize = true,
+                Checked = thickness.PartSpacing.HasValue,
+            };
+            var part = CreateNumericBox(thickness.PartSpacing ?? 0, v =>
+            {
+                thickness.PartSpacing = partBox.Checked ? v : null;
+                MarkDirty();
+            }, 4, 1000, 0.0625m);
+            part.Enabled = partBox.Checked;
+            partBox.CheckedChanged += (s, e) =>
+            {
+                part.Enabled = partBox.Checked;
+                thickness.PartSpacing = partBox.Checked ? (double)part.Value : null;
+                MarkDirty();
+            };
+            AddField(layout, ref row, "Part Spacing:", partBox);
+            AddField(layout, ref row, $"Spacing ({LengthUnitSuffix(null)}):", part);
+
+            var edge = thickness.EdgeSpacing;
+            var edgeBox = new CheckBox
+            {
+                Text = "Use for this thickness",
+                AutoSize = true,
+                Checked = edge != null,
+            };
+            var sides = new NumericUpDown[4];
+            void StoreEdge()
+            {
+                thickness.EdgeSpacing = edgeBox.Checked
+                    ? new EdgeSpacingConfig
+                    {
+                        Left = (double)sides[0].Value,
+                        Bottom = (double)sides[1].Value,
+                        Right = (double)sides[2].Value,
+                        Top = (double)sides[3].Value,
+                    }
+                    : null;
+                MarkDirty();
+            }
+            AddField(layout, ref row, "Edge Spacing:", edgeBox);
+            var values = new[] { edge?.Left ?? 0, edge?.Bottom ?? 0, edge?.Right ?? 0, edge?.Top ?? 0 };
+            var labels = new[] { "Left", "Bottom", "Right", "Top" }
+                .Select(side => $"{side} ({LengthUnitSuffix(null)}):").ToArray();
+            for (var i = 0; i < sides.Length; i++)
+            {
+                sides[i] = CreateNumericBox(values[i], _ => StoreEdge(), 4, 1000, 0.0625m);
+                sides[i].Enabled = edgeBox.Checked;
+                AddField(layout, ref row, labels[i], sides[i]);
+            }
+            edgeBox.CheckedChanged += (s, e) =>
+            {
+                foreach (var side in sides)
+                    side.Enabled = edgeBox.Checked;
+                StoreEdge();
+            };
 
             var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
             panel.Controls.Add(layout);

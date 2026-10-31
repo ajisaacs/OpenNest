@@ -47,6 +47,7 @@
             this.partSpacingBox = new OpenNest.Controls.NumericUpDown();
             this.labelThk = new System.Windows.Forms.Label();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
+            this.useForNewNestsBox = new System.Windows.Forms.CheckBox();
             this.quadrantSelect1 = new OpenNest.Controls.QuadrantSelect();
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabPage1 = new System.Windows.Forms.TabPage();
@@ -631,6 +632,7 @@
             // 
             // tabPage2
             // 
+            this.tabPage2.Controls.Add(this.useForNewNestsBox);
             this.tabPage2.Controls.Add(this.groupBox3);
             this.tabPage2.Controls.Add(this.groupBox1);
             this.tabPage2.Controls.Add(this.tableLayoutPanel1);
@@ -641,6 +643,16 @@
             this.tabPage2.TabIndex = 1;
             this.tabPage2.Text = "Defaults";
             this.tabPage2.UseVisualStyleBackColor = true;
+            // 
+            // useForNewNestsBox
+            // 
+            this.useForNewNestsBox.AutoSize = true;
+            this.useForNewNestsBox.Location = new System.Drawing.Point(12, 288);
+            this.useForNewNestsBox.Name = "useForNewNestsBox";
+            this.useForNewNestsBox.TabIndex = 8;
+            this.useForNewNestsBox.Text = "Use these defaults for new nests";
+            this.useForNewNestsBox.UseVisualStyleBackColor = true;
+            this.useForNewNestsBox.Visible = false;
             // 
             // tabPage3
             // 
@@ -772,6 +784,7 @@
         private Controls.NumericUpDown partSpacingBox;
         private Controls.BottomPanel bottomPanel1;
         private System.Windows.Forms.GroupBox groupBox3;
+        private System.Windows.Forms.CheckBox useForNewNestsBox;
         private Controls.QuadrantSelect quadrantSelect1;
         private System.Windows.Forms.Button applyButton;
         private System.Windows.Forms.Label releaseLabel;

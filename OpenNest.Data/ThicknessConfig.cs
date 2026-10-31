@@ -26,4 +26,10 @@ public class ThicknessConfig
 
     public CutOffConfig CutOff { get; set; } = new();
     public List<string> PlateSizes { get; set; } = new();
+
+    /// <summary>The part spacing of nests in this thickness; null keeps the nest defaults'.</summary>
+    public double? PartSpacing { get; set; }
+
+    /// <summary>The edge spacing of nests in this thickness; null keeps the nest defaults'.</summary>
+    public EdgeSpacingConfig? EdgeSpacing { get; set; }
 }

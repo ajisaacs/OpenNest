@@ -872,7 +872,7 @@ public sealed class SavedNestsForm : Form
             }
             // Same default propagation as Nest > Nest Info in the open editor.
             using var manager = new PlateManager(nest);
-            manager.ChangePlateDefaults(() => dialog.SaveNestInfo(nest));
+            MachineSettings.SaveNestInfo(manager, dialog, nest);
             nest.DateLastModified = DateTime.Now;
             summaryLabel.Text = "Saving nest information...";
             var bytes = await Task.Run(() =>

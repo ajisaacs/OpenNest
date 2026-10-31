@@ -1,5 +1,6 @@
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Data;
+using OpenNest.Geometry;
 
 namespace OpenNest.Tests.Data;
 
@@ -40,6 +41,119 @@ public class MachineCuttingDefaultsTests
         new() { Units = units, Thickness = thickness, Material = new Material("Mild Steel", grade, 0.2836) };
 
     private static readonly LeadConfig LineArc = new() { Type = "Line + Arc", Length = 0.125, Angle = 90, Radius = 0.0625 };
+
+    private static MachineConfig SpacedMachine(UnitSystem units = UnitSystem.Inches)
+    {
+        var machine = Machine(LineArc, units: units);
+        var thickness = machine.Materials[0].Thicknesses[0];
+        thickness.PartSpacing = 0.5;
+        thickness.EdgeSpacing = new EdgeSpacingConfig { Left = 1, Bottom = 2, Right = 3, Top = 4 };
+        return machine;
+    }
+
+    private static Nest SpacedNest(double thickness = 0.25, Units units = Units.Inches)
+    {
+        var nest = NestOf(thickness, "A36", units);
+        nest.PlateDefaults.PartSpacing = 0.1;
+        nest.PlateDefaults.EdgeSpacing = new Spacing(0.2, 0.2, 0.2, 0.2);
+        return nest;
+    }
+
+    [Fact]
+    public void ApplySpacingTo_SetsTheMachinesSpacing()
+    {
+        var nest = SpacedNest();
+
+        Assert.True(MachineCuttingDefaults.ApplySpacingTo(nest, SpacedMachine()));
+
+        Assert.Equal(0.5, nest.PlateDefaults.PartSpacing);
+        Assert.Equal(new Spacing(1, 2, 3, 4), nest.PlateDefaults.EdgeSpacing);
+    }
+
+    [Fact]
+    public void ApplySpacingTo_ConvertsToTheNestsUnits()
+    {
+        var nest = SpacedNest(6.35, Units.Millimeters);
+
+        Assert.True(MachineCuttingDefaults.ApplySpacingTo(nest, SpacedMachine()));
+
+        Assert.Equal(12.7, nest.PlateDefaults.PartSpacing, 6);
+        Assert.Equal(25.4, nest.PlateDefaults.EdgeSpacing.Left, 6);
+    }
+
+    [Fact]
+    public void ApplySpacingTo_KeepsWhatTheThicknessLeavesUnset()
+    {
+        var machine = SpacedMachine();
+        machine.Materials[0].Thicknesses[0].EdgeSpacing = null;
+        var nest = SpacedNest();
+
+        Assert.True(MachineCuttingDefaults.ApplySpacingTo(nest, machine));
+
+        Assert.Equal(0.5, nest.PlateDefaults.PartSpacing);
+        Assert.Equal(new Spacing(0.2, 0.2, 0.2, 0.2), nest.PlateDefaults.EdgeSpacing);
+    }
+
+    [Fact]
+    public void ApplySpacingTo_WithoutSpacingOnFile_ChangesNothing()
+    {
+        var nest = SpacedNest();
+
+        Assert.False(MachineCuttingDefaults.ApplySpacingTo(nest, Machine(LineArc)));
+        Assert.False(MachineCuttingDefaults.ApplySpacingTo(nest, null));
+        Assert.False(MachineCuttingDefaults.ApplySpacingTo(SpacedNest(0.5), SpacedMachine()));
+
+        Assert.Equal(0.1, nest.PlateDefaults.PartSpacing);
+    }
+
+    [Fact]
+    public void ApplySpacingAfter_FollowsAChangedThicknessOnly()
+    {
+        var nest = SpacedNest(0.5);
+
+        MachineCuttingDefaults.ApplySpacingAfter(nest, SpacedMachine(), () => nest.Customer = "Acme");
+        Assert.Equal(0.1, nest.PlateDefaults.PartSpacing);
+
+        MachineCuttingDefaults.ApplySpacingAfter(nest, SpacedMachine(), () => nest.Thickness = 0.25);
+        Assert.Equal(0.5, nest.PlateDefaults.PartSpacing);
+    }
+
+    [Fact]
+    public void ApplySpacingAfter_KeepsSpacingTheEditChanged()
+    {
+        var nest = SpacedNest(0.5);
+
+        MachineCuttingDefaults.ApplySpacingAfter(nest, SpacedMachine(), () =>
+        {
+            nest.Thickness = 0.25;
+            nest.PlateDefaults.PartSpacing = 0.3;
+        });
+
+        Assert.Equal(0.3, nest.PlateDefaults.PartSpacing);
+        Assert.Equal(new Spacing(1, 2, 3, 4), nest.PlateDefaults.EdgeSpacing);
+    }
+
+    [Fact]
+    public void Spacing_SurvivesTheMachineFile()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        try
+        {
+            var provider = new LocalJsonProvider(directory);
+            var machine = SpacedMachine();
+            provider.SaveMachine(machine);
+
+            var thickness = provider.GetMachine(machine.Id)!.Materials[0].Thicknesses[0];
+
+            Assert.Equal(0.5, thickness.PartSpacing);
+            Assert.Equal(4, thickness.EdgeSpacing!.Top);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, true);
+        }
+    }
 
     [Fact]
     public void IsRecordedFor_KeepsLeadsEditedAfterTheMachineSettingsWereTaken()

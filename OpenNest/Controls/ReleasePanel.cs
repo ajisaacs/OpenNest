@@ -116,7 +116,7 @@ namespace OpenNest.Controls
             nestAfterReleaseCheckBox.Checked = Properties.Settings.Default.ReleaseNestAfter;
             nestAfterReleaseCheckBox.Click += NestAfterReleaseCheckBox_Click;
             ShowMessage = (text, buttons, icon) => MessageBox.Show(FindForm(), text, "Release", buttons, icon);
-            CreateNest = (group, _) => NewNestFactory.CreateAsync(FindForm(), group.Units);
+            CreateNest = (group, _) => NewNestFactory.CreateAsync(FindForm(), group);
             EditDrawing = edit =>
             {
                 using var form = new EditLibraryDrawingForm(edit);

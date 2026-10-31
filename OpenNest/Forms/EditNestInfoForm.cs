@@ -15,6 +15,7 @@ namespace OpenNest.Forms
         private DateTime dateLastModified;
         private List<MaterialConfig> materialCatalog = new();
         private string gradeMaterialKey = "";
+        private bool offerNewNestDefaults;
 
         public EditNestInfoForm()
         {
@@ -57,6 +58,24 @@ namespace OpenNest.Forms
             get { return !nameBox.ReadOnly; }
             set { nameBox.ReadOnly = !value; }
         }
+
+        /// <summary>
+        /// Shows the Defaults tab's choice to also start new nests from these values. Hidden
+        /// by default: the tab otherwise edits only this nest.
+        /// </summary>
+        public bool OfferNewNestDefaults
+        {
+            // Not read back from the box: Visible is false once the dialog has closed.
+            get { return offerNewNestDefaults; }
+            set
+            {
+                offerNewNestDefaults = value;
+                useForNewNestsBox.Visible = value;
+            }
+        }
+
+        /// <summary>The user chose to save the Defaults tab for new nests.</summary>
+        public bool UseForNewNests => OfferNewNestDefaults && useForNewNestsBox.Checked;
 
         /// <summary>
         /// The drawing set release this nest came from (Database mode), shown beside the

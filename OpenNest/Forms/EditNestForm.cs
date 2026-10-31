@@ -826,7 +826,11 @@ namespace OpenNest.Forms
 
         public async Task ShowNestInfoEditorAsync()
         {
-            var form = new EditNestInfoForm { AllowRename = NestStorage.Settings.IsDatabaseMode };
+            var form = new EditNestInfoForm
+            {
+                AllowRename = NestStorage.Settings.IsDatabaseMode,
+                OfferNewNestDefaults = true,
+            };
             form.SetMaterialCatalog(MachineSettings.LoadMaterials());
             form.LoadNestInfo(Nest);
             _ = ShowReleaseOriginAsync(form);
@@ -843,13 +847,15 @@ namespace OpenNest.Forms
                 using (var change = BeginChange("Nest Info"))
                 {
                     var before = UndoableNestInfo();
-                    PlateManager.ChangePlateDefaults(() => form.SaveNestInfo(Nest));
+                    MachineSettings.SaveNestInfo(PlateManager, form, Nest);
                     if (UndoableNestInfo() != before)
                         change.MarkChanged();
                     // The material, thickness or units may have changed.
                     MachineSettings.ApplyCutOffDefaults(PlateView, Nest);
                     change.Complete();
                 }
+                if (form.UseForNewNests)
+                    MachineSettings.SaveNestDefaults(this, NestDefaults.FromNest(Nest), Nest.Machine);
                 Text = Nest.Name;
                 drawingListBox1.Units = Nest.Units;
                 drawingListBox1.Invalidate();

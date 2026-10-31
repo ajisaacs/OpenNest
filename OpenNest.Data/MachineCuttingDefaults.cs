@@ -1,4 +1,5 @@
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Geometry;
 
 namespace OpenNest.Data;
 
@@ -62,6 +63,53 @@ public static class MachineCuttingDefaults
         parameters.Grade = nest.Material.Grade;
         parameters.Thickness = nest.Thickness;
         return true;
+    }
+
+    /// <summary>
+    /// Gives the nest's plate defaults the part and edge spacing the machine has for its
+    /// material and thickness. Spacing the machine leaves unset stays as it was. Returns false,
+    /// changing nothing, when the machine sets neither.
+    /// </summary>
+    public static bool ApplySpacingTo(Nest nest, MachineConfig? machine)
+    {
+        ArgumentNullException.ThrowIfNull(nest);
+        var settings = Find(machine, nest);
+        if (settings?.PartSpacing == null && settings?.EdgeSpacing == null)
+            return false;
+
+        var scale = Scale(machine!.Units, nest.Units);
+        if (settings.PartSpacing is { } partSpacing)
+            nest.PlateDefaults.PartSpacing = partSpacing * scale;
+        if (settings.EdgeSpacing is { } edge)
+            nest.PlateDefaults.EdgeSpacing = new Spacing(edge.Left * scale, edge.Bottom * scale, edge.Right * scale, edge.Top * scale);
+        return true;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="edit"/>, then, when it changed the nest's material, grade or
+    /// thickness, applies the machine's spacing for them (<see cref="ApplySpacingTo"/>). A
+    /// spacing the edit changed itself is the user's choice and stays.
+    /// </summary>
+    public static void ApplySpacingAfter(Nest nest, MachineConfig? machine, Action edit)
+    {
+        ArgumentNullException.ThrowIfNull(nest);
+        ArgumentNullException.ThrowIfNull(edit);
+        var job = (nest.Material?.Name, nest.Material?.Grade, nest.Thickness);
+        var plate = nest.PlateDefaults;
+        var (partBefore, edgeBefore) = (plate.PartSpacing, plate.EdgeSpacing);
+
+        edit();
+
+        if (job == (nest.Material?.Name, nest.Material?.Grade, nest.Thickness))
+            return;
+
+        plate = nest.PlateDefaults;
+        var (partEdited, edgeEdited) = (plate.PartSpacing, plate.EdgeSpacing);
+        ApplySpacingTo(nest, machine);
+        if (partEdited != partBefore)
+            plate.PartSpacing = partEdited;
+        if (!edgeEdited.Equals(edgeBefore))
+            plate.EdgeSpacing = edgeEdited;
     }
 
     /// <summary>

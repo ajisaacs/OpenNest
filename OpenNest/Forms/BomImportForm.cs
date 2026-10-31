@@ -280,6 +280,7 @@ namespace OpenNest.Forms
                 : _defaults.Size.Length;
 
             var groups = BomImportGroups.Build(_parts);
+            var machine = MachineSettings.DefaultMachine(_defaults, MachineSettings.LoadMachines());
 
             var table = new DataTable();
             table.Columns.Add("Material", typeof(string));
@@ -297,6 +298,7 @@ namespace OpenNest.Forms
             foreach (var group in groups)
             {
                 var existing = _groupSettings.TryGetValue(group.Key, out var gs);
+                var defaults = GroupDefaults(group, machine);
 
                 table.Rows.Add(
                     group.Material,
@@ -305,11 +307,11 @@ namespace OpenNest.Forms
                     group.TotalQty,
                     existing ? gs.PlateWidth : defaultWidth,
                     existing ? gs.PlateLength : defaultLength,
-                    existing ? gs.PartSpacing : _defaults.PartSpacing,
-                    existing ? gs.EdgeLeft : _defaults.EdgeSpacing.Left,
-                    existing ? gs.EdgeBottom : _defaults.EdgeSpacing.Bottom,
-                    existing ? gs.EdgeRight : _defaults.EdgeSpacing.Right,
-                    existing ? gs.EdgeTop : _defaults.EdgeSpacing.Top
+                    existing ? gs.PartSpacing : defaults.PartSpacing,
+                    existing ? gs.EdgeLeft : defaults.EdgeSpacing.Left,
+                    existing ? gs.EdgeBottom : defaults.EdgeSpacing.Bottom,
+                    existing ? gs.EdgeRight : defaults.EdgeSpacing.Right,
+                    existing ? gs.EdgeTop : defaults.EdgeSpacing.Top
                 );
             }
 
@@ -325,6 +327,15 @@ namespace OpenNest.Forms
             }
 
             btnCreateNests.Enabled = table.Rows.Count > 0;
+        }
+
+        // The saved defaults with the machine's spacing for the group's material and thickness.
+        private NestDefaults GroupDefaults(BomImportGroup group, MachineConfig machine)
+        {
+            var nest = new Nest { Thickness = group.Thickness, Material = new Material(group.Material) };
+            _defaults.ApplyTo(nest);
+            MachineCuttingDefaults.ApplySpacingTo(nest, machine);
+            return NestDefaults.FromNest(nest);
         }
 
         private void SaveGroupSettings()
@@ -416,15 +427,16 @@ namespace OpenNest.Forms
             {
                 if (!_groupSettings.TryGetValue(group.Key, out var plate))
                 {
+                    var defaults = GroupDefaults(group, machine);
                     plate = new BomGroupPlateSettings
                     {
                         PlateWidth = defaultWidth,
                         PlateLength = defaultLength,
-                        PartSpacing = _defaults.PartSpacing,
-                        EdgeLeft = _defaults.EdgeSpacing.Left,
-                        EdgeBottom = _defaults.EdgeSpacing.Bottom,
-                        EdgeRight = _defaults.EdgeSpacing.Right,
-                        EdgeTop = _defaults.EdgeSpacing.Top,
+                        PartSpacing = defaults.PartSpacing,
+                        EdgeLeft = defaults.EdgeSpacing.Left,
+                        EdgeBottom = defaults.EdgeSpacing.Bottom,
+                        EdgeRight = defaults.EdgeSpacing.Right,
+                        EdgeTop = defaults.EdgeSpacing.Top,
                     };
                 }
 

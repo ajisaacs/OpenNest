@@ -79,8 +79,9 @@ namespace OpenNest.Forms
                 items.Add(new ToolStripMenuItem("(no machines; see Tools > Machine Configuration)") { Enabled = false });
         }
 
-        // Assigning a machine also puts every sheet on that machine's support grid and gives
-        // the views its cut-off settings; plates' own cutting parameters are kept.
+        // Assigning a machine also puts every sheet on that machine's support grid, gives the
+        // views its cut-off settings and the nest its spacing; plates' own cutting parameters are
+        // kept, and of the sheets only an untouched trailing one takes the spacing.
         private void AssignMachine(MachineConfig machine)
         {
             var editForm = activeForm;
@@ -101,6 +102,7 @@ namespace OpenNest.Forms
                 MachineSettings.AssignMachine(nest, machine);
                 foreach (var view in views)
                     MachineSettings.ApplyCutOffDefaults(view, nest);
+                editForm.PlateManager.ChangePlateDefaults(() => MachineCuttingDefaults.ApplySpacingTo(nest, machine));
             });
             foreach (var view in views)
                 view.Invalidate();

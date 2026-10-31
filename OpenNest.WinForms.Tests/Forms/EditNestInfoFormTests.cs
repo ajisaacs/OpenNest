@@ -74,6 +74,25 @@ public class EditNestInfoFormTests
         });
     }
 
+    [Fact]
+    public void NewNestDefaultsChoice_NeedsTheOfferAndTheCheck()
+    {
+        RunSta(() =>
+        {
+            using var form = new EditNestInfoForm();
+            var box = (CheckBox)form.Controls.Find("useForNewNestsBox", true).Single();
+
+            box.Checked = true;
+            Assert.False(form.UseForNewNests);
+
+            form.OfferNewNestDefaults = true;
+            Assert.True(form.UseForNewNests);
+
+            box.Checked = false;
+            Assert.False(form.UseForNewNests);
+        });
+    }
+
     private static Nest AcceptanceNest()
     {
         var nest = new Nest("Acceptance nest")

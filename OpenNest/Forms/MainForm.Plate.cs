@@ -9,7 +9,12 @@ namespace OpenNest.Forms
     {
         #region Plate Menu Events
 
-        private void SetAsNestDefault_Click(object sender, EventArgs e) => WithActive(f => f.SetCurrentPlateAsNestDefault());
+        // Both this nest's next plates and every new nest start from the current plate.
+        private void SetAsNestDefault_Click(object sender, EventArgs e)
+        {
+            WithActive(f => f.SetCurrentPlateAsNestDefault());
+            SaveCurrentAsDefaults_Click(sender, e);
+        }
 
         private void AddPlate_Click(object sender, EventArgs e)
         {

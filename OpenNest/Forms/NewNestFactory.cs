@@ -19,13 +19,14 @@ namespace OpenNest.Forms
     {
         private static readonly TimeSpan ServerTimeout = TimeSpan.FromSeconds(3);
 
-        /// <param name="units">
-        /// The new nest's units, with the saved plate defaults converted to them (a drawing set
-        /// release group drawn in other units); null uses the defaults as saved.
+        /// <param name="release">
+        /// The drawing set release group the nest is for: its units, with the saved plate
+        /// defaults converted to them, its material and thickness, and the machine's spacing for
+        /// those. Null uses the defaults as saved.
         /// </param>
-        public static async Task<Nest> CreateAsync(IWin32Window owner, Units? units = null)
+        public static async Task<Nest> CreateAsync(IWin32Window owner, SetReleaseGroup release = null)
         {
-            var nest = CreateDefaultNest(owner, units);
+            var nest = CreateDefaultNest(release);
             var now = DateTime.Now;
 
             nest.DateCreated = now;
@@ -34,15 +35,21 @@ namespace OpenNest.Forms
             return nest;
         }
 
-        private static Nest CreateDefaultNest(IWin32Window owner, Units? units)
+        private static Nest CreateDefaultNest(SetReleaseGroup release)
         {
             var nest = new Nest();
             var defaults = MachineSettings.LoadNestDefaults();
-            (units is { } converted ? defaults.ConvertedTo(converted) : defaults).ApplyTo(nest);
+            (release != null ? defaults.ConvertedTo(release.Units) : defaults).ApplyTo(nest);
             // After the defaults so the rail and grid are converted to the new nest's units.
             var machine = MachineSettings.DefaultMachine(defaults, MachineSettings.LoadMachines());
             MachineSettings.LoadClampSettings(machine).ApplyToNewNest(nest);
             MachineSettings.AssignMachine(nest, machine);
+            if (release != null)
+            {
+                nest.Material = new Material(release.MaterialName, release.MaterialGrade);
+                nest.Thickness = release.Thickness;
+                MachineCuttingDefaults.ApplySpacingTo(nest, machine);
+            }
             return nest;
         }
 

@@ -1,7 +1,7 @@
 # Machine cutting defaults
 
 A nest's assigned machine (`Nest.Machine`, see [nest file format](nest-file-format.md))
-supplies the starting lead-ins, lead-outs, kerf and cut-off settings for the nest's
+supplies the starting lead-ins, lead-outs, kerf, cut-off settings and spacing for the nest's
 material and thickness, from that machine's Tools > Machine Configuration entry (in
 Database mode, the server's [shared machines](shared-settings.md) once it holds them).
 `MachineCuttingDefaults` (OpenNest.Data) holds the mapping; the desktop applies it.
@@ -46,6 +46,16 @@ which comes from the thickness). Types map as follows:
 | Line + Line | not offered; an older configuration's is not mapped (it has no second segment): the lead-in it would set is kept |
 
 Lead-outs map None, Line (length, angle) and Arc (radius); any other type is none.
+
+## Spacing
+
+Each thickness can set a part spacing and an edge spacing (the Spacing tab), each optional:
+one left unset stays at the nest defaults' value. The machine's spacing replaces the nest's
+plate defaults when Nest > Edit or Nest Information changes the material, grade or thickness
+(a spacing edited in the same dialog stays), when Nest > Machine changes the machine, and when a
+drawing set release creates a nest. BOM import starts each group's row from it. File > New has
+no material yet, so a new nest starts from the nest defaults. Plates are kept as they are, except
+an untouched trailing empty sheet, which follows the plate defaults.
 
 ## Cut-offs
 
