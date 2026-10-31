@@ -371,7 +371,8 @@ namespace OpenNest.Controls
         // shows every dimension instead of scrolling inside a short box.
         private void FillDimensionsToBottom()
         {
-            if (!dimensionsPanel.IsExpanded)
+            // Layout already runs inside the constructor (AutoScroll), before the sections exist.
+            if (dimensionsPanel is not { IsExpanded: true })
                 return;
 
             var above = 0;
