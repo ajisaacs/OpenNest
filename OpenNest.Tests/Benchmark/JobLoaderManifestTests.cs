@@ -227,15 +227,26 @@ public sealed class JobLoaderManifestTests : IDisposable
     }
 
     [Fact]
-    public void Rotations_ZeroOnlyLocksAndQuarterTurnsAreAutomatic()
+    public void Rotations_ZeroOnlyLocksAndQuarterTurnsAllowOnlyQuarterTurns()
     {
         var locked = RotationOf("[0]");
         Assert.Equal(RotationPolicyKind.BoundedSweep, locked.Kind);
         Assert.False(locked.Allow180Equivalent);
         Assert.Equal(new[] { 0.0 }, locked.EnumerateAngles());
 
-        Assert.Equal(RotationPolicyKind.Automatic, RotationOf("[0, 90, 180, 270]").Kind);
-        Assert.Equal(RotationPolicyKind.Automatic, RotationOf("[0, -90, 450, 180]").Kind);
+        // Automatic rotation would allow any angle; quarter turns must not.
+        foreach (var set in new[] { "[0, 90, 180, 270]", "[0, -90, 450, 180]" })
+        {
+            var quarter = RotationOf(set);
+            Assert.Equal(RotationPolicyKind.BoundedSweep, quarter.Kind);
+            Assert.Equal(
+                new[] { 0, System.Math.PI / 2, System.Math.PI, 3 * System.Math.PI / 2 },
+                quarter.EnumerateAngles()
+            );
+            Assert.True(quarter.Allows(3 * System.Math.PI / 2));
+            Assert.False(quarter.Allows(0.1));
+            Assert.False(quarter.Allows(4.884));
+        }
     }
 
     [Theory]

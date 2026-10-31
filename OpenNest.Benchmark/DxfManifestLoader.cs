@@ -135,13 +135,17 @@ namespace OpenNest.Benchmark
                 throw new InvalidOperationException($"Failed to import DXF: {dxfPath}");
 
             // A zero legacy step means automatic rotation to DrawingJobMapper, so lock it explicitly.
+            // Quarter turns are a 90° sweep from 0 to 270°; automatic rotation allows any angle.
             var rotations = RotationSet(part);
-            if (rotations != RotationChoice.QuarterTurns)
+            if (rotations != RotationChoice.Any)
             {
+                var quarter = rotations == RotationChoice.QuarterTurns;
                 drawing.Constraints ??= new NestConstraints();
-                drawing.Constraints.StepAngle = OpenNest.Math.Angle.TwoPI;
+                drawing.Constraints.StepAngle = quarter
+                    ? OpenNest.Math.Angle.HalfPI
+                    : OpenNest.Math.Angle.TwoPI;
                 drawing.Constraints.StartAngle = 0;
-                drawing.Constraints.EndAngle = 0;
+                drawing.Constraints.EndAngle = quarter ? 3 * OpenNest.Math.Angle.HalfPI : 0;
                 drawing.Constraints.Allow180Equivalent = rotations == RotationChoice.HalfTurns;
             }
 
@@ -163,16 +167,17 @@ namespace OpenNest.Benchmark
             None,
             HalfTurns,
             QuarterTurns,
+            Any,
         }
 
         /// <summary>
         /// A part's "rotations" (degrees) must be {0}, {0, 180} or {0, 90, 180, 270}; without it,
-        /// "allowRotation" picks quarter turns (true, the default) or none.
+        /// "allowRotation" picks any angle (true, the default: automatic rotation) or none.
         /// </summary>
         private static RotationChoice RotationSet(ManifestPart part)
         {
             if (part.Rotations == null)
-                return part.AllowRotation ? RotationChoice.QuarterTurns : RotationChoice.None;
+                return part.AllowRotation ? RotationChoice.Any : RotationChoice.None;
             if (!part.AllowRotation)
                 throw new InvalidOperationException(
                     $"Manifest part '{part.Dxf}': set \"rotations\" or \"allowRotation\", not both."
