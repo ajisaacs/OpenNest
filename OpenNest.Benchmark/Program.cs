@@ -18,6 +18,9 @@ static class BenchmarkConsole
         if (options == null)
             return 0; // --help was requested
 
+        if (options.Invalid)
+            return 1;
+
         if (options.InputPath == null)
         {
             PrintUsage();
@@ -124,7 +127,8 @@ static class BenchmarkConsole
             options.MinimumSalvageDimension,
             options.OutputDirectory,
             options.Parallel,
-            options.Progress ? Console.Out : null
+            options.Progress ? Console.Out : null,
+            options.TimeLimit
         );
 
         Report.PrintDetailed(results);
@@ -197,6 +201,18 @@ static class BenchmarkConsole
                         );
                     break;
 
+                case "--time-limit":
+                    o.TimeLimit = i + 1 < args.Length ? ParseTimeLimit(args[++i]) : null;
+                    if (o.TimeLimit == null)
+                    {
+                        Console.Error.WriteLine(
+                            "Error: --time-limit needs a number of seconds from 0.001 to "
+                                + $"{BenchmarkRunner.MaxTimeLimit.TotalSeconds:0}"
+                        );
+                        o.Invalid = true;
+                    }
+                    break;
+
                 case "--progress":
                     o.Progress = true;
                     break;
@@ -233,6 +249,22 @@ static class BenchmarkConsole
         }
 
         return sizes.Distinct().ToList();
+    }
+
+    private static TimeSpan? ParseTimeLimit(string text)
+    {
+        if (
+            !double.TryParse(
+                text,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var seconds
+            )
+            || !(seconds >= 0.001)
+            || seconds > BenchmarkRunner.MaxTimeLimit.TotalSeconds
+        )
+            return null;
+        return TimeSpan.FromSeconds(seconds);
     }
 
     private static void PrintUsage()
@@ -330,6 +362,12 @@ static class BenchmarkConsole
         Console.Error.WriteLine(
             "  --progress                      Log each solve's start, engine progress and finish"
         );
+        Console.Error.WriteLine(
+            "  --time-limit <seconds>          Stop each solve at this wall-clock limit and score"
+        );
+        Console.Error.WriteLine(
+            "                                 the best valid plan reported; none = timed out"
+        );
         Console.Error.WriteLine("  --help                          Show this message");
     }
 
@@ -345,5 +383,7 @@ static class BenchmarkConsole
         public double? MinimumSalvageDimension;
         public int Parallel = 3;
         public bool Progress;
+        public TimeSpan? TimeLimit;
+        public bool Invalid;
     }
 }

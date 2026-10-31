@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.NestingEngines;
 
 namespace OpenNest.Benchmark
 {
@@ -28,6 +29,15 @@ namespace OpenNest.Benchmark
         /// <summary>Wall-clock budget for one engine solving one job.</summary>
         private static readonly TimeSpan SolveTimeout = TimeSpan.FromMinutes(5);
 
+        /// <summary>How long past a --time-limit the harness waits before abandoning a solve.
+        /// </summary>
+        private static readonly TimeSpan TimeLimitGrace = TimeSpan.FromMinutes(1);
+
+        /// <summary>The longest --time-limit: the harness timeout above it must still fit a
+        /// cancellation timer.</summary>
+        internal static readonly TimeSpan MaxTimeLimit =
+            DeadlineNestingEngine.MaxLimit - TimeLimitGrace;
+
         public static List<JobResult> Run(
             List<BenchmarkJob> jobs,
             IReadOnlyList<NestingEngineInfo> engines,
@@ -35,7 +45,8 @@ namespace OpenNest.Benchmark
             double? minimumSalvageDimension = null,
             string outputDirectory = null,
             int maxParallelism = 1,
-            System.IO.TextWriter progressLog = null
+            System.IO.TextWriter progressLog = null,
+            TimeSpan? timeLimit = null
         )
         {
             var pairs = jobs.SelectMany(job => engines.Select(engine => (Job: job, Engine: engine)))
@@ -71,7 +82,8 @@ namespace OpenNest.Benchmark
                         salvageRate,
                         minimumSalvageDimension,
                         outputDirectory,
-                        progressLog
+                        progressLog,
+                        timeLimit
                     )
             );
 
@@ -214,13 +226,21 @@ namespace OpenNest.Benchmark
             }
         }
 
+        /// <summary>The harness's own limit on a solve: five minutes, or a --time-limit plus a
+        /// grace period, so the engine's limit always fires first.</summary>
+        private static TimeSpan HarnessTimeout(TimeSpan? timeLimit) =>
+            timeLimit is { } limit && limit + TimeLimitGrace > SolveTimeout
+                ? limit + TimeLimitGrace
+                : SolveTimeout;
+
         private static JobResult RunOne(
             BenchmarkJob job,
             NestingEngineInfo engineInfo,
             double? salvageRate,
             double? minimumSalvageDimension,
             string outputDirectory,
-            System.IO.TextWriter progressLog
+            System.IO.TextWriter progressLog,
+            TimeSpan? timeLimit
         )
         {
             var requested = job.TotalRequestedQuantity;
@@ -234,7 +254,9 @@ namespace OpenNest.Benchmark
             {
                 var nestJob = job.BuildNestJob(MaxPlates, salvageRate, minimumSalvageDimension);
                 var engine = engineInfo.Factory();
-                using var cts = new CancellationTokenSource(SolveTimeout);
+                if (timeLimit is { } limit)
+                    engine = new DeadlineNestingEngine(engine, limit);
+                using var cts = new CancellationTokenSource(HarnessTimeout(timeLimit));
                 var jobResult = engine.Solve(nestJob, log, cts.Token);
                 log?.Finished(jobResult, sw.ElapsedMilliseconds);
 
@@ -356,7 +378,7 @@ namespace OpenNest.Benchmark
                     ElapsedMs = sw.ElapsedMilliseconds,
                 };
             }
-            catch (OperationCanceledException)
+            catch (Exception ex) when (ex is OperationCanceledException || ex is TimeoutException)
             {
                 sw.Stop();
                 log?.Failed("timed out", sw.ElapsedMilliseconds);
@@ -368,7 +390,9 @@ namespace OpenNest.Benchmark
                     PartsRequested = requested,
                     UnplacedPartPenalty = job.UnplacedPartPenalty,
                     ElapsedMs = sw.ElapsedMilliseconds,
-                    Error = $"Timed out after {SolveTimeout.TotalMinutes:F0} minute(s)",
+                    Error = ex is TimeoutException
+                        ? ex.Message
+                        : $"Timed out after {HarnessTimeout(timeLimit).TotalMinutes:0.#} minute(s)",
                 };
             }
             catch (Exception ex)
