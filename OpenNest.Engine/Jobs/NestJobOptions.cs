@@ -1,4 +1,5 @@
 using System;
+using OpenNest;
 
 namespace OpenNest.Engine.Jobs;
 
@@ -10,9 +11,12 @@ public sealed class NestJobOptions
         int? maxPlates = null,
         double salvageRate = 0,
         double minimumSalvageDimension = 0,
-        bool searchUntilCancelled = false
+        bool searchUntilCancelled = false,
+        CutOffAxis? offcutCut = null
     )
     {
+        if (offcutCut is { } axis && !Enum.IsDefined(axis))
+            throw new ArgumentOutOfRangeException(nameof(offcutCut));
         ArgumentException.ThrowIfNullOrWhiteSpace(placementStrategy);
         if (maxPlates <= 0)
             throw new ArgumentOutOfRangeException(nameof(maxPlates));
@@ -25,7 +29,17 @@ public sealed class NestJobOptions
         SalvageRate = salvageRate;
         MinimumSalvageDimension = minimumSalvageDimension;
         SearchUntilCancelled = searchUntilCancelled;
+        OffcutCut = offcutCut;
     }
+
+    /// <summary>
+    /// When set, only the edge strips one cut along this axis frees count as a sheet's offcut, for
+    /// salvage credit and for the compactness tie-break between equal-cost plans:
+    /// <see cref="CutOffAxis.Horizontal"/> keeps full-width strips at the bottom or top (the drop
+    /// off the end of a sheet), <see cref="CutOffAxis.Vertical"/> full-length ones at the sides.
+    /// Null (the default) counts the largest of all four.
+    /// </summary>
+    public CutOffAxis? OffcutCut { get; }
 
     /// <summary>
     /// Asks engines that support it to keep searching after their normal search, reporting
@@ -39,7 +53,7 @@ public sealed class NestJobOptions
 
     /// <summary>A copy of these options with <see cref="SearchUntilCancelled"/> set.</summary>
     public NestJobOptions WithSearchUntilCancelled(bool value) =>
-        new(PlacementStrategy, MaxPlates, SalvageRate, MinimumSalvageDimension, value);
+        new(PlacementStrategy, MaxPlates, SalvageRate, MinimumSalvageDimension, value, OffcutCut);
 
     /// <summary>Fraction of eligible edge-offcut area credited by <see cref="NestJobCost.NetSheetCost"/> (0..1).</summary>
     public double SalvageRate { get; }

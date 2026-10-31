@@ -485,3 +485,12 @@ full-width or full-length edge offcut, measured as salvage measures it but whate
 salvage rate (it honors a positive minimum salvage dimension; with none, any offcut counts).
 Larger wins, summed over a job's sheets. It is never part of the cost, so it cannot outrank a
 cheaper layout or change a reported cost.
+
+`NestJobOptions.OffcutCut` narrows which strips count, for salvage credit and this tie-break
+alike: `CutOffAxis.Horizontal` counts only the full-width strips at the bottom and top (the
+drop cut off the end of a sheet), `Vertical` only the full-length ones at the sides. Unset, the
+largest of the four counts. Set it when the leftover must come off one way, for example a
+shop that keeps only end drops or a benchmark that scores the used length along one axis.
+Only engine callers (the API and benchmark manifests) can set it so far; desktop, Console and
+MCP do not offer it, and the desktop's expected-remnant display still shows the largest strip.
+Fixed strategies keep their own no-salvage tie-break and ignore it.

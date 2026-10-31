@@ -35,14 +35,14 @@ public static class NestJobCost
             return 0;
         var (left, bottom, right, top) = MaterialEnvelope(job, sheet);
         return LargestOffcut(sheet.Stock, left, bottom, right, top,
-            System.Math.Max(0, job.Options.MinimumSalvageDimension));
+            System.Math.Max(0, job.Options.MinimumSalvageDimension), job.Options.OffcutCut);
     }
 
     /// <summary><see cref="CompactnessOffcut(NestJob, NestJobPlateResult)"/> from an existing
     /// material-only placed-parts envelope.</summary>
     public static double CompactnessOffcut(NestJobOptions options, NestPlateStock stock, Box partsEnvelope) =>
         LargestOffcut(stock, partsEnvelope.Left, partsEnvelope.Bottom, partsEnvelope.Right, partsEnvelope.Top,
-            System.Math.Max(0, options.MinimumSalvageDimension));
+            System.Math.Max(0, options.MinimumSalvageDimension), options.OffcutCut);
 
     /// <summary>
     /// An offcut on a 1e-6 grid, for exact tie-break comparisons: differences below it are
@@ -88,14 +88,17 @@ public static class NestJobCost
         var minimum = options.MinimumSalvageDimension;
         if (options.SalvageRate == 0 || minimum <= 0)
             return area;
-        return area - options.SalvageRate * LargestOffcut(stock, left, bottom, right, top, minimum);
+        return area - options.SalvageRate
+            * LargestOffcut(stock, left, bottom, right, top, minimum, options.OffcutCut);
     }
 
     // No rectangular edge strip is guaranteed inside an outlined sheet, so it earns no credit.
     private static double LargestOffcut(
-        NestPlateStock stock, double left, double bottom, double right, double top, double minimum) =>
+        NestPlateStock stock, double left, double bottom, double right, double top, double minimum,
+        CutOffAxis? cut) =>
         stock.Outline == null
-        && PlateRemnant.LargestOffcut(stock.WorkArea, stock.PartSpacing, left, bottom, right, top, minimum)
+        && PlateRemnant.LargestOffcut(stock.WorkArea, stock.PartSpacing,
+            left, bottom, right, top, minimum, cut)
             is { } offcut ? offcut.Length * offcut.Width : 0;
 
     public static bool UsesExplicitCosts(NestJob job) =>

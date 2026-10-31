@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.Converters;
@@ -74,11 +75,16 @@ public sealed class PlateRemnant
     /// material envelope (<paramref name="left"/> to <paramref name="top"/>) by
     /// <paramref name="partSpacing"/>, with both sides at least <paramref name="minimum"/>; null
     /// when none qualifies. Ties keep the first of bottom, top, left, right. This is the salvage
-    /// offcut whole-job costing credits.
+    /// offcut whole-job costing credits. A <paramref name="cut"/> keeps only the strips one cut
+    /// along that axis frees: <see cref="CutOffAxis.Horizontal"/> the full-width bottom and top
+    /// strips, <see cref="CutOffAxis.Vertical"/> the full-length left and right ones.
     /// </summary>
     public static Box LargestOffcut(Box workArea, double partSpacing,
-        double left, double bottom, double right, double top, double minimum)
+        double left, double bottom, double right, double top, double minimum,
+        CutOffAxis? cut = null)
     {
+        if (cut is { } axis && !Enum.IsDefined(axis))
+            throw new ArgumentOutOfRangeException(nameof(cut));
         var work = workArea;
         var gap = partSpacing;
         var candidates = new[]
@@ -89,8 +95,11 @@ public sealed class PlateRemnant
             new Box(right + gap, work.Bottom, work.Right - right - gap, work.Width),
         };
         Box best = null;
-        foreach (var candidate in candidates)
+        for (var i = 0; i < candidates.Length; i++)
         {
+            var candidate = candidates[i];
+            if (cut == CutOffAxis.Horizontal && i >= 2 || cut == CutOffAxis.Vertical && i < 2)
+                continue;
             if (candidate.Length >= minimum && candidate.Width >= minimum
                 && (best == null || candidate.Length * candidate.Width > best.Length * best.Width))
                 best = candidate;

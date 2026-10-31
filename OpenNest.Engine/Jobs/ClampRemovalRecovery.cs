@@ -163,7 +163,8 @@ internal static class ClampRemovalRecovery
 
                 var variant = Clone(group.Removal.Stock, group.Removal.Stock.Id, sheetCap, null);
                 var options = new NestJobOptions(job.Options.PlacementStrategy, platesLeft,
-                    job.Options.SalvageRate, job.Options.MinimumSalvageDimension);
+                    job.Options.SalvageRate, job.Options.MinimumSalvageDimension,
+                    offcutCut: job.Options.OffcutCut);
                 var groupJob = new NestJob(parts, new[] { variant }, options);
 
                 List<NestJobPlateResult> kept = null;

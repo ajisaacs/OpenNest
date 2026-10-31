@@ -83,6 +83,35 @@ public sealed class JobLoaderManifestTests : IDisposable
         Assert.Equal(2, job.Requests.Count);
     }
 
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("\"horizontal\"", CutOffAxis.Horizontal)]
+    [InlineData("\"Vertical\"", CutOffAxis.Vertical)]
+    public void OffcutCut_ReachesTheJobOptions(string json, CutOffAxis? expected)
+    {
+        var manifest = json == null ? ValidManifest
+            : ValidManifest.Replace("\"quadrant\": 2,", $"\"quadrant\": 2, \"offcutCut\": {json},");
+        var job = Assert.Single(JobLoader.Load(WriteManifest("bench.json", manifest)));
+
+        Assert.Equal(expected, job.OffcutCut);
+        Assert.Equal(expected, job.BuildNestJob(10).Options.OffcutCut);
+    }
+
+    [Theory]
+    [InlineData("diagonal")]
+    [InlineData("1")]
+    [InlineData("horizontal,vertical")]
+    [InlineData("Horizontal, Vertical")]
+    public void OffcutCut_RejectsAnythingButAnAxisName(string value)
+    {
+        var manifest = ValidManifest.Replace(
+            "\"quadrant\": 2,", $"\"quadrant\": 2, \"offcutCut\": \"{value}\",");
+        var path = WriteManifest("bench.json", manifest);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => JobLoader.Load(path).ToList());
+        Assert.Contains("offcutCut", ex.Message);
+    }
+
     [Fact]
     public void Overrides_ReplaceManifestSheetSizesAndSpacing()
     {

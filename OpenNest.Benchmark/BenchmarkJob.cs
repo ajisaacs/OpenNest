@@ -47,6 +47,10 @@ namespace OpenNest.Benchmark
         /// <summary>Saved source-nest setting; manifests have no saved salvage rate and use zero.</summary>
         public double SalvageRate { get; init; }
 
+        /// <summary>Manifest "offcutCut": which edge strips count as a sheet's offcut;
+        /// null for all.</summary>
+        public CutOffAxis? OffcutCut { get; init; }
+
         /// <summary>Original hand-authored placements, if the source was a .nest with any real parts.</summary>
         public List<(Plate Plate, List<Part> Parts)> BaselinePlateRuns { get; init; }
         public List<DrawingRequest> Requests { get; init; }
@@ -93,7 +97,8 @@ namespace OpenNest.Benchmark
                     "Fill",
                     maxPlates,
                     salvageRate ?? SalvageRate,
-                    minimumSalvageDimension ?? 0
+                    minimumSalvageDimension ?? 0,
+                    offcutCut: OffcutCut
                 )
             );
         }

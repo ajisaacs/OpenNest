@@ -52,8 +52,23 @@ namespace OpenNest.Benchmark
                 PartSpacing = partSpacingOverride ?? manifest.Spacing,
                 Quadrant = manifest.Quadrant,
                 Requests = requests,
+                OffcutCut = OffcutCut(manifest.OffcutCut, manifestPath),
             };
         }
+
+        /// <summary>"horizontal" or "vertical" (any case); absent counts every edge strip.
+        /// </summary>
+        private static CutOffAxis? OffcutCut(string value, string manifestPath) =>
+            value?.ToLowerInvariant() switch
+            {
+                null => null,
+                "horizontal" => CutOffAxis.Horizontal,
+                "vertical" => CutOffAxis.Vertical,
+                _ => throw new InvalidOperationException(
+                    $"Manifest '{manifestPath}' has offcutCut \"{value}\"; "
+                        + "use \"horizontal\" or \"vertical\"."
+                ),
+            };
 
         private static Manifest ReadManifest(string manifestPath)
         {
@@ -206,6 +221,7 @@ namespace OpenNest.Benchmark
             public double Spacing { get; set; }
             public double EdgeSpacing { get; set; }
             public int Quadrant { get; set; } = 1;
+            public string OffcutCut { get; set; }
             public List<ManifestPart> Parts { get; set; }
         }
 

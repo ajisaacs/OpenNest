@@ -92,6 +92,23 @@ public class DefaultNestingEngineTests
         Assert.Equal("first", error.Message);
     }
 
+    [Theory]
+    [InlineData(null, 0.0)]
+    [InlineData(CutOffAxis.Horizontal, 1.0)]
+    public void TheOffcutCutDecidesWhichEqualCostLayoutWins(CutOffAxis? cut, double expectedY)
+    {
+        // Stacked squares leave a 6 x 10 strip at the side and only 10 x 1 on top; a raised row
+        // leaves 10 x 5 on top. Counting every strip picks the stack; counting only full-width
+        // strips (a horizontal cut) picks the row.
+        var plain = SquaresJob();
+        var job = new NestJob(plain.Parts, plain.Plates, new NestJobOptions(offcutCut: cut));
+
+        var result = Choose(job,
+            Returns(j => Layout(j, Sheet((0, 0), (0, 5)))), Returns(j => Raised(j, 1)));
+
+        Assert.Equal(expectedY, result.Plates[0].Placements[0].Y);
+    }
+
     [Fact]
     public void NearTiesAreChosenInTieBreakOrderWhateverTheRunOrder()
     {

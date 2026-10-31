@@ -144,7 +144,8 @@ public class IrregularSearchUntilCancelledTests
     public void ATimeLimitAsksTheEngineToSearchUntilCancelled()
     {
         NestJob? seen = null;
-        var options = new NestJobOptions("Fill", maxPlates: 3, salvageRate: 0.25, minimumSalvageDimension: 1.5);
+        var options = new NestJobOptions("Fill", maxPlates: 3, salvageRate: 0.25,
+            minimumSalvageDimension: 1.5, offcutCut: CutOffAxis.Vertical);
         var plain = MixedJob(false);
         var job = new NestJob(plain.Parts, plain.Plates, options);
         var engine = new DeadlineNestingEngine(
@@ -165,6 +166,7 @@ public class IrregularSearchUntilCancelledTests
         Assert.Equal(3, seen.Options.MaxPlates);
         Assert.Equal(0.25, seen.Options.SalvageRate);
         Assert.Equal(1.5, seen.Options.MinimumSalvageDimension);
+        Assert.Equal(CutOffAxis.Vertical, seen.Options.OffcutCut);
         Assert.Equal(job.Parts, seen.Parts);
         Assert.Equal(job.Plates, seen.Plates);
         Assert.False(job.Options.SearchUntilCancelled);

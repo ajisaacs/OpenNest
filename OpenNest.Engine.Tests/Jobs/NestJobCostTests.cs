@@ -60,6 +60,59 @@ public class NestJobCostTests
     }
 
     [Theory]
+    [InlineData(null, 211.5)]
+    [InlineData(CutOffAxis.Horizontal, 139.5)]
+    [InlineData(CutOffAxis.Vertical, 211.5)]
+    public void AnOffcutCutCountsOnlyTheStripsThatCutFrees(CutOffAxis? cut, double expected)
+    {
+        // A 6 x 10 part in the corner of an 18 x 18 work area leaves a full-width strip on top,
+        // 18 x 7.75, and a larger full-length strip on the right, 11.75 x 18.
+        var stock = new NestPlateStock("sheet", new Size(20, 20), partSpacing: 0.25,
+            edgeSpacing: new Spacing(1, 1, 1, 1));
+        var work = stock.WorkArea;
+        var part = new NestJobPart("part",
+            PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(6, 10)), 1);
+        var job = new NestJob(new[] { part }, new[] { stock },
+            new NestJobOptions(salvageRate: 1, minimumSalvageDimension: 2, offcutCut: cut));
+        var sheet = new NestJobPlateResult(0, stock,
+            new[] { new NestJobPlacement("part", 0, work.Left, work.Bottom, 0) });
+        var envelope = new Box(work.Left, work.Bottom, 6, 10);
+
+        Assert.Equal(expected, NestJobCost.CompactnessOffcut(job, sheet));
+        Assert.Equal(expected, NestJobCost.CompactnessOffcut(job.Options, stock, envelope));
+        Assert.Equal(400 - expected, NestJobCost.NetSheetArea(job, sheet));
+        Assert.Equal(400 - expected, NestJobCost.NetSheetArea(job.Options, stock, envelope));
+    }
+
+    [Theory]
+    [InlineData(null, 211.5)]
+    [InlineData(CutOffAxis.Horizontal, 211.5)]
+    [InlineData(CutOffAxis.Vertical, 139.5)]
+    public void AVerticalCutCountsOnlyTheSideStrips(CutOffAxis? cut, double expected)
+    {
+        // The mirror case: a 10 x 6 part leaves 18 x 11.75 on top but only 7.75 x 18 at the side.
+        var stock = new NestPlateStock("sheet", new Size(20, 20), partSpacing: 0.25,
+            edgeSpacing: new Spacing(1, 1, 1, 1));
+        var work = stock.WorkArea;
+        var options = new NestJobOptions(salvageRate: 1, minimumSalvageDimension: 2,
+            offcutCut: cut);
+        var envelope = new Box(work.Left, work.Bottom, 10, 6);
+
+        Assert.Equal(expected, NestJobCost.CompactnessOffcut(options, stock, envelope));
+        Assert.Equal(400 - expected, NestJobCost.NetSheetArea(options, stock, envelope));
+    }
+
+    [Fact]
+    public void AnUndefinedAxisIsRejectedByTheRemnantRule() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => PlateRemnant.LargestOffcut(
+            new Box(0, 0, 10, 10), 0, 1, 1, 2, 2, 0, (CutOffAxis)7));
+
+    [Fact]
+    public void AnUndefinedOffcutCutIsRejected() =>
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new NestJobOptions(offcutCut: (CutOffAxis)7));
+
+    [Theory]
     [InlineData(0, 5, 100)]
     [InlineData(0.5, 0, 100)]
     [InlineData(0.5, 7, 100)]

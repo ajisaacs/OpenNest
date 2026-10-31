@@ -60,6 +60,42 @@ public class ClampRemovalRecoveryTests
     }
 
     [Fact]
+    public void ResidualSolvesKeepTheJobsSalvageAndOffcutSettings()
+    {
+        // The residual job is rebuilt for the reduced-clamp stock; it must score offcuts the
+        // way the caller's job does.
+        var part = JobBuilder.Rectangle("p", w: 14, h: 3, count: 1);
+        var job = new NestJob(new[] { part }, new[] { ClampedSheet(Clamp1(), Clamp2()) },
+            new NestJobOptions(salvageRate: 0.5, minimumSalvageDimension: 1,
+                offcutCut: CutOffAxis.Vertical));
+        var seen = new List<NestJobOptions>();
+        var engine = new Recording(seen);
+
+        var outcome = ClampRemovalRecovery.TryRecover(job, Engine.Solve(job), engine, default);
+
+        Assert.NotNull(outcome);
+        // Probe solves use their own unsalvaged options; every solve with the job's salvage
+        // settings is a residual solve and must carry its offcut cut too.
+        var residual = seen.Where(o => o.SalvageRate == 0.5).ToList();
+        Assert.NotEmpty(residual);
+        Assert.All(residual, o =>
+        {
+            Assert.Equal(1, o.MinimumSalvageDimension);
+            Assert.Equal(CutOffAxis.Vertical, o.OffcutCut);
+        });
+    }
+
+    private sealed class Recording(List<NestJobOptions> seen) : INestingEngine
+    {
+        public NestJobResult Solve(NestJob job, IProgress<NestJobProgress> progress = null,
+            CancellationToken token = default)
+        {
+            seen.Add(job.Options);
+            return Engine.Solve(job, progress, token);
+        }
+    }
+
+    [Fact]
     public void RemovalFreesSpaceForOtherResidualDemandToo()
     {
         // C12: a sheet nested with a clamp removed may also take other residual parts.
