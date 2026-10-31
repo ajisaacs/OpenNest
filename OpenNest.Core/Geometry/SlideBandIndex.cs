@@ -50,8 +50,9 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// The widening every extent needs on top of its own exact bound: twice √ε times the
-        /// largest along-axis separation (the quadratic slack), plus a relative rounding term.
+        /// The widening every extent needs on top of its own exact bound: 2√ε·(1 + separation),
+        /// where separation is twice the largest along-axis coordinate (the quadratic slack),
+        /// plus a relative rounding term.
         /// NaN when a coordinate is nonfinite or beyond <see cref="SlideBand.CoordinateLimit"/>,
         /// where the band tests keep every pair and an index could not stand in for them.
         /// </summary>
@@ -70,7 +71,7 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// A curve's half-width before widening. The quadratic tests accept
+        /// A curve's half-width before widening, |r|. The quadratic tests accept at most
         /// |oy| ≤ |r|·(1 + 2ε) + 2√ε·(1 + |ox|) with ε = QuadraticSlack; the reach holds both the
         /// second term and the first one's 2ε·|r|, since its rounding term is 1e-12 times a bound
         /// that includes every radius.
@@ -270,8 +271,8 @@ namespace OpenNest.Geometry
 
         /// <summary>
         /// The exact acceptance bound of the entity's <see cref="SlideBand"/> tests before
-        /// widening: a line's span with its RayLine slack, or a curve's circle with its radius
-        /// slack. False for entity types no slide kernel emits for, or not of
+        /// widening: a line's span with its RayLine slack, or a curve's circle ±|r| (its slack
+        /// is in the reach). False for entity types no slide kernel emits for, or not of
         /// <paramref name="kind"/>.
         /// </summary>
         private static bool TryExtent(
