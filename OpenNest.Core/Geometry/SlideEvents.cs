@@ -228,7 +228,8 @@ namespace OpenNest.Geometry
             double lineDy,
             double rayX,
             double rayY,
-            bool arcMoves
+            bool arcMoves,
+            SlideBand.Axis band
         )
             where TSink : struct, ISlideEventSink
         {
@@ -250,6 +251,13 @@ namespace OpenNest.Geometry
                     var p1y = line.pt1.Y + lineDy;
                     var p2x = line.pt2.X + lineDx;
                     var p2y = line.pt2.Y + lineDy;
+
+                    if (
+                        band != SlideBand.Axis.None
+                        && !SlideBand.CircleMayReachLine(band, cx, cy, r, p1x, p1y, p2x, p2y)
+                    )
+                        continue;
+
                     var ex = p2x - p1x;
                     var ey = p2y - p1y;
 
@@ -476,6 +484,11 @@ namespace OpenNest.Geometry
         public void Enumerate<TSink>(ref TSink sink)
             where TSink : struct, ISlideEventSink
         {
+            // An axis-aligned push only meets entities whose perpendicular extent can hold the
+            // ray. The band tests skip only pairs whose kernels cannot emit and keep the
+            // surviving pairs in their original order, so the emitted events are unchanged.
+            var band = SlideBand.For(dirX, dirY);
+
             // Phase 1: moving vertices along the push against stationary entities.
             for (var v = 0; v < movingVertices.Length; v++)
             {
@@ -484,6 +497,11 @@ namespace OpenNest.Geometry
 
                 for (var j = 0; j < stationary.Count; j++)
                 {
+                    if (
+                        band != SlideBand.Axis.None
+                        && !SlideBand.RayMayHit(band, vx, vy, stationary[j], 0, 0)
+                    )
+                        continue;
                     SlideEvents.Ray(ref sink, vx, vy, stationary[j], 0, 0, dirX, dirY, true);
                     if (sink.IsDone)
                         return;
@@ -498,6 +516,11 @@ namespace OpenNest.Geometry
 
                 for (var j = 0; j < moving.Count; j++)
                 {
+                    if (
+                        band != SlideBand.Axis.None
+                        && !SlideBand.RayMayHit(band, vx, vy, moving[j], movingDx, movingDy)
+                    )
+                        continue;
                     SlideEvents.Ray(
                         ref sink,
                         vx,
@@ -527,7 +550,8 @@ namespace OpenNest.Geometry
                     0,
                     dirX,
                     dirY,
-                    true
+                    true,
+                    band
                 );
                 if (sink.IsDone)
                     return;
@@ -541,7 +565,8 @@ namespace OpenNest.Geometry
                     movingDy,
                     -dirX,
                     -dirY,
-                    false
+                    false,
+                    band
                 );
                 if (sink.IsDone)
                     return;
@@ -556,6 +581,20 @@ namespace OpenNest.Geometry
                 for (var j = 0; j < stationary.Count; j++)
                 {
                     if (!SlideEvents.TryGetCurve(stationary[j], out var scx, out var scy, out var sr))
+                        continue;
+
+                    if (
+                        band != SlideBand.Axis.None
+                        && !SlideBand.CirclesMayTouch(
+                            band,
+                            mcx + movingDx,
+                            mcy + movingDy,
+                            mr,
+                            scx,
+                            scy,
+                            sr
+                        )
+                    )
                         continue;
 
                     SlideEvents.CurveTangency(
