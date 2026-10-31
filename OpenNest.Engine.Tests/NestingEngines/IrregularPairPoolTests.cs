@@ -88,6 +88,46 @@ public class IrregularPairPoolTests
         Assert.Equal(Poses(firstPairs), Poses(secondPairs));
     }
 
+    private sealed class BlockedEvaluator(ManualResetEventSlim release) : IPairEvaluator
+    {
+        public List<BestFitResult> EvaluateAll(List<PairCandidate> candidates)
+        {
+            release.Wait(TimeSpan.FromSeconds(30));
+            return new List<BestFitResult>();
+        }
+    }
+
+    [Fact]
+    public void PairCatalog_CancelingStopsTheWaitForASlowSearch()
+    {
+        // A time limit must not wait for the best-fit search, which can take minutes on one
+        // CPU; the search itself finishes in the background.
+        BestFitCache.Clear();
+        var (_, types) = FreshJob(Wedge(6.3), 2);
+        using var release = new ManualResetEventSlim();
+        var previous = BestFitCache.CreateEvaluator;
+        BestFitCache.CreateEvaluator = (_, _) => new BlockedEvaluator(release);
+        try
+        {
+            using var limit = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+
+            Assert.ThrowsAny<OperationCanceledException>(() =>
+                PairCatalog.Build(types, Spacing, 31.7, 17.3, limit.Token));
+
+            Assert.True(
+                clock.Elapsed < TimeSpan.FromSeconds(5),
+                $"waited {clock.Elapsed.TotalSeconds:0.0} s"
+            );
+        }
+        finally
+        {
+            release.Set();
+            BestFitCache.CreateEvaluator = previous!;
+            BestFitCache.Clear();
+        }
+    }
+
     [Fact]
     public void IrregularEngine_FreshInstanceAndJob_PlacesIdenticallyWithoutSearchingAgain()
     {

@@ -101,7 +101,9 @@ internal static class PairCatalog
         List<BestFitResult> fits;
         try
         {
-            fits = BestFitCache.GetOrCompute(drawing, sheetLength, sheetWidth, spacing);
+            // Canceling stops the wait; the search finishes in the background and is cached.
+            // The drawing is private to this call or to the caller, as that overload requires.
+            fits = BestFitCache.GetOrCompute(drawing, sheetLength, sheetWidth, spacing, token);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException
             or NotSupportedException or ArithmeticException)
