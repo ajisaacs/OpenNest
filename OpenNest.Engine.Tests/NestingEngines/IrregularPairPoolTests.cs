@@ -1,6 +1,7 @@
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Engine.NestingEngines.Irregular;
 using static OpenNest.Engine.Tests.NestingEngines.JobBuilder;
 using static OpenNest.Engine.Tests.NestingEngines.Shapes;
@@ -114,6 +115,37 @@ public class IrregularPairPoolTests
 
             Assert.ThrowsAny<OperationCanceledException>(() =>
                 PairCatalog.Build(types, Spacing, 31.7, 17.3, limit.Token));
+
+            Assert.True(
+                clock.Elapsed < TimeSpan.FromSeconds(5),
+                $"waited {clock.Elapsed.TotalSeconds:0.0} s"
+            );
+        }
+        finally
+        {
+            release.Set();
+            BestFitCache.CreateEvaluator = previous!;
+            BestFitCache.Clear();
+        }
+    }
+
+    [Fact]
+    public void PrivatePlateFill_CancelingStopsTheWaitForASlowSearch()
+    {
+        // Irregular's block catalog fills a private plate per type, which searches best-fit pairs
+        // too: a time limit must not wait for that search either.
+        BestFitCache.Clear();
+        var drawing = new Drawing("wedge", Wedge(6.3));
+        using var release = new ManualResetEventSlim();
+        var previous = BestFitCache.CreateEvaluator;
+        BestFitCache.CreateEvaluator = (_, _) => new BlockedEvaluator(release);
+        try
+        {
+            using var limit = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+
+            Assert.ThrowsAny<OperationCanceledException>(() => PrivatePlateFill.Run(
+                drawing, RotationPolicy.Fixed(0), Spacing, 31.7, 17.3, 4, limit.Token));
 
             Assert.True(
                 clock.Elapsed < TimeSpan.FromSeconds(5),

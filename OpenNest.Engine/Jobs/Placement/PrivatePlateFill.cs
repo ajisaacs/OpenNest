@@ -24,7 +24,9 @@ internal static class PrivatePlateFill
     {
         var plate = new Plate(new Size(width, length)) { PartSpacing = spacing };
         // The drawing is private: stabilize this cache entry before Fill's candidate pruning.
-        var fits = BestFitCache.GetOrCompute(drawing, plate.Size.Length, plate.Size.Width, spacing);
+        // Cancelling stops the wait; the search finishes in the background and fills the cache.
+        var fits = BestFitCache.GetOrCompute(drawing, plate.Size.Length, plate.Size.Width, spacing,
+            token);
         var sorted = fits.OrderBy(f => f.RotatedArea).ThenBy(f => f.Candidate.StrategyIndex)
             .ThenBy(f => f.Candidate.Part2Rotation).ThenBy(f => f.Candidate.Part2Offset.X)
             .ThenBy(f => f.Candidate.Part2Offset.Y).ThenBy(f => f.OptimalRotation).ToArray();
