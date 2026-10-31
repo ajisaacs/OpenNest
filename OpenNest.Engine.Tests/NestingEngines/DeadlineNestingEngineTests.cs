@@ -107,6 +107,51 @@ public class DeadlineNestingEngineTests
     }
 
     [Fact]
+    public async Task TheLimitFiresWhileTheEngineHoldsEveryPoolThread()
+    {
+        // A CPU-bound parallel loop keeps every pool thread on its own local work, so a
+        // thread-pool timer can fire seconds late; on one CPU it may wait for the whole search.
+        // The solve runs on a pool thread, as the loop's own thread is one in a real engine.
+        var job = SquaresJob();
+        NestJobResult? plan = null;
+
+        var engine = new DeadlineNestingEngine(
+            new Stub((j, progress, token) =>
+            {
+                Plan(progress, plan = OneSheet(j));
+                var stop = System.Diagnostics.Stopwatch.StartNew();
+                Parallel.For(
+                    0,
+                    int.MaxValue,
+                    new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                    (_, loop) =>
+                    {
+                        if (token.IsCancellationRequested || stop.Elapsed.TotalSeconds > 30)
+                            loop.Stop();
+                        else
+                            Thread.SpinWait(200);
+                    }
+                );
+                token.ThrowIfCancellationRequested();
+                throw new InvalidOperationException("the limit never cancelled the search");
+            }),
+            Short
+        );
+        // Timed inside the pool thread: other tests can delay its start, not the limit.
+        var (solved, elapsed) = await Task.Run(() =>
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            return (engine.Solve(job), clock.Elapsed);
+        });
+
+        Assert.Same(plan, solved);
+        Assert.True(
+            elapsed < TimeSpan.FromSeconds(3),
+            $"the limit fired after {elapsed.TotalSeconds:0.0} s"
+        );
+    }
+
+    [Fact]
     public void AnInvalidPlanIsNeverReturned()
     {
         var job = SquaresJob();

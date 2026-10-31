@@ -60,7 +60,9 @@ layout check is returned instead (ranked like Default ranks candidates, a tie go
 plan), so the result may leave parts unplaced; with no valid plan the solve fails with a
 `TimeoutException`. The caller's own cancellation still cancels. A limited solve depends on the
 clock, so it is not reproducible, and it can overrun the limit by however long the engine takes to
-notice cancellation. A limit can be any positive time up to about 49.7 days (the cancellation timer's range).
+notice cancellation. A limit can be any positive time up to about 49.7 days. A best-fit pair search running when the
+limit hits cannot be interrupted: Irregular stops waiting for it, and it finishes in the background
+and fills the shared pool, so a later job of the same parts skips it; until then it still uses CPU.
 Desktop, Console and MCP do not apply a limit yet; Console can solve a job twice (with and without
 cutouts), so a limit there needs one deadline shared across both solves.
 

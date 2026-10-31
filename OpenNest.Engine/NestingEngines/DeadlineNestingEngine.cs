@@ -20,11 +20,14 @@ namespace OpenNest.Engine.NestingEngines;
 /// once it is known. Plans are forwarded only when they beat every plan shown so far. A
 /// limited solve depends on the clock, so it is not reproducible like an unlimited one, and
 /// the engine may overrun the limit by however long it takes to observe cancellation. Plans
-/// are expected from the solve thread, as the built-in engines report them.
+/// are expected from the solve thread, as the built-in engines report them. Cancellation
+/// callbacks run on a dedicated clock thread that the solve joins before returning, so a
+/// callback must not wait on the solve thread.
 /// </remarks>
 public sealed class DeadlineNestingEngine : INestingEngine
 {
-    /// <summary>The longest limit a cancellation timer accepts.</summary>
+    /// <summary>The longest limit accepted: about 49.7 days, kept from the original timer bound.
+    /// </summary>
     public static readonly TimeSpan MaxLimit = TimeSpan.FromMilliseconds(uint.MaxValue - 1.0);
 
     private readonly INestingEngine inner;
@@ -52,7 +55,8 @@ public sealed class DeadlineNestingEngine : INestingEngine
         ArgumentNullException.ThrowIfNull(job);
         token.ThrowIfCancellationRequested();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
-        deadline.CancelAfter(Limit);
+        using var finished = new ManualResetEventSlim();
+        var clock = StartClock(deadline, finished);
         var plans = new BestPlan(job, progress);
 
         NestJobResult result;
@@ -69,12 +73,49 @@ public sealed class DeadlineNestingEngine : INestingEngine
                 );
             result = best.Result;
         }
+        finally
+        {
+            finished.Set();
+            clock.Join();
+        }
 
         token.ThrowIfCancellationRequested();
         if (result == null)
             throw new InvalidOperationException("The engine returned no result.");
         CandidateProgress.ReportCommits(result, progress);
         return result;
+    }
+
+    /// <summary>
+    /// Cancels <paramref name="deadline"/> at the limit from a dedicated thread. A thread-pool
+    /// timer (<see cref="CancellationTokenSource.CancelAfter(TimeSpan)"/>) can fire many
+    /// seconds late, or not before the solve ends, when the engine's parallel loops hold every
+    /// pool thread, as they do on one CPU.
+    /// </summary>
+    private Thread StartClock(CancellationTokenSource deadline, ManualResetEventSlim finished)
+    {
+        var thread = new Thread(() =>
+        {
+            var due = System.Diagnostics.Stopwatch.StartNew();
+            while (true)
+            {
+                var left = Limit - due.Elapsed;
+                if (left <= TimeSpan.Zero)
+                    break;
+                var wait = left.TotalMilliseconds >= int.MaxValue
+                    ? TimeSpan.FromMilliseconds(int.MaxValue - 1.0)
+                    : left;
+                if (finished.Wait(wait))
+                    return;
+            }
+            deadline.Cancel();
+        })
+        {
+            IsBackground = true,
+            Name = "OpenNest time limit",
+        };
+        thread.Start();
+        return thread;
     }
 
     /// <summary>Keeps the best reported plan and forwards everything but plate commits.</summary>
