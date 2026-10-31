@@ -213,13 +213,16 @@ public class IrregularSearchUntilCancelledTests
     public void DefaultUnderATimeLimitReturnsAValidPlanNoWorseThanUnlimited()
     {
         // Irregular runs last under Default and searches until the limit; its plans compete
-        // with the Rectangles and Circles results already reported. The limit leaves a wide
-        // margin over the unlimited solve (well under a second here) so a slow machine passes.
+        // with the Rectangles and Circles results already reported. A limit shorter than the
+        // normal search correctly returns an earlier, worse plan, so the limit is scaled from
+        // the measured unlimited solve: seconds on a loaded CI runner, not a fixed constant.
         var job = MixedJob(false);
+        var watch = System.Diagnostics.Stopwatch.StartNew();
         var normal = new DefaultNestingEngine().Solve(job);
+        var limit = TimeSpan.FromTicks(
+            System.Math.Max(TimeSpan.FromSeconds(5).Ticks, 3 * watch.Elapsed.Ticks));
 
-        var limited = new DeadlineNestingEngine(new DefaultNestingEngine(), TimeSpan.FromSeconds(5))
-            .Solve(job);
+        var limited = new DeadlineNestingEngine(new DefaultNestingEngine(), limit).Solve(job);
 
         LayoutAssert.Valid(job, limited);
         Assert.False(CandidateScore.Of(job, normal, 0).IsBetterThan(CandidateScore.Of(job, limited, 0)));
