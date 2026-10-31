@@ -178,7 +178,7 @@ namespace OpenNest.Controls
             {
                 HeaderText = "Dimensions (0)",
                 Dock = DockStyle.Top,
-                ExpandedHeight = 90,
+                ExpandedHeight = DimensionsMinimumHeight,
                 IsExpanded = false,
             };
             dimensionsList = new ListBox
@@ -356,6 +356,34 @@ namespace OpenNest.Controls
             Controls.Add(lineTypesPanel);
             Controls.Add(colorsPanel);
             Controls.Add(layersPanel);
+        }
+
+        /// <summary>The expanded Dimensions section never shrinks below this; when there is room it fills the panel to the bottom.</summary>
+        internal const int DimensionsMinimumHeight = 140;
+
+        protected override void OnLayout(LayoutEventArgs levent)
+        {
+            base.OnLayout(levent);
+            FillDimensionsToBottom();
+        }
+
+        // Dimensions is the bottom section: stretch it over the empty space below it so its list
+        // shows every dimension instead of scrolling inside a short box.
+        private void FillDimensionsToBottom()
+        {
+            if (!dimensionsPanel.IsExpanded)
+                return;
+
+            var above = 0;
+            foreach (Control control in Controls)
+            {
+                if (control != dimensionsPanel && control.Visible)
+                    above += control.Height;
+            }
+
+            var height = System.Math.Max(DimensionsMinimumHeight, ClientSize.Height - above);
+            if (dimensionsPanel.Height != height)
+                dimensionsPanel.Height = height;
         }
 
         private CheckedListBox CreateCheckedList()
