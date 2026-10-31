@@ -13,7 +13,9 @@ namespace OpenNest.Engine.NestingEngines;
 /// results, and a tie goes to the later plan, as engines report only plans they rank higher.
 /// With no valid plan by the limit, the solve fails with a <see cref="TimeoutException"/>.
 /// Cancellation by the caller's own token is never turned into a result. A result the engine
-/// returns, even after the limit, is its own and is returned unchanged.
+/// returns, even after the limit, is its own and is returned unchanged. The engine sees the
+/// job with <see cref="NestJobOptions.SearchUntilCancelled"/> set, so an engine that supports
+/// it keeps improving its plan until the limit.
 /// </summary>
 /// <remarks>
 /// The engine's plate commits are not forwarded: the returned result's commits are reported
@@ -54,6 +56,8 @@ public sealed class DeadlineNestingEngine : INestingEngine
     {
         ArgumentNullException.ThrowIfNull(job);
         token.ThrowIfCancellationRequested();
+        // Engines that can keep searching until cancelled may use all the time.
+        job = new NestJob(job.Parts, job.Plates, job.Options.WithSearchUntilCancelled(true));
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         using var finished = new ManualResetEventSlim();
         var clock = StartClock(deadline, finished);

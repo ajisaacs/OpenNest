@@ -31,10 +31,11 @@ namespace OpenNest.Engine.NestingEngines.Default;
 /// worse plan after a better one. A candidate result that beats them is reported too, and the
 /// chosen result is always the last plan reported.
 ///
-/// Rectangles, the quick and always-valid fallback, runs first, then Irregular, then Circles, so
+/// Rectangles, the quick and always-valid fallback, runs first, then Circles, then Irregular, so
 /// a caller that stops the search early, such as <see cref="DeadlineNestingEngine"/>, already
-/// holds a valid plan. Ties still break by candidate (tie-break) order, so for these three
-/// candidates the run order does not change the choice.
+/// holds a valid plan, and Irregular can search until cancelled
+/// (<see cref="NestJobOptions.SearchUntilCancelled"/>) last. The choice is made after all have
+/// run, in candidate (tie-break) order, so the run order never changes it.
 ///
 /// Deterministic: candidates run one after another and the choice uses no clock.
 /// </summary>
@@ -51,7 +52,7 @@ public sealed class DefaultNestingEngine : INestingEngine
                 () => new RectanglesNestingEngine(),
                 () => new CirclesNestingEngine(),
             },
-            new[] { 1, 0, 2 })
+            new[] { 1, 2, 0 })
     {
     }
 
@@ -62,8 +63,8 @@ public sealed class DefaultNestingEngine : INestingEngine
     }
 
     /// <summary>Test seam: candidate engines in tie-break order, and the order to run them in
-    /// (a permutation of their indexes). Cost comparison has a relative tolerance, so with three
-    /// or more near-tied candidates the run order can matter.</summary>
+    /// (a permutation of their indexes); the run order affects progress, never the choice.
+    /// </summary>
     internal DefaultNestingEngine(
         IReadOnlyList<Func<INestingEngine>> candidates,
         IReadOnlyList<int> runOrder
@@ -101,7 +102,7 @@ public sealed class DefaultNestingEngine : INestingEngine
         ArgumentNullException.ThrowIfNull(job);
         token.ThrowIfCancellationRequested();
         var forward = progress == null ? null : new PlanFilter(job, progress, token);
-        CandidateScore? best = null;
+        var scores = new CandidateScore?[candidates.Count];
         ExceptionDispatchInfo? firstFailure = null;
         var firstFailureOrder = int.MaxValue;
 
@@ -129,10 +130,15 @@ public sealed class DefaultNestingEngine : INestingEngine
                 continue;
 
             var scored = CandidateScore.Of(job, result, order);
-            if (best == null || scored.IsBetterThan(best))
-                best = scored;
+            scores[order] = scored;
             forward?.Offer(scored);
         }
+
+        // Choose in tie-break order, whatever order the candidates ran in.
+        CandidateScore? best = null;
+        foreach (var scored in scores)
+            if (scored != null && (best == null || scored.IsBetterThan(best)))
+                best = scored;
 
         token.ThrowIfCancellationRequested();
         if (best == null)

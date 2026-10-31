@@ -20,7 +20,13 @@ namespace OpenNest.Engine.NestingEngines.Irregular;
 /// remaining demand at the best efficiency seen) is committed. A handful of deterministic
 /// strategy variants (front direction, area exponent) run whole-job, and the cheapest wins.
 ///
-/// Fully deterministic: no clocks or randomness influence any decision.
+/// With <see cref="NestJobOptions.SearchUntilCancelled"/>, a cancellable token and a progress
+/// listener, the search then keeps decoding the variants with seeded per-type weights on the
+/// placement rule, reporting each better plan, until cancelled (not for one-type jobs, where
+/// the weights change nothing).
+///
+/// Fully deterministic: no clocks or randomness influence any decision. The weights come from
+/// fixed seeds 1, 2, 3, ..., so an extended search depends only on how far it got.
 /// </summary>
 public sealed class IrregularNestingEngine : INestingEngine
 {
@@ -57,6 +63,8 @@ public sealed class IrregularNestingEngine : INestingEngine
     internal Action? SheetPacked { get; init; }
     internal Action<RepeatBatch>? BatchSelected { get; init; }
     internal Action<int>? TailReplaced { get; init; }
+    /// <summary>A tail re-plan starts, with the work it may still spend.</summary>
+    internal Action<long>? TailReplanning { get; init; }
 
     public NestJobResult Solve(
         NestJob job,
@@ -67,7 +75,8 @@ public sealed class IrregularNestingEngine : INestingEngine
         ArgumentNullException.ThrowIfNull(job);
         token.ThrowIfCancellationRequested();
         var types = PartCatalog.Build(job);
-        using var solver = new Solver(job, types, progress, token, WorkBudget, DrawingFor, SheetPacked, BatchSelected, TailReplaced);
+        using var solver = new Solver(job, types, progress, token, WorkBudget, DrawingFor, SheetPacked, BatchSelected, TailReplaced,
+            TailReplanning);
 
         // Pair-only orientations may fit stock even when the sampled single poses do not.
         // Demand that neither a single nor a pair can fit is reported unplaced.
@@ -102,7 +111,54 @@ public sealed class IrregularNestingEngine : INestingEngine
         var improved = solver.ImproveTail(best!, WorkBudget * 2);
         if (!ReferenceEquals(improved, best))
             ReportPlan(job, types, improved, progress, token);
+        // More searching can only end in cancellation, so it needs a listener for its plans, and
+        // it needs demand and two or more types, or every weighted decode repeats a variant.
+        if (job.Options.SearchUntilCancelled && token.CanBeCanceled && progress != null
+            && types.Count > 1 && demand.Any(d => d > 0))
+            SearchUntilCancelled(job, types, solver, demand, improved, progress, token);
         return BuildResult(job, types, improved, progress, token);
+    }
+
+    /// <summary>Spread of the seeded type weights: each is e^(±WeightSpread) at most.</summary>
+    internal const double WeightSpread = 0.4;
+
+    /// <summary>The placement-rule weights for one seed, one per part type.</summary>
+    internal static double[] SeedWeights(int seed, int typeCount)
+    {
+        var random = new Random(seed);
+        var weights = new double[typeCount];
+        for (var i = 0; i < weights.Length; i++)
+            weights[i] = System.Math.Exp(WeightSpread * (2 * random.NextDouble() - 1));
+        return weights;
+    }
+
+    /// <summary>
+    /// Decodes seed after seed, cycling the variants, and re-plans the tail of each plan that
+    /// beats the best so far; ends only when the token is cancelled.
+    /// </summary>
+    private void SearchUntilCancelled(
+        NestJob job,
+        IReadOnlyList<PartType> types,
+        Solver solver,
+        int[] demand,
+        Plan best,
+        IProgress<NestJobProgress>? progress,
+        CancellationToken token
+    )
+    {
+        for (var seed = 1; ; seed = seed == int.MaxValue ? 1 : seed + 1)
+        {
+            token.ThrowIfCancellationRequested();
+            var (axis, beta) = Variants[seed % Variants.Length];
+            var plan = solver.Plan(demand, axis, beta, SeedWeights(seed, types.Count));
+            if (!plan.IsBetterThan(best))
+                continue;
+            // Report before the tail re-plan, which the limit may cut short.
+            ReportPlan(job, types, plan, progress, token);
+            best = solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2);
+            if (!ReferenceEquals(best, plan))
+                ReportPlan(job, types, best, progress, token);
+        }
     }
 
     /// <summary>Reports a new best whole-job plan; reporting never changes the search.</summary>
@@ -127,6 +183,17 @@ public sealed class IrregularNestingEngine : INestingEngine
         return BuildResult(job, types, solver.ImproveTail(plan, WorkBudget * 2), null, default);
     }
 
+    /// <summary>Decodes one variant with the given type weights, whole demand placeable; for
+    /// tests of the weighted placement rule only.</summary>
+    internal NestJobResult PlanForTesting(NestJob job, int variant, IReadOnlyList<double>? weights)
+    {
+        var types = PartCatalog.Build(job);
+        using var solver = new Solver(job, types, null, default, WorkBudget, DrawingFor, SheetPacked, BatchSelected, TailReplaced);
+        var demand = types.Select(t => t.Part.Quantity).ToArray();
+        var (axis, beta) = Variants[variant];
+        return BuildResult(job, types, solver.Plan(demand, axis, beta, weights), null, default);
+    }
+
     /// <summary>Shared state for one solve: job, catalog, NFP caches, effort meter.</summary>
     private sealed class Solver(
         NestJob job,
@@ -137,7 +204,8 @@ public sealed class IrregularNestingEngine : INestingEngine
         Func<NestJobPart, Drawing> drawingFor,
         Action? sheetPacked,
         Action<RepeatBatch>? batchSelected,
-        Action<int>? tailReplaced
+        Action<int>? tailReplaced,
+        Action<long>? tailReplanning = null
     ) : IDisposable
     {
         public void Dispose()
@@ -166,9 +234,10 @@ public sealed class IrregularNestingEngine : INestingEngine
 
         private double Penalty => NestJobCost.UnplacedPartPenalty(job);
 
-        public Plan Plan(int[] demand, PackAxis axis, double beta)
+        public Plan Plan(int[] demand, PackAxis axis, double beta, IReadOnlyList<double>? weights = null)
         {
-            var run = Decode(demand, axis, beta, new Dictionary<string, int>(StringComparer.Ordinal), job.Options.MaxPlates, null);
+            var run = Decode(demand, axis, beta, new Dictionary<string, int>(StringComparer.Ordinal), job.Options.MaxPlates, null,
+                weights);
             var unplaced = types.Sum(t => t.Part.Quantity) - run.Sheets.Sum(s => s.Parts.Count);
             var reason = run.Reason;
             if (unplaced > 0 && reason == NestJobStopReason.Completed)
@@ -184,6 +253,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         /// </summary>
         public Plan ImproveTail(Plan plan, long budget)
         {
+            tailReplanning?.Invoke(budget - Work.Value);
             var sheets = plan.Sheets.ToList();
             for (var k = 1; k <= System.Math.Min(MaxTail, sheets.Count); k++)
             {
@@ -287,7 +357,8 @@ public sealed class IrregularNestingEngine : INestingEngine
             double beta,
             IReadOnlyDictionary<string, int> usedBefore,
             int? sheetCap,
-            NestPlateStock? first
+            NestPlateStock? first,
+            IReadOnlyList<double>? weights = null
         )
         {
             var remaining = (int[])demand.Clone();
@@ -320,7 +391,7 @@ public sealed class IrregularNestingEngine : INestingEngine
                         continue;
                     progress?.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stock.Id, sheets.Count, 0, 0));
                     var packer = new FrontierPacker(types, CacheFor(stock), PairsFor(stock), stock, axis, beta, Work,
-                        BlocksFor(stock), ClampsFor(stock), BoundaryFor(stock));
+                        BlocksFor(stock), ClampsFor(stock), BoundaryFor(stock), weights);
                     var fill = packer.Fill(remaining, token);
                     sheetPacked?.Invoke();
                     if (fill.Parts.Count > 0)

@@ -11,19 +11,19 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 
 | Engine | Best for | Method |
 |---|---|---|
-| Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the engine listed first here (whichever runs first) |
+| Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the engine listed first here |
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; stock chosen sheet by sheet by salvage-credited look-ahead cost |
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
-| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan |
+| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan; under a time limit it keeps trying seeded variants until the limit |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
 | Fill, Strip, Vertical Remnant, Horizontal Remnant | Single-strategy fills | The fixed placement strategies behind interactive fill; Fill is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder). In whole jobs, all four place a plate with any fixed or bounded part rotation by the rotation-aware ordered placer instead |
 
 Neither Irregular nor Rectangles wins every job, even within its own lane, so Default runs both
 rather than choosing by part shape; Rectangles adds little time and is also the fallback when an
-Irregular layout fails the check. Default runs Rectangles first, then Irregular, then Circles, so
-a search stopped early already holds a valid plan; ties still go to the earlier engine in the
-table order (Irregular, Rectangles, Circles), so the run order does not change the choice. A
-candidate that throws is skipped. Default routes the whole job:
+Irregular layout fails the check. Default runs Rectangles first, then Circles, then Irregular, so
+a search stopped early already holds a valid plan and Irregular can keep searching last; it
+chooses only after all have run, in table order (Irregular, Rectangles, Circles), so the run
+order never changes the choice. A candidate that throws is skipped. Default routes the whole job:
 engines cannot share a sheet, so a job mixing plain and irregular parts goes to both engines whole.
 Circles is a third candidate that bids only on round jobs (see below), so a job mixing round and
 other parts goes to Irregular and Rectangles.
@@ -63,6 +63,15 @@ clock, so it is not reproducible, and it can overrun the limit by however long t
 notice cancellation. A limit can be any positive time up to about 49.7 days. A best-fit pair search running when the
 limit hits cannot be interrupted: Irregular stops waiting for it, and it finishes in the background
 and fills the shared pool, so a later job of the same parts skips it; until then it still uses CPU.
+The limited engine sees the job with `NestJobOptions.SearchUntilCancelled` set. Irregular then
+keeps going after its normal search: it re-runs its six variants with seeded per-type weights on
+its placement rule (seeds 1, 2, 3, ...; each weight within e^±0.4), re-plans the tail of any plan
+that beats its best, and reports it, until the limit cancels it. On the converted Nestbolt
+b-jakobs1 job this took 5 sheets down to 4 within 10 s. Default passes the option to its
+candidates, and other engines ignore it; Irregular also ignores it when the token cannot be
+cancelled, nobody listens for progress, or the job has a single part type. Default runs Irregular last for this
+reason.
+
 Desktop, Console and MCP do not apply a limit yet; Console can solve a job twice (with and without
 cutouts), so a limit there needs one deadline shared across both solves.
 

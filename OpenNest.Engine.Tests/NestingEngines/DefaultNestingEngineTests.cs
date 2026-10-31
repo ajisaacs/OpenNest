@@ -1,4 +1,5 @@
 using OpenNest.Engine.Jobs;
+using OpenNest.Engine.NestingEngines;
 using OpenNest.Engine.NestingEngines.Default;
 using OpenNest.Engine.NestingEngines.Irregular;
 using OpenNest.Engine.NestingEngines.Rectangles;
@@ -30,16 +31,18 @@ public class DefaultNestingEngineTests
     // Only a 10 x 5 strip left below the parts.
     private static NestJobResult OneSheetHigher(NestJob job) => Layout(job, Sheet((0, 5), (5, 5)));
     private static NestJobResult TwoSheets(NestJob job) => Layout(job, Sheet((0, 0)), Sheet((0, 0)));
+    private static NestJobResult Raised(NestJob job, double y) => Layout(job, Sheet((0, y), (5, y)));
     private static NestJobResult Overlapping(NestJob job) => Layout(job, Sheet((0, 0), (1, 0)));
     private static NestJobResult OnePlaced(NestJob job) => Layout(job, Sheet((0, 0)));
 
     [Fact]
-    public void BuiltInDefaultRunsRectanglesBeforeIrregular()
+    public void BuiltInDefaultRunsIrregularLast()
     {
         // Rectangles is the cheap, always-valid fallback: under a limit it must have reported
-        // its plan before the slower Irregular search starts. Candidates stay in tie-break
+        // its plan before the slower Irregular search starts, and Irregular, which may search
+        // until cancelled, must not keep Circles from running. Candidates stay in tie-break
         // order Irregular, Rectangles, Circles.
-        Assert.Equal(new[] { 1, 0, 2 }, new DefaultNestingEngine().RunOrder);
+        Assert.Equal(new[] { 1, 2, 0 }, new DefaultNestingEngine().RunOrder);
     }
 
     [Fact]
@@ -87,6 +90,31 @@ public class DefaultNestingEngineTests
         );
 
         Assert.Equal("first", error.Message);
+    }
+
+    [Fact]
+    public void NearTiesAreChosenInTieBreakOrderWhateverTheRunOrder()
+    {
+        // Offcuts within the comparison tolerance tie, so these three are not transitively
+        // ordered: neighbours tie, but the lowest layout beats the highest outright. Choosing
+        // in run order would then depend on the order; choosing in tie-break order must not.
+        var job = SquaresJob();
+        var heights = new[] { 8e-9, 4e-9, 0 };
+        var scores = heights.Select(y => CandidateScore.Of(job, Raised(job, y), 0)).ToArray();
+        Assert.False(scores[0].IsBetterThan(scores[1]) || scores[1].IsBetterThan(scores[0]));
+        Assert.False(scores[1].IsBetterThan(scores[2]) || scores[2].IsBetterThan(scores[1]));
+        Assert.True(scores[2].IsBetterThan(scores[0]));
+
+        var candidates = heights.Select(y => Returns(j => Raised(j, y))).ToArray();
+        var orders = new[]
+        {
+            new[] { 0, 1, 2 }, new[] { 0, 2, 1 }, new[] { 1, 0, 2 },
+            new[] { 1, 2, 0 }, new[] { 2, 0, 1 }, new[] { 2, 1, 0 },
+        };
+        var picks = orders
+            .Select(order => new DefaultNestingEngine(candidates, order).Solve(job).Plates[0].Placements[0].Y)
+            .ToList();
+        Assert.All(picks, y => Assert.Equal(picks[0], y));
     }
 
     private sealed class Stub(Func<NestJob, IProgress<NestJobProgress>?, CancellationToken, NestJobResult> solve) : INestingEngine

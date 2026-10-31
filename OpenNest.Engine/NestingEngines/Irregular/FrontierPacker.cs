@@ -63,6 +63,17 @@ internal sealed class FrontierPacker
     private readonly NestPlateStock stock;
     private readonly PackAxis axis;
     private readonly double beta;
+    private readonly IReadOnlyList<double>? typeWeights;
+
+    /// <summary>
+    /// The placement rule's value of a candidate; lower wins. Gap fill prefers bigger parts
+    /// (negated area); advance prefers least advance per area. A type weight above one favors
+    /// the type: a more negative gap-fill value, a smaller advance score. Weight one is exact.
+    /// </summary>
+    internal static double PlacementValue(bool fills, double advance, double area, double beta, double weight) =>
+        fills
+            ? -area * weight
+            : advance / System.Math.Pow(System.Math.Max(area, 1e-12), beta) / weight;
     private readonly Box work;
     private readonly WorkCounter counter;
     private readonly BlockCatalog? blocks;
@@ -81,7 +92,8 @@ internal sealed class FrontierPacker
         WorkCounter counter,
         BlockCatalog? blocks = null,
         ClampObstacles? clamps = null,
-        PackBoundary? boundary = null
+        PackBoundary? boundary = null,
+        IReadOnlyList<double>? typeWeights = null
     )
     {
         if (boundary != null && !ReferenceEquals(boundary.Nfps, nfps))
@@ -95,6 +107,7 @@ internal sealed class FrontierPacker
         this.stock = stock;
         this.axis = axis;
         this.beta = beta;
+        this.typeWeights = typeWeights;
         this.boundary = boundary;
         work = boundary?.Bounds ?? stock.WorkArea;
     }
@@ -260,8 +273,7 @@ internal sealed class FrontierPacker
             if (priority > bestPriority)
                 return;
             var fills = advance <= Tie;
-            // Gap fill prefers bigger parts (negated area); advance prefers least advance per area.
-            var value = fills ? -area : advance / System.Math.Pow(System.Math.Max(area, 1e-12), beta);
+            var value = PlacementValue(fills, advance, area, beta, typeWeights?[typeIndex] ?? 1.0);
 
             var better = bestParts == null
                 || priority < bestPriority
