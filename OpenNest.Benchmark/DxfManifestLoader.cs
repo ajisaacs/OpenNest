@@ -135,12 +135,14 @@ namespace OpenNest.Benchmark
                 throw new InvalidOperationException($"Failed to import DXF: {dxfPath}");
 
             // A zero legacy step means automatic rotation to DrawingJobMapper, so lock it explicitly.
-            if (!part.AllowRotation)
+            var rotations = RotationSet(part);
+            if (rotations != RotationChoice.QuarterTurns)
             {
                 drawing.Constraints ??= new NestConstraints();
                 drawing.Constraints.StepAngle = OpenNest.Math.Angle.TwoPI;
                 drawing.Constraints.StartAngle = 0;
                 drawing.Constraints.EndAngle = 0;
+                drawing.Constraints.Allow180Equivalent = rotations == RotationChoice.HalfTurns;
             }
 
             var constraints = drawing.Constraints;
@@ -154,6 +156,43 @@ namespace OpenNest.Benchmark
                 RotationStart = constraints?.StartAngle ?? 0,
                 RotationEnd = constraints?.EndAngle ?? 0,
             };
+        }
+
+        private enum RotationChoice
+        {
+            None,
+            HalfTurns,
+            QuarterTurns,
+        }
+
+        /// <summary>
+        /// A part's "rotations" (degrees) must be {0}, {0, 180} or {0, 90, 180, 270}; without it,
+        /// "allowRotation" picks quarter turns (true, the default) or none.
+        /// </summary>
+        private static RotationChoice RotationSet(ManifestPart part)
+        {
+            if (part.Rotations == null)
+                return part.AllowRotation ? RotationChoice.QuarterTurns : RotationChoice.None;
+            if (!part.AllowRotation)
+                throw new InvalidOperationException(
+                    $"Manifest part '{part.Dxf}': set \"rotations\" or \"allowRotation\", not both."
+                );
+
+            var set = part.Rotations
+                .Select(degrees => ((degrees % 360) + 360) % 360)
+                .Distinct()
+                .OrderBy(degrees => degrees)
+                .ToArray();
+            if (set.SequenceEqual(new[] { 0.0 }))
+                return RotationChoice.None;
+            if (set.SequenceEqual(new[] { 0.0, 180.0 }))
+                return RotationChoice.HalfTurns;
+            if (set.SequenceEqual(new[] { 0.0, 90.0, 180.0, 270.0 }))
+                return RotationChoice.QuarterTurns;
+            throw new InvalidOperationException(
+                $"Manifest part '{part.Dxf}': \"rotations\" must be [0], [0, 180] or "
+                    + $"[0, 90, 180, 270] (was [{string.Join(", ", part.Rotations)}])."
+            );
         }
 
         private class Manifest
@@ -170,6 +209,7 @@ namespace OpenNest.Benchmark
             public string Dxf { get; set; }
             public int Quantity { get; set; }
             public bool AllowRotation { get; set; } = true;
+            public List<double> Rotations { get; set; }
         }
     }
 }

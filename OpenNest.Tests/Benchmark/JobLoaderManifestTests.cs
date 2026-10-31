@@ -202,6 +202,72 @@ public sealed class JobLoaderManifestTests : IDisposable
         Assert.Equal(0, locked.End);
     }
 
+    private RotationPolicy RotationOf(string rotationsJson)
+    {
+        var path = WriteManifest(
+            "bench.json",
+            $$"""
+            {
+              "sheetSizes": ["48x96"],
+              "parts": [ { "dxf": "parts/plate.dxf", "quantity": 2, "rotations": {{rotationsJson}} } ]
+            }
+            """
+        );
+        return Assert.Single(JobLoader.Load(path)).BuildNestJob(maxPlates: 4).Parts[0].Rotation;
+    }
+
+    [Fact]
+    public void Rotations_HalfTurnsLockAtZeroAndAllowTheHalfTurn()
+    {
+        var policy = RotationOf("[180, 0]");
+
+        Assert.Equal(RotationPolicyKind.BoundedSweep, policy.Kind);
+        Assert.True(policy.Allow180Equivalent);
+        Assert.Equal(new[] { 0, System.Math.PI }, policy.EnumerateAngles());
+    }
+
+    [Fact]
+    public void Rotations_ZeroOnlyLocksAndQuarterTurnsAreAutomatic()
+    {
+        var locked = RotationOf("[0]");
+        Assert.Equal(RotationPolicyKind.BoundedSweep, locked.Kind);
+        Assert.False(locked.Allow180Equivalent);
+        Assert.Equal(new[] { 0.0 }, locked.EnumerateAngles());
+
+        Assert.Equal(RotationPolicyKind.Automatic, RotationOf("[0, 90, 180, 270]").Kind);
+        Assert.Equal(RotationPolicyKind.Automatic, RotationOf("[0, -90, 450, 180]").Kind);
+    }
+
+    [Theory]
+    [InlineData("[0, 90]")]
+    [InlineData("[45]")]
+    [InlineData("[]")]
+    public void Rotations_OtherSetsThrowNamingTheEntry(string rotations)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => RotationOf(rotations));
+
+        Assert.Contains("parts/plate.dxf", error.Message);
+        Assert.Contains("rotations", error.Message);
+    }
+
+    [Fact]
+    public void Rotations_WithAllowRotationFalseThrows()
+    {
+        var path = WriteManifest(
+            "bench.json",
+            """
+            {
+              "sheetSizes": ["48x96"],
+              "parts": [
+                { "dxf": "parts/plate.dxf", "quantity": 2, "allowRotation": false, "rotations": [0] }
+              ]
+            }
+            """
+        );
+
+        Assert.Throws<InvalidOperationException>(() => JobLoader.Load(path));
+    }
+
     [Fact]
     public void Folder_LoadsManifestSuffixedFilesAndIgnoresOtherJson()
     {
