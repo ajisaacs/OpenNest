@@ -16,6 +16,8 @@ namespace OpenNest.Controls
         Display,
         Exclude,
         Include,
+        AddRadiusDimension,
+        AddDiameterDimension,
     }
 
     public sealed class EntityActionEventArgs : EventArgs
@@ -197,6 +199,18 @@ namespace OpenNest.Controls
                 var include = new ToolStripMenuItem("Include");
                 include.Click += (s, e) => RaiseEntityAction(EntityAction.Include, selection);
                 menu.Items.Add(include);
+            }
+
+            var curves = selection.Where(en => !IsExcluded(en) && Dimensions.DimensionBuilder.IsRadialTarget(en)).ToList();
+            if (curves.Count > 0)
+            {
+                menu.Items.Add(new ToolStripSeparator());
+                var radius = new ToolStripMenuItem("Add Radius Dimension");
+                radius.Click += (s, e) => RaiseEntityAction(EntityAction.AddRadiusDimension, curves);
+                menu.Items.Add(radius);
+                var diameter = new ToolStripMenuItem("Add Diameter Dimension");
+                diameter.Click += (s, e) => RaiseEntityAction(EntityAction.AddDiameterDimension, curves);
+                menu.Items.Add(diameter);
             }
 
             menu.Closed += (s, e) => BeginInvoke(new Action(menu.Dispose));

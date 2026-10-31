@@ -468,9 +468,18 @@ namespace OpenNest.IO
             {
                 var dto = d.Dimensions[i];
                 if (dto != null && TryParseName<DimensionKind>(dto.Kind, out var kind)
-                    && dto.Offset != 0 && double.IsFinite(dto.Offset))
+                    && dto.Offset != 0 && double.IsFinite(dto.Offset)
+                    && (!DrawingDimension.IsRadialKind(kind)
+                        || (dto.EntityId is { } id && id != Guid.Empty
+                            && dto.Angle is { } angle && double.IsFinite(angle))))
                 {
-                    dimensions.Add(new DrawingDimension { Kind = kind, Offset = dto.Offset });
+                    dimensions.Add(new DrawingDimension
+                    {
+                        Kind = kind,
+                        Offset = dto.Offset,
+                        EntityId = DrawingDimension.IsRadialKind(kind) ? dto.EntityId!.Value : Guid.Empty,
+                        Angle = DrawingDimension.IsRadialKind(kind) ? dto.Angle!.Value : 0,
+                    });
                 }
                 else
                 {

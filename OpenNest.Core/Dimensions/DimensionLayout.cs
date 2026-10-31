@@ -37,7 +37,60 @@ namespace OpenNest.Dimensions
 
         public string ValueText => Value.ToString("0.000", CultureInfo.InvariantCulture);
 
+        /// <summary>The value as drawn: radius and diameter carry their drafting prefix.</summary>
+        public string DisplayText => Kind switch
+        {
+            DimensionKind.Radius => "R" + ValueText,
+            DimensionKind.Diameter => "\u00D8" + ValueText,
+            _ => ValueText,
+        };
+
         public Vector MidPoint => new((LineStart.X + LineEnd.X) / 2, (LineStart.Y + LineEnd.Y) / 2);
+
+        public bool IsRadial => DrawingDimension.IsRadialKind(Kind);
+
+        // Radius and diameter: the leader runs from LineStart (the center for a radius, the far
+        // side of the curve for a diameter) through ArrowPoint on the curve to LineEnd, the label.
+
+        /// <summary>Radius and diameter: the measured curve's center.</summary>
+        public Vector Center { get; init; }
+
+        /// <summary>Radius and diameter: the measured curve's radius.</summary>
+        public double Radius { get; init; }
+
+        /// <summary>Radius and diameter: the leader's direction from the center, in radians.</summary>
+        public double Angle { get; init; }
+
+        /// <summary>Radius and diameter: where the leader meets the curve on the label's side.</summary>
+        public Vector ArrowPoint { get; init; }
+
+        /// <summary>Diameter: where the leader meets the curve opposite <see cref="ArrowPoint"/>.</summary>
+        public Vector FarArrowPoint { get; init; }
+
+        /// <summary>Radius and diameter on an arc: the measured arc; null for a circle.</summary>
+        public Arc Arc { get; init; }
+
+        /// <summary>
+        /// Radius and diameter: the leader angle and offset that put the label at
+        /// <paramref name="point"/>, with the label at least <paramref name="minimum"/> from both the
+        /// curve and the center. A radius on an arc stays on the arc's sweep.
+        /// </summary>
+        public (double Offset, double Angle) RadialPlacementAt(Vector point, double minimum)
+        {
+            var dx = point.X - Center.X;
+            var dy = point.Y - Center.Y;
+            var distance = System.Math.Sqrt(dx * dx + dy * dy);
+            var angle = distance > 0 ? System.Math.Atan2(dy, dx) : Angle;
+            if (Arc != null && Kind == DimensionKind.Radius)
+                angle = DimensionBuilder.ClampToSweep(Arc, angle);
+
+            var offset = distance - Radius;
+            if (offset > -minimum && offset < minimum)
+                offset = offset >= 0 ? minimum : -minimum;
+            if (offset < minimum - Radius)
+                offset = minimum - Radius <= -minimum ? minimum - Radius : minimum;
+            return (offset, Math.Angle.NormalizeRad(angle));
+        }
 
         /// <summary>
         /// Where an extension line leaving <paramref name="foot"/> on the dimension line first

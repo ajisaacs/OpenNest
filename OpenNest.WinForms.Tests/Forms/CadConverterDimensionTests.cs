@@ -114,6 +114,72 @@ public class CadConverterDimensionTests
         form.Close();
     });
 
+    [Fact]
+    public void RadiusAndDiameter_FromTheEntityMenu_DragAroundTheHole_AndSurviveReopening() => ArchUnitsTests.RunSta(() =>
+    {
+        var part = Part();
+        var hole = new Circle(5, 3, 1) { Layer = part.SourceEntities![0].Layer };
+        part.SourceEntities.Add(hole);
+
+        using var form = new DimensionTestForm();
+        Show(form);
+        form.LoadDrawings([part]);
+        var view = Field<EntityView>(form, "entityView1");
+        var item = Field<FileListControl>(form, "fileList").SelectedItem!;
+
+        Invoke(form, "OnEntityActionRequested", null, new EntityActionEventArgs(EntityAction.AddRadiusDimension, [hole]));
+        Invoke(form, "OnEntityActionRequested", null, new EntityActionEventArgs(EntityAction.AddDiameterDimension, [hole]));
+        // Each kind exists once per curve.
+        Invoke(form, "OnEntityActionRequested", null, new EntityActionEventArgs(EntityAction.AddRadiusDimension, [hole]));
+
+        Assert.Equal(new[] { DimensionKind.Radius, DimensionKind.Diameter }, item.Dimensions.Select(d => d.Kind));
+        Assert.Equal(new[] { 1.0, 2.0 }, view.DimensionLayouts.Select(l => l.Value));
+
+        // Drag the radius label to straight left of the hole, 2 past its edge.
+        var press = view.PointWorldToControl(view.DimensionLayouts[0].LineEnd);
+        var release = view.PointWorldToControl(new Vector(2, 3));
+        Mouse(view, "OnMouseDown", press);
+        Mouse(view, "OnMouseMove", release);
+        Mouse(view, "OnMouseUp", release);
+        Assert.InRange(item.Dimensions[0].Offset, 1.9, 2.1);
+        Assert.InRange(view.DimensionLayouts[0].ArrowPoint.X, 3.99, 4.01);
+
+        var saved = Assert.Single(form.GetDrawings());
+        Assert.All(saved.Dimensions, d => Assert.Equal(hole.Id, d.EntityId));
+        form.Close();
+
+        // Reopened, both still measure the hole; excluded, they are listed as not shown.
+        using var reopened = new DimensionTestForm();
+        Show(reopened);
+        reopened.LoadDrawings([saved]);
+        var reopenedView = Field<EntityView>(reopened, "entityView1");
+        Assert.Equal(new[] { 1.0, 2.0 }, reopenedView.DimensionLayouts.Select(l => l.Value));
+
+        var reopenedHole = Field<FileListControl>(reopened, "fileList").SelectedItem!.Entities.Single(e => e.Id == hole.Id);
+        Invoke(reopened, "OnEntityActionRequested", null, new EntityActionEventArgs(EntityAction.Exclude, [reopenedHole]));
+        Assert.All(reopenedView.DimensionLayouts, l => Assert.False(l.IsValid));
+        reopened.Close();
+    });
+
+    [Fact]
+    public void DisplayOnlyCircle_ExplainsHowToDimensionIt() => ArchUnitsTests.RunSta(() =>
+    {
+        var part = Part();
+        var hole = new Circle(5, 3, 1) { Layer = part.SourceEntities![0].Layer };
+        part.SourceEntities.Add(hole);
+
+        using var form = new DimensionTestForm();
+        Show(form);
+        form.LoadDrawings([part]);
+        Invoke(form, "OnEntityActionRequested", null, new EntityActionEventArgs(EntityAction.Display, [hole]));
+
+        Invoke(form, "OnEntityActionRequested", null, new EntityActionEventArgs(EntityAction.AddRadiusDimension, [hole]));
+
+        Assert.Contains("Cut or Etch", Assert.Single(form.Messages));
+        Assert.Empty(Field<FileListControl>(form, "fileList").SelectedItem!.Dimensions);
+        form.Close();
+    });
+
     private static Drawing Part()
     {
         var entities = new List<Entity>

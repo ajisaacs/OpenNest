@@ -988,10 +988,14 @@ namespace OpenNest.Forms
         private static List<Entity> DimensionedEntities(FileListItem item) =>
             TabbedCutoutBuilder.Apply(CutoutEntities(item), item.TabbedCutouts, out _);
 
+        // Radius and diameter find their curve by ID before tabbed cutouts split it into pieces.
         private void RefreshDimensions(FileListItem item)
         {
-            var entities = item.Dimensions.Count > 0 ? DimensionedEntities(item) : new List<Entity>();
-            var layouts = item.Dimensions.Select(d => DimensionBuilder.Layout(entities, d)).ToList();
+            var entities = item.Dimensions.Any(d => !d.IsRadial) ? DimensionedEntities(item) : new List<Entity>();
+            var curves = item.Dimensions.Any(d => d.IsRadial) ? VisibleEntities(item) : new List<Entity>();
+            var layouts = item.Dimensions
+                .Select(d => DimensionBuilder.Layout(d.IsRadial ? curves : entities, d))
+                .ToList();
             entityView1.DimensionLayouts = layouts;
             filterPanel.LoadDimensions(layouts
                 .Select(l => DimensionLabel(l))
@@ -1000,7 +1004,13 @@ namespace OpenNest.Forms
 
         private static string DimensionLabel(DimensionLayout layout)
         {
-            var name = layout.Kind == DimensionKind.OverallHorizontal ? "Horizontal" : "Vertical";
+            var name = layout.Kind switch
+            {
+                DimensionKind.OverallHorizontal => "Horizontal",
+                DimensionKind.OverallVertical => "Vertical",
+                DimensionKind.Radius => "Radius",
+                _ => "Diameter",
+            };
             return layout.IsValid ? $"{name}: {layout.ValueText}" : $"{name} (not shown): {layout.Error}";
         }
 
@@ -1020,6 +1030,25 @@ namespace OpenNest.Forms
             item.Dimensions.AddRange(DimensionBuilder.MissingOverall(entities, item.Dimensions));
             RefreshDimensions(item);
             entityView1.ZoomToFit();
+        }
+
+        private void AddRadialDimensions(FileListItem item, IEnumerable<Entity> curves, DimensionKind kind)
+        {
+            var visible = VisibleEntities(item).Select(en => en.Id).ToHashSet();
+            var cut = curves.Where(c => visible.Contains(c.Id)).ToList();
+            if (cut.Count == 0)
+            {
+                ShowDimensionMessage("Only a circle or arc that is cut or etched can be dimensioned. Right-click it and choose Cut or Etch first.");
+                return;
+            }
+
+            var added = DimensionBuilder.MissingRadial(cut, kind, DimensionedEntities(item), item.Dimensions);
+            if (added.Count == 0)
+                return;
+            item.Dimensions.AddRange(added);
+            entityView1.SelectedDimensionIndex = item.Dimensions.Count - 1;
+            RefreshDimensions(item);
+            entityView1.Invalidate();
         }
 
         private void OnDimensionRemoved(object sender, int index)
@@ -1047,6 +1076,8 @@ namespace OpenNest.Forms
                 return;
 
             item.Dimensions[e.Dimension].Offset = e.Offset;
+            if (e.Angle is { } angle)
+                item.Dimensions[e.Dimension].Angle = angle;
             entityView1.SelectedDimensionIndex = e.Dimension;
             RefreshDimensions(item);
             entityView1.Invalidate();
@@ -1522,6 +1553,12 @@ namespace OpenNest.Forms
 
             switch (e.Action)
             {
+                case EntityAction.AddRadiusDimension:
+                case EntityAction.AddDiameterDimension:
+                    AddRadialDimensions(item, e.Entities,
+                        e.Action == EntityAction.AddRadiusDimension ? DimensionKind.Radius : DimensionKind.Diameter);
+                    return;
+
                 case EntityAction.Exclude:
                     foreach (var entity in e.Entities)
                         item.ExcludedEntityIds.Add(entity.Id);

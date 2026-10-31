@@ -495,6 +495,14 @@ namespace OpenNest.IO
         {
             public string Kind { get; init; }
             public double Offset { get; init; }
+
+            /// <summary>Radius and diameter: the measured circle or arc. Omitted for overall dimensions.</summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public Guid? EntityId { get; init; }
+
+            /// <summary>Radius and diameter: the leader angle in radians. Omitted for overall dimensions.</summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public double? Angle { get; init; }
         }
 
         public record TabbedCutoutDto

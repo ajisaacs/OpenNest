@@ -269,6 +269,8 @@ namespace OpenNest.IO
                             {
                                 Kind = m.Kind.ToString(),
                                 Offset = m.Offset,
+                                EntityId = m.IsRadial ? m.EntityId : null,
+                                Angle = m.IsRadial ? m.Angle : null,
                             }).ToList()
                             : null,
                     }

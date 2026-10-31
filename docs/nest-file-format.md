@@ -398,11 +398,18 @@ versions without tabbed cutout support read them as ordinary cut motions.
 ## Drawing dimensions
 
 A drawing may carry a `dimensions` array, omitted when empty. Each entry has `kind`
-(`OverallHorizontal` or `OverallVertical`) and `offset`, the signed distance from the part's
-extents to the dimension line (positive is above or right); see [dimensions](dimensions.md).
-Values are not stored: they are measured when shown. An entry with an unknown kind or an
-offset that is zero or not finite is dropped with a reader warning; the drawing and its
-program are unaffected.
+(`OverallHorizontal`, `OverallVertical`, `Radius` or `Diameter`) and `offset`. For the
+overall kinds, `offset` is the signed distance from the part's extents to the dimension line
+(positive is above or right). `Radius` and `Diameter` also have `entityId`, the source entity
+ID of the measured circle or arc, and `angle`, the leader's direction from its center in
+radians; their `offset` is the signed distance from the curve to the label along the leader
+(positive is outside). Overall entries omit `entityId` and `angle`. See
+[dimensions](dimensions.md).
+
+Values are not stored: they are measured when shown. An entry with an unknown kind, an
+offset that is zero or not finite, or a radius or diameter without a non-empty `entityId` and
+a finite `angle` is dropped with a reader warning; the drawing and its program are
+unaffected. Versions without radius and diameter support drop those entries the same way.
 
 ## Drawing entity roles
 
