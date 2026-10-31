@@ -20,11 +20,14 @@ namespace OpenNest.Dimensions
         /// </summary>
         public static Box Extents(IEnumerable<Entity> entities)
         {
-            var measured = entities
-                .Where(e => SpecialLayers.IsMaterial(e.Layer) && !ScribeLayerRepair.IsMarkLayer(e.Layer))
-                .ToList();
+            var measured = Measured(entities);
             return measured.Count == 0 ? null : measured.GetBoundingBox();
         }
+
+        private static List<Entity> Measured(IEnumerable<Entity> entities) =>
+            entities
+                .Where(e => SpecialLayers.IsMaterial(e.Layer) && !ScribeLayerRepair.IsMarkLayer(e.Layer))
+                .ToList();
 
         public static DimensionLayout Layout(IEnumerable<Entity> entities, DrawingDimension dimension)
         {
@@ -32,9 +35,11 @@ namespace OpenNest.Dimensions
             if (dimension.Offset == 0 || !double.IsFinite(dimension.Offset))
                 return new DimensionLayout { Kind = kind, Error = "its offset is not usable" };
 
-            var box = Extents(entities);
-            if (box == null)
+            var measured = Measured(entities);
+            if (measured.Count == 0)
                 return new DimensionLayout { Kind = kind, Error = "there is no cut geometry to measure" };
+
+            var box = measured.GetBoundingBox();
 
             var offset = dimension.Offset;
             if (kind == DimensionKind.OverallHorizontal)
@@ -47,6 +52,7 @@ namespace OpenNest.Dimensions
                 {
                     Kind = kind,
                     Extents = box,
+                    Profile = measured,
                     Value = box.Length,
                     ExtensionStart = new Vector(box.Left, edge),
                     ExtensionEnd = new Vector(box.Right, edge),
@@ -63,6 +69,7 @@ namespace OpenNest.Dimensions
             {
                 Kind = kind,
                 Extents = box,
+                Profile = measured,
                 Value = box.Width,
                 ExtensionStart = new Vector(side, box.Bottom),
                 ExtensionEnd = new Vector(side, box.Top),

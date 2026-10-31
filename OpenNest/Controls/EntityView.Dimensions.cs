@@ -120,8 +120,9 @@ namespace OpenNest.Controls
                 return;
             var along = new PointF((float)((to.X - from.X) / length), (float)((to.Y - from.Y) / length));
 
-            DrawExtensionLine(g, pen, PointWorldToGraph(layout.ExtensionStart), from);
-            DrawExtensionLine(g, pen, PointWorldToGraph(layout.ExtensionEnd), to);
+            var clearance = LengthGuiToWorld(DimensionGapPixels);
+            DrawExtensionLine(g, pen, PointWorldToGraph(layout.ExtensionTip(layout.LineStart, clearance)), from);
+            DrawExtensionLine(g, pen, PointWorldToGraph(layout.ExtensionTip(layout.LineEnd, clearance)), to);
             g.DrawLine(pen, from, to);
             DrawArrow(g, brush, from, along);
             DrawArrow(g, brush, to, new PointF(-along.X, -along.Y));
@@ -137,8 +138,7 @@ namespace OpenNest.Controls
             g.Restore(state);
         }
 
-        // Starts clear of the part and runs a little past the dimension line, the way drafted
-        // extension lines do.
+        // Runs a little past the dimension line, the way drafted extension lines do.
         private static void DrawExtensionLine(Graphics g, Pen pen, PointF from, PointF to)
         {
             var dx = to.X - from.X;
@@ -146,11 +146,9 @@ namespace OpenNest.Controls
             var length = (float)System.Math.Sqrt(dx * dx + dy * dy);
             if (length < 1)
                 return;
-            var start = new PointF(from.X + dx / length * DimensionGapPixels,
-                from.Y + dy / length * DimensionGapPixels);
             var end = new PointF(to.X + dx / length * DimensionOvershootPixels,
                 to.Y + dy / length * DimensionOvershootPixels);
-            g.DrawLine(pen, start, end);
+            g.DrawLine(pen, from, end);
         }
 
         private static void DrawArrow(Graphics g, Brush brush, PointF tip, PointF direction)
