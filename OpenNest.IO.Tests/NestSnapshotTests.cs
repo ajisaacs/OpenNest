@@ -137,7 +137,7 @@ public class NestSnapshotTests
     {
         var nest = new Nest("snapshot");
         nest.PlateDefaults.Size = new Size(40, 20);
-        var square = Square();
+        var square = TestDrawings.Square();
         var bar = new Drawing("Bar", ConvertGeometry.ToProgram(new List<Entity>
         {
             new Line(0, 0, 8, 0),
@@ -176,13 +176,4 @@ public class NestSnapshotTests
         nest.CreatePlate();
         return nest;
     }
-
-    private static Drawing Square() =>
-        new("Square", ConvertGeometry.ToProgram(new List<Entity>
-        {
-            new Line(0, 0, 4, 0),
-            new Line(4, 0, 4, 4),
-            new Line(4, 4, 0, 4),
-            new Line(0, 4, 0, 0),
-        }));
 }

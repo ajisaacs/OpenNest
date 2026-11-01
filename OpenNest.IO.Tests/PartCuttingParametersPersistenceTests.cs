@@ -15,7 +15,7 @@ public class PartCuttingParametersPersistenceTests
     public void ManualLeadIns_KeepTheirSettings_AndCleanPartsWriteNone()
     {
         var nest = new Nest("manual");
-        var drawing = Square();
+        var drawing = TestDrawings.Square();
         nest.Drawings.Add(drawing);
         var plate = nest.CreatePlate();
         var leaded = new Part(drawing, new Vector(1, 1));
@@ -42,7 +42,7 @@ public class PartCuttingParametersPersistenceTests
     public void CommittedCuttingPlan_KeepsEachPartsSettings()
     {
         var nest = new Nest("planned");
-        var drawing = Square();
+        var drawing = TestDrawings.Square();
         nest.Drawings.Add(drawing);
         var plate = nest.CreatePlate();
         plate.Parts.Add(new Part(drawing, new Vector(1, 1)));
@@ -65,7 +65,7 @@ public class PartCuttingParametersPersistenceTests
     public void OlderFiles_WithoutTheField_ReadNullSettings()
     {
         var nest = new Nest("legacy");
-        var drawing = Square();
+        var drawing = TestDrawings.Square();
         nest.Drawings.Add(drawing);
         var part = new Part(drawing, new Vector(1, 1));
         part.ApplyLeadIns(Parameters(0.3), Vector.Zero);
@@ -79,15 +79,6 @@ public class PartCuttingParametersPersistenceTests
         Assert.True(copy.HasManualLeadIns);
         Assert.Null(copy.CuttingParameters);
     }
-
-    private static Drawing Square() =>
-        new("Square", ConvertGeometry.ToProgram(new List<Entity>
-        {
-            new Line(0, 0, 4, 0),
-            new Line(4, 0, 4, 4),
-            new Line(4, 4, 0, 4),
-            new Line(0, 4, 0, 0),
-        }));
 
     private static CuttingParameters Parameters(double leadLength) => new()
     {
