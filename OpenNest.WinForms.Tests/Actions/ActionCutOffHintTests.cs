@@ -3,14 +3,13 @@ using System.Reflection;
 using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Controls;
-using OpenNest.Help;
 using static OpenNest.WinForms.Tests.FormTesting;
 
 namespace OpenNest.WinForms.Tests.Actions;
 
 /// <summary>
-/// The manual cut-off tool says how to turn its line and where its help is, stops a new line at
-/// the first crossing and draws it full length after Tab.
+/// The manual cut-off tool says how to turn its line, stops a new line at the first crossing and
+/// draws it full length after Tab.
 /// </summary>
 public class ActionCutOffHintTests
 {
@@ -68,14 +67,10 @@ public class ActionCutOffHintTests
 
         view.SetAction(typeof(ActionCutOff));
         Assert.Equal(
-            "Sheet Cut-Off: click to add a vertical line stopped at the first crossing, Space turns it horizontal, Tab makes it full length, Esc finishes, F1 for help",
+            "Sheet Cut-Off: click to add a vertical line stopped at the first crossing, Space turns it horizontal, Tab makes it full length, Esc finishes",
             view.Status);
-        Assert.Equal(HelpTopics.SheetCutOff, view.ActionHelpTopic);
 
         PressKey(view, Keys.Space);
         Assert.StartsWith("Sheet Cut-Off: click to add a horizontal line stopped at the first crossing, Space turns it vertical", view.Status);
-
-        view.SetAction(typeof(ActionSelect));
-        Assert.Null(view.ActionHelpTopic);
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
 }

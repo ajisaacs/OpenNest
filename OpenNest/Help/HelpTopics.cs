@@ -38,16 +38,6 @@ namespace OpenNest.Help
 
         public static bool IsInstalled => File.Exists(Path.Combine(Directory, "index.html"));
 
-        /// <summary>Opens <paramref name="topic"/> when F1 is pressed anywhere in <paramref name="form"/>.</summary>
-        public static void Attach(Form form, string topic)
-        {
-            form.HelpRequested += (_, e) =>
-            {
-                e.Handled = true;
-                Show(form, topic);
-            };
-        }
-
         public static void Show(IWin32Window owner, string topic)
         {
             if (!IsInstalled)

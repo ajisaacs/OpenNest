@@ -881,12 +881,6 @@ namespace OpenNest.Controls
         /// <summary>Shows the current action's name and hint again after the hint changed.</summary>
         public void RefreshActionStatus() => actionManager.RefreshStatus();
 
-        /// <summary>The help topic for the current action, or null when it has none.</summary>
-        public string ActionHelpTopic => actionManager.CurrentAction?.HelpTopic;
-
-        /// <summary>Whether the current action takes F1 for itself instead of help.</summary>
-        public bool ActionHandlesF1 => actionManager.CurrentAction?.HandlesF1 == true;
-
         public void AlignSelected(AlignType alignType) => selection.AlignSelected(alignType);
 
         public void AlignSelected(AlignType alignType, LayoutPart fixedPart) =>

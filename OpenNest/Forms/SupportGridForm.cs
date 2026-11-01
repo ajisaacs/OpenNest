@@ -177,7 +177,6 @@ public sealed class SupportGridForm : Form
         layout.Controls.Add(footer);
 
         Controls.Add(layout);
-        HelpTopics.Attach(this, HelpTopics.SupportGrid);
         AcceptButton = ok;
         CancelButton = cancel;
 

@@ -4,7 +4,6 @@ using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Geometry;
-using OpenNest.Help;
 
 namespace OpenNest.Actions
 {
@@ -54,10 +53,8 @@ namespace OpenNest.Actions
         public override bool IsBusy() => false;
 
         public override string Hint => message ?? (extend
-            ? "click near the end of a cut-off to extend it or close a gap, Tab switches to Trim, Esc finishes, F1 for help"
-            : "click the piece of a cut-off to remove, Tab switches to Extend, Esc finishes, F1 for help");
-
-        public override string HelpTopic => HelpTopics.TrimExtendCutOff;
+            ? "click near the end of a cut-off to extend it or close a gap, Tab switches to Trim, Esc finishes"
+            : "click the piece of a cut-off to remove, Tab switches to Extend, Esc finishes");
 
         private CutOffEdit EditAt(CutOff cutOff, Vector point) => extend
             ? CutOffTrim.Extend(plateView.Plate, cutOff, point)

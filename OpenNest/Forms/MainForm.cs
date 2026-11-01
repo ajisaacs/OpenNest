@@ -102,16 +102,6 @@ namespace OpenNest.Forms
             }
             if (ProcessUndoKeys(keyData))
                 return true;
-            // A tool that uses F1 itself (Clone sets the part) gets it before help: skip the
-            // Help menu shortcut so the key reaches the plate view.
-            if (keyData == Keys.F1 && activeForm?.PlateView?.ActionHandlesF1 == true)
-                return false;
-            // F1 opens the active tool's topic before the Help menu's general help.
-            if (keyData == Keys.F1 && activeForm?.PlateView?.ActionHelpTopic is { } topic)
-            {
-                HelpTopics.Show(this, topic);
-                return true;
-            }
 
             return base.ProcessCmdKey(ref msg, keyData);
         }
@@ -187,7 +177,7 @@ namespace OpenNest.Forms
 
         private void InitializeHelpMenu()
         {
-            var contents = new ToolStripMenuItem("OpenNest &Help") { ShortcutKeys = Keys.F1 };
+            var contents = new ToolStripMenuItem("OpenNest &Help");
             contents.Click += (_, _) => HelpTopics.Show(this, HelpTopics.Home);
             var firstNest = new ToolStripMenuItem("&Your First Nest");
             firstNest.Click += (_, _) => HelpTopics.Show(this, HelpTopics.FirstNest);

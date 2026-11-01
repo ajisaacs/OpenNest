@@ -14,7 +14,6 @@ using OpenNest.Controls;
 using OpenNest.Converters;
 using OpenNest.Dimensions;
 using OpenNest.Geometry;
-using OpenNest.Help;
 using OpenNest.IO;
 using OpenNest.IO.Bending;
 using OpenNest.TabbedCutouts;
@@ -46,7 +45,6 @@ namespace OpenNest.Forms
         public CadConverterForm()
         {
             InitializeComponent();
-            HelpTopics.Attach(this, HelpTopics.ImportDrawings);
 
             fileList.SelectedIndexChanged += OnFileSelected;
             filterPanel.FilterChanged += OnFilterChanged;

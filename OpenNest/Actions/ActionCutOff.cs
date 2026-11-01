@@ -6,7 +6,6 @@ using System.Windows.Forms;
 using OpenNest.CNC;
 using OpenNest.Controls;
 using OpenNest.Geometry;
-using OpenNest.Help;
 
 namespace OpenNest.Actions
 {
@@ -58,13 +57,11 @@ namespace OpenNest.Actions
             get
             {
                 var hint = FullLength
-                    ? $"click to add a full-length {AxisName(lockedAxis)} line, Space turns it {AxisName(OtherAxis(lockedAxis))}, Tab stops it at the first crossing, Esc finishes, F1 for help"
-                    : $"click to add a {AxisName(lockedAxis)} line stopped at the first crossing, Space turns it {AxisName(OtherAxis(lockedAxis))}, Tab makes it full length, Esc finishes, F1 for help";
+                    ? $"click to add a full-length {AxisName(lockedAxis)} line, Space turns it {AxisName(OtherAxis(lockedAxis))}, Tab stops it at the first crossing, Esc finishes"
+                    : $"click to add a {AxisName(lockedAxis)} line stopped at the first crossing, Space turns it {AxisName(OtherAxis(lockedAxis))}, Tab makes it full length, Esc finishes";
                 return notice == null ? hint : $"{notice} {hint}";
             }
         }
-
-        public override string HelpTopic => HelpTopics.SheetCutOff;
 
         private bool FullLength => plateView.CutOffs.FullLengthNewLines;
 

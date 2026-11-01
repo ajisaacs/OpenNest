@@ -14,7 +14,7 @@ namespace OpenNest.Help
     /// Single help window hosting the bundled HTML in WebView2. The help folder is served
     /// from a private virtual host so the site's search and scripts run as on a web server.
     /// The window runs its own UI thread, so modal dialogs in the app never disable it:
-    /// F1 in a dialog opens help that can be scrolled and searched while the dialog is open.
+    /// help opened from a dialog can be scrolled and searched while the dialog is open.
     /// </summary>
     public sealed class HelpForm : Form
     {

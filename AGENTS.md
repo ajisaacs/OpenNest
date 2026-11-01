@@ -82,4 +82,4 @@ Read the relevant contract before changing its behavior:
 - [Fill verification](docs/performance/fill-verification.md): opt-in benchmarks, frozen oracles, Debug-only counters and predictor initialization. Zero Release counters do not prove work removal.
 - [Desktop auto-update](docs/auto-update.md): GitHub Releases by default, opt-in rolling `dev-build` pre-release from green master pushes, the nest server's `/updates` mirror first in Database mode (GitHub fallback), `UpdateFeedUrl` for a self-hosted feed, release Velopack assets and `Deploy-OpenNest.ps1`.
 - [Undo and Redo](docs/undo-redo.md): whole-nest history, the recording rule, what a restore rebuilds and what is excluded.
-- [Desktop help](docs/desktop-help.md): WebView2 help window, F1 topic IDs and the pinned help release both packaging scripts install.
+- [Desktop help](docs/desktop-help.md): WebView2 help window, topic IDs and the pinned help release both packaging scripts install.

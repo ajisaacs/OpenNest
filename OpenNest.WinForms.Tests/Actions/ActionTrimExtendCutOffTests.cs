@@ -3,7 +3,6 @@ using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Controls;
 using OpenNest.Geometry;
-using OpenNest.Help;
 using static OpenNest.WinForms.Tests.FormTesting;
 
 namespace OpenNest.WinForms.Tests.Actions;
@@ -43,9 +42,8 @@ public class ActionTrimExtendCutOffTests
         Assert.False(IsInputKey(view, Keys.Tab));
         view.SetAction(typeof(ActionTrimExtendCutOff));
         Assert.Equal(
-            "Trim/Extend Cut-Off: click the piece of a cut-off to remove, Tab switches to Extend, Esc finishes, F1 for help",
+            "Trim/Extend Cut-Off: click the piece of a cut-off to remove, Tab switches to Extend, Esc finishes",
             view.Status);
-        Assert.Equal(HelpTopics.TrimExtendCutOff, view.ActionHelpTopic);
         Assert.True(IsInputKey(view, Keys.Tab));
 
         PressKey(view, Keys.Tab);

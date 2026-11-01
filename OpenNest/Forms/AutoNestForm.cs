@@ -10,7 +10,6 @@ using OpenNest.Controls;
 using OpenNest.Data.MaterialLedger;
 using OpenNest.Engine;
 using OpenNest.Geometry;
-using OpenNest.Help;
 using OpenNest.Math;
 
 namespace OpenNest.Forms
@@ -45,7 +44,6 @@ namespace OpenNest.Forms
             LoadDefaultPlateOptions();
             SetPlateOptimizerVisible(false);
             UpdateLedgerButton();
-            HelpTopics.Attach(this, HelpTopics.AutoNest);
 
             partsGrid.DataError += PartsGrid_DataError;
         }
