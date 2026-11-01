@@ -153,15 +153,21 @@ namespace OpenNest.Forms
             zoomToFitButton.AccessibleName = "Zoom To Fit";
             zoomToFitButton.Click += (s, e) => PlateView.ZoomToFit();
 
+            var zoomToAreaButton = CreateNavButton(Resources.zoom_area);
+            zoomToAreaButton.Name = "btnZoomToArea";
+            zoomToAreaButton.AccessibleName = "Zoom To Area";
+            zoomToAreaButton.Click += (s, e) => PlateView.SetAction(typeof(ActionZoomWindow));
+
             var toolTip = new ToolTip(components);
             toolTip.SetToolTip(zoomOutButton, "Zoom Out (Ctrl+Minus)");
             toolTip.SetToolTip(zoomInButton, "Zoom In (Ctrl+Plus)");
             toolTip.SetToolTip(zoomToFitButton, "Zoom To Fit (F)");
+            toolTip.SetToolTip(zoomToAreaButton, "Zoom To Area");
 
             // Keep navigation and zoom controls together in the header.
             var navPanel = new Panel
             {
-                Width = btnSize.Width * 7 + 8,
+                Width = btnSize.Width * 8 + 8,
                 Height = btnSize.Height,
                 Anchor = AnchorStyles.None,
             };
@@ -181,6 +187,7 @@ namespace OpenNest.Forms
             zoomOutButton.Location = new Point(btnSize.Width * 4 + 8, 0);
             zoomInButton.Location = new Point(btnSize.Width * 5 + 8, 0);
             zoomToFitButton.Location = new Point(btnSize.Width * 6 + 8, 0);
+            zoomToAreaButton.Location = new Point(btnSize.Width * 7 + 8, 0);
 
             var separator = new Panel
             {
@@ -193,7 +200,7 @@ namespace OpenNest.Forms
             navPanel.Controls.AddRange(
                 new Control[]
                 {
-                    plateButtons, separator, zoomOutButton, zoomInButton, zoomToFitButton
+                    plateButtons, separator, zoomOutButton, zoomInButton, zoomToFitButton, zoomToAreaButton
                 }
             );
 

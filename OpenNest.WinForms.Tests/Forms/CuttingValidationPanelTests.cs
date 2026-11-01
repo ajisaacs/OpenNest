@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
+using OpenNest.Actions;
 using OpenNest.CNC;
 using OpenNest.Diagnostics;
 using OpenNest.Forms;
@@ -319,6 +320,32 @@ public class CuttingValidationPanelTests
         panel.RequestClose();
         next.PerformClick();
         Assert.Equal(1, editor.PlateManager.CurrentIndex);
+    });
+
+    [Fact]
+    public void HeaderZoomToAreaStartsZoomWindowButIsLockedDuringInspection() => RunSta(() =>
+    {
+        using var editor = RapidEditor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        var view = editor.PlateView;
+        var area = Assert.IsType<Button>(editor.Controls.Find("btnZoomToArea", true).Single());
+        Assert.Equal("Zoom To Area", area.AccessibleName);
+        Assert.NotNull(area.Image);
+
+        area.PerformClick();
+        Assert.IsType<ActionZoomWindow>(view.Actions.CurrentAction);
+
+        // Inspection owns Escape, so a zoom window could not be cancelled there.
+        view.SetAction(typeof(ActionSelect));
+        editor.OpenValidationInspection();
+        var panel = editor.CuttingInspection!;
+        Pump(() => panel.ValidationReport != null && !panel.IsPlanning);
+        Assert.False(area.Enabled);
+        area.PerformClick();
+        Assert.IsType<ActionSelect>(view.Actions.CurrentAction);
+        panel.RequestClose();
+        Assert.True(area.Enabled);
     });
 
     private static void InvokeView(Control target, string name, params object[] args) => target.GetType()

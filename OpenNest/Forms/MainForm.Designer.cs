@@ -520,6 +520,7 @@ namespace OpenNest.Forms
             // 
             // mnuViewZoomToArea
             // 
+            mnuViewZoomToArea.Image = Properties.Resources.zoom_area;
             mnuViewZoomToArea.Name = "mnuViewZoomToArea";
             mnuViewZoomToArea.Size = new System.Drawing.Size(118, 22);
             mnuViewZoomToArea.Text = "Area";
