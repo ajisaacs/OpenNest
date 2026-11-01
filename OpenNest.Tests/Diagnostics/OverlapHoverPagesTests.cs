@@ -2,6 +2,7 @@ using System.Globalization;
 using OpenNest.CNC;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.Diagnostics;
 
@@ -10,7 +11,7 @@ public class OverlapHoverPagesTests
     [Fact]
     public void CrowdedCoincidentPairsRemainAccessibleInOrderWithinEveryPageBudget()
     {
-        var parts = Enumerable.Range(1, 12).Select(i => Rectangle($"part-{i}")).ToArray();
+        var parts = Enumerable.Range(1, 12).Select(i => MakeSquarePart($"part-{i}")).ToArray();
         var report = PlateOverlapAnalyzer.Analyze(parts);
         var pairs = OverlapPairPresentation.HitTest(report.Pairs.Reverse(), p => p, new Vector(2, 2), 96);
         var text = string.Join("\n\n", pairs.Select(p => OverlapPairPresentation.Details(p, Units.Millimeters, CultureInfo.InvariantCulture)));
@@ -35,7 +36,8 @@ public class OverlapHoverPagesTests
     public void OneDetailWithLongUnbrokenNamesPagesWithoutDroppingText(int rows, int width)
     {
         var name = string.Concat(Enumerable.Repeat("veryLongName😀e\u0301", 30));
-        var pair = Assert.Single(PlateOverlapAnalyzer.Analyze(new[] { Rectangle(name), Rectangle("tail") }).Pairs);
+        var pair = Assert.Single(PlateOverlapAnalyzer.Analyze(
+            new[] { MakeSquarePart(name), MakeSquarePart("tail") }).Pairs);
         var text = OverlapPairPresentation.Details(pair, Units.Inches, CultureInfo.InvariantCulture);
         var pages = OverlapHoverPages.Create(text, 1, rows, width, s => new StringInfo(s).LengthInTextElements);
 
@@ -115,16 +117,5 @@ public class OverlapHoverPagesTests
                 yield return line;
             pages.MovePage(1);
         }
-    }
-
-    private static Part Rectangle(string name)
-    {
-        var program = new Program(Mode.Absolute);
-        program.Codes.Add(new RapidMove(0, 0));
-        program.Codes.Add(new LinearMove(4, 0));
-        program.Codes.Add(new LinearMove(4, 4));
-        program.Codes.Add(new LinearMove(0, 4));
-        program.Codes.Add(new LinearMove(0, 0));
-        return new Part(new Drawing(name, program));
     }
 }

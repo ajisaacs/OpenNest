@@ -3,6 +3,7 @@ using OpenNest.CNC.CuttingPlanning;
 using OpenNest.Diagnostics;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Geometry;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.CuttingPlanning;
 
@@ -111,23 +112,13 @@ public class SafestRouteFallbackTests
     {
         var plate = new Nest().CreatePlate();
         plate.Size = new Size(60, 60);
-        plate.Parts.Add(new Part(new Drawing("bar", Rectangle(1, 50)), new Vector(25, 2)));
+        plate.Parts.Add(new Part(
+            new Drawing("bar", MakeClockwiseRectProgram(1, 50)), new Vector(25, 2)));
         plate.Parts.Add(new Part(new Drawing("left", ExplicitContourTests.Square(false)), new Vector(5, 20)));
         var right = new Part(new Drawing("right", ExplicitContourTests.Square(false)), new Vector(36, 20));
         if (lockRight)
             Assert.True(right.RestoreLeadInProgram((Program)right.Program.Clone(), true));
         plate.Parts.Add(right);
         return plate;
-    }
-
-    private static Program Rectangle(double width, double height)
-    {
-        var program = new Program();
-        program.MoveTo(0, 0);
-        program.LineTo(0, height);
-        program.LineTo(width, height);
-        program.LineTo(width, 0);
-        program.LineTo(0, 0);
-        return program;
     }
 }

@@ -2,6 +2,7 @@ using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Geometry;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.CuttingPlanning;
 
@@ -79,7 +80,7 @@ public class LeadPathValidationTests
         var hole = LeadMaterialSnapshot.Capture(ring, Vector.Zero);
         Assert.True(hole.IsComplete, hole.Reason);
         AssertClear(ExternalLead(), target, hole);
-        var tangent = LeadMaterialSnapshot.Capture(Circle(-1.5, 6, 1), Vector.Zero);
+        var tangent = LeadMaterialSnapshot.Capture(MakeCircleProgram(-1.5, 6, 1), Vector.Zero);
         Assert.True(tangent.IsComplete, tangent.Reason);
         AssertUnsafe(ExternalLead(), target, tangent);
         var arc = new Program();
@@ -87,7 +88,8 @@ public class LeadPathValidationTests
         arc.Codes.Add(new ArcMove(new Vector(0, 5), new Vector(-1, 5), RotationType.CW) { Layer = LayerType.Leadin });
         arc.LineTo(0, 10);
         AssertClear(arc, target);
-        AssertUnsafe(arc, target, LeadMaterialSnapshot.Capture(Circle(-1, 7, 1), Vector.Zero));
+        AssertUnsafe(arc, target,
+            LeadMaterialSnapshot.Capture(MakeCircleProgram(-1, 7, 1), Vector.Zero));
     }
 
     [Fact]
@@ -102,7 +104,7 @@ public class LeadPathValidationTests
         var arbitrary = ExternalLead();
         arbitrary.Codes[2] = new LinearMove(5, 5); // Adjacent move is NOT nominal contour.
         AssertUnsafe(arbitrary, target);
-        var circular = LeadMaterialSnapshot.Capture(Circle(0, 0, 2), Vector.Zero);
+        var circular = LeadMaterialSnapshot.Capture(MakeCircleProgram(0, 0, 2), Vector.Zero);
         var coincident = new Program();
         coincident.MoveTo(2, 0);
         coincident.Codes.Add(new ArcMove(new Vector(-2, 0), Vector.Zero) { Layer = LayerType.Leadin });
@@ -124,7 +126,8 @@ public class LeadPathValidationTests
     public void TinyNativeUncertainContactRefusesRatherThanApproves()
     {
         var target = LeadMaterialSnapshot.Capture(Rectangle(0, 0, 10, 10), Vector.Zero);
-        var obstacle = LeadMaterialSnapshot.Capture(Circle(-0.000005, 5, 0.000001), Vector.Zero);
+        var obstacle = LeadMaterialSnapshot.Capture(
+            MakeCircleProgram(-0.000005, 5, 0.000001), Vector.Zero);
         Assert.True(obstacle.IsComplete, obstacle.Reason);
         var p = ExternalLead(); p.Codes[0] = new RapidMove(-0.00001, 5);
         var check = LeadPathValidator.Check(Read(p), target, [obstacle]);
@@ -152,7 +155,8 @@ public class LeadPathValidationTests
         var p = new Program(); p.MoveTo(0, 10); p.LineTo(0, 5);
         p.Codes.Add(new ArcMove(new Vector(-1, 4), new Vector(-1, 5), RotationType.CW) { Layer = LayerType.Leadout });
         AssertClear(p, target);
-        AssertUnsafe(p, target, LeadMaterialSnapshot.Capture(Circle(-1, 3, 1), Vector.Zero));
+        AssertUnsafe(p, target,
+            LeadMaterialSnapshot.Capture(MakeCircleProgram(-1, 3, 1), Vector.Zero));
         p.Codes[^1] = new ArcMove(new Vector(-1, 4), new Vector(0, 4), RotationType.CW) { Layer = LayerType.Leadout };
         AssertUnsafe(p, target);
     }
@@ -292,7 +296,7 @@ public class LeadPathValidationTests
     public void RealStrategyEmission_ClearExternalAndInternalLeads(string style)
     {
         var clean = ExplicitContourTests.Square(false);
-        clean.Codes.AddRange(Circle(5, 5, 2).Codes);
+        clean.Codes.AddRange(MakeCircleProgram(5, 5, 2).Codes);
         var target = LeadMaterialSnapshot.Capture(clean, Vector.Zero);
         Assert.True(target.IsComplete, target.Reason);
         var parameters = ExplicitContourTests.Parameters(style);
@@ -310,18 +314,13 @@ public class LeadPathValidationTests
     public void RealStrategyEmission_UnsafeCompositePierceRefusesWithoutRepair()
     {
         var clean = ExplicitContourTests.Square(false);
-        clean.Codes.AddRange(Circle(5, 5, 2).Codes);
+        clean.Codes.AddRange(MakeCircleProgram(5, 5, 2).Codes);
         var target = LeadMaterialSnapshot.Capture(clean, Vector.Zero);
         var emitted = new ContourCuttingStrategy { Parameters = ExplicitContourTests.Parameters("linearc") }.Apply(clean, new Vector(-2, 5));
         AssertUnsafe(emitted.Program, target);
         var orphan = new Program(); orphan.MoveTo(-5, 5);
         orphan.Codes.Add(new LinearMove(-3, 5) { Layer = LayerType.Leadin });
         AssertUnsafe(orphan, target);
-    }
-
-    private static Program Circle(double x, double y, double radius)
-    {
-        var p = new Program(); p.MoveTo(x + radius, y); p.ArcTo(x + radius, y, x, y, RotationType.CCW); return p;
     }
 
     private static void AssertClear(Program p, LeadMaterialSnapshot target, params LeadMaterialSnapshot[] others)

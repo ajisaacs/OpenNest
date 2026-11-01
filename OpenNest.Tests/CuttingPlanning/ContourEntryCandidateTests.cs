@@ -1,6 +1,7 @@
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
 using OpenNest.Geometry;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.CuttingPlanning;
 
@@ -15,15 +16,6 @@ public class ContourEntryCandidateTests
         PreparedContours.Capture(program, ExplicitContourTests.Parameters());
 
     // --- fixtures ---------------------------------------------------------------
-
-    private static Program ClosedContour(IEnumerable<Vector> vertices)
-    {
-        var p = new Program();
-        p.MoveTo(vertices.First().X, vertices.First().Y);
-        foreach (var v in vertices.Skip(1).Append(vertices.First()))
-            p.LineTo(v.X, v.Y);
-        return p;
-    }
 
     /// <summary>Square perimeter with an L-notch hole slug; its concave vertex (3,3.5) is reflex for the slug's own travel.</summary>
     private static Program NotchedHole()
@@ -185,7 +177,7 @@ public class ContourEntryCandidateTests
     public void CollinearSplit_IsNotATangentJoint_ButBothMidpointsRemain()
     {
         // Bottom edge split into two collinear lines at (5,0).
-        var p = ClosedContour(new[]
+        var p = MakeClosedProgram(new[]
         {
             new Vector(0, 0), new Vector(5, 0), new Vector(10, 0), new Vector(10, 10), new Vector(0, 10),
         });
@@ -225,7 +217,7 @@ public class ContourEntryCandidateTests
     public void ReflexVertexOfOuterOutline_IsNeverEnumerated()
     {
         // L-shaped outline: (5,5) is reflex for the part's own CCW travel.
-        var p = ClosedContour(new[]
+        var p = MakeClosedProgram(new[]
         {
             new Vector(0, 0), new Vector(10, 0), new Vector(10, 10), new Vector(5, 10),
             new Vector(5, 5), new Vector(0, 5),
@@ -255,7 +247,7 @@ public class ContourEntryCandidateTests
     public void ManualEntry_StillAcceptsAReflexPoint()
     {
         // The manual path is unchanged: an explicit reflex vertex is a valid choice.
-        var prepared = Capture(ClosedContour(new[]
+        var prepared = Capture(MakeClosedProgram(new[]
         {
             new Vector(0, 0), new Vector(10, 0), new Vector(10, 10), new Vector(5, 10),
             new Vector(5, 5), new Vector(0, 5),
@@ -437,7 +429,7 @@ public class ContourEntryCandidateTests
     {
         // 10 x 0.4 rectangle: every convex corner's vertical edge (0.4) is shorter than
         // 2 x lead-in (0.6), so only the horizontal edges carry near-corner points.
-        var p = ClosedContour(new[]
+        var p = MakeClosedProgram(new[]
         {
             new Vector(0, 0), new Vector(10, 0), new Vector(10, 0.4), new Vector(0, 0.4),
         });
@@ -464,7 +456,7 @@ public class ContourEntryCandidateTests
         // Boundary notch 0.6 deep — exactly 2 x lead-in. The inset from each convex
         // opening corner lands exactly on the reflex inner corner, so neither inner
         // corner may appear in the automatic catalog at all.
-        var p = ClosedContour(new[]
+        var p = MakeClosedProgram(new[]
         {
             new Vector(0, 0), new Vector(10, 0), new Vector(10, 10), new Vector(0, 10),
             new Vector(0, 4.6), new Vector(0.6, 4.6), new Vector(0.6, 4), new Vector(0, 4),
@@ -480,7 +472,7 @@ public class ContourEntryCandidateTests
     {
         // L-outline; (5,5) is reflex for its own travel. The raw closest point from that
         // position lands exactly on the reflex vertex and must be dropped.
-        var p = ClosedContour(new[]
+        var p = MakeClosedProgram(new[]
         {
             new Vector(0, 0), new Vector(10, 0), new Vector(10, 10), new Vector(5, 10),
             new Vector(5, 5), new Vector(0, 5),

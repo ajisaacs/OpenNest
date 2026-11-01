@@ -14,18 +14,8 @@ public class BestFitOverlapTests
 
     public BestFitOverlapTests(ITestOutputHelper output) => _output = output;
 
-    private static Drawing MakeRoundedRect(double w = 7.25, double h = 3.31, double r = 0.5)
-    {
-        var pgm = new Program();
-        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(w - r, 0)));
-        pgm.Codes.Add(new ArcMove(new Vector(w, r), new Vector(w - r, r), RotationType.CW));
-        pgm.Codes.Add(new LinearMove(new Vector(w, h - r)));
-        pgm.Codes.Add(new ArcMove(new Vector(w - r, h), new Vector(w - r, h - r), RotationType.CW));
-        pgm.Codes.Add(new LinearMove(new Vector(0, h)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
-        return new Drawing("rounded-rect", pgm);
-    }
+    private static Drawing MakeRoundedRect(double w = 7.25, double h = 3.31, double r = 0.5) =>
+        TestHelpers.MakeRoundedRectDrawing(w, h, r);
 
     private static Drawing ImportDxf()
     {

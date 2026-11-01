@@ -6,6 +6,7 @@ using OpenNest.Collections;
 using OpenNest.Diagnostics;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Geometry;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.CuttingPlanning;
 
@@ -552,24 +553,15 @@ public class CuttingPlanCommitTests
     {
         var clean = new Program();
         clean.MoveTo(width, height / 2);
-        Contour(clean, width, height);
+        TraceRectangleFromRightMidpoint(clean, width, height);
         var part = new Part(new Drawing("same", clean), new Vector(x, y));
         var placed = new Program();
         placed.MoveTo(width + 0.25, height / 2);
         placed.Codes.Add(new LinearMove(width, height / 2) { Layer = LayerType.Leadin });
-        Contour(placed, width, height);
+        TraceRectangleFromRightMidpoint(placed, width, height);
         placed.Codes.Add(new LinearMove(width + 0.25, height / 2) { Layer = LayerType.Leadout });
         Assert.True(part.RestoreLeadInProgram(placed, false));
         part.CuttingParameters = new CuttingParameters();
         return part;
-    }
-
-    private static void Contour(Program program, double width, double height)
-    {
-        program.LineTo(width, 0);
-        program.LineTo(0, 0);
-        program.LineTo(0, height);
-        program.LineTo(width, height);
-        program.LineTo(width, height / 2);
     }
 }

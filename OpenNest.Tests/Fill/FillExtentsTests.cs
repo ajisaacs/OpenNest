@@ -5,6 +5,7 @@ using OpenNest.Tests.BestFit;
 using Xunit.Abstractions;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.Fill;
 
@@ -223,7 +224,7 @@ public class FillExtentsTests
     [InlineData(15, 10)] // One rectangle fits, the pair does not.
     public void Fill_NoFit_MatchesFrozenLegacy(double length, double width)
     {
-        var drawing = MakeRect(10, 8);
+        var drawing = MakeRectDrawing(10, 8);
         var before = Snapshot(drawing);
         var area = new Box(3, 5, length, width);
         var expected = new LegacyFillExtents(area, 0.5).Fill(drawing);
@@ -433,7 +434,7 @@ public class FillExtentsTests
     internal static Drawing MakeFixture(string shape)
     {
         if (shape == "rectangle")
-            return MakeRect(10, 8);
+            return MakeRectDrawing(10, 8);
         if (shape == "triangle")
             return MakeRightTriangle(10, 8);
         var program = new Program();
@@ -525,17 +526,6 @@ public class FillExtentsTests
         return new Drawing("triangle", pgm);
     }
 
-    private static Drawing MakeRect(double w, double h)
-    {
-        var pgm = new Program();
-        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(w, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(w, h)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, h)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
-        return new Drawing("rect", pgm);
-    }
-
     [Fact]
     public void Fill_Triangle_ReturnsPartsWithinWorkArea()
     {
@@ -566,7 +556,7 @@ public class FillExtentsTests
     {
         var workArea = new Box(0, 0, 5, 5);
         var filler = new FillExtents(workArea, 0.5);
-        var drawing = MakeRect(10, 10);
+        var drawing = MakeRectDrawing(10, 10);
 
         var parts = filler.Fill(drawing);
 
@@ -631,7 +621,7 @@ public class FillExtentsTests
     {
         var workArea = new Box(0, 0, 120, 60);
         var filler = new FillExtents(workArea, 0.5);
-        var drawing = MakeRect(15, 10);
+        var drawing = MakeRectDrawing(15, 10);
 
         var parts = filler.Fill(drawing);
 

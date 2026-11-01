@@ -2,6 +2,7 @@ using System.Globalization;
 using OpenNest.CNC;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.Diagnostics;
 
@@ -12,7 +13,10 @@ public class OverlapPairPresentationTests
     [InlineData(Units.Millimeters, "mm")]
     public void DetailsUseCapturedNamesSequenceIdsAndSuppliedUnits(Units units, string symbol)
     {
-        var parts = new[] { Rectangle("cutoff"), Rectangle("left"), Rectangle("right") };
+        var parts = new[]
+        {
+            MakeSquarePart("cutoff"), MakeSquarePart("left"), MakeSquarePart("right"),
+        };
         parts[0].BaseDrawing.IsCutOff = true;
         var snapshot = PlateOverlapAnalyzer.Capture(parts);
         parts[1].BaseDrawing.Name = "changed";
@@ -41,7 +45,8 @@ public class OverlapPairPresentationTests
     {
         Assert.Equal(6 * factor, OverlapPairPresentation.MarkerHalfSize(dpi));
         Assert.Equal(10 * factor, OverlapPairPresentation.HitRadius(dpi));
-        var pairs = PlateOverlapAnalyzer.Analyze(new[] { Rectangle("a"), Rectangle("b") }).Pairs;
+        var pairs = PlateOverlapAnalyzer.Analyze(
+            new[] { MakeSquarePart("a"), MakeSquarePart("b") }).Pairs;
         foreach (var zoom in new[] { 0.5, 20.0, 500.0 })
         {
             Vector ToScreen(Vector world) => new(100 + world.X * zoom, 200 - world.Y * zoom);
@@ -59,20 +64,10 @@ public class OverlapPairPresentationTests
     [Fact]
     public void CoincidentMarkersReturnEveryPairInIdOrderNotFragmentOrder()
     {
-        var pairs = PlateOverlapAnalyzer.Analyze(new[] { Rectangle("a"), Rectangle("b"), Rectangle("c") }).Pairs;
+        var pairs = PlateOverlapAnalyzer.Analyze(
+            new[] { MakeSquarePart("a"), MakeSquarePart("b"), MakeSquarePart("c") }).Pairs;
         var hits = OverlapPairPresentation.HitTest(pairs.Reverse(), p => p, new Vector(2, 2), 96);
         Assert.Equal(new[] { "1/2", "1/3", "2/3" }, hits.Select(OverlapPairPresentation.Label));
         Assert.All(hits, p => Assert.Single(p.Regions)); // One island per coincident pair.
-    }
-
-    private static Part Rectangle(string name)
-    {
-        var program = new Program(Mode.Absolute);
-        program.Codes.Add(new RapidMove(0, 0));
-        program.Codes.Add(new LinearMove(4, 0));
-        program.Codes.Add(new LinearMove(4, 4));
-        program.Codes.Add(new LinearMove(0, 4));
-        program.Codes.Add(new LinearMove(0, 0));
-        return new Part(new Drawing(name, program));
     }
 }

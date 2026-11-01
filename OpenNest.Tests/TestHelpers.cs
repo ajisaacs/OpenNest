@@ -98,6 +98,88 @@ internal static class TestHelpers
         return new Drawing("square", pgm);
     }
 
+    /// <summary>A full circle of the given radius around (x, y), starting at its right.</summary>
+    public static Program MakeCircleProgram(double x, double y, double radius)
+    {
+        var p = new Program();
+        p.MoveTo(x + radius, y);
+        p.ArcTo(x + radius, y, x, y, RotationType.CCW);
+        return p;
+    }
+
+    /// <summary>A counterclockwise size x size square, lower-left corner at (x, y).</summary>
+    public static Program MakeSquareProgram(double x, double y, double size)
+    {
+        var program = new Program();
+        program.MoveTo(x, y);
+        program.LineTo(x + size, y);
+        program.LineTo(x + size, y + size);
+        program.LineTo(x, y + size);
+        program.LineTo(x, y);
+        return program;
+    }
+
+    /// <summary>A width x height rectangle from the origin, clockwise: up first, then +X.</summary>
+    public static Program MakeClockwiseRectProgram(double width, double height)
+    {
+        var program = new Program();
+        program.MoveTo(0, 0);
+        program.LineTo(0, height);
+        program.LineTo(width, height);
+        program.LineTo(width, 0);
+        program.LineTo(0, 0);
+        return program;
+    }
+
+    /// <summary>A closed contour through the vertices in order, back to the first one.</summary>
+    public static Program MakeClosedProgram(IEnumerable<Vector> vertices)
+    {
+        var p = new Program();
+        p.MoveTo(vertices.First().X, vertices.First().Y);
+        foreach (var v in vertices.Skip(1).Append(vertices.First()))
+            p.LineTo(v.X, v.Y);
+        return p;
+    }
+
+    /// <summary>
+    /// Appends a clockwise width x height rectangle that starts and ends at the midpoint of its
+    /// right edge, where <paramref name="program"/> must already be.
+    /// </summary>
+    public static void TraceRectangleFromRightMidpoint(Program program, double width, double height)
+    {
+        program.LineTo(width, 0);
+        program.LineTo(0, 0);
+        program.LineTo(0, height);
+        program.LineTo(width, height);
+        program.LineTo(width, height / 2);
+    }
+
+    /// <summary>A part of a 4 x 4 absolute-mode square drawing with the given name.</summary>
+    public static Part MakeSquarePart(string name)
+    {
+        var program = new Program(Mode.Absolute);
+        program.Codes.Add(new RapidMove(0, 0));
+        program.Codes.Add(new LinearMove(4, 0));
+        program.Codes.Add(new LinearMove(4, 4));
+        program.Codes.Add(new LinearMove(0, 4));
+        program.Codes.Add(new LinearMove(0, 0));
+        return new Part(new Drawing(name, program));
+    }
+
+    /// <summary>A w x h outline whose two right-hand corners are arcs of radius r.</summary>
+    public static Drawing MakeRoundedRectDrawing(double w, double h, double r)
+    {
+        var pgm = new Program();
+        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(w - r, 0)));
+        pgm.Codes.Add(new ArcMove(new Vector(w, r), new Vector(w - r, r), RotationType.CW));
+        pgm.Codes.Add(new LinearMove(new Vector(w, h - r)));
+        pgm.Codes.Add(new ArcMove(new Vector(w - r, h), new Vector(w - r, h - r), RotationType.CW));
+        pgm.Codes.Add(new LinearMove(new Vector(0, h)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
+        return new Drawing("rounded-rect", pgm);
+    }
+
     public static Drawing MakeFrameDrawing(double w = 20, double h = 6, double t = 0.5)
     {
         // Thin-walled hollow frame: outer CW, inner cutout CCW (CNC convention).

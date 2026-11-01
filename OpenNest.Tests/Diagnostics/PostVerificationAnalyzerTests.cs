@@ -4,6 +4,7 @@ using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
 using OpenNest.IO;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.Diagnostics;
 
@@ -50,8 +51,8 @@ public class PostVerificationAnalyzerTests
     [Fact]
     public void Overlap_SubtractsHoles()
     {
-        var program = Square(0, 0, 10);
-        program.Codes.AddRange(Square(2, 2, 6).Codes);
+        var program = MakeSquareProgram(0, 0, 10);
+        program.Codes.AddRange(MakeSquareProgram(2, 2, 6).Codes);
         var frame = Part(program);
         var report = Analyze(frame, Rectangle(3, 3, 1));
         Assert.Empty(Find(report, PostVerificationKind.Overlap));
@@ -91,8 +92,8 @@ public class PostVerificationAnalyzerTests
     [Fact]
     public void MissingLeadIn_PartialApplySingleLeavesOtherContourUncovered()
     {
-        var program = Square(0, 0, 10);
-        program.Codes.AddRange(Square(2, 2, 2).Codes);
+        var program = MakeSquareProgram(0, 0, 10);
+        program.Codes.AddRange(MakeSquareProgram(2, 2, 2).Codes);
         var part = Part(program);
         part.ApplySingleLeadIn(Leads(), Vector.Zero,
             new Line(Vector.Zero, new Vector(10, 0)), ContourType.External);
@@ -377,7 +378,7 @@ public class PostVerificationAnalyzerTests
     public void Rapid_NonzeroInitialLeadRapidIsNotAppliedTwice(Mode mode)
     {
         var part = Rectangle(100, 50, 4);
-        var placed = Square(0, 0, 4);
+        var placed = MakeSquareProgram(0, 0, 4);
         placed.Codes.Insert(0, new RapidMove(-2, 0));
         placed.Codes[1] = new LinearMove(0, 0) { Layer = LayerType.Leadin };
         placed.MoveTo(-2, 2);
@@ -408,7 +409,7 @@ public class PostVerificationAnalyzerTests
         var placed = new Program();
         placed.MoveTo(-2, 2);
         placed.MoveTo(6, 2);
-        placed.Codes.AddRange(Square(0, 0, 4).Codes);
+        placed.Codes.AddRange(MakeSquareProgram(0, 0, 4).Codes);
         part.RestoreLeadInProgram(placed, false);
         Assert.Empty(Find(Analyze(part), PostVerificationKind.RapidCrossing));
     }
@@ -472,7 +473,7 @@ public class PostVerificationAnalyzerTests
     public void Rapid_ResumedContourBecomesObstacleOnlyAfterItsLastCut()
     {
         var part = Rectangle(0, 0, 4);
-        var placed = Square(0, 0, 4);
+        var placed = MakeSquareProgram(0, 0, 4);
         placed.Codes.Insert(3, new RapidMove(4, 4)); // Pause, with no uncut gap.
         placed.MoveTo(-2, 2);
         placed.MoveTo(6, 2);
@@ -486,7 +487,7 @@ public class PostVerificationAnalyzerTests
     public void Rapid_InternalGapDoesNotBecomeAnObstacle(bool staleFlag)
     {
         var part = Rectangle(0, 0, 4);
-        var placed = Square(0, 0, 4);
+        var placed = MakeSquareProgram(0, 0, 4);
         placed.Codes.Insert(3, new RapidMove(3.75, 4)); // Leave a gap on the top edge.
         placed.MoveTo(-2, 2);
         placed.MoveTo(6, 2);
@@ -568,7 +569,7 @@ public class PostVerificationAnalyzerTests
     public void Rapid_OpenCutsAcrossAClosedContourAreIncomplete()
     {
         var part = Rectangle(0, 0, 10);
-        var placed = Square(0, 0, 10);
+        var placed = MakeSquareProgram(0, 0, 10);
         // Two cuts from edge to edge release the strip between them.
         placed.MoveTo(0, 3);
         placed.LineTo(10, 3);
@@ -597,7 +598,7 @@ public class PostVerificationAnalyzerTests
     {
         var part = Rectangle(100, 50, 20);
         var sub = CircleWithLead();
-        var program = Square(0, 0, 20);
+        var program = MakeSquareProgram(0, 0, 20);
         program.Codes.Insert(0, new SubProgramCall { Program = sub, Offset = new Vector(5, 5) });
         program.Codes.Insert(1, new SubProgramCall { Program = sub, Offset = new Vector(15, 5) });
         program.Mode = Mode.Incremental;
@@ -647,25 +648,14 @@ public class PostVerificationAnalyzerTests
     private static Part Part(Program program) => new(new Drawing("fixture", program));
 
     private static Part Rectangle(double x, double y, double size) =>
-        new(new Drawing("rectangle", Square(0, 0, size)), new Vector(x, y));
-
-    private static Program Square(double x, double y, double size)
-    {
-        var program = new Program();
-        program.MoveTo(x, y);
-        program.LineTo(x + size, y);
-        program.LineTo(x + size, y + size);
-        program.LineTo(x, y + size);
-        program.LineTo(x, y);
-        return program;
-    }
+        new(new Drawing("rectangle", MakeSquareProgram(0, 0, size)), new Vector(x, y));
 
     // A 10x10 part whose 4x4 cutout is cut in two pieces, leaving 0.2 tabs on its left and
     // right edges; leads enter and leave each piece from inside the slug.
     private static Part TabbedCutout(bool leads)
     {
-        var clean = Square(3, 3, 4);
-        clean.Codes.AddRange(Square(0, 0, 10).Codes);
+        var clean = MakeSquareProgram(3, 3, 4);
+        clean.Codes.AddRange(MakeSquareProgram(0, 0, 10).Codes);
         var part = new Part(new Drawing("tabbed", clean));
         var program = new Program();
         if (leads)
@@ -691,7 +681,7 @@ public class PostVerificationAnalyzerTests
         program.LineTo(3, 4.9);
         if (leads)
             program.Codes.Add(new LinearMove(3.2, 4.7) { Layer = LayerType.Leadout });
-        program.Codes.AddRange(Square(0, 0, 10).Codes);
+        program.Codes.AddRange(MakeSquareProgram(0, 0, 10).Codes);
         part.RestoreLeadInProgram(program, false);
         return part;
     }

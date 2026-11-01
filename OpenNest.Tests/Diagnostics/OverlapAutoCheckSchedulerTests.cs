@@ -1,6 +1,7 @@
 using OpenNest.CNC;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.Diagnostics;
 
@@ -96,19 +97,8 @@ public class OverlapAutoCheckSchedulerTests
     private static Plate PlateWithParts()
     {
         var plate = new Plate();
-        plate.Parts.Add(Rectangle());
-        plate.Parts.Add(Rectangle());
+        plate.Parts.Add(MakeSquarePart("same name"));
+        plate.Parts.Add(MakeSquarePart("same name"));
         return plate;
-    }
-
-    private static Part Rectangle()
-    {
-        var program = new Program(Mode.Absolute);
-        program.Codes.Add(new RapidMove(0, 0));
-        program.Codes.Add(new LinearMove(4, 0));
-        program.Codes.Add(new LinearMove(4, 4));
-        program.Codes.Add(new LinearMove(0, 4));
-        program.Codes.Add(new LinearMove(0, 0));
-        return new Part(new Drawing("same name", program));
     }
 }

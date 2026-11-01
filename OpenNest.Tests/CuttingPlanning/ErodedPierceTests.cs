@@ -3,6 +3,7 @@ using OpenNest.CNC.CuttingPlanning;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Geometry;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.CuttingPlanning;
 
@@ -42,7 +43,7 @@ public class ErodedPierceTests
     {
         var program = new Program();
         program.Merge(Rectangle(2, 1, 2.4, 1.05));
-        program.Merge(Circle(5, 1.5, 0.03));
+        program.Merge(MakeCircleProgram(5, 1.5, 0.03));
         program.Merge(Rectangle(0, 0, 10, 3));
         var part = new Part(new Drawing("tag", program));
         var parameters = new CuttingParameters
@@ -89,7 +90,7 @@ public class ErodedPierceTests
     public void Planner_RoundHoleSmallerThanItsLeadIsPiercedAtItsCenter(double approach)
     {
         var program = new Program();
-        program.Merge(Circle(2, 1.5, 0.09));
+        program.Merge(MakeCircleProgram(2, 1.5, 0.09));
         program.Merge(Rectangle(0, 0, 4, 3));
         var part = new Part(new Drawing("plate", program));
         var parameters = new CuttingParameters
@@ -243,14 +244,6 @@ public class ErodedPierceTests
 
     private static Program Rectangle(double x1, double y1, double x2, double y2) =>
         LeadPathValidationTests.Rectangle(x1, y1, x2, y2);
-
-    private static Program Circle(double x, double y, double radius)
-    {
-        var p = new Program();
-        p.MoveTo(x + radius, y);
-        p.ArcTo(x + radius, y, x, y, RotationType.CCW);
-        return p;
-    }
 
     private static string Describe(CuttingPlanResult result) =>
         $"{result.Status}: " + string.Join("; ", result.Findings.Select(f => f.Message).Take(5));

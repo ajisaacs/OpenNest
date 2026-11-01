@@ -2,6 +2,7 @@ using OpenNest.CNC;
 using OpenNest.Diagnostics;
 using OpenNest.Engine.Jobs;
 using OpenNest.Geometry;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.Diagnostics;
 
@@ -66,8 +67,8 @@ public class PartSpacingReviewTests
     public void PartInsideCutout_IsHeldToSpacingFromTheHoleEdge(double insert, bool warns)
     {
         var frame = new Program();
-        frame.Codes.AddRange(SquareProgram(0, 0, 10).Codes);
-        frame.Codes.AddRange(SquareProgram(2, 2, 6).Codes);
+        frame.Codes.AddRange(MakeSquareProgram(0, 0, 10).Codes);
+        frame.Codes.AddRange(MakeSquareProgram(2, 2, 6).Codes);
         var report = Analyze(Spacing, new Part(new Drawing("frame", frame)), Square(insert, insert, 2));
 
         Assert.Equal(warns, Find(report, PostVerificationKind.PartSpacing).Length == 1);
@@ -189,18 +190,7 @@ public class PartSpacingReviewTests
     }
 
     private static Part Square(double x, double y, double size, string name = "square") =>
-        new(new Drawing(name, SquareProgram(0, 0, size)), new Vector(x, y));
-
-    private static Program SquareProgram(double x, double y, double size)
-    {
-        var program = new Program();
-        program.MoveTo(x, y);
-        program.LineTo(x + size, y);
-        program.LineTo(x + size, y + size);
-        program.LineTo(x, y + size);
-        program.LineTo(x, y);
-        return program;
-    }
+        new(new Drawing(name, MakeSquareProgram(0, 0, size)), new Vector(x, y));
 
     private static Program Rectangle(double width, double height)
     {

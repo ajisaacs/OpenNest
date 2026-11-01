@@ -4,6 +4,7 @@ using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Diagnostics;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Geometry;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.CuttingPlanning;
 
@@ -107,8 +108,8 @@ public class PierceZoneTests
     public void RoundHole_ShortLeadPiercesAtTheZoneEdge_TooSmallHolePiercesAtItsCenter()
     {
         var clean = Rectangle(0, 0, 10, 10);
-        clean.Codes.AddRange(Circle(3, 5, 2).Codes);
-        clean.Codes.AddRange(Circle(7.5, 5, 0.3).Codes);
+        clean.Codes.AddRange(MakeCircleProgram(3, 5, 2).Codes);
+        clean.Codes.AddRange(MakeCircleProgram(7.5, 5, 0.3).Codes);
         var target = Snapshot(clean);
 
         var execution = Read(new ContourCuttingStrategy { Parameters = Parameters(1) }.Apply(clean, Start).Program);
@@ -349,14 +350,6 @@ public class PierceZoneTests
 
     private static Program Rectangle(double x1, double y1, double x2, double y2) =>
         LeadPathValidationTests.Rectangle(x1, y1, x2, y2);
-
-    private static Program Circle(double x, double y, double radius)
-    {
-        var p = new Program();
-        p.MoveTo(x + radius, y);
-        p.ArcTo(x + radius, y, x, y, RotationType.CCW);
-        return p;
-    }
 
     private static Program ExternalLead()
     {

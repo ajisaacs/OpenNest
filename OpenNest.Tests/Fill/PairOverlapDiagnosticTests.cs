@@ -17,35 +17,11 @@ public class PairOverlapDiagnosticTests
     /// Creates a 5x3.31 rectangle with rounded corners on the top-right and bottom-right
     /// (radius 0.5), similar to "4526 A14 PT13".
     /// </summary>
-    private static Drawing MakeRoundedRect(double w = 5.0, double h = 3.31, double r = 0.5)
-    {
-        var pgm = new Program();
-        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
-        // Bottom edge
-        pgm.Codes.Add(new LinearMove(new Vector(w - r, 0)));
-        // Bottom-right rounded corner
-        pgm.Codes.Add(new ArcMove(new Vector(w, r), new Vector(w - r, r), RotationType.CW));
-        // Right edge
-        pgm.Codes.Add(new LinearMove(new Vector(w, h - r)));
-        // Top-right rounded corner
-        pgm.Codes.Add(new ArcMove(new Vector(w - r, h), new Vector(w - r, h - r), RotationType.CW));
-        // Top edge
-        pgm.Codes.Add(new LinearMove(new Vector(0, h)));
-        // Left edge back to start
-        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
-        return new Drawing("rounded-rect", pgm);
-    }
+    private static Drawing MakeRoundedRect(double w = 5.0, double h = 3.31, double r = 0.5) =>
+        TestHelpers.MakeRoundedRectDrawing(w, h, r);
 
-    private static Drawing MakeSimpleRect(double w = 5.0, double h = 3.31)
-    {
-        var pgm = new Program();
-        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(w, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(w, h)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, h)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
-        return new Drawing("rect", pgm);
-    }
+    private static Drawing MakeSimpleRect(double w = 5.0, double h = 3.31) =>
+        TestHelpers.MakeRectDrawing(w, h);
 
     [Theory]
     [InlineData(0)] // 0 degrees

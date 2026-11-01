@@ -1,6 +1,7 @@
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
 using OpenNest.Geometry;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.CuttingPlanning;
 
@@ -16,16 +17,6 @@ public class ContourEntryRankingTests
             .AutomaticEntryCandidatesWithFallbacks(0);
 
     // --- fixtures ---------------------------------------------------------------
-
-    /// <summary>Square 0..10 in travel order, optionally cyclically reindexed or reversed.</summary>
-    private static Program Square(IEnumerable<Vector> vertices)
-    {
-        var p = new Program();
-        p.MoveTo(vertices.First().X, vertices.First().Y);
-        foreach (var v in vertices.Skip(1).Append(vertices.First()))
-            p.LineTo(v.X, v.Y);
-        return p;
-    }
 
     private static readonly Vector[] SquareVertices =
     {
@@ -55,7 +46,8 @@ public class ContourEntryRankingTests
     [Fact]
     public void LowerRightTarget_PrefersTheBottomRightCorner()
     {
-        var ranked = Catalog(Square(SquareVertices)).RankTowardNextCut(new Vector(14, -2));
+        var ranked = Catalog(MakeClosedProgram(SquareVertices))
+            .RankTowardNextCut(new Vector(14, -2));
 
         // Facing sides right and bottom; the shared corner is the ideal start.
         var first = Assert.Single(ranked.Take(1));
@@ -70,7 +62,8 @@ public class ContourEntryRankingTests
     public void FacingMidpoint_BeatsANonFacingCorner()
     {
         // Target due right: only the right side faces it; the left corners face away.
-        var ranked = Catalog(Square(SquareVertices)).RankTowardNextCut(new Vector(14, 5));
+        var ranked = Catalog(MakeClosedProgram(SquareVertices))
+            .RankTowardNextCut(new Vector(14, 5));
         var order = ranked.ToList();
 
         var rightMid = order.FindIndex(c => c.Kind == AutomaticEntryKind.StraightMidpoint && At(c, 10, 5));
@@ -81,7 +74,8 @@ public class ContourEntryRankingTests
     [Fact]
     public void SameFacingClass_CornerBeatsMidpoint()
     {
-        var ranked = Catalog(Square(SquareVertices)).RankTowardNextCut(new Vector(14, -2));
+        var ranked = Catalog(MakeClosedProgram(SquareVertices))
+            .RankTowardNextCut(new Vector(14, -2));
         var order = ranked.ToList();
 
         var corner = order.FindIndex(c => c.Kind == AutomaticEntryKind.ConvexCorner && At(c, 10, 0));
@@ -140,8 +134,10 @@ public class ContourEntryRankingTests
         var target = new Vector(14, -2);
 
         Assert.Equal(
-            Shape(Catalog(Square(SquareVertices)).RankTowardNextCut(target, new Vector(-1, -1))),
-            Shape(Catalog(Square(vertices)).RankTowardNextCut(target, new Vector(-1, -1))));
+            Shape(Catalog(MakeClosedProgram(SquareVertices))
+                .RankTowardNextCut(target, new Vector(-1, -1))),
+            Shape(Catalog(MakeClosedProgram(vertices))
+                .RankTowardNextCut(target, new Vector(-1, -1))));
     }
 
     [Fact]
@@ -162,7 +158,7 @@ public class ContourEntryRankingTests
     public void Ranking_NeverIntroducesReflexCandidates()
     {
         // L-outline: (5,5) is reflex for its own travel and absent from the catalog.
-        var p = Square(new[]
+        var p = MakeClosedProgram(new[]
         {
             new Vector(0, 0), new Vector(10, 0), new Vector(10, 10), new Vector(5, 10),
             new Vector(5, 5), new Vector(0, 5),
@@ -178,7 +174,7 @@ public class ContourEntryRankingTests
     [Fact]
     public void NonFiniteTarget_IsRejected()
     {
-        var catalog = Catalog(Square(SquareVertices));
+        var catalog = Catalog(MakeClosedProgram(SquareVertices));
         Assert.Throws<ArgumentException>(() =>
             catalog.RankTowardNextCut(new Vector(double.NaN, 5)));
     }
@@ -188,7 +184,8 @@ public class ContourEntryRankingTests
     [Fact]
     public void NoTarget_TierFirstThenDistanceToArrival()
     {
-        var ranked = Catalog(Square(SquareVertices)).RankTowardNextCut(arrival: new Vector(5, 10));
+        var ranked = Catalog(MakeClosedProgram(SquareVertices))
+            .RankTowardNextCut(arrival: new Vector(5, 10));
         var order = ranked.ToList();
 
         // Tier first: an outside corner outranks the midpoint the arrival sits on.
@@ -208,7 +205,7 @@ public class ContourEntryRankingTests
     {
         // The last part faces where the head already is; the ranking must not drag it to
         // the plate origin when the arrival is elsewhere.
-        var ranked = Catalog(Square(SquareVertices))
+        var ranked = Catalog(MakeClosedProgram(SquareVertices))
             .RankTowardNextCut(arrival: new Vector(arrivalX, arrivalY));
 
         Assert.True(At(ranked[0], expectedX, expectedY));

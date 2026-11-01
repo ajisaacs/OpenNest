@@ -3,6 +3,7 @@ using OpenNest.CNC.CuttingPlanning;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Geometry;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.CuttingPlanning;
 
@@ -15,7 +16,7 @@ public class CuttingCaptureRotationTests
     [InlineData(0.3, true)]
     public void SharedDiamond_CaptureAndReadyPreserveOnceRotatedCleanGeometry(double angle, bool incrementalRoot)
     {
-        var leaf = Rectangle(1, 2);
+        var leaf = MakeClockwiseRectProgram(1, 2);
         leaf.Mode = Mode.Incremental;
         var left = new Program();
         left.Codes.Add(new SubProgramCall(leaf, 0));
@@ -23,7 +24,7 @@ public class CuttingCaptureRotationTests
         var right = new Program();
         right.Codes.Add(new SubProgramCall(leaf, 0));
         right.Mode = Mode.Incremental;
-        var clean = Rectangle(10, 10);
+        var clean = MakeClockwiseRectProgram(10, 10);
         clean.Codes.Add(new SubProgramCall(left, 0) { Offset = new Vector(3, 3) });
         clean.Codes.Add(new SubProgramCall(right, 0) { Offset = new Vector(7, 3) });
         if (incrementalRoot) clean.Mode = Mode.Incremental;
@@ -80,15 +81,4 @@ public class CuttingCaptureRotationTests
     }
 
     private static bool IsCut(ExecutionMotion motion) => !motion.Rapid && motion.Layer is LayerType.Cut or LayerType.Display;
-
-    private static Program Rectangle(double width, double height)
-    {
-        var program = new Program();
-        program.MoveTo(0, 0);
-        program.LineTo(0, height);
-        program.LineTo(width, height);
-        program.LineTo(width, 0);
-        program.LineTo(0, 0);
-        return program;
-    }
 }

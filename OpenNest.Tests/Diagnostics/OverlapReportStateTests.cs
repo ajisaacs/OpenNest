@@ -1,6 +1,7 @@
 using OpenNest.CNC;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
+using static OpenNest.Tests.TestHelpers;
 
 namespace OpenNest.Tests.Diagnostics;
 
@@ -51,10 +52,10 @@ public class OverlapReportStateTests
                 case "rotate": part.Rotate(0.01); break;
                 case "reorder": (plate.Parts[0], plate.Parts[1]) = (plate.Parts[1], plate.Parts[0]); break;
                 case "replace-part": plate.Parts[0] = part.CloneAtOffset(new Vector()); break;
-                case "replace-drawing": plate.Parts[0] = Rectangle(); break;
+                case "replace-drawing": plate.Parts[0] = MakeSquarePart("same name"); break;
                 case "placed-program": part.Update(); break;
                 case "clean-program": part.BaseDrawing.Program = (Program)part.BaseDrawing.Program.Clone(); break;
-                case "add": plate.Parts.Add(Rectangle()); break;
+                case "add": plate.Parts.Add(MakeSquarePart("same name")); break;
                 case "remove": plate.Parts.RemoveAt(0); break;
                 case "plate":
                     var replacement = new Plate();
@@ -178,7 +179,7 @@ public class OverlapReportStateTests
     public void CutoffSlotsRemainPartOfTheOrderedIdentityStamp()
     {
         var plate = PlateWithParts();
-        var cutoff = Rectangle();
+        var cutoff = MakeSquarePart("same name");
         cutoff.BaseDrawing.IsCutOff = true;
         plate.Parts.Insert(0, cutoff);
         var state = new OverlapReportState();
@@ -269,7 +270,7 @@ public class OverlapReportStateTests
             case "placed-program": part.Update(); break;
             case "clean-program": part.BaseDrawing.Program = (Program)part.BaseDrawing.Program.Clone(); break;
             case "cutoff": part.BaseDrawing.IsCutOff = true; break;
-            case "replace": plate.Parts[0] = Rectangle(); break;
+            case "replace": plate.Parts[0] = MakeSquarePart("same name"); break;
             case "remove": plate.Parts.RemoveAt(0); break;
             case "reorder": (plate.Parts[0], plate.Parts[1]) = (plate.Parts[1], plate.Parts[0]); break;
         }
@@ -332,7 +333,7 @@ public class OverlapReportStateTests
         var state = new OverlapReportState();
         Assert.True(state.TryPublish(state.Begin(plate), plate, Analyze(plate)));
         var display = state.DisplayPairs;
-        plate.Parts.Add(Rectangle());
+        plate.Parts.Add(MakeSquarePart("same name"));
         state.Invalidate(plate); // Same entry point as the controller's collection event.
         Assert.Null(state.Report);
         Assert.Equal(OverlapCheckStatus.Stale, state.Status);
@@ -345,8 +346,8 @@ public class OverlapReportStateTests
     private static Plate PlateWithTwoPairs()
     {
         var plate = PlateWithParts();
-        var a = Rectangle();
-        var b = Rectangle();
+        var a = MakeSquarePart("same name");
+        var b = MakeSquarePart("same name");
         a.Offset(20, 0);
         b.Offset(20, 0);
         plate.Parts.Add(a);
@@ -359,19 +360,8 @@ public class OverlapReportStateTests
     private static Plate PlateWithParts()
     {
         var plate = new Plate();
-        plate.Parts.Add(Rectangle());
-        plate.Parts.Add(Rectangle());
+        plate.Parts.Add(MakeSquarePart("same name"));
+        plate.Parts.Add(MakeSquarePart("same name"));
         return plate;
-    }
-
-    private static Part Rectangle()
-    {
-        var program = new Program(Mode.Absolute);
-        program.Codes.Add(new RapidMove(0, 0));
-        program.Codes.Add(new LinearMove(4, 0));
-        program.Codes.Add(new LinearMove(4, 4));
-        program.Codes.Add(new LinearMove(0, 4));
-        program.Codes.Add(new LinearMove(0, 0));
-        return new Part(new Drawing("same name", program));
     }
 }
