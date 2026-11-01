@@ -54,7 +54,9 @@ one left unset stays at the nest defaults' value. The machine's spacing replaces
 plate defaults when Nest > Edit or Nest Information changes the material, grade or thickness
 (a spacing edited in the same dialog stays), when Nest > Machine changes the machine, and when a
 drawing set release creates a nest. BOM import starts each group's row from it. File > New has
-no material yet, so a new nest starts from the nest defaults. Plates are kept as they are, except
+no material yet, so a new nest starts from the nest defaults; adding a library drawing to a nest
+with no material or thickness gives it the record's (`LibraryDrawingInsert`), and with them this
+spacing. Drawings from files carry no thickness, so they leave the nest blank. Plates are kept as they are, except
 an untouched trailing empty sheet, which follows the plate defaults.
 
 ## Cut-offs

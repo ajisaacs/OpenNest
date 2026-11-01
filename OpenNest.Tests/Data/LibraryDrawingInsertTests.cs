@@ -128,7 +128,7 @@ public class LibraryDrawingInsertTests
     [InlineData("Other Steel", "Grade A", 0.25, "material Synthetic Steel (nest Other Steel)")]
     [InlineData("Synthetic Steel", "Grade B", 0.25, "grade Grade A (nest Grade B)")]
     [InlineData("Synthetic Steel", "Grade A", 0.1875, "thickness 0.25 (nest 0.1875)")]
-    [InlineData("", "", 0.0, "material Synthetic Steel (nest not set)")]
+    [InlineData("", "", 0.1875, "material Synthetic Steel (nest not set)")]
     public void Mismatch_AddsButDropsPinsAndNamesTheDifference(string material, string grade, double thickness, string expected)
     {
         var nest = MatchingNest();
@@ -168,6 +168,60 @@ public class LibraryDrawingInsertTests
         Assert.Single(drawing.CutPins);
         Assert.Equal(("Other Steel", "Grade B"), (drawing.Material.Name, drawing.Material.Grade));
         Assert.Equal((0.0, ""), (drawing.Library!.Thickness, drawing.Library.MaterialName));
+    }
+
+    [Fact]
+    public void BlankNest_TakesTheRecordsMaterialAndThicknessAndKeepsPins()
+    {
+        var nest = new Nest("New job") { Units = Units.Inches };
+
+        var insert = LibraryDrawingInsert.Plan(nest, Server, Record(), Package(), 1);
+
+        Assert.True(insert.KeepPins);
+        Assert.Empty(insert.Warnings);
+        Assert.Equal(0, nest.Thickness);
+        insert.Apply();
+        Assert.Equal(("Synthetic Steel", "Grade A", 0.25), (nest.Material.Name, nest.Material.Grade, nest.Thickness));
+        Assert.Single(Assert.Single(nest.Drawings).CutPins);
+    }
+
+    [Fact]
+    public void BlankNest_StaysBlankForARecordWithoutMaterialOrThickness()
+    {
+        var nest = new Nest("New job") { Units = Units.Inches };
+        var record = Record();
+        record.MaterialName = "";
+        record.MaterialGrade = "";
+        record.Thickness = 0;
+
+        LibraryDrawingInsert.Plan(nest, Server, record, Package(), 1).Apply();
+
+        Assert.True(string.IsNullOrEmpty(nest.Material.Name));
+        Assert.Equal(0, nest.Thickness);
+    }
+
+    [Fact]
+    public void RefusedInsert_LeavesABlankNestBlank()
+    {
+        var nest = new Nest("New job") { Units = Units.Millimeters };
+
+        Assert.True(LibraryDrawingInsert.Plan(nest, Server, Record(), Package(), 1).IsRefused);
+
+        Assert.True(string.IsNullOrEmpty(nest.Material.Name));
+        Assert.Equal(0, nest.Thickness);
+    }
+
+    [Fact]
+    public void NestWithOnlyAThickness_IsNotBlank()
+    {
+        var nest = new Nest("New job") { Units = Units.Inches, Thickness = 0.1875 };
+
+        var insert = LibraryDrawingInsert.Plan(nest, Server, Record(), Package(), 1);
+
+        Assert.NotEmpty(insert.Warnings);
+        insert.Apply();
+        Assert.True(string.IsNullOrEmpty(nest.Material.Name));
+        Assert.Equal(0.1875, nest.Thickness);
     }
 
     [Fact]

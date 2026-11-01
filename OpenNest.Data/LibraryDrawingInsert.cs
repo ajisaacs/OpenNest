@@ -45,16 +45,19 @@ public enum LibraryInsertKind
 /// a new exact copy carrying its library link, more quantity on the copy already there,
 /// or a refusal. Material, grade or thickness that differ from the nest still allow the
 /// add, but the drawing's cut pins are dropped (D3); a blank material or grade, or a zero
-/// thickness, on the record suits any nest and is never a difference. Different units, a different revision
-/// of the same drawing, or another drawing with the same name refuse it.
+/// thickness, on the record suits any nest and is never a difference. A nest with no material or
+/// thickness yet has nothing to differ from: it takes what the record sets. Different units, a
+/// different revision of the same drawing, or another drawing with the same name refuse it.
 /// </summary>
 public sealed class LibraryDrawingInsert
 {
     private bool _applied;
+    private readonly DrawingLibraryRecord? _adoptedRecord;
 
     private LibraryDrawingInsert(Nest nest, LibraryInsertKind kind, Drawing? drawing, int quantity,
-        bool keepPins, IReadOnlyList<string> warnings, string refusal)
+        bool keepPins, IReadOnlyList<string> warnings, string refusal, DrawingLibraryRecord? adoptedRecord = null)
     {
+        _adoptedRecord = adoptedRecord;
         Nest = nest;
         Kind = kind;
         Drawing = drawing;
@@ -131,7 +134,8 @@ public sealed class LibraryDrawingInsert
             return Refuse(nest, $"This nest already has a drawing named '{sameName.Name}' "
                 + $"({DescribeExisting(sameName)}), so {label} was not added. Rename one of them first.");
 
-        var differences = Differences(nest, record);
+        var blankNest = IsBlank(nest);
+        var differences = blankNest ? new List<string>() : Differences(nest, record);
         var warnings = package.Warnings.ToList();
         if (differences.Count > 0)
             warnings.Add($"{label} differs from this nest: {string.Join("; ", differences)}. The drawing is "
@@ -155,7 +159,7 @@ public sealed class LibraryDrawingInsert
         if (differences.Count > 0)
             drawing.CutPins.Clear();
         return new LibraryDrawingInsert(nest, LibraryInsertKind.AddDrawing, drawing, quantity,
-            keepPins: differences.Count == 0, warnings, "");
+            keepPins: differences.Count == 0, warnings, "", blankNest ? record : null);
     }
 
     /// <summary>Changes the planned nest; call at most once, and only for an insert that is not refused.</summary>
@@ -177,8 +181,19 @@ public sealed class LibraryDrawingInsert
             throw new InvalidOperationException($"This nest already has a drawing named '{Drawing!.Name}'.");
         }
 
+        if (_adoptedRecord != null)
+        {
+            if (IsSet(_adoptedRecord.MaterialName))
+                Nest.Material = new Material(_adoptedRecord.MaterialName, _adoptedRecord.MaterialGrade, Drawing!.Material.Density);
+            if (_adoptedRecord.Thickness > 0)
+                Nest.Thickness = _adoptedRecord.Thickness;
+        }
+
         _applied = true;
     }
+
+    private static bool IsBlank(Nest nest) =>
+        !IsSet(nest.Material?.Name) && !IsSet(nest.Material?.Grade) && nest.Thickness <= 0;
 
     private static LibraryDrawingInsert Refuse(Nest nest, string reason) =>
         new(nest, LibraryInsertKind.Refused, null, 0, keepPins: false, Array.Empty<string>(), reason);

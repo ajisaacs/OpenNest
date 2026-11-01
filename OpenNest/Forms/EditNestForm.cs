@@ -1424,11 +1424,20 @@ namespace OpenNest.Forms
                 form.EnableRelease(NestStorage.CreateRepository(), main.OpenServerNest, main.IsServerNestOpen);
             // The dialog adds drawings and sets quantities as the operator works in it.
             using var change = BeginChange("Drawing Library");
+            var job = (Nest.Material, Nest.Thickness);
             form.ShowDialog(this);
             if (form.AddedDrawings.Count > 0 || form.QuantitiesChanged)
             {
                 change.MarkChanged();
                 UpdateDrawingList();
+            }
+            // A blank nest takes its material and thickness from the first library drawing.
+            if (job != (Nest.Material, Nest.Thickness))
+            {
+                PlateManager.ChangePlateDefaults(
+                    () => MachineCuttingDefaults.ApplySpacingTo(Nest, MachineSettings.FindMachine(Nest.Machine)));
+                MachineSettings.ApplyCutOffDefaults(PlateView, Nest);
+                FirePlateChanged(false);
             }
             change.Complete();
         }
