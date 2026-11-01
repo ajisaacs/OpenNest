@@ -9,11 +9,11 @@ public class FillStrategyRegistryTests
     public void Registry_ListsBuiltInStrategiesInPipelineOrder()
     {
         Assert.Equal(
-            ["Pairs", "Row", "Column", "RectBestFit", "Extents", "Linear", "TiltedRemnant"],
+            ["Pairs", "Row", "Column", "Circle", "RectBestFit", "Extents", "Linear", "TiltedRemnant"],
             FillStrategyRegistry.AllStrategies.Select(s => s.Name)
         );
         Assert.Equal(
-            [100, 150, 160, 200, 300, 400, 500],
+            [100, 150, 160, 170, 200, 300, 400, 500],
             FillStrategyRegistry.AllStrategies.Select(s => s.Order)
         );
     }

@@ -17,6 +17,7 @@ namespace OpenNest.Engine.Strategies
                 new PairsFillStrategy(),
                 new RowFillStrategy(),
                 new ColumnFillStrategy(),
+                new CircleFillStrategy(),
                 new RectBestFitStrategy(),
                 new ExtentsFillStrategy(),
                 new LinearFillStrategy(),
