@@ -90,12 +90,8 @@ namespace OpenNest.Forms
 
             var nest = editForm.Nest;
             var views = ViewsOf(nest);
-            if (IsPlateWorkBusy(views))
-            {
-                MessageBox.Show(this, "Finish or cancel the current nesting or plate action first.",
-                    "Machine", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (WarnIfPlateWorkBusy(views, "Machine"))
                 return;
-            }
 
             editForm.RecordChange("Machine", () =>
             {
@@ -125,17 +121,8 @@ namespace OpenNest.Forms
 
             var nest = editForm.Nest;
             var views = ViewsOf(nest);
-            if (IsPlateWorkBusy(views))
-            {
-                MessageBox.Show(
-                    this,
-                    "Finish or cancel the current nesting or plate action first.",
-                    "Clamps",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                );
+            if (WarnIfPlateWorkBusy(views, "Clamps"))
                 return;
-            }
 
             var machine = MachineSettings.FindMachine(nest.Machine);
             Action<ClampSettings> save = machine == null
@@ -160,12 +147,8 @@ namespace OpenNest.Forms
 
             var nest = editForm.Nest;
             var views = ViewsOf(nest);
-            if (IsPlateWorkBusy(views))
-            {
-                MessageBox.Show(this, "Finish or cancel the current nesting or plate action first.",
-                    "Support Bed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (WarnIfPlateWorkBusy(views, "Support Bed"))
                 return;
-            }
 
             var machine = MachineSettings.FindMachine(nest.Machine);
             Action<SupportGridSettings> save = machine == null

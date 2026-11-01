@@ -559,27 +559,8 @@ namespace OpenNest.Controls
         }
 
         /// <summary>Shows one line per breakoff with <paramref name="selected"/> selected, without raising selection events.</summary>
-        public void LoadBreakoffs(IReadOnlyList<string> labels, int selected)
-        {
-            var added = labels.Count > breakoffsList.Items.Count;
-            loadingBreakoffs = true;
-            try
-            {
-                breakoffsList.BeginUpdate();
-                breakoffsList.Items.Clear();
-                foreach (var label in labels)
-                    breakoffsList.Items.Add(label);
-                breakoffsList.SelectedIndex = selected >= 0 && selected < labels.Count ? selected : -1;
-                breakoffsList.EndUpdate();
-            }
-            finally
-            {
-                loadingBreakoffs = false;
-            }
-            breakoffsPanel.HeaderText = $"Breakoffs ({labels.Count})";
-            if (added)
-                breakoffsPanel.IsExpanded = true;
-        }
+        public void LoadBreakoffs(IReadOnlyList<string> labels, int selected) =>
+            LoadList(breakoffsList, breakoffsPanel, "Breakoffs", ref loadingBreakoffs, labels, selected);
 
         public void SetTabbedCutoutPickMode(bool active)
         {
@@ -588,49 +569,34 @@ namespace OpenNest.Controls
         }
 
         /// <summary>Shows one line per tabbed cutout with <paramref name="selected"/> selected, without raising selection events.</summary>
-        public void LoadTabbedCutouts(IReadOnlyList<string> labels, int selected)
-        {
-            var added = labels.Count > cutoutsList.Items.Count;
-            loadingCutouts = true;
-            try
-            {
-                cutoutsList.BeginUpdate();
-                cutoutsList.Items.Clear();
-                foreach (var label in labels)
-                    cutoutsList.Items.Add(label);
-                cutoutsList.SelectedIndex = selected >= 0 && selected < labels.Count ? selected : -1;
-                cutoutsList.EndUpdate();
-            }
-            finally
-            {
-                loadingCutouts = false;
-            }
-            cutoutsPanel.HeaderText = $"Tabbed Cutouts ({labels.Count})";
-            if (added)
-                cutoutsPanel.IsExpanded = true;
-        }
+        public void LoadTabbedCutouts(IReadOnlyList<string> labels, int selected) =>
+            LoadList(cutoutsList, cutoutsPanel, "Tabbed Cutouts", ref loadingCutouts, labels, selected);
 
         /// <summary>Shows one line per dimension with <paramref name="selected"/> selected, without raising selection events.</summary>
-        public void LoadDimensions(IReadOnlyList<string> labels, int selected)
+        public void LoadDimensions(IReadOnlyList<string> labels, int selected) =>
+            LoadList(dimensionsList, dimensionsPanel, "Dimensions", ref loadingDimensions, labels, selected);
+
+        private static void LoadList(ListBox list, CollapsiblePanel panel, string title, ref bool loading,
+            IReadOnlyList<string> labels, int selected)
         {
-            var added = labels.Count > dimensionsList.Items.Count;
-            loadingDimensions = true;
+            var added = labels.Count > list.Items.Count;
+            loading = true;
             try
             {
-                dimensionsList.BeginUpdate();
-                dimensionsList.Items.Clear();
+                list.BeginUpdate();
+                list.Items.Clear();
                 foreach (var label in labels)
-                    dimensionsList.Items.Add(label);
-                dimensionsList.SelectedIndex = selected >= 0 && selected < labels.Count ? selected : -1;
-                dimensionsList.EndUpdate();
+                    list.Items.Add(label);
+                list.SelectedIndex = selected >= 0 && selected < labels.Count ? selected : -1;
+                list.EndUpdate();
             }
             finally
             {
-                loadingDimensions = false;
+                loading = false;
             }
-            dimensionsPanel.HeaderText = $"Dimensions ({labels.Count})";
+            panel.HeaderText = $"{title} ({labels.Count})";
             if (added)
-                dimensionsPanel.IsExpanded = true;
+                panel.IsExpanded = true;
         }
     }
 

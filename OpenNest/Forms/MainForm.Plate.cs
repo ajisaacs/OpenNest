@@ -86,12 +86,8 @@ namespace OpenNest.Forms
             var nest = editForm.Nest;
             var views = ViewsOf(nest);
             bool IsBusy() => IsPlateWorkBusy(views);
-            if (IsBusy())
-            {
-                MessageBox.Show(this, "Finish or cancel the current nesting or plate action first.",
-                    "Automatic Scrap Cutoffs", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (WarnIfPlateWorkBusy(views, "Automatic Scrap Cutoffs"))
                 return;
-            }
 
             try
             {

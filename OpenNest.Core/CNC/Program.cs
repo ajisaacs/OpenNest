@@ -158,35 +158,7 @@ namespace OpenNest.CNC
                 SetModeInc();
         }
 
-        public virtual void Offset(Vector voffset)
-        {
-            var mode = Mode;
-
-            SetModeAbs();
-
-            for (int i = 0; i < Codes.Count; ++i)
-            {
-                var code = Codes[i];
-
-                if (code is SubProgramCall subpgm)
-                {
-                    subpgm.Offset = new Geometry.Vector(
-                        subpgm.Offset.X + voffset.X,
-                        subpgm.Offset.Y + voffset.Y
-                    );
-                }
-
-                if (code is Motion == false)
-                    continue;
-
-                var code2 = (Motion)code;
-
-                code2.Offset(voffset);
-            }
-
-            if (mode == Mode.Incremental)
-                SetModeInc();
-        }
+        public virtual void Offset(Vector voffset) => Offset(voffset.X, voffset.Y);
 
         public void LineTo(double x, double y)
         {

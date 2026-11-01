@@ -8,29 +8,21 @@ namespace OpenNest.Data;
 /// A server without them raises <see cref="ServerTooOldException"/>; a stale write raises
 /// <see cref="SharedSettingSaveConflictException"/>; other failures surface as <see cref="IOException"/>.
 /// </summary>
-public sealed class RemoteSharedSettings : IDisposable
+public sealed class RemoteSharedSettings : NestServerClient
 {
     private const string Feature = "shared machine settings";
 
-    private readonly HttpClient _httpClient;
-    private readonly bool _ownsClient;
-    private readonly Uri _baseUri;
-
     /// <summary>A client that gives up after <paramref name="timeout"/>, so an unreachable server falls back quickly.</summary>
     public RemoteSharedSettings(string baseUrl, TimeSpan timeout)
-        : this(new HttpClient { Timeout = timeout }, baseUrl)
+        : base(new HttpClient { Timeout = timeout }, baseUrl, ownsClient: true)
     {
-        _ownsClient = true;
     }
 
     /// <summary>For tests and hosts that pool HttpClient instances.</summary>
     public RemoteSharedSettings(HttpClient httpClient, string baseUrl)
+        : base(httpClient, baseUrl, ownsClient: false)
     {
-        _httpClient = httpClient;
-        _baseUri = ServerUrl.ParseBase(baseUrl, nameof(baseUrl));
     }
-
-    private Uri Url(string relative) => new(_baseUri, relative);
 
     private static string Path(string kind, string key) =>
         $"api/settings/{Uri.EscapeDataString(kind)}/{Uri.EscapeDataString(key)}";
@@ -122,12 +114,6 @@ public sealed class RemoteSharedSettings : IDisposable
     private static async Task<SharedSettingRecord> ReadRecord(HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.Content.ReadFromJsonAsync<SharedSettingRecord>(NestServerHttp.JsonOptions, cancellationToken)
         ?? throw new IOException("Nest server returned empty settings.");
-
-    public void Dispose()
-    {
-        if (_ownsClient)
-            _httpClient.Dispose();
-    }
 }
 
 /// <summary>A shared settings write found a newer or different stored document; nothing was changed.</summary>

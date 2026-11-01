@@ -75,30 +75,9 @@ namespace OpenNest.CNC
         /// Refuses a nest a post cannot write, before any output is created: a marked rapid needs
         /// the post's head-raise code, and its markers must be well formed.
         /// </summary>
-        public static void EnsurePostable(Nest nest, bool hasCode, string postName)
-        {
-            ArgumentNullException.ThrowIfNull(nest);
-            foreach (var plate in nest.Plates)
-            {
-                foreach (var part in plate.Parts)
-                {
-                    if (part?.Program == null || !IsMarked(part.Program))
-                        continue;
-                    var name = DisplayPerimeterTail.PartName(part);
-                    if (!hasCode)
-                        throw new InvalidOperationException(
-                            $"{name} has rapids that must raise the head over parts already cut, but the {postName} "
-                            + "post has no head-raise code. Enter it in the post's configuration before posting.");
-                    try
-                    {
-                        RaisedMask(part.Program.Codes);
-                    }
-                    catch (ArgumentException ex)
-                    {
-                        throw new InvalidOperationException($"{name} cannot be posted: {ex.Message}", ex);
-                    }
-                }
-            }
-        }
+        public static void EnsurePostable(Nest nest, bool hasCode, string postName) =>
+            PostMarkers.EnsurePostable(nest, hasCode, IsMarked, program => RaisedMask(program.Codes),
+                name => $"{name} has rapids that must raise the head over parts already cut, but the {postName} "
+                    + "post has no head-raise code. Enter it in the post's configuration before posting.");
     }
 }

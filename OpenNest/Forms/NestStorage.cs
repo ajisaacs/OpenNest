@@ -43,48 +43,34 @@ namespace OpenNest.Forms
         /// URL changes. Throws <see cref="ArgumentException"/> if the configured URL
         /// is not a valid absolute http/https address.
         /// </summary>
-        public static INestRepository CreateRepository()
-        {
-            if (cachedRepository == null || cachedServerUrl != settings.ServerUrl)
-            {
-                cachedRepository?.Dispose();
-                cachedRepository = new RemoteNestRepository(settings.ServerUrl);
-                cachedServerUrl = settings.ServerUrl;
-            }
-
-            return cachedRepository;
-        }
+        public static INestRepository CreateRepository() =>
+            GetOrCreate(ref cachedRepository, ref cachedServerUrl, url => new RemoteNestRepository(url));
 
         /// <summary>
         /// The shared drawing library client for the current server URL, recreated only when
         /// the URL changes. Throws <see cref="ArgumentException"/> for an invalid URL.
         /// </summary>
-        public static IDrawingLibraryStore CreateDrawingLibrary()
-        {
-            if (cachedLibrary == null || cachedLibraryUrl != settings.ServerUrl)
-            {
-                cachedLibrary?.Dispose();
-                cachedLibrary = new RemoteDrawingLibrary(settings.ServerUrl);
-                cachedLibraryUrl = settings.ServerUrl;
-            }
-
-            return cachedLibrary;
-        }
+        public static IDrawingLibraryStore CreateDrawingLibrary() =>
+            GetOrCreate(ref cachedLibrary, ref cachedLibraryUrl, url => new RemoteDrawingLibrary(url));
 
         /// <summary>
         /// The shared drawing set client for the current server URL, recreated only when the
         /// URL changes. Throws <see cref="ArgumentException"/> for an invalid URL.
         /// </summary>
-        public static IDrawingSetStore CreateDrawingSetStore()
+        public static IDrawingSetStore CreateDrawingSetStore() =>
+            GetOrCreate(ref cachedSets, ref cachedSetsUrl, url => new RemoteDrawingSetStore(url));
+
+        private static T GetOrCreate<T>(ref T cached, ref string cachedUrl, Func<string, T> create)
+            where T : NestServerClient
         {
-            if (cachedSets == null || cachedSetsUrl != settings.ServerUrl)
+            if (cached == null || cachedUrl != settings.ServerUrl)
             {
-                cachedSets?.Dispose();
-                cachedSets = new RemoteDrawingSetStore(settings.ServerUrl);
-                cachedSetsUrl = settings.ServerUrl;
+                cached?.Dispose();
+                cached = create(settings.ServerUrl);
+                cachedUrl = settings.ServerUrl;
             }
 
-            return cachedSets;
+            return cached;
         }
     }
 }

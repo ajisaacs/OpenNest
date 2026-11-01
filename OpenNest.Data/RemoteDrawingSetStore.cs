@@ -15,7 +15,7 @@ namespace OpenNest.Data;
 /// <see cref="SetReleaseRules"/> before sending. A server without sets raises
 /// <see cref="ServerTooOldException"/>; other failures surface as <see cref="IOException"/>.
 /// </summary>
-public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
+public sealed class RemoteDrawingSetStore : NestServerClient, IDrawingSetStore
 {
     private const string Feature = "drawing sets";
 
@@ -23,24 +23,16 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
 
     private const string DrawingReleaseFeature = "releasing library drawings on their own";
 
-    private readonly HttpClient _httpClient;
-    private readonly bool _ownsClient;
-    private readonly Uri _baseUri;
-
     public RemoteDrawingSetStore(string baseUrl)
-        : this(new HttpClient(), baseUrl)
+        : base(new HttpClient(), baseUrl, ownsClient: true)
     {
-        _ownsClient = true;
     }
 
     /// <summary>For tests and hosts that pool HttpClient instances.</summary>
     public RemoteDrawingSetStore(HttpClient httpClient, string baseUrl)
+        : base(httpClient, baseUrl, ownsClient: false)
     {
-        _httpClient = httpClient;
-        _baseUri = ServerUrl.ParseBase(baseUrl, nameof(baseUrl));
     }
-
-    private Uri Url(string relative) => new(_baseUri, relative);
 
     public async Task<DrawingSetPage> QueryAsync(DrawingSetQuery query, CancellationToken cancellationToken = default)
     {
@@ -206,8 +198,8 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         if (setId == Guid.Empty) throw new ArgumentException("A drawing set id is required.", nameof(setId));
         if (nestId == Guid.Empty) throw new ArgumentException("A nest id is required.", nameof(nestId));
         if (drawingId == Guid.Empty) throw new ArgumentException("A library drawing id is required.", nameof(drawingId));
-        ValidatePaging(offset, limit);
-        var query = Paging(offset, limit);
+        NestServerHttp.ValidatePaging(offset, limit, DrawingLibraryRules.MaxRevisionLimit);
+        var query = NestServerHttp.Paging(offset, limit);
         if (setId is not null) query += $"&setId={setId}";
         if (nestId is not null) query += $"&nestId={nestId}";
         if (drawingId is not null) query += $"&drawingId={drawingId}";
@@ -220,7 +212,7 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         await NestServerHttp.EnsureSuccessAsync(response, "read releases", cancellationToken);
         var page = await response.Content.ReadFromJsonAsync<SetReleasePage>(NestServerHttp.JsonOptions, cancellationToken)
             ?? throw new IOException("Nest server returned an empty release page.");
-        if (page.Items is null || !IsBoundedPage(page.Items.Count, page.Total, page.Offset, page.Limit, offset, limit)
+        if (page.Items is null || !NestServerHttp.IsBoundedPage(page.Items.Count, page.Total, page.Offset, page.Limit, offset, limit)
             || page.Items.Any(item => item is null || item.Sets is null || item.Drawings is null || item.Nests is null
                 || (setId is not null && item.Sets.All(s => s?.SetId != setId))
                 || (nestId is not null && item.Nests.All(n => n?.NestId != nestId))
@@ -327,8 +319,8 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
     private async Task<DrawingSetPage?> GetPageAsync(string relative, int offset, int limit, string action,
         CancellationToken cancellationToken)
     {
-        ValidatePaging(offset, limit);
-        using var response = await _httpClient.GetAsync(Url($"{relative}?{Paging(offset, limit)}"), cancellationToken);
+        NestServerHttp.ValidatePaging(offset, limit, DrawingLibraryRules.MaxRevisionLimit);
+        using var response = await _httpClient.GetAsync(Url($"{relative}?{NestServerHttp.Paging(offset, limit)}"), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             await ThrowIfServerTooOld(cancellationToken);
@@ -337,7 +329,7 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         await NestServerHttp.EnsureSuccessAsync(response, action, cancellationToken);
         var page = await response.Content.ReadFromJsonAsync<DrawingSetPage>(NestServerHttp.JsonOptions, cancellationToken)
             ?? throw new IOException("Nest server returned an empty drawing set page.");
-        if (page.Items is null || !IsBoundedPage(page.Items.Count, page.Total, page.Offset, page.Limit, offset, limit)
+        if (page.Items is null || !NestServerHttp.IsBoundedPage(page.Items.Count, page.Total, page.Offset, page.Limit, offset, limit)
             || page.Items.Any(item => item is null))
             throw new IOException("Nest server returned an invalid or unbounded drawing set page.");
         return page;
@@ -358,10 +350,6 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         if (probe.StatusCode == HttpStatusCode.NotFound)
             throw new ServerTooOldException(Feature);
     }
-
-    private static bool IsBoundedPage(int count, int total, int pageOffset, int pageLimit, int offset, int limit) =>
-        count <= limit && pageOffset == offset && pageLimit == limit && total >= 0
-        && count <= System.Math.Max(0L, (long)total - offset);
 
     private static bool HasJoinedMembers(DrawingSetRecord record) =>
         record.Members is not null
@@ -432,15 +420,6 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         if (revision < 1) throw new ArgumentOutOfRangeException(nameof(revision));
     }
 
-    private static void ValidatePaging(int offset, int limit)
-    {
-        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
-        if (limit < 1 || limit > DrawingLibraryRules.MaxRevisionLimit) throw new ArgumentOutOfRangeException(nameof(limit));
-    }
-
-    private static string Paging(int offset, int limit) =>
-        $"offset={offset.ToString(CultureInfo.InvariantCulture)}&limit={limit.ToString(CultureInfo.InvariantCulture)}";
-
     private static string BuildQueryString(DrawingSetQuery query)
     {
         var text = new StringBuilder()
@@ -468,13 +447,6 @@ public sealed class RemoteDrawingSetStore : IDrawingSetStore, IDisposable
         if (release is null || release.Sets is null || release.Drawings is null || release.Nests is null)
             throw new IOException("Nest server returned an empty set release record.");
         return release;
-    }
-
-
-    public void Dispose()
-    {
-        if (_ownsClient)
-            _httpClient.Dispose();
     }
 }
 

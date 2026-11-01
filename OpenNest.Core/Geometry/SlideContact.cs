@@ -88,11 +88,11 @@ namespace OpenNest.Geometry
                 }
                 else
                 {
-                    if (!TryEndpoints(entities[i], out var start, out _))
+                    if (!EntityEndpoints.TryGet(entities[i], out var start, out _))
                         return Unresolved(entities);
 
                     var closed = false;
-                    while (i < count && TryEndpoints(entities[i], out _, out var end))
+                    while (i < count && EntityEndpoints.TryGet(entities[i], out _, out var end))
                     {
                         // A lone closed arc is a loop; a lone line cannot be, even when it
                         // has zero length and so ends where it starts.
@@ -105,7 +105,7 @@ namespace OpenNest.Geometry
 
                         if (
                             i + 1 >= count
-                            || !TryEndpoints(entities[i + 1], out var nextStart, out _)
+                            || !EntityEndpoints.TryGet(entities[i + 1], out var nextStart, out _)
                             || !Near(nextStart, end)
                         )
                             break;
@@ -263,11 +263,11 @@ namespace OpenNest.Geometry
         }
 
         private bool StartsNear(int index, Vector point) =>
-            TryEndpoints(entities[index], out var start, out _)
+            EntityEndpoints.TryGet(entities[index], out var start, out _)
             && start.DistanceTo(point) <= JointTolerance;
 
         private bool EndsNear(int index, Vector point) =>
-            TryEndpoints(entities[index], out _, out var end)
+            EntityEndpoints.TryGet(entities[index], out _, out var end)
             && end.DistanceTo(point) <= JointTolerance;
 
         private bool InRun(int index, int first, int last)
@@ -357,24 +357,6 @@ namespace OpenNest.Geometry
                     return System.Math.Abs(circle.Center.DistanceTo(point) - circle.Radius);
                 default:
                     return double.MaxValue;
-            }
-        }
-
-        private static bool TryEndpoints(Entity entity, out Vector start, out Vector end)
-        {
-            switch (entity)
-            {
-                case Line line:
-                    start = line.pt1;
-                    end = line.pt2;
-                    return true;
-                case Arc arc:
-                    start = arc.StartPoint();
-                    end = arc.EndPoint();
-                    return true;
-                default:
-                    start = end = new Vector();
-                    return false;
             }
         }
 

@@ -16,6 +16,30 @@ internal static class NestArchiveJson
         return (reader.Read(), reader.Warnings);
     }
 
+    public static MemoryStream Write(Nest nest)
+    {
+        var stream = new MemoryStream();
+        Assert.True(new NestWriter(nest).Write(stream));
+        stream.Position = 0;
+        return stream;
+    }
+
+    /// <summary>The archive's nest.json, leaving <paramref name="zip"/> ready to read again.</summary>
+    public static JsonObject NestJson(MemoryStream zip)
+    {
+        var json = NestJson(zip.ToArray());
+        zip.Position = 0;
+        return json;
+    }
+
+    /// <summary>A copy of the archive whose nest.json was changed by <paramref name="edit"/>.</summary>
+    public static MemoryStream Rewrite(MemoryStream zip, Action<JsonObject> edit)
+    {
+        var json = NestJson(zip);
+        edit(json);
+        return new MemoryStream(ReplaceNestJson(zip.ToArray(), json));
+    }
+
     public static JsonObject NestJson(byte[] archive)
     {
         using var zip = new ZipArchive(new MemoryStream(archive), ZipArchiveMode.Read);

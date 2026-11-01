@@ -555,13 +555,7 @@ public class GeometrySimplifier
         if (start > 0)
         {
             var prev = entities[start - 1];
-            var prevEnd = prev switch
-            {
-                Line l => l.EndPoint,
-                Arc a => a.EndPoint(),
-                _ => Vector.Invalid,
-            };
-            if (prevEnd.IsValid() && prevEnd.DistanceTo(points[0]) < 1e-6)
+            if (EntityEndpoints.TryGet(prev, out _, out var prevEnd) && prevEnd.DistanceTo(points[0]) < 1e-6)
             {
                 if (prev is Arc)
                     return new TangentEstimate(GetExitDirection(prev), true);
@@ -596,13 +590,7 @@ public class GeometrySimplifier
         if (k + 1 < entities.Count)
         {
             var next = entities[k + 1];
-            var nextStart = next switch
-            {
-                Line l => l.StartPoint,
-                Arc a => a.StartPoint(),
-                _ => Vector.Invalid,
-            };
-            if (nextStart.IsValid() && nextStart.DistanceTo(points[^1]) < 1e-6)
+            if (EntityEndpoints.TryGet(next, out var nextStart, out _) && nextStart.DistanceTo(points[^1]) < 1e-6)
             {
                 if (next is Arc nextArc)
                     return new TangentEstimate(GetEntryDirection(nextArc), true);
@@ -654,15 +642,19 @@ public class GeometrySimplifier
     private static Vector GetEntryDirection(Entity entity) =>
         entity switch
         {
-            Line line => new Vector(
-                line.EndPoint.X - line.StartPoint.X,
-                line.EndPoint.Y - line.StartPoint.Y
-            ),
-            Arc arc => arc.IsReversed
-                ? new Vector(System.Math.Sin(arc.StartAngle), -System.Math.Cos(arc.StartAngle))
-                : new Vector(-System.Math.Sin(arc.StartAngle), System.Math.Cos(arc.StartAngle)),
+            Line line => LineDirection(line),
+            Arc arc => ArcTangent(arc, arc.StartAngle),
             _ => Vector.Invalid,
         };
+
+    private static Vector LineDirection(Line line) =>
+        new(line.EndPoint.X - line.StartPoint.X, line.EndPoint.Y - line.StartPoint.Y);
+
+    /// <summary>The direction of travel along an arc at <paramref name="angle"/>.</summary>
+    private static Vector ArcTangent(Arc arc, double angle) =>
+        arc.IsReversed
+            ? new Vector(System.Math.Sin(angle), -System.Math.Cos(angle))
+            : new Vector(-System.Math.Sin(angle), System.Math.Cos(angle));
 
     /// <summary>
     /// Computes the tangent direction at the last point of a fitted arc,
@@ -806,13 +798,8 @@ public class GeometrySimplifier
     private static Vector GetExitDirection(Entity entity) =>
         entity switch
         {
-            Line line => new Vector(
-                line.EndPoint.X - line.StartPoint.X,
-                line.EndPoint.Y - line.StartPoint.Y
-            ),
-            Arc arc => arc.IsReversed
-                ? new Vector(System.Math.Sin(arc.EndAngle), -System.Math.Cos(arc.EndAngle))
-                : new Vector(-System.Math.Sin(arc.EndAngle), System.Math.Cos(arc.EndAngle)),
+            Line line => LineDirection(line),
+            Arc arc => ArcTangent(arc, arc.EndAngle),
             _ => Vector.Invalid,
         };
 

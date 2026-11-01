@@ -14,27 +14,18 @@ namespace OpenNest.Data;
 /// a "metadata" JSON part and a "file" part holding the .nest archive.
 /// Connection and HTTP failures surface as HttpRequestException/IOException to the caller.
 /// </summary>
-public sealed class RemoteNestRepository : INestRepository, IDisposable
+public sealed class RemoteNestRepository : NestServerClient, INestRepository
 {
-    private readonly HttpClient _httpClient;
-    private readonly bool _ownsClient;
-    private readonly Uri _baseUri;
-
     public RemoteNestRepository(string baseUrl)
-        : this(new HttpClient(), baseUrl)
+        : base(new HttpClient(), baseUrl, ownsClient: true)
     {
-        _ownsClient = true;
     }
 
     /// <summary>For tests and hosts that pool HttpClient instances.</summary>
     public RemoteNestRepository(HttpClient httpClient, string baseUrl)
+        : base(httpClient, baseUrl, ownsClient: false)
     {
-        _httpClient = httpClient;
-        _ownsClient = false;
-        _baseUri = ServerUrl.ParseBase(baseUrl, nameof(baseUrl));
     }
-
-    private Uri Url(string relative) => new(_baseUri, relative);
 
     public async Task<IReadOnlyList<NestRecord>> ListAsync(CancellationToken cancellationToken = default)
     {
@@ -192,19 +183,16 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         CancellationToken cancellationToken)
     {
         ValidateId(id);
-        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
-        if (limit < 1 || limit > NestRevisionPage.MaxLimit) throw new ArgumentOutOfRangeException(nameof(limit));
+        NestServerHttp.ValidatePaging(offset, limit, NestRevisionPage.MaxLimit);
         using var response = await _httpClient.GetAsync(
-            Url($"api/nests/{(deleted ? "deleted/" : "")}{id}/revisions?offset={offset.ToString(CultureInfo.InvariantCulture)}&limit={limit.ToString(CultureInfo.InvariantCulture)}"), cancellationToken);
+            Url($"api/nests/{(deleted ? "deleted/" : "")}{id}/revisions?{NestServerHttp.Paging(offset, limit)}"), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             throw new IOException("Nest history is unavailable or this nest no longer exists. Upgrade the nest server if it does not support version history, then reload.");
         await NestServerHttp.EnsureSuccessAsync(response, $"read nest history {id}", cancellationToken);
         var page = await response.Content.ReadFromJsonAsync<NestRevisionPage>(NestServerHttp.JsonOptions, cancellationToken)
             ?? throw new IOException("Nest server returned an empty history page.");
-        if (page.Items is null || page.Items.Count > limit || page.Offset != offset || page.Limit != limit
-            || page.Total < 0 || page.Items.Count > System.Math.Max(0L, (long)page.Total - offset)
-            || page.Items.Any(item => item is null || item.Revision < 1 || item.Id != id)
-            || page.Items.Zip(page.Items.Skip(1)).Any(pair => pair.First.Revision <= pair.Second.Revision))
+        if (page.Items is null || !NestServerHttp.IsBoundedPage(page.Items.Count, page.Total, page.Offset, page.Limit, offset, limit)
+            || !NestServerHttp.IsRevisionHistory(page.Items, id, item => item.Id, item => item.Revision))
             throw new IOException("Nest server returned an invalid or unbounded history page.");
         return page;
     }
@@ -306,12 +294,6 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
     private static void ValidateRevision(int revisionNumber)
     {
         if (revisionNumber < 1) throw new ArgumentOutOfRangeException(nameof(revisionNumber));
-    }
-
-    public void Dispose()
-    {
-        if (_ownsClient)
-            _httpClient.Dispose();
     }
 
     private static MultipartFormDataContent BuildMultipart(byte[] nestFile, NestRecord record)

@@ -1110,7 +1110,13 @@ namespace OpenNest.Forms
             PlateSequencing.Apply(plate, parameters);
         }
 
-        public void CalculateCurrentPlateCutTime()
+        public void CalculateCurrentPlateCutTime() =>
+            ShowCutTime(() => Timing.GetTimingInfo(PlateView.Plate), cutparams => Timing.CalculateTime(PlateView.Plate, cutparams));
+
+        public void CalculateNestCutTime() =>
+            ShowCutTime(() => Timing.GetTimingInfo(Nest), cutparams => Timing.CalculateTime(Nest, cutparams));
+
+        private void ShowCutTime(Func<TimingInfo> getInfo, Func<CutParameters, TimeSpan> calculateTime)
         {
             var cutParamsForm = new CutParametersForm();
             cutParamsForm.Units = Nest.Units;
@@ -1118,8 +1124,8 @@ namespace OpenNest.Forms
             if (cutParamsForm.ShowDialog() == DialogResult.OK)
             {
                 var cutparams = cutParamsForm.GetCutParameters();
-                var info = Timing.GetTimingInfo(PlateView.Plate);
-                var time = Timing.CalculateTime(PlateView.Plate, cutparams);
+                var info = getInfo();
+                var time = calculateTime(cutparams);
 
                 var timingForm = new TimingForm();
                 timingForm.Units = Nest.Units;
@@ -1153,30 +1159,6 @@ namespace OpenNest.Forms
             cutSimulatorForm.Location = new Point(
                 System.Math.Max(owner.Left, corner.X - cutSimulatorForm.Width - 24),
                 System.Math.Max(owner.Top, corner.Y - cutSimulatorForm.Height - 48));
-        }
-
-        public void CalculateNestCutTime()
-        {
-            var cutParamsForm = new CutParametersForm();
-            cutParamsForm.Units = Nest.Units;
-
-            if (cutParamsForm.ShowDialog() == DialogResult.OK)
-            {
-                var cutparams = cutParamsForm.GetCutParameters();
-                var info = Timing.GetTimingInfo(Nest);
-                var time = Timing.CalculateTime(Nest, cutparams);
-
-                var timingForm = new TimingForm();
-                timingForm.Units = Nest.Units;
-                timingForm.SetCutDistance(info.CutDistance);
-                timingForm.SetCutTime(time);
-                timingForm.SetIntersectionCount(info.IntersectionCount);
-                timingForm.SetPierceCount(info.PierceCount);
-                timingForm.SetRapidDistance(info.TravelDistance);
-                timingForm.SetCutParameters(cutparams);
-
-                timingForm.ShowDialog();
-            }
         }
 
         private void FirePlateChanged(bool updateListView = true)

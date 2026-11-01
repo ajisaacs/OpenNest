@@ -16,26 +16,18 @@ namespace OpenNest.Data;
 /// the library raises <see cref="ServerTooOldException"/>; this client never falls back
 /// to another store. Other failures surface as <see cref="IOException"/>.
 /// </summary>
-public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
+public sealed class RemoteDrawingLibrary : NestServerClient, IDrawingLibraryStore
 {
-    private readonly HttpClient _httpClient;
-    private readonly bool _ownsClient;
-    private readonly Uri _baseUri;
-
     public RemoteDrawingLibrary(string baseUrl)
-        : this(new HttpClient(), baseUrl)
+        : base(new HttpClient(), baseUrl, ownsClient: true)
     {
-        _ownsClient = true;
     }
 
     /// <summary>For tests and hosts that pool HttpClient instances.</summary>
     public RemoteDrawingLibrary(HttpClient httpClient, string baseUrl)
+        : base(httpClient, baseUrl, ownsClient: false)
     {
-        _httpClient = httpClient;
-        _baseUri = ServerUrl.ParseBase(baseUrl, nameof(baseUrl));
     }
-
-    private Uri Url(string relative) => new(_baseUri, relative);
 
     /// <summary>
     /// Stores revision 1 under <c>record.Id</c>, which the caller allocates first so an
@@ -106,11 +98,9 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
         int limit = DrawingLibraryRules.DefaultRevisionLimit, CancellationToken cancellationToken = default)
     {
         ValidateId(id);
-        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
-        if (limit < 1 || limit > DrawingLibraryRules.MaxRevisionLimit) throw new ArgumentOutOfRangeException(nameof(limit));
+        NestServerHttp.ValidatePaging(offset, limit, DrawingLibraryRules.MaxRevisionLimit);
         using var response = await _httpClient.GetAsync(
-            Url($"api/drawings/{id}/revisions?offset={offset.ToString(CultureInfo.InvariantCulture)}&limit={limit.ToString(CultureInfo.InvariantCulture)}"),
-            cancellationToken);
+            Url($"api/drawings/{id}/revisions?{NestServerHttp.Paging(offset, limit)}"), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             await ThrowIfServerTooOld(cancellationToken);
@@ -119,10 +109,8 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
         await NestServerHttp.EnsureSuccessAsync(response, $"read library drawing history {id}", cancellationToken);
         var page = await response.Content.ReadFromJsonAsync<DrawingLibraryPage>(NestServerHttp.JsonOptions, cancellationToken)
             ?? throw new IOException("Nest server returned an empty drawing history page.");
-        if (page.Items is null || page.Items.Count > limit || page.Offset != offset || page.Limit != limit
-            || page.Total < 0 || page.Items.Count > System.Math.Max(0L, (long)page.Total - offset)
-            || page.Items.Any(item => item is null || item.Revision < 1 || item.Id != id)
-            || page.Items.Zip(page.Items.Skip(1)).Any(pair => pair.First.Revision <= pair.Second.Revision))
+        if (page.Items is null || !NestServerHttp.IsBoundedPage(page.Items.Count, page.Total, page.Offset, page.Limit, offset, limit)
+            || !NestServerHttp.IsRevisionHistory(page.Items, id, item => item.Id, item => item.Revision))
             throw new IOException("Nest server returned an invalid or unbounded drawing history page.");
         return page;
     }
@@ -292,13 +280,6 @@ public sealed class RemoteDrawingLibrary : IDrawingLibraryStore, IDisposable
     {
         var record = await response.Content.ReadFromJsonAsync<DrawingLibraryRecord>(NestServerHttp.JsonOptions, cancellationToken);
         return record ?? throw new IOException("Nest server returned an empty library drawing record.");
-    }
-
-
-    public void Dispose()
-    {
-        if (_ownsClient)
-            _httpClient.Dispose();
     }
 }
 

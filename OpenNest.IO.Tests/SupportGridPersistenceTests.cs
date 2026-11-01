@@ -1,9 +1,8 @@
-using System.IO.Compression;
-using System.Text;
 using System.Text.Json.Nodes;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Geometry;
 using OpenNest.Support;
+using static OpenNest.IO.Tests.NestArchiveJson;
 
 namespace OpenNest.IO.Tests;
 
@@ -23,41 +22,6 @@ public class SupportGridPersistenceTests
         var plate = nest.CreatePlate();
         plate.CutOffs.Add(new CutOff(new Vector(40, 0), CutOffAxis.Vertical));
         return nest;
-    }
-
-    private static MemoryStream Write(Nest nest)
-    {
-        var stream = new MemoryStream();
-        Assert.True(new NestWriter(nest).Write(stream));
-        stream.Position = 0;
-        return stream;
-    }
-
-    private static JsonNode NestJson(MemoryStream zip)
-    {
-        zip.Position = 0;
-        using var archive = new ZipArchive(zip, ZipArchiveMode.Read, leaveOpen: true);
-        using var reader = new StreamReader(archive.GetEntry("nest.json")!.Open(), Encoding.UTF8);
-        var json = JsonNode.Parse(reader.ReadToEnd())!;
-        zip.Position = 0;
-        return json;
-    }
-
-    private static MemoryStream Rewrite(MemoryStream zip, Action<JsonNode> edit)
-    {
-        var json = NestJson(zip);
-        edit(json);
-        var copy = new MemoryStream();
-        zip.Position = 0;
-        zip.CopyTo(copy);
-        using (var archive = new ZipArchive(copy, ZipArchiveMode.Update, leaveOpen: true))
-        {
-            archive.GetEntry("nest.json")!.Delete();
-            using var writer = new StreamWriter(archive.CreateEntry("nest.json").Open(), new UTF8Encoding(false));
-            writer.Write(json.ToJsonString());
-        }
-        copy.Position = 0;
-        return copy;
     }
 
     [Fact]

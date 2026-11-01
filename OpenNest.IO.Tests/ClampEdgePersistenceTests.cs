@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json.Nodes;
 using OpenNest.Geometry;
+using static OpenNest.IO.Tests.NestArchiveJson;
 
 namespace OpenNest.IO.Tests;
 
@@ -27,14 +28,6 @@ public class ClampEdgePersistenceTests
         var plate = nest.CreatePlate();
         plate.CutOffs.Add(new CutOff(new Vector(40, 0), CutOffAxis.Vertical));
         return nest;
-    }
-
-    private static MemoryStream Write(Nest nest)
-    {
-        var stream = new MemoryStream();
-        Assert.True(new NestWriter(nest).Write(stream));
-        stream.Position = 0;
-        return stream;
     }
 
     private static JsonNode RailJson(MemoryStream zip)

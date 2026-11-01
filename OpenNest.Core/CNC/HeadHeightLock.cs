@@ -73,31 +73,10 @@ namespace OpenNest.CNC
         /// Refuses a nest a post cannot write, before any output is created: a cut-off with a locked
         /// overcut needs the post's lock and unlock codes, and its markers must be well formed.
         /// </summary>
-        public static void EnsurePostable(Nest nest, bool hasCodes, string postName)
-        {
-            ArgumentNullException.ThrowIfNull(nest);
-            foreach (var plate in nest.Plates)
-            {
-                foreach (var part in plate.Parts)
-                {
-                    if (part?.Program == null || !IsMarked(part.Program))
-                        continue;
-                    var name = DisplayPerimeterTail.PartName(part);
-                    if (!hasCodes)
-                        throw new InvalidOperationException(
-                            $"{name} overcuts past the sheet edge with the head height locked, but the {postName} post "
-                            + "has no head-height lock and unlock codes. Enter them in the post's configuration, "
-                            + "or delete the cut-off and add it again with the head-height lock off.");
-                    try
-                    {
-                        LockedMask(part.Program.Codes);
-                    }
-                    catch (ArgumentException ex)
-                    {
-                        throw new InvalidOperationException($"{name} cannot be posted: {ex.Message}", ex);
-                    }
-                }
-            }
-        }
+        public static void EnsurePostable(Nest nest, bool hasCodes, string postName) =>
+            PostMarkers.EnsurePostable(nest, hasCodes, IsMarked, program => LockedMask(program.Codes),
+                name => $"{name} overcuts past the sheet edge with the head height locked, but the {postName} post "
+                    + "has no head-height lock and unlock codes. Enter them in the post's configuration, "
+                    + "or delete the cut-off and add it again with the head-height lock off.");
     }
 }

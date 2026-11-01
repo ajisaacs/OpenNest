@@ -32,14 +32,6 @@ public class ClampRailPersistenceTests
         return nest;
     }
 
-    private static MemoryStream Write(Nest nest)
-    {
-        var stream = new MemoryStream();
-        Assert.True(new NestWriter(nest).Write(stream));
-        stream.Position = 0;
-        return stream;
-    }
-
     private static Nest RoundTrip(Nest nest) => new NestReader(Write(nest)).Read();
 
     [Fact]

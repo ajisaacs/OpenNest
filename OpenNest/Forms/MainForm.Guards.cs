@@ -29,6 +29,16 @@ namespace OpenNest.Forms
             IsJobRunning
             || views.Any(v => v.IsFillInProgress || v.Actions.CurrentAction?.IsBusy() == true);
 
+        /// <summary>Tells the user to finish first when <see cref="IsPlateWorkBusy"/>; true if it was.</summary>
+        private bool WarnIfPlateWorkBusy(PlateView[] views, string caption)
+        {
+            if (!IsPlateWorkBusy(views))
+                return false;
+            MessageBox.Show(this, "Finish or cancel the current nesting or plate action first.",
+                caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return true;
+        }
+
         /// <summary>
         /// A running job or a fill on any view of <paramref name="nest"/>; a busy current
         /// action does not count.

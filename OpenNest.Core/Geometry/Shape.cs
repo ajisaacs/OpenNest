@@ -585,8 +585,8 @@ namespace OpenNest.Geometry
             }
 
             if (
-                !TryGetEnds(last.Offset, out _, out var gapStart)
-                || !TryGetEnds(next.Offset, out var gapEnd, out _)
+                !EntityEndpoints.TryGet(last.Offset, out _, out var gapStart)
+                || !EntityEndpoints.TryGet(next.Offset, out var gapEnd, out _)
             )
                 return;
 
@@ -625,7 +625,7 @@ namespace OpenNest.Geometry
             corner = default;
 
             if (
-                !TryGetEnds(last, out _, out corner)
+                !EntityEndpoints.TryGet(last, out _, out corner)
                 || !TryGetTangents(last, out _, out var d1)
                 || !TryGetTangents(next, out var d2, out _)
             )
@@ -635,26 +635,6 @@ namespace OpenNest.Geometry
 
             return (side == OffsetSide.Left && cross < -OpenNest.Math.Tolerance.Epsilon)
                 || (side == OffsetSide.Right && cross > OpenNest.Math.Tolerance.Epsilon);
-        }
-
-        private static bool TryGetEnds(Entity entity, out Vector start, out Vector end)
-        {
-            switch (entity)
-            {
-                case Line line:
-                    start = line.StartPoint;
-                    end = line.EndPoint;
-                    return true;
-
-                case Arc arc:
-                    start = arc.StartPoint();
-                    end = arc.EndPoint();
-                    return true;
-
-                default:
-                    start = end = default;
-                    return false;
-            }
         }
 
         /// <summary>

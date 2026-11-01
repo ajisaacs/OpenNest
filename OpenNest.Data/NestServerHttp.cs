@@ -21,6 +21,26 @@ internal static class NestServerHttp
     public static void AddIfMatch(HttpRequestMessage request, int expectedRevision) =>
         request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{expectedRevision.ToString(CultureInfo.InvariantCulture)}\""));
 
+    public static void ValidatePaging(int offset, int limit, int maxLimit)
+    {
+        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
+        if (limit < 1 || limit > maxLimit) throw new ArgumentOutOfRangeException(nameof(limit));
+    }
+
+    public static string Paging(int offset, int limit) =>
+        $"offset={offset.ToString(CultureInfo.InvariantCulture)}&limit={limit.ToString(CultureInfo.InvariantCulture)}";
+
+    /// <summary>Whether a page is the one asked for and holds no more than its window and total allow.</summary>
+    public static bool IsBoundedPage(int count, int total, int pageOffset, int pageLimit, int offset, int limit) =>
+        count <= limit && pageOffset == offset && pageLimit == limit && total >= 0
+        && count <= System.Math.Max(0L, (long)total - offset);
+
+    /// <summary>Whether a history page holds only revisions of <paramref name="id"/>, newest first.</summary>
+    public static bool IsRevisionHistory<T>(IReadOnlyList<T> items, Guid id, Func<T, Guid> idOf, Func<T, int> revisionOf)
+        where T : class =>
+        !items.Any(item => item is null || revisionOf(item) < 1 || idOf(item) != id)
+        && !items.Zip(items.Skip(1)).Any(pair => revisionOf(pair.First) <= revisionOf(pair.Second));
+
     /// <summary>Throws an <see cref="IOException"/> naming the action, status and the start of the body.</summary>
     public static async Task EnsureSuccessAsync(HttpResponseMessage response, string action, CancellationToken cancellationToken)
     {
