@@ -105,7 +105,12 @@ namespace OpenNest.Forms
             UpdateUndoMenu();
         }
 
-        private void History_Changed(object sender, EventArgs e) => UpdateUndoMenu();
+        // Every recorded edit lands here, including those that add or remove a cut-off.
+        private void History_Changed(object sender, EventArgs e)
+        {
+            UpdateUndoMenu();
+            ToolbarEnableCheck();
+        }
 
         internal void UpdateUndoMenu()
         {

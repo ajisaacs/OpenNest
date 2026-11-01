@@ -1,5 +1,6 @@
 using System;
 using System.Windows.Forms;
+using OpenNest.Collections;
 
 namespace OpenNest.Forms
 {
@@ -8,6 +9,7 @@ namespace OpenNest.Forms
         private void EnableCheck()
         {
             NavigationEnableCheck();
+            ToolbarEnableCheck();
 
             var hasValue = activeForm != null;
 
@@ -45,6 +47,31 @@ namespace OpenNest.Forms
             mnuNestLastPlate.Enabled = hasPlates && !plates.IsLast;
         }
 
+        // The plate commands need a plate to act on and, like the Nest and Plate menus, no
+        // running job. Trim/Extend works on existing cut-offs; Sequence by Path needs two parts.
+        private void ToolbarEnableCheck()
+        {
+            var plate = nestingInProgress ? null : activeForm?.PlateView?.Plate;
+            var hasPlate = plate != null;
+            var hasCutOffs = plate?.CutOffs.Count > 0;
+
+            btnAutoNest.Enabled = hasPlate;
+            btnShowRemnants.Enabled = hasPlate;
+            btnCutOff.Enabled = hasPlate;
+            btnTrimExtendCutOff.Enabled = hasCutOffs;
+            mnuPlateTrimExtendCutOff.Enabled = hasCutOffs;
+            btnCutPlanner.Enabled = hasPlate;
+            btnSimulateCutting.Enabled = hasPlate;
+            btnSequenceByPath.Enabled = plate?.Parts.Count >= 2;
+            postButton.Enabled = hasPlate;
+        }
+
+        private void EditForm_PlateChanged(object sender, EventArgs e) => ToolbarEnableCheck();
+
+        private void PlateView_PartAdded(object sender, ItemAddedEventArgs<Part> e) => ToolbarEnableCheck();
+
+        private void PlateView_PartRemoved(object sender, ItemRemovedEventArgs<Part> e) => ToolbarEnableCheck();
+
         private void SetNestingLockout(bool locked)
         {
             nestingInProgress = locked;
@@ -53,6 +80,7 @@ namespace OpenNest.Forms
             mnuNest.Enabled = !locked;
             mnuPlate.Enabled = !locked;
             NavigationEnableCheck(locked);
+            ToolbarEnableCheck();
         }
 
         private void EngineComboBox_SelectedIndexChanged(object sender, EventArgs e)

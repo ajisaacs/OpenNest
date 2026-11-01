@@ -25,6 +25,9 @@ namespace OpenNest.Forms
         private readonly NestStorageController storage;
         private readonly ToolStripMenuItem storageModeMenu = new("Storage Mode...");
         private readonly ToolStripMenuItem exportNestMenu = new("Export .nest...");
+        private readonly ToolStripButton btnCutPlanner;
+        private readonly ToolStripButton btnSimulateCutting;
+        private readonly ToolStripButton btnSequenceByPath;
         private readonly ToolStripDropDownButton postButton = new()
         {
             Name = "btnPost",
@@ -124,12 +127,15 @@ namespace OpenNest.Forms
             statusStripToolTips = new StatusStripToolTips(statusStrip1); // The hold list lives in the ledger label's tooltip.
             statusBar = new MainStatusBar(statusLabel1, locationStatusLabel, selectionStatusLabel,
                 machineStatusLabel, materialStatusLabel, plateUtilStatusLabel, ledgerStatusLabel);
-            toolStrip1.Items.Add(CreateActionButton("btnCutPlanner", "Plan Cutting",
-                Resources.cut_planner, ToolbarPlanCutting_Click));
-            toolStrip1.Items.Add(CreateActionButton("btnSimulateCutting", "Simulate Cutting",
-                Resources.cut_simulate, SimulateCutting_Click));
-            toolStrip1.Items.Add(CreateActionButton("btnSequenceByPath", "Sequence by Path",
-                Resources.manual_sequence, SequenceByPath_Click));
+            btnCutPlanner = CreateActionButton("btnCutPlanner", "Plan Cutting",
+                Resources.cut_planner, ToolbarPlanCutting_Click);
+            btnSimulateCutting = CreateActionButton("btnSimulateCutting", "Simulate Cutting",
+                Resources.cut_simulate, SimulateCutting_Click);
+            btnSequenceByPath = CreateActionButton("btnSequenceByPath", "Sequence by Path",
+                Resources.manual_sequence, SequenceByPath_Click);
+            toolStrip1.Items.Add(btnCutPlanner);
+            toolStrip1.Items.Add(btnSimulateCutting);
+            toolStrip1.Items.Add(btnSequenceByPath);
             toolStrip1.Items.Add(postButton);
             storageModeMenu.Click += StorageMode_Click;
             exportNestMenu.Click += ExportNest_Click;
@@ -262,7 +268,12 @@ namespace OpenNest.Forms
 
             statusBar.Unbind();
             if (activeForm != null)
+            {
+                activeForm.PlateChanged -= EditForm_PlateChanged;
                 activeForm.PlateView.OverlapStateChanged -= OverlapStateChanged;
+                activeForm.PlateView.PartAdded -= PlateView_PartAdded;
+                activeForm.PlateView.PartRemoved -= PlateView_PartRemoved;
+            }
 
             // If nesting is in progress and the active form changed, cancel nesting
             if (nestingInProgress && nestingCts != null)
@@ -280,7 +291,10 @@ namespace OpenNest.Forms
             if (activeForm == null)
                 return;
 
+            activeForm.PlateChanged += EditForm_PlateChanged;
             activeForm.PlateView.OverlapStateChanged += OverlapStateChanged;
+            activeForm.PlateView.PartAdded += PlateView_PartAdded;
+            activeForm.PlateView.PartRemoved += PlateView_PartRemoved;
             var activeNest = activeForm.Nest;
             activeForm.PlateView.CanEditClamps = () => !ClampsInUse(activeNest);
             mnuViewDrawRapids.Checked = activeForm.PlateView.DrawRapid;

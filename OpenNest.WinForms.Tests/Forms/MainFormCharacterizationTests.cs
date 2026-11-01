@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Forms;
 using OpenNest.Geometry;
@@ -76,6 +77,65 @@ public class MainFormCharacterizationTests
         Assert.True(editor.PlateView.Actions.CurrentAction?.IsBusy() == true);
         Assert.Equal(new Guards(false, true, false, false), Read(host, editor, views));
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
+
+    [Fact]
+    public void ToolbarFollowsTheActiveDocumentAndItsPlate() => UndoTestEnv.Run(env =>
+    {
+        var host = env.Host;
+        bool Enabled(string button) => Field<ToolStripItem>(typeof(MainForm), host, button).Enabled;
+        void AddCutOff()
+        {
+            using var change = env.View.BeginChange("Add Cut-Off");
+            change.MarkChanged();
+            env.View.Plate.CutOffs.Add(new CutOff(new Vector(50, 0), CutOffAxis.Vertical));
+            env.View.Plate.RegenerateCutOffs(env.View.CutOffSettings);
+            change.Complete();
+        }
+
+        // The first plate holds two parts and no cut-offs.
+        env.Editor.PlateManager.LoadAt(0);
+        Assert.True(Enabled("btnCutOff"));
+        Assert.True(Enabled("btnSequenceByPath"));
+        Assert.False(Enabled("btnTrimExtendCutOff"));
+        Assert.False(UndoTestEnv.MenuItem(host, "mnuPlateTrimExtendCutOff").Enabled);
+
+        AddCutOff();
+        Assert.True(Enabled("btnTrimExtendCutOff"));
+        Assert.True(UndoTestEnv.MenuItem(host, "mnuPlateTrimExtendCutOff").Enabled);
+
+        Assert.True(host.TryUndo(env.Editor));
+        Assert.False(Enabled("btnTrimExtendCutOff"));
+        Assert.True(host.TryRedo(env.Editor));
+        Assert.True(Enabled("btnTrimExtendCutOff"));
+
+        // Another plate has its own cut-offs; the third one is empty.
+        env.Editor.PlateManager.LoadAt(2);
+        Assert.False(Enabled("btnTrimExtendCutOff"));
+        Assert.False(Enabled("btnSequenceByPath"));
+        env.View.Plate.Parts.Add(new Part(env.Nest.Drawings.First(), new Vector(5, 5)));
+        env.View.Plate.Parts.Add(new Part(env.Nest.Drawings.First(), new Vector(25, 5)));
+        Assert.True(Enabled("btnSequenceByPath"));
+
+        // A running job locks the plate commands, as it does the Nest and Plate menus.
+        Invoke(host, "SetNestingLockout", true);
+        Assert.False(Enabled("btnAutoNest"));
+        Assert.False(Enabled("btnCutOff"));
+        Assert.False(Enabled("postButton"));
+        Invoke(host, "SetNestingLockout", false);
+        Assert.True(Enabled("btnAutoNest"));
+
+        env.Editor.Close();
+        foreach (var button in ToolbarPlateCommands)
+            Assert.False(Enabled(button), button);
+        Assert.True(Enabled("btnNew"));
+        Assert.True(Enabled("btnOpen"));
+    });
+
+    private static readonly string[] ToolbarPlateCommands =
+    {
+        "btnSave", "btnSaveAs", "btnAutoNest", "btnShowRemnants", "btnCutOff", "btnTrimExtendCutOff",
+        "btnCutPlanner", "btnSimulateCutting", "btnSequenceByPath", "postButton",
+    };
 
     private sealed record Guards(bool ExpandSpacing, bool CuttingPlan, bool Clamps, bool NestJob);
 
