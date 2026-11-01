@@ -11,73 +11,87 @@ namespace OpenNest.Engine.CirclePacking
 
         public override void Fill(Item item)
         {
-            var max = new Vector(
-                Bin.Right - item.BoundingBox.Right + Tolerance.Epsilon,
-                Bin.Top - item.BoundingBox.Top + Tolerance.Epsilon
-            );
+            var bin1 = FillHorizontal(item);
+            var bin2 = FillVertical(item);
 
-            var rows = System.Math.Floor((Bin.Length + Tolerance.Epsilon) / (item.Diameter));
-
-            if (rows == 0)
-                return;
-
-            var diameter = item.Diameter;
-            var remaining = Bin.Length - diameter * rows;
-            var radius = diameter * 0.5;
-
-            if (remaining < radius)
-            {
-                var yodd = Bin.Y + remaining;
-                var yoffset = diameter;
-                var xoffset = Trigonometry.Base(remaining, diameter);
-                int column = 0;
-
-                for (var x = Bin.X; x <= max.X; x += xoffset)
-                {
-                    var y = column.IsOdd() ? yodd : Bin.Y;
-
-                    for (; y <= max.Y; y += yoffset)
-                    {
-                        var addedItem = item.Clone();
-                        addedItem.Center = new Vector(x, y);
-                        Bin.Items.Add(addedItem);
-                    }
-
-                    column++;
-                }
-            }
+            if (bin1.Items.Count > bin2.Items.Count)
+                Bin.Items.AddRange(bin1.Items);
             else
-            {
-                var yoffset = (Bin.Length - diameter) / (2 * rows - 1);
-                // Adjacent columns touch diagonally, but columns two apart sit directly beside
-                // each other, so the column spacing can never drop below a radius.
-                var xoffset = System.Math.Max(Trigonometry.Base(yoffset, diameter), radius);
-
-                var yodd = Bin.Y + yoffset;
-
-                yoffset *= 2.0;
-
-                int column = 0;
-
-                for (var x = Bin.X; x <= max.X; x += xoffset)
-                {
-                    var y = column.IsOdd() ? yodd : Bin.Y;
-
-                    for (; y <= max.Y; y += yoffset)
-                    {
-                        var addedItem = item.Clone();
-                        addedItem.Center = new Vector(x, y);
-                        Bin.Items.Add(addedItem);
-                    }
-
-                    column++;
-                }
-            }
+                Bin.Items.AddRange(bin2.Items);
         }
 
         public override void Fill(Item item, int maxCount)
         {
             throw new NotImplementedException();
+        }
+
+        private Bin FillHorizontal(Item item) => FillAxis(item, horizontal: true);
+
+        private Bin FillVertical(Item item) => FillAxis(item, horizontal: false);
+
+        /// <summary>Stripes run along Y and step along X when horizontal, and the reverse otherwise.</summary>
+        private Bin FillAxis(Item item, bool horizontal)
+        {
+            var bin = Bin.Clone() as Bin;
+
+            var max = new Vector(
+                bin.Right - item.Radius + Tolerance.Epsilon,
+                bin.Top - item.Radius + Tolerance.Epsilon
+            );
+
+            // A box's Length runs along X and its Width along Y.
+            var stripeSize = horizontal ? bin.Width : bin.Length;
+            var diameter = item.Diameter;
+            var radius = item.Radius;
+            var rows = System.Math.Floor((stripeSize + Tolerance.Epsilon) / diameter);
+
+            if (rows == 0)
+                return bin;
+
+            var remaining = stripeSize - diameter * rows;
+            double oddShift;
+            double innerOffset;
+            double outerOffset;
+
+            if (remaining < radius)
+            {
+                oddShift = remaining;
+                innerOffset = diameter;
+                outerOffset = Trigonometry.Base(remaining, diameter);
+            }
+            else
+            {
+                oddShift = (stripeSize - diameter) / (2 * rows - 1);
+                innerOffset = oddShift * 2.0;
+                // Adjacent stripes touch diagonally, but stripes two apart sit directly beside
+                // each other, so the stripe spacing can never drop below a radius.
+                outerOffset = System.Math.Max(Trigonometry.Base(oddShift, diameter), radius);
+            }
+
+            var outerStart = (horizontal ? bin.X : bin.Y) + radius;
+            var outerMax = horizontal ? max.X : max.Y;
+            var innerStart = (horizontal ? bin.Y : bin.X) + radius;
+            var innerMax = horizontal ? max.Y : max.X;
+
+            var stripe = 0;
+
+            for (var outer = outerStart; outer <= outerMax; outer += outerOffset)
+            {
+                var inner = stripe.IsOdd() ? innerStart + oddShift : innerStart;
+
+                for (; inner <= innerMax; inner += innerOffset)
+                {
+                    var addedItem = item.Clone();
+                    addedItem.Center = horizontal
+                        ? new Vector(outer, inner)
+                        : new Vector(inner, outer);
+                    bin.Items.Add(addedItem);
+                }
+
+                stripe++;
+            }
+
+            return bin;
         }
     }
 }

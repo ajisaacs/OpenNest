@@ -34,11 +34,12 @@ namespace OpenNest.Engine.CirclePacking
             var bin = Bin.Clone() as Bin;
 
             var max = new Vector(
-                bin.Right - item.BoundingBox.Right + Tolerance.Epsilon,
-                bin.Top - item.BoundingBox.Top + Tolerance.Epsilon
+                bin.Right - item.Radius + Tolerance.Epsilon,
+                bin.Top - item.Radius + Tolerance.Epsilon
             );
 
-            var primarySize = horizontal ? bin.Width : bin.Length;
+            // A box's Length runs along X and its Width along Y.
+            var primarySize = horizontal ? bin.Length : bin.Width;
             var count = System.Math.Floor((primarySize + Tolerance.Epsilon) / item.Diameter);
 
             if (count == 0)
@@ -55,9 +56,9 @@ namespace OpenNest.Engine.CirclePacking
                 ? System.Math.Max(Trigonometry.Height(primaryOffset * 0.5, item.Diameter), item.Diameter * 0.5)
                 : item.Diameter;
 
-            var outerStart = horizontal ? bin.Y : bin.X;
+            var outerStart = (horizontal ? bin.Y : bin.X) + item.Radius;
             var outerMax = horizontal ? max.Y : max.X;
-            var innerStart = horizontal ? bin.X : bin.Y;
+            var innerStart = (horizontal ? bin.X : bin.Y) + item.Radius;
             var innerMax = horizontal ? max.X : max.Y;
 
             var stripe = 0;
