@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using OpenNest.Data;
 using static OpenNest.Server.Tests.DrawingLibraryFixtures;
 using static OpenNest.Server.Tests.DrawingSetFixtures;
+using static OpenNest.Server.Tests.TestDatabase;
 
 namespace OpenNest.Server.Tests;
 
@@ -132,22 +133,4 @@ public sealed class MaterialListTests
         DateCreated = new DateTime(2026, 1, 1),
         DateModified = new DateTime(2026, 1, 2),
     };
-
-    private static void Execute(string path, string sql)
-    {
-        using var connection = new SqliteConnection($"Data Source={path};Pooling=False");
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.ExecuteNonQuery();
-    }
-
-    private static object? Scalar(string path, string sql)
-    {
-        using var connection = new SqliteConnection($"Data Source={path};Pooling=False");
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        return command.ExecuteScalar();
-    }
 }

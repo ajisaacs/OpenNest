@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.Data.Sqlite;
 using OpenNest.Data;
+using static OpenNest.Server.Tests.TestDatabase;
 
 namespace OpenNest.Server.Tests;
 
@@ -171,23 +172,5 @@ public sealed class SharedSettingsTests
         using var request = new HttpRequestMessage(HttpMethod.Put, url) { Content = JsonContent.Create(write) };
         request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{revision}\""));
         return await client.SendAsync(request);
-    }
-
-    private static void Execute(string path, string sql)
-    {
-        using var connection = new SqliteConnection($"Data Source={path};Pooling=False");
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.ExecuteNonQuery();
-    }
-
-    private static object? Scalar(string path, string sql)
-    {
-        using var connection = new SqliteConnection($"Data Source={path};Pooling=False");
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        return command.ExecuteScalar();
     }
 }

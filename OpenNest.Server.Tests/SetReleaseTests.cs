@@ -7,6 +7,7 @@ using Microsoft.Data.Sqlite;
 using OpenNest.Data;
 using static OpenNest.Server.Tests.DrawingLibraryFixtures;
 using static OpenNest.Server.Tests.DrawingSetFixtures;
+using static OpenNest.Server.Tests.TestDatabase;
 
 namespace OpenNest.Server.Tests;
 
@@ -587,23 +588,5 @@ public sealed class SetReleaseTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var stored = (await response.Content.ReadFromJsonAsync<SetReleaseRecord>(Options))!;
         Assert.Equal((false, "Synthetic kit", (SetReleaseNestUndo?)null), (stored.IsUndone, stored.Sets[0].SetName, stored.Nests[0].Undo));
-    }
-
-    private static object? Scalar(string path, string sql)
-    {
-        using var connection = new SqliteConnection($"Data Source={path};Pooling=False");
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        return command.ExecuteScalar();
-    }
-
-    private static void Execute(string path, string sql)
-    {
-        using var connection = new SqliteConnection($"Data Source={path};Pooling=False");
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.ExecuteNonQuery();
     }
 }
