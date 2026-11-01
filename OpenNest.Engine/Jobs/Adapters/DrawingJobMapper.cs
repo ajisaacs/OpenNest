@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OpenNest.CNC;
 using OpenNest.Engine.BestFit;
 
@@ -128,6 +129,27 @@ public static class DrawingJobMapper
         foreach (var zone in stock.SheetClampZones)
             plate.ClampZones.Add(new ClampZone(zone.Id, zone.Bounds));
         plate.Outline = stock.Outline;
+        // The rail supplies the clamp clearance, so the plate is checked as the stock was packed.
+        if (stock.ClampRail != null)
+            FollowClampRail(plate, stock.ClampRail);
         return plate;
+    }
+
+    /// <summary>
+    /// Ties the plate to <paramref name="rail"/> when the rail recreates its zones, directly or
+    /// minus the clamps they lack (Auto Nest's last-resort removal, D8), so it keeps following
+    /// the rail and the removal (C13). Other zones stay explicit: tying them to the rail would
+    /// swap in other clamps.
+    /// </summary>
+    internal static void FollowClampRail(Plate plate, ClampRail rail)
+    {
+        var kept = new HashSet<string>(plate.ClampZones.Select(z => z.Id), StringComparer.Ordinal);
+        var removedClamps = rail.ResolveFor(plate.Size, plate.Quadrant)
+            .Select(z => z.Id)
+            .Where(id => !kept.Contains(id))
+            .ToList();
+        var unchanged = ReferenceEquals(plate.ClampRail, rail) && plate.RemovedClamps.SetEquals(removedClamps);
+        if (!unchanged && rail.Matches(plate, removedClamps))
+            plate.SetClampRail(rail, removedClamps);
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using OpenNest.CNC;
 using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.NestingEngines;
 using OpenNest.Engine.NestingEngines.Circles;
 using OpenNest.Geometry;
@@ -64,6 +65,21 @@ public class CirclesNestingEngineTests
         Assert.NotEmpty(Assert.Single(result.Plates).Placements);
     }
 
+    [Fact]
+    public void ARailsOwnClearanceIsTheOneTheLayoutIsCheckedAgainst()
+    {
+        // Rail clearance 0 under 0.25 edge spacing: discs may pass closer to a clamp than the
+        // edge spacing, and the layout check must judge them by the clearance they were packed to.
+        var plate = new Plate(new Size(60, 120)) { PartSpacing = 0.25, EdgeSpacing = new Spacing(0.25, 0.25) };
+        plate.SetClampRail(new ClampRail(1.5, 0.625, new double[] { 20, 40, 60, 80, 100, 120 }, clearance: 0));
+        var job = Job([Part("disc", Disc(4), 150)], [DrawingJobMapper.FromPlate("s", plate, 1)]);
+        var result = new CirclesNestingEngine().Solve(job);
+
+        LayoutAssert.Valid(job, result);
+        var clamps = job.Plates[0].ClampZones.Select(z => z.Bounds.Offset(job.Plates[0].EdgeSpacing.Bottom));
+        Assert.Contains(Assert.Single(result.Plates).Placements, p => clamps.Any(z => Reaches(z, p.X, p.Y, 4)));
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
@@ -115,6 +131,14 @@ public class CirclesNestingEngineTests
         // Only improvements are reported: each plan beats the one before it.
         var scores = plans.Select(p => CandidateScore.Of(job, p, 0)).ToList();
         Assert.All(scores.Zip(scores.Skip(1)), s => Assert.True(s.Second.IsBetterThan(s.First)));
+    }
+
+    /// <summary>Whether a disc at this center would enter the box.</summary>
+    private static bool Reaches(Box box, double x, double y, double radius)
+    {
+        var dx = System.Math.Max(0, System.Math.Max(box.Left - x, x - box.Right));
+        var dy = System.Math.Max(0, System.Math.Max(box.Bottom - y, y - box.Top));
+        return dx * dx + dy * dy < radius * radius;
     }
 
     /// <summary>A polygonal gear: alternating tip and root radii.</summary>

@@ -64,6 +64,33 @@ public class ClampClearanceTests
     }
 
     [Fact]
+    public void AMaterializedPlateKeepsTheStocksRailAndItsRemovedClamps()
+    {
+        var source = RailPlate(clearance: 0.05);
+        source.SetClampRail(new ClampRail(1.5, ClampTop, new[] { 6.0, 12.0 }, clearance: 0.05), new[] { "clamp-1" });
+        var stock = DrawingJobMapper.FromPlate("s", source, 1);
+
+        var plate = DrawingJobMapper.CreatePlate(stock);
+
+        Assert.Equal(stock.ClampClearance, plate.ClampClearance);
+        Assert.Equal(new[] { "clamp-1" }, plate.RemovedClamps);
+        Assert.Equal("clamp-2", Assert.Single(plate.ClampZones).Id);
+    }
+
+    [Fact]
+    public void AMaterializedPlateKeepsZonesTheRailDoesNotRecreate()
+    {
+        var rail = new ClampRail(1.5, ClampTop, new[] { 6.0 }, clearance: 0.05);
+        var stock = new NestPlateStock("s", new Size(24, 24), 1, 1.0, new Spacing(Edge, Edge), 1, null,
+            new[] { new ClampZone("manual", new Box(9, 0, 2, 1)) })
+        { ClampRail = rail };
+
+        var plate = DrawingJobMapper.CreatePlate(stock);
+
+        Assert.Equal("manual", Assert.Single(plate.ClampZones).Id);
+    }
+
+    [Fact]
     public void LayoutCheckEnforcesTheClampClearanceNotTheEdgeSpacing()
     {
         // A part 0.1 above the clamp, straddling it in X.

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using OpenNest.Engine.Jobs.Adapters;
 
 namespace OpenNest.Engine.Jobs;
 
@@ -123,21 +124,10 @@ public static class NestPipelineCommit
             foreach (var zone in stock.ClampZones)
                 plate.ClampZones.Add(new ClampZone(zone.Id, zone.Bounds.Translate(-left, -bottom)));
         }
-        if (rail == null)
-            return;
-
-        // D8: the sheet's zones may be the rail's resolution for it minus clamps Auto Nest
-        // removed as a last resort; derive which (if any) so the committed plate keeps
-        // following the rail - and the removal - through later resizes (C13). This runs even
-        // when the target already held exactly these zones, so the removal is never lost.
-        var kept = new HashSet<string>(plate.ClampZones.Select(z => z.Id), StringComparer.Ordinal);
-        var removedClamps = rail.ResolveFor(plate.Size, plate.Quadrant)
-            .Select(z => z.Id)
-            .Where(id => !kept.Contains(id))
-            .ToList();
-        var unchanged = ReferenceEquals(plate.ClampRail, rail) && plate.RemovedClamps.SetEquals(removedClamps);
-        if (!unchanged && rail.Matches(plate, removedClamps))
-            plate.SetClampRail(rail, removedClamps);
+        // This runs even when the target already held exactly these zones, so a removal is
+        // never lost.
+        if (rail != null)
+            DrawingJobMapper.FollowClampRail(plate, rail);
     }
 
     private static bool SameInPlacementFrame(
