@@ -11,6 +11,7 @@ using OpenNest.Geometry;
 using OpenNest.IO.Bending;
 using OpenNest.Mcp;
 using OpenNest.Mcp.Tools;
+using static OpenNest.FrontEnd.Tests.ConsoleHost;
 using CadLayer = ACadSharp.Tables.Layer;
 using CadLine = ACadSharp.Entities.Line;
 
@@ -134,13 +135,6 @@ public class RegexImportFailureTests : IDisposable
         Assert.Same(earlierProgram, earlier.Program);
         Assert.Equal(1, detector.CallCount);
         Assert.Equal(hash, Hash(bad));
-    }
-
-    private static int RunConsole(params string[] args)
-    {
-        var method = Assembly.Load("OpenNest.Console").GetType("NestConsole")!
-            .GetMethod("Run", BindingFlags.Static | BindingFlags.Public)!;
-        return (int)method.Invoke(null, new object[] { args })!;
     }
 
     private string WriteDxf(string name, bool marker)

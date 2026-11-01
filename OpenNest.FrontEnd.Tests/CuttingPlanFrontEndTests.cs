@@ -5,6 +5,7 @@ using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.Mcp;
 using OpenNest.Mcp.Tools;
+using static OpenNest.FrontEnd.Tests.ConsoleHost;
 
 namespace OpenNest.FrontEnd.Tests;
 
@@ -169,13 +170,6 @@ public class CuttingPlanFrontEndTests : IDisposable
 
         Assert.Contains("no longer in the session", tools.ApplyCuttingPlan());
         Assert.False(part.HasManualLeadIns);
-    }
-
-    private static int RunConsole(params string[] args)
-    {
-        var method = Assembly.Load("OpenNest.Console").GetType("NestConsole")!
-            .GetMethod("Run", BindingFlags.Static | BindingFlags.Public)!;
-        return (int)method.Invoke(null, new object[] { args })!;
     }
 
     private static Nest Fixture(Program program, params Vector[] locations)
