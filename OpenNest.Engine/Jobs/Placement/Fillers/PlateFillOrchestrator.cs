@@ -52,6 +52,21 @@ internal static class PlateFillOrchestrator
                 token,
                 progress
             );
+
+            // The keep-outs above cost a row along a clamped edge, which losing the few parts
+            // on the clamps may not. A lone drawing with demand left has nothing else to place
+            // around the gaps that leaves.
+            if (
+                clampKeepOuts.Count > 0
+                && fillItems.Count == 1
+                && fillParts.Count < fillItems[0].Quantity
+                && !token.IsCancellationRequested
+            )
+            {
+                fillParts = BetterWithClampHitsDropped(plate, fillItems[0], fillParts, workArea,
+                    comparer, fill, progress, token);
+            }
+
             if (fillParts.Count > 0)
             {
                 allParts.AddRange(fillParts);
@@ -101,6 +116,30 @@ internal static class PlateFillOrchestrator
         Compactor.Settle(allParts, plate);
 
         return allParts;
+    }
+
+    private static List<Part> BetterWithClampHitsDropped(
+        Plate plate,
+        NestItem item,
+        List<Part> current,
+        Box workArea,
+        IFillComparer comparer,
+        Func<NestItem, Box, IProgress<NestProgress>, CancellationToken, List<Part>> fill,
+        IProgress<NestProgress> progress,
+        CancellationToken token
+    )
+    {
+        var demand = new List<NestItem> { item };
+        bool IsBetter(List<Part> candidate, List<Part> floor) =>
+            comparer.IsBetter(candidate, floor, workArea);
+
+        var dropped = PlateFillService.FillDroppingClampHits(
+            (demanded, area, sink) => fill(demanded, area, sink, token),
+            plate, item, demand, workArea,
+            PlateFillService.ClearProgress(progress, plate, workArea, demand, 1, current, IsBetter),
+            token
+        );
+        return IsBetter(dropped, current) ? dropped : current;
     }
 
     private static void DeductPlacedQuantities(List<NestItem> items, List<Part> parts)

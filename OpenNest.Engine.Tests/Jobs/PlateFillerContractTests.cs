@@ -260,6 +260,75 @@ public class PlateFillerContractTests
         Assert.Equal(10, item.Quantity);
     }
 
+    [Fact]
+    public void PlateFillOrchestrator_Nest_KeepsTheFullSheetLayoutLessClampHitsWhenItPlacesMore()
+    {
+        var (plate, drawing) = ClampedPlate();
+        var fullSheetFills = 0;
+        var stripFilled = false;
+
+        var parts = PlateFillOrchestrator.Nest(
+            plate,
+            new List<NestItem> { new() { Drawing = drawing, Quantity = 10 } },
+            new DefaultFillComparer(),
+            (item, area, _, _) =>
+            {
+                if (IsFullSheet(area))
+                {
+                    fullSheetFills++;
+                    return Row(item.Drawing, 0.25, 5, 18, 30, 45, 60);
+                }
+                if (stripFilled)
+                    return new List<Part>();
+                stripFilled = true;
+                return Row(item.Drawing, area.Bottom, 5, 30, 45);
+            },
+            (_, _, _, _) => new List<Part>(),
+            null,
+            CancellationToken.None
+        );
+
+        Assert.Equal(1, fullSheetFills);
+        Assert.Equal(4, parts.Count);
+        Assert.DoesNotContain(parts, part => part.BoundingBox.Left < 21.5 && part.BoundingBox.Right > 20);
+    }
+
+    [Fact]
+    public void PlateFillOrchestrator_Nest_SkipsTheFullSheetLayoutOnceDemandIsMet()
+    {
+        var (plate, drawing) = ClampedPlate();
+
+        var parts = PlateFillOrchestrator.Nest(
+            plate,
+            new List<NestItem> { new() { Drawing = drawing, Quantity = 10 } },
+            new DefaultFillComparer(),
+            (item, area, _, _) =>
+            {
+                Assert.False(IsFullSheet(area));
+                return Row(item.Drawing, area.Bottom, 0.25, 11, 22, 33, 44, 55, 66, 77, 88)
+                    .Concat(Row(item.Drawing, area.Bottom + 11, 0.25)).ToList();
+            },
+            (_, _, _, _) => new List<Part>(),
+            null,
+            CancellationToken.None
+        );
+
+        Assert.Equal(10, parts.Count);
+    }
+
+    private static (Plate Plate, Drawing Drawing) ClampedPlate()
+    {
+        var plate = new Plate(new Size(100, 100));
+        plate.EdgeSpacing = new Spacing(0.25, 0.25);
+        plate.ClampZones.Add(new ClampZone("clamp", new Box(20, 0, 1.5, 0.625)));
+        return (plate, new Drawing("part", TestDrawingFactory.Rectangle(10, 10)));
+    }
+
+    private static bool IsFullSheet(Box area) => area.Bottom <= 0.25 && area.Length > 99;
+
+    private static List<Part> Row(Drawing drawing, double y, params double[] xs) =>
+        xs.Select(x => new Part(drawing, new Vector(x, y))).ToList();
+
     private sealed class FillAndPackProbePlateFiller : PlateFiller
     {
         private readonly Drawing fillDrawing;

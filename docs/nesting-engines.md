@@ -103,7 +103,12 @@ parts by moving past the strip. The second fill reuses the cached best-fit pairs
 previews are filtered by the same check and never fall below the first layout, so a preview
 accepted early is clamp-clear. When a quantity is
 requested and copies were dropped, the fill asks for that many more, up to two more times.
-Pack and whole-plate Nest still pack only into the clamp-free areas.
+Pack and interactive whole-plate Nest still pack only into the clamp-free areas.
+
+Whole jobs placed by these strategies fill the clamp-free areas first. When a plate has one
+drawing to fill and that leaves demand unmet, the job also fills the sheet as if the clamps were
+absent, drops the parts on them, and keeps whichever layout the strategy ranks better (a tie
+keeps the clamp-free layout).
 
 Interactive/full-area box packing uses the same 90% work-area slack allowance as Rectangles.
 A free box may absorb a slightly oversized side only at its right/top edge when that edge

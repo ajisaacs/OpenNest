@@ -56,11 +56,14 @@ public static class PlateFillService
         // the parts that hit one, and the area trimmed past the clamps' edge strip.
         var demand = new List<NestItem> { item };
         return FillBesideClamps(filler, plate, workArea, progress, token,
-            (area, sink) => FillDroppingClampHits(filler, plate, item, demand, area, sink, token),
+            (area, sink) => FillDroppingClampHits(
+                (demanded, box, inner) => filler.Fill(demanded, box, inner, token),
+                plate, item, demand, area, sink, token),
             demand, 1);
     }
 
-    private static List<Part> FillDroppingClampHits(PlateFiller filler, Plate plate,
+    internal static List<Part> FillDroppingClampHits(
+        Func<NestItem, Box, IProgress<NestProgress>, List<Part>> fill, Plate plate,
         NestItem item, List<NestItem> demand, Box area, IProgress<NestProgress> progress,
         CancellationToken token)
     {
@@ -70,7 +73,7 @@ public static class PlateFillService
         var request = item.Quantity;
         for (var attempt = 0; attempt <= MaxClampRefills; attempt++)
         {
-            var proposed = filler.Fill(CopyDemand(item, request), area, progress, token);
+            var proposed = fill(CopyDemand(item, request), area, progress);
             result = new List<Part>();
             AddClear(result, proposed, plate, area, demand);
             if (item.Quantity <= 0 || result.Count >= item.Quantity
@@ -251,7 +254,7 @@ public static class PlateFillService
     /// </summary>
     /// <remarks>A preview is promoted only when it beats <paramref name="floor"/>, the
     /// layout an earlier competing fill already returned.</remarks>
-    private static IProgress<NestProgress> ClearProgress(IProgress<NestProgress> progress,
+    internal static IProgress<NestProgress> ClearProgress(IProgress<NestProgress> progress,
         Plate plate, Box area, List<NestItem> demand, int groupSize, List<Part> floor,
         Func<List<Part>, List<Part>, bool> isBetter) =>
         progress == null ? null
