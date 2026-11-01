@@ -74,6 +74,18 @@ internal static class TestHelpers
     /// <summary>The number of parts the plate's cut-offs materialize, one per trimmed segment.</summary>
     public static int CutOffPartCount(Plate plate) => plate.CutOffs.Sum(c => c.SegmentPrograms().Count);
 
+    /// <summary>A w x h rectangle from the origin, counterclockwise: +X first, then up.</summary>
+    public static Drawing MakeRectDrawing(double w, double h, string name = "rect")
+    {
+        var pgm = new Program();
+        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(w, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(w, h)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, h)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
+        return new Drawing(name, pgm);
+    }
+
     public static Drawing MakeSquareDrawing(double size = 10)
     {
         // CW winding matches CNC convention (OffsetSide.Left = outward)

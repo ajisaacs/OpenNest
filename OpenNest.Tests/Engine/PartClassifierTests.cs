@@ -10,23 +10,12 @@ public class PartClassifierTests
 {
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static Drawing MakeRectDrawing(double w, double h)
-    {
-        var pgm = new OpenNest.CNC.Program();
-        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(w, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(w, h)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, h)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
-        return new Drawing("rect", pgm);
-    }
-
     // ── tests ─────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Classify_PureRectangle_ReturnsRectangle()
     {
-        var drawing = MakeRectDrawing(100, 50);
+        var drawing = TestHelpers.MakeRectDrawing(100, 50);
         var result = PartClassifier.Classify(drawing);
 
         Assert.Equal(PartType.Rectangle, result.Type);

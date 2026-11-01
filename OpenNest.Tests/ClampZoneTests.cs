@@ -96,7 +96,7 @@ public class ClampZoneTests
         for (var i = 0; i < 8; i++)
             plate.ClampZones.Add(new ClampZone($"clamp-{i}", new Box(i * 2.0, 0, 1.5, 0.625)));
 
-        var drawing = MakeRectDrawing(10, 5);
+        var drawing = TestHelpers.MakeRectDrawing(10, 5);
         drawing.Quantity.Required = 4;
         var part = new Part(drawing);
         plate.Parts.Add(part);
@@ -118,16 +118,5 @@ public class ClampZoneTests
         Assert.All(plate.Parts, p => Assert.False(p.BaseDrawing.IsCutOff));
         Assert.Empty(plate.Parts);
         Assert.DoesNotContain(plate.ClampZones, z => ReferenceEquals(z, null));
-    }
-
-    private static Drawing MakeRectDrawing(double length, double width)
-    {
-        var pgm = new Program();
-        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(length, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(length, width)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, width)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
-        return new Drawing("rect", pgm);
     }
 }

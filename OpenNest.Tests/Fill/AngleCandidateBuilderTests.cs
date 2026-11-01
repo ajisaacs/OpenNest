@@ -10,17 +10,6 @@ namespace OpenNest.Tests.Fill;
 [Collection(nameof(OpenNest.Tests.BestFit.FillCacheCollection))]
 public class AngleCandidateBuilderTests
 {
-    private static Drawing MakeRectDrawing(double w, double h)
-    {
-        var pgm = new OpenNest.CNC.Program();
-        pgm.Codes.Add(new OpenNest.CNC.RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(w, 0)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(w, h)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(0, h)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(0, 0)));
-        return new Drawing("rect", pgm);
-    }
-
     private static ClassificationResult MakeClassification(
         double primaryAngle = 0,
         PartType type = PartType.Irregular
@@ -32,7 +21,7 @@ public class AngleCandidateBuilderTests
     public void Characterization_ClassifiedParts_PreserveExactBaseAngleOrder(PartType type)
     {
         var builder = new AngleCandidateBuilder();
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
         var primary = Angle.ToRadians(7);
 
         var angles = builder.Build(item, MakeClassification(primary, type), new Box(0, 0, 100, 50));
@@ -50,7 +39,7 @@ public class AngleCandidateBuilderTests
         var builder = new AngleCandidateBuilder();
         var item = new NestItem
         {
-            Drawing = MakeRectDrawing(20, 10),
+            Drawing = TestHelpers.MakeRectDrawing(20, 10),
             RotationStart = 0,
             RotationEnd = Angle.HalfPI,
             StepAngle = Angle.ToRadians(30),
@@ -69,7 +58,7 @@ public class AngleCandidateBuilderTests
         var builder = new AngleCandidateBuilder();
         var item = new NestItem
         {
-            Drawing = MakeRectDrawing(20, 10),
+            Drawing = TestHelpers.MakeRectDrawing(20, 10),
             RotationStart = Angle.ToRadians(10),
             RotationEnd = Angle.ToRadians(20),
             StepAngle = step,
@@ -86,7 +75,7 @@ public class AngleCandidateBuilderTests
         var builder = new AngleCandidateBuilder();
         var item = new NestItem
         {
-            Drawing = MakeRectDrawing(20, 10),
+            Drawing = TestHelpers.MakeRectDrawing(20, 10),
             RotationStart = Angle.ToRadians(40),
             RotationEnd = Angle.ToRadians(10),
         };
@@ -109,7 +98,7 @@ public class AngleCandidateBuilderTests
             new() { AngleDeg = 65, PartCount = 0 },
             new() { AngleDeg = 120, PartCount = -1 },
         });
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
 
         var angles = builder.Build(item, MakeClassification(Angle.ToRadians(7)), new Box(0, 0, 100, 50));
 
@@ -170,7 +159,7 @@ public class AngleCandidateBuilderTests
     {
         var calls = new PredictionCalls { Available = false };
         var builder = calls.CreateBuilder();
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
 
         var angles = builder.Build(item, MakeClassification(Angle.ToRadians(7)), new Box(0, 0, 100, 50));
 
@@ -183,7 +172,7 @@ public class AngleCandidateBuilderTests
     {
         var calls = new PredictionCalls();
         var builder = calls.CreateBuilder();
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
         var workArea = new Box(3, 5, 123, 47);
 
         var angles = builder.Build(item, MakeClassification(Angle.ToRadians(7)), workArea);
@@ -203,7 +192,7 @@ public class AngleCandidateBuilderTests
     {
         var calls = new PredictionCalls { Features = null };
         var builder = calls.CreateBuilder();
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
 
         var angles = builder.Build(item, MakeClassification(Angle.ToRadians(7)), new Box(0, 0, 100, 50));
 
@@ -219,7 +208,7 @@ public class AngleCandidateBuilderTests
     {
         var calls = new PredictionCalls { Prediction = empty ? new List<double>() : null };
         var builder = calls.CreateBuilder();
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
 
         var angles = builder.Build(item, MakeClassification(Angle.ToRadians(7)), new Box(0, 0, 100, 50));
 
@@ -239,7 +228,7 @@ public class AngleCandidateBuilderTests
         var original = predicted.ToArray();
         var calls = new PredictionCalls { Prediction = predicted };
         var builder = calls.CreateBuilder();
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
 
         var angles = builder.Build(item, MakeClassification(Angle.ToRadians(7)), new Box(0, 0, 100, 50));
 
@@ -263,7 +252,7 @@ public class AngleCandidateBuilderTests
         var original = predicted.ToArray();
         var calls = new PredictionCalls { Prediction = predicted };
         var builder = calls.CreateBuilder();
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
 
         var angles = builder.Build(item, MakeClassification(primary), new Box(0, 0, 100, 50));
 
@@ -280,7 +269,7 @@ public class AngleCandidateBuilderTests
     public void Build_Unavailable_WithCardinalBase_DeduplicatesSweepWithoutReordering()
     {
         var calls = new PredictionCalls { Available = false };
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
 
         var angles = calls.CreateBuilder().Build(item, MakeClassification(), new Box(0, 0, 100, 50));
 
@@ -302,7 +291,7 @@ public class AngleCandidateBuilderTests
     {
         var calls = new PredictionCalls();
         var builder = calls.CreateBuilder();
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
         var classification = MakeClassification(Angle.ToRadians(7));
         var expected = new[] { 7.0, 97, 45 };
         if (branch.EndsWith("circle"))
@@ -340,7 +329,7 @@ public class AngleCandidateBuilderTests
         var builder = calls.CreateBuilder();
         builder.ForceFullSweep = true;
         builder.RecordProductive(new List<AngleResult> { new() { AngleDeg = 45, PartCount = 1 } });
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
 
         var angles = builder.Build(item, MakeClassification(Angle.ToRadians(7)), new Box(0, 0, 100, 50));
 
@@ -358,7 +347,7 @@ public class AngleCandidateBuilderTests
             new() { AngleDeg = 45, PartCount = 0 },
             new() { AngleDeg = 60, PartCount = -1 },
         });
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
 
         var angles = builder.Build(item, MakeClassification(Angle.ToRadians(7)), new Box(0, 0, 100, 50));
 
@@ -386,7 +375,7 @@ public class AngleCandidateBuilderTests
                 predictedFeatures = features;
                 return null!;
             });
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
 
         PerfCounters.Reset();
         try
@@ -411,7 +400,7 @@ public class AngleCandidateBuilderTests
     public void Build_ReturnsAtLeastTwoAngles()
     {
         var builder = new AngleCandidateBuilder();
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
         var workArea = new Box(0, 0, 100, 100);
 
         var angles = builder.Build(item, MakeClassification(), workArea);
@@ -423,7 +412,7 @@ public class AngleCandidateBuilderTests
     public void Build_RectangleType_NarrowWorkArea_UsesBaseAnglesOnly()
     {
         var builder = new AngleCandidateBuilder();
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
         var narrowArea = new Box(0, 0, 100, 8); // narrower than part's longest side
 
         var angles = builder.Build(item, MakeClassification(0, PartType.Rectangle), narrowArea);
@@ -436,7 +425,7 @@ public class AngleCandidateBuilderTests
     public void ForceFullSweep_ProducesFullSweep()
     {
         var builder = new AngleCandidateBuilder { ForceFullSweep = true };
-        var item = new NestItem { Drawing = MakeRectDrawing(5, 5) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(5, 5) };
         var workArea = new Box(0, 0, 100, 100);
 
         var angles = builder.Build(item, MakeClassification(), workArea);
@@ -449,7 +438,7 @@ public class AngleCandidateBuilderTests
     public void RecordProductive_PrunesSubsequentBuilds()
     {
         var builder = new AngleCandidateBuilder { ForceFullSweep = true };
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
         var workArea = new Box(0, 0, 100, 8);
 
         // First build — full sweep
@@ -477,7 +466,7 @@ public class AngleCandidateBuilderTests
     public void Build_RectanglePart_ReturnsTwoAngles()
     {
         var builder = new AngleCandidateBuilder();
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
         var workArea = new Box(0, 0, 100, 100);
         var classification = MakeClassification(0, PartType.Rectangle);
 
@@ -490,7 +479,7 @@ public class AngleCandidateBuilderTests
     public void Build_CirclePart_ReturnsOneAngle()
     {
         var builder = new AngleCandidateBuilder();
-        var item = new NestItem { Drawing = MakeRectDrawing(10, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(10, 10) };
         var workArea = new Box(0, 0, 100, 100);
         var classification = MakeClassification(0, PartType.Circle);
 
@@ -506,7 +495,7 @@ public class AngleCandidateBuilderTests
         var builder = new AngleCandidateBuilder();
         var item = new NestItem
         {
-            Drawing = MakeRectDrawing(100, 50),
+            Drawing = TestHelpers.MakeRectDrawing(100, 50),
             RotationStart = Angle.ToRadians(10),
             RotationEnd = Angle.ToRadians(90),
             StepAngle = Angle.ToRadians(10),
@@ -528,7 +517,7 @@ public class AngleCandidateBuilderTests
         var builder = new AngleCandidateBuilder();
         var item = new NestItem
         {
-            Drawing = MakeRectDrawing(100, 50),
+            Drawing = TestHelpers.MakeRectDrawing(100, 50),
             RotationStart = 0,
             RotationEnd = System.Math.PI,
             StepAngle = Angle.ToRadians(45),

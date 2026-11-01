@@ -91,20 +91,9 @@ namespace OpenNest.Tests.Fill
             );
         }
 
-        private static Drawing MakeRectDrawing(double w, double h)
-        {
-            var pgm = new OpenNest.CNC.Program();
-            pgm.Codes.Add(new OpenNest.CNC.RapidMove(new Vector(0, 0)));
-            pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(w, 0)));
-            pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(w, h)));
-            pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(0, h)));
-            pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(0, 0)));
-            return new Drawing("rect", pgm);
-        }
-
         private static Part MakeRectPart(double x, double y, double w, double h)
         {
-            var drawing = MakeRectDrawing(w, h);
+            var drawing = TestHelpers.MakeRectDrawing(w, h);
             var part = new Part(drawing) { Location = new Vector(x, y) };
             part.UpdateBounds();
             return part;
@@ -232,9 +221,9 @@ namespace OpenNest.Tests.Fill
         public void Push_RotatedParts_PreservesSpacingOnRepeatedPushes(double degrees)
         {
             var angle = OpenNest.Math.Angle.ToRadians(degrees);
-            var obstacle = Part.CreateAtOrigin(MakeRectDrawing(10, 10), angle);
+            var obstacle = Part.CreateAtOrigin(TestHelpers.MakeRectDrawing(10, 10), angle);
             obstacle.Offset(20, 20);
-            var moving = Part.CreateAtOrigin(MakeRectDrawing(10, 10), angle);
+            var moving = Part.CreateAtOrigin(TestHelpers.MakeRectDrawing(10, 10), angle);
             moving.Offset(60, 20);
             var parts = new List<Part> { moving };
             var obstacles = new List<Part> { obstacle };
@@ -261,7 +250,7 @@ namespace OpenNest.Tests.Fill
         {
             var obstacle = MakeRectPart(20, 20, 10, 10);
             var moving = Part.CreateAtOrigin(
-                MakeRectDrawing(10, 10),
+                TestHelpers.MakeRectDrawing(10, 10),
                 OpenNest.Math.Angle.ToRadians(degrees)
             );
             moving.Offset(60, 31);
@@ -363,7 +352,7 @@ namespace OpenNest.Tests.Fill
         [InlineData(2, true)]
         public void Push_InsideStationaryHole_CannotPassThroughItsWall(double spacing, bool plateEntry)
         {
-            var program = MakeRectDrawing(60, 60).Program;
+            var program = TestHelpers.MakeRectDrawing(60, 60).Program;
             program.Codes.Add(new OpenNest.CNC.RapidMove(new Vector(10, 10)));
             program.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(50, 10)));
             program.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(50, 50)));

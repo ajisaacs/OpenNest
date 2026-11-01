@@ -11,23 +11,12 @@ namespace OpenNest.Tests.Strategies;
 
 public class FillPipelineTests
 {
-    private static Drawing MakeRectDrawing(double w, double h, string name = "rect")
-    {
-        var pgm = new OpenNest.CNC.Program();
-        pgm.Codes.Add(new OpenNest.CNC.RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(w, 0)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(w, h)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(0, h)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(0, 0)));
-        return new Drawing(name, pgm);
-    }
-
     [Fact]
     public void Pipeline_PopulatesPhaseResults()
     {
         var plate = new Plate(60, 120);
         var filler = new PlateFiller(plate);
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
 
         filler.Fill(item, plate.WorkArea(), null, System.Threading.CancellationToken.None);
 
@@ -42,7 +31,7 @@ public class FillPipelineTests
     {
         var plate = new Plate(60, 120);
         var filler = new PlateFiller(plate);
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
 
         var parts = filler.Fill(
             item,
@@ -66,7 +55,7 @@ public class FillPipelineTests
     {
         var plate = new Plate(60, 120);
         var filler = new PlateFiller(plate);
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
         var cts = new System.Threading.CancellationTokenSource();
         cts.Cancel();
 
@@ -82,7 +71,7 @@ public class FillPipelineTests
     {
         var plate = new Plate(60, 120);
         var filler = new PlateFiller(plate);
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
         var reports = new List<NestProgress>();
 
         filler.Fill(item, plate.WorkArea(), new SyncProgress(reports.Add), CancellationToken.None);
@@ -98,7 +87,7 @@ public class FillPipelineTests
     {
         var plate = new Plate(60, 120);
         var filler = new PlateFiller(plate);
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
         var reports = new List<NestProgress>();
 
         filler.Fill(item, plate.WorkArea(), new SyncProgress(reports.Add), CancellationToken.None);
@@ -114,7 +103,7 @@ public class FillPipelineTests
     {
         var plate = new Plate(60, 120);
         var filler = new PlateFiller(plate);
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
         using var cts = new CancellationTokenSource();
         NestProgress first = null;
 
@@ -138,7 +127,7 @@ public class FillPipelineTests
     {
         var plate = new Plate(60, 120);
         var filler = new PlateFiller(plate);
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
         var shown = new List<int>();
 
         filler.Fill(

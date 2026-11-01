@@ -11,17 +11,6 @@ namespace OpenNest.Tests.Engine;
 /// </summary>
 public class ExplicitPlacementStrategyTests
 {
-    private static Drawing MakeRectDrawing(double w, double h, string name = "rect")
-    {
-        var pgm = new Program();
-        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(w, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(w, h)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, h)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
-        return new Drawing(name, pgm);
-    }
-
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -51,7 +40,7 @@ public class ExplicitPlacementStrategyTests
     public void PlateFillService_Nest_ResolvesNamedStrategyAndRejectsUnknown()
     {
         var plate = new Plate(new Size(60, 80));
-        var drawing = MakeRectDrawing(6, 4, "part");
+        var drawing = TestHelpers.MakeRectDrawing(6, 4, "part");
 
         var parts = PlateFillService.Nest(
             "Vertical Remnant",

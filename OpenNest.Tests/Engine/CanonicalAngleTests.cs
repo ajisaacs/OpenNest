@@ -11,17 +11,6 @@ public class CanonicalAngleTests
 {
     private const double AngleTol = 0.002; // ~0.11°
 
-    private static Drawing MakeRect(double w, double h)
-    {
-        var pgm = new OpenNest.CNC.Program();
-        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(w, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(w, h)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, h)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
-        return new Drawing("rect", pgm);
-    }
-
     private static Drawing RotateCopy(Drawing src, double angle)
     {
         var pgm = src.Program.Clone() as OpenNest.CNC.Program;
@@ -32,7 +21,7 @@ public class CanonicalAngleTests
     [Fact]
     public void AxisAlignedRectangle_ReturnsZero()
     {
-        var d = MakeRect(100, 50);
+        var d = TestHelpers.MakeRectDrawing(100, 50);
         Assert.Equal(0.0, CanonicalAngle.Compute(d), precision: 6);
     }
 
@@ -59,7 +48,7 @@ public class CanonicalAngleTests
     [InlineData(1.2)]
     public void Rectangle_ReturnsNegatedRotation_Modulo90(double theta)
     {
-        var rotated = RotateCopy(MakeRect(100, 50), theta);
+        var rotated = RotateCopy(TestHelpers.MakeRectDrawing(100, 50), theta);
         var angle = CanonicalAngle.Compute(rotated);
 
         // Applying the returned angle should leave MBR axis-aligned.
@@ -76,7 +65,7 @@ public class CanonicalAngleTests
     [Fact]
     public void NearZeroInput_SnapsToZero()
     {
-        var rotated = RotateCopy(MakeRect(100, 50), 0.0005);
+        var rotated = RotateCopy(TestHelpers.MakeRectDrawing(100, 50), 0.0005);
         Assert.Equal(0.0, CanonicalAngle.Compute(rotated), precision: 6);
     }
 

@@ -8,17 +8,6 @@ namespace OpenNest.Tests.Engine;
 
 public class RemnantEngineTests
 {
-    private static Drawing MakeRectDrawing(double w, double h, string name = "rect")
-    {
-        var pgm = new OpenNest.CNC.Program();
-        pgm.Codes.Add(new OpenNest.CNC.RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(w, 0)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(w, h)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(0, h)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(0, 0)));
-        return new Drawing(name, pgm);
-    }
-
     [Fact]
     public void VerticalRemnantPlateFiller_UsesHorizontalPreferredDirection()
     {
@@ -40,7 +29,7 @@ public class RemnantEngineTests
     {
         var plate = new Plate(60, 120);
         var filler = new PlateFiller(plate, PlateFillPolicy.VerticalRemnant);
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
 
         var parts = filler.Fill(
             item,
@@ -57,7 +46,7 @@ public class RemnantEngineTests
     {
         var plate = new Plate(60, 120);
         var filler = new PlateFiller(plate, PlateFillPolicy.HorizontalRemnant);
-        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var item = new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10) };
 
         var parts = filler.Fill(
             item,
@@ -80,7 +69,7 @@ public class RemnantEngineTests
     public void VerticalRemnantPlateFiller_ProducesTighterXExtent_ThanDefault()
     {
         var plate = new Plate(60, 120);
-        var drawing = MakeRectDrawing(20, 10);
+        var drawing = TestHelpers.MakeRectDrawing(20, 10);
         var item = new NestItem { Drawing = drawing };
 
         var defaultFiller = new PlateFiller(plate);

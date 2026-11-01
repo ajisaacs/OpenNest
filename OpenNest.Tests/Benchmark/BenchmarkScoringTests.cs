@@ -20,7 +20,7 @@ public class BenchmarkScoringTests
     public void SharedCostEqualsBenchmarkRunForEveryEdgeAndUnplacedParts(
         double rate, double x, double y, double salvage)
     {
-        var benchmarkJob = Job(0.5, (Rect(10, 5), 3));
+        var benchmarkJob = Job(0.5, (TestHelpers.MakeRectDrawing(10, 5), 3));
         NestJob? capturedJob = null;
         NestJobResult? capturedResult = null;
         var engine = Engine("Shared cost parity", job =>
@@ -97,7 +97,7 @@ public class BenchmarkScoringTests
     [Fact]
     public void Run_RotationOutsideConstraint_IsInvalid()
     {
-        var part = Rect(10, 5);
+        var part = TestHelpers.MakeRectDrawing(10, 5);
         LockRotation(part);
         var job = Job(0.5, (part, 1));
 
@@ -112,7 +112,7 @@ public class BenchmarkScoringTests
     [Fact]
     public void Run_StockWithLoosenedSpacing_IsInvalid()
     {
-        var job = Job(0.5, (Rect(10, 5), 1));
+        var job = Job(0.5, (TestHelpers.MakeRectDrawing(10, 5), 1));
 
         var result = RunSingle(
             job,
@@ -134,7 +134,7 @@ public class BenchmarkScoringTests
     [Fact]
     public void Run_PartInsideAnotherPartsCutout_IsValidWhenItClearsTheEdge()
     {
-        var job = Job(0.5, (Frame(), 1), (Rect(4, 4), 1));
+        var job = Job(0.5, (Frame(), 1), (TestHelpers.MakeRectDrawing(4, 4), 1));
 
         var clear = RunSingle(
             job,
@@ -154,7 +154,7 @@ public class BenchmarkScoringTests
     [Fact]
     public void Run_OverlappingNeighbors_AreStillCaughtBySweep()
     {
-        var job = Job(0.5, (Rect(10, 5), 3));
+        var job = Job(0.5, (TestHelpers.MakeRectDrawing(10, 5), 3));
 
         var result = RunSingle(
             job,
@@ -173,7 +173,7 @@ public class BenchmarkScoringTests
     [Fact]
     public void Run_WithSalvageCredit_CompactLayoutOutscoresScatteredLayout()
     {
-        var job = Job(0.5, (Rect(10, 5), 2));
+        var job = Job(0.5, (TestHelpers.MakeRectDrawing(10, 5), 2));
         var engines = new List<NestingEngineInfo>
         {
             Engine("Compact", j => Sheet(j, (j.Parts[0].Id, 0, 0, 0), (j.Parts[0].Id, 0, 10, 0))),
@@ -233,17 +233,6 @@ public class BenchmarkScoringTests
             UnplacedPartPenalty = 100,
             PlatesUsed = 1,
         };
-
-    private static Drawing Rect(double w, double h)
-    {
-        var pgm = new OpenNest.CNC.Program();
-        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(w, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(w, h)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, h)));
-        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
-        return new Drawing("rect", pgm);
-    }
 
     /// <summary>20x20 square with a 10x10 cutout centerd in it.</summary>
     private static Drawing Frame()

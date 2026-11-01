@@ -9,20 +9,9 @@ namespace OpenNest.Tests.Strategies;
 
 public class StripeFillerTests
 {
-    private static Drawing MakeRectDrawing(double w, double h, string name = "rect")
-    {
-        var pgm = new OpenNest.CNC.Program();
-        pgm.Codes.Add(new OpenNest.CNC.RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(w, 0)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(w, h)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(0, h)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(0, 0)));
-        return new Drawing(name, pgm);
-    }
-
     private static Pattern MakeRectPattern(double w, double h)
     {
-        var drawing = MakeRectDrawing(w, h);
+        var drawing = TestHelpers.MakeRectDrawing(w, h);
         var part = Part.CreateAtOrigin(drawing);
         var pattern = new Pattern();
         pattern.Parts.Add(part);
@@ -162,7 +151,7 @@ public class StripeFillerTests
     public void Fill_ProducesNonOverlappingPartsForSimpleDrawing()
     {
         var plate = new Plate(60, 120) { PartSpacing = 0.5 };
-        var drawing = MakeRectDrawing(20, 10);
+        var drawing = TestHelpers.MakeRectDrawing(20, 10);
         var item = new NestItem { Drawing = drawing };
         var workArea = new Box(0, 0, 120, 60);
 
@@ -198,7 +187,7 @@ public class StripeFillerTests
     public void Fill_VerticalProducesNonOverlappingParts()
     {
         var plate = new Plate(60, 120) { PartSpacing = 0.5 };
-        var drawing = MakeRectDrawing(20, 10);
+        var drawing = TestHelpers.MakeRectDrawing(20, 10);
         var item = new NestItem { Drawing = drawing };
         var workArea = new Box(0, 0, 120, 60);
 
@@ -230,7 +219,7 @@ public class StripeFillerTests
     private static List<Part> StripeFill(int maxQuantity, NestDirection axis)
     {
         var plate = new Plate(60, 120) { PartSpacing = 0.5 };
-        var drawing = MakeRectDrawing(20, 10);
+        var drawing = TestHelpers.MakeRectDrawing(20, 10);
         var context = new OpenNest.Engine.Strategies.FillContext
         {
             Item = new NestItem { Drawing = drawing, Quantity = maxQuantity },
@@ -262,7 +251,7 @@ public class StripeFillerTests
     public void Fill_ReturnsEmpty_WhenNoBestFits()
     {
         var plate = new Plate(60, 120) { PartSpacing = 0.5 };
-        var drawing = MakeRectDrawing(20, 10);
+        var drawing = TestHelpers.MakeRectDrawing(20, 10);
         var item = new NestItem { Drawing = drawing };
         var workArea = new Box(0, 0, 120, 60);
 

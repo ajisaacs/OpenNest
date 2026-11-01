@@ -32,21 +32,10 @@ public class IterativeShrinkFillerTests
         Assert.Empty(result.Leftovers);
     }
 
-    private static Drawing MakeRectDrawing(double w, double h, string name = "rect")
-    {
-        var pgm = new OpenNest.CNC.Program();
-        pgm.Codes.Add(new OpenNest.CNC.RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(w, 0)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(w, h)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(0, h)));
-        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(0, 0)));
-        return new Drawing(name, pgm);
-    }
-
     [Fact]
     public void Fill_SingleItem_PlacesParts()
     {
-        var drawing = MakeRectDrawing(20, 10);
+        var drawing = TestHelpers.MakeRectDrawing(20, 10);
         var items = new List<NestItem>
         {
             new NestItem { Drawing = drawing, Quantity = 5 },
@@ -69,8 +58,8 @@ public class IterativeShrinkFillerTests
     {
         var items = new List<NestItem>
         {
-            new NestItem { Drawing = MakeRectDrawing(20, 10, "large"), Quantity = 5 },
-            new NestItem { Drawing = MakeRectDrawing(8, 5, "small"), Quantity = 5 },
+            new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10, "large"), Quantity = 5 },
+            new NestItem { Drawing = TestHelpers.MakeRectDrawing(8, 5, "small"), Quantity = 5 },
         };
 
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
@@ -95,7 +84,7 @@ public class IterativeShrinkFillerTests
         // Huge quantity that can't all fit on a small plate
         var items = new List<NestItem>
         {
-            new NestItem { Drawing = MakeRectDrawing(20, 10), Quantity = 1000 },
+            new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10), Quantity = 1000 },
         };
 
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
@@ -117,7 +106,7 @@ public class IterativeShrinkFillerTests
     {
         var items = new List<NestItem>
         {
-            new NestItem { Drawing = MakeRectDrawing(20, 10), Quantity = 0 },
+            new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10), Quantity = 0 },
         };
 
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
@@ -141,7 +130,7 @@ public class IterativeShrinkFillerTests
 
         var items = new List<NestItem>
         {
-            new NestItem { Drawing = MakeRectDrawing(20, 10), Quantity = 10 },
+            new NestItem { Drawing = TestHelpers.MakeRectDrawing(20, 10), Quantity = 10 },
         };
 
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
