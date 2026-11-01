@@ -75,7 +75,7 @@ public class SeparatorPenLifetimeTests
         horizontal ? new HorizontalLine() : new VerticalLine();
 
     private static Pen GetPen(Control control, string name) =>
-        Assert.IsType<Pen>(control.GetType()
+        Assert.IsType<Pen>(typeof(SeparatorLine)
             .GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(control));
 
     private static bool GetStyle(Control control, ControlStyles style) =>

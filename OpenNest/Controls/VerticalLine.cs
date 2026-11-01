@@ -1,54 +1,12 @@
-using System;
 using System.Drawing;
-using System.Windows.Forms;
 
 namespace OpenNest.Controls
 {
-    public class VerticalLine : Control
+    public class VerticalLine : SeparatorLine
     {
-        private readonly Pen lightPen;
-        private readonly Pen darkPen;
+        protected override int Across => Width;
 
-        public VerticalLine()
-        {
-            SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
-            SetStyle(ControlStyles.Selectable, false);
-
-            lightPen = new Pen(ProfessionalColors.SeparatorLight);
-            darkPen = new Pen(ProfessionalColors.SeparatorDark);
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            try
-            {
-                if (disposing)
-                {
-                    lightPen.Dispose();
-                    darkPen.Dispose();
-                }
-            }
-            finally
-            {
-                base.Dispose(disposing);
-            }
-        }
-
-        protected override void OnResize(EventArgs e)
-        {
-            base.OnResize(e);
-            Invalidate();
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            base.OnPaint(e);
-
-            float midpoint = Width * 0.5f;
-
-            e.Graphics.DrawLine(darkPen, midpoint, 0, midpoint, Height);
-            midpoint++;
-            e.Graphics.DrawLine(lightPen, midpoint, 0, midpoint, Height);
-        }
+        protected override void DrawLine(Graphics graphics, Pen pen, float position) =>
+            graphics.DrawLine(pen, position, 0, position, Height);
     }
 }
