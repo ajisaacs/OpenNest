@@ -2,6 +2,7 @@ using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using static OpenNest.Tests.CuttingStrategy.LeadInTestHelpers;
 
 namespace OpenNest.Tests.CuttingStrategy;
 
@@ -168,9 +169,6 @@ public class ArcLeadInTangentTests
             program.Codes.Add(new LinearMove(point));
     }
 
-    private static ShapeProfile Profile(Part part) => new(part.Program.ToGeometry()
-        .Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList());
-
     private static IEnumerable<Entity> Leads(Part part, Layer layer) =>
         part.Program.ToGeometry().Where(e => e.Layer == layer);
 
@@ -181,11 +179,5 @@ public class ArcLeadInTangentTests
     {
         var radial = (point - arc.Center).Normalize();
         return arc.IsReversed ? new Vector(radial.Y, -radial.X) : new Vector(-radial.Y, radial.X);
-    }
-
-    private static void AssertPoint(Vector expected, Vector actual)
-    {
-        Assert.Equal(expected.X, actual.X, 8);
-        Assert.Equal(expected.Y, actual.Y, 8);
     }
 }

@@ -1,6 +1,7 @@
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Geometry;
+using static OpenNest.Tests.CuttingStrategy.LeadInTestHelpers;
 
 namespace OpenNest.Tests.CuttingStrategy;
 
@@ -254,9 +255,6 @@ public class PerimeterCornerLeadInTests
             program.Codes.Add(new LinearMove(point));
     }
 
-    private static ShapeProfile Profile(Part part) => new(part.Program.ToGeometry()
-        .Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList());
-
     private static Shape Perimeter(Part part)
     {
         var perimeter = Profile(part).Perimeter;
@@ -275,10 +273,4 @@ public class PerimeterCornerLeadInTests
 
     private static Line SingleLead(Part part, Layer layer) => Assert.IsType<Line>(Assert.Single(
         part.Program.ToGeometry().Where(e => e.Layer == layer)));
-
-    private static void AssertPoint(Vector expected, Vector actual)
-    {
-        Assert.Equal(expected.X, actual.X, 8);
-        Assert.Equal(expected.Y, actual.Y, 8);
-    }
 }

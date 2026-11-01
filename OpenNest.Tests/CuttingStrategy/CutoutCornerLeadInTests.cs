@@ -1,6 +1,7 @@
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Geometry;
+using static OpenNest.Tests.CuttingStrategy.LeadInTestHelpers;
 
 namespace OpenNest.Tests.CuttingStrategy;
 
@@ -283,9 +284,6 @@ public class CutoutCornerLeadInTests
             program.Codes.Add(new LinearMove(point));
     }
 
-    private static ShapeProfile Profile(Part part) => new(part.Program.ToGeometry()
-        .Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList());
-
     private static Shape Cutout(Part part) => Assert.Single(Profile(part).Cutouts);
 
     private static Line SingleLeadIn(Part part) => Assert.IsType<Line>(Assert.Single(
@@ -296,11 +294,5 @@ public class CutoutCornerLeadInTests
         AssertPoint(corner, lead.EndPoint);
         AssertPoint(corner + direction / direction.DistanceTo(Vector.Zero) * LeadLength, lead.StartPoint);
         Assert.Equal(LeadLength, lead.Length, 8);
-    }
-
-    private static void AssertPoint(Vector expected, Vector actual)
-    {
-        Assert.Equal(expected.X, actual.X, 8);
-        Assert.Equal(expected.Y, actual.Y, 8);
     }
 }
