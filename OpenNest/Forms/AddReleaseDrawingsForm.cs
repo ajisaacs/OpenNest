@@ -72,12 +72,9 @@ namespace OpenNest.Forms
             await RunLibraryAsync(() => librarySession.SetSearchAsync(searchBox.Text));
         }
 
-        private async void LibraryGrid_ColumnHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e)
-        {
-            // Sorting a page locally would misrepresent the library; the server sorts all matches.
-            if (e.Button == MouseButtons.Left && libraryGrid.Columns[e.ColumnIndex].Tag is DrawingSortField field)
-                await RunLibraryAsync(() => librarySession.SortByAsync(field));
-        }
+        private async void LibraryGrid_ColumnHeaderMouseClick(
+            object sender, DataGridViewCellMouseEventArgs e) =>
+            await libraryPager.SortByHeaderAsync(e);
 
         private async void PreviousButton_Click(object sender, EventArgs e) =>
             await RunLibraryAsync(librarySession.PreviousPageAsync);

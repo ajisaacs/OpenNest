@@ -84,6 +84,15 @@ namespace OpenNest.Controls
             }
         }
 
+        /// <summary>
+        /// Sorts by a left-clicked column whose <see cref="DataGridViewColumn.Tag"/> is a sort
+        /// field. Sorting a page locally would misrepresent the list; the server sorts all matches.
+        /// </summary>
+        public Task SortByHeaderAsync(DataGridViewCellMouseEventArgs e) =>
+            e.Button == MouseButtons.Left && grid.Columns[e.ColumnIndex].Tag is TSort field
+                ? RunAsync(() => session.SortByAsync(field))
+                : Task.CompletedTask;
+
         public void UpdateNavigation()
         {
             previous.Enabled = !session.IsLoading && session.CanGoPrevious;

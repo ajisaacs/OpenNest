@@ -128,12 +128,7 @@ public sealed class SavedNestsForm : Form
             Visible = false,
             SortMode = DataGridViewColumnSortMode.NotSortable,
         });
-        // Sorting a page locally would misrepresent the archive; the server sorts all matches.
-        nestGrid.ColumnHeaderMouseClick += async (_, e) =>
-        {
-            if (e.Button == MouseButtons.Left && nestGrid.Columns[e.ColumnIndex].Tag is NestSortField field)
-                await RunAsync(() => session.SortByAsync(field));
-        };
+        nestGrid.ColumnHeaderMouseClick += async (_, e) => await pager.SortByHeaderAsync(e);
         nestGrid.CellDoubleClick += (_, e) =>
         {
             if (e.RowIndex >= 0)

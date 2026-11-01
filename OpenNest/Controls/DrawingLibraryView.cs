@@ -216,12 +216,9 @@ namespace OpenNest.Controls
             await RunAsync(() => session.SetShowAllAsync(showAll));
         }
 
-        private async void DrawingGrid_ColumnHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e)
-        {
-            // Sorting a page locally would misrepresent the library; the server sorts all matches.
-            if (e.Button == MouseButtons.Left && drawingGrid.Columns[e.ColumnIndex].Tag is DrawingSortField field)
-                await RunAsync(() => session.SortByAsync(field));
-        }
+        private async void DrawingGrid_ColumnHeaderMouseClick(
+            object sender, DataGridViewCellMouseEventArgs e) =>
+            await pager.SortByHeaderAsync(e);
 
         private async void PreviousButton_Click(object sender, EventArgs e) =>
             await RunAsync(session.PreviousPageAsync);
