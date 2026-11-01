@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using OpenNest.Math;
 
@@ -55,6 +56,115 @@ namespace OpenNest.Geometry
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Replaces arcs of one center, radius and layer that together cover the whole circle with
+        /// a <see cref="Circle"/>. CAM exports often overshoot the seam of a hole and return along
+        /// a short chord; such a line, lying wholly on the overlap, goes with the arcs. Arcs that
+        /// leave a gap, or overlap by more than <see cref="MaxSeamOverlap"/>, are left alone.
+        /// </summary>
+        public static void JoinFullCircles(List<Entity> entities)
+        {
+            var groups = new List<List<Arc>>();
+            foreach (var arc in entities.OfType<Arc>())
+            {
+                if (!SpecialLayers.IsMaterial(arc.Layer))
+                    continue;
+
+                var group = groups.Find(g => IsSameCircle(g[0], arc));
+                if (group == null)
+                    groups.Add(new List<Arc> { arc });
+                else
+                    group.Add(arc);
+            }
+
+            foreach (var group in groups)
+            {
+                var longest = group.OrderByDescending(a => a.SweepAngle()).First();
+                var tolerance = Tolerance.ChainTolerance / longest.Radius;
+                var spans = group.Select(ToSpan).OrderBy(s => s.Start).ToList();
+                var overlap = spans.Sum(s => s.Sweep) - Angle.TwoPI;
+
+                if (group.Count < 2 || overlap > MaxSeamOverlap || !CoversCircle(spans, tolerance))
+                    continue;
+
+                var chords = entities
+                    .OfType<Line>()
+                    .Where(line => IsSeamChord(line, longest, spans, tolerance))
+                    .ToList();
+
+                var index = entities.FindIndex(e => e is Arc arc && group.Contains(arc));
+                entities.Insert(
+                    index,
+                    new Circle(longest.Center, longest.Radius)
+                    {
+                        Layer = longest.Layer,
+                        Color = longest.Color,
+                    }
+                );
+                entities.RemoveAll(e => e is Arc arc && group.Contains(arc));
+                entities.RemoveAll(e => e is Line line && chords.Contains(line));
+            }
+        }
+
+        /// <summary>The most the arcs of a joined circle may overlap, in radians: 30 degrees.</summary>
+        public const double MaxSeamOverlap = System.Math.PI / 6;
+
+        private static bool IsSameCircle(Arc a, Arc b) =>
+            a.Layer?.Name == b.Layer?.Name
+            && a.Center.DistanceTo(b.Center) <= Tolerance.ChainTolerance
+            && System.Math.Abs(a.Radius - b.Radius) <= Tolerance.ChainTolerance;
+
+        private static (double Start, double Sweep) ToSpan(Arc arc) =>
+            (Angle.NormalizeRad(arc.IsReversed ? arc.EndAngle : arc.StartAngle), arc.SweepAngle());
+
+        // Walks the spans from angle zero, first crediting whatever part of them wraps past it.
+        private static bool CoversCircle(List<(double Start, double Sweep)> spans, double tolerance)
+        {
+            var reach = spans.Max(s => s.Start + s.Sweep - Angle.TwoPI);
+            foreach (var (start, sweep) in spans)
+            {
+                if (start > reach + tolerance)
+                    return false;
+                reach = System.Math.Max(reach, start + sweep);
+            }
+
+            return reach >= Angle.TwoPI - tolerance;
+        }
+
+        private static bool IsSeamChord(
+            Line line,
+            Arc circle,
+            List<(double Start, double Sweep)> spans,
+            double tolerance
+        )
+        {
+            if (line.Layer?.Name != circle.Layer?.Name)
+                return false;
+
+            var center = circle.Center;
+            bool OnCircle(Vector point) =>
+                System.Math.Abs(point.DistanceTo(center) - circle.Radius) <= Tolerance.ChainTolerance;
+            bool OnOverlap(Vector point)
+            {
+                var angle = System.Math.Atan2(point.Y - center.Y, point.X - center.X);
+                return spans.Count(s =>
+                    {
+                        var offset = Angle.NormalizeRad(angle - s.Start);
+                        return offset <= s.Sweep + tolerance || offset >= Angle.TwoPI - tolerance;
+                    }) >= 2;
+            }
+
+            var middle = new Vector(
+                (line.StartPoint.X + line.EndPoint.X) / 2,
+                (line.StartPoint.Y + line.EndPoint.Y) / 2
+            );
+            return OnCircle(line.StartPoint)
+                && OnCircle(line.EndPoint)
+                && OnOverlap(line.StartPoint)
+                && OnOverlap(line.EndPoint)
+                && OnOverlap(middle);
         }
 
         private delegate bool TryJoin<T>(T a, T b, out T joined);

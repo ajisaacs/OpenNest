@@ -40,8 +40,12 @@ namespace OpenNest.IO
                     : dxf.Entities.Where(e => !IsRepairMark(e)).ToList();
             RemoveDuplicateArcs(cleanup);
             RemoveZeroSweepArcs(cleanup);
+            GeometryOptimizer.JoinFullCircles(cleanup);
             if (options.BendRepair != null)
+            {
                 dxf.Entities.RemoveAll(e => !IsRepairMark(e) && !cleanup.Contains(e));
+                dxf.Entities.AddRange(cleanup.Where(e => !dxf.Entities.Contains(e)).ToList());
+            }
 
             var bends = new List<Bend>();
             if (options.DetectBends && dxf.Document != null)
