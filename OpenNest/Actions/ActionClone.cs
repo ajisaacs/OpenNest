@@ -16,6 +16,7 @@ namespace OpenNest.Actions
         private readonly List<Part> sourceParts;
 
         private double lastScale;
+        private System.Drawing.Point? restingCursor;
 
         public ActionClone(PlateView plateView, Drawing drawing)
             : this(plateView, new List<Part> { new Part(drawing) }) { }
@@ -27,6 +28,8 @@ namespace OpenNest.Actions
             plateView.MouseMove += plateView_MouseMove;
             plateView.MouseDown += plateView_MouseDown;
             plateView.Paint += plateView_Paint;
+            plateView.GotFocus += plateView_FocusChanged;
+            plateView.LostFocus += plateView_FocusChanged;
 
             sourceParts = partsToClone;
             parts = new List<LayoutPart>();
@@ -101,12 +104,23 @@ namespace OpenNest.Actions
             lastScale = plateView.ViewScale;
         }
 
+        // Windows posts a mouse move when a dialog opens or closes, though the mouse stayed
+        // put. Following it would throw away arrow-key nudges, so only a real move counts.
         private void plateView_MouseMove(object sender, MouseEventArgs e)
         {
+            if (e.Location == restingCursor)
+                return;
+
+            restingCursor = e.Location;
             var offset = plateView.CurrentPoint - parts.GetBoundingBox().Location;
             parts.ForEach(p => p.Offset(offset));
             plateView.Invalidate();
         }
+
+        // The cursor may have been moved to the dialog's OK button, so measure the rest
+        // position afresh whenever focus leaves or returns.
+        private void plateView_FocusChanged(object sender, System.EventArgs e) =>
+            restingCursor = plateView.PointToClient(Cursor.Position);
 
         public override bool SurvivesPlateChange => true;
 
@@ -121,6 +135,8 @@ namespace OpenNest.Actions
             plateView.MouseMove += plateView_MouseMove;
             plateView.MouseDown += plateView_MouseDown;
             plateView.Paint += plateView_Paint;
+            plateView.GotFocus += plateView_FocusChanged;
+            plateView.LostFocus += plateView_FocusChanged;
 
             SelectPreviews();
         }
@@ -131,6 +147,8 @@ namespace OpenNest.Actions
             plateView.MouseMove -= plateView_MouseMove;
             plateView.MouseDown -= plateView_MouseDown;
             plateView.Paint -= plateView_Paint;
+            plateView.GotFocus -= plateView_FocusChanged;
+            plateView.LostFocus -= plateView_FocusChanged;
 
             plateView.SelectedParts.Clear();
             plateView.Invalidate();

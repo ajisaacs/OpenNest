@@ -74,4 +74,44 @@ public class ActionCloneTests
         view.SetAction(typeof(ActionSelect));
         Assert.False(view.ActionHandlesF1);
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
+
+    [Fact]
+    public void ADialogsFakeMouseMoveLeavesNudgedPreviewsInPlace() => StaTestThread.Run(() =>
+    {
+        using var view = new PlateView { Plate = new Plate(48, 96), Size = new System.Drawing.Size(600, 600) };
+        view.ZoomToFit();
+        view.SetAction(typeof(ActionClone), Square("new"));
+        var preview = Assert.Single(view.SelectedParts);
+        MoveMouse(view, new System.Drawing.Point(300, 300));
+        var followed = preview.BasePart.BoundingBox.Location;
+
+        Nudge(view);
+        var nudged = preview.BasePart.BoundingBox.Location;
+        Assert.Equal(followed.X + view.OffsetIncrementDistance, nudged.X, 6);
+
+        // A repost of the last position, with no focus change.
+        MoveMouse(view, new System.Drawing.Point(300, 300));
+        Assert.Equal(nudged, preview.BasePart.BoundingBox.Location);
+
+        // Opening the dialog, then closing it: each post arrives where the cursor rests.
+        var rest = view.PointToClient(Cursor.Position);
+        Raise(view, "OnLostFocus", EventArgs.Empty);
+        MoveMouse(view, rest);
+        Assert.Equal(nudged, preview.BasePart.BoundingBox.Location);
+
+        Raise(view, "OnGotFocus", EventArgs.Empty);
+        MoveMouse(view, rest);
+        Assert.Equal(nudged, preview.BasePart.BoundingBox.Location);
+
+        // The next real move takes the previews back to the cursor.
+        MoveMouse(view, new System.Drawing.Point(rest.X + 20, rest.Y + 20));
+        Assert.NotEqual(nudged, preview.BasePart.BoundingBox.Location);
+    }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
+
+    private static void MoveMouse(PlateView view, System.Drawing.Point point) =>
+        Raise(view, "OnMouseMove", new MouseEventArgs(MouseButtons.None, 0, point.X, point.Y, 0));
+
+    private static void Nudge(PlateView view) =>
+        typeof(PlateView).GetMethod("ProcessDialogKey", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(view, new object[] { Keys.Right });
 }
