@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Tests.Jobs;
 using OpenNest.Geometry;
 using Xunit;
 
@@ -13,17 +14,6 @@ public class ExpanderFinalQualityTests
 
     private static Program Disk(double radius) =>
         ConvertGeometry.ToProgram(new List<Entity> { new Circle(0, 0, radius) });
-
-    private static Program Rectangle(double width, double height)
-    {
-        var program = new Program();
-        program.MoveTo(0, 0);
-        program.LineTo(width, 0);
-        program.LineTo(width, height);
-        program.LineTo(0, height);
-        program.LineTo(0, 0);
-        return program;
-    }
 
     private static Part Add(Plate plate, Program program, double x, double y)
     {
@@ -56,7 +46,7 @@ public class ExpanderFinalQualityTests
     {
         var plate = Sheet();
         Add(plate, Disk(2), 10, 6);
-        var mover = Add(plate, Rectangle(1, 1), 12, 5.5);
+        var mover = Add(plate, TestDrawingFactory.Rectangle(1, 1), 12, 5.5);
         var result = Expander.Separate(new List<Part> { mover }, plate, spacing: 1);
         Assert.True(result.Converged, $"curved contact pinned: {result.Violations.Count} violations");
         Assert.True(result.Positions[0].X >= 13 - 1e-3);
@@ -79,7 +69,7 @@ public class ExpanderFinalQualityTests
         program.LineTo(0, 6 * k);
         program.LineTo(0, 0);
         Add(plate, program, 10, 5);
-        var mover = Add(plate, Rectangle(2 * k, 2 * k), 10 + k, 5 + 3 * k);
+        var mover = Add(plate, TestDrawingFactory.Rectangle(2 * k, 2 * k), 10 + k, 5 + 3 * k);
         // Left finger [10,10.0002] × [5.0002,5.0006] intersects the
         // mover [10.0001,10.0003] × [5.0003,5.0005] in positive area.
         var result = Expander.Separate(new List<Part> { mover }, plate, 0);
@@ -92,8 +82,8 @@ public class ExpanderFinalQualityTests
     public void Expand_RemoteRegeneratedCutoff_MustNotPinUnrelatedGrowth()
     {
         var plate = Sheet();
-        var anchor = Add(plate, Rectangle(2, 2), 1, 4);
-        var mover = Add(plate, Rectangle(2, 2), 4, 4);
+        var anchor = Add(plate, TestDrawingFactory.Rectangle(2, 2), 1, 4);
+        var mover = Add(plate, TestDrawingFactory.Rectangle(2, 2), 4, 4);
         plate.CutOffs.Add(new CutOff(new Vector(0, 10), CutOffAxis.Horizontal));
         var settings = new CutOffSettings();
         plate.RegenerateCutOffs(settings);
@@ -114,8 +104,8 @@ public class ExpanderFinalQualityTests
     public void Expand_RegeneratedCutoffBlocksCrossingEvenWithClearFarEndpoint()
     {
         var plate = new Plate(new Size(20, 30)) { EdgeSpacing = new Spacing(0, 0) };
-        var anchor = Add(plate, Rectangle(2, 2), 1, 1);
-        var mover = Add(plate, Rectangle(2, 2), 1, 6);
+        var anchor = Add(plate, TestDrawingFactory.Rectangle(2, 2), 1, 1);
+        var mover = Add(plate, TestDrawingFactory.Rectangle(2, 2), 1, 6);
         plate.CutOffs.Add(new CutOff(new Vector(0, 10), CutOffAxis.Horizontal));
         var settings = new CutOffSettings();
         plate.RegenerateCutOffs(settings);
@@ -134,8 +124,8 @@ public class ExpanderFinalQualityTests
     public void Expand_OutsideUnchangedMover_MustNotReturnUnqualifiedSuccess()
     {
         var plate = Sheet();
-        var anchor = Add(plate, Rectangle(2, 2), 1, 4);
-        var mover = Add(plate, Rectangle(2, 2), 35, 4);
+        var anchor = Add(plate, TestDrawingFactory.Rectangle(2, 2), 1, 4);
+        var mover = Add(plate, TestDrawingFactory.Rectangle(2, 2), 35, 4);
         var result = Expander.Expand(new List<Part> { anchor, mover }, plate,
             new Expander.Options { MaxSpacing = 3 });
 

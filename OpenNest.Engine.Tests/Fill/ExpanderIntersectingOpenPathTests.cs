@@ -1,5 +1,6 @@
 using OpenNest.CNC;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Tests.Jobs;
 using OpenNest.Geometry;
 using Xunit;
 
@@ -7,17 +8,6 @@ namespace OpenNest.Engine.Tests.Fill;
 
 public class ExpanderIntersectingOpenPathTests
 {
-    private static Program Square()
-    {
-        var program = new Program();
-        program.MoveTo(0, 0);
-        program.LineTo(2, 0);
-        program.LineTo(2, 2);
-        program.LineTo(0, 2);
-        program.LineTo(0, 0);
-        return program;
-    }
-
     public static IEnumerable<object[]> Cases()
     {
         foreach (var quadrant in new[] { 1, 2, 3, 4 })
@@ -40,8 +30,8 @@ public class ExpanderIntersectingOpenPathTests
         };
         var expectedA = origin + Swap(40, 40);
         var expectedB = origin + Swap(43, 40);
-        var anchor = new Part(new Drawing("anchor", Square()), expectedA);
-        var mover = new Part(new Drawing("mover", Square()), expectedB);
+        var anchor = new Part(new Drawing("anchor", TestDrawingFactory.Rectangle(2, 2)), expectedA);
+        var mover = new Part(new Drawing("mover", TestDrawingFactory.Rectangle(2, 2)), expectedB);
         plate.Parts.Add(anchor);
         plate.Parts.Add(mover);
 

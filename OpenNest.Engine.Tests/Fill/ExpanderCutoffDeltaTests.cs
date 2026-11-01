@@ -1,6 +1,7 @@
 using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Tests.Jobs;
 using OpenNest.Geometry;
 using Xunit;
 
@@ -10,16 +11,8 @@ public class ExpanderCutoffDeltaTests
 {
     private static Plate Sheet() => new(new Size(30, 30)) { EdgeSpacing = new Spacing(0, 0) };
 
-    private static Program Rectangle(double width = 2, double height = 2)
-    {
-        var program = new Program();
-        program.MoveTo(0, 0);
-        program.LineTo(width, 0);
-        program.LineTo(width, height);
-        program.LineTo(0, height);
-        program.LineTo(0, 0);
-        return program;
-    }
+    private static Program Rectangle(double width = 2, double height = 2) =>
+        TestDrawingFactory.Rectangle(width, height);
 
     private static Part Add(Plate plate, Program program, double x, double y)
     {

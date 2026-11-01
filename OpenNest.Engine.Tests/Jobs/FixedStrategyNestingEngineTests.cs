@@ -58,19 +58,6 @@ public class FixedStrategyNestingEngineTests
         Assert.Throws<ArgumentException>(() => new FixedStrategyNestingEngine("  "));
     }
 
-    private static Program LShape()
-    {
-        var program = new Program();
-        program.MoveTo(0, 0);
-        program.LineTo(6, 0);
-        program.LineTo(6, 4);
-        program.LineTo(3, 4);
-        program.LineTo(3, 2);
-        program.LineTo(0, 2);
-        program.LineTo(0, 0);
-        return program;
-    }
-
     public static TheoryData<string, string, double, int> LockedRotationCases =>
         new()
         {
@@ -99,7 +86,7 @@ public class FixedStrategyNestingEngineTests
             "rect-6x4" => TestDrawingFactory.Rectangle(6, 4),
             "rect-20x3" => TestDrawingFactory.Rectangle(20, 3),
             "rect-3x20" => TestDrawingFactory.Rectangle(3, 20),
-            _ => LShape(),
+            _ => TestDrawingFactory.LShape(),
         };
         var part = new NestJobPart(
             shape,

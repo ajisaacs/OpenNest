@@ -34,19 +34,6 @@ namespace OpenNest.Engine.Tests.Jobs;
 /// </remarks>
 public class FillStackCharacterizationTests
 {
-    private static Program LShape()
-    {
-        var program = new Program();
-        program.MoveTo(0, 0);
-        program.LineTo(6, 0);
-        program.LineTo(6, 4);
-        program.LineTo(3, 4);
-        program.LineTo(3, 2);
-        program.LineTo(0, 2);
-        program.LineTo(0, 0);
-        return program;
-    }
-
     /// <summary>6x4 block with a 2x2 notch cut into the middle of its top edge.</summary>
     private static Program Notched()
     {
@@ -59,18 +46,6 @@ public class FillStackCharacterizationTests
         program.LineTo(2, 2);
         program.LineTo(2, 4);
         program.LineTo(0, 4);
-        program.LineTo(0, 0);
-        return program;
-    }
-
-    /// <summary>D-shape: 3x5 block closed by a semicircular arc.</summary>
-    private static Program ArcPart()
-    {
-        var program = new Program();
-        program.MoveTo(0, 0);
-        program.LineTo(3, 0);
-        program.ArcTo(3, 5, 3, 2.5, RotationType.CCW);
-        program.LineTo(0, 5);
         program.LineTo(0, 0);
         return program;
     }
@@ -112,9 +87,9 @@ public class FillStackCharacterizationTests
     private static Program Shape(string name) =>
         name switch
         {
-            "lshape" => LShape(),
+            "lshape" => TestDrawingFactory.LShape(),
             "notched" => Notched(),
-            "arc" => ArcPart(),
+            "arc" => TestDrawingFactory.ArcPart(),
             "bar" => LongBar(),
             "chevron" => Chevron(),
             _ => TestDrawingFactory.Rectangle(4, 3),
@@ -259,9 +234,9 @@ public class FillStackCharacterizationTests
     /// </summary>
     private static List<NestItem> MixedItems() =>
         [
-            new() { Drawing = new Drawing("lshape", LShape()), Quantity = 14 },
+            new() { Drawing = new Drawing("lshape", TestDrawingFactory.LShape()), Quantity = 14 },
             new() { Drawing = new Drawing("notched", Notched()), Quantity = 9 },
-            new() { Drawing = new Drawing("arc", ArcPart()), Quantity = 11 },
+            new() { Drawing = new Drawing("arc", TestDrawingFactory.ArcPart()), Quantity = 11 },
             new() { Drawing = new Drawing("rect", TestDrawingFactory.Rectangle(4, 3)), Quantity = 1 },
         ];
 
@@ -354,7 +329,11 @@ public class FillStackCharacterizationTests
         {
             var plate = MakeClampedPlate();
             // A quantity close to a full sheet makes clamp-dropped copies trigger refills.
-            var item = new NestItem { Drawing = new Drawing("lshape", LShape()), Quantity = 40 };
+            var item = new NestItem
+            {
+                Drawing = new Drawing("lshape", TestDrawingFactory.LShape()),
+                Quantity = 40,
+            };
             return Layout(
                 PlateFillService.FillItem(
                     strategy,

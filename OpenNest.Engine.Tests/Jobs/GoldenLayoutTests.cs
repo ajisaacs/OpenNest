@@ -29,41 +29,6 @@ public class GoldenLayoutTests
 {
     private const double PoseTolerance = 1e-9;
 
-    private static Program Rect(double width, double length)
-    {
-        var program = new Program();
-        program.MoveTo(0, 0);
-        program.LineTo(width, 0);
-        program.LineTo(width, length);
-        program.LineTo(0, length);
-        program.LineTo(0, 0);
-        return program;
-    }
-
-    private static Program LShape()
-    {
-        var program = new Program();
-        program.MoveTo(0, 0);
-        program.LineTo(6, 0);
-        program.LineTo(6, 4);
-        program.LineTo(3, 4);
-        program.LineTo(3, 2);
-        program.LineTo(0, 2);
-        program.LineTo(0, 0);
-        return program;
-    }
-
-    private static Program ArcPart()
-    {
-        var program = new Program();
-        program.MoveTo(0, 0);
-        program.LineTo(3, 0);
-        program.ArcTo(3, 5, 3, 2.5, RotationType.CCW);
-        program.LineTo(0, 5);
-        program.LineTo(0, 0);
-        return program;
-    }
-
     private static NestJobPart Part(string id, Program program, int quantity) =>
         new(id, PartGeometrySnapshot.FromProgram(program), quantity);
 
@@ -72,10 +37,10 @@ public class GoldenLayoutTests
         new(
             new[]
             {
-                Part("rect-a", Rect(6, 4), 8),
-                Part("rect-b", Rect(4, 3), 6),
-                Part("lshape", LShape(), 3),
-                Part("arc", ArcPart(), 3),
+                Part("rect-a", TestDrawingFactory.Rectangle(6, 4), 8),
+                Part("rect-b", TestDrawingFactory.Rectangle(4, 3), 6),
+                Part("lshape", TestDrawingFactory.LShape(), 3),
+                Part("arc", TestDrawingFactory.ArcPart(), 3),
             },
             new[] { new NestPlateStock("stock", new Size(30, 50), 5, 1, new Spacing(1, 1, 1, 1)) },
             new NestJobOptions(strategy)
@@ -86,9 +51,9 @@ public class GoldenLayoutTests
         new(
             new[]
             {
-                Part("rect-a", Rect(6, 4), 5),
-                Part("rect-b", Rect(4, 3), 4),
-                Part("rect-c", Rect(2, 7), 3),
+                Part("rect-a", TestDrawingFactory.Rectangle(6, 4), 5),
+                Part("rect-b", TestDrawingFactory.Rectangle(4, 3), 4),
+                Part("rect-c", TestDrawingFactory.Rectangle(2, 7), 3),
             },
             new[] { new NestPlateStock("stock", new Size(30, 50), 4, 1, new Spacing(1, 1, 1, 1)) },
             new NestJobOptions("Strip")
@@ -339,7 +304,11 @@ public class GoldenLayoutTests
 
     private static NestJob ProgressJob() =>
         new(
-            new[] { Part("a", Rect(6, 4), 5), Part("b", Rect(4, 3), 4) },
+            new[]
+            {
+                Part("a", TestDrawingFactory.Rectangle(6, 4), 5),
+                Part("b", TestDrawingFactory.Rectangle(4, 3), 4),
+            },
             new[]
             {
                 new NestPlateStock("small", new Size(14, 14), 4, 1, new Spacing(1, 1, 1, 1)),

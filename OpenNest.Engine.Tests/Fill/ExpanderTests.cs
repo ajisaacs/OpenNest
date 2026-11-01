@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using OpenNest.CNC;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Tests.Jobs;
 using OpenNest.Geometry;
 using Xunit;
 
@@ -15,16 +16,8 @@ namespace OpenNest.Engine.Tests.Fill;
 /// </summary>
 public class ExpanderTests
 {
-    private static Program Rectangle(double width = 4, double length = 4)
-    {
-        var program = new Program();
-        program.MoveTo(0, 0);
-        program.LineTo(width, 0);
-        program.LineTo(width, length);
-        program.LineTo(0, length);
-        program.LineTo(0, 0);
-        return program;
-    }
+    private static Program Rectangle(double width = 4, double length = 4) =>
+        TestDrawingFactory.Rectangle(width, length);
 
     private static Part AddSquare(Plate plate, double x, double y, double size = 4)
     {

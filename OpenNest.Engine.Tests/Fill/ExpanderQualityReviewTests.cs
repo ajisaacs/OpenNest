@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using OpenNest.CNC;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Tests.Jobs;
 using OpenNest.Geometry;
 using Xunit;
 
@@ -8,20 +9,10 @@ namespace OpenNest.Engine.Tests.Fill;
 
 public class ExpanderQualityReviewTests
 {
-    private static Program Rectangle(double width, double height)
-    {
-        var program = new Program();
-        program.MoveTo(0, 0);
-        program.LineTo(width, 0);
-        program.LineTo(width, height);
-        program.LineTo(0, height);
-        program.LineTo(0, 0);
-        return program;
-    }
-
     private static Part AddSquare(Plate plate, double x, double y, double size)
     {
-        var part = new Part(new Drawing("neutral", Rectangle(size, size)), new Vector(x, y));
+        var part = new Part(
+            new Drawing("neutral", TestDrawingFactory.Rectangle(size, size)), new Vector(x, y));
         plate.Parts.Add(part);
         return part;
     }
@@ -54,7 +45,7 @@ public class ExpanderQualityReviewTests
     {
         var plate = MakePlate(30);
         plate.ClampZones.Add(new ClampZone("tiny", new Box(5, 5, 1e-5, 1e-5)));
-        var frameProgram = Rectangle(10, 10);
+        var frameProgram = TestDrawingFactory.Rectangle(10, 10);
         frameProgram.MoveTo(4, 4);
         frameProgram.LineTo(6, 4);
         frameProgram.LineTo(6, 6);
