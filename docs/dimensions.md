@@ -53,15 +53,19 @@ they do not appear on plates, in PDFs or in DXF export.
 ## Hole table
 
 **Holes...** in the CAD Converter's bottom bar opens a small Hole Table window beside the
-view. It lists the drawing's round holes by diameter, smallest first, with the quantity of
-each and a color swatch. While it is open, every hole on the view is drawn in its size's color
+view. It lists the drawing's round and keyed holes by diameter, smallest first, with the
+quantity of each and a color swatch. While it is open, every hole on the view is drawn in its size's color
 with a heavier line; closing the window restores the normal colors. The table follows the
 selected file and updates when entities are cut, etched, set to display, excluded or
 simplified.
 
 - A round hole is a cut circle, or a closed contour made only of arcs on one center and
   radius, that lies inside another cut contour. The outline of a round part is not a hole.
-  Slots and other shapes are not listed.
+- A keyed hole is a closed contour around its center with at least 270 degrees of arc on one
+  center and radius, and anything else for the rest: a keyway, a flat. It must also lie inside
+  another cut contour. It takes the arc's diameter and its own row, marked `keyed`, after
+  round holes of that diameter.
+- Slots, curved slots and other shapes are not listed.
 - Holes are read from the entities as they will be cut (visible, with roles applied), before
   breakoffs and tabbed cutouts. Etched, display-only, excluded and hidden circles are not
   listed.

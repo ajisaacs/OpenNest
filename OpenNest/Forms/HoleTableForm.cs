@@ -8,7 +8,7 @@ using OpenNest.Dimensions;
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// A small tool window listing the current drawing's round holes by diameter, with the
+    /// A small tool window listing the current drawing's round and keyed holes by diameter, with the
     /// quantity of each and the color its holes are drawn in on the CAD view.
     /// </summary>
     public class HoleTableForm : Form
@@ -123,9 +123,9 @@ namespace OpenNest.Forms
             var total = sizes.Sum(s => s.Quantity);
             Text = string.IsNullOrEmpty(drawingName) ? "Hole Table" : $"Hole Table - {drawingName}";
             summary.Text = sizes.Count == 0
-                ? "No round holes. Slots and other shapes are not listed."
+                ? "No round or keyed holes. Slots and other shapes are not listed."
                 : $"{total} hole{(total == 1 ? "" : "s")}, {sizes.Count} size{(sizes.Count == 1 ? "" : "s")}. "
-                    + "Round holes only, in drawing units.";
+                    + "Round and keyed holes, in drawing units.";
             return colors;
         }
 
