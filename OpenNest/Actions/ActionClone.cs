@@ -163,15 +163,21 @@ namespace OpenNest.Actions
 
         private void DeleteSources()
         {
+            // Select All adds placed parts beside the previews; those go with the sources.
+            var selected = plateView.SelectedParts.Except(parts).Select(p => p.BasePart);
+            var doomed = sourceParts.Concat(selected).ToList();
+
             using var change = plateView.BeginChange("Delete");
-            if (sourceParts.Any(plateView.Plate.Parts.Contains))
+            if (doomed.Any(plateView.Plate.Parts.Contains))
                 change.MarkChanged();
-            foreach (var part in sourceParts)
+            foreach (var part in doomed)
                 plateView.Plate.Parts.Remove(part);
 
             if (plateView.Plate.CutOffs.Count > 0)
                 plateView.Plate.RegenerateCutOffs(plateView.CutOffSettings);
 
+            SelectPreviews();
+            plateView.Selection.NotifySelectionChanged();
             plateView.Invalidate();
             change.Complete();
         }

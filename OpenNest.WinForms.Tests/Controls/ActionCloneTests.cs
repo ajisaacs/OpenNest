@@ -59,6 +59,27 @@ public class ActionCloneTests
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
 
     [Fact]
+    public void DeleteAfterSelectAllRemovesPlacedPartsAndKeepsPlacing() => StaTestThread.Run(() =>
+    {
+        var plate = new Plate(48, 96);
+        var drawing = Square("filled");
+        plate.Parts.Add(new Part(drawing));
+        plate.Parts.Add(new Part(drawing));
+        using var view = new PlateView { Plate = plate, Size = new System.Drawing.Size(600, 600) };
+        view.ZoomToFit();
+        view.SetAction(typeof(ActionClone), drawing);
+        var preview = Assert.Single(view.SelectedParts);
+        view.SelectAll();
+
+        Raise(view, "OnKeyDown", new KeyEventArgs(Keys.Delete));
+
+        Assert.Empty(plate.Parts);
+        Assert.Same(preview, Assert.Single(view.SelectedParts));
+        Assert.True(preview.IsSelected);
+        Assert.IsType<ActionClone>(view.Actions.CurrentAction);
+    }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
+
+    [Fact]
     public void F1SetsThePartInPlaceInsteadOfOpeningHelp() => StaTestThread.Run(() =>
     {
         var plate = new Plate(48, 96);
