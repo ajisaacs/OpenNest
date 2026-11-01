@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
 using OpenNest.Controls;
@@ -16,6 +16,9 @@ namespace OpenNest.Actions
         private readonly Brush fillBrush;
 
         private Status status;
+
+        // One zoom ends this tool; Escape from Select must not bring it back.
+        public override bool ResumeOnEscape => false;
 
         public ActionZoomWindow(PlateView plateView)
             : base(plateView)
@@ -96,20 +99,20 @@ namespace OpenNest.Actions
                 var distance2 = plateView.LengthWorldToGui(distance1);
 
                 if (distance2 > 40)
-                {
-                    ZoomWindow();
-                    CancelAction();
-                }
+                    ZoomAndFinish();
                 else
-                {
                     status = Status.SetSecondPoint;
-                }
             }
             else if (status == Status.SetSecondPoint)
             {
-                ZoomWindow();
-                CancelAction();
+                ZoomAndFinish();
             }
+        }
+
+        private void ZoomAndFinish()
+        {
+            ZoomWindow();
+            plateView.SetAction(typeof(ActionSelect));
         }
 
         private void plateView_Paint(object sender, PaintEventArgs e)
