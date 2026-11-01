@@ -10,7 +10,9 @@ namespace OpenNest.Engine.CuttingPlanning;
 /// Proposes a whole-part visiting order as an open traveling-salesman path from the start point
 /// over part centers: nearest neighbor, then 2-opt and Or-opt improvement, never placing a part
 /// before one of its prerequisites. It is only a proposal; the forward search still checks every
-/// rapid and lead along it.
+/// rapid and lead along it. A part may be left from somewhere other than where it is reached (a
+/// cut-off is entered at its start and left at its far end): each leg then runs from one part's
+/// exit to the next part's center, and a reversed run is costed along its own directed legs.
 /// </summary>
 internal static class CuttingPartOrder
 {
@@ -24,8 +26,11 @@ internal static class CuttingPartOrder
     /// <param name="start">The modeled tool position before the first of these parts.</param>
     /// <param name="prerequisites">Ordinals that must come before each part; must be acyclic.</param>
     /// <param name="endpoint">Optional fixed final position after the last of these parts.</param>
+    /// <param name="exits">Optional point each part is left from, per part ordinal; null when every
+    /// part is left from its center.</param>
     internal static int[] Plan(IReadOnlyList<int> parts, IReadOnlyList<Vector> centers, Vector start,
-        IReadOnlyList<IReadOnlyCollection<int>> prerequisites, CancellationToken token, Vector? endpoint = null)
+        IReadOnlyList<IReadOnlyCollection<int>> prerequisites, CancellationToken token, Vector? endpoint = null,
+        IReadOnlyList<Vector> exits = null)
     {
         var local = new Dictionary<int, int>();
         for (var i = 0; i < parts.Count; i++)
@@ -34,7 +39,8 @@ internal static class CuttingPartOrder
         var localPrerequisites = parts
             .Select(p => (IReadOnlyCollection<int>)prerequisites[p].Where(local.ContainsKey).Select(q => local[q]).ToArray())
             .ToArray();
-        return Plan(localCenters, start, localPrerequisites, token, endpoint).Select(i => parts[i]).ToArray();
+        var localExits = exits == null ? null : parts.Select(p => exits[p]).ToArray();
+        return Plan(localCenters, start, localPrerequisites, token, endpoint, localExits).Select(i => parts[i]).ToArray();
     }
 
     /// <param name="centers">One representative point per part ordinal.</param>
@@ -45,24 +51,29 @@ internal static class CuttingPartOrder
     /// terminal edge). The terminal edge joins EVERY improvement delta, not just final
     /// scoring. Null keeps the previous whole-part open-route semantics exactly.
     /// </param>
+    /// <param name="exits">
+    /// Optional point each part is left from; null (every part left from its center) keeps the
+    /// symmetric route exactly.
+    /// </param>
     internal static int[] Plan(IReadOnlyList<Vector> centers, Vector start,
-        IReadOnlyList<IReadOnlyCollection<int>> prerequisites, CancellationToken token, Vector? endpoint = null)
+        IReadOnlyList<IReadOnlyCollection<int>> prerequisites, CancellationToken token, Vector? endpoint = null,
+        IReadOnlyList<Vector> exits = null)
     {
         var count = centers.Count;
-        var order = NearestNeighbor(centers, start, prerequisites, token);
+        var order = NearestNeighbor(centers, exits ?? centers, start, prerequisites, token);
         var position = new int[count];
         for (var pass = 0; pass < MaxPasses; pass++)
         {
             token.ThrowIfCancellationRequested();
-            var improved = TwoOpt(order, centers, start, prerequisites, position, token, endpoint);
-            improved |= OrOpt(order, centers, start, prerequisites, position, token, endpoint);
+            var improved = TwoOpt(order, centers, exits, start, prerequisites, position, token, endpoint);
+            improved |= OrOpt(order, centers, exits ?? centers, start, prerequisites, position, token, endpoint);
             if (!improved)
                 break;
         }
         return order;
     }
 
-    private static int[] NearestNeighbor(IReadOnlyList<Vector> centers, Vector start,
+    private static int[] NearestNeighbor(IReadOnlyList<Vector> centers, IReadOnlyList<Vector> exits, Vector start,
         IReadOnlyList<IReadOnlyCollection<int>> prerequisites, CancellationToken token)
     {
         var count = centers.Count;
@@ -89,39 +100,56 @@ internal static class CuttingPartOrder
                 throw new InvalidOperationException("Part prerequisites form a cycle.");
             placed[best] = true;
             order[step] = best;
-            current = centers[best];
+            current = exits[best];
         }
         return order;
     }
 
     // Reverses order[i..j] when that shortens the open path and keeps every prerequisite earlier.
-    private static bool TwoOpt(int[] order, IReadOnlyList<Vector> centers, Vector start,
+    // With exits, a leg runs from one part's exit to the next part's center, so the reversed run's
+    // own legs change length too; without them they cancel and are left out, exactly as before.
+    private static bool TwoOpt(int[] order, IReadOnlyList<Vector> centers, IReadOnlyList<Vector> exits, Vector start,
         IReadOnlyList<IReadOnlyCollection<int>> prerequisites, int[] position, CancellationToken token,
         Vector? endpoint = null)
     {
         var improved = false;
         var count = order.Length;
+        var leave = exits ?? centers;
         // The terminal edge belongs to every delta: reversing the route's tail swaps which
         // endpoint-side center faces the fixed final position.
         double Tail(Vector from) => endpoint is { } e ? from.DistanceTo(e) : 0;
         for (var i = 0; i < count - 1; i++)
         {
             token.ThrowIfCancellationRequested();
+            // The run's internal legs, forward and reversed, grown one part at a time.
+            double forward = 0, reversed = 0;
             for (var j = i + 1; j < count; j++)
             {
-                var before = Point(i - 1).DistanceTo(centers[order[i]])
-                    + (j + 1 < count ? centers[order[j]].DistanceTo(centers[order[j + 1]]) : Tail(centers[order[j]]));
-                var after = Point(i - 1).DistanceTo(centers[order[j]])
-                    + (j + 1 < count ? centers[order[i]].DistanceTo(centers[order[j + 1]]) : Tail(centers[order[i]]));
+                if (exits != null)
+                {
+                    forward += leave[order[j - 1]].DistanceTo(centers[order[j]]);
+                    reversed += leave[order[j]].DistanceTo(centers[order[j - 1]]);
+                }
+                var before = Point(i - 1).DistanceTo(centers[order[i]]) + forward
+                    + (j + 1 < count ? leave[order[j]].DistanceTo(centers[order[j + 1]]) : Tail(leave[order[j]]));
+                var after = Point(i - 1).DistanceTo(centers[order[j]]) + reversed
+                    + (j + 1 < count ? leave[order[i]].DistanceTo(centers[order[j + 1]]) : Tail(leave[order[i]]));
                 if (after >= before - Epsilon || !CanReverse(order, i, j, prerequisites, position))
                     continue;
                 Array.Reverse(order, i, j - i + 1);
                 improved = true;
+                // The run is reversed now; its legs are re-measured from scratch.
+                forward = reversed = 0;
+                for (var k = i + 1; k <= j && exits != null; k++)
+                {
+                    forward += leave[order[k - 1]].DistanceTo(centers[order[k]]);
+                    reversed += leave[order[k]].DistanceTo(centers[order[k - 1]]);
+                }
             }
         }
         return improved;
 
-        Vector Point(int index) => index < 0 ? start : centers[order[index]];
+        Vector Point(int index) => index < 0 ? start : leave[order[index]];
     }
 
     // A reversal breaks a prerequisite only when both parts lie inside the reversed span.
@@ -138,7 +166,7 @@ internal static class CuttingPartOrder
     }
 
     // Moves a run of one to three parts to a later or earlier gap when that shortens the path.
-    private static bool OrOpt(int[] order, IReadOnlyList<Vector> centers, Vector start,
+    private static bool OrOpt(int[] order, IReadOnlyList<Vector> centers, IReadOnlyList<Vector> exits, Vector start,
         IReadOnlyList<IReadOnlyCollection<int>> prerequisites, int[] position, CancellationToken token,
         Vector? endpoint = null)
     {
@@ -172,7 +200,7 @@ internal static class CuttingPartOrder
         // end — the fixed endpoint when one was supplied, so the terminal edge is in every delta).
         double Gap(int a, int b)
         {
-            var from = a < 0 ? start : centers[order[a]];
+            var from = a < 0 ? start : exits[order[a]];
             if (b >= count)
                 return endpoint is { } e ? from.DistanceTo(e) : 0;
             if (b < 0)

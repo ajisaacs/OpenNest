@@ -199,6 +199,7 @@ internal static class JointCuttingPlanSearch
     private static CuttingNestedOrder.Context NestedOrder(CuttingPlanSnapshot snapshot, Vector[] centers,
         HashSet<int>[] prerequisites, CancellationToken token)
     {
+        var exits = snapshot.Placements.Any(p => p.IsCutOff) ? snapshot.Placements.Select(Exit).ToArray() : null;
         var inside = snapshot.Placements.Select((placement, host) => placement.IsCutOff ? []
             : snapshot.Dependencies.PrerequisitesOf(host).Where(p => !snapshot.Placements[p].IsCutOff).ToArray()).ToArray();
         var contours = new Dictionary<int, Entity[]>();
@@ -210,7 +211,7 @@ internal static class JointCuttingPlanSearch
                     .Select(m => m.Curve.ToEntity()).ToArray();
             return entities.Length == 0 ? centers[host]
                 : entities.Select(e => e.ClosestPointTo(position)).MinBy(point => point.DistanceTo(position));
-        }, token);
+        }, token, exits);
     }
 
     // When the approach crossed the part cut just before the one it left from, the tool went on
@@ -268,9 +269,17 @@ internal static class JointCuttingPlanSearch
         return false;
     }
 
-    // The center of the part's placed cut material, for ordering only.
+    // Where the tool reaches a part, for ordering only: the center of its placed cut material,
+    // or a cut-off's start. A cut-off runs from a fixed edge, so it is entered at its start and
+    // left at its far end (Exit); its middle is neither.
     private static Vector Center(FixedProgramPlacement placement) =>
-        CutExtent(placement)?.Center ?? placement.Execution.DeparturePoint;
+        placement.IsCutOff && placement.Execution.Motions.FirstOrDefault(m => !m.Rapid) is { Start: { } start }
+            ? start
+            : CutExtent(placement)?.Center ?? placement.Execution.DeparturePoint;
+
+    // Where the tool leaves a part, for ordering only: a cut-off's far end, otherwise its center.
+    private static Vector Exit(FixedProgramPlacement placement) =>
+        placement.IsCutOff ? placement.Execution.DeparturePoint : Center(placement);
 
     // The extent of the part's placed cut material, or null when it has none.
     private static Box CutExtent(FixedProgramPlacement placement)
@@ -444,7 +453,7 @@ internal static class JointCuttingPlanSearch
                 for (var i = node.Order.Length + 1; i < sequence.Length; i++)
                     if (!finished.Contains(sequence[i]) && !IsSegment(snapshot.Placements[sequence[i]]))
                         return snapshot.Placements[sequence[i]];
-            var from = Center(source);
+            var from = Exit(source);
             FixedProgramPlacement best = null;
             var bestDistance = double.PositiveInfinity;
             foreach (var candidate in snapshot.Placements

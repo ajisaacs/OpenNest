@@ -86,6 +86,42 @@ public class CuttingPartOrderTests
         Assert.Throws<InvalidOperationException>(() => Plan([new(0, 0), new(1, 0)], prerequisites));
     }
 
+    [Fact]
+    public void Plan_LeavesAPartFromItsExitPoint()
+    {
+        // Part 1 is a line entered at (2, 0) and left at (2, 100). Toured from its entry
+        // alone, 1, 0, 2 looks shortest; left from its far end, 0, 1, 2 is (5 + 5.39 + 5.39).
+        Vector[] entries = [new(0, 5), new(2, 0), new(0, 95)];
+        Vector[] exits = [new(0, 5), new(2, 100), new(0, 95)];
+
+        Assert.Equal(new[] { 0, 1, 2 }, CuttingPartOrder.Plan(entries, Vector.Zero, NoPrerequisites(3),
+            CancellationToken.None, exits: exits));
+    }
+
+    // Part 3 is entered at (0, 6) and left at (0, 13). A reversed run is costed along its own
+    // legs, from each part's exit: 0, 2, 4, 1, 3 (14.97), not 3, 1, 4, 2, 0 (20.17).
+    [Fact]
+    public void Plan_CostsAReversedRunAlongItsOwnLegsFromEachExit()
+    {
+        Vector[] entries = [new(6, 1), new(2, 6), new(5, 2), new(0, 6), new(4, 2)];
+        Vector[] exits = [new(6, 1), new(2, 6), new(5, 2), new(0, 13), new(4, 2)];
+
+        Assert.Equal(new[] { 0, 2, 4, 1, 3 }, CuttingPartOrder.Plan(entries, Vector.Zero, NoPrerequisites(5),
+            CancellationToken.None, exits: exits));
+    }
+
+    // Part 4 is entered at (4, 4) and left at (4, 13). Nearest first goes on from where each
+    // part is left: 4, 2, 1, 0, 3 (19.92), not 0, 3, 2, 1, 4 (20.49).
+    [Fact]
+    public void Plan_NearestFirstGoesOnFromEachPartsExit()
+    {
+        Vector[] entries = [new(7, 4), new(5, 7), new(7, 9), new(9, 6), new(4, 4)];
+        Vector[] exits = [new(7, 4), new(5, 7), new(7, 9), new(9, 6), new(4, 13)];
+
+        Assert.Equal(new[] { 4, 2, 1, 0, 3 }, CuttingPartOrder.Plan(entries, Vector.Zero, NoPrerequisites(5),
+            CancellationToken.None, exits: exits));
+    }
+
     private static int[] Plan(Vector[] centers, IReadOnlyCollection<int>[] prerequisites) =>
         CuttingPartOrder.Plan(centers, Vector.Zero, prerequisites, CancellationToken.None);
 

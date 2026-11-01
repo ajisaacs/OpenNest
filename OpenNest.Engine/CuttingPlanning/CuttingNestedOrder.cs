@@ -20,9 +20,11 @@ internal static class CuttingNestedOrder
     /// <param name="Prerequisites">Ordinals that must come before each part, learned rules included.</param>
     /// <param name="Inside">Per part ordinal, the parts nested inside its cutouts at any depth.</param>
     /// <param name="HostEntry">The point on a host's contours nearest a tool position.</param>
+    /// <param name="Exits">Optional point each part is left from (a cut-off's far end); null when
+    /// every part is left from its center.</param>
     internal sealed record Context(IReadOnlyList<Vector> Centers,
         IReadOnlyList<IReadOnlyCollection<int>> Prerequisites, IReadOnlyList<IReadOnlyCollection<int>> Inside,
-        Func<int, Vector, Vector> HostEntry, CancellationToken Token);
+        Func<int, Vector, Vector> HostEntry, CancellationToken Token, IReadOnlyList<Vector> Exits = null);
 
     /// <param name="parts">The part ordinals to order; prerequisites outside this set count as done.</param>
     /// <param name="start">The modeled tool position before the first of these parts.</param>
@@ -63,13 +65,14 @@ internal static class CuttingNestedOrder
         int[] rootOrder;
         try
         {
-            rootOrder = CuttingPartOrder.Plan(roots, context.Centers, start, hostsLast, context.Token, endpoint);
+            rootOrder = CuttingPartOrder.Plan(roots, context.Centers, start, hostsLast, context.Token, endpoint, context.Exits);
         }
         catch (InvalidOperationException)
         {
             try
             {
-                rootOrder = CuttingPartOrder.Plan(roots, context.Centers, start, groupRules, context.Token, endpoint);
+                rootOrder = CuttingPartOrder.Plan(roots, context.Centers, start, groupRules, context.Token, endpoint,
+                    context.Exits);
             }
             catch (InvalidOperationException)
             {
@@ -84,7 +87,7 @@ internal static class CuttingNestedOrder
             if (inner.Length != 0)
                 order.AddRange(Plan(inner, position, context, context.HostEntry(root, position)));
             order.Add(root);
-            position = context.Centers[root];
+            position = (context.Exits ?? context.Centers)[root];
         }
         var placed = new HashSet<int>();
         foreach (var part in order)
@@ -95,6 +98,7 @@ internal static class CuttingNestedOrder
         }
         return order.ToArray();
 
-        int[] Flat() => CuttingPartOrder.Plan(parts, context.Centers, start, context.Prerequisites, context.Token, endpoint);
+        int[] Flat() => CuttingPartOrder.Plan(parts, context.Centers, start, context.Prerequisites, context.Token, endpoint,
+            context.Exits);
     }
 }
