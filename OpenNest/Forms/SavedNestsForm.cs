@@ -186,8 +186,8 @@ public sealed class SavedNestsForm : Form
         AddColumn(drawingsGrid, AreaColumn, "Area", 100, typeof(double), alignRight: true, format: "0.###");
 
         detailsTabs = new TabControl { Dock = DockStyle.Fill };
-        detailsTabs.TabPages.Add(CreateTab("Plates", platesGrid));
-        detailsTabs.TabPages.Add(CreateTab("Drawings", drawingsGrid));
+        detailsTabs.TabPages.Add(ControlFactory.Tab("Plates", platesGrid));
+        detailsTabs.TabPages.Add(ControlFactory.Tab("Drawings", drawingsGrid));
         versionsTab = new TabPage("Versions");
         detailsTabs.TabPages.Add(versionsTab);
         detailsTabs.SelectedIndexChanged += (_, _) => UpdateHistoryView();
@@ -425,13 +425,6 @@ public sealed class SavedNestsForm : Form
         var column = AddColumn(nestGrid, header, header, width, typeof(string), alignRight);
         column.SortMode = DataGridViewColumnSortMode.Programmatic;
         column.Tag = sortField;
-    }
-
-    private static TabPage CreateTab(string text, Control content)
-    {
-        var page = new TabPage(text) { Padding = new Padding(0) };
-        page.Controls.Add(content);
-        return page;
     }
 
     private static Label SectionLabel(string text, DockStyle dock) =>

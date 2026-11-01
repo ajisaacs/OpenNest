@@ -26,7 +26,6 @@ namespace OpenNest.Controls
         private static readonly string[] LeadOutTypes = { None, Line, Arc };
 
         // Every field label shares this column so inputs line up across hosts.
-        private const int LabelWidth = 150;
         private const int FieldIndent = 16;
         private const int InputWidth = 100;
         // The preview's least height, below the type with the most fields.
@@ -67,18 +66,18 @@ namespace OpenNest.Controls
             };
 
             leadInCombo = CreateCombo();
-            var leadInType = CreateGrid(0);
+            var leadInType = ControlFactory.SettingsGrid(0);
             AddRow(leadInType, "Lead-in:", leadInCombo, 0, bold: true);
             content.Controls.Add(leadInType);
-            leadInFields = CreateGrid(FieldIndent);
+            leadInFields = ControlFactory.SettingsGrid(FieldIndent);
             content.Controls.Add(leadInFields);
 
             leadOutCombo = CreateCombo();
-            var leadOutType = CreateGrid(0);
+            var leadOutType = ControlFactory.SettingsGrid(0);
             leadOutType.Margin = new Padding(0, 8, 0, 0);
             AddRow(leadOutType, "Lead-out:", leadOutCombo, 0, bold: true);
             content.Controls.Add(leadOutType);
-            leadOutFields = CreateGrid(FieldIndent);
+            leadOutFields = ControlFactory.SettingsGrid(FieldIndent);
             content.Controls.Add(leadOutFields);
 
             // The preview fills whatever the fields leave, so it grows for types with fewer.
@@ -499,21 +498,6 @@ namespace OpenNest.Controls
                     return (double)nud.Value;
             }
             return defaultValue;
-        }
-
-        private static TableLayoutPanel CreateGrid(int indent)
-        {
-            var grid = new TableLayoutPanel
-            {
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                ColumnCount = 3,
-                Margin = new Padding(indent, 0, 0, 0),
-            };
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, LabelWidth - indent));
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            return grid;
         }
 
         private static void AddRow(

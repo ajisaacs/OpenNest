@@ -9,6 +9,7 @@ using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Shapes;
 using OpenNest.Support;
+using ControlFactory = OpenNest.Controls.ControlFactory;
 
 namespace OpenNest.Forms
 {
@@ -271,9 +272,9 @@ namespace OpenNest.Forms
             general.Controls.Add(group);
 
             var tabs = new TabControl { Dock = DockStyle.Fill };
-            tabs.TabPages.Add(CreateTab("General", general));
-            tabs.TabPages.Add(CreateTab("Clamps", BuildClampsTab(machine)));
-            tabs.TabPages.Add(CreateTab("Support Bed", BuildSupportBedTab(machine)));
+            tabs.TabPages.Add(ControlFactory.Tab("General", general));
+            tabs.TabPages.Add(ControlFactory.Tab("Clamps", BuildClampsTab(machine)));
+            tabs.TabPages.Add(ControlFactory.Tab("Support Bed", BuildSupportBedTab(machine)));
             RememberTab(tabs, _machineTab, t => _machineTab = t);
 
             var host = new Panel { Dock = DockStyle.Fill, Height = 420 };
@@ -617,12 +618,13 @@ namespace OpenNest.Forms
         private void ShowThicknessDetails(ThicknessConfig thickness, TreeNode node)
         {
             var tabs = new TabControl { Dock = DockStyle.Fill };
-            tabs.TabPages.Add(CreateTab("General", BuildThicknessGeneralTab(thickness, node)));
-            tabs.TabPages.Add(CreateTab("Outside Cuts", BuildOutsideCutsTab(thickness)));
-            tabs.TabPages.Add(CreateTab("Inside Cuts", BuildInsideCutsTab(thickness)));
-            tabs.TabPages.Add(CreateTab("Cut Off", BuildCutOffTab(thickness.CutOff)));
-            tabs.TabPages.Add(CreateTab("Spacing", BuildSpacingTab(thickness)));
-            tabs.TabPages.Add(CreateTab("Plate Sizes", BuildPlateSizesTab(thickness)));
+            tabs.TabPages.Add(
+                ControlFactory.Tab("General", BuildThicknessGeneralTab(thickness, node)));
+            tabs.TabPages.Add(ControlFactory.Tab("Outside Cuts", BuildOutsideCutsTab(thickness)));
+            tabs.TabPages.Add(ControlFactory.Tab("Inside Cuts", BuildInsideCutsTab(thickness)));
+            tabs.TabPages.Add(ControlFactory.Tab("Cut Off", BuildCutOffTab(thickness.CutOff)));
+            tabs.TabPages.Add(ControlFactory.Tab("Spacing", BuildSpacingTab(thickness)));
+            tabs.TabPages.Add(ControlFactory.Tab("Plate Sizes", BuildPlateSizesTab(thickness)));
             RememberTab(tabs, _thicknessTab, t => _thicknessTab = t);
 
             var host = new Panel { Dock = DockStyle.Fill, Height = 420 };
@@ -1043,13 +1045,6 @@ namespace OpenNest.Forms
                 AutoSize = true,
                 Padding = new Padding(10, 16, 10, 10),
             };
-
-        private static TabPage CreateTab(string text, Control content)
-        {
-            var page = new TabPage(text) { Padding = new Padding(0) };
-            page.Controls.Add(content);
-            return page;
-        }
 
         private static void RememberTab(TabControl tabs, string lastTab, Action<string> store)
         {

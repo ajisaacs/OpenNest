@@ -9,7 +9,6 @@ namespace OpenNest.Controls
     public class CuttingPanel : Panel
     {
         // Every field label shares this column so inputs line up across sections.
-        private const int LabelWidth = 150;
         private const int FieldIndent = 16;
         private const int InputWidth = 100;
 
@@ -146,7 +145,7 @@ namespace OpenNest.Controls
             };
             layout.Controls.Add(chkTabsEnabled);
 
-            tabOptions = CreateGrid(FieldIndent);
+            tabOptions = ControlFactory.SettingsGrid(FieldIndent);
             tabOptions.Enabled = false;
 
             nudTabWidth = CreateNumeric(0.25, 0.0625);
@@ -232,7 +231,7 @@ namespace OpenNest.Controls
             // Pierce
             AddSection("Pierce");
 
-            var pierceGrid = CreateGrid(0);
+            var pierceGrid = ControlFactory.SettingsGrid(0);
             nudPierceClearance = CreateNumeric(0.0625, 0.0625);
             AddRow(pierceGrid, "Clearance from contour:", nudPierceClearance, 0);
             toolTip.SetToolTip(nudPierceClearance, "How far each pierce stays from the contour it leads into.");
@@ -358,22 +357,6 @@ namespace OpenNest.Controls
             header.Paint += (s, e) =>
                 e.Graphics.DrawLine(SystemPens.ControlLight, 0, header.Height - 1, header.Width, header.Height - 1);
             layout.Controls.Add(header);
-        }
-
-        /// <summary>A label / input / hint grid whose input column lines up with every other grid's.</summary>
-        private static TableLayoutPanel CreateGrid(int indent)
-        {
-            var grid = new TableLayoutPanel
-            {
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                ColumnCount = 3,
-                Margin = new Padding(indent, 0, 0, 0),
-            };
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, LabelWidth - indent));
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            return grid;
         }
 
         private static void AddRow(
