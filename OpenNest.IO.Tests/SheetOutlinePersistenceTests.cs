@@ -16,13 +16,6 @@ public class SheetOutlinePersistenceTests
         new[] { new Vector(0, 0), new Vector(96, 0), new Vector(96, 24), new Vector(48, 24), new Vector(48, 48), new Vector(0, 48) },
         new[] { new[] { new Vector(10, 10), new Vector(14, 10), new Vector(14, 14), new Vector(10, 14) } });
 
-    private static byte[] Write(Nest nest)
-    {
-        using var stream = new MemoryStream();
-        Assert.True(new NestWriter(nest).Write(stream));
-        return stream.ToArray();
-    }
-
     private static Nest OutlinedNest()
     {
         var nest = new Nest("outlined");
@@ -33,7 +26,7 @@ public class SheetOutlinePersistenceTests
     [Fact]
     public void OutlineRoundTripsWithObstaclesAndKeepsAnEmptyPlate()
     {
-        var (reopened, warnings) = RoundTrip(Write(OutlinedNest()));
+        var (reopened, warnings) = RoundTrip(ArchiveBytes(OutlinedNest()));
 
         Assert.Empty(warnings);
         var plate = Assert.Single(reopened.Plates);
@@ -47,7 +40,7 @@ public class SheetOutlinePersistenceTests
     [Fact]
     public void FileShapeIsPointsAndObstaclesInPlateCoordinates()
     {
-        var plates = NestJson(Write(OutlinedNest()))["plates"]!.AsArray();
+        var plates = NestJson(ArchiveBytes(OutlinedNest()))["plates"]!.AsArray();
         var outline = Assert.Single(plates)!["outline"]!.AsObject();
 
         var points = outline["points"]!.AsArray();
@@ -66,7 +59,7 @@ public class SheetOutlinePersistenceTests
         var nest = new Nest("plain");
         nest.Plates.Add(new Plate(48, 96));
         nest.Plates[0].CutOffs.Add(new CutOff(new Vector(40, 0), CutOffAxis.Vertical));
-        var archive = Write(nest);
+        var archive = ArchiveBytes(nest);
 
         var json = NestJson(archive);
         Assert.Null(Assert.Single(json["plates"]!.AsArray())!["outline"]);
@@ -86,7 +79,7 @@ public class SheetOutlinePersistenceTests
     [InlineData("{\"points\": [{\"x\": 0, \"y\": 0}, {\"x\": 10, \"y\": 0}, {\"x\": 10, \"y\": 10}], \"obstacles\": 3}", "'obstacles' is not an array")]
     public void MalformedOutlineLoadsARectangleWithAWarning(string value, string problem)
     {
-        var archive = Write(OutlinedNest());
+        var archive = ArchiveBytes(OutlinedNest());
         var json = NestJson(archive);
         var plate = Assert.Single(json["plates"]!.AsArray())!.AsObject();
         plate["outline"] = JsonNode.Parse(value);

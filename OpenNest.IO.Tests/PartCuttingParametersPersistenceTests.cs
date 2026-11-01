@@ -6,6 +6,7 @@ using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Converters;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Geometry;
+using static OpenNest.IO.Tests.NestArchiveJson;
 
 namespace OpenNest.IO.Tests;
 
@@ -24,7 +25,7 @@ public class PartCuttingParametersPersistenceTests
         plate.Parts.Add(leaded);
         plate.Parts.Add(new Part(drawing, new Vector(6, 1)));
 
-        var bytes = Write(nest);
+        var bytes = ArchiveBytes(nest);
         var reader = new NestReader(new MemoryStream(bytes));
         var parts = Assert.Single(reader.Read().Plates).Parts;
 
@@ -53,7 +54,7 @@ public class PartCuttingParametersPersistenceTests
         Assert.All(plate.Parts, part => Assert.NotNull(part.CuttingParameters));
         var expected = plate.Parts.Select(p => CuttingParametersSerializer.Serialize(p.CuttingParameters)).ToArray();
 
-        var reader = new NestReader(new MemoryStream(Write(nest)));
+        var reader = new NestReader(new MemoryStream(ArchiveBytes(nest)));
         var parts = Assert.Single(reader.Read().Plates).Parts;
 
         Assert.Empty(reader.Warnings);
@@ -70,7 +71,7 @@ public class PartCuttingParametersPersistenceTests
         var part = new Part(drawing, new Vector(1, 1));
         part.ApplyLeadIns(Parameters(0.3), Vector.Zero);
         nest.CreatePlate().Parts.Add(part);
-        var legacy = RemovePartSettings(Write(nest));
+        var legacy = RemovePartSettings(ArchiveBytes(nest));
 
         var reader = new NestReader(new MemoryStream(legacy));
         var copy = Assert.Single(Assert.Single(reader.Read().Plates).Parts);
@@ -88,13 +89,6 @@ public class PartCuttingParametersPersistenceTests
         InternalLeadOut = new NoLeadOut(),
         PierceClearance = 0.05,
     };
-
-    private static byte[] Write(Nest nest)
-    {
-        using var stream = new MemoryStream();
-        Assert.True(new NestWriter(nest).Write(stream));
-        return stream.ToArray();
-    }
 
     private static JsonArray PartsJson(byte[] archive)
     {

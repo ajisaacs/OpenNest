@@ -23,17 +23,10 @@ public class StockItemCodesPersistenceTests
         return nest;
     }
 
-    private static byte[] Write(Nest nest)
-    {
-        using var stream = new MemoryStream();
-        Assert.True(new NestWriter(nest).Write(stream));
-        return stream.ToArray();
-    }
-
     [Fact]
     public void CodesRoundTripInSheetOrder()
     {
-        var (reopened, _) = RoundTrip(Write(NestWithPlate(3, "SHEET-456", "SHEET-456")));
+        var (reopened, _) = RoundTrip(ArchiveBytes(NestWithPlate(3, "SHEET-456", "SHEET-456")));
 
         var plate = Assert.Single(reopened.Plates);
         Assert.Equal(3, plate.Quantity);
@@ -44,7 +37,7 @@ public class StockItemCodesPersistenceTests
     [Fact]
     public void UncodedPlate_WritesNoKey()
     {
-        var json = NestJson(Write(NestWithPlate(1)));
+        var json = NestJson(ArchiveBytes(NestWithPlate(1)));
 
         Assert.False(json["plates"]![0]!.AsObject().ContainsKey("stockItemCodes"));
     }
@@ -52,7 +45,7 @@ public class StockItemCodesPersistenceTests
     [Fact]
     public void OldFileWithoutTheKey_LoadsWithNoCodes()
     {
-        var archive = Write(NestWithPlate(1, "DROP-1182"));
+        var archive = ArchiveBytes(NestWithPlate(1, "DROP-1182"));
         var json = NestJson(archive);
         Assert.True(json["plates"]![0]!.AsObject().Remove("stockItemCodes"));
 
@@ -68,7 +61,7 @@ public class StockItemCodesPersistenceTests
     [InlineData("[\"A\", \"B\", \"C\", \"D\"]", new[] { "A", "B", "C" })]
     public void MalformedCodes_ReadLeniently(string value, string[] expected)
     {
-        var archive = Write(NestWithPlate(3, "X"));
+        var archive = ArchiveBytes(NestWithPlate(3, "X"));
         var json = NestJson(archive);
         json["plates"]![0]!["stockItemCodes"] = JsonNode.Parse(value);
 

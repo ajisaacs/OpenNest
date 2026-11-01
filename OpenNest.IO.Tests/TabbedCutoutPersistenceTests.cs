@@ -29,7 +29,7 @@ public class TabbedCutoutPersistenceTests
         var drawing = WithCutout();
         var original = drawing.TabbedCutouts[0];
 
-        var (restored, warnings) = RoundTrip(Write(drawing));
+        var (restored, warnings) = RoundTrip(ArchiveBytes(drawing));
 
         Assert.Empty(warnings);
         var cutout = Assert.Single(Assert.Single(restored.Drawings).TabbedCutouts);
@@ -51,7 +51,7 @@ public class TabbedCutoutPersistenceTests
             entities, new List<Bend>(), 1, null, null, null,
             [new TabbedCutout { EdgeIds = hole.Select(e => e.Id).ToList() }]);
 
-        var (restored, warnings) = RoundTrip(Write(drawing));
+        var (restored, warnings) = RoundTrip(ArchiveBytes(drawing));
 
         Assert.Empty(warnings);
         var reread = Assert.Single(restored.Drawings);
@@ -65,7 +65,7 @@ public class TabbedCutoutPersistenceTests
     [Fact]
     public void NoTabbedCutouts_AreOmittedFromTheFile()
     {
-        var archive = Write(DrawingPackageFixture.Build());
+        var archive = ArchiveBytes(DrawingPackageFixture.Build());
 
         Assert.False(NestJson(archive)["drawings"]![0]!.AsObject().ContainsKey("tabbedCutouts"));
         Assert.Empty(Assert.Single(RoundTrip(archive).Nest.Drawings).TabbedCutouts);
@@ -74,7 +74,7 @@ public class TabbedCutoutPersistenceTests
     [Fact]
     public void UnreadableTabbedCutout_IsDroppedWithAWarning_AndTheDrawingLoads()
     {
-        var archive = Write(WithCutout());
+        var archive = ArchiveBytes(WithCutout());
         var json = NestJson(archive);
         json["drawings"]![0]!["tabbedCutouts"]![0]!["tabWidth"] = 0;
 
@@ -97,14 +97,5 @@ public class TabbedCutoutPersistenceTests
             position = end;
         }
         return length;
-    }
-
-    private static byte[] Write(Drawing drawing)
-    {
-        var nest = new Nest(drawing.Name) { Units = Units.Inches };
-        nest.Drawings.Add(drawing);
-        using var stream = new MemoryStream();
-        Assert.True(new NestWriter(nest).Write(stream));
-        return stream.ToArray();
     }
 }

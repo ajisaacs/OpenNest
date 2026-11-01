@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
+using static OpenNest.IO.Tests.NestArchiveJson;
 
 namespace OpenNest.IO.Tests;
 
@@ -36,7 +37,7 @@ public class DrawingLibraryLinkPersistenceTests
     {
         var drawing = DrawingPackageFixture.Build();
 
-        var json = NestJson(Write(drawing));
+        var json = NestJson(ArchiveBytes(drawing));
         var (restored, warnings) = RoundTrip(drawing);
 
         Assert.False(json["drawings"]![0]!.AsObject().ContainsKey("library"));
@@ -65,7 +66,7 @@ public class DrawingLibraryLinkPersistenceTests
     public void MalformedLink_LoadsTheDrawingWithoutItAndWarns(string linkJson)
     {
         var drawing = DrawingPackageFixture.Build();
-        var archive = ReplaceLibrary(Write(drawing), JsonNode.Parse(linkJson));
+        var archive = ReplaceLibrary(ArchiveBytes(drawing), JsonNode.Parse(linkJson));
 
         var reader = new NestReader(new MemoryStream(archive));
         var restored = reader.Read();
@@ -81,7 +82,7 @@ public class DrawingLibraryLinkPersistenceTests
     [Fact]
     public void NullLink_ReadsAsNoLinkWithoutWarning()
     {
-        var archive = ReplaceLibrary(Write(DrawingPackageFixture.Build()), null);
+        var archive = ReplaceLibrary(ArchiveBytes(DrawingPackageFixture.Build()), null);
 
         var reader = new NestReader(new MemoryStream(archive));
         var restored = reader.Read();
@@ -105,26 +106,10 @@ public class DrawingLibraryLinkPersistenceTests
         Assert.Same(link, drawing.Library);
     }
 
-    private static byte[] Write(Drawing drawing)
-    {
-        var nest = new Nest(drawing.Name) { Units = Units.Inches };
-        nest.Drawings.Add(drawing);
-        using var stream = new MemoryStream();
-        Assert.True(new NestWriter(nest).Write(stream));
-        return stream.ToArray();
-    }
-
     private static (Nest Nest, IReadOnlyList<string> Warnings) RoundTrip(Drawing drawing)
     {
-        var reader = new NestReader(new MemoryStream(Write(drawing)));
+        var reader = new NestReader(new MemoryStream(ArchiveBytes(drawing)));
         return (reader.Read(), reader.Warnings);
-    }
-
-    private static JsonObject NestJson(byte[] archive)
-    {
-        using var zip = new ZipArchive(new MemoryStream(archive), ZipArchiveMode.Read);
-        using var reader = new StreamReader(zip.GetEntry("nest.json")!.Open(), Encoding.UTF8);
-        return JsonNode.Parse(reader.ReadToEnd())!.AsObject();
     }
 
     private static byte[] ReplaceLibrary(byte[] archive, JsonNode? library)

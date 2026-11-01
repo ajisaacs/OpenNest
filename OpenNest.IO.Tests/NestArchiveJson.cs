@@ -24,6 +24,17 @@ internal static class NestArchiveJson
         return stream;
     }
 
+    /// <summary>The archive bytes <see cref="NestWriter"/> writes for the nest.</summary>
+    public static byte[] ArchiveBytes(Nest nest) => Write(nest).ToArray();
+
+    /// <summary>The archive bytes of an inch nest that holds only the drawing.</summary>
+    public static byte[] ArchiveBytes(Drawing drawing)
+    {
+        var nest = new Nest(drawing.Name) { Units = Units.Inches };
+        nest.Drawings.Add(drawing);
+        return ArchiveBytes(nest);
+    }
+
     /// <summary>The archive's nest.json, leaving <paramref name="zip"/> ready to read again.</summary>
     public static JsonObject NestJson(MemoryStream zip)
     {

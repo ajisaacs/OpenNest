@@ -23,13 +23,6 @@ public class ExpectedRemnantPersistenceTests
         return nest;
     }
 
-    private static byte[] Write(Nest nest)
-    {
-        using var stream = new MemoryStream();
-        Assert.True(new NestWriter(nest).Write(stream));
-        return stream.ToArray();
-    }
-
     private static JsonNode Remnant(byte[] archive) => NestJson(archive)["plates"]![0]!["expectedRemnant"];
 
     private static (double, double, string) Shape(JsonNode remnant) =>
@@ -38,7 +31,7 @@ public class ExpectedRemnantPersistenceTests
     [Fact]
     public void Offcut_IsWrittenWithWidthTheShortSide()
     {
-        Assert.Equal((48.0, 86.0, "offcut"), Shape(Remnant(Write(NestWithPart()))));
+        Assert.Equal((48.0, 86.0, "offcut"), Shape(Remnant(ArchiveBytes(NestWithPart()))));
     }
 
     [Fact]
@@ -48,7 +41,7 @@ public class ExpectedRemnantPersistenceTests
         nest.Plates[0].CutOffs.Add(new CutOff(new Vector(60, 0), CutOffAxis.Vertical));
         nest.Plates[0].RegenerateCutOffs(new CutOffSettings());
 
-        Assert.Equal((36.0, 48.0, "cutoff"), Shape(Remnant(Write(nest))));
+        Assert.Equal((36.0, 48.0, "cutoff"), Shape(Remnant(ArchiveBytes(nest))));
     }
 
     [Fact]
@@ -57,7 +50,8 @@ public class ExpectedRemnantPersistenceTests
         var nest = NestWithPart();
         nest.MinimumRemnantDimension = 50;
 
-        Assert.False(NestJson(Write(nest))["plates"]![0]!.AsObject().ContainsKey("expectedRemnant"));
+        var plate = NestJson(ArchiveBytes(nest))["plates"]![0]!.AsObject();
+        Assert.False(plate.ContainsKey("expectedRemnant"));
     }
 
     [Fact]
@@ -65,7 +59,7 @@ public class ExpectedRemnantPersistenceTests
     {
         var nest = NestWithPart();
         nest.MinimumRemnantDimension = 6;
-        var archive = Write(nest);
+        var archive = ArchiveBytes(nest);
 
         Assert.Equal(6, RoundTrip(archive).Nest.MinimumRemnantDimension);
 
@@ -81,23 +75,23 @@ public class ExpectedRemnantPersistenceTests
     [InlineData("[1, 2]")]
     public void StoredValue_IsIgnoredOnRead_AndRecomputedOnSave(string stored)
     {
-        var archive = Write(NestWithPart());
+        var archive = ArchiveBytes(NestWithPart());
         var json = NestJson(archive);
         json["plates"]![0]!["expectedRemnant"] = JsonNode.Parse(stored);
 
         var (reopened, _) = RoundTrip(ReplaceNestJson(archive, json));
 
         Assert.Single(reopened.Plates);
-        Assert.Equal((48.0, 86.0, "offcut"), Shape(Remnant(Write(reopened))));
+        Assert.Equal((48.0, 86.0, "offcut"), Shape(Remnant(ArchiveBytes(reopened))));
     }
 
     [Fact]
     public void PartMove_IsReflectedOnTheNextSave()
     {
-        var (reopened, _) = RoundTrip(Write(NestWithPart()));
+        var (reopened, _) = RoundTrip(ArchiveBytes(NestWithPart()));
         reopened.Plates[0].Parts[0].Location = new Vector(40, 0);
 
         // Strips: 40 x 48 left of the part, 46 x 48 right of it, 96 x 38 above it.
-        Assert.Equal((38.0, 96.0, "offcut"), Shape(Remnant(Write(reopened))));
+        Assert.Equal((38.0, 96.0, "offcut"), Shape(Remnant(ArchiveBytes(reopened))));
     }
 }

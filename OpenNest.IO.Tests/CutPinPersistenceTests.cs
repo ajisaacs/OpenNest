@@ -31,7 +31,7 @@ public class CutPinPersistenceTests
     [Fact]
     public void Pins_RoundTripEveryFieldInOrder()
     {
-        var (restored, warnings) = RoundTrip(Write(PinnedDrawing()));
+        var (restored, warnings) = RoundTrip(ArchiveBytes(PinnedDrawing()));
 
         Assert.Empty(warnings);
         var pins = Assert.Single(restored.Drawings).CutPins;
@@ -60,7 +60,7 @@ public class CutPinPersistenceTests
     [Fact]
     public void NoPins_AreOmittedFromTheFile()
     {
-        var archive = Write(DrawingPackageFixture.Build());
+        var archive = ArchiveBytes(DrawingPackageFixture.Build());
 
         var (restored, warnings) = RoundTrip(archive);
 
@@ -86,7 +86,7 @@ public class CutPinPersistenceTests
     [MemberData(nameof(MalformedPins))]
     public void MalformedPin_IsSkippedWithAWarningAndTheRestLoad(string pinJson)
     {
-        var archive = ReplaceCutPins(Write(DrawingPackageFixture.Build()),
+        var archive = ReplaceCutPins(ArchiveBytes(DrawingPackageFixture.Build()),
             JsonNode.Parse($"[{ValidPin},{pinJson}]"));
 
         var (restored, warnings) = RoundTrip(archive);
@@ -103,7 +103,8 @@ public class CutPinPersistenceTests
     [InlineData("\"pins\"")]
     public void PinsThatAreNotAList_LoadNoPinsWithAWarning(string value)
     {
-        var archive = ReplaceCutPins(Write(DrawingPackageFixture.Build()), JsonNode.Parse(value));
+        var archive = ReplaceCutPins(
+            ArchiveBytes(DrawingPackageFixture.Build()), JsonNode.Parse(value));
 
         var (restored, warnings) = RoundTrip(archive);
 
@@ -180,15 +181,6 @@ public class CutPinPersistenceTests
             plate.Parts.Add(part);
         }
 
-        using var stream = new MemoryStream();
-        Assert.True(new NestWriter(nest).Write(stream));
-        return stream.ToArray();
-    }
-
-    private static byte[] Write(Drawing drawing)
-    {
-        var nest = new Nest(drawing.Name) { Units = Units.Inches };
-        nest.Drawings.Add(drawing);
         using var stream = new MemoryStream();
         Assert.True(new NestWriter(nest).Write(stream));
         return stream.ToArray();

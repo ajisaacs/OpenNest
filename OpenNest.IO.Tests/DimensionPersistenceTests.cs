@@ -16,7 +16,7 @@ public class DimensionPersistenceTests
     [Fact]
     public void Dimensions_RoundTripEveryField()
     {
-        var (restored, warnings) = RoundTrip(Write(WithDimensions()));
+        var (restored, warnings) = RoundTrip(ArchiveBytes(WithDimensions()));
 
         Assert.Empty(warnings);
         var dimensions = Assert.Single(restored.Drawings).Dimensions;
@@ -30,7 +30,7 @@ public class DimensionPersistenceTests
     [Fact]
     public void NoDimensions_AreOmittedFromTheFile()
     {
-        var archive = Write(DrawingPackageFixture.Build());
+        var archive = ArchiveBytes(DrawingPackageFixture.Build());
 
         Assert.False(NestJson(archive)["drawings"]![0]!.AsObject().ContainsKey("dimensions"));
         Assert.Empty(Assert.Single(RoundTrip(archive).Nest.Drawings).Dimensions);
@@ -42,7 +42,7 @@ public class DimensionPersistenceTests
     [InlineData("offset", 0.0)]
     public void UnreadableDimension_IsDroppedWithAWarning_AndTheRestLoad(string field, object value)
     {
-        var archive = Write(WithDimensions());
+        var archive = ArchiveBytes(WithDimensions());
         var json = NestJson(archive);
         json["drawings"]![0]!["dimensions"]![0]![field] = value is string text ? text : (double)value;
 
@@ -72,7 +72,7 @@ public class DimensionPersistenceTests
     [Fact]
     public void RadialDimensions_RoundTripTheirCurveAndAngle_AndOverallOnesOmitThem()
     {
-        var archive = Write(WithRadial());
+        var archive = ArchiveBytes(WithRadial());
         var json = NestJson(archive)["drawings"]![0]!["dimensions"]!;
 
         Assert.False(json[0]!.AsObject().ContainsKey("entityId"));
@@ -92,7 +92,7 @@ public class DimensionPersistenceTests
     [InlineData("angle")]
     public void RadialDimensionWithoutItsCurveOrAngle_IsDroppedWithAWarning(string field)
     {
-        var archive = Write(WithRadial());
+        var archive = ArchiveBytes(WithRadial());
         var json = NestJson(archive);
         json["drawings"]![0]!["dimensions"]![1]!.AsObject().Remove(field);
 
@@ -101,14 +101,5 @@ public class DimensionPersistenceTests
         var dimension = Assert.Single(Assert.Single(restored.Drawings).Dimensions);
         Assert.Equal(DimensionKind.OverallHorizontal, dimension.Kind);
         Assert.Contains(warnings, w => w.Contains("dimension 2 could not be read"));
-    }
-
-    private static byte[] Write(Drawing drawing)
-    {
-        var nest = new Nest(drawing.Name) { Units = Units.Inches };
-        nest.Drawings.Add(drawing);
-        using var stream = new MemoryStream();
-        Assert.True(new NestWriter(nest).Write(stream));
-        return stream.ToArray();
     }
 }

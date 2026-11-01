@@ -27,7 +27,7 @@ public class BreakoffPersistenceTests
         var drawing = WithBreakoff();
         var original = drawing.Breakoffs[0];
 
-        var (restored, warnings) = RoundTrip(Write(drawing));
+        var (restored, warnings) = RoundTrip(ArchiveBytes(drawing));
 
         Assert.Empty(warnings);
         var breakoff = Assert.Single(Assert.Single(restored.Drawings).Breakoffs);
@@ -44,7 +44,7 @@ public class BreakoffPersistenceTests
         drawing.Program.Codes.Add(new OpenNest.CNC.LinearMove(1, 0) { Layer = OpenNest.CNC.LayerType.Break });
         drawing.Program.Codes.Add(new OpenNest.CNC.ArcMove(1, 1, 0, 1) { Layer = OpenNest.CNC.LayerType.Break });
 
-        var (restored, _) = RoundTrip(Write(drawing));
+        var (restored, _) = RoundTrip(ArchiveBytes(drawing));
 
         var moves = Assert.Single(restored.Drawings).Program.Codes.OfType<OpenNest.CNC.Motion>()
             .Where(m => m is OpenNest.CNC.LinearMove { Layer: OpenNest.CNC.LayerType.Break }
@@ -55,7 +55,7 @@ public class BreakoffPersistenceTests
     [Fact]
     public void NoBreakoffs_AreOmittedFromTheFile()
     {
-        var archive = Write(DrawingPackageFixture.Build());
+        var archive = ArchiveBytes(DrawingPackageFixture.Build());
 
         Assert.False(NestJson(archive)["drawings"]![0]!.AsObject().ContainsKey("breakoffs"));
         Assert.Empty(Assert.Single(RoundTrip(archive).Nest.Drawings).Breakoffs);
@@ -64,7 +64,7 @@ public class BreakoffPersistenceTests
     [Fact]
     public void UnreadableBreakoff_IsDroppedWithAWarning_AndTheDrawingLoads()
     {
-        var archive = Write(WithBreakoff());
+        var archive = ArchiveBytes(WithBreakoff());
         var json = NestJson(archive);
         json["drawings"]![0]!["breakoffs"]![0]!["tabWidth"] = 0;
 
@@ -72,14 +72,5 @@ public class BreakoffPersistenceTests
 
         Assert.Empty(Assert.Single(restored.Drawings).Breakoffs);
         Assert.Contains(warnings, w => w.Contains("breakoff 1 could not be read"));
-    }
-
-    private static byte[] Write(Drawing drawing)
-    {
-        var nest = new Nest(drawing.Name) { Units = Units.Inches };
-        nest.Drawings.Add(drawing);
-        using var stream = new MemoryStream();
-        Assert.True(new NestWriter(nest).Write(stream));
-        return stream.ToArray();
     }
 }
