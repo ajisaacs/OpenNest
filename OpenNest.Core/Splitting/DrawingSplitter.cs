@@ -741,7 +741,7 @@ public static class DrawingSplitter
                     continue;
 
                 var bbB = shapes[j].BoundingBox;
-                if (!BoxContainsBox(bbB, bbA))
+                if (!BoundingBox.IsWithin(bbA, bbB))
                     continue;
                 if (!polygons[j].ContainsPoint(repA))
                     continue;
@@ -779,7 +779,7 @@ public static class DrawingSplitter
                     continue;
 
                 var bbJ = shapes[j].BoundingBox;
-                if (!BoxContainsBox(shapes[i].BoundingBox, bbJ))
+                if (!BoundingBox.IsWithin(bbJ, shapes[i].BoundingBox))
                     continue;
 
                 var rep = FirstVertexOf(shapes[j]);
@@ -814,19 +814,6 @@ public static class DrawingSplitter
         if (shape.Entities.Count == 0)
             return new Vector(0, 0);
         return GetStartPoint(shape.Entities[0]);
-    }
-
-    /// <summary>
-    /// True iff box <paramref name="inner"/> is entirely inside box
-    /// <paramref name="outer"/> (tolerant comparison).
-    /// </summary>
-    private static bool BoxContainsBox(Box outer, Box inner)
-    {
-        var eps = Math.Tolerance.Epsilon;
-        return inner.Left >= outer.Left - eps
-            && inner.Right <= outer.Right + eps
-            && inner.Bottom >= outer.Bottom - eps
-            && inner.Top <= outer.Top + eps;
     }
 
     private static Vector GetStartPoint(Entity entity)

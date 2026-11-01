@@ -85,5 +85,28 @@ namespace OpenNest.Geometry
 
             return new Box(left, bottom, right - left, top - bottom);
         }
+
+        /// <summary>
+        /// Whether <paramref name="inner"/> lies inside <paramref name="outer"/>, allowing
+        /// <see cref="Math.Tolerance.Epsilon"/> on every side.
+        /// </summary>
+        internal static bool IsWithin(Box inner, Box outer)
+        {
+            var eps = Math.Tolerance.Epsilon;
+            return inner.Left >= outer.Left - eps
+                && inner.Right <= outer.Right + eps
+                && inner.Bottom >= outer.Bottom - eps
+                && inner.Top <= outer.Top + eps;
+        }
+
+        /// <summary>The smallest box covering both boxes.</summary>
+        internal static Box Union(Box a, Box b)
+        {
+            var left = System.Math.Min(a.Left, b.Left);
+            var bottom = System.Math.Min(a.Bottom, b.Bottom);
+            var right = System.Math.Max(a.Right, b.Right);
+            var top = System.Math.Max(a.Top, b.Top);
+            return new Box(left, bottom, right - left, top - bottom);
+        }
     }
 }

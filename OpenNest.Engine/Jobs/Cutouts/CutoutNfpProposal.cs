@@ -14,7 +14,6 @@ internal static class CutoutNfpProposal
     // Fixed chord tolerance in the shared round offset otherwise makes extremely large
     // spacing values allocate an unbounded number of arc vertices. This conservative
     // test-only kernel declines scales it cannot process safely.
-    private const double MaxCoordinate = 1e8;
     private const double MaxSpacing = 100;
 
     /// <summary>Returns one frame-local pose inside a closed cutout, or null if no pose is certified.
@@ -38,12 +37,13 @@ internal static class CutoutNfpProposal
         var frameGeometry = JobPartGeometry.TryRead(frame.Geometry);
         var insertGeometry = JobPartGeometry.TryRead(insert.Geometry);
         if (frameGeometry == null || insertGeometry == null
-            || !WithinRange(frameGeometry.Bounds) || !WithinRange(insertGeometry.Bounds))
+            || !CutoutCoordinates.WithinRange(frameGeometry.Bounds)
+            || !CutoutCoordinates.WithinRange(insertGeometry.Bounds))
             return null;
         ArgumentOutOfRangeException.ThrowIfNegative(cutoutIndex);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(cutoutIndex, frameGeometry.Cutouts.Count);
         var cutout = frameGeometry.Cutouts[cutoutIndex];
-        if (!cutout.IsClosed() || !WithinRange(cutout.BoundingBox)
+        if (!cutout.IsClosed() || !CutoutCoordinates.WithinRange(cutout.BoundingBox)
             || spacing * 2 >= System.Math.Min(cutout.BoundingBox.Length, cutout.BoundingBox.Width))
             return null;
         var hole = CutoutLatticeFill.Positive(ClipperBridge.ToPath(
@@ -91,12 +91,6 @@ internal static class CutoutNfpProposal
         token.ThrowIfCancellationRequested();
         return null;
     }
-
-    private static bool WithinRange(Box box) =>
-        double.IsFinite(box.Left) && double.IsFinite(box.Right)
-        && double.IsFinite(box.Bottom) && double.IsFinite(box.Top)
-        && System.Math.Abs(box.Left) <= MaxCoordinate && System.Math.Abs(box.Right) <= MaxCoordinate
-        && System.Math.Abs(box.Bottom) <= MaxCoordinate && System.Math.Abs(box.Top) <= MaxCoordinate;
 
     /// <summary>Sample component interiors, then points just inside each boundary toward
     /// its component's center. This bounded search is not a complete inner-fit solver.</summary>

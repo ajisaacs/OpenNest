@@ -76,7 +76,7 @@ internal static class SheetPacker
         {
             counts[p.Type.Index]++;
             var box = new Box(work.Left + p.Left, work.Bottom + p.Bottom, p.Orientation.Width, p.Orientation.Height);
-            envelope = envelope == null ? box : Union(envelope, box);
+            envelope = envelope == null ? box : BoundingBox.Union(envelope, box);
         }
         // Summed per type in type order, the same form as the engine's demand area: plans placing
         // the same parts get bit-identical areas, so the engine's material-area tie-break cannot
@@ -140,14 +140,5 @@ internal static class SheetPacker
             }
             sheet.Block(new Rect(left, bottom, right - left, top - bottom));
         }
-    }
-
-    private static Box Union(Box a, Box b)
-    {
-        var l = System.Math.Min(a.Left, b.Left);
-        var bo = System.Math.Min(a.Bottom, b.Bottom);
-        var r = System.Math.Max(a.Right, b.Right);
-        var t = System.Math.Max(a.Top, b.Top);
-        return new Box(l, bo, r - l, t - bo);
     }
 }

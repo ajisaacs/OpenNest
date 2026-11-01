@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using OpenNest.Geometry;
-using OpenNest.Math;
 
 namespace OpenNest.CNC.CuttingPlanning;
 
@@ -56,17 +55,4 @@ internal static class NestedPartContainment
         ExecutionMotionReader.ReadSupported(clean, location, null, token).Motions
             .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display or LayerType.DisplayPerimeter && m.Curve != null)
             .Select(m => m.Curve.ToEntity().BoundingBox).ToList().GetBoundingBox();
-
-    /// <summary>Whether a host's bounds admit an inner part's bounds as a containment candidate.</summary>
-    internal static bool Within(Box inner, Box outer) =>
-        inner.Left >= outer.Left - Tolerance.Epsilon && inner.Right <= outer.Right + Tolerance.Epsilon
-        && inner.Bottom >= outer.Bottom - Tolerance.Epsilon && inner.Top <= outer.Top + Tolerance.Epsilon;
-
-    /// <summary>The union of two boxes.</summary>
-    internal static Box Union(Box a, Box b)
-    {
-        var left = System.Math.Min(a.Left, b.Left);
-        var bottom = System.Math.Min(a.Bottom, b.Bottom);
-        return new(left, bottom, System.Math.Max(a.Right, b.Right) - left, System.Math.Max(a.Top, b.Top) - bottom);
-    }
 }

@@ -130,7 +130,7 @@ internal static class CutoutCirclePacker
         {
             token.ThrowIfCancellationRequested();
             var center = hole.Center + offset;
-            var origin = center + Rotate(disc.Item.PartOffset, disc.Rotation);
+            var origin = center + disc.Item.PartOffset.Rotate(disc.Rotation);
             var pose = new NestJobPlacement(disc.Part.Id,
                 accepted.Count(p => p.Pose.PartId == disc.Part.Id), origin.X, origin.Y, disc.Rotation);
             var geometry = geometries[disc.Part.Id];
@@ -246,12 +246,5 @@ internal static class CutoutCirclePacker
             return -1;
         var angle = System.Math.Atan2(p.X, -p.Y);
         return angle < 0 ? angle + 2 * System.Math.PI : angle;
-    }
-
-    private static Vector Rotate(Vector v, double angle)
-    {
-        var sine = System.Math.Sin(angle);
-        var cosine = System.Math.Cos(angle);
-        return new Vector(v.X * cosine - v.Y * sine, v.X * sine + v.Y * cosine);
     }
 }

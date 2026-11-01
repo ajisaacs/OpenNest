@@ -20,7 +20,6 @@ namespace OpenNest.Engine.Jobs.Cutouts;
 /// </summary>
 internal static class CutoutPackerProposal
 {
-    private const double MaxCoordinate = 1e8;
     private const double MaxSpacing = 100;
     private const double Tie = 1e-6;
 
@@ -44,19 +43,19 @@ internal static class CutoutPackerProposal
         if (inserts.Count == 0 || !double.IsFinite(spacing) || spacing < 0 || spacing > MaxSpacing)
             return Array.Empty<NestJobPlacement>();
         var frameGeometry = memo?.Read(frame.Geometry) ?? JobPartGeometry.TryRead(frame.Geometry);
-        if (frameGeometry == null || !WithinRange(frameGeometry.Bounds))
+        if (frameGeometry == null || !CutoutCoordinates.WithinRange(frameGeometry.Bounds))
             return Array.Empty<NestJobPlacement>();
         ArgumentOutOfRangeException.ThrowIfNegative(cutoutIndex);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(cutoutIndex, frameGeometry.Cutouts.Count);
         var cutout = frameGeometry.Cutouts[cutoutIndex];
-        if (!cutout.IsClosed() || !WithinRange(cutout.BoundingBox)
+        if (!cutout.IsClosed() || !CutoutCoordinates.WithinRange(cutout.BoundingBox)
             || spacing * 2 >= System.Math.Min(cutout.BoundingBox.Length, cutout.BoundingBox.Width))
             return Array.Empty<NestJobPlacement>();
         var geometries = new Dictionary<string, JobPartGeometry>(StringComparer.Ordinal);
         foreach (var insert in inserts)
         {
             var geometry = memo?.Read(insert.Geometry) ?? JobPartGeometry.TryRead(insert.Geometry);
-            if (geometry == null || !WithinRange(geometry.Bounds))
+            if (geometry == null || !CutoutCoordinates.WithinRange(geometry.Bounds))
                 return Array.Empty<NestJobPlacement>();
             geometries[insert.Id] = geometry;
         }
@@ -194,10 +193,4 @@ internal static class CutoutPackerProposal
             new Vector(pose.X, pose.Y));
         return (CutoutLatticeFill.Positive(path), CutoutLatticeFill.FlattenTolerance);
     }
-
-    private static bool WithinRange(Box box) =>
-        double.IsFinite(box.Left) && double.IsFinite(box.Right)
-        && double.IsFinite(box.Bottom) && double.IsFinite(box.Top)
-        && System.Math.Abs(box.Left) <= MaxCoordinate && System.Math.Abs(box.Right) <= MaxCoordinate
-        && System.Math.Abs(box.Bottom) <= MaxCoordinate && System.Math.Abs(box.Top) <= MaxCoordinate;
 }

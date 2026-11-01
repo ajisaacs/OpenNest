@@ -264,10 +264,10 @@ internal static class DiscPacker
             foreach (var (type, center) in placed)
             {
                 counts[type.Index]++;
-                var origin = center + Rotate(type.Item.PartOffset, type.Rotation);
+                var origin = center + type.Item.PartOffset.Rotate(type.Rotation);
                 poses.Add((type.Id, origin.X, origin.Y, type.Rotation));
                 var box = new Box(center.X - type.Radius, center.Y - type.Radius, 2 * type.Radius, 2 * type.Radius);
-                envelope = envelope == null ? box : Union(envelope, box);
+                envelope = envelope == null ? box : BoundingBox.Union(envelope, box);
             }
             // Summed per type in type order, the form of the stock loop's demand area.
             var area = types.Sum(t => counts[t.Index] * t.MaterialArea);
@@ -345,21 +345,5 @@ internal static class DiscPacker
         yield return new Vector(mx - uy * across, my + ux * across);
         if (across > Epsilon)
             yield return new Vector(mx + uy * across, my - ux * across);
-    }
-
-    private static Vector Rotate(Vector v, double angle)
-    {
-        var sine = System.Math.Sin(angle);
-        var cosine = System.Math.Cos(angle);
-        return new Vector(v.X * cosine - v.Y * sine, v.X * sine + v.Y * cosine);
-    }
-
-    private static Box Union(Box a, Box b)
-    {
-        var l = System.Math.Min(a.Left, b.Left);
-        var bo = System.Math.Min(a.Bottom, b.Bottom);
-        var r = System.Math.Max(a.Right, b.Right);
-        var t = System.Math.Max(a.Top, b.Top);
-        return new Box(l, bo, r - l, t - bo);
     }
 }

@@ -504,7 +504,7 @@ namespace OpenNest.Geometry
             var newC = Centroid(@new.Outer.Samples);
             for (var i = 0; i < seeds.Count; i++)
             {
-                var rotated = Rotate(newC, seeds[i].Item1);
+                var rotated = newC.Rotate(seeds[i].Item1);
                 seeds[i] = (seeds[i].Item1, oldC - rotated);
             }
             return seeds;
@@ -569,7 +569,7 @@ namespace OpenNest.Geometry
                 {
                     var p = @new.Outer.Samples[i].Position;
                     var m = preMirror(p.X, p.Y);
-                    positions[idx++] = Rotate(new Vector(m.X, m.Y), rotation) + translation;
+                    positions[idx++] = new Vector(m.X, m.Y).Rotate(rotation) + translation;
                 }
                 if (!includeHoles)
                     return;
@@ -578,7 +578,7 @@ namespace OpenNest.Geometry
                     {
                         var p = @new.Holes[h].Samples[i].Position;
                         var m = preMirror(p.X, p.Y);
-                        positions[idx++] = Rotate(new Vector(m.X, m.Y), rotation) + translation;
+                        positions[idx++] = new Vector(m.X, m.Y).Rotate(rotation) + translation;
                     }
             }
 
@@ -650,7 +650,7 @@ namespace OpenNest.Geometry
                     return null; // nonfinite update
 
                 rotation += dTheta;
-                translation = Rotate(translation, dTheta) + dT;
+                translation = translation.Rotate(dTheta) + dT;
 
                 var rms = System.Math.Sqrt(order.Average(i => residuals[i] * residuals[i]));
 
@@ -790,7 +790,7 @@ namespace OpenNest.Geometry
             if (double.IsNaN(dTheta) || double.IsInfinity(dTheta))
                 return false;
 
-            var r = Rotate(cq, dTheta);
+            var r = cq.Rotate(dTheta);
             dTranslation = ct - r;
             return !double.IsNaN(dTranslation.X) && !double.IsNaN(dTranslation.Y);
         }
@@ -866,11 +866,11 @@ namespace OpenNest.Geometry
             var outerCenter = Centroid(old.Outer.Samples);
             foreach (var flip in new[] { System.Math.PI, System.Math.PI / 2, -System.Math.PI / 2 })
             {
-                var anchor = Rotate(-outerCenter, flip) + outerCenter;
+                var anchor = (-outerCenter).Rotate(flip) + outerCenter;
                 var probe = new Candidate
                 {
                     Rotation = NormalizeAngle(best.Rotation + flip),
-                    Translation = Rotate(best.Translation, flip) + anchor,
+                    Translation = best.Translation.Rotate(flip) + anchor,
                 };
                 var refined = FitIcp(
                     old,
@@ -971,8 +971,8 @@ namespace OpenNest.Geometry
             var limit = options.SamplingSpacing * 0.5;
             foreach (var s in @new.Outer.Samples)
             {
-                var pa = Rotate(s.Position, a.Rotation) + a.Translation;
-                var pb = Rotate(s.Position, best.Rotation) + best.Translation;
+                var pa = s.Position.Rotate(a.Rotation) + a.Translation;
+                var pb = s.Position.Rotate(best.Rotation) + best.Translation;
                 if (pa.DistanceTo(pb) > limit)
                     return true;
             }
@@ -993,7 +993,7 @@ namespace OpenNest.Geometry
             var newTotal = 0;
             foreach (var s in AllNewSamples(@new))
             {
-                var p = Rotate(s.Position, pose.Rotation) + pose.Translation;
+                var p = s.Position.Rotate(pose.Rotation) + pose.Translation;
                 newTotal++;
                 if (TryClosestSegment(p, oldSegments, out var c) && p.DistanceTo(c) <= spanBound)
                     newMatched++;
@@ -1005,8 +1005,8 @@ namespace OpenNest.Geometry
             var posed = AllNewSegments(@new);
             for (var i = 0; i < posed.Length; i++)
                 posedNewSegments[i] = new Line(
-                    Rotate(posed[i].StartPoint, pose.Rotation) + pose.Translation,
-                    Rotate(posed[i].EndPoint, pose.Rotation) + pose.Translation
+                    posed[i].StartPoint.Rotate(pose.Rotation) + pose.Translation,
+                    posed[i].EndPoint.Rotate(pose.Rotation) + pose.Translation
                 );
 
             var oldMatched = 0;
@@ -1034,7 +1034,7 @@ namespace OpenNest.Geometry
             var distances = new List<double>();
             foreach (var s in AllNewSamples(@new))
             {
-                var p = Rotate(s.Position, pose.Rotation) + pose.Translation;
+                var p = s.Position.Rotate(pose.Rotation) + pose.Translation;
                 if (TryClosestSegment(p, oldSegments, out var c))
                     distances.Add(p.DistanceTo(c));
             }
@@ -1096,7 +1096,7 @@ namespace OpenNest.Geometry
             var path = new PathD(points.Length);
             foreach (var p in points)
             {
-                var q = Rotate(p, rotation) + translation;
+                var q = p.Rotate(rotation) + translation;
                 if (double.IsNaN(q.X) || double.IsNaN(q.Y))
                     return null;
                 path.Add(new PointD(q.X, q.Y));
@@ -1135,13 +1135,6 @@ namespace OpenNest.Geometry
             foreach (var s in samples)
                 sum += s.Position;
             return samples.Length > 0 ? sum * (1.0 / samples.Length) : new Vector();
-        }
-
-        private static Vector Rotate(Vector v, double angle)
-        {
-            var cos = System.Math.Cos(angle);
-            var sin = System.Math.Sin(angle);
-            return new Vector(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos);
         }
 
         private static double NormalizeAngle(double angle)

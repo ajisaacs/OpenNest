@@ -279,7 +279,7 @@ public static class MaximalRectangles
 
             foreach (var larger in results)
             {
-                if (IsContainedIn(box, larger))
+                if (BoundingBox.IsWithin(box, larger))
                 {
                     dominated = true;
                     break;
@@ -291,14 +291,5 @@ public static class MaximalRectangles
         }
 
         return results;
-    }
-
-    private static bool IsContainedIn(Box inner, Box outer)
-    {
-        var eps = Math.Tolerance.Epsilon;
-        return inner.Left >= outer.Left - eps
-            && inner.Right <= outer.Right + eps
-            && inner.Bottom >= outer.Bottom - eps
-            && inner.Top <= outer.Top + eps;
     }
 }

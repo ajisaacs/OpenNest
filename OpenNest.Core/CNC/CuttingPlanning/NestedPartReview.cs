@@ -37,7 +37,7 @@ internal static class NestedPartReview
                     continue;
                 var program = FixedLeadReview.Clean(part);
                 cleanBounds[index] = NestedPartContainment.CleanBounds(program, part.Location, token);
-                hostBounds[index] = NestedPartContainment.Union(part.BoundingBox, cleanBounds[index]);
+                hostBounds[index] = BoundingBox.Union(part.BoundingBox, cleanBounds[index]);
                 clean[index] = program;
             }
             catch (Exception exception) when (IsInvalid(exception))
@@ -52,7 +52,7 @@ internal static class NestedPartReview
             {
                 token.ThrowIfCancellationRequested();
                 if (inner == host || clean[inner] == null || clean[host] == null
-                    || !NestedPartContainment.Within(cleanBounds[inner], hostBounds[host]))
+                    || !BoundingBox.IsWithin(cleanBounds[inner], hostBounds[host]))
                     continue;
                 var inside = NestedPartContainment.InsideCutout(Material(inner), Material(host), token,
                     out var ambiguity);

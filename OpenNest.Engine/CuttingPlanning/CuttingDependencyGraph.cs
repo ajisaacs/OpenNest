@@ -109,7 +109,7 @@ internal sealed class CuttingDependencyGraph
                 token.ThrowIfCancellationRequested();
                 // Bounds only select candidates; containment itself is proven on native material.
                 if (inner != host && !nodes[inner].IsCutOff && !nodes[host].IsCutOff
-                    && NestedPartContainment.Within(nodes[inner].CleanBounds, nodes[host].HostBounds))
+                    && BoundingBox.IsWithin(nodes[inner].CleanBounds, nodes[host].HostBounds))
                 {
                     try
                     {
@@ -216,7 +216,9 @@ internal sealed class DependencyNode
         CutOff = cutOff;
         PlacedBounds = Copy(placedBounds);
         CleanBounds = cleanBounds == null ? null : Copy(cleanBounds);
-        HostBounds = cleanBounds == null ? PlacedBounds : NestedPartContainment.Union(PlacedBounds, CleanBounds);
+        HostBounds = cleanBounds == null
+            ? PlacedBounds
+            : BoundingBox.Union(PlacedBounds, CleanBounds);
         this.materialFactory = materialFactory;
     }
 
