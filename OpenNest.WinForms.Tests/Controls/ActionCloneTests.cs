@@ -3,6 +3,7 @@ using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Controls;
 using OpenNest.Geometry;
+using static OpenNest.WinForms.Tests.FormTesting;
 
 namespace OpenNest.WinForms.Tests.Controls;
 
@@ -22,10 +23,6 @@ public class ActionCloneTests
         program.Codes.Add(new CNC.LinearMove(new Vector(0, 0)));
         return new Drawing(name, program);
     }
-
-    private static void Raise(PlateView view, string method, EventArgs args) =>
-        typeof(PlateView).GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)!
-            .Invoke(view, new object[] { args });
 
     [Fact]
     public void DeleteWhilePlacingADrawingKeepsThePreviewSelected() => StaTestThread.Run(() =>

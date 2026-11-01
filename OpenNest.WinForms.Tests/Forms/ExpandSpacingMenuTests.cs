@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Windows.Forms;
 using OpenNest.Forms;
 using OpenNest.Geometry;
+using static OpenNest.WinForms.Tests.TestReflection;
 
 namespace OpenNest.WinForms.Tests.Forms;
 
@@ -55,11 +56,6 @@ public class ExpandSpacingMenuTests
         (ToolStripMenuItem)host.MainMenuStrip!.Items.Find(name, true).Single();
 
     // Same reflection precedent PlateViewFillLifetimeTests uses for fill-lifetime state.
-    private static void SetBackingField(object target, string property, object value) =>
-        target.GetType()
-            .GetField($"<{property}>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(target, value);
-
     private sealed class MenuHost : MainForm
     {
         // No startup migrations/automatic new document, and no settings save at close.

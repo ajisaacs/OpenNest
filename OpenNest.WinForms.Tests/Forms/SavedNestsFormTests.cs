@@ -5,6 +5,8 @@ using OpenNest.Data;
 using OpenNest.Forms;
 using OpenNest.Geometry;
 using OpenNest.IO;
+using static OpenNest.WinForms.Tests.FormTesting;
+using static OpenNest.WinForms.Tests.TestReflection;
 
 namespace OpenNest.WinForms.Tests.Forms;
 
@@ -366,26 +368,11 @@ public class SavedNestsFormTests
         return stream.ToArray();
     }
 
-    private static void PumpUntil(Func<bool> condition, string what)
-    {
-        var until = DateTime.UtcNow.AddSeconds(15);
-        while (!condition() && DateTime.UtcNow < until)
-        {
-            Application.DoEvents();
-            Thread.Sleep(10);
-        }
-
-        Assert.True(condition(), $"Timed out waiting for {what}.");
-    }
-
     private static bool ProcessKey(Form form, Keys key)
     {
         var method = form.GetType().GetMethod("ProcessCmdKey", BindingFlags.Instance | BindingFlags.NonPublic)!;
         return (bool)method.Invoke(form, new object[] { new Message(), key })!;
     }
-
-    private static T Field<T>(object owner, string name) =>
-        (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
 
     /// <summary>Serves one page of the given records and archives by id.</summary>
     private sealed class FakeRepository : INestRepository

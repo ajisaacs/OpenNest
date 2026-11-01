@@ -4,6 +4,7 @@ using OpenNest.Actions;
 using OpenNest.Controls;
 using OpenNest.Geometry;
 using OpenNest.Help;
+using static OpenNest.WinForms.Tests.FormTesting;
 
 namespace OpenNest.WinForms.Tests.Actions;
 
@@ -17,10 +18,6 @@ public class ActionTrimExtendCutOffTests
     private const double Tolerance = 1.0;
     private const double SeparatorY = 31.510593;
     private const double LastVerticalX = 70.221406;
-
-    private static void PressKey(PlateView view, Keys key) =>
-        typeof(Control).GetMethod("OnKeyDown", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .Invoke(view, new object[] { new KeyEventArgs(key) });
 
     private static bool IsInputKey(PlateView view, Keys key) =>
         (bool)typeof(PlateView).GetMethod("IsInputKey", BindingFlags.Instance | BindingFlags.NonPublic)!

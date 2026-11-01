@@ -5,6 +5,7 @@ using OpenNest.Data;
 using OpenNest.Forms;
 using OpenNest.IO;
 using OpenNest.Shapes;
+using static OpenNest.WinForms.Tests.FormTesting;
 
 namespace OpenNest.WinForms.Tests.Forms;
 
@@ -570,24 +571,8 @@ public class DrawingLibraryFormTests
 
     private static void SelectFirstRow(DataGridView grid) => grid.CurrentCell = grid.Rows[0].Cells["nameColumn"];
 
-    private static void PumpUntil(Func<bool> condition, string what)
-    {
-        var until = DateTime.UtcNow.AddSeconds(15);
-        while (!condition() && DateTime.UtcNow < until)
-        {
-            Application.DoEvents();
-            Thread.Sleep(10);
-        }
-
-        Assert.True(condition(), $"Timed out waiting for {what}.");
-    }
-
-    private static T Field<T>(object owner, string name)
-    {
-        if (owner is DrawingLibraryForm dialog)
-            owner = dialog.View;
-        return (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
-    }
+    private static T Field<T>(object owner, string name) =>
+        TestReflection.Field<T>(owner is DrawingLibraryForm dialog ? dialog.View : owner, name);
 
     /// <summary>Serves every record (ignoring filters) and real packages by revision.</summary>
     private sealed class FakeLibrary : IDrawingLibraryStore

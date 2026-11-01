@@ -2,6 +2,7 @@ using System.Reflection;
 using OpenNest.Controls;
 using OpenNest.Forms;
 using OpenNest.Geometry;
+using static OpenNest.WinForms.Tests.TestReflection;
 
 namespace OpenNest.WinForms.Tests.Forms;
 
@@ -92,11 +93,6 @@ public class MainFormCharacterizationTests
 
     private static void SetField(MainForm host, string name, object value) =>
         typeof(MainForm).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(host, value);
-
-    private static void SetBackingField(object target, string property, object value) =>
-        target.GetType()
-            .GetField($"<{property}>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(target, value);
 
     private sealed class Host : MainForm
     {

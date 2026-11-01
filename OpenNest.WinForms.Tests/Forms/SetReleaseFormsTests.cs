@@ -6,6 +6,8 @@ using OpenNest.Forms;
 using OpenNest.IO;
 using OpenNest.Shapes;
 using OpenNest.Tests.Data;
+using static OpenNest.WinForms.Tests.FormTesting;
+using static OpenNest.WinForms.Tests.TestReflection;
 using IReleaseNestingHost = OpenNest.Controls.IReleaseNestingHost;
 using ReleasePanel = OpenNest.Controls.ReleasePanel;
 
@@ -1128,21 +1130,6 @@ public class SetReleaseFormsTests
         Run((Task)task);
         return task.GetAwaiter().GetResult();
     }
-
-    private static void PumpUntil(Func<bool> condition, string what)
-    {
-        var until = DateTime.UtcNow.AddSeconds(15);
-        while (!condition() && DateTime.UtcNow < until)
-        {
-            Application.DoEvents();
-            Thread.Sleep(10);
-        }
-
-        Assert.True(condition(), $"Timed out waiting for {what}.");
-    }
-
-    private static T Field<T>(object owner, string name) =>
-        (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
 
     /// <summary>Records what Make Nests asks of the main window, and can stop at a given nest.</summary>
     private sealed class FakeNestingHost : IReleaseNestingHost

@@ -7,6 +7,8 @@ using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.IO.Bom;
 using OpenNest.Tests.Data;
+using static OpenNest.WinForms.Tests.FormTesting;
+using static OpenNest.WinForms.Tests.TestReflection;
 using DrawingSetBrowser = OpenNest.Controls.DrawingSetBrowser;
 
 namespace OpenNest.WinForms.Tests.Forms;
@@ -203,19 +205,4 @@ public sealed class ImportBomToSetFormTests : IDisposable
         PumpUntil(() => task.IsCompleted, "the operation to finish");
         return task.GetAwaiter().GetResult();
     }
-
-    private static void PumpUntil(Func<bool> condition, string what)
-    {
-        var until = DateTime.UtcNow.AddSeconds(15);
-        while (!condition() && DateTime.UtcNow < until)
-        {
-            Application.DoEvents();
-            Thread.Sleep(10);
-        }
-
-        Assert.True(condition(), $"Timed out waiting for {what}.");
-    }
-
-    private static T Field<T>(object owner, string name) =>
-        (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
 }

@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Controls;
 using OpenNest.Geometry;
+using static OpenNest.WinForms.Tests.FormTesting;
 
 namespace OpenNest.WinForms.Tests.Controls;
 
@@ -32,10 +33,6 @@ public class ActionClampEditTests
         Paint(view); // dimension labels are laid out while painting
         return view;
     }
-
-    private static void Raise(PlateView view, string method, EventArgs args) =>
-        typeof(PlateView).GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)!
-            .Invoke(view, new object[] { args });
 
     private static void Paint(PlateView view)
     {

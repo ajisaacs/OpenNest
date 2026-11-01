@@ -1,6 +1,7 @@
 using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Forms;
+using static OpenNest.WinForms.Tests.FormTesting;
 
 namespace OpenNest.WinForms.Tests.Forms;
 
@@ -135,17 +136,6 @@ public class MachineClampsFormsTests
 
     private static T Find<T>(Control root, string name) where T : Control =>
         Assert.IsType<T>(root.Controls.Find(name, true).Single());
-
-    private static IEnumerable<T> All<T>(Control root) where T : Control
-    {
-        foreach (Control child in root.Controls)
-        {
-            if (child is T match)
-                yield return match;
-            foreach (var nested in All<T>(child))
-                yield return nested;
-        }
-    }
 
     private static void RunSta(System.Action action) =>
         StaTestThread.Run(action, Timeout.InfiniteTimeSpan, "The STA test did not complete.");

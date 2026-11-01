@@ -4,6 +4,7 @@ using OpenNest.CNC;
 using OpenNest.Controls;
 using OpenNest.Forms;
 using OpenNest.Geometry;
+using static OpenNest.WinForms.Tests.TestReflection;
 
 namespace OpenNest.WinForms.Tests.Forms;
 
@@ -287,11 +288,6 @@ public class NestReportExportTests
         typeof(MainForm).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(target, value);
 
     // Same reflection precedent PlateViewFillLifetimeTests uses for fill-lifetime state.
-    private static void SetBackingField(object target, string property, object value) =>
-        target.GetType()
-            .GetField($"<{property}>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(target, value);
-
     private sealed class TestMainForm : MainForm
     {
         public List<string> DialogRequests { get; } = [];

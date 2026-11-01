@@ -6,6 +6,7 @@ using OpenNest.Controls;
 using OpenNest.Forms;
 using OpenNest.Geometry;
 using OpenNest.IO;
+using static OpenNest.WinForms.Tests.FormTesting;
 
 namespace OpenNest.WinForms.Tests.Forms;
 
@@ -67,15 +68,6 @@ public class CadConverterHoleTableTests
             e.Layer = layer;
         return CadImporter.BuildDrawing(new CadImportResult { Entities = entities, Name = "holes" }, entities,
             new List<Bend>(), 1, null, null);
-    }
-
-    private static void Show(Form form)
-    {
-        form.WindowState = FormWindowState.Normal;
-        form.StartPosition = FormStartPosition.Manual;
-        form.Location = new Point(0, 0);
-        form.Size = new System.Drawing.Size(1200, 800);
-        form.Show();
     }
 
     private static T Field<T>(object owner, string name) =>

@@ -7,6 +7,7 @@ using OpenNest.Dimensions;
 using OpenNest.Forms;
 using OpenNest.Geometry;
 using OpenNest.IO;
+using static OpenNest.WinForms.Tests.FormTesting;
 
 namespace OpenNest.WinForms.Tests.Forms;
 
@@ -243,24 +244,11 @@ public class CadConverterDimensionTests
             new List<Bend>(), 1, null, null);
     }
 
-    private static void Show(Form form)
-    {
-        form.WindowState = FormWindowState.Normal;
-        form.StartPosition = FormStartPosition.Manual;
-        form.Location = new Point(0, 0);
-        form.Size = new System.Drawing.Size(1200, 800);
-        form.Show();
-    }
-
     private static T Field<T>(object owner, string name) =>
-        (T)owner.GetType().BaseType!.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
+        TestReflection.Field<T>(owner.GetType().BaseType!, owner, name);
 
     private static void Invoke(CadConverterForm form, string name, params object?[] args) =>
         typeof(CadConverterForm).GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(form, args);
-
-    private static void Mouse(Control control, string handler, Point at) =>
-        typeof(Control).GetMethod(handler, BindingFlags.Instance | BindingFlags.NonPublic, [typeof(MouseEventArgs)])!
-            .Invoke(control, [new MouseEventArgs(MouseButtons.Left, 1, at.X, at.Y, 0)]);
 
     private sealed class DimensionTestForm : CadConverterForm
     {

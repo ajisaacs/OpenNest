@@ -4,6 +4,8 @@ using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Forms;
 using OpenNest.Shapes;
+using static OpenNest.WinForms.Tests.FormTesting;
+using static OpenNest.WinForms.Tests.TestReflection;
 
 namespace OpenNest.WinForms.Tests.Forms;
 
@@ -160,21 +162,6 @@ public class SaveToDrawingLibraryFormTests
     }
 
     private static void Run(Task task) => PumpUntil(() => task.IsCompleted, "the save to finish");
-
-    private static void PumpUntil(Func<bool> condition, string what)
-    {
-        var until = DateTime.UtcNow.AddSeconds(15);
-        while (!condition() && DateTime.UtcNow < until)
-        {
-            Application.DoEvents();
-            Thread.Sleep(10);
-        }
-
-        Assert.True(condition(), $"Timed out waiting for {what}.");
-    }
-
-    private static T Field<T>(object owner, string name) =>
-        (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
 
     /// <summary>An in-memory library that keeps every revision and filters like the server.</summary>
     private sealed class FakeStore : IDrawingLibraryStore

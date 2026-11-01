@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Controls;
 using OpenNest.Help;
+using static OpenNest.WinForms.Tests.FormTesting;
 
 namespace OpenNest.WinForms.Tests.Actions;
 
@@ -13,10 +14,6 @@ namespace OpenNest.WinForms.Tests.Actions;
 /// </summary>
 public class ActionCutOffHintTests
 {
-    private static void PressKey(PlateView view, Keys key) =>
-        typeof(Control).GetMethod("OnKeyDown", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .Invoke(view, new object[] { new KeyEventArgs(key) });
-
     private static void Mouse(PlateView view, string handler, MouseButtons button, Point at) =>
         typeof(PlateView).GetMethod(handler, BindingFlags.Instance | BindingFlags.NonPublic,
                 new[] { typeof(MouseEventArgs) })!

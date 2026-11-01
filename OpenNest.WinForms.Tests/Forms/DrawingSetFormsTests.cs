@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Forms;
 using OpenNest.Tests.Data;
+using static OpenNest.WinForms.Tests.FormTesting;
 using DrawingSetBrowser = OpenNest.Controls.DrawingSetBrowser;
 
 namespace OpenNest.WinForms.Tests.Forms;
@@ -693,24 +694,8 @@ public class DrawingSetFormsTests
         return task.GetAwaiter().GetResult();
     }
 
-    private static void PumpUntil(Func<bool> condition, string what)
-    {
-        var until = DateTime.UtcNow.AddSeconds(15);
-        while (!condition() && DateTime.UtcNow < until)
-        {
-            Application.DoEvents();
-            Thread.Sleep(10);
-        }
-
-        Assert.True(condition(), $"Timed out waiting for {what}.");
-    }
-
-    private static T Field<T>(object owner, string name)
-    {
-        if (owner is DrawingLibraryForm dialog)
-            owner = dialog.View;
-        return (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
-    }
+    private static T Field<T>(object owner, string name) =>
+        TestReflection.Field<T>(owner is DrawingLibraryForm dialog ? dialog.View : owner, name);
 
     /// <summary>Serves every record, ignoring filters; packages are never needed here.</summary>
     private sealed class FakeLibrary : IDrawingLibraryStore

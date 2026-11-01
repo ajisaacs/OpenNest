@@ -5,6 +5,7 @@ using System.Text;
 using System.Windows.Forms;
 using OpenNest.Forms;
 using OpenNest.IO.Bom;
+using static OpenNest.WinForms.Tests.TestReflection;
 
 namespace OpenNest.WinForms.Tests.Forms;
 
@@ -416,9 +417,6 @@ public class BomImportFormTests
             Thickness = 0.25,
             Qty = qty,
         };
-
-    private static T Field<T>(object owner, string name) =>
-        (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
 
     private static void RunSta(Action action) =>
         StaTestThread.Run(action, TimeSpan.FromSeconds(30), "The BOM import dialog test did not complete.");
