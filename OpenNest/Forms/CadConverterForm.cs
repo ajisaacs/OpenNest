@@ -124,6 +124,7 @@ namespace OpenNest.Forms
                 {
                     Name = result.Name,
                     Entities = result.Entities,
+                    RawEntities = result.RawEntities,
                     Path = result.SourcePath,
                     Quantity = 1,
                     Customer = string.Empty,
@@ -234,7 +235,7 @@ namespace OpenNest.Forms
             entityView1.SelectedBreakoffIndex = -1;
             entityView1.SelectedTabbedCutoutIndex = -1;
             entityView1.SelectedDimensionIndex = -1;
-            entityView1.OriginalEntities = chkShowOriginal.Checked ? item.OriginalEntities : null;
+            entityView1.OriginalEntities = chkShowOriginal.Checked ? item.OverlayEntities : null;
             entityView1.Entities.Clear();
             entityView1.Entities.AddRange(item.Entities);
             entityView1.Bends = item.Bends ?? new List<Bend>();
@@ -521,6 +522,7 @@ namespace OpenNest.Forms
                 {
                     Name = Path.GetFileNameWithoutExtension(splitPath),
                     Entities = result.Entities,
+                    RawEntities = result.RawEntities,
                     Path = splitPath,
                     Quantity = item.Quantity,
                     Customer = item.Customer,
@@ -1331,7 +1333,7 @@ namespace OpenNest.Forms
         private void OnShowOriginalChanged(object sender, EventArgs e)
         {
             var item = CurrentItem;
-            entityView1.OriginalEntities = chkShowOriginal.Checked ? item?.OriginalEntities : null;
+            entityView1.OriginalEntities = chkShowOriginal.Checked ? item?.OverlayEntities : null;
             entityView1.Invalidate();
         }
 

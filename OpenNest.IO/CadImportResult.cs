@@ -19,6 +19,13 @@ namespace OpenNest.IO
         public List<Entity> Entities { get; set; } = new List<Entity>();
 
         /// <summary>
+        /// The source file's geometry on every layer, before any import cleanup, for
+        /// comparing against <see cref="Entities"/>. Display only: these share no instances
+        /// with <see cref="Entities"/> and their IDs key nothing.
+        /// </summary>
+        public List<Entity> RawEntities { get; set; } = new List<Entity>();
+
+        /// <summary>
         /// Bends detected during import. Mutable — callers may add, remove,
         /// or replace entries before building the drawing.
         /// </summary>

@@ -39,7 +39,12 @@ namespace OpenNest.IO
                 );
             }
 
-            return new DxfImportResult { Entities = entities, Document = doc };
+            return new DxfImportResult
+            {
+                Entities = entities,
+                RawEntities = ConvertEntities(doc, _ => false, optimize: false),
+                Document = doc,
+            };
         }
 
         public static List<Entity> GetGeometry(string path) =>

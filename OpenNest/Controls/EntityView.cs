@@ -107,15 +107,12 @@ namespace OpenNest.Controls
 
             e.Graphics.TranslateTransform(origin.X, origin.Y);
 
-            // Draw original geometry overlay (faded, behind current)
+            // Draw original geometry overlay (faded, behind current); filters don't apply to it
             if (OriginalEntities != null)
             {
                 using var origPen = new Pen(Color.FromArgb(50, 255, 140, 40));
                 foreach (var entity in OriginalEntities)
-                {
-                    if (!IsEtchLayer(entity.Layer))
-                        DrawEntity(e.Graphics, entity, origPen);
-                }
+                    DrawEntityShape(e.Graphics, entity, origPen);
             }
 
             using (var excludedPen = new Pen(Color.FromArgb(90, 150, 150, 150)) { DashPattern = new float[] { 2, 4 } })
@@ -301,9 +298,6 @@ namespace OpenNest.Controls
 
         private static readonly Color EtchRoleColor = Color.Magenta;
         private static readonly Color DisplayRoleColor = Color.FromArgb(120, 200, 220);
-
-        private static bool IsEtchLayer(Layer layer) =>
-            string.Equals(layer?.Name, "ETCH", System.StringComparison.OrdinalIgnoreCase);
 
         private void DrawBendLines(Graphics g)
         {

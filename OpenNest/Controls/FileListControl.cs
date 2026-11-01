@@ -17,7 +17,16 @@ namespace OpenNest.Controls
         public int Quantity { get; set; } = 1;
         public string Path { get; set; }
         public List<Entity> Entities { get; set; } = new();
+
+        /// <summary>The cleaned entities before Simplify replaced them; Simplify always restarts from these.</summary>
         public List<Entity> OriginalEntities { get; set; }
+
+        /// <summary>The source file's geometry before import cleanup, for the Original overlay; null when no file was read.</summary>
+        public List<Entity> RawEntities { get; set; }
+
+        /// <summary>What the Original overlay shows: a drawing reopened from a nest has only its pre-Simplify entities.</summary>
+        public List<Entity> OverlayEntities => RawEntities ?? OriginalEntities;
+
         public List<Bend> Bends { get; set; } = new();
         public List<Breakoffs.Breakoff> Breakoffs { get; set; } = new();
         public List<TabbedCutouts.TabbedCutout> TabbedCutouts { get; set; } = new();

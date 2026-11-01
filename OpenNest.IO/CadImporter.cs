@@ -92,6 +92,7 @@ namespace OpenNest.IO
             return new CadImportResult
             {
                 Entities = dxf.Entities,
+                RawEntities = dxf.RawEntities,
                 Bends = bends,
                 BendRepairReports = repairReports,
                 Bounds = dxf.Entities.GetBoundingBox(),

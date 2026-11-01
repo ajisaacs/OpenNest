@@ -221,6 +221,11 @@ namespace OpenNest.IO
         {
             WalkChildren(root, transform, Layer.Default);
 
+            var raw = new List<Entity>();
+            raw.AddRange(circles.CloneAll());
+            raw.AddRange(lines.CloneAll());
+            raw.AddRange(arcs.CloneAll());
+
             GeometryOptimizer.Optimize(lines);
             GeometryOptimizer.Optimize(arcs);
             GeometryOptimizer.Deduplicate(circles);
@@ -234,6 +239,7 @@ namespace OpenNest.IO
             return new DxfImportResult
             {
                 Entities = entities,
+                RawEntities = raw,
                 Warnings = skipped
                     .OrderBy(s => s.Key, StringComparer.Ordinal)
                     .Select(s => $"Skipped {s.Value} <{s.Key}> element(s); convert them to paths to import them.")
