@@ -335,25 +335,56 @@ public class ExpanderTests
     }
 
     [Fact]
-    public void Separate_PreservesEachEntryGap_EvenWhenTargetIsSmaller()
+    public void Separate_WideEntryGap_ClosesOnlyToTheTarget()
     {
         var plate = MakePlate(30, 12, edge: 0);
         var anchor = AddSquare(plate, 1, 4, 2);
         var mover = AddSquare(plate, 4, 4, 2);
         var wall = AddSquare(plate, 12, 4, 2);
-        var initialWallGap = wall.Location.X - (mover.Location.X + 2);
 
         var (converged, positions, _) = Expander.Separate(
             new List<Part> { anchor, mover }, plate, spacing: 3
         );
 
-        // The wall is six units away at entry. Merely clearing the requested
-        // three-unit spacing is not permission to consume that original gap.
-        Assert.True(positions[1].X + 2 <= wall.Location.X - initialWallGap + 1e-6,
-            $"entry gap {initialWallGap}, proposed gap {wall.Location.X - positions[1].X - 2}");
+        // The wall is six units away at entry, so the mover may spend the three
+        // units above the target; it needs only two of them.
+        Assert.True(converged);
+        Assert.True(wall.Location.X - (positions[1].X + 2) >= 3);
         Assert.Equal(new Vector(4, 4), mover.Location);
         Assert.Equal(new Vector(12, 4), wall.Location);
-        Assert.False(converged); // This direct translation cannot reach 3 safely.
+    }
+
+    [Fact]
+    public void Separate_EntryGapBelowTheTarget_StaysAFloor()
+    {
+        var plate = MakePlate(30, 12, edge: 0);
+        var anchor = AddSquare(plate, 1, 4, 2);
+        var mover = AddSquare(plate, 4, 4, 2);
+        AddSquare(plate, 7, 4, 2);
+
+        var (converged, positions, _) = Expander.Separate(
+            new List<Part> { anchor, mover }, plate, spacing: 3
+        );
+
+        // One unit from the wall at entry: closing it to help the other pair
+        // would trade one gap for another.
+        Assert.False(converged);
+        Assert.Equal(new Vector(4, 4), positions[1]);
+    }
+
+    [Fact]
+    public void Expand_MiddlePart_SettlesBetweenItsNeighbors()
+    {
+        var plate = MakePlate(30, 12, edge: 0);
+        var anchor = AddSquare(plate, 1, 4, 2);
+        var mover = AddSquare(plate, 4, 4, 2);
+        var wall = AddSquare(plate, 12, 4, 2);
+
+        var result = Expander.Expand(new List<Part> { anchor, mover }, plate);
+
+        // Seven units of free travel divide evenly across both sides of the mover.
+        Assert.True(result.AchievedSpacing >= 3.4, $"achieved {result.AchievedSpacing}");
+        Assert.Equal(new Vector(12, 4), wall.Location);
     }
 
     [Fact]
@@ -667,5 +698,47 @@ public class ExpanderTests
         Assert.Equal(6.5, w2.Location.X, 6);
         Assert.True(a.Intersects(w1, out _) == false);
         Assert.True(b.Intersects(w2, out _) == false);
+    }
+
+    private static Program RectangleWithRoundHoles(double length, double width, int holes)
+    {
+        var program = new Program();
+        for (var i = 1; i <= holes; i++)
+        {
+            var center = new Vector(i * length / (holes + 1), width / 2);
+            var start = new Vector(center.X + 0.5, center.Y);
+            program.MoveTo(start);
+            program.ArcTo(start, center, RotationType.CW);
+        }
+        program.MoveTo(0, 0);
+        program.LineTo(length, 0);
+        program.LineTo(length, width);
+        program.LineTo(0, width);
+        program.LineTo(0, 0);
+        return program;
+    }
+
+    [Fact]
+    public void Expand_PackedPartsWithManyHoles_FinishesWellBeforeTheBudget()
+    {
+        // Every floor check on a packed grid measures all its neighbors. Without
+        // pruning far pairs and hole rings this takes minutes, not seconds.
+        var plate = MakePlate(120, 60, edge: 0.25);
+        var drawing = new Drawing("holes", RectangleWithRoundHoles(26, 6, 12));
+        var selected = new List<Part>();
+        for (var row = 0; row < 3; row++)
+            for (var column = 0; column < 4; column++)
+            {
+                var part = new Part(drawing, new Vector(0.25 + column * 26.25, 0.25 + row * 6.25));
+                plate.Parts.Add(part);
+                selected.Add(part);
+            }
+
+        using var budget = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var result = Expander.Expand(selected, plate, null, budget.Token);
+
+        Assert.False(result.Canceled);
+        Assert.True(result.AchievedSpacing >= 0.25 - 1e-3, $"achieved {result.AchievedSpacing}");
+        AssertNoOverlaps(plate);
     }
 }

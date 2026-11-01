@@ -260,7 +260,7 @@ namespace OpenNest.Engine.Fill
             var positions = final.Positions;
             // Floors belong to this public operation, not to any individual probe.
             // A failed final check leaves every live part untouched.
-            if (!context.MeetsEntryFloors(positions, entry))
+            if (!context.MeetsEntryFloors(positions, entry, System.Math.Max(0, sGood)))
                 throw new InvalidOperationException("Expand proposal violates an entry clearance floor.");
 
             double measured;
@@ -341,6 +341,8 @@ namespace OpenNest.Engine.Fill
             foreach (var pair in context.Pairs)
             {
                 token.ThrowIfCancellationRequested();
+                if (context.ProvesClearance(pair, positions, min))
+                    continue;
                 var (distance, _) = context.PairClearance(pair.IndexA, pair.IndexB, positions);
                 if (distance < min)
                     min = distance;
@@ -381,6 +383,8 @@ namespace OpenNest.Engine.Fill
                 {
                     if (token.IsCancellationRequested)
                         return (false, start, violations);
+                    if (context.ProvesClearance(pair, positions, spacing))
+                        continue;
                     var (distance, directionA) = context.PairClearance(
                         pair.IndexA,
                         pair.IndexB,
@@ -413,10 +417,10 @@ namespace OpenNest.Engine.Fill
                     // boundary fallback. Only if the normal candidate makes no
                     // safe progress, retry its opposite through the same path,
                     // floor and active-improvement checks. Never move the anchor.
-                    var attempt = ProposeMove(context, positions, pair, distance, direction, need, epsMove);
+                    var attempt = ProposeMove(context, positions, pair, distance, direction, need, spacing, epsMove);
                     if (attempt.Applied <= 0 && distance <= 1e-7)
                     {
-                        var opposite = ProposeMove(context, positions, pair, distance, -direction, need, epsMove);
+                        var opposite = ProposeMove(context, positions, pair, distance, -direction, need, spacing, epsMove);
                         if (opposite.Applied > attempt.Applied)
                             attempt = opposite;
                     }
@@ -467,6 +471,8 @@ namespace OpenNest.Engine.Fill
             {
                 if (token.IsCancellationRequested)
                     return (false, start, violations);
+                if (context.ProvesClearance(pair, positions, spacing))
+                    continue;
                 var (distance, directionA) = context.PairClearance(
                     pair.IndexA,
                     pair.IndexB,
@@ -478,10 +484,10 @@ namespace OpenNest.Engine.Fill
 
                 var direction = pair.Mover == pair.IndexA ? directionA : -directionA;
                 var need = target - distance;
-                var attempt = ProposeMove(context, positions, pair, distance, direction, need, epsMove);
+                var attempt = ProposeMove(context, positions, pair, distance, direction, need, spacing, epsMove);
                 if (attempt.Applied <= 0 && distance <= 1e-7)
                 {
-                    var opposite = ProposeMove(context, positions, pair, distance, -direction, need, epsMove);
+                    var opposite = ProposeMove(context, positions, pair, distance, -direction, need, spacing, epsMove);
                     if (opposite.Applied > attempt.Applied)
                         attempt = opposite;
                 }
@@ -507,7 +513,7 @@ namespace OpenNest.Engine.Fill
 
         private static (double Applied, Vector Proposal, bool EdgeLimited, bool PartLimited) ProposeMove(
             SeparationContext context, List<Vector> positions, Pair pair,
-            double distance, Vector direction, double need, double epsMove)
+            double distance, Vector direction, double need, double spacing, double epsMove)
         {
             var mover = pair.Mover;
             var start = positions[mover];
@@ -519,7 +525,7 @@ namespace OpenNest.Engine.Fill
                 return (0, start, edgeLimited, partLimited);
 
             var trial = start + direction * room;
-            if (context.MaintainsValidity(mover, trial, positions, pair, distance))
+            if (context.MaintainsValidity(mover, trial, positions, pair, distance, spacing))
                 return (room, trial, edgeLimited, partLimited);
 
             var lo = 0.0;
@@ -527,7 +533,7 @@ namespace OpenNest.Engine.Fill
             for (var bisect = 0; bisect < 24 && hi - lo > 1e-6; bisect++)
             {
                 var mid = (lo + hi) / 2;
-                if (context.MaintainsValidity(mover, start + direction * mid, positions, pair, distance))
+                if (context.MaintainsValidity(mover, start + direction * mid, positions, pair, distance, spacing))
                     lo = mid;
                 else
                     hi = mid;
@@ -544,6 +550,15 @@ namespace OpenNest.Engine.Fill
             public int IndexB;
             public int Mover;
             public double EntryFloor;
+
+            /// <summary>True for a pair of parts, whose wide entry gap may close
+            /// to the target. Cut-offs and clamps always keep their entry gap.</summary>
+            public bool Yields;
+
+            /// <summary>Lowest clearance this pair may reach at a target spacing.</summary>
+            public double FloorAt(double spacing) => Yields
+                ? System.Math.Min(EntryFloor, System.Math.Max(0, spacing))
+                : EntryFloor;
         }
 
         /// <summary>
@@ -569,6 +584,7 @@ namespace OpenNest.Engine.Fill
                 public Polygon Outer;
                 public List<Polygon> Rings = new(); // outer + cutout rings, local frame
                 public List<Polygon> Holes = new();
+                public Box Bounds; // union of Rings, local frame; null without a perimeter
                 public List<Entity> Boundaries = new(); // native outer + hole loops, local frame
                 public SlideContactGeometry Contact;
                 public Box NativeBounds; // perimeter's native-entity envelope
@@ -647,6 +663,9 @@ namespace OpenNest.Engine.Fill
                 {
                     token.ThrowIfCancellationRequested();
                     pair.EntryFloor = context.PairClearance(pair.IndexA, pair.IndexB, entry).Distance;
+                    pair.Yields = pair.IndexB < clampStart
+                        && !context.parts[pair.IndexA].BaseDrawing.IsCutOff
+                        && !context.parts[pair.IndexB].BaseDrawing.IsCutOff;
                 }
                 return context;
             }
@@ -691,6 +710,7 @@ namespace OpenNest.Engine.Fill
                             prepared.Holes.Add(hole);
                             prepared.Boundaries.AddRange(cutout.Entities);
                         }
+                        prepared.Bounds = PrepareBounds(prepared.Rings);
                         prepared.Contact = SlideContactGeometry.Prepare(prepared.Boundaries);
                         prepared.HasCurves = prepared.Boundaries.Any(e => e is Arc || e is Circle);
                     }
@@ -698,6 +718,26 @@ namespace OpenNest.Engine.Fill
 
                 programs.Add(program, prepared);
                 return prepared;
+            }
+
+            /// <summary>Gives each prepared ring local bounds, for pruning before
+            /// it is cloned to a scratch pose, and returns their union.</summary>
+            private static Box PrepareBounds(List<Polygon> rings)
+            {
+                var left = double.PositiveInfinity;
+                var right = double.NegativeInfinity;
+                var bottom = double.PositiveInfinity;
+                var top = double.NegativeInfinity;
+                foreach (var ring in rings)
+                {
+                    ring.UpdateBounds();
+                    var box = ring.BoundingBox;
+                    left = System.Math.Min(left, box.Left);
+                    right = System.Math.Max(right, box.Right);
+                    bottom = System.Math.Min(bottom, box.Bottom);
+                    top = System.Math.Max(top, box.Top);
+                }
+                return new Box(left, bottom, right - left, top - bottom);
             }
 
             private static Polygon ExactLineRing(List<Entity> entities)
@@ -754,6 +794,58 @@ namespace OpenNest.Engine.Fill
 
             /// <summary>Current world positions of every part in pair-index order.</summary>
             public List<Vector> Positions() => parts.Select(p => p.Location).ToList();
+
+            // Native arcs can sit 0.001 outside each part's rings, and a measured
+            // gap under 0.002 reads as uncertain; a wider box gap rules out both.
+            private const double BoundsSlack = 0.003;
+
+            /// <summary>
+            /// True when the parts' bounds alone prove <see cref="PairClearance"/>
+            /// is positive and at least <paramref name="floor"/>. A far pair can
+            /// then skip the measurement; open cut-offs and clamp keep-outs have
+            /// their own material tests and are always measured.
+            /// </summary>
+            public bool ProvesClearance(Pair pair, List<Vector> positions, double floor)
+            {
+                if (pair.IndexB >= clampStart
+                    || parts[pair.IndexA].BaseDrawing.IsCutOff
+                    || parts[pair.IndexB].BaseDrawing.IsCutOff)
+                    return false;
+                var boundsA = shapes[pair.IndexA].Bounds;
+                var boundsB = shapes[pair.IndexB].Bounds;
+                if (boundsA == null || boundsB == null)
+                    return false;
+                var proven = BoxGap(boundsA, positions[pair.IndexA], boundsB, positions[pair.IndexB])
+                    - BoundsSlack;
+                return double.IsFinite(proven) && proven > 0 && proven >= floor;
+            }
+
+            private static double BoxGap(Box a, Vector offsetA, Box b, Vector offsetB)
+            {
+                var gapX = System.Math.Max(
+                    b.Left + offsetB.X - (a.Right + offsetA.X),
+                    a.Left + offsetA.X - (b.Right + offsetB.X));
+                var gapY = System.Math.Max(
+                    b.Bottom + offsetB.Y - (a.Top + offsetA.Y),
+                    a.Bottom + offsetA.Y - (b.Top + offsetB.Y));
+                if (gapX <= 0)
+                    return System.Math.Max(gapY, 0);
+                if (gapY <= 0)
+                    return gapX;
+                return System.Math.Sqrt(gapX * gapX + gapY * gapY);
+            }
+
+            /// <summary>Bounds the mover covers over a straight translation.</summary>
+            private static Box SweptBounds(Box bounds, Vector start, Vector direction, double room)
+            {
+                var travelX = direction.X * room;
+                var travelY = direction.Y * room;
+                return new Box(
+                    bounds.Left + start.X + System.Math.Min(travelX, 0),
+                    bounds.Bottom + start.Y + System.Math.Min(travelY, 0),
+                    bounds.Length + System.Math.Abs(travelX),
+                    bounds.Width + System.Math.Abs(travelY));
+            }
 
             /// <summary>
             /// Signed material clearance between two parts at the given scratch
@@ -872,10 +964,16 @@ namespace OpenNest.Engine.Fill
 
                 foreach (var ringA in setA.Rings)
                 {
-                    var worldA = CloneAt(ringA, offsetA);
+                    Polygon worldA = null;
 
                     foreach (var ringB in setB.Rings)
                     {
+                        // Boundaries are never closer than their boxes, so a ring
+                        // pair whose box gap reaches the best distance cannot win.
+                        if (BoxGap(ringA.BoundingBox, offsetA, ringB.BoundingBox, offsetB) - 1e-9 >= best)
+                            continue;
+
+                        worldA ??= CloneAt(ringA, offsetA);
                         var worldB = CloneAt(ringB, offsetB);
                         var clearance = Clearance.BoundaryDistance(worldA, worldB);
 
@@ -993,6 +1091,11 @@ namespace OpenNest.Engine.Fill
                         return 0; // Unknown boundary is not empty space.
 
                     var origin = positions[index];
+                    // Nothing outside the swept corridor can limit this move.
+                    if (BoxGap(SweptBounds(moving.Bounds, origin, direction, room), Vector.Zero,
+                            stationary.Bounds, positions[i]) > BoundsSlack)
+                        continue;
+
                     var alreadyOverlapping = Collision.HasOverlap(
                         CloneAt(moving.Outer, origin), CloneAt(stationary.Outer, positions[i]),
                         moving.Holes.Count == 0 ? null : CloneAll(moving.Holes, origin),
@@ -1233,7 +1336,7 @@ namespace OpenNest.Engine.Fill
             // prevent this comparison tolerance accumulating over iterations.
             private const double FloorTolerance = 1e-6;
 
-            public bool MeetsEntryFloors(List<Vector> positions, List<Vector> entry)
+            public bool MeetsEntryFloors(List<Vector> positions, List<Vector> entry, double spacing)
             {
                 for (var i = 0; i < moverCount; i++)
                     if (!InsideWorkArea(i, positions[i]) &&
@@ -1241,8 +1344,11 @@ namespace OpenNest.Engine.Fill
                         return false;
                 foreach (var pair in Pairs)
                 {
+                    var floor = pair.FloorAt(spacing) - FloorTolerance;
+                    if (ProvesClearance(pair, positions, floor))
+                        continue;
                     var clearance = PairClearance(pair.IndexA, pair.IndexB, positions).Distance;
-                    if (!double.IsFinite(clearance) || clearance < pair.EntryFloor - FloorTolerance)
+                    if (!double.IsFinite(clearance) || clearance < floor)
                         return false;
                 }
                 return true;
@@ -1262,9 +1368,10 @@ namespace OpenNest.Engine.Fill
             }
 
             /// <summary>Check active improvement and every affected pair against
-            /// its immutable operation-entry floor on scratch positions.</summary>
+            /// its floor at the target spacing on scratch positions.</summary>
             public bool MaintainsValidity(
-                int index, Vector trial, List<Vector> positions, Pair active, double activeDistance)
+                int index, Vector trial, List<Vector> positions, Pair active, double activeDistance,
+                double spacing)
             {
                 if (!InsideWorkArea(index, trial))
                     return false;
@@ -1280,8 +1387,11 @@ namespace OpenNest.Engine.Fill
                     {
                         if (pair.IndexA != index && pair.IndexB != index)
                             continue;
+                        var floor = pair.FloorAt(spacing) - FloorTolerance;
+                        if (ProvesClearance(pair, positions, floor))
+                            continue;
                         var clearance = PairClearance(pair.IndexA, pair.IndexB, positions).Distance;
-                        if (!double.IsFinite(clearance) || clearance < pair.EntryFloor - FloorTolerance)
+                        if (!double.IsFinite(clearance) || clearance < floor)
                             return false;
                         // Once an initial overlap is cleared, never reintroduce it.
                         if (clearance < 0)

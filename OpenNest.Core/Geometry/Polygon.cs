@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.Math;
@@ -120,7 +120,7 @@ namespace OpenNest.Geometry
         /// <returns></returns>
         public List<Line> ToLines()
         {
-            var list = new List<Line>();
+            var list = new List<Line>(Vertices.Count);
 
             if (Vertices.Count < 2)
                 return list;
