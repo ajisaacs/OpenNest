@@ -18,7 +18,8 @@ public class LayoutPartLabelZoomTests
     {
         using var view = new PlateView(ColorSchemeRegistry.Get("Workshop"));
         view.Matrix = new Matrix(scale, 0, 0, scale, 0, 0);
-        var layout = LayoutPart.Create(new Part(new Drawing("Washer", Square(10)), new Vector(1, 1)), view);
+        var layout = LayoutPart.Create(
+            new Part(new Drawing("Washer", TestPrograms.Square(10)), new Vector(1, 1)), view);
 
         using var withoutId = new Bitmap(80, 80);
         using (var g = Graphics.FromImage(withoutId))
@@ -77,16 +78,5 @@ public class LayoutPartLabelZoomTests
                 if (image.GetPixel(x, y).ToArgb() != white)
                     return false;
         return true;
-    }
-
-    private static OpenNest.CNC.Program Square(double size)
-    {
-        var program = new OpenNest.CNC.Program();
-        program.MoveTo(0, 0);
-        program.LineTo(size, 0);
-        program.LineTo(size, size);
-        program.LineTo(0, size);
-        program.LineTo(0, 0);
-        return program;
     }
 }

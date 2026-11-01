@@ -18,8 +18,10 @@ public class ExpandSpacingMenuTests
         var nest = new Nest("expand job");
         var plate = nest.CreatePlate();
         plate.Size = new Size(100, 100);
-        plate.Parts.Add(new Part(new Drawing("left", Square()), new Vector(1, 1)));
-        plate.Parts.Add(new Part(new Drawing("right", Square()), new Vector(12, 1)));
+        plate.Parts.Add(new Part(
+            new Drawing("left", TestPrograms.ClockwiseSquare(10)), new Vector(1, 1)));
+        plate.Parts.Add(new Part(
+            new Drawing("right", TestPrograms.ClockwiseSquare(10)), new Vector(12, 1)));
         using var editor = new EditNestForm(nest) { MdiParent = host };
         editor.PlateView.SetOverlapAutoCheck(null); // Background overlap workers are irrelevant here.
         editor.Show();
@@ -48,17 +50,6 @@ public class ExpandSpacingMenuTests
         Assert.True(editor.PlateView.Actions.CurrentAction?.IsBusy() == true);
         Assert.False(host.IsExpandSpacingBusy(editor));
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
-
-    private static CNC.Program Square()
-    {
-        var program = new CNC.Program();
-        program.MoveTo(0, 0);
-        program.LineTo(0, 10);
-        program.LineTo(10, 10);
-        program.LineTo(10, 0);
-        program.LineTo(0, 0);
-        return program;
-    }
 
     private static ToolStripMenuItem Menu(MainForm host, string name) =>
         (ToolStripMenuItem)host.MainMenuStrip!.Items.Find(name, true).Single();

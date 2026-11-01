@@ -15,22 +15,11 @@ public class CutSimulationOverlayTests
         Units = Units.Inches,
     };
 
-    private static Program Square(double size)
-    {
-        var program = new Program();
-        program.Codes.Add(new RapidMove(0, 0));
-        program.Codes.Add(new LinearMove(size, 0));
-        program.Codes.Add(new LinearMove(size, size));
-        program.Codes.Add(new LinearMove(0, size));
-        program.Codes.Add(new LinearMove(0, 0));
-        return program;
-    }
-
     private static Plate TwoSquares()
     {
         var plate = new Plate(48, 96);
-        plate.Parts.Add(new Part(new Drawing("a", Square(10)), new Vector(5, 5)));
-        plate.Parts.Add(new Part(new Drawing("b", Square(10)), new Vector(25, 5)));
+        plate.Parts.Add(new Part(new Drawing("a", TestPrograms.Square(10)), new Vector(5, 5)));
+        plate.Parts.Add(new Part(new Drawing("b", TestPrograms.Square(10)), new Vector(25, 5)));
         return plate;
     }
 

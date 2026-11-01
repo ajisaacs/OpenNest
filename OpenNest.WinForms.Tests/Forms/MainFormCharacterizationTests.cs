@@ -18,8 +18,10 @@ public class MainFormCharacterizationTests
         var nest = new Nest("guards");
         var plate = nest.CreatePlate();
         plate.Size = new Size(100, 100);
-        plate.Parts.Add(new Part(new Drawing("left", Square()), new Vector(1, 1)));
-        plate.Parts.Add(new Part(new Drawing("right", Square()), new Vector(12, 1)));
+        plate.Parts.Add(new Part(
+            new Drawing("left", TestPrograms.ClockwiseSquare(10)), new Vector(1, 1)));
+        plate.Parts.Add(new Part(
+            new Drawing("right", TestPrograms.ClockwiseSquare(10)), new Vector(12, 1)));
         using var editor = new EditNestForm(nest) { MdiParent = host };
         editor.PlateView.SetOverlapAutoCheck(null);
         editor.Show();
@@ -95,17 +97,6 @@ public class MainFormCharacterizationTests
         target.GetType()
             .GetField($"<{property}>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(target, value);
-
-    private static CNC.Program Square()
-    {
-        var program = new CNC.Program();
-        program.MoveTo(0, 0);
-        program.LineTo(0, 10);
-        program.LineTo(10, 10);
-        program.LineTo(10, 0);
-        program.LineTo(0, 0);
-        return program;
-    }
 
     private sealed class Host : MainForm
     {

@@ -126,22 +126,13 @@ public class OperationProgressFormTests
     private static PlateView TwoPartView()
     {
         var plate = new Plate(100, 100);
-        plate.Parts.Add(new Part(new Drawing("left", Square()), new Vector(1, 1)));
-        plate.Parts.Add(new Part(new Drawing("right", Square()), new Vector(12, 1)));
+        plate.Parts.Add(new Part(
+            new Drawing("left", TestPrograms.ClockwiseSquare(10)), new Vector(1, 1)));
+        plate.Parts.Add(new Part(
+            new Drawing("right", TestPrograms.ClockwiseSquare(10)), new Vector(12, 1)));
         var view = new PlateView { Plate = plate };
         view.SelectAll();
         return view;
-    }
-
-    private static CNC.Program Square()
-    {
-        var program = new CNC.Program();
-        program.MoveTo(0, 0);
-        program.LineTo(0, 10);
-        program.LineTo(10, 10);
-        program.LineTo(10, 0);
-        program.LineTo(0, 0);
-        return program;
     }
 
     private static void PumpFor(TimeSpan duration)

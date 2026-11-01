@@ -347,12 +347,12 @@ public class PlateExportTests
     private static Nest CreateJob()
     {
         var nest = new Nest("export job") { Units = Units.Inches };
-        var drawing = new Drawing("rect", Rectangle());
+        var drawing = new Drawing("rect", TestPrograms.Rectangle(4, 2));
         drawing.Source.Path = @"C:\drawings\rect.dxf";
         drawing.Source.Offset = new Vector(1.234567891, -0.987654321);
         drawing.Quantity.Required = 12;
         nest.Drawings.Add(drawing);
-        var spare = new Drawing("spare", Rectangle());
+        var spare = new Drawing("spare", TestPrograms.Rectangle(4, 2));
         spare.Source.Path = @"C:\drawings\spare.dxf";
         spare.Source.Offset = new Vector(-0.25, 0.5);
         spare.Quantity.Required = 5;
@@ -367,17 +367,6 @@ public class PlateExportTests
             nest.Plates.Add(plate);
         }
         return nest;
-    }
-
-    private static Program Rectangle()
-    {
-        var program = new Program();
-        program.Codes.Add(new RapidMove(0, 0));
-        program.Codes.Add(new LinearMove(4, 0));
-        program.Codes.Add(new LinearMove(4, 2));
-        program.Codes.Add(new LinearMove(0, 2));
-        program.Codes.Add(new LinearMove(0, 0));
-        return program;
     }
 
     private static string[] ExpectedLines(Plate plate) => plate.Parts.Select(part =>

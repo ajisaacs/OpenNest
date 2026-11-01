@@ -267,10 +267,10 @@ public class NestReportExportTests
     private static Nest CreateJob(string name)
     {
         var nest = new Nest(name) { Units = Units.Inches };
-        var drawing = new Drawing("rect", Rectangle());
+        var drawing = new Drawing("rect", TestPrograms.Rectangle(4, 2));
         drawing.Quantity.Required = 2;
         nest.Drawings.Add(drawing);
-        nest.Drawings.Add(new Drawing("spare", Rectangle()));
+        nest.Drawings.Add(new Drawing("spare", TestPrograms.Rectangle(4, 2)));
         var first = new Plate(24, 48) { Quantity = 1 };
         first.Parts.Add(new Part(drawing, new Vector(2, 2)));
         var second = new Plate(24, 48) { Quantity = 2 };
@@ -278,17 +278,6 @@ public class NestReportExportTests
         nest.Plates.Add(first);
         nest.Plates.Add(second);
         return nest;
-    }
-
-    private static Program Rectangle()
-    {
-        var program = new Program();
-        program.Codes.Add(new RapidMove(0, 0));
-        program.Codes.Add(new LinearMove(4, 0));
-        program.Codes.Add(new LinearMove(4, 2));
-        program.Codes.Add(new LinearMove(0, 2));
-        program.Codes.Add(new LinearMove(0, 0));
-        return program;
     }
 
     private static ToolStripMenuItem Menu(MainForm host, string name) =>

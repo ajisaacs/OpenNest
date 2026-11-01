@@ -19,7 +19,8 @@ public class CutOffSegmentLabelTests
         view.Matrix = new Matrix();
         view.Plate.Size = new OpenNest.Geometry.Size(100, 100);
         view.Plate.Quadrant = 1;
-        view.Plate.Parts.Add(new Part(new Drawing("Block", Square(20)), new Vector(40, 40)));
+        view.Plate.Parts.Add(new Part(
+            new Drawing("Block", TestPrograms.Square(20)), new Vector(40, 40)));
         view.Plate.CutOffs.Add(new CutOff(new Vector(50, 0), CutOffAxis.Vertical));
         view.Plate.RegenerateCutOffs(new CutOffSettings());
 
@@ -50,7 +51,8 @@ public class CutOffSegmentLabelTests
         view.Matrix = new Matrix(1, 0, 0, -1, 0, 0);
         view.Plate.Size = new OpenNest.Geometry.Size(100, 100);
         view.Plate.Quadrant = 4;
-        view.Plate.Parts.Add(new Part(new Drawing("Block", Square(20)), new Vector(40, -60)));
+        view.Plate.Parts.Add(new Part(
+            new Drawing("Block", TestPrograms.Square(20)), new Vector(40, -60)));
         view.Plate.CutOffs.Add(new CutOff(new Vector(50, 0), CutOffAxis.Vertical));
         view.Plate.RegenerateCutOffs(new CutOffSettings());
 
@@ -94,16 +96,5 @@ public class CutOffSegmentLabelTests
             }
         }
         return count;
-    }
-
-    private static OpenNest.CNC.Program Square(double size)
-    {
-        var program = new OpenNest.CNC.Program();
-        program.MoveTo(0, 0);
-        program.LineTo(size, 0);
-        program.LineTo(size, size);
-        program.LineTo(0, size);
-        program.LineTo(0, 0);
-        return program;
     }
 }

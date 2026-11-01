@@ -7,17 +7,6 @@ namespace OpenNest.WinForms.Tests.Controls;
 
 public class ShapePreviewConcurrencyTests
 {
-    private static Program Square(double size)
-    {
-        var program = new Program();
-        program.Codes.Add(new RapidMove(0, 0));
-        program.Codes.Add(new LinearMove(size, 0));
-        program.Codes.Add(new LinearMove(size, size));
-        program.Codes.Add(new LinearMove(0, size));
-        program.Codes.Add(new LinearMove(0, 0));
-        return program;
-    }
-
     // Parallel test collections paint previews on separate STA threads at once.
     // GDI+ objects are not thread-safe, so any pen, brush or font shared between
     // views fails with "Object is currently in use elsewhere".
@@ -38,7 +27,7 @@ public class ShapePreviewConcurrencyTests
                 {
                     Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
                     using var preview = new ShapePreviewControl { Size = new Size(200, 200) };
-                    preview.ShowDrawing(new Drawing("square", Square(10)));
+                    preview.ShowDrawing(new Drawing("square", TestPrograms.Square(10)));
                     preview.SetInfo("10 x 10", "1 part");
                     using var bitmap = new Bitmap(200, 200);
 
