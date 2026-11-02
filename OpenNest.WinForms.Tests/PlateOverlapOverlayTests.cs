@@ -293,6 +293,88 @@ public class PlateOverlapOverlayTests
     });
 
     [Fact]
+    public void LabelReportsPartSpacingAndRechecksWhenItChanges() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.View.Plate.PartSpacing = 0.25;
+        run.View.Plate.Parts.Add(Rectangle(5.1));
+        run.Finish();
+        Assert.Equal("Overlaps: 1 pairs; part spacing: 1 pairs too close", run.View.OverlapOverlay.Message);
+        Assert.Equal(run.View.OverlapOverlay.Message, run.View.Status);
+
+        run.View.Plate.PartSpacing = 0.05;
+        run.Paint();
+        Assert.Equal(OverlapCheckStatus.Stale, run.View.OverlapStatus);
+        run.Finish();
+        Assert.Equal("Overlaps: 1 pairs", run.View.OverlapOverlay.Message);
+    });
+
+    [Theory]
+    [InlineData(OverlapDisplayMode.Areas, true)]
+    [InlineData(OverlapDisplayMode.Centroids, true)]
+    [InlineData(OverlapDisplayMode.Both, true)]
+    [InlineData(OverlapDisplayMode.Off, false)]
+    public void SpacingRingDrawsAndHoversInEveryVisibleMode(OverlapDisplayMode mode, bool visible) => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.View.Plate.Parts.Clear();
+        run.View.Plate.PartSpacing = 0.25;
+        run.View.Plate.Parts.Add(Rectangle());
+        run.View.Plate.Parts.Add(Rectangle(4.1));
+        run.Finish();
+        run.View.OverlapDisplay = mode;
+        run.View.ZoomToPoint(new Vector(), 20);
+        run.View.SetOrigin(60, 220);
+        using var image = new Bitmap(300, 300);
+        using var graphics = Graphics.FromImage(image);
+        graphics.Clear(Color.White);
+        graphics.TranslateTransform(60, 220);
+        run.View.OverlapOverlay.Draw(graphics);
+
+        var pair = Assert.Single(run.View.OverlapReport.SpacingPairs);
+        var center = run.View.PointWorldToControl(pair.Marker);
+        var radius = (int)OverlapPairPresentation.MarkerHalfSize(run.View.DeviceDpi);
+        Assert.Equal(visible, image.GetPixel(center.X - radius, center.Y).ToArgb() != Color.White.ToArgb());
+        run.View.MoveTo(center);
+        if (visible)
+            Assert.Contains("Part spacing 1/2", run.View.OverlapOverlay.HoverText);
+        else
+            Assert.Null(run.View.OverlapOverlay.HoverText);
+    });
+
+    [Fact]
+    public void ClearPlateDrawsAGreenCheckInsteadOfTheLabelButStatusKeepsTheWords() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.View.Plate.Parts.RemoveAt(1);
+        run.Finish();
+        Assert.True(run.View.OverlapOverlay.ShowsAllClear);
+        Assert.Equal("No material overlaps detected", run.View.Status);
+        Assert.True(CheckIsDrawn(run));
+
+        run.View.Plate.Parts.Add(Rectangle(1));
+        run.Finish();
+        Assert.False(run.View.OverlapOverlay.ShowsAllClear);
+        Assert.False(CheckIsDrawn(run));
+    });
+
+    private static bool CheckIsDrawn(OverlayRun run)
+    {
+        using var image = new Bitmap(64, 64);
+        using var graphics = Graphics.FromImage(image);
+        graphics.Clear(Color.White);
+        run.View.OverlapOverlay.Draw(graphics);
+        for (var x = 0; x < 64; x++)
+            for (var y = 0; y < 64; y++)
+            {
+                var pixel = image.GetPixel(x, y);
+                if (pixel.G > pixel.R + 60 && pixel.G > pixel.B + 40)
+                    return true;
+            }
+        return false;
+    }
+
+    [Fact]
     public void SnapshotKeepsOriginalLabelsWhenLiveNamesChange() => RunSta(() =>
     {
         using var run = new OverlayRun();

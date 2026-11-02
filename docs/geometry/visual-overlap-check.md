@@ -29,12 +29,27 @@ Small positive areas use significant-figure formatting rather than rounding to
 zero. Selection and dragging remain ordinary plate operations, not overlay
 interactions.
 
-A persistent label distinguishes unchecked, checking, current, incomplete, stale,
+A current, fully checked report with no finding of any kind draws a green check in
+the corner instead of words; the status bar still uses the wording below. Every
+other state keeps a persistent label, which distinguishes unchecked, checking,
+current with findings, incomplete, stale,
 canceled, and failed checks. Only a completed, current, fully checked report can
 say **No material overlaps detected**. An incomplete check retains known overlaps
 and states how many distinct parts could not be checked. Pair counts are not
-fragment counts. This diagnostic checks shared material, not minimum spacing,
-plate edges, or cutting-path crossings.
+fragment counts. This diagnostic checks shared material, not plate edges or
+cutting-path crossings.
+
+The label also reports minimum spacing. When the plate's part spacing is above zero,
+pairs that share no material but sit closer than it are counted, as in
+**Overlaps: 1 pairs; part spacing: 3 pairs too close**, and a clear result reads
+**No material overlaps or part spacing violations detected**. These are the same
+pairs the [pre-post check](../post-verification.md) warns about, found by the same
+`PartSpacingReview` scan on the request's snapshot. Each pair gets an orange ring at
+the narrowest point of its gap, labeled like `1/3 gap 0.1`, in every display mode
+except Off: a gap has no shared area to shade, so Areas shows it too. Hover near a
+ring for captured names, the gap and marker coordinates. Rings follow the same
+retention as overlap highlights: only pairs involving changed parts disappear before
+the recheck. Changing the plate's part spacing clears them and reruns the check.
 
 In a nest window the active plate is checked automatically. Any layout edit
 (add, remove, reorder, move, rotate, fill) invalidates the full report and shows
@@ -210,8 +225,11 @@ at zero. Curved-outline centroids inherit the polygonization approximation.
 
 Full containment and coincident parts are detected without relying on crossing
 points. Edge/corner contact with no positive shared material is not overlap.
-There are no spacing offsets, plate-edge checks, cut-path crossing checks, automatic
-repairs, export blocks, or machining-validity guarantees.
+Overlap regions use no spacing offsets; `report.SpacingPairs` is a separate result
+that only a `CapturePlate` snapshot produces (`report.SpacingChecked`), and its
+unreadable inputs are in `report.SpacingIssues`. There are no plate-edge checks,
+cut-path crossing checks, automatic repairs, export blocks, or machining-validity
+guarantees.
 
 Arc/circle flattening uses a chord tolerance of `0.001` model units (also exposed
 as `report.ChordTolerance`). Curved overlaps and topology are therefore polygonal
@@ -228,7 +246,7 @@ resolution.
 
 `OverlapReportState` and `OverlapGeometryStamp` in Core hold the testable request
 policy. The stamp compares ordered part identities, exact pose scalars, drawing
-and program references, cutoff status, and plate identity. It is not a geometry
+and program references, cutoff status, part spacing, and plate identity. It is not a geometry
 hash: any new editor that mutates a clean program in place must call
 `PlateView.InvalidateOverlapCheck()` before loading/mutation. Current live clean
 program editing goes through `EditNestForm.EditDrawingsInConverter_Click`;
@@ -290,6 +308,7 @@ and triple coverage does not darken. World-to-graph conversion excludes pan,
 because PlateView already applies origin translation. Paths are rebuilt for
 displayed-pair/scale changes, not ordinary repaints or panning. The state label
 saves/restores graphics state.
+Spacing rings draw with the cut-off contact marks and have no `GraphicsPath`.
 Marker hit tests use only cached report coordinates and DPI-scaled screen
 radii. Hover clears on edits, mode/request/view changes, leave, and teardown.
 Diagnostic details draw above action adorners and take precedence over the normal

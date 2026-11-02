@@ -26,6 +26,17 @@ public static class OverlapPairPresentation
             + $"Marker: ({Number(pair.Marker.X, provider)}, {Number(pair.Marker.Y, provider)}) {units}";
     }
 
+    public static string Label(PlateSpacingPair pair, IFormatProvider provider = null) =>
+        $"{pair.PartAId + 1}/{pair.PartBId + 1} gap {Number(pair.Gap, provider)}";
+
+    public static string Details(PlateSpacingPair pair, Units capturedUnits, IFormatProvider provider = null)
+    {
+        var units = UnitsHelper.GetShortString(capturedUnits);
+        return $"Part spacing {pair.PartAId + 1}/{pair.PartBId + 1}: {pair.PartAName} / {pair.PartBName}\n"
+            + $"Gap ≈ {Number(pair.Gap, provider)} {units}\n"
+            + $"Marker: ({Number(pair.Marker.X, provider)}, {Number(pair.Marker.Y, provider)}) {units}";
+    }
+
     // Significant figures adapt to scale: a positive sliver must never read as zero.
     public static string Number(double value, IFormatProvider provider = null) =>
         value.ToString("G6", provider ?? CultureInfo.CurrentCulture);
@@ -39,15 +50,21 @@ public static class OverlapPairPresentation
     /// Coincident or nearby markers return every matching pair in stable ID order.
     /// </summary>
     public static IReadOnlyList<PlateOverlapPair> HitTest(IEnumerable<PlateOverlapPair> pairs,
-        Func<Vector, Vector> worldToScreen, Vector pointer, int deviceDpi)
+        Func<Vector, Vector> worldToScreen, Vector pointer, int deviceDpi) =>
+        pairs.Where(pair => Hits(worldToScreen(pair.Marker), pointer, deviceDpi))
+            .OrderBy(pair => pair.PartAId).ThenBy(pair => pair.PartBId).ToArray();
+
+    /// <inheritdoc cref="HitTest(IEnumerable{PlateOverlapPair}, Func{Vector, Vector}, Vector, int)"/>
+    public static IReadOnlyList<PlateSpacingPair> HitTest(IEnumerable<PlateSpacingPair> pairs,
+        Func<Vector, Vector> worldToScreen, Vector pointer, int deviceDpi) =>
+        pairs.Where(pair => Hits(worldToScreen(pair.Marker), pointer, deviceDpi))
+            .OrderBy(pair => pair.PartAId).ThenBy(pair => pair.PartBId).ToArray();
+
+    private static bool Hits(Vector center, Vector pointer, int deviceDpi)
     {
         var radius = HitRadius(deviceDpi);
-        return pairs.Where(pair =>
-        {
-            var center = worldToScreen(pair.Marker);
-            var dx = pointer.X - center.X;
-            var dy = pointer.Y - center.Y;
-            return dx * dx + dy * dy <= radius * radius;
-        }).OrderBy(pair => pair.PartAId).ThenBy(pair => pair.PartBId).ToArray();
+        var dx = pointer.X - center.X;
+        var dy = pointer.Y - center.Y;
+        return dx * dx + dy * dy <= radius * radius;
     }
 }

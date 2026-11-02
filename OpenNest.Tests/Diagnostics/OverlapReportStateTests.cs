@@ -122,7 +122,6 @@ public class OverlapReportStateTests
         state.DisplayMode = OverlapDisplayMode.Off;
         plate.Parts[0].BaseDrawing.Name = "renamed";
         plate.Quantity = 2;
-        plate.PartSpacing = 123;
         Assert.True(state.EnsureFresh(plate));
         Assert.Same(report, state.Report);
         Assert.Equal(request, state.Generation);

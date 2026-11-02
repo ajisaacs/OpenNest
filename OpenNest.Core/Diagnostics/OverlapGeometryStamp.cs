@@ -17,11 +17,13 @@ public sealed class OverlapGeometryStamp
     private readonly (CutOff Definition, CutOffAxis Axis, long X, long Y, long? Start, long? End,
         IReadOnlyList<CutOffGap> Gaps, long Overcut)[] cutoffs;
     private readonly (long Width, long Length, int Quadrant) sheet;
+    private readonly long partSpacing;
 
     private OverlapGeometryStamp(Plate plate)
     {
         this.plate = plate;
         sheet = SheetState(plate);
+        partSpacing = Bits(plate.PartSpacing);
         entries = new Entry[plate.Parts.Count];
         for (var i = 0; i < entries.Length; i++)
             entries[i] = new Entry(plate.Parts[i]);
@@ -77,9 +79,13 @@ public sealed class OverlapGeometryStamp
         return true;
     }
 
+    internal bool SameSpacing(Plate current) =>
+        ReferenceEquals(plate, current) && partSpacing == Bits(current.PartSpacing);
+
     public bool Matches(Plate current)
     {
-        if (current.Parts.Count != entries.Length || !SameZones(current) || !SameCutOffs(current))
+        if (current.Parts.Count != entries.Length || partSpacing != Bits(current.PartSpacing)
+            || !SameZones(current) || !SameCutOffs(current))
             return false;
         for (var i = 0; i < entries.Length; i++)
             if (!entries[i].Matches(current.Parts[i]))

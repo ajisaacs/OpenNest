@@ -85,6 +85,24 @@ namespace OpenNest.Geometry
             return new SpacingOutline(perimeter, region.Holes);
         }
 
+        /// <summary>This outline, built at the origin, moved to <paramref name="location"/>: what
+        /// <see cref="Build"/> returns there, without repeating the offset for identical parts.</summary>
+        public SpacingOutline MovedTo(Vector location)
+        {
+            var perimeter = (Polygon)Perimeter.Clone();
+            ToWorld(perimeter, location);
+            var holes = new List<Polygon>(Holes.Count);
+
+            foreach (var hole in Holes)
+            {
+                var moved = (Polygon)hole.Clone();
+                ToWorld(moved, location);
+                holes.Add(moved);
+            }
+
+            return new SpacingOutline(perimeter, holes);
+        }
+
         /// <summary>True when the two outlines share material (holes subtracted).</summary>
         public bool Overlaps(SpacingOutline other)
         {

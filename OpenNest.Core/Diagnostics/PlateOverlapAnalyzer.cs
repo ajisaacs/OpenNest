@@ -18,7 +18,7 @@ public static class PlateOverlapAnalyzer
     public const double ChordTolerance = 0.001;
 
     /// <summary>
-    /// Capture a whole plate including active clamps and nominal cut-off definitions.
+    /// Capture a whole plate including active clamps, nominal cut-off definitions and part spacing.
     /// Use this entry for the desktop overlap check so manual cut-off contacts
     /// cannot be mistaken for a clear plate merely because cut-offs are not material.
     /// Clamp zones are mapped from the sheet's lower-left frame into the parts' signed
@@ -33,7 +33,7 @@ public static class PlateOverlapAnalyzer
         var cutoffs = ClampCutDiagnostics.Find(plate);
         cancellationToken.ThrowIfCancellationRequested();
         return new PlateOverlapSnapshot(material.Parts.ToList(), material.Issues.ToList(),
-            material.Clamps.ToList(), cutoffs.ToList());
+            material.Clamps.ToList(), cutoffs.ToList(), plate.PartSpacing);
     }
 
     /// <summary>
@@ -223,11 +223,16 @@ public static class PlateOverlapAnalyzer
         }
         cancellationToken.ThrowIfCancellationRequested();
         var clampFindings = FindClampOverlaps(prepared, snapshot, issues, cancellationToken);
+        var spacingPairs = new List<PlateSpacingPair>();
+        var spacingIssues = new List<PlateOverlapIssue>();
+        PartSpacingReview.Add(snapshot, pairs, issues, spacingPairs, spacingIssues, cancellationToken);
         return new PlateOverlapReport(pairs.OrderBy(pair => pair.PartAId)
             .ThenBy(pair => pair.PartBId).ToList(), issues.OrderBy(issue => issue.PartAId)
             .ThenBy(issue => issue.PartBId).ToList(), snapshot, clampFindings
             .OrderBy(pair => pair.PartAId).ThenBy(pair => pair.PartBId).ToList(),
-            snapshot.CutOffClampFindings.ToList());
+            snapshot.CutOffClampFindings.ToList(), spacingPairs.OrderBy(pair => pair.PartAId)
+            .ThenBy(pair => pair.PartBId).ToList(), spacingIssues.OrderBy(issue => issue.PartAId)
+            .ThenBy(issue => issue.PartBId).ToList());
     }
 
     /// <summary>

@@ -9,13 +9,16 @@ public sealed class PlateOverlapReport
 {
     internal PlateOverlapReport(List<PlateOverlapPair> pairs, List<PlateOverlapIssue> issues,
         PlateOverlapSnapshot snapshot, List<PlateOverlapPair> clampFindings = null,
-        List<CutOffClampFinding> cutOffClampFindings = null)
+        List<CutOffClampFinding> cutOffClampFindings = null, List<PlateSpacingPair> spacingPairs = null,
+        List<PlateOverlapIssue> spacingIssues = null)
     {
         Pairs = pairs.AsReadOnly();
         Issues = issues.AsReadOnly();
         Snapshot = snapshot;
         ClampFindings = (clampFindings ?? new List<PlateOverlapPair>()).AsReadOnly();
         CutOffClampFindings = (cutOffClampFindings ?? new List<CutOffClampFinding>()).AsReadOnly();
+        SpacingPairs = (spacingPairs ?? new List<PlateSpacingPair>()).AsReadOnly();
+        SpacingIssues = (spacingIssues ?? new List<PlateOverlapIssue>()).AsReadOnly();
     }
 
     /// <summary>The owned input this report was computed from; the baseline for incremental rechecks.</summary>
@@ -33,7 +36,22 @@ public sealed class PlateOverlapReport
     /// <summary>Nominal cut-off/clamp contacts. Lines have no material area or part pair.</summary>
     public IReadOnlyList<CutOffClampFinding> CutOffClampFindings { get; }
 
-    public bool IsComplete => Issues.Count == 0;
+    /// <summary>
+    /// Pairs that share no material but sit closer than the plate's part spacing. Only a plate
+    /// capture carries the spacing; see <see cref="SpacingChecked"/>.
+    /// </summary>
+    public IReadOnlyList<PlateSpacingPair> SpacingPairs { get; }
+
+    /// <summary>
+    /// Parts or pairs the spacing scan could not read. Kept apart from <see cref="Issues"/>,
+    /// which incremental rechecks reuse by overlap pair.
+    /// </summary>
+    public IReadOnlyList<PlateOverlapIssue> SpacingIssues { get; }
+
+    /// <summary>True when the input required a gap, so empty SpacingPairs means something.</summary>
+    public bool SpacingChecked => PartSpacingReview.Enforces(Snapshot.PartSpacing);
+
+    public bool IsComplete => Issues.Count == 0 && SpacingIssues.Count == 0;
     public double ChordTolerance => PlateOverlapAnalyzer.ChordTolerance;
 }
 
@@ -104,6 +122,13 @@ public sealed class PlateOverlapPair
 }
 
 /// <summary>
+/// Two parts closer than the plate's part spacing, ordered by zero-based input index.
+/// <see cref="Marker"/> is the middle of the narrowest gap, in world coordinates.
+/// </summary>
+public sealed record PlateSpacingPair(int PartAId, int PartBId, string PartAName, string PartBName,
+    double Gap, Vector Marker);
+
+/// <summary>
 /// One connected island of shared material in world coordinates, after hole subtraction:
 /// a counterclockwise outline and its clockwise holes.
 /// </summary>
@@ -144,12 +169,14 @@ public sealed record PlateOverlapIssue(int PartAId, int? PartBId, string Message
 public sealed class PlateOverlapSnapshot
 {
     internal PlateOverlapSnapshot(List<CapturedOverlapPart> parts, List<PlateOverlapIssue> issues,
-        List<CapturedClamp> clamps = null, List<CutOffClampFinding> cutOffClampFindings = null)
+        List<CapturedClamp> clamps = null, List<CutOffClampFinding> cutOffClampFindings = null,
+        double partSpacing = 0)
     {
         Parts = parts.AsReadOnly();
         Issues = issues.AsReadOnly();
         Clamps = (clamps ?? new List<CapturedClamp>()).AsReadOnly();
         CutOffClampFindings = (cutOffClampFindings ?? new List<CutOffClampFinding>()).AsReadOnly();
+        PartSpacing = partSpacing;
     }
 
     internal IReadOnlyList<CapturedOverlapPart> Parts { get; }
@@ -158,6 +185,9 @@ public sealed class PlateOverlapSnapshot
     /// <summary>Owned clamp keep-out rectangles in plate coordinates, capture order.</summary>
     internal IReadOnlyList<CapturedClamp> Clamps { get; }
     internal IReadOnlyList<CutOffClampFinding> CutOffClampFindings { get; }
+
+    /// <summary>The plate's part spacing; zero (no spacing check) for a bare group of parts.</summary>
+    internal double PartSpacing { get; }
 }
 
 internal sealed record CapturedOverlapPart(int Id, string Name, OverlapSource Source,

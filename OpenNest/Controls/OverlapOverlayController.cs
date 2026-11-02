@@ -38,6 +38,7 @@ internal sealed class OverlapOverlayController : IDisposable
     private Units capturedUnits;
     private Plate observedPlate;
     private IReadOnlyList<PlateOverlapPair> hoveredPairs = Array.Empty<PlateOverlapPair>();
+    private IReadOnlyList<PlateSpacingPair> hoveredSpacing = Array.Empty<PlateSpacingPair>();
     private string hoverText;
     private OverlapHoverPages hoverPages;
     private Point hoverPoint;
@@ -78,6 +79,9 @@ internal sealed class OverlapOverlayController : IDisposable
     public string Message => autoCheck.IsWaiting
         ? "Overlaps: check pending…"
         : state.Message;
+
+    /// <summary>The canvas shows a green check instead of the label: a pending recheck is not clear.</summary>
+    internal bool ShowsAllClear => state.IsAllClear && !autoCheck.IsWaiting;
 
     /// <summary>
     /// Recheck automatically after layout edits settle. Units are read when each request
@@ -381,7 +385,10 @@ internal sealed class OverlapOverlayController : IDisposable
                 DrawCentroids(graphics);
         }
         if (state.DisplayMode != OverlapDisplayMode.Off)
+        {
             DrawCutOffClampContacts(graphics);
+            DrawSpacingMarkers(graphics);
+        }
         DrawStateLabel(graphics);
     }
 
@@ -422,7 +429,7 @@ internal sealed class OverlapOverlayController : IDisposable
     public void UpdateHover(Point point)
     {
         ValidateHoverTransform();
-        if (!EnsureFresh() || !ShowsCentroids || state.Report == null)
+        if (!EnsureFresh() || state.DisplayMode == OverlapDisplayMode.Off || state.Report == null)
         {
             ClearHover();
             return;
@@ -430,22 +437,30 @@ internal sealed class OverlapOverlayController : IDisposable
 
         // Graph coordinates are already screen-scaled; remove pan from the pointer once.
         var graphPoint = view.PointControlToGraph(point);
-        var hits = OverlapPairPresentation.HitTest(state.DisplayPairs, world =>
+        var pointer = new Vector(graphPoint.X, graphPoint.Y);
+        Vector ToGraph(Vector world)
         {
             var graph = view.PointWorldToGraph(world);
             return new Vector(graph.X, graph.Y);
-        }, new Vector(graphPoint.X, graphPoint.Y), view.DeviceDpi);
-        var changed = !hits.SequenceEqual(hoveredPairs);
+        }
+        // Overlap markers exist only in these modes; spacing markers in every visible one.
+        var hits = ShowsCentroids
+            ? OverlapPairPresentation.HitTest(state.DisplayPairs, ToGraph, pointer, view.DeviceDpi)
+            : Array.Empty<PlateOverlapPair>();
+        var spacingHits = OverlapPairPresentation.HitTest(state.DisplaySpacingPairs, ToGraph, pointer, view.DeviceDpi);
+        var changed = !hits.SequenceEqual(hoveredPairs) || !spacingHits.SequenceEqual(hoveredSpacing);
         var moved = point != hoverPoint;
         hoveredPairs = hits;
+        hoveredSpacing = spacingHits;
         hoverPoint = point;
         hoverTransform = ViewTransform;
         if (changed)
         {
             hoverPages = null;
             HoverBounds = RectangleF.Empty;
-            hoverText = hits.Count == 0 ? null : string.Join("\n\n",
-                hits.Select(pair => OverlapPairPresentation.Details(pair, capturedUnits)));
+            hoverText = hits.Count + spacingHits.Count == 0 ? null : string.Join("\n\n",
+                hits.Select(pair => OverlapPairPresentation.Details(pair, capturedUnits))
+                    .Concat(spacingHits.Select(pair => OverlapPairPresentation.Details(pair, capturedUnits))));
         }
         if (changed || (moved && hoverText != null))
             view.Invalidate();
@@ -464,6 +479,7 @@ internal sealed class OverlapOverlayController : IDisposable
         hoverPages = null;
         HoverBounds = RectangleF.Empty;
         hoveredPairs = Array.Empty<PlateOverlapPair>();
+        hoveredSpacing = Array.Empty<PlateSpacingPair>();
         if (visible && !disposed && !view.IsDisposed && !view.Disposing)
             view.Invalidate();
     }
@@ -527,7 +543,7 @@ internal sealed class OverlapOverlayController : IDisposable
             using var format = (StringFormat)StringFormat.GenericTypographic.Clone();
             format.FormatFlags |= StringFormatFlags.NoWrap | StringFormatFlags.MeasureTrailingSpaces;
             float Measure(string line) => graphics.MeasureString(line, view.Font, PointF.Empty, format).Width;
-            hoverPages ??= OverlapHoverPages.Create(text, hoveredPairs.Count, maxRows, maxWidth, line => Measure(line));
+            hoverPages ??= OverlapHoverPages.Create(text, hoveredPairs.Count + hoveredSpacing.Count, maxRows, maxWidth, line => Measure(line));
             if (hoverPages.NeedsLargerViewport)
             {
                 // A viewport smaller than a content line plus its paging hint cannot
@@ -637,12 +653,70 @@ internal sealed class OverlapOverlayController : IDisposable
         }
     }
 
+    // A gap has no shared area to shade, so every visible mode marks it: an orange ring at the
+    // narrowest point, apart from the red overlap crosshairs. Labels on one point stack.
+    private void DrawSpacingMarkers(Graphics graphics)
+    {
+        var dpiScale = view.DeviceDpi / 96f;
+        var radius = (float)OverlapPairPresentation.MarkerHalfSize(view.DeviceDpi);
+        var color = Color.FromArgb(200, 90, 0);
+        using var halo = new Pen(Color.White, 4 * dpiScale);
+        using var ring = new Pen(color, 2 * dpiScale);
+        using var text = new SolidBrush(color);
+        var labelRows = new Dictionary<PointF, int>();
+        foreach (var pair in state.DisplaySpacingPairs)
+        {
+            var center = view.PointWorldToGraph(pair.Marker);
+            if (!float.IsFinite(center.X) || !float.IsFinite(center.Y))
+                continue;
+            foreach (var pen in new[] { halo, ring })
+                graphics.DrawEllipse(pen, center.X - radius, center.Y - radius, radius * 2, radius * 2);
+            var label = OverlapPairPresentation.Label(pair);
+            var size = graphics.MeasureString(label, view.Font);
+            labelRows.TryGetValue(center, out var row);
+            labelRows[center] = row + 1;
+            var x = center.X + radius + 3 * dpiScale;
+            var y = center.Y - radius + row * size.Height;
+            graphics.FillRectangle(Brushes.White, x, y, size.Width, size.Height);
+            graphics.DrawString(label, view.Font, text, x, y);
+        }
+    }
+
+    // Same corner as the label; Message keeps the words for the status bar.
+    private void DrawAllClear(Graphics graphics)
+    {
+        var scale = view.DeviceDpi / 96f;
+        var box = 24 * scale;
+        using var background = new SolidBrush(Color.FromArgb(235, Color.White));
+        graphics.FillRectangle(background, 6, 6, box, box);
+        using var pen = new Pen(Color.FromArgb(0, 140, 60), 3 * scale)
+        {
+            StartCap = LineCap.Round,
+            EndCap = LineCap.Round,
+            LineJoin = LineJoin.Round,
+        };
+        var smoothing = graphics.SmoothingMode;
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        graphics.DrawLines(pen, new[]
+        {
+            new PointF(6 + 5 * scale, 6 + 13 * scale),
+            new PointF(6 + 10 * scale, 6 + 18 * scale),
+            new PointF(6 + 19 * scale, 6 + 7 * scale),
+        });
+        graphics.SmoothingMode = smoothing;
+    }
+
     private void DrawStateLabel(Graphics graphics)
     {
         var saved = graphics.Save();
         try
         {
             graphics.ResetTransform();
+            if (ShowsAllClear)
+            {
+                DrawAllClear(graphics);
+                return;
+            }
             var text = Message + (state.DisplayMode == OverlapDisplayMode.Off ? " (display off)" : "");
             var size = graphics.MeasureString(text, view.Font);
             using var background = new SolidBrush(Color.FromArgb(235, Color.White));
