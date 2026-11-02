@@ -134,6 +134,11 @@ drawing to fill and that leaves demand unmet, the job also fills the sheet as if
 absent, drops the parts on them, and keeps whichever layout the strategy ranks better (a tie
 keeps the clamp-free layout).
 
+Fill's rectangle best-fit phase compares a two-block layout with a spiral: four blocks turning
+around a center, with the center filled again. The spiral starts from the rows and columns with
+the least waste; those often overlap themselves, so it also tries every other combination of
+four non-empty blocks and uses one only if it holds more parts than both.
+
 Interactive/full-area box packing uses the same 90% work-area slack allowance as Rectangles.
 A free box may absorb a slightly oversized side only at its right/top edge when that edge
 coincides with the plate work-area boundary. Internal leftover edges keep the strict packing

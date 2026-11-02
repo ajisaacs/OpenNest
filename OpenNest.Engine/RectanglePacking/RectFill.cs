@@ -6,8 +6,12 @@ namespace OpenNest.Engine.RectanglePacking
     {
         public static void FillBest(Bin bin, Item item, int maxCount = int.MaxValue)
         {
+            // Best fit runs first because a spiral other than the least-waste one must beat it.
+            var bestFitBin = bin.Clone() as Bin;
+            new FillBestFit(bestFitBin).Fill(item.Clone() as Item, maxCount);
+
             var spiralBin = bin.Clone() as Bin;
-            var spiral = new FillSpiral(spiralBin);
+            var spiral = new FillSpiral(spiralBin) { AlternativeMustExceed = bestFitBin.Items.Count };
             spiral.Fill(item, maxCount);
 
             // Recursively fill the center remnant of the spiral
@@ -23,9 +27,6 @@ namespace OpenNest.Engine.RectanglePacking
                     FillBest(center.Location, center.Size, spiralBin, item, remaining);
                 }
             }
-
-            var bestFitBin = bin.Clone() as Bin;
-            new FillBestFit(bestFitBin).Fill(item, maxCount);
 
             var winner = spiralBin.Items.Count >= bestFitBin.Items.Count ? spiralBin : bestFitBin;
             bin.Items.AddRange(winner.Items);
