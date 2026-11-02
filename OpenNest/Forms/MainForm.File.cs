@@ -135,10 +135,6 @@ namespace OpenNest.Forms
             mnuFile.DropDown.ShowItemToolTips = true;
             mnuFileDrawingLibrary.Enabled = databaseMode;
             mnuFileDrawingLibrary.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
-            mnuFileDrawingLibraryGrid.Enabled = databaseMode;
-            mnuFileDrawingLibraryGrid.ToolTipText = databaseMode
-                ? "Shows library drawings side by side; Check All Pages finds drawings that fail or freeze a preview."
-                : NestStorage.DatabaseModeOnly;
             mnuFileDrawingSets.Enabled = databaseMode;
             mnuFileDrawingSets.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
             mnuFileReleases.Enabled = databaseMode;
@@ -153,24 +149,6 @@ namespace OpenNest.Forms
         /// settings; needs no open nest. Drawings are added to sets or released from it, never to a nest.
         /// </summary>
         private void FileDrawingLibrary_Click(object sender, EventArgs e) => ShowDrawingSets(releases: false, libraryTab: true);
-
-        /// <summary>Opens the Drawing Library Grid, a window of its own like Drawing Sets.</summary>
-        private void FileDrawingLibraryGrid_Click(object sender, EventArgs e)
-        {
-            if (!NestStorage.Settings.IsDatabaseMode)
-                return;
-            IDrawingLibraryStore library;
-            try
-            {
-                library = NestStorage.CreateDrawingLibrary();
-            }
-            catch (ArgumentException ex)
-            {
-                MessageBox.Show(this, ex.Message, "Drawing Library Grid", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-            new DrawingLibraryGridForm(library, NestStorage.Settings.ServerUrl).Show();
-        }
 
         /// <summary>
         /// Browses, edits and releases drawing sets; needs no open nest, since a release

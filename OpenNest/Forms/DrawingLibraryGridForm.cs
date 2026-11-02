@@ -14,7 +14,7 @@ using OpenNest.IO;
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// File &gt; Drawing Library Grid: a page of library drawings drawn side by side. Check All
+    /// A testing tool, on no menu: a page of library drawings drawn side by side. Check All
     /// Pages walks every page, timing each drawing's download, label search and paint, and lists
     /// the drawings that fail, run slow or would freeze a preview. The label search is timed
     /// without the paint's cell budget, on a worker with a time limit, so a shape the budget hides
