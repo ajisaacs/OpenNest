@@ -44,6 +44,21 @@ public sealed class NestJobRecord
 
     public long PackageSize { get; set; }
 
+    /// <summary>
+    /// Bumped by every change a watcher shows (state, cancel request, progress, plan); the
+    /// event stream's ids. Heartbeats leave it alone.
+    /// </summary>
+    public long Revision { get; set; }
+
+    /// <summary>The <see cref="Revision"/> the best plan so far was stored at; zero when there is none.</summary>
+    public long PlanRevision { get; set; }
+
+    /// <summary>
+    /// The worker's latest progress report while the job runs (<c>RemoteNestProgress</c> JSON,
+    /// opaque to the server); empty when there is none.
+    /// </summary>
+    public string Progress { get; set; } = "";
+
     public bool IsFinished => State is NestJobState.Succeeded or NestJobState.Failed or NestJobState.Cancelled;
 }
 
@@ -72,6 +87,35 @@ public sealed class NestJobHeartbeat
     public bool CancelRequested { get; set; }
 }
 
+/// <summary>What a job's event stream (<c>GET /api/nest-jobs/{id}/events</c>) sent.</summary>
+public enum NestJobEventKind
+{
+    /// <summary>The stream is open; nothing has necessarily changed.</summary>
+    Open,
+
+    /// <summary>The job itself: <see cref="NestJobEvent.Job"/>. The last one of a stream is final.</summary>
+    Job,
+
+    /// <summary>A new best plan so far: <see cref="NestJobEvent.Plan"/>, sent before the job event that names it.</summary>
+    Plan,
+
+    /// <summary>The server no longer holds the job.</summary>
+    Gone,
+}
+
+public sealed class NestJobEvent
+{
+    public NestJobEventKind Kind { get; init; }
+
+    /// <summary>The event id: the job's <see cref="NestJobRecord.Revision"/>, or the plan's for a plan.</summary>
+    public long Id { get; init; }
+
+    public NestJobRecord? Job { get; init; }
+
+    /// <summary>The worker's plan (<c>RemoteNestPlan</c> JSON, opaque to the server).</summary>
+    public string Plan { get; init; } = "";
+}
+
 /// <summary>Limits and timings both sides of server nesting share.</summary>
 public static class NestJobRules
 {
@@ -88,6 +132,24 @@ public static class NestJobRules
 
     /// <summary>How often a worker reports; well inside <see cref="Lease"/>.</summary>
     public static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(20);
+
+    /// <summary>Largest progress report a worker may store.</summary>
+    public const long MaxProgressBytes = 64L * 1024;
+
+    /// <summary>Largest best-plan-so-far a worker may store.</summary>
+    public const long MaxPlanBytes = 16L * 1024 * 1024;
+
+    /// <summary>
+    /// How often a worker at most stores progress and plans (only the latest of each is sent),
+    /// and checks for a cancel request between reports.
+    /// </summary>
+    public static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(2);
+
+    /// <summary>How often an idle event stream sends a comment, so a dropped connection shows.</summary>
+    public static readonly TimeSpan StreamKeepAlive = TimeSpan.FromSeconds(15);
+
+    /// <summary>A stream silent this long (several missed keep-alives) is treated as dropped.</summary>
+    public static readonly TimeSpan StreamIdleTimeout = TimeSpan.FromSeconds(45);
 
     /// <summary>Workers that stop responding this many times fail the job instead of retrying it.</summary>
     public const int MaxAttempts = 3;

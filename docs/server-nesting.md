@@ -16,16 +16,29 @@ With the box ticked, `ServerAutoNest`:
 1. Snapshots the request (`RemoteNestSubmission`) and writes its package (`NestJobPackage`).
 2. Submits it. If the server cannot take it (offline, too old, refused), the user may nest on
    this PC instead; declining discards the run.
-3. Polls every two seconds behind the same owned modal progress window a local run uses,
-   showing the queue position or that the job is running. Transient poll failures only
-   show a waiting message; the job keeps running on the server. A live plan strip is not
-   shown yet.
+3. Follows the job (`NestJobWatch`) behind the same owned modal progress window a local run
+   uses: the queue position, then the worker's stage ("On the nest server: …"), and the
+   worker's **Best plan so far** in the same sheet strip a local run fills
+   (`RemoteNestPlanPreview`, below). Updates come from the job's event stream; when it drops,
+   the client polls once and reconnects with the last event id, and a server without the
+   stream is polled every two seconds throughout. Connection trouble only shows a waiting
+   message; the job keeps running on the server.
 4. On success, replays the result here (below) and continues with the usual validation
    report, review, Keep or Discard and commit. A failed job shows its error.
 
 Stop (or closing the progress window) cancels the server job, best effort, and discards the
-proposal, exactly like stopping a local run. The input drawings stay locked by the modal
-progress for the whole wait.
+proposal, exactly like stopping a local run; the worker stops within one report interval
+(two seconds) plus however long the engine takes to notice its cancellation token. The input
+drawings stay locked by the modal progress for the whole wait.
+
+**Finish notice.** When the job ends (succeeded or failed) while no OpenNest window is active
+or the main window is minimized, `ServerNestNotice` shows a notification-area balloon, which
+Windows 10 and 11 display as a notification. Clicking it (or the tray icon) restores OpenNest
+and activates its topmost window: the check of the result, then the review. The icon goes
+away once OpenNest is in front again, however the user returns. A real toast would need an
+AppUserModelID registered on a Start menu shortcut, which the Velopack install (see
+[desktop auto-update](auto-update.md)) does not promise, so no packaging change is needed.
+Nothing is kept without the review's explicit **Keep**.
 
 ## What travels
 
@@ -46,6 +59,15 @@ progress for the whole wait.
 in order, as what was asked (part and stock ids with quantities) and the raw `NestJobResult`
 returned. Poses keep their IEEE values, nonfinite ones included. No bound plates or
 validation travel back.
+
+**Live progress** travels separately while the job runs, both as versioned JSON the server
+never opens: `RemoteNestProgress` (the stage of the solve in progress: `NestJobStage`, stock,
+plate index and committed counts) and `RemoteNestPlan` (the engine's best plan so far, as the
+raw placements of `NestJobStage.PlanImproved`). The desktop rebuilds the request's job from
+its own drawings (the same part ids the worker solved) and draws the plan on detached
+drawings, exactly as a local run's `PlanSheets`; a bundled cutout trial's frame proxies are
+bundled once on the desktop the first time a plan names one. Like a local plan it is
+unvalidated and never kept.
 
 ## Replay on the desktop
 
@@ -73,10 +95,14 @@ nor `OpenNest.IO`.
 | `POST /api/nest-jobs` | desktop | multipart `metadata` (`NestJobSubmission`) and `file` (package, at most 256 MB); returns the queued job |
 | `GET /api/nest-jobs/{id}` | desktop | state, attempts, error, queue position |
 | `GET /api/nest-jobs/{id}/result` | desktop | the transcript; 409 until the job succeeded |
+| `GET /api/nest-jobs/{id}/events` | desktop | Server-Sent Events of the job until it is final (below) |
+| `GET /api/nest-jobs/{id}/plan` | desktop | the best plan so far, revision in `X-Plan-Revision`; 204 when there is none (the polling fallback) |
 | `POST /api/nest-jobs/{id}/cancel` | desktop | queued: cancelled at once; running: flagged for the worker |
 | `POST /api/nest-jobs/claim` | worker | the oldest queued job on a fresh lease, or 204 |
 | `GET /api/nest-jobs/{id}/package` | worker | the package while queued or running |
 | `POST /api/nest-jobs/{id}/heartbeat` | worker | renews the lease and reports a cancel request; 409 once the worker no longer holds it |
+| `PUT /api/nest-jobs/{id}/progress?workerId=` | worker | stores the latest `RemoteNestProgress` (at most 64 KB); answers like a heartbeat |
+| `PUT /api/nest-jobs/{id}/plan?workerId=` | worker | stores the latest `RemoteNestPlan` (at most 16 MB); answers like a heartbeat |
 | `PUT /api/nest-jobs/{id}/result?workerId=` | worker | stores the transcript (at most 64 MB); a job cancelled meanwhile ends Cancelled |
 | `POST /api/nest-jobs/{id}/fail` | worker | ends the job Failed with a reason |
 | `POST /api/nest-jobs/{id}/cancelled` | worker | confirms a requested stop |
@@ -85,6 +111,47 @@ nor `OpenNest.IO`.
 States: `Queued`, `Running`, then one of `Succeeded`, `Failed` and `Cancelled`. Only one job
 runs at a time: a claim returns nothing while any job is running, so another worker container
 never takes a second job. Claims are serialized by the database's monitor and transaction.
+
+## Progress and the event stream
+
+The worker is a separate process that never opens the SQLite file (it may run on another
+host, and the server's file may sit on NFS, where SQLite locking is unreliable), so progress
+takes the route everything else from the worker takes: HTTP to the server, which stores it in
+the job's row. The server is the one writer; nothing else had to change to carry it across
+processes.
+
+**Worker.** `RecordingNestingEngine.Progress` taps each engine solve's own progress, before
+the pipeline would turn plans into sheets (the worker draws nothing). `NestJobReporter` keeps
+only the latest stage and the latest plan and, every `NestJobRules.ProgressInterval` (two
+seconds), stores whichever changed: at most one small write and one plan write per interval,
+however chatty the engine. A bundled cutout trial reports no commits, as in a local run.
+Reports renew the lease and answer with the cancel flag; a round with nothing new reads the
+job instead, which costs the server no write. Either way a cancel request reaches the worker
+within one interval. The heartbeat still runs every 20 seconds.
+
+**Server.** Schema version 16 adds to `nest_jobs`: `revision` (bumped by every change a
+watcher shows: submit, claim, cancel request, progress, plan, finish, release, lapse;
+heartbeats leave it alone), `progress`, `plan` and `planRevision` (the revision the plan was
+stored at). A finished job keeps its last progress but drops its plan; a job given back or
+lapsed drops both, so the next attempt starts clean. Every job write also completes
+`NestDatabase.JobsChanged`, an in-process signal, so streams wake at once without polling the
+database; each stream also re-reads at every keep-alive.
+
+**Stream.** `GET /api/nest-jobs/{id}/events` (`text/event-stream`, 404 for an unknown job) sends:
+
+- `event: plan`, `id:` the plan's revision, `data:` the `RemoteNestPlan`, whenever a newer
+  plan was stored, always before the job event that names it;
+- `event: job`, `id:` the job's revision, `data:` the job record (with `progress`,
+  `revision` and `planRevision`), on every change and when the queue position moves;
+- `: keep-alive` comments every 15 seconds while nothing changes;
+- `event: gone` if the job is removed meanwhile.
+
+The stream ends after the job event that is final. A reconnect sends `Last-Event-ID`: the
+server sends only a newer plan and a newer job, except that a final job is always sent before
+the stream ends. Ids never go backwards on one stream. SSE rather than SignalR: one-way
+updates over plain HTTP need no hub, client library or sticky connection, and degrade to the
+polling endpoints the server already had. The client treats 45 seconds without a line as a
+dropped stream.
 
 **Crash recovery.** A running job holds a two-minute lease (`NestJobRules.Lease`), which the
 worker renews every 20 seconds. Each claim first settles lapsed leases: a job someone asked to
@@ -121,6 +188,16 @@ make a job slower. Leave enough CPU and memory for the server itself.
 
 `OpenNest.Engine.Tests` `RemoteNestReplayTests`: replay equals the local proposal (including
 the cutout trial plus ordinary solve), edited drawings and different jobs refuse, and stock
-and nonfinite poses survive the wire. `OpenNest.Server.Tests` `NestJobQueueTests` (states,
-single running job, concurrent claims, cancellation, lease lapse, retry limit, release,
-retention, restart) and `NestJobApiTests` (HTTP plus a real worker run end to end).
+and nonfinite poses survive the wire. `RemoteNestProgressTests`: a wire plan draws as the
+local `PlanSheets`, including a cutout trial's proxies. `OpenNest.Server.Tests`
+`NestJobQueueTests` (states, single running job, concurrent claims, cancellation, lease
+lapse, retry limit, release, retention, restart), `NestJobApiTests` (HTTP plus a real worker
+run end to end) and `NestJobEventsTests` (stream order ending at the final state,
+`Last-Event-ID` reconnects, the watch reconnecting a dropped stream and polling a server
+without one, an engine plan reaching the desktop, a cancel seen within one report interval).
+`OpenNest.WinForms.Tests` `ServerAutoNestTests`: the progress window's stage text and plan
+strip, and the finish notice.
+
+A live check against the container: submit a job, then
+`curl -N http://<server>:8090/api/nest-jobs/<id>/events` shows `job` and `plan` events until
+the final job event.

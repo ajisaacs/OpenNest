@@ -25,6 +25,13 @@ internal sealed class CutoutPipelinePrepass
     /// <summary>Most parts on one frame-in-frame chain: flange, washer, smaller washer, slug.</summary>
     internal const int MaxLevels = 4;
 
+    /// <summary>Every frame proxy's part id starts with this; ordinary parts never do.</summary>
+    internal const string ProxyPrefix = "__cutout-proxy-";
+
+    /// <summary>True for a job holding frame proxies: a bundled cutout trial's engine job.</summary>
+    internal static bool HasProxies(NestJob job) =>
+        job.Parts.Any(p => p.Id.StartsWith(ProxyPrefix, StringComparison.Ordinal));
+
     // Levels: parts on the deepest chain through the frame; Area: the outlines of the frame and
     // everything seated in it, which is what taking the bundle spares the sheet.
     private sealed record Bundle(string FrameId, IReadOnlyList<NestJobPlacement> LocalInserts,
@@ -136,7 +143,7 @@ internal sealed class CutoutPipelinePrepass
                 }
                 if (chosen == null || chosen.Count == 0)
                     break;
-                var proxyId = $"__cutout-proxy-{frame.Id}-{instance}";
+                var proxyId = $"{ProxyPrefix}{frame.Id}-{instance}";
                 if (requirements.ContainsKey(proxyId))
                     throw new InvalidOperationException("Cutout proxy ID collides with a requirement.");
                 var levels = 1 + chosen.Max(p => bundles.TryGetValue(p.PartId, out var b) ? b.Levels : 1);

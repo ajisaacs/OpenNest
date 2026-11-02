@@ -9,19 +9,23 @@ namespace OpenNest.Server.Worker;
 /// Solves the nest server's queued jobs one at a time. Each job is read from its package and
 /// run through <see cref="NestPipeline"/> with the named built-in engine wrapped in a
 /// <see cref="RecordingNestingEngine"/>, with no time limit; the recorded engine answers are
-/// the result the desktop replays. A heartbeat keeps the job's lease and carries cancel requests.
+/// the result the desktop replays. A heartbeat keeps the job's lease; the engine's progress and
+/// best plan so far are stored on the server as it runs (<see cref="NestJobReporter"/>), and a
+/// cancel request is seen within one report interval.
 /// </summary>
 public sealed class NestJobWorker
 {
     private readonly RemoteNestJobs _jobs;
     private readonly ILogger _logger;
     private readonly TimeSpan _heartbeat;
+    private readonly TimeSpan _reportInterval;
 
-    public NestJobWorker(RemoteNestJobs jobs, ILogger logger, TimeSpan? heartbeat = null)
+    public NestJobWorker(RemoteNestJobs jobs, ILogger logger, TimeSpan? heartbeat = null, TimeSpan? reportInterval = null)
     {
         _jobs = jobs;
         _logger = logger;
         _heartbeat = heartbeat ?? NestJobRules.HeartbeatInterval;
+        _reportInterval = reportInterval ?? NestJobRules.ProgressInterval;
     }
 
     public string WorkerId { get; } = $"{Environment.MachineName}-{Guid.NewGuid():N}";
@@ -41,7 +45,15 @@ public sealed class NestJobWorker
         using var solve = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         var stop = StopReason.None;
         using var beating = new CancellationTokenSource();
+        void Stop(StopReason reason)
+        {
+            if (stop == StopReason.None)
+                stop = reason;
+            solve.Cancel();
+        }
         var heartbeat = HeartbeatAsync(job.Id, solve, reason => stop = reason, beating.Token);
+        var reporter = new NestJobReporter();
+        var reporting = ReportAsync(job.Id, reporter, Stop, beating.Token);
         try
         {
             NestPipelineRequest request;
@@ -61,7 +73,7 @@ public sealed class NestJobWorker
                 return true;
             }
 
-            var recorder = new RecordingNestingEngine(NestingEngineRegistry.Create(request.EngineName));
+            var recorder = new RecordingNestingEngine(NestingEngineRegistry.Create(request.EngineName)) { Progress = reporter };
             await Task.Factory.StartNew(() => NestPipeline.Run(recorder, request.EngineName, request, progress: null, solve.Token),
                 solve.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
             if (await _jobs.CompleteAsync(job.Id, WorkerId, recorder.Transcript.ToJson(), CancellationToken.None))
@@ -96,8 +108,16 @@ public sealed class NestJobWorker
         {
             beating.Cancel();
             await heartbeat;
+            await reporting;
         }
         return true;
+    }
+
+    private async Task ReportAsync(Guid id, NestJobReporter reporter, Action<StopReason> stopped, CancellationToken token)
+    {
+        var reason = await reporter.RunAsync(_jobs, id, WorkerId, _reportInterval, _logger, token);
+        if (reason != StopReason.None)
+            stopped(reason);
     }
 
     private async Task HeartbeatAsync(Guid id, CancellationTokenSource solve, Action<StopReason> stopped, CancellationToken token)
@@ -141,7 +161,7 @@ public sealed class NestJobWorker
         }
     }
 
-    private enum StopReason
+    public enum StopReason
     {
         None,
         CancelRequested,

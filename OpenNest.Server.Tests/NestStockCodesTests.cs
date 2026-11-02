@@ -119,7 +119,7 @@ public sealed class NestStockCodesTests
             database.SetDeleted(deleted, false, record.Revision);
             Assert.Equal(["SHEET-1", "SHEET-2"], database.StockCodesInUse(null).Select(u => u.ItemCode));
         }
-        Assert.Equal(15L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+        Assert.Equal(16L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
     }
 
     private static Nest Nest(string name, NestStatus status, params string[][] plateCodes)

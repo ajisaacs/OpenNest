@@ -18,7 +18,7 @@ public sealed class NestSolveTranscript
 {
     public const int CurrentVersion = 1;
 
-    private static readonly JsonSerializerOptions Options = new()
+    internal static readonly JsonSerializerOptions Options = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,

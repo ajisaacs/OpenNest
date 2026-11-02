@@ -102,7 +102,9 @@ public sealed class NestPipelineResult
 /// </summary>
 public static class NestPipeline
 {
-    private sealed class PreviewProgress(IProgress<NestJobProgress> inner) : IProgress<NestJobProgress>
+    /// <summary>A bundled cutout trial's progress: its commits count proxies, not physical
+    /// parts, so only candidates and plans pass, with no committed counts.</summary>
+    internal sealed class PreviewProgress(IProgress<NestJobProgress> inner) : IProgress<NestJobProgress>
     {
         public void Report(NestJobProgress value)
         {
@@ -133,42 +135,50 @@ public static class NestPipeline
                     // A plan naming unknown parts has nothing to draw; validation reports it later.
                     if (value.Plan.Plates.Any(s => s.Placements.Any(p => p.PartId == null || !parts.ContainsKey(p.PartId))))
                         return;
-                    value = value with { PlanSheets = Sheets(value.Plan) };
+                    value = value with { PlanSheets = PlanSheets(value.Plan, parts, callerDrawings, drawings, token) };
                 }
             }
             inner.Report(value);
         }
+    }
 
-        private IReadOnlyList<ProposedPlate> Sheets(NestJobResult plan)
+    /// <summary>
+    /// A plan as displayable sheets: identical sheets once with their count, parts on detached
+    /// drawings built from <paramref name="parts"/>' geometry and kept in <paramref name="drawings"/>
+    /// (one per part id), named and colored like the caller's. Every placement must name one of
+    /// <paramref name="parts"/>.
+    /// </summary>
+    internal static IReadOnlyList<ProposedPlate> PlanSheets(NestJobResult plan,
+        IReadOnlyDictionary<string, NestJobPart> parts, IReadOnlyDictionary<string, Drawing> callerDrawings,
+        Dictionary<string, Drawing> drawings, CancellationToken token)
+    {
+        var sheets = new List<ProposedPlate>();
+        foreach (var group in RepeatedPlateGrouping.Create(plan.Plates, true, token))
         {
-            var sheets = new List<ProposedPlate>();
-            foreach (var group in RepeatedPlateGrouping.Create(plan.Plates, true, token))
+            var placed = new List<Part>(group.Sheet.Placements.Count);
+            foreach (var pose in group.Sheet.Placements)
             {
-                var placed = new List<Part>(group.Sheet.Placements.Count);
-                foreach (var pose in group.Sheet.Placements)
+                if (!drawings.TryGetValue(pose.PartId, out var drawing))
                 {
-                    if (!drawings.TryGetValue(pose.PartId, out var drawing))
+                    drawing = DrawingJobMapper.CreateDrawing(parts[pose.PartId]);
+                    // Borrow the caller's name and color for display; bundled frames keep their own.
+                    if (callerDrawings.TryGetValue(pose.PartId, out var caller))
                     {
-                        drawing = DrawingJobMapper.CreateDrawing(parts[pose.PartId]);
-                        // Borrow the caller's name and color for display; bundled frames keep their own.
-                        if (callerDrawings.TryGetValue(pose.PartId, out var caller))
-                        {
-                            drawing.Name = caller.Name;
-                            drawing.Color = caller.Color;
-                        }
-                        drawings[pose.PartId] = drawing;
+                        drawing.Name = caller.Name;
+                        drawing.Color = caller.Color;
                     }
-                    // Same pose mapping as NestResultMaterializer: rotate in the snapshot frame, then move.
-                    var part = new Part(drawing);
-                    part.Rotate(pose.Rotation);
-                    part.Location = new Geometry.Vector(pose.X, pose.Y);
-                    part.UpdateBounds();
-                    placed.Add(part);
+                    drawings[pose.PartId] = drawing;
                 }
-                sheets.Add(new ProposedPlate(group.Sheet.PlateIndex, group.Sheet.Stock, placed) { Quantity = group.Quantity });
+                // Same pose mapping as NestResultMaterializer: rotate in the snapshot frame, then move.
+                var part = new Part(drawing);
+                part.Rotate(pose.Rotation);
+                part.Location = new Geometry.Vector(pose.X, pose.Y);
+                part.UpdateBounds();
+                placed.Add(part);
             }
-            return sheets;
+            sheets.Add(new ProposedPlate(group.Sheet.PlateIndex, group.Sheet.Stock, placed) { Quantity = group.Quantity });
         }
+        return sheets;
     }
 
     /// <summary>Resolves <see cref="NestPipelineRequest.EngineName"/> through
@@ -267,6 +277,16 @@ public static class NestPipeline
     )
     {
         ArgumentNullException.ThrowIfNull(engine);
+        return CreateJob(request, token);
+    }
+
+    /// <summary>The job the pipeline builds for <paramref name="request"/> (before any cutout
+    /// bundling), and the caller drawing behind each part id.</summary>
+    internal static (NestJob Job, Dictionary<string, Drawing> Drawings) CreateJob(
+        NestPipelineRequest request,
+        CancellationToken token
+    )
+    {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.Items);
         ArgumentNullException.ThrowIfNull(request.Stock);

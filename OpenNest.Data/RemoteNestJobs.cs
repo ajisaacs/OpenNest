@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 
@@ -65,6 +67,112 @@ public sealed class RemoteNestJobs : NestServerClient
         return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 
+    /// <summary>The header naming the revision <c>GET .../plan</c> returned.</summary>
+    public const string PlanRevisionHeader = "X-Plan-Revision";
+
+    /// <summary>The best plan so far and the revision it was stored at, or null when the job has none.</summary>
+    public async Task<(string Plan, long Revision)?> GetPlanAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync(Url($"api/nest-jobs/{id}/plan"), cancellationToken);
+        if (response.StatusCode is HttpStatusCode.NoContent or HttpStatusCode.NotFound)
+            return null;
+        await NestServerHttp.EnsureSuccessAsync(response, "read the nest job's plan", cancellationToken);
+        var revision = response.Headers.TryGetValues(PlanRevisionHeader, out var values)
+            && long.TryParse(values.FirstOrDefault(), NumberStyles.None, CultureInfo.InvariantCulture, out var value) ? value : 0;
+        return (await response.Content.ReadAsStringAsync(cancellationToken), revision);
+    }
+
+    /// <summary>
+    /// The job's event stream: an <see cref="NestJobEventKind.Open"/> event, then each plan and
+    /// job change after <paramref name="lastEventId"/> (zero: the current job at once), ending
+    /// after the job event that is final, or with <see cref="NestJobEventKind.Gone"/>. A stream
+    /// that ends without either, or stays silent for <paramref name="idleTimeout"/>, dropped:
+    /// reconnect with the last id seen. A server without the stream raises <see cref="ServerTooOldException"/>.
+    /// </summary>
+    public async IAsyncEnumerable<NestJobEvent> WatchAsync(Guid id, long lastEventId = 0, TimeSpan? idleTimeout = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, Url($"api/nest-jobs/{id}/events"));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+        if (lastEventId > 0)
+            request.Headers.TryAddWithoutValidation("Last-Event-ID", lastEventId.ToString(CultureInfo.InvariantCulture));
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            if (await GetAsync(id, cancellationToken) is null)
+            {
+                yield return new NestJobEvent { Kind = NestJobEventKind.Gone };
+                yield break;
+            }
+            throw new ServerTooOldException("server nesting progress");
+        }
+        await NestServerHttp.EnsureSuccessAsync(response, "watch the nest job", cancellationToken);
+        yield return new NestJobEvent { Kind = NestJobEventKind.Open };
+
+        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        var idle = idleTimeout ?? NestJobRules.StreamIdleTimeout;
+        var type = "";
+        var eventId = 0L;
+        var data = new StringBuilder();
+        while (true)
+        {
+            string? line;
+            using (var silence = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+            {
+                silence.CancelAfter(idle);
+                try { line = await reader.ReadLineAsync(silence.Token); }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    throw new IOException("The nest server stopped sending job updates.");
+                }
+            }
+            if (line is null)
+                yield break;
+            if (line.Length > 0)
+            {
+                if (line[0] == ':')
+                    continue;
+                var colon = line.IndexOf(':');
+                var field = colon < 0 ? line : line[..colon];
+                var value = colon < 0 ? "" : line[(colon + 1)..];
+                if (value.StartsWith(' '))
+                    value = value[1..];
+                switch (field)
+                {
+                    case "event": type = value; break;
+                    case "id": long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out eventId); break;
+                    case "data":
+                        if (data.Length > 0)
+                            data.Append('\n');
+                        data.Append(value);
+                        break;
+                }
+                continue;
+            }
+
+            // A blank line dispatches the event.
+            var text = data.ToString();
+            var kind = type;
+            data.Clear();
+            type = "";
+            switch (kind)
+            {
+                case "job":
+                    var job = JsonSerializer.Deserialize<NestJobRecord>(text, NestServerHttp.JsonOptions)
+                        ?? throw new IOException("Nest server sent an empty nest job.");
+                    yield return new NestJobEvent { Kind = NestJobEventKind.Job, Id = eventId, Job = job };
+                    break;
+                case "plan":
+                    yield return new NestJobEvent { Kind = NestJobEventKind.Plan, Id = eventId, Plan = text };
+                    break;
+                case "gone":
+                    yield return new NestJobEvent { Kind = NestJobEventKind.Gone, Id = eventId };
+                    yield break;
+            }
+        }
+    }
+
     /// <summary>Stops the job: a queued job is cancelled at once, a running one at its worker's next heartbeat.</summary>
     public async Task<NestJobRecord?> CancelAsync(Guid id, CancellationToken cancellationToken = default)
     {
@@ -106,6 +214,29 @@ public sealed class RemoteNestJobs : NestServerClient
         await NestServerHttp.EnsureSuccessAsync(response, "report on the nest job", cancellationToken);
         return await response.Content.ReadFromJsonAsync<NestJobHeartbeat>(NestServerHttp.JsonOptions, cancellationToken)
             ?? throw new IOException("Nest server returned an empty heartbeat.");
+    }
+
+    /// <summary>
+    /// Stores the worker's latest progress report (and renews the lease). Null when the worker
+    /// no longer holds the job; otherwise whether someone asked to stop it.
+    /// </summary>
+    public Task<NestJobHeartbeat?> ReportProgressAsync(Guid id, string workerId, string progress, CancellationToken cancellationToken = default) =>
+        PutReportAsync($"api/nest-jobs/{id}/progress", workerId, progress, "report the nest job's progress", cancellationToken);
+
+    /// <summary>Stores the best plan so far, as <see cref="ReportProgressAsync"/> does a progress report.</summary>
+    public Task<NestJobHeartbeat?> ReportPlanAsync(Guid id, string workerId, string plan, CancellationToken cancellationToken = default) =>
+        PutReportAsync($"api/nest-jobs/{id}/plan", workerId, plan, "report the nest job's plan", cancellationToken);
+
+    private async Task<NestJobHeartbeat?> PutReportAsync(string path, string workerId, string json, string action, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var response = await _httpClient.PutAsync(Url($"{path}?workerId={Uri.EscapeDataString(workerId)}"), content, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.NotFound)
+            return null;
+        await NestServerHttp.EnsureSuccessAsync(response, action, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<NestJobHeartbeat>(NestServerHttp.JsonOptions, cancellationToken)
+            ?? throw new IOException("Nest server returned an empty answer.");
     }
 
     /// <summary>Stores the result. False when the worker no longer holds the job.</summary>

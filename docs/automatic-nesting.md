@@ -52,7 +52,8 @@ Unplaced demand is never dropped silently. `NestPipelineResult.Unplaced` lists e
 An incomplete but valid proposal is keepable like any other; keeping it is still an explicit action. Desktop Auto Nest lists each unplaced drawing, count and reason in its review before committing (the drawing list keeps showing remaining quantities); Console `--autonest` writes `Unplaced:` lines to standard error; MCP `autonest_plate` adds `Unplaced:` lines and `autonest_job` names the reasons when it refuses an incomplete proposal; the API returns `NestResponse.Unplaced` by request part ID. This check does not replace pre-post CNC verification.
 
 In Database mode, **Nest on the server** sends the job to the nest server's worker instead;
-the review and Keep are unchanged. See [server nesting](server-nesting.md).
+the progress window shows the worker's best plan so far, and the review and Keep are
+unchanged. See [server nesting](server-nesting.md).
 
 The selected engine is saved in `%APPDATA%\OpenNest\engine-selection.json`.
 Selection is restored after plug-ins load. A saved name from an earlier release

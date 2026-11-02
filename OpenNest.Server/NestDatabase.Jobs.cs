@@ -37,8 +37,46 @@ public sealed partial class NestDatabase
         PRAGMA user_version=15;
         """;
 
+    // v16: live progress. Revision counts the changes a watcher shows; progress and plan are
+    // the worker's latest reports, opaque here like packages and results. Columns already
+    // present (a database set back to an older version) are kept.
+    private static void AddJobProgress(SqliteCommand command)
+    {
+        foreach (var (name, definition) in new[]
+        {
+            ("revision", "INTEGER NOT NULL DEFAULT 1"),
+            ("planRevision", "INTEGER NOT NULL DEFAULT 0"),
+            ("progress", "TEXT NOT NULL DEFAULT ''"),
+            ("plan", "TEXT"),
+        })
+        {
+            command.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('nest_jobs') WHERE name='{name}'";
+            if ((long)command.ExecuteScalar()! == 0)
+            {
+                command.CommandText = $"ALTER TABLE nest_jobs ADD COLUMN {name} {definition}";
+                command.ExecuteNonQuery();
+            }
+        }
+        command.CommandText = "PRAGMA user_version=16";
+        command.ExecuteNonQuery();
+    }
+
+    // Every write that ends or restarts an attempt drops its progress and plan.
+    private const string ClearProgress = "progress='', plan=NULL, planRevision=0";
+
+    private TaskCompletionSource _jobsChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// Completes at the next change to any job in this process (event streams wait on it). Read
+    /// it before reading the job, so a change between the two is not missed.
+    /// </summary>
+    public Task JobsChanged => Volatile.Read(ref _jobsChanged).Task;
+
+    private void PulseJobs() =>
+        Interlocked.Exchange(ref _jobsChanged, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
+
     private const string JobColumns =
-        "id, title, engineName, submittedBy, state, cancelRequested, submittedAt, startedAt, finishedAt, attempts, error, packageSize, seq";
+        "id, title, engineName, submittedBy, state, cancelRequested, submittedAt, startedAt, finishedAt, attempts, error, packageSize, seq, revision, planRevision, progress";
 
     public NestJobRecord InsertJob(Guid id, NestJobSubmission submission, byte[] package, DateTimeOffset now)
     {
@@ -59,6 +97,7 @@ public sealed partial class NestDatabase
             command.Parameters.AddWithValue("$size", package.LongLength);
             command.Parameters.AddWithValue("$package", package);
             command.ExecuteNonQuery();
+            PulseJobs();
             return GetJob(id)!;
         }
     }
@@ -123,12 +162,15 @@ public sealed partial class NestDatabase
                     state = CASE state WHEN 'Queued' THEN 'Cancelled' ELSE state END,
                     finishedAt = CASE state WHEN 'Queued' THEN $now ELSE finishedAt END,
                     package = CASE state WHEN 'Queued' THEN zeroblob(0) ELSE package END,
-                    cancelRequested = CASE state WHEN 'Running' THEN 1 ELSE cancelRequested END
-                WHERE id=$id
+                    cancelRequested = CASE state WHEN 'Running' THEN 1 ELSE cancelRequested END,
+                    progress = CASE state WHEN 'Queued' THEN '' ELSE progress END,
+                    revision = revision + 1
+                WHERE id=$id AND (state='Queued' OR (state='Running' AND cancelRequested=0))
                 """;
             command.Parameters.AddWithValue("$id", id.ToString());
             command.Parameters.AddWithValue("$now", Stamp(now));
-            command.ExecuteNonQuery();
+            if (command.ExecuteNonQuery() > 0)
+                PulseJobs();
             return GetJob(id);
         }
     }
@@ -144,7 +186,8 @@ public sealed partial class NestDatabase
         lock (_sync)
         {
             using var transaction = _connection.BeginTransaction();
-            SettleJobLeases(transaction, now);
+            if (SettleJobLeases(transaction, now))
+                PulseJobs();
 
             using var running = _connection.CreateCommand();
             running.Transaction = transaction;
@@ -168,7 +211,7 @@ public sealed partial class NestDatabase
             claim.Transaction = transaction;
             claim.CommandText = """
                 UPDATE nest_jobs SET state='Running', workerId=$worker, leaseUntil=$lease,
-                    startedAt=$now, attempts=attempts+1
+                    startedAt=$now, attempts=attempts+1, revision=revision+1
                 WHERE id=$id
                 """;
             claim.Parameters.AddWithValue("$id", id);
@@ -177,6 +220,7 @@ public sealed partial class NestDatabase
             claim.Parameters.AddWithValue("$now", Stamp(now));
             claim.ExecuteNonQuery();
             transaction.Commit();
+            PulseJobs();
             return GetJob(Guid.Parse(id));
         }
     }
@@ -196,6 +240,58 @@ public sealed partial class NestDatabase
             command.Parameters.AddWithValue("$worker", workerId);
             command.Parameters.AddWithValue("$lease", Stamp(now + NestJobRules.Lease));
             return command.ExecuteScalar() is long cancel ? new NestJobHeartbeat { CancelRequested = cancel != 0 } : null;
+        }
+    }
+
+    /// <summary>
+    /// Stores the worker's latest progress report and renews the lease, like a heartbeat. Null
+    /// when <paramref name="workerId"/> no longer holds the job.
+    /// </summary>
+    public NestJobHeartbeat? ReportJobProgress(Guid id, string workerId, string progress, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(progress);
+        return Report(id, workerId, now, "progress=$value, revision=revision+1", progress);
+    }
+
+    /// <summary>Stores the best plan so far, as <see cref="ReportJobProgress"/> does a report.</summary>
+    public NestJobHeartbeat? ReportJobPlan(Guid id, string workerId, string plan, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        // Right-hand sides read the old row, so planRevision is the new revision.
+        return Report(id, workerId, now, "plan=$value, planRevision=revision+1, revision=revision+1", plan);
+    }
+
+    private NestJobHeartbeat? Report(Guid id, string workerId, DateTimeOffset now, string set, string value)
+    {
+        lock (_sync)
+        {
+            using var command = _connection.CreateCommand();
+            command.CommandText = $"""
+                UPDATE nest_jobs SET {set}, leaseUntil=$lease
+                WHERE id=$id AND state='Running' AND workerId=$worker
+                RETURNING cancelRequested
+                """;
+            command.Parameters.AddWithValue("$id", id.ToString());
+            command.Parameters.AddWithValue("$worker", workerId);
+            command.Parameters.AddWithValue("$lease", Stamp(now + NestJobRules.Lease));
+            command.Parameters.AddWithValue("$value", value);
+            if (command.ExecuteScalar() is not long cancel)
+                return null;
+            PulseJobs();
+            return new NestJobHeartbeat { CancelRequested = cancel != 0 };
+        }
+    }
+
+    /// <summary>A running job's best plan so far and the revision it was stored at; null when it has none.</summary>
+    public (string Plan, long Revision)? GetJobPlan(Guid id)
+    {
+        lock (_sync)
+        {
+            using var command = _connection.CreateCommand();
+            command.CommandText = "SELECT plan, planRevision FROM nest_jobs WHERE id=$id AND plan IS NOT NULL";
+            command.Parameters.AddWithValue("$id", id.ToString());
+            using var reader = command.ExecuteReader();
+            return reader.Read() ? (reader.GetString(0), reader.GetInt64(1)) : null;
         }
     }
 
@@ -229,20 +325,20 @@ public sealed partial class NestDatabase
         lock (_sync)
         {
             using var command = _connection.CreateCommand();
-            command.CommandText = """
+            command.CommandText = $"""
                 UPDATE nest_jobs SET
                     state = CASE cancelRequested WHEN 1 THEN 'Cancelled' ELSE 'Queued' END,
                     finishedAt = CASE cancelRequested WHEN 1 THEN $now ELSE NULL END,
                     package = CASE cancelRequested WHEN 1 THEN zeroblob(0) ELSE package END,
                     startedAt = CASE cancelRequested WHEN 1 THEN startedAt ELSE NULL END,
                     attempts = CASE cancelRequested WHEN 1 THEN attempts ELSE MAX(attempts - 1, 0) END,
-                    workerId = NULL, leaseUntil = NULL
+                    workerId = NULL, leaseUntil = NULL, revision = revision + 1, {ClearProgress}
                 WHERE id=$id AND state='Running' AND workerId=$worker
                 """;
             command.Parameters.AddWithValue("$id", id.ToString());
             command.Parameters.AddWithValue("$worker", workerId);
             command.Parameters.AddWithValue("$now", Stamp(now));
-            return command.ExecuteNonQuery() == 1;
+            return Changed(command.ExecuteNonQuery() == 1);
         }
     }
 
@@ -252,7 +348,8 @@ public sealed partial class NestDatabase
         {
             using var command = _connection.CreateCommand();
             command.CommandText = $"""
-                UPDATE nest_jobs SET {set}, finishedAt=$now, workerId=NULL, leaseUntil=NULL, package=zeroblob(0)
+                UPDATE nest_jobs SET {set}, finishedAt=$now, workerId=NULL, leaseUntil=NULL, package=zeroblob(0),
+                    plan=NULL, revision=revision+1
                 WHERE id=$id AND state='Running' AND workerId=$worker
                 """;
             command.Parameters.AddWithValue("$id", id.ToString());
@@ -260,17 +357,24 @@ public sealed partial class NestDatabase
             command.Parameters.AddWithValue("$now", Stamp(now));
             foreach (var (name, value) in values)
                 command.Parameters.AddWithValue(name, value);
-            return command.ExecuteNonQuery() == 1;
+            return Changed(command.ExecuteNonQuery() == 1);
         }
+    }
+
+    private bool Changed(bool changed)
+    {
+        if (changed)
+            PulseJobs();
+        return changed;
     }
 
     // A lapsed lease means the worker stopped: a cancel request ends the job, otherwise it goes
     // back to the queue until it has used its attempts.
-    private void SettleJobLeases(SqliteTransaction transaction, DateTimeOffset now)
+    private bool SettleJobLeases(SqliteTransaction transaction, DateTimeOffset now)
     {
         using var command = _connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = """
+        command.CommandText = $"""
             UPDATE nest_jobs SET
                 state = CASE WHEN cancelRequested=1 THEN 'Cancelled'
                              WHEN attempts >= $max THEN 'Failed' ELSE 'Queued' END,
@@ -280,14 +384,14 @@ public sealed partial class NestDatabase
                 finishedAt = CASE WHEN cancelRequested=1 OR attempts >= $max THEN $now ELSE NULL END,
                 package = CASE WHEN cancelRequested=1 OR attempts >= $max THEN zeroblob(0) ELSE package END,
                 startedAt = CASE WHEN cancelRequested=1 OR attempts >= $max THEN startedAt ELSE NULL END,
-                workerId = NULL, leaseUntil = NULL
+                workerId = NULL, leaseUntil = NULL, revision = revision + 1, {ClearProgress}
             WHERE state='Running' AND leaseUntil < $now;
             DELETE FROM nest_jobs WHERE finishedAt IS NOT NULL AND finishedAt < $expired;
             """;
         command.Parameters.AddWithValue("$max", NestJobRules.MaxAttempts);
         command.Parameters.AddWithValue("$now", Stamp(now));
         command.Parameters.AddWithValue("$expired", Stamp(now - NestJobRules.Retention));
-        command.ExecuteNonQuery();
+        return command.ExecuteNonQuery() > 0;
     }
 
     private static NestJobRecord ReadJob(SqliteDataReader reader) => new()
@@ -304,6 +408,9 @@ public sealed partial class NestDatabase
         Attempts = reader.GetInt32(9),
         Error = reader.GetString(10),
         PackageSize = reader.GetInt64(11),
+        Revision = reader.GetInt64(13),
+        PlanRevision = reader.GetInt64(14),
+        Progress = reader.GetString(15),
     };
 
     private static string Truncate(string? text)

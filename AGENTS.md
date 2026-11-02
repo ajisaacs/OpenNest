@@ -78,7 +78,7 @@ Read the relevant contract before changing its behavior:
 - [Pre-post verification](docs/post-verification.md)
 - [Machine cutting defaults](docs/machine-cutting-defaults.md): the nest's machine supplies leads, kerf and cut-off settings for plates without their own parameters
 - [Shared settings](docs/shared-settings.md): in Database mode machines, post settings, clamps and nest defaults come from the server once it holds them; offline uses the last copy read, read-only
-- [Server nesting](docs/server-nesting.md): Database-mode Auto Nest queued to the server's worker container (`OPENNEST_ROLE=worker`), one job at a time with no time limit; the desktop replays the recorded engine answers to validate and bind locally. The HTTP server stays off Engine/IO
+- [Server nesting](docs/server-nesting.md): Database-mode Auto Nest queued to the server's worker container (`OPENNEST_ROLE=worker`), one job at a time with no time limit, streaming progress and the best plan so far over SSE; the desktop replays the recorded engine answers to validate and bind locally. The HTTP server stays off Engine/IO
 - [Cut-time estimates](docs/cut-time-estimates.md): simulator/Calculate Cut Time acceleration planner and placeholder machine limits
 - [Cincinnati CL](docs/cincinnati-post-output.md) and [CI Fiber](docs/cincinnati-ci-fiber-post-output.md)
 - [Fill verification](docs/performance/fill-verification.md): opt-in benchmarks, frozen oracles, Debug-only counters and predictor initialization. Zero Release counters do not prove work removal.
