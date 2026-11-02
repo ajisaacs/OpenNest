@@ -93,3 +93,28 @@ Plates use their own cutting parameters. A plate without them uses line lead-ins
 
 Record the outcome the code produces today, not the outcome you want. A nest that is still
 blocked guards against getting worse, and its baseline moves up once a fix lands.
+
+## Sweeping a production archive
+
+`ProductionCorpusSweepTests` (`Category=ProductionCorpus`) is a survey, not a gate: it plans
+every occupied plate of every `.nest` file in a local folder the way Plan Cutting does after
+**Clear Lead-ins & Cut-offs** (the parts regenerate from clean geometry, the plate's own cutting
+parameters when it has them, else the nest's machine defaults over a cutting-parameters file)
+and writes one JSON line per plate: outcome, warnings by kind, safest-route and head-raise
+flags, expansions against the budget, time, and the spacing pairs the overlap label would show.
+It never fails on an outcome. The folder holds production nests, so it stays outside the
+repository, and so does the report.
+
+```sh
+OPENNEST_PRODUCTION_CORPUS=<folder of .nest files> \
+OPENNEST_PRODUCTION_CORPUS_MACHINES=<folder of machine JSON> \
+OPENNEST_PRODUCTION_CORPUS_PARAMETERS=<cutting-parameters JSON> \
+OPENNEST_PRODUCTION_CORPUS_REPORT=<report.jsonl> \
+  dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release --filter "Category=ProductionCorpus"
+```
+
+`OPENNEST_PRODUCTION_CORPUS_PARALLELISM` (default 4) plans that many nests at once, so times
+and the 180 s `Timeout` (`..._TIMEOUT`) are under load; `..._FILTER` is a comma-separated list
+of file-name fragments and `..._BUDGET` the planning-effort multiplier. Compare two reports plate
+by plate: a plate that ranks lower, or keeps its rank with a safest route or more head raises
+than before, is a regression. Without the folder variable the test skips.
