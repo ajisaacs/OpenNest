@@ -50,15 +50,18 @@ public class IrregularSearchUntilCancelledTests
     public void KeepsSearchingAfterTheNormalSearchUntilCancelled()
     {
         var plain = new Recorder();
-        var plainResult = new IrregularNestingEngine().Solve(MixedJob(false), plain);
+        // Grouped, this job's normal search already finds a plan the seeds do not beat within the
+        // sheets allowed here; this test is of the seeded search, so it runs ungrouped.
+        var plainResult = new IrregularNestingEngine { GroupLikeParts = false }.Solve(MixedJob(false), plain);
         var normalSheets = 0;
-        new IrregularNestingEngine { SheetPacked = () => normalSheets++ }.Solve(MixedJob(false));
+        new IrregularNestingEngine { GroupLikeParts = false, SheetPacked = () => normalSheets++ }.Solve(MixedJob(false));
 
         var extendedSheets = 0;
         var extendedTailBudgets = new List<long>();
         using var cancel = new CancellationTokenSource();
         var engine = new IrregularNestingEngine
         {
+            GroupLikeParts = false,
             // The normal search packs exactly normalSheets sheets; later ones are extended.
             TailReplanning = budget =>
             {

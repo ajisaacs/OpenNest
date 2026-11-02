@@ -14,7 +14,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 | Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the engine listed first here |
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; stock chosen sheet by sheet by salvage-credited look-ahead cost |
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
-| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan; under a time limit it keeps trying seeded variants until the limit |
+| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan, then grouped variants that pack like parts together; under a time limit it keeps trying seeded variants until the limit |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
 | Lattice, Strip, Vertical Remnant, Horizontal Remnant | Many copies of a few parts | The fixed placement strategies behind interactive fill; Lattice is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder), and the remnant strategies run it ranked to keep the largest drop. In whole jobs, all four place a plate with any fixed or bounded part rotation by the rotation-aware ordered placer instead |
 
@@ -65,7 +65,7 @@ proposals with no committed counts, all come before the plate commits, and the l
 returned layout. Reporting never changes the search: layouts are identical with or without a
 progress sink.
 
-- Irregular reports when a strategy variant or the tail re-plan beats its best plan so far.
+- Irregular reports when a strategy variant, a grouped variant or a tail re-plan beats its best plan so far.
 - Rectangles makes one sheet-by-sheet run, so it reports the finished job as its one plan.
 - Circles reports when a stock-preference run or a tail re-plan beats its best result so far.
 - Default scores each candidate plan as it ranks results (valid, fewest unplaced, lowest cost,
@@ -198,6 +198,33 @@ member free regions and subtracts each placed member separately, preserving usab
 or invalid Fill proposal leaves singles and pairs available. Large enclosed-pocket blocks remain
 pending the hole-geometry integration; containment cutting order and shop-use safety acceptance
 remain separate sequencer/verification work.
+
+### Grouped variants
+
+After its six variants and the tail re-plan, Irregular decodes the job again with like parts
+grouped (`GroupedFill`), when at least two types have demand and one has three or more copies. Each
+sheet packs every such type as one group, in turn: the packer serves a type only when no type of
+the same priority and lower group rank can still be placed. The copies held back from the groups
+and the types with one or two copies then fill around them under the usual rule. Holding copies
+back keeps groups dense: a group's last few copies often start a row of their own and block room
+the next group could use whole, while placed last they drop into whatever gaps remain.
+
+Per sheet, the search packs every order of up to four groups (more groups use the orders by total
+area, part area and part size, each largest first and last), then holds back zero to four copies
+of each group in turn, keeping each count that improves the sheet, for the three best orders. When
+the sheet then holds everything, the best candidates and every order are packed again inside a
+strip ending a quarter unit short of the best front (the packer's `reach`), at most four times,
+while that still holds everything and improves the sheet. Sheets rank by part area placed, then
+net cost, then compactness offcut. Grouped fills use singles and pairs only: Fill blocks made each
+fill several times slower for no denser groups.
+
+The grouped variants front along the stock's length, and also across it when some stock is taller
+than it is long. Like the other variants, none starts once the work budget is spent; each then has
+a budget of its own. They run after the ungrouped search, so that search and its result are
+unchanged; a grouped plan replaces the result only by beating it, and then has its own tail
+re-plan. The search until cancelled takes grouped decodes in turn with the variants, with the
+same seeded weights. On the help tutorial's parts (30 gussets, 20 ells, 10 plates, 12 flanges on
+60 x 120 at 0.3 spacing) the layout ends at 34.9 rather than 38.1.
 
 ## Flat bar
 

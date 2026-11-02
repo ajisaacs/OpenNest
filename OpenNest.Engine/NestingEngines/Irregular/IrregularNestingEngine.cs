@@ -43,6 +43,20 @@ public sealed class IrregularNestingEngine : INestingEngine
     };
 
     /// <summary>
+    /// Front directions of the grouped variants, tried after <see cref="Variants"/>: along the
+    /// length of the stock, and across it too when some stock is taller than it is long.
+    /// </summary>
+    internal static IEnumerable<PackAxis> GroupedAxes(NestJob job)
+    {
+        yield return PackAxis.X;
+        if (job.Plates.Any(s => s.WorkArea.Width > s.WorkArea.Length))
+            yield return PackAxis.Y;
+    }
+
+    /// <summary>Whether the grouped variants run; off only in tests of the ungrouped search.</summary>
+    internal bool GroupLikeParts { get; init; } = true;
+
+    /// <summary>
     /// Deterministic work budget, in free-region subtractions, after which no further variant
     /// starts. Keeps big jobs well inside benchmark timeouts without consulting a clock.
     /// </summary>
@@ -111,11 +125,31 @@ public sealed class IrregularNestingEngine : INestingEngine
         var improved = solver.ImproveTail(best!, WorkBudget * 2);
         if (!ReferenceEquals(improved, best))
             ReportPlan(job, types, improved, progress, token);
+
+        // Like parts grouped, the groups' stragglers filling the gaps after them. These run last, on
+        // their own budget, so the search above is the same with or without them; a grouped plan
+        // replaces its result only by beating it. Like the variants, none starts once the work
+        // budget is spent.
+        var groups = GroupLikeParts && GroupedFill.Applies(types, demand);
+        if (groups)
+            foreach (var axis in GroupedAxes(job))
+            {
+                token.ThrowIfCancellationRequested();
+                if (solver.Work.Value >= WorkBudget)
+                    break;
+                var plan = solver.Plan(demand, axis, 1.0, grouped: true);
+                if (!plan.IsBetterThan(improved))
+                    continue;
+                ReportPlan(job, types, plan, progress, token);
+                improved = solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2);
+                if (!ReferenceEquals(improved, plan))
+                    ReportPlan(job, types, improved, progress, token);
+            }
         // More searching can only end in cancellation, so it needs a listener for its plans, and
         // it needs demand and two or more types, or every weighted decode repeats a variant.
         if (job.Options.SearchUntilCancelled && token.CanBeCanceled && progress != null
             && types.Count > 1 && demand.Any(d => d > 0))
-            SearchUntilCancelled(job, types, solver, demand, improved, progress, token);
+            SearchUntilCancelled(job, types, solver, demand, improved, groups, progress, token);
         return BuildResult(job, types, improved, progress, token);
     }
 
@@ -133,7 +167,7 @@ public sealed class IrregularNestingEngine : INestingEngine
     }
 
     /// <summary>
-    /// Decodes seed after seed, cycling the variants, and re-plans the tail of each plan that
+    /// Decodes seed after seed, cycling the variants and grouped variants, and re-plans the tail of each plan that
     /// beats the best so far; ends only when the token is cancelled.
     /// </summary>
     private void SearchUntilCancelled(
@@ -142,15 +176,20 @@ public sealed class IrregularNestingEngine : INestingEngine
         Solver solver,
         int[] demand,
         Plan best,
+        bool groups,
         IProgress<NestJobProgress>? progress,
         CancellationToken token
     )
     {
+        // Grouped decodes take their turn among the variants when the job groups.
+        var grouped = groups ? GroupedAxes(job).ToArray() : Array.Empty<PackAxis>();
         for (var seed = 1; ; seed = seed == int.MaxValue ? 1 : seed + 1)
         {
             token.ThrowIfCancellationRequested();
-            var (axis, beta) = Variants[seed % Variants.Length];
-            var plan = solver.Plan(demand, axis, beta, SeedWeights(seed, types.Count));
+            var pick = seed % (Variants.Length + grouped.Length);
+            var plan = pick < Variants.Length
+                ? solver.Plan(demand, Variants[pick].Axis, Variants[pick].Beta, SeedWeights(seed, types.Count))
+                : solver.Plan(demand, grouped[pick - Variants.Length], 1.0, SeedWeights(seed, types.Count), grouped: true);
             if (!plan.IsBetterThan(best))
                 continue;
             // Report before the tail re-plan, which the limit may cut short.
@@ -222,6 +261,9 @@ public sealed class IrregularNestingEngine : INestingEngine
         private readonly Dictionary<double, BlockCatalog> blocks = new();
         private readonly IReadOnlyDictionary<string, NestJobPart> parts = job.Parts.ToDictionary(p => p.Id, StringComparer.Ordinal);
 
+        /// <summary>Work at which the current grouped plan stops starting new fills.</summary>
+        private long groupedBudget;
+
         private BlockCatalog BlocksFor(NestPlateStock stock)
         {
             var spacing = System.Math.Max(0, stock.PartSpacing);
@@ -234,10 +276,27 @@ public sealed class IrregularNestingEngine : INestingEngine
 
         private double Penalty => NestJobCost.UnplacedPartPenalty(job);
 
-        public Plan Plan(int[] demand, PackAxis axis, double beta, IReadOnlyList<double>? weights = null)
+        /// <summary>
+        /// One sheet against another for the same demand: more part area placed first, then lower net
+        /// cost, then the larger compactness offcut; negative when <paramref name="a"/> is better.
+        /// </summary>
+        private int CompareSheets(SheetFill a, SheetFill b)
         {
+            static int Compare(double x, double y) =>
+                System.Math.Abs(x - y) <= 1e-9 * System.Math.Max(1, System.Math.Max(System.Math.Abs(x), System.Math.Abs(y)))
+                    ? 0 : x.CompareTo(y);
+            var area = Compare(b.PartArea, a.PartArea);
+            if (area != 0)
+                return area;
+            var cost = Compare(NetCost(job.Options, a), NetCost(job.Options, b));
+            return cost != 0 ? cost : Compare(Offcut(job.Options, b), Offcut(job.Options, a));
+        }
+
+        public Plan Plan(int[] demand, PackAxis axis, double beta, IReadOnlyList<double>? weights = null, bool grouped = false)
+        {
+            groupedBudget = Work.Value + workBudget;
             var run = Decode(demand, axis, beta, new Dictionary<string, int>(StringComparer.Ordinal), job.Options.MaxPlates, null,
-                weights);
+                weights, grouped);
             var unplaced = types.Sum(t => t.Part.Quantity) - run.Sheets.Sum(s => s.Parts.Count);
             var reason = run.Reason;
             if (unplaced > 0 && reason == NestJobStopReason.Completed)
@@ -358,7 +417,8 @@ public sealed class IrregularNestingEngine : INestingEngine
             IReadOnlyDictionary<string, int> usedBefore,
             int? sheetCap,
             NestPlateStock? first,
-            IReadOnlyList<double>? weights = null
+            IReadOnlyList<double>? weights = null,
+            bool grouped = false
         )
         {
             var remaining = (int[])demand.Clone();
@@ -390,9 +450,15 @@ public sealed class IrregularNestingEngine : INestingEngine
                     if (stock.Quantity is int available && used[stock.Id] >= available)
                         continue;
                     progress?.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stock.Id, sheets.Count, 0, 0));
-                    var packer = new FrontierPacker(types, CacheFor(stock), PairsFor(stock), stock, axis, beta, Work,
-                        BlocksFor(stock), ClampsFor(stock), BoundaryFor(stock), weights);
-                    var fill = packer.Fill(remaining, token);
+                    // Grouped fills pack groups from singles and pairs: Fill blocks cost far more per
+                    // fill there and gave no denser groups.
+                    FrontierPacker Packer(IReadOnlyList<int>? ranks, double? reach) => new(types, CacheFor(stock),
+                        PairsFor(stock), stock, axis, beta, Work, grouped ? null : BlocksFor(stock), ClampsFor(stock), BoundaryFor(stock),
+                        weights, ranks, reach);
+                    var fill = grouped && GroupedFill.Applies(types, remaining)
+                        ? new GroupedFill(types, Packer, axis, stock.Outline == null, CompareSheets, Work, groupedBudget)
+                            .Fill(remaining, token)
+                        : Packer(null, null).Fill(remaining, token);
                     sheetPacked?.Invoke();
                     if (fill.Parts.Count > 0)
                         trials.Add((fill, NetCost(job.Options, fill)));

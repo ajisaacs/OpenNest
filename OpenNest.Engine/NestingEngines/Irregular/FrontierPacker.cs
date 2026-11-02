@@ -64,6 +64,7 @@ internal sealed class FrontierPacker
     private readonly PackAxis axis;
     private readonly double beta;
     private readonly IReadOnlyList<double>? typeWeights;
+    private readonly IReadOnlyList<int>? groupRanks;
 
     /// <summary>
     /// The placement rule's value of a candidate; lower wins. Gap fill prefers bigger parts
@@ -82,6 +83,10 @@ internal sealed class FrontierPacker
 
     /// <param name="boundary">Outline to fill instead of the stock's work area; it must be
     /// fitted to <paramref name="nfps"/>.</param>
+    /// <param name="groupRanks">Per type, a rank served after priority: a type is placed only when
+    /// no type of the same priority and lower rank can be, so each type packs as one group.</param>
+    /// <param name="reach">Farthest the packing front may go: the work area ends there along the
+    /// front axis, so the fill must fit a shorter strip of the sheet.</param>
     public FrontierPacker(
         IReadOnlyList<PartType> types,
         NoFitCache nfps,
@@ -93,7 +98,9 @@ internal sealed class FrontierPacker
         BlockCatalog? blocks = null,
         ClampObstacles? clamps = null,
         PackBoundary? boundary = null,
-        IReadOnlyList<double>? typeWeights = null
+        IReadOnlyList<double>? typeWeights = null,
+        IReadOnlyList<int>? groupRanks = null,
+        double? reach = null
     )
     {
         if (boundary != null && !ReferenceEquals(boundary.Nfps, nfps))
@@ -108,12 +115,21 @@ internal sealed class FrontierPacker
         this.axis = axis;
         this.beta = beta;
         this.typeWeights = typeWeights;
+        this.groupRanks = groupRanks;
         this.boundary = boundary;
         work = boundary?.Bounds ?? stock.WorkArea;
+        if (reach is double end)
+            work = axis == PackAxis.X
+                ? new Box(work.Left, work.Bottom, System.Math.Clamp(end - work.Left, 0, work.Length), work.Width)
+                : new Box(work.Left, work.Bottom, work.Length, System.Math.Clamp(end - work.Bottom, 0, work.Width));
+        limited = reach != null;
     }
 
+    private readonly bool limited;
+
     private bool Fits(double width, double height) =>
-        boundary?.Fits(width, height) ?? stock.Fits(width, height);
+        (boundary?.Fits(width, height) ?? stock.Fits(width, height))
+        && (!limited || (width <= work.Length + 1e-9 && height <= work.Width + 1e-9));
 
     /// <param name="seated">Parts already on the sheet: they block space and hold the packing
     /// front where they reached, so the fill starts as gap fill. They are not returned.</param>
@@ -279,17 +295,20 @@ internal sealed class FrontierPacker
         var bestSide = double.PositiveInfinity;
         var bestLead = double.PositiveInfinity;
         var bestPriority = int.MaxValue;
+        var bestRank = int.MaxValue;
 
         void Consider(Func<IReadOnlyList<Placed>> build, int typeIndex, double area, double advance, double side, double lead)
         {
             var priority = types[typeIndex].Part.Priority;
-            if (priority > bestPriority)
+            var rank = groupRanks?[typeIndex] ?? 0;
+            if (priority > bestPriority || (priority == bestPriority && rank > bestRank))
                 return;
             var fills = advance <= Tie;
             var value = PlacementValue(fills, advance, area, beta, typeWeights?[typeIndex] ?? 1.0);
 
             var better = bestParts == null
                 || priority < bestPriority
+                || rank < bestRank
                 || (fills && !bestFills)
                 || (
                     fills == bestFills
@@ -305,6 +324,7 @@ internal sealed class FrontierPacker
                 return;
             bestParts = build();
             bestPriority = priority;
+            bestRank = rank;
             bestFills = fills;
             bestValue = value;
             bestSide = side;
