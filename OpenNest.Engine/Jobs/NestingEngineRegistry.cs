@@ -34,6 +34,7 @@ public static class NestingEngineRegistry
         ["RectanglesNestingEngine"] = "Rectangles",
         // Retired: Default chooses stock at least as well on every benchmark job.
         ["StockLadder"] = "Default",
+        ["Fill"] = "Lattice",
     };
 
     static NestingEngineRegistry()
@@ -41,55 +42,55 @@ public static class NestingEngineRegistry
         // Listed first: the engine front ends use when the caller names none.
         Register(
             "Default",
-            "Any job: runs Irregular, Rectangles and Circles and keeps the cheapest valid layout",
+            "Any job: tries Rectangles, Circles and Irregular and keeps the best",
             () => new DefaultNestingEngine()
         );
 
         Register(
             "Rectangles",
-            "Plain and near-rectangular parts: maximal-rectangles box packing",
+            "Packs each part as a box; best for plain rectangular parts",
             () => new RectanglesNestingEngine()
         );
 
         Register(
             "Irregular",
-            "Irregular parts: no-fit-polygon frontier packing with look-ahead stock selection",
+            "Fits irregular shapes into each other's gaps and notches",
             () => new IrregularNestingEngine()
         );
 
         Register(
             "Circles",
-            "Round parts (blanks, washers, flanges): disc packing by enclosing circle",
+            "Round parts such as blanks, washers and flanges",
             () => new CirclesNestingEngine()
         );
 
         Register(
             "FlatBar",
-            "Flat bar: parts cut in one row along each bar with the saw cut-list packer",
+            "One row of parts along a flat bar",
             () => new FlatBarNestingEngine()
         );
 
         Register(
-            "Fill",
-            "Multi-phase nesting (Linear, Pairs, RectBestFit, Remainder)",
-            () => new FixedStrategyNestingEngine("Fill")
+            "Lattice",
+            "Repeats parts in tight rows and pairs; best for many copies of a few parts",
+            () => new FixedStrategyNestingEngine("Lattice")
         );
 
         Register(
             "Strip",
-            "Strip-based nesting for mixed-drawing layouts",
+            "Fills one strip at a time, part by part; each uses the space the last one left",
             () => new FixedStrategyNestingEngine("Strip")
         );
 
         Register(
             "Vertical Remnant",
-            "Optimizes for largest right-side vertical drop",
+            "Repeats parts in rows and pairs, keeping the largest drop on the right side",
             () => new FixedStrategyNestingEngine("Vertical Remnant")
         );
 
         Register(
             "Horizontal Remnant",
-            "Optimizes for largest top-side horizontal drop",
+            "Repeats parts in rows and pairs, keeping the largest drop on the top",
             () => new FixedStrategyNestingEngine("Horizontal Remnant")
         );
     }

@@ -86,7 +86,10 @@ namespace OpenNest.Forms
         private void EngineComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (engineComboBox.SelectedItem is string name)
+            {
                 EngineSelection.EngineName = name;
+                engineComboBox.ToolTipText = EngineSelection.ToolTip(name);
+            }
         }
 
         #region Statusbar Events

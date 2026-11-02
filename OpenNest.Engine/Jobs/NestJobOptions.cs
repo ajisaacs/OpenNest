@@ -7,7 +7,7 @@ namespace OpenNest.Engine.Jobs;
 public sealed class NestJobOptions
 {
     public NestJobOptions(
-        string placementStrategy = "Fill",
+        string placementStrategy = "Lattice",
         int? maxPlates = null,
         double salvageRate = 0,
         double minimumSalvageDimension = 0,

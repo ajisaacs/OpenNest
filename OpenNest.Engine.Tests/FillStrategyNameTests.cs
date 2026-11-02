@@ -7,8 +7,8 @@ using OpenNest.Geometry;
 namespace OpenNest.Engine.Tests;
 
 /// <summary>
-/// The multi-phase fill engine and placement strategy are named "Fill". "Default" names the
-/// router engine; fill-strategy callers still read "Default" as Fill.
+/// The multi-phase fill engine and placement strategy are named "Lattice". "Default" names the
+/// router engine; fill-strategy callers still read "Default" as Lattice.
 /// </summary>
 public class FillStrategyNameTests
 {
@@ -18,9 +18,9 @@ public class FillStrategyNameTests
         var engines = NestingEngineRegistry.AvailableEngines.Select(e => e.Name).ToList();
 
         Assert.Equal("Default", engines[0]);
-        Assert.Contains("Fill", engines);
+        Assert.Contains("Lattice", engines);
         Assert.IsType<FixedStrategyNestingEngine>(NestingEngineRegistry.Create("Fill"));
-        Assert.Equal(new[] { "Fill", "Strip", "Vertical Remnant", "Horizontal Remnant" },
+        Assert.Equal(new[] { "Lattice", "Strip", "Vertical Remnant", "Horizontal Remnant" },
             PlateFillService.BuiltInStrategies);
     }
 
@@ -45,11 +45,11 @@ public class FillStrategyNameTests
     }
 
     [Theory]
-    [InlineData(null, "Fill")]
-    [InlineData("", "Fill")]
-    [InlineData("fill", "Fill")]
-    [InlineData("Default", "Fill")]
-    [InlineData("DEFAULT", "Fill")]
+    [InlineData(null, "Lattice")]
+    [InlineData("", "Lattice")]
+    [InlineData("fill", "Lattice")]
+    [InlineData("Default", "Lattice")]
+    [InlineData("DEFAULT", "Lattice")]
     public void PlacementStrategyResolvesFillAndItsLegacyName(string? strategy, string expected)
     {
         Assert.Equal(expected, PlateFillService.ResolveStrategy(strategy!));
@@ -90,7 +90,7 @@ public class FillStrategyNameTests
             new Plate(new Size(60, 80)), new NestItem(), new Box(0, 0, 1, 1), null, CancellationToken.None));
 
         Assert.Equal("Unknown placement strategy: Mystery. Known strategies: "
-            + "Fill, Strip, Vertical Remnant, Horizontal Remnant.", error.Message);
+            + "Lattice, Strip, Vertical Remnant, Horizontal Remnant.", error.Message);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public class FillStrategyNameTests
     {
         Assert.IsType<PlateNester>(PlateNesterFactory.Create("Fill"));
         Assert.IsType<PlateNester>(PlateNesterFactory.Create("Default"));
-        Assert.Equal("Fill", new NestJobOptions().PlacementStrategy);
+        Assert.Equal("Lattice", new NestJobOptions().PlacementStrategy);
 
         var job = FiniteStockJobTests.Job(1);
         var legacy = new NestJobRunner(PlateNesterFactory.Create)

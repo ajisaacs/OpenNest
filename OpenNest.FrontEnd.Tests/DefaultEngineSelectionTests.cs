@@ -49,14 +49,14 @@ public class DefaultEngineSelectionTests : IDisposable
     }
 
     [Fact]
-    public void McpFillToolsWithoutAnEngineUseFill()
+    public void McpFillToolsWithoutAnEngineUseLattice()
     {
         var session = Session();
         session.DefaultEngineName = "Rectangles"; // The session default is for autonest only.
 
         var response = new NestingTools(session).FillPlate(0, "square", 2);
 
-        Assert.Contains("(Fill): success", response);
+        Assert.Contains("(Lattice): success", response);
         Assert.Equal(2, session.GetPlate(0).Parts.Count);
     }
 

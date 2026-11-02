@@ -106,8 +106,8 @@ public class PlateNesterParityTests
     }
 
     [Theory]
-    [InlineData("Fill", "Fill")]
-    [InlineData("Default", "Fill")]
+    [InlineData("Fill", "Lattice")]
+    [InlineData("Default", "Lattice")]
     [InlineData("Strip", "Strip")]
     [InlineData("Vertical Remnant", "Vertical Remnant")]
     [InlineData("Horizontal Remnant", "Horizontal Remnant")]
@@ -119,7 +119,7 @@ public class PlateNesterParityTests
         Assert.Equal(canonical, entry.Name);
         var (policy, layout) = canonical switch
         {
-            "Fill" => (PlateFillPolicy.Fill, PlateLayout.FillThenPack),
+            "Lattice" => (PlateFillPolicy.Fill, PlateLayout.FillThenPack),
             "Strip" => (PlateFillPolicy.Fill, PlateLayout.Strips),
             "Vertical Remnant" => (PlateFillPolicy.VerticalRemnant, PlateLayout.FillThenPack),
             _ => (PlateFillPolicy.HorizontalRemnant, PlateLayout.FillThenPack),

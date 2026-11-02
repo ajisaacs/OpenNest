@@ -6,11 +6,11 @@ namespace OpenNest.Engine.Tests.Jobs;
 public class EngineNameResolverTests
 {
     [Theory]
-    [InlineData("Fill", "Fill")]
+    [InlineData("Fill", "Lattice")]
     [InlineData(" strip ", "Strip")]
-    [InlineData("Default", "Fill")]
-    [InlineData(null, "Fill")]
-    [InlineData("  ", "Fill")]
+    [InlineData("Default", "Lattice")]
+    [InlineData(null, "Lattice")]
+    [InlineData("  ", "Lattice")]
     public void FillStrategiesWinAndAreCanonicalized(string name, string expected)
     {
         var result = EngineNameResolver.Classify(name);

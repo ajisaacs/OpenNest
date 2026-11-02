@@ -282,7 +282,7 @@ public class NestPipelineTests
             NestPipeline.Run(Request("Mystery Engine", Item("bracket", 1)))
         );
 
-        Assert.Contains("Fill", error.Message);
+        Assert.Contains("Lattice", error.Message);
     }
 
     [Fact]

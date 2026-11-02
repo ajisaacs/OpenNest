@@ -22,7 +22,7 @@ public readonly record struct EngineNameClassification(EngineNameKind Kind, stri
 /// <summary>
 /// Classifies a name from a front end selector that accepts both single-plate fill strategies
 /// (<see cref="PlateFillService"/>) and whole-job engines (<see cref="NestingEngineRegistry"/>).
-/// Fill strategies win, so "Fill" and "Strip" resolve as strategies; an omitted name means
+/// Fill strategies win, so "Lattice" and "Strip" resolve as strategies; an omitted name means
 /// <see cref="PlateFillService.DefaultStrategy"/>. Front ends keep their own message wording.
 /// </summary>
 public static class EngineNameResolver

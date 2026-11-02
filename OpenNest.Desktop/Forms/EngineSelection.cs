@@ -64,10 +64,28 @@ namespace OpenNest.Forms
         /// built-in strategy, otherwise Fill.</summary>
         public static string FillStrategy => IsFillStrategy(engineName) ? engineName : PlateFillService.DefaultStrategy;
 
-        public static bool IsFillStrategy(string name) =>
-            !string.IsNullOrWhiteSpace(name)
-            && PlateFillService.BuiltInStrategies.Any(
-                s => s.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase)
-            );
+        public static bool IsFillStrategy(string name)
+        {
+            var resolved = NestingEngineRegistry.ResolveName(name);
+            return resolved != null
+                && PlateFillService.BuiltInStrategies.Any(
+                    s => s.Equals(resolved, StringComparison.OrdinalIgnoreCase)
+                );
+        }
+
+        /// <summary>The plain description shown beside an engine's name; empty for plug-ins.</summary>
+        public static string Description(string name) =>
+            NestingEngineRegistry.AvailableEngines
+                .FirstOrDefault(e => e.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+                ?.Description ?? string.Empty;
+
+        /// <summary>The description plus what Fill Area uses, for a tooltip on the selection.</summary>
+        public static string ToolTip(string name)
+        {
+            var description = Description(name);
+            return IsFillStrategy(name)
+                ? description
+                : $"{description}\nFill Area uses {PlateFillService.DefaultStrategy} with this engine.".TrimStart();
+        }
     }
 }

@@ -165,7 +165,9 @@ namespace OpenNest.Forms
             foreach (var name in EngineSelection.UiEngineNames)
                 engineComboBox.Items.Add(name);
 
+            EngineComboBoxDescriptions.Apply(engineComboBox.ComboBox);
             engineComboBox.SelectedItem = EngineSelection.EngineName;
+            engineComboBox.ToolTipText = EngineSelection.ToolTip(EngineSelection.EngineName);
             engineComboBox.SelectedIndexChanged += EngineComboBox_SelectedIndexChanged;
 
             updaterStatus = new UpdaterStatus(this, statusStrip1, statusLabel1.Font);

@@ -16,7 +16,31 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
 | Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan; under a time limit it keeps trying seeded variants until the limit |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
-| Fill, Strip, Vertical Remnant, Horizontal Remnant | Single-strategy fills | The fixed placement strategies behind interactive fill; Fill is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder). In whole jobs, all four place a plate with any fixed or bounded part rotation by the rotation-aware ordered placer instead |
+| Lattice, Strip, Vertical Remnant, Horizontal Remnant | Many copies of a few parts | The fixed placement strategies behind interactive fill; Lattice is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder), and the remnant strategies run it ranked to keep the largest drop. In whole jobs, all four place a plate with any fixed or bounded part rotation by the rotation-aware ordered placer instead |
+
+Each engine's plain description (`NestingEngineInfo.Description`) is shown beside its name in the
+desktop engine lists. The main-window selection also picks Fill Area's strategy; a selection that
+is not one of these four strategies leaves Fill Area on Lattice, and its tooltip says so.
+
+### Leftovers after a fill
+
+The four strategies fill the high-demand parts first, then place the leftovers in two orders and
+keep whichever the strategy's own comparer ranks better as a whole layout; a tie keeps pack-first.
+Neither order wins every job: pairs reach the gaps a fill leaves before singles take them, but plain
+rectangles often pack tighter one at a time.
+
+- Pack first packs everything but quantity-two items into the largest remnant, then places those as
+  best-fit pairs.
+- Pairs first, tried when any leftover has an even quantity, places each even quantity as pairs,
+  largest bounding box first, so a part that fits a gap reaches it before a smaller one takes it,
+  then packs the rest into the largest remnant left.
+
+A pair may also turn a quarter when its part has no rotation limits, is tried in every remnant, and
+is ranked with the layout around it, since a pair's own extent cannot show whether it lengthens the
+layout. The chosen pair then slides left and down against the true outlines around it
+(`CompactPair`), because remnants are boxes and the closing whole-layout settle moves everything as
+one group. Trimming a fill to quantity keeps its interlocked pairs whole, so the spare space stays
+one usable cell rather than two half gaps.
 
 Neither Irregular nor Rectangles wins every job, even within its own lane, so Default runs both
 rather than choosing by part shape; Rectangles adds little time and is also the fallback when an
@@ -434,11 +458,12 @@ desktop selections, scripts and API requests keep working:
 | `Opus55NestingEngine` | Irregular |
 | `RectanglesNestingEngine` | Rectangles |
 | `StockLadder` | Default |
+| `Fill` | Lattice |
 
-In v0.3.0 and earlier, `Default` was the multi-phase fill engine now named Fill. `Default` now names the
-choosing engine above, so saved selections, scripts and API requests that name it get that
-engine. Fill-strategy calls (interactive fill, `PlateFillService`, console fill without
-`--autonest`, MCP fill tools) still read `Default` as Fill.
+In v0.3.0 and earlier, `Default` was the multi-phase fill engine now named Lattice. `Default` now
+names the choosing engine above, so saved selections, scripts and API requests that name it get
+that engine. Fill-strategy calls (interactive fill, `PlateFillService`, console fill without
+`--autonest`, MCP fill tools) still read `Default` and `Fill` as Lattice.
 
 StockLadder, a greedy constrained-first engine kept out of the desktop list, was retired
 because Default matched or beat it on every benchmark job, with and without salvage credit and

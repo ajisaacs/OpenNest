@@ -25,4 +25,19 @@ public class EngineSelectionTests
     [InlineData(null)]
     public void JobsOnlyEnginesAndBlanks_AreNotFillStrategies(string? name) =>
         Assert.False(EngineSelection.IsFillStrategy(name!));
+
+    [Fact]
+    public void EveryBuiltInEngineHasADescription()
+    {
+        foreach (var name in EngineSelection.UiEngineNames)
+            Assert.NotEmpty(EngineSelection.Description(name));
+    }
+
+    [Fact]
+    public void ToolTipSaysWhatFillAreaUsesForJobOnlyEngines()
+    {
+        Assert.DoesNotContain("Fill Area", EngineSelection.ToolTip("Vertical Remnant"));
+        Assert.Contains("Fill Area uses Lattice", EngineSelection.ToolTip("Irregular"));
+    }
+
 }

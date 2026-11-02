@@ -18,12 +18,12 @@ namespace OpenNest.Engine.Jobs.Placement;
 public static class PlateFillService
 {
     /// <summary>Strategy used when a caller selection names none.</summary>
-    public const string DefaultStrategy = "Fill";
+    public const string DefaultStrategy = "Lattice";
 
     /// <summary>The four built-in strategy names, in registry display order.</summary>
     public static IReadOnlyList<string> BuiltInStrategies { get; } =
     [
-        "Fill",
+        "Lattice",
         "Strip",
         "Vertical Remnant",
         "Horizontal Remnant",
@@ -403,10 +403,10 @@ public static class PlateFillService
         && a.Bottom < b.Top && a.Top > b.Bottom;
 
     /// <summary>
-    /// Resolves a caller-supplied strategy name: null or empty means "Fill"; otherwise the name
+    /// Resolves a caller-supplied strategy name: null or empty means "Lattice"; otherwise the name
     /// must match a built-in strategy, matched case-insensitively like the legacy registry's
-    /// ActiveEngineName so tolerant interactive callers keep working. "Default", the Fill
-    /// strategy's name in earlier releases, still resolves to "Fill". Returns the canonical name;
+    /// ActiveEngineName so tolerant interactive callers keep working. "Default" and "Fill", the
+    /// strategy's names in earlier releases, still resolve to "Lattice". Returns the canonical name;
     /// unknown names throw <see cref="NotSupportedException"/>.
     /// </summary>
     public static string ResolveStrategy(string strategy) => ResolveStrategy(strategy, true);

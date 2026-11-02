@@ -7,6 +7,14 @@ namespace OpenNest.Engine.Tests.Jobs;
 public class NestingEngineRegistryTests
 {
     [Fact]
+    public void TheFormerFillNameStillSelectsLattice()
+    {
+        Assert.Equal("Lattice", NestingEngineRegistry.ResolveName("Fill"));
+        Assert.Equal("Lattice", NestingEngineRegistry.ResolveName("fill"));
+        Assert.IsType<FixedStrategyNestingEngine>(NestingEngineRegistry.Create("Fill"));
+    }
+
+    [Fact]
     public void BuiltInStrategiesAreRegistered()
     {
         var names = NestingEngineRegistry.AvailableEngines.Select(e => e.Name).ToList();
@@ -14,7 +22,7 @@ public class NestingEngineRegistryTests
         Assert.Contains("Rectangles", names);
         Assert.Contains("Irregular", names);
         Assert.Contains("Circles", names);
-        Assert.Contains("Fill", names);
+        Assert.Contains("Lattice", names);
         Assert.Contains("Strip", names);
         Assert.Contains("Vertical Remnant", names);
         Assert.Contains("Horizontal Remnant", names);

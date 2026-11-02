@@ -89,6 +89,7 @@ namespace OpenNest.Forms
         {
             foreach (var name in EngineSelection.UiEngineNames)
                 engineComboBox.Items.Add(name);
+            EngineComboBoxDescriptions.Apply(engineComboBox);
             engineComboBox.SelectedItem = EngineSelection.EngineName;
         }
 

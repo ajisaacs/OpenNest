@@ -15,9 +15,9 @@ public class ExplicitPlacementStrategyTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void ResolveStrategy_UnsetMeansFill(string strategy)
+    public void ResolveStrategy_UnsetMeansLattice(string strategy)
     {
-        Assert.Equal("Fill", PlateFillService.ResolveStrategy(strategy));
+        Assert.Equal("Lattice", PlateFillService.ResolveStrategy(strategy));
     }
 
     [Theory]
