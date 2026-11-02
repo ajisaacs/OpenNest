@@ -149,6 +149,29 @@ public class TabHeldSupportTabTests
     }
 
     [Fact]
+    public void PlanCutting_TabsARoundPartsOneCircleOutline()
+    {
+        // A 2 inch disc whose outline is one circle: the plan must leave the tab open, and the
+        // pre-post review must find it.
+        var disc = new Program();
+        disc.MoveTo(2, 1);
+        disc.ArcTo(2, 1, 1, 1, RotationType.CCW);
+        var nest = new Nest("round");
+        var plate = new Plate(20, 20) { CuttingParameters = Parameters(2) };
+        nest.Plates.Add(plate);
+        nest.SetSupportBed(Bed);
+        plate.Parts.Add(new Part(new Drawing("disc", disc), new Vector(3, 3)));
+
+        var proposal = CuttingPlanBatch.Capture([plate], Parameters(2), preservePartOrder: false).Plan();
+
+        Assert.True(proposal.CanApply, string.Join("\n", proposal.Describe("in")));
+        Assert.Equal(TabSize, TabGap(Assert.Single(proposal.Plates[0].Result.ProposedOrder)), 6);
+        Assert.Equal(CuttingCommitStatus.Applied, proposal.Apply().Status);
+        Assert.DoesNotContain(PostVerificationAnalyzer.Analyze(nest).Findings,
+            f => f.Kind == PostVerificationKind.PartSupport);
+    }
+
+    [Fact]
     public void PrePost_WarnsOnlyAboutAnUntabbedShortPart()
     {
         var lead = new Line(new Vector(0, 0), new Vector(0, 1.5));

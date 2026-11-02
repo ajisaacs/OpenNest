@@ -88,7 +88,8 @@ analyzes each regenerated part (`SupportTabCapture`). A part the bed cannot hold
 tabbed perimeter (`PreparedContours.WithSupportTab`), using `TabConfig` for the tab size; all
 other parts keep the plate settings, so supported parts are not tabbed.
 
-The emitter tabs a perimeter at its entry: the cut stops short of the entry by the tab size.
+The emitter tabs a perimeter at its entry: the cut stops short of the entry by the tab size. A
+round perimeter, one circle, is cut as an arc that stops the tab's chord short of its entry.
 A support-tabbed perimeter's automatic entries are therefore limited to catalog points the
 analysis accepts, plus the closest native point to its best tab point (`AutomaticEntryKind.SupportTab`,
 never on a reflex or cusp vertex). Ranking and lead checks are unchanged.

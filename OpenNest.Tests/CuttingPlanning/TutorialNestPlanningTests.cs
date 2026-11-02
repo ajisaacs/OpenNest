@@ -1,6 +1,9 @@
 using OpenNest.CNC;
+using OpenNest.CNC.CuttingPlanning;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Diagnostics;
 using OpenNest.Engine.CuttingPlanning;
+using OpenNest.Geometry;
 using OpenNest.IO;
 
 namespace OpenNest.Tests.CuttingPlanning;
@@ -46,5 +49,12 @@ public class TutorialNestPlanningTests
         Assert.False(result.IsSafestRouteFallback);
         Assert.All(result.Findings, f => Assert.Contains("raises the head", f.Message));
         Assert.Equal(result.HeadRaises, result.ProposedOrder.Sum(p => p.CopyProgram().Codes.Count(HeadRaise.IsMarker)));
+
+        // What Plan Cutting applies, the pre-post review must agree with: every part that needs
+        // a tab has one (the round flanges' single-circle outlines included), and no rapid crosses.
+        Assert.Equal(CuttingCommitStatus.Applied, proposal.Apply().Status);
+        var findings = PostVerificationAnalyzer.Analyze(nest, Vector.Zero).Findings;
+        Assert.DoesNotContain(findings, f => f.Kind is PostVerificationKind.PartSupport
+            or PostVerificationKind.RapidCrossing or PostVerificationKind.MissingLeadIn);
     }
 }

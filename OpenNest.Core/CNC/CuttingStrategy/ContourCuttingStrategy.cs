@@ -1292,6 +1292,22 @@ namespace OpenNest.CNC.CuttingStrategy
 
         private static Shape TrimShapeForTab(Shape shape, Vector center, double tabSize)
         {
+            // A round perimeter is one circle entered at `center`: cut it as an arc from the entry
+            // that stops the tab's chord short of it, travelling the circle's own way.
+            if (shape.Entities is [Circle round] && round.Radius > tabSize / 2)
+            {
+                var entry = round.Center.AngleTo(center);
+                var gap = 2 * System.Math.Asin(tabSize / (2 * round.Radius));
+                var reversed = round.Rotation == RotationType.CW;
+                var arc = new Arc(round.Center, round.Radius, entry, reversed ? entry + gap : entry - gap, reversed)
+                {
+                    Layer = round.Layer,
+                };
+                var trimmed = new Shape();
+                trimmed.Entities.Add(arc);
+                return trimmed;
+            }
+
             var tabCircle = new Circle(center, tabSize);
             var entities = new List<Entity>(shape.Entities);
 
