@@ -855,8 +855,14 @@ internal static class JointCuttingPlanSearch
             {
                 token.ThrowIfCancellationRequested();
                 // The allowance can run out on the outside entries before any hole tour settles.
+                // The reading-order sweeps still get their few expansions per hole: one visits
+                // each hole about once, and it is often the route the searched entries ran out
+                // looking for, as on a frame left from inside its own cutout.
                 if (attemptIndex < firstWidened && Expansions >= stop)
-                    attemptIndex = firstWidened;
+                {
+                    var nextSweep = tries.FindIndex(attemptIndex, firstWidened - attemptIndex, t => t.Sweep != null);
+                    attemptIndex = nextSweep >= 0 ? nextSweep : firstWidened;
+                }
                 var (endpoint, sweep) = tries[attemptIndex];
                 if (attemptIndex >= firstWidened && endpoint >= firstReached)
                     yield break;
@@ -869,13 +875,15 @@ internal static class JointCuttingPlanSearch
                         Motion(entry);
                     stop = Expansions + (long)StallExpansionsPerEntry * snapshot.MaxEntries * prepared.Count;
                 }
-                if (Expansions >= stop) yield break;
+                if (Expansions >= stop && sweep == null) yield break;
                 var outside = perimeters[endpoint];
                 // Share what is left between the outside entries still to try: one that no hole
                 // tour can reach must not spend the allowance of the entries after it. One sweep
-                // visits each hole about once: it gets a few expansions per hole instead.
-                var limit = System.Math.Min(stop, Expansions + (sweep != null ? (long)SweepExpansionsPerHole * prepared.Count
-                    : System.Math.Max((stop - Expansions) / (perimeters.Length - endpoint), (long)StallExpansionsPerEntry * prepared.Count)));
+                // visits each hole about once: it gets a few expansions per hole instead, whether
+                // or not the allowance is spent; the whole budget still bounds it.
+                var limit = sweep != null ? Expansions + (long)SweepExpansionsPerHole * prepared.Count
+                    : System.Math.Min(stop, Expansions + System.Math.Max((stop - Expansions) / (perimeters.Length - endpoint),
+                        (long)StallExpansionsPerEntry * prepared.Count));
                 var chain = new List<ContourChoice>();
                 // This dominance heuristic is confined to recovery: emitted
                 // seams can differ for the same released subset. Never prune full DFS.
