@@ -81,9 +81,9 @@ namespace OpenNest.CNC.CuttingStrategy
         /// With <see cref="SupportTabs"/> on a plate with a support bed, the longest part (the
         /// long side of its outline's minimum-area bounding rectangle) its tab alone holds: such a
         /// part the bed cannot hold level is tabbed, and any tab clear of inside corners steadies
-        /// it. 0 turns the rule off.
+        /// it. 0 turns the rule off. New settings start at 6; settings saved without it read as 0.
         /// </summary>
-        public double TabHeldMaxLength { get; set; }
+        public double TabHeldMaxLength { get; set; } = 6;
 
         /// <summary>Whether a part <paramref name="length"/> long is held by its tab alone (see <see cref="TabHeldMaxLength"/>).</summary>
         public bool TabHoldsAt(double length) =>

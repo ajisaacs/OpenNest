@@ -60,6 +60,35 @@ public class TabHeldSupportTabTests
         Assert.Equal(holdsALengthOfOneAndAHalf, new CuttingParameters { TabHeldMaxLength = max }.TabHoldsAt(1.5));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(45)]
+    [InlineData(90)]
+    [InlineData(135)]
+    [InlineData(180)]
+    [InlineData(270)]
+    [InlineData(315)]
+    public void LengthOfATriangleWithTwoLeastBoxes_DoesNotDependOnItsRotation(double degrees)
+    {
+        // A 5 x 5 right triangle fits its legs' square and its hypotenuse's 7.07 x 3.54 box, both
+        // of area 25: the squarer box is the one measured, whatever way the part is turned.
+        var triangle = new Program();
+        triangle.MoveTo(0, 0); triangle.LineTo(5, 0); triangle.LineTo(0, 5); triangle.LineTo(0, 0);
+        var part = new Part(new Drawing("gusset", triangle), new Vector(10, 10));
+        part.Rotate(degrees * System.Math.PI / 180);
+        var material = SupportMaterial.FromPart(part);
+
+        Assert.Equal(5, SupportAnalyzer.Length(material), 6);
+        Assert.Equal(5, SupportAnalyzer.Width(material), 6);
+    }
+
+    [Fact]
+    public void NewSettingsHoldPartsUpToSixLong()
+    {
+        Assert.Equal(6, new CuttingParameters().TabHeldMaxLength);
+        Assert.True(new CuttingParameters().TabHoldsAt(5));
+    }
+
     [Fact]
     public void Analyze_HoldsAShortPartTheBedCannotByAnyClearTab()
     {

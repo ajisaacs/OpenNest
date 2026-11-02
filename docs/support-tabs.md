@@ -102,7 +102,12 @@ hold level whose length (the long side of its outline's minimum-area bounding re
 `SupportAnalyzer.Length`) is at most that, bound included, is still tabbed, but
 `SupportAnalyzer.HeldByTab` marks its analysis `IsHeldByTab`: it keeps its contacts and margin,
 every tab clear of inside corners steadies it, and its best tab point is chosen as on a plate
-with no bed (below). A part the bed holds is not tabbed. 0 turns the rule off.
+with no bed (below). A part the bed holds is not tabbed. 0 turns the rule off; new settings
+start at 6, while settings saved without the field read as 0, so saved settings keep their
+meaning. Some outlines have two minimum-area rectangles (a right isosceles triangle fits both
+its legs' square and its hypotenuse's 2:1 box), and which one rounding finds depends on how the
+part is turned; of rectangles tied for area, `SupportAnalyzer` measures the one with the shorter
+long side, so a drawing's length and width are the same at every rotation.
 `SupportTabSettings.Analyze` applies it for Plan Cutting, hand-placed lead-ins and the pre-post
 review alike, so such a part warns only when it is cut with no tab at all. View > Draw Support
 does not read cutting settings and still shows it red, since it would tip without its tab.
