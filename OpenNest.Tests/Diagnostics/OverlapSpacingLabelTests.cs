@@ -223,6 +223,45 @@ public class OverlapSpacingLabelTests
         Assert.False(state.SettledClear);
     }
 
+    [Theory]
+    [InlineData(4.5, "Layout: OK", false)]
+    [InlineData(4.1, "Layout: 1 too close", true)]
+    [InlineData(3.0, "Layout: 1 overlap", true)]
+    public void Summary_StaysShort(double x, string expected, bool attention)
+    {
+        var plate = PlateWith(Spacing, Square(0), Square(x));
+        var state = new OverlapReportState();
+        Assert.Equal("Layout: not checked", state.Summary);
+        Assert.True(state.TryPublish(state.Begin(plate), plate, Analyze(plate)));
+
+        Assert.Equal(expected, state.Summary);
+        Assert.Equal(attention, state.NeedsAttention);
+    }
+
+    [Fact]
+    public void Summary_CountsOverlapsAndSpacingTogether()
+    {
+        var plate = PlateWith(Spacing, Square(0), Square(3), Square(3.5), Square(7.6));
+        var state = new OverlapReportState();
+        Assert.True(state.TryPublish(state.Begin(plate), plate, Analyze(plate)));
+
+        Assert.Equal("Layout: 3 overlaps, 1 too close", state.Summary);
+    }
+
+    [Fact]
+    public void Summary_FlagsAnUnfinishedCheck()
+    {
+        var plate = PlateWith(Spacing, Square(0), new Part(new Drawing("invalid", new Program())));
+        var state = new OverlapReportState();
+        Assert.True(state.TryPublish(state.Begin(plate), plate, Analyze(plate)));
+        Assert.Equal("Layout: check incomplete", state.Summary);
+        Assert.True(state.NeedsAttention);
+
+        Assert.True(state.TryFail(state.Begin(plate), plate));
+        Assert.Equal("Layout: check failed", state.Summary);
+        Assert.True(state.NeedsAttention);
+    }
+
     [Fact]
     public void Presentation_ShowsPositionsNamesAndGap()
     {

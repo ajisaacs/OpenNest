@@ -355,6 +355,9 @@ namespace OpenNest.Controls
         }
         public OverlapCheckStatus OverlapStatus => overlapOverlay.Status;
         public PlateOverlapReport OverlapReport => overlapOverlay.Report;
+        public string OverlapSummary => overlapOverlay.Summary;
+        public string OverlapMessage => overlapOverlay.Message;
+        public bool OverlapNeedsAttention => overlapOverlay.NeedsAttention;
         public bool IsOverlapCheckRunning => overlapOverlay.IsRunning;
         public OverlapDisplayMode OverlapDisplay
         {

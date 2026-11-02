@@ -14,7 +14,7 @@ namespace OpenNest.Forms
     /// <summary>
     /// The main window's status labels for the active nest document: status text, cursor
     /// location, selection bounds, nest machine and material, MaterialLedger holds of a server nest,
-    /// and plate utilization. Plate number, size and
+    /// plate utilization and the automatic layout check. Plate number, size and
     /// quantity live in the plate view header instead. The location
     /// follows the mouse (the default, throttled), or only left clicks while click mode is on;
     /// the mode persists as a user setting.
@@ -34,6 +34,7 @@ namespace OpenNest.Forms
         private readonly ToolStripStatusLabel material;
         private readonly ToolStripStatusLabel plateUtil;
         private readonly ToolStripStatusLabel ledger;
+        private readonly ToolStripStatusLabel layout;
         private readonly Timer locationSettleTimer;
 
         private EditNestForm form;
@@ -42,9 +43,11 @@ namespace OpenNest.Forms
 
         public MainStatusBar(ToolStripStatusLabel status, ToolStripStatusLabel location,
             ToolStripStatusLabel selection, ToolStripStatusLabel machine, ToolStripStatusLabel material,
-            ToolStripStatusLabel plateUtil, ToolStripStatusLabel ledger = null)
+            ToolStripStatusLabel plateUtil, ToolStripStatusLabel ledger = null,
+            ToolStripStatusLabel layout = null)
         {
             this.ledger = ledger;
+            this.layout = layout;
             this.status = status;
             this.location = location;
             this.selection = selection;
@@ -67,6 +70,7 @@ namespace OpenNest.Forms
             UpdatePlate();
             UpdateLocation();
             UpdateLedger();
+            UpdateLayout();
 
             if (form == null)
             {
@@ -79,6 +83,7 @@ namespace OpenNest.Forms
             UpdateSelection();
             var view = form.PlateView;
             view.StatusChanged += PlateView_StatusChanged;
+            view.OverlapStateChanged += PlateView_OverlapStateChanged;
             view.SelectionChanged += PlateView_SelectionChanged;
             view.PartAdded += PlateView_PartAdded;
             view.PartRemoved += PlateView_PartRemoved;
@@ -96,12 +101,14 @@ namespace OpenNest.Forms
             view.MouseMove -= PlateView_MouseMove;
             view.MouseClick -= PlateView_MouseClick;
             view.StatusChanged -= PlateView_StatusChanged;
+            view.OverlapStateChanged -= PlateView_OverlapStateChanged;
             view.SelectionChanged -= PlateView_SelectionChanged;
             view.PartAdded -= PlateView_PartAdded;
             view.PartRemoved -= PlateView_PartRemoved;
             form.HoldStatus.Changed -= HoldStatus_Changed;
             form = null;
             UpdateLedger();
+            UpdateLayout();
         }
 
         public void ToggleLocationMode()
@@ -118,6 +125,7 @@ namespace OpenNest.Forms
             UpdatePlate();
             UpdateSelection();
             UpdateLedger();
+            UpdateLayout();
         }
 
         /// <summary>The hidden-by-default hold label MainForm inserts after the material label.</summary>
@@ -153,6 +161,38 @@ namespace OpenNest.Forms
                 : SystemColors.ControlText;
             var tip = summary?.ToolTip(form.Nest.Units) ?? "Reading holds from MaterialLedger…";
             ledger.ToolTipText = tip + Environment.NewLine + (holds.IsRefreshing ? "Refreshing…" : "Click to refresh.");
+        }
+
+        /// <summary>The layout check label MainForm inserts after utilization; hidden without a nest.</summary>
+        internal static ToolStripStatusLabel CreateLayoutLabel() => new()
+        {
+            Name = "layoutStatusLabel",
+            BorderSides = ToolStripStatusLabelBorderSides.Left,
+            Padding = new Padding(5, 0, 5, 0),
+            Visible = false,
+        };
+
+        /// <summary>
+        /// The automatic layout check has its own label: unlike the status text, it may change
+        /// on every edit without replacing the last command's message.
+        /// </summary>
+        public void UpdateLayout()
+        {
+            if (layout == null)
+                return;
+            var view = form?.PlateView;
+            layout.Visible = view != null;
+            if (view == null)
+            {
+                layout.Text = string.Empty;
+                layout.ToolTipText = string.Empty;
+                return;
+            }
+
+            if (layout.Text != view.OverlapSummary)
+                layout.Text = view.OverlapSummary;
+            layout.ForeColor = view.OverlapNeedsAttention ? Color.DarkRed : SystemColors.ControlText;
+            layout.ToolTipText = view.OverlapMessage;
         }
 
         public void UpdateLocation()
@@ -312,6 +352,8 @@ namespace OpenNest.Forms
         }
 
         private void PlateView_StatusChanged(object sender, EventArgs e) => status.Text = form.PlateView.Status;
+
+        private void PlateView_OverlapStateChanged(object sender, EventArgs e) => UpdateLayout();
 
         private void PlateView_SelectionChanged(object sender, EventArgs e) => UpdateSelection();
 

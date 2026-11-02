@@ -61,8 +61,10 @@ In a nest window the active plate is checked automatically. Any layout edit
 Only highlights involving changed ordered input slots are removed; once the
 layout has been unchanged for 0.5 s and no
 mouse button, modal dialog, or fill progress window is active, the check reruns.
-Automatic results appear only in the canvas label, so the status bar keeps the
-last command's message, and an automatic check keeps Display > Off rather than
+Automatic results do not replace the status bar's message, so it keeps the last
+command's text; a separate **Layout** section beside utilization follows the check
+instead, as `Layout: OK`, `Layout: checking…` or `Layout: 1 overlap, 3 too close`,
+in red for findings or an unfinished check, with the full wording in its tooltip, and an automatic check keeps Display > Off rather than
 switching to Areas. Rechecks are incremental: drawing material is prepared once
 and reused, and pairs whose two parts have not moved reuse the previous result,
 so only the moved parts' neighbors are clipped again. Canceling a check is

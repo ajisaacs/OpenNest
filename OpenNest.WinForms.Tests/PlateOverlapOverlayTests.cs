@@ -434,6 +434,51 @@ public class PlateOverlapOverlayTests
         run.Pump(task);
     });
 
+    [Fact]
+    public void SummaryStaysSteadyThroughARecheckAndNotifiesFromPaint() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.View.Plate.Parts.RemoveAt(1);
+        run.EnableAutoCheck();
+        var overlay = run.View.OverlapOverlay;
+        var task = run.AutoTick();
+        Assert.Equal("Layout: checking…", overlay.Summary);
+        run.Next().Complete();
+        run.Pump(task);
+        Assert.Equal("Layout: OK", overlay.Summary);
+
+        var changes = new List<string>();
+        run.View.OverlapStateChanged += (_, _) => changes.Add(overlay.Summary);
+        run.View.Plate.Parts[0].Offset(1, 0); // A drag: only paint can notice it.
+        run.Paint();
+        Assert.Equal("Layout: checking…", Assert.Single(changes.Distinct()));
+        Assert.False(overlay.NeedsAttention);
+    });
+
+    [Fact]
+    public void StatusBarLabelFollowsTheActiveViewWithoutTouchingTheStatusText() => RunSta(() =>
+    {
+        using var form = new EditNestForm(new Nest("layout"));
+        var status = new ToolStripStatusLabel();
+        var layout = MainStatusBar.CreateLayoutLabel();
+        var bar = new MainStatusBar(status, new ToolStripStatusLabel(), new ToolStripStatusLabel(),
+            new ToolStripStatusLabel(), new ToolStripStatusLabel(), new ToolStripStatusLabel(), null, layout);
+        form.PlateView.Status = "Fill: 2 parts in 5 ms";
+
+        bar.Bind(form);
+        Assert.True(layout.Available);
+        Assert.Equal(form.PlateView.OverlapSummary, layout.Text);
+        Assert.Equal(form.PlateView.OverlapMessage, layout.ToolTipText);
+        form.PlateView.Plate.Parts.Add(Rectangle());
+        form.PlateView.InvalidateOverlapCheck();
+        Assert.Equal("Layout: checking…", layout.Text);
+        Assert.Equal("Fill: 2 parts in 5 ms", status.Text);
+
+        bar.Bind(null);
+        Assert.False(layout.Available);
+        Assert.Equal("", layout.Text);
+    });
+
     private static bool CornerIsEmpty(OverlayRun run)
     {
         using var image = new Bitmap(64, 64);

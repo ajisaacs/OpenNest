@@ -32,6 +32,7 @@ internal sealed class OverlapOverlayController : IDisposable
     private Func<Units> autoCheckUnits;
     private ObservableList<Part> observedParts;
     private CancellationTokenSource cancellation;
+    private string reportedSummary;
     private GraphicsPath path;
     private IReadOnlyList<PlateOverlapPair> pathPairs;
     private float pathScale;
@@ -79,6 +80,11 @@ internal sealed class OverlapOverlayController : IDisposable
     public string Message => autoCheck.IsWaiting
         ? "Overlaps: check pending…"
         : state.Message;
+
+    /// <summary>The status bar's words: one steady "checking" for both pending and running.</summary>
+    public string Summary => IsSettling ? "Layout: checking…" : state.Summary;
+
+    public bool NeedsAttention => !IsSettling && state.NeedsAttention;
 
     /// <summary>
     /// The corner stays empty unless something is wrong: on a clear result, and while an
@@ -284,6 +290,7 @@ internal sealed class OverlapOverlayController : IDisposable
         if (toStatusBar || autoCheckUnits == null)
             view.Status = Message;
         view.Invalidate();
+        reportedSummary = Summary;
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -375,6 +382,12 @@ internal sealed class OverlapOverlayController : IDisposable
             return;
         EnsureFresh();
         UpdateAutoCheck(repaint: false); // Drags/nudges are only visible to the stamp; the label is drawn below.
+        // A wait can start or end here without a state change, and the status bar must follow.
+        if (reportedSummary != Summary)
+        {
+            reportedSummary = Summary;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
         ValidateHoverTransform();
 
         if (state.DisplayPairs.Count > 0)

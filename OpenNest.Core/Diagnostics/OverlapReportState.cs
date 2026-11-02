@@ -55,6 +55,34 @@ public sealed class OverlapReportState
         _ => "Overlaps: not checked"
     };
 
+    /// <summary>A few steady words for the status bar; <see cref="Message"/> has the detail.</summary>
+    public string Summary => Status switch
+    {
+        OverlapCheckStatus.Checking => "Layout: checking…",
+        OverlapCheckStatus.Current => IsAllClear ? "Layout: OK" : "Layout: " + Findings(),
+        OverlapCheckStatus.Incomplete => "Layout: check incomplete",
+        OverlapCheckStatus.Failed => "Layout: check failed",
+        OverlapCheckStatus.Canceled => "Layout: check canceled",
+        OverlapCheckStatus.Stale => "Layout: out of date",
+        _ => "Layout: not checked"
+    };
+
+    /// <summary>True when <see cref="Summary"/> reports findings or a check that did not finish.</summary>
+    public bool NeedsAttention => Status is OverlapCheckStatus.Incomplete or OverlapCheckStatus.Failed
+        || Status == OverlapCheckStatus.Current && !IsAllClear;
+
+    private string Findings()
+    {
+        var overlaps = Report.Pairs.Count + Report.ClampFindings.Count + Report.CutOffClampFindings.Count;
+        var spacing = Report.SpacingPairs.Count;
+        var words = new List<string>();
+        if (overlaps != 0)
+            words.Add(overlaps == 1 ? "1 overlap" : $"{overlaps} overlaps");
+        if (spacing != 0)
+            words.Add($"{spacing} too close");
+        return string.Join(", ", words);
+    }
+
     // Only a fully checked report that required a gap may clear spacing as well as overlaps.
     private string CurrentMessage()
     {

@@ -20,6 +20,7 @@ namespace OpenNest.Forms
 
         private readonly MainStatusBar statusBar;
         private readonly ToolStripStatusLabel ledgerStatusLabel = MainStatusBar.CreateLedgerLabel();
+        private readonly ToolStripStatusLabel layoutStatusLabel = MainStatusBar.CreateLayoutLabel();
         private bool nestingInProgress;
         private CancellationTokenSource nestingCts;
         private readonly NestStorageController storage;
@@ -114,9 +115,10 @@ namespace OpenNest.Forms
             Icon = Resources.app_icon;
             statusStrip1.Items.Insert(statusStrip1.Items.IndexOf(materialStatusLabel) + 1, ledgerStatusLabel);
             ledgerStatusLabel.Click += LedgerStatusLabel_Click;
+            statusStrip1.Items.Insert(statusStrip1.Items.IndexOf(plateUtilStatusLabel) + 1, layoutStatusLabel);
             statusStripToolTips = new StatusStripToolTips(statusStrip1); // The hold list lives in the ledger label's tooltip.
             statusBar = new MainStatusBar(statusLabel1, locationStatusLabel, selectionStatusLabel,
-                machineStatusLabel, materialStatusLabel, plateUtilStatusLabel, ledgerStatusLabel);
+                machineStatusLabel, materialStatusLabel, plateUtilStatusLabel, ledgerStatusLabel, layoutStatusLabel);
             btnCutPlanner = CreateActionButton("btnCutPlanner", "Plan Cutting",
                 Resources.cut_planner, ToolbarPlanCutting_Click);
             btnSimulateCutting = CreateActionButton("btnSimulateCutting", "Simulate Cutting",
