@@ -49,10 +49,35 @@ namespace OpenNest.IO
             this.nest = nest;
         }
 
+        /// <summary>
+        /// Writes beside <paramref name="file"/> and swaps the result in, so a failed write leaves
+        /// the previously saved nest intact instead of truncated.
+        /// </summary>
         public bool Write(string file)
         {
-            using var fileStream = new FileStream(file, FileMode.Create);
-            return Write(fileStream);
+            var temp = file + ".tmp";
+            try
+            {
+                bool written;
+                using (var fileStream = new FileStream(temp, FileMode.Create))
+                    written = Write(fileStream);
+                if (!written)
+                {
+                    File.Delete(temp);
+                    return false;
+                }
+                File.Move(temp, file, overwrite: true);
+                return true;
+            }
+            catch
+            {
+                try
+                {
+                    File.Delete(temp);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+                throw;
+            }
         }
 
         public bool Write(Stream stream)
@@ -448,6 +473,16 @@ namespace OpenNest.IO
                         },
                         Parts = parts,
                         CutOffs = cutoffs,
+                        CutOffSettings = cutoffs.Count == 0 || plate.CutOffSettings is not { } settings ? null
+                            : new CutOffSettingsDto
+                            {
+                                PartClearance = settings.PartClearance,
+                                Overtravel = settings.Overtravel,
+                                MinSegmentLength = settings.MinSegmentLength,
+                                CutDirection = settings.CutDirection == CutDirection.TowardOrigin ? "towardOrigin" : "awayFromOrigin",
+                                LockHeadHeight = settings.LockHeadHeight,
+                                HeadLockOvercut = settings.HeadLockOvercut,
+                            },
                         GrainAngle = plate.GrainAngle,
                         CuttingParameters = CuttingParametersSerializer.ToDto(plate.CuttingParameters),
                         Clamps = plate.ClampZones

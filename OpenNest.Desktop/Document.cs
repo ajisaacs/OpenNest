@@ -51,15 +51,28 @@ namespace OpenNest
 
         public bool HasSavePath => File.Exists(LastSavePath);
 
+        /// <summary>
+        /// Saves to <paramref name="path"/>. A failed write throws and leaves the nest's name and
+        /// save path as they were, and any file already at the path untouched.
+        /// </summary>
         public void SaveAs(string path)
         {
-            var name = Path.GetFileNameWithoutExtension(path);
-            Nest.Name = name;
+            var previousName = Nest.Name;
+            Nest.Name = Path.GetFileNameWithoutExtension(path);
+            try
+            {
+                var writer = new NestWriter(Nest) { BestFitStore = BestFitCacheStore.Shared };
+                if (!writer.Write(path))
+                    throw new IOException($"The nest could not be written to {path}.");
+            }
+            catch
+            {
+                Nest.Name = previousName;
+                throw;
+            }
+
             LastSaveDate = DateTime.Now;
             LastSavePath = path;
-
-            var writer = new NestWriter(Nest) { BestFitStore = BestFitCacheStore.Shared };
-            writer.Write(path);
             if (History.Current != null)
                 History.MarkSaved();
         }

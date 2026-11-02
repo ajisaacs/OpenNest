@@ -6,8 +6,9 @@ namespace OpenNest.Data;
 internal static class SettingsFile
 {
     /// <summary>
-    /// Writes the file, creating the parent directory, and retries briefly on IO collisions.
-    /// The last failure propagates; the host handles a persistent write failure.
+    /// Writes the file through a temporary file swapped into place, so a failed write keeps
+    /// the previous settings, creating the parent directory and retrying briefly on IO
+    /// collisions. The last failure propagates; the host handles a persistent write failure.
     /// </summary>
     public static void Write(string path, string json, int maxRetries = 3)
     {
@@ -19,7 +20,9 @@ internal static class SettingsFile
             {
                 if (!string.IsNullOrEmpty(directory))
                     Directory.CreateDirectory(directory);
-                File.WriteAllText(path, json);
+                var temp = path + ".tmp";
+                File.WriteAllText(temp, json);
+                File.Move(temp, path, overwrite: true);
                 return;
             }
             catch (IOException) when (attempt < maxRetries - 1)

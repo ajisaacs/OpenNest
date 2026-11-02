@@ -599,7 +599,17 @@ namespace OpenNest.Forms
 
         public void SaveAs(string path)
         {
-            Document.SaveAs(path);
+            try
+            {
+                Document.SaveAs(path);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this,
+                    $"The nest was not saved. Any copy already at that path was left as it was.\n\n{path}\n\n{ex.Message}",
+                    "Save Nest", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
             Text = Document.Name;
         }
 

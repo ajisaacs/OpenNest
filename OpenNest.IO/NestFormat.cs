@@ -683,6 +683,13 @@ namespace OpenNest.IO
             public List<CutOffDto> CutOffs { get; init; } = new();
 
             /// <summary>
+            /// The settings the plate's cut-offs were generated with (<c>Plate.CutOffSettings</c>).
+            /// Omitted when unknown; older files regenerate with the reader's defaults.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public CutOffSettingsDto CutOffSettings { get; init; }
+
+            /// <summary>
             /// Machine clamp keep-out rectangles in plate coordinates. Missing in older
             /// files, which load with no zones.
             /// </summary>
@@ -962,6 +969,16 @@ namespace OpenNest.IO
             /// </summary>
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             public CutOffGapDto[] Gaps { get; init; }
+        }
+
+        public record CutOffSettingsDto
+        {
+            public double PartClearance { get; init; }
+            public double Overtravel { get; init; }
+            public double MinSegmentLength { get; init; }
+            public string CutDirection { get; init; }
+            public bool LockHeadHeight { get; init; }
+            public double HeadLockOvercut { get; init; }
         }
 
         public record CutOffGapDto

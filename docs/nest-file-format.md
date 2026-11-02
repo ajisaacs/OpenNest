@@ -79,7 +79,12 @@ Each serialized plate's `cutOffs` array holds its cut-off definitions: `x`, `y`,
 `axis` (`vertical` or `horizontal`), optional `startLimit` and `endLimit`, and the
 places in the plate's cut sequence (`Plate.Parts` order, cut-offs included) of the
 parts the definition materializes. Loading regenerates each definition with the
-reader's default cut-off settings and makes one part per trimmed segment. `sequence`
+plate's `cutOffSettings` and makes one part per trimmed segment. That object (`partClearance`,
+`overtravel`, `minSegmentLength`, `cutDirection` as `awayFromOrigin` or `towardOrigin`,
+`lockHeadHeight`, `headLockOvercut`) records the settings the cut-offs were last generated
+with, so a reopened nest posts the cut-off geometry that was reviewed. It is omitted when the
+plate has no cut-offs or the settings are unknown; older files, and any missing, negative or
+nonfinite length, fall back to the reader's defaults. `sequence`
 is the zero-based place of the first segment (by position along the line); null or
 absent in older files, which load the cut-off at the end. `segments` lists the place
 of every segment in ascending order along the line; it is always written (files from

@@ -81,6 +81,55 @@ public class CutOffSerializationTests
     }
 
     [Fact]
+    public void RoundTrip_RegeneratesWithTheSavedSettingsNotTheDefaults()
+    {
+        var nest = new Nest();
+        var plate = TestHelpers.MakePlate(48, 96);
+        nest.Plates.Add(plate);
+        plate.CutOffs.Add(new CutOff(new Vector(35, 0), CutOffAxis.Vertical));
+        var machine = new CutOffSettings
+        {
+            Overtravel = 0.75,
+            MinSegmentLength = 0.5,
+            PartClearance = 0.1,
+            CutDirection = CutDirection.TowardOrigin,
+        };
+        plate.RegenerateCutOffs(machine);
+        var before = Program(plate);
+
+        using var stream = new MemoryStream();
+        Assert.True(new NestWriter(nest) { KeepEmptyPlates = true }.Write(stream));
+        stream.Position = 0;
+        var loaded = Assert.Single(new NestReader(stream).Read().Plates);
+
+        // The defaults have no overtravel, so a reader using them would not cut through.
+        Assert.Equal(before, Program(loaded));
+        Assert.Equal(0.75, loaded.CutOffSettings.Overtravel);
+        Assert.Equal(CutDirection.TowardOrigin, loaded.CutOffSettings.CutDirection);
+
+        static string Program(Plate plate) => string.Join(";", plate.Parts.Where(p => p.BaseDrawing.IsCutOff)
+            .SelectMany(p => p.Program.Codes).OfType<Motion>().Select(m => m.EndPoint.ToString()));
+    }
+
+    [Fact]
+    public void Read_WithoutSavedSettings_UsesTheDefaults()
+    {
+        var nest = new Nest();
+        var plate = TestHelpers.MakePlate(48, 96);
+        nest.Plates.Add(plate);
+        plate.CutOffs.Add(new CutOff(new Vector(35, 0), CutOffAxis.Vertical));
+        plate.RegenerateCutOffs(new CutOffSettings { Overtravel = 0.75 });
+        plate.CutOffSettings = null;
+
+        using var stream = new MemoryStream();
+        Assert.True(new NestWriter(nest) { KeepEmptyPlates = true }.Write(stream));
+        stream.Position = 0;
+        var loaded = Assert.Single(new NestReader(stream).Read().Plates);
+
+        Assert.Equal(0, loaded.CutOffSettings.Overtravel);
+    }
+
+    [Fact]
     public void RoundTrip_CutOffsPreserved()
     {
         var nest = new Nest();

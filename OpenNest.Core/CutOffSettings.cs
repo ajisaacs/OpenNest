@@ -25,5 +25,7 @@ namespace OpenNest
 
         /// <summary>The head-locked overcut a new cut-off gets from these settings; zero when off.</summary>
         public double NewCutOffHeadLockOvercut => LockHeadHeight ? HeadLockOvercut : 0;
+
+        public CutOffSettings Copy() => (CutOffSettings)MemberwiseClone();
     }
 }

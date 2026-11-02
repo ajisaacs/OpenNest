@@ -592,6 +592,30 @@ namespace OpenNest.IO
             return null;
         }
 
+        /// <summary>
+        /// The saved cut-off settings, field by field over the defaults: a missing, negative or
+        /// nonfinite length keeps its default rather than generating different geometry.
+        /// </summary>
+        private static CutOffSettings ReadCutOffSettings(CutOffSettingsDto dto)
+        {
+            var settings = new CutOffSettings();
+            if (dto == null)
+                return settings;
+            static bool Valid(double value) => double.IsFinite(value) && value >= 0;
+            if (Valid(dto.PartClearance))
+                settings.PartClearance = dto.PartClearance;
+            if (Valid(dto.Overtravel))
+                settings.Overtravel = dto.Overtravel;
+            if (Valid(dto.MinSegmentLength))
+                settings.MinSegmentLength = dto.MinSegmentLength;
+            if (string.Equals(dto.CutDirection, "towardOrigin", StringComparison.OrdinalIgnoreCase))
+                settings.CutDirection = CutDirection.TowardOrigin;
+            settings.LockHeadHeight = dto.LockHeadHeight;
+            if (Valid(dto.HeadLockOvercut))
+                settings.HeadLockOvercut = dto.HeadLockOvercut;
+            return settings;
+        }
+
         private static SupportBed ReadSupportBed(SupportBedDto dto)
         {
             if (dto == null)
@@ -812,7 +836,7 @@ namespace OpenNest.IO
                             firstPlaces[cutoff] = index;
                     }
 
-                    plate.RegenerateCutOffs(new CutOffSettings(), places, firstPlaces);
+                    plate.RegenerateCutOffs(ReadCutOffSettings(p.CutOffSettings), places, firstPlaces);
                 }
 
                 nest.Plates.Add(plate);

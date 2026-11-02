@@ -170,6 +170,13 @@ namespace OpenNest
         public ObservableList<CutOff> CutOffs { get; set; }
 
         /// <summary>
+        /// A copy of the settings the cut-offs were last regenerated with, or null before the
+        /// first regeneration. Saved with the nest, so reopening it rebuilds the same cut-off
+        /// geometry rather than geometry from built-in defaults.
+        /// </summary>
+        public CutOffSettings CutOffSettings { get; set; }
+
+        /// <summary>
         /// Fixed rectangular machine-clamp keep-outs in plate coordinates
         /// (<see cref="ClampZone"/>). Never parts: excluded from quantity, utilization,
         /// cut sequence and CNC output; placement rules and display consume them. Mutate
@@ -458,6 +465,7 @@ namespace OpenNest
             var separating = new List<Part>();
             var counts = new Dictionary<CutOff, int>();
             var partCount = Parts.Count;
+            CutOffSettings = settings?.Copy();
 
             // Regenerate and materialize each cut-off's segments
             foreach (var cutoff in CutOffs)
