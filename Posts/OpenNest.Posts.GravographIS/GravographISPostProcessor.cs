@@ -42,21 +42,13 @@ namespace OpenNest.Posts.GravographIS
 
         object IConfigurablePostProcessor.Config => Config;
 
+        /// <summary>Loads this PC's saved settings, else the shipped defaults (see <see cref="PostSettingsFile"/>).</summary>
         public GravographISPostProcessor()
         {
-            var configPath = GetConfigPath();
-            if (File.Exists(configPath))
-            {
-                var json = File.ReadAllText(configPath);
-                Config =
-                    JsonSerializer.Deserialize<GravographISPostConfig>(json, JsonOptions)
-                    ?? new GravographISPostConfig();
-            }
-            else
-            {
-                Config = new GravographISPostConfig();
-                SaveConfig();
-            }
+            var json = PostSettingsFile.Read(typeof(GravographISPostProcessor).Assembly);
+            Config = json == null
+                ? new GravographISPostConfig()
+                : JsonSerializer.Deserialize<GravographISPostConfig>(json, JsonOptions) ?? new GravographISPostConfig();
         }
 
         public GravographISPostProcessor(GravographISPostConfig config)
@@ -64,12 +56,7 @@ namespace OpenNest.Posts.GravographIS
             Config = config ?? throw new ArgumentNullException(nameof(config));
         }
 
-        public void SaveConfig()
-        {
-            var configPath = GetConfigPath();
-            var json = SerializeConfig();
-            File.WriteAllText(configPath, json);
-        }
+        public void SaveConfig() => PostSettingsFile.Write(typeof(GravographISPostProcessor).Assembly, SerializeConfig());
 
         public string SerializeConfig() => JsonSerializer.Serialize(Config, JsonOptions);
 
@@ -77,14 +64,6 @@ namespace OpenNest.Posts.GravographIS
             Config =
                 JsonSerializer.Deserialize<GravographISPostConfig>(json, JsonOptions)
                 ?? throw new JsonException("The post settings are empty.");
-
-        private static string GetConfigPath()
-        {
-            var assemblyPath = typeof(GravographISPostProcessor).Assembly.Location;
-            var dir = Path.GetDirectoryName(assemblyPath);
-            var name = Path.GetFileNameWithoutExtension(assemblyPath);
-            return Path.Combine(dir, name + ".json");
-        }
 
         public void Post(Nest nest, Stream outputStream)
         {

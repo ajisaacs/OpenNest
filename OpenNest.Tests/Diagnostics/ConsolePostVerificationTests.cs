@@ -5,6 +5,7 @@ using OpenNest.IO;
 
 namespace OpenNest.Tests.Diagnostics;
 
+[Collection(OpenNest.Tests.PostSettings.PostSettingsFileTests.Collection)]
 public class ConsolePostVerificationTests
 {
     [Fact]
@@ -12,11 +13,19 @@ public class ConsolePostVerificationTests
     {
         var directory = Path.Combine(Path.GetTempPath(), "opennest-post-verification-" + Guid.NewGuid());
         Directory.CreateDirectory(directory);
+        // Post with the shipped settings, never this PC's saved ones.
+        PostSettingsFile.DirectoryOverride = Path.Combine(directory, "post-settings");
         try
         {
             var input = Path.Combine(directory, "job.nest");
             var output = Path.Combine(directory, "job.cnc");
-            var nest = new Nest("VerificationFixture");
+            // A stock the shipped post has a cut library for, so only verification can refuse it.
+            var nest = new Nest("VerificationFixture")
+            {
+                Material = new Material("Carbon Steel"),
+                Thickness = 0.188,
+                AssistGas = "O2",
+            };
             var program = new OpenNest.CNC.Program();
             program.Codes.Add(new RapidMove(0, 0));
             program.Codes.Add(new LinearMove(2, 0));
@@ -56,6 +65,7 @@ public class ConsolePostVerificationTests
         }
         finally
         {
+            PostSettingsFile.DirectoryOverride = null;
             Directory.Delete(directory, recursive: true);
         }
     }

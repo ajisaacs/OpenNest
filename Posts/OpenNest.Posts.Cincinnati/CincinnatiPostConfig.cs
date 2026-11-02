@@ -354,6 +354,13 @@ namespace OpenNest.Posts.Cincinnati
         [PostSetting(LibrariesSection, 1)]
         public List<MaterialLibraryEntry> MaterialLibraries { get; set; } = new();
 
+        [DisplayName("Require libraries")]
+        [Description(
+            "Refuse to post a nest with no matching cut library, or etch features with no etch library. Turn off only if the controller's library is always loaded by hand: without a G89 it cuts with whatever library it loaded last."
+        )]
+        [PostSetting(LibrariesSection, 3)]
+        public bool RequireLibraries { get; set; } = true;
+
         [DisplayName("Etch libraries")]
         [Description("Etch library (G89 file) for each etch gas.")]
         [PostSetting(LibrariesSection, 2)]

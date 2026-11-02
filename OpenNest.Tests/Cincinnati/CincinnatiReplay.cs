@@ -20,6 +20,7 @@ internal static class CincinnatiReplay
         UsePartSubprograms = partSubprograms,
         UseAntiDive = false,
         PalletExchange = PalletMode.None,
+        RequireLibraries = false,
     };
 
     internal static string Post(Nest nest, bool partSubprograms) => Post(nest, Config(partSubprograms));

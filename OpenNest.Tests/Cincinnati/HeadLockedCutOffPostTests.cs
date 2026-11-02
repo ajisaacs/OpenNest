@@ -46,7 +46,7 @@ public class HeadLockedCutOffPostTests
     public void ClPost_WithoutLockCodes_RefusesBeforeWriting()
     {
         using var stream = new MemoryStream();
-        var post = new CincinnatiPostProcessor(new CincinnatiPostConfig());
+        var post = new CincinnatiPostProcessor(new CincinnatiPostConfig { RequireLibraries = false });
 
         var refusal = Assert.Throws<InvalidOperationException>(() => post.Post(Nest(farEdgeFirst: false), stream));
 
@@ -92,6 +92,7 @@ public class HeadLockedCutOffPostTests
     {
         var post = new CincinnatiPostProcessor(new CincinnatiPostConfig
         {
+            RequireLibraries = false,
             HeadHeightLockCode = LockCode,
             HeadHeightUnlockCode = UnlockCode,
         });

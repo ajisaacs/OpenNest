@@ -188,6 +188,43 @@ public class CincinnatiPostRegressionTests
             Assert.Empty(libraries);
         else
             Assert.Equal(new[] { $"P{expected}.lib" }, libraries);
+
+        // Without a G89 the controller cuts with whatever library it loaded last, so by
+        // default a nest with no matching library is refused.
+        config.RequireLibraries = true;
+        if (expected == "")
+            Assert.Throws<System.InvalidOperationException>(() => Post(nest, config));
+        else
+            Post(nest, config);
+    }
+
+    [Fact]
+    public void EtchFeatures_WithoutAnEtchLibrary_AreRefused()
+    {
+        var nest = SquaresNest(("A", new Vector(5, 5)));
+        var config = Config(partSubprograms: false);
+        config.RequireLibraries = true;
+        config.SelectedLibrary = "MS250O2";
+        Post(nest, config);
+
+        foreach (var move in nest.Plates[0].Parts[0].Program.Codes.OfType<LinearMove>().Take(4))
+            move.Layer = LayerType.Scribe;
+
+        Assert.Throws<System.InvalidOperationException>(() => Post(nest, config));
+        config.EtchLibraries = new() { new() { Gas = config.DefaultEtchGas, Library = "ETCHN2" } };
+        Post(nest, config);
+    }
+
+    [Fact]
+    public void NestUnits_OtherThanThePostedUnits_AreRefused()
+    {
+        var nest = SquaresNest(("A", new Vector(5, 5)));
+        nest.Units = Units.Millimeters;
+        var config = Config(partSubprograms: false);
+
+        Assert.Throws<System.InvalidOperationException>(() => Post(nest, config));
+        config.PostedUnits = Units.Millimeters;
+        Post(nest, config);
     }
 
     [Theory]

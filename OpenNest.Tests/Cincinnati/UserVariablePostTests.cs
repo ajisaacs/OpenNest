@@ -62,7 +62,7 @@ public class UserVariablePostTests
         plate.Parts.Add(new Part(drawing2, new Vector(50, 0)));
         nest.Plates.Add(plate);
 
-        var config = new CincinnatiPostConfig { UserVariableStart = 200 };
+        var config = new CincinnatiPostConfig { RequireLibraries = false, UserVariableStart = 200 };
         var post = new CincinnatiPostProcessor(config);
         var output = PostToString(post, nest);
 
@@ -89,7 +89,7 @@ public class UserVariablePostTests
         plate.Parts.Add(new Part(drawing2, new Vector(50, 0)));
         nest.Plates.Add(plate);
 
-        var config = new CincinnatiPostConfig { UserVariableStart = 200 };
+        var config = new CincinnatiPostConfig { RequireLibraries = false, UserVariableStart = 200 };
         var post = new CincinnatiPostProcessor(config);
         var output = PostToString(post, nest);
 
@@ -103,7 +103,7 @@ public class UserVariablePostTests
     [Fact]
     public void UserVariables_StartNumberConfigurable()
     {
-        var config = new CincinnatiPostConfig { UserVariableStart = 300 };
+        var config = new CincinnatiPostConfig { RequireLibraries = false, UserVariableStart = 300 };
         var output = PostNestWithVariables("width = 48.0\nG90\nG01X$widthY0", config);
 
         Assert.Contains("#300=48", output);
@@ -115,6 +115,7 @@ public class UserVariablePostTests
         // Create a plate with a vertical cutoff
         var config = new CincinnatiPostConfig
         {
+            RequireLibraries = false,
             SheetWidthVariable = 110,
             SheetLengthVariable = 111,
         };
@@ -150,7 +151,7 @@ public class UserVariablePostTests
     public void CutOff_SegmentedCut_OnlyEdgeUsesVariable()
     {
         // Create a plate with a part in the middle and a vertical cutoff
-        var config = new CincinnatiPostConfig { SheetWidthVariable = 110 };
+        var config = new CincinnatiPostConfig { RequireLibraries = false, SheetWidthVariable = 110 };
         var nest = new Nest { Name = "Test" };
         var plate = new Plate(new Size(48, 96));
 
@@ -188,7 +189,7 @@ public class UserVariablePostTests
         plate.Parts.Add(new Part(drawing, new Vector(0, 0)));
         nest.Plates.Add(plate);
 
-        config ??= new CincinnatiPostConfig { UserVariableStart = 200 };
+        config ??= new CincinnatiPostConfig { RequireLibraries = false, UserVariableStart = 200 };
         var post = new CincinnatiPostProcessor(config);
         return PostToString(post, nest);
     }

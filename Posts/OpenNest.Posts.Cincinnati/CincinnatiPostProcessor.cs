@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -58,19 +59,13 @@ namespace OpenNest.Posts.Cincinnati
             Config.SelectedLibrary = entry?.Library ?? "";
         }
 
+        /// <summary>Loads this PC's saved settings, else the shipped defaults (see <see cref="PostSettingsFile"/>).</summary>
         public CincinnatiPostProcessor()
         {
-            var configPath = GetConfigPath();
-            if (File.Exists(configPath))
-            {
-                var json = File.ReadAllText(configPath);
-                Config = JsonSerializer.Deserialize<CincinnatiPostConfig>(json, JsonOptions);
-            }
-            else
-            {
-                Config = new CincinnatiPostConfig();
-                SaveConfig();
-            }
+            var json = PostSettingsFile.Read(typeof(CincinnatiPostProcessor).Assembly);
+            Config = json == null
+                ? new CincinnatiPostConfig()
+                : JsonSerializer.Deserialize<CincinnatiPostConfig>(json, JsonOptions) ?? new CincinnatiPostConfig();
         }
 
         public CincinnatiPostProcessor(CincinnatiPostConfig config)
@@ -78,12 +73,7 @@ namespace OpenNest.Posts.Cincinnati
             Config = config;
         }
 
-        public void SaveConfig()
-        {
-            var configPath = GetConfigPath();
-            var json = SerializeConfig();
-            File.WriteAllText(configPath, json);
-        }
+        public void SaveConfig() => PostSettingsFile.Write(typeof(CincinnatiPostProcessor).Assembly, SerializeConfig());
 
         public string SerializeConfig() => JsonSerializer.Serialize(Config, JsonOptions);
 
@@ -92,20 +82,13 @@ namespace OpenNest.Posts.Cincinnati
                 JsonSerializer.Deserialize<CincinnatiPostConfig>(json, JsonOptions)
                 ?? throw new JsonException("The post settings are empty.");
 
-        private static string GetConfigPath()
-        {
-            var assemblyPath = typeof(CincinnatiPostProcessor).Assembly.Location;
-            var dir = Path.GetDirectoryName(assemblyPath);
-            var name = Path.GetFileNameWithoutExtension(assemblyPath);
-            return Path.Combine(dir, name + ".json");
-        }
-
         public void Post(Nest nest, Stream outputStream)
         {
             // Refuse before writing anything: a head-locked overcut needs the lock codes.
             HeadHeightLock.EnsurePostable(nest, Config.HasHeadHeightLockCodes(), Name);
             // M47 raises the head before a marked rapid; the markers must be well formed.
             HeadRaise.EnsurePostable(nest, true, Name);
+            EnsureProcessResolvable(nest);
 
             // 1. Create variable manager and register standard variables
             var vars = CreateVariableManager();
@@ -266,9 +249,51 @@ namespace OpenNest.Posts.Cincinnati
             DisplayPerimeterTail.EnsurePostable(nest);
             HeadHeightLock.EnsurePostable(nest, Config.HasHeadHeightLockCodes(), Name);
             HeadRaise.EnsurePostable(nest, true, Name);
+            EnsureProcessResolvable(nest);
             using var fs = new FileStream(outputFile, FileMode.Create, FileAccess.Write);
             Post(nest, fs);
         }
+
+        /// <summary>
+        /// Refuses a nest the controller would cut with the wrong process: coordinates in other
+        /// units than the G20/G21 the post declares, or features with no G89 library, which
+        /// leave the controller on whatever library it loaded last.
+        /// </summary>
+        private void EnsureProcessResolvable(Nest nest)
+        {
+            if (nest.Units != Config.PostedUnits)
+                throw new InvalidOperationException(
+                    $"The nest is in {nest.Units} but the {Name} post writes {Config.PostedUnits}. "
+                        + "Change the post's Posted units, or the nest's units, so they match.");
+
+            var parts = nest.Plates.SelectMany(p => p.Parts).Where(p => p?.Program != null).ToList();
+            if (!Config.RequireLibraries || parts.Count == 0)
+                return;
+
+            var resolver = new MaterialLibraryResolver(Config);
+            var gas = MaterialLibraryResolver.ResolveGas(nest, Config);
+            if (parts.Any(p => HasMoves(p.Program, etch: false))
+                && string.IsNullOrEmpty(resolver.ResolveCutLibrary(nest.Material?.Name ?? "", nest.Thickness, gas)))
+                throw new InvalidOperationException(
+                    $"The {Name} post has no cut library for {nest.Material?.Name ?? "(no material)"} "
+                        + $"{nest.Thickness} with {gas} assist gas. Add a row to the post's cut libraries "
+                        + "or select a library before posting.");
+
+            if (parts.Any(p => HasMoves(p.Program, etch: true))
+                && string.IsNullOrEmpty(resolver.ResolveEtchLibrary(Config.DefaultEtchGas)))
+                throw new InvalidOperationException(
+                    $"The nest has etch features but the {Name} post has no etch library for "
+                        + $"{Config.DefaultEtchGas} gas. Add one to the post's etch libraries before posting.");
+        }
+
+        private static bool HasMoves(Program program, bool etch) =>
+            program.Codes.Any(code => code switch
+            {
+                LinearMove line => (line.Layer == LayerType.Scribe) == etch,
+                ArcMove arc => (arc.Layer == LayerType.Scribe) == etch,
+                _ => false,
+            })
+            || program.Codes.OfType<SubProgramCall>().Any(call => call.Program != null && HasMoves(call.Program, etch));
 
         private Dictionary<(int drawingId, string varName), int> RegisterUserVariables(
             ProgramVariableManager vars,

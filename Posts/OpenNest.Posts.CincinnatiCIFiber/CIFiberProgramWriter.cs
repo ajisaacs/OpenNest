@@ -75,8 +75,27 @@ namespace OpenNest.Posts.CincinnatiCIFiber
 
             HeadHeightLock.EnsurePostable(nest, _config.HasHeadHeightLockCodes(), "Cincinnati CI Fiber");
             HeadRaise.EnsurePostable(nest, _config.HasHeadRaiseCode(), "Cincinnati CI Fiber");
+            EnsureMaterialMapped(nest);
             Write(nest, PostedSheets(nest), 1, w);
         }
+
+        /// <summary>
+        /// Refuses a material with no V.E.MATERIAL code: posting it under another material's
+        /// code would have the machine cut it with that material's technology.
+        /// </summary>
+        private void EnsureMaterialMapped(Nest nest)
+        {
+            var materialName = nest.Material?.Name ?? "";
+            if (_config.ResolveMaterialCode(materialName) == null)
+                throw new InvalidOperationException(MissingMaterialMessage(materialName));
+        }
+
+        private static string MissingMaterialMessage(string materialName) =>
+            string.IsNullOrWhiteSpace(materialName)
+                ? "The nest has no material and the Cincinnati CI Fiber post has no default material code. "
+                    + "Set the nest's material before posting."
+                : $"The Cincinnati CI Fiber post has no material code for \"{materialName.Trim()}\". "
+                    + "Add it to the post's material codes before posting.";
 
         /// <summary>
         /// Writes one sheet as a complete program. Contour labels restart at 1;
@@ -91,6 +110,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
 
             HeadHeightLock.EnsurePostable(nest, _config.HasHeadHeightLockCodes(), "Cincinnati CI Fiber");
             HeadRaise.EnsurePostable(nest, _config.HasHeadRaiseCode(), "Cincinnati CI Fiber");
+            EnsureMaterialMapped(nest);
             Write(nest, new[] { sheet }, sheetNumber, w);
         }
 
@@ -164,7 +184,8 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                 thickness = thickness.Substring(1); // sample posts ".060"
             CIFiberFormatter.Line(w, $"( Material = {materialName} {thickness} )".TrimEnd());
 
-            var code = _config.ResolveMaterialCode(materialName);
+            var code = _config.ResolveMaterialCode(materialName)
+                ?? throw new InvalidOperationException(MissingMaterialMessage(materialName));
             CIFiberFormatter.Line(w, $"V.E.MATERIAL = \"{code}\"");
             CIFiberFormatter.Line(w, $"V.E.THICKNESS = {_fmt.Fixed(nest.Thickness)}");
 

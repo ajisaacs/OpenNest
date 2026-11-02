@@ -17,7 +17,7 @@ public class DisplayPerimeterPostTests
 
     private static IPostProcessor Post(string name) => name switch
     {
-        "cincinnati" => new CincinnatiPostProcessor(new CincinnatiPostConfig { ConfigurationName = "CL940", PostedAccuracy = 4 }),
+        "cincinnati" => new CincinnatiPostProcessor(new CincinnatiPostConfig { RequireLibraries = false, ConfigurationName = "CL940", PostedAccuracy = 4 }),
         "cifiber" => new CIFiberPostProcessor(new CIFiberPostConfig { ConfigurationName = "CI FIBER 8K" }),
         _ => new GravographISPostProcessor(),
     };

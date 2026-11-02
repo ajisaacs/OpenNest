@@ -450,7 +450,19 @@ public class CIFiberPostProcessorTests
 
         Assert.Equal("SSN", config.ResolveMaterialCode("stainless"));
         Assert.Equal("SSN", config.ResolveMaterialCode(" STAINLESS "));
-        Assert.Equal("MSN", config.ResolveMaterialCode("Aluminum"));
+        Assert.Null(config.ResolveMaterialCode("Aluminum"));
+        Assert.Equal("MSN", config.ResolveMaterialCode(""));
+    }
+
+    [Fact]
+    public void UnmappedMaterial_IsRefusedRatherThanPostedAsTheDefault()
+    {
+        var nest = MakeMultiSheetNest();
+        nest.Material = new Material("Stainless");
+        var post = new CIFiberPostProcessor(new CIFiberPostConfig());
+
+        var ex = Assert.Throws<InvalidOperationException>(() => post.Post(nest, new MemoryStream()));
+        Assert.Contains("Stainless", ex.Message);
     }
 
     [Fact]

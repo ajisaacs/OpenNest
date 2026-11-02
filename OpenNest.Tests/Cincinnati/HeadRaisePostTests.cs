@@ -97,7 +97,7 @@ public class HeadRaisePostTests
 
     private static List<string> ClLines(Nest nest, M47Mode mode)
     {
-        var post = new CincinnatiPostProcessor(new CincinnatiPostConfig { ExteriorM47 = mode, InteriorM47 = mode });
+        var post = new CincinnatiPostProcessor(new CincinnatiPostConfig { RequireLibraries = false, ExteriorM47 = mode, InteriorM47 = mode });
         using var stream = new MemoryStream();
         post.Post(nest, stream);
         return Lines(stream);

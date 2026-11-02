@@ -7,7 +7,7 @@ building nests and posts the same way:
 | Kind | Key | What it holds | This PC's own copy |
 |---|---|---|---|
 | `machine` | machine id | A Tools > Machine Configuration entry: materials, grades, thicknesses, leads, kerf, cut-offs, motion limits, plate sizes, support grid, clamps | `%APPDATA%\OpenNest\Machines\<id>.json` |
-| `post` | post type name, e.g. `OpenNest.Posts.CincinnatiCIFiber.CIFiberPostProcessor` | A post's settings, as its JSON file holds them | `<post>.json` beside the post DLL in `Posts\` |
+| `post` | post type name, e.g. `OpenNest.Posts.CincinnatiCIFiber.CIFiberPostProcessor` | A post's settings, as its JSON file holds them | `%APPDATA%\OpenNest\Posts\<post>.json`, else the shipped `<post>.json` beside the post DLL in `Posts\` until the first save (an update replaces the install folder, so edits are never saved there) |
 | `clamps` | `default` | Legacy clamp settings, read only to copy them onto a machine once (machines now hold their clamps) | `%APPDATA%\OpenNest\clamps.json` |
 | `nest-defaults` | `default` | Tools > Nest Defaults: units, sheet size, quadrant, spacing, default machine | `%APPDATA%\OpenNest\defaults.json` |
 

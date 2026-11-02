@@ -237,21 +237,27 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             return copy;
         }
 
-        /// <summary>Fallback V.E.MATERIAL code when the material name has no mapping.</summary>
+        /// <summary>V.E.MATERIAL code for a nest with no material name.</summary>
         [DisplayName("Default material code")]
-        [Description("Code used when the nest material has no entry in the table above.")]
+        [Description(
+            "Code used when the nest has no material. A named material missing from the table above is refused rather than posted with this code, so stainless or aluminum is never cut as steel."
+        )]
         [PostSetting(MaterialSection, 1)]
         public string DefaultMaterialCode { get; set; } = "MSN";
 
+        /// <summary>
+        /// The V.E.MATERIAL code for <paramref name="materialName"/>, or null when a named
+        /// material has no mapping (or an unnamed one has no default): the caller must refuse.
+        /// </summary>
         public string ResolveMaterialCode(string materialName)
         {
-            if (!string.IsNullOrWhiteSpace(materialName)
-                && MaterialCodes != null
-                && MaterialCodes.TryGetValue(materialName.Trim(), out var code)
-                && !string.IsNullOrWhiteSpace(code))
-                return code;
+            string code;
+            if (string.IsNullOrWhiteSpace(materialName))
+                code = DefaultMaterialCode;
+            else if (MaterialCodes == null || !MaterialCodes.TryGetValue(materialName.Trim(), out code))
+                code = null;
 
-            return DefaultMaterialCode ?? "MSN";
+            return string.IsNullOrWhiteSpace(code) ? null : code;
         }
 
         /// <summary>

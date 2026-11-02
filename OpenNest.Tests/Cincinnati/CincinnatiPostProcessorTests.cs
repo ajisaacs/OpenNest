@@ -14,7 +14,7 @@ public class CincinnatiPostProcessorTests
     public void Post_ProducesOutput_ForSinglePlateNest()
     {
         var nest = CreateTestNest();
-        var config = new CincinnatiPostConfig { ConfigurationName = "CL940", PostedAccuracy = 4 };
+        var config = new CincinnatiPostConfig { RequireLibraries = false, ConfigurationName = "CL940", PostedAccuracy = 4 };
         var post = new CincinnatiPostProcessor(config);
 
         using var ms = new MemoryStream();
@@ -43,7 +43,7 @@ public class CincinnatiPostProcessorTests
     public void Post_EmitsLeadOutVariable()
     {
         var nest = CreateTestNest();
-        var config = new CincinnatiPostConfig { PostedAccuracy = 4 };
+        var config = new CincinnatiPostConfig { RequireLibraries = false, PostedAccuracy = 4 };
         var post = new CincinnatiPostProcessor(config);
 
         using var ms = new MemoryStream();
@@ -59,6 +59,7 @@ public class CincinnatiPostProcessorTests
         var nest = CreateTestNest();
         var config = new CincinnatiPostConfig
         {
+            RequireLibraries = false,
             PostedAccuracy = 4,
             ArcFeedrate = ArcFeedrateMode.Variables,
         };
@@ -79,6 +80,7 @@ public class CincinnatiPostProcessorTests
         var nest = CreateTestNest();
         var config = new CincinnatiPostConfig
         {
+            RequireLibraries = false,
             PostedAccuracy = 4,
             ArcFeedrate = ArcFeedrateMode.None,
         };
@@ -97,7 +99,7 @@ public class CincinnatiPostProcessorTests
     public void Post_EmitsG90InPreamble()
     {
         var nest = CreateTestNest();
-        var config = new CincinnatiPostConfig { PostedAccuracy = 4 };
+        var config = new CincinnatiPostConfig { RequireLibraries = false, PostedAccuracy = 4 };
         var post = new CincinnatiPostProcessor(config);
 
         using var ms = new MemoryStream();
@@ -110,7 +112,7 @@ public class CincinnatiPostProcessorTests
     [Fact]
     public void Post_ImplementsIPostProcessor()
     {
-        var post = new CincinnatiPostProcessor(new CincinnatiPostConfig());
+        var post = new CincinnatiPostProcessor(new CincinnatiPostConfig { RequireLibraries = false });
         IPostProcessor pp = post;
 
         Assert.Equal("Cincinnati CL-707", pp.Name);
@@ -120,7 +122,7 @@ public class CincinnatiPostProcessorTests
     [Fact]
     public void Post_ImplementsIConfigurablePostProcessor()
     {
-        var post = new CincinnatiPostProcessor(new CincinnatiPostConfig());
+        var post = new CincinnatiPostProcessor(new CincinnatiPostConfig { RequireLibraries = false });
         var configurable = post as IConfigurablePostProcessor;
 
         Assert.NotNull(configurable);
@@ -137,7 +139,7 @@ public class CincinnatiPostProcessorTests
         plate2.Parts.Add(new Part(new Drawing("Part1", CreateSquareProgram())));
         nest.Plates.Add(plate2);
 
-        var config = new CincinnatiPostConfig { PostedAccuracy = 4 };
+        var config = new CincinnatiPostConfig { RequireLibraries = false, PostedAccuracy = 4 };
         var post = new CincinnatiPostProcessor(config);
 
         using var ms = new MemoryStream();
@@ -154,7 +156,7 @@ public class CincinnatiPostProcessorTests
     public void Post_ToFile_CreatesFile()
     {
         var nest = CreateTestNest();
-        var config = new CincinnatiPostConfig { PostedAccuracy = 4 };
+        var config = new CincinnatiPostConfig { RequireLibraries = false, PostedAccuracy = 4 };
         var post = new CincinnatiPostProcessor(config);
         var tempFile = Path.GetTempFileName() + ".CNC";
 
@@ -177,6 +179,7 @@ public class CincinnatiPostProcessorTests
     {
         var config = new CincinnatiPostConfig
         {
+            RequireLibraries = false,
             ConfigurationName = "CL940_CORONA",
             DefaultAssistGas = "N2",
             DefaultEtchGas = "N2",
@@ -239,6 +242,7 @@ public class CincinnatiPostProcessorTests
         var nest = CreateTestNest();
         var config = new CincinnatiPostConfig
         {
+            RequireLibraries = false,
             PostedAccuracy = 4,
             UsePartSubprograms = true,
             PartSubprogramStart = 200,
@@ -279,6 +283,7 @@ public class CincinnatiPostProcessorTests
 
         var config = new CincinnatiPostConfig
         {
+            RequireLibraries = false,
             PostedAccuracy = 4,
             UsePartSubprograms = true,
             PartSubprogramStart = 200,
@@ -317,6 +322,7 @@ public class CincinnatiPostProcessorTests
 
         var config = new CincinnatiPostConfig
         {
+            RequireLibraries = false,
             PostedAccuracy = 4,
             UsePartSubprograms = true,
             PartSubprogramStart = 200,
@@ -349,6 +355,7 @@ public class CincinnatiPostProcessorTests
 
         var config = new CincinnatiPostConfig
         {
+            RequireLibraries = false,
             PostedAccuracy = 4,
             UsePartSubprograms = true,
             PartSubprogramStart = 200,
@@ -373,6 +380,7 @@ public class CincinnatiPostProcessorTests
     {
         var config = new CincinnatiPostConfig
         {
+            RequireLibraries = false,
             UsePartSubprograms = true,
             PartSubprogramStart = 300,
         };
@@ -408,7 +416,7 @@ public class CincinnatiPostProcessorTests
         plate.Parts.Add(new Part(drawing, new Vector(1, 1)));
         nest.Plates.Add(plate);
 
-        var config = new CincinnatiPostConfig { UsePartSubprograms = true, PostedAccuracy = 4 };
+        var config = new CincinnatiPostConfig { RequireLibraries = false, UsePartSubprograms = true, PostedAccuracy = 4 };
         var post = new CincinnatiPostProcessor(config);
 
         using var ms = new MemoryStream();
