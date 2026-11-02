@@ -180,9 +180,47 @@ namespace OpenNest.Support
             return new Vector(System.Math.Cos(angle), System.Math.Sin(angle));
         }
 
-        // The full angle range checks every hull edge.
-        private static BoundingRectangleResult BoundingRectangle(IReadOnlyList<Vector> outline) =>
-            RotatingCalipers.MinimumBoundingRectangle(ConvexHull.Compute(outline.ToList()), 0, Math.Angle.TwoPI);
+        // The minimum-area rectangle over every hull edge. Shapes such as a right isosceles
+        // triangle have more than one (its legs' square and its hypotenuse's 2:1 box have the same
+        // area), and which one rounding picks depends on the part's rotation; of rectangles tied
+        // for area, the one with the shorter long side wins, so a drawing measures the same
+        // however it is placed.
+        private static BoundingRectangleResult BoundingRectangle(IReadOnlyList<Vector> outline)
+        {
+            var hull = ConvexHull.Compute(outline.ToList()).Vertices;
+            var n = hull.Count > 1 && hull[0] == hull[^1] ? hull.Count - 1 : hull.Count;
+            if (n < 3)
+                return RotatingCalipers.MinimumBoundingRectangle(outline.ToList());
+
+            var candidates = new List<BoundingRectangleResult>(n);
+            for (var i = 0; i < n; i++)
+            {
+                var edge = hull[(i + 1) % n] - hull[i];
+                var length = System.Math.Sqrt(edge.X * edge.X + edge.Y * edge.Y);
+                if (length <= Math.Tolerance.Epsilon)
+                    continue;
+                var u = new Vector(edge.X / length, edge.Y / length);
+                var v = new Vector(-u.Y, u.X);
+                double minU = double.MaxValue, maxU = double.MinValue, minV = double.MaxValue, maxV = double.MinValue;
+                for (var j = 0; j < n; j++)
+                {
+                    var pu = hull[j].X * u.X + hull[j].Y * u.Y;
+                    var pv = hull[j].X * v.X + hull[j].Y * v.Y;
+                    minU = System.Math.Min(minU, pu);
+                    maxU = System.Math.Max(maxU, pu);
+                    minV = System.Math.Min(minV, pv);
+                    maxV = System.Math.Max(maxV, pv);
+                }
+                candidates.Add(new BoundingRectangleResult(System.Math.Atan2(edge.Y, edge.X), maxU - minU, maxV - minV));
+            }
+            if (candidates.Count == 0)
+                return RotatingCalipers.MinimumBoundingRectangle(outline.ToList());
+
+            var least = candidates.Min(c => c.Area);
+            var slack = Math.Tolerance.Epsilon * System.Math.Max(least, 1);
+            return candidates.Where(c => c.Area <= least + slack)
+                .MinBy(c => System.Math.Max(c.Width, c.Height));
+        }
 
         // A point `clear` from the nearest inside corner keeps `clearance` from it; with no
         // clearance it must still not be the corner.
