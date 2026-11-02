@@ -491,7 +491,7 @@ public sealed class CuttingPlanProposal
                 + $"{Count(Plates.Sum(p => p.RegeneratedCount), "part program")} regenerated.");
         else if (RequiresWarningAcceptance)
             lines.Add((Plates.All(p => p.IsReady || p.HasOnlyFixedLeadWarnings)
-                    ? "Unverified plan available: fixed lead-ins could not be certified. "
+                    ? "Unverified plan available: " + Unverified(Plates.Where(p => !p.IsReady)).Headline + " "
                     : Plates.Any(p => p.Result.IsSafestRouteFallback)
                         ? "Safest-route plan available: no route passed every check within the search limit. "
                         : "Best-effort plan available. ")
@@ -507,6 +507,19 @@ public sealed class CuttingPlanProposal
             lines.AddRange(DescribePlate(plate, unit, changeSettings));
         }
         return lines;
+    }
+
+    // What an unverified plan whose motions all passed asks the operator to review: its fixed
+    // lead-ins, parts its support bed cannot hold level, or both.
+    private static (string Headline, string Plate) Unverified(IEnumerable<CuttingPlanPlateResult> plates)
+    {
+        var kinds = plates.SelectMany(p => p.Result.Findings).Select(f => f.Kind).Where(k => k != null).ToHashSet();
+        return kinds.Count == 1 && kinds.Contains(PostVerificationKind.PartSupport)
+            ? ("a part may tip once cut free.", "a part may tip once cut free.")
+            : kinds.Contains(PostVerificationKind.PartSupport)
+                ? ("fixed lead-ins could not be certified, and a part may tip once cut free.",
+                    "fixed lead-ins need review, and a part may tip once cut free.")
+                : ("fixed lead-ins could not be certified.", "fixed lead-ins need review.");
     }
 
     private static IEnumerable<string> DescribePlate(CuttingPlanPlateResult plate, string unit, string changeSettings)
@@ -541,7 +554,7 @@ public sealed class CuttingPlanProposal
         if (plate.CanApplyWithWarnings)
         {
             yield return heading + (plate.HasOnlyFixedLeadWarnings
-                ? $"unverified: fixed lead-ins need review. {Count(plate.PartCount, "part")}, "
+                ? $"unverified: {Unverified([plate]).Plate} {Count(plate.PartCount, "part")}, "
                     + $"{plate.RegeneratedCount} regenerated; every planned motion passed its checks."
                 : result.SafestRoute is { } severity
                 ? $"safest route found, unverified. No route passed every check within the search limit; "

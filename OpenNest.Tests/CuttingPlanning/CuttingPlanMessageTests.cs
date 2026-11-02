@@ -94,6 +94,25 @@ public class CuttingPlanMessageTests
         Assert.Same(program, part.Program);
     }
     [Fact]
+    public void Describe_OnlyAnUnsteadyPart_SaysItMayTipNotThatLeadsNeedReview()
+    {
+        // Nothing of the grid runs under the strip, so no single tab can hold it level.
+        var plate = new Plate(20, 20) { SupportBed = new OpenNest.Support.SupportGrid(1, 1, 0, 0.9, stabilityMargin: 0.1) };
+        plate.Parts.Add(new Part(new Drawing("strip", LeadPathValidationTests.Rectangle(0, 0, 10, 0.8)), new Vector(2, 2)));
+        var settings = ExplicitContourTests.Parameters();
+        settings.SupportTabs = true;
+        settings.TabConfig = new NormalTab { Size = 0.2 };
+
+        var proposal = CuttingPlanBatch.Capture([plate], settings, false).Plan();
+        var text = string.Join("\n", proposal.Describe("in"));
+
+        Assert.True(proposal.RequiresWarningAcceptance, text);
+        Assert.StartsWith("Unverified plan available: a part may tip once cut free.", text);
+        Assert.Contains("Plate 1: unverified: a part may tip once cut free.", text);
+        Assert.DoesNotContain("fixed lead-ins", text);
+    }
+
+    [Fact]
     public void Describe_LockedLeadHitsNeighbor_WarnsWithAdviceAndNeedsAcceptance()
     {
         var settings = ExplicitContourTests.Parameters();

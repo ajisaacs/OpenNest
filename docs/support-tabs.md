@@ -131,6 +131,13 @@ back first to every catalog entry clear of inside corners, then to every entry
 lead-in fits, it keeps every one that holds the part level, or else only the steadiest. The
 open-scrap pierce fallback then tries the last of those catalogs.
 
+When no single tab can steady the part (it rests on no contacts, or too few), the steadiest
+entry is only a preference: its other fitting entries clear of inside corners follow it,
+steadiest first, in the search and in contour recovery. A part boxed in by its neighbors, such as
+the upper of two strips nested in a cutout, can then be left toward the next cut instead of
+blocking the plan. It is still tabbed and still warned about as one that may tip. A part a tab
+can hold level keeps to its steadying entries.
+
 A drawing pin on the perimeter wins: its entry, leads and tab are kept as pinned, and the
 analysis is only carried for review. Replay and best-effort plans (`SupportTabCapture.Review`)
 warn with `PostVerificationKind.PartSupport` whenever an unsupported part's emitted perimeter is

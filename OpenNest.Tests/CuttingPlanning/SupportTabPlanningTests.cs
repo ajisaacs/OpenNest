@@ -142,6 +142,62 @@ public class SupportTabPlanningTests
     }
 
     [Fact]
+    public void StripWithALeadOut_IsTabbedAndPlanned()
+    {
+        // The lead-out leaves the tabbed perimeter from its trimmed end, away from the tab: the
+        // open-cut proof shows it cuts no gap, as pre-post review does.
+        var bed = new SupportGrid(2, 4, 0, 2.25, stabilityMargin: 0.1);
+        var (plate, _) = Strip(bed);
+        var parameters = Parameters();
+        parameters.ExternalLeadOut = new LineLeadOut { Length = 0.1, ApproachAngle = 60 };
+
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(0, 0),
+            confirmedParameters: parameters));
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, string.Join("\n", result.Findings.Select(f => f.Message)));
+        var proposal = Assert.Single(result.ProposedOrder);
+        var (entry, cutEnd) = EntryAndCutEnd(proposal);
+        Assert.Equal(TabSize, entry.DistanceTo(cutEnd), 6);
+        var motions = ExecutionMotionReader.Read(proposal.CopyProgram(), proposal.Location, null, default).Motions;
+        Assert.Equal(LayerType.Leadout, motions[^1].Layer);
+    }
+
+    // A 10 x 0.8 strip with a 9 x 0.4 slot near its bottom edge: no rapid from its top edge
+    // reaches the plate below it without crossing the slot once that is cut.
+    private static Program SlottedStrip()
+    {
+        var program = new Program();
+        program.Merge(LeadPathValidationTests.Rectangle(0.5, 0.1, 9.5, 0.5));
+        program.Merge(LeadPathValidationTests.Rectangle(0, 0, 10, 0.8));
+        return program;
+    }
+
+    [Fact]
+    public void PartNoSingleTabCanHold_LeavesFromAnotherEntryWhenItsSteadiestIsBoxedIn()
+    {
+        // No grid row runs under the slotted strip, so no tab can hold it; its steadiest tab
+        // point is on its top edge, across the slot from the part cut after it.
+        var bed = new SupportGrid(1, 1, 0, 0.9, stabilityMargin: 0.1);
+        var plate = new Plate(20, 20) { SupportBed = bed };
+        var slotted = new Part(new Drawing("slotted", SlottedStrip()), new Vector(2, 2));
+        plate.Parts.Add(slotted);
+        plate.Parts.Add(new Part(new Drawing("below", LeadPathValidationTests.Rectangle(0, 0, 10, 0.8)), new Vector(2, 0.6)));
+        var support = SupportAnalyzer.Analyze(bed, plate.Quadrant, slotted);
+        Assert.False(support.TabCanSupport);
+        Assert.True(support.BestTabPoint!.Value.Y > 2.4, $"best tab {support.BestTabPoint}");
+
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(0, 0),
+            confirmedParameters: Parameters(), preservePartOrder: true));
+
+        Assert.True(result.Status == CuttingPlanStatus.BestEffort, string.Join("\n", result.Findings.Select(f => f.Message)));
+        var (entry, cutEnd) = EntryAndCutEnd(result.ProposedOrder.Single(p => ReferenceEquals(p.SourcePart, slotted)));
+        Assert.Equal(TabSize, entry.DistanceTo(cutEnd), 6);
+        Assert.True(entry.Y < 2.4, $"entry {entry}");
+        Assert.Contains(result.Findings, f => ReferenceEquals(f.SourcePart, slotted)
+            && f.Kind == PostVerificationKind.PartSupport && f.Message.Contains("no single tab can steady it"));
+    }
+
+    [Fact]
     public void FallbackCatalog_KeepsClearOfInsideCornersBeforeOfferingEveryEntry()
     {
         var bed = new SupportGrid(2, 4, 0, 0.25, stabilityMargin: 0.1);

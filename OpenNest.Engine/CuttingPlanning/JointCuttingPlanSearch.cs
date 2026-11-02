@@ -739,8 +739,16 @@ internal static class JointCuttingPlanSearch
             {
                 // Placement origins are authored program coordinates, not a downstream cut.
                 // Use the same material-center look-ahead as the retained entry search.
+                var toward = target ?? node.RoutePosition - source.Location;
                 var ranked = prepared.AutomaticEntryCandidatesWithFallbacks(prepared.PerimeterOrdinal, token: token)
-                    .OrderBy(c => c.Choice.Point.DistanceTo(target ?? node.RoutePosition - source.Location)).ToArray();
+                    .OrderBy(c => c.Choice.Point.DistanceTo(toward)).ToArray();
+                // As in SelectEntries: when no single tab can steady the part, its other entries
+                // clear of inside corners follow the steadiest.
+                if (prepared.HasSupportTab && prepared.Support is { TabCanSupport: false })
+                    ranked = [.. ranked, .. prepared.AutomaticEntryCandidatesWithFallbacks(prepared.PerimeterOrdinal,
+                            token: token, supportEntries: SupportEntries.ClearOfInsideCorners)
+                        .Where(c => !ranked.Any(r => r.Choice.Point.DistanceTo(c.Choice.Point) <= OpenNest.Math.Tolerance.Epsilon))
+                        .OrderBy(c => c.Choice.Point.DistanceTo(toward))];
                 perimeters = ranked.Where(c => Evaluate(source, c).Status == ContourFeasibilityStatus.Clear)
                     .Select(c => c.Choice).ToArray();
                 if (perimeters.Length == 0)
@@ -1260,6 +1268,25 @@ internal static class JointCuttingPlanSearch
                     selection = Steadiest(source.Prepared, ContourEntrySelection.Select(ordered,
                         candidate => Evaluate(source, candidate), snapshot.MaxEntries, token));
                 }
+            // When no single tab can steady the part, its steadiest entry is only a preference:
+            // the other entries clear of inside corners follow it, steadiest first, so a part
+            // boxed in by its neighbors can still be left toward the next cut.
+            if (contour == source.Prepared.PerimeterOrdinal && source.Prepared.HasSupportTab
+                && source.Prepared.Support is { TabCanSupport: false }
+                && (selection.Choices.Count != 0 || selection.UncertainChoices.Count != 0))
+            {
+                var others = ContourEntrySelection.Select(
+                    RankedEntries(source, contour, target, arrival, sightTargets, SupportEntries.ClearOfInsideCorners),
+                    candidate => Evaluate(source, candidate), snapshot.MaxEntries, token);
+                var kept = selection.Choices.Concat(selection.UncertainChoices).ToArray();
+                bool IsNew(ContourChoice choice) =>
+                    !kept.Any(k => k.Point.DistanceTo(choice.Point) <= OpenNest.Math.Tolerance.Epsilon);
+                selection = selection with
+                {
+                    Choices = selection.Choices.Concat(others.Choices.Where(IsNew)).ToArray(),
+                    UncertainChoices = selection.UncertainChoices.Concat(others.UncertainChoices.Where(IsNew)).ToArray(),
+                };
+            }
             // No configured lead-in fits a cutout: pierce where eroding it leaves room.
             string erodedReason = null;
             // Entries the check could not settle are no fit either: a clear pierce outranks them.
