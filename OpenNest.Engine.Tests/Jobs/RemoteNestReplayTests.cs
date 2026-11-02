@@ -169,4 +169,28 @@ public class RemoteNestReplayTests
         Assert.True(double.IsPositiveInfinity(pose.Y));
         Assert.Same(stock, back.Plates.Single().Stock);
     }
+
+    [Fact]
+    public void ADrawingsFingerprintFollowsItsExactGeometryAndTravelsWithTheJob()
+    {
+        var a = new Drawing("a", TestDrawingFactory.Rectangle(10, 20));
+        var same = new Drawing("other name", TestDrawingFactory.Rectangle(10, 20));
+        var moved = new Drawing("a", TestDrawingFactory.Rectangle(10, 20.000000001));
+        Assert.Equal(64, RemoteNestSubmission.Fingerprint(a).Length);
+        Assert.Equal(RemoteNestSubmission.Fingerprint(a), RemoteNestSubmission.Fingerprint(same));
+        Assert.NotEqual(RemoteNestSubmission.Fingerprint(a), RemoteNestSubmission.Fingerprint(moved));
+
+        var b = new Drawing("b", TestDrawingFactory.LShape());
+        var request = Request(a, b);
+        var document = NestJobDocument.FromJson(NestJobDocument.From(request, [a, b]).ToJson());
+        Assert.Equal([RemoteNestSubmission.Fingerprint(a), RemoteNestSubmission.Fingerprint(b)], document.DrawingFingerprints);
+
+        // Reopened against new copies of the same drawings, the job replays to the local proposal.
+        var copyA = new Drawing("a", TestDrawingFactory.Rectangle(10, 20));
+        var copyB = new Drawing("b", TestDrawingFactory.LShape());
+        var reopened = RemoteNestSubmission.Reopen(document, [copyB, copyA]).Complete(Solve(request));
+        var local = NestPipeline.Run(Request(copyA, copyB));
+        Assert.Equal(local.Plates.SelectMany(p => p.Parts).Select(p => (p.BaseDrawing, p.Location)),
+            reopened.Plates.SelectMany(p => p.Parts).Select(p => (p.BaseDrawing, p.Location)));
+    }
 }

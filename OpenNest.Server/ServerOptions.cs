@@ -5,6 +5,22 @@ public static class ServerOptions
 {
     public const string DatabaseVariable = "OPENNEST_DB";
     public const string UpdatesVariable = "OPENNEST_UPDATES";
+    public const string JobRetentionVariable = "OPENNEST_JOB_RETENTION_DAYS";
+
+    /// <summary>
+    /// How long finished server nest jobs are kept: <c>OPENNEST_JOB_RETENTION_DAYS</c> (a positive
+    /// number of days, fractions allowed), or <see cref="Data.NestJobRules.Retention"/> when unset.
+    /// Anything else fails startup rather than deleting results sooner than intended.
+    /// </summary>
+    public static TimeSpan JobRetention(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Data.NestJobRules.Retention;
+        if (!double.TryParse(value.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var days)
+            || !(days > 0) || days > 36500)
+            throw new ArgumentException($"{JobRetentionVariable} must be a positive number of days.", nameof(value));
+        return TimeSpan.FromDays(days);
+    }
 
     /// <summary>
     /// True unless <c>OPENNEST_UPDATES</c> is <c>off</c>: the server mirrors the desktop

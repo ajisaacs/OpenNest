@@ -270,6 +270,10 @@ namespace OpenNest.Forms
                 foreach (var form in MdiChildren.OfType<EditNestForm>())
                     form.UpdateDrawingLibraryCommand();
                 RefreshLedgerHolds();
+                EnableCheck();
+                _ = serverJobsStatus?.RefreshAsync();
+                if (!NestStorage.Settings.IsDatabaseMode)
+                    serverJobsForm?.Close();
             }
             catch (Exception ex)
             {

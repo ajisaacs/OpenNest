@@ -24,7 +24,9 @@ With the box ticked, `ServerAutoNest`:
    stream is polled every two seconds throughout. Connection trouble only shows a waiting
    message; the job keeps running on the server.
 4. On success, replays the result here (below) and continues with the usual validation
-   report, review, Keep or Discard and commit. A failed job shows its error.
+   report, review, Keep or Discard and commit. Keep is recorded on the server before anything
+   is committed (below: [Keep once](#keep-once)), and Discard is recorded too. A failed job
+   shows its error.
 
 Stop (or closing the progress window) cancels the server job, best effort, and discards the
 proposal, exactly like stopping a local run; the worker stops within one report interval
@@ -40,12 +42,66 @@ AppUserModelID registered on a Start menu shortcut, which the Velopack install (
 [desktop auto-update](auto-update.md)) does not promise, so no packaging change is needed.
 Nothing is kept without the review's explicit **Keep**.
 
+## My Server Jobs
+
+**Nest > My Server Jobs...** (Database mode only, beside Auto Nest) lists the server's jobs,
+newest first: nest, state, result, engine, submitter, submitted and finished times. **Only my
+jobs** (on by default) shows this Windows user's jobs from any workstation; **Show** narrows to
+active, finished or ready-to-review jobs. A queued job shows its place in the queue, a running
+one the worker's stage, a failed one its error, and a finished one its summary (parts placed,
+sheets, utilization and anything left unplaced). Results waiting for review are bold.
+
+The list polls `GET /api/nest-jobs` every three seconds while the window is open; the list's
+ETag turns an unchanged poll into a 304. Polling rather than the per-job event stream: the
+list must also show jobs other desktops submit and jobs removed or expired, which no single
+job's stream announces, and one conditional request covers every row. The window also
+refreshes at once after anything this desktop does to a job.
+
+- **Open** (or double-click) a result that is ready to review. OpenNest looks for the nest
+  the job was sent from: the open tab bound to its server nest id (`NestId`, sent with the
+  job), then an open tab with its name; otherwise it offers the active nest, or asks the user
+  to open the nest first. It downloads the job's package and result, rebuilds the job from
+  `job.json` against that nest's own drawings (`RemoteNestSubmission.Reopen`) and replays it
+  behind the owned modal progress, then shows the validation report and review exactly as the
+  session that sent it would have. Each drawing is found by name, the one with unchanged
+  geometry when several share it; a drawing missing or changed since the job was sent refuses
+  the result (`NestReplayMismatchException`) and leaves the job unreviewed, so it can be opened
+  again once the drawing is back. Settings that live only on the sending dialog (ledger stock
+  codes, saved plate-size offers) are not reapplied by a later Open.
+- **Cancel Job** stops a queued or running job (`POST .../cancel`).
+- **Remove** deletes a finished job and its stored result from the server, asking first when
+  nobody has kept or discarded the result yet. Active jobs must be cancelled first.
+
+A job kept or discarded shows **Kept** or **Discarded** (who and when in the row's tooltip) and
+cannot be opened again.
+
+**Status bar.** In Database mode, a status-bar item counts this user's results waiting for
+review ("2 server nests to review"), including results that finished while OpenNest was
+closed. It reads the server at startup, every minute and after any job change from this
+desktop, stays hidden when there is nothing to review or the server cannot be reached, and
+opens My Server Jobs when clicked. Nothing pops up.
+
+## Keep once
+
+A succeeded job's result is reviewed once: `POST .../keep` or `POST .../discard`, with
+`If-Match` naming the job revision the desktop reviewed, moves it from unreviewed to `Kept` or
+`Discarded` only while it is still unreviewed at that revision (one conditional `UPDATE`
+under the database monitor). Anything else answers 409 with the job as it is, so of two
+desktops reviewing the same result the second is told who kept it, and when, and commits
+nothing. The desktop records the Keep first and commits only when the server accepts it; if
+the server cannot be reached, nothing is committed and the result stays on the server to open
+again from My Server Jobs. A server too old for the route keeps as before. Discard is best
+effort: a result left unreviewed only stays in the list. Keep and Discard drop the job's
+package and result on the server.
+
 ## What travels
 
 **The package** (`OpenNest.Api.NestJobPackage`) is a ZIP of:
 
 - `job.json`: `NestJobDocument`: engine name, each item's quantity, priority, rotation range
-  and drawing index, the drawing names in order (a guard against reordering), every stock
+  and drawing index, the drawing names in order (a guard against reordering), each drawing's
+  geometry fingerprint (a SHA-256 of the exact motions the freshness check compares, which a
+  later Open checks the nest's drawings against; workers ignore it), every stock
   entry as `NestStockJson` (size, quantity, spacing, quadrant, cost, clamp zones in plate
   coordinates, clamp rail, irregular outline), and the job options. A server job never sets
   `SearchUntilCancelled` and never runs under a `DeadlineNestingEngine`: it has no time
@@ -93,22 +149,30 @@ nor `OpenNest.IO`.
 | Route | Who | Does |
 |---|---|---|
 | `POST /api/nest-jobs` | desktop | multipart `metadata` (`NestJobSubmission`) and `file` (package, at most 256 MB); returns the queued job |
-| `GET /api/nest-jobs/{id}` | desktop | state, attempts, error, queue position |
-| `GET /api/nest-jobs/{id}/result` | desktop | the transcript; 409 until the job succeeded |
+| `GET /api/nest-jobs` | desktop | the job list, newest first: `filter` (`all`, `active`, `finished`, `unreviewed`), `submittedBy` (a bare user name matches that user on any workstation, ignoring case), `limit` (default 200, at most 500); ETag and `If-None-Match` |
+| `GET /api/nest-jobs/{id}` | desktop | state, attempts, error, queue position, review, summary |
+| `GET /api/nest-jobs/{id}/result` | desktop | the transcript; 409 until the job succeeded, and once it was kept or discarded |
+| `POST /api/nest-jobs/{id}/keep` | desktop | `If-Match` job revision, optional `{reviewedBy}`; marks the result Kept once (409 with the job otherwise) |
+| `POST /api/nest-jobs/{id}/discard` | desktop | the same for Discarded |
+| `DELETE /api/nest-jobs/{id}` | desktop | `If-Match`; removes a finished job and its result (409 while active or changed) |
 | `GET /api/nest-jobs/{id}/events` | desktop | Server-Sent Events of the job until it is final (below) |
 | `GET /api/nest-jobs/{id}/plan` | desktop | the best plan so far, revision in `X-Plan-Revision`; 204 when there is none (the polling fallback) |
 | `POST /api/nest-jobs/{id}/cancel` | desktop | queued: cancelled at once; running: flagged for the worker |
 | `POST /api/nest-jobs/claim` | worker | the oldest queued job on a fresh lease, or 204 |
-| `GET /api/nest-jobs/{id}/package` | worker | the package while queued or running |
+| `GET /api/nest-jobs/{id}/package` | worker, desktop | the package while queued or running, or succeeded and unreviewed (a desktop reopening the result) |
 | `POST /api/nest-jobs/{id}/heartbeat` | worker | renews the lease and reports a cancel request; 409 once the worker no longer holds it |
 | `PUT /api/nest-jobs/{id}/progress?workerId=` | worker | stores the latest `RemoteNestProgress` (at most 64 KB); answers like a heartbeat |
 | `PUT /api/nest-jobs/{id}/plan?workerId=` | worker | stores the latest `RemoteNestPlan` (at most 16 MB); answers like a heartbeat |
-| `PUT /api/nest-jobs/{id}/result?workerId=` | worker | stores the transcript (at most 64 MB); a job cancelled meanwhile ends Cancelled |
+| `PUT /api/nest-jobs/{id}/result?workerId=&parts=&unplaced=&sheets=&utilization=` | worker | stores the transcript (at most 64 MB) and its summary for job lists; a job cancelled meanwhile ends Cancelled |
 | `POST /api/nest-jobs/{id}/fail` | worker | ends the job Failed with a reason |
 | `POST /api/nest-jobs/{id}/cancelled` | worker | confirms a requested stop |
 | `POST /api/nest-jobs/{id}/release` | worker | gives the job back without spending an attempt (worker shutting down) |
 
-States: `Queued`, `Running`, then one of `Succeeded`, `Failed` and `Cancelled`. Only one job
+States: `Queued`, `Running`, then one of `Succeeded`, `Failed` and `Cancelled`. A succeeded
+job's `review` is `none` until it is kept or discarded. Schema version 17 adds `nestId`,
+`review`, `reviewedBy`, `reviewedAt` and the summary columns (`partsPlaced`, `partsUnplaced`,
+`sheets`, `utilization`), added only where missing. The worker computes the summary
+(`NestJobSummaries`) because the server never opens results; older workers send none. Only one job
 runs at a time: a claim returns nothing while any job is running, so another worker container
 never takes a second job. Claims are serialized by the database's monitor and transaction.
 
@@ -159,9 +223,15 @@ cancel ends Cancelled; otherwise it goes back to the front of the queue, or fail
 attempts (a job that keeps killing its worker, for example by running out of memory). A
 server restart keeps every job; leases lapse and recover the same way.
 
-Finished jobs drop their package at once, and are deleted with their result seven days after
-they finish. Like the rest of the API, these routes have no authentication; keep the server on
-a trusted LAN.
+**Retention.** Failed and cancelled jobs drop their package at once; a succeeded job keeps it
+until it is kept or discarded (a later Open rebuilds the job from it), then drops it with the
+result. Every finished job, reviewed or not, is deleted with its package and result
+`OPENNEST_JOB_RETENTION_DAYS` after it finished (default 7; a positive number of days,
+fractions allowed; anything else fails startup). Expired jobs are removed whenever a worker
+claims and whenever a job list is read. `compose.server.yaml` passes the variable through and
+`server.env.example` documents it. Like the rest of the API, these routes have no
+authentication; submitter and reviewer are the desktop's `user@machine`, not a verified
+identity. Keep the server on a trusted LAN.
 
 ## Worker and container
 
@@ -195,9 +265,18 @@ lapse, retry limit, release, retention, restart), `NestJobApiTests` (HTTP plus a
 run end to end) and `NestJobEventsTests` (stream order ending at the final state,
 `Last-Event-ID` reconnects, the watch reconnecting a dropped stream and polling a server
 without one, an engine plan reaching the desktop, a cancel seen within one report interval).
-`OpenNest.WinForms.Tests` `ServerAutoNestTests`: the progress window's stage text and plan
-strip, and the finish notice.
+`NestJobListTests` (list filters and submitter matching, queue positions, summary and nest id,
+Keep and Discard once including concurrent keeps, removal, configurable retention, the v16
+upgrade) and `NestJobListApiTests` (the list and its 304, the worker's summary, a second
+desktop's Keep refused over HTTP, If-Match, removal, a result reopened from its package in a
+later session and refused for a changed or missing drawing). `RemoteNestReplayTests` also pins
+drawing fingerprints and a reopened replay. `OpenNest.WinForms.Tests` `ServerAutoNestTests`:
+the progress window's stage text and plan strip, and the finish notice; `ServerJobsFormTests`:
+My Server Jobs rows and per-state actions, Cancel Job, Remove (with its confirmation), Open,
+the status-bar count, and a Keep refused because another desktop kept first.
 
 A live check against the container: submit a job, then
 `curl -N http://<server>:8090/api/nest-jobs/<id>/events` shows `job` and `plan` events until
-the final job event.
+the final job event. For job lists: `curl http://<server>:8090/api/nest-jobs?filter=unreviewed`
+lists the result; `POST .../keep` with `If-Match: "<revision>"` answers 200 once and 409 for a
+second desktop; `POST .../cancel` on a queued job ends it Cancelled at once.

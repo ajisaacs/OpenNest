@@ -59,6 +59,79 @@ public sealed class RemoteNestJobs : NestServerClient
         return record.Id == id ? record : throw new IOException("Nest server returned a different nest job.");
     }
 
+    /// <summary>
+    /// Jobs newest first (at most <paramref name="limit"/>), optionally one submitter's
+    /// (<c>user</c> matches that user on any workstation) and only active, finished or
+    /// unreviewed ones. With the <paramref name="etag"/> of an earlier answer, null means the
+    /// list has not changed. A server without job lists raises <see cref="ServerTooOldException"/>.
+    /// </summary>
+    public async Task<NestJobList?> ListAsync(NestJobListFilter filter = NestJobListFilter.All, string? submittedBy = null,
+        int limit = 200, string? etag = null, CancellationToken cancellationToken = default)
+    {
+        var query = $"api/nest-jobs?filter={filter.ToString().ToLowerInvariant()}&limit={limit.ToString(CultureInfo.InvariantCulture)}";
+        if (!string.IsNullOrWhiteSpace(submittedBy))
+            query += "&submittedBy=" + Uri.EscapeDataString(submittedBy);
+        using var request = new HttpRequestMessage(HttpMethod.Get, Url(query));
+        if (!string.IsNullOrEmpty(etag) && EntityTagHeaderValue.TryParse(etag, out var tag))
+            request.Headers.IfNoneMatch.Add(tag);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotModified)
+            return null;
+        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed)
+            throw new ServerTooOldException("server nest job lists");
+        await NestServerHttp.EnsureSuccessAsync(response, "list the nest jobs", cancellationToken);
+        var jobs = await response.Content.ReadFromJsonAsync<List<NestJobRecord>>(NestServerHttp.JsonOptions, cancellationToken)
+            ?? throw new IOException("Nest server returned an empty job list.");
+        return new NestJobList(jobs, response.Headers.ETag?.ToString());
+    }
+
+    /// <summary>
+    /// Records that the result of <paramref name="job"/> (as last read) is kept. Only one Keep or
+    /// Discard ever succeeds: a job kept, discarded or changed meanwhile raises
+    /// <see cref="NestJobConflictException"/> with the job as it is. Null when the server no longer has it.
+    /// </summary>
+    public Task<NestJobRecord?> KeepAsync(NestJobRecord job, string reviewedBy, CancellationToken cancellationToken = default) =>
+        ReviewAsync(job, "keep", reviewedBy, cancellationToken);
+
+    /// <summary>Records that the result is discarded, as <see cref="KeepAsync"/> records a Keep.</summary>
+    public Task<NestJobRecord?> DiscardAsync(NestJobRecord job, string reviewedBy, CancellationToken cancellationToken = default) =>
+        ReviewAsync(job, "discard", reviewedBy, cancellationToken);
+
+    private async Task<NestJobRecord?> ReviewAsync(NestJobRecord job, string action, string reviewedBy, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(job);
+        using var request = new HttpRequestMessage(HttpMethod.Post, Url($"api/nest-jobs/{job.Id}/{action}"))
+        {
+            Content = JsonContent.Create(new NestJobReviewRequest { ReviewedBy = reviewedBy ?? "" }, options: NestServerHttp.JsonOptions),
+        };
+        NestServerHttp.AddIfMatch(request, checked((int)job.Revision));
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return await GetAsync(job.Id, cancellationToken) is null ? null : throw new ServerTooOldException("keeping server nests once");
+        if (response.StatusCode == HttpStatusCode.Conflict)
+            throw new NestJobConflictException(await ReadRecordAsync(response, cancellationToken));
+        await NestServerHttp.EnsureSuccessAsync(response, $"{action} the nest result", cancellationToken);
+        return await ReadRecordAsync(response, cancellationToken);
+    }
+
+    /// <summary>
+    /// Removes a finished job and its result. False when the server no longer has it; a job
+    /// still active, or changed since <paramref name="job"/> was read, raises <see cref="NestJobConflictException"/>.
+    /// </summary>
+    public async Task<bool> DeleteAsync(NestJobRecord job, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(job);
+        using var request = new HttpRequestMessage(HttpMethod.Delete, Url($"api/nest-jobs/{job.Id}"));
+        NestServerHttp.AddIfMatch(request, checked((int)job.Revision));
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return false;
+        if (response.StatusCode == HttpStatusCode.Conflict)
+            throw new NestJobConflictException(await ReadRecordAsync(response, cancellationToken));
+        await NestServerHttp.EnsureSuccessAsync(response, "remove the nest job", cancellationToken);
+        return true;
+    }
+
     /// <summary>A succeeded job's result (a <c>NestSolveTranscript</c> as JSON).</summary>
     public async Task<string> GetResultAsync(Guid id, CancellationToken cancellationToken = default)
     {
@@ -239,13 +312,20 @@ public sealed class RemoteNestJobs : NestServerClient
             ?? throw new IOException("Nest server returned an empty answer.");
     }
 
-    /// <summary>Stores the result. False when the worker no longer holds the job.</summary>
-    public async Task<bool> CompleteAsync(Guid id, string workerId, string result, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Stores the result, with its <paramref name="summary"/> for job lists. False when the
+    /// worker no longer holds the job.
+    /// </summary>
+    public async Task<bool> CompleteAsync(Guid id, string workerId, string result, NestJobSummary? summary = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(result);
+        var path = $"api/nest-jobs/{id}/result?workerId={Uri.EscapeDataString(workerId)}";
+        if (summary is not null)
+            path += string.Create(CultureInfo.InvariantCulture,
+                $"&parts={summary.PartsPlaced}&unplaced={summary.PartsUnplaced}&sheets={summary.Sheets}&utilization={System.Math.Clamp(summary.Utilization, 0, 1):R}");
         using var content = new StringContent(result, Encoding.UTF8, "application/json");
-        using var response = await _httpClient.PutAsync(
-            Url($"api/nest-jobs/{id}/result?workerId={Uri.EscapeDataString(workerId)}"), content, cancellationToken);
+        using var response = await _httpClient.PutAsync(Url(path), content, cancellationToken);
         return await Held(response, "store the nest result", cancellationToken);
     }
 
@@ -283,4 +363,32 @@ public sealed class RemoteNestJobs : NestServerClient
     private static async Task<NestJobRecord> ReadRecordAsync(HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.Content.ReadFromJsonAsync<NestJobRecord>(NestServerHttp.JsonOptions, cancellationToken)
         ?? throw new IOException("Nest server returned an empty nest job.");
+}
+
+/// <summary>One answer of <see cref="RemoteNestJobs.ListAsync"/>: the jobs and the tag to send next time.</summary>
+public sealed record NestJobList(IReadOnlyList<NestJobRecord> Jobs, string? ETag);
+
+/// <summary>A Keep, Discard or Remove refused because the job was reviewed, removed or changed meanwhile.</summary>
+public sealed class NestJobConflictException : IOException
+{
+    public NestJobConflictException(NestJobRecord job)
+        : base(Describe(job))
+    {
+        Job = job;
+    }
+
+    /// <summary>The job as the server now holds it.</summary>
+    public NestJobRecord Job { get; }
+
+    private static string Describe(NestJobRecord job) => job.Review switch
+    {
+        NestJobReview.Kept => $"This result was already kept{By(job)}.",
+        NestJobReview.Discarded => $"This result was already discarded{By(job)}.",
+        _ when !job.IsFinished => "The job is still running on the nest server; stop it first.",
+        _ => "The job changed on the nest server; refresh and try again.",
+    };
+
+    private static string By(NestJobRecord job) =>
+        (string.IsNullOrWhiteSpace(job.ReviewedBy) ? "" : $" by {job.ReviewedBy}")
+        + (job.ReviewedAt is { } at ? $" on {at.ToLocalTime():g}" : "");
 }

@@ -50,6 +50,27 @@ public static class NestJobPackage
         return buffer.ToArray();
     }
 
+    /// <summary>
+    /// The package's <c>job.json</c> alone, without reading its drawings: a desktop reviewing the
+    /// job in a later session binds it to its own drawings instead
+    /// (<see cref="RemoteNestSubmission.Reopen"/>). Throws <see cref="FormatException"/> when it is not a package.
+    /// </summary>
+    public static NestJobDocument ReadDocument(byte[] package)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        try
+        {
+            using var zip = new ZipArchive(new MemoryStream(package, writable: false), ZipArchiveMode.Read);
+            var jobEntry = zip.GetEntry(JobEntry) ?? throw new FormatException($"The nest job has no {JobEntry}.");
+            using var reader = new StreamReader(jobEntry.Open(), Encoding.UTF8);
+            return NestJobDocument.FromJson(reader.ReadToEnd());
+        }
+        catch (InvalidDataException ex)
+        {
+            throw new FormatException("The nest job is not a readable ZIP package.", ex);
+        }
+    }
+
     /// <summary>Reads a package back into a request; throws <see cref="FormatException"/> when it is not one.</summary>
     public static NestPipelineRequest Read(byte[] package)
     {

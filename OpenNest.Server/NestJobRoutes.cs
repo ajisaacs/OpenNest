@@ -62,6 +62,30 @@ internal static class NestJobRoutes
             return Results.Ok(db.InsertJob(Guid.NewGuid(), submission, buffer.ToArray(), clock.GetUtcNow()));
         });
 
+        // Job lists (My Jobs). The ETag lets a polling desktop skip an unchanged list.
+        app.MapGet("/api/nest-jobs", (HttpContext http, NestDatabase db, TimeProvider clock, IOptions<Microsoft.AspNetCore.Http.Json.JsonOptions> json) =>
+        {
+            var query = http.Request.Query;
+            var filter = NestJobListFilter.All;
+            if (query["filter"].FirstOrDefault() is { Length: > 0 } text
+                && (!Enum.TryParse(text, ignoreCase: true, out filter) || !Enum.IsDefined(filter)))
+                return Results.BadRequest("filter must be all, active, finished or unreviewed.");
+            var limit = 200;
+            if (query["limit"].FirstOrDefault() is { Length: > 0 } limitText
+                && (!int.TryParse(limitText, NumberStyles.None, CultureInfo.InvariantCulture, out limit) || limit < 1))
+                return Results.BadRequest("limit must be a positive integer.");
+            var submittedBy = query["submittedBy"].FirstOrDefault();
+            if (submittedBy?.Length > NestJobRules.MaxTextLength)
+                return Results.BadRequest("submittedBy is too long.");
+
+            var body = JsonSerializer.SerializeToUtf8Bytes(db.ListJobs(filter, submittedBy, limit, clock.GetUtcNow()), json.Value.SerializerOptions);
+            var etag = $"\"{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(body), 0, 16)}\"";
+            http.Response.Headers.ETag = etag;
+            if (http.Request.Headers.IfNoneMatch.Contains(etag))
+                return Results.StatusCode(StatusCodes.Status304NotModified);
+            return Results.Bytes(body, "application/json");
+        });
+
         app.MapGet("/api/nest-jobs/{id:guid}", (Guid id, NestDatabase db) =>
             db.GetJob(id) is { } job ? Results.Ok(job) : Results.NotFound());
 
@@ -70,8 +94,30 @@ internal static class NestJobRoutes
             if (db.GetJobResult(id) is { } result)
                 return Results.Text(result, "application/json", Encoding.UTF8);
             return db.GetJob(id) is { } job
-                ? Results.Conflict($"The job has no result: it is {job.State}.")
+                ? Results.Conflict(job.Review == NestJobReview.None
+                    ? $"The job has no result: it is {job.State}."
+                    : $"The result was {job.Review.ToString().ToLowerInvariant()} already.")
                 : Results.NotFound();
+        });
+
+        // Keep and Discard each happen once per result: If-Match names the job revision the
+        // desktop reviewed, and a job kept, discarded or changed meanwhile answers 409 with the job.
+        app.MapPost("/api/nest-jobs/{id:guid}/keep", (Guid id, HttpRequest request, NestDatabase db, TimeProvider clock) =>
+            Review(id, NestJobReview.Kept, request, db, clock));
+        app.MapPost("/api/nest-jobs/{id:guid}/discard", (Guid id, HttpRequest request, NestDatabase db, TimeProvider clock) =>
+            Review(id, NestJobReview.Discarded, request, db, clock));
+
+        // Removes a finished job, package and result included; an active job must be cancelled first.
+        app.MapDelete("/api/nest-jobs/{id:guid}", (Guid id, HttpRequest request, NestDatabase db) =>
+        {
+            var precondition = IfMatch.Read(request, out var expected);
+            if (precondition is not null) return precondition;
+            return db.DeleteJob(id, expected) switch
+            {
+                null => Results.NotFound(),
+                { Removed: true } => Results.NoContent(),
+                { Job: var job } => Results.Conflict(job),
+            };
         });
 
         app.MapGet("/api/nest-jobs/{id:guid}/plan", (Guid id, HttpResponse response, NestDatabase db) =>
@@ -115,9 +161,11 @@ internal static class NestJobRoutes
         {
             if (string.IsNullOrWhiteSpace(workerId))
                 return Results.BadRequest("workerId is required.");
+            if (!TryReadSummary(http.Request.Query, out var summary))
+                return Results.BadRequest("parts, unplaced and sheets must be non-negative integers and utilization a number from 0 to 1.");
             var (result, error) = await ReadJsonBody(http, NestJobRules.MaxResultBytes, "nest result");
             if (error is not null) return error;
-            return db.CompleteJob(id, workerId, result!, clock.GetUtcNow())
+            return db.CompleteJob(id, workerId, result!, clock.GetUtcNow(), summary)
                 ? Results.Ok(db.GetJob(id))
                 : Results.Conflict("This worker no longer holds the job.");
         });
@@ -236,6 +284,45 @@ internal static class NestJobRoutes
         {
             // The desktop went away.
         }
+    }
+
+    private static async Task<IResult> Review(Guid id, NestJobReview review, HttpRequest request, NestDatabase db, TimeProvider clock)
+    {
+        var precondition = IfMatch.Read(request, out var expected);
+        if (precondition is not null) return precondition;
+        var reviewedBy = "";
+        if (request.HasJsonContentType())
+        {
+            var (json, error) = await DrawingSetRoutes.ReadJson(request, "review");
+            if (error is not null) return error;
+            try { reviewedBy = JsonSerializer.Deserialize<NestJobReviewRequest>(json!, Options)?.ReviewedBy ?? ""; }
+            catch (JsonException) { return Results.BadRequest("Invalid review JSON."); }
+            if (reviewedBy.Length > NestJobRules.MaxTextLength)
+                return Results.BadRequest("reviewedBy is too long.");
+        }
+        return db.ReviewJob(id, review, reviewedBy, expected, clock.GetUtcNow()) switch
+        {
+            null => Results.NotFound(),
+            { Changed: true, Job: var job } => Results.Ok(job),
+            { Job: var job } => Results.Conflict(job),
+        };
+    }
+
+    // The worker's summary of a result travels as query values beside it; none is fine (older workers).
+    private static bool TryReadSummary(IQueryCollection query, out NestJobSummary? summary)
+    {
+        summary = null;
+        var parts = query["parts"].FirstOrDefault();
+        if (string.IsNullOrEmpty(parts))
+            return true;
+        if (!int.TryParse(parts, NumberStyles.None, CultureInfo.InvariantCulture, out var placed)
+            || !int.TryParse(query["unplaced"].FirstOrDefault() ?? "0", NumberStyles.None, CultureInfo.InvariantCulture, out var unplaced)
+            || !int.TryParse(query["sheets"].FirstOrDefault() ?? "0", NumberStyles.None, CultureInfo.InvariantCulture, out var sheets)
+            || !double.TryParse(query["utilization"].FirstOrDefault() ?? "0", NumberStyles.Float, CultureInfo.InvariantCulture, out var utilization)
+            || !(utilization >= 0 && utilization <= 1))
+            return false;
+        summary = new NestJobSummary { PartsPlaced = placed, PartsUnplaced = unplaced, Sheets = sheets, Utilization = utilization };
+        return true;
     }
 
     private static async Task WriteEvent(HttpResponse response, string type, long? id, string data, CancellationToken token)

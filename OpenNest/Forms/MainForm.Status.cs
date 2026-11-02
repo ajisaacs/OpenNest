@@ -18,6 +18,7 @@ namespace OpenNest.Forms
             btnSaveAs.Enabled = hasValue && !storage.IsSaving;
             mnuFileSaveAs.Enabled = hasValue && !storage.IsSaving;
             mnuNestClear.Enabled = activeForm?.PlateManager.CanClearAll ?? false;
+            mnuNestServerJobs.Visible = NestStorage.Settings.IsDatabaseMode;
             exportNestMenu.Enabled = hasValue;
             mnuFileExport.Enabled = hasValue;
             mnuFileExportAll.Enabled = hasValue;

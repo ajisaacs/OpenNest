@@ -29,6 +29,15 @@ public sealed class NestJobDocument
 
     /// <summary>Each drawing's name in list order, so a reader can tell the list arrived in that order.</summary>
     public List<string> DrawingNames { get; set; } = new();
+
+    /// <summary>
+    /// Each drawing's <see cref="PartGeometrySnapshot.Fingerprint"/> as sent, in list order (empty
+    /// for a drawing without supported geometry). A desktop reopening the job in a later session
+    /// checks its drawings against these (<see cref="RemoteNestSubmission.Reopen"/>). Null from
+    /// clients that predate it; workers ignore it.
+    /// </summary>
+    public List<string> DrawingFingerprints { get; set; }
+
     public List<ItemJson> Items { get; set; } = new();
     public List<NestStockJson> Stock { get; set; } = new();
     public OptionsJson JobOptions { get; set; }
@@ -45,6 +54,7 @@ public sealed class NestJobDocument
         {
             EngineName = request.EngineName,
             DrawingNames = drawings.Select(d => d?.Name ?? "").ToList(),
+            DrawingFingerprints = drawings.Select(RemoteNestSubmission.Fingerprint).ToList(),
             Stock = request.Stock.Select(NestStockJson.From).ToList(),
             JobOptions = request.Options is { } o ? new OptionsJson
             {

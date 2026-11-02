@@ -53,7 +53,7 @@ An incomplete but valid proposal is keepable like any other; keeping it is still
 
 In Database mode, **Nest on the server** sends the job to the nest server's worker instead;
 the progress window shows the worker's best plan so far, and the review and Keep are
-unchanged. See [server nesting](server-nesting.md).
+unchanged. Results can be reopened later from **Nest > My Server Jobs**. See [server nesting](server-nesting.md).
 
 The selected engine is saved in `%APPDATA%\OpenNest\engine-selection.json`.
 Selection is restored after plug-ins load. A saved name from an earlier release

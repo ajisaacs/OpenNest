@@ -100,40 +100,23 @@ namespace OpenNest.Forms.Commands
                     new NestJobOptions(maxPlates: 100,
                         salvageRate: plateOptions?.Count > 0 ? salvageRate : 0,
                         minimumSalvageDimension: minRemnantSize));
-                var result = nestOnServer
-                    ? await ServerAutoNest.SolveAsync(owner, target, request, cts)
-                    : await SolveAsync(owner, target, request, cts);
+                NestPipelineResult result;
+                ServerNestDecision server = null;
+                if (nestOnServer)
+                {
+                    var solved = await ServerAutoNest.SolveAsync(owner, target, request, cts);
+                    result = solved.Result;
+                    server = solved.Job == null ? null : new ServerNestDecision(solved.Job);
+                }
+                else
+                {
+                    result = await SolveAsync(owner, target, request, cts);
+                }
                 cts.Token.ThrowIfCancellationRequested();
 
-                var allowInvalid = false;
-                if (!result.IsValid)
+                await ReviewAndCommitAsync(owner, target, result, server, applied =>
                 {
-                    using var review = new NestValidationForm(result.Violations, result.CanKeep);
-                    if (review.ShowDialog(owner) != DialogResult.OK)
-                        return;
-                    allowInvalid = true;
-                }
-
-                var costs = result.IsValid && result.CanKeep ? NestCostSummary.FromAccepted(result) : null;
-                var costText = costs?.Basis == "supplied-cost"
-                    ? $"Gross sheet cost: {costs.GrossTotal:G}; estimated salvage credit: {costs.SalvageCredit:G}; net score: {costs.NetScore:G}"
-                    : null;
-                using (var review = new NestReviewForm(result, target.PlateView.ColorScheme, costText))
-                {
-                    if (review.ShowDialog(owner) != DialogResult.OK)
-                        return;
-                }
-
-                IReadOnlyList<Plate> applied;
-                // Recorded from the commit only: a stopped or discarded run records nothing.
-                using (var change = target.BeginChange(Caption))
-                {
-                    change.MarkChanged();
-                    applied = NestPipelineCommit.ApplyToEmptyPlates(result, target.PlateManager,
-                        allowInvalid, cts.Token);
                     AssignLedgerStock(result, applied);
-                    if (applied.Count > 0)
-                        target.PlateManager.LoadAt(target.Nest.Plates.IndexOf(applied[0]));
                     if (plateOptions?.Count > 0)
                     {
                         // Ledger rows and quantities are request-local inventory; the nest keeps
@@ -143,15 +126,7 @@ namespace OpenNest.Forms.Commands
                         target.Nest.SalvageRate = salvageRate;
                         target.Nest.MinimumRemnantDimension = minRemnantSize;
                     }
-                    change.Complete();
-                }
-                target.PlateView.Invalidate();
-                if (allowInvalid)
-                {
-                    target.OverlapDisplay = OverlapDisplayMode.Both;
-                    await target.CheckOverlapsAsync();
-                }
-                ShowResultNotices(applied);
+                }, cts.Token);
             }
             catch (OperationCanceledException) when (cts.IsCancellationRequested)
             {
@@ -162,6 +137,68 @@ namespace OpenNest.Forms.Commands
                 MessageBox.Show(owner, $"Nesting error: {ex.Message}", Caption,
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        /// <summary>
+        /// The tail every Auto Nest proposal shares: the validation review when it broke layout
+        /// rules, the Keep/Discard review, then the commit to empty plates and the result notices.
+        /// A server job's Keep is recorded on the server first (<paramref name="server"/>), and only
+        /// commits when the server accepts it, so no result is kept twice; its Discard is recorded
+        /// too. <paramref name="applying"/> runs inside the commit's undo record. Returns the plates
+        /// committed, or null when nothing was kept.
+        /// </summary>
+        internal static async Task<IReadOnlyList<Plate>> ReviewAndCommitAsync(IWin32Window owner, EditNestForm target,
+            NestPipelineResult result, ServerNestDecision server, Action<IReadOnlyList<Plate>> applying, CancellationToken token)
+        {
+            var allowInvalid = false;
+            if (!result.IsValid)
+            {
+                using var review = new NestValidationForm(result.Violations, result.CanKeep);
+                if (review.ShowDialog(owner) != DialogResult.OK)
+                {
+                    await (server?.DiscardAsync() ?? Task.CompletedTask);
+                    return null;
+                }
+                allowInvalid = true;
+            }
+
+            var costs = result.IsValid && result.CanKeep ? NestCostSummary.FromAccepted(result) : null;
+            var costText = costs?.Basis == "supplied-cost"
+                ? $"Gross sheet cost: {costs.GrossTotal:G}; estimated salvage credit: {costs.SalvageCredit:G}; net score: {costs.NetScore:G}"
+                : null;
+            using (var review = new NestReviewForm(result, target.PlateView.ColorScheme, costText))
+            {
+                if (review.ShowDialog(owner) != DialogResult.OK)
+                {
+                    await (server?.DiscardAsync() ?? Task.CompletedTask);
+                    return null;
+                }
+            }
+            if (server != null && !await server.KeepAsync(owner))
+                return null;
+            if (target.IsDisposed)
+                return null;
+
+            IReadOnlyList<Plate> applied;
+            // Recorded from the commit only: a stopped or discarded run records nothing.
+            using (var change = target.BeginChange(Caption))
+            {
+                change.MarkChanged();
+                applied = NestPipelineCommit.ApplyToEmptyPlates(result, target.PlateManager,
+                    allowInvalid, token);
+                applying?.Invoke(applied);
+                if (applied.Count > 0)
+                    target.PlateManager.LoadAt(target.Nest.Plates.IndexOf(applied[0]));
+                change.Complete();
+            }
+            target.PlateView.Invalidate();
+            if (allowInvalid)
+            {
+                target.OverlapDisplay = OverlapDisplayMode.Both;
+                await target.CheckOverlapsAsync();
+            }
+            ShowResultNotices(owner, target, applied);
+            return applied;
         }
 
         /// <summary>
@@ -229,7 +266,7 @@ namespace OpenNest.Forms.Commands
         }
 
         // Costs and unplaced parts were shown in the review; clamp removals exist only once kept.
-        private void ShowResultNotices(IReadOnlyList<Plate> applied)
+        private static void ShowResultNotices(IWin32Window owner, EditNestForm target, IReadOnlyList<Plate> applied)
         {
             // D8/D9: name every clamp Auto Nest pulled as a last resort and its added time.
             var removalNotices = applied

@@ -85,7 +85,7 @@ public class NestJobQueueTests
     }
 
     [Fact]
-    public void CompletedJobKeepsItsResultAndDropsItsPackage()
+    public void CompletedJobKeepsItsResultAndPackageUntilReviewed()
     {
         var (factory, db) = Open();
         using (factory) using (db)
@@ -100,8 +100,13 @@ public class NestJobQueueTests
             Assert.Equal(NestJobState.Succeeded, job.State);
             Assert.Equal(T0.AddMinutes(3).UtcDateTime, job.FinishedAt);
             Assert.Equal("{\"version\":1}", db.GetJobResult(id));
-            Assert.Null(db.GetJobPackage(id));
+            // A desktop reopening the result later rebuilds the job from its package.
+            Assert.Equal(Package, db.GetJobPackage(id));
             Assert.Null(db.HeartbeatJob(id, "w1", T0.AddMinutes(4)));
+
+            Assert.True(db.ReviewJob(id, NestJobReview.Kept, "aj@pc", job.Revision, T0.AddMinutes(5))!.Value.Changed);
+            Assert.Null(db.GetJobPackage(id));
+            Assert.Null(db.GetJobResult(id));
         }
     }
 
@@ -151,10 +156,13 @@ public class NestJobQueueTests
             db.ClaimJob("w1", T0);
             db.CancelJob(id, T0.AddSeconds(5));
 
-            Assert.True(db.CompleteJob(id, "w1", "{}", T0.AddSeconds(6)));
+            Assert.True(db.CompleteJob(id, "w1", "{}", T0.AddSeconds(6),
+                new NestJobSummary { PartsPlaced = 4, Sheets = 1, Utilization = 0.5 }));
 
             Assert.Equal(NestJobState.Cancelled, db.GetJob(id)!.State);
             Assert.Null(db.GetJobResult(id));
+            Assert.Null(db.GetJob(id)!.Summary);
+            Assert.Null(db.GetJobPackage(id));
         }
     }
 

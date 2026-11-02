@@ -61,6 +61,39 @@ public sealed partial class NestDatabase
         command.ExecuteNonQuery();
     }
 
+    // v17: job lists. The nest a job was sent from, whether its result was kept or discarded
+    // (each at most once), and the worker's summary of the result.
+    private static void AddJobReview(SqliteCommand command)
+    {
+        foreach (var (name, definition) in new[]
+        {
+            ("nestId", "TEXT"),
+            ("review", "TEXT NOT NULL DEFAULT ''"),
+            ("reviewedBy", "TEXT NOT NULL DEFAULT ''"),
+            ("reviewedAt", "TEXT"),
+            ("partsPlaced", "INTEGER"),
+            ("partsUnplaced", "INTEGER"),
+            ("sheets", "INTEGER"),
+            ("utilization", "REAL"),
+        })
+        {
+            command.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('nest_jobs') WHERE name='{name}'";
+            if ((long)command.ExecuteScalar()! == 0)
+            {
+                command.CommandText = $"ALTER TABLE nest_jobs ADD COLUMN {name} {definition}";
+                command.ExecuteNonQuery();
+            }
+        }
+        command.CommandText = "CREATE INDEX IF NOT EXISTS ix_nest_jobs_seq ON nest_jobs(seq); PRAGMA user_version=17";
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// How long finished jobs are kept, with their packages and results, after they finish
+    /// (<see cref="NestJobRules.Retention"/> unless the server is configured otherwise).
+    /// </summary>
+    public TimeSpan JobRetention { get; set; } = NestJobRules.Retention;
+
     // Every write that ends or restarts an attempt drops its progress and plan.
     private const string ClearProgress = "progress='', plan=NULL, planRevision=0";
 
@@ -76,7 +109,10 @@ public sealed partial class NestDatabase
         Interlocked.Exchange(ref _jobsChanged, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
 
     private const string JobColumns =
-        "id, title, engineName, submittedBy, state, cancelRequested, submittedAt, startedAt, finishedAt, attempts, error, packageSize, seq, revision, planRevision, progress";
+        "id, title, engineName, submittedBy, state, cancelRequested, submittedAt, startedAt, finishedAt, attempts, error, packageSize, seq, revision, planRevision, progress, "
+        + "nestId, review, reviewedBy, reviewedAt, partsPlaced, partsUnplaced, sheets, utilization, "
+        // Queued jobs ahead of a queued one.
+        + "CASE WHEN state='Queued' THEN (SELECT COUNT(*) FROM nest_jobs ahead WHERE ahead.state='Queued' AND ahead.seq < nest_jobs.seq) ELSE 0 END";
 
     public NestJobRecord InsertJob(Guid id, NestJobSubmission submission, byte[] package, DateTimeOffset now)
     {
@@ -86,8 +122,8 @@ public sealed partial class NestDatabase
         {
             using var command = _connection.CreateCommand();
             command.CommandText = """
-                INSERT INTO nest_jobs (id, seq, title, engineName, submittedBy, state, submittedAt, packageSize, package)
-                VALUES ($id, (SELECT COALESCE(MAX(seq), 0) + 1 FROM nest_jobs), $title, $engine, $by, 'Queued', $now, $size, $package)
+                INSERT INTO nest_jobs (id, seq, title, engineName, submittedBy, state, submittedAt, packageSize, package, nestId)
+                VALUES ($id, (SELECT COALESCE(MAX(seq), 0) + 1 FROM nest_jobs), $title, $engine, $by, 'Queued', $now, $size, $package, $nest)
                 """;
             command.Parameters.AddWithValue("$id", id.ToString());
             command.Parameters.AddWithValue("$title", submission.Title);
@@ -96,6 +132,7 @@ public sealed partial class NestDatabase
             command.Parameters.AddWithValue("$now", Stamp(now));
             command.Parameters.AddWithValue("$size", package.LongLength);
             command.Parameters.AddWithValue("$package", package);
+            command.Parameters.AddWithValue("$nest", submission.NestId is { } nest && nest != Guid.Empty ? nest.ToString() : DBNull.Value);
             command.ExecuteNonQuery();
             PulseJobs();
             return GetJob(id)!;
@@ -110,39 +147,122 @@ public sealed partial class NestDatabase
             command.CommandText = $"SELECT {JobColumns} FROM nest_jobs WHERE id=$id";
             command.Parameters.AddWithValue("$id", id.ToString());
             using var reader = command.ExecuteReader();
-            if (!reader.Read())
-                return null;
-            var record = ReadJob(reader);
-            if (record.State == NestJobState.Queued)
-            {
-                using var ahead = _connection.CreateCommand();
-                ahead.CommandText = "SELECT COUNT(*) FROM nest_jobs WHERE state='Queued' AND seq < $seq";
-                ahead.Parameters.AddWithValue("$seq", reader.GetInt64(12));
-                record.QueuePosition = checked((int)(long)ahead.ExecuteScalar()!);
-            }
-            return record;
+            return reader.Read() ? ReadJob(reader) : null;
         }
     }
 
-    /// <summary>The job's package while it is queued or running; finished jobs no longer keep it.</summary>
+    /// <summary>
+    /// Jobs newest first, at most <paramref name="limit"/>. <paramref name="submittedBy"/>
+    /// (ignoring case) keeps one submitter's jobs: a bare user name also matches that user on
+    /// any workstation (<c>user@machine</c>). Finished jobs past <see cref="JobRetention"/> are
+    /// removed first.
+    /// </summary>
+    public IReadOnlyList<NestJobRecord> ListJobs(NestJobListFilter filter, string? submittedBy, int limit, DateTimeOffset now)
+    {
+        lock (_sync)
+        {
+            if (PurgeJobs(null, now))
+                PulseJobs();
+            using var command = _connection.CreateCommand();
+            var where = new List<string>();
+            switch (filter)
+            {
+                case NestJobListFilter.Active: where.Add("state IN ('Queued', 'Running')"); break;
+                case NestJobListFilter.Finished: where.Add("state IN ('Succeeded', 'Failed', 'Cancelled')"); break;
+                case NestJobListFilter.Unreviewed: where.Add("state='Succeeded' AND review=''"); break;
+            }
+            if (!string.IsNullOrWhiteSpace(submittedBy))
+            {
+                where.Add("(lower(submittedBy) = lower($by) OR substr(lower(submittedBy), 1, length($by) + 1) = lower($by) || '@')");
+                command.Parameters.AddWithValue("$by", submittedBy.Trim());
+            }
+            command.CommandText = $"SELECT {JobColumns} FROM nest_jobs"
+                + (where.Count > 0 ? " WHERE " + string.Join(" AND ", where) : "")
+                + " ORDER BY seq DESC LIMIT $limit";
+            command.Parameters.AddWithValue("$limit", System.Math.Clamp(limit, 1, NestJobRules.MaxListLimit));
+            var jobs = new List<NestJobRecord>();
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                jobs.Add(ReadJob(reader));
+            return jobs;
+        }
+    }
+
+    /// <summary>
+    /// Marks a succeeded job's result Kept or Discarded, once: only while it is unreviewed and
+    /// still at <paramref name="expectedRevision"/>, so of two desktops reviewing the same
+    /// result only the first can keep it. Its package and result are dropped. Null when there is
+    /// no such job; otherwise whether it changed and the job as it now is.
+    /// </summary>
+    public (bool Changed, NestJobRecord Job)? ReviewJob(Guid id, NestJobReview review, string reviewedBy, long expectedRevision, DateTimeOffset now)
+    {
+        if (review == NestJobReview.None)
+            throw new ArgumentOutOfRangeException(nameof(review));
+        lock (_sync)
+        {
+            using var command = _connection.CreateCommand();
+            command.CommandText = """
+                UPDATE nest_jobs SET review=$review, reviewedBy=$by, reviewedAt=$now,
+                    package=zeroblob(0), result=NULL, revision=revision+1
+                WHERE id=$id AND state='Succeeded' AND review='' AND revision=$expected
+                """;
+            command.Parameters.AddWithValue("$id", id.ToString());
+            command.Parameters.AddWithValue("$review", review.ToString());
+            command.Parameters.AddWithValue("$by", Truncate(reviewedBy));
+            command.Parameters.AddWithValue("$now", Stamp(now));
+            command.Parameters.AddWithValue("$expected", expectedRevision);
+            var changed = Changed(command.ExecuteNonQuery() == 1);
+            return GetJob(id) is { } job ? (changed, job) : null;
+        }
+    }
+
+    /// <summary>
+    /// Removes a finished job at <paramref name="expectedRevision"/> with its package and result.
+    /// Null when there is no such job; otherwise whether it was removed and, when it was not
+    /// (still active, or changed meanwhile), the job as it is.
+    /// </summary>
+    public (bool Removed, NestJobRecord? Job)? DeleteJob(Guid id, long expectedRevision)
+    {
+        lock (_sync)
+        {
+            using var command = _connection.CreateCommand();
+            command.CommandText = """
+                DELETE FROM nest_jobs
+                WHERE id=$id AND state IN ('Succeeded', 'Failed', 'Cancelled') AND revision=$expected
+                """;
+            command.Parameters.AddWithValue("$id", id.ToString());
+            command.Parameters.AddWithValue("$expected", expectedRevision);
+            if (Changed(command.ExecuteNonQuery() == 1))
+                return (true, null);
+            return GetJob(id) is { } job ? (false, job) : null;
+        }
+    }
+
+    /// <summary>
+    /// The job's package while it is queued or running, or succeeded and unreviewed (a desktop
+    /// reopening the result reads the job from it); other finished jobs no longer keep it.
+    /// </summary>
     public byte[]? GetJobPackage(Guid id)
     {
         lock (_sync)
         {
             using var command = _connection.CreateCommand();
-            command.CommandText = "SELECT package FROM nest_jobs WHERE id=$id AND state IN ('Queued', 'Running')";
+            command.CommandText = """
+                SELECT package FROM nest_jobs
+                WHERE id=$id AND (state IN ('Queued', 'Running') OR (state='Succeeded' AND review=''))
+                """;
             command.Parameters.AddWithValue("$id", id.ToString());
             return command.ExecuteScalar() as byte[];
         }
     }
 
-    /// <summary>A succeeded job's result; null for any other job.</summary>
+    /// <summary>A succeeded, unreviewed job's result; null for any other job.</summary>
     public string? GetJobResult(Guid id)
     {
         lock (_sync)
         {
             using var command = _connection.CreateCommand();
-            command.CommandText = "SELECT result FROM nest_jobs WHERE id=$id AND state='Succeeded'";
+            command.CommandText = "SELECT result FROM nest_jobs WHERE id=$id AND state='Succeeded' AND review=''";
             command.Parameters.AddWithValue("$id", id.ToString());
             return command.ExecuteScalar() as string;
         }
@@ -178,7 +298,7 @@ public sealed partial class NestDatabase
     /// <summary>
     /// Gives <paramref name="workerId"/> the oldest queued job on a fresh lease, or null when
     /// none is queued or another job still runs. Lapsed leases are settled first, and finished
-    /// jobs past <see cref="NestJobRules.Retention"/> removed.
+    /// jobs past <see cref="JobRetention"/> removed.
     /// </summary>
     public NestJobRecord? ClaimJob(string workerId, DateTimeOffset now)
     {
@@ -299,21 +419,32 @@ public sealed partial class NestDatabase
     /// Stores the worker's result. A job someone cancelled meanwhile ends Cancelled and the
     /// result is dropped. False when <paramref name="workerId"/> no longer holds the job.
     /// </summary>
-    public bool CompleteJob(Guid id, string workerId, string result, DateTimeOffset now)
+    public bool CompleteJob(Guid id, string workerId, string result, DateTimeOffset now, NestJobSummary? summary = null)
     {
         ArgumentNullException.ThrowIfNull(result);
+        // A succeeded job keeps its package until it is reviewed: a desktop reopening the
+        // result rebuilds the job from it. A cancelled one keeps no summary of a dropped result.
         return FinishJob(id, workerId, now, """
             state = CASE cancelRequested WHEN 1 THEN 'Cancelled' ELSE 'Succeeded' END,
-            result = CASE cancelRequested WHEN 1 THEN NULL ELSE $result END
-            """, ("$result", result));
+            result = CASE cancelRequested WHEN 1 THEN NULL ELSE $result END,
+            package = CASE cancelRequested WHEN 1 THEN zeroblob(0) ELSE package END,
+            partsPlaced = CASE cancelRequested WHEN 1 THEN NULL ELSE $placed END,
+            partsUnplaced = CASE cancelRequested WHEN 1 THEN NULL ELSE $unplaced END,
+            sheets = CASE cancelRequested WHEN 1 THEN NULL ELSE $sheets END,
+            utilization = CASE cancelRequested WHEN 1 THEN NULL ELSE $utilization END
+            """, ("$result", result),
+            ("$placed", summary is null ? DBNull.Value : summary.PartsPlaced),
+            ("$unplaced", summary is null ? DBNull.Value : summary.PartsUnplaced),
+            ("$sheets", summary is null ? DBNull.Value : summary.Sheets),
+            ("$utilization", summary is null ? DBNull.Value : summary.Utilization));
     }
 
     public bool FailJob(Guid id, string workerId, string error, DateTimeOffset now) =>
-        FinishJob(id, workerId, now, "state='Failed', error=$error", ("$error", Truncate(error)));
+        FinishJob(id, workerId, now, "state='Failed', error=$error, package=zeroblob(0)", ("$error", Truncate(error)));
 
     /// <summary>The worker stopped the job after a cancel request.</summary>
     public bool ConfirmJobCancelled(Guid id, string workerId, DateTimeOffset now) =>
-        FinishJob(id, workerId, now, "state='Cancelled'");
+        FinishJob(id, workerId, now, "state='Cancelled', package=zeroblob(0)");
 
     /// <summary>
     /// Puts a running job back at the front of the queue without spending an attempt: its
@@ -348,7 +479,7 @@ public sealed partial class NestDatabase
         {
             using var command = _connection.CreateCommand();
             command.CommandText = $"""
-                UPDATE nest_jobs SET {set}, finishedAt=$now, workerId=NULL, leaseUntil=NULL, package=zeroblob(0),
+                UPDATE nest_jobs SET {set}, finishedAt=$now, workerId=NULL, leaseUntil=NULL,
                     plan=NULL, revision=revision+1
                 WHERE id=$id AND state='Running' AND workerId=$worker
                 """;
@@ -386,11 +517,20 @@ public sealed partial class NestDatabase
                 startedAt = CASE WHEN cancelRequested=1 OR attempts >= $max THEN startedAt ELSE NULL END,
                 workerId = NULL, leaseUntil = NULL, revision = revision + 1, {ClearProgress}
             WHERE state='Running' AND leaseUntil < $now;
-            DELETE FROM nest_jobs WHERE finishedAt IS NOT NULL AND finishedAt < $expired;
             """;
         command.Parameters.AddWithValue("$max", NestJobRules.MaxAttempts);
         command.Parameters.AddWithValue("$now", Stamp(now));
-        command.Parameters.AddWithValue("$expired", Stamp(now - NestJobRules.Retention));
+        var settled = command.ExecuteNonQuery() > 0;
+        return PurgeJobs(transaction, now) || settled;
+    }
+
+    // Retention: finished jobs go, package and result with them, JobRetention after they finish.
+    private bool PurgeJobs(SqliteTransaction? transaction, DateTimeOffset now)
+    {
+        using var command = _connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "DELETE FROM nest_jobs WHERE finishedAt IS NOT NULL AND finishedAt < $expired";
+        command.Parameters.AddWithValue("$expired", Stamp(now - JobRetention));
         return command.ExecuteNonQuery() > 0;
     }
 
@@ -411,6 +551,18 @@ public sealed partial class NestDatabase
         Revision = reader.GetInt64(13),
         PlanRevision = reader.GetInt64(14),
         Progress = reader.GetString(15),
+        NestId = reader.IsDBNull(16) ? null : Guid.Parse(reader.GetString(16)),
+        Review = reader.GetString(17) is { Length: > 0 } review ? Enum.Parse<NestJobReview>(review) : NestJobReview.None,
+        ReviewedBy = reader.GetString(18),
+        ReviewedAt = reader.IsDBNull(19) ? null : ParseStamp(reader.GetString(19)),
+        Summary = reader.IsDBNull(20) ? null : new NestJobSummary
+        {
+            PartsPlaced = reader.GetInt32(20),
+            PartsUnplaced = reader.IsDBNull(21) ? 0 : reader.GetInt32(21),
+            Sheets = reader.IsDBNull(22) ? 0 : reader.GetInt32(22),
+            Utilization = reader.IsDBNull(23) ? 0 : reader.GetDouble(23),
+        },
+        QueuePosition = checked((int)reader.GetInt64(24)),
     };
 
     private static string Truncate(string? text)

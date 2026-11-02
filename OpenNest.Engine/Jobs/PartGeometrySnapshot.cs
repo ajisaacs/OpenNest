@@ -70,6 +70,33 @@ public sealed class PartGeometrySnapshot
 
     private static long Bits(double value) => BitConverter.DoubleToInt64Bits(value);
 
+    /// <summary>
+    /// A SHA-256 of the exact content <see cref="ContentComparer"/> compares (lowercase hex):
+    /// equal geometry gives equal fingerprints across processes and machines, so geometry can be
+    /// checked against a copy that no longer exists (a server job reviewed in a later session).
+    /// </summary>
+    public string Fingerprint()
+    {
+        using var buffer = new System.IO.MemoryStream();
+        using (var writer = new System.IO.BinaryWriter(buffer, System.Text.Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write((int)Mode);
+            writer.Write(Motions.Count);
+            foreach (var motion in Motions)
+            {
+                writer.Write((int)motion.Type);
+                writer.Write(Bits(motion.X));
+                writer.Write(Bits(motion.Y));
+                writer.Write(Bits(motion.CenterX));
+                writer.Write(Bits(motion.CenterY));
+                writer.Write((int)motion.Rotation);
+                writer.Write((int)motion.Layer);
+                writer.Write(motion.Suppressed);
+            }
+        }
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(buffer.ToArray())).ToLowerInvariant();
+    }
+
     private static bool SameMotion(PartGeometryMotion a, PartGeometryMotion b) =>
         a.Type == b.Type
         && Bits(a.X) == Bits(b.X)

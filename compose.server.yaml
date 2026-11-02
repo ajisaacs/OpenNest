@@ -13,6 +13,7 @@ services:
       OPENNEST_DB: /app/data/nests.db
       # "off" stops mirroring the desktop update feed from GitHub (clients then check GitHub themselves).
       OPENNEST_UPDATES: ${OPENNEST_UPDATES:-on}
+      OPENNEST_JOB_RETENTION_DAYS: ${OPENNEST_JOB_RETENTION_DAYS:-7}
     volumes:
       - opennest-data:/app/data
     security_opt:

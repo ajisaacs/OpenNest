@@ -174,6 +174,7 @@ namespace OpenNest.Forms
 
             updaterStatus = new UpdaterStatus(this, statusStrip1, statusLabel1.Font);
             updaterStatus.Start();
+            InitializeServerJobs();
         }
 
         private UpdaterStatus updaterStatus;

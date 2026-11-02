@@ -74,9 +74,9 @@ public sealed class NestJobWorker
             }
 
             var recorder = new RecordingNestingEngine(NestingEngineRegistry.Create(request.EngineName)) { Progress = reporter };
-            await Task.Factory.StartNew(() => NestPipeline.Run(recorder, request.EngineName, request, progress: null, solve.Token),
+            var result = await Task.Factory.StartNew(() => NestPipeline.Run(recorder, request.EngineName, request, progress: null, solve.Token),
                 solve.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
-            if (await _jobs.CompleteAsync(job.Id, WorkerId, recorder.Transcript.ToJson(), CancellationToken.None))
+            if (await _jobs.CompleteAsync(job.Id, WorkerId, recorder.Transcript.ToJson(), NestJobSummaries.From(result), CancellationToken.None))
                 _logger.LogInformation("Nest job {Id} finished.", job.Id);
             else
                 _logger.LogWarning("Nest job {Id} finished after this worker lost it; the result was dropped.", job.Id);

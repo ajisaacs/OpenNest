@@ -59,7 +59,62 @@ public sealed class NestJobRecord
     /// </summary>
     public string Progress { get; set; } = "";
 
+    /// <summary>The server nest the job was sent from, when it had been saved there; null otherwise.</summary>
+    public Guid? NestId { get; set; }
+
+    /// <summary>Whether a succeeded job's result was kept or discarded; each happens at most once.</summary>
+    public NestJobReview Review { get; set; }
+
+    /// <summary>Who kept or discarded the result; empty while it is unreviewed.</summary>
+    public string ReviewedBy { get; set; } = "";
+
+    public DateTime? ReviewedAt { get; set; }
+
+    /// <summary>What a succeeded job's result holds, as its worker reported it; null for other jobs and older workers.</summary>
+    public NestJobSummary? Summary { get; set; }
+
     public bool IsFinished => State is NestJobState.Succeeded or NestJobState.Failed or NestJobState.Cancelled;
+
+    /// <summary>A succeeded job nobody has kept or discarded yet: its result can still be opened.</summary>
+    public bool IsUnreviewed => State == NestJobState.Succeeded && Review == NestJobReview.None;
+}
+
+/// <summary>What became of a succeeded job's result. Kept and Discarded are final.</summary>
+public enum NestJobReview
+{
+    None,
+    Kept,
+    Discarded,
+}
+
+/// <summary>A finished job's result in numbers, for job lists (the server never opens the result).</summary>
+public sealed class NestJobSummary
+{
+    /// <summary>Parts placed, counting every copy of a repeated sheet.</summary>
+    public int PartsPlaced { get; set; }
+
+    public int PartsUnplaced { get; set; }
+
+    /// <summary>Physical sheets, counting repeats.</summary>
+    public int Sheets { get; set; }
+
+    /// <summary>Part area over sheet area across every sheet, 0 to 1.</summary>
+    public double Utilization { get; set; }
+}
+
+/// <summary>Which jobs <c>GET /api/nest-jobs</c> lists.</summary>
+public enum NestJobListFilter
+{
+    All,
+
+    /// <summary>Queued or running.</summary>
+    Active,
+
+    /// <summary>Succeeded, failed or cancelled.</summary>
+    Finished,
+
+    /// <summary>Succeeded and neither kept nor discarded.</summary>
+    Unreviewed,
 }
 
 /// <summary>The description sent with a job's package.</summary>
@@ -70,6 +125,15 @@ public sealed class NestJobSubmission
     public string EngineName { get; set; } = "";
 
     public string SubmittedBy { get; set; } = "";
+
+    /// <summary>The server nest the job is for, when it is saved there (helps a later review find it).</summary>
+    public Guid? NestId { get; set; }
+}
+
+/// <summary>A desktop's Keep or Discard of a succeeded job's result.</summary>
+public sealed class NestJobReviewRequest
+{
+    public string ReviewedBy { get; set; } = "";
 }
 
 /// <summary>A worker's message about the job it holds.</summary>
@@ -154,6 +218,12 @@ public static class NestJobRules
     /// <summary>Workers that stop responding this many times fail the job instead of retrying it.</summary>
     public const int MaxAttempts = 3;
 
-    /// <summary>Finished jobs, their packages and results are removed after this long.</summary>
+    /// <summary>
+    /// Finished jobs, their packages and results are removed this long after they finish,
+    /// unless the server is configured otherwise (<c>OPENNEST_JOB_RETENTION_DAYS</c>).
+    /// </summary>
     public static readonly TimeSpan Retention = TimeSpan.FromDays(7);
+
+    /// <summary>Most jobs one list request returns.</summary>
+    public const int MaxListLimit = 500;
 }

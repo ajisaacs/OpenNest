@@ -27,7 +27,12 @@ namespace OpenNest.Forms.Commands
     {
         private const string Caption = "Auto Nest";
 
-        internal static async Task<NestPipelineResult> SolveAsync(IWin32Window owner, EditNestForm target,
+        /// <summary>
+        /// The replayed proposal and the server job it came from, whose Keep or Discard the
+        /// caller records (<see cref="ServerNestDecision"/>); the job is null when the user chose
+        /// to nest on this PC because the server could not take it.
+        /// </summary>
+        internal static async Task<(NestPipelineResult Result, NestJobRecord Job)> SolveAsync(IWin32Window owner, EditNestForm target,
             NestPipelineRequest request, CancellationTokenSource cts)
         {
             var submission = new RemoteNestSubmission(request);
@@ -40,8 +45,10 @@ namespace OpenNest.Forms.Commands
                 {
                     Title = target.Nest.Name ?? "",
                     EngineName = request.EngineName,
-                    SubmittedBy = $"{Environment.UserName}@{Environment.MachineName}",
+                    SubmittedBy = ServerNestDecision.Identity,
+                    NestId = target.Document.RemoteId == Guid.Empty ? null : target.Document.RemoteId,
                 }, package, cts.Token);
+                ServerNestDecision.RaiseJobsChanged();
             }
             catch (Exception ex) when (!cts.IsCancellationRequested
                 && ex is IOException or HttpRequestException or TaskCanceledException)
@@ -50,7 +57,7 @@ namespace OpenNest.Forms.Commands
                     $"The nest server could not take this nest:\n\n{ex.Message}\n\nNest on this PC instead?",
                     Caption, MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                 if (choice == DialogResult.Yes)
-                    return await AutoNestCommand.SolveAsync(owner, target, request, cts);
+                    return (await AutoNestCommand.SolveAsync(owner, target, request, cts), null);
                 cts.Cancel();
                 throw new OperationCanceledException(cts.Token);
             }
@@ -67,7 +74,7 @@ namespace OpenNest.Forms.Commands
             return await wait;
         }
 
-        private static async Task<NestPipelineResult> WaitAsync(IWin32Window owner, RemoteNestJobs jobs, NestJobRecord job,
+        private static async Task<(NestPipelineResult, NestJobRecord)> WaitAsync(IWin32Window owner, RemoteNestJobs jobs, NestJobRecord job,
             RemoteNestSubmission submission, NestProgressForm progressForm, CancellationTokenSource cts)
         {
             var view = new LiveView(progressForm, submission.Request, cts.Token);
@@ -80,6 +87,7 @@ namespace OpenNest.Forms.Commands
             try
             {
                 job = await watch.RunAsync(job, cts.Token);
+                ServerNestDecision.RaiseJobsChanged();
                 cts.Token.ThrowIfCancellationRequested();
                 switch (job.State)
                 {
@@ -88,7 +96,7 @@ namespace OpenNest.Forms.Commands
                             $"{Title(job)} is ready to review. Click to open OpenNest.");
                         view.Show("Checking the server's nest on this PC");
                         var transcript = NestSolveTranscript.FromJson(await jobs.GetResultAsync(job.Id, cts.Token));
-                        return await Task.Run(() => submission.Complete(transcript, cts.Token), cts.Token);
+                        return (await Task.Run(() => submission.Complete(transcript, cts.Token), cts.Token), job);
                     case NestJobState.Failed:
                         ServerNestNotice.ShowIfAway(owner, "Server nest failed",
                             $"The nest server could not nest {Title(job)}. Click to open OpenNest.");
@@ -122,7 +130,7 @@ namespace OpenNest.Forms.Commands
         private static string Title(NestJobRecord job) =>
             string.IsNullOrWhiteSpace(job.Title) ? "Your nest" : job.Title;
 
-        private static string Describe(NestJobRecord job) => job.State switch
+        internal static string Describe(NestJobRecord job) => job.State switch
         {
             NestJobState.Queued when job.QueuePosition > 0 =>
                 $"Queued on the nest server, {job.QueuePosition} {(job.QueuePosition == 1 ? "job" : "jobs")} ahead",

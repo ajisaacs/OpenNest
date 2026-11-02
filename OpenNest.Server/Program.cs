@@ -22,7 +22,9 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 // Storage path: --database=<path> or --database <path>, then OPENNEST_DB, default ./data/nests.db (a Docker volume).
 var databasePath = ServerOptions.DatabasePath(args, Environment.GetEnvironmentVariable(ServerOptions.DatabaseVariable));
-builder.Services.AddSingleton(_ => new NestDatabase(databasePath));
+// Finished server nest jobs are deleted with their results after OPENNEST_JOB_RETENTION_DAYS (default 7).
+var jobRetention = ServerOptions.JobRetention(Environment.GetEnvironmentVariable(ServerOptions.JobRetentionVariable));
+builder.Services.AddSingleton(_ => new NestDatabase(databasePath) { JobRetention = jobRetention });
 // The server nesting queue's leases read this clock; tests replace it.
 builder.Services.AddSingleton(TimeProvider.System);
 
