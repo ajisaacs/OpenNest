@@ -12,8 +12,10 @@ namespace OpenNest.Engine.CuttingPlanning;
 /// The last resort for a route no search could keep head-down: each planner-chosen rapid that
 /// crosses parts already cut is marked to raise the head (<see cref="HeadRaise"/>). Only the
 /// safest-route fallback uses it, after the strict search found no route avoiding every crossing,
-/// so a plate that can be cut head-down never gets a raise. Rapids into or inside a fixed emission,
-/// and rapids inside sub-programs, are never marked: their crossings stay findings.
+/// so a plate that can be cut head-down never gets a raise. Rapids into or inside a fixed emission
+/// are never marked, and neither is a sub-program, which may be shared: the rapid arriving at a hole
+/// sub-program is raised by marking its call, and other rapids inside sub-programs keep their
+/// crossings as findings.
 /// </summary>
 internal static class RaisedRapids
 {
@@ -49,7 +51,8 @@ internal static class RaisedRapids
         return marked;
     }
 
-    // The own-code indices of the planner's rapids that cross parts already cut.
+    // The own-code indices of the planner's rapids that cross parts already cut: the rapid itself,
+    // or the call of the sub-program the rapid arrives at.
     private static HashSet<int> Crossing(ReleasedContourState checker, FixedProgramPlacement proposal,
         OwnedExecution execution, Vector arrival, CancellationToken token)
     {
@@ -63,9 +66,14 @@ internal static class RaisedRapids
             for (var index = 0; index < execution.Motions.Count; index++)
             {
                 var motion = execution.Motions[index];
-                if (motion.Rapid && motion.Code is int code && isFixed?.Invoke(index) != true
-                    && motion.End == end && (index == 0 ? arrival : motion.Start) == finding.RapidStart)
+                if (!motion.Rapid || isFixed?.Invoke(index) == true || motion.End != end
+                    || (index == 0 ? arrival : motion.Start) != finding.RapidStart)
+                    continue;
+                if (motion.Code is int code)
                     codes.Add(code);
+                else if (motion.CallCode is int call
+                    && (index == 0 || execution.Motions[index - 1].CallCode != call))
+                    codes.Add(call);
             }
         }
         return codes;

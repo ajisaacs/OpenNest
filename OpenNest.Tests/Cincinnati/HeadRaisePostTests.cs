@@ -61,8 +61,34 @@ public class HeadRaisePostTests
         post.Post(Nest(markSecond: false), new MemoryStream()); // Nothing marked: nothing to refuse.
     }
 
-    // Two squares side by side, each with a line lead-in on its left; the second one's rapid marked.
-    private static Nest Nest(bool markSecond)
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ClPost_RaisesBeforeAMarkedHoleCall(bool marked)
+    {
+        var lines = ClLines(Nest(markSecond: marked, holedSecond: true), M47Mode.None);
+
+        var call = lines.FindIndex(l => l.Contains("G52 X12 Y1"));
+        Assert.True(call > 0, string.Join("\n", lines));
+        Assert.Equal(marked, lines[call - 1] == "M47");
+    }
+
+    [Fact]
+    public void CiFiberPost_WritesTheRaiseBeforeAMarkedHoleCallsRapid()
+    {
+        var post = new CIFiberPostProcessor(new CIFiberPostConfig { HeadRaiseCode = RaiseCode });
+        using var stream = new MemoryStream();
+        post.Post(Nest(markSecond: true, holedSecond: true), stream);
+        var lines = Lines(stream);
+
+        var raise = Assert.Single(lines, l => l == RaiseCode);
+        Assert.Equal("G0X12Y1", lines[lines.IndexOf(raise) + 1]);
+    }
+
+    // Two squares side by side, each with a line lead-in on its left; the second one's rapid
+    // marked. With holedSecond the second starts with a round hole cut as a sub-program, and the
+    // mark goes on its call.
+    private static Nest Nest(bool markSecond, bool holedSecond = false)
     {
         var nest = new Nest("RAISE");
         var plate = new Plate(60, 120);
@@ -71,6 +97,8 @@ public class HeadRaisePostTests
         {
             var part = new Part(new Drawing("square", Square()), new Vector(x, 0));
             var program = LeadIn();
+            if (holedSecond && x > 1)
+                program.Codes.Insert(0, new SubProgramCall { Id = 1, Program = Hole(), Offset = new Vector(1, 1) });
             if (markSecond && x > 1)
                 program = HeadRaise.Mark(program, [0]);
             Assert.True(part.RestoreLeadInProgram(program, true));
@@ -92,6 +120,16 @@ public class HeadRaisePostTests
         p.MoveTo(-0.25, 1);
         p.Codes.Add(new LinearMove(0, 1) { Layer = LayerType.Leadin });
         p.LineTo(0, 2); p.LineTo(2, 2); p.LineTo(2, 0); p.LineTo(0, 0); p.LineTo(0, 1);
+        return p;
+    }
+
+    // A round hole of radius 0.25 around its sub-program's origin, entered from its center.
+    private static Program Hole()
+    {
+        var p = new Program();
+        p.MoveTo(0, 0);
+        p.Codes.Add(new LinearMove(0.25, 0) { Layer = LayerType.Leadin });
+        p.ArcTo(0.25, 0, 0, 0, RotationType.CCW);
         return p;
     }
 

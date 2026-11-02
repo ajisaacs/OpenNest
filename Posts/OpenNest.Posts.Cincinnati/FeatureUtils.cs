@@ -23,10 +23,18 @@ public static class FeatureUtils
         {
             if (code is SubProgramCall)
             {
+                // A SubProgramCall is its own feature; a marker just before it raises the head
+                // for the rapid into the call, so it stays with the call.
+                if (current is [var marker] && HeadRaise.IsMarker(marker))
+                {
+                    current.Add(code);
+                    features.Add(current);
+                    current = null;
+                    continue;
+                }
                 // Flush any pending feature
                 if (current != null)
                     features.Add(current);
-                // SubProgramCall is its own feature
                 features.Add(new List<ICode> { code });
                 current = null;
             }
@@ -63,6 +71,17 @@ public static class FeatureUtils
 
     /// <summary>Whether the rapid that starts <paramref name="feature"/> raises the head (<see cref="HeadRaise"/>).</summary>
     public static bool IsRaised(List<ICode> feature) => feature.Count > 0 && HeadRaise.IsMarker(feature[0]);
+
+    /// <summary>
+    /// The hole call <paramref name="feature"/> is, raised or not (<see cref="SplitByRapids"/>);
+    /// null for any other feature.
+    /// </summary>
+    public static SubProgramCall HoleCall(List<ICode> feature) => feature switch
+    {
+        [SubProgramCall call] => call,
+        [var marker, SubProgramCall call] when HeadRaise.IsMarker(marker) => call,
+        _ => null,
+    };
 
     /// <summary>
     /// Classifies features as etch or cut and orders etch features before cut features.
@@ -147,7 +166,12 @@ public static class FeatureUtils
             }
 
             if (code is SubProgramCall call && !HasCut(call.Program))
+            {
+                // Its head raise goes with it.
+                if (kept.Count > 0 && HeadRaise.IsMarker(kept[^1]))
+                    kept.RemoveAt(kept.Count - 1);
                 continue;
+            }
 
             if (resumeAt.HasValue && code is Motion and not RapidMove)
                 kept.Add(new RapidMove(resumeAt.Value));
@@ -199,7 +223,7 @@ public static class FeatureUtils
     /// </summary>
     public static Vector StartPoint(List<ICode> feature)
     {
-        if (feature.Count == 1 && feature[0] is SubProgramCall call && call.Program != null)
+        if (HoleCall(feature) is { Program: not null } call)
             return call.Offset + StartPoint(AbsoluteCodes(call.Program));
 
         foreach (var code in feature)
@@ -218,7 +242,7 @@ public static class FeatureUtils
     /// <summary>Where the tool stops at the end of a feature, in its program's frame.</summary>
     public static Vector EndPoint(List<ICode> feature)
     {
-        if (feature.Count == 1 && feature[0] is SubProgramCall call && call.Program != null)
+        if (HoleCall(feature) is { Program: not null } call)
             return call.Offset + EndPoint(AbsoluteCodes(call.Program));
 
         for (var i = feature.Count - 1; i >= 0; i--)
@@ -241,7 +265,7 @@ public static class FeatureUtils
         for (var i = 0; i < features.Count; i++)
         {
             var (codes, isEtch) = features[i];
-            if (isEtch || (codes.Count == 1 && codes[0] is SubProgramCall))
+            if (isEtch || HoleCall(codes) != null)
                 continue;
             bounds[i] = CutBounds(codes);
             if (bounds[i] != null)

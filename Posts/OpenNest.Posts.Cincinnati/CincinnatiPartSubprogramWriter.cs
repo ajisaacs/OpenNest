@@ -71,7 +71,7 @@ public sealed class CincinnatiPartSubprogramWriter
             var isLastFeature = i == ordered.Count - 1;
 
             // SubProgramCall features are emitted as M98 hole calls
-            if (codes.Count == 1 && codes[0] is SubProgramCall holeCall)
+            if (FeatureUtils.HoleCall(codes) is { } holeCall)
             {
                 CincinnatiHoleCallWriter.Write(
                     w, holeCall, Vector.Zero, i, isLastFeature, _config, _fmt, _holeSubprograms
@@ -253,6 +253,8 @@ public sealed class CincinnatiPartSubprogramWriter
                 );
             else if (code is RapidMove rm)
                 sb.Append(CultureInfo.InvariantCulture, $"R{rm.EndPoint.X:F6},{rm.EndPoint.Y:F6}");
+            else if (HeadRaise.IsMarker(code))
+                sb.Append('H');
             else if (code is SubProgramCall { Program: not null } call)
                 sb.Append(
                     CultureInfo.InvariantCulture,

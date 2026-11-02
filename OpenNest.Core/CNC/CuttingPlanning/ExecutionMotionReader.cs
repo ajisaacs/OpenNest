@@ -27,10 +27,12 @@ public static class ExecutionMotionReader
         var moves = new List<ExecutionMotion>();
         var visiting = new HashSet<Program>(ReferenceEqualityComparer.Instance);
         var budget = 1000000;
-        Walk(program, origin, previous);
+        Walk(program, origin, previous, false, null);
         return new OwnedExecution(moves);
 
-        Vector Walk(Program current, Vector frame, Vector? arrival)
+        // raiseArrival: a marked call raises the head for the rapid that arrives at its first motion.
+        // callCode: the part's own code that called this sub-program, or null for the part's own codes.
+        Vector Walk(Program current, Vector frame, Vector? arrival, bool raiseArrival, int? callCode)
         {
             token.ThrowIfCancellationRequested();
             PostVerificationGeometry.Validate(frame);
@@ -72,7 +74,8 @@ public static class ExecutionMotionReader
                         throw new ArgumentException("Subprogram rotation is not finite.");
                     // Call rotation is baked into the shared program by its setter. Do not
                     // rotate again; offsets are frame-relative even in incremental mode.
-                    pos = Walk(call.Program, frame + call.Offset, first ? arrival : pos);
+                    pos = Walk(call.Program, frame + call.Offset, first ? arrival : pos,
+                        raised[codeIndex] || first && raiseArrival, callCode ?? codeIndex);
                     first = false;
                     continue;
                 }
@@ -93,7 +96,7 @@ public static class ExecutionMotionReader
                 PostVerificationGeometry.Validate(end);
                 var rapid = motion is RapidMove;
                 if (first && !rapid)
-                    moves.Add(new(arrival, frame, true, LayerType.Display, null));
+                    moves.Add(new(arrival, frame, true, LayerType.Display, null, raiseArrival, callCode: callCode));
                 var start = first && rapid ? arrival : pos;
                 var layer = motion switch
                 {
@@ -108,8 +111,8 @@ public static class ExecutionMotionReader
                 var curve = rapid ? null : PostVerificationGeometry.Curve.Create(pos, end,
                     motion is ArcMove arcMove ? reference + arcMove.CenterPoint : null,
                     motion is ArcMove { Rotation: RotationType.CW });
-                moves.Add(new(start, end, rapid, layer, curve, raised[codeIndex],
-                    ReferenceEquals(current, program) ? codeIndex : null));
+                moves.Add(new(start, end, rapid, layer, curve, raised[codeIndex] || first && rapid && raiseArrival,
+                    ReferenceEquals(current, program) ? codeIndex : null, callCode));
                 pos = end;
                 first = false;
             }

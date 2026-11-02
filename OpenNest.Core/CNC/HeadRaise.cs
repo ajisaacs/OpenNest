@@ -7,8 +7,9 @@ namespace OpenNest.CNC
     /// <summary>
     /// A rapid the head must make raised because it passes over parts already cut, which may have
     /// tipped. Plan Cutting marks such a rapid only when no route avoids the crossing: a
-    /// <see cref="Marker"/> comment immediately before the <see cref="RapidMove"/>. Rapid checks accept
-    /// a crossing on a marked rapid. Posts write their machine's head raise before every marked rapid,
+    /// <see cref="Marker"/> comment immediately before the <see cref="RapidMove"/>, or before the
+    /// <see cref="SubProgramCall"/> whose arrival rapid it is, since a sub-program may be shared and
+    /// is never marked itself. Rapid checks accept a crossing on a marked rapid. Posts write their machine's head raise before every marked rapid,
     /// and refuse to post a marked program when they have none, since the rapid is unsafe head down.
     /// See docs/cutting-planner.md.
     /// </summary>
@@ -31,9 +32,10 @@ namespace OpenNest.CNC
         }
 
         /// <summary>
-        /// For each of <paramref name="codes"/>, whether it is a rapid made with the head raised. A
-        /// marker must be followed directly by a rapid; anything else is a malformed program
-        /// (<see cref="ArgumentException"/>), since a post could raise before the wrong move.
+        /// For each of <paramref name="codes"/>, whether it is a rapid made with the head raised, or a
+        /// sub-program call whose arrival rapid is. A marker must be followed directly by a rapid or
+        /// a call; anything else is a malformed program (<see cref="ArgumentException"/>), since a
+        /// post could raise before the wrong move.
         /// </summary>
         public static bool[] RaisedMask(IReadOnlyList<ICode> codes)
         {
@@ -43,7 +45,7 @@ namespace OpenNest.CNC
             {
                 if (!IsMarker(codes[i]))
                     continue;
-                if (i + 1 >= codes.Count || codes[i + 1] is not RapidMove)
+                if (i + 1 >= codes.Count || codes[i + 1] is not (RapidMove or SubProgramCall))
                     throw new ArgumentException("A head-raise marker is not followed by a rapid.");
                 mask[i + 1] = true;
             }
@@ -52,7 +54,7 @@ namespace OpenNest.CNC
 
         /// <summary>
         /// A copy of <paramref name="program"/> with a marker before each of its own codes at
-        /// <paramref name="rapids"/>, which must be rapids not marked already.
+        /// <paramref name="rapids"/>, which must be rapids or sub-program calls not marked already.
         /// </summary>
         public static Program Mark(Program program, IReadOnlyCollection<int> rapids)
         {
@@ -64,8 +66,8 @@ namespace OpenNest.CNC
             {
                 if (!rapids.Contains(i))
                     continue;
-                if (copy.Codes[i] is not RapidMove || marked[i])
-                    throw new ArgumentException("Only an unmarked rapid can be marked for a head raise.");
+                if (copy.Codes[i] is not (RapidMove or SubProgramCall) || marked[i])
+                    throw new ArgumentException("Only an unmarked rapid or sub-program call can be marked for a head raise.");
                 copy.Codes.Insert(i, new Comment(Marker));
             }
             return copy;

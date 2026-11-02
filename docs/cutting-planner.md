@@ -846,11 +846,14 @@ It gets twice the plate's expansion budget, so the planning effort scales it too
 
 Before replay, each rapid of the walk that still passes over parts already cut is marked to
 raise the head (`RaisedRapids`, `OpenNest.CNC.HeadRaise`): a `HEAD RAISE` comment directly
-before the rapid in the part's program, which saves with the nest. This is the only place a
+before the rapid in the part's program, which saves with the nest. A sub-program may be shared,
+so it is never marked: when the rapid arrives at a hole sub-program (a round hole is cut as one),
+the comment goes directly before the part's own call, and the call's arrival rapid is the raised
+one (`ExecutionMotion.CallCode` names the call a sub-program's motions run in). This is the only place a
 raise is added, so a plate the strict search can plan never gets one: it is the last resort for
 a route no search kept head-down, not a shortcut. Only rapids the planner chose in a
-regenerated program are marked; a rapid into or inside a locked program, a cut-off or a hole
-sub-program keeps its crossing as a finding. The checker sets a raised rapid's crossings apart
+regenerated program are marked; a rapid into or inside a locked program or a cut-off, and a
+rapid inside a hole sub-program after its arrival, keeps its crossing as a finding. The checker sets a raised rapid's crossings apart
 instead of reporting them, in replay and in pre-post verification alike.
 
 The batch walks both the free order and the current order, replays each against its captured

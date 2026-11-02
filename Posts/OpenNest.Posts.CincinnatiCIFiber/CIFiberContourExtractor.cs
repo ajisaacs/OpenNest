@@ -74,12 +74,15 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         /// A contour starts at each rapid move; moves before the first rapid
         /// form a contour whose pierce is the last move's endpoint (closed-loop
         /// continuation), matching FeatureUtils' synthetic-rapid convention.
+        /// <paramref name="raiseFirst"/> raises the head for the program's first
+        /// contour: a marker before the call that runs it.
         /// </summary>
         private static void Flatten(
             Program program,
             Vector partLocation,
             Vector subOffset,
-            List<CIFiberContour> contours
+            List<CIFiberContour> contours,
+            bool raiseFirst = false
         )
         {
             if (program == null)
@@ -98,7 +101,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             }
 
             CIFiberContour current = null;
-            var raise = false;
+            var raise = raiseFirst;
 
             void Flush()
             {
@@ -140,7 +143,8 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                         // offset.
                         Flush();
                         var sub = new List<CIFiberContour>();
-                        Flatten(call.Program, partLocation, subOffset + call.Offset, sub);
+                        Flatten(call.Program, partLocation, subOffset + call.Offset, sub, raise);
+                        raise = false;
                         contours.AddRange(sub);
                         break;
 
@@ -151,7 +155,8 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                             // mid-contour): in absolute mode the implicit
                             // start position is the frame origin, which is the
                             // closure point of a closed contour = the pierce.
-                            current = new CIFiberContour { Pierce = origin };
+                            current = new CIFiberContour { Pierce = origin, Raised = raise };
+                            raise = false;
                         }
 
                         var absolute = (Motion)motion.Clone();

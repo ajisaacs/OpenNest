@@ -57,7 +57,8 @@ uses the Cincinnati machine-sample convention, not a generic TF5200 laser API:
   next contour's `L0` keep a locked head down for the rapid back is unconfirmed.
 - A rapid Plan Cutting marked to pass over parts already cut (see
   [the cutting planner](cutting-planner.md#safest-route-fallback-when-the-search-runs-out))
-  writes the `Head raise` block just before its `G0`. The block is blank by default,
+  writes the `Head raise` block just before its `G0`; a marked hole call raises before
+  its hole's first `G0`. The block is blank by default,
   and a nest with a marked rapid is refused while it is blank. Which block raises the
   head on the CI Fiber (whether `L "L0"` without block delete does) is unconfirmed;
   enter and verify it on the machine.

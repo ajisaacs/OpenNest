@@ -242,7 +242,7 @@ public sealed class CincinnatiSheetWriter
             var codes = item.Codes;
 
             // SubProgramCall features are emitted as M98 hole calls
-            if (codes.Count == 1 && codes[0] is SubProgramCall holeCall)
+            if (FeatureUtils.HoleCall(codes) is { } holeCall)
             {
                 CincinnatiHoleCallWriter.Write(
                     w,

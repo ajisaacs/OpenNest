@@ -148,7 +148,7 @@ in this order (`CincinnatiHeadRaise`):
    part or drawing comes next does not matter. Unknown travel (a hole call's rapid
    inside a part sub-program) never takes it.
 2. Otherwise `M47` when Plan Cutting marked the rapid to pass over parts already
-   cut (a `HEAD RAISE` comment before it; see
+   cut (a `HEAD RAISE` comment before it, or before the hole call it arrives at; see
    [the cutting planner](cutting-planner.md#safest-route-fallback-when-the-search-runs-out)),
    whatever the M47 mode: block delete must not skip it.
 3. Otherwise the M47 mode for the feature just cut: `ExteriorM47` after a
