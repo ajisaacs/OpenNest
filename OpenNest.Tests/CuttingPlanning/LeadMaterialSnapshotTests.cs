@@ -20,7 +20,9 @@ public class LeadMaterialSnapshotTests
         var arcs = execution.Motions.Where(m => m.Curve?.IsFiniteArc == true).Select(m => m.Curve!).ToArray();
         var contacts = arcs[0].Contacts(arcs[1], out var overlap);
         Assert.False(overlap);
-        Assert.Contains(contacts, p => arcs.Any(a => a.IsOutsideArcSpan(p)));
+        // Adjacent curves meet exactly at their joint: the second crossing of these near-tangent
+        // circles, 0.000106 away on the radius-18 arc's extension, is off that arc's span.
+        Assert.Equal(location, Assert.Single(contacts));
 
         var material = LeadMaterialSnapshot.Capture(program, location);
 
@@ -45,8 +47,8 @@ public class LeadMaterialSnapshotTests
 
     private static Program ArcJoint(double centerOffset, bool reverseSecond, bool atSeam)
     {
-        // Near-tangent circles meet at zero and about 0.000106 away. The native
-        // angular band of the radius-18 arc admits its extension beyond zero.
+        // Near-tangent circles meet at zero and about 0.000106 away, on the radius-18 arc's
+        // extension beyond zero, within the native query's angular band.
         var first = new Vector(-18, 18);
         var center = new Vector(centerOffset, 1);
         var end = center + new Vector(center.DistanceTo(Vector.Zero), 0);

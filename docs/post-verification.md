@@ -153,7 +153,10 @@ they may form no loop, counting each closed contour with its leads as one point.
 an open end must also stay out of the gap beyond it: a lead-out never reaches ahead of the
 end it leaves, and a lead-in never behind the start it enters. Anything else (pieces that
 meet exactly, a lead that bridges or curls into a tab, cuts from edge to edge) is reported
-as incomplete, needing manual review. Kerf, tab strength and other parts' cuts are not modeled. Plan
+as incomplete, needing manual review. Kerf, tab strength and other parts' cuts are not modeled.
+Consecutive cuts of one piece meet at their shared vertex exactly, however their arcs were
+rounded (see [cutting dependencies](cutting-planner.md#cutting-dependencies)): the proof
+never mistakes a fillet's joint for a loop. Plan
 Cutting runs the same proof, so its own [tabbed cutouts](tabbed-cutouts.md) (pieces without
 lead-outs) pass, and so do its tabbed perimeters followed by a lead-out that stays out of the
 tab. A program that still has a tabbed cutout's `Tab` motions (never planned) is

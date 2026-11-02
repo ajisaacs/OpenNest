@@ -66,12 +66,22 @@ Nominal material validation recognizes contacts at shared endpoints of adjacent
 contour segments using `OpenNest.Math.Tolerance.Epsilon` (0.00001 model units).
 This avoids false self-intersection warnings from rounding at arc/line joints,
 including the contour seam. Overlapping segments and contacts away from those
-joints or between separate contours still fail validation. For adjacent finite arcs
-with a shared endpoint, material validation filters native contacts against both
-actual arc spans: the native query's angular padding can otherwise report a
-supporting-circle intersection beyond one arc's endpoint. This does not increase
-the joint-distance tolerance, discard overlapping arcs, or waive a second intersection
-inside both spans. Lead and rapid checks keep their conservative contact queries.
+joints or between separate contours still fail validation. Two curves that meet end to
+end (within the check epsilon, 1e-8) are not put to the native intersection query at
+all: it is ill-conditioned at such a joint (two circles meeting at a shallow angle, as a
+fillet continuing into a larger arc, or a line meeting its fillet), and lands its root up
+to 1e-5 off the vertex, which no joint tolerance can tell from a cut that touches beside
+the joint. `PostVerificationGeometry.Curve.Contacts` reports the shared vertex itself and
+derives the pair's other intersection from it (two circles meet again at the vertex's mirror
+image across the line through their centers; a line meets a circle again at the far end of
+its chord), keeping it only when it lies on both finite spans. Every consumer of contacts
+(material validation, lead checks, nested-part containment and the open-cut proof) sees the
+same exact joint, so a part whose DXF arcs were rounded apart from their neighbors by 1e-9
+neither fails material validation nor loses its tabbed perimeter's retention proof. For
+adjacent finite arcs, material validation still filters any native contact against both
+actual arc spans. None of this increases the joint-distance tolerance, discards overlapping
+arcs, or waives a second intersection inside both spans. Lead and rapid checks keep their
+conservative contact queries.
 Source contour closure
 in material capture and emitter preparation accepts endpoint gaps up to 0.000001
 model units (inches for an inch nest), with a floating-point roundoff allowance

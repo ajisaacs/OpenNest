@@ -392,9 +392,26 @@ internal static class PostVerificationGeometry
                 || InteriorWitness(other.Start, this, witness) || InteriorWitness(other.End, this, witness));
             if (SameSupport(other))
                 points.Clear();
+            // Two curves that meet end to end share that vertex, and the native query is
+            // ill-conditioned there: circles meeting at a shallow angle, or a line meeting its own
+            // fillet, put their root up to 1e-5 off the joint, which no joint tolerance can tell
+            // from a cut that touches beside it. Both shapes are known, so their other
+            // intersection, if there is one, follows from the shared vertex exactly instead.
+            var joint = SameSupport(other) ? null : SharedVertex(other);
+            var adjacent = joint.HasValue;
+            if (joint is { } vertex)
+            {
+                points.Clear();
+                points.Add(vertex);
+                if (SecondIntersection(other, vertex) is { } second && second.DistanceTo(vertex) > Epsilon
+                    && Contains(second) && other.Contains(second)
+                    && !IsOutsideArcSpan(second) && !other.IsOutsideArcSpan(second))
+                    points.Add(second);
+            }
             foreach (var point in points)
                 Validate(point);
-            var nativeContactCount = points.Count;
+            // Analytic contacts of adjacent curves are certain; the ray guard below is for native queries.
+            var nativeContactCount = adjacent ? int.MaxValue : points.Count;
             foreach (var point in new[] { Start, End, other.Start, other.End })
                 if (Contains(point) && other.Contains(point)
                     && !points.Exists(p => p.DistanceTo(point) <= Epsilon))
@@ -410,6 +427,49 @@ internal static class PostVerificationGeometry
             static bool InteriorWitness(Vector point, Curve curve, double tolerance) => curve.Contains(point, tolerance)
                 && (curve.Start.DistanceTo(curve.End) <= Epsilon
                     || (point.DistanceTo(curve.Start) > tolerance && point.DistanceTo(curve.End) > tolerance));
+        }
+
+        /// <summary>
+        /// The end this curve and <paramref name="other"/> share, within <see cref="Epsilon"/>, as
+        /// this curve has it; null when they share none or either is a full circle.
+        /// </summary>
+        private Vector? SharedVertex(Curve other)
+        {
+            if (Center.HasValue && !IsFiniteArc || other.Center.HasValue && !other.IsFiniteArc)
+                return null;
+            foreach (var end in new[] { End, Start })
+                if (end.DistanceTo(other.Start) <= Epsilon || end.DistanceTo(other.End) <= Epsilon)
+                    return end;
+            return null;
+        }
+
+        /// <summary>
+        /// Where the supports of this curve and <paramref name="other"/> meet again, given that
+        /// they meet at <paramref name="vertex"/>: two circles meet again at the vertex's mirror
+        /// image across the line through their centers, and a line meets a circle again at the
+        /// far end of its chord through the vertex. Two lines meet only once. The result is on
+        /// both supports; it may be the vertex itself (tangency) or off either finite span.
+        /// </summary>
+        private Vector? SecondIntersection(Curve other, Vector vertex)
+        {
+            if (Center is { } center && other.Center is { } otherCenter)
+            {
+                var axis = otherCenter - center;
+                var distance = otherCenter.DistanceTo(center);
+                if (distance <= Epsilon)
+                    return null;
+                var unit = axis * (1 / distance);
+                var foot = center + unit * Dot(vertex - center, unit);
+                return foot * 2 - vertex;
+            }
+            if (Center is null && other.Center is null)
+                return null;
+            var line = Center is null ? this : other;
+            var circle = Center is null ? other.Center!.Value : Center!.Value;
+            if (line.Length <= Epsilon)
+                return null;
+            var direction = (line.End - line.Start) * (1 / line.Length);
+            return vertex + direction * (2 * Dot(circle - vertex, direction));
         }
 
         /// <summary>

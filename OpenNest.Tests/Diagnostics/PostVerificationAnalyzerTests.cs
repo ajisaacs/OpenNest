@@ -545,6 +545,39 @@ public class PostVerificationAnalyzerTests
             || Find(report, PostVerificationKind.Incomplete).Any());
     }
 
+    [Fact]
+    public void Rapid_TabbedPerimeterOfTangentArcsWithALeadOutIsRetained()
+    {
+        // A D-shaped part: a half circle of radius 5 continued tangentially by a quarter circle
+        // of radius 3, the half circle's center off by 2e-11 as a DXF arc rounded apart from its
+        // neighbor is. The arcs still meet within the closure epsilon, but their circles cross
+        // again 2e-5 beside the joint, inside the native query's angular padding and past the
+        // proof's joint tolerance: read as a loop, the open perimeter was not retained. Adjacent
+        // curves meet exactly, so the tabbed perimeter with its perpendicular lead-out passes.
+        var clean = new Program();
+        clean.MoveTo(0, 0);
+        clean.LineTo(10, 0);
+        clean.ArcTo(new Vector(10, 10), new Vector(10, 5 - 2e-11), RotationType.CCW);
+        clean.ArcTo(new Vector(7, 7), new Vector(10, 7), RotationType.CCW);
+        clean.LineTo(0, 7);
+        clean.LineTo(0, 0);
+        var part = new Part(new Drawing("d", clean));
+        var program = new Program();
+        program.MoveTo(0, -0.2);
+        program.Codes.Add(new LinearMove(0, 0) { Layer = LayerType.Leadin });
+        program.LineTo(10, 0);
+        program.ArcTo(new Vector(10, 10), new Vector(10, 5 - 2e-11), RotationType.CCW);
+        program.ArcTo(new Vector(7, 7), new Vector(10, 7), RotationType.CCW);
+        program.LineTo(0, 7);
+        program.LineTo(0, 0.2);
+        program.Codes.Add(new LinearMove(-0.1, 0.2) { Layer = LayerType.Leadout });
+        part.RestoreLeadInProgram(program, false);
+
+        var report = Analyze(part, Scribe(-2, 5), Scribe(16, 5));
+
+        Assert.Empty(Find(report, PostVerificationKind.Incomplete));
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
