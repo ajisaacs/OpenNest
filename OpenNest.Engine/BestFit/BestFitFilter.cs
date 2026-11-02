@@ -19,6 +19,8 @@ namespace OpenNest.Engine.BestFit
 
         public void Apply(List<BestFitResult> results)
         {
+            var partAspects = new Dictionary<Drawing, double>(ReferenceEqualityComparer.Instance);
+
             foreach (var result in results)
             {
                 if (!result.Keep)
@@ -35,20 +37,47 @@ namespace OpenNest.Engine.BestFit
                 }
 
                 var aspect = result.LongestSide / result.ShortestSide;
+                var maxAspect = System.Math.Max(
+                    MaxAspectRatio,
+                    PartAspect(result.Candidate?.Drawing, partAspects)
+                );
 
-                if (aspect > MaxAspectRatio && result.Utilization < UtilizationOverride)
+                if (aspect > maxAspect && result.Utilization < UtilizationOverride)
                 {
                     result.Keep = false;
                     result.Reason = string.Format(
-                        "Aspect ratio {0:F1} exceeds max {1}",
+                        "Aspect ratio {0:F1} exceeds max {1:0.#}",
                         aspect,
-                        MaxAspectRatio
+                        maxAspect
                     );
                     continue;
                 }
 
                 result.Reason = "Valid";
             }
+        }
+
+        /// <summary>
+        /// A pair is never held to a tighter aspect limit than one part alone: two long, thin
+        /// parts laid side by side are less elongated than either, so a fixed limit would reject
+        /// every pair of a part longer than it. Measured on the drawing's own frame (canonical
+        /// for cached pairs); any other frame only understates the aspect.
+        /// </summary>
+        private static double PartAspect(Drawing drawing, Dictionary<Drawing, double> cache)
+        {
+            if (drawing?.Program == null)
+                return 0;
+
+            if (!cache.TryGetValue(drawing, out var aspect))
+            {
+                var box = drawing.Program.BoundingBox();
+                var shortest = System.Math.Min(box.Width, box.Length);
+                aspect =
+                    shortest > 0 ? System.Math.Max(box.Width, box.Length) / shortest : 0;
+                cache[drawing] = aspect;
+            }
+
+            return aspect;
         }
     }
 }

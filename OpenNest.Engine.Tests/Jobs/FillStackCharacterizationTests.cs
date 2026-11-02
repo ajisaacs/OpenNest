@@ -30,6 +30,9 @@ namespace OpenNest.Engine.Tests.Jobs;
 /// Re-captured when quantity trimming began keeping interlocked pairs whole
 /// (<c>ShrinkFiller.TrimToCount</c>): nine quantity-limited cases kept their counts but drop
 /// different copies. Whole-job leftovers trying pairs first changed none of these pins.
+/// The learned-angle nests were re-captured when the best-fit aspect limit began allowing a
+/// part's own aspect: the long bar now nests as an interlocked pair, and the notched quantity
+/// dropped from 6 to 4 so the Fill nest still differs from a full sweep.
 /// Not pinned: richer mixes that pair parallelogram, chevron or tee parts at oblique angles
 /// with other irregular items. Their Fill and Vertical Remnant nests vary between runs, most
 /// likely because best-fit pair candidates are gathered in a <c>ConcurrentBag</c> and equal
@@ -258,7 +261,7 @@ public class FillStackCharacterizationTests
         [
             new() { Drawing = new Drawing("bar", LongBar()), Quantity = 3 },
             new() { Drawing = new Drawing("chevron", Chevron()), Quantity = 20 },
-            new() { Drawing = new Drawing("notched", Notched()), Quantity = 6 },
+            new() { Drawing = new Drawing("notched", Notched()), Quantity = 4 },
             new() { Drawing = new Drawing("rect", TestDrawingFactory.Rectangle(4, 3)), Quantity = 1 },
         ];
 
@@ -289,10 +292,10 @@ public class FillStackCharacterizationTests
     }
 
     [Theory]
-    [InlineData("Fill", 30, "5732030365D13B9A")]
-    [InlineData("Strip", 30, "666F8E276808A9C2")]
-    [InlineData("Vertical Remnant", 30, "5732030365D13B9A")]
-    [InlineData("Horizontal Remnant", 30, "C05F6A30A648B929")]
+    [InlineData("Fill", 28, "2D424BF0DBA7CD32")]
+    [InlineData("Strip", 28, "E13C9185F4206BA8")]
+    [InlineData("Vertical Remnant", 28, "2D424BF0DBA7CD32")]
+    [InlineData("Horizontal Remnant", 28, "5E349DF948B78808")]
     public void Nest_LearnedAngleItems_PinnedLayout(
         string strategy,
         int expectedCount,
