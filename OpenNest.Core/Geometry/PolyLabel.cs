@@ -28,12 +28,16 @@ namespace OpenNest.Geometry
         /// A precision proportional to the shape's mean material width (twice the net area over
         /// the total outline length, holes included), so small or slender shapes refine further
         /// than large solid ones. A fixed precision near the shape's size stops at the first
-        /// interior cell.
+        /// interior cell. Holes that leave no net area (a second outline mistaken for a hole, so
+        /// lying outside the first) fall back to the outline alone: a near-zero precision would
+        /// refine a pole ridge, such as a rectangle's centerline, into billions of cells.
         /// </summary>
         public static double ThicknessPrecision(Polygon outer, IList<Polygon> holes = null, double fraction = 0.05)
         {
-            var area = outer.Area();
-            var length = ClosedLength(outer);
+            var outerArea = outer.Area();
+            var outerLength = ClosedLength(outer);
+            var area = outerArea;
+            var length = outerLength;
 
             if (holes != null)
             {
@@ -42,6 +46,13 @@ namespace OpenNest.Geometry
                     area -= holes[i].Area();
                     length += ClosedLength(holes[i]);
                 }
+            }
+
+            // Equal outlines leave rounding noise, not material.
+            if (!(area > outerArea * 1e-6) || !(length > 0))
+            {
+                area = outerArea;
+                length = outerLength;
             }
 
             if (!(area > 0) || !(length > 0))

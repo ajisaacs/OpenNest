@@ -13,6 +13,7 @@ namespace OpenNest
     public class LayoutPart : IPart
     {
         private static Color selectedColor = Color.FromArgb(90, 150, 200, 255);
+        private const int LabelSearchCells = 20000;
 
         // GDI+ objects are not thread-safe, so views on different UI threads each draw
         // with their own; sharing one fails with "Object is currently in use elsewhere".
@@ -335,7 +336,8 @@ namespace OpenNest
                     holes.Add(cutout.ToPolygonWithTolerance(0.1));
             }
 
-            return PolyLabel.Find(outer, holes, PolyLabel.ThicknessPrecision(outer, holes));
+            // The label is cosmetic: a budget keeps any shape from stalling the paint.
+            return PolyLabel.Find(outer, holes, PolyLabel.ThicknessPrecision(outer, holes), LabelSearchCells);
         }
 
         /// <summary>Rebuilds the part's paths from its program and maps them to the view.</summary>

@@ -154,6 +154,34 @@ public class PolyLabelTests
     }
 
     [Fact]
+    public async Task ThicknessPrecision_HoleOutsideTheOutline_FallsBackToTheOutline()
+    {
+        // A drawing of two equal rectangles side by side: the profile takes one as the
+        // perimeter and the other as a cutout, so the net area is zero. A near-zero precision
+        // refined the rectangle's whole centerline ridge and never finished.
+        static Polygon Rect(double x, double length, double width)
+        {
+            var p = new Polygon();
+            p.Vertices.Add(new Vector(x, 0));
+            p.Vertices.Add(new Vector(x + length, 0));
+            p.Vertices.Add(new Vector(x + length, width));
+            p.Vertices.Add(new Vector(x, width));
+            return p;
+        }
+
+        var outer = Rect(0, 15.456693, 9.055118);
+        // The real drawing's second outline came out 1e-13 smaller: a net area of rounding noise.
+        var holes = new[] { Rect(16.401575, 15.456693 - 1e-14, 9.055118) };
+
+        var precision = PolyLabel.ThicknessPrecision(outer, holes);
+        Assert.Equal(PolyLabel.ThicknessPrecision(outer), precision, 12);
+
+        var pole = await Task.Run(() => PolyLabel.Find(outer, holes, precision)).WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.True(outer.ContainsPoint(pole));
+        Assert.Equal(9.055118 / 2, pole.Y, 0.5);
+    }
+
+    [Fact]
     public void DegeneratePolygon_ReturnsFallback()
     {
         var p = new Polygon();
