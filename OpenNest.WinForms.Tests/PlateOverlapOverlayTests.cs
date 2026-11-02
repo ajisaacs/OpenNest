@@ -358,6 +358,62 @@ public class PlateOverlapOverlayTests
         Assert.False(CheckIsDrawn(run));
     });
 
+    [Fact]
+    public void ClearPlateKeepsAGrayCheckWhileRechecking() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.View.Plate.Parts.RemoveAt(1);
+        run.EnableAutoCheck();
+        var overlay = run.View.OverlapOverlay;
+        var task = run.AutoTick();
+        run.Next().Complete();
+        run.Pump(task);
+        Assert.True(overlay.ShowsAllClear);
+
+        run.View.Plate.Parts[0].Offset(1, 0);
+        run.Paint();
+        Assert.True(overlay.IsAutoCheckScheduled);
+        Assert.True(overlay.ShowsPendingCheck);
+        Assert.False(overlay.ShowsAllClear);
+        Assert.False(CheckIsDrawn(run)); // Gray, not green: this layout is unconfirmed.
+
+        task = run.AutoTick();
+        var work = run.Next();
+        Assert.True(overlay.ShowsPendingCheck);
+        work.Complete();
+        run.Pump(task);
+        Assert.False(overlay.ShowsPendingCheck);
+        Assert.True(overlay.ShowsAllClear);
+    });
+
+    [Fact]
+    public void FindingsStayInTheLabelWhileRechecking() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.EnableAutoCheck();
+        var task = run.AutoTick();
+        run.Next().Complete();
+        run.Pump(task);
+
+        run.View.Plate.Parts[1].Offset(0.5, 0);
+        run.Paint();
+        Assert.False(run.View.OverlapOverlay.ShowsPendingCheck);
+        Assert.False(run.View.OverlapOverlay.ShowsAllClear);
+    });
+
+    [Fact]
+    public void StaleWithoutAutoCheckStillAsksForACheck() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.View.Plate.Parts.RemoveAt(1);
+        run.Finish();
+        run.View.Plate.Parts[0].Offset(1, 0);
+        run.Paint();
+        Assert.Equal(OverlapCheckStatus.Stale, run.View.OverlapStatus);
+        Assert.False(run.View.OverlapOverlay.ShowsPendingCheck);
+        Assert.False(run.View.OverlapOverlay.ShowsAllClear);
+    });
+
     private static bool CheckIsDrawn(OverlayRun run)
     {
         using var image = new Bitmap(64, 64);

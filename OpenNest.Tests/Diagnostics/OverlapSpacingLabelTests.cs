@@ -201,6 +201,29 @@ public class OverlapSpacingLabelTests
     }
 
     [Fact]
+    public void SettledResult_SurvivesEditsAndRechecksButNotFailureOrCancel()
+    {
+        var plate = PlateWith(Spacing, Square(0), Square(4.1));
+        var state = new OverlapReportState();
+        Assert.Null(state.SettledMessage);
+        Assert.True(state.TryPublish(state.Begin(plate), plate, Analyze(plate)));
+        const string message = "No material overlaps; part spacing: 1 pairs too close";
+
+        plate.Parts[1].Offset(1, 0);
+        state.EnsureFresh(plate);
+        Assert.Equal((message, false), (state.SettledMessage, state.SettledClear));
+        var request = state.Begin(plate);
+        Assert.Equal(message, state.SettledMessage);
+
+        Assert.True(state.TryPublish(request, plate, Analyze(plate)));
+        Assert.True(state.SettledClear);
+
+        Assert.True(state.TryFail(state.Begin(plate), plate));
+        Assert.Null(state.SettledMessage);
+        Assert.False(state.SettledClear);
+    }
+
+    [Fact]
     public void Presentation_ShowsPositionsNamesAndGap()
     {
         var pair = new PlateSpacingPair(1, 2, "a", "b", 0.1, new Vector(4.05, 2));

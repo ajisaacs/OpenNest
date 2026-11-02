@@ -81,7 +81,12 @@ internal sealed class OverlapOverlayController : IDisposable
         : state.Message;
 
     /// <summary>The canvas shows a green check instead of the label: a pending recheck is not clear.</summary>
-    internal bool ShowsAllClear => state.IsAllClear && !autoCheck.IsWaiting;
+    internal bool ShowsAllClear => state.IsAllClear && !IsSettling;
+
+    /// <summary>A gray check while a recheck settles: unconfirmed, and steady in the corner.</summary>
+    internal bool ShowsPendingCheck => IsSettling && (state.SettledMessage == null || state.SettledClear);
+
+    private bool IsSettling => autoCheck.IsWaiting || state.IsRunning;
 
     /// <summary>
     /// Recheck automatically after layout edits settle. Units are read when each request
@@ -683,13 +688,13 @@ internal sealed class OverlapOverlayController : IDisposable
     }
 
     // Same corner as the label; Message keeps the words for the status bar.
-    private void DrawAllClear(Graphics graphics)
+    private void DrawCheck(Graphics graphics, Color color)
     {
         var scale = view.DeviceDpi / 96f;
         var box = 24 * scale;
         using var background = new SolidBrush(Color.FromArgb(235, Color.White));
         graphics.FillRectangle(background, 6, 6, box, box);
-        using var pen = new Pen(Color.FromArgb(0, 140, 60), 3 * scale)
+        using var pen = new Pen(color, 3 * scale)
         {
             StartCap = LineCap.Round,
             EndCap = LineCap.Round,
@@ -712,16 +717,19 @@ internal sealed class OverlapOverlayController : IDisposable
         try
         {
             graphics.ResetTransform();
-            if (ShowsAllClear)
+            if (ShowsAllClear || ShowsPendingCheck)
             {
-                DrawAllClear(graphics);
+                DrawCheck(graphics, ShowsAllClear ? Color.FromArgb(0, 140, 60) : Color.FromArgb(150, 150, 150));
                 return;
             }
-            var text = Message + (state.DisplayMode == OverlapDisplayMode.Off ? " (display off)" : "");
+            // While settling, the last findings stay put, dimmed, instead of status text flickering.
+            var settling = IsSettling;
+            var text = (settling ? state.SettledMessage : Message)
+                + (state.DisplayMode == OverlapDisplayMode.Off ? " (display off)" : "");
             var size = graphics.MeasureString(text, view.Font);
             using var background = new SolidBrush(Color.FromArgb(235, Color.White));
             graphics.FillRectangle(background, 6, 6, size.Width + 8, size.Height + 6);
-            graphics.DrawString(text, view.Font, Brushes.DarkRed, 10, 9);
+            graphics.DrawString(text, view.Font, settling ? Brushes.Gray : Brushes.DarkRed, 10, 9);
         }
         finally
         {

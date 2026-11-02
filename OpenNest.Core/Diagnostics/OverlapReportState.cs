@@ -31,6 +31,13 @@ public sealed class OverlapReportState
     public bool IsAllClear => Status == OverlapCheckStatus.Current && Report.Pairs.Count == 0
         && Report.ClampFindings.Count == 0 && Report.CutOffClampFindings.Count == 0
         && Report.SpacingPairs.Count == 0;
+    /// <summary>
+    /// The last published result's message, kept through layout edits and rechecks so the canvas
+    /// stays quiet until the next result; never a claim about the current layout. Null when none.
+    /// </summary>
+    public string SettledMessage { get; private set; }
+    /// <summary>Whether that last published result was all clear.</summary>
+    public bool SettledClear { get; private set; }
 
     public string Message => Status switch
     {
@@ -91,6 +98,8 @@ public sealed class OverlapReportState
         observedDisplayStamp = stamp;
         uncheckedPartCount = CountUncheckedParts(report.Issues.Concat(report.SpacingIssues));
         Status = report.IsComplete ? OverlapCheckStatus.Current : OverlapCheckStatus.Incomplete;
+        SettledMessage = Message;
+        SettledClear = IsAllClear;
         return true;
     }
 
@@ -175,7 +184,11 @@ public sealed class OverlapReportState
     private void Clear(OverlapCheckStatus status, bool preserveDisplay = false)
     {
         if (!preserveDisplay)
+        {
             ClearDisplayPairs();
+            SettledMessage = null;
+            SettledClear = false;
+        }
         Generation++;
         Report = null;
         uncheckedPartCount = 0;

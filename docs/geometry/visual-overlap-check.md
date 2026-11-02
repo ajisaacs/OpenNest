@@ -30,7 +30,10 @@ zero. Selection and dragging remain ordinary plate operations, not overlay
 interactions.
 
 A current, fully checked report with no finding of any kind draws a green check in
-the corner instead of words; the status bar still uses the wording below. Every
+the corner instead of words; the status bar still uses the wording below. While a
+recheck is pending or running the corner stays quiet: a gray check after a clear
+result or when there is no result yet, or the last findings dimmed in gray, neither
+of which says anything about the edited layout. Every
 other state keeps a persistent label, which distinguishes unchecked, checking,
 current with findings, incomplete, stale,
 canceled, and failed checks. Only a completed, current, fully checked report can
