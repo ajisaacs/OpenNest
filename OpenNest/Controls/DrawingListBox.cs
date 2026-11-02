@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using Size = System.Drawing.Size;
 
@@ -108,6 +109,12 @@ namespace OpenNest.Controls
 
         public bool HideQuantity { get; set; }
 
+        /// <summary>
+        /// The plate shown beside the list; each drawing's count on it prefixes the nested
+        /// quantity. Null omits the count.
+        /// </summary>
+        public Plate Plate { get; set; }
+
         protected override void OnDrawItem(DrawItemEventArgs e)
         {
             if (e.Index >= Items.Count || e.Index <= -1)
@@ -198,6 +205,11 @@ namespace OpenNest.Controls
                     dwg.Quantity.Nested,
                     dwg.Quantity.Required
                 );
+                var onPlate = Plate?.Parts.Count(part => part.BaseDrawing == dwg) ?? 0;
+
+                if (onPlate > 0)
+                    text1 = $"[{onPlate}] {text1}";
+
                 pt.Y += 22;
                 e.Graphics.DrawString(text1, Font, detailBrush, pt);
                 pt.Y += 18;

@@ -502,6 +502,7 @@ namespace OpenNest.Forms
 
             Text = Nest.Name;
             drawingListBox1.Units = Nest.Units;
+            drawingListBox1.Plate = PlateManager.CurrentPlate;
         }
 
         private void UnbindNest()
@@ -1627,6 +1628,8 @@ namespace OpenNest.Forms
         {
             PlateView.Plate = PlateManager.CurrentPlate;
             PlateView.ZoomToFit();
+            drawingListBox1.Plate = PlateManager.CurrentPlate;
+            drawingListBox1.Invalidate();
             SelectCurrentPlateInList();
             UpdatePlateHeader();
             UpdateRemovePlateButton();
