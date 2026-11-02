@@ -10,6 +10,12 @@ namespace OpenNest.CNC.CuttingStrategy
     {
         public CuttingParameters Parameters { get; set; }
 
+        /// <summary>
+        /// Remembers pierce-zone resolutions by contour ordinal across the emissions of one
+        /// preparation (see <see cref="PierceZoneMemo"/>); null resolves every emission afresh.
+        /// </summary>
+        internal PierceZoneMemo PierceZones { get; set; }
+
         private record ContourEntry(Shape Shape, Vector Point, Entity Entity);
 
         public CuttingResult Apply(Program partProgram, Vector approachPoint)
@@ -315,7 +321,8 @@ namespace OpenNest.CNC.CuttingStrategy
                     EmitContour(result, shape, choice.Point, shape.Entities[choice.EntityOrdinal],
                         choice.ContourOrdinal == perimeterOrdinal ? ContourType.External : null,
                         exactCirclePrograms: true, scrapPierce: choice.Pierce,
-                        stopAtCenterLine: contourParameters?[choice.ContourOrdinal] == null);
+                        stopAtCenterLine: contourParameters?[choice.ContourOrdinal] == null,
+                        memoContour: choice.ContourOrdinal);
                 }
             }
             finally
@@ -442,7 +449,8 @@ namespace OpenNest.CNC.CuttingStrategy
             ContourType? forceType = null,
             bool exactCirclePrograms = false,
             Vector? scrapPierce = null,
-            bool stopAtCenterLine = false
+            bool stopAtCenterLine = false,
+            int? memoContour = null
         )
         {
             var contourType = forceType ?? DetectContourType(shape);
@@ -478,7 +486,7 @@ namespace OpenNest.CNC.CuttingStrategy
                         leadIn = StopAtCenterLine(shape, point, leadIn, normal, winding);
                     leadIn = ClampLeadInForCircle(leadIn, circle, point, normal,
                         Parameters.GetEffectivePierceClearance());
-                    leadIn = ResolvePierceZone(shape, point, leadIn, normal, Parameters.GetPierceZoneRadius(), winding);
+                    leadIn = PierceZone(memoContour, shape, point, leadIn, normal, winding);
                 }
 
                 // Build hole sub-program relative to (0,0)
@@ -531,7 +539,7 @@ namespace OpenNest.CNC.CuttingStrategy
                 {
                     if (stopAtCenterLine)
                         leadIn = StopAtCenterLine(shape, point, leadIn, leadInNormal, turn);
-                    leadIn = ResolvePierceZone(shape, point, leadIn, leadInNormal, Parameters.GetPierceZoneRadius(), turn);
+                    leadIn = PierceZone(memoContour, shape, point, leadIn, leadInNormal, turn);
                 }
             }
             program.Codes.AddRange(leadIn.Generate(point, leadInNormal, turn));
@@ -1079,6 +1087,15 @@ namespace OpenNest.CNC.CuttingStrategy
         /// manual placement preview. <paramref name="turn"/> is the hole's
         /// <see cref="LeadTurn"/>, which places a curved lead's pierce.
         /// </summary>
+        // The memoized resolution for a contour the preparation emits by ordinal.
+        private LeadIn PierceZone(int? contour, Shape hole, Vector point, LeadIn leadIn, double normal, RotationType turn)
+        {
+            var radius = Parameters.GetPierceZoneRadius();
+            return PierceZones != null && contour is { } ordinal
+                ? PierceZones.Resolve(ordinal, hole, point, leadIn, normal, radius, turn)
+                : ResolvePierceZone(hole, point, leadIn, normal, radius, turn);
+        }
+
         public static LeadIn ResolvePierceZone(Shape hole, Vector point, LeadIn leadIn, double normal,
             double pierceRadius, RotationType turn)
         {

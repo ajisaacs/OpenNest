@@ -39,6 +39,8 @@ public sealed class PreparedContours
     // Closed cutouts with tab spans, in program order. Like break cuts they are not choices:
     // every full or prefix emission cuts their pieces after the break cuts.
     private readonly List<Shape> tabbedCutouts;
+    // Pierce-zone resolutions by contour, shared with every copy: the contours are the same by ordinal.
+    private readonly PierceZoneMemo pierceZones;
     // By contour ordinal; all null without pins. A pinned contour has exactly one entry and
     // its own owned settings (the pin's lead-in, lead-out and tab).
     private readonly ContourChoice[] pinned;
@@ -61,8 +63,9 @@ public sealed class PreparedContours
     }
 
     private PreparedContours(Shape[] shapes, List<Entity> scribes, List<Shape> breakCuts, List<Shape> tabbedCutouts,
-        CuttingParameters parameters, Shape displayOutline)
+        CuttingParameters parameters, Shape displayOutline, PierceZoneMemo pierceZones = null)
     {
+        this.pierceZones = pierceZones ?? new PierceZoneMemo();
         this.displayOutline = displayOutline;
         this.shapes = shapes;
         this.scribes = scribes;
@@ -75,7 +78,7 @@ public sealed class PreparedContours
 
     private PreparedContours(PreparedContours unpinned, IReadOnlyList<CutPinResolution> pins, CancellationToken token)
         : this(unpinned.shapes, unpinned.scribes, unpinned.breakCuts, unpinned.tabbedCutouts, unpinned.parameters,
-            unpinned.displayOutline)
+            unpinned.displayOutline, unpinned.pierceZones)
     {
         contourParameters = new CuttingParameters[shapes.Length];
         var rejected = new List<CutPinResolution>();
@@ -113,7 +116,7 @@ public sealed class PreparedContours
     // a pinned perimeter keeps its pin's settings: the analysis is only kept for review.
     private PreparedContours(PreparedContours source, PartSupport support, Vector location, Tab tab)
         : this(source.shapes, source.scribes, source.breakCuts, source.tabbedCutouts, source.parameters,
-            source.displayOutline)
+            source.displayOutline, source.pierceZones)
     {
         for (var contour = 0; contour < Count; contour++)
         {
@@ -171,6 +174,9 @@ public sealed class PreparedContours
 
     /// <summary>The pierce zone every lead-in pierce of these contours keeps; 0 when off.</summary>
     internal double PierceZoneRadius => parameters.GetPierceZoneRadius();
+
+    /// <summary>The pierce-zone resolutions these contours' emissions share; for tests.</summary>
+    internal PierceZoneMemo PierceZones => pierceZones;
     /// <summary>
     /// The cut perimeter, emitted after every hole; <see cref="Count"/> (no contour) when the outside
     /// is a display perimeter, so every contour below it is a hole.
@@ -882,7 +888,7 @@ public sealed class PreparedContours
         // reads only the chosen contour and the contour count, so only that contour is cloned.
         var owned = new Shape[shapes.Length];
         owned[choice.ContourOrdinal] = (Shape)shapes[choice.ContourOrdinal].Clone();
-        return new ContourCuttingStrategy { Parameters = parameters }.EmitCandidateIsolated(
+        return new ContourCuttingStrategy { Parameters = parameters, PierceZones = pierceZones }.EmitCandidateIsolated(
             owned, scribes.Select(e => e.Clone()).ToList(), choice, contourParameters, PerimeterOrdinal);
     }
 
@@ -895,7 +901,7 @@ public sealed class PreparedContours
 
     // Only a complete emission carries a display perimeter's tail: prefixes are search probes.
     private Program EmitOwned(IReadOnlyList<ContourChoice> choices, bool complete) =>
-        new ContourCuttingStrategy { Parameters = parameters }.EmitPrepared(
+        new ContourCuttingStrategy { Parameters = parameters, PierceZones = pierceZones }.EmitPrepared(
             shapes.Select(s => (Shape)s.Clone()).ToArray(), scribes.Select(e => e.Clone()).ToList(), choices,
             contourParameters, breakCuts.Select(s => (Shape)s.Clone()).ToList(),
             tabbedCutouts.Select(s => (Shape)s.Clone()).ToList(), PerimeterOrdinal,

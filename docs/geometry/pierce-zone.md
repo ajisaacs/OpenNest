@@ -40,6 +40,15 @@ emitter cuts, and for the manual lead-in preview:
 The fallback reads only the hole's own geometry, so it does not know about a part nested
 inside the hole. Such a part is still checked as other material.
 
+Plan Cutting emits a part's whole chain again on every search expansion, and steps 3 and 4
+flatten the hole, find its pole and erode it each time, so a part with dozens of holes too
+narrow for their configured pierce spent most of its planning time there (three 1,600-motion
+parts took 41 minutes). The resolution is a pure function of the hole, the entry, the configured
+lead-in, the zone and the turn, so `PreparedContours` keeps a `PierceZoneMemo` of it by contour
+ordinal, shared with its pinned and support-tabbed copies; the first emission of each entry
+computes it and every later emission of the same entry reuses it unchanged. The manual preview
+and `ContourCuttingStrategy.Apply` resolve every call afresh, as before.
+
 ## Perimeter fallback
 
 A perimeter's fallback needs the parts around it, which the emitter never reads (it emits each

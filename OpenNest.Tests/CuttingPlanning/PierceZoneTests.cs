@@ -233,6 +233,28 @@ public class PierceZoneTests
     }
 
     [Fact]
+    public void Emission_RemembersAHoleFallbackAcrossEmissionsOfOnePreparation()
+    {
+        // A 0.5 pierce diameter in a 6 x 0.6 slot: the configured pierce is inside the zone, so
+        // the hole fallback flattens the slot, finds its pole and erodes it. The search emits the
+        // whole chain again on every expansion; the memo answers the repeats, and identically.
+        var program = Rectangle(0, 0, 10, 10);
+        program.Codes.AddRange(LeadPathValidationTests.Rectangle(2, 4.7, 8, 5.3).Codes);
+        var prepared = PreparedContours.Capture(program, Parameters(0.5));
+        var hole = Enumerable.Range(0, prepared.Count).First(c => c != prepared.PerimeterOrdinal);
+        var chain = new[] { prepared.ClosestEntry(hole, new Vector(3, 4.7)), prepared.ClosestEntry(prepared.PerimeterOrdinal, new Vector(0, 5)) };
+
+        var first = prepared.Emit(chain).ToString();
+        var hits = prepared.PierceZones.Hits;
+        var second = prepared.Emit(chain).ToString();
+
+        Assert.Equal(first, second);
+        Assert.True(prepared.PierceZones.Hits > hits, "The second emission did not reuse the first's pierce-zone resolution.");
+        var pierce = Assert.Single(Pierces(Read(prepared.Emit(chain))), p => p.X > 2 && p.X < 8);
+        Assert.InRange(pierce.Y, 4.95 - 1e-9, 5.05 + 1e-9); // The slot's center line keeps the 0.25 zone.
+    }
+
+    [Fact]
     public void ScrapPierceEntry_LeadsStraightFromThePierceToTheNearestPoint()
     {
         var prepared = PreparedContours.Capture(Rectangle(0, 0, 10, 10), Parameters(1));
