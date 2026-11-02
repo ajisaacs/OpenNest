@@ -11,7 +11,7 @@ namespace OpenNest.Engine.Jobs.Cutouts;
 /// prefers a shifted partial lattice; the middle compares it with occupied-aware NFP search;
 /// the large-insert path tries NFP first. A round hole whose inserts are all round gets only the
 /// circle-in-circle proposal for the whole list. Every other hole is also packed by
-/// <see cref="CutoutPackerProposal"/>, which wins with more copies or an equal count packed tighter.
+/// <see cref="CutoutPackerProposal"/>, which wins with more seated area or the same area packed tighter.
 /// All accepted poses are clearance-checked.
 /// Fill's equal-score pose nondeterminism remains PM c98c21bd.</remarks>
 internal static class CutoutRouter
@@ -153,13 +153,11 @@ internal static class CutoutRouter
         }
         token.ThrowIfCancellationRequested();
         // The frontier packer sees every requirement at once and settles parts against the
-        // walls and each other; it replaces the sampled proposal when it seats more copies, or
-        // the same number more compactly.
+        // walls and each other; it replaces the sampled proposal when it seats more area, or
+        // the same area more compactly.
         var packed = CutoutPackerProposal.Fill(frame, cutoutIndex, inserts, spacing,
             Array.Empty<(JobPartGeometry Geometry, NestJobPlacement Pose)>(), memo, token);
-        if (packed.Count > accepted.Count
-            || (packed.Count == accepted.Count
-                && CutoutPackerProposal.Tighter(packed, accepted, id => geometries[id])))
+        if (CutoutSeatedArea.Better(packed, accepted, id => geometries[id]))
             return Observe(packed);
         foreach (var (pose, lattice) in observed)
             observeAccepted?.Invoke(pose, lattice);

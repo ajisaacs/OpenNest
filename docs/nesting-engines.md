@@ -340,6 +340,11 @@ inside other parts' enclosed cutouts, before the selected engine, so every engin
 none needs to know about holes. The steps below prepare frame-plus-insert bundles; the engine
 places each bundle's frame as an ordinary part and never sees its reserved inserts.
 
+Filling maximizes the job's material seated in cutouts (`CutoutSeatedArea`): every square inch in
+a hole is saved from the sheet, so proposals compare insert outline area, never copies, and equal
+areas keep the tighter or earlier proposal. A hole takes one large part over a crowd of tiny ones
+of less area; a crowd of small copies still wins when it seats more.
+
 `CutoutLatticeFill` (`OpenNest.Engine/Jobs/Cutouts/`) fills one closed cutout with copies of one
 part. It runs Fill over the cutout's bounds plus one part step on every side, then shifts
 that lattice across a grid of offsets of up to half a step each way. At each offset it keeps the
@@ -359,7 +364,8 @@ try instead. A null NFP proposal is not proof of geometric impossibility. No mat
 ratio cutoff rejects a possible placement: the measured 0.10 and 0.35 ratios guide
 search order only. Below 0.10 it starts with Fill for three or more copies; between
 0.10 and 0.35 it compares Fill-plus-NFP with NFP-only counts; above 0.35 it tries
-NFP first, then Fill if demand remains, taking the higher-count valid proposal.
+NFP first, then Fill if demand remains, taking the higher-count valid proposal. Those comparisons
+are between copies of one part, so count and area agree.
 An 0.20 NFP-only rule would lose a second 4-inch square in a 10-inch round hole.
 Six geometry-only, anonymized real-job probes and neutral ring fixtures informed
 the search-order hints; these limited cases are not a global density guarantee.
@@ -372,12 +378,18 @@ carries the other half, so the frame keeps the full spacing exactly as another p
 the no-fit polygons of inserts already seated in the hole; the inner fits are computed once per
 orientation per boundary. The packer then places every offered requirement at once under its
 usual gap-fill and least-advance rule, so copies settle against the wall and each other instead
-of at the first sampled point that clears. All six strategy variants pack the hole; the one
-seating the most copies wins, and ties go to the tighter layout (smaller bounding box of the
-placed inserts, then lower, then further left). Every pose is certified with
-`NestLayoutCheck.Clears` against the frame, the occupants and the other poses, as the lattice
-and NFP poses are; no tolerance is loosened. The router keeps the packer's proposal when it
-seats more copies than the lattice-and-NFP proposal, or the same number more compactly. Two
+of at the first sampled point that clears. All six strategy variants pack the hole. The frontier
+rule's first move in an empty hole is the least advance per area, which sends narrow small parts
+first, so largest-first candidates follow: each of the 12 largest requirements opens the hole on
+each axis with as many copies as fit, then up to three fewer (two wide bars can leave room for a
+plate that a third bar would take), and the other requirements are offered around them one at a
+time, largest first (`FrontierPacker.Fill` takes those seated parts as blockers). A hole's
+largest-first candidates share a budget of 60,000 counted region updates and stop there; a single
+requirement has none. The candidate seating the most area wins, and ties go to the tighter layout
+(smaller bounding box of the placed inserts, then lower, then further left). Every pose is
+certified with `NestLayoutCheck.Clears` against the frame, the occupants and the other poses, as
+the lattice and NFP poses are; no tolerance is loosened. The router keeps the packer's proposal
+when it seats more area than the lattice-and-NFP proposal, or the same area more compactly. Two
 bars with quantity two, which the lattice never tries and the sampled NFP search scattered
 across a tall window, now stand together against one wall. Without a boundary the packer is
 unchanged: rectangular stock still starts from the work-area inner-fit rectangle, so engine
@@ -387,7 +399,8 @@ When the cutout is one circle and every insert fills at least 0.8 of its enclosi
 (discs, washers, gears by their tip circle), `CutoutCirclePacker` first packs the whole insert
 list as discs: largest first, at centers tangent to two of the hole wall and the placed discs,
 or at the hole's center. It tries a center-out pass, so a single insert sits concentric, and a
-wall-first pass, which reaches the optimal counts for up to nine equal discs. Each gap is the
+wall-first pass, which reaches the optimal counts for up to nine equal discs, and the pass
+seating more outline area wins, the center-out pass on a tie. Each gap is the
 spacing plus twice `NestTolerances.ValidationOutline`, and every pose passes `NestLayoutCheck`.
 Its result is the router's proposal for that hole: the lattice and NFP searches never placed
 more there and were slow on round inserts, most of all when demand exceeds what fits.
@@ -404,8 +417,10 @@ with a cutout some part fits (a washer with an empty bore) or an earlier bundle 
 holds a washer that holds a smaller washer that holds a slug. Chains stop at four parts deep
 (`CutoutPipelinePrepass.MaxLevels`). Lattice and NFP proposals never take such inserts, since they
 could seat a part in a ring's bore or over a nested bundle's reserved inserts; non-round frames
-with such cutouts stay independent. A frame's proposals are compared by physical parts placed, a nested
-bundle counting its frame and contents, and ties keep the flat router's proposal. It uses the largest offered spacing for every bundle because the current
+with such cutouts stay independent. A frame's proposals and angles are compared by outline area
+seated, a nested bundle counting its frame's outline plus its contents (all of that leaves the
+sheet), and ties keep the flat router's proposal or the earlier angle. Holes are still filled one
+after another, frames smallest first, each taking the most area it can from what remains. It uses the largest offered spacing for every bundle because the current
 job contract cannot condition insert demand on the stock selected later. Remaining demand is
 offered to the selected engine once. Only actually placed proxies expand, recursively, to original frame and
 insert identities. An unplaced proxy's reservations, including every nested frame and insert,

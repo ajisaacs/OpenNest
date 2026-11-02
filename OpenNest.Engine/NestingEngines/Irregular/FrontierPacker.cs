@@ -115,7 +115,9 @@ internal sealed class FrontierPacker
     private bool Fits(double width, double height) =>
         boundary?.Fits(width, height) ?? stock.Fits(width, height);
 
-    public SheetFill Fill(IReadOnlyList<int> remaining, CancellationToken token)
+    /// <param name="seated">Parts already on the sheet: they block space and hold the packing
+    /// front where they reached, so the fill starts as gap fill. They are not returned.</param>
+    public SheetFill Fill(IReadOnlyList<int> remaining, CancellationToken token, IReadOnlyList<Placed>? seated = null)
     {
         var left = remaining.ToArray();
         var states = new List<Region>();
@@ -168,6 +170,28 @@ internal sealed class FrontierPacker
         }
 
         var placed = new List<Placed>();
+        void Block(Placed part)
+        {
+            // Regions are independent, so they update in parallel without affecting determinism.
+            var snapshot = states.ToArray();
+            counter.Add(snapshot.Length);
+            Parallel.For(
+                0,
+                snapshot.Length,
+                new ParallelOptions { CancellationToken = token },
+                i => snapshot[i].Subtract(nfps.Get(part.Orientation, snapshot[i].Orientation), part.X, part.Y)
+            );
+        }
+        var front = axis == PackAxis.X ? work.Left : work.Bottom;
+        foreach (var part in seated ?? Array.Empty<Placed>())
+        {
+            placed.Add(part);
+            front = System.Math.Max(front, axis == PackAxis.X ? part.Right : part.Top);
+            Block(part);
+        }
+        var firstNew = placed.Count;
+        states.RemoveAll(s => s.IsEmpty);
+        offered.RemoveAll(p => p.A.IsEmpty || p.B.IsEmpty);
         var blockStates = new List<BlockState>();
         var preparations = 0;
         void PrepareBlocks()
@@ -202,7 +226,6 @@ internal sealed class FrontierPacker
         }
         PrepareBlocks();
         var partArea = 0.0;
-        var front = axis == PackAxis.X ? work.Left : work.Bottom;
 
         while (states.Count > 0)
         {
@@ -229,19 +252,9 @@ internal sealed class FrontierPacker
                 states.RemoveAll(s => s.Orientation.TypeIndex == typeIndex && !s.Single);
             }
 
-            // Each surviving region loses the positions the new parts now block. Regions are
-            // independent, so they update in parallel without affecting determinism.
-            var snapshot = states.ToArray();
+            // Each surviving region loses the positions the new parts now block.
             foreach (var part in choice)
-            {
-                counter.Add(snapshot.Length);
-                Parallel.For(
-                    0,
-                    snapshot.Length,
-                    new ParallelOptions { CancellationToken = token },
-                    i => snapshot[i].Subtract(nfps.Get(part.Orientation, snapshot[i].Orientation), part.X, part.Y)
-                );
-            }
+                Block(part);
             states.RemoveAll(s => s.IsEmpty);
             offered.RemoveAll(p => p.A.IsEmpty || p.B.IsEmpty);
             if (offered.Count == 0 && blocks == null)
@@ -250,7 +263,7 @@ internal sealed class FrontierPacker
             PrepareBlocks();
         }
 
-        return new SheetFill(stock, placed, partArea);
+        return new SheetFill(stock, firstNew == 0 ? placed : placed.GetRange(firstNew, placed.Count - firstNew), partArea);
     }
 
     /// <summary>

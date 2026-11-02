@@ -122,7 +122,7 @@ internal static class CutoutCirclePacker
         var gap = spacing + Margin;
         var centered = Greedy(discs, wall, gap, fromCenter: true, token);
         var walled = discs.Count > 1 ? Greedy(discs, wall, gap, fromCenter: false, token) : centered;
-        var chosen = walled.Count > centered.Count ? walled : centered;
+        var chosen = CutoutSeatedArea.More(Seated(walled), Seated(centered)) ? walled : centered;
 
         var framePose = new NestJobPlacement(frame.Id, 0, 0, 0, 0);
         var accepted = new List<(Disc Disc, Vector Center, NestJobPlacement Pose)>();
@@ -146,6 +146,9 @@ internal static class CutoutCirclePacker
         }
         token.ThrowIfCancellationRequested();
         return accepted.Select(p => p.Pose).ToArray();
+
+        double Seated(IEnumerable<(Disc Disc, Vector Offset)> placed) =>
+            placed.Sum(p => CutoutSeatedArea.Outline(geometries[p.Disc.Part.Id]));
 
         JobPartGeometry? Read(PartGeometrySnapshot snapshot) =>
             memo != null ? memo.Read(snapshot) : JobPartGeometry.TryRead(snapshot);

@@ -13,8 +13,9 @@ namespace OpenNest.Engine.Jobs.Cutouts;
 /// Frame-local cutout proposal that packs one closed cutout with the Irregular engine's
 /// <see cref="FrontierPacker"/>, taking the cutout as the packing boundary and every insert
 /// requirement at once: parts settle against the cutout wall and each other instead of at the
-/// first sampled point that clears. Each of the engine's strategy variants packs the hole; the
-/// variant seating the most copies wins, ties going to the tighter layout. Every pose is then
+/// first sampled point that clears. Each of the engine's strategy variants packs the hole, then
+/// largest-first candidates give big parts the first move (see <see cref="LargestFirst"/>); the
+/// candidate seating the most area wins, ties going to the tighter layout. Every pose is
 /// certified with <see cref="NestLayoutCheck.Clears"/> against the frame, the occupants and the
 /// other accepted poses, exactly as the lattice and NFP proposals are. Never changes a job.
 /// </summary>
@@ -22,6 +23,16 @@ internal static class CutoutPackerProposal
 {
     private const double MaxSpacing = 100;
     private const double Tie = 1e-6;
+
+    /// <summary>Requirements, largest first, that each open a largest-first candidate.</summary>
+    private const int MaxHeads = 12;
+
+    /// <summary>Copy counts tried for a head: as many as fit, then fewer, leaving room for
+    /// another part beside them.</summary>
+    private const int MaxHeadCopies = 4;
+
+    /// <summary>Region updates the largest-first candidates of one hole may spend.</summary>
+    internal const long LargestFirstWork = 60_000;
 
     internal static IReadOnlyList<NestJobPlacement> Fill(NestJobPart frame, int cutoutIndex,
         IReadOnlyList<NestJobPart> inserts, double spacing, CancellationToken token = default) =>
@@ -92,23 +103,13 @@ internal static class CutoutPackerProposal
         {
             token.ThrowIfCancellationRequested();
             var packer = new FrontierPacker(types, nfps, pairs, stock, axis, beta, counter, boundary: boundary);
-            var fill = packer.Fill(demand, token);
-            var poses = new List<NestJobPlacement>(fill.Parts.Count);
-            foreach (var placed in fill.Parts)
-            {
-                token.ThrowIfCancellationRequested();
-                var part = types[placed.Orientation.TypeIndex].Part;
-                var pose = new NestJobPlacement(part.Id, 0, System.Math.Round(placed.X, 8),
-                    System.Math.Round(placed.Y, 8), placed.Orientation.Rotation);
-                if (Clears(pose, geometries[part.Id], preparedFrame, preparedOccupied, poses, geometries, spacing, memo, token))
-                    poses.Add(pose);
-            }
-            if (poses.Count == 0)
-                continue;
-            if (best == null || poses.Count > best.Count
-                || (poses.Count == best.Count && Tighter(poses, best, id => geometries[id])))
-                best = poses;
+            var poses = new List<NestJobPlacement>();
+            Seat(packer, demand, new List<Placed>(), poses);
+            Offer(poses);
         }
+        LargestFirst(types, demand, System.Math.Abs(cutout.Area()), counter, Seat, Offer,
+            (axis, beta) => new FrontierPacker(types, nfps, pairs, stock, axis, beta, counter, boundary: boundary),
+            token);
         token.ThrowIfCancellationRequested();
         if (best == null)
             return Array.Empty<NestJobPlacement>();
@@ -119,6 +120,91 @@ internal static class CutoutPackerProposal
             counts[p.PartId] = index + 1;
             return p with { InstanceIndex = index };
         }).ToArray();
+
+        // Packs the offered demand around what is seated; only certified poses join it.
+        void Seat(FrontierPacker packer, IReadOnlyList<int> offered, List<Placed> seated, List<NestJobPlacement> poses)
+        {
+            var fill = packer.Fill(offered, token, seated);
+            foreach (var placed in fill.Parts)
+            {
+                token.ThrowIfCancellationRequested();
+                var part = types[placed.Orientation.TypeIndex].Part;
+                var pose = new NestJobPlacement(part.Id, 0, System.Math.Round(placed.X, 8),
+                    System.Math.Round(placed.Y, 8), placed.Orientation.Rotation);
+                if (!Clears(pose, geometries[part.Id], preparedFrame, preparedOccupied, poses, geometries, spacing, memo, token))
+                    continue;
+                poses.Add(pose);
+                seated.Add(placed);
+            }
+        }
+
+        void Offer(List<NestJobPlacement> poses)
+        {
+            if (poses.Count > 0 && (best == null || CutoutSeatedArea.Better(poses, best, id => geometries[id])))
+                best = poses;
+        }
+    }
+
+    /// <summary>The frontier rule's first move in an empty hole is the least advance per area, so
+    /// narrow small parts go first and a big part may never find its room. These candidates let
+    /// each of the largest requirements open the hole, then offer the other requirements one at a
+    /// time, largest first, around what is seated. Bounded by counted region updates; the
+    /// order is fixed, so the outcome does not depend on the machine.</summary>
+    private static void LargestFirst(IReadOnlyList<OpenNest.Engine.NestingEngines.Irregular.PartType> types, IReadOnlyList<int> demand, double holeArea,
+        WorkCounter counter, Action<FrontierPacker, IReadOnlyList<int>, List<Placed>, List<NestJobPlacement>> seat,
+        Action<List<NestJobPlacement>> offer, Func<PackAxis, double, FrontierPacker> packerFor, CancellationToken token)
+    {
+        var order = types.Where(t => t.Orientations.Count > 0 && demand[t.Index] > 0)
+            .OrderByDescending(t => t.Area).ThenBy(t => t.Index).ToArray();
+        // One requirement alone has no order to try: the variants already pack it.
+        if (order.Length < 2)
+            return;
+        var limit = counter.Value + LargestFirstWork;
+        var packers = new[] { PackAxis.X, PackAxis.Y }.Select(axis => packerFor(axis, 1.0)).ToArray();
+        foreach (var head in order.Take(MaxHeads))
+            foreach (var packer in packers)
+            {
+                var copies = demand[head.Index];
+                for (var trial = 0; trial < MaxHeadCopies && copies > 0; trial++, copies--)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (counter.Value >= limit)
+                        return;
+                    var seatedHead = Cascade(packer, head, copies);
+                    if (seatedHead == 0)
+                        break;
+                    copies = System.Math.Min(copies, seatedHead);
+                }
+            }
+
+        int Cascade(FrontierPacker packer, OpenNest.Engine.NestingEngines.Irregular.PartType head, int headCopies)
+        {
+            var left = demand.ToArray();
+            var seated = new List<Placed>();
+            var poses = new List<NestJobPlacement>();
+            var free = holeArea;
+            Stage(head, headCopies);
+            var seatedHead = poses.Count;
+            if (seatedHead == 0)
+                return 0;
+            foreach (var type in order)
+                Stage(type, left[type.Index]);
+            offer(poses);
+            return seatedHead;
+
+            void Stage(OpenNest.Engine.NestingEngines.Irregular.PartType type, int copies)
+            {
+                if (copies <= 0 || type.Area > free)
+                    return;
+                var offered = new int[demand.Count];
+                offered[type.Index] = copies;
+                var before = seated.Count;
+                seat(packer, offered, seated, poses);
+                var added = seated.Count - before;
+                left[type.Index] -= added;
+                free -= added * type.Area;
+            }
+        }
     }
 
     /// <summary>True when <paramref name="candidate"/> is the more compact layout: a smaller

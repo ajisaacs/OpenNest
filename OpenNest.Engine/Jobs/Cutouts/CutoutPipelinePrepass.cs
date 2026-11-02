@@ -25,9 +25,10 @@ internal sealed class CutoutPipelinePrepass
     /// <summary>Most parts on one frame-in-frame chain: flange, washer, smaller washer, slug.</summary>
     internal const int MaxLevels = 4;
 
-    // Levels: parts on the deepest chain through the frame; Parts: every physical part.
+    // Levels: parts on the deepest chain through the frame; Area: the outlines of the frame and
+    // everything seated in it, which is what taking the bundle spares the sheet.
     private sealed record Bundle(string FrameId, IReadOnlyList<NestJobPlacement> LocalInserts,
-        int Levels, int Parts);
+        int Levels, double Area);
     private readonly IReadOnlyDictionary<string, Bundle> bundles;
 
     private CutoutPipelinePrepass(NestJob engineJob, IReadOnlyDictionary<string, Bundle> bundles)
@@ -128,7 +129,7 @@ internal sealed class CutoutPipelinePrepass
                             available[pose.PartId]--;
                         }
                     }
-                    if (Weight(local) <= Weight(chosen ?? Array.Empty<NestJobPlacement>()))
+                    if (!CutoutSeatedArea.More(Weight(local), Weight(chosen ?? Array.Empty<NestJobPlacement>())))
                         continue;
                     chosen = local.ToArray();
                     frameAngle = angle;
@@ -139,7 +140,7 @@ internal sealed class CutoutPipelinePrepass
                 if (requirements.ContainsKey(proxyId))
                     throw new InvalidOperationException("Cutout proxy ID collides with a requirement.");
                 var levels = 1 + chosen.Max(p => bundles.TryGetValue(p.PartId, out var b) ? b.Levels : 1);
-                bundles.Add(proxyId, new Bundle(frame.Id, chosen, levels, 1 + Weight(chosen)));
+                bundles.Add(proxyId, new Bundle(frame.Id, chosen, levels, outline[frame.Id] + Weight(chosen)));
                 var proxy = new NestJobPart(proxyId, frame.Geometry, 1, frame.Priority,
                     RotationPolicy.Fixed(frameAngle));
                 proxies.Add(proxy);
@@ -194,12 +195,12 @@ internal sealed class CutoutPipelinePrepass
                 || poses.Count(p => flatIds.Contains(p.PartId)) == flat.Sum(p => (long)p.Quantity))
                 return poses;
             var router = CutoutRouter.Fill(frame, hole, flat, spacing, memo, token);
-            return Weight(router) >= Weight(poses) ? router : poses;
+            return CutoutSeatedArea.More(Weight(poses), Weight(router)) ? poses : router;
         }
 
-        // Physical parts a proposal places: a nested bundle counts its frame and contents.
-        int Weight(IReadOnlyList<NestJobPlacement> poses) =>
-            poses.Sum(p => bundles.TryGetValue(p.PartId, out var b) ? b.Parts : 1);
+        // Outline area a proposal seats: a nested bundle counts its frame and contents.
+        double Weight(IReadOnlyList<NestJobPlacement> poses) =>
+            poses.Sum(p => bundles.TryGetValue(p.PartId, out var b) ? b.Area : outline[p.PartId]);
     }
 
     private static string ProposalKey(NestJobPart frame, int hole, NestJobPart[] flat, NestJobPart[] nested)
