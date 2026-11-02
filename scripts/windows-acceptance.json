@@ -155,7 +155,7 @@
         },
         {
           "project": "OpenNest.FrontEnd.Tests",
-          "method": "OpenNest.FrontEnd.Tests.DefaultEngineSelectionTests.McpFillToolsWithoutAnEngineUseFill",
+          "method": "OpenNest.FrontEnd.Tests.DefaultEngineSelectionTests.McpFillToolsWithoutAnEngineUseLattice",
           "minimum_cases": 1
         },
         {
