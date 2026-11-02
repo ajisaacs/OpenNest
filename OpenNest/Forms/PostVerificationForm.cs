@@ -28,7 +28,10 @@ public partial class PostVerificationForm : Form
         (PostVerificationKind.FixedLead, "Fixed leads"),
         (PostVerificationKind.PierceZone, "Pierce zones"),
         (PostVerificationKind.PartSpacing, "Part spacing"),
+        (PostVerificationKind.PartSupport, "Part support"),
     };
+
+    internal static PostVerificationKind[] ListedKinds => Categories.Select(c => c.Kind).ToArray();
 
     // Checks every plate always runs, so their tiles show even at zero.
     private static readonly PostVerificationKind[] CoreChecks =

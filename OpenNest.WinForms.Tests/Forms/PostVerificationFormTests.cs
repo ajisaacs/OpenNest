@@ -11,6 +11,14 @@ public class PostVerificationFormTests
 {
 #pragma warning disable xUnit1031 // Dedicated STA; only await completed tasks, or explicitly pump until completion.
     [Fact]
+    public void EveryFindingKindIsListed()
+    {
+        // A kind left out would raise the warning count with nothing to read.
+        Assert.Equal(Enum.GetValues<PostVerificationKind>().OrderBy(k => k),
+            PostVerificationForm.ListedKinds.OrderBy(k => k));
+    }
+
+    [Fact]
     public void WarningsRequireFreshAcknowledgmentAndUncheckingRevokesPermission()
     {
         RunSta(() =>
