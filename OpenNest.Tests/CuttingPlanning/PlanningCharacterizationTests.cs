@@ -194,7 +194,7 @@ public class PlanningCharacterizationTests
         return plate;
     }
 
-    private static string RepositoryRoot()
+    internal static string RepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory != null; directory = directory.Parent)
             if (File.Exists(Path.Combine(directory.FullName, "OpenNest.sln")))
