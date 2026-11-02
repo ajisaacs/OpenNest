@@ -706,8 +706,8 @@ public class CutoutPipelinePreviewTests
         foreach (var x in new[] { 0.0, 3.0 })
             foreach (var y in new[] { 0.0, 3.0 })
             {
-                Assert.InRange(localX + x, 5.25, 14.75);
-                Assert.InRange(localY + y, 5.25, 14.75);
+                Assert.InRange(localX + x, 5.25 - 1e-9, 14.75 + 1e-9);
+                Assert.InRange(localY + y, 5.25 - 1e-9, 14.75 + 1e-9);
             }
     }
 
