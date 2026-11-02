@@ -19,12 +19,15 @@ public static class PostVerificationAnalyzer
         CancellationToken cancellationToken = default)
     {
         var report = Analyze(nest, cancellationToken);
-        if (postProcessor is IPostVerificationSupport { PreservesPlacedProgramOrder: true })
+        var change = postProcessor is IPostVerificationSupport support
+            ? support.PlacedProgramOrderChange(nest)
+            : "does not declare that it preserves placed part/contour order and pierce positions";
+        if (change == null)
             return report;
         var findings = report.Findings.ToList();
         findings.Add(new(PostVerificationKind.Incomplete, 0, null, null,
-            $"Post '{postProcessor?.Name ?? "unknown"}' does not declare that it preserves placed part/contour order " +
-            "and pierce positions. Nest-level checks ran, but the final rapid sequence requires manual review."));
+            $"Post '{postProcessor?.Name ?? "unknown"}' {change}. " +
+            "Nest-level checks ran, but the final rapid sequence requires manual review."));
         return new PostVerificationReport(findings);
     }
 
