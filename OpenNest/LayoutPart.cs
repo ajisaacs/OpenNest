@@ -308,16 +308,22 @@ namespace OpenNest
             return path;
         }
 
-        private Vector ComputeLabelPoint()
+        private Vector ComputeLabelPoint() => ComputeLabelPoint(BasePart.BaseDrawing);
+
+        /// <summary>
+        /// The drawing's label point in its program frame; uses no GDI+ objects. The Drawing
+        /// Library grid's check passes an unlimited <paramref name="maxCells"/> to time the search.
+        /// </summary>
+        internal static Vector ComputeLabelPoint(Drawing drawing, int maxCells = LabelSearchCells)
         {
-            var entities = ConvertProgram.ToGeometry(BasePart.BaseDrawing.Program);
+            var entities = ConvertProgram.ToGeometry(drawing.Program);
             var nonRapid = entities.Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList();
 
             var shapes = ShapeBuilder.GetShapes(nonRapid);
 
             if (shapes.Count == 0)
             {
-                var bbox = BasePart.BaseDrawing.Program.BoundingBox();
+                var bbox = drawing.Program.BoundingBox();
                 return new Vector(
                     bbox.Location.X + bbox.Length / 2,
                     bbox.Location.Y + bbox.Width / 2
@@ -337,7 +343,7 @@ namespace OpenNest
             }
 
             // The label is cosmetic: a budget keeps any shape from stalling the paint.
-            return PolyLabel.Find(outer, holes, PolyLabel.ThicknessPrecision(outer, holes), LabelSearchCells);
+            return PolyLabel.Find(outer, holes, PolyLabel.ThicknessPrecision(outer, holes), maxCells);
         }
 
         /// <summary>Rebuilds the part's paths from its program and maps them to the view.</summary>

@@ -42,6 +42,7 @@ namespace OpenNest.Forms
             mnuFileOpen = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileImportBom = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileDrawingLibrary = new System.Windows.Forms.ToolStripMenuItem();
+            mnuFileDrawingLibraryGrid = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileDrawingSets = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileReleases = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem1 = new System.Windows.Forms.ToolStripSeparator();
@@ -216,7 +217,7 @@ namespace OpenNest.Forms
             // 
             // mnuFile
             // 
-            mnuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuFileNew, mnuFileOpen, mnuFileImportBom, mnuFileDrawingLibrary, mnuFileDrawingSets, mnuFileReleases, toolStripMenuItem1, mnuFileSave, mnuFileSaveAs, toolStripMenuItem2, mnuFileExport, mnuFileExportAll, mnuFileExportNestReport, toolStripMenuItem3, mnuFileExit });
+            mnuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuFileNew, mnuFileOpen, mnuFileImportBom, mnuFileDrawingLibrary, mnuFileDrawingLibraryGrid, mnuFileDrawingSets, mnuFileReleases, toolStripMenuItem1, mnuFileSave, mnuFileSaveAs, toolStripMenuItem2, mnuFileExport, mnuFileExportAll, mnuFileExportNestReport, toolStripMenuItem3, mnuFileExit });
             mnuFile.Name = "mnuFile";
             mnuFile.DropDownOpening += FileMenu_Opening;
             mnuFile.Size = new System.Drawing.Size(37, 20);
@@ -253,6 +254,13 @@ namespace OpenNest.Forms
             mnuFileDrawingLibrary.Size = new System.Drawing.Size(180, 22);
             mnuFileDrawingLibrary.Text = "Drawing Library...";
             mnuFileDrawingLibrary.Click += FileDrawingLibrary_Click;
+            //
+            // mnuFileDrawingLibraryGrid
+            //
+            mnuFileDrawingLibraryGrid.Name = "mnuFileDrawingLibraryGrid";
+            mnuFileDrawingLibraryGrid.Size = new System.Drawing.Size(180, 22);
+            mnuFileDrawingLibraryGrid.Text = "Drawing Library Grid...";
+            mnuFileDrawingLibraryGrid.Click += FileDrawingLibraryGrid_Click;
             //
             // mnuFileDrawingSets
             //
@@ -1416,6 +1424,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuFileOpen;
         private System.Windows.Forms.ToolStripMenuItem mnuFileImportBom;
         private System.Windows.Forms.ToolStripMenuItem mnuFileDrawingLibrary;
+        private System.Windows.Forms.ToolStripMenuItem mnuFileDrawingLibraryGrid;
         private System.Windows.Forms.ToolStripMenuItem mnuFileDrawingSets;
         private System.Windows.Forms.ToolStripMenuItem mnuFileReleases;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem1;
