@@ -15,10 +15,22 @@ namespace OpenNest.Geometry
             Update(entities);
         }
 
-        private void Update(List<Entity> entities)
+        private ShapeProfile()
         {
-            var shapes = ShapeBuilder.GetShapes(entities);
+        }
 
+        /// <summary>A profile of shapes already built, for callers that need them too; at least one.</summary>
+        public static ShapeProfile FromShapes(List<Shape> shapes)
+        {
+            var profile = new ShapeProfile();
+            profile.Update(shapes);
+            return profile;
+        }
+
+        private void Update(List<Entity> entities) => Update(ShapeBuilder.GetShapes(entities));
+
+        private void Update(List<Shape> shapes)
+        {
             Perimeter = shapes[0];
             Cutouts = new List<Shape>();
 

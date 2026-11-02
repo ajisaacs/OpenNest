@@ -117,6 +117,7 @@ namespace OpenNest.Geometry
             }
 
             var halfCell = cellSize / 2;
+            var boxes = HoleBoxes(holes);
 
             var initial = new List<Cell>();
 
@@ -124,7 +125,7 @@ namespace OpenNest.Geometry
             {
                 for (var y = minY; y < maxY; y += cellSize)
                 {
-                    initial.Add(new Cell(x + halfCell, y + halfCell, halfCell, outer, holes));
+                    initial.Add(new Cell(x + halfCell, y + halfCell, halfCell, outer, holes, boxes));
                     // Far from the origin a step smaller than the coordinate's precision
                     // no longer advances; the grid would never end.
                     if (y + cellSize == y)
@@ -136,7 +137,7 @@ namespace OpenNest.Geometry
 
             initial.Sort((a, b) => b.MaxDist.CompareTo(a.MaxDist));
 
-            var bestCell = GetCentroidCell(outer, holes);
+            var bestCell = GetCentroidCell(outer, holes, boxes);
             evaluatedCells = initial.Count + 1;
 
             for (var i = 0; i < initial.Count; i++)
@@ -176,10 +177,10 @@ namespace OpenNest.Geometry
 
                 var newCells = new[]
                 {
-                    new Cell(cell.X - halfCell, cell.Y - halfCell, halfCell, outer, holes),
-                    new Cell(cell.X + halfCell, cell.Y - halfCell, halfCell, outer, holes),
-                    new Cell(cell.X - halfCell, cell.Y + halfCell, halfCell, outer, holes),
-                    new Cell(cell.X + halfCell, cell.Y + halfCell, halfCell, outer, holes),
+                    new Cell(cell.X - halfCell, cell.Y - halfCell, halfCell, outer, holes, boxes),
+                    new Cell(cell.X + halfCell, cell.Y - halfCell, halfCell, outer, holes, boxes),
+                    new Cell(cell.X - halfCell, cell.Y + halfCell, halfCell, outer, holes, boxes),
+                    new Cell(cell.X + halfCell, cell.Y + halfCell, halfCell, outer, holes, boxes),
                 };
                 evaluatedCells += newCells.Length;
 
@@ -193,7 +194,7 @@ namespace OpenNest.Geometry
             return new Vector(bestCell.X, bestCell.Y);
         }
 
-        private static Cell GetCentroidCell(Polygon outer, IList<Polygon> holes)
+        private static Cell GetCentroidCell(Polygon outer, IList<Polygon> holes, Box[] boxes)
         {
             var area = 0.0;
             var cx = 0.0;
@@ -213,12 +214,12 @@ namespace OpenNest.Geometry
             area *= 0.5;
 
             if (System.Math.Abs(area) < 1e-10)
-                return new Cell(verts[0].X, verts[0].Y, 0, outer, holes);
+                return new Cell(verts[0].X, verts[0].Y, 0, outer, holes, boxes);
 
             cx /= (6 * area);
             cy /= (6 * area);
 
-            return new Cell(cx, cy, 0, outer, holes);
+            return new Cell(cx, cy, 0, outer, holes, boxes);
         }
 
         private static double PointToPolygonDist(double x, double y, Polygon polygon)
@@ -267,7 +268,7 @@ namespace OpenNest.Geometry
             public readonly double Dist;
             public readonly double MaxDist;
 
-            public Cell(double x, double y, double halfSize, Polygon outer, IList<Polygon> holes)
+            public Cell(double x, double y, double halfSize, Polygon outer, IList<Polygon> holes, Box[] boxes)
             {
                 X = x;
                 Y = y;
@@ -280,7 +281,7 @@ namespace OpenNest.Geometry
                 {
                     for (var i = 0; i < holes.Count; i++)
                     {
-                        if (holes[i].ContainsPoint(pt))
+                        if (boxes[i].Contains(x, y) && holes[i].ContainsPoint(pt))
                         {
                             inside = false;
                             break;
@@ -288,7 +289,7 @@ namespace OpenNest.Geometry
                     }
                 }
 
-                Dist = PointToAllEdgesDist(x, y, outer, holes);
+                Dist = PointToAllEdgesDist(x, y, outer, holes, boxes);
 
                 if (!inside)
                     Dist = -Dist;
@@ -301,7 +302,8 @@ namespace OpenNest.Geometry
             double x,
             double y,
             Polygon outer,
-            IList<Polygon> holes
+            IList<Polygon> holes,
+            Box[] boxes
         )
         {
             var minDist = PointToPolygonDist(x, y, outer);
@@ -310,6 +312,9 @@ namespace OpenNest.Geometry
             {
                 for (var i = 0; i < holes.Count; i++)
                 {
+                    // No edge is nearer than its hole's box, so a farther box cannot lower the minimum.
+                    if (boxes[i].Distance(x, y) > minDist)
+                        continue;
                     var d = PointToPolygonDist(x, y, holes[i]);
                     if (d < minDist)
                         minDist = d;
@@ -317,6 +322,39 @@ namespace OpenNest.Geometry
             }
 
             return minDist;
+        }
+
+        // Each hole's vertex bounds: a cell skips the containment test outside them and the
+        // edge distances when they are farther than the nearest edge found so far. Both skips
+        // leave the result exactly as without them; parts with many small holes search far faster.
+        private static Box[] HoleBoxes(IList<Polygon> holes)
+        {
+            if (holes == null)
+                return null;
+
+            var boxes = new Box[holes.Count];
+            for (var i = 0; i < holes.Count; i++)
+            {
+                var box = new Box(double.MaxValue, double.MaxValue, double.MinValue, double.MinValue);
+                foreach (var v in holes[i].Vertices)
+                    box = new Box(System.Math.Min(box.MinX, v.X), System.Math.Min(box.MinY, v.Y),
+                        System.Math.Max(box.MaxX, v.X), System.Math.Max(box.MaxY, v.Y));
+                boxes[i] = box;
+            }
+            return boxes;
+        }
+
+        private readonly record struct Box(double MinX, double MinY, double MaxX, double MaxY)
+        {
+            // Inclusive, so a point on a hole's edge is still tested.
+            public bool Contains(double x, double y) => x >= MinX && x <= MaxX && y >= MinY && y <= MaxY;
+
+            public double Distance(double x, double y)
+            {
+                var dx = System.Math.Max(System.Math.Max(MinX - x, x - MaxX), 0);
+                var dy = System.Math.Max(System.Math.Max(MinY - y, y - MaxY), 0);
+                return System.Math.Sqrt(dx * dx + dy * dy);
+            }
         }
     }
 }

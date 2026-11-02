@@ -330,7 +330,7 @@ namespace OpenNest
                 );
             }
 
-            var profile = new ShapeProfile(nonRapid);
+            var profile = ShapeProfile.FromShapes(shapes);
             var outer = profile.Perimeter.ToPolygonWithTolerance(0.1);
 
             List<Polygon> holes = null;
