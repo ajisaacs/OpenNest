@@ -5,6 +5,7 @@ using OpenNest.Diagnostics;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Geometry;
 using OpenNest.IO;
+using OpenNest.Posts.Cincinnati;
 
 namespace OpenNest.Tests.CuttingPlanning;
 
@@ -56,5 +57,11 @@ public class TutorialNestPlanningTests
         var findings = PostVerificationAnalyzer.Analyze(nest, Vector.Zero).Findings;
         Assert.DoesNotContain(findings, f => f.Kind is PostVerificationKind.PartSupport
             or PostVerificationKind.RapidCrossing or PostVerificationKind.MissingLeadIn);
+
+        // The tutorial posts with the Cincinnati CL post, which writes a planned nest in the order
+        // checked, so the review before posting is complete and finds nothing.
+        var post = new CincinnatiPostProcessor(new CincinnatiPostConfig { RequireLibraries = false });
+        var report = PostVerificationAnalyzer.AnalyzeForPost(nest, post);
+        Assert.True(report.Findings.Count == 0, string.Join("\n", report.Findings.Select(f => f.Message)));
     }
 }
