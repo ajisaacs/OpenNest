@@ -42,6 +42,27 @@ public class AdjacentCurveContactTests
         Assert.Equal(vertex, Assert.Single(reversed));
     }
 
+    // A fillet whose circle is tangent inside the arc it continues, as a keyhole's slot ends
+    // are: the supporting circles' intersection has no real root (their distance is the
+    // radii's difference up to rounding), which the native query reports as NaN.
+    [Theory]
+    [InlineData(1.125, 0.0625, 1.3761, 2.12)]
+    [InlineData(1.1, 0.0625, 0, 0)]
+    [InlineData(0.9375, 0.03125, 10.5, -3.25)]
+    [InlineData(2.3, 0.1, 100.001, 7)]
+    public void FilletTangentInsideTheArcItContinues_TouchesOnlyAtTheirVertex(double radius, double fillet, double x, double y)
+    {
+        var center = new Vector(x, y);
+        var vertex = center + new Vector(radius, 0);
+        var filletCenter = center + new Vector(radius - fillet, 0);
+        var small = Arc(filletCenter + new Vector(0, fillet), vertex, filletCenter, clockwise: true);
+        var large = Arc(vertex, center + new Vector(0, radius), center);
+
+        Assert.Equal(vertex, Assert.Single(small.Contacts(large, out var overlap)));
+        Assert.Equal(vertex, Assert.Single(large.Contacts(small, out _)));
+        Assert.False(overlap);
+    }
+
     [Fact]
     public void LineMeetingItsFilletEndToEnd_TouchesOnlyAtTheirVertex()
     {

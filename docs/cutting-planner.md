@@ -71,7 +71,9 @@ end (within the check epsilon, 1e-8) are not put to the native intersection quer
 all: it is ill-conditioned at such a joint (two circles meeting at a shallow angle, as a
 fillet continuing into a larger arc, or a line meeting its fillet), and lands its root up
 to 1e-5 off the vertex, which no joint tolerance can tell from a cut that touches beside
-the joint. `PostVerificationGeometry.Curve.Contacts` reports the shared vertex itself and
+the joint; a fillet whose circle is tangent inside the arc it continues, as a keyhole's slot
+ends are, gives the supporting-circle query no real root at all, which read as nonfinite
+coordinates and refused the whole part. `PostVerificationGeometry.Curve.Contacts` reports the shared vertex itself and
 derives the pair's other intersection from it (two circles meet again at the vertex's mirror
 image across the line through their centers; a line meets a circle again at the far end of
 its chord), keeping it only when it lies on both finite spans. Every consumer of contacts

@@ -351,33 +351,53 @@ internal static class PostVerificationGeometry
 
         internal IReadOnlyList<Vector> Contacts(Curve other, out bool overlap)
         {
-            var entity = nativeEntity.Value;
-            var candidate = other.nativeEntity.Value;
-            // Native arc filters discard NaN supporting-circle intersections. Inspect
-            // both unfiltered queries first: roundoff can differ by operand direction.
-            // Coincident supports have separate overlap handling below.
-            if (Center is { } center && other.Center is { } otherCenter && !SameSupport(other))
-            {
-                var support = new Circle(center, Radius);
-                var otherSupport = new Circle(otherCenter, other.Radius);
-                support.Intersects(otherSupport, out var forward);
-                otherSupport.Intersects(support, out var reverse);
-                foreach (var point in forward)
-                    Validate(point);
-                foreach (var point in reverse)
-                    Validate(point);
-            }
+            var same = SameSupport(other);
+            // Two curves that meet end to end share that vertex, and the native query is
+            // ill-conditioned there: circles meeting at a shallow angle, or a line meeting its own
+            // fillet, put their root up to 1e-5 off the joint, which no joint tolerance can tell
+            // from a cut that touches beside it, and a fillet's circle tangent inside the arc it
+            // continues gives the supporting-circle query no root at all. Both shapes are known,
+            // so their other intersection, if there is one, follows from the shared vertex
+            // exactly instead, and no native query runs for the pair.
+            var joint = same ? null : SharedVertex(other);
             List<Vector> points;
-            bool intersects;
-            switch (candidate)
+            if (joint is { } vertex)
             {
-                case Line line: intersects = entity.Intersects(line, out points); break;
-                case Arc arc: intersects = entity.Intersects(arc, out points); break;
-                case Circle circle: intersects = entity.Intersects(circle, out points); break;
-                default: throw new NotSupportedException("Unsupported native boundary.");
+                points = [vertex];
+                if (SecondIntersection(other, vertex) is { } second && second.DistanceTo(vertex) > Epsilon
+                    && Contains(second) && other.Contains(second)
+                    && !IsOutsideArcSpan(second) && !other.IsOutsideArcSpan(second))
+                    points.Add(second);
             }
-            if (!intersects)
-                points.Clear();
+            else
+            {
+                var entity = nativeEntity.Value;
+                var candidate = other.nativeEntity.Value;
+                // Native arc filters discard NaN supporting-circle intersections. Inspect
+                // both unfiltered queries first: roundoff can differ by operand direction.
+                // Coincident supports have separate overlap handling below.
+                if (Center is { } center && other.Center is { } otherCenter && !same)
+                {
+                    var support = new Circle(center, Radius);
+                    var otherSupport = new Circle(otherCenter, other.Radius);
+                    support.Intersects(otherSupport, out var forward);
+                    otherSupport.Intersects(support, out var reverse);
+                    foreach (var point in forward)
+                        Validate(point);
+                    foreach (var point in reverse)
+                        Validate(point);
+                }
+                bool intersects;
+                switch (candidate)
+                {
+                    case Line line: intersects = entity.Intersects(line, out points); break;
+                    case Arc arc: intersects = entity.Intersects(arc, out points); break;
+                    case Circle circle: intersects = entity.Intersects(circle, out points); break;
+                    default: throw new NotSupportedException("Unsupported native boundary.");
+                }
+                if (!intersects)
+                    points.Clear();
+            }
             // Coincident circles produce NaNs in the native discrete-contact query.
             // Their support overlap is handled separately, without inventing crossings.
             // Supports that agree only within Epsilon (arcs of one circle whose centers were
@@ -386,32 +406,16 @@ internal static class PostVerificationGeometry
             // still refuse, while arcs that only meet at a joint or lie apart are not overlap.
             var witness = Center is { } c && other.Center is { } oc
                 && (c.X != oc.X || c.Y != oc.Y || Radius != other.Radius) ? RaySeamTolerance : Epsilon;
-            overlap = SameSupport(other) && (InteriorWitness(Midpoint, other, witness)
+            overlap = same && (InteriorWitness(Midpoint, other, witness)
                 || InteriorWitness(other.Midpoint, this, witness)
                 || InteriorWitness(Start, other, witness) || InteriorWitness(End, other, witness)
                 || InteriorWitness(other.Start, this, witness) || InteriorWitness(other.End, this, witness));
-            if (SameSupport(other))
+            if (same)
                 points.Clear();
-            // Two curves that meet end to end share that vertex, and the native query is
-            // ill-conditioned there: circles meeting at a shallow angle, or a line meeting its own
-            // fillet, put their root up to 1e-5 off the joint, which no joint tolerance can tell
-            // from a cut that touches beside it. Both shapes are known, so their other
-            // intersection, if there is one, follows from the shared vertex exactly instead.
-            var joint = SameSupport(other) ? null : SharedVertex(other);
-            var adjacent = joint.HasValue;
-            if (joint is { } vertex)
-            {
-                points.Clear();
-                points.Add(vertex);
-                if (SecondIntersection(other, vertex) is { } second && second.DistanceTo(vertex) > Epsilon
-                    && Contains(second) && other.Contains(second)
-                    && !IsOutsideArcSpan(second) && !other.IsOutsideArcSpan(second))
-                    points.Add(second);
-            }
             foreach (var point in points)
                 Validate(point);
             // Analytic contacts of adjacent curves are certain; the ray guard below is for native queries.
-            var nativeContactCount = adjacent ? int.MaxValue : points.Count;
+            var nativeContactCount = joint.HasValue ? int.MaxValue : points.Count;
             foreach (var point in new[] { Start, End, other.Start, other.End })
                 if (Contains(point) && other.Contains(point)
                     && !points.Exists(p => p.DistanceTo(point) <= Epsilon))
