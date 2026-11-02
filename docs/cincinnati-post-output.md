@@ -60,6 +60,21 @@ Sub-program bodies start with a `:<subNum>` label and end with `M99`.
 The post reads part programs through absolute-mode copies and never changes the
 nest: an incremental part program stays incremental after posting.
 
+### Order and pre-post verification
+
+Within a part (and within each hole sub-program) the post writes etch features
+before cut features, keeping each group in program order (`FeatureUtils.ClassifyAndOrder`).
+It also inserts a rapid to a contour's return point when the contour opens without
+one, and drops rapids with nothing to cut. Part sub-programs add a rapid to each
+part's toolpath corner and back, and smart rapids blend rapids off the straight line.
+The post declares that it preserves the placed order to
+[pre-post verification](post-verification.md#selected-post-and-cut-order)
+(`CincinnatiPlacedOrder`) only when, for the nest and settings being posted, none of
+these changes a motion: part sub-programs and smart rapids off, and each part's and
+hole's posted motions exactly equal to its placed ones. Plan Cutting already cuts a
+part's scribes first, so planned nests qualify; otherwise posting warns that the
+final rapid sequence is unverified. Output is the same either way.
+
 ### Sheet header
 
 Each sheet sub-program re-anchors the work frame with `G92 X#5021 Y#5022`

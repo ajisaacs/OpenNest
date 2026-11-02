@@ -163,6 +163,17 @@ public sealed class CincinnatiPartSubprogramWriter
         return (mapping, entries);
     }
 
+    /// <summary>
+    /// The absolute copy a hole sub-program is written from: suppressed moves left uncut and
+    /// a leading rapid ensured. <see cref="Write"/> then puts its etch features first.
+    /// </summary>
+    internal static Program PostedHole(Program hole)
+    {
+        var absolute = PostedCopy(hole);
+        EnsureLeadingRapid(absolute);
+        return absolute;
+    }
+
     // An absolute copy with suppressed moves left uncut, as the post writes it.
     private static Program PostedCopy(Program program)
     {
@@ -203,8 +214,7 @@ public sealed class CincinnatiPartSubprogramWriter
                 if (mapping.ContainsKey(call.Program) || !FeatureUtils.HasCut(call.Program))
                     continue;
 
-                var absolute = PostedCopy(call.Program);
-                EnsureLeadingRapid(absolute);
+                var absolute = PostedHole(call.Program);
 
                 var canonical = ProgramToCanonical(absolute);
                 if (!contentIndex.TryGetValue(canonical, out var subNum))

@@ -9,5 +9,15 @@ namespace OpenNest;
 /// </summary>
 public interface IPostVerificationSupport
 {
+    /// <summary>True when the post preserves the placed order for every nest.</summary>
     bool PreservesPlacedProgramOrder { get; }
+
+    /// <summary>
+    /// Why posting <paramref name="nest"/> with the current settings would not move in the
+    /// placed order, or null when it would. A post whose order depends on the nest or its
+    /// settings overrides this; it must return null only when the posted motion sequence
+    /// provably equals the placed one.
+    /// </summary>
+    string PlacedProgramOrderChange(Nest nest) =>
+        PreservesPlacedProgramOrder ? null : "does not declare that it preserves placed part/contour order and pierce positions";
 }

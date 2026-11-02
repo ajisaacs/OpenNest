@@ -198,11 +198,17 @@ the gate is installed at OpenNest's desktop and console posting entry points.
 
 Cincinnati CI Fiber preserves the placed part/contour order and pierce positions
 used by this check. Cincinnati CL keeps placed part order, including cut-offs, but
-puts etch features before cut features and can add subprogram routing moves;
-Gravograph builds and optimizes separate tool passes. Those two posts, and unknown
-plugins, therefore show an additional **incomplete final rapid sequence** warning
-requiring acknowledgment even if the nest-level checks have no findings. This
-change does not silently alter their existing CNC output order.
+writes each part's (and hole's) etch features before its cut features, adds a rapid
+ahead of a contour that opens without one, drops rapids with nothing to cut, and with
+**Use part sub-programs** rapids to and from each part's corner. It declares the
+placed order for a nest only when none of that changes a single motion with the
+settings being posted: part sub-programs and smart rapids off, and every part's and
+hole's motions, compared exactly, unchanged by its writer. Plan Cutting's programs
+cut a part's scribes first, so a planned nest qualifies. Otherwise the warning names
+the first part it changes, and the CNC output order is left as it was.
+Gravograph builds and optimizes separate tool passes. It, a CL nest that does not
+qualify, and unknown plugins show an additional **incomplete final rapid sequence**
+warning requiring acknowledgment even if the nest-level checks have no findings.
 
 ## Limits and maintainer contract
 
@@ -218,7 +224,10 @@ its report exposes findings, display text, and `CanPost(risksAcknowledged)`. Use
 `AnalyzeForPost` at posting entry points so unknown post ordering is not silently
 certified. `IPostVerificationSupport.PreservesPlacedProgramOrder` is an opt-in
 contract, not a machine-safety claim; only declare it after verifying the writer's
-part order, contour order, and pierce positions. The WinForms dialog renders the
+part order, contour order, and pierce positions. A post whose order depends on the
+nest or its settings overrides `PlacedProgramOrderChange(nest)` instead, returning
+null only when the posted motion sequence provably equals the placed one and
+otherwise what it changes; the analyzer shows that reason in the warning. The WinForms dialog renders the
 report and enforces per-attempt consent. New callers
 must keep inputs stable until analysis completes, honor cancellation, and never
 treat incomplete analysis as a clear result. Keep analysis out of paint handlers.

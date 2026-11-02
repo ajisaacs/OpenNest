@@ -10,23 +10,30 @@ namespace OpenNest.Tests.Diagnostics;
 public class PostVerificationPostContractTests
 {
     [Fact]
-    public void ReorderingPostsRequireAcknowledgmentEvenWhenNestChecksAreClear()
+    public void ReorderingPostRequiresAcknowledgmentEvenWhenNestChecksAreClear()
     {
         var nest = ClearNest();
         Assert.False(PostVerificationAnalyzer.Analyze(nest).HasWarnings);
-        IPostProcessor[] posts =
-        [
-            new CincinnatiPostProcessor(new CincinnatiPostConfig()),
-            new GravographISPostProcessor(new GravographISPostConfig())
-        ];
-        foreach (var post in posts)
-        {
-            var report = PostVerificationAnalyzer.AnalyzeForPost(nest, post);
-            Assert.Contains(report.Findings, finding => finding.Kind == PostVerificationKind.Incomplete);
-            Assert.False(report.CanPost(false));
-            Assert.True(report.CanPost(true));
-            Assert.Contains(post.Name, report.ToDisplayText());
-        }
+        var post = new GravographISPostProcessor(new GravographISPostConfig());
+        var report = PostVerificationAnalyzer.AnalyzeForPost(nest, post);
+        Assert.Contains(report.Findings, finding => finding.Kind == PostVerificationKind.Incomplete);
+        Assert.False(report.CanPost(false));
+        Assert.True(report.CanPost(true));
+        Assert.Contains(post.Name, report.ToDisplayText());
+    }
+
+    [Fact]
+    public void CincinnatiClDeclaresPlacedOrderOnlyWhenThisNestPostsInIt()
+    {
+        var report = PostVerificationAnalyzer.AnalyzeForPost(ClearNest(),
+            new CincinnatiPostProcessor(new CincinnatiPostConfig()));
+        Assert.Empty(report.Findings);
+        Assert.True(report.CanPost(false));
+
+        var subprograms = PostVerificationAnalyzer.AnalyzeForPost(ClearNest(),
+            new CincinnatiPostProcessor(new CincinnatiPostConfig { UsePartSubprograms = true }));
+        Assert.Contains(subprograms.Findings, finding => finding.Kind == PostVerificationKind.Incomplete);
+        Assert.False(subprograms.CanPost(false));
     }
 
     [Fact]

@@ -13,7 +13,8 @@ namespace OpenNest.Posts.Cincinnati
     public sealed class CincinnatiPostProcessor
         : IJsonConfigPostProcessor,
             IPostProcessorNestAware,
-            IMaterialProvidingPostProcessor
+            IMaterialProvidingPostProcessor,
+            IPostVerificationSupport
     {
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -24,6 +25,15 @@ namespace OpenNest.Posts.Cincinnati
         public string Name => "Cincinnati CL-707";
         public string Author => "OpenNest";
         public string Description => "Cincinnati CL-707/CL-800/CL-900/CL-940/CLX family";
+
+        /// <summary>Etch-first writing and part sub-programs can change it; see <see cref="PlacedProgramOrderChange"/>.</summary>
+        public bool PreservesPlacedProgramOrder => false;
+
+        /// <summary>
+        /// Null when this nest posts with the current settings in exactly its placed motion order,
+        /// which Plan Cutting's scribes-first programs do; otherwise what the post changes.
+        /// </summary>
+        public string PlacedProgramOrderChange(Nest nest) => CincinnatiPlacedOrder.Change(nest, Config);
 
         public CincinnatiPostConfig Config { get; private set; }
 
