@@ -634,17 +634,13 @@ static class NestConsole
 
         if (options.AutoNest)
         {
-            var nestItems = new List<NestItem>();
-            var qty = options.Quantity > 0 ? options.Quantity : 1;
-
-            if (options.DrawingName != null)
+            var nestItems = AutoNestItems(nest, plate, drawing, options);
+            if (nestItems.Count == 0)
             {
-                nestItems.Add(new NestItem { Drawing = drawing, Quantity = qty });
-            }
-            else
-            {
-                foreach (var d in nest.Drawings)
-                    nestItems.Add(new NestItem { Drawing = d, Quantity = qty });
+                Console.Error.WriteLine(
+                    "Error: other plates already hold every required part. Use --quantity to nest more. Nothing saved."
+                );
+                return (false, sw.ElapsedMilliseconds, false, plates);
             }
 
             Console.WriteLine(
@@ -680,6 +676,38 @@ static class NestConsole
 
         sw.Stop();
         return (success, sw.ElapsedMilliseconds, accepted, plates);
+    }
+
+    /// <summary>
+    /// The job's demand: --quantity of each drawing when given, otherwise each drawing's
+    /// required quantity less the copies on other plates (the target's parts are replaced).
+    /// As in Desktop Auto Nest, a drawing without a required quantity is left out, unless no
+    /// drawing has one: then one of each is nested.
+    /// </summary>
+    static List<NestItem> AutoNestItems(Nest nest, Plate target, Drawing drawing, Options options)
+    {
+        var drawings = (options.DrawingName != null ? new[] { drawing } : nest.Drawings.ToArray())
+            .Where(d => !d.IsCutOff)
+            .ToList();
+        var anyRequired = drawings.Any(d => d.Quantity.Required > 0);
+
+        int Demand(Drawing d)
+        {
+            if (options.Quantity > 0)
+                return options.Quantity;
+            if (!anyRequired)
+                return 1;
+
+            var elsewhere = nest.Plates
+                .Where(p => p != target)
+                .Sum(p => p.Parts.Count(part => part.BaseDrawing == d) * p.Quantity);
+            return d.Quantity.Required - elsewhere;
+        }
+
+        return drawings
+            .Select(d => new NestItem { Drawing = d, Quantity = Demand(d) })
+            .Where(item => item.Quantity > 0)
+            .ToList();
     }
 
     static (bool accepted, int committed, IReadOnlyList<Plate> plates) AutoNestJob(
@@ -1040,7 +1068,9 @@ static class NestConsole
               --svg-units-per-inch N SVG units per inch, for a file without a real-world size
               --drawing <name>       Drawing name to fill with (default: first drawing)
               --plate <index>        Plate index to fill (default: 0)
-              --quantity <n>          Max parts to place (default: 0 = unlimited)
+              --quantity <n>          Max parts to place (default: 0 = unlimited). With --autonest: copies of
+                                     each drawing (default: its required quantity less copies on other
+                                     plates; one of each when no drawing has a required quantity)
               --spacing <value>      Override part spacing
               --size <WxL>           Override plate size (e.g. 60x120); required for DXF-only mode
               --outline <dxf>        Make the plate an irregular sheet: the file's largest closed contour is

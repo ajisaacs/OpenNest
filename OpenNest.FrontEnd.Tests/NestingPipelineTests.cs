@@ -160,6 +160,123 @@ public class NestingPipelineTests : IDisposable
         Assert.Equal(new Spacing(0.5, 0.5, 0.5, 0.5), plate.EdgeSpacing);
     }
 
+    /// <summary>
+    /// Saves a nest of drawings named with their required quantities, runs --autonest and
+    /// returns the demand the engine saw, largest first.
+    /// </summary>
+    private int[] AutoNestDemand(Action<Nest>? arrange, string[] options, int exit = 0, params (string Name, int Required)[] drawings)
+    {
+        var input = Path.Combine(directory, "input.nest");
+        var output = Path.Combine(directory, "output.nest");
+        var nest = new Nest("fixture");
+        foreach (var (name, required) in drawings)
+        {
+            var drawing = Square();
+            drawing.Name = name;
+            drawing.Quantity.Required = required;
+            nest.Drawings.Add(drawing);
+        }
+
+        var target = nest.CreatePlate();
+        target.Size = new Size(20, 30);
+        target.Parts.Add(new Part(nest.Drawings.First()));
+        arrange?.Invoke(nest);
+        Assert.True(new NestWriter(nest).Write(input));
+
+        var demand = Array.Empty<int>();
+        var engine = Engine((job, _) =>
+        {
+            demand = job.Parts.Select(p => p.Quantity).OrderDescending().ToArray();
+            return Result(job, "valid");
+        });
+        var args = new[] { input, "--autonest", "--engine", engine, "--output", output }.Concat(options).ToArray();
+        Assert.Equal(exit, RunConsole(args));
+        return demand;
+    }
+
+    private static void OccupiedSheet(Nest nest, string drawing, int copies, int sheets)
+    {
+        var plate = nest.CreatePlate();
+        plate.Size = new Size(40, 40);
+        plate.Quantity = sheets;
+        var source = nest.Drawings.Single(d => d.Name == drawing);
+        for (var i = 0; i < copies; i++)
+            plate.Parts.Add(new Part(source, new Vector(i * 3, 0)));
+    }
+
+    [Fact]
+    public void Console_AutoNestDefaultsToEachDrawingsRequiredQuantity()
+    {
+        var demand = AutoNestDemand(null, [], 0, ("a", 5), ("b", 3));
+        Assert.Equal(new[] { 5, 3 }, demand);
+    }
+
+    [Fact]
+    public void Console_AutoNestCountsCopiesOnOtherPlatesButNotTheTarget()
+    {
+        // Two copies on each of two sheets; the target's copy of "a" is replaced, so it does not count.
+        var demand = AutoNestDemand(nest => OccupiedSheet(nest, "b", 2, 2), [], 0, ("a", 5), ("b", 6), ("c", 0));
+        Assert.Equal(new[] { 5, 2 }, demand);
+    }
+
+    [Fact]
+    public void Console_AutoNestSkipsDrawingsAlreadyFilledElsewhere()
+    {
+        var demand = AutoNestDemand(nest => OccupiedSheet(nest, "b", 3, 1), [], 0, ("a", 2), ("b", 3));
+        Assert.Equal(new[] { 2 }, demand);
+    }
+
+    [Fact]
+    public void Console_AutoNestNestsOneOfEachWhenNothingIsRequired()
+    {
+        var demand = AutoNestDemand(null, [], 0, ("a", 0), ("b", 0));
+        Assert.Equal(new[] { 1, 1 }, demand);
+    }
+
+    [Fact]
+    public void Console_AutoNestQuantityOverridesRequiredQuantities()
+    {
+        var demand = AutoNestDemand(nest => OccupiedSheet(nest, "b", 3, 1), ["--quantity", "2"], 0, ("a", 5), ("b", 3), ("c", 0));
+        Assert.Equal(new[] { 2, 2, 2 }, demand);
+    }
+
+    [Fact]
+    public void Console_AutoNestDrawingLimitsTheJobToItsRequiredQuantity()
+    {
+        var demand = AutoNestDemand(null, ["--drawing", "b"], 0, ("a", 5), ("b", 3));
+        Assert.Equal(new[] { 3 }, demand);
+    }
+
+    [Fact]
+    public void Console_AutoNestWithEverythingElsewhereSavesNothing()
+    {
+        var demand = AutoNestDemand(nest => OccupiedSheet(nest, "a", 2, 1), [], 2, ("a", 2));
+        Assert.Empty(demand);
+        Assert.False(File.Exists(Path.Combine(directory, "output.nest")));
+    }
+
+    [Fact]
+    public void Console_AutoNestPlacesEveryRequiredPart()
+    {
+        var input = Path.Combine(directory, "input.nest");
+        var output = Path.Combine(directory, "output.nest");
+        var session = Session();
+        session.Nest.Drawings.Single().Quantity.Required = 3;
+        var other = Square();
+        other.Name = "other";
+        other.Quantity.Required = 4;
+        session.Nest.Drawings.Add(other);
+        // Empty plates are not persisted, so seed the target with a part to be replaced.
+        session.GetPlate(0).Parts.Add(new Part(other));
+        Assert.True(new NestWriter(session.Nest).Write(input));
+
+        Assert.Equal(0, RunConsole(input, "--autonest", "--check-overlaps", "--output", output));
+
+        var nest = new NestReader(output).Read();
+        Assert.Equal(7, nest.Plates.Sum(p => p.Parts.Count * p.Quantity));
+        Assert.All(nest.Drawings, d => Assert.Equal(0, d.Quantity.Remaining));
+    }
+
     [Fact]
     public void Console_MaxSheetsCommitsEveryLayoutAfterTheTarget()
     {

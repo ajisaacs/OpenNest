@@ -63,7 +63,7 @@ dotnet run --project OpenNest.Console -- job.nest --no-fill --plan-cutting --all
 | `--size WxL` | Set the plate size; required for DXF-only input. |
 | `--autonest` | Run validated whole-job nesting; one sheet unless `--max-sheets <n>` allows more. |
 | `--engine <name>` | Choose a whole-job engine with `--autonest`, or a fill strategy without it. |
-| `--quantity <n>` | Limit parts placed (0 means unlimited). |
+| `--quantity <n>` | Limit parts placed (0 means unlimited). With `--autonest`, nest `n` of each drawing instead of its required quantity. |
 | `--spacing <value>` | Override part spacing. |
 | `--template <path>` | Read plate defaults from a nest file. |
 | `--output <path>` | Set the output nest path. |
