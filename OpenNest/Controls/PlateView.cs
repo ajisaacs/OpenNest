@@ -995,7 +995,7 @@ namespace OpenNest.Controls
                         change.Complete();
 
                         sw.Stop();
-                        Status = $"Fill: {parts.Count} parts in {sw.ElapsedMilliseconds} ms";
+                        Status = $"Fill: {parts.Count} parts in {FormatFillTime(sw.Elapsed)}";
                     }
                     else
                     {
@@ -1021,6 +1021,18 @@ namespace OpenNest.Controls
                 operationActive = false;
                 IsFillInProgress = false;
             }
+        }
+
+        // Truncates so a time just under a unit boundary never reads as "60.0 s".
+        internal static string FormatFillTime(TimeSpan elapsed)
+        {
+            if (elapsed.TotalSeconds < 1)
+                return $"{(int)elapsed.TotalMilliseconds} ms";
+
+            if (elapsed.TotalMinutes < 1)
+                return $"{(int)(elapsed.TotalSeconds * 10) / 10.0:0.0} s";
+
+            return $"{(int)elapsed.TotalMinutes}m {elapsed.Seconds:00}s";
         }
 
         public void RemoveSelectedParts() => selection.RemoveSelectedParts();
