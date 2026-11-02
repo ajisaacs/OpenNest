@@ -157,7 +157,12 @@ internal static class CutoutRouter
         // the same area more compactly.
         var packed = CutoutPackerProposal.Fill(frame, cutoutIndex, inserts, spacing,
             Array.Empty<(JobPartGeometry Geometry, NestJobPlacement Pose)>(), memo, token);
-        if (CutoutSeatedArea.Better(packed, accepted, id => geometries[id]))
+        // A rectangular hole is also solved as a knapsack of boxes; it wins on seated outline area.
+        var boxed = CutoutBoxProposal.Fill(frame, cutoutIndex, inserts, spacing, memo, token);
+        var packedWins = CutoutSeatedArea.Better(packed, accepted, id => geometries[id]);
+        if (CutoutSeatedArea.Better(boxed, packedWins ? packed : accepted, id => geometries[id]))
+            return Observe(boxed);
+        if (packedWins)
             return Observe(packed);
         foreach (var (pose, lattice) in observed)
             observeAccepted?.Invoke(pose, lattice);

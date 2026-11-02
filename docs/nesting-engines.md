@@ -395,6 +395,19 @@ across a tall window, now stand together against one wall. Without a boundary th
 unchanged: rectangular stock still starts from the work-area inner-fit rectangle, so engine
 layouts are identical.
 
+A nearly rectangular cutout (at least 0.97 of its bounding box) is also solved as a small knapsack
+by `CutoutBoxProposal`. Inside the rectangle the flattened cutout holds, a deterministic beam search
+over maximal free rectangles (`MaxRectsSheet.Carve`), bounded by a count of expanded states, places
+or gives up the lowest-left free corner, and in other passes the leftmost-low one, to maximize
+seated outline area. Boxes come from `BoxCatalog`, so they follow the rotation policy and the layout
+check's arc flattening. A part filling under 0.8 of its box with two or more copies is also offered
+with its half turn slid against it along each axis, which closes two triangles into one box; the
+slide takes a few clearance checks where a best-fit search can take a minute for a new drawing, and
+only pairs at least 0.05 denser than a single copy are offered. The three best selections are
+certified with `NestLayoutCheck.Clears`, then `CutoutPackerProposal` drops the remaining demand into
+what is left, with the boxes as its occupants. The router keeps this proposal only when it seats
+more outline area than the others.
+
 When the cutout is one circle and every insert fills at least 0.8 of its enclosing circle
 (discs, washers, gears by their tip circle), `CutoutCirclePacker` first packs the whole insert
 list as discs: largest first, at centers tangent to two of the hole wall and the placed discs,

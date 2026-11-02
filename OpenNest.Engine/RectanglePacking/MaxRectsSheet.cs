@@ -106,6 +106,15 @@ internal sealed class MaxRectsSheet
 
     private void Split(Rect item)
     {
+        var next = Carve(free, item);
+        free.Clear();
+        free.AddRange(next);
+    }
+
+    /// <summary>The maximal free rectangles left once <paramref name="item"/> is taken out of
+    /// <paramref name="free"/>; a search that branches keeps its own lists with this.</summary>
+    internal static List<Rect> Carve(IReadOnlyList<Rect> free, Rect item)
+    {
         var next = new List<Rect>(free.Count + 8);
         foreach (var f in free)
         {
@@ -123,8 +132,7 @@ internal sealed class MaxRectsSheet
             if (item.Top < f.Top - Eps)
                 next.Add(new Rect(f.X, item.Top, f.W, f.Top - item.Top));
         }
-        free.Clear();
-        free.AddRange(Prune(next));
+        return Prune(next);
     }
 
     private static List<Rect> Prune(List<Rect> rects)
