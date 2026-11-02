@@ -9,6 +9,7 @@ using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Data.MaterialLedger;
 using OpenNest.Engine;
+using OpenNest.Engine.Jobs;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -52,6 +53,35 @@ namespace OpenNest.Forms
         {
             get { return engineComboBox.SelectedItem as string; }
             set { engineComboBox.SelectedItem = value; }
+        }
+
+        /// <summary>
+        /// Offers "Nest on the server" (Database mode only). The box starts at the last choice and
+        /// is enabled only for built-in engines, since the server loads no plug-ins.
+        /// </summary>
+        public bool ServerNestingAvailable
+        {
+            get => nestOnServerBox.Visible;
+            set
+            {
+                nestOnServerBox.Visible = value;
+                nestOnServerBox.Checked = value && Properties.Settings.Default.AutoNestOnServer;
+                UpdateNestOnServerBox();
+            }
+        }
+
+        /// <summary>True when the user chose to nest on the server with an engine it can run.</summary>
+        public bool NestOnServer => nestOnServerBox.Visible && nestOnServerBox.Enabled && nestOnServerBox.Checked;
+
+        private void engineComboBox_SelectedIndexChanged(object sender, EventArgs e) => UpdateNestOnServerBox();
+
+        private void UpdateNestOnServerBox()
+        {
+            var builtIn = NestingEngineRegistry.IsBuiltIn(EngineName);
+            nestOnServerBox.Enabled = builtIn;
+            ledgerToolTip.SetToolTip(nestOnServerBox, builtIn
+                ? "Send this nest to the nest server's worker. This PC stays free while it runs; Keep and Discard work as usual."
+                : "Plug-in engines run only on this PC.");
         }
 
         public bool OptimizePlateSize
@@ -446,6 +476,11 @@ namespace OpenNest.Forms
                 e.Cancel = true;
                 DialogResult = DialogResult.None;
                 ReportStockValidationFailure(error);
+            }
+            else if (DialogResult == DialogResult.OK && nestOnServerBox.Visible && nestOnServerBox.Enabled)
+            {
+                Properties.Settings.Default.AutoNestOnServer = nestOnServerBox.Checked;
+                Properties.Settings.Default.Save();
             }
             base.OnFormClosing(e);
         }

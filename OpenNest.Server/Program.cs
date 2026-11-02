@@ -23,6 +23,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 // Storage path: --database=<path> or --database <path>, then OPENNEST_DB, default ./data/nests.db (a Docker volume).
 var databasePath = ServerOptions.DatabasePath(args, Environment.GetEnvironmentVariable(ServerOptions.DatabaseVariable));
 builder.Services.AddSingleton(_ => new NestDatabase(databasePath));
+// The server nesting queue's leases read this clock; tests replace it.
+builder.Services.AddSingleton(TimeProvider.System);
 
 // Desktop update feed mirrored from GitHub beside the database; OPENNEST_UPDATES=off turns it off.
 var updatesEnabled = ServerOptions.UpdatesEnabled(Environment.GetEnvironmentVariable(ServerOptions.UpdatesVariable));
@@ -167,6 +169,7 @@ app.MapDrawingSets();
 app.MapReleases();
 app.MapMaterials();
 app.MapSettings();
+app.MapNestJobs();
 if (updatesEnabled)
     app.MapUpdates();
 

@@ -68,7 +68,7 @@ public sealed class SharedSettingsTests
 
         using var upgraded = new NestDatabase(factory.DatabasePath, pooling: false);
 
-        Assert.Equal(14L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+        Assert.Equal(15L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
         Assert.Empty(upgraded.ListSharedSettings());
     }
 

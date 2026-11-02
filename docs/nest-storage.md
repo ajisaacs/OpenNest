@@ -1133,7 +1133,10 @@ project files before restore and their source/resources before publish, includin
 Data's embedded `Defaults/Generic-Laser.json`. The allowlist `.dockerignore` excludes
 other projects, host `bin`/`obj`, local databases, environment files, and launch
 settings. The server image uses the .NET 8 SDK to build and the .NET 8 ASP.NET
-runtime to run; IO/Engine are used only by the host-side smoke tool, not the image.
+runtime to run. The HTTP server references neither IO nor Engine; the image also
+carries the server nesting worker (`OpenNest.Server.Worker`, under `/app/worker`), which
+references Api, Engine and IO, so the Dockerfile and `.dockerignore` include those
+projects too. `OPENNEST_ROLE` picks the process; see [server nesting](server-nesting.md).
 
 ```sh
 docker build --pull -f OpenNest.Server/Dockerfile -t opennest-server:local .

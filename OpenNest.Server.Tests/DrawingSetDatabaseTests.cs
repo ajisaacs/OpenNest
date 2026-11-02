@@ -23,7 +23,7 @@ public sealed class DrawingSetDatabaseTests
             using (var database = new NestDatabase(factory.DatabasePath, pooling: false))
                 Assert.Empty(database.QueryDrawingSets(new DrawingSetQuery { IncludeArchived = true }).Items);
             Assert.Equal(before, Digest(factory.DatabasePath));
-            Assert.Equal(14L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+            Assert.Equal(15L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
         }
 
         using var upgraded = new NestDatabase(factory.DatabasePath, pooling: false);
@@ -48,7 +48,7 @@ public sealed class DrawingSetDatabaseTests
         Assert.Equal(before, Digest(factory.DatabasePath));
         Execute(factory.DatabasePath, "DROP TABLE ix_drawing_set_members_drawing");
         using var database = new NestDatabase(factory.DatabasePath, pooling: false);
-        Assert.Equal(14L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+        Assert.Equal(15L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
     }
 
     [Fact]

@@ -24,6 +24,7 @@ namespace OpenNest.Forms
             this.summaryLabel = new System.Windows.Forms.Label();
             this.engineLabel = new System.Windows.Forms.Label();
             this.engineComboBox = new System.Windows.Forms.ComboBox();
+            this.nestOnServerBox = new System.Windows.Forms.CheckBox();
             this.minRemnantLabel = new System.Windows.Forms.Label();
             this.minRemnantBox = new System.Windows.Forms.TextBox();
             this.plateOptimizerGroup = new System.Windows.Forms.GroupBox();
@@ -76,6 +77,7 @@ namespace OpenNest.Forms
             this.platesTab.Controls.Add(this.engineLabel);
             this.platesTab.Controls.Add(this.engineComboBox);
             this.platesTab.Controls.Add(this.plateOptimizerGroup);
+            this.platesTab.Controls.Add(this.nestOnServerBox);
             this.platesTab.Location = new System.Drawing.Point(4, 25);
             this.platesTab.Name = "platesTab";
             this.platesTab.Padding = new System.Windows.Forms.Padding(6);
@@ -121,6 +123,18 @@ namespace OpenNest.Forms
             this.engineComboBox.Name = "engineComboBox";
             this.engineComboBox.Size = new System.Drawing.Size(200, 24);
             this.engineComboBox.TabIndex = 1;
+            this.engineComboBox.SelectedIndexChanged += new System.EventHandler(this.engineComboBox_SelectedIndexChanged);
+            //
+            // nestOnServerBox
+            //
+            this.nestOnServerBox.AutoSize = true;
+            this.nestOnServerBox.Location = new System.Drawing.Point(10, 396);
+            this.nestOnServerBox.Name = "nestOnServerBox";
+            this.nestOnServerBox.Size = new System.Drawing.Size(330, 20);
+            this.nestOnServerBox.TabIndex = 3;
+            this.nestOnServerBox.Text = "Nest on the server (keeps this PC free; may be slower)";
+            this.nestOnServerBox.UseVisualStyleBackColor = true;
+            this.nestOnServerBox.Visible = false;
             //
             // minRemnantLabel
             //
@@ -295,6 +309,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Label summaryLabel;
         private System.Windows.Forms.Label engineLabel;
         private System.Windows.Forms.ComboBox engineComboBox;
+        private System.Windows.Forms.CheckBox nestOnServerBox;
         private System.Windows.Forms.Label minRemnantLabel;
         private System.Windows.Forms.TextBox minRemnantBox;
         private System.Windows.Forms.GroupBox plateOptimizerGroup;

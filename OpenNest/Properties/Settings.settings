@@ -110,5 +110,8 @@
     <Setting Name="DrawingSetsWindowState" Type="System.Windows.Forms.FormWindowState" Scope="User">
       <Value Profile="(Default)">Maximized</Value>
     </Setting>
+    <Setting Name="AutoNestOnServer" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

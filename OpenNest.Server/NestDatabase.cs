@@ -344,7 +344,7 @@ public sealed partial class NestDatabase : IDisposable
             command.Transaction = transaction;
             command.CommandText = "PRAGMA user_version";
             var version = (long)command.ExecuteScalar()!;
-            if (version > 14) throw new InvalidOperationException("Database schema is newer than this server.");
+            if (version > 15) throw new InvalidOperationException("Database schema is newer than this server.");
             if (version == 0)
             {
                 command.CommandText = """
@@ -439,6 +439,12 @@ public sealed partial class NestDatabase : IDisposable
             }
             if (version < 14)
                 AddStockCodes(command);
+            if (version < 15)
+            {
+                // The server nesting queue; see NestDatabase.Jobs.
+                command.CommandText = NestJobSchema;
+                command.ExecuteNonQuery();
+            }
             transaction.Commit();
         }
     }

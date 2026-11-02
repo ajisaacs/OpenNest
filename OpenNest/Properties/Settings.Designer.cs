@@ -463,5 +463,18 @@ namespace OpenNest.Properties {
                 this["DrawingSetsWindowState"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        // Auto Nest sends the job to the nest server's worker (Database mode); the dialog remembers the last choice.
+        public bool AutoNestOnServer {
+            get {
+                return ((bool)(this["AutoNestOnServer"]));
+            }
+            set {
+                this["AutoNestOnServer"] = value;
+            }
+        }
     }
 }

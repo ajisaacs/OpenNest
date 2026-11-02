@@ -93,7 +93,7 @@ internal static class NestPipelineDrawingFreshness
         return changed;
     }
 
-    private static bool Same(PartGeometrySnapshot a, PartGeometrySnapshot b) =>
+    internal static bool Same(PartGeometrySnapshot a, PartGeometrySnapshot b) =>
         a.Mode == b.Mode && a.Motions.Count == b.Motions.Count
         && a.Motions.Zip(b.Motions).All(pair =>
             pair.First.Type == pair.Second.Type

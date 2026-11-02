@@ -5,6 +5,14 @@
 !OpenNest.Data/**
 !OpenNest.Core/
 !OpenNest.Core/**
+!OpenNest.Server.Worker/
+!OpenNest.Server.Worker/**
+!OpenNest.Api/
+!OpenNest.Api/**
+!OpenNest.Engine/
+!OpenNest.Engine/**
+!OpenNest.IO/
+!OpenNest.IO/**
 **/bin/**
 **/obj/**
 **/data/**

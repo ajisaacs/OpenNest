@@ -23,7 +23,7 @@ public sealed class DrawingLibraryDatabaseTests
             using (var database = new NestDatabase(factory.DatabasePath, pooling: false))
                 Assert.Empty(database.QueryDrawings(new DrawingLibraryQuery { IncludeArchived = true }).Items);
             Assert.Equal(before, NestDigest(factory.DatabasePath));
-            Assert.Equal(14L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+            Assert.Equal(15L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
         }
 
         using var upgraded = new NestDatabase(factory.DatabasePath, pooling: false);
@@ -44,7 +44,7 @@ public sealed class DrawingLibraryDatabaseTests
 
         using (var database = new NestDatabase(factory.DatabasePath, pooling: false))
         {
-            Assert.Equal(14L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+            Assert.Equal(15L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
             Assert.Equal(before, NestDigest(factory.DatabasePath));
             // Two distinct blobs across four revisions: the bracket's notes edit and the
             // plate both reuse the bracket's first package.
@@ -81,7 +81,7 @@ public sealed class DrawingLibraryDatabaseTests
     {
         using var factory = new ServerFactory();
         using (new NestDatabase(factory.DatabasePath, pooling: false)) { }
-        Execute(factory.DatabasePath, "PRAGMA user_version=15");
+        Execute(factory.DatabasePath, "PRAGMA user_version=16");
 
         Assert.Throws<InvalidOperationException>(() => new NestDatabase(factory.DatabasePath, pooling: false));
     }

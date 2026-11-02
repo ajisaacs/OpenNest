@@ -24,6 +24,9 @@ public static class NestingEngineRegistry
 {
     private static readonly List<NestingEngineInfo> engines = new();
 
+    // Names registered by this assembly, before any plug-in could load.
+    private static readonly HashSet<string> builtInNames;
+
     /// <summary>
     /// Registry names used by earlier releases, mapped to the engine that replaced them, so saved
     /// selections and scripts keep working. Consulted only when no engine has the requested name.
@@ -93,6 +96,8 @@ public static class NestingEngineRegistry
             "Repeats parts in rows and pairs, keeping the largest drop on the top",
             () => new FixedStrategyNestingEngine("Horizontal Remnant")
         );
+
+        builtInNames = new HashSet<string>(engines.Select(e => e.Name), StringComparer.OrdinalIgnoreCase);
     }
 
     public static IReadOnlyList<NestingEngineInfo> AvailableEngines => engines;
@@ -115,6 +120,14 @@ public static class NestingEngineRegistry
             ? target.Name
             : null;
     }
+
+    /// <summary>
+    /// Whether <paramref name="name"/> (or the engine a renamed legacy name maps to) ships with
+    /// OpenNest rather than coming from a plug-in. Only built-in engines run on the nest server,
+    /// which loads no plug-ins.
+    /// </summary>
+    public static bool IsBuiltIn(string? name) =>
+        ResolveName(name) is { } resolved && builtInNames.Contains(resolved);
 
     /// <summary>
     /// Creates the engine registered under <paramref name="name"/> (case-insensitive, renamed legacy

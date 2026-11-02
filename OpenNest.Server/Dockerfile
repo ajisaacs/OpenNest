@@ -7,17 +7,30 @@ ARG RUNTIME_IMAGE=mcr.microsoft.com/dotnet/aspnet:8.0
 FROM ${SDK_IMAGE} AS build
 WORKDIR /src
 
+# The worker (OPENNEST_ROLE=worker) solves server nesting jobs, so it also needs the
+# engine and the nest file format; the HTTP server references neither.
 COPY OpenNest.Server/OpenNest.Server.csproj OpenNest.Server/
+COPY OpenNest.Server.Worker/OpenNest.Server.Worker.csproj OpenNest.Server.Worker/
+COPY OpenNest.Api/OpenNest.Api.csproj OpenNest.Api/
+COPY OpenNest.Engine/OpenNest.Engine.csproj OpenNest.Engine/
+COPY OpenNest.IO/OpenNest.IO.csproj OpenNest.IO/
 COPY OpenNest.Data/OpenNest.Data.csproj OpenNest.Data/
 COPY OpenNest.Core/OpenNest.Core.csproj OpenNest.Core/
-RUN dotnet restore OpenNest.Server/OpenNest.Server.csproj
+RUN dotnet restore OpenNest.Server/OpenNest.Server.csproj \
+    && dotnet restore OpenNest.Server.Worker/OpenNest.Server.Worker.csproj
 
 COPY OpenNest.Server/ OpenNest.Server/
+COPY OpenNest.Server.Worker/ OpenNest.Server.Worker/
+COPY OpenNest.Api/ OpenNest.Api/
+COPY OpenNest.Engine/ OpenNest.Engine/
+COPY OpenNest.IO/ OpenNest.IO/
 COPY OpenNest.Data/ OpenNest.Data/
 COPY OpenNest.Core/ OpenNest.Core/
 ARG VERSION=0.0.0-dev
 ARG SOURCE_REVISION=unknown
 RUN dotnet publish OpenNest.Server/OpenNest.Server.csproj -c Release -o /app --no-restore \
+    -p:Version="$VERSION" -p:SourceRevisionId="$SOURCE_REVISION" \
+    && dotnet publish OpenNest.Server.Worker/OpenNest.Server.Worker.csproj -c Release -o /app/worker --no-restore \
     -p:Version="$VERSION" -p:SourceRevisionId="$SOURCE_REVISION"
 
 FROM ${RUNTIME_IMAGE} AS runtime
@@ -28,6 +41,7 @@ RUN apt-get update \
 WORKDIR /app
 # Runtime files stay root-owned and read-only to the app user.
 COPY --from=build /app .
+COPY --chmod=0755 OpenNest.Server/entrypoint.sh OpenNest.Server/healthcheck.sh /app/
 
 # SQLite database + .nest blobs live here; mount a volume at this path. The directory
 # belongs to the base image's non-root app user (APP_UID 1654), so a fresh named volume
@@ -41,18 +55,20 @@ EXPOSE 8090
 USER $APP_UID
 VOLUME /app/data
 
+# The server answers /healthz; the worker touches its alive file every poll round and heartbeat.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --start-interval=2s --retries=3 \
-    CMD ["curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8090/healthz"]
+    CMD ["/app/healthcheck.sh"]
 
 ARG VERSION=0.0.0-dev
 ARG SOURCE_REVISION=unknown
 ARG RUNTIME_IMAGE
 LABEL org.opencontainers.image.title="OpenNest.Server" \
-      org.opencontainers.image.description="OpenNest nest-storage HTTP service (SQLite)" \
+      org.opencontainers.image.description="OpenNest nest-storage HTTP service (SQLite) and server nesting worker" \
       org.opencontainers.image.source="https://github.com/ajisaacs/OpenNest" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="$VERSION" \
       org.opencontainers.image.revision="$SOURCE_REVISION" \
       org.opencontainers.image.base.name="$RUNTIME_IMAGE"
 
-ENTRYPOINT ["dotnet", "OpenNest.Server.dll"]
+# OPENNEST_ROLE picks the process: server (default) or worker; see docs/server-nesting.md.
+ENTRYPOINT ["/app/entrypoint.sh"]

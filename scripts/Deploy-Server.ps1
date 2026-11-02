@@ -65,7 +65,7 @@ $ShortRevision = $Revision.Substring(0, 8)
 $Branch = (& git -C $RepoRoot rev-parse --abbrev-ref HEAD).Trim()
 
 # Only the directories the Dockerfile copies affect the image.
-$ServerSources = 'OpenNest.Server', 'OpenNest.Data', 'OpenNest.Core'
+$ServerSources = 'OpenNest.Server', 'OpenNest.Server.Worker', 'OpenNest.Api', 'OpenNest.Engine', 'OpenNest.IO', 'OpenNest.Data', 'OpenNest.Core'
 $Dirty = & git -C $RepoRoot status --porcelain -- $ServerSources
 if ($Dirty) {
     Write-Warning "Uncommitted changes in server sources are included in this build:"

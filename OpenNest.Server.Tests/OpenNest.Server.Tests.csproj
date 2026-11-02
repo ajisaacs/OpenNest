@@ -25,6 +25,8 @@
     <ProjectReference Include="..\OpenNest.Data\OpenNest.Data.csproj" />
     <!-- IO only writes/reads synthetic .nest archives in tests; the server never references it. -->
     <ProjectReference Include="..\OpenNest.IO\OpenNest.IO.csproj" />
+    <!-- Server nesting end to end: the worker solves a job queued through the in-memory server. -->
+    <ProjectReference Include="..\OpenNest.Server.Worker\OpenNest.Server.Worker.csproj" />
   </ItemGroup>
 
 </Project>

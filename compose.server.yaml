@@ -19,6 +19,28 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+
+  # Server nesting (docs/server-nesting.md): the same image solving queued Auto Nest jobs one
+  # at a time. It talks to the server over HTTP and never opens the database, and its own CPU
+  # and memory limits keep a large nest from slowing nest open and save. A job has no time
+  # limit, so fewer CPUs only make it slower, never a worse nest.
+  opennest-worker:
+    image: ${OPENNEST_SERVER_IMAGE:?Set a tested version or digest}
+    restart: unless-stopped
+    depends_on:
+      - opennest-server
+    environment:
+      OPENNEST_ROLE: worker
+      OPENNEST_SERVER_URL: http://opennest-server:8090/
+    cpus: ${OPENNEST_WORKER_CPUS:-2}
+    mem_limit: ${OPENNEST_WORKER_MEMORY:-4g}
+    # Time to give a running job back to the queue on stop.
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
 volumes:
   opennest-data:
     # A restore switches to a separately verified volume instead of overwriting this one.

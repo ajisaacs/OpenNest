@@ -31,6 +31,7 @@ namespace OpenNest.Forms.Commands
         private readonly double minRemnantSize;
         private List<PlateOption> savedOptions;
         private IReadOnlyList<LedgerStockRow> ledgerRows = Array.Empty<LedgerStockRow>();
+        private bool nestOnServer;
 
         private AutoNestCommand(IWin32Window owner, EditNestForm target, List<NestItem> items,
             List<PlateOption> plateOptions, string engineName, double salvageRate, double minRemnantSize)
@@ -53,7 +54,11 @@ namespace OpenNest.Forms.Commands
         /// </summary>
         public static AutoNestCommand Prompt(IWin32Window owner, EditNestForm target)
         {
-            using var form = new AutoNestForm(target.Nest) { ServerNestId = target.Document.RemoteId };
+            using var form = new AutoNestForm(target.Nest)
+            {
+                ServerNestId = target.Document.RemoteId,
+                ServerNestingAvailable = NestStorage.Settings.IsDatabaseMode,
+            };
             if (target.Nest.PlateOptions.Count > 0)
                 form.LoadPlateOptions(target.Nest.PlateOptions, target.Nest.SalvageRate);
             if (target.Nest.MinimumRemnantDimension > 0)
@@ -78,6 +83,7 @@ namespace OpenNest.Forms.Commands
             {
                 savedOptions = savedOptions,
                 ledgerRows = form.OptimizePlateSize ? form.LedgerRows : Array.Empty<LedgerStockRow>(),
+                nestOnServer = form.NestOnServer,
             };
         }
 
@@ -94,7 +100,9 @@ namespace OpenNest.Forms.Commands
                     new NestJobOptions(maxPlates: 100,
                         salvageRate: plateOptions?.Count > 0 ? salvageRate : 0,
                         minimumSalvageDimension: minRemnantSize));
-                var result = await SolveAsync(owner, target, request, cts);
+                var result = nestOnServer
+                    ? await ServerAutoNest.SolveAsync(owner, target, request, cts)
+                    : await SolveAsync(owner, target, request, cts);
                 cts.Token.ThrowIfCancellationRequested();
 
                 var allowInvalid = false;
