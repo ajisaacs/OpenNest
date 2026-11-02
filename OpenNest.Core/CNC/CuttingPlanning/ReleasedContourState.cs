@@ -101,7 +101,7 @@ public sealed class ReleasedContourState
     internal void AnalyzeMoves(IReadOnlyList<ExecutionMotion> moves, bool cutoff,
         List<PostVerificationFinding> findings, int plate, int part, CancellationToken token,
         Func<int, bool> isFixed = null, List<PostVerificationFinding> fixedFindings = null,
-        bool proveOpenCuts = false, int contoursBefore = 0, List<PostVerificationFinding> raisedFindings = null)
+        int contoursBefore = 0, List<PostVerificationFinding> raisedFindings = null)
     {
         var current = new CutGroup();
         var unfinished = new List<CutGroup>();
@@ -261,14 +261,13 @@ public sealed class ReleasedContourState
         Finish();
         loose.Leads.AddRange(leadIns);
         // Open cuts that provably enclose nothing retain all their material, however many
-        // pieces a tabbed cutout was cut in. Otherwise they need manual review. Planning proves
-        // them too (its own tabbed cutouts are cut in pieces without lead-outs), but only
-        // pre-post review lets the proof clear a lead-out: planning keeps refusing to certify
-        // its own tabs followed by a lead-out.
+        // pieces a tabbed cutout was cut in, and so does a tabbed perimeter whose lead-out stays
+        // out of its tab: planning and pre-post review prove them alike. Otherwise they need
+        // manual review.
         var retained = !cutoff && (unfinished.Count > 1 || deferred.Count > 0)
             && unfinished.All(LeadsClearOpenEnds)
             && OpenCutsEncloseNothing(closed, unfinished.Concat(otherOpen).Append(loose).ToList(), token);
-        for (var i = deferred.Count - 1; i >= 0 && !(retained && proveOpenCuts); i--)
+        for (var i = deferred.Count - 1; i >= 0 && !retained; i--)
             deferred[i].Target.Insert(deferred[i].Index, deferred[i].Finding);
         // Only one open fragment per part can be the planner's own certified tab, so a
         // further fragment that a fixed emission cut makes this uncertainty that emission's.

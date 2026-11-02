@@ -144,8 +144,7 @@ public static class PostVerificationAnalyzer
                         && move.Layer is LayerType.Cut or LayerType.Display
                         && move.Curve.Length > PostVerificationGeometry.Epsilon))
                         Incomplete("Placed program has no cutting contour motions for this drawing.");
-                    obstacles.AnalyzeMoves(moves, cutoff, findings, plateNumber, partNumber, cancellationToken,
-                        proveOpenCuts: true);
+                    obstacles.AnalyzeMoves(moves, cutoff, findings, plateNumber, partNumber, cancellationToken);
                     if (clamps is { Count: > 0 })
                         foreach (var move in moves)
                         {

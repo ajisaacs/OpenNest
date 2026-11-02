@@ -155,8 +155,8 @@ end it leaves, and a lead-in never behind the start it enters. Anything else (pi
 meet exactly, a lead that bridges or curls into a tab, cuts from edge to edge) is reported
 as incomplete, needing manual review. Kerf, tab strength and other parts' cuts are not modeled. Plan
 Cutting runs the same proof, so its own [tabbed cutouts](tabbed-cutouts.md) (pieces without
-lead-outs) pass, but keeps its stricter rule and does not certify its own tabs followed by a
-lead-out. A program that still has a tabbed cutout's `Tab` motions (never planned) is
+lead-outs) pass, and so do its tabbed perimeters followed by a lead-out that stays out of the
+tab. A program that still has a tabbed cutout's `Tab` motions (never planned) is
 incomplete: a post may cut through them.
 
 ## Explicit override

@@ -508,8 +508,9 @@ or retraced cut) is kept as given with a fixed-lead warning instead; see below. 
 no-parameter route retains its narrower compatibility contract and still refuses
 fixed-program violations. A planned lead-out that may bridge a tab, or a malformed
 emitted arc, is refused, not automatically repaired. Tabbed lead-outs leave from the
-trimmed cut end, but a lead-out after an open contour still needs manual review of
-its retention gap, so confirmed-parameters planning refuses it in a planned contour.
+trimmed cut end; planning runs pre-post review's open-cut proof on them (see
+[post verification](post-verification.md)), so a support-tabbed or tabbed perimeter with a
+lead-out that stays out of its tab plans like any other, and one that reaches into it is refused.
 
 ### Fixed emissions warn
 
