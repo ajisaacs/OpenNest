@@ -27,6 +27,9 @@ namespace OpenNest.Engine.Tests.Jobs;
 /// processor count); fix that rather than repinning. The whole-plate Fill nests fill several
 /// irregular drawings with one filler, so later items use the angles
 /// <c>AngleCandidateBuilder.RecordProductive</c> learned from earlier ones.
+/// Re-captured when quantity trimming began keeping interlocked pairs whole
+/// (<c>ShrinkFiller.TrimToCount</c>): nine quantity-limited cases kept their counts but drop
+/// different copies. Whole-job leftovers trying pairs first changed none of these pins.
 /// Not pinned: richer mixes that pair parallelogram, chevron or tee parts at oblique angles
 /// with other irregular items. Their Fill and Vertical Remnant nests vary between runs, most
 /// likely because best-fit pair candidates are gathered in a <c>ConcurrentBag</c> and equal
@@ -211,16 +214,22 @@ public class FillStackCharacterizationTests
         {
             var plate = MakePlate();
             var item = new NestItem { Drawing = new Drawing(shape, Shape(shape)), Quantity = 0 };
-            return Layout(
-                PlateFillService.FillItem(
-                    strategy,
-                    plate,
-                    item,
-                    plate.WorkArea(),
-                    null,
-                    CancellationToken.None
-                )
+            var parts = PlateFillService.FillItem(
+                strategy,
+                plate,
+                item,
+                plate.WorkArea(),
+                null,
+                CancellationToken.None
             );
+            Assert.Empty(NestLayoutCheck.Validate(
+                new List<(Plate, List<Part>)> { (plate, parts) },
+                new Dictionary<Drawing, (string Name, int Quantity)>
+                {
+                    [item.Drawing] = (item.Drawing.Name, parts.Count),
+                }
+            ));
+            return Layout(parts);
         });
 
         AssertPinned(layout, expectedCount, expectedDigest);
@@ -281,7 +290,7 @@ public class FillStackCharacterizationTests
 
     [Theory]
     [InlineData("Fill", 30, "5732030365D13B9A")]
-    [InlineData("Strip", 30, "A573BA6919FCD300")]
+    [InlineData("Strip", 30, "666F8E276808A9C2")]
     [InlineData("Vertical Remnant", 30, "5732030365D13B9A")]
     [InlineData("Horizontal Remnant", 30, "C05F6A30A648B929")]
     public void Nest_LearnedAngleItems_PinnedLayout(
@@ -315,10 +324,10 @@ public class FillStackCharacterizationTests
     // --- interactive fill beside clamps ---
 
     [Theory]
-    [InlineData("Fill", 40, "9B3EFF9B72243576")]
-    [InlineData("Strip", 40, "9B3EFF9B72243576")]
-    [InlineData("Vertical Remnant", 40, "039C0D607166D805")]
-    [InlineData("Horizontal Remnant", 40, "C1E81564A620302A")]
+    [InlineData("Fill", 40, "5D07DCF3DC9B5F57")]
+    [InlineData("Strip", 40, "5D07DCF3DC9B5F57")]
+    [InlineData("Vertical Remnant", 40, "7072140D787044BD")]
+    [InlineData("Horizontal Remnant", 40, "8FDDB0EA5D6D3620")]
     public void FillItem_WithClampZones_PinnedLayout(
         string strategy,
         int expectedCount,
@@ -334,16 +343,22 @@ public class FillStackCharacterizationTests
                 Drawing = new Drawing("lshape", TestDrawingFactory.LShape()),
                 Quantity = 40,
             };
-            return Layout(
-                PlateFillService.FillItem(
-                    strategy,
-                    plate,
-                    item,
-                    plate.WorkArea(),
-                    null,
-                    CancellationToken.None
-                )
+            var parts = PlateFillService.FillItem(
+                strategy,
+                plate,
+                item,
+                plate.WorkArea(),
+                null,
+                CancellationToken.None
             );
+            Assert.Empty(NestLayoutCheck.Validate(
+                new List<(Plate, List<Part>)> { (plate, parts) },
+                new Dictionary<Drawing, (string Name, int Quantity)>
+                {
+                    [item.Drawing] = (item.Drawing.Name, parts.Count),
+                }
+            ));
+            return Layout(parts);
         });
 
         AssertPinned(layout, expectedCount, expectedDigest);
@@ -368,10 +383,10 @@ public class FillStackCharacterizationTests
         );
 
     [Theory]
-    [InlineData("Fill", 26, "64CE33B01B205978")]
-    [InlineData("Strip", 26, "FD03A4529D37E32C")]
-    [InlineData("Vertical Remnant", 26, "BDCA1DA111B396F0")]
-    [InlineData("Horizontal Remnant", 26, "C356EC216CD56627")]
+    [InlineData("Fill", 26, "0A7A67E19F821E84")]
+    [InlineData("Strip", 26, "06ABFA7EBBF15472")]
+    [InlineData("Vertical Remnant", 26, "0A7A67E19F821E84")]
+    [InlineData("Horizontal Remnant", 26, "25DC495707C2BCA4")]
     public void FixedStrategyEngine_IrregularJob_PinnedLayout(
         string strategy,
         int expectedCount,

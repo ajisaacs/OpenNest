@@ -16,7 +16,9 @@ The category covers comparer, group-pattern, rotated-pattern, extents-column, fe
 Irregular's private block proposals opt into quantity-limited Row/Column stripe fills.
 `FillLinear.MaxParts` is a soft row limit: the first primary row stays complete, and
 perpendicular copies stop after reaching the requested count. The final fill still
-trims its winner to the exact quantity. Existing overlap fallbacks and block spacing
+trims its winner to the exact quantity, keeping or dropping interlocked pairs whole
+(`ShrinkFiller.TrimToCount`; a pair is split only for an odd count with no unpaired part
+left). Existing overlap fallbacks and block spacing
 certification remain active; fallback tiling can exceed the soft limit. Nonpositive
 limits remain uncapped. Ordinary Fill-strategy fills and the zero-quantity cutout lattice
 keep their full-area behavior.

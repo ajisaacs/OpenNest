@@ -138,6 +138,42 @@ public class ShrinkFillerTests
     }
 
     [Fact]
+    public void TrimToCount_KeepsInterlockedPairsWhole()
+    {
+        // Overlapping bounding boxes mark an interlocked pair: (0, 1) and (10, 11).
+        var parts = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 5),
+            TestHelpers.MakePartAt(1, 0, 5),
+            TestHelpers.MakePartAt(10, 0, 5),
+            TestHelpers.MakePartAt(11, 0, 5),
+            TestHelpers.MakePartAt(30, 0, 5),
+        };
+
+        var trimmed = ShrinkFiller.TrimToCount(parts, 3, ShrinkAxis.Width);
+
+        Assert.Equal(new[] { parts[0], parts[1], parts[4] }, trimmed);
+    }
+
+    [Fact]
+    public void TrimToCount_SplitsTheNearestPairOnlyWithoutAnUnpairedPart()
+    {
+        var parts = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 5),
+            TestHelpers.MakePartAt(1, 0, 5),
+            TestHelpers.MakePartAt(10, 0, 5),
+            TestHelpers.MakePartAt(11, 0, 5),
+            TestHelpers.MakePartAt(20, 0, 5),
+            TestHelpers.MakePartAt(21, 0, 5),
+        };
+
+        var trimmed = ShrinkFiller.TrimToCount(parts, 3, ShrinkAxis.Width);
+
+        Assert.Equal(new[] { parts[0], parts[1], parts[2] }, trimmed);
+    }
+
+    [Fact]
     public void TrimToCount_DoesNotMutateInput()
     {
         var parts = new List<Part>

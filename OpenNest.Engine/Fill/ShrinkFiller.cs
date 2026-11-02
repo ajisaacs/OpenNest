@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using OpenNest.Geometry;
 using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Engine.RectanglePacking;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Fill
 {
@@ -161,6 +161,8 @@ namespace OpenNest.Engine.Fill
         /// <summary>
         /// Keeps the <paramref name="targetCount"/> parts nearest to the origin
         /// along the given axis, discarding parts farthest from the origin.
+        /// Interlocked pairs are kept or discarded whole; a pair is split only when an
+        /// odd count leaves no unpaired part to keep instead.
         /// Returns the input list unchanged if count is already at or below target.
         /// </summary>
         internal static List<Part> TrimToCount(List<Part> parts, int targetCount, ShrinkAxis axis)
@@ -168,9 +170,34 @@ namespace OpenNest.Engine.Fill
             if (parts == null || parts.Count <= targetCount)
                 return parts;
 
-            return axis == ShrinkAxis.Width
-                ? parts.OrderBy(p => p.BoundingBox.Right).Take(targetCount).ToList()
-                : parts.OrderBy(p => p.BoundingBox.Top).Take(targetCount).ToList();
+            var boxes = parts.Select(p => p.BoundingBox).ToArray();
+            (double, double) Key(int i) => axis == ShrinkAxis.Width
+                ? (boxes[i].Right, boxes[i].Top)
+                : (boxes[i].Top, boxes[i].Right);
+            var partner = InterlockedPairs.Partners(boxes);
+            // A pair's later member decides when it is discarded; within a unit, the nearer first.
+            var units = Enumerable.Range(0, parts.Count)
+                .Where(i => partner[i] < 0 || i < partner[i])
+                .Select(i => (partner[i] < 0 ? new[] { i } : new[] { i, partner[i] })
+                    .OrderBy(Key).ThenBy(j => j).ToArray())
+                .OrderBy(u => Key(u[^1])).ThenBy(u => u[0])
+                .ToList();
+
+            var kept = new List<int>(targetCount);
+            int[] split = null;
+            foreach (var unit in units)
+            {
+                if (kept.Count == targetCount)
+                    break;
+                if (kept.Count + unit.Length <= targetCount)
+                    kept.AddRange(unit);
+                else
+                    split ??= unit;
+            }
+            if (kept.Count < targetCount)
+                kept.Add(split[0]);
+
+            return kept.OrderBy(Key).ThenBy(i => i).Select(i => parts[i]).ToList();
         }
     }
 }

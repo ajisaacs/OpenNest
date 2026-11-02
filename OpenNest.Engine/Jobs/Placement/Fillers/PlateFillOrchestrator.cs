@@ -73,49 +73,134 @@ internal static class PlateFillOrchestrator
 
                 DeductPlacedQuantities(fillItems, fillParts);
 
-                var placedObstacles = fillParts
-                    .Select(part => part.BoundingBox.Offset(plate.PartSpacing))
-                    .ToList();
-                placedObstacles.AddRange(clampKeepOuts);
-                var finder = new RemnantFinder(workArea, placedObstacles);
-                var remnants = finder.FindRemnants();
-                if (remnants.Count > 0)
-                    workArea = remnants[0];
-                else
-                    workArea = new Box(0, 0, 0, 0);
+                workArea = LargestRemnant(plate, workArea, fillParts, clampKeepOuts);
             }
         }
 
-        packItems = packItems.Where(item => item.Quantity > 0).ToList();
-        var pairItems = packItems.Where(item => item.Quantity == 2).ToList();
-        var regularPackItems = packItems.Where(item => item.Quantity != 2).ToList();
+        var leftovers = packItems.Where(item => item.Quantity > 0).ToList();
 
-        if (
-            regularPackItems.Count > 0
-            && workArea.Width > 0
-            && workArea.Length > 0
-            && !token.IsCancellationRequested
-        )
+        if (leftovers.Count > 0 && !token.IsCancellationRequested)
         {
-            var packParts = pack(workArea, regularPackItems, progress, token);
+            var packFirst = PackThenPairs(plate, leftovers, allParts, workArea, comparer, pack,
+                clampKeepOuts, progress, token);
+            var chosen = packFirst;
 
-            if (packParts.Count > 0)
+            // Neither order wins every job: pairs reach the gaps a fill leaves before singles
+            // take them, but plain rectangles often pack tighter one at a time. The strategy's
+            // own ranking of the whole layout decides, and a tie keeps pack-first.
+            if (
+                leftovers.Any(IsPairable)
+                && !token.IsCancellationRequested
+            )
             {
-                allParts.AddRange(packParts);
-
-                DeductPlacedQuantities(regularPackItems, packParts);
+                var pairsFirst = PairsThenPack(plate, leftovers, allParts, workArea, comparer, pack,
+                    clampKeepOuts, token);
+                if (comparer.IsBetter(
+                    allParts.Concat(pairsFirst).ToList(),
+                    allParts.Concat(packFirst).ToList(),
+                    plate.WorkArea()
+                ))
+                    chosen = pairsFirst;
             }
-        }
 
-        if (pairItems.Count > 0 && !token.IsCancellationRequested)
-        {
-            var placed = PlaceBestFitPairs(plate, comparer, pairItems, allParts, plate.WorkArea(), clampKeepOuts);
-            allParts.AddRange(placed);
+            allParts.AddRange(chosen);
+            DeductPlacedQuantities(leftovers, chosen);
         }
 
         Compactor.Settle(allParts, plate);
 
         return allParts;
+    }
+
+    private static bool IsPairable(NestItem item) => item.Quantity >= 2 && item.Quantity % 2 == 0;
+
+    private static List<NestItem> Copies(IEnumerable<NestItem> items) =>
+        items.Select(item => new NestItem
+        {
+            Drawing = item.Drawing,
+            Priority = item.Priority,
+            Quantity = item.Quantity,
+            StepAngle = item.StepAngle,
+            RotationStart = item.RotationStart,
+            RotationEnd = item.RotationEnd,
+        }).ToList();
+
+    /// <summary>Packs everything but quantity-two items, then places those as pairs.</summary>
+    private static List<Part> PackThenPairs(
+        Plate plate,
+        List<NestItem> leftovers,
+        List<Part> existingParts,
+        Box workArea,
+        IFillComparer comparer,
+        Func<Box, List<NestItem>, IProgress<NestProgress>, CancellationToken, List<Part>> pack,
+        IReadOnlyList<Box> clampKeepOuts,
+        IProgress<NestProgress> progress,
+        CancellationToken token
+    )
+    {
+        var items = Copies(leftovers);
+        var placed = new List<Part>();
+        var packItems = items.Where(item => item.Quantity != 2).ToList();
+
+        if (packItems.Count > 0 && workArea.Width > 0 && workArea.Length > 0)
+            placed.AddRange(pack(workArea, packItems, progress, token));
+
+        var pairItems = items.Where(item => item.Quantity == 2).ToList();
+        if (pairItems.Count > 0 && !token.IsCancellationRequested)
+            placed.AddRange(PlaceBestFitPairs(plate, comparer, pairItems,
+                existingParts.Concat(placed).ToList(), plate.WorkArea(), clampKeepOuts));
+
+        return placed;
+    }
+
+    /// <summary>
+    /// Places every even quantity as pairs, largest box first so a part that fits a gap reaches
+    /// it before a smaller one takes it, then packs the rest around them.
+    /// </summary>
+    private static List<Part> PairsThenPack(
+        Plate plate,
+        List<NestItem> leftovers,
+        List<Part> existingParts,
+        Box workArea,
+        IFillComparer comparer,
+        Func<Box, List<NestItem>, IProgress<NestProgress>, CancellationToken, List<Part>> pack,
+        IReadOnlyList<Box> clampKeepOuts,
+        CancellationToken token
+    )
+    {
+        var items = Copies(leftovers);
+        var pairItems = items
+            .Where(IsPairable)
+            .OrderByDescending(item => item.Drawing.Program.BoundingBox().Area())
+            .ToList();
+
+        var placed = PlaceBestFitPairs(plate, comparer, pairItems, existingParts, plate.WorkArea(), clampKeepOuts);
+        if (placed.Count > 0)
+            workArea = LargestRemnant(plate, plate.WorkArea(), existingParts.Concat(placed), clampKeepOuts);
+
+        var packItems = items.Where(item => item.Quantity > 0).ToList();
+        if (
+            packItems.Count > 0
+            && workArea.Width > 0
+            && workArea.Length > 0
+            && !token.IsCancellationRequested
+        )
+            placed.AddRange(pack(workArea, packItems, null, token));
+
+        return placed;
+    }
+
+    private static Box LargestRemnant(
+        Plate plate,
+        Box area,
+        IEnumerable<Part> parts,
+        IReadOnlyList<Box> clampKeepOuts
+    )
+    {
+        var obstacles = parts.Select(part => part.BoundingBox.Offset(plate.PartSpacing)).ToList();
+        obstacles.AddRange(clampKeepOuts);
+        var remnants = new RemnantFinder(area, obstacles).FindRemnants();
+        return remnants.Count > 0 ? remnants[0] : new Box(0, 0, 0, 0);
     }
 
     private static List<Part> BetterWithClampHitsDropped(
@@ -167,12 +252,10 @@ internal static class PlateFillOrchestrator
         if (clampKeepOuts != null)
             obstacles.AddRange(clampKeepOuts);
         var finder = new RemnantFinder(fullWorkArea, obstacles);
+        var layout = new List<Part>(existingParts);
 
         foreach (var item in pairItems)
         {
-            if (item.Quantity < 2)
-                continue;
-
             var bestFits = BestFitCache.GetOrCompute(
                 item.Drawing,
                 plate.Size.Length,
@@ -182,65 +265,112 @@ internal static class PlateFillOrchestrator
 
             var canonicalDrawing = CanonicalFrame.AsCanonicalCopy(item.Drawing);
 
-            List<Part> bestPlacement = null;
-            Box bestTarget = null;
+            // A part free to rotate may lie along either sheet axis as a pair.
+            var turns = item.StepAngle == 0 && item.RotationStart == 0 && item.RotationEnd == 0
+                ? new[] { 0, Angle.HalfPI }
+                : new[] { 0.0 };
 
-            foreach (var fit in bestFits)
+            while (item.Quantity >= 2)
             {
-                if (!fit.Keep)
-                    continue;
+                List<Part> bestPlacement = null;
+                Box bestTarget = null;
 
-                var parts = fit.BuildParts(canonicalDrawing);
-                var pairBbox = ((IEnumerable<IBoundable>)parts).GetBoundingBox();
-                var pairWidth = pairBbox.Width;
-                var pairLength = pairBbox.Length;
-                var minDimension = System.Math.Min(pairWidth, pairLength);
-
-                var remnants = finder.FindRemnants(minDimension);
-
-                foreach (var remnant in remnants)
+                foreach (var fit in bestFits)
                 {
-                    if (
-                        pairWidth <= remnant.Width + Tolerance.Epsilon
-                        && pairLength <= remnant.Length + Tolerance.Epsilon
-                    )
-                    {
-                        var offset = remnant.Location - pairBbox.Location;
-                        foreach (var part in parts)
-                        {
-                            part.Offset(offset);
-                            part.UpdateBounds();
-                        }
+                    if (!fit.Keep)
+                        continue;
 
-                        if (bestPlacement == null || comparer.IsBetter(parts, bestPlacement, remnant))
+                    foreach (var turn in turns)
+                    {
+                        var probe = ((IEnumerable<IBoundable>)BuildPair(fit, canonicalDrawing, turn)).GetBoundingBox();
+                        var pairWidth = probe.Width;
+                        var pairLength = probe.Length;
+
+                        foreach (var remnant in finder.FindRemnants(System.Math.Min(pairWidth, pairLength)))
                         {
-                            bestPlacement = parts;
-                            bestTarget = remnant;
+                            if (
+                                pairWidth > remnant.Width + Tolerance.Epsilon
+                                || pairLength > remnant.Length + Tolerance.Epsilon
+                            )
+                                continue;
+
+                            var parts = BuildPair(fit, canonicalDrawing, turn);
+                            var offset = remnant.Location - probe.Location;
+                            foreach (var part in parts)
+                            {
+                                part.Offset(offset);
+                                part.UpdateBounds();
+                            }
+
+                            // Ranked with the layout around it: alone, a pair's own extent says
+                            // nothing about whether it stays inside the layout or lengthens it.
+                            if (
+                                bestPlacement == null
+                                || comparer.IsBetter(layout.Concat(parts).ToList(), layout.Concat(bestPlacement).ToList(), fullWorkArea)
+                            )
+                            {
+                                bestPlacement = parts;
+                                bestTarget = remnant;
+                            }
                         }
-                        break;
                     }
                 }
+
+                if (bestPlacement == null)
+                    break;
+
+                bestPlacement = CanonicalFrame.RebindToOriginal(bestPlacement, item.Drawing);
+                CompactPair(bestPlacement, layout, plate, fullWorkArea);
+
+                result.AddRange(bestPlacement);
+                layout.AddRange(bestPlacement);
+                item.Quantity -= 2;
+
+                var envelope = ((IEnumerable<IBoundable>)bestPlacement).GetBoundingBox();
+                finder.AddObstacle(envelope.Offset(plate.PartSpacing));
+
+                Debug.WriteLine(
+                    $"[Nest] Placed best-fit pair for {item.Drawing.Name} "
+                        + $"at ({bestTarget.X:F1},{bestTarget.Y:F1}), "
+                        + $"size {envelope.Width:F1}x{envelope.Length:F1}"
+                );
             }
-
-            if (bestPlacement == null)
-                continue;
-
-            bestPlacement = CanonicalFrame.RebindToOriginal(bestPlacement, item.Drawing);
-
-            result.AddRange(bestPlacement);
-            item.Quantity = 0;
-
-            var envelope = ((IEnumerable<IBoundable>)bestPlacement).GetBoundingBox();
-            finder.AddObstacle(envelope.Offset(plate.PartSpacing));
-
-            Debug.WriteLine(
-                $"[Nest] Placed best-fit pair for {item.Drawing.Name} "
-                    + $"at ({bestTarget.X:F1},{bestTarget.Y:F1}), "
-                    + $"size {envelope.Width:F1}x{envelope.Length:F1}"
-            );
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Slides a pair placed by its bounding box left then down against the true outlines around
+    /// it, so it takes the space its box could not. The whole-layout settle cannot: it moves
+    /// everything as one group. Clamp keep-outs stay walls, here at the part spacing.
+    /// </summary>
+    private static void CompactPair(List<Part> pair, List<Part> layout, Plate plate, Box workArea)
+    {
+        const double threshold = 0.01;
+        const int maxIterations = 20;
+
+        var obstacles = layout.Concat(plate.Parts).Concat(InteractiveClamps.ObstacleParts(plate)).ToList();
+
+        for (var i = 0; i < maxIterations; i++)
+        {
+            var moved = Compactor.Push(pair, obstacles, workArea, plate.PartSpacing, PushDirection.Left)
+                + Compactor.Push(pair, obstacles, workArea, plate.PartSpacing, PushDirection.Down);
+            if (moved < threshold)
+                break;
+        }
+    }
+
+    private static List<Part> BuildPair(BestFitResult fit, Drawing drawing, double turn)
+    {
+        var parts = fit.BuildParts(drawing);
+        if (turn != 0)
+            foreach (var part in parts)
+            {
+                part.Rotate(turn, new Vector());
+                part.UpdateBounds();
+            }
+        return parts;
     }
 
     private static bool ShouldFill(NestItem item, Plate plate, double plateArea)

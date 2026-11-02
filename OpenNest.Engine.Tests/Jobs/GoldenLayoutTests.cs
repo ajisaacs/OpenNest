@@ -170,17 +170,17 @@ public class GoldenLayoutTests
             MixedJob("Vertical Remnant")
         );
         Assert.Equal(NestJobStatus.Complete, result.Status);
-        // Coincides with Default on this job; pinned independently so strategy divergence
-        // after extraction is caught even where layouts agree today.
+        // Pairs-first leftovers beat pack-first here (26 long, not 28); pinned independently
+        // so strategy divergence after extraction is caught.
         AssertGolden(
             result,
             [
-                P("arc", 0, 20, 1, 1.5707963267948966),
-                P("arc", 1, 20, 7.5, 1.5707963267948966),
-                P("arc", 2, 20, 14, 1.5707963267948966),
-                P("lshape", 0, 19, 20.5, 1.5707963267948966),
-                P("lshape", 1, 24, 20.5, 1.5707963267948966),
-                P("lshape", 2, 25, 1, 1.5707963267948966),
+                P("arc", 0, 21, 1, 1.5707963267948966),
+                P("arc", 1, 21, 7.5, 1.5707963267948966),
+                P("arc", 2, 21, 14, 1.5707963267948966),
+                P("lshape", 0, 20, 20.5, 1.5707963267948966),
+                P("lshape", 1, 25, 20.5, 1.5707963267948966),
+                P("lshape", 2, 26, 1, 1.5707963267948966),
                 P("rect-a", 0, 5, 21, 1.5707963267948966),
                 P("rect-a", 1, 1, 1, 0),
                 P("rect-a", 2, 1, 6, 0),
@@ -189,12 +189,12 @@ public class GoldenLayoutTests
                 P("rect-a", 5, 10, 21, 1.5707963267948966),
                 P("rect-a", 6, 8, 1, 0),
                 P("rect-a", 7, 8, 6, 0),
-                P("rect-b", 0, 24, 8, 1.5707963267948966),
-                P("rect-b", 1, 24, 13, 1.5707963267948966),
-                P("rect-b", 2, 28, 8, 1.5707963267948966),
-                P("rect-b", 3, 28, 13, 1.5707963267948966),
-                P("rect-b", 4, 28, 18, 1.5707963267948966),
-                P("rect-b", 5, 28, 23, 1.5707963267948966),
+                P("rect-b", 0, 11, 11, 1.5707963267948966),
+                P("rect-b", 1, 11, 16, 1.5707963267948966),
+                P("rect-b", 2, 15, 11, 1.5707963267948966),
+                P("rect-b", 3, 15, 16, 1.5707963267948966),
+                P("rect-b", 4, 11, 21, 0),
+                P("rect-b", 5, 11, 25, 0),
             ]
         );
     }
