@@ -343,47 +343,41 @@ public class PlateOverlapOverlayTests
     });
 
     [Fact]
-    public void ClearPlateDrawsAGreenCheckInsteadOfTheLabelButStatusKeepsTheWords() => RunSta(() =>
+    public void ClearPlateDrawsNoLabelButStatusKeepsTheWords() => RunSta(() =>
     {
         using var run = new OverlayRun();
         run.View.Plate.Parts.RemoveAt(1);
         run.Finish();
-        Assert.True(run.View.OverlapOverlay.ShowsAllClear);
+        Assert.True(run.View.OverlapOverlay.ShowsNoLabel);
         Assert.Equal("No material overlaps detected", run.View.Status);
-        Assert.True(CheckIsDrawn(run));
+        Assert.True(CornerIsEmpty(run));
 
         run.View.Plate.Parts.Add(Rectangle(1));
         run.Finish();
-        Assert.False(run.View.OverlapOverlay.ShowsAllClear);
-        Assert.False(CheckIsDrawn(run));
+        Assert.False(run.View.OverlapOverlay.ShowsNoLabel);
+        Assert.False(CornerIsEmpty(run));
     });
 
     [Fact]
-    public void ClearPlateKeepsAGrayCheckWhileRechecking() => RunSta(() =>
+    public void ClearPlateStaysEmptyWhileRechecking() => RunSta(() =>
     {
         using var run = new OverlayRun();
         run.View.Plate.Parts.RemoveAt(1);
         run.EnableAutoCheck();
         var overlay = run.View.OverlapOverlay;
+        Assert.True(overlay.ShowsNoLabel); // Before the first result too.
         var task = run.AutoTick();
-        run.Next().Complete();
+        var work = run.Next();
+        Assert.True(overlay.ShowsNoLabel);
+        work.Complete();
         run.Pump(task);
-        Assert.True(overlay.ShowsAllClear);
+        Assert.True(overlay.ShowsNoLabel);
 
         run.View.Plate.Parts[0].Offset(1, 0);
         run.Paint();
         Assert.True(overlay.IsAutoCheckScheduled);
-        Assert.True(overlay.ShowsPendingCheck);
-        Assert.False(overlay.ShowsAllClear);
-        Assert.False(CheckIsDrawn(run)); // Gray, not green: this layout is unconfirmed.
-
-        task = run.AutoTick();
-        var work = run.Next();
-        Assert.True(overlay.ShowsPendingCheck);
-        work.Complete();
-        run.Pump(task);
-        Assert.False(overlay.ShowsPendingCheck);
-        Assert.True(overlay.ShowsAllClear);
+        Assert.True(overlay.ShowsNoLabel);
+        Assert.True(CornerIsEmpty(run));
     });
 
     [Fact]
@@ -397,37 +391,60 @@ public class PlateOverlapOverlayTests
 
         run.View.Plate.Parts[1].Offset(0.5, 0);
         run.Paint();
-        Assert.False(run.View.OverlapOverlay.ShowsPendingCheck);
-        Assert.False(run.View.OverlapOverlay.ShowsAllClear);
+        Assert.False(run.View.OverlapOverlay.ShowsNoLabel);
     });
 
-    [Fact]
-    public void StaleWithoutAutoCheckStillAsksForACheck() => RunSta(() =>
+    [Theory]
+    [InlineData("failed")]
+    [InlineData("canceled")]
+    public void FailedOrCanceledCheckIsNeverAnEmptyCorner(string outcome) => RunSta(() =>
     {
         using var run = new OverlayRun();
         run.View.Plate.Parts.RemoveAt(1);
+        run.EnableAutoCheck();
+        var task = run.AutoTick();
+        var work = run.Next();
+        if (outcome == "failed")
+            work.Fail();
+        else
+        {
+            run.View.CancelOverlapCheck();
+            work.Complete();
+        }
+        run.Pump(task);
+        run.Paint();
+        Assert.False(run.View.OverlapOverlay.ShowsNoLabel);
+    });
+
+    [Fact]
+    public void WithoutAutoCheckPendingStatesKeepTheirText() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.View.Plate.Parts.RemoveAt(1);
+        Assert.False(run.View.OverlapOverlay.ShowsNoLabel); // Not checked.
         run.Finish();
         run.View.Plate.Parts[0].Offset(1, 0);
         run.Paint();
         Assert.Equal(OverlapCheckStatus.Stale, run.View.OverlapStatus);
-        Assert.False(run.View.OverlapOverlay.ShowsPendingCheck);
-        Assert.False(run.View.OverlapOverlay.ShowsAllClear);
+        Assert.False(run.View.OverlapOverlay.ShowsNoLabel);
+        var task = run.Start();
+        var work = run.Next();
+        Assert.False(run.View.OverlapOverlay.ShowsNoLabel); // Checking.
+        work.Complete();
+        run.Pump(task);
     });
 
-    private static bool CheckIsDrawn(OverlayRun run)
+    private static bool CornerIsEmpty(OverlayRun run)
     {
         using var image = new Bitmap(64, 64);
         using var graphics = Graphics.FromImage(image);
         graphics.Clear(Color.White);
         run.View.OverlapOverlay.Draw(graphics);
         for (var x = 0; x < 64; x++)
-            for (var y = 0; y < 64; y++)
-            {
-                var pixel = image.GetPixel(x, y);
-                if (pixel.G > pixel.R + 60 && pixel.G > pixel.B + 40)
-                    return true;
-            }
-        return false;
+            for (var y = 0; y < 32; y++)
+                if (image.GetPixel(x, y).ToArgb() != Color.White.ToArgb())
+                    return false;
+        return true;
     }
 
     [Fact]

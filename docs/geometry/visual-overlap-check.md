@@ -29,11 +29,12 @@ Small positive areas use significant-figure formatting rather than rounding to
 zero. Selection and dragging remain ordinary plate operations, not overlay
 interactions.
 
-A current, fully checked report with no finding of any kind draws a green check in
-the corner instead of words; the status bar still uses the wording below. While a
-recheck is pending or running the corner stays quiet: a gray check after a clear
-result or when there is no result yet, or the last findings dimmed in gray, neither
-of which says anything about the edited layout. Every
+A current, fully checked report with no finding of any kind leaves the corner empty;
+the status bar still uses the wording below. In a nest window the corner also stays
+empty while a recheck is pending or running after a clear result or before the first,
+and earlier findings stay dimmed in gray, which says nothing about the edited layout.
+Failed, canceled and incomplete checks always show text, and hosts without automatic
+rechecks keep their pending text, so an empty corner there is a finished clear check. Every
 other state keeps a persistent label, which distinguishes unchecked, checking,
 current with findings, incomplete, stale,
 canceled, and failed checks. Only a completed, current, fully checked report can

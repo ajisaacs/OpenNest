@@ -80,13 +80,16 @@ internal sealed class OverlapOverlayController : IDisposable
         ? "Overlaps: check pending…"
         : state.Message;
 
-    /// <summary>The canvas shows a green check instead of the label: a pending recheck is not clear.</summary>
-    internal bool ShowsAllClear => state.IsAllClear && !IsSettling;
+    /// <summary>
+    /// The corner stays empty unless something is wrong: on a clear result, and while an
+    /// automatic recheck settles after one or before the first. Views without automatic rechecks
+    /// keep their pending text, because nothing will arrive unless the user asks.
+    /// </summary>
+    internal bool ShowsNoLabel => IsSettling
+        ? state.SettledMessage == null || state.SettledClear
+        : state.IsAllClear;
 
-    /// <summary>A gray check while a recheck settles: unconfirmed, and steady in the corner.</summary>
-    internal bool ShowsPendingCheck => IsSettling && (state.SettledMessage == null || state.SettledClear);
-
-    private bool IsSettling => autoCheck.IsWaiting || state.IsRunning;
+    private bool IsSettling => autoCheckUnits != null && (autoCheck.IsWaiting || state.IsRunning);
 
     /// <summary>
     /// Recheck automatically after layout edits settle. Units are read when each request
@@ -687,41 +690,14 @@ internal sealed class OverlapOverlayController : IDisposable
         }
     }
 
-    // Same corner as the label; Message keeps the words for the status bar.
-    private void DrawCheck(Graphics graphics, Color color)
-    {
-        var scale = view.DeviceDpi / 96f;
-        var box = 24 * scale;
-        using var background = new SolidBrush(Color.FromArgb(235, Color.White));
-        graphics.FillRectangle(background, 6, 6, box, box);
-        using var pen = new Pen(color, 3 * scale)
-        {
-            StartCap = LineCap.Round,
-            EndCap = LineCap.Round,
-            LineJoin = LineJoin.Round,
-        };
-        var smoothing = graphics.SmoothingMode;
-        graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        graphics.DrawLines(pen, new[]
-        {
-            new PointF(6 + 5 * scale, 6 + 13 * scale),
-            new PointF(6 + 10 * scale, 6 + 18 * scale),
-            new PointF(6 + 19 * scale, 6 + 7 * scale),
-        });
-        graphics.SmoothingMode = smoothing;
-    }
-
     private void DrawStateLabel(Graphics graphics)
     {
         var saved = graphics.Save();
         try
         {
             graphics.ResetTransform();
-            if (ShowsAllClear || ShowsPendingCheck)
-            {
-                DrawCheck(graphics, ShowsAllClear ? Color.FromArgb(0, 140, 60) : Color.FromArgb(150, 150, 150));
+            if (ShowsNoLabel)
                 return;
-            }
             // While settling, the last findings stay put, dimmed, instead of status text flickering.
             var settling = IsSettling;
             var text = (settling ? state.SettledMessage : Message)
