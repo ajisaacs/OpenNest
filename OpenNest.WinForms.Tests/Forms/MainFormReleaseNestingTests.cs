@@ -111,8 +111,14 @@ public class MainFormReleaseNestingTests
             && p.StockItemCodes.Count == 0);
         Assert.Equal(2, nest.Plates.Sum(p => p.Parts.Count * p.Quantity));
         Assert.Equal("B3", tab.LedgerLocations["S-1"]);
-        // Each stage is its own Auto Nest step in the tab.
+        // Each stage is its own Auto Nest step in the tab, and its codes are part of that step.
         Assert.Equal(2, tab.History.UndoCount);
+        tab.Undo();
+        tab.Undo();
+        tab.Redo();
+        tab.Redo();
+        var redone = Assert.Single(tab.Nest.Plates, p => p.StockItemCodes.Count > 0);
+        Assert.Equal("S-1", Assert.Single(redone.StockItemCodes));
         host.End(null!);
         Application.DoEvents();
     }, TestTimeout, "The live release ledger test did not complete.");

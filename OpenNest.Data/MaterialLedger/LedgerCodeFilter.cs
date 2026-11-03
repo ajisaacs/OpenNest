@@ -20,13 +20,41 @@ public static class LedgerCodeFilter
         ArgumentNullException.ThrowIfNull(rows);
         ArgumentNullException.ThrowIfNull(codesInUse);
         var exclude = codesInUse as IReadOnlySet<string> ?? codesInUse.ToHashSet(StringComparer.Ordinal);
+        return Rebuild(rows, exclude.Contains, out removed);
+    }
+
+    /// <summary>
+    /// <paramref name="rows"/> with only <paramref name="copies"/> of each code taken out, in
+    /// row and ledger order: a bundle whose one code repeats per sheet loses as many sheets
+    /// as were taken, not the whole bundle. Otherwise as
+    /// <see cref="Exclude(IEnumerable{LedgerStockRow}, IEnumerable{string}, out int)"/>.
+    /// </summary>
+    public static IReadOnlyList<LedgerStockRow> ExcludeCopies(IEnumerable<LedgerStockRow> rows,
+        IReadOnlyDictionary<string, int> copies, out int removed)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        ArgumentNullException.ThrowIfNull(copies);
+        var left = new Dictionary<string, int>(copies, StringComparer.Ordinal);
+        return Rebuild(rows, code =>
+        {
+            if (!left.TryGetValue(code, out var count) || count <= 0)
+                return false;
+            left[code] = count - 1;
+            return true;
+        }, out removed);
+    }
+
+    // takeOut is asked once per copy, in row order and the ledger order within a row.
+    private static IReadOnlyList<LedgerStockRow> Rebuild(IEnumerable<LedgerStockRow> rows,
+        Func<string, bool> takeOut, out int removed)
+    {
         removed = 0;
         var kept = new List<LedgerStockRow>();
         foreach (var row in rows)
         {
             if (row == null)
                 continue;
-            var codes = row.ItemCodes.Where(code => !exclude.Contains(code)).ToList();
+            var codes = row.ItemCodes.Where(code => !takeOut(code)).ToList();
             var dropped = row.ItemCodes.Count - codes.Count;
             if (dropped == 0)
             {
@@ -37,8 +65,9 @@ public static class LedgerCodeFilter
             if (codes.Count == 0)
                 continue;
 
+            var left = codes.ToHashSet(StringComparer.Ordinal);
             var itemLocations = row.ItemLocations
-                .Where(pair => !exclude.Contains(pair.Key))
+                .Where(pair => left.Contains(pair.Key) || !row.ItemCodes.Contains(pair.Key))
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
             // A location stays listed while an item left in the row is there, or when the row
             // never said which item it held.

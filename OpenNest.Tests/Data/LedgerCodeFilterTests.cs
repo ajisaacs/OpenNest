@@ -142,6 +142,23 @@ public class LedgerCodeFilterTests
     internal static NestStockCodeUse Use(string code, string nest) =>
         new() { ItemCode = code, NestId = Guid.NewGuid(), NestName = nest, Status = NestStatus.Quote };
 
+    [Fact]
+    public void ExcludeCopies_TakesOnlyTheCopiesTaken_InLedgerOrder()
+    {
+        var bundle = Row("ledger:1", ["B-1", "B-1", "B-1"], ("B-1", "R1"));
+        var drops = Row("ledger:2", ["D-1", "D-2"], ("D-1", "R1"), ("D-2", "R2"));
+
+        var taken = new Dictionary<string, int> { ["B-1"] = 2, ["D-2"] = 1, ["UNRELATED"] = 1 };
+
+        var rows = LedgerCodeFilter.ExcludeCopies([bundle, drops], taken, out var removed);
+
+        Assert.Equal(3, removed);
+        Assert.Equal((1, "B-1"), (rows[0].Quantity, Assert.Single(rows[0].ItemCodes)));
+        Assert.Equal("R1", rows[0].ItemLocations["B-1"]);
+        Assert.Equal(["D-1"], rows[1].ItemCodes);
+        Assert.Equal(["R1"], rows[1].Locations);
+    }
+
     private static LedgerStockRow Row(string id, string[] codes, params (string Code, string Location)[] locations) =>
         new(id, new Size(48, 96), codes.Length, IsDrop: codes.Distinct().Count() > 1, IsIrregular: false, codes,
             locations.Select(l => l.Location).Distinct().ToList())

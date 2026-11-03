@@ -24,6 +24,12 @@ public sealed record NestRenestResult(
     /// </summary>
     public IReadOnlyList<(Plate Plate, string StockId)> Committed { get; init; } =
         Array.Empty<(Plate Plate, string StockId)>();
+
+    /// <summary>
+    /// True when a staged run's first stock got a layout that was not valid or not keepable,
+    /// so none of it was used (<see cref="NestRenest.RunStagedAsync"/>).
+    /// </summary>
+    public bool FirstStockNotKept { get; init; }
 }
 
 /// <summary>
@@ -57,16 +63,7 @@ public static class NestRenest
     /// </param>
     public static NestRenestResult Run(Nest nest, INestingEngine engine, string engineName,
         double minimumSalvageDimension = 0, IProgress<NestJobProgress> progress = null,
-        CancellationToken token = default) =>
-        Run(nest, engine, engineName, null, minimumSalvageDimension, progress, token);
-
-    /// <param name="firstStock">
-    /// Sheets offered before the plate defaults (see <see cref="RunStagedAsync"/>); null or
-    /// empty nests on the plate defaults alone.
-    /// </param>
-    public static NestRenestResult Run(Nest nest, INestingEngine engine, string engineName,
-        IReadOnlyList<PlateOption> firstStock, double minimumSalvageDimension = 0,
-        IProgress<NestJobProgress> progress = null, CancellationToken token = default)
+        CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(nest);
         ArgumentNullException.ThrowIfNull(engine);
@@ -75,7 +72,7 @@ public static class NestRenest
         nest.Plates.Clear();
         nest.UpdateDrawingQuantities();
         // Solved synchronously: the returned task has already completed.
-        return RunStagedAsync(nest, engineName, firstStock, minimumSalvageDimension,
+        return RunStagedAsync(nest, engineName, null, minimumSalvageDimension,
                 request => Task.FromResult(
                     NestPipeline.Run(engine, engineName, request, progress, token)),
                 kept => NestPipelineCommit.ApplyToPlates(kept, nest.CreatePlate, token: token),
@@ -89,8 +86,11 @@ public static class NestRenest
     /// (finite sheets such as MaterialLedger stock, so they are used before anything else),
     /// then whatever is left on the plate defaults and plate-size options. A stage whose layout
     /// is not valid and keepable commits nothing, so its copies fall to the next stage or stay
-    /// remaining. <paramref name="solve"/> runs a request; <paramref name="commit"/> attaches a
-    /// kept result's sheets to the nest on the nest's own thread and returns them.
+    /// remaining, listed as unplaced when no later stage takes them. <paramref name="solve"/>
+    /// runs a request; <paramref name="commit"/> attaches a kept result's sheets to the nest's
+    /// plates on the nest's own thread and returns them. Attaching the parts counts them as
+    /// nested, which is how the next stage asks only for the rest. Each stage may use up to
+    /// <see cref="MaxPlates"/> sheets.
     /// </summary>
     public static async Task<NestRenestResult> RunStagedAsync(Nest nest, string engineName,
         IReadOnlyList<PlateOption> firstStock, double minimumSalvageDimension,
@@ -106,6 +106,7 @@ public static class NestRenest
         var committed = new List<(Plate Plate, string StockId)>();
         IReadOnlyList<NestUnplacedPart> unplaced = Array.Empty<NestUnplacedPart>();
         var anyRequest = false;
+        var firstStockNotKept = false;
         var stages = firstStock is { Count: > 0 }
             ? new[] { firstStock, null }
             : new IReadOnlyList<PlateOption>[] { null };
@@ -121,8 +122,15 @@ public static class NestRenest
             token.ThrowIfCancellationRequested();
             unplaced = result.Unplaced;
             if (!IsKeepable(result))
+            {
+                if (!result.IsValid || !result.CanKeep)
+                {
+                    // Every copy this stage asked for is left, not just what its layout missed.
+                    unplaced = NotKept(request);
+                    firstStockNotKept |= stock != null;
+                }
                 continue;
-            // Attaching parts counts them as nested, so the next stage asks only for the rest.
+            }
             var plates = commit(result);
             committed.AddRange(StockIds(result, plates));
             applied.AddRange(plates);
@@ -132,8 +140,15 @@ public static class NestRenest
             return new NestRenestResult(false, 0, 0, Array.Empty<NestUnplacedPart>(),
                 NothingToNestNote);
         if (applied.Count == 0)
-            return new NestRenestResult(false, 0, 0, unplaced, NotKeptNote);
-        return Summarize(applied, unplaced) with { Committed = committed };
+            return new NestRenestResult(false, 0, 0, unplaced, NotKeptNote)
+            {
+                FirstStockNotKept = firstStockNotKept,
+            };
+        return Summarize(applied, unplaced) with
+        {
+            Committed = committed,
+            FirstStockNotKept = firstStockNotKept,
+        };
     }
 
     /// <summary>
@@ -195,6 +210,12 @@ public static class NestRenest
         IReadOnlyList<Plate> applied) =>
         NestPipelineCommit.PairWithStock(result, applied)
             .Select(p => (p.Plate, p.Stock.Id))
+            .ToList();
+
+    private static IReadOnlyList<NestUnplacedPart> NotKept(NestPipelineRequest request) =>
+        request.Items
+            .Select(item => new NestUnplacedPart(item.Drawing.Name, item.Drawing, item.Quantity,
+                NestUnplacedReason.ProposalNotKeepable))
             .ToList();
 
     private static bool IsKeepable(NestPipelineResult result) =>

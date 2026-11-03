@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Data.MaterialLedger;
+using OpenNest.Desktop;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Jobs;
 using OpenNest.Forms;
@@ -1161,22 +1162,12 @@ namespace OpenNest.Controls
             var engineName = EngineSelection.EngineName;
             return Task.Run(async () =>
             {
-                var offer = ledger == null ? null : await ledger.OfferAsync(nest, token);
-                var renested = NestRenest.Run(nest, NestingEngineRegistry.Create(engineName),
-                    engineName, offer?.Options, AutoNestForm.DefaultMinRemnantSize, token: token);
-                var ledgerNote = offer == null
-                    ? null
-                    : ledger.Assign(nest, offer, renested.Committed);
-                return new SetReleaseRenest(renested.Nested,
-                    ReleaseNote(renested.Note, ledgerNote));
+                var renested = await ReleaseRenest.RunHeadlessAsync(nest, ledger,
+                    NestingEngineRegistry.Create(engineName), engineName,
+                    AutoNestForm.DefaultMinRemnantSize, token);
+                return new SetReleaseRenest(renested.Nested, renested.Note);
             }, token);
         }
-
-        /// <summary>
-        /// The note a released nest shows: Auto Nest's, then what MaterialLedger stock it used.
-        /// </summary>
-        internal static string ReleaseNote(string renestNote, string ledgerNote) =>
-            string.Join(" ", new[] { renestNote, ledgerNote }.Where(n => !string.IsNullOrEmpty(n)));
 
         private static LibraryPackage ReadPackage(byte[] bytes)
         {

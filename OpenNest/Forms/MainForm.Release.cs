@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Data;
 using OpenNest.Data.MaterialLedger;
+using OpenNest.Desktop;
 using OpenNest.Engine.Jobs;
 using OpenNest.Forms.Commands;
 
@@ -54,26 +55,27 @@ namespace OpenNest.Forms
             if (tab.PlateManager.CanClearAll)
                 tab.ClearNest();
             nest.UpdateDrawingQuantities();
-            var offer = ledger == null ? null : await ledger.OfferAsync(nest, token);
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            // As for Auto Nest, switching tabs while it runs stops it.
+            // As for Auto Nest, switching tabs while it runs (or reads the ledger) stops it.
             nestingCts = cts;
-            NestRenestResult renested;
+            ReleaseRenestResult renested;
             try
             {
-                // Ledger stock first, then the plate defaults: each stage is its own Auto Nest run.
+                // Ledger stock first, then the plate defaults: each stage is its own Auto Nest
+                // run and undo step, with its ledger codes recorded in that step.
                 var solve = SolveReleasedNest
                     ?? ((t, r, c) => AutoNestCommand.SolveAsync(this, t, r, c));
-                renested = await NestRenest.RunStagedAsync(nest, EngineSelection.EngineName,
-                    offer?.Options, AutoNestForm.DefaultMinRemnantSize,
+                renested = await ReleaseRenest.RunAsync(nest, ledger, EngineSelection.EngineName,
+                    AutoNestForm.DefaultMinRemnantSize,
                     request => solve(tab, request, cts),
-                    r =>
+                    (r, finish) =>
                     {
                         using var change = tab.BeginChange("Auto Nest");
                         change.MarkChanged();
                         var applied = NestPipelineCommit.ApplyToEmptyPlates(r, tab.PlateManager,
                             token: cts.Token);
+                        finish(applied);
                         change.Complete();
                         return applied;
                     }, cts.Token);
@@ -83,20 +85,15 @@ namespace OpenNest.Forms
                 nestingCts = null;
             }
 
-            var ledgerNote = offer == null ? null : ledger.Assign(nest, offer, renested.Committed);
-            foreach (var row in offer?.Rows ?? Array.Empty<LedgerStockRow>())
-            {
-                foreach (var (code, location) in row.ItemLocations)
-                    tab.LedgerLocations[code] = location;
-            }
+            foreach (var (code, location) in renested.LedgerLocations)
+                tab.LedgerLocations[code] = location;
             if (renested.Nested)
             {
                 tab.UpdatePlateList();
                 tab.PlateManager.LoadFirst();
             }
             tab.PlateView.ZoomToFit();
-            return new SetReleaseRenest(renested.Nested,
-                ReleasePanel.ReleaseNote(renested.Note, ledgerNote));
+            return new SetReleaseRenest(renested.Nested, renested.Note);
         }
 
         void IReleaseNestingHost.End(SetReleaseResult result)
