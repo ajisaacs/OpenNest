@@ -1163,9 +1163,11 @@ Runtime contract:
   database stays `OPENNEST_DB=/app/data/nests.db`, and the
   [update feed mirror](#update-feed-mirror) caches packages in `/app/data/updates`. The server also needs the
   container's writable `/tmp`: multipart uploads over 64 KiB are buffered there.
-- `HEALTHCHECK` runs `curl --fail http://127.0.0.1:8090/healthz` (interval 30 s,
-  timeout 5 s, start period 10 s, retries 3, and a 2 s start interval during the
-  start period on Docker 25+). curl is in the image only for it.
+- `HEALTHCHECK` runs `/app/healthcheck.sh` (interval 30 s, timeout 5 s, start
+  period 10 s, retries 3, and a 2 s start interval during the start period on
+  Docker 25+). For the server role it runs
+  `curl --fail http://127.0.0.1:8090/healthz`; for the worker role see
+  [server nesting](server-nesting.md). curl is in the image only for it.
 - A read-only or unwritable data location fails startup: the process exits
   rather than serving requests it cannot store.
 - Uploads: Kestrel's default 30,000,000-byte request limit covers the whole

@@ -176,7 +176,7 @@ healthcheck=$(docker_local image inspect --format '{{.Config.Healthcheck.Test}} 
 labels=$(docker_local image inspect --format '{{index .Config.Labels "org.opencontainers.image.source"}} {{index .Config.Labels "org.opencontainers.image.version"}} {{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")
 printf 'user=%s\nhealthcheck=%s\nsource/version/revision=%s\n' "$image_user" "$healthcheck" "$labels" >> "$run_results/image.log"
 [[ "$image_user" =~ ^[1-9][0-9]*$ ]] || fail 'Image must declare a numeric non-root USER.'
-[[ "$healthcheck" == '[CMD curl --fail --silent --show-error http://127.0.0.1:8090/healthz] 30s 5s 10s 2s 3' ]] \
+[[ "$healthcheck" == '[CMD /app/healthcheck.sh] 30s 5s 10s 2s 3' ]] \
     || fail 'Image HEALTHCHECK does not match the documented probe.'
 [[ "$labels" == 'https://github.com/ajisaacs/OpenNest '?*' '?* ]] || fail 'Image OCI source/version/revision labels are missing.'
 
