@@ -245,7 +245,9 @@ crossed the part cut just before the one it left from, and no other part, the to
 past that part and came back across it, so the search learns "cut those two the other way round"
 instead: the tool then leaves from the nearer one, as with two stacked strips cut far
 one first. An approach that crosses other parts too would still cross them after the swap,
-so it teaches "cut this part before those". When the part
+so it teaches "cut this part before those". A swap is a guess: when the search later
+stalls with nothing new to learn, it takes back the newest swap, learns "cut this part
+before those" from the attempt that taught it, and backs up from there. When the part
 cannot come earlier (a sheet separator is cut after everything), it learns the other
 way round, "cut the part the approach left from before those", so the tool arrives
 from beyond them. The first pass

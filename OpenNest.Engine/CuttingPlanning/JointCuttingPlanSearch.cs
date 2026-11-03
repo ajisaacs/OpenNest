@@ -120,6 +120,10 @@ internal static class JointCuttingPlanSearch
                     ? CuttingGridOrder.Plan(extents, snapshot.StartPoint, token) : null)
                 ?? CuttingNestedOrder.Plan(planned, snapshot.StartPoint, nesting);
             Node resume = null;
+            // Swaps learned so far, newest last, and swaps taken back: a swap is a guess, and a
+            // stall after it can mean the swapped pair is what blocks now.
+            var swaps = new List<(Attempt Attempt, int[] Sequence, int First, int Then)>();
+            var revoked = new HashSet<(int, int)>();
             while (true)
             {
                 // A pass that teaches an order rule ends the round: the heavier passes would
@@ -132,10 +136,24 @@ internal static class JointCuttingPlanSearch
                     var pass = walk.Follow(sequence, stall, resume, preferredOnly, contourRecovery, prerequisites);
                     if (pass.Order != null)
                         return walk.Ready(pass.Order);
-                    if (Learn(pass, prerequisites))
+                    if (Learn(pass, sequence, prerequisites, revoked, swaps))
                     {
                         attempt = pass;
                         break;
+                    }
+                }
+                // Nothing new to learn after a swap: take back the newest swap and learn the plain
+                // rule its attempt would have taught instead, backing up from that attempt.
+                while (attempt == null && swaps.Count != 0)
+                {
+                    var (swapped, swappedSequence, first, then) = swaps[^1];
+                    swaps.RemoveAt(swaps.Count - 1);
+                    prerequisites[then].Remove(first);
+                    revoked.Add((first, then));
+                    if (Learn(swapped, swappedSequence, prerequisites, revoked, swaps))
+                    {
+                        attempt = swapped;
+                        sequence = swappedSequence;
                     }
                 }
                 if (attempt == null)
@@ -223,8 +241,18 @@ internal static class JointCuttingPlanSearch
     // is cut after everything), the blocked part cannot come earlier, so the tool must arrive
     // from beyond those parts instead: "cut the part it left from before them". False when
     // nothing new was learned.
-    private static bool Learn(Attempt attempt, HashSet<int>[] prerequisites)
+    // A swap is recorded in 'swaps' so a later stall can take it back; swaps in 'revoked' are
+    // never learned again.
+    private static bool Learn(Attempt attempt, int[] sequence, HashSet<int>[] prerequisites,
+        HashSet<(int, int)> revoked,
+        List<(Attempt Attempt, int[] Sequence, int First, int Then)> swaps)
     {
+        if (Swap(attempt, prerequisites, revoked) is var (last, previous))
+        {
+            prerequisites[previous].Add(last);
+            swaps.Add((attempt, sequence, last, previous));
+            return true;
+        }
         var rules = Rules(attempt, prerequisites).ToArray();
         foreach (var (first, then) in rules)
             prerequisites[then].Add(first);
@@ -233,18 +261,24 @@ internal static class JointCuttingPlanSearch
 
     // True when a crossing of the blocked part's approach would teach a new order rule.
     private static bool CanLearn(Attempt attempt, HashSet<int>[] prerequisites) =>
-        Rules(attempt, prerequisites).Any();
+        Swap(attempt, prerequisites, []) != null || Rules(attempt, prerequisites).Any();
 
-    // The rules Learn would add, as (cut first, cut then) pairs.
+    // The swap Learn would try first, as (cut first, cut then), unless it was taken back.
+    private static (int First, int Then)? Swap(Attempt attempt, HashSet<int>[] prerequisites,
+        HashSet<(int, int)> revoked) =>
+        attempt.Blocked is int && attempt.LastCut?.SourceOrdinal is int last
+            && attempt.CutBeforeLast?.SourceOrdinal is int previous
+            && attempt.Crossed.Contains(previous)
+            && attempt.Crossed.All(crossed => crossed == previous || crossed == last)
+            && !prerequisites[previous].Contains(last)
+            && !Precedes(previous, last, prerequisites) && !revoked.Contains((last, previous))
+            ? (last, previous) : null;
+
+    // The plain rules Learn adds when there is no swap to try, as (cut first, cut then) pairs.
     private static IEnumerable<(int First, int Then)> Rules(Attempt attempt, HashSet<int>[] prerequisites)
     {
         if (attempt.Blocked is not int blocked)
             return [];
-        if (attempt.LastCut?.SourceOrdinal is int last && attempt.CutBeforeLast?.SourceOrdinal is int previous
-            && attempt.Crossed.Contains(previous) && attempt.Crossed.All(crossed => crossed == previous || crossed == last)
-            && !prerequisites[previous].Contains(last)
-            && !Precedes(previous, last, prerequisites))
-            return [(last, previous)];
         var before = New(blocked);
         return before.Length != 0 || attempt.LastCut?.SourceOrdinal is not int departed ? before : New(departed);
 
