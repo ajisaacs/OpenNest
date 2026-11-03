@@ -136,11 +136,13 @@ namespace OpenNest.Forms.Commands
                     renamed = chosen != originalName;
                     form.Nest.Name = chosen;
                 }
+                // The save marks the history's current state saved, so it must include every edit.
+                form.RecordUnrecordedChange();
                 var saved = await form.Document.SaveToDatabaseAsync(
                     repository, serverUrl, saveCopy);
                 if (!form.IsDisposed)
                 {
-                    form.Text = form.Document.Name;
+                    form.UpdateTitle();
                     _ = form.HoldStatus.RefreshAfterSaveAsync();
                 }
                 if (!owner.IsDisposed)

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Engine.BestFit;
@@ -230,8 +231,14 @@ namespace OpenNest.Forms
 
         private async void Save_Click(object sender, EventArgs e)
         {
-            var form = activeForm;
-            if (form == null || storage.IsSaving || RefuseSaveDuringRelease(form))
+            if (activeForm != null)
+                await SaveNestAsync(activeForm);
+        }
+
+        /// <summary>Saves <paramref name="form"/>'s nest to the nest storage in use.</summary>
+        internal async Task SaveNestAsync(EditNestForm form)
+        {
+            if (storage.IsSaving || RefuseSaveDuringRelease(form))
                 return;
             if (NestStorage.Settings.Mode == NestStorageMode.File)
                 form.Save();

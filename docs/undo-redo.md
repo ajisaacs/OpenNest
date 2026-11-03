@@ -48,6 +48,10 @@ Deliberately excluded:
 
 A save does not clear the history; it marks a save point (`UndoHistory.MarkSaved`,
 `IsAtSavePoint`). A database save marks it only when no edit was recorded while it ran.
+A save first commits any edit no scope recorded, so the point covers what was written.
+`EditNestForm.HasUnsavedChanges` is true off the save point or while such an edit is pending:
+the window title then ends in ` *`, and closing asks Save, Don't Save or Cancel. Yes saves to
+the storage in use; a database save cancels the close and closes the window once it succeeds.
 
 ## Recording rule
 

@@ -98,10 +98,22 @@ namespace OpenNest.Forms
             RestoreNest(restored);
         }
 
+        /// <summary>
+        /// True when the nest differs from the state last saved (or opened): the history has
+        /// moved off its save point, or an edit no scope recorded is pending.
+        /// </summary>
+        public bool HasUnsavedChanges =>
+            History.Current != null
+            && (!History.IsAtSavePoint || NestFingerprint.Compute(Nest) != recordedFingerprint);
+
+        /// <summary>Shows the nest's name, marked with an asterisk while it has unsaved changes.</summary>
+        internal void UpdateTitle() => Text = HasUnsavedChanges ? $"{Nest.Name} *" : Nest.Name;
+
         private void InitializeHistory()
         {
             History.Reset(new NestUndoState(NestSnapshot.Capture(Nest)));
             recordedFingerprint = NestFingerprint.Compute(Nest);
+            History.Changed += (_, _) => UpdateTitle();
 #if DEBUG
             Application.Idle += CheckForUnrecordedChange;
             FormClosed += (_, _) => Application.Idle -= CheckForUnrecordedChange;
@@ -123,13 +135,15 @@ namespace OpenNest.Forms
         {
             History.Commit(label, new NestUndoState(NestSnapshot.Capture(Nest)), coalesceKey);
             recordedFingerprint = NestFingerprint.Compute(Nest);
+            UpdateTitle();
         }
 
         /// <summary>
         /// Commits an edit no scope recorded as its own entry, so a rollback, Undo or Redo
-        /// does not silently discard it. Detected by fingerprint, so best effort.
+        /// does not silently discard it, and a save marks it saved. Detected by fingerprint, so
+        /// best effort.
         /// </summary>
-        private void RecordUnrecordedChange()
+        internal void RecordUnrecordedChange()
         {
             if (History.Current != null && NestFingerprint.Compute(Nest) != recordedFingerprint)
                 Commit("Change", null);
@@ -210,6 +224,7 @@ namespace OpenNest.Forms
             }
 
             recordedFingerprint = NestFingerprint.Compute(Nest);
+            UpdateTitle();
             NestRestored?.Invoke(this, EventArgs.Empty);
         }
 

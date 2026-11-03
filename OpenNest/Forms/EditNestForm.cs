@@ -500,7 +500,7 @@ namespace OpenNest.Forms
             UpdateDrawingList();
             UpdateRemovePlateButton();
 
-            Text = Nest.Name;
+            UpdateTitle();
             drawingListBox1.Units = Nest.Units;
             drawingListBox1.Plate = PlateManager.CurrentPlate;
         }
@@ -599,6 +599,8 @@ namespace OpenNest.Forms
 
         public void SaveAs(string path)
         {
+            // The save marks the history's current state saved, so it must include every edit.
+            RecordUnrecordedChange();
             try
             {
                 Document.SaveAs(path);
@@ -610,7 +612,7 @@ namespace OpenNest.Forms
                     "Save Nest", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-            Text = Document.Name;
+            UpdateTitle();
         }
 
         public void Import()
@@ -874,7 +876,7 @@ namespace OpenNest.Forms
                 }
                 if (form.UseForNewNests)
                     MachineSettings.SaveNestDefaults(this, NestDefaults.FromNest(Nest), Nest.Machine);
-                Text = Nest.Name;
+                UpdateTitle();
                 drawingListBox1.Units = Nest.Units;
                 drawingListBox1.Invalidate();
                 if (statusBefore != NestStatus.HasBeenCut && Nest.Status == NestStatus.HasBeenCut)
@@ -1252,13 +1254,65 @@ namespace OpenNest.Forms
                 }
             }
             base.OnClosing(e);
+            if (!e.Cancel && !ConfirmCloseWithUnsavedChanges())
+                e.Cancel = true;
+        }
 
+        /// <summary>
+        /// Asks whether to save the nest's unsaved changes before closing (Yes, No or Cancel);
+        /// tests replace it so a closing window never waits on a message box.
+        /// </summary>
+        internal static Func<EditNestForm, DialogResult> UnsavedChangesPrompt = form =>
+            MessageBox.Show(form, $"Save changes to '{form.Nest.Name}' before closing?",
+                "Unsaved Changes", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+
+        // Whether the window may close now. A save that has to wait on the nest server cancels
+        // this close and closes the window once the nest is saved.
+        private bool ConfirmCloseWithUnsavedChanges()
+        {
+            if (!HasUnsavedChanges)
+                return true;
+            switch (UnsavedChangesPrompt(this))
+            {
+                case DialogResult.No:
+                    return true;
+                case DialogResult.Yes:
+                    var save = SaveChangesAsync();
+                    if (save.IsCompleted)
+                        return !HasUnsavedChanges;
+                    _ = CloseWhenSavedAsync(save);
+                    return false;
+                default:
+                    return false;
+            }
+        }
+
+        // The main window saves to the nest storage in use; a window without one saves to a file.
+        private Task SaveChangesAsync()
+        {
+            if (MdiParent is MainForm main)
+                return main.SaveNestAsync(this);
+            Save();
+            return Task.CompletedTask;
+        }
+
+        private async Task CloseWhenSavedAsync(Task save)
+        {
+            await save;
+            if (!IsDisposed && !HasUnsavedChanges)
+                Close();
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            // Released here, not while closing: another window can still cancel closing the app.
             PlateManager.Dispose();
 
             Settings.Default.PlateViewDrawBounds = PlateView.DrawBounds;
             Settings.Default.PlateViewDrawRapid = PlateView.DrawRapid;
             Settings.Default.SplitterDistance = splitContainer.SplitterDistance;
             Settings.Default.Save();
+            base.OnFormClosed(e);
         }
 
         protected override void OnResize(EventArgs e)
