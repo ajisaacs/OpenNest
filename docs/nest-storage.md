@@ -716,16 +716,25 @@ every drawing's required quantity with the selected engine, in two steps:
    grade and thickness, substitute grades included
    (`OpenNest.Data.MaterialLedger.ReleaseLedgerStock`). Sheets coded on other open
    server nests are left out, and so are sheets an earlier group of the same Make
-   Nests took (those nests are not on the server until the release uploads them).
-   The sheets this step uses get their ledger codes, as Auto Nest gives them.
+   Nests took (those nests are not on the server until the release uploads them;
+   a bundle loses only the sheets taken). The sheets this step uses get their
+   ledger codes inside its Auto Nest undo step, as Auto Nest gives them
+   (`OpenNest.Desktop.ReleaseRenest`). A draft being merged into is renested from
+   scratch, but the codes it was saved with still count as on another nest, so
+   its own earlier sheets are not offered again.
 2. **Then the plate defaults.** Copies the ledger stock cannot hold are nested on
    the nest's plate defaults (Tools > Nest Defaults) and plate-size options.
    These sheets have no ledger code.
 
-When the ledger is not set up on the PC, cannot be reached, rejects the API key,
-has no mapping for the material or has no free stock of it, the group goes
-straight to step 2 and its note says "MaterialLedger not used: " and why.
-Otherwise the note says how many sheets came from MaterialLedger stock.
+When the nest has no material or thickness, or the ledger is not set up on the
+PC, cannot be reached, rejects the API key, has no mapping for the material or
+has no usable stock of it (the note counts what was left out: on other nests,
+taken by earlier nests of this release, too small for any part), the group goes
+straight to step 2 and its note says "MaterialLedger not used: " and why. So
+does a step 1 whose layout Auto Nest cannot keep. Otherwise the note says how
+many sheets came from MaterialLedger stock, and adds "Codes on other nests were
+not checked" with the reason when the nest server could not list them. The
+ledger is not read for a group with nothing to nest.
 
 Each step keeps only a valid layout; when neither does, the nest is saved without
 sheets and its status says "Auto Nest could not keep a layout: open it and run

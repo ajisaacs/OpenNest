@@ -297,7 +297,7 @@ batch stays the only authority, and another programmer can hold the same drop fi
 
 Make Nests in the drawing sets window (with **Nest after release** ticked) uses the same
 stock without the dialog: each released group nests on its free ledger stock first,
-substitutes included, then on the Nest Defaults sheet. See
+substitutes included, then on the Nest Defaults sheet and the nest's plate-size options. See
 [Make Nests](nest-storage.md#make-nests-the-release-panel-desktop) for the details.
 
 **Setup (per PC).** Tools > Options > MaterialLedger takes the ledger URL and the API
