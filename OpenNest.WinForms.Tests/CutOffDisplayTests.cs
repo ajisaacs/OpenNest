@@ -78,6 +78,35 @@ public class CutOffDisplayTests
     }, TimeSpan.FromMinutes(1), "Cut-off display test timed out.");
 
     [Fact]
+    public void HeadLockedOvercutPastTheSheetIsDashedOrange() => StaTestThread.Run(() =>
+    {
+        // Quadrant 4's far edge for a vertical cut-off is the bottom (graph row 100); a 10
+        // overcut runs on to row 110, past the sheet.
+        var (view, cutoff) = BuildPlateWithCutOff();
+        using (view)
+        using (var image = new Bitmap(100, 130))
+        using (var g = Graphics.FromImage(image))
+        {
+            cutoff.HeadLockOvercut = 10;
+            view.Plate.RegenerateCutOffs(new CutOffSettings());
+            g.Clear(Color.White);
+            view.Renderer.DrawCutOffs(g);
+
+            var overcut = 0;
+            for (var y = 102; y <= 109; y++)
+                for (var x = 48; x <= 52; x++)
+                {
+                    var c = image.GetPixel(x, y);
+                    if (c.R >= 200 && c.G <= 120 && c.B <= 80)
+                        overcut++;
+                }
+            Assert.True(overcut >= 4, $"Expected the orange dash on the overcut, found {overcut} pixels.");
+            var (orange, _, _, _) = CountLinePixels(image);
+            Assert.True(orange >= 10, $"Expected the orange dash on the sheet, found {orange} pixels.");
+        }
+    }, TimeSpan.FromMinutes(1), "Head-locked cut-off display test timed out.");
+
+    [Fact]
     public void SelectedCutOffKeepsSolidBlueHighlight() => StaTestThread.Run(() =>
     {
         var (view, cutoff) = BuildPlateWithCutOff();
