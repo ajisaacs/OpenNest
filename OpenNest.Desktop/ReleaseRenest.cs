@@ -25,8 +25,8 @@ namespace OpenNest.Desktop
     {
         /// <summary>
         /// Attaches a kept result's sheets to the nest's plates and returns them. It must call
-        /// <c>finish</c> with those plates before its undo step closes; that gives them their
-        /// ledger codes.
+        /// <c>finish</c> once with those plates before its undo step closes; that gives them
+        /// their ledger codes. Not calling it, or calling it twice, throws.
         /// </summary>
         public delegate IReadOnlyList<Plate> Commit(NestPipelineResult result,
             Action<IReadOnlyList<Plate>> finish);
@@ -47,24 +47,38 @@ namespace OpenNest.Desktop
             var wanted = nest.Drawings.Any(d => !d.IsCutOff && d.Quantity.Remaining > 0);
             var offer = ledger != null && wanted ? await ledger.OfferAsync(nest, token) : null;
             var locations = new Dictionary<string, string>(StringComparer.Ordinal);
+            var sheets = 0;
 
             var renested = await NestRenest.RunStagedAsync(nest, engineName, offer?.Options,
                 minimumSalvageDimension, solve,
-                result => commit(result, plates =>
+                result =>
                 {
-                    if (offer == null)
-                        return;
-                    var stock = NestPipelineCommit.PairWithStock(result, plates)
-                        .Select(p => (p.Plate, p.Stock.Id))
-                        .ToList();
-                    foreach (var (code, location) in ledger.AssignCodes(nest, offer, stock))
-                        locations[code] = location;
-                }),
+                    var finished = false;
+                    var plates = commit(result, applied =>
+                    {
+                        if (finished)
+                            throw new InvalidOperationException(
+                                "A release commit finished its plates twice.");
+                        finished = true;
+                        if (offer == null)
+                            return;
+                        var stock = NestPipelineCommit.PairWithStock(result, applied)
+                            .Select(p => (p.Plate, p.Stock.Id))
+                            .ToList();
+                        foreach (var (code, location) in ledger.AssignCodes(nest, offer, stock))
+                            locations[code] = location;
+                        sheets += stock.Sum(p => p.Plate.StockItemCodes.Count);
+                    });
+                    if (!finished)
+                        throw new InvalidOperationException(
+                            "A release commit did not finish its plates, so they have no codes.");
+                    return plates;
+                },
                 token);
 
             var ledgerNote = offer == null
                 ? null
-                : ReleaseLedgerStock.Note(offer, nest, renested.FirstStockNotKept);
+                : ReleaseLedgerStock.Note(offer, sheets, renested.FirstStockNotKept);
             return new ReleaseRenestResult(renested.Nested, Join(renested.Note, ledgerNote),
                 locations);
         }

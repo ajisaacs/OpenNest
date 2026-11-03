@@ -729,10 +729,12 @@ every drawing's required quantity with the selected engine, in two steps:
 When the nest has no material or thickness, or the ledger is not set up on the
 PC, cannot be reached, rejects the API key, has no mapping for the material or
 has no usable stock of it (the note counts what was left out: on other nests,
-taken by earlier nests of this release, too small for any part), the group goes
+taken by earlier nests of this release, too small for any part, of unknown
+shape; "no free stock" when the ledger had none at all), the group goes
 straight to step 2 and its note says "MaterialLedger not used: " and why. So
-does a step 1 whose layout Auto Nest cannot keep. Otherwise the note says how
-many sheets came from MaterialLedger stock, and adds "Codes on other nests were
+does a step 1 whose layout Auto Nest cannot keep. A step 1 that places nothing
+says "No MaterialLedger stock used: Auto Nest placed nothing on it." Otherwise
+the note says how many sheets came from MaterialLedger stock, and adds "Codes on other nests were
 not checked" with the reason when the nest server could not list them. The
 ledger is not read for a group with nothing to nest.
 

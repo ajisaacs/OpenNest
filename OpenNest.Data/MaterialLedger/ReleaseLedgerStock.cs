@@ -19,7 +19,8 @@ public sealed record ReleaseLedgerOffer(IReadOnlyList<LedgerStockRow> Rows, stri
     /// <summary>
     /// The rows as engine stock: finite, under their <c>ledger:{n}</c> ids, no costs.
     /// </summary>
-    public IReadOnlyList<PlateOption> Options { get; } = Rows
+    public IReadOnlyList<PlateOption> Options { get; } =
+        (Rows ?? throw new ArgumentNullException(nameof(Rows)))
         .Select(row => new PlateOption
         {
             Width = row.Size.Width,
@@ -132,24 +133,23 @@ public sealed class ReleaseLedgerStock
     }
 
     /// <summary>
-    /// The release note for <paramref name="nest"/> nested on <paramref name="offer"/>: how
-    /// many sheets came from the ledger, or why it was not used.
+    /// The release note for a nest nested on <paramref name="offer"/>: how many sheets came
+    /// from the ledger, or why it was not used.
     /// </summary>
+    /// <param name="sheets">The ledger codes <see cref="AssignCodes"/> gave the nest.</param>
     /// <param name="layoutNotKept">
     /// True when Auto Nest could not keep a layout on the offer.
     /// </param>
-    public static string Note(ReleaseLedgerOffer offer, Nest nest, bool layoutNotKept)
+    public static string Note(ReleaseLedgerOffer offer, int sheets, bool layoutNotKept)
     {
         ArgumentNullException.ThrowIfNull(offer);
-        ArgumentNullException.ThrowIfNull(nest);
         if (offer.NotUsed != null)
             return $"MaterialLedger not used: {offer.NotUsed}.";
 
-        var sheets = nest.Plates.Sum(p => p.StockItemCodes.Count);
         var note = layoutNotKept
             ? "MaterialLedger not used: Auto Nest could not keep a layout on its stock."
             : sheets == 0
-                ? "No MaterialLedger stock used: no part fits it."
+                ? "No MaterialLedger stock used: Auto Nest placed nothing on it."
                 : string.Format(CultureInfo.CurrentCulture,
                     "{0} sheet{1} from MaterialLedger stock.", sheets, sheets == 1 ? "" : "s");
         return offer.OtherNestsUnchecked == null

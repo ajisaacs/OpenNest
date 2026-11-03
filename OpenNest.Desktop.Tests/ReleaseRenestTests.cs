@@ -296,4 +296,51 @@ public class ReleaseRenestTests
 
         Assert.Equal(["S-1"], codesAtClose);
     }
+
+    /// <summary>Rectangles, except that a ledger sheet gets an empty layout.</summary>
+    private sealed class NothingOnLedger : INestingEngine
+    {
+        private readonly INestingEngine _inner = NestingEngineRegistry.Create("Rectangles");
+
+        public NestJobResult Solve(NestJob job, IProgress<NestJobProgress> progress = null,
+            CancellationToken token = default) =>
+            LedgerStockMapper.IsLedgerId(job.Plates[0].Id)
+                ? new NestJobResultBuilder(job).Build(NestJobStopReason.Completed)
+                : _inner.Solve(job, progress, token);
+    }
+
+    [Fact]
+    public async Task AValidLedgerLayoutThatPlacesNothing_SaysSo()
+    {
+        var ledger = new FakeLedger { Stock = Stock(Sheet("S-1", 60, 120)) };
+        var nest = NestOf(20, 2);
+
+        var result = await Release(ledger.Create(), nest, new NothingOnLedger());
+
+        Assert.True(result.Nested, result.Note);
+        Assert.EndsWith(" No MaterialLedger stock used: Auto Nest placed nothing on it.",
+            result.Note);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public async Task ACommitThatDoesNotFinishItsPlatesOnce_Throws(int finishes)
+    {
+        var ledger = new FakeLedger { Stock = Stock(Sheet("S-1", 60, 120)) }.Create();
+        var nest = NestOf(20, 2);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ReleaseRenest.RunAsync(nest,
+            ledger, "Rectangles", 0,
+            request => Task.FromResult(NestPipeline.Run(NestingEngineRegistry.Create("Rectangles"),
+                "Rectangles", request, null, CancellationToken.None)),
+            (result, finish) =>
+            {
+                var plates = NestPipelineCommit.ApplyToPlates(result, nest.CreatePlate);
+                for (var i = 0; i < finishes; i++)
+                    finish(plates);
+                return plates;
+            },
+            CancellationToken.None));
+    }
 }

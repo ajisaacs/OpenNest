@@ -122,6 +122,22 @@ public class NestRenestTests
         Assert.StartsWith("Nested on 1 sheet", kept.Note);
     }
 
+    [Fact]
+    public void ANotKeptLayout_KeepsTheRealReasonForCopiesNoSheetFits()
+    {
+        var nest = NestOf(("SYN-A", 4, 2, 2), ("SYN-HUGE", 200, 200, 1));
+
+        var result = NestRenest.Run(nest, new OverlappingEngine(), "overlapping");
+
+        Assert.False(result.Nested);
+        Assert.Equal(
+            [
+                ("SYN-A", 2, NestUnplacedReason.ProposalNotKeepable),
+                ("SYN-HUGE", 1, NestUnplacedReason.NoStockFits),
+            ],
+            result.Unplaced.Select(u => (u.Drawing.Name, u.Count, u.Reason)).OrderBy(u => u.Name));
+    }
+
     /// <summary>Puts every copy at the same spot, so the layout never validates.</summary>
     private sealed class OverlappingEngine : INestingEngine
     {

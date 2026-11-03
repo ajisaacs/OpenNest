@@ -9,7 +9,10 @@ namespace OpenNest.Engine.Jobs;
 
 /// <summary>
 /// What <see cref="NestRenest"/> kept: whether a layout was committed, its physical sheets
-/// and utilization, the copies it left unplaced, and one operator-facing note.
+/// and utilization, the copies it left unplaced, and one operator-facing note. A staged run
+/// (<see cref="NestRenest.RunStagedAsync"/>) lists every copy of a layout it did not keep,
+/// the ones that layout placed as <see cref="NestUnplacedReason.ProposalNotKeepable"/>;
+/// <see cref="NestRenest.Keep"/> lists the result's own unplaced copies.
 /// </summary>
 public sealed record NestRenestResult(
     bool Nested,
@@ -126,7 +129,7 @@ public static class NestRenest
                 if (!result.IsValid || !result.CanKeep)
                 {
                     // Every copy this stage asked for is left, not just what its layout missed.
-                    unplaced = NotKept(request);
+                    unplaced = NotKept(request, result);
                     firstStockNotKept |= stock != null;
                 }
                 continue;
@@ -212,11 +215,21 @@ public static class NestRenest
             .Select(p => (p.Plate, p.Stock.Id))
             .ToList();
 
-    private static IReadOnlyList<NestUnplacedPart> NotKept(NestPipelineRequest request) =>
-        request.Items
-            .Select(item => new NestUnplacedPart(item.Drawing.Name, item.Drawing, item.Quantity,
-                NestUnplacedReason.ProposalNotKeepable))
-            .ToList();
+    // The copies the layout missed keep their own reasons; the ones it placed were not kept.
+    private static IReadOnlyList<NestUnplacedPart> NotKept(NestPipelineRequest request,
+        NestPipelineResult result)
+    {
+        var unplaced = result.Unplaced.ToList();
+        foreach (var item in request.Items)
+        {
+            var listed = unplaced.Where(u => ReferenceEquals(u.Drawing, item.Drawing))
+                .Sum(u => u.Count);
+            if (item.Quantity > listed)
+                unplaced.Add(new NestUnplacedPart(item.Drawing.Name, item.Drawing,
+                    item.Quantity - listed, NestUnplacedReason.ProposalNotKeepable));
+        }
+        return unplaced;
+    }
 
     private static bool IsKeepable(NestPipelineResult result) =>
         result.IsValid && result.CanKeep && result.Plates.Any(p => p.Parts.Count > 0);
