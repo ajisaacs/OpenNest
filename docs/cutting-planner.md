@@ -136,11 +136,16 @@ the final replay enforce them:
 - A cutoff that splits the whole sheet is cut after every part and every other
   cutoff, so the head never travels back across the separated edge. It qualifies
   when its placed program is one continuous straight cut on its own line spanning
-  the sheet from edge to edge (`CutOff.SeparatesSheet`). A line trimmed around parts,
-  limited short of an edge, on the sheet edge, stale after a move or in an
-  unrecognized program form does not qualify and keeps the crossing rule above.
-  Being continuous, a separating line passes through no part. A kept order that cuts
-  it earlier is a constraint conflict naming the separating cutoff.
+  the sheet from edge to edge (`CutOff.SeparatesSheet`). A continuous line from a
+  sheet edge or separator to another, such as the last strip line stopping at a
+  remnant's horizontal separator, also qualifies (`CutOff.Separators`): it frees a
+  piece with the lines it stops on, so the remnants are cut last and their mass stays
+  on the sheet to absorb heat. It is cut just before the separators it stops on. A
+  line trimmed around parts, limited short of an edge or separator, on the sheet edge,
+  stale after a move or in an unrecognized program form does not qualify and keeps
+  the crossing rule above. Being continuous, a separating line passes through no
+  part. A kept order that cuts it earlier is a constraint conflict naming the
+  separating cutoff.
 - A drawing's break cuts (`LayerType.Break`, see [breakoffs](breakoffs.md)) are open
   cuts inside its material. Preparation keeps them apart from contours (no choices,
   no material); every full and prefix emission cuts them after scribes and before any

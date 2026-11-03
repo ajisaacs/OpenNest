@@ -156,6 +156,7 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
             Spacing = spacing,
             MinimumStripLength = spacing / 2.0,
             MinimumTailLength = units == Units.Millimeters ? 304.8 : 12,
+            KeepHorizontalRemnant = true, // As both desktop entry points set it.
         }, new CutOffSettings());
         Assert.False(staging.IsBlocked, $"Plate {number}'s scrap cut-offs are blocked.");
         PlateSequencing.PlaceCutOffs(plate, staging.Plans[0].Definitions);

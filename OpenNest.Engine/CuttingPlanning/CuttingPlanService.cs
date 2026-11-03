@@ -57,6 +57,8 @@ public static class CuttingPlanService
             // Each cut-off part cuts one trimmed segment of its line and precedes only the parts
             // in that segment's span (docs/automatic-scrap-cutoffs.md), not every part the line passes.
             var spans = new Dictionary<CutOff, Dictionary<Part, (double Start, double End)>>(ReferenceEqualityComparer.Instance);
+            // Lines splitting off a piece of the sheet, alone or with the separators they stop on.
+            IReadOnlyDictionary<Part, int> separators = null;
             var nodes = new List<DependencyNode>();
             // Reuse the reader's coordinate validation without publishing its native kernel.
             var identities = new HashSet<Part>(ReferenceEqualityComparer.Instance);
@@ -84,7 +86,9 @@ public static class CuttingPlanService
                         throw new ArgumentException("Placed cutoff program has no nonzero cutting motions.");
                     var defined = definitions.TryGetValue(source.BaseDrawing, out var definition);
                     var sheet = request.Plate.BoundingBox(includeParts: false);
-                    var separates = defined && CutOff.SeparatesSheet(source, definition, sheet);
+                    separators ??= CutOff.Separators(request.Parts, definitions.Values, sheet);
+                    int? round = defined && separators.TryGetValue(source, out var found) ? found : null;
+                    var separates = round != null;
                     CutOffDefinition nominal = null;
                     if (defined)
                     {
@@ -99,7 +103,7 @@ public static class CuttingPlanService
                             : new(definition.Axis, definition.Position, definition.StartLimit, definition.EndLimit,
                                 definition.Gaps);
                     }
-                    nodes.Add(new(true, nominal, source.BoundingBox, null, null, separates));
+                    nodes.Add(new(true, nominal, source.BoundingBox, null, null, round));
                     // A head-locked far-edge segment may be cut from either end (docs/automatic-scrap-cutoffs.md).
                     FixedProgramPlacement reversed = null;
                     if (defined && CutOff.ReverseAtFarEdge(source.Program) is { } flipped)

@@ -40,8 +40,8 @@ namespace OpenNest.Engine.Sequencing
         /// Moves the given cutoffs' segment parts to where the cutoff rules need them while every
         /// other part and cutoff keeps its position: each segment just before the first part in
         /// its span of the nominal line (see <see cref="CutOffSegments"/>), or last when it splits
-        /// the whole sheet. One that crosses nothing stays put, unless it would follow a
-        /// sheet-separating cutoff.
+        /// off a piece of the sheet (<see cref="CutOff.Separators(Plate)"/>), before any separator it
+        /// stops on. One that crosses nothing stays put, unless it would follow a separator.
         /// </summary>
         public static void PlaceCutOffs(Plate plate, IEnumerable<CutOff> definitions)
         {
@@ -54,15 +54,13 @@ namespace OpenNest.Engine.Sequencing
                 return;
             var movingParts = new HashSet<Part>(moving.Select(item => item.Segment.Part), ReferenceEqualityComparer.Instance);
 
-            var existing = new Dictionary<Drawing, CutOff>(ReferenceEqualityComparer.Instance);
-            foreach (var cutOff in plate.CutOffs)
-                existing[cutOff.Drawing] = cutOff;
             var order = plate.Parts.ToList();
+            var separators = CutOff.Separators(plate);
             var separating = new List<Part>();
             foreach (var (definition, segment) in moving)
             {
                 var part = segment.Part;
-                if (CutOff.SeparatesSheet(part, definition, bounds))
+                if (separators.ContainsKey(part))
                 {
                     order.Remove(part);
                     separating.Add(part);
@@ -72,14 +70,20 @@ namespace OpenNest.Engine.Sequencing
                     && CuttingDependencyGraph.CutOffCrosses(definition.Axis, definition.Position,
                         segment.SpanStart, segment.SpanEnd, other.BoundingBox, bounds, definition.Gaps));
                 if (target < 0)
-                    target = order.FindIndex(other => other.BaseDrawing.IsCutOff && !movingParts.Contains(other)
-                        && existing.TryGetValue(other.BaseDrawing, out var cut) && CutOff.SeparatesSheet(other, cut, bounds));
+                    target = order.FindIndex(other => !movingParts.Contains(other) && separators.ContainsKey(other));
                 if (target < 0 || target > order.IndexOf(part))
                     continue;
                 order.Remove(part);
                 order.Insert(target, part);
             }
-            order.AddRange(separating);
+            // Each moved separator goes last, but before a staying separator of an earlier round:
+            // one it may stop on.
+            foreach (var part in separating.OrderByDescending(part => separators[part]))
+            {
+                var before = order.FindIndex(other => !movingParts.Contains(other)
+                    && separators.TryGetValue(other, out var round) && round < separators[part]);
+                order.Insert(before < 0 ? order.Count : before, part);
+            }
 
             // Touch only the moved cutoff parts; real parts never leave the plate.
             foreach (var part in movingParts)
@@ -110,11 +114,12 @@ namespace OpenNest.Engine.Sequencing
                 foreach (var segment in CutOffSegments.Of(cutOff, ordered, bounds))
                     spans[segment.Part] = (segment.SpanStart, segment.SpanEnd);
 
-            // A cutoff that splits the whole sheet goes after every part and other cutoff, so the
-            // head never travels back across it. It passes through no part.
-            var separating = ordered.Where(part => part.BaseDrawing.IsCutOff
-                && definitions.TryGetValue(part.BaseDrawing, out var definition)
-                && CutOff.SeparatesSheet(part, definition, bounds)).ToList();
+            // A cutoff that splits off a piece of the sheet goes after every part and other cutoff,
+            // so the head never travels back across it and the remnant's mass stays on to the end;
+            // one stopping on other separators goes before them. It passes through no part.
+            var separators = CutOff.Separators(ordered, plate.CutOffs, bounds);
+            var separating = ordered.Where(separators.ContainsKey)
+                .OrderByDescending(part => separators[part]).ToList();
             if (separating.Count > 0)
             {
                 var last = new HashSet<Part>(separating, ReferenceEqualityComparer.Instance);

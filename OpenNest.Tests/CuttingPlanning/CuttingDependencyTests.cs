@@ -66,6 +66,39 @@ public class CuttingDependencyTests
         Assert.Contains(right, plate.Parts);
     }
 
+    // N26-264: the last strip line stops at the remnant's full-length horizontal separator. It
+    // frees the corner remnant with the separator, so both are cut after every part, keeping the
+    // remnant's mass on the sheet to absorb heat; the line goes first, as it stops on the separator.
+    [Fact]
+    public void Plan_LineStoppingOnTheRemnantSeparator_IsCutLastBeforeTheSeparator()
+    {
+        var nest = new Nest();
+        var plate = nest.CreatePlate();
+        plate.Size = new Size(100, 100);
+        var low = new Part(new Drawing("low", ExplicitContourTests.Square(false)), new Vector(1, 1));
+        var high = new Part(new Drawing("high", ExplicitContourTests.Square(false)), new Vector(1, 20));
+        plate.Parts.Add(low);
+        plate.Parts.Add(high);
+        var vertical = new CutOff(new Vector(40, 0), CutOffAxis.Vertical) { EndLimit = 40 };
+        var horizontal = new CutOff(new Vector(0, 40), CutOffAxis.Horizontal);
+        plate.CutOffs.Add(vertical);
+        plate.CutOffs.Add(horizontal);
+        plate.RegenerateCutOffs(new CutOffSettings());
+        var line = plate.Parts.Single(p => ReferenceEquals(p.BaseDrawing, vertical.Drawing));
+        var separator = plate.Parts.Single(p => ReferenceEquals(p.BaseDrawing, horizontal.Drawing));
+        plate.Parts.Reorder([line, low, separator, high]);
+        var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
+            confirmedParameters: ExplicitContourTests.Parameters()));
+        Assert.Equal(new[] { 1, 3 }, snapshot.Dependencies.PrerequisitesOf(0));
+        Assert.Equal(new[] { 0, 1, 3 }, snapshot.Dependencies.PrerequisitesOf(2));
+
+        var result = CuttingPlanService.Plan(snapshot);
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.Equal(new[] { line, separator }, result.ProposedOrder.Skip(2).Select(o => o.SourcePart));
+        Assert.All(result.ProposedOrder.Skip(2), o => Assert.True(o.SeparatesSheet));
+    }
+
     [Fact]
     public void Plan_KeptOrderCuttingTheSeparatorFirst_IsAConstraintConflictThatSaysWhy()
     {

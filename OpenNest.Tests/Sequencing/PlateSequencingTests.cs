@@ -189,6 +189,35 @@ public class PlateSequencingTests
         AssertPrecedes(plate, cutB, first, second);
     }
 
+    // The remnant's lines go last: the strip line stopping on the separator, then the separator.
+    [Theory]
+    [InlineData(SequenceMethod.RightSide)]
+    [InlineData(SequenceMethod.LeftSide)]
+    [InlineData(SequenceMethod.LeastCode)]
+    public void Apply_RemnantLines_AreCutLastInnerFirst(SequenceMethod method)
+    {
+        var plate = new Plate(60, 120);
+        plate.Parts.Add(TestHelpers.MakePartAt(10, 10, 10));
+        plate.Parts.Add(TestHelpers.MakePartAt(50, 10, 10));
+        var vertical = new CutOff(new Vector(80, 0), CutOffAxis.Vertical) { EndLimit = 30 };
+        var horizontal = new CutOff(new Vector(0, 30), CutOffAxis.Horizontal);
+        plate.CutOffs.Add(horizontal);
+        plate.CutOffs.Add(vertical);
+        plate.RegenerateCutOffs(new CutOffSettings());
+        plate.Parts.Reorder([.. plate.Parts.Where(p => p.BaseDrawing.IsCutOff), .. plate.Parts.Where(p => !p.BaseDrawing.IsCutOff)]);
+
+        PlateSequencing.Apply(plate, new SequenceParameters { Method = method });
+
+        Assert.Same(vertical.Drawing, plate.Parts[^2].BaseDrawing);
+        Assert.Same(horizontal.Drawing, plate.Parts[^1].BaseDrawing);
+
+        // Placing them again after an edit keeps that order.
+        plate.Parts.Reorder([plate.Parts[^1], plate.Parts[^2], .. plate.Parts.Take(plate.Parts.Count - 2)]);
+        PlateSequencing.PlaceCutOffs(plate, [horizontal, vertical]);
+        Assert.Same(vertical.Drawing, plate.Parts[^2].BaseDrawing);
+        Assert.Same(horizontal.Drawing, plate.Parts[^1].BaseDrawing);
+    }
+
     [Theory]
     [InlineData(SequenceMethod.RightSide)]
     [InlineData(SequenceMethod.LeftSide)]

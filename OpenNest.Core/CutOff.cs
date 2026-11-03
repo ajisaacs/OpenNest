@@ -255,19 +255,80 @@ namespace OpenNest
         /// splits the sheet in two. Anything else (gaps around parts, limits short of an edge, a
         /// line on the sheet edge, a stale or unrecognized program) does not separate the sheet.
         /// </summary>
-        internal static bool SeparatesSheet(Part part, CutOff definition, Box sheet)
+        internal static bool SeparatesSheet(Part part, CutOff definition, Box sheet) =>
+            ContinuousCut(part, definition, sheet) is { } cut
+            && cut.Low <= (definition.Axis == CutOffAxis.Vertical ? sheet.Bottom : sheet.Left) + Math.Tolerance.Epsilon
+            && cut.High >= (definition.Axis == CutOffAxis.Vertical ? sheet.Top : sheet.Right) - Math.Tolerance.Epsilon;
+
+        /// <summary>
+        /// The cut-off parts among <paramref name="parts"/> that split off a piece of the sheet,
+        /// each with the round it was found in. Round 0 holds the lines that
+        /// <see cref="SeparatesSheet"/> across the whole sheet; a line of a later round is one
+        /// continuous cut from a sheet edge or an earlier round's line to another, such as the
+        /// last strip line stopping at a remnant's horizontal separator. It frees a piece together
+        /// with the lines it stops on, so it is cut after every other part and before those lines
+        /// (higher rounds first), keeping the remnant's mass on the sheet until the end.
+        /// </summary>
+        public static IReadOnlyDictionary<Part, int> Separators(IEnumerable<Part> parts, IEnumerable<CutOff> definitions, Box sheet)
+        {
+            var rounds = new Dictionary<Part, int>(ReferenceEqualityComparer.Instance);
+            if (parts == null || definitions == null || sheet == null)
+                return rounds;
+            var byDrawing = new Dictionary<Drawing, CutOff>(ReferenceEqualityComparer.Instance);
+            foreach (var definition in definitions)
+                if (definition?.Drawing != null)
+                    byDrawing[definition.Drawing] = definition;
+            var cuts = new List<(Part Part, bool Vertical, double Line, double Low, double High)>();
+            foreach (var part in parts)
+                if (part?.BaseDrawing is { IsCutOff: true } drawing && byDrawing.TryGetValue(drawing, out var definition)
+                    && ContinuousCut(part, definition, sheet) is { } cut)
+                {
+                    var vertical = definition.Axis == CutOffAxis.Vertical;
+                    cuts.Add((part, vertical, vertical ? definition.Position.X : definition.Position.Y, cut.Low, cut.High));
+                }
+
+            for (var round = 0; ; round++)
+            {
+                var found = cuts.Where(cut => !rounds.ContainsKey(cut.Part) && Bounded(cut)).ToList();
+                if (found.Count == 0)
+                    return rounds;
+                foreach (var cut in found)
+                    rounds[cut.Part] = round;
+            }
+
+            // The cut runs between two boundaries: sheet edges, or lines found in an earlier round
+            // that cross this one where they are cut. The stretch between them is cut, as the cut
+            // is continuous.
+            bool Bounded((Part Part, bool Vertical, double Line, double Low, double High) cut)
+            {
+                var reached = cuts.Where(other => other.Vertical != cut.Vertical && rounds.ContainsKey(other.Part)
+                        && other.Low <= cut.Line + Math.Tolerance.Epsilon && other.High >= cut.Line - Math.Tolerance.Epsilon)
+                    .Select(other => other.Line)
+                    .Append(cut.Vertical ? sheet.Bottom : sheet.Left)
+                    .Append(cut.Vertical ? sheet.Top : sheet.Right)
+                    .Where(b => b >= cut.Low - Math.Tolerance.Epsilon && b <= cut.High + Math.Tolerance.Epsilon)
+                    .ToList();
+                return reached.Count > 1 && reached.Max() - reached.Min() > Math.Tolerance.Epsilon;
+            }
+        }
+
+        /// <summary>The cut-off parts on <paramref name="plate"/> that split off a piece of it, by round.</summary>
+        public static IReadOnlyDictionary<Part, int> Separators(Plate plate) =>
+            Separators(plate.Parts, plate.CutOffs, plate.BoundingBox(includeParts: false));
+
+        // The extent along the line of a part that cuts one continuous straight line on its
+        // definition's line strictly inside the sheet, or null for anything else.
+        private static (double Low, double High)? ContinuousCut(Part part, CutOff definition, Box sheet)
         {
             if (part?.Program == null || definition == null || sheet == null
                 || part.Program.Mode != Mode.Absolute)
-                return false;
+                return null;
             var vertical = definition.Axis == CutOffAxis.Vertical;
             var line = vertical ? definition.Position.X : definition.Position.Y;
             var acrossMin = vertical ? sheet.Left : sheet.Bottom;
             var acrossMax = vertical ? sheet.Right : sheet.Top;
-            var alongMin = vertical ? sheet.Bottom : sheet.Left;
-            var alongMax = vertical ? sheet.Top : sheet.Right;
             if (!(line > acrossMin + Math.Tolerance.Epsilon && line < acrossMax - Math.Tolerance.Epsilon))
-                return false;
+                return null;
 
             Vector? position = null;
             double? low = null, high = null;
@@ -285,13 +346,13 @@ namespace OpenNest
                         // A second pierce leaves an uncut gap; a head-locked rapid returns along
                         // the overcut to where the cut toward the origin begins.
                         if (cutting && !locked)
-                            return false;
+                            return null;
                         position = rapid.EndPoint + part.Location;
                         break;
                     case LinearMove move when position != null:
                         var end = move.EndPoint + part.Location;
                         if (!OnLine(position.Value) || !OnLine(end))
-                            return false;
+                            return null;
                         foreach (var value in new[] { Along(position.Value), Along(end) })
                         {
                             low = low == null ? value : System.Math.Min(low.Value, value);
@@ -301,10 +362,10 @@ namespace OpenNest
                         cutting = true;
                         break;
                     case Motion:
-                        return false;
+                        return null;
                 }
             }
-            return cutting && low <= alongMin + Math.Tolerance.Epsilon && high >= alongMax - Math.Tolerance.Epsilon;
+            return cutting ? (low.Value, high.Value) : null;
 
             bool OnLine(Vector point) =>
                 System.Math.Abs((vertical ? point.X : point.Y) - line) <= Math.Tolerance.Epsilon;

@@ -3,7 +3,7 @@ using OpenNest.Geometry;
 
 namespace OpenNest.Tests.CutOffs;
 
-/// <summary>Which cut-offs split the whole sheet (and so must be cut after every part).</summary>
+/// <summary>Which cut-offs split off a piece of the sheet (and so must be cut after every part).</summary>
 public class CutOffSeparationTests
 {
     [Theory]
@@ -55,6 +55,33 @@ public class CutOffSeparationTests
         Assert.False(Separates(plate, stale));
         Assert.False(CutOff.SeparatesSheet(broken, split, plate.BoundingBox(false))); // Two pierces leave a gap.
         Assert.False(CutOff.SeparatesSheet(Part(plate, limited), null, plate.BoundingBox(false)));
+    }
+
+    // The automatic remnant layout: a full-length horizontal separator above the parts and strip
+    // lines stopping at it. The last line, clear of the parts, frees the corner remnant together
+    // with the separator, so it separates in the next round, as does a line from it to the far
+    // edge. A strip line trimmed around a part and a line short of the separator do not.
+    [Fact]
+    public void LinesStoppingOnSeparators_SeparateInLaterRounds()
+    {
+        var plate = new Plate(60, 120);
+        plate.Parts.Add(TestHelpers.MakePartAt(10, 10, 10));
+        var horizontal = new CutOff(new Vector(0, 30), CutOffAxis.Horizontal);
+        var remnant = new CutOff(new Vector(70, 0), CutOffAxis.Vertical) { EndLimit = 30 };
+        var beyond = new CutOff(new Vector(0, 15), CutOffAxis.Horizontal) { StartLimit = 70 };
+        var strip = new CutOff(new Vector(15, 0), CutOffAxis.Vertical) { EndLimit = 30 };
+        var shortOf = new CutOff(new Vector(50, 0), CutOffAxis.Vertical) { EndLimit = 20 };
+        plate.CutOffs.AddRange([horizontal, remnant, beyond, strip, shortOf]);
+        plate.RegenerateCutOffs(new CutOffSettings());
+
+        var separators = CutOff.Separators(plate);
+
+        Assert.Equal(0, separators[Part(plate, horizontal)]);
+        Assert.Equal(1, separators[Part(plate, remnant)]);
+        Assert.Equal(2, separators[Part(plate, beyond)]);
+        Assert.False(Separates(plate, remnant)); // Not across the whole sheet on its own.
+        Assert.Equal(3, separators.Count);
+        Assert.DoesNotContain(Part(plate, shortOf), separators.Keys);
     }
 
     // A line trimmed around a part is two segment parts, neither of which spans the sheet.

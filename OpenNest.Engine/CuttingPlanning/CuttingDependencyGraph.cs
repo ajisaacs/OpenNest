@@ -86,10 +86,12 @@ internal sealed class CuttingDependencyGraph
             if (nodes[cut].SeparatesSheet)
             {
                 // Cutting a line that splits the sheet comes after every part and every other
-                // cutoff, so the head never travels back across the separated edge. Such a line
-                // is continuous, so it passes through no part and needs no crossing edge.
+                // cutoff, so the head never travels back across the separated edge and the
+                // remnant's mass stays on to the end. Among separators, a line stopping on others
+                // (a later round) goes before them. Such a line is continuous, so it passes
+                // through no part and needs no crossing edge.
                 for (var other = 0; other < nodes.Count; other++)
-                    if (!nodes[other].SeparatesSheet)
+                    if (!nodes[other].SeparatesSheet || nodes[other].SeparatorRound > nodes[cut].SeparatorRound)
                         edges[cut].Add(other);
                 continue;
             }
@@ -208,11 +210,11 @@ internal sealed class DependencyNode
     private LeadMaterialSnapshot material;
 
     internal DependencyNode(bool isCutOff, CutOffDefinition cutOff, Box placedBounds, Box cleanBounds,
-        Func<LeadMaterialSnapshot> materialFactory, bool separatesSheet = false, bool cutFirst = false)
+        Func<LeadMaterialSnapshot> materialFactory, int? separatorRound = null, bool cutFirst = false)
     {
         IsCutOff = isCutOff;
         CutFirst = !isCutOff && cutFirst;
-        SeparatesSheet = isCutOff && separatesSheet;
+        SeparatorRound = isCutOff ? separatorRound : null;
         CutOff = cutOff;
         PlacedBounds = Copy(placedBounds);
         CleanBounds = cleanBounds == null ? null : Copy(cleanBounds);
@@ -223,8 +225,13 @@ internal sealed class DependencyNode
     }
 
     internal bool IsCutOff { get; }
-    /// <summary>A cutoff whose placed program is one continuous cut across the whole sheet.</summary>
-    internal bool SeparatesSheet { get; }
+    /// <summary>
+    /// A cutoff whose placed program is one continuous cut splitting off a piece of the sheet,
+    /// alone or with the separators it stops on (see CutOff.Separators).
+    /// </summary>
+    internal bool SeparatesSheet => SeparatorRound != null;
+    /// <summary>The separator's round: 0 across the whole sheet, higher for lines stopping on earlier rounds.</summary>
+    internal int? SeparatorRound { get; }
     /// <summary>A part whose drawing asks to be cut before the plate's other parts.</summary>
     internal bool CutFirst { get; }
     internal CutOffDefinition CutOff { get; }
