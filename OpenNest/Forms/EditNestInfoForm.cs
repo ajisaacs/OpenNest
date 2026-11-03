@@ -16,6 +16,7 @@ namespace OpenNest.Forms
         private List<MaterialConfig> materialCatalog = new();
         private string gradeMaterialKey = "";
         private bool offerNewNestDefaults;
+        private string shownMadeBy = "";
 
         public EditNestInfoForm()
         {
@@ -230,6 +231,32 @@ namespace OpenNest.Forms
             set { madeByBox.Text = value; }
         }
 
+        /// <summary>
+        /// Fills a blank Made By: the name the user last typed there, else their Windows user name.
+        /// </summary>
+        public static string DefaultMadeBy
+        {
+            get
+            {
+                var remembered = Properties.Settings.Default.MadeBy;
+                return string.IsNullOrWhiteSpace(remembered) ? Environment.UserName : remembered.Trim();
+            }
+        }
+
+        /// <summary>
+        /// Remembers a Made By the user typed, so later blank nests start from it; clearing
+        /// the box falls back to the Windows user name again.
+        /// </summary>
+        private void RememberMadeBy()
+        {
+            var typed = MadeBy.Trim();
+            if (typed == shownMadeBy.Trim())
+                return;
+
+            Properties.Settings.Default.MadeBy = typed;
+            Properties.Settings.Default.Save();
+        }
+
         public void SetUnits(Units units)
         {
             switch (units)
@@ -330,7 +357,8 @@ namespace OpenNest.Forms
             MaterialName = nest.Material?.Name ?? "";
             MaterialGrade = nest.Material?.Grade ?? "";
             Status = nest.Status;
-            MadeBy = nest.MadeBy ?? "";
+            MadeBy = string.IsNullOrWhiteSpace(nest.MadeBy) ? DefaultMadeBy : nest.MadeBy;
+            shownMadeBy = MadeBy;
             SizeString = nest.PlateDefaults.Size.ToString();
             PartSpacing = nest.PlateDefaults.PartSpacing;
             LeftSpacing = nest.PlateDefaults.EdgeSpacing.Left;
@@ -354,6 +382,7 @@ namespace OpenNest.Forms
             nest.Material = NestMaterialSelection.Apply(nest.Material, MaterialName, MaterialGrade);
             nest.Status = Status;
             nest.MadeBy = MadeBy;
+            RememberMadeBy();
             nest.PlateDefaults.Size = OpenNest.Geometry.Size.Parse(SizeString);
             nest.PlateDefaults.PartSpacing = PartSpacing;
             nest.PlateDefaults.EdgeSpacing = new Spacing(

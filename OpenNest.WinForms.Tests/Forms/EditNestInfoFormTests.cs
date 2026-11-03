@@ -310,6 +310,47 @@ public class EditNestInfoFormTests
         });
     }
 
+    [Fact]
+    public void BlankMadeBy_StartsFromTheUserName_AndRemembersATypedName()
+    {
+        RunSta(() =>
+        {
+            var settings = Properties.Settings.Default;
+            var saved = settings.MadeBy;
+            try
+            {
+                settings.MadeBy = "";
+                using (var form = new EditNestInfoForm())
+                {
+                    form.LoadNestInfo(new Nest());
+                    Assert.Equal(Environment.UserName, form.MadeBy);
+                    form.MadeBy = "Synthetic operator";
+                    form.SaveNestInfo(new Nest());
+                }
+                Assert.Equal("Synthetic operator", settings.MadeBy);
+
+                using (var form = new EditNestInfoForm())
+                {
+                    form.LoadNestInfo(new Nest());
+                    Assert.Equal("Synthetic operator", form.MadeBy);
+                }
+
+                // A nest's own author is shown as is and, left alone, is not remembered.
+                using (var form = new EditNestInfoForm())
+                {
+                    form.LoadNestInfo(new Nest { MadeBy = "Synthetic author" });
+                    Assert.Equal("Synthetic author", form.MadeBy);
+                    form.SaveNestInfo(new Nest());
+                }
+                Assert.Equal("Synthetic operator", settings.MadeBy);
+            }
+            finally
+            {
+                settings.MadeBy = saved;
+            }
+        });
+    }
+
     private static void RunSta(Action action) =>
         StaTestThread.Run(action, TimeSpan.FromSeconds(15), "The STA test did not complete.");
 }

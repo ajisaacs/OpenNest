@@ -476,5 +476,17 @@ namespace OpenNest.Properties {
                 this["AutoNestOnServer"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string MadeBy {
+            get {
+                return ((string)(this["MadeBy"]));
+            }
+            set {
+                this["MadeBy"] = value;
+            }
+        }
     }
 }
