@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Windows.Forms;
 using OpenNest.Data;
+using OpenNest.Data.MaterialLedger;
 using OpenNest.Forms;
 using OpenNest.IO;
 using OpenNest.Shapes;
@@ -421,7 +422,11 @@ public class SetReleaseFormsTests
 
                 var (host, panel) = ShowPanel(sets, library, nests);
                 using var _ = host;
-                panel.Renest = (_, _) => { renested++; return Task.FromResult(new SetReleaseRenest(true, "")); };
+                panel.Renest = (_, _, _) =>
+                {
+                    renested++;
+                    return Task.FromResult(new SetReleaseRenest(true, ""));
+                };
                 var nestAfter = Field<CheckBox>(panel, "nestAfterReleaseCheckBox");
                 nestAfter.Checked = true;
                 panel.AddSet(set);
@@ -510,6 +515,10 @@ public class SetReleaseFormsTests
                 Run(panel.ReleaseAsync());
 
                 Assert.Equal(new[] { "Begin", "Renest Synthetic Aluminum", "Renest Synthetic Steel", "End" }, host.Calls);
+                // Both nests share the run's ledger stock, so neither takes a sheet the other took.
+                Assert.Equal(2, host.Ledgers.Count);
+                Assert.NotNull(host.Ledgers[0]);
+                Assert.Same(host.Ledgers[0], host.Ledgers[1]);
                 Assert.Equal(FormWindowState.Minimized, form.WindowState);
                 Assert.Same(panel.Result, host.Ended);
                 // The host's nests are the ones saved and opened (bound) afterwards.
@@ -1136,14 +1145,17 @@ public class SetReleaseFormsTests
     {
         public List<string> Calls { get; } = new();
         public List<Nest> Nests { get; } = new();
+        public List<ReleaseLedgerStock> Ledgers { get; } = new();
         public SetReleaseResult? Ended { get; private set; }
         public int StopAt { get; init; }
 
         public void Begin() => Calls.Add("Begin");
 
-        public Task<SetReleaseRenest> RenestAsync(Nest nest, CancellationToken token)
+        public Task<SetReleaseRenest> RenestAsync(Nest nest, ReleaseLedgerStock ledger,
+            CancellationToken token)
         {
             Nests.Add(nest);
+            Ledgers.Add(ledger);
             Calls.Add($"Renest {nest.Material.Name}");
             if (Nests.Count == StopAt)
                 throw new OperationCanceledException();

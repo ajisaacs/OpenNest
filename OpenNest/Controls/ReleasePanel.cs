@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Data;
+using OpenNest.Data.MaterialLedger;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Jobs;
 using OpenNest.Forms;
@@ -70,9 +71,20 @@ namespace OpenNest.Controls
 
         /// <summary>
         /// Nests a group's built nest when Nest after release is ticked: Auto Nest headless with
-        /// the selected engine (<see cref="NestRenest"/>); replaced by tests.
+        /// the selected engine (<see cref="NestRenest"/>), on the run's MaterialLedger stock first
+        /// (null when not offered); replaced by tests.
         /// </summary>
-        internal Func<Nest, CancellationToken, Task<SetReleaseRenest>> Renest { get; set; } = RenestAsync;
+        internal Func<Nest, ReleaseLedgerStock, CancellationToken, Task<SetReleaseRenest>> Renest
+        { get; set; } = RenestAsync;
+
+        /// <summary>
+        /// The MaterialLedger stock one Make Nests run nests on; replaced by tests.
+        /// </summary>
+        internal Func<ReleaseLedgerStock> CreateLedgerStock { get; set; } =
+            () => new ReleaseLedgerStock(
+                (material, grade, thicknessIn, token) => MaterialLedgerStore.CreateClient()
+                    .GetStockAsync(material, grade, thicknessIn, token),
+                token => LedgerCodesOnOtherNests.ReadAsync(Guid.Empty, token));
 
         /// <summary>Shows Edit Drawing and returns the saved record, or null; replaced by tests.</summary>
         internal Func<DrawingLibraryEditSession, DrawingLibraryRecord> EditDrawing { get; set; }
@@ -733,11 +745,15 @@ namespace OpenNest.Controls
             var merges = ChosenMerges();
             var nestAfter = nestAfterReleaseCheckBox.Checked;
             var live = nestAfter ? NestingHost : null;
+            // One run shares its ledger stock, so two of its nests never take the same sheet.
+            var ledger = nestAfter ? CreateLedgerStock() : null;
             running = true;
             cancellation = new CancellationTokenSource();
             UpdateCommands();
             session = new SetReleaseSession(sets, library, nests, serverUrl, ReadPackage, WriteNest, CreateNest, ReadNest,
-                !nestAfter ? null : live == null ? Renest : LiveRenest(live));
+                !nestAfter ? null
+                : live == null ? (nest, token) => Renest(nest, ledger, token)
+                : LiveRenest(live, ledger));
             var progress = new Progress<SetReleaseProgress>(ShowProgress);
             if (live != null)
             {
@@ -767,12 +783,13 @@ namespace OpenNest.Controls
         }
 
         // The host's Auto Nest stops the whole release, as Stop here does.
-        private Func<Nest, CancellationToken, Task<SetReleaseRenest>> LiveRenest(IReleaseNestingHost live) =>
+        private Func<Nest, CancellationToken, Task<SetReleaseRenest>> LiveRenest(
+            IReleaseNestingHost live, ReleaseLedgerStock ledger) =>
             async (nest, token) =>
             {
                 try
                 {
-                    return await live.RenestAsync(nest, token);
+                    return await live.RenestAsync(nest, ledger, token);
                 }
                 catch (OperationCanceledException) when (!token.IsCancellationRequested)
                 {
@@ -1138,15 +1155,28 @@ namespace OpenNest.Controls
             }.Where(s => !string.IsNullOrWhiteSpace(s)));
 
         // The nest is not shown anywhere yet, so Auto Nest runs off the UI thread on it alone.
-        private static Task<SetReleaseRenest> RenestAsync(Nest nest, CancellationToken token)
+        private static Task<SetReleaseRenest> RenestAsync(Nest nest, ReleaseLedgerStock ledger,
+            CancellationToken token)
         {
             var engineName = EngineSelection.EngineName;
-            return Task.Run(() =>
+            return Task.Run(async () =>
             {
-                var renested = NestRenest.Run(nest, engineName, AutoNestForm.DefaultMinRemnantSize, token: token);
-                return new SetReleaseRenest(renested.Nested, renested.Note);
+                var offer = ledger == null ? null : await ledger.OfferAsync(nest, token);
+                var renested = NestRenest.Run(nest, NestingEngineRegistry.Create(engineName),
+                    engineName, offer?.Options, AutoNestForm.DefaultMinRemnantSize, token: token);
+                var ledgerNote = offer == null
+                    ? null
+                    : ledger.Assign(nest, offer, renested.Committed);
+                return new SetReleaseRenest(renested.Nested,
+                    ReleaseNote(renested.Note, ledgerNote));
             }, token);
         }
+
+        /// <summary>
+        /// The note a released nest shows: Auto Nest's, then what MaterialLedger stock it used.
+        /// </summary>
+        internal static string ReleaseNote(string renestNote, string ledgerNote) =>
+            string.Join(" ", new[] { renestNote, ledgerNote }.Where(n => !string.IsNullOrEmpty(n)));
 
         private static LibraryPackage ReadPackage(byte[] bytes)
         {
@@ -1179,11 +1209,13 @@ namespace OpenNest.Controls
 
         /// <summary>
         /// Shows <paramref name="nest"/>, built but not saved, and nests it from scratch: every
-        /// drawing's required quantity, keeping only a valid layout (else no sheets and a note).
-        /// Throws <see cref="OperationCanceledException"/> when the operator stops it, which
-        /// stops the release.
+        /// drawing's required quantity on <paramref name="ledger"/>'s stock first, then the plate
+        /// defaults (null: the plate defaults only), keeping only valid layouts (else no sheets
+        /// and a note). Throws <see cref="OperationCanceledException"/> when the operator stops
+        /// it, which stops the release.
         /// </summary>
-        Task<SetReleaseRenest> RenestAsync(Nest nest, CancellationToken token);
+        Task<SetReleaseRenest> RenestAsync(Nest nest, ReleaseLedgerStock ledger,
+            CancellationToken token);
 
         /// <summary>
         /// Make Nests has finished (<paramref name="result"/> is null if it threw) and has

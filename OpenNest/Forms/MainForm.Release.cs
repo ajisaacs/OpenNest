@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Data;
+using OpenNest.Data.MaterialLedger;
 using OpenNest.Engine.Jobs;
 using OpenNest.Forms.Commands;
 
@@ -39,7 +40,8 @@ namespace OpenNest.Forms
             BringForward();
         }
 
-        async Task<SetReleaseRenest> IReleaseNestingHost.RenestAsync(Nest nest, CancellationToken token)
+        async Task<SetReleaseRenest> IReleaseNestingHost.RenestAsync(Nest nest,
+            ReleaseLedgerStock ledger, CancellationToken token)
         {
             ArgumentNullException.ThrowIfNull(nest);
             token.ThrowIfCancellationRequested();
@@ -52,36 +54,49 @@ namespace OpenNest.Forms
             if (tab.PlateManager.CanClearAll)
                 tab.ClearNest();
             nest.UpdateDrawingQuantities();
-            var request = NestRenest.CreateRequest(nest, EngineSelection.EngineName, AutoNestForm.DefaultMinRemnantSize);
-            if (request == null)
-                return new SetReleaseRenest(false, NestRenest.NothingToNestNote);
+            var offer = ledger == null ? null : await ledger.OfferAsync(nest, token);
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
             // As for Auto Nest, switching tabs while it runs stops it.
             nestingCts = cts;
-            NestPipelineResult result;
+            NestRenestResult renested;
             try
             {
-                result = await (SolveReleasedNest ?? ((t, r, c) => AutoNestCommand.SolveAsync(this, t, r, c)))(tab, request, cts);
+                // Ledger stock first, then the plate defaults: each stage is its own Auto Nest run.
+                var solve = SolveReleasedNest
+                    ?? ((t, r, c) => AutoNestCommand.SolveAsync(this, t, r, c));
+                renested = await NestRenest.RunStagedAsync(nest, EngineSelection.EngineName,
+                    offer?.Options, AutoNestForm.DefaultMinRemnantSize,
+                    request => solve(tab, request, cts),
+                    r =>
+                    {
+                        using var change = tab.BeginChange("Auto Nest");
+                        change.MarkChanged();
+                        var applied = NestPipelineCommit.ApplyToEmptyPlates(r, tab.PlateManager,
+                            token: cts.Token);
+                        change.Complete();
+                        return applied;
+                    }, cts.Token);
             }
             finally
             {
                 nestingCts = null;
             }
-            cts.Token.ThrowIfCancellationRequested();
 
-            var kept = NestRenest.Keep(result, r =>
+            var ledgerNote = offer == null ? null : ledger.Assign(nest, offer, renested.Committed);
+            foreach (var row in offer?.Rows ?? Array.Empty<LedgerStockRow>())
             {
-                using var change = tab.BeginChange("Auto Nest");
-                change.MarkChanged();
-                var applied = NestPipelineCommit.ApplyToEmptyPlates(r, tab.PlateManager, token: cts.Token);
-                change.Complete();
-                return applied;
-            });
-            if (kept.Nested)
+                foreach (var (code, location) in row.ItemLocations)
+                    tab.LedgerLocations[code] = location;
+            }
+            if (renested.Nested)
+            {
+                tab.UpdatePlateList();
                 tab.PlateManager.LoadFirst();
+            }
             tab.PlateView.ZoomToFit();
-            return new SetReleaseRenest(kept.Nested, kept.Note);
+            return new SetReleaseRenest(renested.Nested,
+                ReleasePanel.ReleaseNote(renested.Note, ledgerNote));
         }
 
         void IReleaseNestingHost.End(SetReleaseResult result)
