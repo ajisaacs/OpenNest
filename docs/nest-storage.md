@@ -709,9 +709,25 @@ until it is nested.
 **Nest after release** (beside the button, ticked by default; the panel
 remembers the operator's last choice) runs Auto Nest on every released
 group, new or merged, before anything is saved (`OpenNest.Engine.Jobs.NestRenest`):
-every drawing's required quantity, the selected engine, sheets from the nest's
-plate defaults and plate-size options, as the Auto Nest dialog would offer them.
-A layout is kept only when it is valid; otherwise the nest is saved without
+every drawing's required quantity with the selected engine, in two steps:
+
+1. **MaterialLedger stock first.** The group is offered the free sheets and drops
+   that **Load from ledger** in the Auto Nest dialog would load for its material,
+   grade and thickness, substitute grades included
+   (`OpenNest.Data.MaterialLedger.ReleaseLedgerStock`). Sheets coded on other open
+   server nests are left out, and so are sheets an earlier group of the same Make
+   Nests took (those nests are not on the server until the release uploads them).
+   The sheets this step uses get their ledger codes, as Auto Nest gives them.
+2. **Then the plate defaults.** Copies the ledger stock cannot hold are nested on
+   the nest's plate defaults (Tools > Nest Defaults) and plate-size options.
+   These sheets have no ledger code.
+
+When the ledger is not set up on the PC, cannot be reached, rejects the API key,
+has no mapping for the material or has no free stock of it, the group goes
+straight to step 2 and its note says "MaterialLedger not used: " and why.
+Otherwise the note says how many sheets came from MaterialLedger stock.
+
+Each step keeps only a valid layout; when neither does, the nest is saved without
 sheets and its status says "Auto Nest could not keep a layout: open it and run
 Auto Nest". The row lists each group's sheets and utilization, and any
 copies left unplaced, which stay as remaining quantity. Unticked, new nests are
@@ -722,7 +738,8 @@ starts, the drawing sets window minimizes and the main window comes forward.
 Each group's nest opens in its own main-window tab as soon as it is built, before
 it is saved, and Auto Nest runs on it there with the usual progress window and
 live plan strip (`AutoNestCommand.SolveAsync`), one nest at a time in plan order,
-switching to each tab in turn. The release keeps the layout as headless
+switching to each tab in turn. A nest nested on ledger stock and then the plate
+defaults shows two Auto Nest runs, one per step. The release keeps the layout as headless
 `NestRenest` would (only a valid one, with no Keep or validation review). Stop in
 the progress window (or switching tabs, as for Auto Nest) stops the whole release,
 as the panel's Stop does: nothing is saved. Until Make Nests finishes the main

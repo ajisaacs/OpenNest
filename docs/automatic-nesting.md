@@ -295,6 +295,11 @@ Auto Nest, save and post work exactly as before. OpenNest only reads from the le
 The stock it loads is a snapshot taken at nesting time and reserves nothing. ML's hold
 batch stays the only authority, and another programmer can hold the same drop first.
 
+Make Nests in the drawing sets window (with **Nest after release** ticked) uses the same
+stock without the dialog: each released group nests on its free ledger stock first,
+substitutes included, then on the Nest Defaults sheet. See
+[Make Nests](nest-storage.md#make-nests-the-release-panel-desktop) for the details.
+
 **Setup (per PC).** Tools > Options > MaterialLedger takes the ledger URL and the API
 key for ML's `Api:Keys:OpenNest`. They are stored in `%APPDATA%\OpenNest\material-ledger.json`,
 with the key encrypted by DPAPI for the current Windows user. The key never goes in
