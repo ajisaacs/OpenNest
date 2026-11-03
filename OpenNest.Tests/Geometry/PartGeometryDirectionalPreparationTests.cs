@@ -45,13 +45,13 @@ public class PartGeometryDirectionalPreparationTests
     }
 
     [Fact]
-    public void MaterialIncludesDisplayAndLeads_ButExcludesRapidAndScribe()
+    public void MaterialIncludesDisplay_ButExcludesLeadsRapidAndScribe()
     {
         var material = RectangleProgram(false);
         AddRectangle(material, 15, 2, 3, 2, LayerType.Display);
+        var clean = MakePart(material);
         AddRectangle(material, 21, 3, 2, 4, LayerType.Leadin);
         AddRectangle(material, 26, 1, 4, 3, LayerType.Leadout);
-        var clean = MakePart(material);
         AddRectangle(material, 100, 120, 7, 9, LayerType.Scribe);
         material.MoveTo(-200, -300);
         material.MoveTo(400, 500);
@@ -59,9 +59,9 @@ public class PartGeometryDirectionalPreparationTests
         foreach (var direction in new[] { PushDirection.Left, PushDirection.Right, PushDirection.Up, PushDirection.Down })
         {
             var expected = FrozenGetPartLines(clean, direction);
-            Assert.Equal(4, expected.Count);
+            Assert.Equal(2, expected.Count);
             AssertLines(expected, PartGeometry.GetPartLines(marked, direction));
-            AssertMatches(marked, direction, new Vector(3, -2), 0.001);
+            AssertMatches(clean, direction, new Vector(3, -2), 0.001);
         }
         AssertLines(PartGeometry.GetPartLines(clean), PartGeometry.GetPartLines(marked));
     }

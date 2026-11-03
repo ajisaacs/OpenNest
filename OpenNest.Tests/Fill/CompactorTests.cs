@@ -312,6 +312,35 @@ namespace OpenNest.Tests.Fill
             AssertClearance(moving, obstacle, 2);
         }
 
+        [Theory]
+        [InlineData(PushDirection.Right)]
+        [InlineData(PushDirection.Up)]
+        public void Push_WithSpacing_ContactWithLeadInPartDoesNotBlockOtherDirections(
+            PushDirection next
+        )
+        {
+            // Leads are cut into scrap, not material: chained into the obstacle's perimeter
+            // they left its offset contour open, so every contact with it blocked.
+            var workArea = new Box(0, 0, 100, 100);
+            var obstacle = MakeRectPart(20, 20, 40, 10);
+            obstacle.ApplyLeadIns(new OpenNest.CNC.CuttingStrategy.CuttingParameters
+            {
+                ExternalLeadIn = new OpenNest.CNC.CuttingStrategy.LineLeadIn { Length = 0.25 },
+                ExternalLeadOut = new OpenNest.CNC.CuttingStrategy.LineLeadOut { Length = 0.25 },
+            }, new Vector(0, 0));
+            var moving = MakeRectPart(30, 60, 5, 5);
+            var parts = new List<Part> { moving };
+            var obstacles = new List<Part> { obstacle };
+
+            Assert.True(Compactor.Push(parts, obstacles, workArea, 2, PushDirection.Down) > 0);
+            Assert.Equal(32, moving.BoundingBox.Bottom, 7);
+
+            var distance = Compactor.Push(parts, obstacles, workArea, 2, next);
+
+            Assert.True(distance > 1, $"Push {next} after contact moved only {distance:R}");
+            AssertClearance(moving, obstacle, 2);
+        }
+
         [Fact]
         public void Push_WithSpacing_ContactStillBlocksTheSameDirection()
         {

@@ -7,12 +7,21 @@ namespace OpenNest
 {
     public static class PartGeometry
     {
+        /// <summary>
+        /// Nesting material of a program, without lead-ins and lead-outs: a lead is a cut
+        /// into scrap, not part material, and chaining it into the perimeter leaves an open
+        /// spur, so the offset contour no longer closes and every slide contact against it
+        /// blocks.
+        /// </summary>
+        private static List<Entity> MaterialEntities(CNC.Program program) =>
+            ConvertProgram.ToGeometry(program)
+                .Where(e => e.Layer != SpecialLayers.Leadin && e.Layer != SpecialLayers.Leadout)
+                .ForNesting();
+
         public static List<Line> GetPartLines(Part part, double chordTolerance = 0.001)
         {
-            var entities = ConvertProgram.ToGeometry(part.Program);
-            var shapes = ShapeBuilder.GetShapes(
-                entities.ForNesting()
-            );
+            var entities = MaterialEntities(part.Program);
+            var shapes = ShapeBuilder.GetShapes(entities);
             var lines = new List<Line>();
 
             foreach (var shape in shapes)
@@ -55,10 +64,8 @@ namespace OpenNest
         public static List<Entity> GetOffsetPerimeterEntities(CNC.Program program, double spacing)
         {
             PerfCounters.CountOffsetPerimeterEntities();
-            var geoEntities = ConvertProgram.ToGeometry(program);
-            var profile = new ShapeProfile(
-                geoEntities.ForNesting().ToList()
-            );
+            var geoEntities = MaterialEntities(program);
+            var profile = new ShapeProfile(geoEntities);
 
             var offsetShape = profile.Perimeter.OffsetOutward(spacing);
             if (offsetShape == null)
@@ -73,10 +80,8 @@ namespace OpenNest
         /// </summary>
         public static List<Entity> GetOffsetPartEntities(Part part, double spacing)
         {
-            var geoEntities = ConvertProgram.ToGeometry(part.Program);
-            var profile = new ShapeProfile(
-                geoEntities.ForNesting().ToList()
-            );
+            var geoEntities = MaterialEntities(part.Program);
+            var profile = new ShapeProfile(geoEntities);
             var entities = new List<Entity>();
 
             var perimeter = profile.Perimeter.OffsetOutward(spacing);
@@ -106,10 +111,8 @@ namespace OpenNest
         /// </summary>
         public static List<Entity> GetPerimeterEntities(Part part)
         {
-            var geoEntities = ConvertProgram.ToGeometry(part.Program);
-            var profile = new ShapeProfile(
-                geoEntities.ForNesting().ToList()
-            );
+            var geoEntities = MaterialEntities(part.Program);
+            var profile = new ShapeProfile(geoEntities);
 
             return CopyEntitiesAtLocation(profile.Perimeter.Entities, part.Location);
         }
@@ -120,10 +123,8 @@ namespace OpenNest
         /// </summary>
         public static List<Entity> GetPartEntities(Part part)
         {
-            var geoEntities = ConvertProgram.ToGeometry(part.Program);
-            var profile = new ShapeProfile(
-                geoEntities.ForNesting().ToList()
-            );
+            var geoEntities = MaterialEntities(part.Program);
+            var profile = new ShapeProfile(geoEntities);
             var entities = CopyEntitiesAtLocation(profile.Perimeter.Entities, part.Location);
 
             foreach (var cutout in profile.Cutouts)
@@ -165,10 +166,8 @@ namespace OpenNest
             Vector vectorDirection
         )
         {
-            var entities = ConvertProgram.ToGeometry(part.Program);
-            var shapes = ShapeBuilder.GetShapes(
-                entities.ForNesting()
-            );
+            var entities = MaterialEntities(part.Program);
+            var shapes = ShapeBuilder.GetShapes(entities);
             var lines = new List<Line>();
 
             foreach (var shape in shapes)
