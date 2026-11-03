@@ -214,9 +214,10 @@ internal static class JointCuttingPlanSearch
         }, token, exits);
     }
 
-    // When the approach crossed the part cut just before the one it left from, the tool went on
-    // past that part and came back across it: "cut those two the other way round", so the tool
-    // leaves from the nearer one (two stacked strips, cut far one first). Otherwise "cut the
+    // When the approach crossed the part cut just before the one it left from, and no part but
+    // those two, the tool went on past that part and came back across it: "cut those two the
+    // other way round", so the tool leaves from the nearer one (two stacked strips, cut far one
+    // first). An approach that crosses other parts too would still cross them. Otherwise "cut the
     // blocked part before every part whose cut contour its approach crossed", unless that
     // would contradict an order already required. When every such rule would (a sheet separator
     // is cut after everything), the blocked part cannot come earlier, so the tool must arrive
@@ -240,7 +241,8 @@ internal static class JointCuttingPlanSearch
         if (attempt.Blocked is not int blocked)
             return [];
         if (attempt.LastCut?.SourceOrdinal is int last && attempt.CutBeforeLast?.SourceOrdinal is int previous
-            && attempt.Crossed.Contains(previous) && !prerequisites[previous].Contains(last)
+            && attempt.Crossed.Contains(previous) && attempt.Crossed.All(crossed => crossed == previous || crossed == last)
+            && !prerequisites[previous].Contains(last)
             && !Precedes(previous, last, prerequisites))
             return [(last, previous)];
         var before = New(blocked);
@@ -359,7 +361,7 @@ internal static class JointCuttingPlanSearch
         internal Attempt Follow(int[] sequence, int? stall, Node resume, bool preferredOnly = false, bool contourRecovery = false,
             HashSet<int>[] prerequisites = null, int? expansionLimit = null)
         {
-            var root = resume ?? new Node([], snapshot.StartPoint, new ReleasedContourState(reportMissingLeadIns: false), null, null);
+            var root = resume ?? new Node([], snapshot.StartPoint, snapshot.NewReleasedState(), null, null);
             var attempt = new Attempt(sequence);
             var progressExpansions = Expansions;
             var stack = new Stack<Frame>();
@@ -1277,14 +1279,17 @@ internal static class JointCuttingPlanSearch
                         candidate => Evaluate(source, candidate), snapshot.MaxEntries, token));
                 }
             // When no single tab can steady the part, its steadiest entry is only a preference:
-            // the other entries clear of inside corners follow it, steadiest first, so a part
-            // boxed in by its neighbors can still be left toward the next cut.
+            // the other entries clear of inside corners follow it, ranked toward the next cut, so a
+            // part boxed in by its neighbors, or one that must not be crossed once cut, can still
+            // be left toward the next cut. Ranked steadiest first, the shortlist of a long strip
+            // held on one line of contacts is all on one side.
             if (contour == source.Prepared.PerimeterOrdinal && source.Prepared.HasSupportTab
                 && source.Prepared.Support is { TabCanSupport: false }
                 && (selection.Choices.Count != 0 || selection.UncertainChoices.Count != 0))
             {
                 var others = ContourEntrySelection.Select(
-                    RankedEntries(source, contour, target, arrival, sightTargets, SupportEntries.ClearOfInsideCorners),
+                    RankedEntries(source, contour, target, arrival, sightTargets, SupportEntries.ClearOfInsideCorners,
+                        steadiestFirst: false),
                     candidate => Evaluate(source, candidate), snapshot.MaxEntries, token);
                 var kept = selection.Choices.Concat(selection.UncertainChoices).ToArray();
                 bool IsNew(ContourChoice choice) =>
@@ -1353,9 +1358,11 @@ internal static class JointCuttingPlanSearch
         }
 
         // One contour's automatic catalog ranked toward the next cut, before lead checks. A
-        // support fallback leads with the entries whose tab steadies the part most.
+        // support fallback leads with the entries whose tab steadies the part most, unless
+        // <paramref name="steadiestFirst"/> is false.
         private IReadOnlyList<ContourEntryCandidate> RankedEntries(FixedProgramPlacement source, int contour,
-            Vector? target, Vector arrival, Vector[] sightTargets, SupportEntries supportEntries)
+            Vector? target, Vector arrival, Vector[] sightTargets, SupportEntries supportEntries,
+            bool steadiestFirst = true)
         {
             // Last contour has no downstream target, but still needs its exact native
             // closest-arrival fallback. Keep target null in the ranker: arrival is not
@@ -1377,7 +1384,7 @@ internal static class JointCuttingPlanSearch
             // pierce clears the hole itself lead.
             if (target is { } next && contour != source.Prepared.PerimeterOrdinal)
                 ordered = ordered.DepartingClear(source.Prepared, next, token);
-            if (supportEntries != SupportEntries.Steadying && contour == source.Prepared.PerimeterOrdinal)
+            if (steadiestFirst && supportEntries != SupportEntries.Steadying && contour == source.Prepared.PerimeterOrdinal)
                 ordered = ordered.OrderByDescending(c => source.Prepared.SupportMarginAt(c.Choice)).ToList();
             return ordered;
         }
@@ -1434,7 +1441,7 @@ internal static class JointCuttingPlanSearch
         internal IReadOnlyList<FixedProgramPlacement> FollowSegments(IReadOnlyList<FixedProgramPlacement> order)
         {
             var followed = order.ToArray();
-            var checker = new ReleasedContourState(reportMissingLeadIns: false);
+            var checker = snapshot.NewReleasedState();
             var position = snapshot.StartPoint;
             try
             {
@@ -1517,7 +1524,7 @@ internal static class JointCuttingPlanSearch
 
         internal IReadOnlyList<FixedProgramPlacement> SafestRoute()
         {
-            var node = new Node([], snapshot.StartPoint, new ReleasedContourState(reportMissingLeadIns: false), null, null);
+            var node = new Node([], snapshot.StartPoint, snapshot.NewReleasedState(), null, null);
             while (node.Order.Length < snapshot.Placements.Count)
             {
                 token.ThrowIfCancellationRequested();

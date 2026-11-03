@@ -26,7 +26,7 @@ internal static class RaisedRapids
     internal static IReadOnlyList<FixedProgramPlacement> Mark(CuttingPlanSnapshot snapshot,
         IReadOnlyList<FixedProgramPlacement> order, CancellationToken token)
     {
-        var checker = new ReleasedContourState(reportMissingLeadIns: false);
+        var checker = snapshot.NewReleasedState();
         var position = snapshot.StartPoint;
         var marked = new List<FixedProgramPlacement>(order.Count);
         foreach (var proposal in order)

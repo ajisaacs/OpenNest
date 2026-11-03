@@ -39,7 +39,8 @@ var result = CuttingPlanService.Plan(snapshot, cancellationToken);
   the plate's own under `ForPlate`), each regenerated part the bed cannot hold level gets a
   tabbed perimeter whose automatic entries keep to points where the tab steadies it. A tab
   that still cannot hold its part level, or sits in an inside corner, is noted on the plan
-  without changing its status. A part no longer than `TabHeldMaxLength` is held by its tab
+  without changing its status. A part no single tab can hold level may tip once cut, so its
+  tabbed outside is a rapid obstacle from then on, like an untabbed one. A part no longer than `TabHeldMaxLength` is held by its tab
   alone, so any tab clear of inside corners steadies it. Without a bed, the parts whose width is in
   `NoBedTabMinWidth`..`NoBedTabMaxWidth` are tabbed instead, and with no range set the plan notes
   that nothing was tabbed; see [support tabs](support-tabs.md).
@@ -240,10 +241,11 @@ before those", backs up to just before the earliest of them and re-plans the res
 from the tool position there; parts cut before that point are kept. The last of them was
 planned facing the part that followed it; when another part follows it now, it is
 planned again, in the same place, facing that one. When the approach
-crossed the part cut just before the one it left from, the tool went on past that part
-and came back across it, so the search learns "cut those two the other way round"
+crossed the part cut just before the one it left from, and no other part, the tool went on
+past that part and came back across it, so the search learns "cut those two the other way round"
 instead: the tool then leaves from the nearer one, as with two stacked strips cut far
-one first. When the part
+one first. An approach that crosses other parts too would still cross them after the swap,
+so it teaches "cut this part before those". When the part
 cannot come earlier (a sheet separator is cut after everything), it learns the other
 way round, "cut the part the approach left from before those", so the tool arrives
 from beyond them. The first pass

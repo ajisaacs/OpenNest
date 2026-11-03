@@ -327,7 +327,7 @@ public static class CuttingPlanService
         if (snapshot.Dependencies.FirstViolation(order) is { } violation)
             return new(CuttingPlanStatus.InvalidInput,
                 findings: [DependencyFinding(snapshot, violation, "The proposed order")], expansions: expansions);
-        var checker = new ReleasedContourState(reportMissingLeadIns: false);
+        var checker = snapshot.NewReleasedState();
         var position = snapshot.StartPoint;
         var distance = 0.0;
         var findings = new List<PostVerificationFinding>();
@@ -402,7 +402,7 @@ public static class CuttingPlanService
         if (snapshot.Dependencies.FirstViolation(order.Select(p => p.SourceOrdinal).ToArray()) is { } violation)
             return new(CuttingPlanStatus.InvalidInput,
                 findings: [DependencyFinding(snapshot, violation, "The proposed order")], expansions: expansions);
-        var checker = new ReleasedContourState(reportMissingLeadIns: false);
+        var checker = snapshot.NewReleasedState();
         var position = snapshot.StartPoint;
         var distance = 0.0;
         var findings = new List<CuttingPlanFinding>();

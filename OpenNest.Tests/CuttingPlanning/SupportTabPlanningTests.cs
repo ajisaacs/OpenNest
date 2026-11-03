@@ -197,6 +197,49 @@ public class SupportTabPlanningTests
             && f.Kind == PostVerificationKind.PartSupport && f.Message.Contains("no single tab can steady it"));
     }
 
+    // A 0.8 x 10 upright strip at x 4..4.8 between squares cut before and after it on either side.
+    // The kept order goes left, strip, right, then back left: that last rapid must cross the strip.
+    private static (Plate Plate, Part Strip) StripBetweenSquares(SupportBed bed)
+    {
+        var plate = new Plate(20, 20) { SupportBed = bed };
+        var strip = new Part(new Drawing("strip", LeadPathValidationTests.Rectangle(0, 0, 0.8, 10)), new Vector(4, 1));
+        var square = new Drawing("square", LeadPathValidationTests.Rectangle(0, 0, 1, 1));
+        plate.Parts.Add(new Part(square, new Vector(1, 2)));
+        plate.Parts.Add(strip);
+        plate.Parts.Add(new Part(square, new Vector(7, 4)));
+        plate.Parts.Add(new Part(square, new Vector(1, 8)));
+        return (plate, strip);
+    }
+
+    [Theory]
+    // No grid column runs under the strip: no single tab can hold it, so once cut it may tip.
+    [InlineData(0.9, false)]
+    // A column runs under it, off its center line: its tab holds it level, so it stays crossable.
+    [InlineData(0.25, true)]
+    public void PartNoSingleTabCanHold_IsNotCrossedOnceCut(double columnOffset, bool crossable)
+    {
+        var bed = new SupportGrid(1, 1, columnOffset, 0, stabilityMargin: 0.1);
+        var (plate, strip) = StripBetweenSquares(bed);
+        var support = SupportAnalyzer.Analyze(bed, plate.Quadrant, strip);
+        Assert.False(support.IsSupported);
+        Assert.Equal(crossable, support.TabCanSupport);
+
+        var kept = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(0, 0),
+            confirmedParameters: Parameters(), preservePartOrder: true));
+        var free = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(0, 0),
+            confirmedParameters: Parameters()));
+
+        Assert.Equal(crossable, kept.ProposedOrder.Count != 0);
+        Assert.True(free.ProposedOrder.Count == plate.Parts.Count,
+            string.Join("\n", free.Findings.Select(f => f.Message)));
+        Assert.True(free.IndependentlyReplayed);
+        if (crossable)
+            return;
+        // Free to reorder, the squares on the strip's left side are both cut before it.
+        var stripAt = free.ProposedOrder.ToList().FindIndex(p => ReferenceEquals(p.SourcePart, strip));
+        Assert.All(free.ProposedOrder.Skip(stripAt + 1), p => Assert.True(p.Location.X > 5, $"{p.Location} after the strip"));
+    }
+
     [Fact]
     public void FallbackCatalog_KeepsClearOfInsideCornersBeforeOfferingEveryEntry()
     {

@@ -12,6 +12,9 @@ public sealed class ReleasedContourState
 {
     private readonly List<Obstacle> obstacles = new();
     private readonly bool reportMissingLeadIns;
+    // Parts (by caller part number) whose single tab may not hold them level: once cut, their
+    // tabbed perimeter is an obstacle as if cut free, since the part may tip into the head's path.
+    private readonly Func<int, bool> tabMayNotHold;
     // How the last analysed part ended: the contours it numbered, and whether nothing it left
     // (open fragments, deferred findings, a reported tab, a dangling lead-in) can change how
     // motions appended to it are judged. See Continue.
@@ -22,14 +25,20 @@ public sealed class ReleasedContourState
 
     /// <param name="reportMissingLeadIns">Keep pre-post warnings by default. Planning
     /// may pierce directly on a contour and checks travel without requiring a lead.</param>
-    public ReleasedContourState(bool reportMissingLeadIns)
+    public ReleasedContourState(bool reportMissingLeadIns) : this(reportMissingLeadIns, null) { }
+
+    /// <param name="tabMayNotHold">Part numbers whose support tab may not hold them level (no
+    /// single tab can steady them): the longest open cut a part leaves, its tabbed
+    /// perimeter, becomes an obstacle when the part ends, closed across its tab gap.</param>
+    public ReleasedContourState(bool reportMissingLeadIns, Func<int, bool> tabMayNotHold)
     {
         this.reportMissingLeadIns = reportMissingLeadIns;
+        this.tabMayNotHold = tabMayNotHold;
     }
 
     public ReleasedContourState Copy()
     {
-        var copy = new ReleasedContourState(reportMissingLeadIns)
+        var copy = new ReleasedContourState(reportMissingLeadIns, tabMayNotHold)
         {
             partContours = partContours,
             partClosed = partClosed,
@@ -174,7 +183,9 @@ public sealed class ReleasedContourState
                         continue;
                     var crossing = new PostVerificationFinding(PostVerificationKind.RapidCrossing, plate, part,
                         obstacle.Part, (move.HeadRaised ? "Head-raised" : "Direct") + " XY rapid crosses or touches "
-                        + $"completed untabbed contour {obstacle.Contour} of part {obstacle.Part}.")
+                        + (obstacle.TabMayNotHold
+                            ? $"the tabbed outside of part {obstacle.Part}, which its tab may not hold level."
+                            : $"completed untabbed contour {obstacle.Contour} of part {obstacle.Part}."))
                     {
                         Location = (start + move.End) * 0.5,
                         RapidStart = start,
@@ -276,6 +287,16 @@ public sealed class ReleasedContourState
                 "Multiple interrupted/open cutting fragments remain. Their combined cuts may release material; " +
                 "they cannot be assumed to be retained by tabs. Review rapid travel manually."),
                 unfinished.Any(chain => chain.Fixed));
+        // A part that may tip once cut is avoided like one cut free. The retention proof above is
+        // unchanged: the part is still attached by its tab, just not held level by it.
+        if (!cutoff && unfinished.Count > 0 && tabMayNotHold?.Invoke(part) == true)
+        {
+            var perimeter = unfinished.MaxBy(chain => chain.Curves.Sum(curve => curve.Length));
+            var curves = perimeter.Curves.ToList();
+            if (curves[^1].End.DistanceTo(curves[0].Start) > PostVerificationGeometry.Epsilon)
+                curves.Add(PostVerificationGeometry.Curve.Create(curves[^1].End, curves[0].Start, null, false));
+            obstacles.Add(new(part, contourNumber, curves, null) { TabMayNotHold = true });
+        }
         partContours = contourNumber;
         partClosed = !cutoff && isFixed == null && unfinished.Count == 0 && deferred.Count == 0 && !reportedTab
             && !inBreakCut && loose.Leads.Count == 0;
@@ -502,5 +523,8 @@ public sealed class ReleasedContourState
     {
         internal PostVerificationGeometry.Extent Extent { get; } =
             Curves.Aggregate(PostVerificationGeometry.Extent.None, (extent, curve) => extent.Union(curve.Extent));
+
+        /// <summary>A tabbed perimeter closed across its tab gap, for a part its tab may not hold level.</summary>
+        internal bool TabMayNotHold { get; init; }
     }
 }

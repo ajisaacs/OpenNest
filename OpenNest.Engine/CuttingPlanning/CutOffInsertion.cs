@@ -50,7 +50,7 @@ internal static class CutOffInsertion
         // The contours finished before each gap, and where the tool is when it reaches the gap.
         var states = new ReleasedContourState[count + 1];
         var arrivals = new Vector[count + 1];
-        states[0] = new ReleasedContourState(reportMissingLeadIns: false);
+        states[0] = snapshot.NewReleasedState();
         arrivals[0] = snapshot.StartPoint;
         for (var gap = 0; gap < count; gap++)
         {

@@ -86,7 +86,22 @@ public sealed class CuttingPlanSnapshot
         PreservePartOrder = preservePartOrder;
         MaxEntries = maxEntries;
         ExpansionObserver = expansionObserver;
+        tabMayNotHold = Placements
+            .Where(p => p.Prepared is { Support.TabCanSupport: false, PerimeterTabbed: true })
+            .Select(p => p.SourceOrdinal + 1).ToHashSet();
     }
+
+    // Part numbers (source ordinal + 1, as every checker is keyed) of support-tabbed parts that no
+    // single tab can steady.
+    private readonly HashSet<int> tabMayNotHold;
+
+    /// <summary>
+    /// An empty rapid checker for this capture. A support-tabbed part no single tab can steady may
+    /// tip once cut, so its tabbed outside is an obstacle from then on, as an untabbed one is;
+    /// rapids may still cross parts their tab holds level.
+    /// </summary>
+    internal ReleasedContourState NewReleasedState() =>
+        new(reportMissingLeadIns: false, tabMayNotHold.Count == 0 ? null : tabMayNotHold.Contains);
 
     /// <summary>Whole-part prerequisites by source ordinal (cutoffs, inner parts before hosts).</summary>
     internal CuttingDependencyGraph Dependencies { get; }

@@ -138,11 +138,19 @@ lead-in fits, it keeps every one that holds the part level, or else only the ste
 open-scrap pierce fallback then tries the last of those catalogs.
 
 When no single tab can steady the part (it rests on no contacts, or too few), the steadiest
-entry is only a preference: its other fitting entries clear of inside corners follow it,
-steadiest first, in the search and in contour recovery. A part boxed in by its neighbors, such as
-the upper of two strips nested in a cutout, can then be left toward the next cut instead of
-blocking the plan. It is still tabbed and still warned about as one that may tip. A part a tab
-can hold level keeps to its steadying entries.
+entry is only a preference: its other fitting entries clear of inside corners follow it, ranked
+toward the next cut, in the search and in contour recovery (ranked steadiest first, the shortlist
+of a long strip resting on one line of contacts would all lie on its far side). A part boxed in
+by its neighbors, such as the upper of two strips nested in a cutout, can then be left toward the
+next cut instead of blocking the plan. It is still tabbed and still warned about as one that may
+tip. A part a tab can hold level keeps to its steadying entries.
+
+Once cut, such a part may tip into the head's path, so Plan Cutting treats its tabbed outside as a
+rapid obstacle, closed across its tab gap, exactly as an untabbed part: no later rapid may cross
+it, and the search reorders around it (a row of long strips is cut after the parts beside them,
+each strip left toward the next). Parts their tab holds level stay crossable, as the retained
+material allows. The pre-post review does not read support settings for rapids, so it still
+checks rapid crossings against untabbed contours only.
 
 A drawing pin on the perimeter wins: its entry, leads and tab are kept as pinned, and the
 analysis is only carried for review. Replay and best-effort plans (`SupportTabCapture.Review`)
