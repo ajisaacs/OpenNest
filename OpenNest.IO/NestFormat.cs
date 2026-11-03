@@ -443,7 +443,17 @@ namespace OpenNest.IO
             public bool CustomColor { get; init; }
 
             public QuantityDto Quantity { get; init; } = new();
+
+            /// <summary>
+            /// The lower-first legacy priority (<see cref="OpenNest.LegacyPriority"/>), still
+            /// written so older readers keep the same order. Read only when
+            /// <see cref="NestPriority"/> is absent.
+            /// </summary>
             public int Priority { get; init; }
+
+            /// <summary>Nesting priority, higher numbers first. Omitted when zero.</summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public int? NestPriority { get; init; }
 
             /// <summary>Sequence this drawing's parts first. Omitted when false.</summary>
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]

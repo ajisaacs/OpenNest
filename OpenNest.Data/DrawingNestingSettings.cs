@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Text.Json.Serialization;
 using OpenNest;
 
 namespace OpenNest.Data;
@@ -14,7 +15,28 @@ public sealed record DrawingNestingSettings
     /// <summary>Automatic sequencing cuts this drawing's parts first (for example test squares).</summary>
     public bool CutFirst { get; init; }
 
+    /// <summary>Nesting order: higher numbers nest first.</summary>
+    [JsonIgnore]
     public int Priority { get; init; }
+
+    /// <summary>
+    /// The lower-first legacy value (<see cref="OpenNest.LegacyPriority"/>) older clients read
+    /// and send. Written before <see cref="NestPriority"/>, so a reader that sees both ends on it.
+    /// </summary>
+    [JsonPropertyName("priority")]
+    public int LegacyPriorityValue
+    {
+        get => LegacyPriority.Convert(Priority);
+        init => Priority = LegacyPriority.Convert(value);
+    }
+
+    /// <summary><see cref="Priority"/> on the wire; absent from older clients.</summary>
+    [JsonPropertyName("nestPriority")]
+    public int NestPriority
+    {
+        get => Priority;
+        init => Priority = value;
+    }
 
     /// <summary>Rotation step in radians; zero means the engine's default.</summary>
     public double StepAngle { get; init; }

@@ -307,7 +307,9 @@ first upload), `revision`, `name`, `customer`, `materialName`, `materialGrade`,
 and `savedAt`.
 
 `settings` holds the drawing's nesting settings, applied when it is added to a
-nest: `cutFirst` (sequence its parts first, for example test squares), `priority`,
+nest: `cutFirst` (sequence its parts first, for example test squares), `nestPriority`
+(higher numbers nest first; `priority` carries the negated, lower-first value for older
+clients, and a request without `nestPriority` is read from it),
 `stepAngle`, `startAngle`, `endAngle` (radians), `allow180Equivalent` and
 `colorArgb` (32-bit ARGB; alpha 0 means no stored color, so the nest assigns one).
 They are record fields, not package content (see

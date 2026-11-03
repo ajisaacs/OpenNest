@@ -406,6 +406,7 @@ namespace OpenNest.Forms
             priorityBox.Dock = DockStyle.Fill;
             priorityBox.Margin = new Padding(3, 4, 3, 4);
             priorityBox.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
+            priorityBox.Minimum = new decimal(new int[] { 999999, 0, 0, int.MinValue });
             priorityBox.Name = "priorityBox";
             priorityBox.Suffix = "";
             priorityBox.TabIndex = 1;
@@ -416,7 +417,7 @@ namespace OpenNest.Forms
             priorityHint.AutoSize = true;
             priorityHint.ForeColor = SystemColors.GrayText;
             priorityHint.Name = "priorityHint";
-            priorityHint.Text = "Lower numbers nest first";
+            priorityHint.Text = "Higher numbers nest first";
             //
             // cutFirstBox
             //

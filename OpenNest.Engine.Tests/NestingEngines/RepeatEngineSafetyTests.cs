@@ -79,7 +79,7 @@ public abstract class RepeatEngineSafetyTests
     public void SameNamedDrawingsRetainExactDistinctRequirementIds()
     {
         var a = new Drawing("same", Shapes.Rectangle(6, 9));
-        var b = new Drawing("same", Shapes.Rectangle(3, 9)) { Priority = 1 };
+        var b = new Drawing("same", Shapes.Rectangle(3, 9)) { Priority = -1 };
         var job = Job([DrawingJobMapper.FromDrawing("a", a, 5), DrawingJobMapper.FromDrawing("A", b, 8)], [Stock("s", 10, 10, spacing: 0.2)]);
         var result = Engine().Solve(job);
         LayoutAssert.Valid(job, result);
@@ -202,7 +202,7 @@ public abstract class RepeatEngineSafetyTests
     }
 
     private static NestJob Mixed(int a, int b) => Job(
-        [Part("a", Shapes.Rectangle(6, 9), a, RotationPolicy.Fixed(0)), Part("b", Shapes.Rectangle(3, 9), b, RotationPolicy.Fixed(0), priority: 1)],
+        [Part("a", Shapes.Rectangle(6, 9), a, RotationPolicy.Fixed(0)), Part("b", Shapes.Rectangle(3, 9), b, RotationPolicy.Fixed(0), priority: -1)],
         [Stock("s", 10, 10, spacing: 0.2)]);
 
     private sealed class InlineProgress(Action<NestJobProgress> report) : IProgress<NestJobProgress>

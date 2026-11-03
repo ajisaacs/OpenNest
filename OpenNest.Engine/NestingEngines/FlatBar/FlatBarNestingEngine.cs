@@ -245,14 +245,14 @@ public sealed class FlatBarNestingEngine : INestingEngine
     private readonly record struct Estimate(int Tier, int UrgentUnplaced, int Unplaced, double Cost)
         : IComparable<Estimate>
     {
-        public static Estimate Zero => new(int.MaxValue, 0, 0, 0);
+        public static Estimate Zero => new(int.MinValue, 0, 0, 0);
 
         public static Estimate Leaving(IReadOnlyList<BarType> types, int[] left, double penalty)
         {
             var open = types.Where(t => left[t.Index] > 0).ToList();
             if (open.Count == 0)
                 return Zero;
-            var tier = open.Min(t => t.Priority);
+            var tier = open.Max(t => t.Priority);
             var count = open.Sum(t => left[t.Index]);
             return new Estimate(tier, open.Where(t => t.Priority == tier).Sum(t => left[t.Index]), count, count * penalty);
         }
@@ -261,9 +261,9 @@ public sealed class FlatBarNestingEngine : INestingEngine
 
         public int CompareTo(Estimate other)
         {
-            // A more urgent tier left unplaced is worse than any later tier left unplaced.
+            // A more urgent (higher) tier left unplaced is worse than any later tier left unplaced.
             if (Tier != other.Tier)
-                return other.Tier.CompareTo(Tier);
+                return Tier.CompareTo(other.Tier);
             var c = UrgentUnplaced.CompareTo(other.UrgentUnplaced);
             if (c != 0)
                 return c;

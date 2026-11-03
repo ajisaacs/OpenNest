@@ -36,7 +36,7 @@ internal static class PlateFillOrchestrator
 
         var fillItems = items
             .Where(item => ShouldFill(item, plate, plateArea))
-            .OrderBy(item => item.Priority)
+            .OrderByDescending(item => item.Priority)
             .ThenByDescending(item => item.Drawing.Area)
             .ToList();
 

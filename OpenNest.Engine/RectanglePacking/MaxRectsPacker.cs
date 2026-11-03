@@ -16,7 +16,7 @@ internal enum PickMode
 }
 
 /// <summary>A box type to pack.</summary>
-/// <param name="Priority">Demand tier; lower numbers are served first.</param>
+/// <param name="Priority">Demand tier; higher numbers are served first.</param>
 /// <param name="Sizes">Allowed packing sizes (one per orientation), already grown by any spacing.</param>
 /// <param name="Area">Ranking area: larger boxes win score ties and go first in ordered mode.</param>
 internal sealed record PackType(int Priority, IReadOnlyList<(double Width, double Height)> Sizes, double Area);
@@ -25,9 +25,9 @@ internal sealed record PackType(int Priority, IReadOnlyList<(double Width, doubl
 internal readonly record struct PackPlacement(int Type, int Size, double X, double Y);
 
 /// <summary>
-/// Packs box types onto one <see cref="MaxRectsSheet"/> under a fit rule and pick mode. Lower
-/// priority numbers are always served first: a higher-number type is only placed when no
-/// lower-number type still fits anywhere. Deterministic: ties resolve by input order.
+/// Packs box types onto one <see cref="MaxRectsSheet"/> under a fit rule and pick mode. Higher
+/// priority numbers are always served first: a lower-number type is only placed when no
+/// higher-number type still fits anywhere. Deterministic: ties resolve by input order.
 /// </summary>
 internal static class MaxRectsPacker
 {
@@ -60,7 +60,7 @@ internal static class MaxRectsPacker
     {
         // Free space only shrinks, so a size that fails once never fits again on this sheet.
         var dead = types.Select(t => new bool[t.Sizes.Count]).ToArray();
-        var tiers = types.Select(t => t.Priority).Distinct().Order().ToArray();
+        var tiers = types.Select(t => t.Priority).Distinct().OrderDescending().ToArray();
 
         while (true)
         {
@@ -115,7 +115,7 @@ internal static class MaxRectsPacker
         var order = Enumerable
             .Range(0, types.Count)
             .Where(t => types[t].Sizes.Count > 0)
-            .OrderBy(t => types[t].Priority)
+            .OrderByDescending(t => types[t].Priority)
             .ThenByDescending(t => types[t].Area)
             .ThenBy(t => t);
 

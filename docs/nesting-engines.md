@@ -241,7 +241,7 @@ its length less that gain; the first copy of each run pays the gain back.
 Bar by bar, every available stock offers two candidate bars: the fullest bar of the CutList packer
 (first-fit decreasing plus its swap optimization, or an exhaustive fewest-bars search for 25 items
 or fewer) and the fullest single bar a bounded subset-sum search can fill from the remaining
-demand. Lower priority numbers pack first in both. Each candidate is laid out, then the rest of
+demand. Higher priority numbers pack first in both. Each candidate is laid out, then the rest of
 the demand is priced at the cheaper of each stock's cut-list plan and its repeated best fills. The
 winner has the fewest unplaced parts of the most urgent tier, then the fewest unplaced parts, then
 the lowest salvage-credited cost. Searches stop at counted node budgets, so results are
@@ -345,7 +345,7 @@ that circle (a square fills 0.64, a gear about 0.85), it returns everything unpl
 reporting progress, and Default discards it at almost no cost. Holes are not used here; rings in
 rings come from the cutout pre-pass, which hands the engine each nested chain as its outer frame.
 
-Each disc goes, lower priority number first and then largest first, to the best feasible center
+Each disc goes, higher priority number first and then largest first, to the best feasible center
 tangent to two of: the work-area walls, placed discs, and clamp zones grown by the clamp
 clearance (square-cornered, as the layout check grows them). Discs keep the part spacing plus
 twice `NestTolerances.ValidationOutline` between them. Bottom-left fills rows and left-bottom

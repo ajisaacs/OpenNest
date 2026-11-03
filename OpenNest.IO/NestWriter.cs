@@ -236,7 +236,8 @@ namespace OpenNest.IO
                         },
                         CustomColor = d.HasCustomColor,
                         Quantity = new QuantityDto { Required = d.Quantity.Required },
-                        Priority = d.Priority,
+                        Priority = LegacyPriority.Convert(d.Priority),
+                        NestPriority = d.Priority == 0 ? null : d.Priority,
                         CutFirst = d.CutFirst,
                         Constraints = new ConstraintsDto
                         {

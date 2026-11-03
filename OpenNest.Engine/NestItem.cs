@@ -1,4 +1,4 @@
-﻿namespace OpenNest.Engine
+namespace OpenNest.Engine
 {
     public class NestItem
     {
@@ -8,7 +8,7 @@
         public Drawing Drawing { get; set; }
 
         /// <summary>
-        /// Priority of the part determines nesting order. Highest priority will be nested first.
+        /// Priority of the part determines nesting order. Higher numbers are nested first.
         /// </summary>
         public int Priority { get; set; }
 

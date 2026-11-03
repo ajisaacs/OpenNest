@@ -37,7 +37,7 @@ internal enum DiscSeed
 /// <summary>
 /// Packs discs onto one sheet. Each disc goes to the best feasible center tangent to two of
 /// {work-area walls, placed discs, clamp keep-outs}, the exact candidate set for circles, so no
-/// no-fit polygons are needed. Discs go lower priority number first, then largest first, so small
+/// no-fit polygons are needed. Discs go higher priority number first, then largest first, so small
 /// discs land in the gaps between large ones. An optional hexagonal or square lattice of one type
 /// seeds the sheet before the greedy pass fills the rest.
 /// </summary>
@@ -72,7 +72,7 @@ internal static class DiscPacker
             }
         }
         // Stable: equal radii keep requirement order.
-        foreach (var type in fits.OrderBy(t => t.Priority).ThenByDescending(t => t.Radius))
+        foreach (var type in fits.OrderByDescending(t => t.Priority).ThenByDescending(t => t.Radius))
         {
             while (left[type.Index] > 0)
             {
@@ -102,7 +102,7 @@ internal static class DiscPacker
     {
         if (fits.Count == 0)
             return null;
-        var top = fits.Min(t => t.Priority);
+        var top = fits.Max(t => t.Priority);
         var best = fits.Where(t => t.Priority == top)
             .OrderByDescending(t => left[t.Index] * t.Radius * t.Radius)
             .First();

@@ -161,7 +161,7 @@ internal static class SheetByStock
     }
 
     /// <summary>
-    /// Priority guard: how many instances of the most urgent (lowest-number) tier with remaining
+    /// Priority guard: how many instances of the most urgent (highest-number) tier with remaining
     /// demand this layout leaves unplaced. Layouts are ranked on this before cost, so a cheaper sheet
     /// can never win by serving a later tier at the expense of an earlier one.
     /// </summary>
@@ -171,7 +171,7 @@ internal static class SheetByStock
         var active = types.Where(t => remaining[t.Index] > 0).ToList();
         if (active.Count == 0)
             return 0;
-        var top = active.Min(t => t.Priority);
+        var top = active.Max(t => t.Priority);
         var placed = layout.Poses.Count(p => priority[p.PartId] == top);
         return active.Where(t => t.Priority == top).Sum(t => remaining[t.Index]) - placed;
     }

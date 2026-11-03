@@ -66,6 +66,7 @@ namespace OpenNest
 
         public string Customer { get; set; }
 
+        /// <summary>Nesting order: higher numbers nest first. Zero is the default.</summary>
         public int Priority { get; set; }
 
         public DwgQty Quantity;

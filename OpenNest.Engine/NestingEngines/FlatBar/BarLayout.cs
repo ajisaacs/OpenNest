@@ -35,7 +35,7 @@ internal sealed record BarSheet(BarStock Bar, IReadOnlyList<BarPart> Parts, Box?
 /// and backed off until it passes; the box-to-box start always passes, so the result is never
 /// worse than plain box packing. Parts whose outline fills their box gain nothing and skip the
 /// slide. The length a slide frees at the end of a run is refilled from the remaining demand,
-/// lowest priority number first, then longest first.
+/// highest priority number first, then longest first.
 /// </summary>
 internal sealed class BarLayout
 {
@@ -156,7 +156,7 @@ internal sealed class BarLayout
 
     private IEnumerable<BarType> RefillOrder(BarStock bar, int[] available) =>
         types.Where(t => available[t.Index] > 0 && !double.IsNaN(bar.Lengths[t.Index]))
-            .OrderBy(t => t.Priority)
+            .OrderByDescending(t => t.Priority)
             .ThenByDescending(t => bar.Lengths[t.Index])
             .ThenBy(t => t.Index);
 

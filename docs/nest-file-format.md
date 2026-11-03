@@ -323,7 +323,7 @@ the server's library record owns are written as their defaults, so editing them 
 changes the hash:
 
 - nest and drawing `name` (blank), drawing `customer`, material `name` and `grade` (blank);
-- `color`, `customColor`, `priority`, `cutFirst` and `constraints` (omitted);
+- `color`, `customColor`, `priority`, `nestPriority`, `cutFirst` and `constraints` (omitted);
 - `quantity.required` (zero) and `library` (omitted).
 
 Adding a library drawing to a nest ignores whatever a package holds for these fields
@@ -345,6 +345,14 @@ changing the color scheme, reassigns every non-custom, non-cutoff drawing a colo
 from the active scheme's palette, so the view follows the application's scheme
 rather than whichever scheme the file was saved under. Files written before this
 flag have no custom colors and are recolored on open. Split pieces keep the flag.
+
+## Drawing priority
+
+`nestPriority` is the drawing's nesting priority: higher numbers nest first, and it is
+omitted when zero. Readers that predate it used `priority`, where lower numbers nested
+first, so writers keep writing `priority` as the negated value and older readers keep the
+same order. A reader uses `nestPriority` when present and otherwise negates `priority`, so
+files written before the change open in the order they were saved with.
 
 ## Drawing cut-first flag
 

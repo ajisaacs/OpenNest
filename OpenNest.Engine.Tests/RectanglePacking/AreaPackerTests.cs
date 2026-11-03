@@ -216,10 +216,10 @@ public class AreaPackerTests
     }
 
     [Fact]
-    public void Pack_ServesLowerPriorityNumberFirst()
+    public void Pack_ServesHigherPriorityNumberFirst()
     {
         var area = new Box(0, 0, 10, 10);
-        var items = new List<NestItem> { Item("later", 10, 10, 1, priority: 1), Item("first", 6, 6, 1, priority: 0) };
+        var items = new List<NestItem> { Item("later", 10, 10, 1, priority: 0), Item("first", 6, 6, 1, priority: 1) };
 
         var parts = AreaPacker.Pack(area, items, 0, new DefaultFillComparer(), CancellationToken.None);
 

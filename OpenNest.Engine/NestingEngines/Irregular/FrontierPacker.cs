@@ -294,20 +294,20 @@ internal sealed class FrontierPacker
         var bestValue = double.PositiveInfinity;
         var bestSide = double.PositiveInfinity;
         var bestLead = double.PositiveInfinity;
-        var bestPriority = int.MaxValue;
+        var bestPriority = int.MinValue;
         var bestRank = int.MaxValue;
 
         void Consider(Func<IReadOnlyList<Placed>> build, int typeIndex, double area, double advance, double side, double lead)
         {
             var priority = types[typeIndex].Part.Priority;
             var rank = groupRanks?[typeIndex] ?? 0;
-            if (priority > bestPriority || (priority == bestPriority && rank > bestRank))
+            if (priority < bestPriority || (priority == bestPriority && rank > bestRank))
                 return;
             var fills = advance <= Tie;
             var value = PlacementValue(fills, advance, area, beta, typeWeights?[typeIndex] ?? 1.0);
 
             var better = bestParts == null
-                || priority < bestPriority
+                || priority > bestPriority
                 || rank < bestRank
                 || (fills && !bestFills)
                 || (

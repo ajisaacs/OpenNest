@@ -87,6 +87,16 @@ public sealed partial class NestDatabase
         PRAGMA user_version=5;
         """;
 
+    // v18: priority nests higher numbers first. Stored values were lower-first, so they are
+    // negated as LegacyPriority.Convert does (int.MinValue, which has no negation, becomes int.MaxValue).
+    private const string PriorityNegation = "CASE WHEN priority = -2147483648 THEN 2147483647 ELSE -priority END";
+
+    private const string DrawingPriorityUpgradeToV18 = $"""
+        UPDATE drawings SET priority = {PriorityNegation} WHERE priority <> 0;
+        UPDATE drawing_revisions SET priority = {PriorityNegation} WHERE priority <> 0;
+        PRAGMA user_version=18;
+        """;
+
     private const string DrawingColumns = """
         id, revision, name, customer, materialName, materialGrade, thickness, units,
         cutType, notes, archived, packageSha256, packageSize, savedAt, savedBy,

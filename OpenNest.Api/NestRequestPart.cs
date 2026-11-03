@@ -7,5 +7,6 @@ public class NestRequestPart
     public string DxfPath { get; init; }
     public int Quantity { get; init; } = 1;
     public bool AllowRotation { get; init; } = true;
+    /// <summary>Nesting order: higher numbers nest first.</summary>
     public int Priority { get; init; } = 0;
 }

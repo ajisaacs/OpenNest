@@ -21,7 +21,7 @@ public class NestJobExampleTests
             new[]
             {
                 Part("bracket", 100.0, 60.0, 5, priority: 0),
-                Part("plate-clip", 40.0, 40.0, 8, priority: 1),
+                Part("plate-clip", 40.0, 40.0, 8, priority: -1),
             },
             // Mixed inventory: five large sheets and unlimited small sheets.
             new[]

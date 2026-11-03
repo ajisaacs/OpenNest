@@ -29,8 +29,8 @@ internal sealed record SheetPlan(
 
 /// <summary>
 /// Packs the remaining demand onto one sheet of the given stock with a maximal-rectangles free
-/// list. Lower priority numbers are always served first: a higher-number type is only placed
-/// when no lower-number type still fits anywhere.
+/// list. Higher priority numbers are always served first: a lower-number type is only placed
+/// when no higher-number type still fits anywhere.
 /// </summary>
 internal static class SheetPacker
 {

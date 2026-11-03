@@ -71,9 +71,9 @@ public abstract class EngineContractTests<TEngine> where TEngine : INestingEngin
     }
 
     [Fact]
-    public void ContractLowerNumberPriorityWins()
+    public void ContractHigherNumberPriorityWins()
     {
-        var job = Job([Part("low", Block(8), 1, priority: 9), Part("high", Block(8), 1, priority: 0)],
+        var job = Job([Part("low", Block(8), 1, priority: 0), Part("high", Block(8), 1, priority: 9)],
             [Stock("s", 10, 10, quantity: 1)]);
         var result = new TEngine().Solve(job);
         LayoutAssert.Valid(job, result);

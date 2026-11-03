@@ -28,7 +28,7 @@ public class RemoteNestProgressTests
         return new NestPipelineRequest(engine,
             [
                 new NestItem { Drawing = new Drawing("bracket", TestDrawingFactory.Rectangle(10, 20)), Quantity = 9 },
-                new NestItem { Drawing = new Drawing("ell", TestDrawingFactory.LShape()), Quantity = 6, Priority = 1 },
+                new NestItem { Drawing = new Drawing("ell", TestDrawingFactory.LShape()), Quantity = 6, Priority = -1 },
             ],
             NestStockBuilder.FromTemplate(template, null),
             new NestJobOptions(maxPlates: 5));

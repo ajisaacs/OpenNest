@@ -226,7 +226,7 @@ public static class PlateFillService
         // strategies, partition the sheet at static keep-outs before searching, then
         // certify each accepted material footprint against the full zone and occupants.
         var result = new List<Part>();
-        foreach (var item in items.OrderBy(item => item.Priority))
+        foreach (var item in items.OrderByDescending(item => item.Priority))
         {
             token.ThrowIfCancellationRequested();
             // Fill/Remnant whole-plate orchestration skips exhausted demand; the

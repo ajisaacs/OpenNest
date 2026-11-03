@@ -61,7 +61,7 @@ internal sealed record BarPlan(IReadOnlyList<PackedBar> Bars, IReadOnlyList<BarI
 /// that replaces a shorter group in a bar with unplaced items that fill it better. DuplicateBins
 /// is omitted: it only acts on leftovers after the bar cap, when no bar can be added anyway.
 ///
-/// OpenNest additions: items are ordered by priority before length, so a lower-number tier is
+/// OpenNest additions: items are ordered by priority before length, so a higher-number tier is
 /// packed first and wins scarce bars, and the swap step never trades an item for a later tier.
 /// The exhaustive search counts its nodes and stops at a fixed budget, keeping the best plan found.
 /// </summary>
@@ -95,7 +95,7 @@ internal static class BarPacker
     {
         var remaining = items
             .Select((item, order) => (item, order))
-            .OrderBy(x => x.item.Priority)
+            .OrderByDescending(x => x.item.Priority)
             .ThenByDescending(x => x.item.Length)
             .ThenBy(x => x.item.Type)
             .ThenBy(x => x.order)
@@ -135,7 +135,7 @@ internal static class BarPacker
     /// <summary>
     /// Takes out one item of a length group (never the longest group) and refills the freed
     /// space greedily from the unplaced items, keeping the swap only when the run ends fuller.
-    /// Only items of the same or a lower-number priority may replace the removed one.
+    /// Only items of the same or a higher-number priority may replace the removed one.
     /// </summary>
     private static bool TryImprove(PackedSegment segment, List<BarItem> remaining)
     {
@@ -161,7 +161,7 @@ internal static class BarPacker
                 var first = remaining[i];
                 // Charging the trial its own gains is conservative for types already in the run.
                 var trial = new PackedSegment(free);
-                if (!trial.Fits(first) || first.Priority > removed.Priority)
+                if (!trial.Fits(first) || first.Priority < removed.Priority)
                     continue;
                 trial.Items.Add(first);
                 for (var j = i + 1; j < remaining.Count; j++)
@@ -169,7 +169,7 @@ internal static class BarPacker
                     if (trial.Remaining < shortest)
                         break;
                     var next = remaining[j];
-                    if (!trial.Fits(next) || next.Priority > removed.Priority)
+                    if (!trial.Fits(next) || next.Priority < removed.Priority)
                         continue;
                     trial.Items.Add(next);
                 }
@@ -311,7 +311,7 @@ internal static class BarPacker
         var pool = items
             .GroupBy(i => i.Type)
             .Select(g => (Item: g.First(), Count: g.Count()))
-            .OrderBy(t => t.Item.Priority)
+            .OrderByDescending(t => t.Item.Priority)
             .ThenByDescending(t => t.Item.Length)
             .ThenBy(t => t.Item.Type)
             .ToList();
@@ -392,7 +392,7 @@ internal static class BarPacker
         {
             var ordered = segment.Items
                 .OrderByDescending(i => i.Length)
-                .ThenBy(i => i.Priority)
+                .ThenByDescending(i => i.Priority)
                 .ThenBy(i => i.Type)
                 .ToList();
             segment.Items.Clear();

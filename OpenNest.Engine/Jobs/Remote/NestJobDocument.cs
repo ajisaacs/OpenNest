@@ -15,7 +15,14 @@ namespace OpenNest.Engine.Jobs.Remote;
 /// </summary>
 public sealed class NestJobDocument
 {
-    public const int CurrentVersion = 1;
+    /// <summary>
+    /// Version 2 nests higher priority numbers first. Version 1 jobs, from desktops that nested
+    /// lower numbers first, still read, with their priorities converted
+    /// (<see cref="LegacyPriority"/>); an older worker refuses version 2 instead of reversing it.
+    /// </summary>
+    public const int CurrentVersion = 2;
+
+    private const int LowerFirstPriorityVersion = 1;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -87,7 +94,7 @@ public sealed class NestJobDocument
     public NestPipelineRequest ToRequest(IReadOnlyList<Drawing> drawings)
     {
         ArgumentNullException.ThrowIfNull(drawings);
-        if (Version != CurrentVersion)
+        if (Version != CurrentVersion && Version != LowerFirstPriorityVersion)
             throw new FormatException($"Nest job version {Version} is not supported; this build reads {CurrentVersion}.");
         if (string.IsNullOrWhiteSpace(EngineName))
             throw new FormatException("The nest job names no engine.");
@@ -108,7 +115,7 @@ public sealed class NestJobDocument
             {
                 Drawing = drawings[item.Drawing],
                 Quantity = item.Quantity,
-                Priority = item.Priority,
+                Priority = Version == LowerFirstPriorityVersion ? LegacyPriority.Convert(item.Priority) : item.Priority,
                 StepAngle = item.StepAngle,
                 RotationStart = item.RotationStart,
                 RotationEnd = item.RotationEnd,

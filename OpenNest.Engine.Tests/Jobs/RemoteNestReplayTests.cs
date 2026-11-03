@@ -17,7 +17,7 @@ public class RemoteNestReplayTests
         var template = new Plate(48, 96) { EdgeSpacing = new Spacing(0.25, 0.25, 0.25, 0.25), PartSpacing = 0.25 };
         template.SetClampRail(new ClampRail(1.5, 0.625, new[] { 6.0, 30.0 }));
         return new NestPipelineRequest(engine,
-            [new NestItem { Drawing = a, Quantity = 12 }, new NestItem { Drawing = b, Quantity = 7, Priority = 1 }],
+            [new NestItem { Drawing = a, Quantity = 12 }, new NestItem { Drawing = b, Quantity = 7, Priority = -1 }],
             NestStockBuilder.FromTemplate(template,
                 [new PlateOption { Width = 48, Length = 96, Cost = 100 }, new PlateOption { Width = 60, Length = 120, Quantity = 2, Cost = 160 }]),
             new NestJobOptions(maxPlates: 10, salvageRate: 0.5, minimumSalvageDimension: 6));

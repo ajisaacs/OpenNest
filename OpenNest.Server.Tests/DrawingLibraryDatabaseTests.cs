@@ -23,7 +23,7 @@ public sealed class DrawingLibraryDatabaseTests
             using (var database = new NestDatabase(factory.DatabasePath, pooling: false))
                 Assert.Empty(database.QueryDrawings(new DrawingLibraryQuery { IncludeArchived = true }).Items);
             Assert.Equal(before, NestDigest(factory.DatabasePath));
-            Assert.Equal(17L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+            Assert.Equal(18L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
         }
 
         using var upgraded = new NestDatabase(factory.DatabasePath, pooling: false);
@@ -44,7 +44,7 @@ public sealed class DrawingLibraryDatabaseTests
 
         using (var database = new NestDatabase(factory.DatabasePath, pooling: false))
         {
-            Assert.Equal(17L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+            Assert.Equal(18L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
             Assert.Equal(before, NestDigest(factory.DatabasePath));
             // Two distinct blobs across four revisions: the bracket's notes edit and the
             // plate both reuse the bracket's first package.
@@ -81,9 +81,35 @@ public sealed class DrawingLibraryDatabaseTests
     {
         using var factory = new ServerFactory();
         using (new NestDatabase(factory.DatabasePath, pooling: false)) { }
-        Execute(factory.DatabasePath, "PRAGMA user_version=18");
+        Execute(factory.DatabasePath, "PRAGMA user_version=19");
 
         Assert.Throws<InvalidOperationException>(() => new NestDatabase(factory.DatabasePath, pooling: false));
+    }
+
+    [Fact]
+    public void V18Upgrade_NegatesLowerFirstPrioritiesInEveryRevision()
+    {
+        using var factory = new ServerFactory();
+        var record = Record();
+        var other = Record("Synthetic plate");
+        using (var database = new NestDatabase(factory.DatabasePath, pooling: false))
+        {
+            database.InsertDrawing(record.Id, record, Package());
+            database.InsertDrawing(other.Id, other, Package("other"));
+        }
+        // A v17 library stored lower-first values: 3 nested before 0, and int.MinValue before both.
+        Execute(factory.DatabasePath, $"""
+            UPDATE drawings SET priority = 3 WHERE id = '{record.Id}';
+            UPDATE drawing_revisions SET priority = 3 WHERE id = '{record.Id}';
+            UPDATE drawings SET priority = -2147483648 WHERE id = '{other.Id}';
+            PRAGMA user_version=17;
+            """);
+
+        using var upgraded = new NestDatabase(factory.DatabasePath, pooling: false);
+        Assert.Equal(18L, Scalar(factory.DatabasePath, "PRAGMA user_version"));
+        Assert.Equal(-3, upgraded.GetDrawing(record.Id)!.Settings.Priority);
+        Assert.Equal(-3, Assert.Single(upgraded.DrawingHistory(record.Id, 0, 100)!.Items).Settings.Priority);
+        Assert.Equal(int.MaxValue, upgraded.GetDrawing(other.Id)!.Settings.Priority);
     }
 
     [Fact]

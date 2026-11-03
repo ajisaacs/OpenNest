@@ -11,7 +11,7 @@ namespace OpenNest.Engine.RectanglePacking;
 /// <summary>
 /// Packs mixed parts into one rectangular area as their program bounding boxes, at 0 or 90
 /// degrees, with the maximal-rectangles packer. Every fit rule and pick mode is tried. The layout
-/// that places the most parts, then the most box area, wins, compared tier by tier from the lowest
+/// that places the most parts, then the most box area, wins, compared tier by tier from the highest
 /// <see cref="NestItem.Priority"/>; the caller's fill comparer breaks ties, so leftover packing
 /// keeps the same goal (density, or a clear right or top remnant) as the rest of the fill.
 /// </summary>
@@ -66,7 +66,7 @@ internal static class AreaPacker
             demand[i] = System.Math.Clamp(items[i].Quantity, 0, capacity);
         }
 
-        var tiers = types.Select(t => t.Priority).Distinct().Order().ToArray();
+        var tiers = types.Select(t => t.Priority).Distinct().OrderDescending().ToArray();
         List<Part>? best = null;
         (int Count, double Area)[]? bestTiers = null;
 

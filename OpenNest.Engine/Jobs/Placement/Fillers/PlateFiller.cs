@@ -517,7 +517,7 @@ internal class PlateFiller
         var workArea = Plate.WorkArea();
         var fillItems = items
             .Where(item => item.Quantity != 1)
-            .OrderBy(item => item.Priority)
+            .OrderByDescending(item => item.Priority)
             .ThenByDescending(item => item.Drawing.Area)
             .ToList();
         var packItems = items.Where(item => item.Quantity == 1).ToList();

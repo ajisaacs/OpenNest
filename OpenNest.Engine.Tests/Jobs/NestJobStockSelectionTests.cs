@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using OpenNest.Engine.Jobs;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Tests.Jobs;
 
@@ -22,7 +22,7 @@ public class NestJobStockSelectionTests
     public void ExhaustedLargeStockIsNotRecreatedWhileSmallerStockServesSmallParts()
     {
         var result = Solve(
-            new[] { Part("large", 1, 0), Part("small", 2, 1) },
+            new[] { Part("large", 1, 1), Part("small", 2, 0) },
             new[] { Stock("large", 20, 20, 1), Stock("small", 10, 10, 2) },
             request =>
                 request.Stock.Id switch
@@ -98,7 +98,7 @@ public class NestJobStockSelectionTests
     public void CandidatePriorityAreaEnvelopeAndInputOrderAreComparedInDocumentedOrder()
     {
         var priority = Solve(
-            new[] { Part("high", 1, 0), Part("low", 1, 1) },
+            new[] { Part("high", 1, 1), Part("low", 1, 0) },
             new[] { Stock("a", 10, 10, 1), Stock("b", 10, 10, 1) },
             request =>
                 request.Stock.Id == "a" ? Candidate(request, "low") : Candidate(request, "high")

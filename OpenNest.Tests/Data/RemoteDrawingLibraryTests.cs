@@ -177,7 +177,7 @@ public class RemoteDrawingLibraryTests
 
         Assert.Equal(HttpMethod.Put, handler.Requests[0].Method);
         Assert.EndsWith($"/api/drawings/{record.Id}/metadata", handler.Requests[0].RequestUri!.AbsoluteUri);
-        Assert.Contains("\"settings\":{\"cutFirst\":true,\"priority\":2", handler.RequestBodies[0]);
+        Assert.Contains("\"settings\":{\"cutFirst\":true,\"priority\":-2,\"nestPriority\":2", handler.RequestBodies[0]);
         Assert.Equal(record.Settings, saved.Settings);
     }
 

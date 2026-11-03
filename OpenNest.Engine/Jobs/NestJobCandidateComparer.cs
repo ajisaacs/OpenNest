@@ -30,7 +30,7 @@ public sealed class NestJobCandidateComparer
         var priorities = parts
             .Select(part => part.Priority)
             .Distinct()
-            .OrderBy(priority => priority);
+            .OrderByDescending(priority => priority);
         foreach (var priority in priorities)
         {
             var leftCount = Count(left, priority);

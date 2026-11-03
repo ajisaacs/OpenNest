@@ -98,7 +98,8 @@ package and result on the server.
 
 **The package** (`OpenNest.Api.NestJobPackage`) is a ZIP of:
 
-- `job.json`: `NestJobDocument`: engine name, each item's quantity, priority, rotation range
+- `job.json`: `NestJobDocument`: engine name, each item's quantity, priority (higher first;
+  version 1 jobs nested lower numbers first and are converted when read), rotation range
   and drawing index, the drawing names in order (a guard against reordering), each drawing's
   geometry fingerprint (a SHA-256 of the exact motions the freshness check compares, which a
   later Open checks the nest's drawings against; workers ignore it), every stock

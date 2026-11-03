@@ -278,7 +278,7 @@ namespace OpenNest.IO
                 drawing.Color = Color.FromArgb(d.Color.A, d.Color.R, d.Color.G, d.Color.B);
                 drawing.HasCustomColor = d.CustomColor;
                 drawing.Quantity.Required = d.Quantity.Required;
-                drawing.Priority = d.Priority;
+                drawing.Priority = d.NestPriority ?? LegacyPriority.Convert(d.Priority);
                 drawing.CutFirst = d.CutFirst;
                 drawing.Constraints.StepAngle = d.Constraints.StepAngle;
                 drawing.Constraints.StartAngle = d.Constraints.StartAngle;
