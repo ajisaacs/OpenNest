@@ -46,6 +46,12 @@ the corner along the last-cut edge, with the same clearance fallback to the last
 edge's normal and a bisector at reflex corners. A tabbed perimeter gets no run-out:
 every lead-out style leaves from where the trimmed cut actually ends, on that end's
 normal, so an arc lead-out starts on its own radius and the tab gap stays uncut.
+When the tab wraps a convex corner (the cut starts on one edge and stops on the other, as at a
+fillet joint), a straight lead-in and straight lead-out both take the bisector of those two
+ends' normals instead, so they form the same V centered on the corner that they form on a
+straight edge. Each lead must keep the pierce clearance and cross the part only where it meets
+the cut; otherwise both keep their own edge's normal. The straight in-line corner lead-in and
+curved leads are unchanged.
 `ContourCuttingStrategy.ResolveLeadIn`/`ResolveLeadOut` own these rules;
 program generation and the manual preview share them. Other lead-in styles are
 unchanged.
@@ -63,7 +69,8 @@ edges at both ends, turn convexly through less than a half circle, and have a re
 a convex corner entry (`PreparedContours.FilletReach`). Ranking counts the joint on both sides of
 the corner it rounds, as it would a sharp corner. Longer curves, half-circle ends and inside
 (reflex) fillets keep their tangent joints, which rank level with edge midpoints. The lead-in at
-a fillet's joint is the normal one for its edge, since emission still sees a smooth joint there.
+a fillet's joint is the normal one for its edge, since emission still sees a smooth joint there,
+unless a tab wraps the fillet (see above).
 
 ## Curved leads
 

@@ -528,6 +528,7 @@ namespace OpenNest.CNC.CuttingStrategy
 
             var turn = LeadTurn(contourType, winding);
             double leadInNormal;
+            var configuredLeadIn = leadIn;
             // A planner-placed scrap pierce replaces the configured lead-in with a straight one.
             if (scrapPierce is { } pierce)
                 leadIn = StraightLeadIn(point, pierce, out leadInNormal);
@@ -542,7 +543,6 @@ namespace OpenNest.CNC.CuttingStrategy
                     leadIn = PierceZone(memoContour, shape, point, leadIn, leadInNormal, turn);
                 }
             }
-            program.Codes.AddRange(leadIn.Generate(point, leadInNormal, turn));
 
             var reindexedShape = shape.ReindexAt(point, entity);
 
@@ -555,6 +555,7 @@ namespace OpenNest.CNC.CuttingStrategy
             var leadOutNormal = normal;
             if (tabbed)
             {
+                var first = reindexedShape.Entities.Count > 0 ? reindexedShape.Entities[0] : null;
                 reindexedShape = TrimShapeForTab(reindexedShape, point, Parameters.TabConfig.Size);
 
                 // Leave from where the trimmed cut actually ends, on that entity's normal:
@@ -564,6 +565,18 @@ namespace OpenNest.CNC.CuttingStrategy
                     var last = reindexedShape.Entities[^1];
                     leadOutPoint = EntityEndPoint(last);
                     leadOutNormal = ComputeNormal(leadOutPoint, last, contourType, winding);
+
+                    // Straight leads either side of a tab that wraps a corner share its bisector,
+                    // as they share the edge normal on a straight edge.
+                    if (ReferenceEquals(leadIn, configuredLeadIn) && leadIn is LineLeadIn lineIn
+                        && leadOut is LineLeadOut lineOut && first is Line or Arc
+                        && TabCornerNormal(shape, point, TravelTangent(first, point), leadInNormal, lineIn,
+                            leadOutPoint, TravelTangent(last, leadOutPoint), leadOutNormal, lineOut, winding,
+                            turn, Parameters.GetEffectivePierceClearance()) is { } tabNormal)
+                    {
+                        leadInNormal = tabNormal;
+                        leadOutNormal = tabNormal;
+                    }
                 }
             }
             else
@@ -572,6 +585,7 @@ namespace OpenNest.CNC.CuttingStrategy
                     Parameters.GetEffectivePierceClearance(), out leadOutNormal);
             }
 
+            program.Codes.AddRange(leadIn.Generate(point, leadInNormal, turn));
             program.Codes.AddRange(ConvertShapeToMoves(reindexedShape, point));
             program.Codes.AddRange(leadOut.Generate(leadOutPoint, leadOutNormal, turn));
         }
@@ -921,6 +935,46 @@ namespace OpenNest.CNC.CuttingStrategy
                 return null; // Opposing normals at a cusp have no unique bisector.
 
             return Angle.NormalizeRad(System.Math.Atan2(y, x));
+        }
+
+        /// <summary>
+        /// The normal straight leads either side of a perimeter tab share when the tab wraps a
+        /// convex corner: the bisector of the normals where the cut starts and where it stops, so
+        /// the leads form the V they form on a straight edge, centered on the corner. Null when the
+        /// tab lies on one edge or wraps a reflex turn, or when either lead would not keep
+        /// <paramref name="clearance"/> from the part or would cross it.
+        /// </summary>
+        private static double? TabCornerNormal(
+            Shape shape,
+            Vector start,
+            Vector tangentStart,
+            double startNormal,
+            LineLeadIn leadIn,
+            Vector end,
+            Vector tangentEnd,
+            double endNormal,
+            LineLeadOut leadOut,
+            RotationType winding,
+            RotationType turn,
+            double clearance
+        )
+        {
+            if (!IsFinite(tangentStart) || !IsFinite(tangentEnd)
+                || ClassifyTurn(tangentEnd, tangentStart, winding) != CornerKind.Convex)
+                return null;
+
+            var x = System.Math.Cos(startNormal) + System.Math.Cos(endNormal);
+            var y = System.Math.Sin(startNormal) + System.Math.Sin(endNormal);
+            if (x * x + y * y <= Tolerance.Epsilon * Tolerance.Epsilon)
+                return null;
+
+            var normal = Angle.NormalizeRad(System.Math.Atan2(y, x));
+            var pierce = leadIn.GetPiercePoint(start, normal, turn);
+            var leadOutEnd = ((LinearMove)leadOut.Generate(end, normal, turn)[0]).EndPoint;
+            return IsClearStraightLead(shape, start, pierce, clearance)
+                && IsClearStraightLead(shape, end, leadOutEnd, clearance)
+                ? normal
+                : null;
         }
 
         /// <summary>

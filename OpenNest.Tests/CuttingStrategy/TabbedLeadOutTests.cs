@@ -84,6 +84,58 @@ public class TabbedLeadOutTests
         Assert.Equal(5, arc.Center.Y, 9);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LineLeads_TabWrappingAFilletedCorner_ShareTheCornerBisector(bool reversed)
+    {
+        // Entered at the fillet joint the tab trims back around: on its own edge's normal the
+        // lead-in and lead-out would sit 150 degrees apart, not the 60 degree V of a straight edge.
+        const double fillet = 0.015;
+        const double tab = 0.03;
+        var clean = new Program(Mode.Absolute);
+        if (reversed)
+        {
+            clean.MoveTo(fillet, 10); clean.ArcTo(0, 10 - fillet, fillet, 10 - fillet, RotationType.CCW);
+            clean.LineTo(0, 0); clean.LineTo(10, 0); clean.LineTo(10, 10); clean.LineTo(fillet, 10);
+        }
+        else
+        {
+            clean.MoveTo(0, 0); clean.LineTo(0, 10 - fillet);
+            clean.ArcTo(fillet, 10, fillet, 10 - fillet, RotationType.CW);
+            clean.LineTo(10, 10); clean.LineTo(10, 0); clean.LineTo(0, 0);
+        }
+        var part = new Part(new Drawing("tabbed-fillet", clean));
+        var perimeter = LeadInTestHelpers.Profile(part).Perimeter;
+        var entry = reversed ? new Vector(0, 10 - fillet) : new Vector(fillet, 10);
+        var entity = perimeter.Entities.OfType<Line>().First(l => l.StartPoint.DistanceTo(entry) < 1e-9);
+        var parameters = new CuttingParameters
+        {
+            ExternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 60 },
+            ExternalLeadOut = new LineLeadOut { Length = 0.1, ApproachAngle = 60 },
+            TabsEnabled = true,
+            TabConfig = new NormalTab { Size = tab },
+        };
+
+        part.ApplySingleLeadIn(parameters, entry, entity, ContourType.External);
+
+        var geometry = part.Program.ToGeometry();
+        var leadIn = Assert.IsType<Line>(Assert.Single(geometry.Where(e => e.Layer == SpecialLayers.Leadin)));
+        var leadOut = Assert.IsType<Line>(Assert.Single(geometry.Where(e => e.Layer == SpecialLayers.Leadout)));
+        LeadInTestHelpers.AssertPoint(entry, leadIn.EndPoint);
+        Assert.Equal(tab, leadOut.StartPoint.DistanceTo(entry), 9);
+        // The cut stops on the other edge, past the corner.
+        Assert.Equal(0, reversed ? 10 - leadOut.StartPoint.Y : leadOut.StartPoint.X, 9);
+
+        const double bisector = 3 * System.Math.PI / 4;
+        var spread = OpenNest.Math.Angle.ToRadians(30);
+        LeadInTestHelpers.AssertPoint(entry + Polar(0.15, bisector - spread), leadIn.StartPoint);
+        LeadInTestHelpers.AssertPoint(leadOut.StartPoint + Polar(0.1, bisector + spread), leadOut.EndPoint);
+    }
+
+    private static Vector Polar(double length, double angle) =>
+        new(length * System.Math.Cos(angle), length * System.Math.Sin(angle));
+
     private static OwnedExecution Emit(Program clean, Vector approach, LeadOut leadOut, bool tabs)
     {
         var parameters = ExplicitContourTests.Parameters();
