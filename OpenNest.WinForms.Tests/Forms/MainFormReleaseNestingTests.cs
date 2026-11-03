@@ -116,9 +116,12 @@ public class MainFormReleaseNestingTests
         tab.Undo();
         tab.Undo();
         tab.Redo();
-        tab.Redo();
-        var redone = Assert.Single(tab.Nest.Plates, p => p.StockItemCodes.Count > 0);
+        // Redone to the ledger step alone: its own recorded state carries the code.
+        var redone = Assert.Single(tab.Nest.Plates, p => p.Parts.Count > 0);
+        Assert.Equal(new Size(10, 10), redone.Size);
         Assert.Equal("S-1", Assert.Single(redone.StockItemCodes));
+        tab.Redo();
+        Assert.Single(tab.Nest.Plates, p => p.StockItemCodes.Count > 0);
         host.End(null!);
         Application.DoEvents();
     }, TestTimeout, "The live release ledger test did not complete.");
