@@ -312,17 +312,25 @@ namespace OpenNest.CNC.CuttingStrategy
             var shared = Parameters;
             try
             {
+                var inSlug = false;
                 foreach (var choice in choices)
                 {
                     // A contour's own settings apply to its emission alone; scribes and every
                     // other contour keep the shared settings.
                     Parameters = contourParameters?[choice.ContourOrdinal] ?? shared;
                     var shape = shapes[choice.ContourOrdinal];
-                    EmitContour(result, shape, choice.Point, shape.Entities[choice.EntityOrdinal],
+                    var arrival = result.Codes.Count;
+                    var leftInSlug = EmitContour(result, shape, choice.Point, shape.Entities[choice.EntityOrdinal],
                         choice.ContourOrdinal == perimeterOrdinal ? ContourType.External : null,
                         exactCirclePrograms: true, scrapPierce: choice.Pierce,
                         stopAtCenterLine: contourParameters?[choice.ContourOrdinal] == null,
                         memoContour: choice.ContourOrdinal);
+                    // A cutout's lead-out ends in its slug, which may drop or tip once cut free, so
+                    // the rapid out over the cut is made head up. An overcut or no lead-out leaves
+                    // from the cut itself and stays head down.
+                    if (inSlug && arrival < result.Codes.Count && result.Codes[arrival] is RapidMove or SubProgramCall)
+                        result.Codes.Insert(arrival, new Comment(HeadRaise.Marker));
+                    inSlug = leftInSlug;
                 }
             }
             finally
@@ -441,7 +449,8 @@ namespace OpenNest.CNC.CuttingStrategy
         private static bool SameVector(Vector a, Vector b) => SameBits(a.X, b.X) && SameBits(a.Y, b.Y);
         private static bool SameBits(double a, double b) => BitConverter.DoubleToInt64Bits(a) == BitConverter.DoubleToInt64Bits(b);
 
-        private void EmitContour(
+        /// <returns>Whether the contour is a cutout left by a lead-out, which ends in its slug.</returns>
+        private bool EmitContour(
             Program program,
             Shape shape,
             Vector point,
@@ -504,7 +513,8 @@ namespace OpenNest.CNC.CuttingStrategy
                 var reindexed = relativeShape.ReindexAt(relativePoint, relativeCircle);
 
                 subPgm.Codes.AddRange(ConvertShapeToMoves(reindexed, relativePoint));
-                subPgm.Codes.AddRange(leadOut.Generate(relativePoint, normal, winding));
+                var holeLeadOut = leadOut.Generate(relativePoint, normal, winding);
+                subPgm.Codes.AddRange(holeLeadOut);
                 subPgm.Mode = Mode.Incremental;
 
                 // Deduplicate: check if an identical sub-program already exists
@@ -523,7 +533,7 @@ namespace OpenNest.CNC.CuttingStrategy
                     }
                 );
 
-                return;
+                return holeLeadOut.Count > 0;
             }
 
             var turn = LeadTurn(contourType, winding);
@@ -587,7 +597,9 @@ namespace OpenNest.CNC.CuttingStrategy
 
             program.Codes.AddRange(leadIn.Generate(point, leadInNormal, turn));
             program.Codes.AddRange(ConvertShapeToMoves(reindexedShape, point));
-            program.Codes.AddRange(leadOut.Generate(leadOutPoint, leadOutNormal, turn));
+            var leadOutCodes = leadOut.Generate(leadOutPoint, leadOutNormal, turn);
+            program.Codes.AddRange(leadOutCodes);
+            return contourType != ContourType.External && leadOutCodes.Count > 0;
         }
 
         /// <summary>

@@ -858,9 +858,21 @@ raise the head (`RaisedRapids`, `OpenNest.CNC.HeadRaise`): a `HEAD RAISE` commen
 before the rapid in the part's program, which saves with the nest. A sub-program may be shared,
 so it is never marked: when the rapid arrives at a hole sub-program (a round hole is cut as one),
 the comment goes directly before the part's own call, and the call's arrival rapid is the raised
-one (`ExecutionMotion.CallCode` names the call a sub-program's motions run in). This is the only place a
-raise is added, so a plate the strict search can plan never gets one: it is the last resort for
-a route no search kept head-down, not a shortcut. Only rapids the planner chose in a
+one (`ExecutionMotion.CallCode` names the call a sub-program's motions run in). Apart from the
+slug exits below, this is the only place a raise is added, so a plate the strict search can plan
+never gets one: it is the last resort for a route no search kept head-down, not a shortcut.
+
+A cutout's lead-out ends in its slug, which is cut free and may drop or tip, so the rapid after
+it always leaves over the cutout just cut. Emission therefore marks that rapid to raise the head
+(or the next hole's call, as above) whenever a cutout has a lead-out; the checker accepts a raised
+rapid that starts at the lead-out's end, inside the cutout, and meets its cut exactly once on the
+way out, and reports none of its crossings, in the search, in replay and in pre-post
+verification. These designed raises are not counted in `HeadRaises` or listed as notes. A raised
+rapid that crosses its cutout again (a re-entrant slug) is treated as any raised rapid, and a
+head-down one still crosses its cutout. A cutout cut without a lead-out, or with its cut run on
+along itself as an overcut, leaves from the cut and keeps the head down. A cutout cut last in a
+part with no cut perimeter leaves into the next part's arrival rapid, which emission cannot mark,
+so that rapid is still checked strictly. Only rapids the planner chose in a
 regenerated program are marked; a rapid into or inside a locked program or a cut-off, and a
 rapid inside a hole sub-program after its arrival, keeps its crossing as a finding. The checker sets a raised rapid's crossings apart
 instead of reporting them, in replay and in pre-post verification alike.

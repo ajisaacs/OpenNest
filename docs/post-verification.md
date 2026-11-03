@@ -91,7 +91,8 @@ shows the first three check categories, even when there are no findings:
   bypass. A rapid Plan Cutting marked to raise the head (see
   [the safest-route fallback](cutting-planner.md#safest-route-fallback-when-the-search-runs-out))
   passes over cut contours with the head up, so its contour crossings are not warnings; its
-  clamp crossings still are.
+  clamp crossings still are. The raised rapid out of a cutout's slug after its lead-out is
+  accepted the same way; a head-down one still warns that it crosses the cutout.
 - **Fixed leads:** Plan Cutting accepts fixed emissions as given and only warns (see
   [cutting planner](cutting-planner.md#fixed-emissions-warn)), so posting checks them
   again: every lead-in and lead-out of a locked program, and of each contour a part's

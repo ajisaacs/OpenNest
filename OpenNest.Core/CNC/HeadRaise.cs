@@ -6,7 +6,8 @@ namespace OpenNest.CNC
 {
     /// <summary>
     /// A rapid the head must make raised because it passes over parts already cut, which may have
-    /// tipped. Plan Cutting marks such a rapid only when no route avoids the crossing: a
+    /// tipped. Plan Cutting marks such a rapid only when no route avoids the crossing, and always
+    /// marks the rapid out of a cutout's slug after its lead-out (see docs/cutting-planner.md): a
     /// <see cref="Marker"/> comment immediately before the <see cref="RapidMove"/>, or before the
     /// <see cref="SubProgramCall"/> whose arrival rapid it is, since a sub-program may be shared and
     /// is never marked itself. Rapid checks accept a crossing on a marked rapid. Posts write their machine's head raise before every marked rapid,

@@ -126,11 +126,19 @@ public sealed class ReleasedContourState
         var contourNumber = contoursBefore;
         var inBreakCut = false;
         var reportedTab = false;
+        // The contour last closed, and the one a lead-out has just left it into: a cutout's
+        // lead-out ends in its slug, so the rapid after it must leave over that cutout's own cut.
+        CutGroup lastClosed = null;
+        Obstacle lastObstacle = null;
+        Obstacle exited = null;
+        var exitPoint = Vector.Zero;
         for (var index = 0; index < moves.Count; index++)
         {
             token.ThrowIfCancellationRequested();
             var move = moves[index];
             var owned = isFixed?.Invoke(index) == true;
+            if (!move.Rapid && move.Layer != LayerType.Leadout)
+                exited = null;
             if (!move.Rapid && move.Layer == LayerType.Break)
             {
                 // A break cut is intentionally open and retained by its uncut tabs: it is never a
@@ -161,7 +169,14 @@ public sealed class ReleasedContourState
                 loose.Leads.AddRange(leadIns);
                 leadIns.Clear();
                 previous = null;
+                var leaving = exited;
+                exited = null;
                 if (move.Start is not { } start || start.DistanceTo(move.End) <= PostVerificationGeometry.Epsilon)
+                    continue;
+                // A raised rapid out of a slug its cutout's lead-out ended in is the designed way
+                // out: it may cross that cutout once, and passes over the rest with the head up.
+                if (move.HeadRaised && leaving != null && start.DistanceTo(exitPoint) <= PostVerificationGeometry.Epsilon
+                    && LeavesOnce(leaving, start, move.End, token))
                     continue;
                 var reach = new PostVerificationGeometry.Extent(System.Math.Min(start.X, move.End.X),
                     System.Math.Min(start.Y, move.End.Y), System.Math.Max(start.X, move.End.X),
@@ -217,6 +232,11 @@ public sealed class ReleasedContourState
                             "A lead-out follows an open cutting contour and may cut through its retention gap. " +
                             "Rapid safety for that contour requires manual review."), owned);
                     (previous ?? loose).Leads.Add(move.Curve);
+                    if (previous != null && ReferenceEquals(previous, lastClosed))
+                    {
+                        exited = lastObstacle;
+                        exitPoint = move.Curve.End;
+                    }
                 }
                 Finish();
                 hasLead = false;
@@ -324,14 +344,26 @@ public sealed class ReleasedContourState
             // no flag or tab configuration is used as evidence of retention.
             if (!cutoff && (current.OvercutEnd.HasValue || PostVerificationGeometry.Closed(current.Curves)))
             {
-                obstacles.Add(new(part, contourNumber, current.Curves.ToArray(), current.OvercutEnd));
+                lastObstacle = new(part, contourNumber, current.Curves.ToArray(), current.OvercutEnd);
+                obstacles.Add(lastObstacle);
                 closed.Add(current);
+                lastClosed = current;
             }
             else if (!cutoff)
                 unfinished.Add(current);
             current = new CutGroup();
         }
     }
+
+    /// <summary>
+    /// Whether the rapid from <paramref name="start"/> inside <paramref name="cutout"/> to
+    /// <paramref name="end"/> outside it meets its cut just once, on the way out: a rapid that
+    /// leaves a re-entrant cutout and passes back over it crosses the cut where the slug may lie.
+    /// </summary>
+    private static bool LeavesOnce(Obstacle cutout, Vector start, Vector end, CancellationToken token) =>
+        PostVerificationGeometry.Inside(start, cutout.Curves, token)
+        && !PostVerificationGeometry.Inside(end, cutout.Curves, token)
+        && PostVerificationGeometry.ContactPoints(start, end, cutout.Curves, token).Count == 1;
 
     /// <summary>
     /// The closing piece of a contour cut on past its own start along its first cut, as a source
