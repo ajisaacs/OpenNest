@@ -23,6 +23,7 @@ namespace OpenNest.Forms
             mnuFileExport.Enabled = hasValue;
             mnuFileExportAll.Enabled = hasValue;
             mnuFileExportNestReport.Enabled = hasValue && !storage.IsSaving;
+            mnuFileViewNestReport.Enabled = mnuFileExportNestReport.Enabled;
             mnuEdit.Visible = hasValue;
             mnuView.Visible = hasValue;
             mnuNest.Visible = hasValue;

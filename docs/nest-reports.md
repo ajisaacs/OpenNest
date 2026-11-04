@@ -9,8 +9,15 @@ the dialog closes, the target and those conditions are revalidated; the snapshot
 is then captured synchronously on the UI thread and only that detached snapshot
 reaches the renderer. Export never changes the selected plate, dirty state,
 timestamps or quantities, and it never touches post selection, verification or
-CNC output. Opening and printing use any normal PDF viewer; the report includes
-no printer controls and there are no persisted report settings or templates.
+CNC output. There are no persisted report settings or templates.
+
+**File -> View Nest Report...** runs the same guards and capture without a dialog,
+renders to a private folder under `%TEMP%\OpenNest\Reports\` and opens a modeless
+viewer window (WebView2's PDF viewer, sharing Help's WebView2 data folder) with
+**Save As...**, which copies the rendered file to a chosen path, and **Print...**,
+the WebView2 print dialog. Closing the window deletes its temporary folder; a
+render failure opens no viewer and leaves no folder. Without the WebView2 Runtime
+the window still offers Save As.
 
 The same two calls back the command and any future integration:
 

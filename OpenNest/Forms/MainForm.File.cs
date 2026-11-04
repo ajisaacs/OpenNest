@@ -315,30 +315,69 @@ namespace OpenNest.Forms
         private void ExportNestReport_Click(object sender, EventArgs e)
         {
             var form = activeForm;
-            if (form == null)
+            if (form == null || !TryCaptureReportTargets(form, out var targets))
                 return;
-
-            // The report never depends on a selected post or NC output; it only needs a
-            // quiescent nest so the snapshot is coherent.
-            Func<bool> isJobBusy = IsNestJobBusy;
-            EditNestForm.NestReportTargets targets;
-            try
-            {
-                targets = form.CaptureReportTargets(isJobBusy);
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
-            {
-                ReportFailure(null, ex);
-                return;
-            }
 
             var destination = ShowReportSaveDialog(targets.SuggestedFileName);
             if (destination == null)
                 return; // Cancel: nothing written, job untouched.
 
+            if (!TryWriteNestReport(form, targets, destination))
+                return;
+            statusLabel1.Text = $"Saved nest report to {destination}";
+            ReportSuccess(destination);
+        }
+
+        /// <summary>Renders the report to a private temporary file and opens it in a viewer to save or print.</summary>
+        private void ViewNestReport_Click(object sender, EventArgs e)
+        {
+            var form = activeForm;
+            if (form == null || !TryCaptureReportTargets(form, out var targets))
+                return;
+
+            var path = Path.Combine(Path.GetTempPath(), "OpenNest", "Reports",
+                Guid.NewGuid().ToString("N"), targets.SuggestedFileName);
             try
             {
-                form.WriteNestReport(targets, destination, isJobBusy);
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                ReportFailure(targets, ex);
+                return;
+            }
+
+            if (!TryWriteNestReport(form, targets, path))
+            {
+                NestReportViewerForm.DeleteReportFolder(path);
+                return;
+            }
+            ShowReportViewer(path, targets);
+        }
+
+        // The report never depends on a selected post or NC output; it only needs a
+        // quiescent nest so the snapshot is coherent.
+        private bool TryCaptureReportTargets(EditNestForm form, out EditNestForm.NestReportTargets targets)
+        {
+            try
+            {
+                targets = form.CaptureReportTargets(IsNestJobBusy);
+                return true;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+            {
+                ReportFailure(null, ex);
+                targets = null;
+                return false;
+            }
+        }
+
+        private bool TryWriteNestReport(EditNestForm form, EditNestForm.NestReportTargets targets, string destination)
+        {
+            try
+            {
+                form.WriteNestReport(targets, destination, IsNestJobBusy);
+                return true;
             }
             catch (Exception ex)
                 when (ex is InvalidOperationException
@@ -350,10 +389,15 @@ namespace OpenNest.Forms
             {
                 // Failures describe the captured target; an active-document switch is irrelevant.
                 ReportFailure(targets, ex);
-                return;
+                return false;
             }
-            statusLabel1.Text = $"Saved nest report to {destination}";
-            ReportSuccess(destination);
+        }
+
+        /// <summary>Opens the rendered report; internal so tests observe it without a WebView2 window.</summary>
+        internal virtual void ShowReportViewer(string pdfPath, EditNestForm.NestReportTargets targets)
+        {
+            var viewer = new NestReportViewerForm(pdfPath, targets.Nest.Name, targets.SuggestedFileName);
+            viewer.Show(this);
         }
 
         /// <summary>Returns the chosen path, or null on cancel. Overwrite consent is the dialog prompt.</summary>

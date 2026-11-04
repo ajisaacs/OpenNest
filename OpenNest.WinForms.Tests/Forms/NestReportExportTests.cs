@@ -48,16 +48,20 @@ public class NestReportExportTests
         using var host = new TestMainForm();
         host.Show();
         var item = Menu(host, "mnuFileExportNestReport");
+        var view = Menu(host, "mnuFileViewNestReport");
         Assert.False(item.Enabled);
+        Assert.False(view.Enabled);
 
         using var form = new EditNestForm(new Nest("enabled job")) { MdiParent = host };
         form.PlateView.SetOverlapAutoCheck(null); // Background overlap workers are irrelevant here.
         form.Show();
         Assert.True(item.Enabled);
+        Assert.True(view.Enabled);
 
         form.Close();
         host.Activate();
         Assert.False(item.Enabled);
+        Assert.False(view.Enabled);
     });
 
     [Fact]
@@ -233,6 +237,55 @@ public class NestReportExportTests
     });
 
     [Fact]
+    public void ViewRendersATemporaryPdfForTheViewer() => RunSta(() =>
+    {
+        using var host = new TestMainForm();
+        host.Show();
+        var nest = CreateJob("view job");
+        using var form = new EditNestForm(nest) { MdiParent = host };
+        form.PlateView.SetOverlapAutoCheck(null); // Background overlap workers are irrelevant here.
+        form.Show();
+
+        Menu(host, "mnuFileViewNestReport").PerformClick();
+
+        Assert.Empty(host.DialogRequests);
+        Assert.Empty(host.Failures);
+        var path = Assert.Single(host.Viewed);
+        try
+        {
+            Assert.Equal("view job.report.pdf", Path.GetFileName(path));
+            var bytes = File.ReadAllBytes(path);
+            Assert.Equal("%PDF-", System.Text.Encoding.ASCII.GetString(bytes, 0, 5));
+            Assert.Equal(2, nest.Drawings.Count);
+        }
+        finally
+        {
+            NestReportViewerForm.DeleteReportFolder(path);
+        }
+        Assert.False(Directory.Exists(Path.GetDirectoryName(path)));
+    });
+
+    [Fact]
+    public void ViewRenderFailureOpensNoViewerAndLeavesNoTempFolder() => RunSta(() =>
+    {
+        using var host = new TestMainForm();
+        host.Show();
+        var nest = CreateJob("view failure");
+        nest.Notes = "em—dash"; // Fails font validation before layout.
+        using var form = new EditNestForm(nest) { MdiParent = host };
+        form.PlateView.SetOverlapAutoCheck(null); // Background overlap workers are irrelevant here.
+        form.Show();
+        var reports = Path.Combine(Path.GetTempPath(), "OpenNest", "Reports");
+        var before = Directory.Exists(reports) ? Directory.GetDirectories(reports).Length : 0;
+
+        Menu(host, "mnuFileViewNestReport").PerformClick();
+
+        Assert.Empty(host.Viewed);
+        Assert.Contains("view failure", Assert.Single(host.Failures));
+        Assert.Equal(before, Directory.Exists(reports) ? Directory.GetDirectories(reports).Length : 0);
+    });
+
+    [Fact]
     public void BusyAfterDialogRejectsWriteWithoutTouchingDestination() => RunSta(() =>
     {
         using var form = new EditNestForm(CreateJob("late busy"));
@@ -295,6 +348,7 @@ public class NestReportExportTests
         public DialogResult NextDialogResult { get; set; } = DialogResult.OK;
         public List<string> Failures { get; } = [];
         public List<string> Successes { get; } = [];
+        public List<string> Viewed { get; } = [];
 
         // No startup migrations/automatic new document, and no settings save at close.
         protected override void OnLoad(EventArgs e) { }
@@ -310,6 +364,9 @@ public class NestReportExportTests
             Failures.Add($"{targets?.Nest.Name}|{error.Message}");
 
         internal override void ReportSuccess(string destination) => Successes.Add(destination);
+
+        internal override void ShowReportViewer(string pdfPath, EditNestForm.NestReportTargets targets) =>
+            Viewed.Add(pdfPath);
     }
 
     private static void RunSta(System.Action action) =>
