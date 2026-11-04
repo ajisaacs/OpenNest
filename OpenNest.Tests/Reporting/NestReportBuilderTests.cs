@@ -63,6 +63,27 @@ public class NestReportBuilderTests
             Assert.Equal(expected.Value, weight!.Value, 9);
     }
 
+    [Theory]
+    [InlineData(0, 0.287, 0.1, 0.0358750)]
+    [InlineData(0.2836, 0.287, 0.1, 0.03545)]
+    [InlineData(0, 0, 0.1, 0.0125)]
+    [InlineData(0, 0, 0, null)]
+    public void Capture_CatalogDensityStandsInWhenTheNestMaterialHasNone(double nestDensity, double catalogDensity,
+        double drawingDensity, double? expected)
+    {
+        var nest = new Nest("Catalog") { Units = Units.Inches, Thickness = 0.125, Material = new Material("Stainless Steel", "310", nestDensity) };
+        var drawing = NestReportTestData.Rectangle("Plate", 1, 1);
+        drawing.Material = new Material("Stainless Steel", "310", drawingDensity);
+        nest.Drawings.Add(drawing);
+
+        var weight = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt, catalogDensity: catalogDensity).Drawings[0].Weight;
+
+        if (expected == null)
+            Assert.Null(weight);
+        else
+            Assert.Equal(expected.Value, weight!.Value, 9);
+    }
+
     [Fact]
     public void Capture_WithCutTimeEstimatesEachPlateLikeCalculateCutTime()
     {

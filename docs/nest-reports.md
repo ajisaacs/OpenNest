@@ -53,8 +53,12 @@ the selected plate, or certify that a layout passed geometry/pre-post checks.
   geometry. Invalid/missing/nonfinite geometry fails with drawing/plate context.
 - A drawing's weight is its net area (holes excluded) times the nest thickness
   times the material density, read as **pounds per cubic inch** as in the machine
-  material defaults (steel 0.2836). The nest material's density wins; the
-  drawing's own material is the fallback. Millimeter jobs convert the volume to
+  material defaults (steel 0.2836). The nest material's density wins. Nest
+  materials picked by name and grade carry none, so the desktop passes
+  `Capture(..., catalogDensity)` from `MaterialDensityLookup`: the nest machine's
+  exact name and grade, any machine's exact name and grade, then the same material
+  name on the nest machine or any machine. The drawing's own material is the last
+  fallback. Millimeter jobs convert the volume to
   cubic inches and report kilograms. With no thickness or no density the weight
   is unknown, never zero.
 

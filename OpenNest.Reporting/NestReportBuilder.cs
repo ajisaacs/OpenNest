@@ -11,8 +11,11 @@ public static class NestReportBuilder
     /// Capture synchronously while the caller keeps the nest stable. No quantity refresh,
     /// domain cloning, or event-wired temporary plates are used. With <paramref name="cutParameters"/>,
     /// each plate also gets an estimated cut time from <see cref="CutSimulation"/>.
+    /// <paramref name="catalogDensity"/> is the nest material's density from the machine material
+    /// defaults (lb/in^3), used when the nest material carries none of its own.
     /// </summary>
-    public static NestReportSnapshot Capture(Nest nest, DateTimeOffset generatedAt, CutParameters? cutParameters = null)
+    public static NestReportSnapshot Capture(Nest nest, DateTimeOffset generatedAt, CutParameters? cutParameters = null,
+        double catalogDensity = 0)
     {
         ArgumentNullException.ThrowIfNull(nest);
         var registry = new DrawingRegistry();
@@ -35,7 +38,7 @@ public static class NestReportBuilder
 
         var drawings = ImmutableArray.CreateBuilder<ReportDrawing>();
         foreach (var item in registry.Ordered)
-            drawings.Add(CaptureDrawing(item, nest));
+            drawings.Add(CaptureDrawing(item, nest, catalogDensity));
 
         return new NestReportSnapshot(nest.Name ?? "", nest.Customer ?? "", nest.Notes ?? "",
             nest.Material?.Name ?? "", nest.Material?.Grade ?? "", nest.Thickness, units, generatedAt,
@@ -126,7 +129,7 @@ public static class NestReportBuilder
         return bounds;
     }
 
-    private static ReportDrawing CaptureDrawing(DrawingCount item, Nest nest)
+    private static ReportDrawing CaptureDrawing(DrawingCount item, Nest nest, double catalogDensity)
     {
         var drawing = item.Drawing;
         var context = $"Drawing {item.Id} ('{drawing.Name}')";
@@ -138,7 +141,7 @@ public static class NestReportBuilder
             System.Math.Max(checked(required - item.Nested), 0),
             System.Math.Max(checked(item.Nested - required), 0), item.Plates.ToImmutableArray(), geometry)
         {
-            Weight = PartWeight(drawing, nest),
+            Weight = PartWeight(drawing, nest, catalogDensity),
         };
     }
 
@@ -148,11 +151,14 @@ public static class NestReportBuilder
     /// <summary>
     /// Net area x nest thickness x density. Density is pounds per cubic inch, as in the
     /// machine material defaults; millimeter jobs convert the volume and report kilograms.
-    /// The nest material's density wins; the drawing's own material is the fallback.
+    /// The nest material's density wins, then the machine catalog's density for that material;
+    /// the drawing's own material is the last fallback.
     /// </summary>
-    internal static double? PartWeight(Drawing drawing, Nest nest)
+    internal static double? PartWeight(Drawing drawing, Nest nest, double catalogDensity = 0)
     {
         var density = nest.Material?.Density ?? 0;
+        if (!(density > 0))
+            density = catalogDensity;
         if (!(density > 0))
             density = drawing.Material?.Density ?? 0;
         var area = drawing.Area;

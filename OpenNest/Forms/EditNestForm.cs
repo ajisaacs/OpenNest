@@ -809,10 +809,18 @@ namespace OpenNest.Forms
 
             // Reporting must have no accounting side effects: no quantity refresh, no
             // selection or dirty-state change. Only the detached snapshot reaches the writer.
+            var material = targets.Nest.Material;
+            var catalogDensity = Data.MaterialDensityLookup.Resolve(
+                material?.Name,
+                material?.Grade,
+                MachineSettings.FindMachine(targets.Nest.Machine),
+                MachineSettings.LoadMaterials()
+            );
             var snapshot = NestReportBuilder.Capture(
                 targets.Nest,
                 DateTimeOffset.Now,
-                SavedCutParameters.Load(targets.Nest.Units)
+                SavedCutParameters.Load(targets.Nest.Units),
+                catalogDensity
             );
             NestPdfWriter.Write(snapshot, destination);
         }
