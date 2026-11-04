@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using OpenNest.Collections;
 
 namespace OpenNest
@@ -23,6 +24,7 @@ namespace OpenNest
         private bool batching;
         private Plate subscribedLast;
         private Plate subscribedSecondToLast;
+        private Plate reorderCurrent;
 
         public event EventHandler<PlateChangedEventArgs> CurrentPlateChanged;
         public event EventHandler PlateListChanged;
@@ -32,6 +34,7 @@ namespace OpenNest
             this.nest = nest;
             nest.Plates.ItemAdded += OnPlateAdded;
             nest.Plates.ItemRemoved += OnPlateRemoved;
+            nest.Plates.ItemsReordered += OnPlatesReordered;
         }
 
         public int CurrentIndex { get; private set; }
@@ -162,6 +165,48 @@ namespace OpenNest
             PlateListChanged?.Invoke(this, EventArgs.Empty);
             if (ReferenceEquals(CurrentPlate, trailing))
                 FireCurrentPlateChanged();
+        }
+
+        /// <summary>
+        /// Number of plates the user can reorder: every plate except the trailing empty
+        /// new-plate sentinel, which always stays last.
+        /// </summary>
+        public int MovableCount =>
+            Count > 0 && nest.Plates[^1].Parts.Count == 0 ? Count - 1 : Count;
+
+        /// <summary>Whether <see cref="MovePlate"/> would change the plate order.</summary>
+        public bool CanMovePlate(int fromIndex, int toIndex) =>
+            fromIndex >= 0 && fromIndex < MovableCount
+            && toIndex >= 0 && toIndex < MovableCount
+            && fromIndex != toIndex;
+
+        /// <summary>
+        /// Moves the plate at <paramref name="fromIndex"/> so it lands at
+        /// <paramref name="toIndex"/>, shifting the plates between them. Only the order changes:
+        /// no plate is added or removed, so quantity accounting is untouched. The current plate
+        /// stays current at its new index. The trailing empty sentinel cannot be moved or passed;
+        /// an empty plate moved to the end of the movable range becomes the new sentinel.
+        /// </summary>
+        /// <returns>Whether the order changed.</returns>
+        public bool MovePlate(int fromIndex, int toIndex)
+        {
+            if (!CanMovePlate(fromIndex, toIndex))
+                return false;
+
+            var order = new List<Plate>(nest.Plates);
+            var plate = order[fromIndex];
+            order.RemoveAt(fromIndex);
+            order.Insert(toIndex, plate);
+            reorderCurrent = CurrentPlate;
+            try
+            {
+                nest.Plates.Reorder(order);
+            }
+            finally
+            {
+                reorderCurrent = null;
+            }
+            return true;
         }
 
         public void BeginBatch()
@@ -321,6 +366,29 @@ namespace OpenNest
                 FireCurrentPlateChanged();
         }
 
+        // The current plate keeps its identity; only its index follows the new order.
+        private void OnPlatesReordered(object sender, EventArgs e)
+        {
+            var current = reorderCurrent;
+            if (current != null)
+            {
+                var index = nest.Plates.IndexOf(current);
+                if (index >= 0)
+                    CurrentIndex = index;
+            }
+
+            // An empty plate moved next to the sentinel doubles the empty tail; collapse it as
+            // any other edit would, so the order saved and reloaded is the order shown.
+            if (!batching)
+                EnsureSentinel();
+            else
+                SubscribeToTailPlates();
+
+            PlateListChanged?.Invoke(this, EventArgs.Empty);
+            if (current != null && !nest.Plates.Contains(current))
+                FireCurrentPlateChanged();
+        }
+
         private void FireCurrentPlateChanged()
         {
             CurrentPlateChanged?.Invoke(
@@ -338,6 +406,7 @@ namespace OpenNest
             UnsubscribeFromTailPlates();
             nest.Plates.ItemAdded -= OnPlateAdded;
             nest.Plates.ItemRemoved -= OnPlateRemoved;
+            nest.Plates.ItemsReordered -= OnPlatesReordered;
         }
     }
 }

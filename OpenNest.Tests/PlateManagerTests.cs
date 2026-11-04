@@ -215,8 +215,8 @@ public class PlateManagerTests
         var nest = CreateNest();
         using var mgr = new PlateManager(nest);
         mgr.EnsureSentinel();
-        Assert.Equal(1, nest.Plates.Count);
-        Assert.Equal(0, nest.Plates[0].Parts.Count);
+        Assert.Single(nest.Plates);
+        Assert.Empty(nest.Plates[0].Parts);
     }
 
     [Fact]
@@ -228,7 +228,7 @@ public class PlateManagerTests
         using var mgr = new PlateManager(nest);
         mgr.EnsureSentinel();
         Assert.Equal(2, nest.Plates.Count);
-        Assert.Equal(0, nest.Plates[^1].Parts.Count);
+        Assert.Empty(nest.Plates[^1].Parts);
     }
 
     [Fact]
@@ -239,7 +239,7 @@ public class PlateManagerTests
         nest.CreatePlate();
         using var mgr = new PlateManager(nest);
         mgr.EnsureSentinel();
-        Assert.Equal(1, nest.Plates.Count);
+        Assert.Single(nest.Plates);
     }
 
     [Fact]
@@ -266,7 +266,7 @@ public class PlateManagerTests
         var initialCount = nest.Plates.Count;
         nest.Plates[^1].Parts.Add(MakePart());
         Assert.Equal(initialCount + 1, nest.Plates.Count);
-        Assert.Equal(0, nest.Plates[^1].Parts.Count);
+        Assert.Empty(nest.Plates[^1].Parts);
     }
 
     [Fact]
@@ -279,7 +279,7 @@ public class PlateManagerTests
         mgr.EnsureSentinel();
         Assert.Equal(2, nest.Plates.Count);
         nest.Plates[0].Parts.RemoveAt(0);
-        Assert.Equal(1, nest.Plates.Count);
+        Assert.Single(nest.Plates);
     }
 
     [Fact]
@@ -294,7 +294,7 @@ public class PlateManagerTests
         Assert.Equal(3, nest.Plates.Count);
         nest.Plates[^1].Parts.Add(MakePart());
         Assert.Equal(4, nest.Plates.Count);
-        Assert.Equal(0, nest.Plates[^1].Parts.Count);
+        Assert.Empty(nest.Plates[^1].Parts);
     }
 
     // Task 5: Batch mode and plate operations
@@ -331,7 +331,7 @@ public class PlateManagerTests
         mgr.EndBatch();
 
         Assert.Equal(3, nest.Plates.Count);
-        Assert.Equal(0, nest.Plates[^1].Parts.Count);
+        Assert.Empty(nest.Plates[^1].Parts);
         Assert.True(listChangedCount > 0);
     }
 
@@ -346,7 +346,7 @@ public class PlateManagerTests
 
         var result = mgr.GetOrCreateEmpty();
         Assert.Same(nest.Plates[^1], result);
-        Assert.Equal(0, result.Parts.Count);
+        Assert.Empty(result.Parts);
     }
 
     [Fact]
@@ -358,7 +358,7 @@ public class PlateManagerTests
         using var mgr = new PlateManager(nest);
 
         var result = mgr.GetOrCreateEmpty();
-        Assert.Equal(0, result.Parts.Count);
+        Assert.Empty(result.Parts);
     }
 
     [Fact]
@@ -377,7 +377,7 @@ public class PlateManagerTests
         // plate1 + sentinel (created by reactive sentinel enforcement)
         Assert.Equal(2, nest.Plates.Count);
         Assert.Same(plate1, nest.Plates[0]);
-        Assert.Equal(0, nest.Plates[^1].Parts.Count);
+        Assert.Empty(nest.Plates[^1].Parts);
         Assert.Equal(0, mgr.CurrentIndex);
     }
 
@@ -574,7 +574,7 @@ public class PlateManagerTests
 
         // Sentinel should be restored reactively by OnPlateRemoved
         Assert.Equal(2, nest.Plates.Count);
-        Assert.Equal(0, nest.Plates[^1].Parts.Count);
+        Assert.Empty(nest.Plates[^1].Parts);
     }
 
     [Fact]
@@ -595,6 +595,112 @@ public class PlateManagerTests
 
         // Verify reactive subscriptions still work on the new tail
         nest.Plates[^1].Parts.Add(MakePart());
-        Assert.Equal(0, nest.Plates[^1].Parts.Count);
+        Assert.Empty(nest.Plates[^1].Parts);
+    }
+
+    private static (Nest Nest, PlateManager Manager, Plate[] Filled) NestWithFilledPlates(int count)
+    {
+        var nest = CreateNest();
+        var filled = new Plate[count];
+        for (var i = 0; i < count; i++)
+        {
+            filled[i] = nest.CreatePlate();
+            filled[i].Parts.Add(MakePart());
+        }
+        var mgr = new PlateManager(nest);
+        mgr.EnsureSentinel();
+        return (nest, mgr, filled);
+    }
+
+    [Fact]
+    public void MovePlate_MovesPlateAndShiftsTheOthers()
+    {
+        var (nest, mgr, filled) = NestWithFilledPlates(3);
+        using var _ = mgr;
+
+        Assert.True(mgr.MovePlate(2, 0));
+
+        Assert.Equal(new[] { filled[2], filled[0], filled[1] }, nest.Plates.Take(3));
+        Assert.Equal(4, nest.Plates.Count);
+        Assert.Empty(nest.Plates[^1].Parts);
+    }
+
+    [Fact]
+    public void MovePlate_CurrentPlateKeepsItsIdentity()
+    {
+        var (nest, mgr, filled) = NestWithFilledPlates(3);
+        using var _ = mgr;
+        mgr.LoadAt(1);
+        var listChanged = 0;
+        var currentChanged = 0;
+        mgr.PlateListChanged += (s, e) => listChanged++;
+        mgr.CurrentPlateChanged += (s, e) => currentChanged++;
+
+        Assert.True(mgr.MovePlate(0, 2));
+
+        Assert.Same(filled[1], mgr.CurrentPlate);
+        Assert.Equal(0, mgr.CurrentIndex);
+        Assert.Equal(1, listChanged);
+        Assert.Equal(0, currentChanged);
+    }
+
+    [Fact]
+    public void MovePlate_DoesNotChangeQuantities()
+    {
+        var (nest, mgr, _) = NestWithFilledPlates(3);
+        using var __ = mgr;
+        var drawing = nest.Plates[0].Parts[0].BaseDrawing;
+        var nested = drawing.Quantity.Nested;
+
+        mgr.MovePlate(0, 2);
+
+        Assert.Equal(nested, drawing.Quantity.Nested);
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(-1, 0)]
+    [InlineData(0, 3)]
+    [InlineData(3, 0)]
+    public void MovePlate_RefusesNoOpsAndTheSentinel(int from, int to)
+    {
+        var (nest, mgr, filled) = NestWithFilledPlates(3);
+        using var _ = mgr;
+        var sentinel = nest.Plates[^1];
+
+        Assert.Equal(3, mgr.MovableCount);
+        Assert.False(mgr.MovePlate(from, to));
+        Assert.Equal(filled.Append(sentinel), nest.Plates);
+    }
+
+    [Fact]
+    public void MovePlate_TailSubscriptionsFollowTheNewOrder()
+    {
+        var (nest, mgr, filled) = NestWithFilledPlates(2);
+        using var _ = mgr;
+
+        mgr.MovePlate(1, 0);
+        // filled[0] is now second to last; emptying it must collapse the doubled empty tail.
+        filled[0].Parts.Clear();
+
+        Assert.Equal(new[] { filled[1], filled[0] }, nest.Plates);
+    }
+
+    [Fact]
+    public void MovePlate_EmptyPlateMovedToTheEndBecomesTheSentinel()
+    {
+        var (nest, mgr, filled) = NestWithFilledPlates(2);
+        using var _ = mgr;
+        var empty = nest.Plates[^1];
+        nest.Plates.Insert(0, new Plate(10, 10));
+        var configured = nest.Plates[0];
+        mgr.EnsureSentinel();
+        mgr.LoadAt(0);
+
+        Assert.True(mgr.MovePlate(0, 2));
+
+        Assert.Equal(new[] { filled[0], filled[1], configured }, nest.Plates);
+        Assert.Same(configured, mgr.CurrentPlate);
+        Assert.DoesNotContain(empty, nest.Plates);
     }
 }

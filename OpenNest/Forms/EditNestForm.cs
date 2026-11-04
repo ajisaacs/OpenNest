@@ -102,6 +102,7 @@ namespace OpenNest.Forms
 
                 PlateManager.LoadAt(platesListView.SelectedIndices[0]);
             };
+            InitializePlateReordering();
         }
 
         private void CreatePlateHeader()

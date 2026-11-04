@@ -79,6 +79,20 @@ public class UndoRecordingTests
         env.AssertOneUndoableEdit("Remove Empty Plates", env.Editor.RemoveEmptyPlates));
 
     [Fact]
+    public void MovePlateRecordsOneEntry() => UndoTestEnv.Run(env =>
+        env.AssertOneUndoableEdit("Move Plate", () => Assert.True(env.Editor.MovePlate(3, 0))));
+
+    [Fact]
+    public void MovePlateIntoItsOwnPlaceRecordsNothing() => UndoTestEnv.Run(env =>
+    {
+        var count = env.Editor.History.UndoCount;
+        Assert.False(env.Editor.MovePlate(1, 1));
+        // The trailing empty new-plate sentinel stays last.
+        Assert.False(env.Editor.MovePlate(0, env.Nest.Plates.Count - 1));
+        Assert.Equal(count, env.Editor.History.UndoCount);
+    });
+
+    [Fact]
     public void CenterPartsRecordsOneEntry() => UndoTestEnv.Run(env =>
     {
         env.Editor.PlateManager.LoadAt(0);
