@@ -80,6 +80,27 @@ public class NestReportGeometryTests
     }
 
     [Fact]
+    public void Capture_ClosesOutlineWhoseArcEndpointIsRebuiltWithRoundoff()
+    {
+        // Posted/rounded programs carry arcs whose end radius differs slightly from the start
+        // radius; the converted arc's rebuilt end then misses the next move's start by that much.
+        var nest = NestReportTestData.CreateNest();
+        var codes = nest.Plates[0].Parts[0].Program.Codes;
+        codes.Clear();
+        codes.Add(new RapidMove(0, 0));
+        codes.Add(new LinearMove(10, 0));
+        codes.Add(new ArcMove(new Vector(12.000004, 2), new Vector(10, 2), RotationType.CCW));
+        codes.Add(new LinearMove(12.000004, 10));
+        codes.Add(new LinearMove(0, 10));
+        codes.Add(new LinearMove(0, 0));
+        var geometry = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt).Plates[0].Parts[0].Geometry;
+        var contour = Assert.Single(geometry.Contours);
+        Assert.True(contour.Closed);
+        Assert.Equal(5, contour.Segments.Length);
+        Assert.False(geometry.StrokeOnly);
+    }
+
+    [Fact]
     public void Capture_ExcludedLayersCannotConnectSeparateMaterialPaths()
     {
         var nest = NestReportTestData.CreateNest();

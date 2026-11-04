@@ -165,10 +165,14 @@ internal static class NestReportGeometry
             throw Error(context, "nonfinite geometry coordinate.");
     }
 
-    // Only absorb floating-point trig roundoff, never ShapeBuilder's welding tolerance.
-    // A deliberate tab/rapid interruption is never joined by contour construction.
+    // Converted arcs rebuild their end from center, start radius and end angle, so a program
+    // arc whose end radius differs from its start radius (rounded or incremental posts; the
+    // validator accepts up to Tolerance.Epsilon) misses the next move's exact start by that
+    // much. Absorb only that, never ShapeBuilder's larger welding tolerance: a deliberate
+    // tab/rapid interruption is never joined by contour construction.
     private static bool SamePoint(ReportPoint first, ReportPoint second) =>
-        System.Math.Abs(first.X - second.X) <= 1e-12 && System.Math.Abs(first.Y - second.Y) <= 1e-12;
+        System.Math.Abs(first.X - second.X) <= Tolerance.Epsilon
+        && System.Math.Abs(first.Y - second.Y) <= Tolerance.Epsilon;
 
     private static InvalidOperationException Error(string context, string message) => new($"{context}: {message}");
 }
