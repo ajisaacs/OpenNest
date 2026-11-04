@@ -20,8 +20,11 @@ public static class NestPdfWriter
     private const int MaxHeaderLines = 3;
     private const double BodyFontSize = 9;
     private const double CellPadding = 3;
-    private const double ThumbnailWidth = 54;
-    private const double ThumbnailHeight = 36;
+    private const int CardsPerRow = 4;
+    private const double CardGap = 8;
+    private const double CardWidth = (PortraitWidth - (CardsPerRow - 1) * CardGap) / CardsPerRow;
+    private const double CardThumbnailHeight = 66;
+    private const double CardFontSize = 8;
     private const double PortraitWidth = 540;
     private const double LandscapeWidth = 720;
     private const double OverviewHeight = 320;
@@ -153,19 +156,127 @@ public static class NestPdfWriter
             section.AddParagraph("No parts in this job.");
             return;
         }
-        // Column widths fit the bold headings on one line (measured, plus padding).
-        var parts = AddTable(section, 36, 62, 138, 56, 50, 56, 42, 100);
-        AddHeader(parts, "ID", "Part", "Drawing", "Required", "Nested", "Shortage", "Extra", "Plates");
-        foreach (var drawing in snapshot.Drawings)
+        if (snapshot.Drawings.Any(drawing => drawing.Weight == null))
         {
-            var row = AddRow(parts, $"Drawing {drawing.Id}", false, drawing.Id, null, drawing.Name,
-                drawing.Required.ToString(Invariant), drawing.Nested.ToString(Invariant),
-                drawing.Shortage.ToString(Invariant), drawing.Extra.ToString(Invariant), ReportText.Ranges(drawing.Plates));
-            var image = row.Cells[1].AddParagraph().AddImage(Thumbnail(drawing.Geometry));
-            image.Width = Unit.FromPoint(ThumbnailWidth);
-            image.Height = Unit.FromPoint(ThumbnailHeight);
+            var note = section.AddParagraph(WeightNote(snapshot));
+            note.Format.Font.Size = 7.5;
+            note.Format.SpaceAfter = Unit.FromPoint(4);
+        }
+        AddPartCards(section, snapshot);
+    }
+
+    /// <summary>
+    /// One card per drawing, <see cref="CardsPerRow"/> to a row. Cards are table cells with
+    /// unbordered spacer columns between them; MigraDoc never splits a row across pages.
+    /// </summary>
+    private static void AddPartCards(Section section, NestReportSnapshot snapshot)
+    {
+        var columns = new List<double>();
+        for (var index = 0; index < CardsPerRow; index++)
+        {
+            if (index > 0)
+                columns.Add(CardGap);
+            columns.Add(CardWidth);
+        }
+        var table = AddTable(section, columns.ToArray());
+        table.Borders.Visible = false;
+        table.LeftPadding = table.RightPadding = Unit.FromPoint(CellPadding);
+        table.TopPadding = table.BottomPadding = Unit.FromPoint(CellPadding);
+        table.Format.Font.Size = CardFontSize;
+
+        Row? row = null;
+        for (var index = 0; index < snapshot.Drawings.Length; index++)
+        {
+            if (index % CardsPerRow == 0)
+            {
+                if (row != null)
+                {
+                    var gap = table.AddRow();
+                    gap.HeightRule = RowHeightRule.Exactly;
+                    gap.Height = Unit.FromPoint(CardGap);
+                    gap.TopPadding = gap.BottomPadding = Unit.Zero;
+                }
+                row = table.AddRow();
+                row.VerticalAlignment = VerticalAlignment.Top;
+            }
+            AddPartCard(row!.Cells[index % CardsPerRow * 2], snapshot, snapshot.Drawings[index]);
         }
     }
+
+    private static void AddPartCard(Cell cell, NestReportSnapshot snapshot, ReportDrawing drawing)
+    {
+        var context = $"Drawing {drawing.Id}";
+        var inner = CardWidth - 2 * CellPadding;
+        cell.Borders.Visible = true;
+        cell.Borders.Width = 0.5;
+        cell.Borders.Color = Colors.Gray;
+
+        // ID on the left; a shortage or extra on the right. Complete parts show no status.
+        var title = cell.AddParagraph();
+        title.Format.Font.Bold = true;
+        title.Format.Font.Size = BodyFontSize;
+        title.Format.TabStops.AddTabStop(Unit.FromPoint(inner - 1), TabAlignment.Right);
+        title.AddText(drawing.Id);
+        if (drawing.Shortage > 0 || drawing.Extra > 0)
+        {
+            title.AddTab();
+            var status = title.AddFormattedText(drawing.Shortage > 0
+                ? $"SHORT {drawing.Shortage.ToString(Invariant)}"
+                : $"EXTRA {drawing.Extra.ToString(Invariant)}");
+            status.Color = drawing.Shortage > 0 ? Colors.DarkRed : Colors.Black;
+            status.Font.Size = CardFontSize;
+        }
+
+        var picture = cell.AddParagraph();
+        picture.Format.Alignment = ParagraphAlignment.Center;
+        picture.Format.SpaceBefore = picture.Format.SpaceAfter = Unit.FromPoint(2);
+        var image = picture.AddImage(Thumbnail(drawing.Geometry, inner, CardThumbnailHeight));
+        image.Width = Unit.FromPoint(inner);
+        image.Height = Unit.FromPoint(CardThumbnailHeight);
+
+        var name = cell.AddParagraph();
+        name.Format.Font.Bold = true;
+        AddLines(name, ReportText.Cell(drawing.Name, CardFont(true), inner, context));
+
+        var details = cell.AddParagraph();
+        details.Format.SpaceBefore = Unit.FromPoint(1);
+        string[] lines =
+        [
+            $"Size: {PartSize(snapshot, drawing.Geometry.Bounds)}",
+            $"Weight: {PartWeight(snapshot, drawing)}",
+            .. TotalWeight(snapshot, drawing),
+            $"Required {drawing.Required.ToString(Invariant)}, nested {drawing.Nested.ToString(Invariant)}",
+            $"Plates: {ReportText.Ranges(drawing.Plates)}",
+        ];
+        AddLines(details, lines.SelectMany(line => ReportText.Cell(line, CardFont(false), inner, context)).ToList());
+    }
+
+    private static string PartSize(NestReportSnapshot snapshot, ReportBounds bounds) =>
+        $"{Dimension(bounds.Width)} x {Dimension(bounds.Length)} {snapshot.Units}";
+
+    /// <summary>Bounding-box sizes to shop precision; sheet sizes keep <see cref="Number"/>.</summary>
+    private static string Dimension(double value) => value.ToString("0.###", Invariant);
+
+    private static string PartWeight(NestReportSnapshot snapshot, ReportDrawing drawing) =>
+        drawing.Weight is { } each ? $"{Weight(each)} {snapshot.WeightUnits} ea" : "-";
+
+    /// <summary>All nested copies; omitted when it would repeat the single-part weight.</summary>
+    private static string[] TotalWeight(NestReportSnapshot snapshot, ReportDrawing drawing) =>
+        drawing.Weight is { } each && drawing.Nested > 1
+            ? [$"Total weight: {Weight(each * drawing.Nested)} {snapshot.WeightUnits}"]
+            : [];
+
+    private static string WeightNote(NestReportSnapshot snapshot) => snapshot.Thickness > 0
+        ? "Weights need a material density (lb/in\u00B3); parts without one show \"-\"."
+        : "Weights need the nest thickness and a material density (lb/in\u00B3); parts without them show \"-\".";
+
+    /// <summary>Three significant figures for light parts, whole units from 1000 up.</summary>
+    private static string Weight(double value) => value switch
+    {
+        < 10 => value.ToString("0.00", Invariant),
+        < 1000 => value.ToString("0.0", Invariant),
+        _ => value.ToString("#,0", Invariant),
+    };
 
     private static void AddPlate(Document document, NestReportSnapshot snapshot, ReportPlate plate,
         DiagramView plan, List<(Table, Action<XGraphics, XRect>)> areas)
@@ -289,15 +400,15 @@ public static class NestPdfWriter
         }
     }
 
-    private static string Thumbnail(ReportGeometry geometry)
+    private static string Thumbnail(ReportGeometry geometry, double width, double height)
     {
         using var document = new PdfDocument();
         var page = document.AddPage();
-        page.Width = XUnit.FromPoint(ThumbnailWidth);
-        page.Height = XUnit.FromPoint(ThumbnailHeight);
+        page.Width = XUnit.FromPoint(width);
+        page.Height = XUnit.FromPoint(height);
         using (var gfx = XGraphics.FromPdfPage(page))
         {
-            var fit = Fit.Create(geometry.Bounds, new XRect(2, 2, ThumbnailWidth - 4, ThumbnailHeight - 4));
+            var fit = Fit.Create(geometry.Bounds, new XRect(2, 2, width - 4, height - 4));
             DrawGeometry(gfx, geometry, fit, new XPen(XColors.Black, 0.5));
         }
         using var stream = new MemoryStream();
@@ -361,6 +472,9 @@ public static class NestPdfWriter
 
     private static XFont BodyFont(bool bold) =>
         new(ReportFonts.Family, BodyFontSize, bold ? XFontStyleEx.Bold : XFontStyleEx.Regular);
+
+    private static XFont CardFont(bool bold) =>
+        new(ReportFonts.Family, CardFontSize, bold ? XFontStyleEx.Bold : XFontStyleEx.Regular);
 
     private static Section AddSection(Document document, Orientation orientation, double width, string header)
     {

@@ -15,7 +15,7 @@ public static class NestReportTestData
         {
             Customer = "Test customer",
             Notes = "Synthetic report test data",
-            Material = new Material("Steel", "A36"),
+            Material = new Material("Steel", "A36", 0.2836),
             Thickness = 0.125,
             Units = Units.Inches,
             DateCreated = new DateTime(2026, 9, 1),

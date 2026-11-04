@@ -19,6 +19,51 @@ public class NestReportBuilderTests
     }
 
     [Fact]
+    public void Capture_WeighsEachPartFromNetAreaThicknessAndPoundsPerCubicInch()
+    {
+        var snapshot = NestReportBuilder.Capture(NestReportTestData.CreateNest(), NestReportTestData.GeneratedAt);
+
+        Assert.Equal("lb", snapshot.WeightUnits);
+        // The 10 x 10 bracket's 1 in radius hole is not material.
+        Assert.Equal((100 - System.Math.PI) * 0.125 * 0.2836, snapshot.Drawings[0].Weight!.Value, 9);
+        Assert.Equal(8 * 0.125 * 0.2836, snapshot.Drawings[1].Weight!.Value, 9);
+    }
+
+    [Fact]
+    public void Capture_MillimeterJobConvertsTheVolumeAndReportsKilograms()
+    {
+        var nest = new Nest("Metric") { Units = Units.Millimeters, Thickness = 10, Material = new Material("Steel", "", 0.2836) };
+        nest.Drawings.Add(NestReportTestData.Rectangle("Block", 100, 100));
+
+        var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
+
+        Assert.Equal("kg", snapshot.WeightUnits);
+        // 100 cm^3 of steel at 0.2836 lb/in^3 (7.85 g/cm^3) is 0.785 kg.
+        Assert.Equal(0.785, snapshot.Drawings[0].Weight!.Value, 3);
+    }
+
+    [Theory]
+    [InlineData(0.125, 0, 0, null)]
+    [InlineData(0, 0.2836, 0, null)]
+    [InlineData(0.125, 0, 0.1, 0.0125)]
+    [InlineData(0.125, 0.2836, 0.1, 0.03545)]
+    public void Capture_WeightNeedsThicknessAndPrefersTheNestDensity(double thickness, double nestDensity,
+        double drawingDensity, double? expected)
+    {
+        var nest = new Nest("Weights") { Units = Units.Inches, Thickness = thickness, Material = new Material("Steel", "", nestDensity) };
+        var drawing = NestReportTestData.Rectangle("Plate", 1, 1);
+        drawing.Material = new Material("Steel", "", drawingDensity);
+        nest.Drawings.Add(drawing);
+
+        var weight = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt).Drawings[0].Weight;
+
+        if (expected == null)
+            Assert.Null(weight);
+        else
+            Assert.Equal(expected.Value, weight!.Value, 9);
+    }
+
+    [Fact]
     public void Capture_WithCutTimeEstimatesEachPlateLikeCalculateCutTime()
     {
         var nest = NestReportTestData.CreateMultiPlateNest();

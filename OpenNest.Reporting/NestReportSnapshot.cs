@@ -22,7 +22,14 @@ public sealed record ReportGeometry(ImmutableArray<ReportContour> Contours, Repo
 }
 
 public sealed record ReportDrawing(string Id, string Name, long Required, long Nested,
-    long Shortage, long Extra, ImmutableArray<int> Plates, ReportGeometry Geometry);
+    long Shortage, long Extra, ImmutableArray<int> Plates, ReportGeometry Geometry)
+{
+    /// <summary>
+    /// Net weight of one part in <see cref="NestReportSnapshot.WeightUnits"/>; null when the nest
+    /// has no thickness or the material has no density.
+    /// </summary>
+    public double? Weight { get; init; }
+}
 
 public sealed record ReportPlacement(string ReportId, ReportGeometry Geometry);
 
@@ -39,6 +46,9 @@ public sealed record NestReportSnapshot(string Name, string Customer, string Not
     ImmutableArray<ReportDrawing> Drawings, ImmutableArray<ReportPlate> Plates)
 {
     public long TotalSheets => Plates.Aggregate(0L, (total, plate) => checked(total + plate.Copies));
+
+    /// <summary>"lb" for inch jobs, "kg" for millimeter jobs.</summary>
+    public string WeightUnits => Units == "mm" ? "kg" : "lb";
 
     /// <summary>True when the report carries estimated cut times.</summary>
     public bool HasCutTimes { get; init; }

@@ -48,10 +48,13 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Matches(@"Distinct layouts:\s+1", summary);
         Assert.Matches(@"Total physical sheets:\s+2", summary);
         Assert.Matches(@"1\s+24 x 48 in\s+2\s+4\s+\d+\.\d%", summary);
-        Assert.Matches(@"1\s+Bracket\s+5\s+4\s+1\s+0\s+1", summary);
-        Assert.Matches(@"2\s+Rotated\s+1\s+2\s+0\s+1\s+1", summary);
-        Assert.Matches(@"3\s+Bracket\s+7\s+2\s+5\s+0\s+1", summary);
-        Assert.Matches(@"4\s+Unplaced\s+3\s+0\s+3\s+0\s+-", summary);
+        Assert.Equal(new[]
+        {
+            "1 SHORT 1\nBracket\nSize: 10 x 10 in\nWeight: 3.43 lb ea\nTotal weight: 13.7 lb\nRequired 5, nested 4\nPlates: 1",
+            "2 EXTRA 1\nRotated\nSize: 2 x 4 in\nWeight: 0.28 lb ea\nTotal weight: 0.57 lb\nRequired 1, nested 2\nPlates: 1",
+            "3 SHORT 5\nBracket\nSize: 2 x 3 in\nWeight: 0.21 lb ea\nTotal weight: 0.43 lb\nRequired 7, nested 2\nPlates: 1",
+            "4 SHORT 3\nUnplaced\nSize: 1 x 2 in\nWeight: 0.07 lb ea\nRequired 3, nested 0\nPlates: -",
+        }, ReportPdf.PartCards(path));
         Assert.Contains("Page 1 of 2", summary);
         Assert.Matches(@"Stock size\s+Quantity\s+Parts per plate", summary);
         Assert.DoesNotMatch(@"\bR\d+\b", summary + plate);
@@ -87,7 +90,10 @@ public sealed class NestPdfWriterTests : IDisposable
         nest.Drawings.Add(NestReportTestData.Rectangle("Alpha", 20, 10, 2));
         var demand = ReportPdf.Text(WriteReport(nest, "demand.pdf"), 1);
         Assert.Contains("No plates in this job.", demand);
-        Assert.Matches(@"1\s+Alpha\s+2\s+0\s+2\s+0\s+-", demand);
+        // No thickness or density: the card shows no weight and the note says what is missing.
+        Assert.Equal(new[] { "1 SHORT 2\nAlpha\nSize: 10 x 20 mm\nWeight: -\nRequired 2, nested 0\nPlates: -" },
+            ReportPdf.PartCards(Path.Combine(directory, "demand.pdf")));
+        Assert.Contains("Weights need the nest thickness and a material density", demand);
         Assert.Contains("Page 1 of 1", demand);
     }
 

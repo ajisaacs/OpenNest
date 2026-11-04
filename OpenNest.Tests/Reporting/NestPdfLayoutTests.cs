@@ -33,10 +33,15 @@ public sealed class NestPdfLayoutTests : IDisposable
         Assert.Matches(@"Distinct layouts:\s+4", summary);
         Assert.Matches(@"Total physical sheets:\s+7", summary);
         // Bracket 1: 2/sheet x 2 + 1 x 3 + 1 x 1 = 8. Same-named 3: 1 x 2 + 1 x 1 = 3.
-        Assert.Matches(@"1\s+Bracket\s+5\s+8\s+0\s+3\s+1-2, 4", summary);
-        Assert.Matches(@"2\s+Rotated\s+1\s+3\s+0\s+2\s+1, 3", summary);
-        Assert.Matches(@"3\s+Bracket\s+7\s+3\s+4\s+0\s+1, 3", summary);
-        Assert.Matches(@"4\s+Unplaced\s+3\s+0\s+3\s+0\s+-", summary);
+        // Weights: net area x 0.125 in x 0.2836 lb/in^3; the 10 x 10 bracket has a 1 in radius hole.
+        Assert.Equal(new[]
+        {
+            "1 EXTRA 3\nBracket\nSize: 10 x 10 in\nWeight: 3.43 lb ea\nTotal weight: 27.5 lb\nRequired 5, nested 8\nPlates: 1-2, 4",
+            "2 EXTRA 2\nRotated\nSize: 2 x 4 in\nWeight: 0.28 lb ea\nTotal weight: 0.85 lb\nRequired 1, nested 3\nPlates: 1, 3",
+            "3 SHORT 4\nBracket\nSize: 2 x 3 in\nWeight: 0.21 lb ea\nTotal weight: 0.64 lb\nRequired 7, nested 3\nPlates: 1, 3",
+            "4 SHORT 3\nUnplaced\nSize: 1 x 2 in\nWeight: 0.07 lb ea\nRequired 3, nested 0\nPlates: -",
+        }, ReportPdf.PartCards(path));
+        Assert.DoesNotContain("Weights need", summary);
         Assert.Matches(@"3\s+30 x 60 in\s+1\s+2", summary);
         for (var plate = 1; plate <= 4; plate++)
         {
@@ -69,15 +74,14 @@ public sealed class NestPdfLayoutTests : IDisposable
 
         var summaryPages = pages.TakeWhile(page => !page.Contains("Plate 1 of 4")).ToList();
         Assert.True(summaryPages.Count >= 2, $"summary pages: {summaryPages.Count}");
-        var summaryText = string.Join("\n", summaryPages);
-        // Every row exactly once; the Parts heading row repeats on every continuation page.
-        for (var id = 1; id <= 74; id++)
-            Assert.Single(Regex.Matches(summaryText, $@"(?m)^\s*{id}\s+(?:Bracket|Rotated|Unplaced|Demand)\b"));
-        Assert.All(summaryPages.Skip(1), page => Assert.Matches(@"ID\s+Part\s+Drawing\s+Required\s+Nested\s+Shortage", page));
+        // Every card exactly once, in ID order, and no card is split across pages.
+        var cards = ReportPdf.PartCards(path);
+        Assert.Equal(Enumerable.Range(1, 74).Select(id => id.ToString()),
+            cards.Select(card => card.Split(' ', '\n')[0]));
         // Placements first (4-43 on plate 1), then unplaced demand by ordinal name.
-        Assert.Matches(@"43\s+Demand 39\s+40\s+2\s+38\s+0\s+1", summaryText);
-        Assert.Matches(@"73\s+Demand 69\s+70\s+0\s+70\s+0\s+-", summaryText);
-        Assert.Matches(@"74\s+Unplaced\s+3\s+0\s+3\s+0\s+-", summaryText);
+        Assert.Matches(@"^43 SHORT 38\nDemand 39\nSize: 1 x 1 in\n(?:.*\n)+Required 40, nested 2\nPlates: 1$", cards[42]);
+        Assert.Matches(@"^73 SHORT 70\nDemand 69\n(?:.*\n)+Required 70, nested 0\nPlates: -$", cards[72]);
+        Assert.Matches(@"^74 SHORT 3\nUnplaced\n(?:.*\n)+Required 3, nested 0\nPlates: -$", cards[73]);
 
         var platePages = pages.Where(page => page.Contains("Plate 1 of 4")).ToList();
         Assert.True(platePages.Count >= 2, $"plate 1 pages: {platePages.Count}");
@@ -109,14 +113,15 @@ public sealed class NestPdfLayoutTests : IDisposable
         var notes = Regex.Matches(all, @"note(\d+)").Select(match => int.Parse(match.Groups[1].Value)).ToList();
         Assert.Equal(Enumerable.Range(0, 900), notes);
         Assert.Contains(string.Concat(Enumerable.Repeat("X", 120)), Regex.Replace(all, @"\s+", ""));
-        // The long drawing name is wrapped inside its column on the summary and plate tables.
-        var summaryPage = Array.FindIndex(pages, page => page.Contains("Required") && page.Contains("2"));
+        // The long drawing name wraps inside its card (words past the card edge are not
+        // collected) and inside its plate-table column.
+        var card = ReportPdf.PartCards(path)[1].Split('\n');
+        Assert.Equal("2 EXTRA 2", card[0]);
+        var size = Array.FindIndex(card, line => line.StartsWith("Size:", StringComparison.Ordinal));
+        Assert.True(size > 2, "the long name should need several card lines");
+        Assert.Equal(longName.Replace(" ", ""), string.Concat(card[1..size]).Replace(" ", ""));
         var platePage = Array.FindIndex(pages, page => page.Contains("Plate 1 of 4"));
-        Assert.True(summaryPage >= 0 && platePage > summaryPage);
-        Assert.Equal(longName.Replace(" ", ""), ColumnText(path, summaryPage + 1, "Drawing", "Required"));
         Assert.Equal(longName.Replace(" ", ""), ColumnText(path, platePage + 1, "Drawing", "Parts"));
-        // Column headings stay on one line.
-        Assert.Matches(@"ID\s+Part\s+Drawing\s+Required\s+Nested\s+Shortage\s+Extra\s+Plates", pages[summaryPage]);
     }
 
     [SkippableTheory]

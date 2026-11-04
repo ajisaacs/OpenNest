@@ -29,13 +29,14 @@ public static class NestReportBuilder
             .ThenBy(drawing => drawing.Source?.Path ?? "", StringComparer.Ordinal))
             registry.Register(drawing);
 
-        var drawings = ImmutableArray.CreateBuilder<ReportDrawing>();
-        foreach (var item in registry.Ordered)
-            drawings.Add(CaptureDrawing(item));
-
         var units = UnitsLabel(nest.Units);
         if (!double.IsFinite(nest.Thickness) || nest.Thickness < 0)
             throw new InvalidOperationException("Nest: thickness must be finite and nonnegative.");
+
+        var drawings = ImmutableArray.CreateBuilder<ReportDrawing>();
+        foreach (var item in registry.Ordered)
+            drawings.Add(CaptureDrawing(item, nest));
+
         return new NestReportSnapshot(nest.Name ?? "", nest.Customer ?? "", nest.Notes ?? "",
             nest.Material?.Name ?? "", nest.Material?.Grade ?? "", nest.Thickness, units, generatedAt,
             drawings.ToImmutable(), plates.ToImmutable())
@@ -125,7 +126,7 @@ public static class NestReportBuilder
         return bounds;
     }
 
-    private static ReportDrawing CaptureDrawing(DrawingCount item)
+    private static ReportDrawing CaptureDrawing(DrawingCount item, Nest nest)
     {
         var drawing = item.Drawing;
         var context = $"Drawing {item.Id} ('{drawing.Name}')";
@@ -135,7 +136,32 @@ public static class NestReportBuilder
         var geometry = NestReportGeometry.Capture(drawing.Program, new Vector(), context);
         return new ReportDrawing(item.Id, drawing.Name ?? "", required, item.Nested,
             System.Math.Max(checked(required - item.Nested), 0),
-            System.Math.Max(checked(item.Nested - required), 0), item.Plates.ToImmutableArray(), geometry);
+            System.Math.Max(checked(item.Nested - required), 0), item.Plates.ToImmutableArray(), geometry)
+        {
+            Weight = PartWeight(drawing, nest),
+        };
+    }
+
+    private const double CubicInchesPerCubicMillimeter = 1 / 16387.064;
+    private const double KilogramsPerPound = 0.45359237;
+
+    /// <summary>
+    /// Net area x nest thickness x density. Density is pounds per cubic inch, as in the
+    /// machine material defaults; millimeter jobs convert the volume and report kilograms.
+    /// The nest material's density wins; the drawing's own material is the fallback.
+    /// </summary>
+    internal static double? PartWeight(Drawing drawing, Nest nest)
+    {
+        var density = nest.Material?.Density ?? 0;
+        if (!(density > 0))
+            density = drawing.Material?.Density ?? 0;
+        var area = drawing.Area;
+        if (!PositiveFinite(density) || !PositiveFinite(nest.Thickness) || !double.IsFinite(area) || area < 0)
+            return null;
+        var volume = area * nest.Thickness;
+        return nest.Units == Units.Millimeters
+            ? volume * CubicInchesPerCubicMillimeter * density * KilogramsPerPound
+            : volume * density;
     }
 
     private static string UnitsLabel(Units units) => units switch

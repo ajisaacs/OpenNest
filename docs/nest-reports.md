@@ -51,6 +51,12 @@ the selected plate, or certify that a layout passed geometry/pre-post checks.
   separate strokes with no product ID or quantity.
 - Snapshots retain values, not live drawings, parts, CNC programs or mutable
   geometry. Invalid/missing/nonfinite geometry fails with drawing/plate context.
+- A drawing's weight is its net area (holes excluded) times the nest thickness
+  times the material density, read as **pounds per cubic inch** as in the machine
+  material defaults (steel 0.2836). The nest material's density wins; the
+  drawing's own material is the fallback. Millimeter jobs convert the volume to
+  cubic inches and report kilograms. With no thickness or no density the weight
+  is unknown, never zero.
 
 ## Layout, pagination and dense-label fallback
 
@@ -58,10 +64,18 @@ An empty/demand-only job, a single plate, or many plates and drawings all
 produce one document: a Letter portrait summary followed by one Letter
 landscape section per plate, every page carrying a repeated header and
 "Page X of Y". Long notes, long drawing names, many drawings and many parts
-per sheet paginate naturally: MigraDoc continues the Plates/Parts tables and
-each plate's part table across pages with the heading row repeated, and notes
-flow as an ordinary paragraph. No row, table or note text is ever dropped or
-truncated to fit a page.
+per sheet paginate naturally: MigraDoc continues the Plates table and each
+plate's part table across pages with the heading row repeated, the summary's
+part cards continue row by row, and notes flow as an ordinary paragraph. No
+row, card, table or note text is ever dropped or truncated to fit a page.
+
+The summary shows each drawing as a card, four to a row: its ID, a thumbnail,
+the drawing name, its bounding-box size (width x length, to three decimals),
+the weight of one part and of all nested copies, required and nested counts,
+and its plates. A shortage (**SHORT n**, in red) or extra (**EXTRA n**) sits
+beside the ID; complete drawings show no status. Cards without a weight show
+"-" with a note under the Parts heading saying what is missing. A card row is
+a table row, so a card never splits across pages.
 
 Stock sizes read **width x length** in job units. Plate tables use **Quantity**
 and **Parts per plate**; the plate quantity multiplies per-plate part counts for
@@ -85,9 +99,9 @@ the destination:
 
 - a page header (nest name plus plate/material line) needing more than 3
   wrapped lines;
-- a table cell needing more than 20 wrapped lines.
+- a table cell or part-card field needing more than 20 wrapped lines.
 
-Summary thumbnails and the sheet diagram are vector paths, never raster images.
+Card thumbnails and the sheet diagram are vector paths, never raster images.
 Each thumbnail is a small PDFsharp page embedded by MigraDoc as a form XObject.
 The diagram is drawn into a fixed-height table row reserved in MigraDoc's flow,
 located after layout with `DocumentRenderer.GetRenderInfoFromPage`. Closed parts
@@ -114,7 +128,7 @@ column. Each plate page shows the time per plate and for all its copies. The rep
 does not state the settings behind the estimate. These are estimates, not
 machine-reported times. Without `CutParameters` the report has no timing rows or column.
 
-Cutting distances, pierce counts, weights, costs, gas use, and machine/NC identity
+Cutting distances, pierce counts, costs, gas use, and machine/NC identity
 are intentionally omitted until their semantics are verified.
 The PDF can be opened or printed through a normal PDF viewer.
 
@@ -153,7 +167,8 @@ dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter FullyQualifiedName~Rep
 
 The writer tests read page sizes and content streams with PDFsharp. Text
 assertions use Poppler's `pdftotext -bbox` coordinates to rebuild visual rows;
-`-layout` can return columns in a different order on Windows. They are skipped,
+`-layout` can return columns in a different order on Windows. Part cards are
+read column by column (`ReportPdf.PartCards`), each ending at its "Plates:" line. They are skipped,
 not passed, when poppler-utils is absent. The Windows release workflow installs
 an SHA-256-pinned Poppler binary because the runner's built-in `pdftotext` lacks
 `-bbox`; no PDF text test is skipped for that reason in a release candidate.
