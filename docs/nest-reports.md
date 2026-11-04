@@ -70,7 +70,8 @@ quantity tables even when its diagram label cannot fit.
 Nearby small parts with the same report ID may share a dotted rectangular outline
 and one ID beside it. Separate clusters get separate outlines. A group is omitted
 if its rectangle includes any other part or cutoff, or if there is no clear space
-for its label. Dotted group outlines are distinct from dashed scrap cutoffs.
+for its label. Clearance is tested against real contours, not bounding boxes, so a
+cluster nested in a larger part's cutout or notch is still grouped and labeled. Dotted group outlines are distinct from dashed scrap cutoffs.
 
 The writer still rejects, with `NotSupportedException` and before touching
 the destination:

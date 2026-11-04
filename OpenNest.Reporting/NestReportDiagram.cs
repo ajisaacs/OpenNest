@@ -46,15 +46,20 @@ internal static class NestReportDiagram
         var view = new XRect(0, 0, width, height);
         var fit = Fit.Create(union, new XRect(Inset, Inset, width - 2 * Inset, height - 2 * Inset));
         var labels = PlaceLabels(plate, shapes, obstacles, all, fit, view, font, out var failed);
-        var groups = PlaceGroups(plate, failed, labels, fit, view, font);
+        var groups = PlaceGroups(plate, obstacles, failed, labels, fit, view, font);
         return new DiagramView(canvas, fit, labels, groups);
     }
 
-    private static List<DiagramGroup> PlaceGroups(ReportPlate plate, List<int> failed,
+    /// <summary>
+    /// Groups unlabeled same-ID neighbors. Clearance against other parts and cutoffs is tested on
+    /// their real contours, not their bounding boxes: a cluster nested in a large part's hole or
+    /// concave notch lies inside that part's bounding box but touches none of its material.
+    /// </summary>
+    private static List<DiagramGroup> PlaceGroups(ReportPlate plate, List<Shape> obstacles, List<int> failed,
         List<DiagramLabel> labels, Fit fit, XRect view, XFont font)
     {
+        // Obstacles are the parts, in plate order, followed by the cutoffs.
         var boxes = plate.Parts.Select(part => fit.Rect(part.Geometry.Bounds)).ToList();
-        var cutoffs = plate.Cutoffs.Select(cutoff => fit.Rect(cutoff.Bounds)).ToList();
         var groups = new List<DiagramGroup>();
         // A small screen-space gap also accommodates tightly packed parts with unset spacing.
         var gap = System.Math.Max(4, plate.PartSpacing * fit.Scale * 2);
@@ -89,8 +94,7 @@ internal static class NestReportDiagram
             var memberSet = members.ToHashSet();
             // A rectangular group must not imply that unrelated or ungrouped parts belong to it.
             if (!view.Contains(boundary)
-                || boxes.Where((_, index) => !memberSet.Contains(index)).Any(box => box.IntersectsWith(boundary))
-                || cutoffs.Any(box => box.IntersectsWith(boundary))
+                || obstacles.Where((_, index) => !memberSet.Contains(index)).Any(shape => shape.Crosses(ModelBox(fit, boundary)))
                 || labels.Any(label => label.Box.IntersectsWith(boundary))
                 || groups.Any(group => group.Boundary.IntersectsWith(boundary) || group.Label.Box.IntersectsWith(boundary)))
                 continue;
@@ -112,8 +116,7 @@ internal static class NestReportDiagram
             {
                 var padded = box;
                 padded.Inflate(Clearance, Clearance);
-                if (!view.Contains(padded) || boxes.Any(other => other.IntersectsWith(padded))
-                    || cutoffs.Any(other => other.IntersectsWith(padded))
+                if (!view.Contains(padded) || obstacles.Any(shape => shape.Crosses(ModelBox(fit, padded)))
                     || labels.Any(label => label.Box.IntersectsWith(padded))
                     || groups.Any(group => group.Boundary.IntersectsWith(padded) || group.Label.Box.IntersectsWith(padded)))
                     continue;
@@ -143,9 +146,9 @@ internal static class NestReportDiagram
             var height = size.Height + 2 * LabelPadding;
             var pole = fit.Point(shapes[index].Pole.X, shapes[index].Pole.Y);
             var box = new XRect(pole.X - width / 2, pole.Y - height / 2, width, height);
-            var topLeft = fit.Model(new XPoint(box.X - Clearance, box.Y - Clearance));
-            var bottomRight = fit.Model(new XPoint(box.Right + Clearance, box.Bottom + Clearance));
-            var test = new Box(topLeft.X, bottomRight.Y, bottomRight.X - topLeft.X, topLeft.Y - bottomRight.Y);
+            var padded = box;
+            padded.Inflate(Clearance, Clearance);
+            var test = ModelBox(fit, padded);
             if (view.Contains(box) && !placed.Any(label => label.Box.IntersectsWith(box))
                 && !obstacles.Any(shape => shape.Crosses(test)))
                 placed.Add(new DiagramLabel(index, id, box));
@@ -153,6 +156,14 @@ internal static class NestReportDiagram
                 failed.Add(index);
         }
         return placed;
+    }
+
+    /// <summary>The model-space rectangle under a canvas rectangle.</summary>
+    private static Box ModelBox(Fit fit, XRect rect)
+    {
+        var topLeft = fit.Model(new XPoint(rect.Left, rect.Top));
+        var bottomRight = fit.Model(new XPoint(rect.Right, rect.Bottom));
+        return new Box(topLeft.X, bottomRight.Y, bottomRight.X - topLeft.X, topLeft.Y - bottomRight.Y);
     }
 
     private static ReportBounds Union(ReportPlate plate, IEnumerable<Shape> shapes)

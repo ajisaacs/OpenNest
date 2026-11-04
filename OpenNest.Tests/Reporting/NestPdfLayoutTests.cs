@@ -210,6 +210,34 @@ public sealed class NestPdfLayoutTests : IDisposable
     }
 
     [Fact]
+    public void Plan_GroupNestedInsideALargerPartsCutoutIsStillLabeled()
+    {
+        // A frame whose cutout holds the washer cluster: its bounding box covers the group, but
+        // its material does not, so the group outline and ID are still clear.
+        var nest = NestReportTestData.CreateDenseNest();
+        var frame = new Program();
+        frame.Codes.Add(new RapidMove(0, 0));
+        frame.Codes.Add(new LinearMove(0, 30));
+        frame.Codes.Add(new LinearMove(40, 30));
+        frame.Codes.Add(new LinearMove(40, 0));
+        frame.Codes.Add(new LinearMove(0, 0));
+        frame.Codes.Add(new RapidMove(5, 5));
+        frame.Codes.Add(new LinearMove(35, 5));
+        frame.Codes.Add(new LinearMove(35, 25));
+        frame.Codes.Add(new LinearMove(5, 25));
+        frame.Codes.Add(new LinearMove(5, 5));
+        nest.Plates[0].Parts.Add(new Part(new Drawing("Frame", frame), new Vector(50, 20)));
+        var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var group = Assert.Single(plan.Groups);
+        Assert.Equal("2", group.Label.Id);
+        Assert.Equal(24, group.Parts.Count);
+        var frameBox = plan.Fit.Rect(snapshot.Plates[0].Parts[^1].Geometry.Bounds);
+        Assert.True(frameBox.Contains(group.Boundary));
+        Assert.True(frameBox.Contains(group.Label.Box));
+    }
+
+    [Fact]
     public void Plan_SeparatedClustersOfTheSamePartGetSeparateGroups()
     {
         var nest = NestReportTestData.CreateDenseNest();
