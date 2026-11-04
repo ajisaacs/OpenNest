@@ -224,7 +224,7 @@ namespace OpenNest.Forms
 
             var nest = form.Nest;
             machine.Text = FormatMachine(nest.Machine);
-            material.Text = FormatMaterial(nest.Material?.Name, nest.Thickness, nest.Units);
+            material.Text = FormatMaterial(nest.Material?.Name, nest.Material?.Grade, nest.Thickness, nest.Units);
 
             plateUtil.Text = string.Format(
                 "Util: {0:P1}",
@@ -240,12 +240,16 @@ namespace OpenNest.Forms
             return "Machine: " + (string.IsNullOrWhiteSpace(machine.Name) ? "(unnamed)" : machine.Name.Trim());
         }
 
-        /// <summary>Status text for the nest's material and thickness, e.g. "Material: A36 · 0.25 in".</summary>
-        internal static string FormatMaterial(string name, double thickness, Units units)
+        /// <summary>
+        /// Status text for the nest's material, grade and thickness, e.g. "Material: Steel A36 · 0.25 in".
+        /// </summary>
+        internal static string FormatMaterial(string name, string grade, double thickness, Units units)
         {
             var parts = new List<string>();
-            if (!string.IsNullOrWhiteSpace(name))
-                parts.Add(name.Trim());
+            var description = string.Join(" ", new[] { name?.Trim(), grade?.Trim() }
+                .Where(s => !string.IsNullOrEmpty(s)));
+            if (description.Length > 0)
+                parts.Add(description);
             if (thickness > 0)
                 parts.Add(thickness.ToString("0.####", CultureInfo.CurrentCulture) + " " + UnitsHelper.GetShortString(units));
 
