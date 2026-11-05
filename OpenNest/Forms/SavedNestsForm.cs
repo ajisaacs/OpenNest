@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -72,6 +73,8 @@ public sealed class SavedNestsForm : Form
     private bool editingInfo;
     private readonly Button infoButton;
     private readonly ToolStripMenuItem infoMenuItem;
+    private readonly ToolStripMenuItem materialsMenuItem;
+    private readonly Button materialsButton;
 
     internal Func<EditNestInfoForm, DialogResult> ShowNestInfoDialog { get; set; }
     private IReadOnlyList<Plate> previewPlates = Array.Empty<Plate>();
@@ -106,6 +109,8 @@ public sealed class SavedNestsForm : Form
 
         // Nests: one server page, sorted by the server when a header is clicked.
         nestGrid = CreateGrid();
+        // Several rows can be chosen for Get Materials; the other commands use the current row.
+        nestGrid.MultiSelect = true;
         nestGrid.RowHeadersWidth = 64;
         AddNestColumn("Nest name", NestSortField.Name, 170);
         AddNestColumn("Status", NestSortField.Status, 100);
@@ -136,8 +141,9 @@ public sealed class SavedNestsForm : Form
         };
         nestGrid.CellMouseDown += (_, e) =>
         {
-            // Right-click highlights the row under the pointer before its menu opens.
-            if (e.Button == MouseButtons.Right && e.RowIndex >= 0)
+            // Right-click highlights the row under the pointer before its menu opens, keeping
+            // a multi-row selection that already includes it.
+            if (e.Button == MouseButtons.Right && e.RowIndex >= 0 && !nestGrid.Rows[e.RowIndex].Selected)
                 nestGrid.CurrentCell = nestGrid.Rows[e.RowIndex].Cells[0];
         };
         nestGrid.SelectionChanged += (_, _) =>
@@ -145,13 +151,26 @@ public sealed class SavedNestsForm : Form
             UpdateCommands();
             ScheduleDetails();
         };
+        // With several rows selected the details follow the current row, which settles
+        // after SelectionChanged.
+        nestGrid.CurrentCellChanged += (_, _) =>
+        {
+            if (nestGrid.SelectedRows.Count > 1)
+                ScheduleDetails();
+        };
 
         var menu = new ContextMenuStrip();
         openMenuItem = new ToolStripMenuItem("Open", null, (_, _) => OpenSelected()) { ShortcutKeyDisplayString = "Enter" };
         deleteMenuItem = new ToolStripMenuItem("Delete...", null, async (_, _) => await DeleteSelectedAsync());
         var refreshMenuItem = new ToolStripMenuItem("Refresh", null, async (_, _) => await RunAsync(session.RefreshAsync));
         infoMenuItem = new ToolStripMenuItem("Nest Information...", null, async (_, _) => await EditSelectedInfoAsync());
-        menu.Items.AddRange(new ToolStripItem[] { openMenuItem, infoMenuItem, deleteMenuItem, new ToolStripSeparator(), refreshMenuItem });
+        materialsMenuItem = new ToolStripMenuItem("Get Materials...", null, (_, _) => ShowSelectedMaterials());
+        var allMaterialsMenuItem = new ToolStripMenuItem("Get Materials for All Matching Nests...", null, (_, _) => ShowAllMatchingMaterials());
+        menu.Items.AddRange(new ToolStripItem[]
+        {
+            openMenuItem, infoMenuItem, deleteMenuItem, new ToolStripSeparator(),
+            materialsMenuItem, allMaterialsMenuItem, new ToolStripSeparator(), refreshMenuItem,
+        });
         nestGrid.ContextMenuStrip = menu;
 
         // Details of the highlighted nest.
@@ -247,8 +266,22 @@ public sealed class SavedNestsForm : Form
         split.Panel1.Controls.Add(nestGrid);
         infoButton = new Button { Text = "Nest Information...", AutoSize = true, Dock = DockStyle.Right };
         infoButton.Click += async (_, _) => await EditSelectedInfoAsync();
+        materialsButton = new Button { Text = "Get Materials \u25BE", AutoSize = true, Dock = DockStyle.Right };
+        materialsButton.Click += (_, _) =>
+        {
+            var selected = SelectedNestRecords().Count;
+            var total = session.Page?.Total ?? 0;
+            var choices = new ContextMenuStrip();
+            choices.Items.Add($"Selected Nests ({selected:N0})...", null, (_, _) => ShowSelectedMaterials())
+                .Enabled = selected > 0;
+            choices.Items.Add($"All Matching Nests ({total:N0})...", null, (_, _) => ShowAllMatchingMaterials())
+                .Enabled = total > 0;
+            choices.Closed += (_, _) => BeginInvoke(new Action(choices.Dispose));
+            choices.Show(materialsButton, new Point(0, materialsButton.Height));
+        };
         var nestsHeader = new Panel { Dock = DockStyle.Top, Height = 36 };
         nestsHeader.Controls.Add(infoButton);
+        nestsHeader.Controls.Add(materialsButton);
         nestsHeader.Controls.Add(SectionLabel("Nests", DockStyle.Left));
         split.Panel1.Controls.Add(nestsHeader);
         ShowNestInfoDialog = dialog => dialog.ShowDialog(this);
@@ -443,11 +476,16 @@ public sealed class SavedNestsForm : Form
 
     private void UpdateCommands()
     {
-        var hasSelection = SelectedNestId() != null && !editingInfo && !deleting;
+        // Open, information and delete act on one nest; Get Materials on every selected nest.
+        var hasSelection = SelectedNestId() != null && nestGrid.SelectedRows.Count == 1 && !editingInfo && !deleting;
         openMenuItem.Enabled = hasSelection;
         infoButton.Enabled = hasSelection;
         infoMenuItem.Enabled = hasSelection;
         deleteMenuItem.Enabled = hasSelection;
+        materialsMenuItem.Enabled = nestGrid.SelectedRows.Count > 0 && !editingInfo;
+        materialsMenuItem.Text = nestGrid.SelectedRows.Count > 1
+            ? $"Get Materials for {nestGrid.SelectedRows.Count:N0} Nests..."
+            : "Get Materials...";
     }
 
     private void UpdateTitle(string summary)
@@ -513,8 +551,80 @@ public sealed class SavedNestsForm : Form
         return unitIndex == 0 ? $"{size:0} {FileSizeUnits[unitIndex]}" : $"{size:0.#} {FileSizeUnits[unitIndex]}";
     }
 
-    private Guid? SelectedNestId() =>
-        nestGrid.SelectedRows.Count > 0 && nestGrid.SelectedRows[0].Cells[IdColumn].Value is Guid id ? id : null;
+    /// <summary>
+    /// The highlighted nest: the current row while it is selected. With several rows
+    /// selected the details follow the row last clicked or arrowed to.
+    /// </summary>
+    private Guid? SelectedNestId()
+    {
+        // While SelectionChanged runs, CurrentRow still names the previously current row,
+        // so a single selection is read from SelectedRows.
+        var row = nestGrid.SelectedRows.Count == 1 ? nestGrid.SelectedRows[0]
+            : nestGrid.CurrentRow is { Selected: true } current ? current : null;
+        return row?.Cells[IdColumn].Value is Guid id ? id : null;
+    }
+
+    /// <summary>Every selected nest, in list order.</summary>
+    private List<NestRecord> SelectedNestRecords() =>
+        nestGrid.SelectedRows.Cast<DataGridViewRow>()
+            .OrderBy(row => row.Index)
+            .Select(row => row.Tag as NestRecord)
+            .Where(record => record != null)
+            .ToList();
+
+    private void ShowSelectedMaterials()
+    {
+        var records = SelectedNestRecords();
+        if (records.Count == 0)
+            return;
+        ShowMaterials(
+            _ => Task.FromResult<IReadOnlyList<NestRecord>>(records),
+            records.Count == 1 ? records[0].Name : $"{records.Count:N0} selected nests");
+    }
+
+    /// <summary>
+    /// Lists materials for every nest the current search matches, across all pages, read
+    /// from the server in the largest pages it allows.
+    /// </summary>
+    private void ShowAllMatchingMaterials()
+    {
+        var search = session.Search;
+        var sort = session.Sort;
+        var descending = session.Descending;
+        ShowMaterials(
+            async token =>
+            {
+                var records = new List<NestRecord>();
+                var seen = new HashSet<Guid>();
+                var offset = 0;
+                while (true)
+                {
+                    var page = await repository.QueryAsync(
+                        new NestQuery
+                        {
+                            Search = search,
+                            Sort = sort,
+                            Descending = descending,
+                            Offset = offset,
+                            Limit = NestQuery.MaxLimit,
+                        },
+                        token);
+                    foreach (var record in page.Items)
+                        if (seen.Add(record.Id))
+                            records.Add(record);
+                    offset += page.Items.Count;
+                    if (page.Items.Count == 0 || offset >= page.Total)
+                        return records;
+                }
+            },
+            search.Length == 0 ? "all nests" : $"nests matching \"{search}\"");
+    }
+
+    private void ShowMaterials(Func<CancellationToken, Task<IReadOnlyList<NestRecord>>> records, string description)
+    {
+        using var dialog = new NestMaterialsForm(repository, records, description);
+        dialog.ShowDialog(this);
+    }
 
     /// <summary>
     /// Shows the highlighted nest's details after a short pause, so arrowing through the
@@ -706,7 +816,7 @@ public sealed class SavedNestsForm : Form
 
     private void OpenSelected()
     {
-        if (editingInfo || SelectedNestId() is not Guid id)
+        if (editingInfo || nestGrid.SelectedRows.Count != 1 || SelectedNestId() is not Guid id)
             return;
         SelectedId = id;
         DialogResult = DialogResult.OK;
@@ -908,7 +1018,7 @@ public sealed class SavedNestsForm : Form
 
     private async Task DeleteSelectedAsync()
     {
-        if (deleting || SelectedNestId() is not Guid id)
+        if (deleting || nestGrid.SelectedRows.Count != 1 || SelectedNestId() is not Guid id)
             return;
 
         var name = nestGrid.SelectedRows[0].Cells[0].Value?.ToString() ?? "";

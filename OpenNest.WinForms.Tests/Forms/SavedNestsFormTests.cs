@@ -338,6 +338,48 @@ public class SavedNestsFormTests
         }, TestTimeout, "The pending information edit did not complete.");
     }
 
+    [Fact]
+    public void SelectingSeveralNests_DisablesSingleNestCommands_AndGetMaterialsSumsTheirSheets()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var first = Record("4734-01");
+                first.Material = "Mild Steel";
+                first.Thickness = 0.25;
+                var second = Record("4734-02");
+                second.Material = "Mild Steel";
+                second.Thickness = 0.25;
+                var repository = new FakeRepository(first, second);
+                repository.Files[first.Id] = NestFile((Quantity: 2, Parts: 3));
+                repository.Files[second.Id] = NestFile((Quantity: 3, Parts: 1));
+
+                using var form = new SavedNestsForm(repository);
+                form.Show();
+                var nests = Field<DataGridView>(form, "nestGrid");
+                PumpUntil(() => nests.Rows.Count == 2, "the nest page");
+
+                nests.SelectAll();
+                Application.DoEvents();
+                Assert.Equal(2, nests.SelectedRows.Count);
+                Assert.False(Field<Button>(form, "infoButton").Enabled);
+                Assert.Equal("Get Materials for 2 Nests...", Field<ToolStripMenuItem>(form, "materialsMenuItem").Text);
+
+                var records = nests.SelectedRows.Cast<DataGridViewRow>().Select(row => (NestRecord)row.Tag).ToList();
+                using var materials = new NestMaterialsForm(
+                    repository, _ => Task.FromResult<IReadOnlyList<NestRecord>>(records), "2 selected nests");
+                materials.Show();
+                var grid = Field<DataGridView>(materials, "grid");
+                PumpUntil(() => grid.Rows.Count == 1, "the materials list");
+                Assert.Equal("Mild Steel", grid.Rows[0].Cells["Material"].Value);
+                Assert.Equal("48 x 96", grid.Rows[0].Cells["Size"].Value);
+                Assert.Equal(5, grid.Rows[0].Cells["Quantity"].Value);
+                Assert.Equal("4734-01 (2), 4734-02 (3)", grid.Rows[0].Cells["Nests"].Value);
+            },
+            TestTimeout,
+            "The materials test did not complete.");
+    }
+
     private static NestRecord Record(string name) =>
         new() { Id = Guid.NewGuid(), Name = name, SavedAt = DateTime.Now };
 
