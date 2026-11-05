@@ -254,14 +254,18 @@ namespace OpenNest.Forms
                 Settings.Default.UpdateFeedUrl = "";
                 Settings.Default.Save();
                 updateFeedUrlBox.Text = "";
-                MessageBox.Show(this, "Update feed URL cleared. Updates will come from GitHub Releases after a restart.",
+                MessageBox.Show(this, "Update feed URL cleared. After a restart, updates come from "
+                    + "the nest server's mirror in Database mode (GitHub Releases if it has none), "
+                    + "otherwise from GitHub Releases.",
                     "Update Feed URL", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             if (!NestStorageSettings.TryNormalizeServerUrl(text, out var url))
             {
-                MessageBox.Show(this, "Enter a valid http or https feed URL, or clear the field to update from GitHub Releases.",
+                MessageBox.Show(this, "Enter a valid http or https feed URL, or clear the field to "
+                    + "use the default source: the nest server's mirror in Database mode, "
+                    + "otherwise GitHub Releases.",
                     "Update Feed URL", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }

@@ -13,7 +13,7 @@ starts: `VelopackApp.Build().Run()` in `MainApp` keeps Velopack's default
 version. Nothing runs while OpenNest is closed (no service or scheduled task),
 and a session shorter than the first minute never checks.
 
-**Help > Check for Updates** runs the same check immediately (waiting for a
+**Help > Check for Updates...** runs the same check immediately (waiting for a
 background check already in progress rather than starting a second one) and
 reports the result: already the latest version, the feed was unreachable, or a
 downloaded update with the same restart prompt. A copy that is not a Velopack
@@ -24,7 +24,8 @@ the assembly's informational version without its `+commit` build metadata.
 
 ## Where updates come from
 
-By default an installed copy checks the public
+Unless Database mode or a hand-set feed URL applies (below), an installed copy
+checks the public
 [GitHub Releases](https://github.com/ajisaacs/OpenNest/releases) for full,
 non-pre-release versions (`GithubSource`, unauthenticated: GitHub allows 60 API
 requests per hour per IP address, ample for a 30-minute poll but shared by every

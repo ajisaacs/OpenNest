@@ -21,7 +21,7 @@ namespace OpenNest
     /// A blank <see cref="Settings.UpdateFeedUrl"/> (the default) checks the
     /// public GitHub Releases for full versions, plus the rolling development
     /// pre-release when <see cref="Settings.UpdateIncludeDevBuilds"/> is set. A URL set in
-    /// the Options dialog points this machine at a self-hosted feed instead;
+    /// the Options dialog points this Windows user's copies at a self-hosted feed instead;
     /// that URL is operator infrastructure and never lives in source control.
     /// In Database mode without such a URL, the nest server's mirror of the same feed
     /// (<c>{server}/updates/stable</c> or <c>/dev</c>) is read first, so a shop's workstations

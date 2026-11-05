@@ -269,7 +269,7 @@
             this.updateGroupBox.Size = new System.Drawing.Size(684, 88);
             this.updateGroupBox.TabIndex = 3;
             this.updateGroupBox.TabStop = false;
-            this.updateGroupBox.Text = "Auto-update feed URL (blank uses GitHub Releases; set per machine)";
+            this.updateGroupBox.Text = "Auto-update feed URL (blank: nest server mirror in Database mode, else GitHub Releases)";
             //
             // updateFeedUrlBox
             //
