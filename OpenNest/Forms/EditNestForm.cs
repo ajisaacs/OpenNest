@@ -21,7 +21,6 @@ using OpenNest.IO;
 using OpenNest.Math;
 using OpenNest.Properties;
 using OpenNest.Reporting;
-using OpenNest.Shapes;
 using Timer = System.Timers.Timer;
 
 namespace OpenNest.Forms
@@ -962,11 +961,7 @@ namespace OpenNest.Forms
 
         public void ResizePlateToFitParts()
         {
-            var options = new PlateSizeOptions
-            {
-                SnapIncrement = Settings.Default.AutoSizePlateFactor,
-            };
-            RecordChange("Resize Plate", () => PlateView.Plate.SnapToStandardSize(options));
+            RecordChange("Resize Plate", () => PlateView.Plate.AutoSize(Settings.Default.AutoSizePlateFactor));
             PlateView.ZoomToPlate();
             PlateView.Refresh();
             UpdatePlateList();

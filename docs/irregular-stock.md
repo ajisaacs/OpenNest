@@ -38,7 +38,7 @@ Drawing an outline in the plate view and taking the leftover of a cut plate are 
 | Salvage and remnants | No salvage credit and no `expectedRemnant`: no rectangular edge strip is guaranteed inside an outline |
 | Manual cut-offs | A line is cut only where it crosses material: each crossing is a segment of its own, started at the material's edge and overtraveled past the far one, within the user's limits and the usual part clearance. The head-locked overcut applies only to a span that reaches the bounding box's far edge |
 | Automatic cut-offs | Refused: `AutomaticCutOffPlanner` rejects an outlined plate ("Automatic cut-offs need a rectangular sheet") |
-| AutoSize, Snap to Standard Size | Leave an outlined plate unchanged: the outline is a particular piece of material |
+| AutoSize (Resize Plate to Fit Parts) | Leaves an outlined plate unchanged: the outline is a particular piece of material |
 | Rotate 90/180 | Turn the outline with the sheet |
 | Repeated layouts, clamp-removal recovery, stock matching | An outlined stock is never the same stock as its rectangle |
 

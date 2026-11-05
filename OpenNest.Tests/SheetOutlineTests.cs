@@ -179,8 +179,6 @@ public class SheetOutlineTests
         plate.AutoSize();
         Assert.Equal(96, plate.Size.Width);
         Assert.NotNull(plate.Outline);
-        Assert.Equal(default, plate.SnapToStandardSize());
-        Assert.NotNull(plate.Outline);
     }
 
     [Fact]
