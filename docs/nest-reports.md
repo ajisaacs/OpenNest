@@ -88,17 +88,23 @@ the totals.
 Individual IDs use 7 pt text centered on the part's pole of inaccessibility
 (`PolyLabel`, as in `PlateView`), clear of edges, holes, cutoffs and other labels.
 The search uses a placement-independent quantized copy for consistent placement
-on identical parts. Labels are best effort: there are no closeup or grid pages,
-and a part too small to label never prevents export. Every part remains in the
-quantity tables even when its diagram label cannot fit.
+on identical parts. When the pole is too narrow (a ring around a large hole), the
+ID goes in the clear spot within the part's own extents with the most room, such
+as an empty hole, nearest the part's center. Labels are best effort: there are no
+closeup or grid pages, and a part too small to label never prevents export. Every
+part remains in the quantity tables even when its diagram label cannot fit.
 
 Nearby small parts with the same report ID may share a dotted rectangular outline
-and one ID beside it. Separate clusters get separate outlines; an outline stays
-within half the part spacing of its parts, so clusters of different parts packed
-one spacing apart each keep their own outline and ID. A group is omitted
-if its rectangle includes any other part or cutoff, or if there is no clear space
-for its label. Clearance is tested against real contours, not bounding boxes, so a
-cluster nested in a larger part's cutout or notch is still grouped and labeled. Dotted group outlines are distinct from dashed scrap cutoffs.
+and one ID. Separate clusters get separate outlines; an outline stays within half
+the part spacing of its parts, so clusters of different parts packed one spacing
+apart each keep their own outline and ID. The group ID goes wherever it has the
+most room, inside the outline (between the parts or in a hole) or beside it. With
+no clear spot, it covers the group's own parts near the outline's center (the
+parts list shows each part up close), but never another part or a cutoff. No ID
+sits across the sheet outline. A group is omitted if its rectangle includes any
+other part or cutoff, or if even that fallback finds no place for its label.
+Clearance is tested against real contours, not bounding boxes, so a cluster nested
+in a larger part's cutout or notch is still grouped and labeled. Dotted group outlines are distinct from dashed scrap cutoffs.
 
 The writer still rejects, with `NotSupportedException` and before touching
 the destination:

@@ -280,6 +280,29 @@ public sealed class NestPdfLayoutTests : IDisposable
                 plan.Fit.Rect(snapshot.Plates[0].Parts[index].Geometry.Bounds))));
     }
 
+    [Fact]
+    public void Plan_RingTooNarrowForItsIdIsLabeledInItsHole()
+    {
+        // A 6.5 in plate with a 4.56 in hole on a 60 x 96 sheet: the ring of material is ~5 pt wide
+        // at overview scale, too narrow for the ID, but the empty hole has plenty of room.
+        var nest = new Nest("Ring test") { Units = Units.Inches };
+        var ring = new Drawing("Ring", NestReportTestData.HoledSquare(6.5, 2.28));
+        nest.Drawings.Add(ring);
+        var plate = new Plate(60, 96) { Quantity = 1, PartSpacing = 0.25 };
+        plate.Parts.Add(new Part(ring, new Vector(80, 50)));
+        nest.Plates.Add(plate);
+        var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
+
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+
+        var label = Assert.Single(plan.Labels);
+        Assert.Empty(plan.Groups);
+        var center = plan.Fit.Model(new PdfSharp.Drawing.XPoint(label.Box.X + label.Box.Width / 2, label.Box.Y + label.Box.Height / 2));
+        var bounds = snapshot.Plates[0].Parts[0].Geometry.Bounds;
+        Assert.InRange(center.X - (bounds.Left + bounds.Right) / 2, -0.5, 0.5);
+        Assert.InRange(center.Y - (bounds.Bottom + bounds.Top) / 2, -0.5, 0.5);
+    }
+
     [SkippableFact]
     public void Write_LabelOnHoledPartAvoidsTheHole()
     {

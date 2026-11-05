@@ -63,6 +63,7 @@ internal static class NestReportDiagram
         var groups = new List<DiagramGroup>();
         // A small screen-space gap also accommodates tightly packed parts with unset spacing.
         var gap = System.Math.Max(4, plate.PartSpacing * fit.Scale * 2);
+        var sheet = fit.Rect(plate.Bounds);
         // Outlines stay under half the part spacing from their members, so the outlines of two
         // neighboring clusters (different IDs one spacing apart) never meet or overlap.
         var margin = plate.PartSpacing > 0 ? System.Math.Min(1, plate.PartSpacing * fit.Scale * 0.45) : 1;
@@ -107,34 +108,106 @@ internal static class NestReportDiagram
             var labelHeight = size.Height + 2 * LabelPadding;
             var centerX = boundary.X + (boundary.Width - labelWidth) / 2;
             var centerY = boundary.Y + (boundary.Height - labelHeight) / 2;
-            // Put the ID beside the dotted boundary, never over a small part or its hole.
-            var candidates = new[]
-            {
+            var target = new XPoint(boundary.X + boundary.Width / 2, boundary.Y + boundary.Height / 2);
+            var inside = Grid(boundary, labelWidth, labelHeight).ToList();
+            // The ID goes wherever it fits best: clear space inside the outline (between the parts
+            // or in a hole) or beside it.
+            var candidates = inside.Concat(
+            [
                 new XRect(centerX, boundary.Y - labelHeight - Clearance, labelWidth, labelHeight),
                 new XRect(centerX, boundary.Bottom + Clearance, labelWidth, labelHeight),
                 new XRect(boundary.Right + Clearance, centerY, labelWidth, labelHeight),
                 new XRect(boundary.X - labelWidth - Clearance, centerY, labelWidth, labelHeight),
-            };
-            foreach (var box in candidates)
-            {
-                var padded = box;
-                padded.Inflate(Clearance, Clearance);
-                if (!view.Contains(padded) || obstacles.Any(shape => shape.Crosses(ModelBox(fit, padded)))
-                    || labels.Any(label => label.Box.IntersectsWith(padded))
-                    || groups.Any(group => group.Boundary.IntersectsWith(padded) || group.Label.Box.IntersectsWith(padded)))
-                    continue;
+            ]);
+            bool Blocked(XRect padded) => !view.Contains(padded) || OnSheetEdge(sheet, padded)
+                || labels.Any(label => label.Box.IntersectsWith(padded))
+                || groups.Any(group => group.Boundary.IntersectsWith(padded) || group.Label.Box.IntersectsWith(padded));
+            var others = obstacles.Where((_, index) => !memberSet.Contains(index)).ToList();
+            // With no clear space anywhere, the ID may cover the group's own parts (the parts
+            // list shows each part up close), but never another part or a cutoff.
+            var spot = BestSpot(candidates, obstacles, others, fit, Blocked, target)
+                ?? BestSpot(inside, others, others, fit, Blocked, target, required: 0, preferRoom: false);
+            if (spot is { } box)
                 groups.Add(new DiagramGroup(members, boundary, new DiagramLabel(seed, id, box)));
-                break;
-            }
         }
         return groups;
+    }
+
+    /// <summary>Whether a label would sit across the sheet outline and hide part of it.</summary>
+    private static bool OnSheetEdge(XRect sheet, XRect padded) =>
+        sheet.IntersectsWith(padded) && !sheet.Contains(padded);
+
+    /// <summary>Label-sized boxes tiling an area on a fine grid, centered when the area is too small.</summary>
+    private static IEnumerable<XRect> Grid(XRect area, double width, double height)
+    {
+        yield return new XRect(area.X + (area.Width - width) / 2, area.Y + (area.Height - height) / 2, width, height);
+        var spanX = area.Width - width;
+        var spanY = area.Height - height;
+        if (spanX < 0 || spanY < 0)
+            yield break;
+        var step = System.Math.Max(1, System.Math.Max(spanX, spanY) / 60);
+        for (var y = 0.0; y <= spanY + 1e-9; y += step)
+            for (var x = 0.0; x <= spanX + 1e-9; x += step)
+                yield return new XRect(area.X + x, area.Y + y, width, height);
+    }
+
+    /// <summary>
+    /// The candidate with the most room to the nearest contour (capped, so open space ties) and,
+    /// among ties, the one nearest <paramref name="target"/>. A candidate must keep at least
+    /// <paramref name="required"/> canvas points from every obstacle edge and may not sit inside
+    /// the material of any shape in <paramref name="foreign"/>, which would label the wrong part.
+    /// Without <paramref name="preferRoom"/>, only the distance to the target ranks candidates.
+    /// </summary>
+    private static XRect? BestSpot(IEnumerable<XRect> candidates, IReadOnlyList<Shape> obstacles,
+        IReadOnlyList<Shape> foreign, Fit fit, Func<XRect, bool> blocked, XPoint target, double required = Clearance,
+        bool preferRoom = true)
+    {
+        XRect? best = null;
+        var bestRoom = double.NegativeInfinity;
+        var bestDistance = double.PositiveInfinity;
+        foreach (var box in candidates)
+        {
+            var padded = box;
+            padded.Inflate(Clearance, Clearance);
+            if (blocked(padded))
+                continue;
+            var cap = 2 * box.Height;
+            var reach = box;
+            reach.Inflate(cap, cap);
+            var near = ModelBox(fit, reach);
+            var model = ModelBox(fit, box);
+            var room = cap;
+            foreach (var shape in obstacles)
+            {
+                if (room < required || !shape.Overlaps(near))
+                    continue;
+                room = System.Math.Min(room, shape.Distance(model) * fit.Scale);
+            }
+            if (room < required)
+                continue;
+            var center = fit.Model(new XPoint(box.X + box.Width / 2, box.Y + box.Height / 2));
+            if (foreign.Any(shape => shape.InMaterial(new Vector(center.X, center.Y))))
+                continue;
+            var distance = System.Math.Pow(box.X + box.Width / 2 - target.X, 2)
+                + System.Math.Pow(box.Y + box.Height / 2 - target.Y, 2);
+            if (!preferRoom)
+                room = 0;
+            if (room > bestRoom + 1e-6 || (room > bestRoom - 1e-6 && distance < bestDistance))
+            {
+                best = box;
+                bestRoom = room;
+                bestDistance = distance;
+            }
+        }
+        return best;
     }
 
     /// <summary>
     /// Centers each ID on its part's pole of inaccessibility (<see cref="PolyLabel"/>, as PlateView
     /// does), so it sits deepest inside the material and clear of holes. A label box that would
-    /// touch an edge, hole, cutoff or another label is not moved elsewhere: the individual label is skipped here
-    /// and may share a group label or remain unlabeled.
+    /// touch an edge, hole, cutoff or another label falls back to the roomiest clear spot within the
+    /// part's own extents (such as an empty hole); failing that, the part may share a group label or
+    /// remain unlabeled.
     /// </summary>
     private static List<DiagramLabel> PlaceLabels(ReportPlate plate, List<Shape> shapes, List<Shape> obstacles,
         List<int> targets, Fit fit, XRect view, XFont font, out List<int> failed)
@@ -157,6 +230,24 @@ internal static class NestReportDiagram
                 placed.Add(new DiagramLabel(index, id, box));
             else
                 failed.Add(index);
+        }
+
+        // A part too narrow at its pole (a ring around a large hole) may still have clear room
+        // elsewhere within its own extents, such as the hole itself.
+        foreach (var index in failed.ToList())
+        {
+            var id = plate.Parts[index].ReportId;
+            var size = ReportText.Size(id, font);
+            var area = fit.Rect(shapes[index].Bounds);
+            var others = obstacles.Where((_, other) => other != index).ToList();
+            var spot = BestSpot(Grid(area, size.Width + 2 * LabelPadding, size.Height + 2 * LabelPadding)
+                    .Where(area.Contains), obstacles, others, fit,
+                padded => !view.Contains(padded) || OnSheetEdge(fit.Rect(plate.Bounds), padded) || placed.Any(label => label.Box.IntersectsWith(padded)),
+                new XPoint(area.X + area.Width / 2, area.Y + area.Height / 2));
+            if (spot is not { } found)
+                continue;
+            placed.Add(new DiagramLabel(index, id, found));
+            failed.Remove(index);
         }
         return placed;
     }
@@ -246,6 +337,93 @@ internal static class NestReportDiagram
                 new Vector(box.Right, box.Top), new Vector(box.Left, box.Top)]);
             outline.Close();
             return Rings.Any(ring => ring.Vertices.Any(box.Contains) || ring.Intersects(outline));
+        }
+
+        public bool Overlaps(Box box) => Box.Intersects(box);
+
+        /// <summary>Distance from the rectangle to the nearest contour edge; zero when one touches it.</summary>
+        public double Distance(Box box)
+        {
+            var best = double.PositiveInfinity;
+            foreach (var ring in Rings)
+            {
+                var vertices = ring.Vertices;
+                for (var i = 0; i < vertices.Count; i++)
+                {
+                    best = System.Math.Min(best, SegmentDistance(vertices[i], vertices[(i + 1) % vertices.Count], box));
+                    if (best <= 0)
+                        return 0;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>Whether the point lies in material: inside an odd number of contours.</summary>
+        public bool InMaterial(Vector point)
+        {
+            if (!Box.Contains(point))
+                return false;
+            var inside = false;
+            foreach (var ring in Rings)
+            {
+                var vertices = ring.Vertices;
+                for (int i = 0, j = vertices.Count - 1; i < vertices.Count; j = i++)
+                {
+                    if ((vertices[i].Y > point.Y) != (vertices[j].Y > point.Y)
+                        && point.X < (vertices[j].X - vertices[i].X) * (point.Y - vertices[i].Y)
+                            / (vertices[j].Y - vertices[i].Y) + vertices[i].X)
+                        inside = !inside;
+                }
+            }
+            return inside;
+        }
+
+        private static double SegmentDistance(Vector a, Vector b, Box box)
+        {
+            if (box.Contains(a) || box.Contains(b))
+                return 0;
+            Vector[] corners = [new(box.Left, box.Bottom), new(box.Right, box.Bottom),
+                new(box.Right, box.Top), new(box.Left, box.Top)];
+            for (var i = 0; i < 4; i++)
+            {
+                if (SegmentsCross(a, b, corners[i], corners[(i + 1) % 4]))
+                    return 0;
+            }
+            var best = System.Math.Min(PointToBox(a, box), PointToBox(b, box));
+            foreach (var corner in corners)
+                best = System.Math.Min(best, PointToSegment(corner, a, b));
+            return best;
+        }
+
+        private static double PointToBox(Vector point, Box box)
+        {
+            var dx = System.Math.Max(System.Math.Max(box.Left - point.X, 0), point.X - box.Right);
+            var dy = System.Math.Max(System.Math.Max(box.Bottom - point.Y, 0), point.Y - box.Top);
+            return System.Math.Sqrt(dx * dx + dy * dy);
+        }
+
+        private static double PointToSegment(Vector point, Vector a, Vector b)
+        {
+            var dx = b.X - a.X;
+            var dy = b.Y - a.Y;
+            var lengthSquared = dx * dx + dy * dy;
+            var t = lengthSquared <= 0 ? 0
+                : System.Math.Clamp(((point.X - a.X) * dx + (point.Y - a.Y) * dy) / lengthSquared, 0, 1);
+            var x = a.X + t * dx - point.X;
+            var y = a.Y + t * dy - point.Y;
+            return System.Math.Sqrt(x * x + y * y);
+        }
+
+        private static bool SegmentsCross(Vector a, Vector b, Vector c, Vector d)
+        {
+            static double Cross(Vector o, Vector p, Vector q) => (p.X - o.X) * (q.Y - o.Y) - (p.Y - o.Y) * (q.X - o.X);
+            var d1 = Cross(c, d, a);
+            var d2 = Cross(c, d, b);
+            var d3 = Cross(a, b, c);
+            var d4 = Cross(a, b, d);
+            return ((d1 > 0) != (d2 > 0) || d1 == 0 || d2 == 0) && ((d3 > 0) != (d4 > 0) || d3 == 0 || d4 == 0)
+                && System.Math.Min(a.X, b.X) <= System.Math.Max(c.X, d.X) && System.Math.Min(c.X, d.X) <= System.Math.Max(a.X, b.X)
+                && System.Math.Min(a.Y, b.Y) <= System.Math.Max(c.Y, d.Y) && System.Math.Min(c.Y, d.Y) <= System.Math.Max(a.Y, b.Y);
         }
 
         private static OpenNest.Geometry.Shape ToShape(ReportContour contour)
