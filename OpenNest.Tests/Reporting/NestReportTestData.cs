@@ -126,7 +126,7 @@ public static class NestReportTestData
         return drawing;
     }
 
-    private static Program HoledSquare(double size, double radius)
+    internal static Program HoledSquare(double size, double radius)
     {
         var program = RectangleProgram(size, size);
         var center = size / 2;

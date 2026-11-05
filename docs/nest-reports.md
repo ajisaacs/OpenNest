@@ -93,7 +93,9 @@ and a part too small to label never prevents export. Every part remains in the
 quantity tables even when its diagram label cannot fit.
 
 Nearby small parts with the same report ID may share a dotted rectangular outline
-and one ID beside it. Separate clusters get separate outlines. A group is omitted
+and one ID beside it. Separate clusters get separate outlines; an outline stays
+within half the part spacing of its parts, so clusters of different parts packed
+one spacing apart each keep their own outline and ID. A group is omitted
 if its rectangle includes any other part or cutoff, or if there is no clear space
 for its label. Clearance is tested against real contours, not bounding boxes, so a
 cluster nested in a larger part's cutout or notch is still grouped and labeled. Dotted group outlines are distinct from dashed scrap cutoffs.

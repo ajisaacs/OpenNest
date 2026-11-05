@@ -63,6 +63,9 @@ internal static class NestReportDiagram
         var groups = new List<DiagramGroup>();
         // A small screen-space gap also accommodates tightly packed parts with unset spacing.
         var gap = System.Math.Max(4, plate.PartSpacing * fit.Scale * 2);
+        // Outlines stay under half the part spacing from their members, so the outlines of two
+        // neighboring clusters (different IDs one spacing apart) never meet or overlap.
+        var margin = plate.PartSpacing > 0 ? System.Math.Min(1, plate.PartSpacing * fit.Scale * 0.45) : 1;
         var remaining = failed.ToHashSet();
         foreach (var seed in failed)
         {
@@ -90,7 +93,7 @@ internal static class NestReportDiagram
             var boundary = boxes[seed];
             foreach (var member in members.Skip(1))
                 boundary.Union(boxes[member]);
-            boundary.Inflate(1, 1);
+            boundary.Inflate(margin, margin);
             var memberSet = members.ToHashSet();
             // A rectangular group must not imply that unrelated or ungrouped parts belong to it.
             if (!view.Contains(boundary)

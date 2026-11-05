@@ -256,6 +256,30 @@ public sealed class NestPdfLayoutTests : IDisposable
         Assert.False(plan.Groups[0].Boundary.IntersectsWith(plan.Groups[1].Boundary));
     }
 
+    [Fact]
+    public void Plan_NeighboringClustersOfDifferentPartsOneSpacingApartAreBothGrouped()
+    {
+        // A second washer drawing (another ID) packed one part spacing to the right of the first
+        // cluster: their outlines must not meet, or the second group and its ID were dropped.
+        var nest = NestReportTestData.CreateDenseNest();
+        var plate = nest.Plates[0];
+        var other = new Drawing("Other washer", NestReportTestData.HoledSquare(1, 0.25));
+        nest.Drawings.Add(other);
+        var right = plate.Parts.Max(part => part.BoundingBox.Right);
+        for (var row = 0; row < 4; row++)
+            plate.Parts.Add(new Part(other, new Vector(right + plate.PartSpacing, 30 + row * 1.5)));
+        var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
+
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+
+        Assert.Equal(2, plan.Groups.Count);
+        Assert.Equal(["2", "3"], plan.Groups.Select(group => group.Label.Id).Order());
+        Assert.False(plan.Groups[0].Boundary.IntersectsWith(plan.Groups[1].Boundary));
+        foreach (var group in plan.Groups)
+            Assert.All(group.Parts, index => Assert.True(group.Boundary.Contains(
+                plan.Fit.Rect(snapshot.Plates[0].Parts[index].Geometry.Bounds))));
+    }
+
     [SkippableFact]
     public void Write_LabelOnHoledPartAvoidsTheHole()
     {
