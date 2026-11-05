@@ -201,7 +201,7 @@ namespace OpenNest.Forms
             cancelJobButton.MinimumSize = new System.Drawing.Size(93, 29);
             cancelJobButton.Name = "cancelJobButton";
             cancelJobButton.TabIndex = 2;
-            cancelJobButton.Text = "&Cancel Job";
+            cancelJobButton.Text = "&Stop Job";
             cancelJobButton.UseVisualStyleBackColor = true;
             cancelJobButton.Click += CancelJobButton_Click;
             //

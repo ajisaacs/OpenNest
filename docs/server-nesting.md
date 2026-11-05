@@ -68,7 +68,7 @@ refreshes at once after anything this desktop does to a job.
   the result (`NestReplayMismatchException`) and leaves the job unreviewed, so it can be opened
   again once the drawing is back. Settings that live only on the sending dialog (ledger stock
   codes, saved plate-size offers) are not reapplied by a later Open.
-- **Cancel Job** stops a queued or running job (`POST .../cancel`).
+- **Stop Job** stops a queued or running job (`POST .../cancel`).
 - **Remove** deletes a finished job and its stored result from the server, asking first when
   nobody has kept or discarded the result yet. Active jobs must be cancelled first.
 
@@ -273,7 +273,7 @@ desktop's Keep refused over HTTP, If-Match, removal, a result reopened from its 
 later session and refused for a changed or missing drawing). `RemoteNestReplayTests` also pins
 drawing fingerprints and a reopened replay. `OpenNest.WinForms.Tests` `ServerAutoNestTests`:
 the progress window's stage text and plan strip, and the finish notice; `ServerJobsFormTests`:
-My Server Jobs rows and per-state actions, Cancel Job, Remove (with its confirmation), Open,
+My Server Jobs rows and per-state actions, Stop Job, Remove (with its confirmation), Open,
 the status-bar count, and a Keep refused because another desktop kept first.
 
 A live check against the container: submit a job, then

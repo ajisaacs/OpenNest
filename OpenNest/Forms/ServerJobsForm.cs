@@ -18,7 +18,7 @@ namespace OpenNest.Forms
     /// Polling rather than the per-job event stream because the list must also show jobs other
     /// desktops submit and jobs removed or expired, which no one job's stream announces, and one
     /// conditional request covers every row. Open reopens a result that is ready to review (Keep
-    /// or Discard as after a local run, kept at most once); Cancel Job stops a queued or running
+    /// or Discard as after a local run, kept at most once); Stop Job stops a queued or running
     /// job; Remove deletes a finished job and its result from the server.
     /// See docs/server-nesting.md.
     /// </summary>
