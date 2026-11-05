@@ -1084,8 +1084,10 @@ static class NestConsole
               --stock <WxL[:cost],...>  With --autonest: sheet sizes to offer, each unlimited (default: the
                                      target plate's size); spacing, quadrant and clamps follow the target
               --allow-invalid        Explicitly keep representable invalid autonest layouts (default: reject, exit 2)
-              --engine <name>        With --autonest: jobs engine (default: Default; also Irregular, Rectangles, Fill, ...).
-                                     Without --autonest: fill strategy (Fill (default), Strip, Vertical Remnant, Horizontal Remnant)
+              --engine <name>        With --autonest: jobs engine (default: Default; also Irregular,
+                                     Rectangles, Lattice, ...). Without --autonest: fill strategy
+                                     (Lattice (default), Strip, Vertical Remnant,
+                                     Horizontal Remnant)
               --keep-parts           Don't clear existing parts before filling
               --no-fill              Keep the loaded .nest as it is (no fill); plan, save or post it
               --plan-cutting         After filling (or loading with --no-fill), plan cutting (part order,

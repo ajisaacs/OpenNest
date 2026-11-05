@@ -20,8 +20,9 @@ namespace OpenNest.Mcp.Tools
         private readonly NestSession _session;
 
         private const string FillStrategies =
-            "Placement strategy: Fill (default; lattice fill of repeated copies), Strip, "
-            + "Vertical Remnant (keeps a right-side drop), Horizontal Remnant (keeps a top-side drop)";
+            "Placement strategy: Lattice (default; lattice fill of repeated copies), Strip, "
+            + "Vertical Remnant (keeps a right-side drop), "
+            + "Horizontal Remnant (keeps a top-side drop)";
 
         /// <summary>Built-in engines with what each suits; a test keeps this in step with the registry.</summary>
         private const string JobEngines =
@@ -32,8 +33,9 @@ namespace OpenNest.Mcp.Tools
             + "Circles: round parts (blanks, washers, flanges); packs each part as its enclosing circle; places nothing when any part is not round. "
             + "FlatBar: flat bar, parts about as wide as the bar; each stock cut as one row of parts along its length, shaped ends nested together; not run by Default. "
             + "Lattice: many copies of few drawings; lattice fill with pairs and rectangle best-fit. "
-            + "Strip: Fill variant laying mixed drawings in strips. "
-            + "Vertical Remnant, Horizontal Remnant: Fill variants keeping a right-side or top-side drop. "
+            + "Strip: Lattice variant laying mixed drawings in strips. "
+            + "Vertical Remnant, Horizontal Remnant: Lattice variants keeping a right-side "
+            + "or top-side drop. "
             + "Plug-ins loaded from Engines/ use their class name.";
 
         public NestingTools(NestSession session)
