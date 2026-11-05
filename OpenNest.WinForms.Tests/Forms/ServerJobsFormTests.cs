@@ -192,7 +192,7 @@ public class ServerJobsFormTests
             form.Select(queued.Id);
             form.CancelJobButton.PerformClick();
             PumpUntil(() => form.Jobs.Any(j => j.Id == queued.Id && j.State == NestJobState.Cancelled), "the cancelled job");
-            Assert.Equal("Cancelled", Cell(form, queued.Id, 1));
+            Assert.Equal("Stopped", Cell(form, queued.Id, 1));
 
             form.Select(ready.Id);
             form.OpenButton.PerformClick();
@@ -276,7 +276,7 @@ public class ServerJobsFormTests
         Assert.Equal("Queued (next)", ServerJobText.State(new NestJobRecord { State = NestJobState.Queued }));
         Assert.Equal("Stopping", ServerJobText.State(new NestJobRecord { State = NestJobState.Running, CancelRequested = true }));
         Assert.Equal("Discarded", ServerJobText.State(new NestJobRecord { State = NestJobState.Succeeded, Review = NestJobReview.Discarded }));
-        Assert.Equal("Cancelled", ServerJobText.State(new NestJobRecord { State = NestJobState.Cancelled }));
+        Assert.Equal("Stopped", ServerJobText.State(new NestJobRecord { State = NestJobState.Cancelled }));
         Assert.Equal("out of memory", ServerJobText.Result(new NestJobRecord { State = NestJobState.Failed, Error = "out of memory" }));
         Assert.Equal("", ServerJobText.Result(new NestJobRecord { State = NestJobState.Succeeded }));
         Assert.Equal("(unnamed nest)", ServerJobText.Title(new NestJobRecord()));

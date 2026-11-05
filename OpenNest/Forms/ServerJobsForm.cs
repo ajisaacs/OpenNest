@@ -313,7 +313,7 @@ namespace OpenNest.Forms
                 _ => "Ready to review",
             },
             NestJobState.Failed => "Failed",
-            _ => "Cancelled",
+            _ => "Stopped",
         };
 
         public static string Result(NestJobRecord job)
