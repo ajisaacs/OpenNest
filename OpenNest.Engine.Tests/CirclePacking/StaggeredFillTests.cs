@@ -3,7 +3,7 @@ using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Tests.CirclePacking;
 
-public class FillEndOverlapTests
+public class StaggeredFillTests
 {
     private const double Diameter = 10;
 
@@ -18,11 +18,11 @@ public class FillEndOverlapTests
 
     [Theory]
     [MemberData(nameof(BinSizes))]
-    public void FillEndOdd_PlacesNoOverlappingCircles(double width, double length)
+    public void HalfPitch_PlacesNoOverlappingCircles(double width, double length)
     {
         var bin = new Bin { Location = new Vector(0, 0), Size = new Size(width, length) };
 
-        new FillEndOdd(bin).Fill(CreateItem());
+        StaggeredFill.Fill(bin, CreateItem(), StaggerMode.HalfPitch);
 
         Assert.NotEmpty(bin.Items);
         AssertNoOverlaps(bin.Items);
@@ -30,11 +30,11 @@ public class FillEndOverlapTests
 
     [Theory]
     [MemberData(nameof(BinSizes))]
-    public void FillEndEven_PlacesNoOverlappingCircles(double width, double length)
+    public void SlackShift_PlacesNoOverlappingCircles(double width, double length)
     {
         var bin = new Bin { Location = new Vector(0, 0), Size = new Size(width, length) };
 
-        new FillEndEven(bin).Fill(CreateItem());
+        StaggeredFill.Fill(bin, CreateItem(), StaggerMode.SlackShift);
 
         Assert.NotEmpty(bin.Items);
         Assert.All(bin.Items, i => Assert.Equal(Diameter, i.Diameter, 9));
@@ -42,35 +42,35 @@ public class FillEndOverlapTests
     }
 
     [Fact]
-    public void FillEndOdd_SingleCircleWidth_StacksAlongTheOtherAxis()
+    public void HalfPitch_SingleCircleWidth_StacksAlongTheOtherAxis()
     {
         var bin = new Bin { Location = new Vector(0, 0), Size = new Size(1.5 * Diameter, 1.5 * Diameter) };
 
-        new FillEndOdd(bin).Fill(CreateItem());
+        StaggeredFill.Fill(bin, CreateItem(), StaggerMode.HalfPitch);
 
         AssertNoOverlaps(bin.Items);
     }
 
     [Theory]
     [MemberData(nameof(BinSizes))]
-    public void FillEnd_KeepsEveryCircleInsideTheBin(double width, double length)
+    public void StaggeredFill_KeepsEveryCircleInsideTheBin(double width, double length)
     {
         var odd = new Bin { Location = new Vector(3, 7), Size = new Size(width, length) };
         var even = new Bin { Location = new Vector(3, 7), Size = new Size(width, length) };
 
-        new FillEndOdd(odd).Fill(CreateItem());
-        new FillEndEven(even).Fill(CreateItem());
+        StaggeredFill.Fill(odd, CreateItem(), StaggerMode.HalfPitch);
+        StaggeredFill.Fill(even, CreateItem(), StaggerMode.SlackShift);
 
         AssertInside(odd);
         AssertInside(even);
     }
 
     [Fact]
-    public void FillEndOdd_StretchesStripesToTheBinOnALongSheet()
+    public void HalfPitch_StretchesStripesToTheBinOnALongSheet()
     {
         var bin = new Bin { Location = new Vector(0, 0), Size = new Size(59.375, 119.75) };
 
-        new FillEndOdd(bin).Fill(new Item { Radius = 4.125 });
+        StaggeredFill.Fill(bin, new Item { Radius = 4.125 }, StaggerMode.HalfPitch);
 
         // Staggered all the way places 108; the last stripes stacked straight fit one more.
         AssertNoOverlaps(bin.Items, 8.25);
@@ -79,24 +79,24 @@ public class FillEndOverlapTests
     }
 
     [Fact]
-    public void FillEndEven_TriesTheStripesAlongTheLongSide()
+    public void SlackShift_TriesTheStripesAlongTheLongSide()
     {
         var bin = new Bin { Location = new Vector(0, 0), Size = new Size(59.375, 119.75) };
 
-        new FillEndEven(bin).Fill(new Item { Radius = 4.125 });
+        StaggeredFill.Fill(bin, new Item { Radius = 4.125 }, StaggerMode.SlackShift);
 
         AssertNoOverlaps(bin.Items, 8.25);
         Assert.Equal(112, bin.Items.Count);
     }
 
     [Fact]
-    public void FillEndOdd_EndsWithStraightStripesWhenTheyFitMore()
+    public void HalfPitch_EndsWithStraightStripesWhenTheyFitMore()
     {
         // 13 discs to a stripe: seven staggered stripes place 88 and six straight ones 78, but
         // five staggered and two straight over the fifth place 89.
         var bin = new Bin { Location = new Vector(0, 0), Size = new Size(59.8, 119.8) };
 
-        new FillEndOdd(bin).Fill(new Item { Radius = 4.6 });
+        StaggeredFill.Fill(bin, new Item { Radius = 4.6 }, StaggerMode.HalfPitch);
 
         AssertNoOverlaps(bin.Items, 9.2);
         AssertInside(bin);
@@ -112,13 +112,13 @@ public class FillEndOverlapTests
     }
 
     [Fact]
-    public void FillEndOdd_KeepsStaggeredStripesWhenStraightOnesFitNoMore()
+    public void HalfPitch_KeepsStaggeredStripesWhenStraightOnesFitNoMore()
     {
         // Seven staggered stripes place 88; too short for the mixed 89, straight stripes from
         // any switch point place at most 78.
         var bin = new Bin { Location = new Vector(0, 0), Size = new Size(57.2, 119.8) };
 
-        new FillEndOdd(bin).Fill(new Item { Radius = 4.6 });
+        StaggeredFill.Fill(bin, new Item { Radius = 4.6 }, StaggerMode.HalfPitch);
 
         Assert.Equal(88, bin.Items.Count);
         var stripes = bin.Items.GroupBy(i => System.Math.Round(i.Center.Y, 6)).Select(g => g.Count());

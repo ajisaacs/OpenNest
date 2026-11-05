@@ -9,8 +9,9 @@ using OpenNest.Geometry;
 namespace OpenNest.Engine.Strategies;
 
 /// <summary>
-/// Staggers round parts edge to edge with <see cref="FillEndOdd"/> and <see cref="FillEndEven"/>,
-/// which stretch a row's pitch to the sheet so the next row drops deeper than a fixed lattice does.
+/// Staggers round parts edge to edge with <see cref="StaggeredFill"/>, whose half-pitch rows stretch
+/// their pitch to the sheet so the next row drops deeper than a fixed lattice does, and whose
+/// slack-shifted rows keep every row full; the better of the two is kept.
 /// </summary>
 public class CircleFillStrategy : IFillStrategy
 {
@@ -35,22 +36,22 @@ public class CircleFillStrategy : IFillStrategy
         var area = context.WorkArea.Offset(gap * 0.5);
 
         var comparer = context.Policy?.Comparer ?? new DefaultFillComparer();
-        var odd = Pack(area, spaced, bin => new FillEndOdd(bin), item, context.Item.Drawing);
-        var even = Pack(area, spaced, bin => new FillEndEven(bin), item, context.Item.Drawing);
+        var halfPitch = Pack(area, spaced, StaggerMode.HalfPitch, item, context.Item.Drawing);
+        var slackShift = Pack(area, spaced, StaggerMode.SlackShift, item, context.Item.Drawing);
 
-        return comparer.IsBetter(even, odd, context.WorkArea) ? even : odd;
+        return comparer.IsBetter(slackShift, halfPitch, context.WorkArea) ? slackShift : halfPitch;
     }
 
     private static List<Part> Pack(
         Box area,
         Item spaced,
-        System.Func<Bin, FillEngine> engine,
+        StaggerMode mode,
         Item item,
         Drawing drawing
     )
     {
         var bin = new Bin { Location = area.Location, Size = area.Size };
-        engine(bin).Fill(spaced);
+        StaggeredFill.Fill(bin, spaced, mode);
         return bin.Items.Select(i => new Part(drawing, i.Center + item.PartOffset)).ToList();
     }
 }
