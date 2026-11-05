@@ -24,8 +24,12 @@ namespace OpenNest.Engine.Fill
     /// selected part moves. Nonselected parts never move; there is no counterpart
     /// fallback when the prescribed mover is blocked.
     /// </para>
+    /// <para>
+    /// A selection that repeats on a lattice skips the pair search: its lattice
+    /// is stretched per axis instead, so the pattern is kept (ExpanderPattern.cs).
+    /// </para>
     /// </summary>
-    public static class Expander
+    public static partial class Expander
     {
         public sealed class Options
         {
@@ -73,6 +77,13 @@ namespace OpenNest.Engine.Fill
             /// work-area poses, including unresolved negative clearances when no
             /// positive target was feasible.</summary>
             public List<Violation> Violations = new();
+
+            /// <summary>True when the selection repeated on a lattice and was
+            /// stretched as one pattern rather than pushed apart pair by pair.</summary>
+            public bool KeptPattern;
+
+            /// <summary>True when a kept pattern had room to spread and moved.</summary>
+            public bool PatternMoved;
         }
 
         /// <summary>Per-call test checkpoints; no process-global mutable hook.</summary>
@@ -158,6 +169,10 @@ namespace OpenNest.Engine.Fill
                 result.Canceled = true;
                 return result;
             }
+
+            var stretched = StretchPattern(context, entry, selected, sMin, opt, token);
+            if (stretched != null)
+                return stretched;
 
             var sGood = sMin;
             var cap = opt.MaxSpacing > 0 ? opt.MaxSpacing : context.SpacingCap;
@@ -790,6 +805,11 @@ namespace OpenNest.Engine.Fill
 
             public bool IsMover(int index) => index < moverCount;
 
+            public Box WorkArea => workArea;
+
+            /// <summary>True when anything besides the movers can block them.</summary>
+            public bool HasWalls => parts.Count > moverCount;
+
             public Part PartOf(int index) => parts[index];
 
             /// <summary>Current world positions of every part in pair-index order.</summary>
@@ -1023,9 +1043,12 @@ namespace OpenNest.Engine.Fill
             /// <summary>
             /// Stop at the first material-blocking contact along the whole straight
             /// translation, including hole walls. Destination clearance alone can
-            /// accept a pose on the far side of a thin wall.
+            /// accept a pose on the far side of a thin wall. With
+            /// <paramref name="wallsOnly"/>, other movers are ignored because they
+            /// move along with this one.
             /// </summary>
-            public double ClipToMaterial(int index, List<Vector> positions, Vector direction, double room)
+            public double ClipToMaterial(
+                int index, List<Vector> positions, Vector direction, double room, bool wallsOnly = false)
             {
                 if (room <= 0 || !double.IsFinite(room)
                     || !double.IsFinite(direction.X) || !double.IsFinite(direction.Y))
@@ -1036,7 +1059,7 @@ namespace OpenNest.Engine.Fill
 
                 for (var i = 0; i < parts.Count; i++)
                 {
-                    if (i == index)
+                    if (i == index || wallsOnly && i < moverCount)
                         continue;
                     var stationary = shapes[i];
                     if (parts[i].BaseDrawing.IsCutOff)

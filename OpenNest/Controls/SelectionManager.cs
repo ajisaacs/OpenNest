@@ -254,9 +254,12 @@ namespace OpenNest.Controls
 
             view.Invalidate();
 
-            view.Status =
-                $"Expanded spacing to {result.AchievedSpacing:0.###}"
-                + (result.Violations.Count > 0 ? $" - {result.Violations.Count} blocked pairs" : "");
+            view.Status = result.KeptPattern
+                ? (result.PatternMoved
+                    ? $"Spread the repeating pattern - smallest gap {result.AchievedSpacing:0.###}"
+                    : $"The repeating pattern has no room to spread - smallest gap {result.AchievedSpacing:0.###}")
+                : $"Expanded spacing to {result.AchievedSpacing:0.###}"
+                    + (result.Violations.Count > 0 ? $" - {result.Violations.Count} blocked pairs" : "");
 
             change.Complete();
             return true;
