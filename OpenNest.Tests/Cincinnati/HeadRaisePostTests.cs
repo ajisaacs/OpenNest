@@ -58,6 +58,7 @@ public class HeadRaisePostTests
         var refusal = Assert.Throws<InvalidOperationException>(() => post.Post(Nest(markSecond: true), new MemoryStream()));
 
         Assert.Contains("head-raise code", refusal.Message);
+        Assert.Contains("\"Head raise\" in the Cincinnati CI Fiber Settings dialog", refusal.Message);
         post.Post(Nest(markSecond: false), new MemoryStream()); // Nothing marked: nothing to refuse.
     }
 

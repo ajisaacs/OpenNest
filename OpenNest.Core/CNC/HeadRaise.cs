@@ -80,7 +80,8 @@ namespace OpenNest.CNC
         /// </summary>
         public static void EnsurePostable(Nest nest, bool hasCode, string postName) =>
             PostMarkers.EnsurePostable(nest, hasCode, IsMarked, program => RaisedMask(program.Codes),
-                name => $"{name} has rapids that must raise the head over parts already cut, but the {postName} "
-                    + "post has no head-raise code. Enter it in the post's configuration before posting.");
+                name => $"{name} has rapids that must raise the head over parts already cut, but "
+                    + $"the {postName} post has no head-raise code. Enter it in \"Head raise\" in "
+                    + $"the {postName} Settings dialog, which opens when you post.");
     }
 }

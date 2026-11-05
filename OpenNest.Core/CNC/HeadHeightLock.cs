@@ -75,8 +75,10 @@ namespace OpenNest.CNC
         /// </summary>
         public static void EnsurePostable(Nest nest, bool hasCodes, string postName) =>
             PostMarkers.EnsurePostable(nest, hasCodes, IsMarked, program => LockedMask(program.Codes),
-                name => $"{name} overcuts past the sheet edge with the head height locked, but the {postName} post "
-                    + "has no head-height lock and unlock codes. Enter them in the post's configuration, "
-                    + "or delete the cut-off and add it again with the head-height lock off.");
+                name => $"{name} overcuts past the sheet edge with the head height locked, but the "
+                    + $"{postName} post has no head-height lock and unlock codes. Enter them in "
+                    + $"\"Head height lock\" and \"Head height unlock\" in the {postName} Settings "
+                    + "dialog, which opens when you post, or delete the cut-off and add it again "
+                    + "with \"Lock head height and overcut the far edge\" unchecked.");
     }
 }

@@ -201,6 +201,8 @@ public class HeadLockedCutOffTests
 
         var refusal = Assert.Throws<InvalidOperationException>(() => HeadHeightLock.EnsurePostable(nest, false, "Test"));
         Assert.Contains("head-height lock and unlock codes", refusal.Message);
+        Assert.Contains("\"Head height lock\" and \"Head height unlock\" in the Test Settings", refusal.Message);
+        Assert.Contains("\"Lock head height and overcut the far edge\" unchecked", refusal.Message);
         HeadHeightLock.EnsurePostable(nest, true, "Test");
     }
 
