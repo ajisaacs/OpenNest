@@ -1177,7 +1177,7 @@ namespace OpenNest.Forms
             PlateView.EndAction();
             cutSimulatorForm = new CutSimulatorForm(this);
             cutSimulatorForm.FormClosed += (_, _) => cutSimulatorForm = null;
-            var owner = MdiParent ?? (Form)this;
+            var owner = DialogOwner;
             var corner = owner.PointToScreen(new Point(owner.ClientSize.Width, owner.ClientSize.Height));
             cutSimulatorForm.Show(owner);
             cutSimulatorForm.Location = new Point(
@@ -1457,6 +1457,12 @@ namespace OpenNest.Forms
             drawingListBox1.SaveToLibraryUnavailableReason = enabled ? null : NestStorage.DatabaseModeOnly;
         }
 
+        /// <summary>
+        /// The top-level window that owns this tab's dialogs. An MDI child is a child window, and a
+        /// dialog owned by one is not kept above the main window, so it can fall behind it.
+        /// </summary>
+        private Form DialogOwner => MdiParent ?? this;
+
         /// <summary>Opens the drawing library browser and lists whatever it added.</summary>
         public void AddFromDrawingLibrary()
         {
@@ -1483,7 +1489,7 @@ namespace OpenNest.Forms
             // The dialog adds drawings and sets quantities as the operator works in it.
             using var change = BeginChange("Drawing Library");
             var job = (Nest.Material, Nest.Thickness);
-            form.ShowDialog(this);
+            form.ShowDialog(DialogOwner);
             if (form.AddedDrawings.Count > 0 || form.QuantitiesChanged)
             {
                 change.MarkChanged();
@@ -1531,7 +1537,7 @@ namespace OpenNest.Forms
                 lastCutType, Environment.UserName);
             // The library itself is on the server; the drawing's link to it is saved with the nest.
             using var change = BeginChange("Save to Drawing Library");
-            if (form.ShowDialog(this) != DialogResult.OK || form.Result == null)
+            if (form.ShowDialog(DialogOwner) != DialogResult.OK || form.Result == null)
             {
                 change.Complete();
                 return;
@@ -1574,7 +1580,7 @@ namespace OpenNest.Forms
             addingToSet = true;
             try
             {
-                await new NestDrawingsToSet(this, sets, library, NestStorage.Settings.ServerUrl).RunAsync(Nest);
+                await new NestDrawingsToSet(DialogOwner, sets, library, NestStorage.Settings.ServerUrl).RunAsync(Nest);
             }
             finally
             {

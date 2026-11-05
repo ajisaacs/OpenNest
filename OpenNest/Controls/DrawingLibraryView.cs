@@ -100,6 +100,12 @@ namespace OpenNest.Controls
         /// </summary>
         public bool QuantitiesChanged { get; private set; }
 
+        /// <summary>
+        /// The window that owns this view's dialogs. A dialog owned by a child control is not kept
+        /// above its top-level window, so it can fall behind it.
+        /// </summary>
+        private IWin32Window DialogOwner => (IWin32Window)TopLevelControl ?? this;
+
         public DrawingLibraryView()
         {
             InitializeComponent();
@@ -126,24 +132,24 @@ namespace OpenNest.Controls
             EditDrawing = edit =>
             {
                 using var form = new EditLibraryDrawingForm(edit);
-                return form.ShowDialog(this) == DialogResult.OK ? form.Saved : null;
+                return form.ShowDialog(DialogOwner) == DialogResult.OK ? form.Saved : null;
             };
             ChooseSet = () =>
             {
                 using var form = new ChooseDrawingSetForm(sets, library, this.serverUrl);
-                return form.ShowDialog(this) == DialogResult.OK ? (true, form.PickedSet) : (false, null);
+                return form.ShowDialog(DialogOwner) == DialogResult.OK ? (true, form.PickedSet) : (false, null);
             };
             EditSet = edit =>
             {
                 using var form = new EditDrawingSetForm(edit, library, this.serverUrl);
-                return form.ShowDialog(this) == DialogResult.OK ? form.Saved : null;
+                return form.ShowDialog(DialogOwner) == DialogResult.OK ? form.Saved : null;
             };
             ShowReleases = record =>
             {
                 using var form = new DrawingSetsForm(sets, library, this.serverUrl);
                 enableSetsRelease(form);
                 _ = form.ShowReleasesAsync(drawing: record);
-                form.ShowDialog(this);
+                form.ShowDialog(DialogOwner);
             };
             LoadPreview = async (record, token) =>
             {
@@ -437,7 +443,7 @@ namespace OpenNest.Controls
                 using var form = new ReleaseSetForm(sets, library, nests, serverUrl, Array.Empty<DrawingSetRecord>(),
                     new[] { new SetReleaseDrawingLine(record, quantity) }, openNest)
                 { IsNestOpen = isNestOpen ?? (_ => false) };
-                form.ShowDialog(this);
+                form.ShowDialog(DialogOwner);
             };
             enableSetsRelease = form => form.EnableRelease(nests, openNest, isNestOpen);
             releaseSeparator.Visible = true;
