@@ -24,6 +24,9 @@ return NestConsole.Run(args);
 
 static class NestConsole
 {
+    private const string OutlinedSheetMessage =
+        "Error: Fill strategies need a rectangular sheet. Use --autonest --engine Irregular.";
+
     public static int Run(string[] args)
     {
         using var cancellation = new CancellationTokenSource();
@@ -209,9 +212,9 @@ static class NestConsole
             ApplyTemplate(plate, options);
             ApplyOverrides(plate, options);
 
-            if (!options.AutoNest && PlateFillService.Refusal(plate) is { } refusal)
+            if (!options.AutoNest && PlateFillService.Refusal(plate) != null)
             {
-                Console.Error.WriteLine($"Error: {refusal} Use --autonest.");
+                Console.Error.WriteLine(OutlinedSheetMessage);
                 return 2;
             }
 

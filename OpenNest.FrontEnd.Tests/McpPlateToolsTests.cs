@@ -37,6 +37,26 @@ public class McpPlateToolsTests : IDisposable
         Assert.Null(sessionOnly.GetPlate(1));
     }
 
+    [Fact]
+    public void FillOnOutlinedSheetNamesTheMcpToolsThatCanNestIt()
+    {
+        var session = new NestSession { Nest = new Nest("fixture") };
+        session.Nest.Drawings.Add(new Drawing("square", new Program()));
+        var outline = new SheetOutline(new[]
+        {
+            new Vector(0, 0), new Vector(96, 0), new Vector(96, 24),
+            new Vector(48, 24), new Vector(48, 48), new Vector(0, 48),
+        });
+        var plate = new Plate(10, 10) { Outline = outline };
+        session.Nest.Plates.Add(plate);
+
+        Assert.Equal(
+            "Error: Fill strategies need a rectangular sheet. Use autonest_plate or autonest_job "
+                + "with engine Irregular. Nothing committed.",
+            new NestingTools(session).FillPlate(0, "square"));
+        Assert.Empty(plate.Parts);
+    }
+
     private static string Delete(SetupTools tools, int index) => tools.DeletePlate(index);
 
     [Fact]

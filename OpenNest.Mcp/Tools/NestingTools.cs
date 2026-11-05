@@ -68,8 +68,8 @@ namespace OpenNest.Mcp.Tools
             var strategy = ResolveStrategy(engine);
             if (strategy == null)
                 return EngineError(engine);
-            if (PlateFillService.Refusal(plate) is { } refusal)
-                return $"Error: {refusal} Nothing committed.";
+            if (OutlinedSheetRefusal(plate) is { } refusal)
+                return refusal;
 
             var countBefore = plate.Parts.Count;
             var item = new NestItem { Drawing = drawing, Quantity = quantity };
@@ -125,8 +125,8 @@ namespace OpenNest.Mcp.Tools
             var strategy = ResolveStrategy(engine);
             if (strategy == null)
                 return EngineError(engine);
-            if (PlateFillService.Refusal(plate) is { } refusal)
-                return $"Error: {refusal} Nothing committed.";
+            if (OutlinedSheetRefusal(plate) is { } refusal)
+                return refusal;
 
             var countBefore = plate.Parts.Count;
             var item = new NestItem { Drawing = drawing, Quantity = quantity };
@@ -179,8 +179,8 @@ namespace OpenNest.Mcp.Tools
             var strategy = ResolveStrategy(engine);
             if (strategy == null)
                 return EngineError(engine);
-            if (PlateFillService.Refusal(plate) is { } refusal)
-                return $"Error: {refusal} Nothing committed.";
+            if (OutlinedSheetRefusal(plate) is { } refusal)
+                return refusal;
 
             var finder = RemnantFinder.FromPlate(plate);
             var remnants = finder.FindRemnants();
@@ -248,8 +248,8 @@ namespace OpenNest.Mcp.Tools
             var strategy = ResolveStrategy(engine);
             if (strategy == null)
                 return EngineError(engine);
-            if (PlateFillService.Refusal(plate) is { } refusal)
-                return $"Error: {refusal} Nothing committed.";
+            if (OutlinedSheetRefusal(plate) is { } refusal)
+                return refusal;
 
             var parsed = ParseItems(drawingNames, quantities);
             if (parsed.error != null)
@@ -613,6 +613,17 @@ namespace OpenNest.Mcp.Tools
         /// name is not a single-plate placement strategy.
         /// </summary>
         private static string ResolveStrategy(string engine) => EngineNameResolver.Classify(engine).FillStrategy;
+
+        internal const string OutlinedSheetMessage =
+            "Error: Fill strategies need a rectangular sheet. Use autonest_plate or autonest_job "
+            + "with engine Irregular. Nothing committed.";
+
+        /// <summary>
+        /// The fill tools' refusal for an outlined sheet, naming the MCP tools that can nest it;
+        /// null when the plate is rectangular.
+        /// </summary>
+        private static string OutlinedSheetRefusal(Plate plate) =>
+            PlateFillService.Refusal(plate) == null ? null : OutlinedSheetMessage;
 
         private static string EngineError(string engine)
         {
