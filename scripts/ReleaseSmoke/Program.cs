@@ -20,7 +20,11 @@ try
     var create = registry.GetMethod("Create")!;
 
     // Every built-in engine the desktop offers must instantiate from the packaged assembly.
-    string[] expected = ["Default", "Rectangles", "Irregular", "Circles", "FlatBar", "Fill", "Strip", "Vertical Remnant", "Horizontal Remnant"];
+    string[] expected =
+    [
+        "Default", "Rectangles", "Irregular", "Circles", "FlatBar",
+        "Lattice", "Strip", "Vertical Remnant", "Horizontal Remnant",
+    ];
     foreach (var name in expected)
     {
         var engine = create.Invoke(null, [name])!;
@@ -30,10 +34,17 @@ try
     }
 
     // A selection saved before the engines were renamed must still resolve.
-    var resolved = registry.GetMethod("ResolveName")!.Invoke(null, ["Opus55NestingEngine"]);
-    if (!Equals(resolved, "Irregular"))
-        throw new InvalidOperationException($"Legacy selection Opus55NestingEngine resolved to '{resolved}', expected Irregular.");
-    Console.WriteLine("PASS: legacy selection Opus55NestingEngine resolves to Irregular");
+    (string Legacy, string Current)[] renamed =
+        [("Opus55NestingEngine", "Irregular"), ("Fill", "Lattice")];
+    var resolveName = registry.GetMethod("ResolveName")!;
+    foreach (var (legacy, current) in renamed)
+    {
+        var resolved = resolveName.Invoke(null, [legacy]);
+        if (!Equals(resolved, current))
+            throw new InvalidOperationException(
+                $"Legacy selection {legacy} resolved to '{resolved}', expected {current}.");
+        Console.WriteLine($"PASS: legacy selection {legacy} resolves to {current}");
+    }
 
     // Failure case: an unknown engine must be rejected, so a broken registry cannot pass silently.
     try
