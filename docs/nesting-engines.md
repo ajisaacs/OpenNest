@@ -107,7 +107,7 @@ detail reads "Computing best-fit pairs (may take a minute)...". Accepting or sto
 waiting for the pair computation, which finishes in the background and is cached for the next
 fill.
 
-For round parts, Fill's Circle strategy staggers rows edge to edge, stretching each row's pitch
+For round parts, Lattice's Circle strategy staggers rows edge to edge, stretching each row's pitch
 to the sheet. Straight rows, a diameter apart over the last staggered row, climb further per row
 but fit more where the sheet leaves too little room for another staggered row, so it tries
 switching from staggered to straight rows at every row, all staggered and all straight
@@ -115,7 +115,7 @@ included, and keeps whichever places the most; a tie stays staggered. A 9-inch c
 60 x 120 sheet at 0.2 spacing fits 89 that way (five staggered rows of 13 and 12, then two
 straight rows of 13) against 88 staggered throughout.
 
-Fill's last strategy, TiltedRemnant, adds tilted parts beside the best layout when the room
+Lattice's last strategy, TiltedRemnant, adds tilted parts beside the best layout when the room
 left past it on the right or top is too narrow for the part at 0 or 90 degrees, such as a long
 part beside a grid of the same part turned 90 degrees. It moves the layout flush to the low end
 of that axis, so leftover room on both sides becomes one remnant, and also to either end of the
@@ -142,7 +142,7 @@ drawing to fill and that leaves demand unmet, the job also fills the sheet as if
 absent, drops the parts on them, and keeps whichever layout the strategy ranks better (a tie
 keeps the clamp-free layout).
 
-Fill's rectangle best-fit phase compares a two-block layout with a spiral: four blocks turning
+Lattice's rectangle best-fit phase compares a two-block layout with a spiral: four blocks turning
 around a center, with the center filled again. The spiral starts from the rows and columns with
 the least waste; those often overlap themselves, so it also tries every other combination of
 four non-empty blocks and uses one only if it holds more parts than both.
@@ -177,7 +177,7 @@ runs) keeps the single boundary/containment union.
 Any remaining numerical hole is filled only when its entire ring is certified to lie in forbidden
 space, preserving genuine enclosed placement pockets without changing spacing tolerances.
 
-The pairs and the Fill blocks below read each part through one private drawing per part
+The pairs and the Lattice blocks below read each part through one private drawing per part
 geometry, owned by the engine instance: pairs and blocks share it, and so do a pipeline's cutout
 trial and its ordinary solve. The best-fit search itself runs once per part geometry and spacing
 in the whole process: every drawing reconstructed from job geometry
@@ -191,19 +191,19 @@ area sort, so equal-area candidates come out in the same order on every run. The
 the private drawings (`Invalidate` releases a drawing's entry, not the pool) and is in-memory only:
 the sets saved in a `.nest` file belong to the caller's drawings and are not consulted here.
 
-When remaining demand exceeds two, Irregular also offers Fill patterns as optional
-multi-member candidates, not as solid bounding boxes or a whole-job Fill fallback. It searches
+When remaining demand exceeds two, Irregular also offers Lattice patterns as optional
+multi-member candidates, not as solid bounding boxes or a whole-job Lattice fallback. It searches
 the empty work area and physical leftover space for up to two high-area rectangles. Occupied
 outlines are expanded by part spacing before rectangle search. Each sheet prepares blocks initially
 and after its first placement, for up to four high-demand-area types; each type has at most eight
-new Fill preparations per spacing per solve. Repeated rectangles reuse private drawing/candidate
-caches. Quantity-one and quantity-two requests never run block Fill.
+new Lattice preparations per spacing per solve. Repeated rectangles reuse private drawing/candidate
+caches. Quantity-one and quantity-two requests never run Lattice blocks.
 
 Block members are trimmed to remaining demand, mapped back to source-frame rotations, and checked
 for legal rotations and internal material clearance before competing with singles and pairs.
 Group-only rotations do not expand the single-part rotation choices. Placement intersects all
 member free regions and subtracts each placed member separately, preserving usable gaps. A failed
-or invalid Fill proposal leaves singles and pairs available. Large enclosed-pocket blocks remain
+or invalid Lattice proposal leaves singles and pairs available. Large enclosed-pocket blocks remain
 pending the hole-geometry integration; containment cutting order and shop-use safety acceptance
 remain separate sequencer/verification work.
 
@@ -223,7 +223,7 @@ of each group in turn, keeping each count that improves the sheet, for the three
 the sheet then holds everything, the best candidates and every order are packed again inside a
 strip ending a quarter unit short of the best front (the packer's `reach`), at most four times,
 while that still holds everything and improves the sheet. Sheets rank by part area placed, then
-net cost, then compactness offcut. Grouped fills use singles and pairs only: Fill blocks made each
+net cost, then compactness offcut. Grouped fills use singles and pairs only: Lattice blocks made each
 fill several times slower for no denser groups.
 
 The grouped variants front along the stock's length, and also across it when some stock is taller
@@ -294,7 +294,7 @@ zones exactly; reading `Plate.ClampZones` bounds directly is wrong in quadrants 
 Irregular prepares static rectangle obstacles and their cached no-fit polygons once
 per stock per solve, separately from the part-spacing cache. Every orientation's initial
 free region excludes these obstacles, including extra orientations introduced by pairs
-or Fill blocks. Blocks still size their proposals from work-area/placed-part rectangles;
+or Lattice blocks. Blocks still size their proposals from work-area/placed-part rectangles;
 member free regions determine whether the whole proposal can actually fit around clamps.
 Open notches and material between clamps remain available. Inflated synthetic rectangles
 are enclosed on the existing clipping grid before NFP preparation, retaining at least one
@@ -381,13 +381,13 @@ areas keep the tighter or earlier proposal. A hole takes one large part over a c
 of less area; a crowd of small copies still wins when it seats more.
 
 `CutoutLatticeFill` (`OpenNest.Engine/Jobs/Cutouts/`) fills one closed cutout with copies of one
-part. It runs Fill over the cutout's bounds plus one part step on every side, then shifts
+part. It runs Lattice over the cutout's bounds plus one part step on every side, then shifts
 that lattice across a grid of offsets of up to half a step each way. At each offset it keeps the
 copies whose spacing-grown outline lies inside the cutout, using the part's inner-fit region of
 the inscribed, flattened cutout, and the offset keeping the most copies wins. Every returned pose
 is then checked against the frame and the other copies with `NestLayoutCheck.Clears`, the test the
 layout check uses. The method suits many small copies in a large cutout; a few large inserts are
-meant for no-fit-polygon placement. Fill can return different, equally scored lattices on repeated
+meant for no-fit-polygon placement. Lattice can return different, equally scored lattices on repeated
 calls for some parts, so results are not yet guaranteed identical between runs.
 
 The internal `CutoutRouter` can propose copies from the shifted lattice, then search bounded
@@ -397,10 +397,10 @@ and every previously accepted insert. Lattice shifts account for occupied poses 
 quantity trimming; a pre-fill work limit declines giant grids and lets bounded NFP sampling
 try instead. A null NFP proposal is not proof of geometric impossibility. No material-area
 ratio cutoff rejects a possible placement: the measured 0.10 and 0.35 ratios guide
-search order only. Below 0.10 it starts with Fill for three or more copies; between
-0.10 and 0.35 it compares Fill-plus-NFP with NFP-only counts; above 0.35 it tries
-NFP first, then Fill if demand remains, taking the higher-count valid proposal. Those comparisons
-are between copies of one part, so count and area agree.
+search order only. Below 0.10 it starts with the lattice fill for three or more copies;
+between 0.10 and 0.35 it compares lattice-plus-NFP with NFP-only counts; above 0.35 it tries
+NFP first, then the lattice fill if demand remains, taking the higher-count valid proposal.
+Those comparisons are between copies of one part, so count and area agree.
 An 0.20 NFP-only rule would lose a second 4-inch square in a 10-inch round hole.
 Six geometry-only, anonymized real-job probes and neutral ring fixtures informed
 the search-order hints; these limited cases are not a global density guarantee.
@@ -572,7 +572,7 @@ to explicit costs; geometric area still controls fit, utilization and material o
 Rectangles uses net cost in sheet trials and remaining-material estimates. Irregular
 uses it in look-ahead, strategy comparison and equivalent-demand tail replacement.
 Default compares valid equally fulfilled results by generic job score.
-Fixed Fill/Strip/remnant strategies rank priority fulfillment first, then net cost
+Fixed Lattice/Strip/remnant strategies rank priority fulfillment first, then net cost
 for priced stock (gross area for legacy unpriced stock), then existing stable ties.
 None guarantees globally optimal purchasing or explores every combination of patterns.
 

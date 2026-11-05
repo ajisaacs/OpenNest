@@ -20,7 +20,7 @@ trims its winner to the exact quantity, keeping or dropping interlocked pairs wh
 (`ShrinkFiller.TrimToCount`; a pair is split only for an odd count with no unpaired part
 left). Existing overlap fallbacks and block spacing
 certification remain active; fallback tiling can exceed the soft limit. Nonpositive
-limits remain uncapped. Ordinary Fill-strategy fills and the zero-quantity cutout lattice
+limits remain uncapped. Ordinary Lattice-strategy fills and the zero-quantity cutout lattice
 keep their full-area behavior.
 
 This can change which private block candidate wins; it is not a promise of identical

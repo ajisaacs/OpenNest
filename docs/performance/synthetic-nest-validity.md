@@ -39,7 +39,7 @@ Sheet dimensions below are X length by Y width (the `Size` API takes width first
 All drawings permit automatic rotation. The edge-fit fixture deliberately leaves
 0.02 extra work-area room: it is a tight rotated fit, not an exact-contact test.
 The qty-two fixture checks one-sheet interlocking fulfillment; the qty-greater-than-two
-fixture exercises a job eligible for Fill-block candidates. This smoke gate does not
+fixture exercises a job eligible for Lattice-block candidates. This smoke gate does not
 assert which internal candidate won; the existing pair/block unit tests retain those
 contracts. These are ordinary solid contours, not acceptance of future hole nesting,
 containment sequencing or shop-use safety.
