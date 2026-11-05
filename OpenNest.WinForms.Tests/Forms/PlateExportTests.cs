@@ -327,6 +327,50 @@ public class PlateExportTests
         Assert.Same(form.Nest.Plates[0], form.PlateView.Plate);
     });
 
+    [Fact]
+    public void ViewInCadWritesDxfAndOpensItThroughTheShell() => RunSta(() =>
+    {
+        using var form = ShowJob();
+        form.PlateManager.LoadAt(1);
+
+        form.OpenCurrentPlate();
+
+        var path = Assert.Single(form.Launches);
+        try
+        {
+            Assert.Equal(Path.Combine(Path.GetTempPath(), "export job-P2.dxf"), path);
+            Assert.Same(form.Nest.Plates[1], Assert.Single(form.WriteRequests).Plate);
+            Assert.True(new FileInfo(path).Length > 0);
+            Assert.Empty(form.Failures);
+            Assert.True(EditNestForm.ExternalCadStartInfo(path).UseShellExecute);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    });
+
+    [Fact]
+    public void ViewInCadReportsLaunchFailureInsteadOfThrowing() => RunSta(() =>
+    {
+        using var form = ShowJob();
+        var error = new System.ComponentModel.Win32Exception("No application is associated with .dxf.");
+        form.LaunchAction = _ => throw error;
+
+        form.OpenCurrentPlate();
+
+        var failure = Assert.Single(form.Failures);
+        File.Delete(failure.Destination);
+        Assert.Same(error, failure.Error);
+    });
+
+    [Theory]
+    [InlineData("job 1", 3, "job 1-P3.dxf")]
+    [InlineData("A/B:C*?", 1, "A_B_C__-P1.dxf")]
+    [InlineData("  ", 2, "Nest-P2.dxf")]
+    public void ViewInCadFileNameIsAlwaysUsable(string nestName, int plateNumber, string expected) =>
+        Assert.Equal(expected, EditNestForm.ExternalCadFileName(nestName, plateNumber));
+
     private static TestEditNestForm ShowJob()
     {
         var form = new TestEditNestForm(CreateJob());
@@ -409,6 +453,18 @@ public class PlateExportTests
 
         internal override void ReportPlateExportFailure(string destination, Exception error) =>
             Failures.Add((destination, error));
+
+        public List<string> Launches { get; } = [];
+        public System.Action<string>? LaunchAction { get; set; }
+
+        internal override void LaunchExternalCad(string path)
+        {
+            Launches.Add(path);
+            LaunchAction?.Invoke(path);
+        }
+
+        internal override void ReportExternalCadFailure(string path, Exception error) =>
+            Failures.Add((path, error));
     }
 
     private sealed class FlushFailureStream(string path) : FileStream(path, FileMode.Create)

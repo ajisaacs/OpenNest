@@ -1057,12 +1057,43 @@ namespace OpenNest.Forms
         public void OpenCurrentPlate()
         {
             var plate = PlateView.Plate;
-            var name = string.Format("{0}-P{1}.dxf", Nest.Name, PlateManager.CurrentIndex + 1);
+            var name = ExternalCadFileName(Nest.Name, PlateManager.CurrentIndex + 1);
             var path = Path.Combine(Path.GetTempPath(), name);
-            Dxf.ExportPlate(plate, path);
-
-            Process.Start(path);
+            try
+            {
+                WritePlateExport(plate, path, 1);
+                LaunchExternalCad(path);
+            }
+            catch (Exception ex)
+            {
+                ReportExternalCadFailure(path, ex);
+            }
         }
+
+        /// <summary>
+        /// Temp DXF name for View in CAD; characters a file name cannot hold become underscores.
+        /// </summary>
+        internal static string ExternalCadFileName(string nestName, int plateNumber)
+        {
+            var baseName = string.IsNullOrWhiteSpace(nestName) ? "Nest" : nestName.Trim();
+            var invalid = Path.GetInvalidFileNameChars();
+            var chars = baseName.Select(c => Array.IndexOf(invalid, c) >= 0 ? '_' : c).ToArray();
+            return $"{new string(chars)}-P{plateNumber}.dxf";
+        }
+
+        // .NET 8 defaults UseShellExecute to false, which tries to run the DXF as an executable;
+        // the shell opens it in the program associated with .dxf instead.
+        internal static ProcessStartInfo ExternalCadStartInfo(string path) =>
+            new ProcessStartInfo(path) { UseShellExecute = true };
+
+        internal virtual void LaunchExternalCad(string path)
+        {
+            using var process = Process.Start(ExternalCadStartInfo(path));
+        }
+
+        internal virtual void ReportExternalCadFailure(string path, Exception error) =>
+            MessageBox.Show(this, $"Could not open '{path}' in CAD: {error.Message}",
+                "View in CAD", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
         public void AddPlate()
         {
