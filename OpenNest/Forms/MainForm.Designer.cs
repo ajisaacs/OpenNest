@@ -158,6 +158,7 @@ namespace OpenNest.Forms
             toolStripMenuItemCommonLine = new System.Windows.Forms.ToolStripSeparator();
             mnuPlateJoinCommonLine = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateRemoveCommonLine = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateCutCommonLinesTwice = new System.Windows.Forms.ToolStripMenuItem();
             mnuSequenceParts = new System.Windows.Forms.ToolStripMenuItem();
             autoSequenceCurrentPlateToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             manualSequenceToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -971,10 +972,11 @@ namespace OpenNest.Forms
             //
             // mnuPlateArrange
             //
-            mnuPlateArrange.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateAlignLeft, mnuPlateAlignRight, mnuPlateAlignTop, mnuPlateAlignBottom, toolStripMenuItem11, mnuPlateAlignHorizontal, mnuPlateAlignVertically, toolStripMenuItem8, mnuPlateEvenlySpaceHorizontal, mnuPlateEvenlySpaceVertical, toolStripMenuItem23, centerPartsToolStripMenuItem, toolStripMenuItem24, mnuPlatePatternTile, mnuPlateExpandSpacing, toolStripMenuItemCommonLine, mnuPlateJoinCommonLine, mnuPlateRemoveCommonLine });
+            mnuPlateArrange.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateAlignLeft, mnuPlateAlignRight, mnuPlateAlignTop, mnuPlateAlignBottom, toolStripMenuItem11, mnuPlateAlignHorizontal, mnuPlateAlignVertically, toolStripMenuItem8, mnuPlateEvenlySpaceHorizontal, mnuPlateEvenlySpaceVertical, toolStripMenuItem23, centerPartsToolStripMenuItem, toolStripMenuItem24, mnuPlatePatternTile, mnuPlateExpandSpacing, toolStripMenuItemCommonLine, mnuPlateJoinCommonLine, mnuPlateRemoveCommonLine, mnuPlateCutCommonLinesTwice });
             mnuPlateArrange.Name = "mnuPlateArrange";
             mnuPlateArrange.Size = new System.Drawing.Size(177, 22);
             mnuPlateArrange.Text = "Arrange";
+            mnuPlateArrange.DropDownOpening += ArrangeMenu_Opening;
             //
             // mnuPlateAlignLeft
             //
@@ -1092,6 +1094,14 @@ namespace OpenNest.Forms
             mnuPlateRemoveCommonLine.Size = new System.Drawing.Size(209, 22);
             mnuPlateRemoveCommonLine.Text = "Remove Common Line";
             mnuPlateRemoveCommonLine.Click += RemoveCommonLine_Click;
+            //
+            // mnuPlateCutCommonLinesTwice
+            //
+            mnuPlateCutCommonLinesTwice.Name = "mnuPlateCutCommonLinesTwice";
+            mnuPlateCutCommonLinesTwice.Size = new System.Drawing.Size(209, 22);
+            mnuPlateCutCommonLinesTwice.Text = "Cut Common Lines Twice";
+            mnuPlateCutCommonLinesTwice.ToolTipText = "Cut every shared edge with both parts' whole perimeters, for a post that cannot cut a common line once.";
+            mnuPlateCutCommonLinesTwice.Click += CutCommonLinesTwice_Click;
             //
             // mnuSequenceParts
             //
@@ -1597,6 +1607,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItemCommonLine;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateJoinCommonLine;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateRemoveCommonLine;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateCutCommonLinesTwice;
         private System.Windows.Forms.ToolStripButton btnSaveAs;
         private System.Windows.Forms.ToolStripMenuItem centerPartsToolStripMenuItem;
         private System.Windows.Forms.ToolStripStatusLabel selectionStatusLabel;

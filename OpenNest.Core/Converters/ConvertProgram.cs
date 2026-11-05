@@ -216,6 +216,9 @@ namespace OpenNest.Converters
                 case LayerType.DisplayPerimeter:
                     return SpecialLayers.DisplayPerimeter;
 
+                case LayerType.CommonLine:
+                    return SpecialLayers.CommonLine;
+
                 default:
                     return new Layer(layer.ToString());
             }

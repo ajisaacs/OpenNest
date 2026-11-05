@@ -119,6 +119,14 @@ nonfinite or nonpositive kerf. Spans are not saved; they are derived from the pl
 Versions before it ignore the array, so they load the parts one kerf apart and report the
 pairs as part-spacing findings: never a silently different cut.
 
+A plate's optional `cutCommonLinesTwice` (`Plate.CutCommonLinesTwice`) is `true` when its
+common lines are cut twice; it is omitted when false, the default, in which Plan Cutting cuts
+each shared span once. A program planned that way saves its shared cuts as motions tagged
+`:COMMONLINE` and puts a `COMMON LINE REMAINDER CW` or `CCW` comment after the rapid into each
+remainder piece. Versions without single-pass support read those motions as ordinary cuts,
+which a post would cut with compensation, so such a nest must not be posted from an older
+version.
+
 ## Plate cutting parameters
 
 Each plate's optional `cuttingParameters` stores the settings last applied to it.

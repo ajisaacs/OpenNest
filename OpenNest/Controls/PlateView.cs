@@ -944,6 +944,22 @@ namespace OpenNest.Controls
             return true;
         }
 
+        /// <summary>
+        /// Sets whether the plate cuts its common lines twice (<see cref="Plate.CutCommonLinesTwice"/>),
+        /// as an undoable edit. False when nothing changed.
+        /// </summary>
+        public bool SetCutCommonLinesTwice(bool twice)
+        {
+            if (Plate == null || Plate.CutCommonLinesTwice == twice)
+                return false;
+            using var change = BeginChange(twice ? "Cut Common Lines Twice" : "Cut Common Lines Once");
+            change.MarkChanged();
+            Plate.CutCommonLinesTwice = twice;
+            Invalidate();
+            change.Complete();
+            return true;
+        }
+
         public void AlignSelected(AlignType alignType, LayoutPart fixedPart) =>
             selection.AlignSelected(alignType, fixedPart);
 

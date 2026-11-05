@@ -1013,6 +1013,17 @@ static class NestConsole
             return false;
         }
 
+        // A common line cut once needs a post that writes it; none falls back to cutting it twice.
+        try
+        {
+            OpenNest.CNC.CommonLineCuts.EnsurePostable(nest, post);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message} No output was written.");
+            return false;
+        }
+
         var verification = PostVerificationAnalyzer.AnalyzeForPost(nest, post);
         Console.WriteLine(verification.ToDisplayText());
         if (!verification.CanPost(options.AcknowledgePostRisks))

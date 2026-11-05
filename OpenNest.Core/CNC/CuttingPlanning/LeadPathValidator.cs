@@ -65,6 +65,17 @@ public static class LeadPathValidator
             {
                 token.ThrowIfCancellationRequested();
                 var move = execution.Motions[i];
+                if (!move.Rapid && move.Layer == LayerType.CommonLine)
+                {
+                    // A shared cut runs in the kerf between two parts: it may touch no material at all.
+                    var (shared, sharedObstacle) = CheckSharedCut(i);
+                    if (shared == null)
+                        continue;
+                    if (isFixed?.Invoke(i) != true || fixedFailures == null)
+                        return shared;
+                    fixedFailures.Add(new(i, shared, sharedObstacle));
+                    continue;
+                }
                 if (move.Layer is not (LayerType.Leadin or LayerType.Leadout))
                     continue;
                 var (failure, obstacle) = CheckMotion(i);
@@ -77,6 +88,27 @@ public static class LeadPathValidator
             // No lead motion is valid for direct contour piercing. The caller still
             // checks rapid travel and contour accounting for the complete program.
             return new(true, true, null);
+
+            (LeadPathValidationResult Failure, int? Obstacle) CheckSharedCut(int i)
+            {
+                var move = execution.Motions[i];
+                if (move.Curve == null || !double.IsFinite(move.Length) || move.Length <= PostVerificationGeometry.Epsilon)
+                    return (new(false, false, "A common-line shared cut is missing, degenerate or inconsistent."), null);
+                if (MaterialContact(move.Curve, target, null, ref budget, token) is { } own)
+                    return (new(true, false, $"Common-line shared cut {i} contacts its own part's material ({own}). "
+                        + "Rejoin the parts one kerf apart, then replan."), null);
+                for (var other = 0; other < otherMaterials.Count; other++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var material = otherMaterials[other];
+                    if (ReferenceEquals(material, target) || move.Curve.Extent.IsClearOfQueriesFrom(material.Extent))
+                        continue;
+                    if (MaterialContact(move.Curve, material, null, ref budget, token) != null)
+                        return (new(true, false, "A common-line shared cut contacts or enters another placed material. "
+                            + "Rejoin the parts one kerf apart at the current kerf, then replan."), other);
+                }
+                return (null, null);
+            }
 
             (LeadPathValidationResult Failure, int? Obstacle) CheckMotion(int i)
             {
@@ -100,6 +132,7 @@ public static class LeadPathValidator
                 var adjacentIndex = groupEdge + step;
                 var genuineJoint = false;
                 var breakLead = false;
+                var sharedLead = false;
                 if (adjacentIndex >= 0 && adjacentIndex < execution.Motions.Count)
                 {
                     var adjacent = execution.Motions[adjacentIndex];
@@ -117,6 +150,20 @@ public static class LeadPathValidator
                             breakLead = true;
                             if (groupEdge == i)
                                 allowed = joint;
+                        }
+                    }
+                    // A shared cut lies in the kerf between two parts, so its lead joins no boundary
+                    // and may touch none: its joint is the cut's own start (or end for a lead-out).
+                    else if (!adjacent.Rapid && adjacent.Layer == LayerType.CommonLine
+                        && adjacent.Curve != null && adjacent.Length > PostVerificationGeometry.Epsilon)
+                    {
+                        var edge = execution.Motions[groupEdge];
+                        var joint = move.Layer == LayerType.Leadin ? edge.End : edge.Curve.Start;
+                        var cutJoint = move.Layer == LayerType.Leadin ? adjacent.Curve.Start : adjacent.End;
+                        if (joint.DistanceTo(cutJoint) <= PostVerificationGeometry.Epsilon)
+                        {
+                            genuineJoint = true;
+                            sharedLead = true;
                         }
                     }
                     else if (!adjacent.Rapid && adjacent.Layer is LayerType.Cut or LayerType.Display
@@ -154,11 +201,13 @@ public static class LeadPathValidator
                 // material is expected there, but touching any of its boundaries is not.
                 var failure = breakLead
                     ? MaterialContact(move.Curve, target, null, ref budget, token, allowInterior: true)
-                    : CheckMaterial(target, allowed);
+                    : CheckMaterial(target, sharedLead ? null : allowed);
                 if (failure != null)
                     return (new(true, false, breakLead
                         ? $"Break cut lead motion {i} contacts its part's boundary ({failure}). Try a shorter lead-in or move the tabs."
-                        : $"Lead motion {i} contacts or enters target material outside its adjacent contour joint ({failure})."), null);
+                        : sharedLead
+                            ? $"Common-line lead motion {i} contacts its part's material ({failure}). The lead runs along the shared line: shorten the lead-in or lead-out, or cut the common lines twice."
+                            : $"Lead motion {i} contacts or enters target material outside its adjacent contour joint ({failure})."), null);
                 var reach = move.Curve.Extent;
                 for (var other = 0; other < otherMaterials.Count; other++)
                 {

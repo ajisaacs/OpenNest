@@ -27,7 +27,8 @@ internal static class SupportTabCapture
     {
         var parameters = request.ConfirmedParameters;
         // A display perimeter is a supplied blank: it is never cut free, so it needs no tab.
-        if (prepared == null || !prepared.HasCutPerimeter || parameters?.TabConfig == null
+        // A common-line member is never support-tabbed: its outside is cut from its shared spans.
+        if (prepared == null || !prepared.HasCutPerimeter || prepared.IsCommonLinePerimeter || parameters?.TabConfig == null
             || !SupportTabSettings.CanTab(parameters, request.SupportBed))
             return prepared;
         token.ThrowIfCancellationRequested();

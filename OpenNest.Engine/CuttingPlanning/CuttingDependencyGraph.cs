@@ -75,10 +75,15 @@ internal sealed class CuttingDependencyGraph
         return cyclic < 0 ? null : cyclic;
     }
 
+    /// <param name="required">Further (part, prerequisite) ordinals the caller proved, such as a
+    /// common line's owner before its partner.</param>
     internal static CuttingDependencyGraph Build(IReadOnlyList<DependencyNode> nodes, Box plate,
-        CancellationToken token, Action<CuttingDependencyException> uncertain = null)
+        CancellationToken token, Action<CuttingDependencyException> uncertain = null,
+        IReadOnlyList<(int Part, int Prerequisite)> required = null)
     {
         var edges = nodes.Select(_ => new SortedSet<int>()).ToArray();
+        foreach (var (part, prerequisite) in required ?? [])
+            edges[part].Add(prerequisite);
         for (var cut = 0; cut < nodes.Count; cut++)
         {
             if (!nodes[cut].IsCutOff)

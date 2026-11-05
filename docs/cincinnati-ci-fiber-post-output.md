@@ -64,8 +64,34 @@ uses the Cincinnati machine-sample convention, not a generic TF5200 laser API:
   enter and verify it on the machine.
 - Hole subprogram geometry is inlined. Suppressed moves and, by default,
   wholly scribe contours are omitted.
+- Common lines cut once: see [common lines](#common-lines) below.
 - Files use UTF-8 without a BOM and CRLF lines. Default accuracy is three decimal
   places: coordinates trim trailing zeros; dimensional header values retain them.
+
+## Common lines
+
+A [common line cut once](common-line-cutting.md#cutting-each-shared-line-once) posts in plate
+order, member by member, each member's holes first:
+
+- **Shared cut** (`CommonLine` motions): the cut-off form with a real lead-in. `/L "L0"`, restart
+  number, rapid to the pierce on the span's axis, `/L "L4"`, the straight lead-in `G1`, `/L "L6"`,
+  the centerline `G1`, the straight lead-out `G1` when there is one, and `/L "ZHSOFF"`. No
+  `G41`/`G42` is selected: the line is the beam centerline between the two parts.
+- **Remainder** (an open contour after a `COMMON LINE REMAINDER` comment): the normal contour
+  form with the perimeter macro, `/L "L4"`, `G41` for a clockwise perimeter or `G42` for a
+  counterclockwise one (the side its whole perimeter would get), the straight lead-in that starts
+  in the shared kerf, `/L "L6"`, the open path and `/L "ZHSOFF"`. A member's closed contours are
+  all holes; the post picks no perimeter among them.
+
+**Unconfirmed on the machine** (release gate, see [common-line cutting](common-line-cutting.md)):
+
+- compensation start-up on a remainder whose lead-in starts in void (the kerf the shared cut
+  opened) and runs along it;
+- compensation cancel where a remainder ends in that kerf, and that the next contour starts
+  uncompensated, since the post writes no `G40` (the macros cancel compensation);
+- whether `L4` runs correctly before an uncompensated shared cut, as for cut-offs.
+
+Verify on a 3/16 stainless coupon pair on the CI FIBER 4020 and record the result here.
 
 ## Configuration and boundaries
 
@@ -126,6 +152,9 @@ cover a square with a hole, kerf side for either winding, coordinate
 transforms/formatting, lead-in rejection,
 cut-off sequencing and output, table bounds, suppression/scribe handling, and
 multi-sheet output in both modes.
+[Common-line post tests](../OpenNest.Tests/CommonLines/CommonLinePostTests.cs) hold a golden
+program for a planned two-part pair (shared cut and both remainders), the remainders'
+compensation side for either winding, and the refusals of posts without support.
 [Sample regression tests](../OpenNest.Tests/CincinnatiCIFiber/CIFiberSampleRegressionTests.cs)
 post a nest rebuilt from a Cincinnati machine sample, whose parts carry the
 sample's own pierce, lead-in and cut moves. Posted unchanged, the program body

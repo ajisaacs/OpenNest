@@ -292,6 +292,13 @@ namespace OpenNest.IO
                                         layer = LayerType.DisplayPerimeter;
                                         break;
 
+
+                                    case "COMMONLINE":
+
+                                        layer = LayerType.CommonLine;
+
+                                        break;
+
                                     case "SUPPRESSED":
                                         suppressed = true;
                                         break;
@@ -400,6 +407,13 @@ namespace OpenNest.IO
 
                                     case "DISPLAYPERIMETER":
                                         layer = LayerType.DisplayPerimeter;
+                                        break;
+
+
+                                    case "COMMONLINE":
+
+                                        layer = LayerType.CommonLine;
+
                                         break;
 
                                     case "SUPPRESSED":

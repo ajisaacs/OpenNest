@@ -160,6 +160,8 @@ public class CommonLineTests
         Assert.Single(ungrouped.Findings, f => f.Kind == PostVerificationKind.PartSpacing);
 
         nest.Plates[0].JoinCommonLine(new[] { a, b }, Kerf);
+        // Unplanned programs cut every perimeter whole: these plates cut their common lines twice.
+        nest.Plates[0].CutCommonLinesTwice = true;
         var grouped = PostVerificationAnalyzer.Analyze(nest);
         Assert.DoesNotContain(grouped.Findings, f => f.Kind is PostVerificationKind.PartSpacing
             or PostVerificationKind.CommonLine or PostVerificationKind.Overlap);
@@ -172,6 +174,8 @@ public class CommonLineTests
         var b = Chamfered(Width + Kerf, 0);
         var nest = NestWith(a, b);
         nest.Plates[0].JoinCommonLine(new[] { a, b }, Kerf);
+        // Unplanned programs cut every perimeter whole: these plates cut their common lines twice.
+        nest.Plates[0].CutCommonLinesTwice = true;
         b.Offset(-Kerf / 2, 0);
 
         var findings = PostVerificationAnalyzer.Analyze(nest).Findings;
@@ -199,6 +203,8 @@ public class CommonLineTests
         var b = Chamfered(Width + Kerf, 0);
         var nest = NestWith(a, b);
         nest.Plates[0].JoinCommonLine(new[] { a, b }, Kerf);
+        // Unplanned programs cut every perimeter whole: these plates cut their common lines twice.
+        nest.Plates[0].CutCommonLinesTwice = true;
         b.Offset(1, 0);
 
         var findings = PostVerificationAnalyzer.Analyze(nest).Findings
@@ -215,6 +221,8 @@ public class CommonLineTests
         var b = Chamfered(Width + Kerf, 0);
         var nest = NestWith(a, b);
         nest.Plates[0].JoinCommonLine(new[] { a, b }, Kerf);
+        // Unplanned programs cut every perimeter whole: these plates cut their common lines twice.
+        nest.Plates[0].CutCommonLinesTwice = true;
         nest.Plates[0].CuttingParameters = new CuttingParameters { Kerf = 0.02 };
 
         var finding = Assert.Single(PostVerificationAnalyzer.Analyze(nest).Findings,
@@ -238,6 +246,8 @@ public class CommonLineTests
         var b = new Part(new Drawing("plain", Rectangle()), new Vector(Width + Kerf, 0));
         var nest = NestWith(a, b);
         nest.Plates[0].JoinCommonLine(new[] { a, b }, Kerf);
+        // Unplanned programs cut every perimeter whole: these plates cut their common lines twice.
+        nest.Plates[0].CutCommonLinesTwice = true;
 
         var finding = Assert.Single(PostVerificationAnalyzer.Analyze(nest).Findings,
             f => f.Kind == PostVerificationKind.CommonLine);

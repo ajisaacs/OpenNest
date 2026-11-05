@@ -701,6 +701,13 @@ namespace OpenNest.IO
             public List<CommonLineDto> CommonLines { get; init; }
 
             /// <summary>
+            /// True when the plate's common lines are cut twice (<c>Plate.CutCommonLinesTwice</c>).
+            /// Omitted when false: Plan Cutting cuts each shared line once.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+            public bool CutCommonLinesTwice { get; init; }
+
+            /// <summary>
             /// The settings the plate's cut-offs were generated with (<c>Plate.CutOffSettings</c>).
             /// Omitted when unknown; older files regenerate with the reader's defaults.
             /// </summary>

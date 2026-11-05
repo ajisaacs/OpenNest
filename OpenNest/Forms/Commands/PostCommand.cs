@@ -40,6 +40,17 @@ namespace OpenNest.Forms.Commands
                     return;
             }
 
+            // A common line cut once needs a post that writes it; none falls back to cutting it twice.
+            try
+            {
+                CNC.CommonLineCuts.EnsurePostable(nest, postProcessor);
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(owner, ex.Message, postProcessor.Name, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
             // Verification runs fresh on every attempt; its consent never outlives this call.
             using (var verification = new PostVerificationForm(nest, postProcessor))
             {

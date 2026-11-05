@@ -378,7 +378,15 @@ namespace OpenNest
             localCut = cutPath;
             localEtch = etchPath;
             // Only programs with break cuts or open (tabbed) cuts need a fill apart from the outline path.
-            if (hasOpenCuts || HasBreakCuts(program))
+            // A common-line member cut once leaves its shared spans to the shared cut: its material is
+            // the drawing's, rotated as placed (docs/common-line-cutting.md).
+            if (CNC.CommonLineCuts.IsSinglePass(program))
+            {
+                var clean = (CNC.Program)BasePart.BaseDrawing.Program.Clone();
+                clean.Rotate(BasePart.Rotation - BasePart.BaseDrawing.Program.Rotation);
+                localFill = clean.GetFillPath(Vector.Zero);
+            }
+            else if (hasOpenCuts || HasBreakCuts(program))
                 localFill = program.GetFillPath(Vector.Zero);
             localLead = BasePart.HasManualLeadIns ? leadPath : null;
             if (!BasePart.HasManualLeadIns)

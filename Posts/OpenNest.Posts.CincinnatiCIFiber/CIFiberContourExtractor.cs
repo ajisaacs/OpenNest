@@ -45,6 +45,19 @@ namespace OpenNest.Posts.CincinnatiCIFiber
 
         /// <summary>Whether the rapid to the pierce raises the head over parts already cut (<see cref="HeadRaise"/>).</summary>
         public bool Raised { get; set; }
+
+        /// <summary>
+        /// True for a common line's shared cut (<see cref="LayerType.CommonLine"/>): an open
+        /// centerline cut made without kerf compensation.
+        /// </summary>
+        public bool IsCommonLine { get; set; }
+
+        /// <summary>
+        /// For a common-line remainder, the winding of the perimeter it belongs to
+        /// (<see cref="CommonLineCuts"/>): it is cut as the perimeter, compensated on that side.
+        /// Null for every other contour.
+        /// </summary>
+        public RotationType? RemainderWinding { get; set; }
     }
 
     /// <summary>
@@ -122,6 +135,13 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                     continue;
                 }
 
+                if (CommonLineCuts.RemainderWinding(code) is { } winding)
+                {
+                    current ??= new CIFiberContour { Pierce = origin };
+                    current.RemainderWinding = winding;
+                    continue;
+                }
+
                 if (HeadHeightLock.IsLock(code) || HeadHeightLock.IsUnlock(code))
                 {
                     current ??= new CIFiberContour { Pierce = origin };
@@ -180,6 +200,8 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                             // only Scribe is reliably a mark. Scribe contours
                             // are dropped by the writer when SkipScribe is on.
                             current.Cuts.Add(absolute);
+                            if (layer == LayerType.CommonLine)
+                                current.IsCommonLine = true;
                         }
                         break;
                 }

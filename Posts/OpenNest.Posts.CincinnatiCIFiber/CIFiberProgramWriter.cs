@@ -248,12 +248,19 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                 contours = contours.Where(c => !IsScribeContour(c)).ToList();
 
             var isCutOff = part.BaseDrawing.IsCutOff;
-            var perimeter = CIFiberWinding.PerimeterIndex(contours);
+            // A common-line member's outside is its remainders; every closed contour is a hole.
+            var remainders = contours.Any(c => c.RemainderWinding != null);
+            var perimeter = remainders ? -1 : CIFiberWinding.PerimeterIndex(contours);
             for (var i = 0; i < contours.Count; i++)
             {
                 contourNumber++;
                 if (isCutOff)
                     WriteCutOffContour(contours[i], contourNumber, w);
+                else if (contours[i].IsCommonLine)
+                    WriteCommonLineContour(contours[i], contourNumber, w);
+                else if (contours[i].RemainderWinding is { } winding)
+                    // G41 leaves the product right of travel: a clockwise perimeter's side.
+                    WriteContour(contours[i], true, contourNumber, w, winding == RotationType.CW);
                 else
                     WriteContour(contours[i], contours[i].IsExterior || i == perimeter, contourNumber, w);
             }
@@ -270,7 +277,8 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             CIFiberFormatter.Line(w, $"G0X{Fmt(contour.Pierce.X)}Y{Fmt(contour.Pierce.Y)}");
         }
 
-        private void WriteContour(CIFiberContour contour, bool isExterior, int contourNumber, TextWriter w)
+        private void WriteContour(CIFiberContour contour, bool isExterior, int contourNumber, TextWriter w,
+            bool? compensatesLeft = null)
         {
             CIFiberFormatter.Line(w, $"N{contourNumber}:");
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerCancel));
@@ -302,7 +310,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             // way this contour actually runs.
             CIFiberFormatter.Line(
                 w,
-                CIFiberWinding.CompensatesLeft(contour, isExterior) ? "G41" : "G42"
+                compensatesLeft ?? CIFiberWinding.CompensatesLeft(contour, isExterior) ? "G41" : "G42"
             );
 
             var prev = contour.LeadIn.EndPoint;
@@ -368,6 +376,43 @@ namespace OpenNest.Posts.CincinnatiCIFiber
                     break;
                 CIFiberFormatter.Line(w, FormatMotion(contour.Cuts[i], prev));
                 prev = contour.Cuts[i].EndPoint;
+            }
+
+            CIFiberFormatter.Line(w, SkippableLine(_config.LayerCutEnd));
+        }
+
+        /// <summary>
+        /// A common line's shared cut (docs/common-line-cutting.md): the cut-off form with a real
+        /// lead-in. The line is the beam centerline between two parts one kerf apart, so no
+        /// G41/G42 is selected; the exterior lead macro runs, then the straight lead-in, the cut
+        /// layer, the cut and its lead-out. Unconfirmed on the machine: that a contour after a
+        /// compensated one starts uncompensated, as the post never writes G40.
+        /// </summary>
+        private void WriteCommonLineContour(CIFiberContour contour, int contourNumber, TextWriter w)
+        {
+            if (contour.LeadIn is not (null or LinearMove) || contour.LeadInExtra.Count > 0)
+                throw new InvalidOperationException(
+                    $"Contour {contourNumber} is a common-line shared cut with a lead-in that is not one straight move."
+                );
+
+            CIFiberFormatter.Line(w, $"N{contourNumber}:");
+            CIFiberFormatter.Line(w, SkippableLine(_config.LayerCancel));
+            CIFiberFormatter.Line(w, $"V.E.R3={contourNumber}");
+            WriteRapidToPierce(contour, w);
+            CIFiberFormatter.Line(w, SkippableLine(_config.LayerExteriorLeadin));
+
+            var prev = contour.Pierce;
+            if (contour.LeadIn != null)
+            {
+                CIFiberFormatter.Line(w, FormatMotion(contour.LeadIn, prev));
+                prev = contour.LeadIn.EndPoint;
+            }
+
+            CIFiberFormatter.Line(w, SkippableLine(_config.LayerCut));
+            foreach (var cut in contour.Cuts)
+            {
+                CIFiberFormatter.Line(w, FormatMotion(cut, prev));
+                prev = cut.EndPoint;
             }
 
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerCutEnd));

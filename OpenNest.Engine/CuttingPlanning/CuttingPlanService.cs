@@ -49,6 +49,9 @@ public static class CuttingPlanService
                     if (part == null || !request.Parts.Any(p => ReferenceEquals(p, part)) || !eligible.Add(part))
                         throw new ArgumentException("Foreign or duplicate eligible placement.");
             }
+            // Common lines cut once: each member regenerates as its holes, shared cuts and remainder.
+            var commonLines = CommonLineCapture.Of(request);
+            var deferredMembers = new List<(int Placement, Program Clean)>();
             // Cutoff definitions by drawing reference, as automatic sequencing matches them.
             var definitions = new Dictionary<Drawing, CutOff>(ReferenceEqualityComparer.Instance);
             foreach (var cutOff in request.Plate?.CutOffs ?? [])
@@ -136,20 +139,33 @@ public static class CuttingPlanService
                 IncrementalClosureDrift.Close(ownedClean);
                 // A baked-in seam overcut encloses no area; left in, the ring touches itself.
                 SeamOvercut.Trim(ownedClean);
+                // A common-line member never cuts its shared spans: they are its material's tabs.
+                var member = request.ConfirmedParameters != null && commonLines?.IsMember(source) == true;
+                if (member)
+                {
+                    if (source.LeadInsLocked || request.EligibleParts != null && !eligible.Contains(source))
+                        throw new NotSupportedException($"Part {index + 1} shares a common line that is cut once, "
+                            + "so Plan Cutting must regenerate its program: "
+                            + (source.LeadInsLocked ? "unlock its lead-ins" : "include it in the plan")
+                            + ", or cut the plate's common lines twice.");
+                    ownedClean = commonLines.Mark(source, ownedClean, source.Location, index);
+                }
                 // Material extent only: remote rapids and scribe marks must not widen it, or a
                 // genuine insert could fail the containment prefilter.
                 var cleanBounds = NestedPartContainment.CleanBounds(ownedClean, source.Location, token);
                 var location = source.Location;
                 if (request.ConfirmedParameters != null)
                 {
-                    material = LeadMaterialSnapshot.Capture(ownedClean, location, token);
+                    material = LeadMaterialSnapshot.Capture(ownedClean, location, token, sharedSpans: member);
                     if (!material.IsComplete)
                     {
                         if (!bestEffort)
                             throw new NotSupportedException(material.Reason);
                         warnings.Add(new(index, source, null, null, PostVerificationKind.Incomplete, material.Reason));
                     }
-                    if (!source.LeadInsLocked && (request.EligibleParts == null || eligible.Contains(source)))
+                    if (member)
+                        deferredMembers.Add((placements.Count, ownedClean));
+                    else if (!source.LeadInsLocked && (request.EligibleParts == null || eligible.Contains(source)))
                     {
                         prepared = DrawingPinCapture.Prepare(source, index, ownedClean, request.ConfirmedParameters,
                             warnings, token);
@@ -166,14 +182,25 @@ public static class CuttingPlanService
                 placements.Add(new(source, index, source.Location, source.Rotation, source.LeadInsLocked,
                     execution, ownedProgram, prepared, material));
             }
+            // A member's shared cuts need every part's material: each must fit its leads at one end.
+            var materials = placements.Where(p => !p.IsCutOff && p.Material != null).Select(p => p.Material).ToArray();
+            foreach (var (at, clean) in deferredMembers)
+            {
+                token.ThrowIfCancellationRequested();
+                var placed = placements[at];
+                source = placed.SourcePart;
+                ordinal = placed.SourceOrdinal;
+                placements[at] = CaptureMember(placed, clean, commonLines, request, materials, warnings, bestEffort, token);
+            }
             // The start can be invalid even when the first rapid has no cutting geometry.
             placements[0].Execution.RapidDistanceFrom(request.StartPoint);
             source = null;
             ordinal = null;
+            var commonLineOrder = commonLines?.Order(request.Parts) ?? [];
             var dependencies = CuttingDependencyGraph.Build(nodes, request.Plate?.BoundingBox(includeParts: false), token,
                 bestEffort ? exception => warnings.Add(new(exception.Ordinal, request.Parts[exception.Ordinal],
                     exception.Other, exception.Other is int other ? request.Parts[other] : null,
-                    PostVerificationKind.Incomplete, exception.Message)) : null);
+                    PostVerificationKind.Incomplete, exception.Message)) : null, commonLineOrder);
             return new(placements, request.StartPoint, request.ExpansionBudget, regeneration: request.ConfirmedParameters != null,
                 preservePartOrder: request.PreservePartOrder, maxEntries: request.MaxEntries,
                 expansionObserver: request.ExpansionObserver, plateState: plateState,
@@ -182,6 +209,8 @@ public static class CuttingPlanService
                 dependencies: dependencies, findings: warnings, bestEffort: bestEffort)
             {
                 SupportTabsSkipped = SupportTabSettings.SkipsForNoRange(request.ConfirmedParameters, request.SupportBed),
+                CommonLineMembers = commonLines?.MemberNumbers(request.Parts) ?? new HashSet<int>(),
+                CommonLineOrder = commonLineOrder.ToHashSet(),
             };
         }
         catch (OperationCanceledException)
@@ -206,6 +235,44 @@ public static class CuttingPlanService
         CuttingPlanSnapshot Failure(CuttingPlanStatus status, string message) =>
             new(placements, request?.StartPoint ?? Vector.Zero, request?.ExpansionBudget ?? 0, status,
                 [new(ordinal, source, null, null, null, message)]);
+    }
+
+    // A common-line member regenerates from its marked clean program: holes as usual, then its
+    // shared cuts and remainder from one fixed entry. Its leads are checked here, so a lead that
+    // fits nowhere refuses with the span named rather than as a search that ran out.
+    private static FixedProgramPlacement CaptureMember(FixedProgramPlacement placed, Program clean,
+        CommonLineCapture commonLines, CuttingPlanRequest request, IReadOnlyList<LeadMaterialSnapshot> materials,
+        List<CuttingPlanFinding> warnings, bool bestEffort, CancellationToken token)
+    {
+        var source = placed.SourcePart;
+        var index = placed.SourceOrdinal;
+        var parameters = request.ConfirmedParameters;
+        var pierceRadius = parameters.GetPierceZoneRadius();
+        var material = placed.Material;
+        PreparedContours prepared;
+        try
+        {
+            var perimeter = commonLines.Perimeter(source, index, request.Parts, material, materials, parameters,
+                pierceRadius, token);
+            prepared = DrawingPinCapture.Prepare(source, index, clean, parameters, warnings, token, perimeter);
+            if (!bestEffort)
+            {
+                var entry = prepared.Entries(prepared.PerimeterOrdinal, Vector.Zero)[0];
+                var probe = ExecutionMotionReader.ReadSupported(prepared.EmitCandidateForValidation(entry),
+                    source.Location, null, token);
+                var lead = LeadPathValidator.Check(probe, material, materials, pierceRadius, token);
+                if (!lead.IsComplete || !lead.IsClear)
+                    throw new NotSupportedException("no lead-in fits its common-line remainder in the shared kerf: "
+                        + lead.Reason);
+            }
+        }
+        catch (NotSupportedException exception) when (!exception.Message.StartsWith("Part ", StringComparison.Ordinal)
+            && !exception.Message.StartsWith("No lead fits", StringComparison.Ordinal))
+        {
+            throw new NotSupportedException($"Part {index + 1}: {exception.Message}", exception);
+        }
+        return new(source, index, placed.Location, placed.Rotation, placed.LeadInsLocked, placed.Execution,
+            placed.CopyProgram(), prepared, material);
     }
 
     public static CuttingPlanResult Plan(CuttingPlanRequest request, CancellationToken token = default) =>
@@ -519,6 +586,8 @@ public static class CuttingPlanService
                 $"{subject} cuts the sheet-separating cutoff (part {part.SourceOrdinal + 1}) before part "
                 + $"{prerequisite.SourceOrdinal + 1}; every part and other cutoff must be cut before the sheet is separated.");
         var reason = prerequisite.IsCutOff ? "the cutoff crossing it"
+            : snapshot.CommonLineOrder.Contains((violation.Part, violation.Prerequisite))
+                ? "the common-line partner that cuts their shared line"
             : prerequisite.SourcePart.BaseDrawing.CutFirst && !part.SourcePart.BaseDrawing.CutFirst
                 ? "the cut-first part" : "the part nested in its cutout";
         return new(part.SourceOrdinal, part.SourcePart, prerequisite.SourceOrdinal, prerequisite.SourcePart, null,

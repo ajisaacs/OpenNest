@@ -186,6 +186,9 @@ namespace OpenNest.Converters
             if (string.Equals(name, SpecialLayers.DisplayPerimeter.Name, System.StringComparison.OrdinalIgnoreCase))
                 return LayerType.DisplayPerimeter;
 
+            if (string.Equals(name, SpecialLayers.CommonLine.Name, System.StringComparison.OrdinalIgnoreCase))
+                return LayerType.CommonLine;
+
             return LayerType.Cut;
         }
     }

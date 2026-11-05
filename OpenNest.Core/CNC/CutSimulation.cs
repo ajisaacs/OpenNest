@@ -379,7 +379,7 @@ namespace OpenNest.CNC
                 {
                     // Cutting strategies emit contour moves on Display; the posts cut them.
                     LayerType.Cut or LayerType.Display or LayerType.Leadin or LayerType.Leadout or LayerType.Break
-                        => CutSimulationStepKind.Cut,
+                        or LayerType.CommonLine => CutSimulationStepKind.Cut,
                     LayerType.Scribe => CutSimulationStepKind.Scribe,
                     _ => null, // Tab spans are never cut.
                 };

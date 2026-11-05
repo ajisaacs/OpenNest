@@ -202,6 +202,19 @@ namespace OpenNest
             return result;
         }
 
+        /// <summary>
+        /// Cuts every common line twice, as slice 1 did: each member cuts its whole perimeter and
+        /// the second pass runs in kerf the first opened. Off by default: Plan Cutting cuts each
+        /// shared line once and each member's remaining edges after it (see
+        /// docs/common-line-cutting.md). Choose this for a post that cannot write single-pass cuts.
+        /// </summary>
+        public bool CutCommonLinesTwice { get; set; }
+
+        /// <summary>
+        /// True when the plate's common lines are cut once: it has groups and does not cut them twice.
+        /// </summary>
+        public bool CutsCommonLinesOnce => CommonLines.Count > 0 && !CutCommonLinesTwice;
+
         /// <summary>Removes the common-line group holding <paramref name="part"/>; true when there was one.</summary>
         public bool RemoveCommonLine(Part part) =>
             CommonLineGroupOf(part) is { } group && CommonLines.Remove(group);

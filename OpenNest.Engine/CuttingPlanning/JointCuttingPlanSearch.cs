@@ -1256,6 +1256,7 @@ internal static class JointCuttingPlanSearch
             reason = null;
             var prepared = source.Prepared;
             if (snapshot.PierceZoneRadius <= 0 || !prepared.HasCutPerimeter || prepared.IsPinned(prepared.PerimeterOrdinal)
+                || prepared.IsCommonLinePerimeter
                 || source.Material is not { IsComplete: true })
                 return [];
             CountExpansion(source);

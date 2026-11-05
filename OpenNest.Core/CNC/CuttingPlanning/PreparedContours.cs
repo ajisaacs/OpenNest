@@ -25,6 +25,16 @@ public sealed record ContourChoice(int ContourOrdinal, int EntityOrdinal, Vector
 }
 
 /// <summary>
+/// The shared cuts a common-line member makes before its remainder (see
+/// docs/common-line-cutting.md): open centerline cuts in part coordinates, each from
+/// <see cref="CommonLineCutPath.Start"/> to <see cref="CommonLineCutPath.End"/>, with the group's kerf.
+/// </summary>
+public sealed record CommonLinePerimeter(double Kerf, IReadOnlyList<CommonLineCutPath> SharedCuts);
+
+/// <summary>One shared cut on a common line's centerline, in part coordinates and cut direction.</summary>
+public sealed record CommonLineCutPath(Vector Start, Vector End);
+
+/// <summary>
 /// Immutable owned clean contours and settings. Callers supply the clean, already-rotated
 /// program and keep it stable during Capture. This is not a topology or lead-path verdict.
 /// </summary>
@@ -55,6 +65,10 @@ public sealed class PreparedContours
     // never-executed DisplayPerimeterTail. Null for an ordinary cut perimeter.
     private readonly Shape displayOutline;
     private bool hasCutPerimeter => displayOutline == null;
+    // Set for a common-line member: the perimeter's shared spans are Tab entities, never cut by
+    // this part. It is cut as its shared cuts, then its remainder pieces, from one fixed entry.
+    private readonly CommonLinePerimeter commonLine;
+    private readonly ContourChoice commonLineEntry;
 
     private PreparedContours(Shape[] shapes, List<Entity> scribes, List<Shape> breakCuts, List<Shape> tabbedCutouts,
         CuttingParameters parameters)
@@ -63,10 +77,12 @@ public sealed class PreparedContours
     }
 
     private PreparedContours(Shape[] shapes, List<Entity> scribes, List<Shape> breakCuts, List<Shape> tabbedCutouts,
-        CuttingParameters parameters, Shape displayOutline, PierceZoneMemo pierceZones = null)
+        CuttingParameters parameters, Shape displayOutline, PierceZoneMemo pierceZones = null,
+        CommonLinePerimeter commonLine = null)
     {
         this.pierceZones = pierceZones ?? new PierceZoneMemo();
         this.displayOutline = displayOutline;
+        this.commonLine = commonLine;
         this.shapes = shapes;
         this.scribes = scribes;
         this.breakCuts = breakCuts;
@@ -74,11 +90,19 @@ public sealed class PreparedContours
         this.parameters = parameters;
         pinned = new ContourChoice[shapes.Length];
         pinNumbers = new int[shapes.Length];
+        if (commonLine != null)
+        {
+            // The remainder's first piece starts where a shared span ends: the one fixed entry.
+            var perimeter = shapes[^1];
+            var first = ContourCuttingStrategy.TabbedCutoutPieces(perimeter)[0].Entities[0];
+            var entity = perimeter.Entities.IndexOf(first);
+            commonLineEntry = new ContourChoice(shapes.Length - 1, entity, Start(first)) { Owner = this };
+        }
     }
 
     private PreparedContours(PreparedContours unpinned, IReadOnlyList<CutPinResolution> pins, CancellationToken token)
         : this(unpinned.shapes, unpinned.scribes, unpinned.breakCuts, unpinned.tabbedCutouts, unpinned.parameters,
-            unpinned.displayOutline, unpinned.pierceZones)
+            unpinned.displayOutline, unpinned.pierceZones, unpinned.commonLine)
     {
         contourParameters = new CuttingParameters[shapes.Length];
         var rejected = new List<CutPinResolution>();
@@ -95,8 +119,9 @@ public sealed class PreparedContours
                 throw new ArgumentException("A pin resolution does not belong to these contours.", nameof(pins));
             if (pinned[contour] != null)
                 throw new ArgumentException("Two pins resolve to one contour.", nameof(pins));
-            // The emitter tabs only the outside, so a tab elsewhere cannot be cut as pinned.
-            if (pin.Pin.HasTab && contour != PerimeterOrdinal)
+            // The emitter tabs only the outside, so a tab elsewhere cannot be cut as pinned. A
+            // common-line member's outside is cut from its shared spans, never from a pin.
+            if (pin.Pin.HasTab && contour != PerimeterOrdinal || commonLine != null && contour == PerimeterOrdinal)
             {
                 rejected.Add(pin);
                 continue;
@@ -116,7 +141,7 @@ public sealed class PreparedContours
     // a pinned perimeter keeps its pin's settings: the analysis is only kept for review.
     private PreparedContours(PreparedContours source, PartSupport support, Vector location, Tab tab)
         : this(source.shapes, source.scribes, source.breakCuts, source.tabbedCutouts, source.parameters,
-            source.displayOutline, source.pierceZones)
+            source.displayOutline, source.pierceZones, source.commonLine)
     {
         for (var contour = 0; contour < Count; contour++)
         {
@@ -155,6 +180,8 @@ public sealed class PreparedContours
             throw new ArgumentException("Support tabs need a complete analysis with a tab point.", nameof(support));
         if (!hasCutPerimeter)
             throw new ArgumentException("A display perimeter is never cut, so it cannot hold a support tab.", nameof(support));
+        if (commonLine != null)
+            throw new ArgumentException("A common-line member is never support-tabbed.", nameof(support));
         return new PreparedContours(this, support, location, tab);
     }
 
@@ -168,7 +195,16 @@ public sealed class PreparedContours
     public Vector SupportOrigin => supportOrigin;
 
     /// <summary>Whether the emitted perimeter is tabbed: by the plate settings, its pin or support.</summary>
-    internal bool PerimeterTabbed => hasCutPerimeter && ParametersFor(PerimeterOrdinal).TabsEnabled;
+    internal bool PerimeterTabbed => hasCutPerimeter && commonLine == null && ParametersFor(PerimeterOrdinal).TabsEnabled;
+
+    /// <summary>
+    /// True for a common-line member (see <see cref="CommonLinePerimeter"/>): its perimeter has one
+    /// fixed entry and is emitted as its shared cuts, then its remainder pieces.
+    /// </summary>
+    public bool IsCommonLinePerimeter => commonLine != null;
+
+    /// <summary>The member's shared cuts and kerf, or null for any other part.</summary>
+    public CommonLinePerimeter CommonLine => commonLine;
 
     public int Count => shapes.Length;
 
@@ -209,10 +245,10 @@ public sealed class PreparedContours
     /// contour keeps the automatic selection with <paramref name="parameters"/>.
     /// </summary>
     public static PreparedContours Capture(Program program, CuttingParameters parameters,
-        IReadOnlyList<CutPinResolution> pins, CancellationToken token = default)
+        IReadOnlyList<CutPinResolution> pins, CancellationToken token = default, CommonLinePerimeter commonLine = null)
     {
         ArgumentNullException.ThrowIfNull(pins);
-        var unpinned = Capture(program, parameters, token);
+        var unpinned = Capture(program, parameters, token, commonLine);
         return pins.Any(p => p?.IsResolved != false) ? new PreparedContours(unpinned, pins, token) : unpinned;
     }
 
@@ -234,7 +270,11 @@ public sealed class PreparedContours
 
     private CuttingParameters ParametersFor(int contourOrdinal) => contourParameters?[contourOrdinal] ?? parameters;
 
-    public static PreparedContours Capture(Program program, CuttingParameters parameters, CancellationToken token = default)
+    /// <param name="commonLine">For a common-line member: its shared cuts. The program's perimeter
+    /// must carry the member's shared spans on the Tab layer (CommonLineCutting.MarkSharedSpans); it
+    /// is then the perimeter, cut in pieces between them, rather than a tabbed cutout.</param>
+    public static PreparedContours Capture(Program program, CuttingParameters parameters, CancellationToken token = default,
+        CommonLinePerimeter commonLine = null)
     {
         token.ThrowIfCancellationRequested();
         var ownedParameters = OwnedCuttingParameters.Copy(parameters);
@@ -296,6 +336,40 @@ public sealed class PreparedContours
             current.Entities.Add(entity);
             if (NominalContourClosure.IsClosed(Start(current.Entities[0]), End(entity)))
                 FinishContour();
+        }
+        if (commonLine != null)
+        {
+            if (displayPerimeter != null || current.Entities.Count != 0)
+                throw new ArgumentException("A common-line member needs one closed cut perimeter.");
+            if (!double.IsFinite(commonLine.Kerf) || commonLine.Kerf <= 0 || commonLine.SharedCuts == null
+                || commonLine.SharedCuts.Any(c => c == null || c.Start.DistanceTo(c.End) <= PostVerificationGeometry.Epsilon))
+                throw new ArgumentException("A common-line member needs a positive kerf and nondegenerate shared cuts.");
+            // The outside carries the shared spans as tabs; every other contour lies inside it.
+            var outside = tabbedCutouts.Concat(contours).MaxBy(shape => shape.BoundingBox.Width * shape.BoundingBox.Length);
+            if (outside == null || !tabbedCutouts.Contains(outside)
+                || ContourCuttingStrategy.TabbedCutoutPieces(outside).Count == 0)
+                throw new ArgumentException("A common-line member's perimeter does not carry its shared spans.");
+            // Each remainder piece is pierced in the kerf of the span before it, the external
+            // lead-in's reach back along it: the span must be that long. Never shortened.
+            var reach = ContourCuttingStrategy.CommonLineLeadInReach(ownedParameters.ExternalLeadIn ?? new NoLeadIn());
+            if (reach <= OpenNest.Math.Tolerance.Epsilon)
+                throw new NotSupportedException("A common-line member's remainder needs a lead-in with length: "
+                    + "its compensation starts in the shared kerf along the lead-in. Choose an external lead-in "
+                    + "with length, or cut the common lines twice.");
+            foreach (var piece in ContourCuttingStrategy.TabbedCutoutPieces(outside))
+            {
+                var index = outside.Entities.IndexOf(piece.Entities[0]);
+                var span = outside.Entities[(index + outside.Entities.Count - 1) % outside.Entities.Count];
+                if (span is not Line line || line.Length < reach + PostVerificationGeometry.Epsilon)
+                    throw new NotSupportedException(FormattableString.Invariant(
+                        $"One of its shared spans is {span.Length:0.####} long, shorter than the {reach:0.####} external lead-in its remainder starts along in that span's kerf. Shorten the lead-in, or cut the common lines twice."));
+            }
+            tabbedCutouts.Remove(outside);
+            contours.Add(outside);
+            foreach (var cut in breakCuts)
+                cut.UpdateBounds();
+            return new(contours.ToArray(), scribes, breakCuts, tabbedCutouts, ownedParameters, null, null,
+                commonLine with { SharedCuts = commonLine.SharedCuts.ToArray() });
         }
         if (displayPerimeter != null)
         {
@@ -366,6 +440,8 @@ public sealed class PreparedContours
         var shape = GetShape(contourOrdinal);
         if (pinned[contourOrdinal] is { } pin)
             return pin;
+        if (FixedCommonLineEntry(contourOrdinal) is { } fixedEntry)
+            return fixedEntry;
         var point = shape.ClosestPointTo(approach, out var entity);
         return Entry(contourOrdinal, shape.Entities.IndexOf(entity), point);
     }
@@ -384,6 +460,8 @@ public sealed class PreparedContours
         var shape = GetShape(contourOrdinal);
         if (pinned[contourOrdinal] is { } pin)
             return new[] { pin };
+        if (FixedCommonLineEntry(contourOrdinal) is { } fixedEntry)
+            return new[] { fixedEntry };
         var entries = new List<ContourChoice>();
         entries.Add(ClosestEntry(contourOrdinal, approach));
         for (var i = 0; i < shape.Entities.Count && entries.Count < maxEntries; i++)
@@ -533,6 +611,8 @@ public sealed class PreparedContours
         var shape = GetShape(contourOrdinal);
         if (pinned[contourOrdinal] is { } pin)
             return new[] { new ContourEntryCandidate(pin, AutomaticEntryKind.Pinned) };
+        if (FixedCommonLineEntry(contourOrdinal) is { } fixedEntry)
+            return new[] { new ContourEntryCandidate(fixedEntry, AutomaticEntryKind.Pinned) };
         if (IsSingleCircle(shape))
             throw new ArgumentException("Circles have no preferred corners or joints; use the fallback catalog.");
         return SupportFiltered(contourOrdinal, PreferredCandidates(shape, contourOrdinal, token), SupportEntries.Steadying);
@@ -559,6 +639,8 @@ public sealed class PreparedContours
         var shape = GetShape(contourOrdinal);
         if (pinned[contourOrdinal] is { } pin)
             return new[] { new ContourEntryCandidate(pin, AutomaticEntryKind.Pinned) };
+        if (FixedCommonLineEntry(contourOrdinal) is { } fixedEntry)
+            return new[] { new ContourEntryCandidate(fixedEntry, AutomaticEntryKind.Pinned) };
         var all = IsSingleCircle(shape)
             ? new List<ContourEntryCandidate>()
             : PreferredCandidates(shape, contourOrdinal, token);
@@ -889,7 +971,7 @@ public sealed class PreparedContours
         var owned = new Shape[shapes.Length];
         owned[choice.ContourOrdinal] = (Shape)shapes[choice.ContourOrdinal].Clone();
         return new ContourCuttingStrategy { Parameters = parameters, PierceZones = pierceZones }.EmitCandidateIsolated(
-            owned, scribes.Select(e => e.Clone()).ToList(), choice, contourParameters, PerimeterOrdinal);
+            owned, scribes.Select(e => e.Clone()).ToList(), choice, contourParameters, PerimeterOrdinal, commonLine);
     }
 
     // Each prefix is a standalone owned program, including the same scribes and break cuts once.
@@ -905,7 +987,7 @@ public sealed class PreparedContours
             shapes.Select(s => (Shape)s.Clone()).ToArray(), scribes.Select(e => e.Clone()).ToList(), choices,
             contourParameters, breakCuts.Select(s => (Shape)s.Clone()).ToList(),
             tabbedCutouts.Select(s => (Shape)s.Clone()).ToList(), PerimeterOrdinal,
-            complete ? (Shape)displayOutline?.Clone() : null);
+            complete ? (Shape)displayOutline?.Clone() : null, commonLine);
 
     /// <summary>Open break cuts this preparation cuts before its contours.</summary>
     public int BreakCutCount => breakCuts.Count;
@@ -925,8 +1007,9 @@ public sealed class PreparedContours
     {
         token.ThrowIfCancellationRequested();
         var expected = ExecutionMotionReader.ReadSupported(Emit(choices), location, null, token);
-        // Only the outside is tabbed, with its own pin's tab when it is pinned.
-        if (!hasCutPerimeter)
+        // Only the outside is tabbed, with its own pin's tab when it is pinned. A common-line
+        // member's shared spans are accounted as the material's tabs, never as a tab gap.
+        if (!hasCutPerimeter || commonLine != null)
             return new(this, choices, expected, 0);
         var perimeter = ParametersFor(PerimeterOrdinal);
         return new(this, choices, expected, perimeter.TabsEnabled ? perimeter.TabConfig.Size : 0);
@@ -959,6 +1042,11 @@ public sealed class PreparedContours
         // A pinned contour is cut exactly as pinned: no other entry may be emitted for it.
         if (pinned[choice.ContourOrdinal] is { } pin && pin != choice)
             throw new ArgumentException("A pinned contour keeps its drawing pin's entry.");
+        // A common-line perimeter is cut from its one fixed entry, after its shared cuts.
+        if (commonLineEntry != null && choice.ContourOrdinal == PerimeterOrdinal
+            && (choice.EntityOrdinal != commonLineEntry.EntityOrdinal || choice.Point != commonLineEntry.Point
+                || choice.Pierce != null))
+            throw new ArgumentException("A common-line member's perimeter is cut from its fixed entry.");
         if (choice.Pierce is { } pierce)
         {
             PostVerificationGeometry.Validate(pierce);
@@ -966,6 +1054,9 @@ public sealed class PreparedContours
                 throw new ArgumentException("A planner-placed pierce must lie off its contour.");
         }
     }
+
+    private ContourChoice FixedCommonLineEntry(int contourOrdinal) =>
+        commonLineEntry != null && contourOrdinal == PerimeterOrdinal ? commonLineEntry : null;
 
     private Shape GetShape(int ordinal) => ordinal < 0 || ordinal >= Count
         ? throw new ArgumentException("Foreign contour ordinal.") : shapes[ordinal];

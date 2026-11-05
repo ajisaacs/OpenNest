@@ -15,6 +15,9 @@ public sealed class ReleasedContourState
     // Parts (by caller part number) whose single tab may not hold them level: once cut, their
     // tabbed perimeter is an obstacle as if cut free, since the part may tip into the head's path.
     private readonly Func<int, bool> tabMayNotHold;
+    // Common-line members (by caller part number): their outside is cut as open remainder pieces
+    // that end in kerf their shared cuts opened, so once the part's program ends it is cut free.
+    private readonly Func<int, bool> commonLineMember;
     // How the last analysed part ended: the contours it numbered, and whether nothing it left
     // (open fragments, deferred findings, a reported tab, a dangling lead-in) can change how
     // motions appended to it are judged. See Continue.
@@ -31,14 +34,24 @@ public sealed class ReleasedContourState
     /// single tab can steady them): the longest open cut a part leaves, its tabbed
     /// perimeter, becomes an obstacle when the part ends, closed across its tab gap.</param>
     public ReleasedContourState(bool reportMissingLeadIns, Func<int, bool> tabMayNotHold)
+        : this(reportMissingLeadIns, tabMayNotHold, null)
+    {
+    }
+
+    /// <param name="commonLineMember">Part numbers of common-line members (docs/common-line-cutting.md):
+    /// a member's open cuts are its remainder pieces, which end in kerf its shared cuts opened. They
+    /// need no retention proof, and when the part ends they become one obstacle, closed across its
+    /// shared spans, since the part is then cut free.</param>
+    public ReleasedContourState(bool reportMissingLeadIns, Func<int, bool> tabMayNotHold, Func<int, bool> commonLineMember)
     {
         this.reportMissingLeadIns = reportMissingLeadIns;
         this.tabMayNotHold = tabMayNotHold;
+        this.commonLineMember = commonLineMember;
     }
 
     public ReleasedContourState Copy()
     {
-        var copy = new ReleasedContourState(reportMissingLeadIns, tabMayNotHold)
+        var copy = new ReleasedContourState(reportMissingLeadIns, tabMayNotHold, commonLineMember)
         {
             partContours = partContours,
             partClosed = partClosed,
@@ -125,6 +138,7 @@ public sealed class ReleasedContourState
         var hasLead = false;
         var contourNumber = contoursBefore;
         var inBreakCut = false;
+        var member = commonLineMember?.Invoke(part) == true;
         var reportedTab = false;
         // The contour last closed, and the one a lead-out has just left it into: a cutout's
         // lead-out ends in its slug, so the rapid after it must leave over that cutout's own cut.
@@ -139,23 +153,27 @@ public sealed class ReleasedContourState
             var owned = isFixed?.Invoke(index) == true;
             if (!move.Rapid && move.Layer != LayerType.Leadout)
                 exited = null;
-            if (!move.Rapid && move.Layer == LayerType.Break)
+            if (!move.Rapid && move.Layer is LayerType.Break or LayerType.CommonLine)
             {
                 // A break cut is intentionally open and retained by its uncut tabs: it is never a
-                // rapid obstacle and never an unexplained fragment, but it is still pierced.
+                // rapid obstacle and never an unexplained fragment, but it is still pierced. A
+                // common line's shared cut runs in the kerf between two parts: it bounds and
+                // retains nothing, so it is never an obstacle and takes no part in the open-cut proof.
                 if (!inBreakCut)
                 {
                     Finish();
                     if (reportMissingLeadIns && !cutoff && !hasLead)
                         Add(new(PostVerificationKind.MissingLeadIn, plate, part, null,
-                            "A break cut is missing lead-in geometry.")
+                            move.Layer == LayerType.Break ? "A break cut is missing lead-in geometry."
+                                : "A common-line shared cut is missing lead-in geometry.")
                         { Location = move.Curve.Start }, owned);
                     inBreakCut = true;
                     hasLead = false;
                     previous = new CutGroup();
                     previous.Leads.AddRange(leadIns);
                     leadIns.Clear();
-                    otherOpen.Add(previous);
+                    if (move.Layer == LayerType.Break)
+                        otherOpen.Add(previous);
                 }
                 if (move.Curve.Length > PostVerificationGeometry.Epsilon)
                     previous.Curves.Add(move.Curve);
@@ -295,9 +313,12 @@ public sealed class ReleasedContourState
         // pieces a tabbed cutout was cut in, and so does a tabbed perimeter whose lead-out stays
         // out of its tab: planning and pre-post review prove them alike. Otherwise they need
         // manual review.
+        // A common-line member's open cuts are its remainder pieces: they end in shared kerf, not at
+        // tabs, and the planner's contour accounting proves they cut its outside exactly once.
+        var remainders = member && !cutoff && unfinished.Count > 0;
         var retained = !cutoff && (unfinished.Count > 1 || deferred.Count > 0)
-            && unfinished.All(LeadsClearOpenEnds)
-            && OpenCutsEncloseNothing(closed, unfinished.Concat(otherOpen).Append(loose).ToList(), token);
+            && (remainders || unfinished.All(LeadsClearOpenEnds)
+                && OpenCutsEncloseNothing(closed, unfinished.Concat(otherOpen).Append(loose).ToList(), token));
         for (var i = deferred.Count - 1; i >= 0 && !retained; i--)
             deferred[i].Target.Insert(deferred[i].Index, deferred[i].Finding);
         // Only one open fragment per part can be the planner's own certified tab, so a
@@ -309,7 +330,22 @@ public sealed class ReleasedContourState
                 unfinished.Any(chain => chain.Fixed));
         // A part that may tip once cut is avoided like one cut free. The retention proof above is
         // unchanged: the part is still attached by its tab, just not held level by it.
-        if (!cutoff && unfinished.Count > 0 && tabMayNotHold?.Invoke(part) == true)
+        if (remainders)
+        {
+            // Its remainder pieces in cutting order, joined across the shared spans between them:
+            // the member's outside, now cut free.
+            var curves = new List<PostVerificationGeometry.Curve>();
+            foreach (var chain in unfinished)
+            {
+                if (curves.Count > 0 && curves[^1].End.DistanceTo(chain.Curves[0].Start) > PostVerificationGeometry.Epsilon)
+                    curves.Add(PostVerificationGeometry.Curve.Create(curves[^1].End, chain.Curves[0].Start, null, false));
+                curves.AddRange(chain.Curves);
+            }
+            if (curves[^1].End.DistanceTo(curves[0].Start) > PostVerificationGeometry.Epsilon)
+                curves.Add(PostVerificationGeometry.Curve.Create(curves[^1].End, curves[0].Start, null, false));
+            obstacles.Add(new(part, contourNumber, curves, null));
+        }
+        else if (!cutoff && unfinished.Count > 0 && tabMayNotHold?.Invoke(part) == true)
         {
             var perimeter = unfinished.MaxBy(chain => chain.Curves.Sum(curve => curve.Length));
             var curves = perimeter.Curves.ToList();

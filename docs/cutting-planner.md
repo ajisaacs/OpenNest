@@ -158,6 +158,13 @@ the final replay enforce them:
   and prefix emission cuts their pieces after the break cuts and before any contour,
   entered from the slug without lead-outs; accounting requires each span between tabs cut
   whole, once.
+- A plate that cuts its [common lines](common-line-cutting.md#cutting-each-shared-line-once) once
+  captures each group's order: the member that owns a shared cut precedes its partner, and the
+  tour runs the pair like a nested part before its host. A member regenerates from its owned clean
+  copy with its shared spans as tabs: its holes are choices as usual, and its perimeter has one
+  fixed entry whose emission is its shared cuts, then its remainder pieces. Capture checks each
+  shared cut's and remainder's leads against every part's material and refuses one that fits
+  nowhere, naming the span.
 - A part whose perimeter lies strictly inside a cutout of another part precedes
   that host. Material bounds (never rapids or scribe marks) only select candidate
   pairs; containment is proven on native clean material. Touching or crossing boundaries, or material that cannot be

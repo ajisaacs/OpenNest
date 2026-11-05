@@ -486,6 +486,7 @@ namespace OpenNest.IO
                         Parts = parts,
                         CutOffs = cutoffs,
                         CommonLines = commonLines.Count == 0 ? null : commonLines,
+                        CutCommonLinesTwice = plate.CutCommonLinesTwice,
                         CutOffSettings = cutoffs.Count == 0 || plate.CutOffSettings is not { } settings ? null
                             : new CutOffSettingsDto
                             {
@@ -886,6 +887,9 @@ namespace OpenNest.IO
 
                 case LayerType.DisplayPerimeter:
                     return ":DISPLAYPERIMETER";
+
+                case LayerType.CommonLine:
+                    return ":COMMONLINE";
 
                 default:
                     return string.Empty;

@@ -51,7 +51,12 @@ public sealed class LeadMaterialSnapshot
     /// <summary>Capture a stable, clean, rotation-baked program, applying location once.
     /// Unsupported or malformed geometry produces an incomplete snapshot; cancellation throws.</summary>
     public static LeadMaterialSnapshot Capture(Program cleanProgram, Vector location,
-        CancellationToken token = default)
+        CancellationToken token = default) => Capture(cleanProgram, location, token, sharedSpans: false);
+
+    /// <param name="sharedSpans">A common-line member's clean program (docs/common-line-cutting.md):
+    /// its perimeter may carry Tab spans, the shared spans the member never cuts.</param>
+    internal static LeadMaterialSnapshot Capture(Program cleanProgram, Vector location,
+        CancellationToken token, bool sharedSpans)
     {
         try
         {
@@ -141,7 +146,7 @@ public sealed class LeadMaterialSnapshot
                 throw new ArgumentException(ringDisplay.Contains(true)
                     ? "A display perimeter must enclose every other contour."
                     : "Material must have exactly one enclosing perimeter.");
-            if (ringTabs[outer].Any(tab => tab))
+            if (!sharedSpans && ringTabs[outer].Any(tab => tab))
                 throw new ArgumentException("A perimeter cannot have tabs.");
             if (ringDisplay.Where((_, i) => i != outer).Any(display => display))
                 throw new ArgumentException("A display perimeter must enclose every other contour.");

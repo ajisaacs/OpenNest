@@ -808,6 +808,7 @@ namespace OpenNest.IO
 
                 // Common lines: a group naming a missing part keeps the rest; one left with
                 // fewer than two parts, or with an unusable kerf, is dropped.
+                plate.CutCommonLinesTwice = p.CutCommonLinesTwice;
                 foreach (var group in p.CommonLines ?? new List<CommonLineDto>())
                 {
                     var members = (group?.Parts ?? Array.Empty<int>())

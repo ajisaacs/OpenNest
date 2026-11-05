@@ -72,7 +72,7 @@ Read the relevant contract before changing its behavior:
 - [Breakoffs](docs/breakoffs.md): tabbed scrap; `Break`-layer open cuts that are cut but are not material
 - [Tabbed cutouts](docs/tabbed-cutouts.md): holes cut in pieces around `Tab`-layer spans that are material but never cut; nesting reads material through `NestingMaterial.ForNesting`, so nothing nests in them
 - [Dimensions](docs/dimensions.md): CAD Converter annotations that store placement only, are measured from the cut geometry when shown and never affect the program
-- [Common-line cutting](docs/common-line-cutting.md): parts one kerf apart in `Plate.CommonLines` share an edge; spans are derived, never stored, and spacing checks hold group members to the kerf. Each shared edge is still cut twice; single-pass cutting is not built
+- [Common-line cutting](docs/common-line-cutting.md): parts one kerf apart in `Plate.CommonLines` share an edge; spans are derived, never stored, and spacing checks hold group members to the kerf. Plan Cutting cuts each shared span once (owner first, open `CommonLine` centerline cut, then each member's remainder) unless the plate is set to cut them twice; only posts implementing `ICommonLinePostProcessor` (CI Fiber) may write it, others refuse. Machine trial pending
 - [Support tabs](docs/support-tabs.md): the nest's support grid, the center-of-gravity check, and Plan Cutting's tab placement for parts the grid cannot hold level
 - [Material-overlap diagnostics](docs/geometry/visual-overlap-check.md)
 - [Automatic cutoffs and sequencing](docs/automatic-scrap-cutoffs.md)

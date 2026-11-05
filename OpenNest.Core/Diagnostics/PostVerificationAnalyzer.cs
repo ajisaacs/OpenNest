@@ -104,7 +104,13 @@ public static class PostVerificationAnalyzer
                         "Clamp/cut-off check: " + exception.Message));
                 }
             }
-            var obstacles = new ReleasedContourState();
+            // A common-line member cut once ends in open remainder pieces that cut it free.
+            var members = (plate.CommonLines ?? [])
+                .SelectMany(group => group.Members)
+                .Select(member => plate.Parts.IndexOf(member) + 1)
+                .Where(number => number > 0)
+                .ToHashSet();
+            var obstacles = new ReleasedContourState(true, null, members.Count == 0 ? null : members.Contains);
             Vector? position = startPoint;
             for (var index = 0; index < plate.Parts.Count; index++)
             {

@@ -101,7 +101,21 @@ public sealed class CuttingPlanSnapshot
     /// rapids may still cross parts their tab holds level.
     /// </summary>
     internal ReleasedContourState NewReleasedState() =>
-        new(reportMissingLeadIns: false, tabMayNotHold.Count == 0 ? null : tabMayNotHold.Contains);
+        new(reportMissingLeadIns: false, tabMayNotHold.Count == 0 ? null : tabMayNotHold.Contains,
+            CommonLineMembers.Count == 0 ? null : CommonLineMembers.Contains);
+
+    /// <summary>
+    /// Part numbers (source ordinal + 1) of the members of common-line groups cut once
+    /// (docs/common-line-cutting.md): each member's open remainder cuts free its outside, which is a
+    /// rapid obstacle once its program ends.
+    /// </summary>
+    internal IReadOnlySet<int> CommonLineMembers { get; init; } = new HashSet<int>();
+
+    /// <summary>
+    /// The prerequisites that are common-line order (source ordinals: the member that cuts a shared
+    /// line before its partner), for naming them in findings.
+    /// </summary>
+    internal IReadOnlySet<(int Part, int Prerequisite)> CommonLineOrder { get; init; } = new HashSet<(int, int)>();
 
     /// <summary>Whole-part prerequisites by source ordinal (cutoffs, inner parts before hosts).</summary>
     internal CuttingDependencyGraph Dependencies { get; }
@@ -135,14 +149,22 @@ public sealed class CuttingPlanSnapshot
         new(Placements, StartPoint, expansionBudget, Failure, Findings, Regeneration,
             PreservePartOrder, maxEntries, ExpansionObserver, PlateState, OwnedParameters,
             Dependencies, BestEffort)
-        { SupportTabsSkipped = SupportTabsSkipped };
+        {
+            SupportTabsSkipped = SupportTabsSkipped,
+            CommonLineMembers = CommonLineMembers,
+            CommonLineOrder = CommonLineOrder,
+        };
 
     /// <summary>The same capture planned along its current part order.</summary>
     internal CuttingPlanSnapshot WithPreservedOrder() =>
         new(Placements, StartPoint, ExpansionBudget, Failure, Findings, Regeneration,
             preservePartOrder: true, MaxEntries, ExpansionObserver, PlateState, OwnedParameters,
             Dependencies, BestEffort)
-        { SupportTabsSkipped = SupportTabsSkipped };
+        {
+            SupportTabsSkipped = SupportTabsSkipped,
+            CommonLineMembers = CommonLineMembers,
+            CommonLineOrder = CommonLineOrder,
+        };
 }
 
 public sealed class FixedProgramPlacement
@@ -251,8 +273,13 @@ public sealed class FixedProgramPlacement
                     tabbedPieces--;
                     continue;
                 }
+                // A common-line perimeter, cut last, is several groups: its shared cuts, then its pieces.
                 if (++group >= choices.Count)
-                    return null;
+                {
+                    if (!Prepared.IsCommonLinePerimeter || choices[^1].ContourOrdinal != Prepared.PerimeterOrdinal)
+                        return null;
+                    group = choices.Count - 1;
+                }
                 pin = Prepared.PinNumberOf(choices[group].ContourOrdinal);
             }
             pins[index] = pin;

@@ -154,8 +154,15 @@ shows the first three check categories, even when there are no findings:
   before posting.
 - **Common lines:** a [common-line group](common-line-cutting.md#checks) member that no longer
   shares an edge one kerf from another member, a group placed for a different kerf than the
-  plate's cutting parameters now use, or a member's lead that touches or enters a partner's
-  material. This line appears in the summary only when there is such a finding.
+  plate's cutting parameters now use, or a member's lead or shared cut that touches or enters a
+  partner's material. On a plate that cuts its common lines once, also a span no member cuts once
+  on its centerline (an unplanned plate would cut it twice), a span cut more than once, or one cut
+  after the partner whose remainder ends in it; on a plate set to cut them twice, a program that
+  still cuts one once. The rapid check treats a member's remainder pieces as cutting the part free
+  when its program ends, and never treats a shared cut as an obstacle. This line appears in the
+  summary only when there is such a finding. Posting a single-pass program through a post that
+  cannot write it is refused before verification runs (see
+  [common-line cutting](common-line-cutting.md#posting)).
 - **Pierce zones:** with a `PierceDiameter` in the part's (or else the plate's) cutting
   parameters, every lead-in pierce of every placed program must keep half of it from all part
   material; see [pierce zones](geometry/pierce-zone.md). This line appears in the summary only

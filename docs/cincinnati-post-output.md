@@ -276,6 +276,14 @@ next time the post is edited.
 | `G21` | Metric mode | §1.21 |
 | `G90` | Absolute mode | §1.90 |
 
+### Common lines
+
+The post cannot write a [common line cut once](common-line-cutting.md#cutting-each-shared-line-once):
+it applies one configured `G41`/`G42` side (`DefaultKerfSide`) to every feature and, in
+`KerfMode.PreApplied`, offsets no geometry, so a shared cut would be compensated into a part and a
+remainder could not be offset on its perimeter's side. It refuses such a nest before writing
+anything. Set the plate to cut its common lines twice and plan cutting again to post it here.
+
 ### Kerf compensation
 
 | Code | Description | Manual |

@@ -16,21 +16,26 @@ namespace OpenNest.Engine.CuttingPlanning;
 internal static class DrawingPinCapture
 {
     internal static PreparedContours Prepare(Part source, int ordinal, Program ownedClean,
-        CuttingParameters parameters, List<CuttingPlanFinding> warnings, CancellationToken token)
+        CuttingParameters parameters, List<CuttingPlanFinding> warnings, CancellationToken token,
+        CommonLinePerimeter commonLine = null)
     {
-        var prepared = PreparedContours.Capture(ownedClean, parameters, token);
+        var prepared = PreparedContours.Capture(ownedClean, parameters, token, commonLine);
         // Pins switched off for this placement (D1's escape hatch) leave it to the plate settings.
         if (!source.HasActiveDrawingPins)
             return prepared;
         // The clean program is the drawing's own program rotated by the part's rotation, so the
         // resolver maps the source-frame pins onto exactly these contours.
         var resolutions = CutPinResolver.Resolve(source.BaseDrawing, source.Rotation, prepared, token);
-        var pinned = PreparedContours.Capture(ownedClean, parameters, resolutions, token);
+        var pinned = PreparedContours.Capture(ownedClean, parameters, resolutions, token, commonLine);
         foreach (var resolution in resolutions.Where(r => !r.IsResolved))
             warnings.Add(Warning(source, ordinal, resolution, Unresolved(resolution)));
         foreach (var rejected in pinned.RejectedPins)
-            warnings.Add(Warning(source, ordinal, rejected, $"Drawing pin {rejected.PinIndex + 1} puts a tab on an "
-                + "internal contour, but only the outside can be tabbed; planned with nest settings."));
+            warnings.Add(Warning(source, ordinal, rejected,
+                pinned.IsCommonLinePerimeter && rejected.ContourOrdinal == pinned.PerimeterOrdinal
+                    ? $"Drawing pin {rejected.PinIndex + 1} is on the outside, which a common line cuts from its "
+                        + "shared spans; planned with nest settings."
+                    : $"Drawing pin {rejected.PinIndex + 1} puts a tab on an "
+                        + "internal contour, but only the outside can be tabbed; planned with nest settings."));
         return pinned;
     }
 

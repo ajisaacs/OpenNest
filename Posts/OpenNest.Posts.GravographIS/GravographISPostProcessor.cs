@@ -72,6 +72,7 @@ namespace OpenNest.Posts.GravographIS
             if (outputStream == null)
                 throw new ArgumentNullException(nameof(outputStream));
 
+            CNC.CommonLineCuts.EnsurePostable(nest, this);
             var passes = BuildPasses(Extractor.ExtractLayered(nest));
             new GravographISWriter(WriterOptions).Write(passes, outputStream);
         }
@@ -80,6 +81,7 @@ namespace OpenNest.Posts.GravographIS
         {
             // Refuse before creating the file, so a refusal never empties an existing program.
             CNC.DisplayPerimeterTail.EnsurePostable(nest);
+            CNC.CommonLineCuts.EnsurePostable(nest, this);
             using var fs = new FileStream(outputFile, FileMode.Create, FileAccess.Write);
             Post(nest, fs);
         }

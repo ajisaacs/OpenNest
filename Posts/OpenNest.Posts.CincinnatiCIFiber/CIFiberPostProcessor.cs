@@ -19,7 +19,8 @@ namespace OpenNest.Posts.CincinnatiCIFiber
     public sealed class CIFiberPostProcessor
         : IJsonConfigPostProcessor,
             IMultiFilePostProcessor,
-            IPostVerificationSupport
+            IPostVerificationSupport,
+            ICommonLinePostProcessor
     {
         private static readonly JsonSerializerOptions JsonOptions = new()
         {

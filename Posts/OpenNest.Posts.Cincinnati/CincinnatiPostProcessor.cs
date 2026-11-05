@@ -98,6 +98,8 @@ namespace OpenNest.Posts.Cincinnati
             HeadHeightLock.EnsurePostable(nest, Config.HasHeadHeightLockCodes(), Name);
             // M47 raises the head before a marked rapid; the markers must be well formed.
             HeadRaise.EnsurePostable(nest, true, Name);
+            // Shared cuts and remainders need per-contour compensation this post does not write.
+            CommonLineCuts.EnsurePostable(nest, this);
             EnsureProcessResolvable(nest);
 
             // 1. Create variable manager and register standard variables
@@ -259,6 +261,8 @@ namespace OpenNest.Posts.Cincinnati
             DisplayPerimeterTail.EnsurePostable(nest);
             HeadHeightLock.EnsurePostable(nest, Config.HasHeadHeightLockCodes(), Name);
             HeadRaise.EnsurePostable(nest, true, Name);
+            // Shared cuts and remainders need per-contour compensation this post does not write.
+            CommonLineCuts.EnsurePostable(nest, this);
             EnsureProcessResolvable(nest);
             using var fs = new FileStream(outputFile, FileMode.Create, FileAccess.Write);
             Post(nest, fs);

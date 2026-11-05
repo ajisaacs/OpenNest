@@ -30,5 +30,13 @@ namespace OpenNest.CNC
         /// closed contour enclosing every other contour.
         /// </summary>
         DisplayPerimeter,
+
+        /// <summary>
+        /// A shared cut of a common-line group (see docs/common-line-cutting.md): an open cut on the
+        /// centerline between two parts placed one kerf apart, which cuts both parts' facing edges
+        /// at once. It is cut without kerf compensation, bounds no material and is never a rapid
+        /// obstacle. Posts that cannot write it refuse the nest.
+        /// </summary>
+        CommonLine,
     }
 }

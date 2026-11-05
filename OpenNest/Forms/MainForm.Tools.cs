@@ -109,6 +109,21 @@ namespace OpenNest.Forms
                 ShowCommonLineNotice("None of the selected parts share a common line.");
         }
 
+        private void CutCommonLinesTwice_Click(object sender, EventArgs e)
+        {
+            var plateView = activeForm?.PlateView;
+            if (plateView?.Plate == null)
+                return;
+            plateView.SetCutCommonLinesTwice(!plateView.Plate.CutCommonLinesTwice);
+        }
+
+        private void ArrangeMenu_Opening(object sender, EventArgs e)
+        {
+            var plate = activeForm?.PlateView?.Plate;
+            mnuPlateCutCommonLinesTwice.Checked = plate?.CutCommonLinesTwice == true;
+            mnuPlateCutCommonLinesTwice.Enabled = plate != null;
+        }
+
         // Native tests capture this notice without opening a modal dialog in session zero.
         internal System.Action<string> CommonLineNotice { get; set; }
 

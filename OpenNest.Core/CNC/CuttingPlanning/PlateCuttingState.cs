@@ -27,10 +27,17 @@ public sealed class PlateCuttingState
     private readonly Dictionary<Drawing, DrawingRecord> drawings;
     private readonly Dictionary<CuttingParameters, string> settings;
     private readonly CuttingParameters plateSettings;
+    private readonly ObservableList<CommonLineGroup> commonLineList;
+    private readonly CommonLineRecord[] commonLines;
+    private readonly bool cutCommonLinesTwice;
 
     private PlateCuttingState(Plate plate, PartRecord[] parts, CutOffRecord[] cutOffs,
         Dictionary<Drawing, DrawingRecord> drawings, Dictionary<CuttingParameters, string> settings)
     {
+        commonLineList = plate.CommonLines;
+        commonLines = plate.CommonLines.Select(group => new CommonLineRecord(group, group.Kerf,
+            group.Members.ToArray())).ToArray();
+        cutCommonLinesTwice = plate.CutCommonLinesTwice;
         this.settings = settings;
         plateSettings = plate.CuttingParameters;
         Plate = plate;
@@ -162,6 +169,18 @@ public sealed class PlateCuttingState
                 || !Bits(cutOff.HeadLockOvercut, record.HeadLockOvercut) || cutOff.FarEdgeFirst != record.FarEdgeFirst)
                 return $"Cutoff {i + 1} definition changed.";
         }
+        // Common lines decide which edges each member cuts, and whether they are cut once.
+        if (!ReferenceEquals(plate.CommonLines, commonLineList) || plate.CutCommonLinesTwice != cutCommonLinesTwice
+            || plate.CommonLines.Count != commonLines.Length)
+            return "Common lines changed.";
+        for (var i = 0; i < commonLines.Length; i++)
+        {
+            var record = commonLines[i];
+            var group = plate.CommonLines[i];
+            if (!ReferenceEquals(group, record.Group) || !Bits(group.Kerf, record.Kerf)
+                || !group.Members.SequenceEqual(record.Members, ReferenceEqualityComparer.Instance))
+                return $"Common line {i + 1} changed.";
+        }
         // Part.Rotation derives from the manual flag, PreLeadInRotation and Program.Rotation,
         // all compared exactly above.
         return null;
@@ -206,6 +225,8 @@ public sealed class PlateCuttingState
 
     private sealed record DrawingRecord(Program Program, Program Copy, bool IsCutOff,
         List<ContourCutPin> Pins, string PinsFingerprint);
+
+    private sealed record CommonLineRecord(CommonLineGroup Group, double Kerf, Part[] Members);
 
     private sealed record CutOffRecord(CutOff CutOff, Drawing Drawing, CutOffAxis Axis, Vector Position,
         double? StartLimit, double? EndLimit, IReadOnlyList<CutOffGap> Gaps, double HeadLockOvercut,
