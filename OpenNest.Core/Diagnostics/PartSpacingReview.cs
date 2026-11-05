@@ -21,7 +21,7 @@ namespace OpenNest.Diagnostics;
 /// is short of the spacing by more than the slack. Zero spacing enforces nothing, so contact stays
 /// valid.
 /// Pairs whose material already overlaps, and parts the overlap check could not read, are left to
-/// that check. The sheet edge and clamps are not spacing-checked here. The pre-post review and the
+/// that check. Clamps are not spacing-checked here; <see cref="PlateEdgeReview"/> checks the sheet edge. The pre-post review and the
 /// desktop overlap label share this scan, so they cannot disagree.
 /// </summary>
 internal static class PartSpacingReview
@@ -172,7 +172,7 @@ internal static class PartSpacingReview
 
     /// <summary>Clean drawing material, rotated to the part's pose; null when the part has none.
     /// Converted once per program and rotation.</summary>
-    private static ShapeProfile Profile(Part part, Dictionary<(Program, long), ShapeProfile> profiles)
+    internal static ShapeProfile Profile(Part part, Dictionary<(Program, long), ShapeProfile> profiles)
     {
         var program = part.BaseDrawing.Program;
         var rotation = part.Rotation - program.Rotation;

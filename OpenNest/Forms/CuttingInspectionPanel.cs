@@ -642,6 +642,8 @@ internal sealed class CuttingInspectionPanel : UserControl
         PostVerificationKind.PierceZone => "Pierce zone",
         PostVerificationKind.PartSpacing => "Part spacing",
         PostVerificationKind.PartSupport => "Part support",
+        PostVerificationKind.OffPlate => "Off the plate",
+        PostVerificationKind.EdgeSpacing => "Edge spacing",
         _ => kind.ToString(),
     };
 
@@ -708,6 +710,8 @@ internal sealed class CuttingInspectionPanel : UserControl
         PostVerificationKind.PierceZone => "The ring marks the pierce that is too close to part material.",
         PostVerificationKind.PartSpacing => "The ring marks where the two parts come closest.",
         PostVerificationKind.PartSupport => "The ring marks the part's center of gravity.",
+        PostVerificationKind.OffPlate => "The ring marks where the part leaves the plate.",
+        PostVerificationKind.EdgeSpacing => "The ring marks the gap between the part and the plate edge.",
         _ => "The ring marks the affected part; the exact spot is not known."
     };
 

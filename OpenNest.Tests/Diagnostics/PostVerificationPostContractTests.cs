@@ -53,7 +53,7 @@ public class PostVerificationPostContractTests
         program.LineTo(4, 4);
         program.LineTo(0, 4);
         program.LineTo(0, 0);
-        var part = new Part(new Drawing("square", program));
+        var part = new Part(new Drawing("square", program), new Vector(5, 5));
         part.ApplyLeadIns(new CuttingParameters { ExternalLeadIn = new LineLeadIn { Length = 0.5 } },
             new Vector(-2, -2));
         var nest = new Nest();

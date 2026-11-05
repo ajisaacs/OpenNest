@@ -21,6 +21,7 @@ public partial class PostVerificationForm : Form
     {
         (PostVerificationKind.Incomplete, "Incomplete checks"),
         (PostVerificationKind.Overlap, "Overlaps"),
+        (PostVerificationKind.OffPlate, "Off the plate"),
         (PostVerificationKind.RapidCrossing, "Rapid crossings"),
         (PostVerificationKind.MissingLeadIn, "Missing lead-ins"),
         (PostVerificationKind.NestedCutOrder, "Nested part order"),
@@ -28,6 +29,7 @@ public partial class PostVerificationForm : Form
         (PostVerificationKind.FixedLead, "Fixed leads"),
         (PostVerificationKind.PierceZone, "Pierce zones"),
         (PostVerificationKind.PartSpacing, "Part spacing"),
+        (PostVerificationKind.EdgeSpacing, "Edge spacing"),
         (PostVerificationKind.PartSupport, "Part support"),
     };
 

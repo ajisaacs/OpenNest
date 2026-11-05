@@ -34,6 +34,15 @@ internal static class TestConfig
 
 internal static class TestHelpers
 {
+    /// <summary>
+    /// The report without its sheet-bound findings, for routing replays whose fixtures sit at the
+    /// sheet origin with leads hanging off it. PlateEdgeReviewTests covers those checks.
+    /// </summary>
+    public static OpenNest.Diagnostics.PostVerificationReport RouteFindings(
+        OpenNest.Diagnostics.PostVerificationReport report) =>
+        new(report.Findings.Where(f => f.Kind is not (OpenNest.Diagnostics.PostVerificationKind.OffPlate
+            or OpenNest.Diagnostics.PostVerificationKind.EdgeSpacing)));
+
     public static Part MakePartAt(double x, double y, double size = 1)
     {
         // CW winding matches CNC convention (OffsetSide.Left = outward)

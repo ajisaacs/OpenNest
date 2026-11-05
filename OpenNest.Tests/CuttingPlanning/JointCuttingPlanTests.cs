@@ -79,7 +79,7 @@ public class JointCuttingPlanTests
         var copy = new Part(new Drawing("replay", (Program)part.BaseDrawing.Program.Clone()), proposal.Location);
         Assert.True(copy.RestoreLeadInProgram(proposal.CopyProgram(), false));
         plate.Parts.Add(copy);
-        var report = PostVerificationAnalyzer.Analyze(nest, Vector.Zero);
+        var report = TestHelpers.RouteFindings(PostVerificationAnalyzer.Analyze(nest, Vector.Zero));
         Assert.Empty(report.Findings);
         var detached = proposal.CopyProgram(); detached.Codes.Clear(); detached.SubPrograms.Clear();
         Assert.NotEmpty(proposal.CopyProgram().Codes);

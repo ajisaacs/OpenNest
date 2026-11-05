@@ -7,7 +7,8 @@ planner or selecting a post processor. It opens the editor's read-only side pane
 in **Validate Nest (live programs)** mode, distinct from the panel's unapplied
 **Plan Cutting** proposal. The validation panel checks overlapping material,
 missing lead-ins, rapid crossings in the existing placed programs and cutting
-order, and parts closer than the plate's part spacing. Findings identify plate and part
+order, parts closer than the plate's part spacing, and parts off the plate or inside
+its edge spacing. Findings identify plate and part
 sequence numbers in a read-only grid;
 incomplete or failed checks are never reported as clear. Select a row to switch
 the main plate view to that plate and focus the finding. A colored headline gives
@@ -23,7 +24,8 @@ Overlaps use the same magenta material shading as **View > Overlap Check**. A
 DPI-scaled ring expands and fades continuously while the finding is selected;
 both its color and contrasting halo fade as it grows. For overlaps the ring marks a point inside the largest
 shared patch; for missing lead-ins it marks the contour start; for part spacing it marks
-the middle of the closest gap. Rapid warnings
+the middle of the closest gap; for edge spacing it marks the gap between the part and
+the edge; for a part off the plate it marks where it leaves the plate. Rapid warnings
 pulse the offending orange dashed segment continuously and mark its contacts with
 the completed contour using fixed-screen-size magenta crosshairs with white halos.
 Contacts use native lines/arcs and the rapid check's existing numerical tolerances;
@@ -36,7 +38,7 @@ clears the highlight and restores the original plate, zoom, and overlap display 
 Validation does not change placements, programs, lead-ins, or cutting order, save
 the nest, or write CNC output. It includes material overlaps with active clamps and
 cut-off or rapid crossings of their footprints, but does not check minimum spacing
-to clamps or plate edges, or whether parts lie within the plate boundaries.
+to clamps.
 It does not verify a post processor's final output. Posting still runs its own
 fresh verification and consent flow.
 
@@ -118,9 +120,22 @@ shows the first three check categories, even when there are no findings:
   than `SpacingSlack`, which lets interactive fills that place arcs exactly at the spacing
   pass. Auto Nest's layout check and the whole-job runner's candidate validation confirm the
   same way, so all three agree. Zero spacing allows contact.
-  A part inside another's cutout is held to the spacing from the hole edge. Cut-offs, the
-  plate edge and clamps are not spacing-checked. The finding gives the measured gap; this
+  A part inside another's cutout is held to the spacing from the hole edge. Cut-offs and
+  clamps are not spacing-checked; the plate edge has its own check below. The finding gives the measured gap; this
   line appears in the summary only when there is such a finding.
+- **Off the plate:** a part whose placed program cuts, leads or scribes past the sheet
+  (native curve bounds, beyond `SpacingSlack`), or, on an [outlined sheet](irregular-stock.md),
+  whose clean material lies outside the outline or over one of its obstacles. The finding
+  gives how far it runs past which edge. This line appears in the summary only when there
+  is such a finding.
+- **Edge spacing:** a part on the sheet whose clean nesting material (leads excluded) lies
+  outside the plate's work area, so closer to an edge than that side's edge spacing, or, on
+  an outlined sheet, closer than the largest edge spacing to the outline or an obstacle.
+  This is the bound Auto Nest's layout check applies, so a layout it accepted stays clear;
+  shortfalls up to `SpacingSlack` pass. Leads may run into the edge spacing. The finding
+  gives the gap and the side's spacing. Zero edge spacing allows contact with the edge.
+  Cut-off parts are exempt from both checks. This line appears in the summary only when
+  there is such a finding.
 - **Nested parts:** a part whose perimeter lies strictly inside a cutout of another part (its
   host), proven on clean material exactly as Plan Cutting proves its inner-before-host
   prerequisite. **Nested part order** warns when the nested part comes after its host in the

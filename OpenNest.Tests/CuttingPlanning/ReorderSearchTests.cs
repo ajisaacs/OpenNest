@@ -232,7 +232,7 @@ public class ReorderSearchTests
             Assert.True(copy.RestoreLeadInProgram((Program)source.Program.Clone(), source.LeadInsLocked));
             plate.Parts.Add(copy);
         }
-        return PostVerificationAnalyzer.Analyze(nest, start);
+        return TestHelpers.RouteFindings(PostVerificationAnalyzer.Analyze(nest, start));
     }
 
     private static string Describe(CuttingPlanResult r) =>

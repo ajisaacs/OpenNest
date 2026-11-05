@@ -40,7 +40,19 @@ public enum PostVerificationKind
     /// A part its plate's support bed cannot hold level has no tab that keeps it level, so it may
     /// tip once cut free (see docs/support-tabs.md).
     /// </summary>
-    PartSupport
+    PartSupport,
+
+    /// <summary>
+    /// A part's cuts, leads or scribes run past the sheet, or its material lies outside an outlined
+    /// sheet or over one of its obstacles.
+    /// </summary>
+    OffPlate,
+
+    /// <summary>
+    /// A part's clean material is closer to the sheet's edge than the plate's edge spacing, judged as
+    /// Auto Nest's layout check judges it.
+    /// </summary>
+    EdgeSpacing
 }
 
 /// <summary>Plate and part numbers are one-based; plate zero denotes a whole-post limitation.</summary>
@@ -92,6 +104,10 @@ public sealed class PostVerificationReport
             Summary(PostVerificationKind.PartSpacing, "Part spacing");
         if (Findings.Any(finding => finding.Kind == PostVerificationKind.PartSupport))
             Summary(PostVerificationKind.PartSupport, "Part support");
+        if (Findings.Any(finding => finding.Kind == PostVerificationKind.OffPlate))
+            Summary(PostVerificationKind.OffPlate, "Off the plate");
+        if (Findings.Any(finding => finding.Kind == PostVerificationKind.EdgeSpacing))
+            Summary(PostVerificationKind.EdgeSpacing, "Edge spacing");
         foreach (var finding in Findings)
         {
             text.Append(finding.PlateNumber == 0 ? "Post processor" : $"Plate {finding.PlateNumber}");

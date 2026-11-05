@@ -411,6 +411,6 @@ public class CuttingPlanServiceTests
             Assert.True(copy.RestoreLeadInProgram((Program)source.Program.Clone(), source.LeadInsLocked));
             plate.Parts.Add(copy);
         }
-        return PostVerificationAnalyzer.Analyze(nest, start);
+        return TestHelpers.RouteFindings(PostVerificationAnalyzer.Analyze(nest, start));
     }
 }

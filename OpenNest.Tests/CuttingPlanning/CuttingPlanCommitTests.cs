@@ -80,7 +80,7 @@ public class CuttingPlanCommitTests
         var detached = proposal.CopyProgram();
         detached.Codes.Clear();
         Assert.NotEmpty(part.Program.Codes);
-        Assert.Empty(PostVerificationAnalyzer.Analyze(nest, Vector.Zero).Findings);
+        Assert.Empty(TestHelpers.RouteFindings(PostVerificationAnalyzer.Analyze(nest, Vector.Zero)).Findings);
     }
 
     [Theory]
