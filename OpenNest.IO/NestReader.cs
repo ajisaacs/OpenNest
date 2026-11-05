@@ -790,6 +790,7 @@ namespace OpenNest.IO
                 if (p.StockItemCodes != null)
                     plate.StockItemCodes = p.StockItemCodes.TakeWhile(code => !string.IsNullOrWhiteSpace(code)).ToList();
 
+                var readParts = new Part[p.Parts.Count];
                 for (var partIndex = 0; partIndex < p.Parts.Count; partIndex++)
                 {
                     var partDto = p.Parts[partIndex];
@@ -802,6 +803,21 @@ namespace OpenNest.IO
                     RestorePartProgram(part, partDto, p.Id, partIndex);
                     part.DrawingPinsOff = ReadPinsOff(partDto, p.Id, partIndex, part);
                     plate.Parts.Add(part);
+                    readParts[partIndex] = part;
+                }
+
+                // Common lines: a group naming a missing part keeps the rest; one left with
+                // fewer than two parts, or with an unusable kerf, is dropped.
+                foreach (var group in p.CommonLines ?? new List<CommonLineDto>())
+                {
+                    var members = (group?.Parts ?? Array.Empty<int>())
+                        .Where(index => index >= 0 && index < readParts.Length && readParts[index] != null)
+                        .Select(index => readParts[index])
+                        .Distinct()
+                        .ToList();
+                    if (members.Count >= 2 && double.IsFinite(group.Kerf) && group.Kerf > 0
+                        && !members.Any(member => plate.CommonLineGroupOf(member) != null))
+                        plate.CommonLines.Add(new CommonLineGroup(members, group.Kerf));
                 }
 
                 // Cut-offs

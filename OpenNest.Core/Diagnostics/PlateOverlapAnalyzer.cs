@@ -28,12 +28,14 @@ public static class PlateOverlapAnalyzer
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(plate);
-        var material = Capture(plate.Parts.ToArray(), ClampZoneFrame.ToPlacement(plate).ToArray(),
+        var parts = plate.Parts.ToArray();
+        var material = Capture(parts, ClampZoneFrame.ToPlacement(plate).ToArray(),
             cache ?? new OverlapMaterialCache(), cancellationToken);
         var cutoffs = ClampCutDiagnostics.Find(plate);
         cancellationToken.ThrowIfCancellationRequested();
         return new PlateOverlapSnapshot(material.Parts.ToList(), material.Issues.ToList(),
-            material.Clamps.ToList(), cutoffs.ToList(), plate.PartSpacing);
+            material.Clamps.ToList(), cutoffs.ToList(), plate.PartSpacing,
+            PartSpacingReview.CommonLinePairs(plate, parts));
     }
 
     /// <summary>

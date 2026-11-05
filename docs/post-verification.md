@@ -120,6 +120,8 @@ shows the first three check categories, even when there are no findings:
   than `SpacingSlack`, which lets interactive fills that place arcs exactly at the spacing
   pass. Auto Nest's layout check and the whole-job runner's candidate validation confirm the
   same way, so all three agree. Zero spacing allows contact.
+  Two members of one [common-line group](common-line-cutting.md) are held to the group's kerf
+  instead (they are placed one kerf apart on purpose); the finding then names that kerf.
   A part inside another's cutout is held to the spacing from the hole edge. Cut-offs and
   clamps are not spacing-checked; the plate edge has its own check below. The finding gives the measured gap; this
   line appears in the summary only when there is such a finding.
@@ -150,6 +152,10 @@ shows the first three check categories, even when there are no findings:
   order finding; leads keep their own checks. Plan Cutting's Ready result for the plate cuts
   nested parts first with leads that clear them; this review checks the live programs again
   before posting.
+- **Common lines:** a [common-line group](common-line-cutting.md#checks) member that no longer
+  shares an edge one kerf from another member, a group placed for a different kerf than the
+  plate's cutting parameters now use, or a member's lead that touches or enters a partner's
+  material. This line appears in the summary only when there is such a finding.
 - **Pierce zones:** with a `PierceDiameter` in the part's (or else the plate's) cutting
   parameters, every lead-in pierce of every placed program must keep half of it from all part
   material; see [pierce zones](geometry/pierce-zone.md). This line appears in the summary only

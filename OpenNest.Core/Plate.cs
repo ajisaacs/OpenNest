@@ -56,6 +56,7 @@ namespace OpenNest
             Parts.ItemAdded += Parts_PartAdded;
             Parts.ItemRemoved += Parts_PartRemoved;
             CutOffs = new ObservableList<CutOff>();
+            CommonLines = new ObservableList<CommonLineGroup>();
             ClampZones = new ObservableList<ClampZone>();
             ClampZones.ItemAdded += (_, _) => OnClampZonesChanged();
             ClampZones.ItemRemoved += (_, _) => OnClampZonesChanged();
@@ -73,6 +74,10 @@ namespace OpenNest
         {
             if (!e.Item.BaseDrawing.IsCutOff)
                 e.Item.BaseDrawing.Quantity.Nested -= Quantity;
+            // A removed part leaves its common-line group; a group left with one part is gone.
+            for (var i = CommonLines.Count - 1; i >= 0; i--)
+                if (CommonLines[i].Remove(e.Item) && CommonLines[i].Members.Count < 2)
+                    CommonLines.RemoveAt(i);
         }
 
         /// <summary>
@@ -167,6 +172,39 @@ namespace OpenNest
         /// The cut-off lines defined on this plate.
         /// </summary>
         public ObservableList<CutOff> CutOffs { get; set; }
+
+        /// <summary>
+        /// Groups of parts placed one kerf apart to share common-line cuts (see
+        /// docs/common-line-cutting.md). A part removed from <see cref="Parts"/> leaves its group.
+        /// </summary>
+        public ObservableList<CommonLineGroup> CommonLines { get; }
+
+        /// <summary>The common-line group holding <paramref name="part"/>, or null.</summary>
+        public CommonLineGroup CommonLineGroupOf(Part part) =>
+            CommonLines.FirstOrDefault(group => group.Contains(part));
+
+        /// <summary>
+        /// Puts <paramref name="parts"/> into one common-line group at <paramref name="kerf"/>,
+        /// merging any groups they already belong to. Every part must be on this plate.
+        /// </summary>
+        public CommonLineGroup JoinCommonLine(IEnumerable<Part> parts, double kerf)
+        {
+            ArgumentNullException.ThrowIfNull(parts);
+            var joined = parts.ToList();
+            if (joined.Any(part => part == null || !Parts.Contains(part)))
+                throw new ArgumentException("Every part in a common line must be on the plate.", nameof(parts));
+            var merged = CommonLines.Where(group => joined.Any(group.Contains)).ToList();
+            var members = merged.SelectMany(group => group.Members).Concat(joined);
+            var result = new CommonLineGroup(members, kerf);
+            foreach (var group in merged)
+                CommonLines.Remove(group);
+            CommonLines.Add(result);
+            return result;
+        }
+
+        /// <summary>Removes the common-line group holding <paramref name="part"/>; true when there was one.</summary>
+        public bool RemoveCommonLine(Part part) =>
+            CommonLineGroupOf(part) is { } group && CommonLines.Remove(group);
 
         /// <summary>
         /// A copy of the settings the cut-offs were last regenerated with, or null before the

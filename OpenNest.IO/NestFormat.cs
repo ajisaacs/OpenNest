@@ -693,6 +693,14 @@ namespace OpenNest.IO
             public List<CutOffDto> CutOffs { get; init; } = new();
 
             /// <summary>
+            /// Common-line groups (<c>Plate.CommonLines</c>): parts placed one kerf apart to share
+            /// cuts. Omitted when there are none; older readers ignore it and see a spacing
+            /// violation, never a silently changed cut.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public List<CommonLineDto> CommonLines { get; init; }
+
+            /// <summary>
             /// The settings the plate's cut-offs were generated with (<c>Plate.CutOffSettings</c>).
             /// Omitted when unknown; older files regenerate with the reader's defaults.
             /// </summary>
@@ -989,6 +997,15 @@ namespace OpenNest.IO
             public string CutDirection { get; init; }
             public bool LockHeadHeight { get; init; }
             public double HeadLockOvercut { get; init; }
+        }
+
+        public record CommonLineDto
+        {
+            /// <summary>The gap the parts were placed at: the kerf when the group was made.</summary>
+            public double Kerf { get; init; }
+
+            /// <summary>Positions in the plate's <c>parts</c> array.</summary>
+            public int[] Parts { get; init; }
         }
 
         public record CutOffGapDto

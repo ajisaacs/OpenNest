@@ -42,6 +42,12 @@ namespace OpenNest.Undo
                     hash.Add(cutOff.Position.Y);
                     hash.Add(cutOff.Axis);
                 }
+                hash.Add(plate.CommonLines.Count);
+                foreach (var group in plate.CommonLines)
+                {
+                    hash.Add(RuntimeHelpers.GetHashCode(group));
+                    hash.Add(group.Members.Count);
+                }
             }
 
             hash.Add(nest.Drawings.Count);

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using OpenNest.Bending;
 using OpenNest.CNC;
 using OpenNest.Geometry;
@@ -326,6 +327,43 @@ namespace OpenNest.Controls
         // Scrap cut-off lines must stand out from the dark part outlines and the
         // sheet: a saturated orange-red dash, not another solid near-black line.
         private static readonly Color CutOffLineColor = Color.OrangeRed;
+
+        private static readonly Color CommonLineColor = Color.FromArgb(0, 150, 136);
+
+        // Each group's last derived spans, reused until a member moves, turns or is replaced.
+        private readonly Dictionary<CommonLineGroup, (string State, CommonLineCheck Check)> commonLineChecks = new();
+
+        /// <summary>
+        /// Shared common-line spans as a dashed centerline; a member that no longer shares a span with
+        /// its group is outlined in red (see docs/common-line-cutting.md).
+        /// </summary>
+        public void DrawCommonLines(Graphics g)
+        {
+            var plate = view.Plate;
+            if (plate?.CommonLines is not { Count: > 0 } groups)
+            {
+                commonLineChecks.Clear();
+                return;
+            }
+            using var pen = new Pen(CommonLineColor, 2.0f) { DashStyle = DashStyle.Dash };
+            using var broken = new Pen(Color.Red, 2.0f);
+            foreach (var stale in commonLineChecks.Keys.Where(group => !groups.Contains(group)).ToList())
+                commonLineChecks.Remove(stale);
+            foreach (var group in groups)
+            {
+                var state = string.Join(";", group.Members.Select(m =>
+                    $"{m.Location.X:R},{m.Location.Y:R},{m.Rotation:R},{RuntimeHelpers.GetHashCode(m.BaseDrawing.Program)}"));
+                if (!commonLineChecks.TryGetValue(group, out var cached) || cached.State != state)
+                {
+                    cached = (state, CommonLineGeometry.Check(group));
+                    commonLineChecks[group] = cached;
+                }
+                foreach (var span in cached.Check.Spans)
+                    DrawLine(g, span.Start, span.End, pen);
+                foreach (var problem in cached.Check.Problems)
+                    DrawBox(g, problem.Part.BoundingBox, broken);
+            }
+        }
 
         public void DrawCutOffs(Graphics g)
         {
@@ -751,7 +789,9 @@ namespace OpenNest.Controls
             g.DrawLine(pen, point1, point2);
         }
 
-        private void DrawBox(Graphics g, Box box)
+        private void DrawBox(Graphics g, Box box) => DrawBox(g, box, view.ColorScheme.BoundingBoxPen);
+
+        private void DrawBox(Graphics g, Box box, Pen pen)
         {
             var rect = new RectangleF
             {
@@ -761,7 +801,7 @@ namespace OpenNest.Controls
             };
 
             g.DrawRectangle(
-                view.ColorScheme.BoundingBoxPen,
+                pen,
                 rect.X,
                 rect.Y - rect.Height,
                 rect.Width,

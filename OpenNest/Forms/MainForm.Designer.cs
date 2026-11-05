@@ -155,6 +155,9 @@ namespace OpenNest.Forms
             toolStripMenuItem24 = new System.Windows.Forms.ToolStripSeparator();
             mnuPlatePatternTile = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateExpandSpacing = new System.Windows.Forms.ToolStripMenuItem();
+            toolStripMenuItemCommonLine = new System.Windows.Forms.ToolStripSeparator();
+            mnuPlateJoinCommonLine = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateRemoveCommonLine = new System.Windows.Forms.ToolStripMenuItem();
             mnuSequenceParts = new System.Windows.Forms.ToolStripMenuItem();
             autoSequenceCurrentPlateToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             manualSequenceToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -968,7 +971,7 @@ namespace OpenNest.Forms
             //
             // mnuPlateArrange
             //
-            mnuPlateArrange.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateAlignLeft, mnuPlateAlignRight, mnuPlateAlignTop, mnuPlateAlignBottom, toolStripMenuItem11, mnuPlateAlignHorizontal, mnuPlateAlignVertically, toolStripMenuItem8, mnuPlateEvenlySpaceHorizontal, mnuPlateEvenlySpaceVertical, toolStripMenuItem23, centerPartsToolStripMenuItem, toolStripMenuItem24, mnuPlatePatternTile, mnuPlateExpandSpacing });
+            mnuPlateArrange.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateAlignLeft, mnuPlateAlignRight, mnuPlateAlignTop, mnuPlateAlignBottom, toolStripMenuItem11, mnuPlateAlignHorizontal, mnuPlateAlignVertically, toolStripMenuItem8, mnuPlateEvenlySpaceHorizontal, mnuPlateEvenlySpaceVertical, toolStripMenuItem23, centerPartsToolStripMenuItem, toolStripMenuItem24, mnuPlatePatternTile, mnuPlateExpandSpacing, toolStripMenuItemCommonLine, mnuPlateJoinCommonLine, mnuPlateRemoveCommonLine });
             mnuPlateArrange.Name = "mnuPlateArrange";
             mnuPlateArrange.Size = new System.Drawing.Size(177, 22);
             mnuPlateArrange.Text = "Arrange";
@@ -1069,6 +1072,26 @@ namespace OpenNest.Forms
             mnuPlateExpandSpacing.Size = new System.Drawing.Size(209, 22);
             mnuPlateExpandSpacing.Text = "Expand Spacing";
             mnuPlateExpandSpacing.Click += ExpandSpacing_Click;
+            //
+            // toolStripMenuItemCommonLine
+            //
+            toolStripMenuItemCommonLine.Name = "toolStripMenuItemCommonLine";
+            toolStripMenuItemCommonLine.Size = new System.Drawing.Size(206, 6);
+            //
+            // mnuPlateJoinCommonLine
+            //
+            mnuPlateJoinCommonLine.Name = "mnuPlateJoinCommonLine";
+            mnuPlateJoinCommonLine.Size = new System.Drawing.Size(209, 22);
+            mnuPlateJoinCommonLine.Text = "Join Common Line";
+            mnuPlateJoinCommonLine.ToolTipText = "Slide the selected parts one kerf apart so they share their facing edges' cut.";
+            mnuPlateJoinCommonLine.Click += JoinCommonLine_Click;
+            //
+            // mnuPlateRemoveCommonLine
+            //
+            mnuPlateRemoveCommonLine.Name = "mnuPlateRemoveCommonLine";
+            mnuPlateRemoveCommonLine.Size = new System.Drawing.Size(209, 22);
+            mnuPlateRemoveCommonLine.Text = "Remove Common Line";
+            mnuPlateRemoveCommonLine.Click += RemoveCommonLine_Click;
             //
             // mnuSequenceParts
             //
@@ -1571,6 +1594,9 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuToolsBestFitViewer;
         private System.Windows.Forms.ToolStripMenuItem mnuPlatePatternTile;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateExpandSpacing;
+        private System.Windows.Forms.ToolStripSeparator toolStripMenuItemCommonLine;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateJoinCommonLine;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateRemoveCommonLine;
         private System.Windows.Forms.ToolStripButton btnSaveAs;
         private System.Windows.Forms.ToolStripMenuItem centerPartsToolStripMenuItem;
         private System.Windows.Forms.ToolStripStatusLabel selectionStatusLabel;

@@ -230,6 +230,8 @@ public static class PostVerificationAnalyzer
             PlateEdgeReview.Add(plate, plateNumber, findings, cancellationToken);
             // Parts the support bed cannot hold level need a tab that keeps them level.
             PartSupportReview.Add(plate, plateNumber, findings, cancellationToken);
+            // Common-line groups still share their spans at the kerf, and no lead cuts a partner.
+            CommonLineReview.Add(plate, plateNumber, findings, cancellationToken);
         }
         cancellationToken.ThrowIfCancellationRequested();
         return new PostVerificationReport(findings);

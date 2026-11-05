@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OpenNest.CNC;
 
 namespace OpenNest.Diagnostics;
@@ -18,12 +19,14 @@ public sealed class OverlapGeometryStamp
         IReadOnlyList<CutOffGap> Gaps, long Overcut)[] cutoffs;
     private readonly (long Width, long Length, int Quadrant) sheet;
     private readonly long partSpacing;
+    private readonly string commonLines;
 
     private OverlapGeometryStamp(Plate plate)
     {
         this.plate = plate;
         sheet = SheetState(plate);
         partSpacing = Bits(plate.PartSpacing);
+        commonLines = CommonLineState(plate);
         entries = new Entry[plate.Parts.Count];
         for (var i = 0; i < entries.Length; i++)
             entries[i] = new Entry(plate.Parts[i]);
@@ -80,12 +83,18 @@ public sealed class OverlapGeometryStamp
     }
 
     internal bool SameSpacing(Plate current) =>
-        ReferenceEquals(plate, current) && partSpacing == Bits(current.PartSpacing);
+        ReferenceEquals(plate, current) && partSpacing == Bits(current.PartSpacing)
+        && commonLines == CommonLineState(current);
+
+    // Which plate slots share a common-line group, and its kerf: the spacing check reads both.
+    private static string CommonLineState(Plate plate) =>
+        string.Join(";", plate.CommonLines.Select(group => Bits(group.Kerf) + ":"
+            + string.Join(",", group.Members.Select(member => plate.Parts.IndexOf(member)))));
 
     public bool Matches(Plate current)
     {
         if (current.Parts.Count != entries.Length || partSpacing != Bits(current.PartSpacing)
-            || !SameZones(current) || !SameCutOffs(current))
+            || commonLines != CommonLineState(current) || !SameZones(current) || !SameCutOffs(current))
             return false;
         for (var i = 0; i < entries.Length; i++)
             if (!entries[i].Matches(current.Parts[i]))

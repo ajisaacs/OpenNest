@@ -802,6 +802,7 @@ namespace OpenNest.Controls
             renderer.DrawCutOffs(e.Graphics);
             if (!HasProposalDisplay)
             {
+                renderer.DrawCommonLines(e.Graphics);
                 renderer.DrawActiveWorkArea(e.Graphics);
                 renderer.DrawDebugRemnants(e.Graphics);
                 DrawOverlapOverlay(e.Graphics);
@@ -904,6 +905,44 @@ namespace OpenNest.Controls
         public void RefreshActionStatus() => actionManager.RefreshStatus();
 
         public void AlignSelected(AlignType alignType) => selection.AlignSelected(alignType);
+
+        /// <summary>
+        /// Slides the selected parts one <paramref name="kerf"/> apart along their facing straight
+        /// edges and groups them for common-line cutting (see docs/common-line-cutting.md). Parts
+        /// already in a group move with it. Nothing changes when the join fails.
+        /// </summary>
+        public CommonLineJoinResult JoinSelectedCommonLine(double kerf)
+        {
+            var parts = SelectedParts.Select(p => p.BasePart).ToList();
+            // Facing edges up to a few part spacings apart (and at least an inch) are joined.
+            var maxGap = System.Math.Max(1.0, 4 * Plate.PartSpacing);
+            using var change = BeginChange("Join Common Line");
+            var result = CommonLineJoiner.Join(Plate, parts, kerf, maxGap);
+            if (!result.Succeeded)
+                return result;
+            change.MarkChanged();
+            foreach (var layout in this.parts.Where(p => result.Group.Contains(p.BasePart)))
+                layout.IsDirty = true;
+            Invalidate();
+            change.Complete();
+            return result;
+        }
+
+        /// <summary>Removes the common-line groups of the selected parts; the parts stay where they are.</summary>
+        public bool RemoveSelectedCommonLines()
+        {
+            var groups = SelectedParts.Select(p => Plate.CommonLineGroupOf(p.BasePart))
+                .Where(group => group != null).Distinct().ToList();
+            if (groups.Count == 0)
+                return false;
+            using var change = BeginChange("Remove Common Line");
+            change.MarkChanged();
+            foreach (var group in groups)
+                Plate.CommonLines.Remove(group);
+            Invalidate();
+            change.Complete();
+            return true;
+        }
 
         public void AlignSelected(AlignType alignType, LayoutPart fixedPart) =>
             selection.AlignSelected(alignType, fixedPart);

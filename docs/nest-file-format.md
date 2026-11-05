@@ -108,6 +108,17 @@ and drops empty or nonfinite ones. Versions before it ignore the array and would
 straight through every gap, so a nest with gaps must not be opened and posted from an
 older version.
 
+## Common lines
+
+A plate's optional `commonLines` array holds its [common-line groups](common-line-cutting.md):
+each is `{ "kerf", "parts" }`, the gap the parts were placed at (model units) and the
+zero-based positions of its members in that plate's `parts` array (cut-offs are never in it).
+The array is omitted when the plate has none. The reader drops a position that names no loaded
+part, a part already in an earlier group, and a group left with fewer than two parts or with a
+nonfinite or nonpositive kerf. Spans are not saved; they are derived from the placed parts.
+Versions before it ignore the array, so they load the parts one kerf apart and report the
+pairs as part-spacing findings: never a silently different cut.
+
 ## Plate cutting parameters
 
 Each plate's optional `cuttingParameters` stores the settings last applied to it.

@@ -52,7 +52,13 @@ public enum PostVerificationKind
     /// A part's clean material is closer to the sheet's edge than the plate's edge spacing, judged as
     /// Auto Nest's layout check judges it.
     /// </summary>
-    EdgeSpacing
+    EdgeSpacing,
+
+    /// <summary>
+    /// A common-line group (see docs/common-line-cutting.md) no longer shares its spans one kerf
+    /// apart, was placed for another kerf, or a member's lead runs into its partner.
+    /// </summary>
+    CommonLine
 }
 
 /// <summary>Plate and part numbers are one-based; plate zero denotes a whole-post limitation.</summary>
@@ -108,6 +114,8 @@ public sealed class PostVerificationReport
             Summary(PostVerificationKind.OffPlate, "Off the plate");
         if (Findings.Any(finding => finding.Kind == PostVerificationKind.EdgeSpacing))
             Summary(PostVerificationKind.EdgeSpacing, "Edge spacing");
+        if (Findings.Any(finding => finding.Kind == PostVerificationKind.CommonLine))
+            Summary(PostVerificationKind.CommonLine, "Common lines");
         foreach (var finding in Findings)
         {
             text.Append(finding.PlateNumber == 0 ? "Post processor" : $"Plate {finding.PlateNumber}");

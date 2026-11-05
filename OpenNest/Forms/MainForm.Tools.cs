@@ -90,6 +90,36 @@ namespace OpenNest.Forms
                 );
         }
 
+        private void JoinCommonLine_Click(object sender, EventArgs e)
+        {
+            var editForm = activeForm;
+            if (editForm?.PlateView?.Plate == null)
+                return;
+            var kerf = MachineSettings.CuttingParametersFor(editForm.PlateView.Plate, editForm.Nest).Kerf;
+            var result = editForm.PlateView.JoinSelectedCommonLine(kerf);
+            if (!result.Succeeded)
+                ShowCommonLineNotice(result.Failure);
+        }
+
+        private void RemoveCommonLine_Click(object sender, EventArgs e)
+        {
+            if (activeForm?.PlateView?.Plate == null)
+                return;
+            if (!activeForm.PlateView.RemoveSelectedCommonLines())
+                ShowCommonLineNotice("None of the selected parts share a common line.");
+        }
+
+        // Native tests capture this notice without opening a modal dialog in session zero.
+        internal System.Action<string> CommonLineNotice { get; set; }
+
+        private void ShowCommonLineNotice(string message)
+        {
+            if (CommonLineNotice != null)
+                CommonLineNotice(message);
+            else
+                MessageBox.Show(this, message, "Common Line", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
         private void PatternTile_Click(object sender, EventArgs e)
         {
             if (activeForm == null)

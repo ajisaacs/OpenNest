@@ -23,6 +23,8 @@ namespace OpenNest.Diagnostics;
 /// Pairs whose material already overlaps, and parts the overlap check could not read, are left to
 /// that check. Clamps are not spacing-checked here; <see cref="PlateEdgeReview"/> checks the sheet edge. The pre-post review and the
 /// desktop overlap label share this scan, so they cannot disagree.
+/// Two members of one common-line group (<see cref="Plate.CommonLines"/>) are held to the group's
+/// kerf instead of the part spacing: they are placed one kerf apart on purpose.
 /// </summary>
 internal static class PartSpacingReview
 {
@@ -48,13 +50,16 @@ internal static class PartSpacingReview
         var profiles = new Dictionary<(Program, long), ShapeProfile>();
         var inputs = parts.Select((part, id) => new SpacingInput(id, () => Profile(part, profiles), part.Location))
             .ToList();
-        Scan(inputs, spacing, overlap.Pairs, overlap.Issues,
+        Scan(inputs, spacing, CommonLinePairs(plate, parts), overlap.Pairs, overlap.Issues,
             (a, b, message) => findings.Add(new(PostVerificationKind.Incomplete, plateNumber, partNumbers[a],
                 b is { } other ? partNumbers[other] : null, "Part spacing check: " + message)),
             (a, b, gap, marker) => findings.Add(new(PostVerificationKind.PartSpacing, plateNumber, partNumbers[a],
                 partNumbers[b],
-                $"'{Name(parts[a])}' and '{Name(parts[b])}' are {gap:F3} apart, closer than the "
-                + $"plate's part spacing ({spacing:F3}).")
+                CommonLineKerf(plate, parts[a], parts[b]) is { } kerf
+                    ? $"'{Name(parts[a])}' and '{Name(parts[b])}' are {gap:F4} apart, closer than the "
+                        + $"kerf ({kerf:F4}) of their common-line group."
+                    : $"'{Name(parts[a])}' and '{Name(parts[b])}' are {gap:F3} apart, closer than the "
+                        + $"plate's part spacing ({spacing:F3}).")
             { Location = marker }),
             cancellationToken);
     }
@@ -74,7 +79,7 @@ internal static class PartSpacingReview
         var profiles = new Dictionary<(OverlapSource, long), ShapeProfile>();
         var inputs = snapshot.Parts
             .Select(part => new SpacingInput(part.Id, () => Profile(part, profiles), part.Location)).ToList();
-        Scan(inputs, spacing, overlaps, overlapIssues,
+        Scan(inputs, spacing, snapshot.CommonLinePairs, overlaps, overlapIssues,
             (a, b, message) => issues.Add(new PlateOverlapIssue(a, b, message)),
             (a, b, gap, marker) => pairs.Add(new PlateSpacingPair(a, b, names[a], names[b], gap, marker)),
             cancellationToken);
@@ -85,7 +90,7 @@ internal static class PartSpacingReview
     /// part or pair that could not be read; <paramref name="tooClose"/> a confirmed gap and its marker.
     /// </summary>
     private static void Scan(IReadOnlyList<SpacingInput> parts, double spacing,
-        IEnumerable<PlateOverlapPair> overlaps, IEnumerable<PlateOverlapIssue> overlapIssues,
+        IReadOnlyDictionary<(int, int), double> commonLines, IEnumerable<PlateOverlapPair> overlaps, IEnumerable<PlateOverlapIssue> overlapIssues,
         Action<int, int?, string> incomplete, Action<int, int, double, Vector> tooClose,
         CancellationToken cancellationToken)
     {
@@ -164,7 +169,10 @@ internal static class PartSpacingReview
                     incomplete(first, second, exception.Message);
                     continue;
                 }
-                if (gap < spacing - SpacingOutline.SpacingSlack)
+                // Common-line partners are one kerf apart by design, never less.
+                var required = commonLines != null && commonLines.TryGetValue((first, second), out var kerf)
+                    ? System.Math.Min(kerf, spacing) : spacing;
+                if (gap < required - SpacingOutline.SpacingSlack)
                     tooClose(first, second, gap, marker);
             }
         }
@@ -214,6 +222,32 @@ internal static class PartSpacingReview
     }
 
     private static (int, int) Key(int a, int b) => a < b ? (a, b) : (b, a);
+
+    /// <summary>
+    /// Each pair of <paramref name="parts"/> (by position, lower first) in one common-line group of
+    /// <paramref name="plate"/>, with the group's kerf.
+    /// </summary>
+    internal static IReadOnlyDictionary<(int, int), double> CommonLinePairs(Plate plate, IReadOnlyList<Part> parts)
+    {
+        var pairs = new Dictionary<(int, int), double>();
+        if (plate?.CommonLines is not { Count: > 0 } groups)
+            return pairs;
+        var positions = new Dictionary<Part, int>(ReferenceEqualityComparer.Instance);
+        for (var i = 0; i < parts.Count; i++)
+            if (parts[i] != null)
+                positions.TryAdd(parts[i], i);
+        foreach (var group in groups)
+        {
+            var ids = group.Members.Where(positions.ContainsKey).Select(member => positions[member]).ToList();
+            for (var i = 0; i < ids.Count; i++)
+                for (var j = i + 1; j < ids.Count; j++)
+                    pairs[Key(ids[i], ids[j])] = group.Kerf;
+        }
+        return pairs;
+    }
+
+    private static double? CommonLineKerf(Plate plate, Part a, Part b) =>
+        plate.CommonLineGroupOf(a) is { } group && group.Contains(b) ? group.Kerf : null;
 
     private static string Name(Part part) => part.BaseDrawing.Name;
 

@@ -170,8 +170,9 @@ public sealed class PlateOverlapSnapshot
 {
     internal PlateOverlapSnapshot(List<CapturedOverlapPart> parts, List<PlateOverlapIssue> issues,
         List<CapturedClamp> clamps = null, List<CutOffClampFinding> cutOffClampFindings = null,
-        double partSpacing = 0)
+        double partSpacing = 0, IReadOnlyDictionary<(int, int), double> commonLinePairs = null)
     {
+        CommonLinePairs = commonLinePairs ?? new Dictionary<(int, int), double>();
         Parts = parts.AsReadOnly();
         Issues = issues.AsReadOnly();
         Clamps = (clamps ?? new List<CapturedClamp>()).AsReadOnly();
@@ -188,6 +189,10 @@ public sealed class PlateOverlapSnapshot
 
     /// <summary>The plate's part spacing; zero (no spacing check) for a bare group of parts.</summary>
     internal double PartSpacing { get; }
+
+    /// <summary>Part ids (lower first) of each pair in one common-line group, with its kerf: held to
+    /// the kerf instead of <see cref="PartSpacing"/>.</summary>
+    internal IReadOnlyDictionary<(int, int), double> CommonLinePairs { get; }
 }
 
 internal sealed record CapturedOverlapPart(int Id, string Name, OverlapSource Source,

@@ -428,6 +428,17 @@ namespace OpenNest.IO
                     );
                 }
 
+                // Groups name parts by their position in the parts array written above.
+                var written = plate.Parts.Where(p => !p.BaseDrawing.IsCutOff).ToList();
+                var commonLines = plate.CommonLines
+                    .Select(group => new CommonLineDto
+                    {
+                        Kerf = group.Kerf,
+                        Parts = group.Members.Select(member => written.IndexOf(member)).Where(index => index >= 0).ToArray(),
+                    })
+                    .Where(group => group.Parts.Length >= 2)
+                    .ToList();
+
                 var cutoffs = new List<CutOffDto>();
                 foreach (var cutoff in plate.CutOffs)
                 {
@@ -474,6 +485,7 @@ namespace OpenNest.IO
                         },
                         Parts = parts,
                         CutOffs = cutoffs,
+                        CommonLines = commonLines.Count == 0 ? null : commonLines,
                         CutOffSettings = cutoffs.Count == 0 || plate.CutOffSettings is not { } settings ? null
                             : new CutOffSettingsDto
                             {
