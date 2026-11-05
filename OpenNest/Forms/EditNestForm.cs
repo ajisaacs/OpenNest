@@ -49,6 +49,12 @@ namespace OpenNest.Forms
         public readonly NestHoldStatus HoldStatus;
 
         private readonly Timer updateDrawingListTimer;
+
+        // The window's UI thread. updateDrawingListTimer fires on a pool thread, which must
+        // never touch a control: Control.Invoke reads Handle, and a handle destroyed between
+        // the check and the call is then re-created on the pool thread while this window is
+        // being disposed ("Dispose() cannot be called while doing CreateHandle()").
+        private readonly SynchronizationContext uiContext;
         private bool updatingPlateList;
         private bool addingToSet;
         private CutSimulatorForm cutSimulatorForm;
@@ -457,6 +463,7 @@ namespace OpenNest.Forms
                 Interval = 50,
             };
             updateDrawingListTimer.Elapsed += drawingListUpdateTimer_Elapsed;
+            uiContext = SynchronizationContext.Current;
 
             Document = new Document { Nest = nest };
             HoldStatus = new NestHoldStatus(Document);
@@ -1790,14 +1797,13 @@ namespace OpenNest.Forms
             updateDrawingListTimer.Start();
         }
 
-        private void drawingListUpdateTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
-        {
-            if (!drawingListBox1.IsHandleCreated)
-                return;
-
-            drawingListBox1.Invoke(
-                new MethodInvoker(() =>
+        private void drawingListUpdateTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e) =>
+            uiContext?.Post(_ =>
                 {
+                    // Runs on the UI thread, so this check cannot race the window's disposal.
+                    if (IsDisposed || Disposing || !drawingListBox1.IsHandleCreated)
+                        return;
+
                     if (hideNestedButton.Checked)
                     {
                         drawingListBox1.BeginUpdate();
@@ -1827,9 +1833,8 @@ namespace OpenNest.Forms
                     // part-count and utilization columns stay current. The debounce
                     // timer collapses a fill's many per-part events into one refresh.
                     UpdatePlateList();
-                })
-            );
-        }
+                },
+                null);
 
         private void drawingListBox1_DoubleClick(object sender, EventArgs e)
         {

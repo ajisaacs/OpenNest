@@ -19,6 +19,8 @@
             // The simulator's lock disables the main window until it closes.
             if (disposing)
                 cutSimulatorForm?.Close();
+            if (disposing)
+                updateDrawingListTimer?.Dispose();
             if (disposing && (components != null))
             {
                 components.Dispose();
