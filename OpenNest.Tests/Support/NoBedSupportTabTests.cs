@@ -23,8 +23,8 @@ public class NoBedSupportTabTests
         var parameters = ExplicitContourTests.Parameters();
         parameters.SupportTabs = true;
         parameters.TabConfig = new NormalTab { Size = TabSize };
-        parameters.NoBedTabMinWidth = min;
-        parameters.NoBedTabMaxWidth = max;
+        parameters.TabSizeMinWidth = min;
+        parameters.TabSizeMaxWidth = max;
         return parameters;
     }
 
@@ -54,10 +54,10 @@ public class NoBedSupportTabTests
     [InlineData(1, 1, true)]    // the bounds are inclusive
     public void TheRangeTabsWidthsInsideIt(double min, double max, bool tabsAWidthOfOne)
     {
-        var parameters = new CuttingParameters { NoBedTabMinWidth = min, NoBedTabMaxWidth = max };
+        var parameters = new CuttingParameters { TabSizeMinWidth = min, TabSizeMaxWidth = max };
 
-        Assert.Equal(tabsAWidthOfOne, parameters.TabsWithoutBedAt(1));
-        Assert.False(parameters.TabsWithoutBedAt(3));
+        Assert.Equal(tabsAWidthOfOne, parameters.TabsBySizeAt(1));
+        Assert.False(parameters.TabsBySizeAt(3));
     }
 
     [Fact]
@@ -161,7 +161,7 @@ public class NoBedSupportTabTests
 
         var finding = Assert.Single(PostVerificationAnalyzer.Analyze(untabbed).Findings,
             f => f.Kind == PostVerificationKind.PartSupport);
-        Assert.Contains("without a support bed", finding.Message);
+        Assert.Contains("tabbed by size", finding.Message);
         Assert.Contains("no tab", finding.Message);
         Assert.DoesNotContain(PostVerificationAnalyzer.Analyze(tabbed).Findings,
             f => f.Kind == PostVerificationKind.PartSupport);

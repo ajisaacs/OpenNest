@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.IO;
+using OpenNest.Support;
 
 namespace OpenNest.Controls
 {
@@ -24,11 +25,11 @@ namespace OpenNest.Controls
         private readonly CheckBox chkTabsEnabled;
         private readonly TableLayoutPanel tabOptions;
         private readonly NumericUpDown nudTabWidth;
-        private readonly RadioButton rbTabAll;
         private readonly RadioButton rbSupportTab;
+        private readonly RadioButton rbTabBySize;
         private readonly TableLayoutPanel supportTabOptions;
-        private readonly NumericUpDown nudNoBedTabMin;
-        private readonly NumericUpDown nudNoBedTabMax;
+        private readonly NumericUpDown nudTabSizeMin;
+        private readonly NumericUpDown nudTabSizeMax;
         private readonly NumericUpDown nudTabHeldMax;
         private readonly NumericUpDown nudPierceClearance;
         private readonly NumericUpDown nudPierceDiameter;
@@ -151,29 +152,19 @@ namespace OpenNest.Controls
             nudTabWidth = CreateNumeric(0.25, 0.0625);
             AddRow(tabOptions, "Tab size:", nudTabWidth, FieldIndent);
 
-            rbTabAll = new RadioButton
-            {
-                Text = "Tab every part",
-                AutoSize = true,
-                Checked = true,
-                Margin = new Padding(0, 4, 0, 0),
-            };
-            AddSpanningRow(tabOptions, rbTabAll);
-
             // Plan Cutting tabs only the parts the plate's support grid cannot hold level.
             rbSupportTab = new RadioButton
             {
                 Text = "Only tab parts the support grid can't hold level",
                 AutoSize = true,
-                Margin = new Padding(0, 2, 0, 0),
+                Checked = true,
+                Margin = new Padding(0, 4, 0, 0),
             };
             toolTip.SetToolTip(rbSupportTab,
                 "Plan Cutting tabs each part that would tip once cut free, where it best keeps the part level.");
             AddSpanningRow(tabOptions, rbSupportTab);
 
-            // A part up to this long is held by its tab alone, wherever the tab goes; a plate with
-            // no support bed tabs the parts whose narrow side is in the range below. A maximum of
-            // 0 turns either rule off.
+            // A part up to this long is held by its tab alone, wherever the tab goes. 0 turns it off.
             supportTabOptions = new TableLayoutPanel
             {
                 AutoSize = true,
@@ -192,22 +183,48 @@ namespace OpenNest.Controls
                     CreateHint("long (0 = off)", new Padding(6, 0, 0, 0))
                 )
             );
-            supportTabOptions.Controls.Add(
-                CreateHint("On plates with no support bed, tab parts whose narrow side is:", new Padding(0, 4, 0, 2))
+            AddSpanningRow(tabOptions, supportTabOptions);
+
+            // Tabs the parts whose narrow side is in the range below, whatever the support grid.
+            rbTabBySize = new RadioButton
+            {
+                Text = "Tab parts by size",
+                AutoSize = true,
+                Margin = new Padding(0, 2, 0, 0),
+            };
+            toolTip.SetToolTip(rbTabBySize,
+                "Ignores the support grid: tabs every part whose narrow side is in the range below.");
+            AddSpanningRow(tabOptions, rbTabBySize);
+
+            // The size range: the narrow side of each part's smallest bounding box, at any angle.
+            // Tabs by size use it, and so do support grid tabs on a plate with no support bed. A
+            // maximum of 0 tabs nothing.
+            var sizeRange = new TableLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 1,
+                Margin = new Padding(FieldIndent + 2, 0, 0, 0),
+            };
+            sizeRange.Controls.Add(
+                CreateHint("By size, or with no support bed, tab parts whose narrow side is:", new Padding(0, 4, 0, 2))
             );
-            nudNoBedTabMin = CreateNumeric(0, 0.25);
-            nudNoBedTabMin.Width = 80;
-            nudNoBedTabMax = CreateNumeric(0, 0.25);
-            nudNoBedTabMax.Width = 80;
-            supportTabOptions.Controls.Add(
+            nudTabSizeMin = CreateNumeric(0, 0.25);
+            nudTabSizeMin.Width = 80;
+            nudTabSizeMax = CreateNumeric(0, 0.25);
+            nudTabSizeMax.Width = 80;
+            nudTabSizeMax.Maximum = (decimal)SupportTabSettings.TabEveryPartMaxWidth;
+            toolTip.SetToolTip(nudTabSizeMax,
+                "The narrow side of the part's smallest bounding box, at any angle, so a part's rotation does not matter.");
+            sizeRange.Controls.Add(
                 CreateInline(
-                    nudNoBedTabMin,
+                    nudTabSizeMin,
                     CreateHint("to", new Padding(4, 0, 4, 0)),
-                    nudNoBedTabMax,
+                    nudTabSizeMax,
                     CreateHint("(0 = none)", new Padding(6, 0, 0, 0))
                 )
             );
-            AddSpanningRow(tabOptions, supportTabOptions);
+            AddSpanningRow(tabOptions, sizeRange);
             layout.Controls.Add(tabOptions);
 
             chkTabsEnabled.CheckedChanged += (s, e) =>
@@ -218,14 +235,14 @@ namespace OpenNest.Controls
             };
 
             // The two choices toggle together, so one handler sees every change.
-            rbTabAll.CheckedChanged += (s, e) =>
+            rbSupportTab.CheckedChanged += (s, e) =>
             {
                 UpdateSupportTabOptions();
                 OnParametersChanged();
             };
             nudTabWidth.ValueChanged += (s, e) => OnParametersChanged();
-            nudNoBedTabMin.ValueChanged += (s, e) => OnParametersChanged();
-            nudNoBedTabMax.ValueChanged += (s, e) => OnParametersChanged();
+            nudTabSizeMin.ValueChanged += (s, e) => OnParametersChanged();
+            nudTabSizeMax.ValueChanged += (s, e) => OnParametersChanged();
             nudTabHeldMax.ValueChanged += (s, e) => OnParametersChanged();
 
             // Pierce
@@ -273,15 +290,18 @@ namespace OpenNest.Controls
             parameters.ExternalLeadOut = externalLeads.LeadOut;
             parameters.InternalLeadIn = internalLeads.LeadIn;
             parameters.InternalLeadOut = internalLeads.LeadOut;
-            parameters.TabsEnabled = chkTabsEnabled.Checked && rbTabAll.Checked;
+            // Tabs on every part are retired: Plan Cutting and Place Lead-in enable a tab on the
+            // copies they give the parts that need one.
+            parameters.TabsEnabled = false;
             parameters.TabConfig = new NormalTab { Size = (double)nudTabWidth.Value };
             parameters.PierceClearance = (double)nudPierceClearance.Value;
             parameters.PierceDiameter = (double)nudPierceDiameter.Value;
             parameters.RoundLeadInAngles = chkRoundLeadInAngles.Checked;
             parameters.LeadInAngleIncrement = (double)nudLeadInAngleIncrement.Value;
-            parameters.SupportTabs = chkTabsEnabled.Checked && rbSupportTab.Checked;
-            parameters.NoBedTabMinWidth = (double)nudNoBedTabMin.Value;
-            parameters.NoBedTabMaxWidth = (double)nudNoBedTabMax.Value;
+            parameters.SupportTabs = chkTabsEnabled.Checked;
+            parameters.TabBySize = rbTabBySize.Checked;
+            parameters.TabSizeMinWidth = (double)nudTabSizeMin.Value;
+            parameters.TabSizeMaxWidth = (double)nudTabSizeMax.Value;
             parameters.TabHeldMaxLength = (double)nudTabHeldMax.Value;
             return parameters;
         }
@@ -290,19 +310,22 @@ namespace OpenNest.Controls
         {
             suppressEvents = true;
             loaded = CuttingParametersSerializer.Deserialize(CuttingParametersSerializer.Serialize(p));
+            // Settings saved with "Tab every part" show as tabs by size over every width.
+            SupportTabSettings.MigrateTabEveryPart(loaded);
+            p = loaded;
 
             externalLeads.LeadIn = p.ExternalLeadIn;
             externalLeads.LeadOut = p.ExternalLeadOut;
             internalLeads.LeadIn = p.InternalLeadIn;
             internalLeads.LeadOut = p.InternalLeadOut;
 
-            chkTabsEnabled.Checked = p.TabsEnabled || p.SupportTabs;
-            rbSupportTab.Checked = p.SupportTabs;
-            rbTabAll.Checked = !p.SupportTabs;
+            chkTabsEnabled.Checked = p.SupportTabs;
+            rbTabBySize.Checked = p.TabBySize;
+            rbSupportTab.Checked = !p.TabBySize;
             if (p.TabConfig != null)
                 nudTabWidth.Value = Clamp(nudTabWidth, p.TabConfig.Size);
-            nudNoBedTabMin.Value = Clamp(nudNoBedTabMin, p.NoBedTabMinWidth);
-            nudNoBedTabMax.Value = Clamp(nudNoBedTabMax, p.NoBedTabMaxWidth);
+            nudTabSizeMin.Value = Clamp(nudTabSizeMin, p.TabSizeMinWidth);
+            nudTabSizeMax.Value = Clamp(nudTabSizeMax, p.TabSizeMaxWidth);
             nudTabHeldMax.Value = Clamp(nudTabHeldMax, p.TabHeldMaxLength);
             tabOptions.Enabled = chkTabsEnabled.Checked;
             UpdateSupportTabOptions();

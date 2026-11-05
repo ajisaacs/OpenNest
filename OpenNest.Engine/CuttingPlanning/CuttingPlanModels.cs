@@ -123,8 +123,9 @@ public sealed class CuttingPlanSnapshot
     internal IReadOnlyList<CuttingPlanFinding> Findings { get; }
 
     /// <summary>
-    /// Support tabs are on, but the request had no support bed and its settings set no no-bed
-    /// width range, so capture tabbed no part; the plan carries a note saying so.
+    /// Support tabs are on but go by size (the request had no support bed, or its settings tab by
+    /// size) and its settings set no size range, so capture tabbed no part; the plan carries a
+    /// note saying so.
     /// </summary>
     internal bool SupportTabsSkipped { get; init; }
 

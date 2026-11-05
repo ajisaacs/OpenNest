@@ -67,7 +67,7 @@ namespace OpenNest.Support
 
         /// <summary>
         /// A part on a plate with no support bed, tabbed for its <see cref="Width"/> instead
-        /// (<see cref="CNC.CuttingStrategy.CuttingParameters.TabsWithoutBedAt"/>). With no contacts
+        /// (<see cref="CNC.CuttingStrategy.CuttingParameters.TabsBySizeAt"/>). With no contacts
         /// to judge by, a tab anywhere clear of inside corners is accepted; the best tab point is
         /// the clear outline point nearest the line through the center of gravity across the
         /// outline's long side, then the one farthest from an inside corner.

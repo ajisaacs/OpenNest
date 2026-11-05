@@ -42,40 +42,55 @@ namespace OpenNest.CNC.CuttingStrategy
         public double LeadInAngleIncrement { get; set; } = 5.0;
 
         public Tab TabConfig { get; set; }
+
+        /// <summary>
+        /// Whether a contour is cut with a tab at its entry. The cutting settings never set it for
+        /// every part: Plan Cutting, Place Lead-in and drawing pins set it on the copies of the
+        /// settings they give the parts they tab. Parameters recorded with it on replay as planned.
+        /// </summary>
         public bool TabsEnabled { get; set; }
 
         /// <summary>
-        /// Tabs each part its plate's support bed cannot hold level once it is cut free, at the
-        /// perimeter point that best keeps its center of gravity over the bed's contacts (see
-        /// docs/support-tabs.md). Needs <see cref="TabConfig"/> for the tab size.
+        /// Tabs the parts that need one (see docs/support-tabs.md): with <see cref="TabBySize"/>
+        /// off, each part its plate's support bed cannot hold level once it is cut free, at the
+        /// perimeter point that best keeps its center of gravity over the bed's contacts, or on a
+        /// plate with no bed each part in the size range; with it on, each part in the size range.
+        /// Needs <see cref="TabConfig"/> for the tab size.
         /// </summary>
         public bool SupportTabs { get; set; }
 
         /// <summary>
-        /// With <see cref="SupportTabs"/> on a plate that has no support bed, the narrowest part
-        /// width that is tabbed instead (see <see cref="TabsWithoutBedAt"/>).
+        /// With <see cref="SupportTabs"/>, ignore the support bed and tab every part whose width is
+        /// in <see cref="TabSizeMinWidth"/> to <see cref="TabSizeMaxWidth"/>
+        /// (<see cref="TabsBySizeAt"/>).
         /// </summary>
-        public double NoBedTabMinWidth { get; set; }
+        public bool TabBySize { get; set; }
 
         /// <summary>
-        /// With <see cref="SupportTabs"/> on a plate that has no support bed, the widest part
-        /// width that is tabbed instead; 0 turns the rule off, so nothing is tabbed without a bed.
+        /// The narrowest part width that is tabbed by size: with <see cref="TabBySize"/>, or with
+        /// <see cref="SupportTabs"/> on a plate that has no support bed (see <see cref="TabsBySizeAt"/>).
         /// </summary>
-        public double NoBedTabMaxWidth { get; set; }
+        public double TabSizeMinWidth { get; set; }
 
-        /// <summary>Whether <see cref="NoBedTabMinWidth"/> to <see cref="NoBedTabMaxWidth"/> is a usable range.</summary>
-        public bool HasNoBedTabRange() =>
-            NoBedTabMaxWidth > 0 && double.IsFinite(NoBedTabMaxWidth)
-            && NoBedTabMinWidth >= 0 && NoBedTabMinWidth <= NoBedTabMaxWidth;
+        /// <summary>
+        /// The widest part width that is tabbed by size; 0 turns the rule off, so nothing is
+        /// tabbed by size.
+        /// </summary>
+        public double TabSizeMaxWidth { get; set; }
+
+        /// <summary>Whether <see cref="TabSizeMinWidth"/> to <see cref="TabSizeMaxWidth"/> is a usable range.</summary>
+        public bool HasTabSizeRange() =>
+            TabSizeMaxWidth > 0 && double.IsFinite(TabSizeMaxWidth)
+            && TabSizeMinWidth >= 0 && TabSizeMinWidth <= TabSizeMaxWidth;
 
         /// <summary>
         /// Whether a part <paramref name="width"/> wide (the short side of its minimum-area
-        /// bounding rectangle) is tabbed when its plate has no support bed.
+        /// bounding rectangle) is tabbed by size.
         /// </summary>
-        public bool TabsWithoutBedAt(double width) =>
-            HasNoBedTabRange()
-            && width >= NoBedTabMinWidth - Math.Tolerance.Epsilon
-            && width <= NoBedTabMaxWidth + Math.Tolerance.Epsilon;
+        public bool TabsBySizeAt(double width) =>
+            HasTabSizeRange()
+            && width >= TabSizeMinWidth - Math.Tolerance.Epsilon
+            && width <= TabSizeMaxWidth + Math.Tolerance.Epsilon;
 
         /// <summary>
         /// With <see cref="SupportTabs"/> on a plate with a support bed, the longest part (the

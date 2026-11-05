@@ -12,9 +12,9 @@ namespace OpenNest.Diagnostics;
 /// <summary>
 /// Pre-post review of part support (docs/support-tabs.md). Every part whose cutting parameters
 /// ask for support tabs and that needs one (<see cref="SupportTabSettings.Analyze"/>: its plate's
-/// support bed cannot hold it level or, without a bed, its width is in the no-bed range) must be
+/// support bed cannot hold it level or, by size, its width is in the size range) must be
 /// cut with a tab that keeps it level, however its program was made (planned, placed by hand or
-/// locked); without a bed any tab will do. The tab is the gap the outside cut leaves between its end and its start. Reports
+/// locked); by size any tab will do. The tab is the gap the outside cut leaves between its end and its start. Reports
 /// only; a part whose material or program cannot be read is reported as not checked.
 /// </summary>
 internal static class PartSupportReview
@@ -28,8 +28,7 @@ internal static class PartSupportReview
             token.ThrowIfCancellationRequested();
             var part = plate.Parts[index];
             var parameters = part?.CuttingParameters ?? plate.CuttingParameters;
-            if (part?.BaseDrawing == null || part.BaseDrawing.IsCutOff || parameters?.SupportTabs != true
-                || (bed == null && !parameters.HasNoBedTabRange()))
+            if (part?.BaseDrawing == null || part.BaseDrawing.IsCutOff || !SupportTabSettings.CanTab(parameters, bed))
                 continue;
             var partNumber = index + 1;
             try
@@ -110,7 +109,7 @@ internal static class PartSupportReview
                     ? FormattableString.Invariant(
                         $"The part is {support.Length:0.####} long, short enough for its tab alone to hold, ")
                     : FormattableString.Invariant(
-                        $"The part is {support.Width:0.####} wide, in the width range tabbed without a support bed, "))
+                        $"The part is {support.Width:0.####} wide, in the width range tabbed by size, "))
                 + "and it has no tab; it may tip once cut free."
                 + (support.BestTabPoint is { } suggested
                     ? FormattableString.Invariant($" Tab it near ({suggested.X:0.####}, {suggested.Y:0.####}).")

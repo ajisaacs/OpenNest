@@ -33,6 +33,8 @@ public class CuttingParametersDto
     public bool RoundLeadInAngles { get; set; }
     public double LeadInAngleIncrement { get; set; }
     public bool SupportTabs { get; set; }
+    public bool TabBySize { get; set; }
+    // The size range's JSON keys keep their names from when only plates with no support bed used it.
     public double NoBedTabMinWidth { get; set; }
     public double NoBedTabMaxWidth { get; set; }
     public double TabHeldMaxLength { get; set; }

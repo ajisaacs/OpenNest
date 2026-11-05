@@ -82,11 +82,23 @@ Cutting inspects a proposal, the overlay shows the proposal's parts on the same 
 
 ## Support tabs in Plan Cutting
 
-Cutting Settings > Tabs > "Tab parts the support grid cannot hold level" sets
-`CuttingParameters.SupportTabs`. With it and a plate support bed, `CuttingPlanService` capture
-analyzes each regenerated part (`SupportTabCapture`). A part the bed cannot hold level gets a
-tabbed perimeter (`PreparedContours.WithSupportTab`), using `TabConfig` for the tab size; all
-other parts keep the plate settings, so supported parts are not tabbed.
+Cutting Settings > Tabs > "Add tabs to hold parts in the sheet" sets
+`CuttingParameters.SupportTabs`, and its two choices say which parts need a tab:
+
+- "Only tab parts the support grid can't hold level": the plate's support bed decides. A plate
+  with no bed falls back to the size range ([below](#tabbing-by-size)).
+- "Tab parts by size" (`CuttingParameters.TabBySize`): the bed is ignored and the size range
+  decides on every plate.
+
+There is no setting that tabs every part: the former "Tab every part" choice is gone (see
+[migration](#settings-saved-with-tab-every-part)). `CuttingParameters.TabsEnabled`, which tabs
+every contour cut with those parameters, remains only on the copies Plan Cutting, Place Lead-in
+and drawing pins give the parts they tab, and on parameters recorded that way.
+
+With support tabs on, `CuttingPlanService` capture analyzes each regenerated part
+(`SupportTabCapture`). A part that needs a tab gets a tabbed perimeter
+(`PreparedContours.WithSupportTab`), using `TabConfig` for the tab size; all other parts keep the
+plate settings, so parts that need no tab are not tabbed.
 
 The emitter tabs a perimeter at its entry: the cut stops short of the entry by the tab size. A
 round perimeter, one circle, is cut as an arc that stops the tab's chord short of its entry.
@@ -102,8 +114,8 @@ sets `CuttingParameters.TabHeldMaxLength`: on a plate with a support bed, a part
 hold level whose length (the long side of its outline's minimum-area bounding rectangle,
 `SupportAnalyzer.Length`) is at most that, bound included, is still tabbed, but
 `SupportAnalyzer.HeldByTab` marks its analysis `IsHeldByTab`: it keeps its contacts and margin,
-every tab clear of inside corners steadies it, and its best tab point is chosen as on a plate
-with no bed (below). A part the bed holds is not tabbed. 0 turns the rule off; new settings
+every tab clear of inside corners steadies it, and its best tab point is chosen as for a part
+tabbed by size (below). A part the bed holds is not tabbed. 0 turns the rule off; new settings
 start at 6, while settings saved without the field read as 0, so saved settings keep their
 meaning. Some outlines have two minimum-area rectangles (a right isosceles triangle fits both
 its legs' square and its hypotenuse's 2:1 box), and which one rounding finds depends on how the
@@ -113,14 +125,18 @@ long side, so a drawing's length and width are the same at every rotation.
 review alike, so such a part warns only when it is cut with no tab at all. View > Draw Support
 does not read cutting settings and still shows it red, since it would tip without its tab.
 
-## Plates without a support bed
+## Tabbing by size
 
-With no bed there are no contacts to judge a part by. Cutting Settings > Tabs > "No bed: tab
-widths" sets `CuttingParameters.NoBedTabMinWidth` to `NoBedTabMaxWidth`: on a plate with no
-support bed, support tabs then tab every part whose width (the short side of its outline's
-minimum-area bounding rectangle, `SupportAnalyzer.Width`) is in that range, bounds included. A
-maximum of 0 turns the rule off. `SupportTabSettings.Analyze` makes this choice for Plan Cutting,
-hand-placed lead-ins and the pre-post review alike; a plate with a bed never uses the range.
+Cutting Settings > Tabs > "By size, or with no support bed, tab parts whose narrow side is" sets
+`CuttingParameters.TabSizeMinWidth` to `TabSizeMaxWidth` (stored under their earlier JSON names
+`noBedTabMinWidth` and `noBedTabMaxWidth`, so saved settings and nests read unchanged). Support
+tabs go by size under "Tab parts by size", and under the support grid choice on a plate with no
+bed, where there are no contacts to judge a part by (`SupportTabSettings.UsesBed`). They then tab
+every part whose width (the short side of its outline's minimum-area bounding rectangle,
+`SupportAnalyzer.Width`) is in that range, bounds included. That rectangle may be turned at any
+angle, so a drawing is tabbed or not however the nest rotated it. A maximum of 0 turns the rule
+off. `SupportTabSettings.Analyze` makes this choice for Plan Cutting, hand-placed lead-ins and
+the pre-post review alike; the support grid choice never uses the range on a plate with a bed.
 
 `SupportAnalyzer.AnalyzeWithoutBed` gives such a part a `PartSupport` with `HasBed` false: no
 contacts, never supported, and every tab clear of inside corners steadies it, so the perimeter's
@@ -128,8 +144,16 @@ automatic entries are every catalog point clear of inside corners plus the best 
 clear outline point nearest the line through the center of gravity across the long side. Which
 of those wins is left to the usual ranking toward the next cut.
 
-With support tabs on, no bed and no range, nothing is tabbed and the plan carries one advisory
-note saying so; its status is unchanged.
+When tabs go by size and no range is set, nothing is tabbed and the plan carries one advisory
+note saying so (`SupportTabSettings.SkipsForNoRange`); its status is unchanged.
+
+### Settings saved with "Tab every part"
+
+The user's saved cutting settings with the former "Tab every part" (`TabsEnabled` on,
+`SupportTabs` off) read as "Tab parts by size" from 0 to 9999 (`SupportTabSettings.MigrateTabEveryPart`),
+which tabs the same parts. This happens only where the user's settings are read (the saved
+settings and the cutting panel): a plate's recorded parameters and drawing pins keep
+`TabsEnabled` and replay as planned.
 
 If none of those entries has a lead-in that fits, the part is still tabbed. The search falls
 back first to every catalog entry clear of inside corners, then to every entry
@@ -166,9 +190,9 @@ the plate.
 
 ## Lead-ins placed by hand
 
-Plate > Place Lead-in cuts where it is clicked. Under "Tab parts the support grid cannot hold
-level", `SupportTabSettings.ForManualLeadIn` enables tabs on a copy of the settings when the
-plate's bed cannot hold the clicked part level, so the tab sits at the clicked entry. The
+Plate > Place Lead-in cuts where it is clicked. With tabs on, `SupportTabSettings.ForManualLeadIn`
+enables tabs on a copy of the settings when the clicked part needs one (the plate's bed cannot
+hold it level or, by size, its width is in the range), so the tab sits at the clicked entry. The
 overlay's orange diamond shows where it steadies the part; the pre-post review checks the
 result. Plan Cutting is the only automatic lead-in assignment.
 
@@ -176,11 +200,11 @@ result. Plan Cutting is the only automatic lead-in assignment.
 
 `PartSupportReview` runs in every pre-post verification and in Validate Nest. Each part whose
 settings (its own, else the plate's) ask for support tabs and that needs one (the plate's bed
-cannot hold it level or, with no bed, its width is in the no-bed range) is checked, however its
+cannot hold it level or, by size, its width is in the size range) is checked, however its
 program was made. The tab is the gap between
 the end and the start of the program's outside cut (the chain of cutting motions with the
-largest extent). A part with no such gap, or whose gap does not steady it (without
-a bed, or for a part its tab alone holds, any gap does), gets a `PartSupport` warning at its center of gravity naming the best tab point; posting needs
+largest extent). A part with no such gap, or whose gap does not steady it (by size,
+or for a part its tab alone holds, any gap does), gets a `PartSupport` warning at its center of gravity naming the best tab point; posting needs
 consent as for every warning. A part whose material cannot be read is reported as not checked.
 
 Not covered yet:

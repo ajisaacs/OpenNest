@@ -232,7 +232,11 @@ namespace OpenNest.Forms
             {
                 try
                 {
-                    return CuttingParametersSerializer.Deserialize(json);
+                    // Settings saved with the retired "Tab every part" read as tabs by size over
+                    // every width. A plate's recorded parameters are never migrated.
+                    var parameters = CuttingParametersSerializer.Deserialize(json);
+                    Support.SupportTabSettings.MigrateTabEveryPart(parameters);
+                    return parameters;
                 }
                 catch
                 { /* fall through */

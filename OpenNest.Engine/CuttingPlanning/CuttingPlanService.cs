@@ -181,7 +181,7 @@ public static class CuttingPlanService
                     : OwnedCuttingParameters.Copy(request.ConfirmedParameters),
                 dependencies: dependencies, findings: warnings, bestEffort: bestEffort)
             {
-                SupportTabsSkipped = SupportTabSettings.SkipsWithoutBed(request.ConfirmedParameters, request.SupportBed),
+                SupportTabsSkipped = SupportTabSettings.SkipsForNoRange(request.ConfirmedParameters, request.SupportBed),
             };
         }
         catch (OperationCanceledException)

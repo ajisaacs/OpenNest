@@ -90,8 +90,9 @@ internal static class StateFingerprint
             TabSettings(p.TabConfig);
             Flag(p.TabsEnabled);
             Flag(p.SupportTabs);
-            Number(p.NoBedTabMinWidth);
-            Number(p.NoBedTabMaxWidth);
+            Flag(p.TabBySize);
+            Number(p.TabSizeMinWidth);
+            Number(p.TabSizeMaxWidth);
             Number(p.TabHeldMaxLength);
             Sequence(p.Sequencing);
             Assignment(p.Assignment);

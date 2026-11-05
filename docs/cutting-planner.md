@@ -41,9 +41,10 @@ var result = CuttingPlanService.Plan(snapshot, cancellationToken);
   that still cannot hold its part level, or sits in an inside corner, is noted on the plan
   without changing its status. A part no single tab can hold level may tip once cut, so its
   tabbed outside is a rapid obstacle from then on, like an untabbed one. A part no longer than `TabHeldMaxLength` is held by its tab
-  alone, so any tab clear of inside corners steadies it. Without a bed, the parts whose width is in
-  `NoBedTabMinWidth`..`NoBedTabMaxWidth` are tabbed instead, and with no range set the plan notes
-  that nothing was tabbed; see [support tabs](support-tabs.md).
+  alone, so any tab clear of inside corners steadies it. Without a bed, or with
+  `CuttingParameters.TabBySize`, the parts whose width is in `TabSizeMinWidth`..`TabSizeMaxWidth`
+  are tabbed instead, and with no range set the plan notes that nothing was tabbed; see
+  [support tabs](support-tabs.md).
 - Parameters are caller-confirmed inputs. The service does not recover missing
   operator settings or silently change lead styles to find a solution.
 

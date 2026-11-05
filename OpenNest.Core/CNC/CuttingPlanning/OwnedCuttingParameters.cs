@@ -42,8 +42,9 @@ internal static class OwnedCuttingParameters
                 : CopyTab(source.TabConfig),
             TabsEnabled = source.TabsEnabled,
             SupportTabs = source.SupportTabs,
-            NoBedTabMinWidth = Dimension(source.NoBedTabMinWidth),
-            NoBedTabMaxWidth = Dimension(source.NoBedTabMaxWidth),
+            TabBySize = source.TabBySize,
+            TabSizeMinWidth = Dimension(source.TabSizeMinWidth),
+            TabSizeMaxWidth = Dimension(source.TabSizeMaxWidth),
             TabHeldMaxLength = Dimension(source.TabHeldMaxLength),
             Sequencing = new SequenceParameters
             {
