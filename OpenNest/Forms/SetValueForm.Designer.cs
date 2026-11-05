@@ -32,6 +32,7 @@
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.labelIncrement = new System.Windows.Forms.Label();
             this.numericUpDownValue = new OpenNest.Controls.NumericUpDown();
+            this.checkBoxOption = new System.Windows.Forms.CheckBox();
             this.tableLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownValue)).BeginInit();
             this.SuspendLayout();
@@ -56,11 +57,13 @@
             this.tableLayoutPanel1.Controls.Add(this.buttonSet, 2, 0);
             this.tableLayoutPanel1.Controls.Add(this.labelIncrement, 0, 0);
             this.tableLayoutPanel1.Controls.Add(this.numericUpDownValue, 1, 0);
+            this.tableLayoutPanel1.Controls.Add(this.checkBoxOption, 0, 1);
             this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tableLayoutPanel1.Location = new System.Drawing.Point(6, 5);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
-            this.tableLayoutPanel1.RowCount = 1;
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tableLayoutPanel1.RowCount = 2;
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 41F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.tableLayoutPanel1.Size = new System.Drawing.Size(344, 41);
             this.tableLayoutPanel1.TabIndex = 0;
             // 
@@ -90,6 +93,18 @@
             this.numericUpDownValue.Size = new System.Drawing.Size(171, 22);
             this.numericUpDownValue.TabIndex = 1;
             // 
+            // checkBoxOption
+            // 
+            this.checkBoxOption.AutoSize = true;
+            this.tableLayoutPanel1.SetColumnSpan(this.checkBoxOption, 3);
+            this.checkBoxOption.Location = new System.Drawing.Point(3, 44);
+            this.checkBoxOption.Name = "checkBoxOption";
+            this.checkBoxOption.Size = new System.Drawing.Size(15, 14);
+            this.checkBoxOption.TabIndex = 3;
+            this.checkBoxOption.UseVisualStyleBackColor = true;
+            this.checkBoxOption.Visible = false;
+            this.checkBoxOption.CheckedChanged += new System.EventHandler(this.checkBoxOption_CheckedChanged);
+            // 
             // SetValueForm
             // 
             this.AcceptButton = this.buttonSet;
@@ -118,5 +133,6 @@
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
         private System.Windows.Forms.Label labelIncrement;
         private Controls.NumericUpDown numericUpDownValue;
+        private System.Windows.Forms.CheckBox checkBoxOption;
     }
 }

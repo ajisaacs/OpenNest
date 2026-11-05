@@ -288,6 +288,12 @@ namespace OpenNest.Controls
 
         public double OffsetIncrementDistance { get; set; }
 
+        /// <summary>
+        /// When true, the arrow keys step the selection by its own size plus the part
+        /// spacing instead of <see cref="OffsetIncrementDistance"/>.
+        /// </summary>
+        public bool CalculatedOffsetDistance { get; set; }
+
         public Plate Plate
         {
             get { return plate; }
@@ -720,7 +726,7 @@ namespace OpenNest.Controls
                     break;
 
                 case Keys.Left:
-                    selection.NudgeSelected(-OffsetIncrementDistance, 0);
+                    NudgeSelected(PushDirection.Left);
                     break;
 
                 case Keys.X:
@@ -744,19 +750,32 @@ namespace OpenNest.Controls
                     break;
 
                 case Keys.Right:
-                    selection.NudgeSelected(OffsetIncrementDistance, 0);
+                    NudgeSelected(PushDirection.Right);
                     break;
 
                 case Keys.Up:
-                    selection.NudgeSelected(0, OffsetIncrementDistance);
+                    NudgeSelected(PushDirection.Up);
                     break;
 
                 case Keys.Down:
-                    selection.NudgeSelected(0, -OffsetIncrementDistance);
+                    NudgeSelected(PushDirection.Down);
                     break;
             }
 
             return base.ProcessDialogKey(keyData);
+        }
+
+        /// <summary>An arrow key: the fixed offset increment, or the calculated step.</summary>
+        public void NudgeSelected(PushDirection direction)
+        {
+            if (CalculatedOffsetDistance)
+            {
+                selection.StepSelected(direction);
+                return;
+            }
+
+            var offset = SpatialQuery.DirectionToOffset(direction, OffsetIncrementDistance);
+            selection.NudgeSelected(offset.X, offset.Y);
         }
 
         protected override void OnPaint(PaintEventArgs e)

@@ -152,9 +152,14 @@ namespace OpenNest.Forms
             using var form = new SetValueForm();
             form.Text = "Set Offset Increment";
             form.Value = activeForm.PlateView.OffsetIncrementDistance;
+            form.OptionText = "Calculated distance (selection size + part spacing)";
+            form.OptionChecked = activeForm.PlateView.CalculatedOffsetDistance;
 
             if (form.ShowDialog(this) == DialogResult.OK)
+            {
                 activeForm.PlateView.OffsetIncrementDistance = form.Value;
+                activeForm.PlateView.CalculatedOffsetDistance = form.OptionChecked;
+            }
         }
 
         private void SetRotationIncrement_Click(object sender, EventArgs e)

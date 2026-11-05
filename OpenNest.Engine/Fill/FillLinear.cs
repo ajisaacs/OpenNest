@@ -197,6 +197,14 @@ namespace OpenNest.Engine.Fill
         }
 
         /// <summary>
+        /// Geometry-aware distance between a pattern and its next copy along an axis at
+        /// this filler's part spacing. A copy is a translation, so the distance is the
+        /// same in the opposite direction.
+        /// </summary>
+        public double CopyDistance(Pattern pattern, NestDirection direction) =>
+            FindPatternCopyDistance(pattern, direction, new OffsetPerimeterCache(HalfSpacing));
+
+        /// <summary>
         /// Tiles a pattern along the given axis, returning the cloned parts
         /// (does not include the original pattern's parts). For multi-part
         /// patterns, also adds individual parts from the next incomplete copy

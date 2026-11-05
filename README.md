@@ -113,7 +113,7 @@ Default compares the built-in Irregular, Rectangles and Circles engines and keep
 
 ## Keyboard Shortcuts
 
-`Ctrl+F` fill area · `F` zoom to fit · `Shift+wheel` / middle-click rotate · `X`/`Y` push · arrows nudge · `Shift+arrow` push.
+`Ctrl+F` fill area · `F` zoom to fit · `Shift+wheel` / middle-click rotate · `X`/`Y` push · arrows nudge by the offset increment (`F5`), or with its calculated distance by the selection's own size plus part spacing, landing tight with no push back · `Shift+arrow` push.
 
 ## Status & License
 

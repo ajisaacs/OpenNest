@@ -80,7 +80,7 @@ change.Complete();
   open the scope at their final commit and record only the result they keep. A stopped run
   that keeps nothing records nothing; an interactive drag records one entry on mouse-up.
 - Repeated edits with an equal `coalesceKey` within one second undo as one (arrow-key nudges of
-  one selection). An Undo, Redo or save in between ends the run.
+  one selection, fixed or calculated). An Undo, Redo or save in between ends the run.
 
 ### The "Change" safety net
 

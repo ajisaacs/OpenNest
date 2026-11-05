@@ -31,14 +31,44 @@ namespace OpenNest.Engine.Fill
         public static double Push(List<Part> movingParts, Plate plate, double angle) =>
             Push(movingParts, plate, new Vector(System.Math.Cos(angle), System.Math.Sin(angle)));
 
-        private static double Push(List<Part> movingParts, Plate plate, Vector direction)
+        private static double Push(List<Part> movingParts, Plate plate, Vector direction) =>
+            Push(movingParts, plate, direction, double.MaxValue);
+
+        private static double Push(List<Part> movingParts, Plate plate, Vector direction, double limit)
         {
             var obstacleParts = plate.Parts
                 .Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
                 .ToList();
 
-            return Push(movingParts, plate.WorkArea(), direction,
+            return Push(movingParts, plate.WorkArea(), direction, limit,
                 new ObstacleSet(obstacleParts, plate.PartSpacing), ZoneObstacles(plate));
+        }
+
+        /// <summary>
+        /// Moves movingParts one repeat step along <paramref name="direction"/>: the
+        /// distance at which a copy left behind would sit at the plate's part spacing,
+        /// measured on the parts' geometry like a fill's copy distance, so shapes that
+        /// nest into their own copy step less than their size. Like
+        /// <see cref="Push(List{Part}, Plate, PushDirection)"/>, the move stops early at
+        /// the work-area edge, a clamp zone or another part, never passing one.
+        /// Returns the distance moved.
+        /// </summary>
+        public static double Step(List<Part> movingParts, Plate plate, PushDirection direction)
+        {
+            if (movingParts.Count == 0)
+                return 0;
+
+            var pattern = new Pattern();
+            pattern.Parts.AddRange(movingParts);
+            pattern.UpdateBounds();
+            var axis = SpatialQuery.IsHorizontalDirection(direction)
+                ? NestDirection.Horizontal
+                : NestDirection.Vertical;
+            var step = new FillLinear(plate.WorkArea(), plate.PartSpacing).CopyDistance(pattern, axis);
+            if (!double.IsFinite(step) || step <= 0)
+                return 0;
+
+            return Push(movingParts, plate, SpatialQuery.DirectionToOffset(direction, 1.0), step);
         }
 
         /// <summary>
@@ -52,19 +82,27 @@ namespace OpenNest.Engine.Fill
             Vector direction
         ) => Push(movingParts, workArea, direction, new ObstacleSet(obstacleParts, partSpacing));
 
-        /// <summary>
-        /// Pushes movingParts to the first contact with the work-area edge or an obstacle,
-        /// keeping each obstacle set's own spacing.
-        /// </summary>
         private static double Push(
             List<Part> movingParts,
             Box workArea,
             Vector direction,
             params ObstacleSet[] obstacleSets
+        ) => Push(movingParts, workArea, direction, double.MaxValue, obstacleSets);
+
+        /// <summary>
+        /// Pushes movingParts at most <paramref name="limit"/> toward the first contact
+        /// with the work-area edge or an obstacle, keeping each obstacle set's own spacing.
+        /// </summary>
+        private static double Push(
+            List<Part> movingParts,
+            Box workArea,
+            Vector direction,
+            double limit,
+            params ObstacleSet[] obstacleSets
         )
         {
             var opposite = -direction;
-            var distance = double.MaxValue;
+            var distance = limit;
 
             foreach (var moving in movingParts)
             {

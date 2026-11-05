@@ -1,9 +1,12 @@
-﻿using System.Windows.Forms;
+using System.Drawing;
+using System.Windows.Forms;
 
 namespace OpenNest.Forms
 {
     public partial class SetValueForm : Form
     {
+        private int optionRowHeight;
+
         public SetValueForm()
         {
             InitializeComponent();
@@ -44,5 +47,39 @@ namespace OpenNest.Forms
             get { return (double)numericUpDownValue.Value; }
             set { numericUpDownValue.Value = (decimal)value; }
         }
+
+        /// <summary>
+        /// Shows a check box under the value with this text; checking it disables the
+        /// value. Hidden while empty.
+        /// </summary>
+        public string OptionText
+        {
+            get { return checkBoxOption.Text; }
+            set
+            {
+                var show = !string.IsNullOrEmpty(value);
+                checkBoxOption.Text = value;
+                checkBoxOption.Visible = show;
+                // Visible reads false until the form is shown, so track the extra row here.
+                var rowHeight = show
+                    ? checkBoxOption.PreferredSize.Height + checkBoxOption.Margin.Vertical
+                    : 0;
+                var width = show
+                    ? System.Math.Max(ClientSize.Width,
+                        checkBoxOption.PreferredSize.Width + checkBoxOption.Margin.Horizontal + Padding.Horizontal)
+                    : ClientSize.Width;
+                ClientSize = new Size(width, ClientSize.Height - optionRowHeight + rowHeight);
+                optionRowHeight = rowHeight;
+            }
+        }
+
+        public bool OptionChecked
+        {
+            get { return checkBoxOption.Checked; }
+            set { checkBoxOption.Checked = value; }
+        }
+
+        private void checkBoxOption_CheckedChanged(object sender, System.EventArgs e) =>
+            numericUpDownValue.Enabled = !checkBoxOption.Checked;
     }
 }

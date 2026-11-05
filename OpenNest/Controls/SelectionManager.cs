@@ -107,6 +107,26 @@ namespace OpenNest.Controls
             change.Complete();
         }
 
+        /// <summary>
+        /// Moves the selection one repeat step in <paramref name="direction"/>: its own
+        /// size along that axis plus the part spacing, measured on its geometry
+        /// (<see cref="Compactor.Step"/>). It stops early at an edge or another part.
+        /// Repeated steps undo as one move, like nudges.
+        /// </summary>
+        public void StepSelected(PushDirection direction)
+        {
+            if (selectedParts.Count == 0)
+                return;
+
+            using var change = view.BeginChange("Nudge", new SelectionKey("Nudge", view.Plate, selectedParts));
+            var movingParts = selectedParts.Select(p => p.BasePart).ToList();
+            if (Compactor.Step(movingParts, view.Plate, direction) > 0)
+                change.MarkChanged();
+            selectedParts.ForEach(p => p.IsDirty = true);
+            view.Invalidate();
+            change.Complete();
+        }
+
         public void AlignSelected(AlignType alignType)
         {
             if (selectedParts.Count == 0)
