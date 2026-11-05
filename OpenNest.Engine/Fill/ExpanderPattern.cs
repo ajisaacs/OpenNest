@@ -18,8 +18,16 @@ namespace OpenNest.Engine.Fill
         {
             public Vector A;
 
-            /// <summary>Second translation; <see cref="Vector.Zero"/> for a single row.</summary>
+            /// <summary>Second translation; <see cref="Vector.Zero"/> for a single row
+            /// or for <see cref="Rows"/>.</summary>
             public Vector B;
+
+            /// <summary>
+            /// True for rows that share the pitch <see cref="A"/> but stack at
+            /// their own spacing, such as staggered rows topped by straight ones.
+            /// Each part is its own lattice point.
+            /// </summary>
+            public bool Rows;
 
             /// <summary>
             /// Per selected part, the lattice point of its motif copy. Parts of
@@ -39,6 +47,8 @@ namespace OpenNest.Engine.Fill
             /// A pattern must over-determine its lattice: a row needs three parts
             /// of one motif group and a grid four, since any two or three points
             /// trivially fit some lattice. Every group needs at least two parts.
+            /// A single motif group that fits no one lattice may still form
+            /// <see cref="Rows"/>.
             /// </summary>
             public static RepeatingPattern Detect(IReadOnlyList<Part> parts)
             {
@@ -50,6 +60,13 @@ namespace OpenNest.Engine.Fill
                 if (groups.Any(g => g.Count < 2))
                     return null;
 
+                return DetectLattice(groups, centers)
+                    ?? DetectRows(parts, groups, centers, horizontal: true)
+                    ?? DetectRows(parts, groups, centers, horizontal: false);
+            }
+
+            private static RepeatingPattern DetectLattice(List<List<int>> groups, Vector[] centers)
+            {
                 if (!TryBasis(groups, centers, out var a, out var b))
                     return null;
 
@@ -61,7 +78,7 @@ namespace OpenNest.Engine.Fill
                 // its part nearest that group's origin: the reduced motif offset,
                 // so an interlocked partner moves with its own copy.
                 var origin = centers[groups[0][0]];
-                var points = new Vector[parts.Count];
+                var points = new Vector[centers.Length];
                 foreach (var group in groups)
                 {
                     var groupOrigin = centers[group.OrderBy(i => centers[i].DistanceTo(origin)).First()];
@@ -74,6 +91,56 @@ namespace OpenNest.Engine.Fill
                 }
 
                 return new RepeatingPattern { A = a, B = b, LatticePoints = points };
+            }
+
+            /// <summary>
+            /// Rows of one motif along X (or Y): at least two rows, each of at
+            /// least two parts and one of at least three, whose steps along the
+            /// row are all whole multiples of one shared pitch. Rows may stack at
+            /// any spacing and offset, so stretching moves each row rigidly.
+            /// </summary>
+            private static RepeatingPattern DetectRows(
+                IReadOnlyList<Part> parts, List<List<int>> groups, Vector[] centers, bool horizontal)
+            {
+                if (groups.Count != 1)
+                    return null;
+                double Along(Vector v) => horizontal ? v.X : v.Y;
+                double Across(Vector v) => horizontal ? v.Y : v.X;
+
+                // Parts of one row share their cross coordinate to within a
+                // sliver of the part's own size.
+                var box = parts[0].BoundingBox;
+                var rowTolerance = CoordinateTolerance * System.Math.Min(box.Length, box.Width);
+                var rows = new List<List<Vector>>();
+                foreach (var center in centers.OrderBy(Across))
+                {
+                    if (rows.Count == 0 || Across(center) - Across(rows[^1][0]) > rowTolerance)
+                        rows.Add(new List<Vector>());
+                    rows[^1].Add(center);
+                }
+                if (rows.Count < 2 || rows.Any(r => r.Count < 2) || rows.Max(r => r.Count) < 3)
+                    return null;
+
+                var steps = rows
+                    .SelectMany(r =>
+                    {
+                        var along = r.Select(Along).OrderBy(x => x).ToList();
+                        return along.Skip(1).Select((x, i) => x - along[i]);
+                    })
+                    .ToList();
+                var pitch = steps.Min();
+                if (pitch <= rowTolerance)
+                    return null;
+                if (steps.Any(step => System.Math.Abs(step / pitch - System.Math.Round(step / pitch)) > CoordinateTolerance))
+                    return null;
+
+                return new RepeatingPattern
+                {
+                    A = horizontal ? new Vector(pitch, 0) : new Vector(0, pitch),
+                    B = Vector.Zero,
+                    Rows = true,
+                    LatticePoints = centers.ToArray(),
+                };
             }
 
             private static List<List<int>> Group(IReadOnlyList<Part> parts)

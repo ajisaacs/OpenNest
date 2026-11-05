@@ -104,6 +104,48 @@ public class ExpanderPatternTests
     }
 
     [Fact]
+    public void Expand_StaggeredRowsToppedByStraightRows_SpreadsEveryRow()
+    {
+        // Three staggered rows, then two straight rows stacked on the wide
+        // rows' columns: no single lattice, but rows sharing one pitch.
+        const double gap = 0.2;
+        const double edge = 0.2;
+        const int columns = 9;
+        var pitch = 2 * Radius + gap;
+        var dx = pitch / 2;
+        var dy = System.Math.Sqrt(pitch * pitch - dx * dx);
+        var plate = MakePlate(2 * edge + 2 * Radius + (columns - 1) * dx, 40, edge);
+        var drawing = new Drawing("disk", Disk(Radius));
+        var parts = new List<Part>();
+        var rowYs = new List<double>();
+        var y = edge + Radius;
+        for (var row = 0; row < 5; row++)
+        {
+            var odd = row == 1;
+            rowYs.Add(y);
+            for (var column = odd ? 1 : 0; column < columns; column += 2)
+                parts.Add(Add(plate, drawing, edge + Radius + column * dx, y));
+            y += row < 2 ? dy : pitch;
+        }
+        var xs = parts.Select(p => p.Location.X).ToList();
+        var entryGap = parts.SelectMany((a, i) => parts.Skip(i + 1).Select(b => DiskGap(a, b))).Min();
+
+        var result = Expander.Expand(parts, plate);
+
+        Assert.True(result.KeptPattern);
+        Assert.True(result.PatternMoved);
+        for (var i = 0; i < parts.Count; i++)
+            Assert.Equal(xs[i], parts[i].Location.X, 6);
+        var spreadYs = parts.Select(p => p.Location.Y).Distinct(new Near()).OrderBy(v => v).ToList();
+        Assert.Equal(5, spreadYs.Count);
+        for (var row = 1; row < 5; row++)
+            Assert.True(spreadYs[row] - spreadYs[row - 1] > rowYs[row] - rowYs[row - 1] + 0.1);
+        var work = plate.WorkArea();
+        Assert.True(work.Top - parts.Max(p => p.BoundingBox.Top) < 0.02);
+        Assert.True(parts.SelectMany((a, i) => parts.Skip(i + 1).Select(b => DiskGap(a, b))).Min() >= entryGap - 1e-6);
+    }
+
+    [Fact]
     public void Expand_GridWithRoomBothWays_FillsTheWorkAreaEvenly()
     {
         var plate = MakePlate(40, 30, 0.5);
