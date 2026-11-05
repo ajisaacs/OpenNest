@@ -143,9 +143,9 @@ make unlikely. The user then runs Auto Nest again; nothing partial is kept.
 
 ## Server
 
-`/api/nest-jobs` (`NestJobRoutes`, `NestDatabase.Jobs`, schema version 15) stores packages and
-results as opaque bytes. The HTTP server never opens either and references neither the engine
-nor `OpenNest.IO`.
+`/api/nest-jobs` (`NestJobRoutes`, `NestDatabase.Jobs`, added in schema version 15) stores
+packages and results as opaque bytes. The HTTP server never opens either and references neither
+the engine nor `OpenNest.IO`.
 
 | Route | Who | Does |
 |---|---|---|

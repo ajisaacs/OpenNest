@@ -57,7 +57,7 @@ snapshots go through the same writer and reader, so a restore rebuilds the outli
 - Only the Irregular engine nests on an outlined sheet. A job offering an outlined sheet and a
   rectangle to Default may well land on the rectangle: Default keeps the cheaper valid layout.
 - Auto Nest's stock-options grid offers rectangles only; an outlined sheet is nested through
-  the target plate (no options), or through `NestPlateStock` directly (console, MCP, API callers
-  that pass an outline).
+  the target plate (no options), or through `NestPlateStock` directly: the console's `--outline`,
+  or API callers that set `NestPlateStock.Outline`. MCP has no outline input.
 - The stored polygon is inside the true material by up to the chord tolerance (0.001) on
   imported arcs and exactly on straight edges.

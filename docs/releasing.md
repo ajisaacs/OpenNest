@@ -36,7 +36,7 @@ pulls from GitHub every hour; it refuses pushes.
 The workflow has read-only repository permissions and does **not** publish
 releases. The separate [development build](auto-update.md#development-builds)
 workflow does replace the rolling `dev-build` pre-release after each green master
-push (owner-approved); it is not a release and never touches `vX.Y.Z` tags. Once present on the default branch, it can also be dispatched manually
+push; it is not a release and never touches `vX.Y.Z` tags. Once present on the default branch, it can also be dispatched manually
 with an `X.Y.Z` version. Running/dispatching via a PAT needs suitable Actions
 permissions; public run metadata alone does not prove dispatch access.
 
