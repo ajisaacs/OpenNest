@@ -49,6 +49,7 @@ public enum AutomaticCutOffDiagnosticCode
     ShiftedCut,
     HorizontalRemnant,
     NoSafeHorizontalSeparator,
+    ClampMovedTailSeparator,
 }
 
 public sealed record AutomaticCutOffDiagnostic(
@@ -167,7 +168,21 @@ public static class AutomaticCutOffPlanner
         occupied = System.Math.Min(occupied, length);
         occupiedY = System.Math.Min(occupiedY, width);
         var margin = System.Math.Max(plate.PartSpacing, settings.PartClearance) + GeometryTolerance;
-        var separator = occupied + margin;
+        var nominalSeparator = occupied + margin;
+        // A separator on a clamp moves just past it, away from the origin: the tail is a
+        // little shorter, but a clamp in the way no longer costs the whole remnant. Repeat
+        // for a clamp whose clearance the moved line now meets.
+        var separator = nominalSeparator;
+        ClampZone movedPast = null;
+        for (var pass = 0; pass <= clamps.Count && double.IsFinite(separator); pass++)
+        {
+            var blocking = clamps.FirstOrDefault(zone => CrossesClamp(zone, sign * separator));
+            if (blocking == null)
+                break;
+            movedPast = blocking;
+            var farEdge = sign > 0 ? blocking.Bounds.Right : -blocking.Bounds.Left;
+            separator = farEdge + plate.ClampClearance + GeometryTolerance;
+        }
         var hasTailCandidate = double.IsFinite(separator) && separator < length - GeometryTolerance;
         var diagnostics = new List<AutomaticCutOffDiagnostic>();
 
@@ -306,7 +321,14 @@ public static class AutomaticCutOffPlanner
             }
         }
         if (keepsTail)
+        {
+            if (movedPast != null)
+                diagnostics.Add(new AutomaticCutOffDiagnostic(
+                    AutomaticCutOffDiagnosticCode.ClampMovedTailSeparator,
+                    $"The tail separator moved from {sign * nominalSeparator:G8} to {sign * separator:G8} "
+                    + $"to clear clamp '{movedPast.Id}' (including its clearance).", X: sign * separator));
             AddCandidate(sign * separator, true);
+        }
         else if (hasTailCandidate)
             diagnostics.Add(new AutomaticCutOffDiagnostic(
                 AutomaticCutOffDiagnosticCode.TailBelowMinimum,
