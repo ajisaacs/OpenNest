@@ -56,28 +56,15 @@ namespace OpenNest.Engine.CirclePacking
                 ? System.Math.Max(Trigonometry.Height(primaryOffset * 0.5, item.Diameter), item.Diameter * 0.5)
                 : item.Diameter;
 
-            var outerStart = (horizontal ? bin.Y : bin.X) + item.Radius;
-            var outerMax = horizontal ? max.Y : max.X;
-            var innerStart = (horizontal ? bin.X : bin.Y) + item.Radius;
-            var innerMax = horizontal ? max.X : max.Y;
-
-            var stripe = 0;
-
-            for (var outer = outerStart; outer <= outerMax; outer += secondaryOffset)
-            {
-                var inner = count > 1 && stripe.IsOdd() ? innerStart + primaryOffset * 0.5 : innerStart;
-
-                for (; inner <= innerMax; inner += primaryOffset)
-                {
-                    var addedItem = item.Clone();
-                    addedItem.Center = horizontal
-                        ? new Vector(inner, outer)
-                        : new Vector(outer, inner);
-                    bin.Items.Add(addedItem);
-                }
-
-                stripe++;
-            }
+            AddStripes(bin, item, new Stripes(
+                InnerAlongX: horizontal,
+                OuterStart: (horizontal ? bin.Y : bin.X) + item.Radius,
+                OuterMax: horizontal ? max.Y : max.X,
+                OuterStep: secondaryOffset,
+                InnerStart: (horizontal ? bin.X : bin.Y) + item.Radius,
+                InnerMax: horizontal ? max.X : max.Y,
+                InnerStep: primaryOffset,
+                Shift: count > 1 ? primaryOffset * 0.5 : 0));
 
             return bin;
         }

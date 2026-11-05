@@ -72,8 +72,10 @@ public class FillEndOverlapTests
 
         new FillEndOdd(bin).Fill(new Item { Radius = 4.125 });
 
+        // Staggered all the way places 108; the last stripes stacked straight fit one more.
         AssertNoOverlaps(bin.Items, 8.25);
-        Assert.Equal(108, bin.Items.Count);
+        AssertInside(bin);
+        Assert.Equal(109, bin.Items.Count);
     }
 
     [Fact]
@@ -85,6 +87,42 @@ public class FillEndOverlapTests
 
         AssertNoOverlaps(bin.Items, 8.25);
         Assert.Equal(112, bin.Items.Count);
+    }
+
+    [Fact]
+    public void FillEndOdd_EndsWithStraightStripesWhenTheyFitMore()
+    {
+        // 13 discs to a stripe: seven staggered stripes place 88 and six straight ones 78, but
+        // five staggered and two straight over the fifth place 89.
+        var bin = new Bin { Location = new Vector(0, 0), Size = new Size(59.8, 119.8) };
+
+        new FillEndOdd(bin).Fill(new Item { Radius = 4.6 });
+
+        AssertNoOverlaps(bin.Items, 9.2);
+        AssertInside(bin);
+        Assert.Equal(89, bin.Items.Count);
+        var stripes = bin.Items.GroupBy(i => System.Math.Round(i.Center.Y, 6)).OrderBy(g => g.Key).ToList();
+        Assert.Equal(new[] { 13, 12, 13, 12, 13, 13, 13 }, stripes.Select(s => s.Count()));
+        var fifth = stripes[4].Select(i => i.Center.X).Order().ToList();
+        for (var stripe = 5; stripe < stripes.Count; stripe++)
+        {
+            Assert.Equal(9.2, stripes[stripe].Key - stripes[stripe - 1].Key, 6);
+            Assert.Equal(fifth, stripes[stripe].Select(i => i.Center.X).Order());
+        }
+    }
+
+    [Fact]
+    public void FillEndOdd_KeepsStaggeredStripesWhenStraightOnesFitNoMore()
+    {
+        // Seven staggered stripes place 88; too short for the mixed 89, straight stripes from
+        // any switch point place at most 78.
+        var bin = new Bin { Location = new Vector(0, 0), Size = new Size(57.2, 119.8) };
+
+        new FillEndOdd(bin).Fill(new Item { Radius = 4.6 });
+
+        Assert.Equal(88, bin.Items.Count);
+        var stripes = bin.Items.GroupBy(i => System.Math.Round(i.Center.Y, 6)).Select(g => g.Count());
+        Assert.Equal(new[] { 13, 12, 13, 12, 13, 12, 13 }, stripes);
     }
 
     private static Item CreateItem() => new Item { Radius = Diameter * 0.5, Center = new Vector(Diameter * 0.5, Diameter * 0.5) };

@@ -46,6 +46,40 @@ public class CircleFillStrategyTests
     }
 
     [Fact]
+    public void Fill_NineInchCirclesOnASixtyByOneTwenty_EndsWithStraightRows()
+    {
+        // Seven staggered rows of 13 and 12 place 88; five staggered rows and two straight rows
+        // of 13 over the fifth place 89.
+        var pgm = new Program();
+        var start = new Vector(4.5, 0);
+        pgm.Codes.Add(new RapidMove(start));
+        pgm.Codes.Add(new ArcMove(start, new Vector(0, 0), RotationType.CCW));
+        var plate = new Plate(60, 120) { PartSpacing = 0.2 };
+        plate.EdgeSpacing = new Spacing(0.2, 0.2, 0.2, 0.2);
+        var filler = new PlateFiller(plate);
+
+        var parts = filler.Fill(
+            new NestItem { Drawing = new Drawing("nine", pgm) },
+            plate.WorkArea(),
+            null,
+            CancellationToken.None
+        );
+
+        Assert.Equal(89, parts.Count);
+        Assert.Equal(NestPhase.Custom, filler.WinnerPhase);
+        var rows = parts.GroupBy(p => System.Math.Round(p.BoundingBox.Center.Y, 6)).OrderBy(g => g.Key);
+        Assert.Equal(new[] { 13, 12, 13, 12, 13, 13, 13 }, rows.Select(r => r.Count()));
+        var work = plate.WorkArea();
+        Assert.All(parts, p => Assert.True(work.Contains(p.BoundingBox.Offset(-Tolerance.Epsilon))));
+        var centers = parts.Select(p => p.BoundingBox.Center).ToList();
+        for (var i = 0; i < centers.Count; i++)
+        {
+            for (var j = i + 1; j < centers.Count; j++)
+                Assert.True(centers[i].DistanceTo(centers[j]) >= 9.2 - Tolerance.Epsilon);
+        }
+    }
+
+    [Fact]
     public void Fill_RoundPartOffItsOrigin_PlacesItAtTheFilledCenter()
     {
         var pgm = new Program();
