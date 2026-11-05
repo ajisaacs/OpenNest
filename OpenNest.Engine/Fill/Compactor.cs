@@ -31,16 +31,13 @@ namespace OpenNest.Engine.Fill
         public static double Push(List<Part> movingParts, Plate plate, double angle) =>
             Push(movingParts, plate, new Vector(System.Math.Cos(angle), System.Math.Sin(angle)));
 
-        private static double Push(List<Part> movingParts, Plate plate, Vector direction) =>
-            Push(movingParts, plate, direction, double.MaxValue);
-
-        private static double Push(List<Part> movingParts, Plate plate, Vector direction, double limit)
+        private static double Push(List<Part> movingParts, Plate plate, Vector direction)
         {
             var obstacleParts = plate.Parts
                 .Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
                 .ToList();
 
-            return Push(movingParts, plate.WorkArea(), direction, limit,
+            return Push(movingParts, plate.WorkArea(), direction,
                 new ObstacleSet(obstacleParts, plate.PartSpacing), ZoneObstacles(plate));
         }
 
@@ -48,10 +45,9 @@ namespace OpenNest.Engine.Fill
         /// Moves movingParts one repeat step along <paramref name="direction"/>: the
         /// distance at which a copy left behind would sit at the plate's part spacing,
         /// measured on the parts' geometry like a fill's copy distance, so shapes that
-        /// nest into their own copy step less than their size. Like
-        /// <see cref="Push(List{Part}, Plate, PushDirection)"/>, the move stops early at
-        /// the work-area edge, a clamp zone or another part, never passing one.
-        /// Returns the distance moved.
+        /// nest into their own copy step less than their size. Unlike a push it always
+        /// moves the full step, like a nudge: it ignores the work-area edge and other
+        /// parts, so it can land off the plate or on a part. Returns the distance moved.
         /// </summary>
         public static double Step(List<Part> movingParts, Plate plate, PushDirection direction)
         {
@@ -68,7 +64,10 @@ namespace OpenNest.Engine.Fill
             if (!double.IsFinite(step) || step <= 0)
                 return 0;
 
-            return Push(movingParts, plate, SpatialQuery.DirectionToOffset(direction, 1.0), step);
+            var offset = SpatialQuery.DirectionToOffset(direction, step);
+            foreach (var part in movingParts)
+                part.Offset(offset);
+            return step;
         }
 
         /// <summary>
@@ -82,27 +81,19 @@ namespace OpenNest.Engine.Fill
             Vector direction
         ) => Push(movingParts, workArea, direction, new ObstacleSet(obstacleParts, partSpacing));
 
-        private static double Push(
-            List<Part> movingParts,
-            Box workArea,
-            Vector direction,
-            params ObstacleSet[] obstacleSets
-        ) => Push(movingParts, workArea, direction, double.MaxValue, obstacleSets);
-
         /// <summary>
-        /// Pushes movingParts at most <paramref name="limit"/> toward the first contact
-        /// with the work-area edge or an obstacle, keeping each obstacle set's own spacing.
+        /// Pushes movingParts to the first contact with the work-area edge or an obstacle,
+        /// keeping each obstacle set's own spacing.
         /// </summary>
         private static double Push(
             List<Part> movingParts,
             Box workArea,
             Vector direction,
-            double limit,
             params ObstacleSet[] obstacleSets
         )
         {
             var opposite = -direction;
-            var distance = limit;
+            var distance = double.MaxValue;
 
             foreach (var moving in movingParts)
             {

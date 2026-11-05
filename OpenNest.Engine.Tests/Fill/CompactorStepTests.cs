@@ -8,7 +8,7 @@ namespace OpenNest.Engine.Tests.Fill;
 
 /// <summary>
 /// Compactor.Step moves a selection by its own repeat distance at the part spacing,
-/// and like a push never passes the work-area edge or another part.
+/// always the full distance, whatever lies on the way or at the landing.
 /// </summary>
 public class CompactorStepTests
 {
@@ -86,25 +86,29 @@ public class CompactorStepTests
     }
 
     [Fact]
-    public void StopsAtAnotherPartInsteadOfPassingIt()
+    public void MovesTheFullStepPastAnotherPart()
     {
+        // Interlocked rows cannot slide straight past their neighbors, so patterning
+        // them needs the jump, not a push.
         var plate = MakePlate();
         var part = AddSquare(plate, 2, 10);
-        AddSquare(plate, 7, 10); // 2 clear of the mover: it may close 1 at 1.0 spacing.
+        AddSquare(plate, 7, 10);
 
         var moved = Compactor.Step(new List<Part> { part }, plate, PushDirection.Right);
 
-        Assert.Equal(1, moved, 3);
+        Assert.Equal(4, moved, 3);
+        Assert.Equal(6, part.Location.X, 3);
     }
 
     [Fact]
-    public void StopsAtTheWorkAreaEdge()
+    public void MovesTheFullStepOffThePlate()
     {
         var plate = MakePlate();
         var part = AddSquare(plate, 18, 10); // Right side at 21, 2.5 from the work area's.
 
         var moved = Compactor.Step(new List<Part> { part }, plate, PushDirection.Right);
 
-        Assert.Equal(2.5, moved, 3);
+        Assert.Equal(4, moved, 3);
+        Assert.Equal(22, part.Location.X, 3);
     }
 }

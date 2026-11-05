@@ -110,8 +110,8 @@ namespace OpenNest.Controls
         /// <summary>
         /// Moves the selection one repeat step in <paramref name="direction"/>: its own
         /// size along that axis plus the part spacing, measured on its geometry
-        /// (<see cref="Compactor.Step"/>). It stops early at an edge or another part.
-        /// Repeated steps undo as one move, like nudges.
+        /// (<see cref="Compactor.Step"/>). Like a nudge it always moves the full step, even
+        /// off the plate or onto a part. Repeated steps undo as one move.
         /// </summary>
         public void StepSelected(PushDirection direction)
         {
