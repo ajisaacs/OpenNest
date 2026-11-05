@@ -221,6 +221,90 @@ namespace OpenNest.Forms
                 ? plate.CuttingParameters
                 : DefaultCuttingParameters(nest);
 
+        /// <summary>Whether the cutting settings of <paramref name="nest"/> are kept on its machine's thickness.</summary>
+        public static bool HasMachineThickness(Nest nest) =>
+            nest != null && MachineCuttingDefaults.Find(FindMachine(nest.Machine), nest) != null;
+
+        /// <summary>
+        /// Where the cutting settings of <paramref name="nest"/> are kept, for the settings
+        /// dialogs: the machine's thickness, or why this PC's settings are used instead.
+        /// </summary>
+        public static string DescribeCuttingSource(Nest nest)
+        {
+            var machine = FindMachine(nest?.Machine);
+            if (nest == null || machine == null)
+                return "This PC's settings: the nest has no machine.";
+            var material = nest.Material?.Name;
+            if (string.IsNullOrWhiteSpace(material) || !double.IsFinite(nest.Thickness) || nest.Thickness <= 0)
+                return "This PC's settings: the nest has no material and thickness.";
+            var job = $"{material}{(string.IsNullOrWhiteSpace(nest.Material.Grade) ? "" : " " + nest.Material.Grade)} "
+                + $"{nest.Thickness:0.####} {(nest.Units == Units.Millimeters ? "mm" : "in")}";
+            return MachineCuttingDefaults.Find(machine, nest) == null
+                ? $"This PC's settings: {machine.Name} has no {job}."
+                : $"Saved for {machine.Name} · {job}";
+        }
+
+        /// <summary>
+        /// Saves cutting settings edited for <paramref name="nest"/>: on the machine's thickness
+        /// when it has one, otherwise as this PC's settings. When the machine cannot be saved
+        /// (the nest server is offline, or someone else changed the machine), the settings are
+        /// kept on this PC for this job and the user is told why. Returns whether they reached the machine.
+        /// </summary>
+        public static bool SaveCuttingParameters(IWin32Window owner, Nest nest, CuttingParameters parameters) =>
+            SaveCuttingParameters(nest, parameters, CreateMachineProvider(), error => MessageBox.Show(owner, error,
+                "Cutting Parameters", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+
+        /// <summary>
+        /// <see cref="SaveCuttingParameters(IWin32Window, Nest, CuttingParameters)"/> with the
+        /// machines of <paramref name="provider"/>, telling <paramref name="warn"/> why a machine
+        /// save failed.
+        /// </summary>
+        internal static bool SaveCuttingParameters(Nest nest, CuttingParameters parameters, IDataProvider provider, Action<string> warn)
+        {
+            MachineConfig machine = null;
+            string error;
+            try
+            {
+                machine = nest?.Machine == null ? null : provider.GetMachine(nest.Machine.Id);
+                if (machine == null || !MachineCuttingDefaults.WriteTo(machine, nest, parameters))
+                {
+                    SaveLastCuttingParameters(parameters);
+                    return false;
+                }
+                provider.SaveMachine(machine);
+                // A copy kept on this PC for this job would hide the machine's from now on.
+                var last = ReadLastCuttingParameters();
+                if (last != null && MachineCuttingDefaults.IsRecordedFor(last, machine, nest))
+                {
+                    last.MachineName = null;
+                    SaveLastCuttingParameters(last);
+                }
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                error = ex.Message;
+            }
+
+            // Stamped for this job, so the edit sticks on this PC until the machine takes it.
+            var kept = CuttingParametersSerializer.Deserialize(CuttingParametersSerializer.Serialize(parameters));
+            kept.MachineName = machine?.Name ?? nest.Machine.Name;
+            kept.MaterialName = nest.Material?.Name;
+            kept.Grade = nest.Material?.Grade;
+            kept.Thickness = nest.Thickness;
+            SaveLastCuttingParameters(kept);
+            warn($"The cutting settings could not be saved to {kept.MachineName}:\n\n{error}\n\n"
+                + "They are kept on this PC for this material and thickness.");
+            return false;
+        }
+
+        /// <summary>Saves <paramref name="parameters"/> as this PC's last cutting settings.</summary>
+        public static void SaveLastCuttingParameters(CuttingParameters parameters)
+        {
+            Properties.Settings.Default.CuttingParametersJson = CuttingParametersSerializer.Serialize(parameters);
+            Properties.Settings.Default.Save();
+        }
+
         /// <summary>The cutting parameters last applied, or the built-in defaults when none are saved or readable.</summary>
         public static CuttingParameters LastCuttingParameters() =>
             ReadLastCuttingParameters() ?? new CuttingParameters();

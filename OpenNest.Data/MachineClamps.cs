@@ -89,4 +89,8 @@ public sealed class MachineClamps
 
     // Finite in either unit, so converting to an inch or millimeter nest cannot overflow.
     private static bool IsLength(double value) => double.IsFinite(value) && double.IsFinite(value * 25.4);
+
+    /// <summary>Fields a newer OpenNest wrote, kept so saving here does not drop them.</summary>
+    [System.Text.Json.Serialization.JsonExtensionData]
+    public Dictionary<string, System.Text.Json.JsonElement>? Unknown { get; set; }
 }

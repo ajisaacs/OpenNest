@@ -1254,12 +1254,16 @@ internal sealed class CuttingInspectionPanel : UserControl
     {
         // A running plan keeps going behind the dialog; OK cancels it and replans with the new settings.
         if (closed || closeRequested || pendingMode != null || Mode != CuttingInspectionMode.Plan) return;
-        using var dialog = new CuttingParametersDialog();
+        using var dialog = new CuttingParametersDialog
+        {
+            MachineLeads = MachineSettings.HasMachineThickness(editor.Nest),
+            Source = MachineSettings.DescribeCuttingSource(editor.Nest),
+        };
         dialog.LoadParameters(parameters);
         if (dialog.ShowDialog(this) != DialogResult.OK || closed || closeRequested) return;
         parameters = dialog.GetParameters();
         // Saved now, not only on Apply: a plate that will not plan must not lose the edit.
-        EditNestForm.SaveCuttingParameters(parameters);
+        editor.SaveCuttingParameters(parameters);
         ShowSettings();
         RestartPlanning();
     }
@@ -1267,7 +1271,7 @@ internal sealed class CuttingInspectionPanel : UserControl
     private void ShowSettings()
     {
         settingsLabel.Text = $"Outside: {Describe(parameters.ExternalLeadIn)} · Holes: {Describe(parameters.InternalLeadIn)} · "
-            + $"Tabs: {(parameters.TabsEnabled ? "on" : "off")}";
+            + $"Tabs: {(parameters.SupportTabs ? parameters.TabBySize ? "by size" : "support grid" : "off")}";
     }
 
     private static string Describe(LeadIn leadIn)

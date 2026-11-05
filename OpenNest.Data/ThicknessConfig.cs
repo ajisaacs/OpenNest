@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace OpenNest.Data;
 
@@ -32,4 +34,14 @@ public class ThicknessConfig
 
     /// <summary>The edge spacing of nests in this thickness; null keeps the nest defaults'.</summary>
     public EdgeSpacingConfig? EdgeSpacing { get; set; }
+
+    /// <summary>
+    /// Lead-in angle rounding, tabs and pierce for this thickness; null takes this PC's last
+    /// cutting settings.
+    /// </summary>
+    public ThicknessCuttingConfig? Cutting { get; set; }
+
+    /// <summary>Fields a newer OpenNest wrote, kept so saving here does not drop them.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
 }

@@ -50,6 +50,7 @@ internal static class SettingRoutes
                 return updated is null ? Results.NotFound() : Results.Ok(updated);
             }
             catch (SharedSettingConflictException conflict) { return Conflict(conflict); }
+            catch (InvalidOperationException refused) { return Results.BadRequest(refused.Message); }
         });
 
         app.MapDelete("/api/settings/{kind}/{key}", (string kind, string key, string? savedBy, HttpRequest request, NestDatabase db) =>

@@ -94,6 +94,8 @@ public sealed partial class NestDatabase
                 throw new SharedSettingConflictException(current.Record, "These settings were changed by someone else. Reload before saving.");
             if (current.Record.Json == write.Json)
                 return current.Record;
+            if (SharedSettingRules.GetReplaceError(kind, current.Record.Json, write.Json) is { } refused)
+                throw new InvalidOperationException(refused);
 
             var record = WriteSetting(kind, key, write, checked(current.Record.Revision + 1), deleted: false, transaction);
             transaction.Commit();

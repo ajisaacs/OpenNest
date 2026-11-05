@@ -1454,12 +1454,12 @@ namespace OpenNest.Forms
             PlateView.SetAction(typeof(Actions.ActionLeadIn));
         }
 
-        internal static void SaveCuttingParameters(CuttingParameters parameters)
-        {
-            var json = CuttingParametersSerializer.Serialize(parameters);
-            Properties.Settings.Default.CuttingParametersJson = json;
-            Properties.Settings.Default.Save();
-        }
+        /// <summary>
+        /// Saves cutting settings edited for this nest: on its machine's thickness when it has one,
+        /// otherwise as this PC's (see <see cref="MachineSettings.SaveCuttingParameters"/>).
+        /// </summary>
+        internal void SaveCuttingParameters(CuttingParameters parameters) =>
+            MachineSettings.SaveCuttingParameters(this, Nest, parameters);
 
         private void ImportDrawings_Click(object sender, EventArgs e)
         {

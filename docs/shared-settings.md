@@ -6,7 +6,7 @@ building nests and posts the same way:
 
 | Kind | Key | What it holds | This PC's own copy |
 |---|---|---|---|
-| `machine` | machine id | A Tools > Machine Configuration entry: materials, grades, thicknesses, leads, kerf, cut-offs, motion limits, plate sizes, support grid, clamps | `%APPDATA%\OpenNest\Machines\<id>.json` |
+| `machine` | machine id | A Tools > Machine Configuration entry: materials, grades, thicknesses, leads, kerf, lead-in rounding, tabs, pierce, cut-offs, motion limits, plate sizes, support grid, clamps | `%APPDATA%\OpenNest\Machines\<id>.json` |
 | `post` | post type name, e.g. `OpenNest.Posts.CincinnatiCIFiber.CIFiberPostProcessor` | A post's settings, as its JSON file holds them | `%APPDATA%\OpenNest\Posts\<post>.json`, else the shipped `<post>.json` beside the post DLL in `Posts\` until the first save (an update replaces the install folder, so edits are never saved there) |
 | `clamps` | `default` | Legacy clamp settings, read only to copy them onto a machine once (machines now hold their clamps) | `%APPDATA%\OpenNest\clamps.json` |
 | `nest-defaults` | `default` | Tools > Nest Defaults: units, sheet size, quadrant, spacing, default machine | `%APPDATA%\OpenNest\defaults.json` |
@@ -73,7 +73,12 @@ trace or recover a change.
 
 The server checks the key against the kind (a machine id, a post type name of letters,
 digits and `._-+`, or `default`), that `json` is a JSON object of at most 512 K characters,
-and that a machine's JSON is a machine configuration with the key's id. It cannot check a
+and that a machine's JSON is a machine configuration with the key's id. A machine PUT that
+leaves out a field the stored machine, one of its materials (by name and grade) or one of their
+thicknesses (by value) holds a value for is refused with 400: it comes from an OpenNest too old
+to know that setting, and saving it would erase the setting (`SharedSettingRules.GetReplaceError`).
+Current builds keep the fields they do not know (`[JsonExtensionData]` on the machine
+configuration classes) and write cleared settings as null, so only older builds are refused. It cannot check a
 post's settings beyond that; the desktop only sends what the post serialized. Recreating a
 deleted document continues its revision count. Kinds a client does not know are ignored, so
 a newer server can share more.

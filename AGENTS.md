@@ -76,7 +76,7 @@ Read the relevant contract before changing its behavior:
 - [Material-overlap diagnostics](docs/geometry/visual-overlap-check.md)
 - [Automatic cutoffs and sequencing](docs/automatic-scrap-cutoffs.md)
 - [Pre-post verification](docs/post-verification.md)
-- [Machine cutting defaults](docs/machine-cutting-defaults.md): the nest's machine supplies leads, kerf and cut-off settings for plates without their own parameters
+- [Machine cutting defaults](docs/machine-cutting-defaults.md): the nest's machine supplies leads, kerf, tabs, pierce and cut-off settings per material and thickness; the Cutting Parameters dialog saves to that thickness
 - [Shared settings](docs/shared-settings.md): in Database mode machines, post settings, clamps and nest defaults come from the server once it holds them; offline uses the last copy read, read-only
 - [Server nesting](docs/server-nesting.md): Database-mode Auto Nest queued to the server's worker container (`OPENNEST_ROLE=worker`), one job at a time with no time limit, streaming progress and the best plan so far over SSE; the desktop replays the recorded engine answers to validate and bind locally. My Server Jobs reopens results in later sessions, and each result is kept at most once (`If-Match` Keep). The HTTP server stays off Engine/IO
 - [Cut-time estimates](docs/cut-time-estimates.md): simulator/Calculate Cut Time acceleration planner and placeholder machine limits

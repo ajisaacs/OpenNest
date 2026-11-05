@@ -46,8 +46,10 @@ public static class MachineCuttingDefaults
 
     /// <summary>
     /// Replaces the lead-ins, lead-outs and kerf of <paramref name="parameters"/> with the
-    /// machine's for the nest, and records the machine, material and thickness they came from.
-    /// Returns false, changing nothing, when the machine has no settings for the nest.
+    /// machine's for the nest, and its lead-in angle rounding, tabs and pierce when the thickness
+    /// sets them (<see cref="ThicknessConfig.Cutting"/>), and records the machine, material and
+    /// thickness they came from. Returns false, changing nothing, when the machine has no
+    /// settings for the nest.
     /// </summary>
     public static bool ApplyTo(CuttingParameters parameters, MachineConfig? machine, Nest nest)
     {
@@ -58,12 +60,149 @@ public static class MachineCuttingDefaults
         var scale = Scale(machine!.Units, nest.Units);
         ApplyLeads(parameters, settings, scale);
         parameters.Kerf = settings.Kerf * scale;
+        if (settings.Cutting is { } cutting)
+            ApplyCutting(parameters, cutting, scale);
         parameters.MachineName = machine.Name;
         parameters.MaterialName = nest.Material.Name;
         parameters.Grade = nest.Material.Grade;
         parameters.Thickness = nest.Thickness;
         return true;
     }
+
+    /// <summary>
+    /// Stores the leads, lead-in angle rounding, tabs and pierce of <paramref name="parameters"/>
+    /// (in the nest's units) on the machine's thickness for the nest, in the machine's units: the
+    /// inverse of <see cref="ApplyTo(CuttingParameters, MachineConfig?, Nest)"/>. Kerf, cut-off,
+    /// spacing and plate sizes are kept. Inside cuts that match the outside ones keep following
+    /// them. Returns false, changing nothing, when the machine has no settings for the nest.
+    /// </summary>
+    public static bool WriteTo(MachineConfig? machine, Nest nest, CuttingParameters parameters)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        if (Find(machine, nest) is not { } settings)
+            return false;
+
+        var scale = Scale(nest.Units, machine!.Units);
+        // A lead the configuration cannot hold (Line + Line, which it never applies) leaves the
+        // lead as it was; so does a Clean Hole on outside cuts, which is for holes only.
+        var insideFrom = settings.InsideLeadIn ?? settings.LeadIn;
+        var outsideIn = parameters.ExternalLeadIn is LineLineLeadIn or CleanHoleLeadIn
+            ? settings.LeadIn
+            : ToConfig(Scaled(parameters.ExternalLeadIn, scale), settings.LeadIn);
+        var outsideOut = ToConfig(Scaled(parameters.ExternalLeadOut, scale), settings.LeadOut);
+        var insideIn = parameters.InternalLeadIn is LineLineLeadIn
+            ? insideFrom
+            : ToConfig(Scaled(parameters.InternalLeadIn, scale), insideFrom);
+        var insideOut = ToConfig(Scaled(parameters.InternalLeadOut, scale), settings.InsideLeadOut ?? settings.LeadOut);
+        settings.LeadIn = outsideIn;
+        settings.LeadOut = outsideOut;
+        var follows = SameLead(insideIn, settings.LeadIn) && SameLead(insideOut, settings.LeadOut);
+        settings.InsideLeadIn = follows ? null : insideIn;
+        settings.InsideLeadOut = follows ? null : insideOut;
+        settings.Cutting = ToCuttingConfig(parameters, scale, settings.Cutting);
+        return true;
+    }
+
+    /// <summary>
+    /// The thickness's lead-in angle rounding, tabs and pierce as cutting parameters in the
+    /// machine's units, for editing them; <see cref="ThicknessCuttingConfig"/>'s defaults when it
+    /// sets none.
+    /// </summary>
+    public static CuttingParameters CuttingOf(ThicknessCuttingConfig? cutting)
+    {
+        var parameters = new CuttingParameters();
+        ApplyCutting(parameters, cutting ?? new ThicknessCuttingConfig(), 1);
+        return parameters;
+    }
+
+    /// <summary>The thickness settings form of <paramref name="parameters"/>' rounding, tabs and pierce, unscaled.</summary>
+    public static ThicknessCuttingConfig ToCuttingConfig(CuttingParameters parameters, ThicknessCuttingConfig? previous = null) =>
+        ToCuttingConfig(parameters, 1, previous);
+
+    private static ThicknessCuttingConfig ToCuttingConfig(CuttingParameters parameters, double scale, ThicknessCuttingConfig? previous) =>
+        new()
+        {
+            RoundLeadInAngles = parameters.RoundLeadInAngles,
+            LeadInAngleIncrement = parameters.LeadInAngleIncrement,
+            Tabs = parameters.SupportTabs,
+            TabBySize = parameters.TabBySize,
+            TabSize = (parameters.TabConfig?.Size ?? previous?.TabSize ?? new ThicknessCuttingConfig().TabSize) * scale,
+            TabHeldMaxLength = parameters.TabHeldMaxLength * scale,
+            TabSizeMinWidth = parameters.TabSizeMinWidth * scale,
+            TabSizeMaxWidth = parameters.TabSizeMaxWidth * scale,
+            PierceClearance = parameters.PierceClearance * scale,
+            PierceDiameter = parameters.PierceDiameter * scale,
+            Unknown = previous?.Unknown,
+        };
+
+    private static void ApplyCutting(CuttingParameters parameters, ThicknessCuttingConfig cutting, double scale)
+    {
+        parameters.RoundLeadInAngles = cutting.RoundLeadInAngles;
+        parameters.LeadInAngleIncrement = cutting.LeadInAngleIncrement;
+        parameters.SupportTabs = cutting.Tabs;
+        parameters.TabBySize = cutting.TabBySize;
+        // The thickness's tabs replace any retired "Tab every part" the fallback still carries.
+        parameters.TabsEnabled = false;
+        parameters.TabConfig = new NormalTab { Size = cutting.TabSize * scale };
+        parameters.TabHeldMaxLength = cutting.TabHeldMaxLength * scale;
+        parameters.TabSizeMinWidth = cutting.TabSizeMinWidth * scale;
+        parameters.TabSizeMaxWidth = cutting.TabSizeMaxWidth * scale;
+        parameters.PierceClearance = cutting.PierceClearance * scale;
+        parameters.PierceDiameter = cutting.PierceDiameter * scale;
+    }
+
+    // Equal for the fields the lead's type uses; ToConfig carries the others over from before.
+    private static bool SameLead(LeadConfig a, LeadConfig b)
+    {
+        if (a.Type != b.Type)
+            return false;
+        var (length, angle, radius) = a.Type switch
+        {
+            "Line" => (true, true, false),
+            "Arc" => (false, false, true),
+            "Line + Arc" => (true, true, true),
+            "Clean Hole" => (true, false, true),
+            "Line + Line" => (true, true, false),
+            _ => (false, false, false),
+        };
+        return (!length || a.Length.Equals(b.Length))
+            && (!angle || a.Angle.Equals(b.Angle))
+            && (!radius || a.Radius.Equals(b.Radius));
+    }
+
+    // A lead with its lengths converted; angles and the arc sweep are not lengths.
+    private static LeadIn Scaled(LeadIn leadIn, double scale) => scale == 1 ? leadIn : leadIn switch
+    {
+        LineLeadIn line => new LineLeadIn { Length = line.Length * scale, ApproachAngle = line.ApproachAngle },
+        ArcLeadIn arc => new ArcLeadIn { Radius = arc.Radius * scale, SweepAngle = arc.SweepAngle },
+        LineArcLeadIn lineArc => new LineArcLeadIn
+        {
+            LineLength = lineArc.LineLength * scale,
+            ArcRadius = lineArc.ArcRadius * scale,
+            ApproachAngle = lineArc.ApproachAngle,
+        },
+        CleanHoleLeadIn cleanHole => new CleanHoleLeadIn
+        {
+            LineLength = cleanHole.LineLength * scale,
+            ArcRadius = cleanHole.ArcRadius * scale,
+            Kerf = cleanHole.Kerf * scale,
+        },
+        LineLineLeadIn lineLine => new LineLineLeadIn
+        {
+            Length1 = lineLine.Length1 * scale,
+            ApproachAngle1 = lineLine.ApproachAngle1,
+            Length2 = lineLine.Length2 * scale,
+            ApproachAngle2 = lineLine.ApproachAngle2,
+        },
+        _ => leadIn,
+    };
+
+    private static LeadOut Scaled(LeadOut leadOut, double scale) => scale == 1 ? leadOut : leadOut switch
+    {
+        LineLeadOut line => new LineLeadOut { Length = line.Length * scale, ApproachAngle = line.ApproachAngle },
+        ArcLeadOut arc => new ArcLeadOut { Radius = arc.Radius * scale },
+        _ => leadOut,
+    };
 
     /// <summary>
     /// Gives the nest's plate defaults the part and edge spacing the machine has for its

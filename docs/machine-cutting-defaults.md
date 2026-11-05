@@ -1,8 +1,8 @@
 # Machine cutting defaults
 
 A nest's assigned machine (`Nest.Machine`, see [nest file format](nest-file-format.md))
-supplies the starting lead-ins, lead-outs, kerf, cut-off settings and spacing for the nest's
-material and thickness, from that machine's Tools > Machine Configuration entry (in
+supplies the lead-ins, lead-outs, kerf, lead-in angle rounding, tabs, pierce, cut-off settings
+and spacing for the nest's material and thickness, from that machine's Tools > Machine Configuration entry (in
 Database mode, the server's [shared machines](shared-settings.md) once it holds them).
 `MachineCuttingDefaults` (OpenNest.Data) holds the mapping; the desktop applies it.
 
@@ -15,18 +15,42 @@ decimals (PEP stores 3/16 as 0.188) finds the machine's 0.1875; the nearest one 
 file, nothing changes and the previous behavior applies. Lengths are converted from the
 machine's units to the nest's.
 
-## Lead-ins and lead-outs
+## Where the Cutting Parameters dialog saves
 
-Plan Cutting and Place Lead-in start from the user's last applied parameters, with the machine's
-leads and kerf laid over them and the machine, material, grade and thickness recorded on the
-parameters. A plate's own parameters are used only when no user parameters are saved or readable,
-so an edit reaches nests already planned. When the last parameters
-already record the same machine, material, grade and thickness, the machine's settings are not
-laid over them again, so lead and tab edits made for that job stick; the cutting panel keeps the
-record (and the kerf) through an edit. Plan Cutting saves its settings as the last parameters as
-soon as its settings dialog is accepted, not only on Apply. Changing the settings, machine,
-material or thickness does not rewrite the leads a plate was planned with: its programs and
-stored parameters stay until a plan is applied.
+Every setting in Plan Cutting's Cutting Parameters dialog and the Place Lead-in panel is kept on
+the nest's machine thickness: leads on the Outside Cuts and Inside Cuts tabs, lead-in angle
+rounding, tabs and pierce on the Tabs & Pierce tab (`ThicknessConfig.Cutting`). So 0.25 in can
+tab parts while 0.5 in tabs none, and in Database mode every workstation gets the same
+settings. The dialog names what it edits above its fields ("Saved for Fiber 1 · Mild Steel A36
+0.25 in") or why it edits this PC's settings instead (no machine, no material or thickness, or
+a thickness the machine does not list).
+
+Plan Cutting and Place Lead-in start from this PC's last settings (`CuttingParametersJson` in
+user-settings.json), with the machine's leads and kerf laid over them, and its rounding, tabs and
+pierce when the thickness sets them (a thickness whose Tabs & Pierce box is unchecked keeps this
+PC's), and the machine, material, grade and thickness recorded on the parameters. A plate's own
+parameters are used only when no user parameters are saved or readable, so an edit reaches nests
+already planned.
+
+The dialog saves when it is accepted and when a plan is applied, and Place Lead-in when its panel
+closes after an edit. With a matching thickness the settings are written to the machine
+(`MachineCuttingDefaults.WriteTo`, converted to the machine's units; inside cuts equal to the
+outside ones keep following them, and kerf, cut-off, spacing and plate sizes are untouched), and
+this PC's settings are left alone, so a thin job's tabs never become another job's. Matched, the
+dialog offers only the leads a thickness can hold: no Line + Line, no arc sweep, no outside Clean
+Hole. Without a matching thickness the settings are saved as this PC's.
+
+When the machine cannot be saved (the nest server is offline, someone else changed the machine,
+or the thickness was removed), the settings are saved as this PC's, recorded for that machine,
+material, grade and thickness, and the user is told. While they are recorded for that job the
+machine's settings are not laid over them, so the edit sticks on this PC; the next successful
+save to the machine clears the record. Changing the settings, machine, material or thickness does
+not rewrite the leads a plate was planned with: its programs and stored parameters stay until a
+plan is applied.
+
+Tools > Machine Configuration's thickness menu has Copy Tabs & Pierce To..., which copies one
+thickness's Tabs & Pierce (or their absence) to the thicknesses picked, with Thinner and Thicker
+shortcuts.
 
 Each thickness holds a lead-in and lead-out for outside cuts (the Outside Cuts tab, external
 contours) and, optionally, its own pair for inside cuts (the Inside Cuts tab, internal contours,

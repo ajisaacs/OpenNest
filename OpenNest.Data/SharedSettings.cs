@@ -121,4 +121,110 @@ public static class SharedSettingRules
         }
         return null;
     }
+
+    /// <summary>
+    /// Why <paramref name="json"/> may not replace the stored <paramref name="storedJson"/>, or
+    /// null when it may. A machine saved by an OpenNest too old to know a setting would drop it:
+    /// a field the stored machine, one of its materials (matched by name and grade) or one of
+    /// their thicknesses (matched by value) holds a value for, and that the new document leaves
+    /// out entirely, refuses the save. Current builds keep fields they do not know, and write
+    /// cleared settings as null, so they never trip this.
+    /// </summary>
+    public static string? GetReplaceError(string? kind, string storedJson, string json)
+    {
+        if (kind != SharedSettingKinds.Machine)
+            return null;
+        try
+        {
+            using var stored = JsonDocument.Parse(storedJson);
+            using var incoming = JsonDocument.Parse(json);
+            var dropped = DroppedField(stored.RootElement, incoming.RootElement, "");
+            return dropped is null
+                ? null
+                : $"This machine has settings ({dropped}) that this version of OpenNest does not know, "
+                    + "so saving here would erase them. Update OpenNest to change this machine.";
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    // The first field with a value in stored that incoming leaves out, as a path; materials and
+    // thicknesses are matched by identity, so a reorder or a removed entry is not a drop.
+    private static string? DroppedField(JsonElement stored, JsonElement incoming, string path)
+    {
+        if (stored.ValueKind != JsonValueKind.Object || incoming.ValueKind != JsonValueKind.Object)
+            return null;
+        foreach (var field in stored.EnumerateObject())
+        {
+            if (field.Value.ValueKind == JsonValueKind.Null)
+                continue;
+            var name = path.Length == 0 ? field.Name : $"{path}.{field.Name}";
+            if (!TryGetProperty(incoming, field.Name, out var match))
+                return name;
+            var nested = field.Name.ToLowerInvariant() switch
+            {
+                "materials" => DroppedInList(field.Value, match, name, Material),
+                "thicknesses" => DroppedInList(field.Value, match, name, Thickness),
+                _ => path.Length > 0 && path.EndsWith("]", StringComparison.Ordinal)
+                    ? DroppedField(field.Value, match, name)
+                    : null,
+            };
+            if (nested != null)
+                return nested;
+        }
+        return null;
+    }
+
+    private static string? DroppedInList(JsonElement stored, JsonElement incoming, string path, Func<JsonElement, string?> identity)
+    {
+        if (stored.ValueKind != JsonValueKind.Array || incoming.ValueKind != JsonValueKind.Array)
+            return null;
+        foreach (var item in stored.EnumerateArray())
+        {
+            var id = identity(item);
+            if (id == null)
+                continue;
+            foreach (var candidate in incoming.EnumerateArray())
+            {
+                if (identity(candidate) != id)
+                    continue;
+                if (DroppedField(item, candidate, $"{path}[{id}]") is { } dropped)
+                    return dropped;
+                break;
+            }
+        }
+        return null;
+    }
+
+    private static string? Material(JsonElement material) =>
+        material.ValueKind == JsonValueKind.Object
+            ? $"{Text(material, "name")}/{Text(material, "grade")}"
+            : null;
+
+    private static string? Thickness(JsonElement thickness) =>
+        thickness.ValueKind == JsonValueKind.Object && TryGetProperty(thickness, "value", out var value)
+            && value.ValueKind == JsonValueKind.Number
+            ? value.GetDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture)
+            : null;
+
+    private static string Text(JsonElement element, string name) =>
+        TryGetProperty(element, name, out var value) && value.ValueKind == JsonValueKind.String
+            ? SharedListNames.Key(value.GetString())
+            : "";
+
+    private static bool TryGetProperty(JsonElement element, string name, out JsonElement value)
+    {
+        foreach (var property in element.EnumerateObject())
+        {
+            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+        value = default;
+        return false;
+    }
 }

@@ -7,4 +7,8 @@ public class EdgeSpacingConfig
     public double Bottom { get; set; }
     public double Right { get; set; }
     public double Top { get; set; }
+
+    /// <summary>Fields a newer OpenNest wrote, kept so saving here does not drop them.</summary>
+    [System.Text.Json.Serialization.JsonExtensionData]
+    public Dictionary<string, System.Text.Json.JsonElement>? Unknown { get; set; }
 }

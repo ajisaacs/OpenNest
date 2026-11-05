@@ -218,4 +218,8 @@ public sealed class SupportGridSettings
             return fallback;
         return value;
     }
+
+    /// <summary>Fields a newer OpenNest wrote, kept so saving here does not drop them.</summary>
+    [System.Text.Json.Serialization.JsonExtensionData]
+    public Dictionary<string, System.Text.Json.JsonElement>? Unknown { get; set; }
 }

@@ -83,7 +83,9 @@ Cutting inspects a proposal, the overlay shows the proposal's parts on the same 
 ## Support tabs in Plan Cutting
 
 Cutting Settings > Tabs > "Add tabs to hold parts in the sheet" sets
-`CuttingParameters.SupportTabs`, and its two choices say which parts need a tab:
+`CuttingParameters.SupportTabs`, and its two choices say which parts need a tab. Like every
+cutting setting they are kept per machine thickness (Tools > Machine Configuration > Tabs &
+Pierce), so thick plate can go untabbed; see [machine cutting defaults](machine-cutting-defaults.md):
 
 - "Only tab parts the support grid can't hold level": the plate's support bed decides. A plate
   with no bed falls back to the size range ([below](#tabbing-by-size)).

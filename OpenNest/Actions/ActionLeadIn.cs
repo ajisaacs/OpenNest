@@ -104,6 +104,8 @@ namespace OpenNest.Actions
             cuttingPanel = new CuttingPanel();
             cuttingPanel.ParametersChanged += OnToolParametersChanged;
 
+            cuttingPanel.MachineLeads = MachineSettings.HasMachineThickness(form.Nest);
+            cuttingPanel.Source = MachineSettings.DescribeCuttingSource(form.Nest);
             cuttingPanel.LoadFromParameters(MachineSettings.CuttingParametersFor(plateView.Plate, form.Nest));
             loadedParameters = CuttingParametersSerializer.Serialize(cuttingPanel.BuildParameters());
 
@@ -139,8 +141,14 @@ namespace OpenNest.Actions
 
             var parameters = cuttingPanel.BuildParameters();
             var json = CuttingParametersSerializer.Serialize(parameters);
-            Properties.Settings.Default.CuttingParametersJson = json;
-            Properties.Settings.Default.Save();
+            // Saved only when edited, so opening and closing the tool never writes the machine.
+            if (json != loadedParameters)
+            {
+                if (plateView.FindForm() is EditNestForm editor)
+                    editor.SaveCuttingParameters(parameters);
+                else
+                    MachineSettings.SaveLastCuttingParameters(parameters);
+            }
 
             // A plate takes the tool's parameters with its first lead-in; after that an edit in
             // the panel is a change of its own. Closing the tool otherwise changes nothing.

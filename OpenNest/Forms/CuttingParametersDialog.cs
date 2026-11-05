@@ -50,14 +50,42 @@ namespace OpenNest.Forms
 
             AcceptButton = btnOk;
             CancelButton = btnCancel;
+            this.buttonPanel = buttonPanel;
+            FitContent();
+        }
 
-            // Fit the whole panel so nothing scrolls, unless the screen is too short for it.
+        private readonly FlowLayoutPanel buttonPanel;
+
+        // Sized again once shown, since the source line set after construction adds a row.
+        protected override void OnLoad(System.EventArgs e)
+        {
+            FitContent();
+            base.OnLoad(e);
+        }
+
+        // Fit the whole panel so nothing scrolls, unless the screen is too short for it.
+        private void FitContent()
+        {
             var content = cuttingPanel.GetPreferredSize(Size.Empty);
             var maxHeight = Screen.FromPoint(Cursor.Position).WorkingArea.Height - 80;
             ClientSize = new Size(
                 System.Math.Max(380, content.Width + SystemInformation.VerticalScrollBarWidth),
                 System.Math.Min(maxHeight, content.Height + buttonPanel.GetPreferredSize(Size.Empty).Height)
             );
+        }
+
+        /// <summary>Where the settings are saved, shown above them.</summary>
+        public string Source
+        {
+            get => cuttingPanel.Source;
+            set => cuttingPanel.Source = value;
+        }
+
+        /// <summary>Offers only the leads a machine thickness can hold (see <see cref="CuttingPanel.MachineLeads"/>).</summary>
+        public bool MachineLeads
+        {
+            get => cuttingPanel.MachineLeads;
+            set => cuttingPanel.MachineLeads = value;
         }
 
         public void LoadParameters(CuttingParameters parameters)

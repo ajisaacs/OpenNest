@@ -60,4 +60,8 @@ public class MachineConfig
     /// </summary>
     public IEnumerable<MaterialConfig> GetGrades(string name) =>
         Materials.Where(m => SharedListNames.Key(m.Name) == SharedListNames.Key(name));
+
+    /// <summary>Fields a newer OpenNest wrote, kept so saving here does not drop them.</summary>
+    [System.Text.Json.Serialization.JsonExtensionData]
+    public Dictionary<string, System.Text.Json.JsonElement>? Unknown { get; set; }
 }

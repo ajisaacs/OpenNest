@@ -36,6 +36,9 @@ namespace OpenNest.Controls
 
         private CuttingParameters loaded;
 
+        private readonly Label sourceLabel;
+        private bool machineLeads;
+
         private readonly CheckBox chkRoundLeadInAngles;
         private readonly NumericUpDown nudLeadInAngleIncrement;
 
@@ -73,6 +76,13 @@ namespace OpenNest.Controls
         }
 
         public CuttingPanel()
+            : this(showLeads: true) { }
+
+        /// <param name="showLeads">
+        /// False leaves out the lead-in and lead-out editors (Machine Configuration edits a
+        /// thickness's leads on their own tabs); lead-in angle rounding stays.
+        /// </param>
+        public CuttingPanel(bool showLeads)
         {
             AutoScroll = true;
             BackColor = Color.White;
@@ -87,8 +97,19 @@ namespace OpenNest.Controls
             };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
+            // Where these settings are saved: the nest's machine thickness, or this PC.
+            sourceLabel = new Label
+            {
+                AutoSize = true,
+                ForeColor = HintColor,
+                Margin = new Padding(0, 6, 0, 0),
+                Visible = false,
+            };
+            layout.Controls.Add(sourceLabel);
+
             // Leads: one tab per contour type, sized for the type with the most fields.
-            AddSection("Leads");
+            if (showLeads)
+                AddSection("Leads");
 
             tabControl = new TabControl
             {
@@ -110,7 +131,8 @@ namespace OpenNest.Controls
 
             tabControl.Controls.Add(tabExternal);
             tabControl.Controls.Add(tabInternal);
-            layout.Controls.Add(tabControl);
+            if (showLeads)
+                layout.Controls.Add(tabControl);
 
             chkRoundLeadInAngles = new CheckBox
             {
@@ -272,6 +294,37 @@ namespace OpenNest.Controls
         }
 
         public override Size GetPreferredSize(Size proposedSize) => layout.GetPreferredSize(proposedSize);
+
+        /// <summary>Where these settings are saved, shown above them; null or empty hides the line.</summary>
+        public string Source
+        {
+            get => sourceLabel.Text;
+            set
+            {
+                sourceLabel.Text = value ?? "";
+                sourceLabel.Visible = !string.IsNullOrEmpty(value);
+            }
+        }
+
+        /// <summary>
+        /// Offers only the leads a machine thickness can hold: no Line + Line, no arc sweep (leads
+        /// are half circles), a clean hole's kerf from the thickness and no clean hole outside.
+        /// </summary>
+        public bool MachineLeads
+        {
+            get => machineLeads;
+            set
+            {
+                machineLeads = value;
+                foreach (var leads in new[] { externalLeads, internalLeads })
+                {
+                    leads.AllowLineLine = !value;
+                    leads.ShowArcSweep = !value;
+                    leads.ShowCleanHoleKerf = !value;
+                }
+                externalLeads.AllowCleanHole = !value;
+            }
+        }
 
         protected override void Dispose(bool disposing)
         {

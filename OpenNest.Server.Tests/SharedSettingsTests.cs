@@ -59,6 +59,39 @@ public sealed class SharedSettingsTests
     }
 
     [Fact]
+    public async Task Api_RefusesAMachineFromABuildThatWouldDropItsThicknessCuttingSettings()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        var machine = new MachineConfig
+        {
+            Name = "Synthetic laser",
+            Materials =
+            {
+                new MaterialConfig
+                {
+                    Name = "Mild Steel",
+                    Thicknesses = { new ThicknessConfig { Value = 0.25, Cutting = new ThicknessCuttingConfig { Tabs = true } } },
+                },
+            },
+        };
+        var url = $"/api/settings/machine/{machine.Id}";
+        var json = SharedMachineProvider.Serialize(machine);
+        // What a build without per-thickness cutting settings sends back: no "cutting" field at all.
+        var old = json.Replace("\"cutting\":", "\"plateSizesNote\":", StringComparison.Ordinal);
+        machine.Materials[0].Thicknesses[0].Cutting = null;
+        var cleared = SharedMachineProvider.Serialize(machine);
+
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(url, Write(json))).StatusCode);
+        var refused = await Put(client, url, Write(old), revision: 1);
+        var allowed = await Put(client, url, Write(cleared), revision: 1);
+
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Contains("Update OpenNest", await refused.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+    }
+
+    [Fact]
     public void V12Upgrade_StartsWithNoSharedSettings()
     {
         using var factory = new ServerFactory();

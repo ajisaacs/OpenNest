@@ -119,6 +119,9 @@ namespace OpenNest.Forms
         private static string GradeLabel(MaterialConfig material) =>
             string.IsNullOrWhiteSpace(material.Grade) ? "(no grade)" : material.Grade;
 
+        private static string GradeLabelOf(MaterialConfig material) =>
+            string.IsNullOrWhiteSpace(material.Grade) ? material.Name : $"{material.Name} {material.Grade}";
+
         private static TreeNode BuildThicknessNode(ThicknessConfig thickness) =>
             new(ThicknessLabel(thickness)) { Tag = thickness };
 
@@ -193,6 +196,8 @@ namespace OpenNest.Forms
                     menu.Items.Add("Delete Grade", null, RemoveGrade_Click);
                     break;
                 case ThicknessConfig:
+                    menu.Items.Add("Copy Tabs && Pierce To...", null, CopyCuttingSettings_Click);
+                    menu.Items.Add(new ToolStripSeparator());
                     menu.Items.Add("Delete Thickness", null, RemoveThickness_Click);
                     break;
                 default:
@@ -622,6 +627,7 @@ namespace OpenNest.Forms
                 ControlFactory.Tab("General", BuildThicknessGeneralTab(thickness, node)));
             tabs.TabPages.Add(ControlFactory.Tab("Outside Cuts", BuildOutsideCutsTab(thickness)));
             tabs.TabPages.Add(ControlFactory.Tab("Inside Cuts", BuildInsideCutsTab(thickness)));
+            tabs.TabPages.Add(ControlFactory.Tab("Tabs & Pierce", BuildTabsPierceTab(thickness)));
             tabs.TabPages.Add(ControlFactory.Tab("Cut Off", BuildCutOffTab(thickness.CutOff)));
             tabs.TabPages.Add(ControlFactory.Tab("Spacing", BuildSpacingTab(thickness)));
             tabs.TabPages.Add(ControlFactory.Tab("Plate Sizes", BuildPlateSizesTab(thickness)));
@@ -854,6 +860,131 @@ namespace OpenNest.Forms
             page.Controls.Add(CreateTabNote("Cutouts and holes, full circles included."));
             return page;
         }
+
+        // Lead-in angle rounding, tabs and pierce for this thickness; unchecked, nests in it take
+        // the cutting settings last used on each PC. The Cutting Parameters dialog saves here too.
+        private Control BuildTabsPierceTab(ThicknessConfig thickness)
+        {
+            var useBox = new CheckBox
+            {
+                Text = "Use for this thickness",
+                AutoSize = true,
+                Dock = DockStyle.Top,
+                Padding = new Padding(10, 4, 0, 0),
+                Checked = thickness.Cutting != null,
+            };
+            var panel = new Controls.CuttingPanel(showLeads: false)
+            {
+                Dock = DockStyle.Fill,
+                Enabled = useBox.Checked,
+            };
+            panel.LoadFromParameters(MachineCuttingDefaults.CuttingOf(thickness.Cutting));
+            panel.ParametersChanged += (s, e) =>
+            {
+                if (!useBox.Checked)
+                    return;
+                thickness.Cutting = MachineCuttingDefaults.ToCuttingConfig(panel.BuildParameters(), thickness.Cutting);
+                MarkDirty();
+            };
+            useBox.CheckedChanged += (s, e) =>
+            {
+                panel.Enabled = useBox.Checked;
+                thickness.Cutting = useBox.Checked
+                    ? MachineCuttingDefaults.ToCuttingConfig(panel.BuildParameters(), thickness.Cutting)
+                    : null;
+                MarkDirty();
+            };
+
+            var page = new Panel { Dock = DockStyle.Fill, BackColor = Color.White };
+            page.Controls.Add(panel);
+            page.Controls.Add(useBox);
+            page.Controls.Add(CreateTabNote(
+                $"Lengths in {LengthUnitSuffix(null)}. Unchecked, nests in this thickness use the cutting settings last used on each PC."));
+            return page;
+        }
+
+        // Copies the selected thickness's tabs and pierce (or their absence) to other thicknesses
+        // of this machine, so a rule such as "tabs only up to 0.25 in" takes a few clicks.
+        private void CopyCuttingSettings_Click(object sender, EventArgs e)
+        {
+            if (_tree.SelectedNode?.Tag is not ThicknessConfig source || _currentMachine is null)
+                return;
+
+            var targets = _currentMachine.Materials
+                .SelectMany(m => m.Thicknesses.Where(t => !ReferenceEquals(t, source)).Select(t => (Material: m, Thickness: t)))
+                .OrderBy(x => x.Material.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(x => x.Material.Grade, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(x => x.Thickness.Value)
+                .ToList();
+            if (targets.Count == 0)
+                return;
+
+            using var dialog = new Form
+            {
+                Text = $"Copy Tabs & Pierce of {ThicknessLabel(source)}",
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                ShowInTaskbar = false,
+                StartPosition = FormStartPosition.CenterParent,
+                ClientSize = new Size(420, 420),
+            };
+            var list = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true, IntegralHeight = false };
+            foreach (var (material, thickness) in targets)
+                list.Items.Add($"{GradeLabelOf(material)} · {ThicknessLabel(thickness)}");
+
+            void Select(Func<ThicknessConfig, bool> pick)
+            {
+                for (var i = 0; i < targets.Count; i++)
+                    list.SetItemChecked(i, pick(targets[i].Thickness));
+            }
+
+            var pickers = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(4) };
+            pickers.Controls.Add(new Label
+            {
+                Text = $"{(source.Cutting == null ? "No tabs & pierce of its own" : "Its tabs & pierce")} to:",
+                AutoSize = true,
+                Margin = new Padding(3, 8, 6, 0),
+            });
+            foreach (var (text, pick) in new (string, Func<ThicknessConfig, bool>)[]
+            {
+                ("Thinner", t => t.Value < source.Value),
+                ("Thicker", t => t.Value > source.Value),
+                ("All", _ => true),
+                ("None", _ => false),
+            })
+            {
+                var button = new Button { Text = text, AutoSize = true };
+                button.Click += (s2, e2) => Select(pick);
+                pickers.Controls.Add(button);
+            }
+
+            var ok = new Button { Text = "Copy", DialogResult = DialogResult.OK, Size = new Size(80, 28) };
+            var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Size = new Size(80, 28) };
+            var buttons = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Bottom,
+                FlowDirection = FlowDirection.RightToLeft,
+                AutoSize = true,
+                Padding = new Padding(8),
+            };
+            buttons.Controls.Add(cancel);
+            buttons.Controls.Add(ok);
+            dialog.Controls.Add(list);
+            dialog.Controls.Add(pickers);
+            dialog.Controls.Add(buttons);
+            dialog.AcceptButton = ok;
+            dialog.CancelButton = cancel;
+
+            if (dialog.ShowDialog(this) != DialogResult.OK || list.CheckedIndices.Count == 0)
+                return;
+            foreach (int index in list.CheckedIndices)
+                targets[index].Thickness.Cutting = CopyCutting(source.Cutting);
+            MarkDirty();
+        }
+
+        internal static ThicknessCuttingConfig CopyCutting(ThicknessCuttingConfig cutting) =>
+            cutting == null ? null : MachineCuttingDefaults.ToCuttingConfig(MachineCuttingDefaults.CuttingOf(cutting), cutting);
 
         // The machine holds no arc sweep (leads are half circles) and takes a clean hole's kerf
         // from the thickness; Line + Line is never applied from it, so it is not offered.
