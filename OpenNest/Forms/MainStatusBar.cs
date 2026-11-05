@@ -232,7 +232,7 @@ namespace OpenNest.Forms
             );
         }
 
-        /// <summary>Status text for the nest's machine, e.g. "Machine: CL-980".</summary>
+        /// <summary>Status text for the nest's machine, e.g. "Machine: Generic Laser".</summary>
         internal static string FormatMachine(NestMachine machine)
         {
             if (machine == null)
