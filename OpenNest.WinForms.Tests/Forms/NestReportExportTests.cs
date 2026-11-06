@@ -286,6 +286,22 @@ public class NestReportExportTests
     });
 
     [Fact]
+    public void ViewerCentersOnItsOwnerInsideTheScreen()
+    {
+        var area = Screen.PrimaryScreen!.WorkingArea;
+        var owner = new System.Drawing.Rectangle(area.Left + 100, area.Top + 50, 600, 400);
+
+        var small = NestReportViewerForm.CenteredBounds(owner, new System.Drawing.Size(200, 100));
+        Assert.Equal(owner.Left + 200, small.Left);
+        Assert.Equal(owner.Top + 150, small.Top);
+
+        // Larger than the owner: still centered on it, then shrunk and kept on screen.
+        var large = NestReportViewerForm.CenteredBounds(owner,
+            new System.Drawing.Size(area.Width + 500, area.Height + 500));
+        Assert.Equal(area, large);
+    }
+
+    [Fact]
     public void BusyAfterDialogRejectsWriteWithoutTouchingDestination() => RunSta(() =>
     {
         using var form = new EditNestForm(CreateJob("late busy"));

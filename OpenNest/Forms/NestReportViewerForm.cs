@@ -25,9 +25,9 @@ namespace OpenNest.Forms
             this.suggestedFileName = suggestedFileName;
             Text = $"Nest Report - {nestName}";
             Icon = Properties.Resources.app_icon;
-            StartPosition = FormStartPosition.CenterParent;
-            var area = Screen.FromPoint(Cursor.Position).WorkingArea;
-            Size = new Size(System.Math.Min(1000, area.Width), System.Math.Min(900, area.Height));
+            // CenterParent is ignored for modeless windows; OnLoad centers on the owner instead.
+            StartPosition = FormStartPosition.Manual;
+            Size = new Size(1000, 900);
 
             var saveButton = new ToolStripButton("Save As...") { Name = "btnSaveAs" };
             saveButton.Click += (_, _) => SaveAs();
@@ -45,6 +45,7 @@ namespace OpenNest.Forms
 
         protected override async void OnLoad(EventArgs e)
         {
+            Bounds = CenteredBounds(Owner?.Bounds ?? Screen.FromPoint(Cursor.Position).WorkingArea, Size);
             base.OnLoad(e);
             try
             {
@@ -74,6 +75,21 @@ namespace OpenNest.Forms
             core.NewWindowRequested += (_, args) => args.Handled = true;
             core.Navigate(new Uri(pdfPath).AbsoluteUri);
             printButton.Enabled = true;
+        }
+
+        /// <summary>
+        /// Centers <paramref name="size"/> on <paramref name="owner"/>, shrunk to fit and kept inside
+        /// the working area of the screen holding the owner's center.
+        /// </summary>
+        internal static Rectangle CenteredBounds(Rectangle owner, Size size)
+        {
+            var center = new Point(owner.Left + owner.Width / 2, owner.Top + owner.Height / 2);
+            var area = Screen.FromPoint(center).WorkingArea;
+            var width = System.Math.Min(size.Width, area.Width);
+            var height = System.Math.Min(size.Height, area.Height);
+            var left = System.Math.Clamp(center.X - width / 2, area.Left, area.Right - width);
+            var top = System.Math.Clamp(center.Y - height / 2, area.Top, area.Bottom - height);
+            return new Rectangle(left, top, width, height);
         }
 
         private void SaveAs()
