@@ -94,4 +94,31 @@ public class CompactorPushAwayTests
         Assert.Equal(0, Compactor.Push(new List<Part> { bottom }, plate, PushDirection.Up));
         Assert.Equal(0, Compactor.PushBoundingBox(new List<Part> { bottom }, plate, PushDirection.Up));
     }
+
+    [Fact]
+    public void TopPartStillStopsAgainstThePartBelow()
+    {
+        var (plate, bottom, top) = StackedPair();
+
+        Assert.Equal(0, Compactor.Push(new List<Part> { top }, plate, PushDirection.Down));
+    }
+
+    [Theory]
+    [InlineData(PushDirection.Right)]
+    [InlineData(PushDirection.Left)]
+    public void TopPartSlidesAlongTheTouchingPartBelow(PushDirection direction)
+    {
+        var (plate, bottom, top) = StackedPair();
+        bottom.Offset(5, 0);
+        top.Offset(5, 0);
+        var work = plate.WorkArea();
+        var expected = direction == PushDirection.Right
+            ? work.Right - top.BoundingBox.Right
+            : top.BoundingBox.Left - work.Left;
+        Assert.True(expected > 0.1);
+
+        var moved = Compactor.Push(new List<Part> { top }, plate, direction);
+
+        Assert.Equal(expected, moved, 6);
+    }
 }
