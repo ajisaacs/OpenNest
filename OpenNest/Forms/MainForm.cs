@@ -292,6 +292,8 @@ namespace OpenNest.Forms
             activeForm.PlateView.PartRemoved += PlateView_PartRemoved;
             var activeNest = activeForm.Nest;
             activeForm.PlateView.CanEditClamps = () => !ClampsInUse(activeNest);
+            activeForm.PlateView.JoinCommonLineCommand = () => JoinCommonLine_Click(this, EventArgs.Empty);
+            activeForm.PlateView.RemoveCommonLineCommand = () => RemoveCommonLine_Click(this, EventArgs.Empty);
             mnuViewDrawRapids.Checked = activeForm.PlateView.DrawRapid;
             mnuViewDrawPiercePoints.Checked = activeForm.PlateView.DrawPiercePoints;
             mnuViewDrawBounds.Checked = activeForm.PlateView.DrawBounds;

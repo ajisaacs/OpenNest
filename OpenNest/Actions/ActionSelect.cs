@@ -140,7 +140,20 @@ namespace OpenNest.Actions
             }
             else if (e.Button == MouseButtons.Right)
             {
-                CancelAction();
+                // On a part, keep the selection it belongs to (or select it and its group) so the
+                // part menu acts on it; elsewhere a right-click clears the selection.
+                var part = plateView.GetPartAtControlPoint(e.Location);
+                if (part == null)
+                {
+                    CancelAction();
+                }
+                else if (!plateView.SelectedParts.Contains(part))
+                {
+                    plateView.DeselectAll();
+                    plateView.Selection.Select(part);
+                    plateView.NotifySelectionChanged();
+                    plateView.Invalidate();
+                }
             }
         }
 
@@ -199,11 +212,8 @@ namespace OpenNest.Actions
             )
                 plateView.DeselectAll();
 
-            if (plateView.SelectedParts.Contains(part) == false)
-            {
-                plateView.SelectedParts.Add(part);
-                part.IsSelected = true;
-            }
+            // A common-line member brings its whole group, so a drag moves the joined parts together.
+            plateView.Selection.Select(part);
 
             plateView.NotifySelectionChanged();
             plateView.Invalidate();
@@ -216,13 +226,7 @@ namespace OpenNest.Actions
             var parts = plateView.GetPartsFromWindow(rect, SelectionType);
 
             foreach (var part in parts)
-            {
-                if (plateView.SelectedParts.Contains(part))
-                    continue;
-
-                plateView.SelectedParts.Add(part);
-                part.IsSelected = true;
-            }
+                plateView.Selection.Select(part);
 
             foreach (var cutOff in plateView.Selection.GetCutOffsFromWindow(rect, SelectionType))
             {

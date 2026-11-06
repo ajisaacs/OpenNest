@@ -55,6 +55,35 @@ namespace OpenNest.Controls
             SelectionChanged?.Invoke(view, EventArgs.Empty);
         }
 
+        /// <summary>
+        /// Adds <paramref name="part"/> to the selection with every other member of its
+        /// common-line group, so the joined parts move, rotate and push as one unit and the
+        /// group's shared spans survive the edit (see docs/common-line-cutting.md).
+        /// </summary>
+        public void Select(LayoutPart part)
+        {
+            foreach (var layout in WithCommonLineGroup(part))
+            {
+                if (selectedParts.Contains(layout))
+                    continue;
+                selectedParts.Add(layout);
+                layout.IsSelected = true;
+            }
+        }
+
+        private IEnumerable<LayoutPart> WithCommonLineGroup(LayoutPart part)
+        {
+            yield return part;
+            var group = view.Plate?.CommonLineGroupOf(part.BasePart);
+            if (group == null)
+                yield break;
+            foreach (var layout in view.LayoutParts)
+            {
+                if (!ReferenceEquals(layout, part) && group.Contains(layout.BasePart))
+                    yield return layout;
+            }
+        }
+
         public void NotifySelectionChanged()
         {
             SelectionChanged?.Invoke(view, EventArgs.Empty);

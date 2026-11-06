@@ -38,6 +38,7 @@ namespace OpenNest.Controls
         private CutOffHandler cutOffHandler;
         private readonly ClampMenuHandler clampMenu;
         private readonly CutOffMenuHandler cutOffMenu;
+        private readonly PartMenuHandler partMenu;
         private PreviewManager previewManager;
         protected List<LayoutPart> parts;
         private Point middleMouseDownPoint;
@@ -79,6 +80,7 @@ namespace OpenNest.Controls
         internal CutOffHandler CutOffs => cutOffHandler;
         internal ClampMenuHandler ClampMenu => clampMenu;
         internal CutOffMenuHandler CutOffMenu => cutOffMenu;
+        internal PartMenuHandler PartMenu => partMenu;
         internal ActionManager Actions => actionManager;
         internal PreviewManager Previews => previewManager;
 
@@ -119,6 +121,7 @@ namespace OpenNest.Controls
             cutOffHandler = new CutOffHandler(this);
             clampMenu = new ClampMenuHandler(this);
             cutOffMenu = new CutOffMenuHandler(this);
+            partMenu = new PartMenuHandler(this);
             previewManager = new PreviewManager(this);
 
             redrawTimer = new Timer()
@@ -177,6 +180,18 @@ namespace OpenNest.Controls
         /// no nest to edit (clamp edit mode then does nothing).
         /// </summary>
         internal Func<Nest> ClampNest { get; set; }
+
+        /// <summary>
+        /// Plate &gt; Arrange &gt; Join Common Line for the selected parts, offered on the part
+        /// right-click menu; null leaves it off the menu. The host supplies the kerf.
+        /// </summary>
+        internal System.Action JoinCommonLineCommand { get; set; }
+
+        /// <summary>
+        /// Plate &gt; Arrange &gt; Remove Common Line for the selected parts, offered on the part
+        /// right-click menu; null leaves it off the menu.
+        /// </summary>
+        internal System.Action RemoveCommonLineCommand { get; set; }
 
         /// <summary>
         /// Opens an undo scope in the nest document this view shows; null when the view is not a
@@ -533,8 +548,9 @@ namespace OpenNest.Controls
 
             if (e.Button == MouseButtons.Right)
             {
-                if (!clampMenu.TryShow(e.Location, 3.0 / ViewScale))
-                    cutOffMenu.TryShow(e.Location, 5.0 / ViewScale);
+                if (!clampMenu.TryShow(e.Location, 3.0 / ViewScale)
+                    && !cutOffMenu.TryShow(e.Location, 5.0 / ViewScale))
+                    partMenu.TryShow(e.Location);
             }
 
             base.OnMouseUp(e);
@@ -865,8 +881,11 @@ namespace OpenNest.Controls
                 }
                 clampMenu?.Dispose();
                 cutOffMenu?.Dispose();
+                partMenu?.Dispose();
                 CanEditClamps = null;
                 ClampNest = null;
+                JoinCommonLineCommand = null;
+                RemoveCommonLineCommand = null;
                 overlapOverlay?.Dispose();
                 validationOverlay?.Dispose();
                 cutSimulation?.Dispose();

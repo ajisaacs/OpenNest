@@ -92,9 +92,15 @@ head on the second. Changing the setting after planning makes the plan stale.
   a facing partner, nothing moves.
 - **Plate > Arrange > Remove Common Line** removes the selected parts' groups. The parts stay put
   and are then held to the part spacing again.
+- **Right-click a part** for the same Join Common Line and Remove Common Line commands on the
+  selection. Right-clicking a part keeps the selection it is in, or selects it with its group;
+  right-clicking empty plate still clears the selection. Join is offered when the selection holds
+  at least two units (loose parts or groups), Remove when any selected part is in a group.
 - The plate draws each shared span as a teal dashed centerline. A member that no longer shares a
   span is outlined in red.
-- Moving one member moves only that part and breaks the group. Rejoin, or remove the group.
+- Selecting a member, by click or window, selects its whole group, so dragging, nudging, pushing,
+  rotating and aligning move the joined parts as one and keep their shared spans. Deleting the
+  selection deletes the whole group. To move one member alone, remove the group first.
 - Join, Remove and Cut Common Lines Twice are undoable like any other edit.
 
 ## Automatic placement
