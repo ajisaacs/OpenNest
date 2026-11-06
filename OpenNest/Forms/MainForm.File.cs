@@ -59,6 +59,9 @@ namespace OpenNest.Forms
             if (MdiChildren.OfType<EditNestForm>().FirstOrDefault(f => ReferenceEquals(f.Nest, nest)) is { } shown)
             {
                 shown.Document.BindRemote(record.Id, NestStorage.Settings.ServerUrl, record.Revision);
+                // The release saved the tab's nest as it stands, so closing it later must not
+                // save it again: that would move the draft past the revision a release chose.
+                shown.MarkSaved();
                 releaseTabs.Remove(shown);
                 _ = shown.HoldStatus.RefreshAfterSaveAsync();
                 return;

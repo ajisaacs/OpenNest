@@ -42,15 +42,36 @@ public class MainFormReleaseNestingTests
         Assert.False(main.TryUndo(tab));
         Run(host.RenestAsync(unsaved, null, CancellationToken.None));
         Assert.Equal(2, Tabs(main).Count);
+        var unsavedTab = Tabs(main).Single(f => ReferenceEquals(f.Nest, unsaved));
+        Assert.True(unsavedTab.HasUnsavedChanges);
 
-        // Make Nests opens what it saved: the tab already showing it is bound instead.
+        // Make Nests opens what it saved: the tab already showing it is bound instead, and is
+        // saved as it stands, so closing it later saves no second revision.
         var record = new NestRecord { Id = Guid.NewGuid(), Revision = 1, Name = saved.Name };
         main.OpenServerNest(saved, record);
         Assert.Equal(2, Tabs(main).Count);
         Assert.Equal((record.Id, 1), (tab.Document.RemoteId, tab.Document.RemoteRevision));
+        Assert.False(tab.HasUnsavedChanges);
+        Assert.Equal(saved.Name, tab.Text);
 
-        host.End(null!);
-        Application.DoEvents();
+        // The nest it did not save closes without asking: Save would be refused for it.
+        var prompts = new List<string>();
+        var previous = EditNestForm.UnsavedChangesPrompt;
+        EditNestForm.UnsavedChangesPrompt = form =>
+        {
+            prompts.Add(form.Nest.Name);
+            return DialogResult.Yes;
+        };
+        try
+        {
+            host.End(null!);
+            Application.DoEvents();
+        }
+        finally
+        {
+            EditNestForm.UnsavedChangesPrompt = previous;
+        }
+        Assert.Empty(prompts);
         Assert.Same(tab, Assert.Single(Tabs(main)));
     }, TestTimeout, "The live release nesting test did not complete.");
 

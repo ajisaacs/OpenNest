@@ -106,6 +106,18 @@ namespace OpenNest.Forms
             History.Current != null
             && (!History.IsAtSavePoint || NestFingerprint.Compute(Nest) != recordedFingerprint);
 
+        /// <summary>
+        /// Marks the nest as it stands saved, for a nest something else wrote to the server
+        /// (Make Nests saved it from this tab).
+        /// </summary>
+        internal void MarkSaved()
+        {
+            RecordUnrecordedChange();
+            if (History.Current != null)
+                History.MarkSaved();
+            UpdateTitle();
+        }
+
         /// <summary>Shows the nest's name, marked with an asterisk while it has unsaved changes.</summary>
         internal void UpdateTitle() => Text = HasUnsavedChanges ? $"{Nest.Name} *" : Nest.Name;
 

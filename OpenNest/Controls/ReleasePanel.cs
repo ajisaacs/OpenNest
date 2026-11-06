@@ -743,7 +743,6 @@ namespace OpenNest.Controls
                 return;
             }
 
-            var merges = ChosenMerges();
             var nestAfter = nestAfterReleaseCheckBox.Checked;
             var live = nestAfter ? NestingHost : null;
             // One run shares its ledger stock, so two of its nests never take the same sheet.
@@ -751,6 +750,7 @@ namespace OpenNest.Controls
             running = true;
             cancellation = new CancellationTokenSource();
             UpdateCommands();
+            var merges = await RereadMergesAsync(ChosenMerges(), cancellation.Token);
             session = new SetReleaseSession(sets, library, nests, serverUrl, ReadPackage, WriteNest, CreateNest, ReadNest,
                 !nestAfter ? null
                 : live == null ? (nest, token) => Renest(nest, ledger, token)
@@ -781,6 +781,42 @@ namespace OpenNest.Controls
                     NestsOpened?.Invoke(this, EventArgs.Empty);
             }
             MakeNestsFinished?.Invoke(this, EventArgs.Empty);
+        }
+
+        // A draft saved since its lookup (the panel asks the operator to save and close an open
+        // one) merges at the revision now on the server, not the one looked up: the session
+        // saves the merge only over the revision it was given. One saved while the release
+        // runs is still refused. A draft that cannot be read again keeps the revision looked up.
+        private async Task<IReadOnlyDictionary<SetReleaseGroup, NestRecord>> RereadMergesAsync(
+            IReadOnlyDictionary<SetReleaseGroup, NestRecord> merges, CancellationToken token)
+        {
+            var current = new Dictionary<SetReleaseGroup, NestRecord>();
+            foreach (var (group, draft) in merges)
+            {
+                NestRecord found = null;
+                try
+                {
+                    found = await nests.GetMetadataAsync(draft.Id, token);
+                }
+                catch (Exception ex) when (ex is IOException or HttpRequestException or OperationCanceledException
+                    or System.Text.Json.JsonException or NotSupportedException)
+                {
+                }
+
+                if (found != null && found.Id == draft.Id && found.Revision > draft.Revision)
+                {
+                    if (drafts.TryGetValue(group.Key, out var candidates))
+                        drafts[group.Key] = candidates.Select(d => d.Id == found.Id ? found : d).ToList();
+                    if (targets.ContainsKey(group.Key))
+                        targets[group.Key] = found;
+                    current[group] = found;
+                }
+                else
+                {
+                    current[group] = draft;
+                }
+            }
+            return current;
         }
 
         // The host's Auto Nest stops the whole release, as Stop here does.

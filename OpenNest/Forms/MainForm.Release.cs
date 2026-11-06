@@ -98,13 +98,16 @@ namespace OpenNest.Forms
 
         void IReleaseNestingHost.End(SetReleaseResult result)
         {
-            // Saved nests were bound to their records and left the list; the rest were never saved.
-            foreach (var tab in releaseTabs.ToList())
+            // Saved nests were bound to their records and left the list; the rest were never
+            // saved and go without asking: Save would be refused while they are listed, and
+            // saving one now would make a nest outside the release.
+            var unsaved = releaseTabs.ToList();
+            releaseTabs.Clear();
+            foreach (var tab in unsaved)
             {
                 if (!tab.IsDisposed)
-                    tab.Close();
+                    tab.CloseDiscardingChanges();
             }
-            releaseTabs.Clear();
             SetNestingLockout(false);
 
             var first = result?.Created.FirstOrDefault()?.Nest;

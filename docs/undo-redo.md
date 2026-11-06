@@ -53,6 +53,9 @@ A save first commits any edit no scope recorded, so the point covers what was wr
 `EditNestForm.HasUnsavedChanges` is true off the save point or while such an edit is pending:
 the window title then ends in ` *`, and closing asks Save, Don't Save or Cancel. Yes saves to
 the storage in use; a database save cancels the close and closes the window once it succeeds.
+Make Nests saves the nests it nests in tabs itself: binding a tab to its saved record marks its
+save point (`EditNestForm.MarkSaved`), and a tab whose nest it did not save closes without the
+prompt (`CloseDiscardingChanges`).
 
 ## Recording rule
 

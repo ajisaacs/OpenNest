@@ -359,14 +359,19 @@ public class SetReleaseFormsTests
                 Assert.Empty(sets.Releases);
                 Assert.Contains("is open in a tab", Assert.Single(messages));
 
-                // Closed in its tab, as the window learns when it is activated again.
+                // Saved and closed in its tab, as the note asks, which the window learns when it
+                // is activated again. The save moved the draft past the revision looked up.
+                var saved = nests.SaveDraft(draft);
                 openTabs.Clear();
                 panel.RefreshOpenNests();
                 Assert.True(release.Enabled);
                 Assert.StartsWith("→ merges into N26-0007", Note(row));
 
                 Run(panel.ReleaseAsync());
-                Assert.Equal(SetReleaseNestKind.Merged, Assert.Single(Assert.Single(sets.Releases).Nests).Kind);
+                var merged = Assert.Single(Assert.Single(sets.Releases).Nests);
+                Assert.Equal((SetReleaseNestKind.Merged, (int?)saved.Revision, saved.Revision + 1),
+                    (merged.Kind, merged.RevisionBefore, merged.RevisionAfter));
+                Assert.StartsWith("Merged into N26-0007", Note(row));
             },
             TestTimeout,
             "The open-draft release test did not complete.");
@@ -1305,7 +1310,29 @@ public class SetReleaseFormsTests
         }
 
         public Task<NestRecord?> GetMetadataAsync(Guid id, CancellationToken ct = default) =>
-            Task.FromResult(Uploaded.FirstOrDefault(r => r.Id == id));
+            Task.FromResult(Uploaded.FirstOrDefault(r => r.Id == id) ?? Drafts.FirstOrDefault(r => r.Id == id));
+
+        /// <summary>Saves <paramref name="draft"/> again unchanged, as its tab does, under the next revision.</summary>
+        public NestRecord SaveDraft(NestRecord draft)
+        {
+            var index = Drafts.FindIndex(d => d.Id == draft.Id);
+            var current = Drafts[index];
+            var saved = new NestRecord
+            {
+                Id = current.Id,
+                Revision = current.Revision + 1,
+                Name = current.Name,
+                Material = current.Material,
+                MaterialGrade = current.MaterialGrade,
+                Thickness = current.Thickness,
+                Status = current.Status,
+                PlateCount = current.PlateCount,
+                SavedAt = current.SavedAt.AddMinutes(1),
+            };
+            _revisions[(saved.Id, saved.Revision)] = _revisions[(current.Id, current.Revision)];
+            Drafts[index] = saved;
+            return saved;
+        }
 
         public Task<IReadOnlyList<NestRecord>> ListAsync(CancellationToken ct = default) => throw new NotSupportedException();
         public Task<byte[]?> GetFileAsync(Guid id, CancellationToken ct = default) => throw new NotSupportedException();

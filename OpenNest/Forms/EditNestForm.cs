@@ -1298,6 +1298,20 @@ namespace OpenNest.Forms
             splitContainer.SplitterDistance = Settings.Default.SplitterDistance;
         }
 
+        // Set by CloseDiscardingChanges: this close does not ask to save.
+        private bool discardOnClose;
+
+        /// <summary>
+        /// Closes the window without asking to save, for a nest whose owner discards it (Make
+        /// Nests closing a nest it did not save). A close the cutting inspection defers stays
+        /// unasked.
+        /// </summary>
+        internal void CloseDiscardingChanges()
+        {
+            discardOnClose = true;
+            Close();
+        }
+
         protected override void OnClosing(CancelEventArgs e)
         {
             if (CuttingInspection != null)
@@ -1327,7 +1341,7 @@ namespace OpenNest.Forms
         // this close and closes the window once the nest is saved.
         private bool ConfirmCloseWithUnsavedChanges()
         {
-            if (!HasUnsavedChanges)
+            if (discardOnClose || !HasUnsavedChanges)
                 return true;
             switch (UnsavedChangesPrompt(this))
             {
