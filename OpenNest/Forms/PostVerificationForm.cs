@@ -29,7 +29,7 @@ public partial class PostVerificationForm : Form
         (PostVerificationKind.FixedLead, "Fixed leads"),
         (PostVerificationKind.PierceZone, "Pierce zones"),
         (PostVerificationKind.PartSpacing, "Part spacing"),
-        (PostVerificationKind.EdgeSpacing, "Edge spacing"),
+        (PostVerificationKind.EdgeSpacing, "Outside work area"),
         (PostVerificationKind.PartSupport, "Part support"),
         (PostVerificationKind.CommonLine, "Common lines"),
     };

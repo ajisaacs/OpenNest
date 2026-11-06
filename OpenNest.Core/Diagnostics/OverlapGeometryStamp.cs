@@ -95,6 +95,11 @@ public sealed class OverlapGeometryStamp
         ReferenceEquals(plate, current) && partSpacing == Bits(current.PartSpacing)
         && commonLines == CommonLineState(current);
 
+    /// <summary>The same sheet, edge spacing and outline: an unchanged part keeps its edge finding.</summary>
+    internal bool SameSheet(Plate current) =>
+        ReferenceEquals(plate, current) && sheet == SheetState(current) && edgeSpacing == EdgeState(current)
+        && Equals(outline, current.Outline);
+
     // Which plate slots share a common-line group, and its kerf: the spacing check reads both.
     private static string CommonLineState(Plate plate) =>
         string.Join(";", plate.CommonLines.Select(group => Bits(group.Kerf) + ":"

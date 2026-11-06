@@ -58,9 +58,14 @@ the recheck. Changing the plate's part spacing clears them and reruns the check.
 The label also checks the plate edge with the pre-post check's `PlateEdgeReview`, on clean
 material only (the snapshot holds no leads): a part past the sheet, or outside an outlined
 sheet or over one of its obstacles, counts as **off plate**, and one inside the edge spacing
-as **near edge**, as in **Layout: 1 overlap, 1 off plate**. A lead or scribe past the sheet
-is left to Validate Nest and posting, which read the placed programs. These findings have no
-canvas marker. Changing the plate's edge spacing or outline makes the result out of date.
+as **outside work area**, as in **Layout: 1 overlap, 1 off plate, 1 outside work area**. A
+lead or scribe past the sheet is left to Validate Nest and posting, which read the placed
+programs. Each finding is marked in every display mode except Off: off the plate with a red
+crosshair where the part leaves the sheet, outside the work area with an orange ring at the
+middle of its gap to the edge, labeled like `3 off plate` or `2 outside work area`. Hover near
+a marker for the finding's message and marker coordinates. Markers follow the same retention
+as overlap highlights: only a changed part's marker disappears before the recheck. Changing
+the plate's size, edge spacing or outline clears them and makes the result out of date.
 
 In a nest window the active plate is checked automatically. Any layout edit
 (add, remove, reorder, move, rotate, fill) invalidates the full report and shows

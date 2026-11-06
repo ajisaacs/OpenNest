@@ -15,7 +15,7 @@ public class PlateEdgeReviewTests
         Assert.Empty(Find(report, PostVerificationKind.OffPlate));
         Assert.Empty(Find(report, PostVerificationKind.EdgeSpacing));
         Assert.DoesNotContain("Off the plate", report.ToDisplayText());
-        Assert.DoesNotContain("Edge spacing", report.ToDisplayText());
+        Assert.DoesNotContain("Outside work area", report.ToDisplayText());
     }
 
     [Fact]
@@ -33,10 +33,10 @@ public class PlateEdgeReviewTests
 
         var finding = Assert.Single(Find(report, PostVerificationKind.EdgeSpacing));
         Assert.Equal((1, 1), (finding.PlateNumber, finding.PartNumber));
-        Assert.Contains("0.200 from the plate's left edge", finding.Message);
-        Assert.Contains("(0.500)", finding.Message);
+        Assert.Equal("'square' is outside the work area: 0.200 from the plate's left edge, inside its "
+            + "0.500 edge spacing.", finding.Message);
         Assert.Equal(0.1, finding.Location!.Value.X, 6);
-        Assert.Contains("Edge spacing: 1 warning(s)", report.ToDisplayText());
+        Assert.Contains("Outside work area: 1 warning(s)", report.ToDisplayText());
         Assert.False(report.CanPost(false));
     }
 
@@ -157,7 +157,8 @@ public class PlateEdgeReviewTests
         var report = PostVerificationAnalyzer.Analyze(near);
         Assert.Empty(Find(report, PostVerificationKind.OffPlate));
         var finding = Assert.Single(Find(report, PostVerificationKind.EdgeSpacing));
-        Assert.Contains("outline or one of its obstacles", finding.Message);
+        Assert.Contains("is outside the work area: inside the 0.500 edge spacing of the plate's outline "
+            + "or one of its obstacles", finding.Message);
 
         var clear = NestWith(Edges(0.5), Square(10, 10, 4));
         clear.Plates[0].Outline = outline;

@@ -643,7 +643,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         PostVerificationKind.PartSpacing => "Part spacing",
         PostVerificationKind.PartSupport => "Part support",
         PostVerificationKind.OffPlate => "Off the plate",
-        PostVerificationKind.EdgeSpacing => "Edge spacing",
+        PostVerificationKind.EdgeSpacing => "Outside work area",
         PostVerificationKind.CommonLine => "Common line",
         _ => kind.ToString(),
     };
@@ -712,7 +712,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         PostVerificationKind.PartSpacing => "The ring marks where the two parts come closest.",
         PostVerificationKind.PartSupport => "The ring marks the part's center of gravity.",
         PostVerificationKind.OffPlate => "The ring marks where the part leaves the plate.",
-        PostVerificationKind.EdgeSpacing => "The ring marks the gap between the part and the plate edge.",
+        PostVerificationKind.EdgeSpacing => "The ring marks where the part leaves the work area, inside the edge spacing.",
         PostVerificationKind.CommonLine => "The ring marks the common-line part or lead to review.",
         _ => "The ring marks the affected part; the exact spot is not known."
     };

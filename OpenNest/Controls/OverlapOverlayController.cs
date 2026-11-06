@@ -40,6 +40,7 @@ internal sealed class OverlapOverlayController : IDisposable
     private Plate observedPlate;
     private IReadOnlyList<PlateOverlapPair> hoveredPairs = Array.Empty<PlateOverlapPair>();
     private IReadOnlyList<PlateSpacingPair> hoveredSpacing = Array.Empty<PlateSpacingPair>();
+    private IReadOnlyList<PlateEdgeFinding> hoveredEdges = Array.Empty<PlateEdgeFinding>();
     private string hoverText;
     private OverlapHoverPages hoverPages;
     private Point hoverPoint;
@@ -409,6 +410,7 @@ internal sealed class OverlapOverlayController : IDisposable
         {
             DrawCutOffClampContacts(graphics);
             DrawSpacingMarkers(graphics);
+            DrawEdgeMarkers(graphics);
         }
         DrawStateLabel(graphics);
     }
@@ -464,24 +466,28 @@ internal sealed class OverlapOverlayController : IDisposable
             var graph = view.PointWorldToGraph(world);
             return new Vector(graph.X, graph.Y);
         }
-        // Overlap markers exist only in these modes; spacing markers in every visible one.
+        // Overlap markers exist only in these modes; spacing and edge markers in every visible one.
         var hits = ShowsCentroids
             ? OverlapPairPresentation.HitTest(state.DisplayPairs, ToGraph, pointer, view.DeviceDpi)
             : Array.Empty<PlateOverlapPair>();
         var spacingHits = OverlapPairPresentation.HitTest(state.DisplaySpacingPairs, ToGraph, pointer, view.DeviceDpi);
-        var changed = !hits.SequenceEqual(hoveredPairs) || !spacingHits.SequenceEqual(hoveredSpacing);
+        var edgeHits = OverlapPairPresentation.HitTest(state.DisplayEdgeFindings, ToGraph, pointer, view.DeviceDpi);
+        var changed = !hits.SequenceEqual(hoveredPairs) || !spacingHits.SequenceEqual(hoveredSpacing)
+            || !edgeHits.SequenceEqual(hoveredEdges);
         var moved = point != hoverPoint;
         hoveredPairs = hits;
         hoveredSpacing = spacingHits;
+        hoveredEdges = edgeHits;
         hoverPoint = point;
         hoverTransform = ViewTransform;
         if (changed)
         {
             hoverPages = null;
             HoverBounds = RectangleF.Empty;
-            hoverText = hits.Count + spacingHits.Count == 0 ? null : string.Join("\n\n",
+            hoverText = hits.Count + spacingHits.Count + edgeHits.Count == 0 ? null : string.Join("\n\n",
                 hits.Select(pair => OverlapPairPresentation.Details(pair, capturedUnits))
-                    .Concat(spacingHits.Select(pair => OverlapPairPresentation.Details(pair, capturedUnits))));
+                    .Concat(spacingHits.Select(pair => OverlapPairPresentation.Details(pair, capturedUnits)))
+                    .Concat(edgeHits.Select(finding => OverlapPairPresentation.Details(finding, capturedUnits))));
         }
         if (changed || (moved && hoverText != null))
             view.Invalidate();
@@ -501,6 +507,7 @@ internal sealed class OverlapOverlayController : IDisposable
         HoverBounds = RectangleF.Empty;
         hoveredPairs = Array.Empty<PlateOverlapPair>();
         hoveredSpacing = Array.Empty<PlateSpacingPair>();
+        hoveredEdges = Array.Empty<PlateEdgeFinding>();
         if (visible && !disposed && !view.IsDisposed && !view.Disposing)
             view.Invalidate();
     }
@@ -564,7 +571,7 @@ internal sealed class OverlapOverlayController : IDisposable
             using var format = (StringFormat)StringFormat.GenericTypographic.Clone();
             format.FormatFlags |= StringFormatFlags.NoWrap | StringFormatFlags.MeasureTrailingSpaces;
             float Measure(string line) => graphics.MeasureString(line, view.Font, PointF.Empty, format).Width;
-            hoverPages ??= OverlapHoverPages.Create(text, hoveredPairs.Count + hoveredSpacing.Count, maxRows, maxWidth, line => Measure(line));
+            hoverPages ??= OverlapHoverPages.Create(text, hoveredPairs.Count + hoveredSpacing.Count + hoveredEdges.Count, maxRows, maxWidth, line => Measure(line));
             if (hoverPages.NeedsLargerViewport)
             {
                 // A viewport smaller than a content line plus its paging hint cannot
@@ -700,6 +707,47 @@ internal sealed class OverlapOverlayController : IDisposable
             var y = center.Y - radius + row * size.Height;
             graphics.FillRectangle(Brushes.White, x, y, size.Width, size.Height);
             graphics.DrawString(label, view.Font, text, x, y);
+        }
+    }
+
+    // Edge findings mark a point, not shared area, so every visible mode shows them: off the
+    // plate in the overlaps' red crosshair, outside the work area in the spacing ring's orange.
+    private void DrawEdgeMarkers(Graphics graphics)
+    {
+        var dpiScale = view.DeviceDpi / 96f;
+        var radius = (float)OverlapPairPresentation.MarkerHalfSize(view.DeviceDpi);
+        var spacingColor = Color.FromArgb(200, 90, 0);
+        using var halo = new Pen(Color.White, 4 * dpiScale);
+        using var crosshair = new Pen(Color.DarkRed, 2 * dpiScale);
+        using var ring = new Pen(spacingColor, 2 * dpiScale);
+        using var spacingText = new SolidBrush(spacingColor);
+        var labelRows = new Dictionary<PointF, int>();
+        foreach (var finding in state.DisplayEdgeFindings)
+        {
+            var center = view.PointWorldToGraph(finding.Marker);
+            if (!float.IsFinite(center.X) || !float.IsFinite(center.Y))
+                continue;
+            if (finding.OffPlate)
+            {
+                foreach (var pen in new[] { halo, crosshair })
+                {
+                    graphics.DrawLine(pen, center.X - radius, center.Y, center.X + radius, center.Y);
+                    graphics.DrawLine(pen, center.X, center.Y - radius, center.X, center.Y + radius);
+                }
+            }
+            else
+            {
+                foreach (var pen in new[] { halo, ring })
+                    graphics.DrawEllipse(pen, center.X - radius, center.Y - radius, radius * 2, radius * 2);
+            }
+            var label = OverlapPairPresentation.Label(finding);
+            var size = graphics.MeasureString(label, view.Font);
+            labelRows.TryGetValue(center, out var row);
+            labelRows[center] = row + 1;
+            var x = center.X + radius + 3 * dpiScale;
+            var y = center.Y - radius + row * size.Height;
+            graphics.FillRectangle(Brushes.White, x, y, size.Width, size.Height);
+            graphics.DrawString(label, view.Font, finding.OffPlate ? Brushes.DarkRed : spacingText, x, y);
         }
     }
 

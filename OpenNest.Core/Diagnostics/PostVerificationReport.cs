@@ -113,7 +113,7 @@ public sealed class PostVerificationReport
         if (Findings.Any(finding => finding.Kind == PostVerificationKind.OffPlate))
             Summary(PostVerificationKind.OffPlate, "Off the plate");
         if (Findings.Any(finding => finding.Kind == PostVerificationKind.EdgeSpacing))
-            Summary(PostVerificationKind.EdgeSpacing, "Edge spacing");
+            Summary(PostVerificationKind.EdgeSpacing, "Outside work area");
         if (Findings.Any(finding => finding.Kind == PostVerificationKind.CommonLine))
             Summary(PostVerificationKind.CommonLine, "Common lines");
         foreach (var finding in Findings)

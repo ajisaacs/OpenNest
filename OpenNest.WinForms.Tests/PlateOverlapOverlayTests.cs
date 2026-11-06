@@ -343,6 +343,38 @@ public class PlateOverlapOverlayTests
     });
 
     [Fact]
+    public void EdgeMarkersDrawAndHoverWithTheFindingsMessage() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.View.Plate.Parts.Clear();
+        run.View.Plate.EdgeSpacing = new Spacing(0.5, 0, 0, 0);
+        run.View.Plate.Parts.Add(Rectangle(0.2));
+        var hanging = Rectangle(-1);
+        hanging.Offset(0, 5);
+        run.View.Plate.Parts.Add(hanging);
+        run.Finish();
+        Assert.Equal("Layout: 1 off plate, 1 outside work area", run.View.OverlapSummary);
+        run.View.ZoomToPoint(new Vector(), 20);
+        run.View.SetOrigin(60, 220);
+        using var image = new Bitmap(300, 300);
+        using var graphics = Graphics.FromImage(image);
+        graphics.Clear(Color.White);
+        graphics.TranslateTransform(60, 220);
+        run.View.OverlapOverlay.Draw(graphics);
+
+        var radius = (int)OverlapPairPresentation.MarkerHalfSize(run.View.DeviceDpi);
+        foreach (var finding in run.View.OverlapReport.EdgeFindings)
+        {
+            var center = run.View.PointWorldToControl(finding.Marker);
+            Assert.NotEqual(Color.White.ToArgb(), image.GetPixel(center.X - radius, center.Y).ToArgb());
+            run.View.MoveTo(center);
+            Assert.Contains(finding.Message, run.View.OverlapOverlay.HoverText);
+            Assert.StartsWith(finding.OffPlate ? "Off the plate: part 2" : "Outside work area: part 1",
+                run.View.OverlapOverlay.HoverText);
+        }
+    });
+
+    [Fact]
     public void ClearPlateDrawsNoLabelButStatusKeepsTheWords() => RunSta(() =>
     {
         using var run = new OverlayRun();

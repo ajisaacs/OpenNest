@@ -19,7 +19,7 @@ namespace OpenNest.Diagnostics;
 /// table.
 /// </para>
 /// <para>
-/// <b>Edge spacing</b>: clean nesting material (leads excluded, as the part-spacing check reads it)
+/// <b>Outside the work area</b>: clean nesting material (leads excluded, as the part-spacing check reads it)
 /// outside the plate's work area, or, on an outlined sheet, closer than the largest edge spacing to
 /// the outline or an obstacle: Auto Nest's layout check judges bounds exactly this way, so a layout
 /// it accepted stays clear. Shortfalls up to <see cref="SpacingOutline.SpacingSlack"/> pass. Leads
@@ -150,11 +150,11 @@ internal static class PlateEdgeReview
                     bounds.Center);
         }
         if (Shortest(bounds, frame.Sheet, frame.Work) is { } close)
-            return new Verdict(false, $"is {close.Gap:F3} from the plate's {close.Edge} edge, closer than "
-                + $"its edge spacing ({close.Spacing:F3}).", close.Marker);
+            return new Verdict(false, $"is outside the work area: {close.Gap:F3} from the plate's {close.Edge} "
+                + $"edge, inside its {close.Spacing:F3} edge spacing.", close.Marker);
         if (region != null && frame.Inset > 0 && !frame.Outline.Holds(region, frame.Inset, frame.Origin, Slack))
-            return new Verdict(false, $"is closer than the edge spacing ({frame.Inset:F3}) to the plate's outline "
-                + "or one of its obstacles.", bounds.Center);
+            return new Verdict(false, $"is outside the work area: inside the {frame.Inset:F3} edge spacing of the "
+                + "plate's outline or one of its obstacles.", bounds.Center);
         return null;
     }
 

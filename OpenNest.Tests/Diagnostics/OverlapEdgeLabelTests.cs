@@ -1,3 +1,4 @@
+using System.Globalization;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
 using static OpenNest.Tests.TestHelpers;
@@ -12,8 +13,8 @@ public class OverlapEdgeLabelTests
     [InlineData(118, 10, "Layout: 1 off plate", true)]
     [InlineData(130, 10, "Layout: 1 off plate", true)]
     [InlineData(10, -2, "Layout: 1 off plate", true)]
-    [InlineData(0.2, 10, "Layout: 1 near edge", true)]
-    public void Summary_ReportsPartsOffThePlateOrNearItsEdge(double x, double y, string expected, bool attention)
+    [InlineData(0.2, 10, "Layout: 1 outside work area", true)]
+    public void Summary_ReportsPartsOffThePlateOrOutsideTheWorkArea(double x, double y, string expected, bool attention)
     {
         var plate = PlateWith(new Spacing(0.5, 0.5, 0.5, 0.5), Square(x, y));
         var state = Publish(plate);
@@ -54,6 +55,49 @@ public class OverlapEdgeLabelTests
 
         Assert.False(state.EnsureFresh(plate));
         Assert.Equal("Layout: out of date", state.Summary);
+    }
+
+    [Fact]
+    public void EdgeFindings_AreDrawnAndHitAtTheirMarkers()
+    {
+        var plate = PlateWith(new Spacing(0.5, 0.5, 0.5, 0.5), Square(10, 10), Square(0.2, 10, "close"),
+            Square(-1, 30, "hanging"));
+        var state = Publish(plate);
+
+        Assert.Equal(new[] { (1, false), (2, true) },
+            state.DisplayEdgeFindings.Select(finding => (finding.PartId, finding.OffPlate)));
+        var close = state.DisplayEdgeFindings[0];
+        Assert.Equal("2 outside work area", OverlapPairPresentation.Label(close));
+        Assert.Equal("3 off plate", OverlapPairPresentation.Label(state.DisplayEdgeFindings[1]));
+
+        var hit = Assert.Single(OverlapPairPresentation.HitTest(state.DisplayEdgeFindings, world => world,
+            close.Marker + new Vector(3, 0), 96));
+        Assert.Same(close, hit);
+        Assert.Empty(OverlapPairPresentation.HitTest(state.DisplayEdgeFindings, world => world,
+            close.Marker + new Vector(11, 0), 96));
+        var details = OverlapPairPresentation.Details(hit, Units.Inches, CultureInfo.InvariantCulture);
+        Assert.StartsWith("Outside work area: part 2\n'close' is outside the work area: 0.200 from the plate's "
+            + "left edge, inside its 0.500 edge spacing.\nMarker: (", details);
+    }
+
+    [Fact]
+    public void EdgeMarkers_FollowTheirPartsThroughEdits()
+    {
+        var plate = PlateWith(new Spacing(0.5, 0.5, 0.5, 0.5), Square(10, 10), Square(0.2, 10, "close"),
+            Square(-1, 30, "hanging"));
+        var state = Publish(plate);
+
+        plate.Parts[0].Offset(1, 0);
+        state.Invalidate(plate);
+        Assert.Equal(new[] { 1, 2 }, state.DisplayEdgeFindings.Select(finding => finding.PartId));
+
+        plate.Parts[2].Offset(5, 0);
+        state.Invalidate(plate);
+        Assert.Equal(1, Assert.Single(state.DisplayEdgeFindings).PartId);
+
+        plate.EdgeSpacing = new Spacing();
+        state.Invalidate(plate);
+        Assert.Empty(state.DisplayEdgeFindings);
     }
 
     [Fact]

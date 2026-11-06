@@ -37,6 +37,18 @@ public static class OverlapPairPresentation
             + $"Marker: ({Number(pair.Marker.X, provider)}, {Number(pair.Marker.Y, provider)}) {units}";
     }
 
+    /// <summary>A short canvas label: the part's sequence number and what is wrong.</summary>
+    public static string Label(PlateEdgeFinding finding) =>
+        $"{finding.PartId + 1} " + (finding.OffPlate ? "off plate" : "outside work area");
+
+    public static string Details(PlateEdgeFinding finding, Units capturedUnits, IFormatProvider provider = null)
+    {
+        var units = UnitsHelper.GetShortString(capturedUnits);
+        return (finding.OffPlate ? "Off the plate" : "Outside work area") + $": part {finding.PartId + 1}\n"
+            + finding.Message + "\n"
+            + $"Marker: ({Number(finding.Marker.X, provider)}, {Number(finding.Marker.Y, provider)}) {units}";
+    }
+
     // Significant figures adapt to scale: a positive sliver must never read as zero.
     public static string Number(double value, IFormatProvider provider = null) =>
         value.ToString("G6", provider ?? CultureInfo.CurrentCulture);
@@ -59,6 +71,12 @@ public static class OverlapPairPresentation
         Func<Vector, Vector> worldToScreen, Vector pointer, int deviceDpi) =>
         pairs.Where(pair => Hits(worldToScreen(pair.Marker), pointer, deviceDpi))
             .OrderBy(pair => pair.PartAId).ThenBy(pair => pair.PartBId).ToArray();
+
+    /// <inheritdoc cref="HitTest(IEnumerable{PlateOverlapPair}, Func{Vector, Vector}, Vector, int)"/>
+    public static IReadOnlyList<PlateEdgeFinding> HitTest(IEnumerable<PlateEdgeFinding> findings,
+        Func<Vector, Vector> worldToScreen, Vector pointer, int deviceDpi) =>
+        findings.Where(finding => Hits(worldToScreen(finding.Marker), pointer, deviceDpi))
+            .OrderBy(finding => finding.PartId).ToArray();
 
     private static bool Hits(Vector center, Vector pointer, int deviceDpi)
     {
