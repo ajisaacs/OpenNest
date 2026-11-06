@@ -40,7 +40,7 @@ current with findings, incomplete, stale,
 canceled, and failed checks. Only a completed, current, fully checked report can
 say **No material overlaps detected**. An incomplete check retains known overlaps
 and states how many distinct parts could not be checked. Pair counts are not
-fragment counts. This diagnostic checks shared material, not plate edges or
+fragment counts. This diagnostic checks shared material and the plate edge (below), not
 cutting-path crossings.
 
 The label also reports minimum spacing. When the plate's part spacing is above zero,
@@ -54,6 +54,13 @@ except Off: a gap has no shared area to shade, so Areas shows it too. Hover near
 ring for captured names, the gap and marker coordinates. Rings follow the same
 retention as overlap highlights: only pairs involving changed parts disappear before
 the recheck. Changing the plate's part spacing clears them and reruns the check.
+
+The label also checks the plate edge with the pre-post check's `PlateEdgeReview`, on clean
+material only (the snapshot holds no leads): a part past the sheet, or outside an outlined
+sheet or over one of its obstacles, counts as **off plate**, and one inside the edge spacing
+as **near edge**, as in **Layout: 1 overlap, 1 off plate**. A lead or scribe past the sheet
+is left to Validate Nest and posting, which read the placed programs. These findings have no
+canvas marker. Changing the plate's edge spacing or outline makes the result out of date.
 
 In a nest window the active plate is checked automatically. Any layout edit
 (add, remove, reorder, move, rotate, fill) invalidates the full report and shows

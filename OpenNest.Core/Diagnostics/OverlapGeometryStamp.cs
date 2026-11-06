@@ -20,6 +20,9 @@ public sealed class OverlapGeometryStamp
     private readonly (long Width, long Length, int Quadrant) sheet;
     private readonly long partSpacing;
     private readonly string commonLines;
+    // The label also checks the sheet edge, so its spacing and outline make a result stale too.
+    private readonly (long Left, long Bottom, long Right, long Top) edgeSpacing;
+    private readonly SheetOutline outline;
 
     private OverlapGeometryStamp(Plate plate)
     {
@@ -27,6 +30,8 @@ public sealed class OverlapGeometryStamp
         sheet = SheetState(plate);
         partSpacing = Bits(plate.PartSpacing);
         commonLines = CommonLineState(plate);
+        edgeSpacing = EdgeState(plate);
+        outline = plate.Outline;
         entries = new Entry[plate.Parts.Count];
         for (var i = 0; i < entries.Length; i++)
             entries[i] = new Entry(plate.Parts[i]);
@@ -55,6 +60,10 @@ public sealed class OverlapGeometryStamp
 
     private static (long, long, int) SheetState(Plate plate) =>
         (Bits(plate.Size.Width), Bits(plate.Size.Length), plate.Quadrant);
+
+    private static (long, long, long, long) EdgeState(Plate plate) =>
+        (Bits(plate.EdgeSpacing.Left), Bits(plate.EdgeSpacing.Bottom), Bits(plate.EdgeSpacing.Right),
+            Bits(plate.EdgeSpacing.Top));
 
     public static OverlapGeometryStamp Capture(Plate plate) => new(plate);
 
@@ -94,7 +103,8 @@ public sealed class OverlapGeometryStamp
     public bool Matches(Plate current)
     {
         if (current.Parts.Count != entries.Length || partSpacing != Bits(current.PartSpacing)
-            || commonLines != CommonLineState(current) || !SameZones(current) || !SameCutOffs(current))
+            || commonLines != CommonLineState(current) || edgeSpacing != EdgeState(current)
+            || !Equals(outline, current.Outline) || !SameZones(current) || !SameCutOffs(current))
             return false;
         for (var i = 0; i < entries.Length; i++)
             if (!entries[i].Matches(current.Parts[i]))

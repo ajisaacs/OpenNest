@@ -30,7 +30,7 @@ public sealed class OverlapReportState
     /// <summary>A current, fully checked report with no finding of any kind.</summary>
     public bool IsAllClear => Status == OverlapCheckStatus.Current && Report.Pairs.Count == 0
         && Report.ClampFindings.Count == 0 && Report.CutOffClampFindings.Count == 0
-        && Report.SpacingPairs.Count == 0;
+        && Report.SpacingPairs.Count == 0 && Report.EdgeFindings.Count == 0;
     /// <summary>
     /// The last published result's message, kept through layout edits and rechecks so the canvas
     /// stays quiet until the next result; never a claim about the current layout. Null when none.
@@ -48,6 +48,7 @@ public sealed class OverlapReportState
             + (Report.CutOffClampFindings.Count == 0 ? ""
                 : $"{Report.CutOffClampFindings.Count} cut-off/clamp contacts; ")
             + (Report.SpacingPairs.Count == 0 ? "" : $"{Report.SpacingPairs.Count} pairs under part spacing; ")
+            + Edges("; ")
             + $"{uncheckedPartCount} parts could not be checked",
         OverlapCheckStatus.Failed => "Overlap check failed — run Check Overlaps again",
         OverlapCheckStatus.Canceled => "Overlap check canceled",
@@ -80,14 +81,30 @@ public sealed class OverlapReportState
             words.Add(overlaps == 1 ? "1 overlap" : $"{overlaps} overlaps");
         if (spacing != 0)
             words.Add($"{spacing} too close");
+        var off = Report.EdgeFindings.Count(finding => finding.OffPlate);
+        var near = Report.EdgeFindings.Count - off;
+        if (off != 0)
+            words.Add($"{off} off plate");
+        if (near != 0)
+            words.Add($"{near} near edge");
         return string.Join(", ", words);
+    }
+
+    // Plate-edge counts for the detailed message, each followed by the separator; empty when none.
+    private string Edges(string separator)
+    {
+        var off = Report.EdgeFindings.Count(finding => finding.OffPlate);
+        var near = Report.EdgeFindings.Count - off;
+        return (off == 0 ? "" : $"{off} parts off the plate{separator}")
+            + (near == 0 ? "" : $"{near} parts inside the edge spacing{separator}");
     }
 
     // Only a fully checked report that required a gap may clear spacing as well as overlaps.
     private string CurrentMessage()
     {
-        var spacing = Report.SpacingPairs.Count == 0 ? ""
-            : $"; part spacing: {Report.SpacingPairs.Count} pairs too close";
+        var spacing = (Report.SpacingPairs.Count == 0 ? ""
+            : $"; part spacing: {Report.SpacingPairs.Count} pairs too close")
+            + (Report.EdgeFindings.Count == 0 ? "" : "; " + Edges("; ").TrimEnd(' ', ';'));
         if (Report.ClampFindings.Count != 0 || Report.CutOffClampFindings.Count != 0)
             return $"Overlaps: {Report.Pairs.Count} pairs, {Report.ClampFindings.Count} clamps, "
                 + $"{Report.CutOffClampFindings.Count} cut-off/clamp contacts{spacing}";

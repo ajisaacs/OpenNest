@@ -10,7 +10,7 @@ public sealed class PlateOverlapReport
     internal PlateOverlapReport(List<PlateOverlapPair> pairs, List<PlateOverlapIssue> issues,
         PlateOverlapSnapshot snapshot, List<PlateOverlapPair> clampFindings = null,
         List<CutOffClampFinding> cutOffClampFindings = null, List<PlateSpacingPair> spacingPairs = null,
-        List<PlateOverlapIssue> spacingIssues = null)
+        List<PlateOverlapIssue> spacingIssues = null, List<PlateEdgeFinding> edgeFindings = null)
     {
         Pairs = pairs.AsReadOnly();
         Issues = issues.AsReadOnly();
@@ -19,6 +19,7 @@ public sealed class PlateOverlapReport
         CutOffClampFindings = (cutOffClampFindings ?? new List<CutOffClampFinding>()).AsReadOnly();
         SpacingPairs = (spacingPairs ?? new List<PlateSpacingPair>()).AsReadOnly();
         SpacingIssues = (spacingIssues ?? new List<PlateOverlapIssue>()).AsReadOnly();
+        EdgeFindings = (edgeFindings ?? new List<PlateEdgeFinding>()).AsReadOnly();
     }
 
     /// <summary>The owned input this report was computed from; the baseline for incremental rechecks.</summary>
@@ -47,6 +48,13 @@ public sealed class PlateOverlapReport
     /// which incremental rechecks reuse by overlap pair.
     /// </summary>
     public IReadOnlyList<PlateOverlapIssue> SpacingIssues { get; }
+
+    /// <summary>
+    /// Parts off the sheet or inside its edge spacing, judged on clean material. Only a plate
+    /// capture carries the sheet; a bare group of parts has none. Unreadable parts join
+    /// <see cref="SpacingIssues"/>.
+    /// </summary>
+    public IReadOnlyList<PlateEdgeFinding> EdgeFindings { get; }
 
     /// <summary>True when the input required a gap, so empty SpacingPairs means something.</summary>
     public bool SpacingChecked => PartSpacingReview.Enforces(Snapshot.PartSpacing);
@@ -129,6 +137,12 @@ public sealed record PlateSpacingPair(int PartAId, int PartBId, string PartAName
     double Gap, Vector Marker);
 
 /// <summary>
+/// A part off the sheet (<see cref="OffPlate"/>) or closer to its edge than the edge spacing.
+/// <see cref="Marker"/> is where it leaves the sheet or the middle of its gap to the edge.
+/// </summary>
+public sealed record PlateEdgeFinding(int PartId, string PartName, bool OffPlate, string Message, Vector Marker);
+
+/// <summary>
 /// One connected island of shared material in world coordinates, after hole subtraction:
 /// a counterclockwise outline and its clockwise holes.
 /// </summary>
@@ -170,7 +184,8 @@ public sealed class PlateOverlapSnapshot
 {
     internal PlateOverlapSnapshot(List<CapturedOverlapPart> parts, List<PlateOverlapIssue> issues,
         List<CapturedClamp> clamps = null, List<CutOffClampFinding> cutOffClampFindings = null,
-        double partSpacing = 0, IReadOnlyDictionary<(int, int), double> commonLinePairs = null)
+        double partSpacing = 0, IReadOnlyDictionary<(int, int), double> commonLinePairs = null,
+        PlateEdgeReview.SheetFrame frame = null)
     {
         CommonLinePairs = commonLinePairs ?? new Dictionary<(int, int), double>();
         Parts = parts.AsReadOnly();
@@ -178,6 +193,7 @@ public sealed class PlateOverlapSnapshot
         Clamps = (clamps ?? new List<CapturedClamp>()).AsReadOnly();
         CutOffClampFindings = (cutOffClampFindings ?? new List<CutOffClampFinding>()).AsReadOnly();
         PartSpacing = partSpacing;
+        Frame = frame;
     }
 
     internal IReadOnlyList<CapturedOverlapPart> Parts { get; }
@@ -193,6 +209,9 @@ public sealed class PlateOverlapSnapshot
     /// <summary>Part ids (lower first) of each pair in one common-line group, with its kerf: held to
     /// the kerf instead of <see cref="PartSpacing"/>.</summary>
     internal IReadOnlyDictionary<(int, int), double> CommonLinePairs { get; }
+
+    /// <summary>The sheet the parts must stay on; null for a bare group of parts or an unusable sheet.</summary>
+    internal PlateEdgeReview.SheetFrame Frame { get; }
 }
 
 internal sealed record CapturedOverlapPart(int Id, string Name, OverlapSource Source,

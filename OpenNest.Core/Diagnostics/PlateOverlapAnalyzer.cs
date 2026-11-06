@@ -33,9 +33,23 @@ public static class PlateOverlapAnalyzer
             cache ?? new OverlapMaterialCache(), cancellationToken);
         var cutoffs = ClampCutDiagnostics.Find(plate);
         cancellationToken.ThrowIfCancellationRequested();
-        return new PlateOverlapSnapshot(material.Parts.ToList(), material.Issues.ToList(),
+        var issues = material.Issues.ToList();
+        PlateEdgeReview.SheetFrame frame = null;
+        if (material.Parts.Count != 0)
+        {
+            try
+            {
+                frame = PlateEdgeReview.SheetFrame.Of(plate);
+            }
+            catch (ArgumentException exception)
+            {
+                // Reported against the first part: the sheet itself cannot be checked.
+                issues.Add(new PlateOverlapIssue(material.Parts[0].Id, null, "Plate edge check: " + exception.Message));
+            }
+        }
+        return new PlateOverlapSnapshot(material.Parts.ToList(), issues,
             material.Clamps.ToList(), cutoffs.ToList(), plate.PartSpacing,
-            PartSpacingReview.CommonLinePairs(plate, parts));
+            PartSpacingReview.CommonLinePairs(plate, parts), frame);
     }
 
     /// <summary>
@@ -228,13 +242,15 @@ public static class PlateOverlapAnalyzer
         var spacingPairs = new List<PlateSpacingPair>();
         var spacingIssues = new List<PlateOverlapIssue>();
         PartSpacingReview.Add(snapshot, pairs, issues, spacingPairs, spacingIssues, cancellationToken);
+        var edgeFindings = new List<PlateEdgeFinding>();
+        PlateEdgeReview.Add(snapshot, edgeFindings, spacingIssues, cancellationToken);
         return new PlateOverlapReport(pairs.OrderBy(pair => pair.PartAId)
             .ThenBy(pair => pair.PartBId).ToList(), issues.OrderBy(issue => issue.PartAId)
             .ThenBy(issue => issue.PartBId).ToList(), snapshot, clampFindings
             .OrderBy(pair => pair.PartAId).ThenBy(pair => pair.PartBId).ToList(),
             snapshot.CutOffClampFindings.ToList(), spacingPairs.OrderBy(pair => pair.PartAId)
             .ThenBy(pair => pair.PartBId).ToList(), spacingIssues.OrderBy(issue => issue.PartAId)
-            .ThenBy(issue => issue.PartBId).ToList());
+            .ThenBy(issue => issue.PartBId).ToList(), edgeFindings.OrderBy(finding => finding.PartId).ToList());
     }
 
     /// <summary>

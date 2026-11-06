@@ -198,7 +198,7 @@ internal static class PartSpacingReview
     }
 
     /// <summary>A snapshot source's material at a part's pose, from clones: sources are shared.</summary>
-    private static ShapeProfile Profile(CapturedOverlapPart part,
+    internal static ShapeProfile Profile(CapturedOverlapPart part,
         Dictionary<(OverlapSource, long), ShapeProfile> profiles)
     {
         var key = (part.Source, BitConverter.DoubleToInt64Bits(part.Rotation));
