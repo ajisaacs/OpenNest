@@ -459,7 +459,7 @@ namespace OpenNest.Forms
             allowCommonLineHint.ForeColor = SystemColors.GrayText;
             allowCommonLineHint.Margin = new Padding(20, 0, 3, 4);
             allowCommonLineHint.Name = "allowCommonLineHint";
-            allowCommonLineHint.Text = "Auto Nest may place parts one kerf apart to share a cut";
+            allowCommonLineHint.Text = "Copies may share a cut, one kerf apart";
             //
             // bottomPanel1
             //
