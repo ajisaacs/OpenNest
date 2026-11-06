@@ -14,6 +14,7 @@ namespace OpenNest.Actions
     {
         private readonly List<LayoutPart> parts;
         private readonly List<Part> sourceParts;
+        private readonly List<(int[] Members, double Kerf)> commonLines;
 
         private double lastScale;
         private System.Drawing.Point? restingCursor;
@@ -38,7 +39,27 @@ namespace OpenNest.Actions
             for (int i = 0; i < partsToClone.Count; i++)
                 parts.Add(LayoutPart.Create(partsToClone[i].Clone() as Part, plateView));
 
+            commonLines = CopiedCommonLines(plateView.Plate, partsToClone);
+
             SelectPreviews();
+        }
+
+        // The common-line groups among the copied parts, by index into the copy, so each paste
+        // joins its clones the same way. Read now: Cut removes the sources, and their groups, next.
+        private static List<(int[] Members, double Kerf)> CopiedCommonLines(Plate plate, List<Part> copied)
+        {
+            var groups = new List<(int[] Members, double Kerf)>();
+            if (plate == null)
+                return groups;
+
+            foreach (var group in plate.CommonLines)
+            {
+                var members = Enumerable.Range(0, copied.Count).Where(i => group.Contains(copied[i])).ToArray();
+                if (members.Length >= 2)
+                    groups.Add((members, group.Kerf));
+            }
+
+            return groups;
         }
 
         // Re-flag on every reselect: a deselect elsewhere would otherwise leave the
@@ -219,7 +240,10 @@ namespace OpenNest.Actions
                 plateView.Invalidate();
             }
 
-            parts.ForEach(p => plateView.Plate.Parts.Add(p.BasePart.Clone() as Part));
+            var placed = parts.Select(p => p.BasePart.Clone() as Part).ToList();
+            placed.ForEach(plateView.Plate.Parts.Add);
+            foreach (var (members, kerf) in commonLines)
+                plateView.Plate.JoinCommonLine(members.Select(i => placed[i]), kerf);
 
             if (plateView.Plate.CutOffs.Count > 0)
                 plateView.Plate.RegenerateCutOffs(plateView.CutOffSettings);

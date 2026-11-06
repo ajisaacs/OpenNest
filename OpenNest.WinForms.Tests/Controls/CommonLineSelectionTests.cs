@@ -1,3 +1,4 @@
+using OpenNest.Actions;
 using OpenNest.Controls;
 using OpenNest.Geometry;
 
@@ -110,6 +111,41 @@ public class CommonLineSelectionTests
         view.Selection.Select(Layout(view, left));
 
         Assert.Null(view.PartMenu.BuildMenu(view.PointWorldToControl(left.BoundingBox.Center)));
+    });
+
+    [Fact]
+    public void PastingACopiedJoinedPairKeepsTheCopiesJoined() => RunSta(() =>
+    {
+        var (plate, left, right, loose) = JoinedPairWithLoosePart();
+        using var view = new PlateView { Plate = plate };
+
+        view.SetAction(typeof(ActionClone), new List<Part> { left, right, loose });
+        Assert.IsType<ActionClone>(view.Actions.CurrentAction).Apply();
+
+        Assert.Equal(6, plate.Parts.Count);
+        Assert.Equal(2, plate.CommonLines.Count);
+        var pasted = plate.CommonLines[1];
+        Assert.DoesNotContain(pasted.Members, p => p == left || p == right || p == loose);
+        Assert.Equal(Kerf, pasted.Kerf);
+        Assert.True(CommonLineGeometry.Check(pasted).IsIntact);
+    });
+
+    [Fact]
+    public void PastingACutJoinedPairKeepsItJoined() => RunSta(() =>
+    {
+        var (plate, left, right, _) = JoinedPairWithLoosePart();
+        using var view = new PlateView { Plate = plate };
+
+        // Edit > Cut starts the clone, then removes the sources and their group.
+        view.SetAction(typeof(ActionClone), new List<Part> { left, right });
+        plate.Parts.Remove(left);
+        plate.Parts.Remove(right);
+        Assert.Empty(plate.CommonLines);
+        Assert.IsType<ActionClone>(view.Actions.CurrentAction).Apply();
+
+        var group = Assert.Single(plate.CommonLines);
+        Assert.Equal(2, group.Members.Count);
+        Assert.True(CommonLineGeometry.Check(group).IsIntact);
     });
 
     private static List<System.Windows.Forms.ToolStripItem> MenuItems(System.Windows.Forms.ContextMenuStrip? menu)

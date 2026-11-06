@@ -101,6 +101,8 @@ head on the second. Changing the setting after planning makes the plan stale.
 - Selecting a member, by click or window, selects its whole group, so dragging, nudging, pushing,
   rotating and aligning move the joined parts as one and keep their shared spans. Deleting the
   selection deletes the whole group. To move one member alone, remove the group first.
+- Copying or cutting joined parts and pasting them keeps each pasted copy joined at the source
+  group's kerf; members copied without their partners paste as loose parts.
 - Join, Remove and Cut Common Lines Twice are undoable like any other edit.
 
 ## Automatic placement
