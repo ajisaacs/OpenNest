@@ -479,6 +479,7 @@ namespace OpenNest.Forms
             drawingListBox1.OpenInConverterRequested += drawingListBox1_OpenInConverterRequested;
             drawingListBox1.DrawingPickedUp += drawingListBox1_DrawingPickedUp;
             drawingListBox1.DrawingDropped += drawingListBox1_DrawingDropped;
+            drawingListBox1.EmptyTextClicked += (_, _) => hideNestedButton.Checked = false;
             Activated += (_, _) => UpdateDrawingLibraryCommand();
             UpdateDrawingLibraryCommand();
             PlateView.BeginChangeHandler = BeginChange;
@@ -584,6 +585,20 @@ namespace OpenNest.Forms
                 drawingListBox1.TopIndex = topIndex;
 
             drawingListBox1.EndUpdate();
+            UpdateDrawingListEmptyText();
+        }
+
+        /// <summary>
+        /// Explains an empty list that only Hide Fully Nested Drawings emptied, so the drawings
+        /// don't look lost; clicking the note turns the filter off. The filter stays the user's
+        /// choice and is never turned off on its own.
+        /// </summary>
+        private void UpdateDrawingListEmptyText()
+        {
+            drawingListBox1.EmptyText =
+                hideNestedButton.Checked && Nest.Drawings.Count > 0
+                    ? "All drawings are fully nested and hidden.\n\nClick here to show them."
+                    : null;
         }
 
         public void Save()
@@ -1827,6 +1842,7 @@ namespace OpenNest.Forms
                         drawingListBox1.EndUpdate();
                     }
 
+                    UpdateDrawingListEmptyText();
                     drawingListBox1.Invalidate();
 
                     // Parts were added or removed: rebuild the plate rows so the

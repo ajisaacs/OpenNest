@@ -8,6 +8,7 @@ namespace OpenNest.Controls
 {
     public class DrawingListBox : ListBox
     {
+        private const int WM_PAINT = 0x000F;
         private const int WM_ERASEBKGND = 0x0014;
 
         private readonly Size imageSize;
@@ -114,6 +115,30 @@ namespace OpenNest.Controls
         /// quantity. Null omits the count.
         /// </summary>
         public Plate Plate { get; set; }
+
+        private string emptyText;
+
+        /// <summary>
+        /// A note drawn in the middle of the list while it has no rows; null draws nothing.
+        /// Clicking the empty list while the note shows raises <see cref="EmptyTextClicked"/>.
+        /// </summary>
+        public string EmptyText
+        {
+            get => emptyText;
+            set
+            {
+                if (emptyText == value)
+                    return;
+
+                emptyText = value;
+                Invalidate();
+            }
+        }
+
+        /// <summary>Raised when the empty list is clicked while <see cref="EmptyText"/> shows.</summary>
+        public event EventHandler EmptyTextClicked;
+
+        private bool IsShowingEmptyText => Items.Count == 0 && !string.IsNullOrEmpty(emptyText);
 
         protected override void OnDrawItem(DrawItemEventArgs e)
         {
@@ -227,6 +252,8 @@ namespace OpenNest.Controls
         {
             base.OnMouseMove(e);
 
+            Cursor = IsShowingEmptyText && EmptyTextClicked != null ? Cursors.Hand : Cursors.Default;
+
             var drawing = pressedDrawing;
 
             if (drawing == null || e.Button != MouseButtons.Left)
@@ -263,6 +290,36 @@ namespace OpenNest.Controls
         {
             pressedDrawing = null;
             base.OnMouseUp(e);
+
+            if (e.Button == MouseButtons.Left && IsShowingEmptyText)
+                EmptyTextClicked?.Invoke(this, EventArgs.Empty);
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+
+            // The note wraps to the width, so a resize must repaint all of it.
+            if (IsShowingEmptyText)
+                Invalidate();
+        }
+
+        private void DrawEmptyText()
+        {
+            using var g = CreateGraphics();
+            var bounds = Rectangle.Inflate(ClientRectangle, -12, -12);
+
+            TextRenderer.DrawText(
+                g,
+                emptyText,
+                Font,
+                bounds,
+                SystemColors.GrayText,
+                TextFormatFlags.HorizontalCenter
+                    | TextFormatFlags.Top
+                    | TextFormatFlags.WordBreak
+                    | TextFormatFlags.TextBoxControl
+            );
         }
 
         /// <summary>
@@ -310,6 +367,10 @@ namespace OpenNest.Controls
                 return;
             }
             base.WndProc(ref m);
+
+            // An owner-drawn list paints nothing when empty, so the note goes on top afterward.
+            if (m.Msg == WM_PAINT && IsShowingEmptyText)
+                DrawEmptyText();
         }
     }
 
