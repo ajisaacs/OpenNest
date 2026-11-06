@@ -178,7 +178,11 @@ namespace OpenNest.Engine.Fill
                         obstacleSpacingBox,
                         opposite
                     );
-                    if (reverseGap > 0)
+                    // An obstacle wholly behind the moving part, its bounds touching
+                    // included, can only fall further behind. A part placed exactly at the
+                    // spacing touches its neighbor's offset contour, and rounding in that
+                    // contact can make the slide kernel block the push away from it.
+                    if (IsBehind(reverseGap))
                         continue;
 
                     var gap = SpatialQuery.DirectionalGap(
@@ -233,6 +237,10 @@ namespace OpenNest.Engine.Fill
                 return distance;
             }
         }
+
+        /// <summary>True when an obstacle's bounds end at or behind the moving bounds'
+        /// trailing side (<paramref name="reverseGap"/> measured against the push).</summary>
+        private static bool IsBehind(double reverseGap) => reverseGap >= -Tolerance.Epsilon;
 
         private static Box SpacingBounds(Box box, double spacing)
         {
@@ -350,7 +358,7 @@ namespace OpenNest.Engine.Fill
                             obstacleBoxes[i],
                             opposite
                         );
-                        if (reverseGap > 0)
+                        if (IsBehind(reverseGap))
                             continue;
 
                         var perpOverlap = isHorizontal
