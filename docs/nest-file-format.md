@@ -119,6 +119,15 @@ nonfinite or nonpositive kerf. Spans are not saved; they are derived from the pl
 Versions before it ignore the array, so they load the parts one kerf apart and report the
 pairs as part-spacing findings: never a silently different cut.
 
+The nest's optional `commonLineUsage` (`Nest.CommonLineUsage`) is `"whenItAddsParts"` or
+`"whenever"`: when Auto Nest and Fill Area may place parts on common lines themselves (see
+[automatic placement](common-line-cutting.md#automatic-placement)). It is omitted when off, the
+default; an unknown value reads as off. A drawing's optional `allowCommonLine: true`
+(`Drawing.AllowCommonLine`) lets its parts take part; it is omitted when false. Older readers
+ignore both, so they nest without common lines. Drawing packages leave `allowCommonLine` out of
+their canonical content, like the other nesting settings, so it never changes a package hash
+(and a library drawing added to a nest starts with it off).
+
 A plate's optional `cutCommonLinesTwice` (`Plate.CutCommonLinesTwice`) is `true` when its
 common lines are cut twice; it is omitted when false, the default, in which Plan Cutting cuts
 each shared span once. A program planned that way saves its shared cuts as motions tagged
@@ -342,7 +351,8 @@ the server's library record owns are written as their defaults, so editing them 
 changes the hash:
 
 - nest and drawing `name` (blank), drawing `customer`, material `name` and `grade` (blank);
-- `color`, `customColor`, `priority`, `nestPriority`, `cutFirst` and `constraints` (omitted);
+- `color`, `customColor`, `priority`, `nestPriority`, `cutFirst`, `allowCommonLine` and
+  `constraints` (omitted);
 - `quantity.required` (zero) and `library` (omitted).
 
 Adding a library drawing to a nest ignores whatever a package holds for these fields

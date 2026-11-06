@@ -36,25 +36,69 @@ public sealed record PartFulfillment(string PartId, int Requested, int Placed, i
 /// <summary>Used counts physical sheets; Remaining is null only for unlimited stock.</summary>
 public sealed record StockUsage(string StockId, int Used, int? Remaining);
 
+/// <summary>
+/// One common-line group on a result sheet: the zero-based positions of its members in the
+/// sheet's <see cref="NestJobPlateResult.Placements"/> and the kerf they were placed at. The
+/// validation exempts members from the part spacing only through this explicit list, never by
+/// guessing from proximity (see docs/common-line-cutting.md).
+/// </summary>
+public sealed record NestJobCommonLine
+{
+    public NestJobCommonLine(double kerf, IEnumerable<int> placements)
+    {
+        Kerf = kerf;
+        Placements = NestJob.Own(placements ?? throw new ArgumentNullException(nameof(placements)));
+    }
+
+    public double Kerf { get; }
+    public IReadOnlyList<int> Placements { get; }
+
+    public bool Equals(NestJobCommonLine other) =>
+        other is not null
+        && BitConverter.DoubleToInt64Bits(Kerf) == BitConverter.DoubleToInt64Bits(other.Kerf)
+        && System.Linq.Enumerable.SequenceEqual(Placements, other.Placements);
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(BitConverter.DoubleToInt64Bits(Kerf));
+        foreach (var index in Placements)
+            hash.Add(index);
+        return hash.ToHashCode();
+    }
+}
+
 /// <summary>One physical sheet, with owned ordered placements and immutable stock/settings snapshot.</summary>
 public sealed class NestJobPlateResult
 {
     public NestJobPlateResult(
         int plateIndex,
         NestPlateStock stock,
-        IEnumerable<NestJobPlacement> placements
+        IEnumerable<NestJobPlacement> placements,
+        IEnumerable<NestJobCommonLine> commonLines = null
     )
     {
         ArgumentNullException.ThrowIfNull(stock);
         PlateIndex = plateIndex;
         Stock = stock;
         Placements = NestJob.Own(placements);
+        CommonLines = commonLines == null ? Array.Empty<NestJobCommonLine>() : NestJob.Own(commonLines);
     }
 
     public int PlateIndex { get; }
     public string StockId => Stock.Id;
     public NestPlateStock Stock { get; }
     public IReadOnlyList<NestJobPlacement> Placements { get; }
+
+    /// <summary>Common-line groups among <see cref="Placements"/>; empty when there are none.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<NestJobCommonLine> CommonLines { get; }
+
+    /// <summary><see cref="CommonLines"/> when serialized: omitted when empty, so a sheet without
+    /// groups serializes exactly as before they existed.</summary>
+    [System.Text.Json.Serialization.JsonPropertyName("CommonLines")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<NestJobCommonLine> SerializedCommonLines => CommonLines.Count == 0 ? null : CommonLines;
 }
 
 /// <summary>Detached result values in commit/input order; no mutable Drawing, Plate, or NestItem escapes.</summary>

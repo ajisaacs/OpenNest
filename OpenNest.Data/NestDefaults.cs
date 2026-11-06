@@ -53,6 +53,12 @@ public sealed class NestDefaults
     public Guid? MachineId { get; set; }
 
     /// <summary>
+    /// The common-line usage new nests start with (<see cref="Nest.CommonLineUsage"/>). Off by
+    /// default; saved as <c>commonLineUsage</c> and omitted when off.
+    /// </summary>
+    public CommonLineUsage CommonLineUsage { get; set; }
+
+    /// <summary>
     /// The built-in defaults used when no file exists and for every field
     /// that is missing or invalid. Matches the historical
     /// File > New values (units default to Inches; callers
@@ -176,6 +182,9 @@ public sealed class NestDefaults
             && Guid.TryParse(machineId.GetString(), out var machine) && machine != Guid.Empty)
             defaults.MachineId = machine;
 
+        if (dto.CommonLineUsage is { ValueKind: JsonValueKind.String } usage)
+            defaults.CommonLineUsage = CommonLineUsageNames.Parse(usage.GetString());
+
         return defaults;
     }
 
@@ -201,6 +210,7 @@ public sealed class NestDefaults
             PartSpacing = plate.PartSpacing,
             EdgeSpacing = plate.EdgeSpacing,
             MachineId = nest.Machine?.Id,
+            CommonLineUsage = nest.CommonLineUsage,
         };
     }
 
@@ -222,6 +232,19 @@ public sealed class NestDefaults
     }
 
     /// <summary>
+    /// <see cref="FromPlate(Units, Plate)"/>, keeping the settings a plate does not hold (the
+    /// common-line usage) from <paramref name="saved"/>, the defaults being replaced, so saving a
+    /// plate as the defaults never resets them.
+    /// </summary>
+    public static NestDefaults FromPlate(Units units, Plate plate, NestDefaults saved)
+    {
+        ArgumentNullException.ThrowIfNull(saved);
+        var defaults = FromPlate(units, plate);
+        defaults.CommonLineUsage = saved.CommonLineUsage;
+        return defaults;
+    }
+
+    /// <summary>
     /// These defaults in <paramref name="units"/>: plate size and spacings are converted
     /// (25.4 mm per inch) and rounded to four decimals; the quadrant is kept. Returns a copy
     /// even when the units already match.
@@ -239,6 +262,7 @@ public sealed class NestDefaults
             EdgeSpacing = new Spacing(Convert(EdgeSpacing.Left), Convert(EdgeSpacing.Bottom),
                 Convert(EdgeSpacing.Right), Convert(EdgeSpacing.Top)),
             MachineId = MachineId,
+            CommonLineUsage = CommonLineUsage,
         };
     }
 
@@ -253,6 +277,7 @@ public sealed class NestDefaults
         plate.Quadrant = Quadrant;
         plate.PartSpacing = PartSpacing;
         plate.EdgeSpacing = EdgeSpacing;
+        nest.CommonLineUsage = CommonLineUsage;
     }
 
     /// <summary>
@@ -282,6 +307,8 @@ public sealed class NestDefaults
                 Top = EdgeSpacing.Top,
             },
             MachineId = MachineId is { } machineId ? JsonSerializer.SerializeToElement(machineId.ToString()) : null,
+            CommonLineUsage = CommonLineUsageNames.Format(CommonLineUsage) is { } usage
+                ? JsonSerializer.SerializeToElement(usage) : null,
         };
 
         return JsonSerializer.Serialize(dto, JsonOptions);
@@ -316,6 +343,8 @@ public sealed class NestDefaults
         // Raw JSON for the same reason as Units.
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public JsonElement? MachineId { get; init; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public JsonElement? CommonLineUsage { get; init; }
     }
 
     private sealed record SizeDto

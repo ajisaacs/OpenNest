@@ -243,8 +243,9 @@ namespace OpenNest.Forms
             if (activeForm == null)
                 return;
 
-            MachineSettings.SaveNestDefaults(this, NestDefaults.FromPlate(activeForm.Nest.Units, activeForm.PlateView.Plate),
-                activeForm.Nest.Machine);
+            // A plate holds no common-line usage, so the saved defaults keep theirs.
+            MachineSettings.SaveNestDefaults(this, NestDefaults.FromPlate(activeForm.Nest.Units, activeForm.PlateView.Plate,
+                MachineSettings.LoadSavedNestDefaults(out _)), activeForm.Nest.Machine);
         }
 
         private void MachineConfig_Click(object sender, EventArgs e)

@@ -46,6 +46,13 @@ namespace OpenNest.IO
             public double SalvageRate { get; init; } = 0.5;
 
             /// <summary>
+            /// <c>Nest.CommonLineUsage</c>: <c>"whenItAddsParts"</c> or <c>"whenever"</c>. Omitted
+            /// when off; an unknown value reads as off.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public string CommonLineUsage { get; init; }
+
+            /// <summary>
             /// Smallest remnant side in model units. Missing in older files, which load the Auto
             /// Nest default.
             /// </summary>
@@ -458,6 +465,11 @@ namespace OpenNest.IO
             /// <summary>Sequence this drawing's parts first. Omitted when false.</summary>
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
             public bool CutFirst { get; init; }
+
+            /// <summary>Automatic nesting may place this drawing's parts on common lines
+            /// (<c>Drawing.AllowCommonLine</c>). Omitted when false.</summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+            public bool AllowCommonLine { get; init; }
 
             public ConstraintsDto Constraints { get; init; } = new();
             public MaterialDto Material { get; init; } = new();

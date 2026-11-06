@@ -35,7 +35,8 @@ public sealed class NestJobResultBuilder
     /// </summary>
     public int AddSheet(
         NestPlateStock stock,
-        IEnumerable<(string PartId, double X, double Y, double Rotation)> placements
+        IEnumerable<(string PartId, double X, double Y, double Rotation)> placements,
+        IEnumerable<NestJobCommonLine> commonLines = null
     )
     {
         ArgumentNullException.ThrowIfNull(placements);
@@ -57,7 +58,7 @@ public sealed class NestJobResultBuilder
         }
 
         var plateIndex = sheets.Count;
-        sheets.Add(new NestJobPlateResult(plateIndex, stock, poses));
+        sheets.Add(new NestJobPlateResult(plateIndex, stock, poses, commonLines));
         foreach (var count in counts)
             placed[count.Key] = count.Value;
         used[stock.Id]++;

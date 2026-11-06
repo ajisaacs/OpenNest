@@ -352,4 +352,66 @@ public class NestDefaultsTests : IDisposable
         Assert.Equal(id, defaults.MachineId);
         Assert.Equal(id, defaults.ConvertedTo(Units.Millimeters).MachineId);
     }
+
+    [Theory]
+    [InlineData(CommonLineUsage.WhenItAddsParts, "whenItAddsParts")]
+    [InlineData(CommonLineUsage.Whenever, "whenever")]
+    public void CommonLineUsage_SavesAndLoads(CommonLineUsage usage, string saved)
+    {
+        new NestDefaults { CommonLineUsage = usage }.Save(_path);
+
+        Assert.Contains($"\"commonLineUsage\": \"{saved}\"", File.ReadAllText(_path));
+        Assert.Equal(usage, NestDefaults.Load(_path, out var status).CommonLineUsage);
+        Assert.Equal(NestDefaultsStatus.Ok, status);
+    }
+
+    [Fact]
+    public void CommonLineUsage_Off_IsOmitted_AndMissingReadsOff()
+    {
+        var json = new NestDefaults().ToJson();
+
+        Assert.DoesNotContain("commonLineUsage", json);
+        Assert.Equal(CommonLineUsage.Off, NestDefaults.Parse(json, Units.Inches, out _).CommonLineUsage);
+    }
+
+    [Theory]
+    [InlineData("\"sometimes\"")]
+    [InlineData("3")]
+    [InlineData("null")]
+    public void CommonLineUsage_Invalid_FallsBackToOff_WithoutLosingOtherFields(string value)
+    {
+        var json = $"{{ \"partSpacing\": 0.3, \"commonLineUsage\": {value} }}";
+
+        var defaults = NestDefaults.Parse(json, Units.Inches, out var status);
+
+        Assert.Equal(NestDefaultsStatus.Ok, status);
+        Assert.Equal(CommonLineUsage.Off, defaults.CommonLineUsage);
+        Assert.Equal(0.3, defaults.PartSpacing);
+    }
+
+    [Fact]
+    public void CommonLineUsage_FromNest_ApplyTo_AndConvertedTo_CarryIt()
+    {
+        var source = new Nest { CommonLineUsage = CommonLineUsage.Whenever };
+        var defaults = NestDefaults.FromNest(source);
+        var target = new Nest();
+
+        defaults.ConvertedTo(Units.Millimeters).ApplyTo(target);
+
+        Assert.Equal(CommonLineUsage.Whenever, defaults.CommonLineUsage);
+        Assert.Equal(CommonLineUsage.Whenever, target.CommonLineUsage);
+    }
+
+    [Fact]
+    public void FromPlate_WithSavedDefaults_KeepsTheirCommonLineUsage()
+    {
+        var plate = new Plate(new Size(48, 120)) { PartSpacing = 0.25 };
+        var saved = new NestDefaults { CommonLineUsage = CommonLineUsage.WhenItAddsParts, PartSpacing = 1 };
+
+        var defaults = NestDefaults.FromPlate(Units.Inches, plate, saved);
+
+        Assert.Equal(CommonLineUsage.WhenItAddsParts, defaults.CommonLineUsage);
+        Assert.Equal(0.25, defaults.PartSpacing);
+        Assert.Equal(CommonLineUsage.Off, NestDefaults.FromPlate(Units.Inches, plate).CommonLineUsage);
+    }
 }

@@ -6,6 +6,7 @@
 2. Resolve the selected name through `NestingEngineRegistry` (built-ins and plug-ins use the same path).
 3. Bundle parts that fit other parts' enclosed cutouts into their frames ([filling cutouts](nesting-engines.md#filling-cutouts)); a refused or less complete bundled trial is replaced by the ordinary solve.
 4. Run the engine without mutating caller drawings or plates.
+   When the job's common-line level is on, solve once more with eligible parts offered as kerf-gap pairs and keep that layout only by the level's ranking ([automatic common-line placement](common-line-cutting.md#automatic-placement)).
 5. Check returned placements with the independent `NestLayoutCheck` used by the benchmark (for bundles, again after expanding them to physical frames and inserts).
 6. Consolidate exact ordered nonempty layouts only when the entire result is valid, then bind each layout to the caller's drawing references; the caller decides whether to commit it.
 

@@ -32,6 +32,7 @@ namespace OpenNest.Forms.Commands
         private List<PlateOption> savedOptions;
         private IReadOnlyList<LedgerStockRow> ledgerRows = Array.Empty<LedgerStockRow>();
         private bool nestOnServer;
+        private CommonLineUsage commonLineUsage;
 
         private AutoNestCommand(IWin32Window owner, EditNestForm target, List<NestItem> items,
             List<PlateOption> plateOptions, string engineName, double salvageRate, double minRemnantSize)
@@ -43,6 +44,17 @@ namespace OpenNest.Forms.Commands
             EngineName = engineName;
             this.salvageRate = salvageRate;
             this.minRemnantSize = minRemnantSize;
+        }
+
+        /// <summary>
+        /// The cutting kerf common-line groups are made at: the current plate's for the nest's
+        /// material and thickness (the machine's cutting defaults). Zero, which makes no groups,
+        /// when it is unknown.
+        /// </summary>
+        internal static double CommonLineKerf(EditNestForm target)
+        {
+            var kerf = MachineSettings.CuttingParametersFor(target.PlateView.Plate, target.Nest)?.Kerf ?? 0;
+            return double.IsFinite(kerf) && kerf > 0 ? kerf : 0;
         }
 
         /// <summary>The engine chosen in the dialog, or the current selection when it named none.</summary>
@@ -84,6 +96,7 @@ namespace OpenNest.Forms.Commands
                 savedOptions = savedOptions,
                 ledgerRows = form.OptimizePlateSize ? form.LedgerRows : Array.Empty<LedgerStockRow>(),
                 nestOnServer = form.NestOnServer,
+                commonLineUsage = form.CommonLineUsage,
             };
         }
 
@@ -99,7 +112,11 @@ namespace OpenNest.Forms.Commands
                     NestStockBuilder.FromTemplate(target.PlateView.Plate, plateOptions),
                     new NestJobOptions(maxPlates: 100,
                         salvageRate: plateOptions?.Count > 0 ? salvageRate : 0,
-                        minimumSalvageDimension: minRemnantSize));
+                        minimumSalvageDimension: minRemnantSize)
+                    {
+                        CommonLineUsage = commonLineUsage,
+                        CommonLineKerf = CommonLineKerf(target),
+                    });
                 NestPipelineResult result;
                 ServerNestDecision server = null;
                 if (nestOnServer)
@@ -117,6 +134,7 @@ namespace OpenNest.Forms.Commands
                 await ReviewAndCommitAsync(owner, target, result, server, applied =>
                 {
                     AssignLedgerStock(result, applied);
+                    target.Nest.CommonLineUsage = commonLineUsage;
                     if (plateOptions?.Count > 0)
                     {
                         // Ledger rows and quantities are request-local inventory; the nest keeps

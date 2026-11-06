@@ -52,6 +52,9 @@ namespace OpenNest.Forms
             this.edgePlateLabel = new System.Windows.Forms.Label();
             this.edgeRightBox = new OpenNest.Controls.NumericUpDown();
             this.edgeBottomBox = new OpenNest.Controls.NumericUpDown();
+            this.nestingGroup = new System.Windows.Forms.GroupBox();
+            this.commonLineLabel = new System.Windows.Forms.Label();
+            this.commonLineCombo = new System.Windows.Forms.ComboBox();
             this.sourceLabel = new System.Windows.Forms.Label();
             this.saveButton = new System.Windows.Forms.Button();
             this.cancelButton = new System.Windows.Forms.Button();
@@ -64,6 +67,7 @@ namespace OpenNest.Forms
             ((System.ComponentModel.ISupportInitialize)(this.edgeRightBox)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.edgeBottomBox)).BeginInit();
             this.generalGroup.SuspendLayout();
+            this.nestingGroup.SuspendLayout();
             this.plateGroup.SuspendLayout();
             this.quadrantGroup.SuspendLayout();
             this.spacingGroup.SuspendLayout();
@@ -232,6 +236,39 @@ namespace OpenNest.Forms
             this.spacingGroup.TabStop = false;
             this.spacingGroup.Text = "Spacing";
             //
+            // nestingGroup
+            //
+            this.nestingGroup.Controls.Add(this.commonLineLabel);
+            this.nestingGroup.Controls.Add(this.commonLineCombo);
+            this.nestingGroup.Location = new System.Drawing.Point(12, 352);
+            this.nestingGroup.Name = "nestingGroup";
+            this.nestingGroup.Size = new System.Drawing.Size(576, 58);
+            this.nestingGroup.TabIndex = 4;
+            this.nestingGroup.TabStop = false;
+            this.nestingGroup.Text = "Auto Nest";
+            //
+            // commonLineLabel
+            //
+            this.commonLineLabel.AutoSize = true;
+            this.commonLineLabel.Location = new System.Drawing.Point(12, 27);
+            this.commonLineLabel.Name = "commonLineLabel";
+            this.commonLineLabel.Size = new System.Drawing.Size(88, 15);
+            this.commonLineLabel.TabIndex = 0;
+            this.commonLineLabel.Text = "Common lines:";
+            //
+            // commonLineCombo
+            //
+            this.commonLineCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.commonLineCombo.Items.AddRange(new object[] {
+            "Off",
+            "When it adds parts",
+            "Whenever available"});
+            this.commonLineCombo.Location = new System.Drawing.Point(110, 23);
+            this.commonLineCombo.Name = "commonLineCombo";
+            this.commonLineCombo.Size = new System.Drawing.Size(180, 23);
+            this.commonLineCombo.TabIndex = 1;
+            this.toolTip.SetToolTip(this.commonLineCombo, "The common-line usage new nests start with. Only drawings with \"Allow common line\" set in Drawing Properties take part.");
+            //
             // partSpacingLabel
             //
             this.partSpacingLabel.AutoSize = true;
@@ -319,29 +356,29 @@ namespace OpenNest.Forms
             // sourceLabel
             //
             this.sourceLabel.ForeColor = System.Drawing.SystemColors.GrayText;
-            this.sourceLabel.Location = new System.Drawing.Point(12, 356);
+            this.sourceLabel.Location = new System.Drawing.Point(12, 422);
             this.sourceLabel.Name = "sourceLabel";
             this.sourceLabel.Size = new System.Drawing.Size(380, 28);
-            this.sourceLabel.TabIndex = 4;
+            this.sourceLabel.TabIndex = 5;
             this.sourceLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // saveButton
             //
             this.saveButton.DialogResult = System.Windows.Forms.DialogResult.OK;
-            this.saveButton.Location = new System.Drawing.Point(402, 356);
+            this.saveButton.Location = new System.Drawing.Point(402, 422);
             this.saveButton.Name = "saveButton";
             this.saveButton.Size = new System.Drawing.Size(90, 28);
-            this.saveButton.TabIndex = 5;
+            this.saveButton.TabIndex = 6;
             this.saveButton.Text = "Save";
             this.saveButton.UseVisualStyleBackColor = true;
             //
             // cancelButton
             //
             this.cancelButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.cancelButton.Location = new System.Drawing.Point(498, 356);
+            this.cancelButton.Location = new System.Drawing.Point(498, 422);
             this.cancelButton.Name = "cancelButton";
             this.cancelButton.Size = new System.Drawing.Size(90, 28);
-            this.cancelButton.TabIndex = 6;
+            this.cancelButton.TabIndex = 7;
             this.cancelButton.Text = "Cancel";
             this.cancelButton.UseVisualStyleBackColor = true;
             //
@@ -350,11 +387,12 @@ namespace OpenNest.Forms
             this.AcceptButton = this.saveButton;
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.CancelButton = this.cancelButton;
-            this.ClientSize = new System.Drawing.Size(600, 396);
+            this.ClientSize = new System.Drawing.Size(600, 462);
             this.Controls.Add(this.generalGroup);
             this.Controls.Add(this.plateGroup);
             this.Controls.Add(this.quadrantGroup);
             this.Controls.Add(this.spacingGroup);
+            this.Controls.Add(this.nestingGroup);
             this.Controls.Add(this.sourceLabel);
             this.Controls.Add(this.saveButton);
             this.Controls.Add(this.cancelButton);
@@ -380,11 +418,16 @@ namespace OpenNest.Forms
             this.quadrantGroup.ResumeLayout(false);
             this.spacingGroup.ResumeLayout(false);
             this.spacingGroup.PerformLayout();
+            this.nestingGroup.ResumeLayout(false);
+            this.nestingGroup.PerformLayout();
             this.ResumeLayout(false);
         }
 
         #endregion
 
+        private System.Windows.Forms.GroupBox nestingGroup;
+        private System.Windows.Forms.Label commonLineLabel;
+        private System.Windows.Forms.ComboBox commonLineCombo;
         private System.Windows.Forms.GroupBox generalGroup;
         private System.Windows.Forms.Label machineLabel;
         private System.Windows.Forms.ComboBox machineCombo;

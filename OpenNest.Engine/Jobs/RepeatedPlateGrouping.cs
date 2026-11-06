@@ -80,7 +80,8 @@ internal static class RepeatedPlateGrouping
             if (ReferenceEquals(a, b))
                 return true;
             if (a == null || b == null || !SameStock(a.Stock, b.Stock)
-                || a.Placements.Count != b.Placements.Count)
+                || a.Placements.Count != b.Placements.Count
+                || !System.Linq.Enumerable.SequenceEqual(a.CommonLines, b.CommonLines))
                 return false;
             for (var i = 0; i < a.Placements.Count; i++)
             {

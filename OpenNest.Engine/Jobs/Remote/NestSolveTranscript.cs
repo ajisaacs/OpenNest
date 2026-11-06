@@ -76,6 +76,8 @@ public sealed class NestSolveTranscript
                 PlateIndex = p.PlateIndex,
                 Stock = NestStockJson.From(p.Stock),
                 Placements = p.Placements.ToList(),
+                CommonLines = p.CommonLines.Count == 0 ? null
+                    : p.CommonLines.Select(g => new CommonLineJson { Kerf = g.Kerf, Placements = g.Placements.ToList() }).ToList(),
             }).ToList(),
             Fulfillment = result.Fulfillment.ToList(),
             StockUsage = result.StockUsage.ToList(),
@@ -90,7 +92,9 @@ public sealed class NestSolveTranscript
             {
                 var stock = plate.Stock?.ToStock() ?? throw new FormatException("A result sheet has no stock.");
                 var own = job.Plates.FirstOrDefault(s => RepeatedPlateGrouping.SameStock(s, stock));
-                plates.Add(new NestJobPlateResult(plate.PlateIndex, own ?? stock, plate.Placements ?? new()));
+                plates.Add(new NestJobPlateResult(plate.PlateIndex, own ?? stock, plate.Placements ?? new(),
+                    plate.CommonLines?.Select(g => g == null ? throw new FormatException("A result common-line group is empty.")
+                        : new NestJobCommonLine(g.Kerf, g.Placements ?? new()))));
             }
             return new NestJobResult(Status, StopReason, plates, Fulfillment ?? new(), StockUsage ?? new());
         }
@@ -101,5 +105,16 @@ public sealed class NestSolveTranscript
         public int PlateIndex { get; set; }
         public NestStockJson Stock { get; set; }
         public List<NestJobPlacement> Placements { get; set; } = new();
+
+        /// <summary>Common-line groups an engine returned itself (none of the built-in engines
+        /// do: the pipeline makes pairs around them). Omitted when empty.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<CommonLineJson> CommonLines { get; set; }
+    }
+
+    public sealed class CommonLineJson
+    {
+        public double Kerf { get; set; }
+        public List<int> Placements { get; set; } = new();
     }
 }

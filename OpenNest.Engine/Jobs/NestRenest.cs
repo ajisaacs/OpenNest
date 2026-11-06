@@ -190,7 +190,13 @@ public static class NestRenest
             NestStockBuilder.FromTemplate(nest.PlateDefaults.CreateNew(), options),
             new NestJobOptions(maxPlates: MaxPlates,
                 salvageRate: options.Count > 0 ? nest.SalvageRate : 0,
-                minimumSalvageDimension: options.Count > 0 ? minimumSalvageDimension : 0));
+                minimumSalvageDimension: options.Count > 0 ? minimumSalvageDimension : 0)
+            {
+                // The engine has no machine defaults: a plate's saved cutting kerf, if any.
+                CommonLineUsage = nest.CommonLineUsage,
+                CommonLineKerf = nest.Plates.Select(p => p.CuttingParameters?.Kerf ?? 0)
+                    .FirstOrDefault(k => double.IsFinite(k) && k > 0),
+            });
     }
 
     /// <summary>

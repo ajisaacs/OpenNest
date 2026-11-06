@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Jobs.Adapters;
@@ -36,5 +37,21 @@ public static class NestResultBinder
             parts.Add(part);
         }
         return parts;
+    }
+
+    /// <summary>The sheet's common-line groups over <paramref name="parts"/>, which
+    /// <see cref="Bind"/> returned for that sheet (same order).</summary>
+    public static IReadOnlyList<CommonLineGroup> BindCommonLines(NestJobPlateResult sheet, IReadOnlyList<Part> parts)
+    {
+        ArgumentNullException.ThrowIfNull(sheet);
+        ArgumentNullException.ThrowIfNull(parts);
+        var groups = new List<CommonLineGroup>(sheet.CommonLines.Count);
+        foreach (var group in sheet.CommonLines)
+        {
+            if (group.Placements.Count < 2 || group.Placements.Any(i => i < 0 || i >= parts.Count))
+                throw new ArgumentException("A common-line group names a placement the sheet does not have.", nameof(sheet));
+            groups.Add(new CommonLineGroup(group.Placements.Select(i => parts[i]), group.Kerf));
+        }
+        return groups;
     }
 }

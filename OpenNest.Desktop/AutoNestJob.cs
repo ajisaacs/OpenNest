@@ -41,7 +41,21 @@ namespace OpenNest.Desktop
             return new NestPipelineRequest(engineName, items,
                 NestStockBuilder.FromTemplate(template, null),
                 new NestJobOptions(maxPlates: NestRenest.MaxPlates, salvageRate: 0,
-                    minimumSalvageDimension: nest.MinimumRemnantDimension));
+                    minimumSalvageDimension: nest.MinimumRemnantDimension)
+                {
+                    CommonLineUsage = nest.CommonLineUsage,
+                    CommonLineKerf = CommonLineKerf(template),
+                });
+        }
+
+        /// <summary>
+        /// The template plate's saved cutting kerf, or zero (no common lines) when it has none.
+        /// This toolkit-neutral path has no machine defaults to fall back on.
+        /// </summary>
+        private static double CommonLineKerf(Plate template)
+        {
+            var kerf = template.CuttingParameters?.Kerf ?? 0;
+            return double.IsFinite(kerf) && kerf > 0 ? kerf : 0;
         }
 
         /// <summary>

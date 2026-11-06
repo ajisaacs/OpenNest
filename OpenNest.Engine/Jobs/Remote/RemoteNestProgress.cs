@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
+using OpenNest.Engine.Jobs.CommonLines;
 using OpenNest.Engine.Jobs.Cutouts;
 
 namespace OpenNest.Engine.Jobs.Remote;
@@ -131,6 +132,11 @@ public sealed class RemoteNestPlanPreview
                 foreach (var part in engineJob.Parts)
                     parts.TryAdd(part.Id, part);
             }
+            // A common-line trial's pair proxies, from either share (same geometry per part).
+            foreach (var share in new[] { CommonLinePipelinePrepass.Share.All, CommonLinePipelinePrepass.Share.Half })
+                if (CommonLinePipelinePrepass.Prepare(job, share, token)?.EngineJob is { } pairJob)
+                    foreach (var part in pairJob.Parts)
+                        parts.TryAdd(part.Id, part);
         }
         if (!Known(plan))
             return null;

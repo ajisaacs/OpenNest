@@ -113,6 +113,12 @@ namespace OpenNest
         public double SalvageRate { get; set; } = 0.5;
 
         /// <summary>
+        /// When Auto Nest and the fills may place parts on common lines (only drawings with
+        /// <see cref="Drawing.AllowCommonLine"/>). Off unless the nest or the new-nest defaults say so.
+        /// </summary>
+        public CommonLineUsage CommonLineUsage { get; set; }
+
+        /// <summary>
         /// The smallest side, in model units, of an offcut credited as salvage or reported as the
         /// plate's expected remnant (<see cref="PlateRemnant.Expected"/>). Auto Nest records the
         /// minimum it last used.

@@ -25,6 +25,8 @@ namespace OpenNest.Forms
             this.engineLabel = new System.Windows.Forms.Label();
             this.engineComboBox = new System.Windows.Forms.ComboBox();
             this.nestOnServerBox = new System.Windows.Forms.CheckBox();
+            this.commonLineLabel = new System.Windows.Forms.Label();
+            this.commonLineComboBox = new System.Windows.Forms.ComboBox();
             this.minRemnantLabel = new System.Windows.Forms.Label();
             this.minRemnantBox = new System.Windows.Forms.TextBox();
             this.plateOptimizerGroup = new System.Windows.Forms.GroupBox();
@@ -78,6 +80,8 @@ namespace OpenNest.Forms
             this.platesTab.Controls.Add(this.engineComboBox);
             this.platesTab.Controls.Add(this.plateOptimizerGroup);
             this.platesTab.Controls.Add(this.nestOnServerBox);
+            this.platesTab.Controls.Add(this.commonLineLabel);
+            this.platesTab.Controls.Add(this.commonLineComboBox);
             this.platesTab.Location = new System.Drawing.Point(4, 25);
             this.platesTab.Name = "platesTab";
             this.platesTab.Padding = new System.Windows.Forms.Padding(6);
@@ -135,6 +139,27 @@ namespace OpenNest.Forms
             this.nestOnServerBox.Text = "Nest on the server (keeps this PC free; may be slower)";
             this.nestOnServerBox.UseVisualStyleBackColor = true;
             this.nestOnServerBox.Visible = false;
+            //
+            // commonLineLabel
+            //
+            this.commonLineLabel.AutoSize = true;
+            this.commonLineLabel.Location = new System.Drawing.Point(10, 427);
+            this.commonLineLabel.Name = "commonLineLabel";
+            this.commonLineLabel.Size = new System.Drawing.Size(92, 16);
+            this.commonLineLabel.TabIndex = 5;
+            this.commonLineLabel.Text = "Common Lines:";
+            //
+            // commonLineComboBox
+            //
+            this.commonLineComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.commonLineComboBox.Items.AddRange(new object[] {
+            "Off",
+            "When it adds parts",
+            "Whenever available"});
+            this.commonLineComboBox.Location = new System.Drawing.Point(110, 424);
+            this.commonLineComboBox.Name = "commonLineComboBox";
+            this.commonLineComboBox.Size = new System.Drawing.Size(188, 24);
+            this.commonLineComboBox.TabIndex = 6;
             //
             // minRemnantLabel
             //
@@ -318,6 +343,8 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Button ledgerButton;
         private System.Windows.Forms.Label ledgerSummaryLabel;
         private System.Windows.Forms.ToolTip ledgerToolTip;
+        private System.Windows.Forms.Label commonLineLabel;
+        private System.Windows.Forms.ComboBox commonLineComboBox;
         private System.Windows.Forms.Label salvageRateLabel;
         private System.Windows.Forms.TextBox salvageRateBox;
         private System.Windows.Forms.Label salvageRatePercentLabel;

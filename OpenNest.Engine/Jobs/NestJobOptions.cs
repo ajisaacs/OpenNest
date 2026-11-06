@@ -53,7 +53,35 @@ public sealed class NestJobOptions
 
     /// <summary>A copy of these options with <see cref="SearchUntilCancelled"/> set.</summary>
     public NestJobOptions WithSearchUntilCancelled(bool value) =>
-        new(PlacementStrategy, MaxPlates, SalvageRate, MinimumSalvageDimension, value, OffcutCut);
+        new(PlacementStrategy, MaxPlates, SalvageRate, MinimumSalvageDimension, value, OffcutCut)
+        {
+            CommonLineUsage = CommonLineUsage,
+            CommonLineKerf = CommonLineKerf,
+        };
+
+    /// <summary>
+    /// When the pipeline may place parts that allow it on common lines, one
+    /// <see cref="CommonLineKerf"/> apart (see docs/common-line-cutting.md). Off by default;
+    /// without a positive kerf it acts as off.
+    /// </summary>
+    public CommonLineUsage CommonLineUsage
+    {
+        get => commonLineUsage;
+        init => commonLineUsage = Enum.IsDefined(value) ? value : throw new ArgumentOutOfRangeException(nameof(CommonLineUsage));
+    }
+
+    private readonly CommonLineUsage commonLineUsage;
+    private readonly double commonLineKerf;
+
+    /// <summary>The cutting kerf for the job's material and thickness, in job units; zero when unknown.</summary>
+    public double CommonLineKerf
+    {
+        get => commonLineKerf;
+        init => commonLineKerf = double.IsFinite(value) && value >= 0 ? value : throw new ArgumentOutOfRangeException(nameof(CommonLineKerf));
+    }
+
+    /// <summary>True when common lines may be made: a level is on and the kerf is positive.</summary>
+    public bool UsesCommonLines => CommonLineUsage != CommonLineUsage.Off && CommonLineKerf > 0;
 
     /// <summary>Fraction of eligible edge-offcut area credited by <see cref="NestJobCost.NetSheetCost"/> (0..1).</summary>
     public double SalvageRate { get; }

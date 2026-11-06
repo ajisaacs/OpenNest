@@ -131,6 +131,7 @@ public static class DrawingSplitter
         piece.HasCustomColor = source.HasCustomColor;
         piece.Priority = source.Priority;
         piece.CutFirst = source.CutFirst;
+        piece.AllowCommonLine = source.AllowCommonLine;
         piece.Material = source.Material;
         piece.Constraints = source.Constraints;
         piece.Customer = source.Customer;

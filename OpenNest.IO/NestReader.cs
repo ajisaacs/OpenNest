@@ -280,6 +280,7 @@ namespace OpenNest.IO
                 drawing.Quantity.Required = d.Quantity.Required;
                 drawing.Priority = d.NestPriority ?? LegacyPriority.Convert(d.Priority);
                 drawing.CutFirst = d.CutFirst;
+                drawing.AllowCommonLine = d.AllowCommonLine;
                 drawing.Constraints.StepAngle = d.Constraints.StepAngle;
                 drawing.Constraints.StartAngle = d.Constraints.StartAngle;
                 drawing.Constraints.EndAngle = d.Constraints.EndAngle;
@@ -717,6 +718,7 @@ namespace OpenNest.IO
 
             // Stock options: sheet sizes and salvage rate
             nest.SalvageRate = dto.SalvageRate;
+            nest.CommonLineUsage = CommonLineUsageNames.Parse(dto.CommonLineUsage);
             nest.MinimumRemnantDimension = double.IsFinite(dto.MinimumRemnantDimension)
                 && dto.MinimumRemnantDimension > 0
                     ? dto.MinimumRemnantDimension

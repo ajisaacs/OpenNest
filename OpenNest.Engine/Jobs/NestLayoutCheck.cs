@@ -90,6 +90,11 @@ public static class NestLayoutCheck
                 if (!double.IsFinite(pose.Rotation))
                     violations.Add($"{description} has nonfinite Rotation ({pose.Rotation})");
             }
+            var grouped = new HashSet<int>();
+            foreach (var group in sheet.CommonLines)
+                if (group.Placements.Count < 2 || !double.IsFinite(group.Kerf) || group.Kerf <= 0
+                    || group.Placements.Any(i => i < 0 || i >= sheet.Placements.Count || !grouped.Add(i)))
+                    violations.Add($"Plate {sheet.PlateIndex} has a malformed common-line group");
         }
     }
 
@@ -232,7 +237,8 @@ public static class NestLayoutCheck
 
             ValidateBounds(parts, plate, requirements, result);
             ValidateAreaBudget(parts, plate, result);
-            ValidateSpacing(parts, plate.PartSpacing, requirements, result);
+            ValidateSpacing(parts, plate.PartSpacing, requirements, result, plate.CommonLines);
+            ValidateCommonLines(plate, parts, requirements, result);
             if (plate.ClampZones.Count > 0)
                 ValidateClamps(parts, plate, requirements, result);
         }
@@ -364,6 +370,9 @@ public static class NestLayoutCheck
         }
 
         foreach (var sheet in jobResult.Plates)
+            ValidateCommonLinesAgainstJob(job, sheet, partsById, displayNames, result);
+
+        foreach (var sheet in jobResult.Plates)
         {
             foreach (var placement in sheet.Placements)
             {
@@ -380,6 +389,43 @@ public static class NestLayoutCheck
                             + $"outside its rotation constraint ({Describe(part.Rotation)})"
                     );
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// A sheet's explicit common-line groups must be allowed by the job: a common-line level on,
+    /// the job's kerf, members that allow common lines, and positions on the sheet that no other
+    /// group takes. Geometry (that the members really share edges) is checked on the plate.
+    /// </summary>
+    private static void ValidateCommonLinesAgainstJob(NestJob job, NestJobPlateResult sheet,
+        IReadOnlyDictionary<string, NestJobPart> partsById, IReadOnlyDictionary<string, string> displayNames,
+        List<string> result)
+    {
+        if (sheet.CommonLines.Count == 0)
+            return;
+        if (!job.Options.UsesCommonLines)
+        {
+            result.Add($"Plate {sheet.PlateIndex} has common-line groups, which this job does not allow");
+            return;
+        }
+        var taken = new HashSet<int>();
+        foreach (var group in sheet.CommonLines)
+        {
+            if (BitConverter.DoubleToInt64Bits(group.Kerf) != BitConverter.DoubleToInt64Bits(job.Options.CommonLineKerf))
+                result.Add($"Plate {sheet.PlateIndex} has a common-line group at kerf {group.Kerf:F4}; the job's kerf is {job.Options.CommonLineKerf:F4}");
+            if (group.Placements.Count < 2)
+                result.Add($"Plate {sheet.PlateIndex} has a common-line group of fewer than two parts");
+            foreach (var index in group.Placements)
+            {
+                if (index < 0 || index >= sheet.Placements.Count || !taken.Add(index))
+                {
+                    result.Add($"Plate {sheet.PlateIndex} has a common-line group naming placement {index}, which is missing or already in a group");
+                    continue;
+                }
+                var id = sheet.Placements[index].PartId;
+                if (id != null && partsById.TryGetValue(id, out var part) && !part.AllowCommonLine)
+                    result.Add($"'{displayNames.GetValueOrDefault(id, id)}' is in a common-line group on plate {sheet.PlateIndex} but does not allow common lines");
             }
         }
     }
@@ -547,9 +593,16 @@ public static class NestLayoutCheck
         List<Part> parts,
         double spacing,
         IReadOnlyDictionary<Drawing, (string Name, int Quantity)> requirements,
-        List<string> result
+        List<string> result,
+        IEnumerable<CommonLineGroup> commonLines = null
     )
     {
+        // Members of one explicit common-line group are held to the group's kerf instead.
+        var groupOf = new Dictionary<Part, CommonLineGroup>(ReferenceEqualityComparer.Instance);
+        if (commonLines != null)
+            foreach (var group in commonLines)
+                foreach (var member in group.Members)
+                    groupOf.TryAdd(member, group);
         var profiles = new ShapeProfile[parts.Count];
         var raw = new SpacingOutline[parts.Count];
         var inflated = new SpacingOutline[parts.Count];
@@ -596,6 +649,18 @@ public static class NestLayoutCheck
                 if (!Overlaps(inflated[i], raw[j]))
                     continue;
 
+                if (groupOf.TryGetValue(parts[i], out var shared)
+                    && groupOf.TryGetValue(parts[j], out var partnerGroup) && ReferenceEquals(shared, partnerGroup))
+                {
+                    native[i] ??= NativeContours.Of(profiles[i], parts[i].Location);
+                    native[j] ??= NativeContours.Of(profiles[j], parts[j].Location);
+                    if (native[i].TooClose(native[j], shared.Kerf))
+                        result.Add(
+                            $"'{DisplayName(parts[i], requirements)}' and '{DisplayName(parts[j], requirements)}' share a common line but are closer than its kerf ({shared.Kerf:F4})"
+                        );
+                    continue;
+                }
+
                 // The outline circumscribes arcs by more than the slack, so confirm a spacing
                 // candidate on the native contours. Zero spacing has no gap to confirm.
                 if (inflateBy > Tolerance.Epsilon)
@@ -610,6 +675,29 @@ public static class NestLayoutCheck
                     $"'{DisplayName(parts[i], requirements)}' and '{DisplayName(parts[j], requirements)}' are closer than the required spacing ({spacing:F3})"
                 );
             }
+        }
+    }
+
+    /// <summary>
+    /// Every explicit common-line group must be intact: each member shares a straight edge one
+    /// kerf apart with another member and the members form one connected group
+    /// (<see cref="CommonLineGeometry.Check"/>). A group that does not share is not a common line,
+    /// so its spacing exemption would hide a real violation.
+    /// </summary>
+    private static void ValidateCommonLines(Plate plate, List<Part> parts,
+        IReadOnlyDictionary<Drawing, (string Name, int Quantity)> requirements, List<string> result)
+    {
+        foreach (var group in plate.CommonLines)
+        {
+            if (group.Members.Any(member => !parts.Contains(member)))
+            {
+                result.Add("A common-line group names a part that is not on its plate");
+                continue;
+            }
+            if (!(group.Kerf < plate.PartSpacing))
+                result.Add($"A common-line group's kerf ({group.Kerf:F4}) is not smaller than the part spacing ({plate.PartSpacing:F3})");
+            foreach (var problem in CommonLineGeometry.Check(group).Problems)
+                result.Add($"'{DisplayName(problem.Part, requirements)}' {problem.Message}");
         }
     }
 

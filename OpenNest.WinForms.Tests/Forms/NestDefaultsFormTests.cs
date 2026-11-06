@@ -53,6 +53,26 @@ public class NestDefaultsFormTests
         });
     }
 
+    [Fact]
+    public void CommonLineUsage_LoadsAndSaves_AndSurvivesAUnitSwitch()
+    {
+        RunSta(() =>
+        {
+            using var form = new NestDefaultsForm(new NestDefaults { CommonLineUsage = CommonLineUsage.Whenever },
+                Array.Empty<MachineConfig>(), ("Saved on this PC.", false));
+            var combo = Control<ComboBox>(form, "commonLineCombo");
+            Assert.Equal(2, combo.SelectedIndex);
+
+            Control<RadioButton>(form, "millimetersRadio").Checked = true;
+            Assert.Equal(CommonLineUsage.Whenever, form.GetDefaults().CommonLineUsage);
+
+            combo.SelectedIndex = 1;
+            Assert.Equal(CommonLineUsage.WhenItAddsParts, form.GetDefaults().CommonLineUsage);
+            combo.SelectedIndex = 0;
+            Assert.Equal(CommonLineUsage.Off, form.GetDefaults().CommonLineUsage);
+        });
+    }
+
     private static T Control<T>(NestDefaultsForm form, string name) where T : Control =>
         Assert.IsType<T>(form.Controls.Find(name, true).Single());
 

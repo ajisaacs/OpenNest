@@ -120,6 +120,14 @@ namespace OpenNest
         /// </summary>
         public bool CutFirst { get; set; }
 
+        /// <summary>
+        /// Lets automatic nesting place this drawing's parts one kerf apart so they share a cut
+        /// (see docs/common-line-cutting.md), when the nest's common-line usage allows it. Off by
+        /// default: a shared edge is cut once from the centerline, which some customers'
+        /// edge-quality requirements do not accept.
+        /// </summary>
+        public bool AllowCommonLine { get; set; }
+
         public NestConstraints Constraints { get; set; }
 
         public SourceInfo Source { get; set; }

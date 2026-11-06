@@ -15,7 +15,7 @@ namespace OpenNest.Engine.Jobs.Placement;
 /// (accepting a preview, adding parts to a plate) and cancel/discard behavior remain with the
 /// caller, exactly as they were with the legacy single-plate engine surface.
 /// </summary>
-public static class PlateFillService
+public static partial class PlateFillService
 {
     /// <summary>Strategy used when a caller selection names none.</summary>
     public const string DefaultStrategy = "Lattice";

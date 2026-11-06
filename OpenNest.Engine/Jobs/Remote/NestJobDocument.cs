@@ -24,6 +24,13 @@ public sealed class NestJobDocument
 
     private const int LowerFirstPriorityVersion = 1;
 
+    /// <summary>
+    /// A version 2 job that also uses common lines (<see cref="OptionsJson.CommonLineUsage"/> on
+    /// with a positive kerf). Written only then, so a worker that cannot make common lines refuses
+    /// the job rather than solving it without them, which the desktop's replay would reject.
+    /// </summary>
+    public const int CommonLineVersion = 3;
+
     private static readonly JsonSerializerOptions Options = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -70,8 +77,12 @@ public sealed class NestJobDocument
                 SalvageRate = o.SalvageRate,
                 MinimumSalvageDimension = o.MinimumSalvageDimension,
                 OffcutCut = o.OffcutCut,
+                CommonLineUsage = o.CommonLineUsage,
+                CommonLineKerf = o.CommonLineKerf,
             } : null,
         };
+        if (request.Options?.UsesCommonLines == true)
+            document.Version = CommonLineVersion;
         foreach (var item in request.Items)
         {
             var index = item?.Drawing == null ? -1 : IndexOf(drawings, item.Drawing);
@@ -94,8 +105,8 @@ public sealed class NestJobDocument
     public NestPipelineRequest ToRequest(IReadOnlyList<Drawing> drawings)
     {
         ArgumentNullException.ThrowIfNull(drawings);
-        if (Version != CurrentVersion && Version != LowerFirstPriorityVersion)
-            throw new FormatException($"Nest job version {Version} is not supported; this build reads {CurrentVersion}.");
+        if (Version != CurrentVersion && Version != LowerFirstPriorityVersion && Version != CommonLineVersion)
+            throw new FormatException($"Nest job version {Version} is not supported; this build reads {CommonLineVersion}.");
         if (string.IsNullOrWhiteSpace(EngineName))
             throw new FormatException("The nest job names no engine.");
         if (DrawingNames == null || DrawingNames.Count != drawings.Count
@@ -124,6 +135,12 @@ public sealed class NestJobDocument
         var options = JobOptions is { } o
             ? new NestJobOptions(o.PlacementStrategy ?? "Lattice", o.MaxPlates, o.SalvageRate, o.MinimumSalvageDimension,
                 searchUntilCancelled: false, o.OffcutCut)
+            {
+                CommonLineUsage = Enum.IsDefined(o.CommonLineUsage) ? o.CommonLineUsage
+                    : throw new FormatException("The nest job's common-line usage is not one this build knows."),
+                CommonLineKerf = double.IsFinite(o.CommonLineKerf) && o.CommonLineKerf >= 0 ? o.CommonLineKerf
+                    : throw new FormatException("The nest job's common-line kerf is not a finite, nonnegative number."),
+            }
             : null;
         return new NestPipelineRequest(EngineName, items,
             (Stock ?? new()).Select(s => s?.ToStock() ?? throw new FormatException("A nest job stock entry is empty.")).ToList(),
@@ -169,5 +186,11 @@ public sealed class NestJobDocument
         public double SalvageRate { get; set; }
         public double MinimumSalvageDimension { get; set; }
         public CutOffAxis? OffcutCut { get; set; }
+
+        /// <summary><see cref="NestJobOptions.CommonLineUsage"/>; absent (off) before version 3.</summary>
+        public CommonLineUsage CommonLineUsage { get; set; }
+
+        /// <summary><see cref="NestJobOptions.CommonLineKerf"/>; absent (zero) before version 3.</summary>
+        public double CommonLineKerf { get; set; }
     }
 }

@@ -57,22 +57,28 @@ namespace OpenNest.Actions
             }
 
             var strategy = EngineSelection.FillStrategy;
+            // The nest's common-line level and the plate's kerf (see docs/common-line-cutting.md).
+            var nest = (plateView.FindForm() as EditNestForm)?.Nest;
+            var usage = nest?.CommonLineUsage ?? CommonLineUsage.Off;
+            var kerf = nest == null ? 0 : MachineSettings.CuttingParametersFor(plateView.Plate, nest)?.Kerf ?? 0;
             if (progress != null && cts != null)
             {
                 try
                 {
-                    var parts = await Task.Run(() =>
+                    var proposal = await Task.Run(() =>
                         PlateFillService.FillItem(
                             strategy,
                             plateView.Plate,
                             new NestItem { Drawing = drawing },
                             SelectedArea,
+                            usage,
+                            kerf,
                             progress,
                             cts.Token
                         )
                     );
 
-                    onFillComplete?.Invoke(parts);
+                    onFillComplete?.Invoke(proposal.Parts);
                 }
                 catch (Exception)
                 {
@@ -82,17 +88,21 @@ namespace OpenNest.Actions
             else
             {
                 using var change = plateView.BeginChange("Fill Area");
-                var parts = PlateFillService.FillItem(
+                var proposal = PlateFillService.FillItem(
                     strategy,
                     plateView.Plate,
                     new NestItem { Drawing = drawing },
                     SelectedArea,
+                    usage,
+                    kerf,
                     null,
                     CancellationToken.None
                 );
-                if (parts.Count > 0)
+                if (proposal.Parts.Count > 0)
                     change.MarkChanged();
-                plateView.Plate.Parts.AddRange(parts);
+                plateView.Plate.Parts.AddRange(proposal.Parts);
+                foreach (var group in proposal.CommonLines)
+                    plateView.Plate.CommonLines.Add(group);
                 plateView.Invalidate();
                 change.Complete();
             }

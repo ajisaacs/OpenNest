@@ -104,7 +104,9 @@ package and result on the server.
   geometry fingerprint (a SHA-256 of the exact motions the freshness check compares, which a
   later Open checks the nest's drawings against; workers ignore it), every stock
   entry as `NestStockJson` (size, quantity, spacing, quadrant, cost, clamp zones in plate
-  coordinates, clamp rail, irregular outline), and the job options. A server job never sets
+  coordinates, clamp rail, irregular outline), and the job options, including the common-line
+  level and kerf. A job that uses common lines is written as version 3, so a worker without them
+  refuses it instead of solving it differently from the desktop's replay. A server job never sets
   `SearchUntilCancelled` and never runs under a `DeadlineNestingEngine`: it has no time
   limit, so a throttled worker finds the same nest a fast one does, later.
 - `drawings.nest`: a throwaway nest of exactly the items' drawings, written by `NestWriter`.
@@ -115,7 +117,10 @@ package and result on the server.
 **The result** is a `NestSolveTranscript`: every engine solve the pipeline made on the worker,
 in order, as what was asked (part and stock ids with quantities) and the raw `NestJobResult`
 returned. Poses keep their IEEE values, nonfinite ones included. No bound plates or
-validation travel back.
+validation travel back. A [common-line](common-line-cutting.md#automatic-placement) trial is one
+more recorded solve whose answer places pair proxies; the desktop's replay expands them into the
+same parts and groups the worker made, so the groups travel as those recorded answers (a sheet's
+own `commonLines`, written only when an engine returns groups itself, travel too).
 
 **Live progress** travels separately while the job runs, both as versioned JSON the server
 never opens: `RemoteNestProgress` (the stage of the solve in progress: `NestJobStage`, stock,
@@ -124,14 +129,14 @@ raw placements of `NestJobStage.PlanImproved`). The desktop rebuilds the request
 its own drawings (the same part ids the worker solved) and draws the plan on detached
 drawings, exactly as a local run's `PlanSheets`; a bundled cutout trial's frame proxies are
 bundled once on the desktop the first time a plan names one. Like a local plan it is
-unvalidated and never kept.
+unvalidated and never kept. A common-line trial's pair proxies are rebuilt the same way.
 
 ## Replay on the desktop
 
 `RemoteNestSubmission.Complete` first checks that each item's drawing still has the geometry
 it had when the job was sent; a changed drawing refuses the result. It then runs
 `NestPipeline.Run` with a `ReplayNestingEngine` that answers each solve with the next recorded
-result, after checking it is asked the same question. Cutout bundling, the ordinary-solve
+result, after checking it is asked the same question. Cutout bundling, common-line trials, the ordinary-solve
 comparison and clamp-removal recovery therefore happen here exactly as on the worker, and the
 result is validated by `NestLayoutCheck` and bound to the caller's own drawings like a local
 run. A recorded sheet that matches one of the request's stock entries uses that entry itself.

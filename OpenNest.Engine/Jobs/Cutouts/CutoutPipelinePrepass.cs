@@ -16,7 +16,7 @@ namespace OpenNest.Engine.Jobs.Cutouts;
 /// Those go only through <see cref="CutoutCirclePacker"/>, which keeps every disc clear of the
 /// others' whole enclosing circles; lattice and NFP placement could seat a part in a ring's
 /// empty bore, or over a nested bundle's reserved inserts.</remarks>
-internal sealed class CutoutPipelinePrepass
+internal sealed class CutoutPipelinePrepass : IPipelinePrepass
 {
     // A job with thousands of repeats still offers the residual as ordinary demand;
     // do not multiply expensive Clipper/Fill preparation by every physical instance.
@@ -44,7 +44,9 @@ internal sealed class CutoutPipelinePrepass
         this.bundles = bundles;
     }
 
-    internal NestJob EngineJob { get; }
+    public NestJob EngineJob { get; }
+
+    public string ReconciliationFailure => "Cutout engine output failed reconciliation";
 
     internal static CutoutPipelinePrepass? Prepare(NestJob original, CancellationToken token)
     {
@@ -242,7 +244,7 @@ internal sealed class CutoutPipelinePrepass
 
     /// <summary>Reserved insert copies per original requirement whose frame proxy the engine
     /// did not place; call only on engine output that <see cref="TryExpand"/> accepted.</summary>
-    internal IReadOnlyDictionary<string, int> ReleasedInserts(NestJobResult engineResult)
+    public IReadOnlyDictionary<string, int> ReleasedInserts(NestJobResult engineResult)
     {
         var placed = engineResult.Plates.SelectMany(p => p.Placements)
             .Select(p => p.PartId).ToHashSet(StringComparer.Ordinal);
@@ -271,65 +273,13 @@ internal sealed class CutoutPipelinePrepass
     /// <summary>Reject untrusted accounting before expansion. A failed trial is never bindable,
     /// including with allowInvalid. Only actually placed proxies consume reserved inserts;
     /// an unplaced proxy's inserts stay unplaced demand of their own requirements.</summary>
-    internal bool TryExpand(NestJob original, NestJobResult result, CancellationToken token,
+    public bool TryExpand(NestJob original, NestJobResult result, CancellationToken token,
         out NestJobResult? expanded,
         out string failure)
     {
         expanded = null;
         failure = "Invalid cutout engine accounting";
-        var parts = EngineJob.Parts.ToDictionary(p => p.Id);
-        var counts = parts.ToDictionary(p => p.Key, _ => 0);
-        var indices = parts.ToDictionary(p => p.Key, _ => new HashSet<int>());
-        var stockById = EngineJob.Plates.ToDictionary(s => s.Id, StringComparer.Ordinal);
-        var used = stockById.ToDictionary(s => s.Key, _ => 0, StringComparer.Ordinal);
-        var expectedIndex = 0;
-        foreach (var sheet in result.Plates)
-        {
-            token.ThrowIfCancellationRequested();
-            if (sheet.PlateIndex != expectedIndex++ || sheet.Placements.Count == 0
-                || !used.ContainsKey(sheet.StockId))
-                return false;
-            used[sheet.StockId]++;
-            foreach (var pose in sheet.Placements)
-            {
-                if (pose.PartId == null || !parts.ContainsKey(pose.PartId)
-                    || pose.InstanceIndex < 0 || !indices[pose.PartId].Add(pose.InstanceIndex)
-                    || ++counts[pose.PartId] > parts[pose.PartId].Quantity)
-                    return false;
-            }
-        }
-        foreach (var row in indices)
-        {
-            token.ThrowIfCancellationRequested();
-            if (row.Value.Any(index => index >= counts[row.Key]))
-                return false;
-        }
-        if (result.Fulfillment.Count != parts.Count || result.StockUsage.Count != used.Count)
-            return false;
-        var seenParts = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var row in result.Fulfillment)
-        {
-            token.ThrowIfCancellationRequested();
-            if (row.PartId == null || !parts.TryGetValue(row.PartId, out var part)
-                || !seenParts.Add(row.PartId)
-                || row.Requested != part.Quantity || row.Placed != counts[row.PartId]
-                || row.Unplaced != part.Quantity - counts[row.PartId])
-                return false;
-        }
-        var seenStock = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var row in result.StockUsage)
-        {
-            token.ThrowIfCancellationRequested();
-            if (row.StockId == null || !stockById.TryGetValue(row.StockId, out var stock)
-                || !seenStock.Add(row.StockId)
-                || row.Used != used[row.StockId]
-                || row.Remaining != stock.Quantity - row.Used)
-                return false;
-        }
-        var complete = parts.Values.All(p => counts[p.Id] == p.Quantity);
-        if (result.Status != (complete ? NestJobStatus.Complete : NestJobStatus.Incomplete)
-            || (complete && result.StopReason != NestJobStopReason.Completed)
-            || (!complete && result.StopReason == NestJobStopReason.Completed))
+        if (!PipelinePrepassAccounting.Matches(EngineJob, result, token))
             return false;
 
         var builder = new NestJobResultBuilder(original);

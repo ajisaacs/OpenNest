@@ -38,17 +38,35 @@ namespace OpenNest.Forms
             shownUnits = defaults.Units;
             (defaults.Units == Units.Millimeters ? millimetersRadio : inchesRadio).Checked = true;
             ShowValues(defaults);
+            CommonLineUsage = defaults.CommonLineUsage;
 
             sourceLabel.Text = source.Text;
             saveButton.Enabled = !source.ReadOnly;
             // Nothing typed here could be saved, so show the values without inviting edits.
-            foreach (var group in new Control[] { generalGroup, plateGroup, quadrantGroup, spacingGroup })
+            foreach (var group in new Control[] { generalGroup, plateGroup, quadrantGroup, spacingGroup, nestingGroup })
                 group.Enabled = !source.ReadOnly;
         }
 
         private NestDefaultsForm() => InitializeComponent();
 
         public Units Units => millimetersRadio.Checked ? Units.Millimeters : Units.Inches;
+
+        /// <summary>The common-line usage new nests start with.</summary>
+        public CommonLineUsage CommonLineUsage
+        {
+            get => commonLineCombo.SelectedIndex switch
+            {
+                1 => CommonLineUsage.WhenItAddsParts,
+                2 => CommonLineUsage.Whenever,
+                _ => CommonLineUsage.Off,
+            };
+            set => commonLineCombo.SelectedIndex = value switch
+            {
+                CommonLineUsage.WhenItAddsParts => 1,
+                CommonLineUsage.Whenever => 2,
+                _ => 0,
+            };
+        }
 
         public NestDefaults GetDefaults() => ReadValues(Units);
 
@@ -68,6 +86,7 @@ namespace OpenNest.Forms
                 ),
                 // With no machines on file there is nothing to choose, so keep the saved choice.
                 MachineId = (machineCombo.SelectedItem as MachineChoice)?.Machine.Id ?? savedMachineId,
+                CommonLineUsage = CommonLineUsage,
             };
         }
 

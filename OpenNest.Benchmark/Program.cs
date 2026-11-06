@@ -128,7 +128,8 @@ static class BenchmarkConsole
             options.OutputDirectory,
             options.Parallel,
             options.Progress ? Console.Out : null,
-            options.TimeLimit
+            options.TimeLimit,
+            options.CommonLines
         );
 
         Report.PrintDetailed(results);
@@ -217,6 +218,15 @@ static class BenchmarkConsole
                     o.Progress = true;
                     break;
 
+                case "--common-lines" when i + 1 < args.Length:
+                    o.CommonLineLevel = args[++i];
+                    break;
+
+                case "--kerf" when i + 1 < args.Length:
+                    o.Kerf = double.TryParse(args[++i], System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var kerf) ? kerf : double.NaN;
+                    break;
+
                 case "--help":
                     PrintUsage();
                     return null;
@@ -228,6 +238,25 @@ static class BenchmarkConsole
             }
         }
 
+        if (o.CommonLineLevel != null)
+        {
+            CommonLineUsage? usage = o.CommonLineLevel.ToLowerInvariant() switch
+            {
+                "off" => CommonLineUsage.Off,
+                "when-it-adds-parts" => CommonLineUsage.WhenItAddsParts,
+                "whenever" => CommonLineUsage.Whenever,
+                _ => null,
+            };
+            if (usage == null || o.Kerf is not { } kerf || !double.IsFinite(kerf) || kerf <= 0)
+            {
+                Console.Error.WriteLine(
+                    "Error: --common-lines needs off, when-it-adds-parts or whenever, and a positive --kerf"
+                );
+                o.Invalid = true;
+            }
+            else
+                o.CommonLines = new CommonLineSetting(usage.Value, kerf);
+        }
         return o;
     }
 
@@ -368,6 +397,18 @@ static class BenchmarkConsole
         Console.Error.WriteLine(
             "                                 the best valid plan reported; none = timed out"
         );
+        Console.Error.WriteLine(
+            "  --common-lines <level>          Solve through the Auto Nest pipeline with every part allowed"
+        );
+        Console.Error.WriteLine(
+            "                                 to share a common line: off, when-it-adds-parts or whenever"
+        );
+        Console.Error.WriteLine(
+            "                                 (needs --kerf; off is the baseline to compare levels with)"
+        );
+        Console.Error.WriteLine(
+            "  --kerf <value>                  Common-line kerf in job units (with --common-lines)"
+        );
         Console.Error.WriteLine("  --help                          Show this message");
     }
 
@@ -384,6 +425,9 @@ static class BenchmarkConsole
         public int Parallel = 3;
         public bool Progress;
         public TimeSpan? TimeLimit;
+        public string CommonLineLevel;
+        public double? Kerf;
+        public CommonLineSetting CommonLines;
         public bool Invalid;
     }
 }

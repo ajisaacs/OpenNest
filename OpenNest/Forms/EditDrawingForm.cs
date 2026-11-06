@@ -48,6 +48,12 @@ namespace OpenNest.Forms
             set { cutFirstBox.Checked = value; }
         }
 
+        private bool AllowCommonLine
+        {
+            get { return allowCommonLineBox.Checked; }
+            set { allowCommonLineBox.Checked = value; }
+        }
+
         private Image DrawingImage
         {
             get { return pictureBox1.Image; }
@@ -151,6 +157,7 @@ namespace OpenNest.Forms
             Quantity = drawing.Quantity.Required;
             Priority = drawing.Priority;
             CutFirst = drawing.CutFirst;
+            AllowCommonLine = drawing.AllowCommonLine;
             Text = string.IsNullOrEmpty(drawing.Name)
                 ? "Drawing Properties"
                 : $"Drawing Properties - {drawing.Name}";
@@ -166,6 +173,7 @@ namespace OpenNest.Forms
             drawing.Quantity.Required = Quantity;
             drawing.Priority = Priority;
             drawing.CutFirst = CutFirst;
+            drawing.AllowCommonLine = AllowCommonLine;
             if (IsAutomaticColorRequested)
             {
                 if (!drawing.HasCustomColor)

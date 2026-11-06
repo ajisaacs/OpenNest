@@ -42,4 +42,10 @@ public sealed class NestJobPart
     /// </summary>
     public int Priority { get; }
     public RotationPolicy Rotation { get; }
+
+    /// <summary>
+    /// The part may share a common line with copies of itself when the job's
+    /// <see cref="NestJobOptions.CommonLineUsage"/> allows it (<c>Drawing.AllowCommonLine</c>).
+    /// </summary>
+    public bool AllowCommonLine { get; init; }
 }

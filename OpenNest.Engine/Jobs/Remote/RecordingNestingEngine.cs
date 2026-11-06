@@ -31,7 +31,7 @@ public sealed class RecordingNestingEngine : INestingEngine
     {
         if (Progress != null)
         {
-            var tap = CutoutPipelinePrepass.HasProxies(job) ? new NestPipeline.PreviewProgress(Progress) : Progress;
+            var tap = CutoutPipelinePrepass.HasProxies(job) || CommonLines.CommonLinePipelinePrepass.HasProxies(job) ? new NestPipeline.PreviewProgress(Progress) : Progress;
             progress = progress == null ? tap : new BothProgress(progress, tap);
         }
         var result = inner.Solve(job, progress, token);

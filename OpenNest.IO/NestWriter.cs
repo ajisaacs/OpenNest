@@ -159,6 +159,7 @@ namespace OpenNest.IO
                         .ToList()
                     ?? new(),
                 SalvageRate = nest.SalvageRate,
+                CommonLineUsage = CommonLineUsageNames.Format(nest.CommonLineUsage),
                 MinimumRemnantDimension = nest.MinimumRemnantDimension,
             };
         }
@@ -239,6 +240,7 @@ namespace OpenNest.IO
                         Priority = LegacyPriority.Convert(d.Priority),
                         NestPriority = d.Priority == 0 ? null : d.Priority,
                         CutFirst = d.CutFirst,
+                        AllowCommonLine = d.AllowCommonLine,
                         Constraints = new ConstraintsDto
                         {
                             StepAngle = d.Constraints.StepAngle,

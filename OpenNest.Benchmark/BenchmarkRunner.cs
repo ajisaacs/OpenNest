@@ -46,7 +46,8 @@ namespace OpenNest.Benchmark
             string outputDirectory = null,
             int maxParallelism = 1,
             System.IO.TextWriter progressLog = null,
-            TimeSpan? timeLimit = null
+            TimeSpan? timeLimit = null,
+            CommonLineSetting commonLines = null
         )
         {
             var pairs = jobs.SelectMany(job => engines.Select(engine => (Job: job, Engine: engine)))
@@ -83,7 +84,8 @@ namespace OpenNest.Benchmark
                         minimumSalvageDimension,
                         outputDirectory,
                         progressLog,
-                        timeLimit
+                        timeLimit,
+                        commonLines
                     )
             );
 
@@ -240,7 +242,8 @@ namespace OpenNest.Benchmark
             double? minimumSalvageDimension,
             string outputDirectory,
             System.IO.TextWriter progressLog,
-            TimeSpan? timeLimit
+            TimeSpan? timeLimit,
+            CommonLineSetting commonLines = null
         )
         {
             var requested = job.TotalRequestedQuantity;
@@ -257,7 +260,19 @@ namespace OpenNest.Benchmark
                 if (timeLimit is { } limit)
                     engine = new DeadlineNestingEngine(engine, limit);
                 using var cts = new CancellationTokenSource(HarnessTimeout(timeLimit));
-                var jobResult = engine.Solve(nestJob, log, cts.Token);
+                NestJobResult jobResult;
+                if (commonLines != null)
+                {
+                    // Through the desktop's pipeline, so its common-line trial runs; every part
+                    // may pair. "off" is the like-for-like baseline for the levels.
+                    nestJob = commonLines.Apply(nestJob);
+                    var pipeline = NestPipeline.Run(engine, engineInfo.Name, nestJob,
+                        job.Requests.ToDictionary(r => r.Drawing.Id.ToString(), r => r.Drawing), log, cts.Token);
+                    nestJob = pipeline.Job;
+                    jobResult = pipeline.Raw;
+                }
+                else
+                    jobResult = engine.Solve(nestJob, log, cts.Token);
                 log?.Finished(jobResult, sw.ElapsedMilliseconds);
 
                 var materialized = NestResultMaterializer.Materialize(nestJob, jobResult);

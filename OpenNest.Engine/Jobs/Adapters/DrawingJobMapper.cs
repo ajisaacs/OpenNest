@@ -26,7 +26,8 @@ public static class DrawingJobMapper
                     constraints.EndAngle,
                     constraints.Allow180Equivalent
                 )
-        );
+        )
+        { AllowCommonLine = drawing.AllowCommonLine };
     }
 
     public static NestJobPart FromItem(string partId, NestItem item)
@@ -44,7 +45,8 @@ public static class DrawingJobMapper
                 item.RotationEnd,
                 item.Drawing.Constraints?.Allow180Equivalent ?? false
             )
-        );
+        )
+        { AllowCommonLine = item.Drawing.AllowCommonLine };
     }
 
     /// <summary>Available stock is explicit; the legacy plate repeat count is not inventory.</summary>
@@ -98,7 +100,11 @@ public static class DrawingJobMapper
     /// geometry in a later job, engine instance or Auto Nest run does not search again.</summary>
     internal static Drawing CreateDrawing(NestJobPart part)
     {
-        var drawing = new Drawing(part.Id, ToProgram(part.Geometry)) { Priority = part.Priority };
+        var drawing = new Drawing(part.Id, ToProgram(part.Geometry))
+        {
+            Priority = part.Priority,
+            AllowCommonLine = part.AllowCommonLine,
+        };
         drawing.Quantity.Required = part.Quantity;
         drawing.Constraints = new NestConstraints
         {

@@ -97,6 +97,8 @@ public static class NestPipelineCommit
             plate.Quantity = proposed.Quantity;
             SyncClampZones(plate, proposed.Stock);
             plate.Parts.AddRange(proposed.Parts);
+            foreach (var group in proposed.CommonLines)
+                plate.CommonLines.Add(group);
             applied.Add(plate);
         }
         return applied.AsReadOnly();

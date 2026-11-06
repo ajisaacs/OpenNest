@@ -90,6 +90,7 @@ public class DrawingPackageTests
         drawing.HasCustomColor = true;
         drawing.Priority = 9;
         drawing.CutFirst = true;
+        drawing.AllowCommonLine = true;
         drawing.Constraints = new NestConstraints { StepAngle = 0.5, StartAngle = 0.25, EndAngle = 3, Allow180Equivalent = true };
 
         Assert.Equal(baseline, Sha(DrawingPackage.Write(drawing, Units.Inches)));

@@ -45,8 +45,31 @@ namespace OpenNest.Forms
             LoadDefaultPlateOptions();
             SetPlateOptimizerVisible(false);
             UpdateLedgerButton();
+            CommonLineUsage = nest?.CommonLineUsage ?? CommonLineUsage.Off;
+            ledgerToolTip.SetToolTip(commonLineComboBox,
+                "Place parts one kerf apart so they share a cut. Only drawings with \"Allow common line\" "
+                + "set in Drawing Properties take part. \"When it adds parts\" keeps a common-line layout only "
+                + "when it places more parts or uses fewer sheets; \"Whenever available\" also takes one that "
+                + "shortens the cut or uses less material, never at the cost of a part.");
 
             partsGrid.DataError += PartsGrid_DataError;
+        }
+
+        /// <summary>When the run may place parts on common lines; saved to the nest when accepted.</summary>
+        public CommonLineUsage CommonLineUsage
+        {
+            get => commonLineComboBox.SelectedIndex switch
+            {
+                1 => CommonLineUsage.WhenItAddsParts,
+                2 => CommonLineUsage.Whenever,
+                _ => CommonLineUsage.Off,
+            };
+            set => commonLineComboBox.SelectedIndex = value switch
+            {
+                CommonLineUsage.WhenItAddsParts => 1,
+                CommonLineUsage.Whenever => 2,
+                _ => 0,
+            };
         }
 
         public string EngineName

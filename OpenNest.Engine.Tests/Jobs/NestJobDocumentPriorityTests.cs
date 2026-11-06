@@ -30,7 +30,7 @@ public class NestJobDocumentPriorityTests
     [Fact]
     public void UnknownVersionIsRefused()
     {
-        Assert.Throws<FormatException>(() => Document(NestJobDocument.CurrentVersion + 1, 0).ToRequest(Drawings()));
+        Assert.Throws<FormatException>(() => Document(NestJobDocument.CommonLineVersion + 1, 0).ToRequest(Drawings()));
     }
 
     private static Drawing[] Drawings() => [new Drawing("a", TestDrawingFactory.Rectangle(10, 20))];

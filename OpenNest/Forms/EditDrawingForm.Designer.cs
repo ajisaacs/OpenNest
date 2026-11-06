@@ -65,6 +65,8 @@ namespace OpenNest.Forms
             priorityHint = new Label();
             cutFirstBox = new CheckBox();
             cutFirstHint = new Label();
+            allowCommonLineBox = new CheckBox();
+            allowCommonLineHint = new Label();
             bottomPanel1 = new OpenNest.Controls.BottomPanel();
             buttonsPanel = new FlowLayoutPanel();
             cancelButton = new Button();
@@ -361,9 +363,15 @@ namespace OpenNest.Forms
             nestingFields.Controls.Add(cutFirstHint, 1, 3);
             nestingFields.SetColumnSpan(cutFirstBox, 2);
             nestingFields.SetColumnSpan(cutFirstHint, 2);
+            nestingFields.Controls.Add(allowCommonLineBox, 1, 4);
+            nestingFields.Controls.Add(allowCommonLineHint, 1, 5);
+            nestingFields.SetColumnSpan(allowCommonLineBox, 2);
+            nestingFields.SetColumnSpan(allowCommonLineHint, 2);
             nestingFields.Dock = DockStyle.Fill;
             nestingFields.Name = "nestingFields";
-            nestingFields.RowCount = 4;
+            nestingFields.RowCount = 6;
+            nestingFields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            nestingFields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             nestingFields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             nestingFields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             nestingFields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -436,6 +444,23 @@ namespace OpenNest.Forms
             cutFirstHint.Name = "cutFirstHint";
             cutFirstHint.Text = "Cut before other parts on the plate";
             //
+            // allowCommonLineBox
+            //
+            allowCommonLineBox.AutoSize = true;
+            allowCommonLineBox.Margin = new Padding(3, 6, 3, 0);
+            allowCommonLineBox.Name = "allowCommonLineBox";
+            allowCommonLineBox.TabIndex = 3;
+            allowCommonLineBox.Text = "Allow &common line";
+            allowCommonLineBox.UseVisualStyleBackColor = true;
+            //
+            // allowCommonLineHint
+            //
+            allowCommonLineHint.AutoSize = true;
+            allowCommonLineHint.ForeColor = SystemColors.GrayText;
+            allowCommonLineHint.Margin = new Padding(20, 0, 3, 4);
+            allowCommonLineHint.Name = "allowCommonLineHint";
+            allowCommonLineHint.Text = "Auto Nest may place parts one kerf apart to share a cut";
+            //
             // bottomPanel1
             //
             bottomPanel1.Controls.Add(buttonsPanel);
@@ -487,7 +512,7 @@ namespace OpenNest.Forms
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = cancelButton;
-            ClientSize = new Size(640, 430);
+            ClientSize = new Size(640, 470);
             Controls.Add(layout);
             Controls.Add(bottomPanel1);
             Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
@@ -558,6 +583,8 @@ namespace OpenNest.Forms
         private Label priorityHint;
         private CheckBox cutFirstBox;
         private Label cutFirstHint;
+        private CheckBox allowCommonLineBox;
+        private Label allowCommonLineHint;
         private Controls.BottomPanel bottomPanel1;
         private FlowLayoutPanel buttonsPanel;
         private Button cancelButton;

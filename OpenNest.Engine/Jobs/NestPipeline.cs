@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.Jobs.CommonLines;
 using OpenNest.Engine.Jobs.Cutouts;
 
 namespace OpenNest.Engine.Jobs;
@@ -24,6 +25,10 @@ public sealed record NestPipelineRequest(
 /// raw physical occurrence; Quantity is the total physical copies, including the first.</summary>
 public sealed record ProposedPlate(int PlateIndex, NestPlateStock Stock, IReadOnlyList<Part> Parts)
 {
+    /// <summary>Common-line groups among <see cref="Parts"/>; committing the plate adds them to
+    /// <see cref="Plate.CommonLines"/>. Empty when the layout has none.</summary>
+    public IReadOnlyList<CommonLineGroup> CommonLines { get; init; } = Array.Empty<CommonLineGroup>();
+
     private int quantity = 1;
     public int Quantity
     {
@@ -176,7 +181,11 @@ public static class NestPipeline
                 part.UpdateBounds();
                 placed.Add(part);
             }
-            sheets.Add(new ProposedPlate(group.Sheet.PlateIndex, group.Sheet.Stock, placed) { Quantity = group.Quantity });
+            sheets.Add(new ProposedPlate(group.Sheet.PlateIndex, group.Sheet.Stock, placed)
+            {
+                Quantity = group.Quantity,
+                CommonLines = NestResultBinder.BindCommonLines(group.Sheet, placed),
+            });
         }
         return sheets;
     }
@@ -251,6 +260,55 @@ public static class NestPipeline
     )
     {
         var (job, drawingsByPartId) = CreateJob(engine, request, token);
+        return Run(engine, engineName, job, drawingsByPartId, progress, token, cutouts);
+    }
+
+    /// <summary>
+    /// The pipeline for an already built job whose part ids map to <paramref name="drawingsByPartId"/>
+    /// (the benchmark builds its own jobs); identical to <see cref="Run(INestingEngine, string, NestPipelineRequest, IProgress{NestJobProgress}, CancellationToken)"/> otherwise.
+    /// </summary>
+    internal static NestPipelineResult Run(INestingEngine engine, string engineName, NestJob job,
+        IReadOnlyDictionary<string, Drawing> drawingsByPartId, IProgress<NestJobProgress> progress,
+        CancellationToken token, bool cutouts = true)
+    {
+        ArgumentNullException.ThrowIfNull(engine);
+        ArgumentNullException.ThrowIfNull(job);
+        NestJobValidator.Validate(job);
+        var ordinary = RunOrdinary(engine, engineName, job, drawingsByPartId, progress, token, cutouts);
+        return job.Options.UsesCommonLines
+            ? WithCommonLines(engine, engineName, job, drawingsByPartId, ordinary, progress, token)
+            : ordinary;
+    }
+
+    /// <summary>
+    /// The common-line trials (see <see cref="CommonLinePipelinePrepass"/>), each solved after
+    /// the ordinary solve and kept only when <see cref="CommonLineRanking"/> prefers it at the
+    /// job's usage level; otherwise the ordinary result stands as it was.
+    /// </summary>
+    private static NestPipelineResult WithCommonLines(INestingEngine engine, string engineName, NestJob job,
+        IReadOnlyDictionary<string, Drawing> drawingsByPartId, NestPipelineResult ordinary,
+        IProgress<NestJobProgress> progress, CancellationToken token)
+    {
+        var best = ordinary;
+        var asked = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var share in new[] { CommonLinePipelinePrepass.Share.All, CommonLinePipelinePrepass.Share.Half })
+        {
+            token.ThrowIfCancellationRequested();
+            var prepass = CommonLinePipelinePrepass.Prepare(job, share, token);
+            // Two shares that pair the same counts would ask the engine the same question.
+            if (prepass == null || !asked.Add(string.Join("|", Remote.NestSolveTranscript.Fingerprint(prepass.EngineJob))))
+                continue;
+            var trial = Evaluate(engine, engineName, job, prepass, drawingsByPartId, progress, token);
+            if (CommonLineRanking.Prefers(job.Options.CommonLineUsage, trial, best))
+                best = trial;
+        }
+        return ReferenceEquals(best, ordinary) ? ordinary : Committed(best, progress, token);
+    }
+
+    private static NestPipelineResult RunOrdinary(INestingEngine engine, string engineName, NestJob job,
+        IReadOnlyDictionary<string, Drawing> drawingsByPartId, IProgress<NestJobProgress> progress,
+        CancellationToken token, bool cutouts)
+    {
         var prepass = cutouts ? CutoutPipelinePrepass.Prepare(job, token) : null;
         if (prepass == null)
             return Evaluate(engine, engineName, job, null, drawingsByPartId, progress, token);
@@ -331,7 +389,7 @@ public static class NestPipeline
         INestingEngine engine,
         string engineName,
         NestJob job,
-        CutoutPipelinePrepass prepass,
+        IPipelinePrepass prepass,
         IReadOnlyDictionary<string, Drawing> drawingsByPartId,
         IProgress<NestJobProgress> progress,
         CancellationToken token
@@ -378,7 +436,7 @@ public static class NestPipeline
         {
             // A compound may be physically invalid even when its envelope is legal.
             // Refuse every unverified trial, including with explicit invalid-result consent.
-            var failure = "Cutout engine output failed reconciliation";
+            var failure = prepass.ReconciliationFailure;
             if (violations.Count == 0 && prepass.TryExpand(job, raw, token, out var expanded, out failure))
             {
                 released = prepass.ReleasedInserts(raw);
@@ -408,9 +466,12 @@ public static class NestPipeline
             foreach (var group in RepeatedPlateGrouping.Create(raw.Plates, consolidate, token))
             {
                 token.ThrowIfCancellationRequested();
-                plates.Add(new ProposedPlate(group.Sheet.PlateIndex, group.Sheet.Stock,
-                    NestResultBinder.Bind(group.Sheet, drawingsByPartId))
-                { Quantity = group.Quantity });
+                var bound = NestResultBinder.Bind(group.Sheet, drawingsByPartId);
+                plates.Add(new ProposedPlate(group.Sheet.PlateIndex, group.Sheet.Stock, bound)
+                {
+                    Quantity = group.Quantity,
+                    CommonLines = NestResultBinder.BindCommonLines(group.Sheet, bound),
+                });
             }
 
         // Binding clones the caller's current Program; a concurrent edit during binding

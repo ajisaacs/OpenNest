@@ -97,13 +97,62 @@ head on the second. Changing the setting after planning makes the plan stale.
 - Moving one member moves only that part and breaks the group. Rejoin, or remove the group.
 - Join, Remove and Cut Common Lines Twice are undoable like any other edit.
 
+## Automatic placement
+
+Auto Nest, the server's nesting worker and Fill Area can place parts on common lines themselves.
+
+- **Who may pair.** Only drawings with **Allow common line** set in Drawing Properties
+  (`Drawing.AllowCommonLine`, off by default: a shared edge is cut from the centerline, which some
+  customers' edge-quality requirements do not accept). A drawing pairs only with copies of itself.
+- **The level** is the nest's `Nest.CommonLineUsage`, chosen in the Auto Nest dialog (saved with
+  the nest) and seeded for new nests from the nest defaults (`defaults.json`, Tools > Nest
+  Defaults):
+  - **Off** (the default): engines and fills run exactly as without common lines; the pipeline
+    asks the engine nothing more.
+  - **When it adds parts:** a common-line layout is kept only when it places more parts than the
+    best layout without common lines, or (whole jobs) the same parts on fewer sheets. A tie keeps
+    the layout without common lines.
+  - **Whenever available:** part count still ranks first and sheets second, so common lines never
+    cost a part or a sheet. With both equal, the common-line layout is kept when it is better on
+    one of material (a lower salvage-credited cost, then a larger compactness offcut: a shorter
+    used length or a larger remnant) and cut length (perimeters less each shared span once), and
+    no worse on the other.
+- **The kerf** is the plate's cutting kerf for the nest's material and thickness (the machine's,
+  see [machine cutting defaults](machine-cutting-defaults.md)). With no kerf, or a kerf not
+  smaller than the part spacing, nothing pairs.
+- **How.** `CommonLinePair` builds a compound of two copies sharing the part's longest straight
+  edge (the second turned half a turn, so that edge faces its own copy one kerf apart; shorter
+  edges are tried when the turned copy would come closer than the kerf elsewhere). The compound's
+  outline is both perimeters (arcs circumscribed) and the kerf between them, without holes. The
+  pair needs a part that may turn half a turn: automatic rotation, or a rotation limit that allows
+  the 180° equivalent.
+- **Whole jobs** (`NestPipeline`, every engine, built-in or plug-in): after the ordinary solve,
+  `CommonLinePipelinePrepass` offers each eligible part as pairs plus its odd copy (all copies
+  paired, then about half, so rows that fit an odd count are tried too) and solves again. Placed
+  pairs expand into their two parts and one `NestJobCommonLine` group each on the result sheet
+  (`NestJobPlateResult.CommonLines`: placement positions and kerf). The expanded layout is checked
+  by `NestLayoutCheck` again, and `CommonLineRanking` chooses at the job's level
+  (`NestJobOptions.CommonLineUsage`, `CommonLineKerf`, `NestJobPart.AllowCommonLine`). Committing
+  adds the groups to `Plate.CommonLines`. Engines themselves are unchanged, and `FillScore` and
+  every engine comparer still rank their own layouts.
+- **Fill Area** (`PlateFillService.FillItem` with a level and kerf) also fills the area with
+  pairs and keeps that fill when it places more parts, or, at "Whenever available", as many and
+  the strategy's own ranking does not prefer the plain fill. Other interactive fills, the console
+  and MCP fills do not pair.
+- **Benchmark:** `--common-lines off|when-it-adds-parts|whenever --kerf <k>` runs each job through
+  the pipeline with every part allowed to pair; `off` is the baseline to compare the levels with
+  (see [engine benchmarking](performance/engine-benchmarking.md)).
+
 ## Checks
 
 - **Part spacing** (the pre-post review and the desktop's live label): any two members of one
   group are held to the group's kerf instead of the plate's part spacing. Everything else,
-  including spacing to non-members and the plate edge, is unchanged. The engines' layout
-  certification (`NestLayoutCheck`) knows nothing of groups. Engines never make them, and a plate
-  with groups is not an engine result.
+  including spacing to non-members and the plate edge, is unchanged.
+- **Engine results** (`NestLayoutCheck`, the benchmark's and the pipeline's validation): the
+  exemption comes only from a result sheet's explicit group list, never from proximity. A group
+  must be allowed by the job (a level on, the job's kerf, members whose parts allow common lines,
+  each placement in one group at most), smaller than the part spacing, and intact
+  (`CommonLineGeometry.Check`).
 - **Common lines** (pre-post, a warning that needs consent like any other):
   - a member that no longer shares a span one kerf from another member, or a group split in two;
   - a group whose kerf differs from the plate's cutting parameters' kerf (when the plate has
@@ -133,6 +182,3 @@ back to cutting the line twice. Set the plate to cut its lines twice and plan ag
 
 See [nest file format](nest-file-format.md#common-lines).
 
-## Planned next
-
-Automatic common-line placement in fills, after the machine trial above.

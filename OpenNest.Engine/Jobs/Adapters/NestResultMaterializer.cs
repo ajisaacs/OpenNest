@@ -52,8 +52,29 @@ public static class NestResultMaterializer
                 // Quantity=1 is set before the only attachment; Plate's event owns Nested accounting.
                 plate.Parts.Add(part);
             }
+            AddCommonLines(plate, plate.Parts.ToList(), sheet.CommonLines);
             nest.Plates.Add(plate);
         }
         return new MaterializedNestResult(nest, drawings);
+    }
+
+    /// <summary>
+    /// Adds a sheet's explicit common-line groups to <paramref name="plate"/>; members are the
+    /// sheet's placements by position in <paramref name="parts"/>. A group naming a position
+    /// outside the sheet, a part twice, a part of an earlier group, or fewer than two parts throws:
+    /// such a result is malformed.
+    /// </summary>
+    internal static void AddCommonLines(Plate plate, IReadOnlyList<Part> parts,
+        IReadOnlyList<NestJobCommonLine> groups)
+    {
+        if (groups.Count == 0)
+            return;
+        var taken = new HashSet<int>();
+        foreach (var group in groups)
+        {
+            if (group.Placements.Count < 2 || group.Placements.Any(i => i < 0 || i >= parts.Count || !taken.Add(i)))
+                throw new ArgumentException("A common-line group names a placement that is missing, repeated or in another group.");
+            plate.CommonLines.Add(new CommonLineGroup(group.Placements.Select(i => parts[i]), group.Kerf));
+        }
     }
 }

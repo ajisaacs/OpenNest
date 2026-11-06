@@ -540,6 +540,18 @@ mixed sheet sizes. Every whole-job engine chooses among the offered stock sizes.
 Gpt6Astra and Qwen38FlashNext are no longer shipped and have no alias. A saved selection of either
 falls back to the default engine with the usual status-bar warning.
 
+## Common lines
+
+Engines do not know about common lines. When the job's `NestJobOptions.CommonLineUsage` is on,
+`NestPipeline` solves once more with each part that allows it offered as kerf-gap pairs (a
+compound part), expands the placed pairs into parts plus explicit `NestJobCommonLine` groups and
+keeps the trial only by the level's ranking; see
+[automatic placement](common-line-cutting.md#automatic-placement). Off asks the engine exactly what
+it asked before. An engine or plug-in may return groups itself on `NestJobPlateResult.CommonLines`;
+`NestLayoutCheck` holds members to the kerf only through that list and only when the job allows
+common lines. Benchmark a level with `--common-lines <level> --kerf <k>` against
+`--common-lines off`, reporting placed parts and absolute nested area.
+
 ## Changing an engine
 
 Use the [engine benchmarking guide](performance/engine-benchmarking.md) for the command, candidate-sheet controls, and comparison procedure.
