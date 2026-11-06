@@ -150,6 +150,28 @@ namespace OpenNest
         }
 
         /// <summary>
+        /// The cut strokes of a cut-off <paramref name="program"/>, offset by <paramref name="offset"/>:
+        /// one line per cutting move, from wherever the previous motion ended. Walks the motions rather
+        /// than pairing rapid and cut codes, because a head-locked far-edge segment carries lock
+        /// comments and a rapid return between its cuts.
+        /// </summary>
+        public static IEnumerable<Line> CutStrokes(Program program, Vector offset = default)
+        {
+            if (program == null)
+                yield break;
+            Vector? position = null;
+            foreach (var code in program.Codes)
+            {
+                if (code is not Motion motion)
+                    continue;
+                var end = motion.EndPoint + offset;
+                if (motion is LinearMove && position is { } start)
+                    yield return new Line(start, end);
+                position = end;
+            }
+        }
+
+        /// <summary>
         /// Whether the far edge, along this axis on <paramref name="plate"/>, is the high
         /// coordinate: the sheet runs from the origin toward positive coordinates on that axis.
         /// </summary>

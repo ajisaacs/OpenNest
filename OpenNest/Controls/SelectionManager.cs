@@ -345,23 +345,15 @@ namespace OpenNest.Controls
             var result = new List<CutOff>();
             foreach (var cutOff in view.Plate.CutOffs)
             {
-                var program = cutOff.Drawing?.Program;
-                if (program == null)
-                    continue;
-
                 var hasSegment = false;
                 var matches = selectionType == SelectionType.Contains;
                 // Match the actual cut strokes drawn by PlateRenderer, not the nominal
                 // full-length line: a gap around a part is not selectable material.
-                for (var i = 0; i < program.Codes.Count - 1; i += 2)
+                foreach (var stroke in CutOff.CutStrokes(cutOff.Drawing?.Program))
                 {
-                    if (program.Codes[i] is not RapidMove rapid
-                        || program.Codes[i + 1] is not LinearMove linear)
-                        continue;
-
                     hasSegment = true;
-                    var start = view.PointWorldToGraph(rapid.EndPoint);
-                    var end = view.PointWorldToGraph(linear.EndPoint);
+                    var start = view.PointWorldToGraph(stroke.StartPoint);
+                    var end = view.PointWorldToGraph(stroke.EndPoint);
                     var hit = selectionType == SelectionType.Contains
                         ? ContainsInclusive(rect, start) && ContainsInclusive(rect, end)
                         : SegmentIntersects(rect, start, end);

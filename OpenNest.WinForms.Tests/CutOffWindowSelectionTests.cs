@@ -61,6 +61,45 @@ public class CutOffWindowSelectionTests
         Assert.Empty(view.Selection.GetCutOffsFromWindow(full, SelectionType.Contains));
     });
 
+    // A head-locked far-edge segment carries lock comments (and, cut from the far edge, a rapid
+    // return) between its cuts, so its codes do not pair up as rapid/cut at even positions.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HeadLockedCutOffIsSelectableByClickAndWindow(bool farEdgeFirst) => RunSta(() =>
+    {
+        var square = new CNC.Program();
+        square.MoveTo(8, 8);
+        square.LineTo(12, 8);
+        square.LineTo(12, 12);
+        square.LineTo(8, 12);
+        square.LineTo(8, 8);
+        var plate = new Plate(20, 20);
+        plate.Parts.Add(new Part(new Drawing("square", square)));
+        var cutoff = new CutOff(new Vector(10, 0), CutOffAxis.Vertical)
+        {
+            HeadLockOvercut = 0.25,
+            FarEdgeFirst = farEdgeFirst,
+        };
+        plate.CutOffs.Add(cutoff);
+        plate.RegenerateCutOffs(new CutOffSettings());
+        Assert.Contains(cutoff.Drawing.Program.Codes, HeadHeightLock.IsLock);
+
+        using var view = new PlateView { Plate = plate };
+        Assert.Same(cutoff, view.GetCutOffAtPoint(new Vector(10, 3), 0.1));
+        Assert.Same(cutoff, view.GetCutOffAtPoint(new Vector(10, 17), 0.1));
+        Assert.Same(cutoff, view.GetCutOffAtPoint(new Vector(10, 20.2), 0.1));
+        Assert.Null(view.GetCutOffAtPoint(new Vector(10, 10), 0.1));
+
+        var farSegment = GraphRect(view, new Vector(9, 16), new Vector(11, 18));
+        var full = GraphRect(view, new Vector(9, -1), new Vector(11, 21));
+        var beforeOvercut = GraphRect(view, new Vector(9, -1), new Vector(11, 20));
+        Assert.Contains(cutoff, view.Selection.GetCutOffsFromWindow(farSegment, SelectionType.Intersect));
+        Assert.Contains(cutoff, view.Selection.GetCutOffsFromWindow(full, SelectionType.Contains));
+        // The overcut past the sheet is part of the line, so a window short of it does not contain it.
+        Assert.Empty(view.Selection.GetCutOffsFromWindow(beforeOvercut, SelectionType.Contains));
+    });
+
     [Fact]
     public void ActionSelectsPartsAndCutOffsTogetherAndDeleteRemovesBoth() => RunSta(() =>
     {

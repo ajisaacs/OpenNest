@@ -420,20 +420,11 @@ namespace OpenNest.Controls
             }
         }
 
-        // Walk the motions rather than pairing rapid/cut codes: a head-locked far-edge segment
-        // carries lock comments between its cuts, and its overcut past the sheet must dash too.
+        // The head-locked overcut past the sheet dashes too; selection hit-tests the same strokes.
         private void DrawCutOffSegments(Graphics g, Program program, Vector offset, Pen pen)
         {
-            Vector? position = null;
-            foreach (var code in program.Codes)
-            {
-                if (code is not Motion motion)
-                    continue;
-                var end = motion.EndPoint + offset;
-                if (motion is LinearMove && position is { } start)
-                    DrawLine(g, start, end, pen);
-                position = end;
-            }
+            foreach (var stroke in CutOff.CutStrokes(program, offset))
+                DrawLine(g, stroke.StartPoint, stroke.EndPoint, pen);
         }
 
         /// <summary>

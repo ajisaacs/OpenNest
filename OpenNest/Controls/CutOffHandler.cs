@@ -108,21 +108,10 @@ namespace OpenNest.Controls
 
             foreach (var cutoff in view.Plate.CutOffs)
             {
-                var program = cutoff.Drawing?.Program;
-                if (program == null)
-                    continue;
-
-                for (var i = 0; i < program.Codes.Count - 1; i += 2)
+                foreach (var line in CutOff.CutStrokes(cutoff.Drawing?.Program))
                 {
-                    if (
-                        program.Codes[i] is RapidMove rapid
-                        && program.Codes[i + 1] is LinearMove linear
-                    )
-                    {
-                        var line = new Line(rapid.EndPoint, linear.EndPoint);
-                        if (line.ClosestPointTo(point).DistanceTo(point) <= tolerance)
-                            return cutoff;
-                    }
+                    if (line.ClosestPointTo(point).DistanceTo(point) <= tolerance)
+                        return cutoff;
                 }
             }
 

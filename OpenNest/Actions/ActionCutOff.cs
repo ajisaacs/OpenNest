@@ -151,17 +151,11 @@ namespace OpenNest.Actions
                 DashStyle = DashStyle.Dash,
             };
 
-            for (var i = 0; i < program.Codes.Count - 1; i += 2)
+            foreach (var stroke in CutOff.CutStrokes(program))
             {
-                if (
-                    program.Codes[i] is RapidMove rapid
-                    && program.Codes[i + 1] is LinearMove linear
-                )
-                {
-                    var pt1 = plateView.PointWorldToGraph(rapid.EndPoint);
-                    var pt2 = plateView.PointWorldToGraph(linear.EndPoint);
-                    e.Graphics.DrawLine(pen, pt1, pt2);
-                }
+                var pt1 = plateView.PointWorldToGraph(stroke.StartPoint);
+                var pt2 = plateView.PointWorldToGraph(stroke.EndPoint);
+                e.Graphics.DrawLine(pen, pt1, pt2);
             }
 
             DrawRotateTag(e.Graphics);
