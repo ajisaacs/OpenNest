@@ -20,6 +20,18 @@ namespace OpenNest.Shapes
             Radius = 1;
         }
 
+        public override IReadOnlyList<ShapeDimension> GetDimensions() =>
+            new[]
+            {
+                ShapeDimension.Linear(nameof(Length), new Vector(0, 0), new Vector(Length, 0), ShapeDimension.Down),
+                ShapeDimension.Linear(nameof(Width), new Vector(Length, 0), new Vector(Length, Width), ShapeDimension.Right),
+                // On the top-left corner arc, pointing out along its 45-degree radius, clear of
+                // the width dimension on the right.
+                ShapeDimension.Leader(nameof(Radius),
+                    new Vector(Radius * (1 - System.Math.Sqrt(0.5)), Width - Radius * (1 - System.Math.Sqrt(0.5))),
+                    new Vector(-1, 1), "R"),
+            };
+
         public override Drawing GetDrawing()
         {
             var r = Radius;

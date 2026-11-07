@@ -48,30 +48,113 @@ public class ShapeLibraryFormTests
     }
 
     [Fact]
-    public void InvalidShapeInputClearsOldPreviewAndBlocksAddUntilCorrected() => ArchUnitsTests.RunSta(() =>
+    public void ParametersAreDimensionsOnTheDrawingNotASidePanel() => ArchUnitsTests.RunSta(() =>
     {
         using var form = new ShapeLibraryForm();
         SelectShape(form, typeof(RectangleShape));
         var preview = Find<ShapePreviewControl>(form, "previewBox");
-        var add = Find<Button>(form, "addButton");
-        var input = Find<Panel>(form, "parametersPanel").Controls.OfType<TextBox>().First();
-        var valid = input.Text;
-        Assert.NotEmpty(preview.Plate.Parts);
-        Assert.True(add.Enabled);
 
-        input.Text = "invalid dimension";
-        Assert.Equal(Color.Red, input.ForeColor);
-        Assert.Empty(preview.Plate.Parts);
-        Assert.False(add.Enabled);
-        InvokeAdd(form);
-        Assert.Empty(form.GetDrawings());
+        Assert.Empty(form.Controls.Find("parametersPanel", true));
+        Assert.Equal(new[] { "Length", "Width" }, preview.LabelKeys);
+        Assert.NotNull(preview.LabelBounds("Length"));
+    });
 
-        input.Text = valid;
-        Assert.Equal(SystemColors.WindowText, input.ForeColor);
-        Assert.NotEmpty(preview.Plate.Parts);
-        Assert.True(add.Enabled);
+    [Fact]
+    public void TypingADimensionResizesTheShape() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        SelectShape(form, typeof(RectangleShape));
+        var preview = Find<ShapePreviewControl>(form, "previewBox");
+
+        var box = OpenEditor(form, "Length");
+        Assert.Equal("Length", preview.ActiveKey);
+        box.Text = "20 1/2";
+        Press(box, Keys.Enter);
+
+        Assert.Null(form.ActiveEditor);
+        Assert.Equal(20.5, preview.Plate.Parts.Single().BoundingBox.Length, 6);
         InvokeAdd(form);
-        Assert.Single(form.GetDrawings());
+        Assert.Equal(20.5, form.GetDrawings().Single().Program.BoundingBox().Length, 6);
+    });
+
+    [Fact]
+    public void InvalidEntryStaysOpenInRedAndKeepsTheLastShape() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        SelectShape(form, typeof(RectangleShape));
+        var preview = Find<ShapePreviewControl>(form, "previewBox");
+        var length = preview.Plate.Parts.Single().BoundingBox.Length;
+
+        var box = OpenEditor(form, "Length");
+        box.Text = "invalid dimension";
+        Press(box, Keys.Enter);
+        Assert.Same(box, form.ActiveEditor);
+        Assert.Equal(Color.Red, box.ForeColor);
+
+        box.Text = "0";
+        Press(box, Keys.Enter);
+        Assert.Same(box, form.ActiveEditor);
+
+        Press(box, Keys.Escape);
+        Assert.Null(form.ActiveEditor);
+        Assert.Equal(length, preview.Plate.Parts.Single().BoundingBox.Length, 6);
+        Assert.True(Find<Button>(form, "addButton").Enabled);
+    });
+
+    [Fact]
+    public void TabCommitsAndMovesToTheNextDimension() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        SelectShape(form, typeof(RectangleShape));
+        var preview = Find<ShapePreviewControl>(form, "previewBox");
+
+        var box = OpenEditor(form, "Length");
+        box.Text = "15";
+        Press(box, Keys.Tab);
+
+        Assert.Equal("Width", preview.ActiveKey);
+        Assert.Equal(15, preview.Plate.Parts.Single().BoundingBox.Length, 6);
+    });
+
+    [Fact]
+    public void FlangeHoleCountSitsBesideTheHoleDiameter() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        SelectShape(form, typeof(PipeFlangeShape));
+        var preview = Find<ShapePreviewControl>(form, "previewBox");
+
+        var diameter = preview.LabelBounds("HoleDiameter")!.Value;
+        var count = preview.LabelBounds("HoleCount")!.Value;
+        Assert.Equal(diameter.Right, count.Left);
+        Assert.Equal(diameter.Top, count.Top);
+
+        int ArcsWith(int holes)
+        {
+            var box = OpenEditor(form, "HoleCount");
+            box.Text = holes.ToString();
+            Press(box, Keys.Enter);
+            Assert.Null(form.ActiveEditor);
+            return Arcs(preview);
+        }
+        var ten = ArcsWith(10);
+        var perHole = ArcsWith(11) - ten;
+        Assert.True(perHole > 0);
+        Assert.Equal(ten + 2 * perHole, ArcsWith(12));
+    });
+
+    [Fact]
+    public void BlindTogglesOnClickAndDropsTheBore() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        SelectShape(form, typeof(PipeFlangeShape));
+        var preview = Find<ShapePreviewControl>(form, "previewBox");
+        Assert.Contains("Blind", preview.LabelKeys);
+        var arcs = Arcs(preview);
+
+        form.EditParameter("Blind");
+
+        Assert.Null(form.ActiveEditor);
+        Assert.True(Arcs(preview) < arcs);
     });
 
     [Fact]
@@ -125,6 +208,19 @@ public class ShapeLibraryFormTests
 
     private static T Find<T>(Control form, string name) where T : Control =>
         Assert.IsType<T>(form.Controls.Find(name, true).Single());
+
+    private static int Arcs(ShapePreviewControl preview) =>
+        preview.Plate.Parts.Single().Program.Codes.OfType<OpenNest.CNC.ArcMove>().Count();
+
+    private static TextBox OpenEditor(ShapeLibraryForm form, string key)
+    {
+        form.EditParameter(key);
+        return Assert.IsAssignableFrom<TextBox>(form.ActiveEditor);
+    }
+
+    private static void Press(Control control, Keys key) => typeof(Control)
+        .GetMethod("OnKeyDown", BindingFlags.Instance | BindingFlags.NonPublic)!
+        .Invoke(control, new object[] { new KeyEventArgs(key) });
 
     private static void InvokeAdd(ShapeLibraryForm form) => typeof(ShapeLibraryForm)
         .GetMethod("AddButton_Click", BindingFlags.Instance | BindingFlags.NonPublic)!

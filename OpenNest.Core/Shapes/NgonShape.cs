@@ -16,6 +16,13 @@ namespace OpenNest.Shapes
             Width = 8;
         }
 
+        public override IReadOnlyList<ShapeDimension> GetDimensions() =>
+            new[]
+            {
+                // Across the flats: the flat at angle 0 and the one opposite it.
+                ShapeDimension.Linear(nameof(Width), new Vector(0, Width / 2.0), new Vector(Width, Width / 2.0), ShapeDimension.Down),
+            };
+
         public override Drawing GetDrawing()
         {
             var n = Sides < 3 ? 3 : Sides;

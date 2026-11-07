@@ -16,6 +16,13 @@ namespace OpenNest.Shapes
             Height = 6;
         }
 
+        public override IReadOnlyList<ShapeDimension> GetDimensions() =>
+            new[]
+            {
+                ShapeDimension.Linear(nameof(Width), new Vector(0, 0), new Vector(Width, 0), ShapeDimension.Down),
+                ShapeDimension.Linear(nameof(Height), new Vector(0, 0), new Vector(0, Height), ShapeDimension.Left),
+            };
+
         public override Drawing GetDrawing()
         {
             var entities = new List<Entity>

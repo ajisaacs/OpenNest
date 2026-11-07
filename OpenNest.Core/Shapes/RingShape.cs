@@ -16,6 +16,14 @@ namespace OpenNest.Shapes
             InnerDiameter = 6;
         }
 
+        public override IReadOnlyList<ShapeDimension> GetDimensions() =>
+            new[]
+            {
+                ShapeDimension.Linear(nameof(OuterDiameter), new Vector(-OuterDiameter / 2, 0), new Vector(OuterDiameter / 2, 0),
+                    ShapeDimension.Up, "Ø"),
+                ShapeDimension.Inline(nameof(InnerDiameter), new Vector(-InnerDiameter / 2, 0), new Vector(InnerDiameter / 2, 0), "Ø"),
+            };
+
         public override Drawing GetDrawing()
         {
             var entities = new List<Entity>

@@ -34,7 +34,6 @@ namespace OpenNest.Forms
             configComboBox = new System.Windows.Forms.ComboBox();
             contentPanel = new System.Windows.Forms.Panel();
             previewBox = new OpenNest.Controls.ShapePreviewControl();
-            parametersPanel = new System.Windows.Forms.Panel();
             buttonPanel = new System.Windows.Forms.Panel();
             addButton = new System.Windows.Forms.Button();
             closeButton = new System.Windows.Forms.Button();
@@ -189,7 +188,6 @@ namespace OpenNest.Forms
             // contentPanel
             // 
             contentPanel.Controls.Add(previewBox);
-            contentPanel.Controls.Add(parametersPanel);
             contentPanel.Dock = System.Windows.Forms.DockStyle.Fill;
             contentPanel.Location = new System.Drawing.Point(9, 110);
             contentPanel.Name = "contentPanel";
@@ -240,20 +238,10 @@ namespace OpenNest.Forms
             previewBox.Plate = plate1;
             previewBox.RotateIncrementAngle = 10D;
             previewBox.ShowBendLines = false;
-            previewBox.Size = new System.Drawing.Size(318, 363);
+            previewBox.Size = new System.Drawing.Size(578, 363);
             previewBox.Status = "Select";
             previewBox.TabIndex = 4;
             previewBox.TabStop = false;
-            // 
-            // parametersPanel
-            // 
-            parametersPanel.AutoScroll = true;
-            parametersPanel.Dock = System.Windows.Forms.DockStyle.Right;
-            parametersPanel.Location = new System.Drawing.Point(318, 0);
-            parametersPanel.Name = "parametersPanel";
-            parametersPanel.Padding = new System.Windows.Forms.Padding(8, 0, 0, 0);
-            parametersPanel.Size = new System.Drawing.Size(260, 363);
-            parametersPanel.TabIndex = 5;
             // 
             // buttonPanel
             // 
@@ -328,7 +316,6 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ComboBox configComboBox;
         private System.Windows.Forms.Panel contentPanel;
         private Controls.ShapePreviewControl previewBox;
-        private System.Windows.Forms.Panel parametersPanel;
         private System.Windows.Forms.Panel buttonPanel;
         private System.Windows.Forms.Button addButton;
         private System.Windows.Forms.Button closeButton;

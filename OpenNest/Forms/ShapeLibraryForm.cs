@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -9,6 +10,8 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using OpenNest.Controls;
+using OpenNest.Math;
 using OpenNest.Shapes;
 
 namespace OpenNest.Forms
@@ -37,11 +40,13 @@ namespace OpenNest.Forms
 
         private readonly List<Drawing> addedDrawings = new List<Drawing>();
         private readonly List<ShapeEntry> shapeEntries = new List<ShapeEntry>();
-        private readonly List<ParameterBinding> parameterBindings = new List<ParameterBinding>();
+        private readonly List<PropertyInfo> parameters = new List<PropertyInfo>();
+        private readonly Dictionary<string, object> values = new Dictionary<string, object>();
         private readonly HashSet<string> existingNames;
 
         private ShapeEntry selectedEntry;
         private bool suppressPreview;
+        private Control editor;
 
         public ShapeLibraryForm(IEnumerable<string> existingDrawingNames = null)
         {
@@ -61,6 +66,7 @@ namespace OpenNest.Forms
 
             shapeListView.SelectedIndexChanged += ShapeListView_SelectedIndexChanged;
             configComboBox.SelectedIndexChanged += ConfigComboBox_SelectedIndexChanged;
+            previewBox.LabelClicked += PreviewBox_LabelClicked;
             addButton.Click += AddButton_Click;
             closeButton.Click += (s, e) => Close();
 
@@ -207,6 +213,7 @@ namespace OpenNest.Forms
 
         private void ShowShape(ShapeEntry entry)
         {
+            CloseEditor();
             selectedEntry = entry;
             suppressPreview = true;
 
@@ -227,7 +234,7 @@ namespace OpenNest.Forms
                 nameTextBox.Text = selectedEntry.DisplayName;
                 var defaults = (ShapeDefinition)Activator.CreateInstance(selectedEntry.ShapeType);
                 defaults.SetPreviewDefaults();
-                BuildParameterControls(selectedEntry.ShapeType, defaults);
+                LoadParameters(selectedEntry.ShapeType, defaults);
             }
 
             suppressPreview = false;
@@ -243,143 +250,78 @@ namespace OpenNest.Forms
             nameTextBox.Text = config.Name;
 
             suppressPreview = true;
-            BuildParameterControls(selectedEntry.ShapeType, config);
+            LoadParameters(selectedEntry.ShapeType, config);
             suppressPreview = false;
             UpdatePreview();
         }
 
-        private void BuildParameterControls(Type shapeType, ShapeDefinition sourceValues)
+        private void LoadParameters(Type shapeType, ShapeDefinition sourceValues)
         {
-            parametersPanel.SuspendLayout();
-            parametersPanel.Controls.Clear();
-            parameterBindings.Clear();
+            CloseEditor();
+            parameters.Clear();
+            values.Clear();
 
-            var props = shapeType
-                .GetProperties(
-                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly
-                )
-                .Where(p => p.CanRead && p.CanWrite && p.Name != "Name")
-                .ToArray();
+            parameters.AddRange(shapeType
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                .Where(p => p.CanRead && p.CanWrite && p.Name != "Name"));
 
-            var panelWidth = parametersPanel.ClientSize.Width - parametersPanel.Padding.Horizontal;
-            var y = 4;
-
-            foreach (var prop in props)
-            {
-                var label = new Label
-                {
-                    Text = FriendlyName(prop.Name),
-                    Location = new Point(parametersPanel.Padding.Left, y),
-                    AutoSize = true,
-                };
-
-                y += 18;
-
-                Control editor;
-                if (prop.PropertyType == typeof(bool))
-                {
-                    var cb = new CheckBox
-                    {
-                        Location = new Point(parametersPanel.Padding.Left, y),
-                        AutoSize = true,
-                        Checked = sourceValues != null && (bool)prop.GetValue(sourceValues),
-                    };
-                    cb.CheckedChanged += (s, ev) => UpdatePreview();
-                    editor = cb;
-                }
-                else if (prop.PropertyType == typeof(string) && prop.Name == "PipeSize")
-                {
-                    var combo = new ComboBox
-                    {
-                        Location = new Point(parametersPanel.Padding.Left, y),
-                        Width = panelWidth,
-                        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-                        DropDownStyle = ComboBoxStyle.DropDownList,
-                    };
-
-                    // Initial population: every entry; the filter runs on first UpdatePreview.
-                    foreach (var entry in PipeSizes.All)
-                        combo.Items.Add(entry.Label);
-
-                    var initial = sourceValues != null ? (string)prop.GetValue(sourceValues) : null;
-                    if (!string.IsNullOrEmpty(initial) && combo.Items.Contains(initial))
-                        combo.SelectedItem = initial;
-                    else if (combo.Items.Count > 0)
-                        combo.SelectedIndex = 0;
-
-                    combo.SelectedIndexChanged += (s, ev) => UpdatePreview();
-                    editor = combo;
-                }
-                else
-                {
-                    var tb = new TextBox
-                    {
-                        Location = new Point(parametersPanel.Padding.Left, y),
-                        Width = panelWidth,
-                        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-                    };
-
-                    if (sourceValues != null)
-                    {
-                        if (prop.PropertyType == typeof(int))
-                            tb.Text = ((int)prop.GetValue(sourceValues)).ToString();
-                        else
-                            tb.Text = ((double)prop.GetValue(sourceValues)).ToString("G");
-                    }
-
-                    tb.TextChanged += (s, ev) => UpdatePreview();
-                    editor = tb;
-                }
-
-                parameterBindings.Add(new ParameterBinding { Property = prop, Control = editor });
-
-                parametersPanel.Controls.Add(label);
-                parametersPanel.Controls.Add(editor);
-
-                y += 30;
-            }
-
-            parametersPanel.ResumeLayout(true);
+            foreach (var prop in parameters)
+                values[prop.Name] = sourceValues != null ? prop.GetValue(sourceValues) : DefaultOf(prop.PropertyType);
         }
 
-        private void UpdatePreview()
+        private static object DefaultOf(Type type) => type.IsValueType ? Activator.CreateInstance(type) : null;
+
+        private PropertyInfo Parameter(string name) => parameters.FirstOrDefault(p => p.Name == name);
+
+        private void UpdatePreview(string error = null)
         {
             if (suppressPreview || selectedEntry == null)
                 return;
 
-            UpdatePipeSizeFilter();
+            UpdatePipeSize();
 
             try
             {
                 var shape = CreateShapeFromInputs();
-                if (shape == null)
+                var drawing = shape.GetDrawing();
+                if (drawing?.Program == null)
                 {
                     InvalidatePreview();
                     return;
                 }
 
-                var drawing = shape.GetDrawing();
-                addButton.Enabled = drawing?.Program != null;
+                addButton.Enabled = true;
                 nameTextBox.Text = shape.GenerateName();
                 previewBox.ShowDrawing(drawing);
 
-                if (drawing?.Program != null)
+                var dimensions = shape.GetDimensions()
+                    .Where(d => Parameter(d.Property) != null)
+                    .ToList();
+                var placed = dimensions.Select(d => d.Property)
+                    .Concat(dimensions.Select(d => d.CountProperty).Where(p => p != null))
+                    .ToHashSet();
+                previewBox.SetAnnotations(
+                    dimensions.Select(d => new ShapePreviewControl.Annotation(d,
+                        d.Prefix + FormatLength((double)values[d.Property]),
+                        d.CountProperty != null && values.TryGetValue(d.CountProperty, out var count)
+                            ? $"x {count} {d.CountNoun}"
+                            : null)).ToList(),
+                    parameters.Where(p => !placed.Contains(p.Name)).Select(NoteFor).ToList());
+
+                var bb = drawing.Program.BoundingBox();
+                var info = string.Format("{0:F3} x {1:F3}", bb.Size.Length, bb.Size.Width);
+
+                if (
+                    shape is PipeFlangeShape flange
+                    && !flange.Blind
+                    && !string.IsNullOrEmpty(flange.PipeSize)
+                    && !PipeSizes.TryGetOD(flange.PipeSize, out _)
+                )
                 {
-                    var bb = drawing.Program.BoundingBox();
-                    var info = string.Format("{0:F3} x {1:F3}", bb.Size.Length, bb.Size.Width);
-
-                    if (
-                        shape is PipeFlangeShape flange
-                        && !flange.Blind
-                        && !string.IsNullOrEmpty(flange.PipeSize)
-                        && !PipeSizes.TryGetOD(flange.PipeSize, out _)
-                    )
-                    {
-                        info += "  — Invalid pipe size, no bore cut";
-                    }
-
-                    previewBox.SetInfo(nameTextBox.Text, info);
+                    info += "  — Invalid pipe size, no bore cut";
                 }
+
+                previewBox.SetInfo(nameTextBox.Text, info, error);
             }
             catch
             {
@@ -387,140 +329,277 @@ namespace OpenNest.Forms
             }
         }
 
+        /// <summary>
+        /// No drawing to dimension: every parameter becomes a note so the input can still be
+        /// corrected.
+        /// </summary>
         private void InvalidatePreview()
         {
             addButton.Enabled = false;
             previewBox.ShowDrawing(null);
+            previewBox.SetAnnotations(null, parameters.Select(NoteFor).ToList());
             previewBox.SetInfo("Invalid shape input");
         }
 
-        private void UpdatePipeSizeFilter()
+        private ShapePreviewControl.Note NoteFor(PropertyInfo prop)
         {
-            // Find the PipeSize combo and the numeric inputs it depends on.
-            ComboBox pipeCombo = null;
-            double holePattern = 0,
-                holeDia = 0,
-                clearance = 0;
-            bool blind = false;
-
-            foreach (var binding in parameterBindings)
+            var value = values[prop.Name];
+            var text = value switch
             {
-                var name = binding.Property.Name;
-                if (name == "PipeSize" && binding.Control is ComboBox cb)
-                    pipeCombo = cb;
-                else if (name == "HolePatternDiameter" && binding.Control is TextBox tb1)
-                    double.TryParse(tb1.Text, out holePattern);
-                else if (name == "HoleDiameter" && binding.Control is TextBox tb2)
-                    double.TryParse(tb2.Text, out holeDia);
-                else if (name == "PipeClearance" && binding.Control is TextBox tb3)
-                    double.TryParse(tb3.Text, out clearance);
-                else if (name == "Blind" && binding.Control is CheckBox chk)
-                    blind = chk.Checked;
-            }
-
-            if (pipeCombo == null)
-                return;
-
-            // Disable when blind, but keep visible with the selection preserved.
-            pipeCombo.Enabled = !blind;
-
-            // Compute filter: pipeOD + clearance < HolePatternDiameter - HoleDiameter.
-            var maxPipeOD = holePattern - holeDia - clearance;
-            var fittingLabels = PipeSizes.GetFittingSizes(maxPipeOD).Select(e => e.Label).ToList();
-
-            // Sequence-equal on existing items — no-op if unchanged (avoids flicker).
-            var currentLabels = pipeCombo.Items.Cast<string>().ToList();
-            if (currentLabels.SequenceEqual(fittingLabels))
-                return;
-
-            var previousSelection = pipeCombo.SelectedItem as string;
-
-            pipeCombo.BeginUpdate();
-            try
-            {
-                pipeCombo.Items.Clear();
-                foreach (var label in fittingLabels)
-                    pipeCombo.Items.Add(label);
-
-                if (fittingLabels.Count == 0)
-                {
-                    // No pipe fits — leave unselected.
-                }
-                else if (previousSelection != null && fittingLabels.Contains(previousSelection))
-                {
-                    pipeCombo.SelectedItem = previousSelection;
-                }
-                else
-                {
-                    // Select the largest (last, since PipeSizes.All is sorted ascending).
-                    pipeCombo.SelectedIndex = fittingLabels.Count - 1;
-                }
-            }
-            finally
-            {
-                pipeCombo.EndUpdate();
-            }
+                bool b => b ? "Yes" : "No",
+                double d => FormatLength(d),
+                null => "None",
+                _ => value.ToString(),
+            };
+            var enabled = prop.Name != nameof(PipeFlangeShape.PipeSize) || !Equals(values.GetValueOrDefault(nameof(PipeFlangeShape.Blind)), true);
+            return new ShapePreviewControl.Note(prop.Name, $"{FriendlyName(prop.Name)}: {text}", enabled);
         }
 
-        private ShapeDefinition CreateShapeFromInputs()
+        internal static string FormatLength(double inches) => Fraction.Format(inches) + "\"";
+
+        /// <summary>The pipe sizes that fit inside the bolt holes: pipe OD + clearance &lt; pattern - hole.</summary>
+        private List<string> FittingPipeSizes()
         {
+            double Length(string name) => values.TryGetValue(name, out var v) && v is double d ? d : 0;
+            var maxPipeOD = Length(nameof(PipeFlangeShape.HolePatternDiameter))
+                - Length(nameof(PipeFlangeShape.HoleDiameter))
+                - Length(nameof(PipeFlangeShape.PipeClearance));
+            return PipeSizes.GetFittingSizes(maxPipeOD).Select(e => e.Label).ToList();
+        }
+
+        /// <summary>Keeps the pipe size one that fits, else the largest that does (none when none fits).</summary>
+        private void UpdatePipeSize()
+        {
+            const string key = nameof(PipeFlangeShape.PipeSize);
+            if (Parameter(key)?.PropertyType != typeof(string))
+                return;
+
+            var fitting = FittingPipeSizes();
+            if (values[key] is string current && fitting.Contains(current))
+                return;
+            values[key] = fitting.Count > 0 ? fitting[^1] : null;
+        }
+
+        private ShapeDefinition CreateShapeFromInputs(IReadOnlyDictionary<string, object> source = null)
+        {
+            source ??= values;
             var shape = (ShapeDefinition)Activator.CreateInstance(selectedEntry.ShapeType);
             shape.Name = nameTextBox.Text;
+            foreach (var prop in parameters)
+                prop.SetValue(shape, source[prop.Name]);
+            return shape;
+        }
 
-            foreach (var binding in parameterBindings)
+        #region On-drawing editors
+
+        private void PreviewBox_LabelClicked(object sender, string key) => EditParameter(key);
+
+        /// <summary>
+        /// Opens the editor for a parameter over its label: a text box for a number, a list for
+        /// the pipe size; a yes/no parameter toggles at once.
+        /// </summary>
+        internal void EditParameter(string key)
+        {
+            var prop = Parameter(key);
+            if (prop == null)
+                return;
+
+            CloseEditor();
+            if (prop.PropertyType == typeof(bool))
             {
-                if (binding.Property.PropertyType == typeof(bool))
-                {
-                    var cb = (CheckBox)binding.Control;
-                    binding.Property.SetValue(shape, cb.Checked);
-                    continue;
-                }
+                values[key] = !(bool)values[key];
+                UpdatePreview();
+                return;
+            }
 
-                if (binding.Control is ComboBox combo)
-                {
-                    binding.Property.SetValue(shape, combo.SelectedItem?.ToString());
-                    continue;
-                }
+            var bounds = previewBox.LabelBounds(key);
+            if (bounds == null)
+                return;
 
-                var tb = (TextBox)binding.Control;
+            if (prop.PropertyType == typeof(string))
+                OpenListEditor(key, bounds.Value);
+            else
+                OpenTextEditor(key, bounds.Value);
+        }
 
-                if (binding.Property.PropertyType == typeof(int))
-                {
-                    if (int.TryParse(tb.Text, out var intVal))
-                    {
-                        binding.Property.SetValue(shape, intVal);
-                        tb.ForeColor = SystemColors.WindowText;
-                    }
-                    else
-                    {
-                        tb.ForeColor = Color.Red;
-                        return null;
-                    }
-                }
-                else
-                {
-                    var val = ArchUnits.GetLengthInches(tb);
-                    if (double.IsNaN(val))
-                        return null;
+        internal Control ActiveEditor => editor;
 
-                    binding.Property.SetValue(shape, val);
+        private void OpenTextEditor(string key, Rectangle bounds)
+        {
+            var value = values[key];
+            var box = new DimensionBox
+            {
+                Font = previewBox.Font,
+                Text = value is double d ? Fraction.Format(d) : Convert.ToString(value, CultureInfo.CurrentCulture),
+                Location = bounds.Location,
+                Width = System.Math.Max(bounds.Width + 24, 80),
+            };
+            box.Commit += (_, _) => TryCommit(key, box.Text);
+            box.Cancel += (_, _) => CloseEditor();
+            box.Advance += (_, back) =>
+            {
+                if (TryCommit(key, box.Text))
+                    EditNext(key, back);
+            };
+            box.LostFocus += (_, _) =>
+            {
+                // Clicking away keeps a valid entry and drops an invalid one.
+                if (editor == box && !TryCommit(key, box.Text))
+                    CloseEditor();
+            };
+            Show(key, box);
+            box.SelectAll();
+        }
+
+        private void OpenListEditor(string key, Rectangle bounds)
+        {
+            var combo = new ComboBox
+            {
+                Font = previewBox.Font,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Location = bounds.Location,
+                Width = System.Math.Max(bounds.Width + 40, 110),
+            };
+            foreach (var label in FittingPipeSizes())
+                combo.Items.Add(label);
+            if (values[key] is string current && combo.Items.Contains(current))
+                combo.SelectedItem = current;
+
+            combo.SelectionChangeCommitted += (_, _) =>
+            {
+                values[key] = combo.SelectedItem as string;
+                CloseEditor();
+                UpdatePreview();
+            };
+            combo.DropDownClosed += (_, _) => BeginInvoke(() =>
+            {
+                if (editor == combo)
+                    CloseEditor();
+            });
+            combo.LostFocus += (_, _) =>
+            {
+                if (editor == combo && !combo.DroppedDown)
+                    CloseEditor();
+            };
+            Show(key, combo);
+            combo.DroppedDown = combo.Items.Count > 0;
+        }
+
+        private void Show(string key, Control control)
+        {
+            editor = control;
+            previewBox.Controls.Add(control);
+            previewBox.ActiveKey = key;
+            control.Focus();
+        }
+
+        private void CloseEditor()
+        {
+            var control = editor;
+            if (control == null)
+                return;
+            editor = null; // first: removing the control raises LostFocus again
+            previewBox.ActiveKey = null;
+            previewBox.Controls.Remove(control);
+            control.Dispose();
+        }
+
+        /// <summary>Tab moves to the next number on the drawing, Shift+Tab to the previous.</summary>
+        private void EditNext(string key, bool back)
+        {
+            var keys = previewBox.LabelKeys
+                .Where(k => Parameter(k) is { } p && (p.PropertyType == typeof(double) || p.PropertyType == typeof(int)))
+                .ToList();
+            if (keys.Count == 0)
+                return;
+            var index = keys.IndexOf(key);
+            var next = index < 0 ? 0 : (index + (back ? keys.Count - 1 : 1)) % keys.Count;
+            EditParameter(keys[next]);
+        }
+
+        /// <summary>
+        /// Applies the typed text to <paramref name="key"/> when it is a valid value that still
+        /// makes a shape; otherwise leaves the editor open with the text in red.
+        /// </summary>
+        private bool TryCommit(string key, string text)
+        {
+            var prop = Parameter(key);
+            var error = ParseValue(prop, text, out var value);
+            if (error == null)
+            {
+                var candidate = new Dictionary<string, object>(values) { [key] = value };
+                error = ShapeError(candidate);
+                if (error == null)
+                {
+                    values[key] = value;
+                    CloseEditor();
+                    UpdatePreview();
+                    return true;
                 }
             }
 
-            return shape;
+            if (editor != null)
+                editor.ForeColor = Color.Red;
+            UpdatePreviewInfoError(error);
+            return false;
         }
+
+        private void UpdatePreviewInfoError(string error) =>
+            previewBox.SetInfo(nameTextBox.Text, error);
+
+        private static string ParseValue(PropertyInfo prop, string text, out object value)
+        {
+            value = null;
+            if (prop.PropertyType == typeof(int))
+            {
+                if (!int.TryParse(text?.Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, out var count))
+                    return $"'{text}' is not a whole number.";
+                if (count < 0)
+                    return "The value cannot be negative.";
+                value = count;
+                return null;
+            }
+
+            double length;
+            try
+            {
+                length = double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out var plain)
+                    ? plain
+                    : ArchUnits.ParseToInches(text);
+            }
+            catch (FormatException)
+            {
+                return $"'{text}' is not a length.";
+            }
+            if (!double.IsFinite(length))
+                return $"'{text}' is not a length.";
+            if (length < 0)
+                return "The value cannot be negative.";
+            value = length;
+            return null;
+        }
+
+        private string ShapeError(IReadOnlyDictionary<string, object> candidate)
+        {
+            try
+            {
+                var program = CreateShapeFromInputs(candidate).GetDrawing()?.Program;
+                var box = program?.BoundingBox();
+                return box != null && box.Length > 0 && box.Width > 0 ? null : "That value does not make a shape.";
+            }
+            catch
+            {
+                return "That value does not make a shape.";
+            }
+        }
+
+        #endregion
 
         private void AddButton_Click(object sender, EventArgs e)
         {
             try
             {
                 var shape = CreateShapeFromInputs();
-                if (shape == null)
-                {
-                    InvalidatePreview();
-                    return;
-                }
-
                 var drawing = shape.GetDrawing();
                 drawing.Name = GetUniqueName(drawing.Name);
                 drawing.Color = Drawing.GetNextColor();
@@ -588,12 +667,6 @@ namespace OpenNest.Forms
             public bool HasConfigurations => Configurations != null && Configurations.Count > 0;
 
             public override string ToString() => DisplayName;
-        }
-
-        private class ParameterBinding
-        {
-            public PropertyInfo Property { get; set; }
-            public Control Control { get; set; }
         }
     }
 }

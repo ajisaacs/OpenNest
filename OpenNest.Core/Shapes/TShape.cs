@@ -20,11 +20,28 @@ namespace OpenNest.Shapes
             BarHeight = 3;
         }
 
+        private double EffectiveStemWidth => StemWidth > 0 ? StemWidth : Width / 3.0;
+
+        private double EffectiveBarHeight => BarHeight > 0 ? BarHeight : Height / 3.0;
+
+        private double StemLeft => (Width - EffectiveStemWidth) / 2.0;
+
+        public override IReadOnlyList<ShapeDimension> GetDimensions() =>
+            new[]
+            {
+                ShapeDimension.Linear(nameof(Width), new Vector(0, Height), new Vector(Width, Height), ShapeDimension.Up),
+                ShapeDimension.Linear(nameof(Height), new Vector(StemLeft, 0), new Vector(0, Height), ShapeDimension.Left),
+                ShapeDimension.Linear(nameof(StemWidth), new Vector(StemLeft, 0), new Vector(StemLeft + EffectiveStemWidth, 0),
+                    ShapeDimension.Down),
+                ShapeDimension.Linear(nameof(BarHeight), new Vector(Width, Height - EffectiveBarHeight), new Vector(Width, Height),
+                    ShapeDimension.Right),
+            };
+
         public override Drawing GetDrawing()
         {
-            var sw = StemWidth > 0 ? StemWidth : Width / 3.0;
-            var bh = BarHeight > 0 ? BarHeight : Height / 3.0;
-            var stemLeft = (Width - sw) / 2.0;
+            var sw = EffectiveStemWidth;
+            var bh = EffectiveBarHeight;
+            var stemLeft = StemLeft;
             var stemRight = stemLeft + sw;
             var stemTop = Height - bh;
 

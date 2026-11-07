@@ -16,6 +16,13 @@ namespace OpenNest.Shapes
             Height = 10;
         }
 
+        public override IReadOnlyList<ShapeDimension> GetDimensions() =>
+            new[]
+            {
+                ShapeDimension.Linear(nameof(Base), new Vector(0, 0), new Vector(Base, 0), ShapeDimension.Down),
+                ShapeDimension.Linear(nameof(Height), new Vector(Base, 0), new Vector(Base / 2.0, Height), ShapeDimension.Right),
+            };
+
         public override Drawing GetDrawing()
         {
             var midX = Base / 2.0;

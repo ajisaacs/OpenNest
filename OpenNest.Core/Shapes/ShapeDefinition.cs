@@ -36,6 +36,12 @@ namespace OpenNest.Shapes
 
         public virtual void SetPreviewDefaults() { }
 
+        /// <summary>
+        /// Where the Shape Library draws each parameter's dimension, in the coordinates of the
+        /// entities <see cref="GetDrawing"/> builds. Parameters without one are shown as notes.
+        /// </summary>
+        public virtual IReadOnlyList<ShapeDimension> GetDimensions() => Array.Empty<ShapeDimension>();
+
         public static List<T> LoadFromJson<T>(string path)
             where T : ShapeDefinition
         {

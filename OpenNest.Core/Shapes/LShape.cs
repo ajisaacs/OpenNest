@@ -20,10 +20,23 @@ namespace OpenNest.Shapes
             LegHeight = 3;
         }
 
+        private double EffectiveLegWidth => LegWidth > 0 ? LegWidth : Width / 2.0;
+
+        private double EffectiveLegHeight => LegHeight > 0 ? LegHeight : Height / 2.0;
+
+        public override IReadOnlyList<ShapeDimension> GetDimensions() =>
+            new[]
+            {
+                ShapeDimension.Linear(nameof(Width), new Vector(0, 0), new Vector(Width, 0), ShapeDimension.Down),
+                ShapeDimension.Linear(nameof(Height), new Vector(0, 0), new Vector(0, Height), ShapeDimension.Left),
+                ShapeDimension.Linear(nameof(LegWidth), new Vector(0, Height), new Vector(EffectiveLegWidth, Height), ShapeDimension.Up),
+                ShapeDimension.Linear(nameof(LegHeight), new Vector(Width, 0), new Vector(Width, EffectiveLegHeight), ShapeDimension.Right),
+            };
+
         public override Drawing GetDrawing()
         {
-            var lw = LegWidth > 0 ? LegWidth : Width / 2.0;
-            var lh = LegHeight > 0 ? LegHeight : Height / 2.0;
+            var lw = EffectiveLegWidth;
+            var lh = EffectiveLegHeight;
 
             var entities = new List<Entity>
             {

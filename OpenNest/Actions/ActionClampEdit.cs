@@ -541,26 +541,6 @@ namespace OpenNest.Actions
                 || double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
         }
 
-        /// <summary>A text box that commits on Enter instead of letting the form handle it.</summary>
-        private sealed class DimensionBox : TextBox
-        {
-            public event EventHandler Commit;
-
-            protected override bool IsInputKey(Keys keyData) =>
-                keyData == Keys.Enter || base.IsInputKey(keyData);
-
-            protected override void OnKeyDown(KeyEventArgs e)
-            {
-                if (e.KeyCode == Keys.Enter)
-                {
-                    e.SuppressKeyPress = true;
-                    Commit?.Invoke(this, EventArgs.Empty);
-                    return;
-                }
-                base.OnKeyDown(e);
-            }
-        }
-
         #endregion
 
         #region Painting
