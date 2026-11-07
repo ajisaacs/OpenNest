@@ -201,7 +201,8 @@ namespace OpenNest.Forms
             }
 
             // A window of its own, beside the main window rather than in it: the main window's
-            // menus and toolbar edit nests. It is not owned, so either can be in front.
+            // menus and toolbar edit nests. It is modeless but owned by the main window, so it
+            // stays in front of it; it keeps its taskbar button to minimize while nesting runs.
             var form = new DrawingSetsForm(sets, library, NestStorage.Settings.ServerUrl)
             {
                 Icon = Icon,
@@ -229,7 +230,7 @@ namespace OpenNest.Forms
                     drawingSetsForm = null;
             };
             drawingSetsForm = form;
-            form.Show();
+            form.Show(this);
         }
 
         private async void Save_Click(object sender, EventArgs e)
