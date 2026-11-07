@@ -56,6 +56,12 @@ public sealed class IrregularNestingEngine : INestingEngine
     /// <summary>Whether the grouped variants run; off only in tests of the ungrouped search.</summary>
     internal bool GroupLikeParts { get; init; } = true;
 
+    /// <summary>Whether the sheet-reduction pass runs; off only in tests of the search before it.</summary>
+    internal bool ReduceSheets { get; init; } = true;
+
+    /// <summary>Most parts a plan may hold for the sheet-reduction pass to try it.</summary>
+    internal const int MaxReduceParts = 40;
+
     /// <summary>
     /// Deterministic work budget, in free-region subtractions, after which no further variant
     /// starts. Keeps big jobs well inside benchmark timeouts without consulting a clock.
@@ -145,6 +151,17 @@ public sealed class IrregularNestingEngine : INestingEngine
                 if (!ReferenceEquals(improved, plan))
                     ReportPlan(job, types, improved, progress, token);
             }
+        // Then try to drop a sheet: split the parts over one sheet fewer and pack each sheet edge
+        // first, the key part turned by its contacts. Replaces the result only by beating it.
+        if (ReduceSheets)
+        {
+            var reduced = solver.ReduceSheets(improved);
+            if (!ReferenceEquals(reduced, improved))
+            {
+                improved = reduced;
+                ReportPlan(job, types, improved, progress, token);
+            }
+        }
         // More searching can only end in cancellation, so it needs a listener for its plans, and
         // it needs demand and two or more types, or every weighted decode repeats a variant.
         if (job.Options.SearchUntilCancelled && token.CanBeCanceled && progress != null
@@ -220,6 +237,16 @@ public sealed class IrregularNestingEngine : INestingEngine
             unplaced == 0 ? NestJobStopReason.Completed : NestJobStopReason.NoPlacementFound, NestJobCost.UsesExplicitCosts(job),
             job.Options);
         return BuildResult(job, types, solver.ImproveTail(plan, WorkBudget * 2), null, default);
+    }
+
+    /// <summary>Runs the sheet-reduction pass on a test-owned complete plan.</summary>
+    internal NestJobResult ReduceSheetsForTesting(NestJob job, IReadOnlyList<SheetFill> physicalPlan)
+    {
+        var types = PartCatalog.Build(job);
+        using var solver = new Solver(job, types, null, default, WorkBudget, DrawingFor, SheetPacked, BatchSelected, TailReplaced);
+        var plan = new Plan(physicalPlan, physicalPlan.Sum(s => NetCost(job.Options, s)), 0, NestJobStopReason.Completed,
+            NestJobCost.UsesExplicitCosts(job), job.Options);
+        return BuildResult(job, types, solver.ReduceSheets(plan), null, default);
     }
 
     /// <summary>Decodes one variant with the given type weights, whole demand placeable; for
@@ -351,6 +378,92 @@ public sealed class IrregularNestingEngine : INestingEngine
             }
             return plan;
         }
+
+        /// <summary>
+        /// Drops sheets while it can: the parts of a complete plan on one stock are split over
+        /// one sheet fewer (by area, largest first onto the lightest sheet, then dealt in a snake)
+        /// and each sheet packed by <see cref="EdgeFirstFill"/>. A split that packs every sheet
+        /// replaces the plan when it beats it.
+        /// </summary>
+        public Plan ReduceSheets(Plan plan)
+        {
+            while (plan.Unplaced == 0 && plan.Sheets.Count >= 2)
+            {
+                token.ThrowIfCancellationRequested();
+                var stock = plan.Sheets[0].Stock;
+                if (stock.Outline != null || plan.Sheets.Any(s => !ReferenceEquals(s.Stock, stock)))
+                    break;
+                var instances = plan.Sheets.SelectMany(s => s.Parts).Select(p => p.Orientation.TypeIndex)
+                    .OrderByDescending(t => types[t].Area).ThenBy(t => t).ToList();
+                var target = plan.Sheets.Count - 1;
+                var room = stock.WorkArea.Length * stock.WorkArea.Width;
+                if (instances.Count > MaxReduceParts || instances.Sum(t => types[t].Area) > target * room)
+                    break;
+
+                Plan? found = null;
+                foreach (var bins in Splits(instances, target))
+                {
+                    var sheets = new List<SheetFill>();
+                    foreach (var bin in bins)
+                    {
+                        var fill = new EdgeFirstFill(types, CacheFor(stock), stock, ClampsFor(stock), Work,
+                            () => new FrontierPacker(types, CacheFor(stock), PairsFor(stock), stock, PackAxis.X, 1.0, Work,
+                                null, ClampsFor(stock)),
+                            Orient).Fill(bin, token);
+                        if (fill == null)
+                            break;
+                        sheets.Add(fill);
+                    }
+                    if (sheets.Count < target)
+                        continue;
+                    var candidate = new Plan(sheets, NestJobCost.RequireFinite(sheets.Sum(s => NetCost(job.Options, s))), 0,
+                        NestJobStopReason.Completed, NestJobCost.UsesExplicitCosts(job), job.Options);
+                    if (candidate.IsBetterThan(plan))
+                        found = candidate;
+                    break;
+                }
+                if (found == null)
+                    break;
+                plan = found;
+            }
+            return plan;
+        }
+
+        /// <summary>Per-sheet demands for <paramref name="count"/> sheets: largest part first onto
+        /// the lightest sheet, then the same parts dealt out in a snake.</summary>
+        private IEnumerable<int[][]> Splits(IReadOnlyList<int> instances, int count)
+        {
+            var greedy = Enumerable.Range(0, count).Select(_ => new int[types.Count]).ToArray();
+            var load = new double[count];
+            foreach (var t in instances)
+            {
+                var lightest = 0;
+                for (var i = 1; i < count; i++)
+                    if (load[i] < load[lightest] - 1e-9)
+                        lightest = i;
+                greedy[lightest][t]++;
+                load[lightest] += types[t].Area;
+            }
+            yield return greedy;
+            if (count < 2)
+                yield break;
+            var snake = Enumerable.Range(0, count).Select(_ => new int[types.Count]).ToArray();
+            for (var i = 0; i < instances.Count; i++)
+            {
+                var round = i / count;
+                var slot = i % count;
+                snake[round % 2 == 0 ? slot : count - 1 - slot][instances[i]]++;
+            }
+            if (!snake.Zip(greedy).All(p => p.First.SequenceEqual(p.Second)))
+                yield return snake;
+        }
+
+        /// <summary>Next private orientation index: far above the catalog's, pair and block poses.</summary>
+        private int solvedOrientations = 1_000_000;
+
+        /// <summary>A pose of <paramref name="type"/> at a solved angle, with its own NFP cache key.</summary>
+        private Orientation? Orient(PartType type, double angle) =>
+            PartCatalog.CreateOrientation(type, solvedOrientations++, angle);
 
         private NoFitCache CacheFor(NestPlateStock stock)
         {

@@ -55,6 +55,9 @@ internal sealed class ClampObstacles
 
     public int Count => rectangles.Length;
 
+    /// <summary>The keep-out rectangle, clearance included: a part's outline must stay outside it.</summary>
+    public PathD Outline(int index) => rectangles[index].Outline;
+
     // No additional physical spacing. NoFitCache retains the established arc/grid safety
     // margin and covered-hole certification for the moving orientation and rectangle.
     public Nfp Get(int index, Orientation moving) => nfps.Get(rectangles[index], moving);

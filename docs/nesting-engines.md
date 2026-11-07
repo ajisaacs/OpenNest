@@ -14,7 +14,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 | Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the engine listed first here |
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; stock chosen sheet by sheet by salvage-credited look-ahead cost |
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
-| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan, then grouped variants that pack like parts together; under a time limit it keeps trying seeded variants until the limit |
+| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan, then grouped variants that pack like parts together, then a sheet-reduction pass that packs edge parts first and turns a key part by its contacts; under a time limit it keeps trying seeded variants until the limit |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
 | Lattice, Strip, Vertical Remnant, Horizontal Remnant | Many copies of a few parts | The fixed placement strategies behind interactive fill; Lattice is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder), and the remnant strategies run it ranked to keep the largest drop. In whole jobs, all four place a plate with any fixed or bounded part rotation by the rotation-aware ordered placer instead |
 
@@ -233,6 +233,37 @@ unchanged; a grouped plan replaces the result only by beating it, and then has i
 re-plan. The search until cancelled takes grouped decodes in turn with the variants, with the
 same seeded weights. On the help tutorial's parts (30 gussets, 20 ells, 10 plates, 12 flanges on
 60 x 120 at 0.3 spacing) the layout ends at 34.9 rather than 38.1.
+
+### Sheet reduction
+
+Last, Irregular tries to drop a sheet from a complete plan of at most 40 parts on one rectangular
+stock. It splits the parts over one sheet fewer (by area, largest first onto the lightest sheet,
+then the same parts dealt out in a snake) and packs each sheet edge first (`EdgeFirstFill`); a
+split that packs every sheet replaces the plan when it beats it, and the pass repeats while it
+can. The frontier packer grows a layout from one side, so parts that fit only when the outer ones
+hug opposite edges never meet there.
+
+- Parts under 15% of the largest part's area wait for the gaps. Each large part is tried as the
+  key, largest first (at most four); the others go to the corners, each in one of its two best
+  corner poses, depth first, at most eight arrangements per key. A pose ranks by its gap to the
+  corner, then the length of outline on the sheet edges, then how thin it is across the sheet,
+  then its distance from the parts already placed.
+- Clamps along a side move that side in past their keep-outs, as a larger edge spacing would, so
+  edge parts sit flush with one straight line; a clamp off every side stays an obstacle. The
+  small parts fill around the real clamps.
+- The key takes any sampled orientation that fits. Failing that, `ContactFit` starts it in the
+  largest free pocket and turns it by its contacts: every footprint vertex inside or near a
+  neighbor, every neighbor vertex inside or near it and every outline vertex at the work-area
+  edge is a linear constraint on a small move (dx, dy, rotation), and the least move meeting them
+  all is taken until nothing overlaps. Three contacts then hold the part, so the neighbors set its
+  angle; no angle list is sampled. Rotation-locked parts are never turned.
+- The solver only proposes the angle. Orientations flattened at it, then 0.1 degree steps out to
+  two degrees either side, are checked on the exact free region (no-fit polygons, unchanged
+  spacing) until one fits.
+
+On a job of ten one-off brackets (four 112-inch tapered bars, four gussets, two small plates) on
+60 x 120 with a clamp rail, the bars stacked three to a sheet and the plan took three sheets; the
+pass packs two bars, two gussets and a plate per sheet, the middle bar turned 4.4 degrees, on two.
 
 ## Flat bar
 
