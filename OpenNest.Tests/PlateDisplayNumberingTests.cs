@@ -42,6 +42,8 @@ public class PlateDisplayNumberingTests
         Assert.True(PlateDisplayNumbering.IsTrailingSentinel(nest.Plates, sentinel));
         Assert.Null(PlateDisplayNumbering.DisplayedPlateNumber(nest.Plates, sentinel));
         Assert.Equal("New plate (empty)", PlateDisplayNumbering.FormatHeader(nest.Plates, sentinel, null));
+        Assert.Equal("New plate (empty)  |  60 x 120",
+            PlateDisplayNumbering.FormatHeader(nest.Plates, sentinel, "60 x 120"));
     }
 
     [Fact]

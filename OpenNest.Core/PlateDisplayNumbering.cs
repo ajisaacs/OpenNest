@@ -49,18 +49,19 @@ namespace OpenNest
         }
 
         /// <summary>
-        /// Header text for the plate at <paramref name="storageIndex"/>. A quantity above one is
+        /// Header text for the plate at <paramref name="storageIndex"/>, including the trailing
+        /// new-plate sentinel. The plate size follows when given; a quantity above one is
         /// appended as "×N"; a single sheet shows no quantity.
         /// </summary>
         public static string FormatHeader(IList<Plate> plates, int storageIndex, string plateSizeText, int quantity = 1)
         {
             var displayed = DisplayedPlateNumber(plates, storageIndex);
-            if (displayed == null)
-                return IsTrailingSentinel(plates, storageIndex)
-                    ? "New plate (empty)"
-                    : "No plates";
+            if (displayed == null && !IsTrailingSentinel(plates, storageIndex))
+                return "No plates";
 
-            var text = string.Format("Plate {0} of {1}", displayed.Value, DisplayedPlateCount(plates));
+            var text = displayed == null
+                ? "New plate (empty)"
+                : string.Format("Plate {0} of {1}", displayed.Value, DisplayedPlateCount(plates));
             if (!string.IsNullOrEmpty(plateSizeText))
                 text += "  |  " + plateSizeText;
             if (quantity > 1)

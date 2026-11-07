@@ -34,7 +34,7 @@ public class PlateHeaderNumberingTests
         form.Show();
 
         Assert.True(form.PlateManager.LoadNext()); // onto the sentinel
-        Assert.Equal("New plate (empty)", Header(form));
+        Assert.Equal("New plate (empty)", Header(form).Split("  |  ")[0]);
         Assert.Equal(1, form.PlateManager.CurrentIndex); // navigation itself is unchanged
 
         Assert.True(form.PlateManager.LoadPrevious());
@@ -51,7 +51,7 @@ public class PlateHeaderNumberingTests
         form.Show();
 
         Assert.Single(nest.Plates);
-        Assert.Equal("New plate (empty)", Header(form));
+        Assert.Equal("New plate (empty)", Header(form).Split("  |  ")[0]);
     });
 
     [Fact]
@@ -71,7 +71,7 @@ public class PlateHeaderNumberingTests
         form.PlateManager.LoadAt(2);
         Assert.Equal("Plate 3 of 3", Header(form).Split("  |  ")[0]);
         form.PlateManager.LoadAt(3);
-        Assert.Equal("New plate (empty)", Header(form));
+        Assert.Equal("New plate (empty)", Header(form).Split("  |  ")[0]);
         Assert.Equal(4, nest.Plates.Count);
     });
 
