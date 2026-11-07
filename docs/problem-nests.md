@@ -1,10 +1,11 @@
 # Problem-nest regression corpus
 
-Real nests that once failed to plan are kept on a dedicated OpenNest server that holds nothing
-else, not in this repository: they carry customer geometry and names. Every nest in it guards
-Plan Cutting, so only a change to the cutting planner calls for it: plan the nests that guard the
-areas the change touches and confirm that no plate got worse. Nesting engines, fills, the UI,
-posts and file formats never need it.
+Every real nest that ever caused a problem is kept on a dedicated OpenNest server that holds
+nothing else, not in this repository: they carry customer geometry and names. Each nest's comments
+say what went wrong and which commit fixed it, and its `checks:` line names the areas it guards, so
+a change runs only the nests that guard what it touches: plan or nest them and confirm none got
+worse. Most guard Plan Cutting; `auto-nest` nests guard the nesting engines. Fills, the UI, posts
+and file formats never need the corpus.
 
 ## Areas
 
@@ -21,8 +22,9 @@ nest: a plate tagged with another area can still run out of budget after such a 
 | `geometry-checks` | The checks a route must pass: rapid crossings, lead and material paths, replay, overlaps (`ReleasedContourState`, `LeadPathValidator`, `LeadMaterialSnapshot`, `ContourProgramVerifier`, `PlateOverlapAnalyzer`) |
 | `cut-offs` | Cut-off segments in the plan (`CutOffInsertion`, `CutOffSegments`, `PlateSequencing` cut-off placement, automatic scrap cut-offs) |
 | `grid` | Large plates: the aligned-grid serpentine, or any work done once per part or per pair that would grow on thousands of parts (`CuttingGridOrder`, per-part capture and checks) |
+| `auto-nest` | Auto Nest's layout, not its cutting plan: the whole-job nesting engines (`OpenNest.Engine/NestingEngines/`) and what they share. Guarded by sheet count, not by planning |
 
-A new area goes in `ProblemNestRegressionTests.Areas` and this table together. A misspelt area,
+A new planner area goes in `ProblemNestRegressionTests.PlannerAreas` and this table together. A misspelt area,
 in a comment or the filter, fails the run rather than skipping nests.
 
 ## Running
@@ -53,6 +55,17 @@ Each plate is ranked: `Ready` (replayed with no overlaps) above `BestEffort` abo
 baseline, when a nest has no baseline, or when the baseline's plate numbers differ from the
 nest's. A different outcome at the same or a better rank is only reported. When it is
 intended, update the baseline.
+
+### Auto Nest nests
+
+`ProblemNests_AutoNestNoWorseThanTheirBaselines` takes the nests whose `checks:` line names
+`auto-nest` and runs the Default engine on their demand, the way the benchmark builds a job from a
+saved nest: each drawing's required quantity, the nest's own sheet sizes, and the first plate's
+spacing, quadrant and clamps. It fails when a layout breaks the layout check, leaves parts
+unplaced, times out, or uses more sheets than the nest's `auto-nest: 2 sheets` comment line;
+fewer sheets are only reported. Run it with `OPENNEST_PROBLEM_NESTS_CHECKS=auto-nest`; a filter
+naming only planner areas skips it, and the planning test skips nests guarding only `auto-nest`
+and runs not at all for a filter naming only `auto-nest`.
 
 ## Budget headroom
 
@@ -86,7 +99,8 @@ Plates use their own cutting parameters. A plate without them uses line lead-ins
 2. In **Nest > Edit**, name it after the problem, and in the comments describe what failed
    and which commit fixed it, if any.
 3. Add a baseline line to the comments, with plate numbers counted from the first plate:
-   `planning: 1=NoSolutionWithinBudget 2=BestEffort`.
+   `planning: 1=NoSolutionWithinBudget 2=BestEffort`. An Auto Nest problem takes
+   `auto-nest: 2 sheets` instead, the sheet count Auto Nest reaches today.
    To get the line, save without one and run the test: the failure prints the observed line.
    Add a `checks:` line naming the [areas](#areas) the problem was in, such as `checks: part-order`.
 4. Save. Every save keeps the earlier versions, so a baseline change can be reviewed later.

@@ -31,9 +31,16 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
     internal const string PlanningLine = "planning:";
     internal const string CutOffPlanningLine = "planning with cut-offs:";
     internal const string ChecksLine = "checks:";
+    internal const string AutoNestLine = "auto-nest:";
+
+    /// <summary>The area of a nest whose problem was Auto Nest's layout, not its cutting plan.</summary>
+    internal const string AutoNestArea = "auto-nest";
 
     /// <summary>The planner areas a nest can guard; docs/problem-nests.md says which changes touch each.</summary>
-    internal static readonly string[] Areas = ["part-order", "entries", "contours", "geometry-checks", "cut-offs", "grid"];
+    internal static readonly string[] PlannerAreas = ["part-order", "entries", "contours", "geometry-checks", "cut-offs", "grid"];
+
+    /// <summary>Every area a nest can guard: the planner's and Auto Nest's.</summary>
+    internal static readonly string[] Areas = [.. PlannerAreas, AutoNestArea];
 
     /// <summary>
     /// Areas whose changes reorder the search on every plate, not just the nests tagged with them:
@@ -57,6 +64,8 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
             && seconds > 0 ? seconds : 120);
         Assert.True(records.Count > 0, $"No nests on {server}.");
         var named = Checks(Environment.GetEnvironmentVariable(ChecksVariable));
+        Skip.If(named.Length != 0 && !named.Intersect(PlannerAreas).Any(),
+            $"{string.Join(", ", named)} names no planner area, so no nest is planned.");
         var wanted = Wanted(named);
         if (wanted.Length != named.Length)
             output.WriteLine($"{string.Join(", ", named.Intersect(WholeCorpusAreas))} change the search on every plate, "
@@ -67,7 +76,7 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
         foreach (var record in records)
         {
             var guards = Checks(CommentLine(record.Comments, ChecksLine));
-            if (!Selected(guards, wanted))
+            if (!Selected(guards, wanted) || (guards.Length != 0 && !guards.Intersect(PlannerAreas).Any()))
             {
                 output.WriteLine($"{record.Name}: skipped, checks {string.Join(", ", guards)}");
                 continue;
@@ -88,6 +97,82 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
         ReportNearBudget(usage);
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
+
+    /// <summary>
+    /// Runs Auto Nest (the Default engine, the nest's own sheet sizes, spacing and clamps, as the
+    /// benchmark builds the job) on every nest that guards <see cref="AutoNestArea"/>, and fails
+    /// when a layout is invalid, leaves parts unplaced or needs more sheets than its
+    /// "auto-nest: 2 sheets" baseline.
+    /// </summary>
+    [SkippableFact]
+    public async Task ProblemNests_AutoNestNoWorseThanTheirBaselines()
+    {
+        var server = Environment.GetEnvironmentVariable(ServerVariable);
+        Skip.If(string.IsNullOrWhiteSpace(server), $"Set {ServerVariable} to the OpenNest server URL to nest its problem nests.");
+        var named = Checks(Environment.GetEnvironmentVariable(ChecksVariable));
+        Skip.If(named.Length != 0 && !named.Contains(AutoNestArea), $"{string.Join(", ", named)} does not name {AutoNestArea}.");
+        using var repository = new RemoteNestRepository(server!);
+        var records = await ProblemNests(repository);
+        var limit = TimeSpan.FromSeconds(int.TryParse(Environment.GetEnvironmentVariable(TimeoutVariable), out var seconds)
+            && seconds > 0 ? seconds : 120);
+
+        var failures = new List<string>();
+        var nested = 0;
+        foreach (var record in records)
+        {
+            if (!Checks(CommentLine(record.Comments, ChecksLine)).Contains(AutoNestArea))
+                continue;
+            nested++;
+            var bytes = await repository.GetFileAsync(record.Id)
+                ?? throw new InvalidOperationException($"'{record.Name}' has no file.");
+            var baseline = SheetBaseline(record.Comments);
+            var watch = Stopwatch.StartNew();
+            var (sheets, problem) = AutoNest(bytes, limit);
+            output.WriteLine($"{record.Name}: {(problem ?? $"{sheets} sheets")} (baseline {baseline?.ToString() ?? "none"}), "
+                + $"{watch.Elapsed.TotalSeconds:0.0} s");
+            if (problem != null)
+                failures.Add($"{record.Name}: {problem}");
+            else if (baseline == null)
+                failures.Add($"{record.Name} has no Auto Nest baseline. Add this line to its comments: {AutoNestLine} {sheets} sheets");
+            else if (sheets > baseline)
+                failures.Add($"{record.Name}: {sheets} sheets, worse than baseline {baseline}.");
+            else if (sheets < baseline)
+                output.WriteLine($"  better than {baseline}; update the baseline.");
+        }
+        Skip.If(nested == 0, $"No nest on {server} checks {AutoNestArea}.");
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+    }
+
+    // Auto Nest on the nest's demand: sheet count, or why the layout cannot be kept.
+    private static (int Sheets, string Problem) AutoNest(byte[] bytes, TimeSpan limit)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"opennest-problem-{Guid.NewGuid():N}.nest");
+        try
+        {
+            File.WriteAllBytes(path, bytes);
+            var job = OpenNest.Benchmark.JobLoader.Load(path).Single().BuildNestJob(maxPlates: 100);
+            using var cancellation = new CancellationTokenSource(limit);
+            var result = OpenNest.Engine.Jobs.NestingEngineRegistry.Create("Default").Solve(job, token: cancellation.Token);
+            var violations = OpenNest.Engine.Jobs.NestLayoutCheck.Violations(job, result);
+            if (violations.Count != 0)
+                return (result.Plates.Count, "invalid layout: " + string.Join(" | ", violations.Take(3)));
+            var unplaced = result.Fulfillment.Sum(f => f.Unplaced);
+            return unplaced != 0 ? (result.Plates.Count, $"{unplaced} parts unplaced") : (result.Plates.Count, null);
+        }
+        catch (OperationCanceledException)
+        {
+            return (0, Timeout);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>The sheet count of an "auto-nest: 2 sheets" comment line; null when there is none.</summary>
+    internal static int? SheetBaseline(string comments) =>
+        CommentLine(comments, AutoNestLine) is { } line && Regex.Match(line, @"\d+") is { Success: true } count
+            ? int.Parse(count.Value) : null;
 
     // Plates near their budget pass today but are the first a reordered search pushes over it.
     private void ReportNearBudget(List<(string Plate, double Share)> usage)
@@ -297,6 +382,14 @@ public class ProblemNestBaselineTests
         Assert.False(ProblemNestRegressionTests.Selected(guards, ["grid"]));
         Assert.True(ProblemNestRegressionTests.Selected([], ["grid"]));
         Assert.Throws<ArgumentException>(() => ProblemNestRegressionTests.Checks("part-order, lead-ins"));
+    }
+
+    [Fact]
+    public void SheetBaseline_ReadsTheAutoNestLine()
+    {
+        Assert.Equal(2, ProblemNestRegressionTests.SheetBaseline("Three sheets before the fix.\nchecks: auto-nest\nauto-nest: 2 sheets"));
+        Assert.Null(ProblemNestRegressionTests.SheetBaseline("planning: 1=Ready"));
+        Assert.Equal(["auto-nest"], ProblemNestRegressionTests.Checks("auto-nest"));
     }
 
     [Fact]
