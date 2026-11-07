@@ -45,4 +45,34 @@ public class PlateReorderTests
         Assert.True(list.Items[1].Selected);
         Assert.Equal("2", list.Items[1].Text);
     });
+
+    [Fact]
+    public void DuplicatingTheCurrentPlateInsertsItsCopyAfterItAndSelectsIt() => UndoTestEnv.Run(env =>
+    {
+        env.Editor.PlateManager.LoadAt(0);
+        var source = env.Nest.Plates[0];
+        var count = env.Nest.Plates.Count;
+
+        Assert.True(env.Editor.DuplicateCurrentPlate());
+
+        Assert.Equal(count + 1, env.Nest.Plates.Count);
+        Assert.Same(source, env.Nest.Plates[0]);
+        var copy = env.Nest.Plates[1];
+        Assert.NotSame(source, copy);
+        Assert.Equal(source.Parts.Count, copy.Parts.Count);
+        Assert.Same(copy, env.Editor.PlateManager.CurrentPlate);
+        if (source.CuttingParameters != null)
+            Assert.NotSame(source.CuttingParameters, copy.CuttingParameters);
+        var list = (ListView)Assert.Single(env.Editor.Controls.Find("platesListView", true));
+        Assert.True(list.Items[1].Selected);
+        Assert.NotNull(list.ContextMenuStrip);
+    });
+
+    [Fact]
+    public void TheEmptySentinelCannotBeDuplicated() => UndoTestEnv.Run(env =>
+    {
+        var count = env.Nest.Plates.Count;
+        Assert.False(env.Editor.DuplicatePlate(count - 1, 0));
+        Assert.Equal(count, env.Nest.Plates.Count);
+    });
 }

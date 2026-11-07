@@ -209,6 +209,47 @@ namespace OpenNest
             return true;
         }
 
+        /// <summary>
+        /// Whether <see cref="DuplicatePlate"/> can copy the plate at <paramref name="fromIndex"/>
+        /// to <paramref name="toIndex"/>: any plate but the trailing empty sentinel, landing
+        /// anywhere from the first place to just before the sentinel.
+        /// </summary>
+        public bool CanDuplicatePlate(int fromIndex, int toIndex) =>
+            fromIndex >= 0 && fromIndex < MovableCount
+            && toIndex >= 0 && toIndex <= MovableCount
+            && HasLayout(nest.Plates[fromIndex]);
+
+        private static bool HasLayout(Plate plate) => plate.Parts.Count > 0 || plate.CutOffs.Count > 0;
+
+        /// <summary>
+        /// Inserts a copy of the plate at <paramref name="fromIndex"/> (see
+        /// <see cref="Plate.CopyLayout"/>) so it lands at <paramref name="toIndex"/>, and makes
+        /// the copy the current plate. The trailing empty sentinel stays last.
+        /// </summary>
+        /// <returns>The copy, or null when <see cref="CanDuplicatePlate"/> is false.</returns>
+        public Plate DuplicatePlate(int fromIndex, int toIndex)
+        {
+            if (!CanDuplicatePlate(fromIndex, toIndex))
+                return null;
+
+            var copy = nest.Plates[fromIndex].CopyLayout();
+            suppressNavigation = true;
+            try
+            {
+                nest.Plates.Insert(toIndex, copy);
+            }
+            finally
+            {
+                suppressNavigation = false;
+            }
+
+            EnsureSentinel();
+            PlateListChanged?.Invoke(this, EventArgs.Empty);
+            CurrentIndex = nest.Plates.IndexOf(copy);
+            FireCurrentPlateChanged();
+            return copy;
+        }
+
         public void BeginBatch()
         {
             batching = true;

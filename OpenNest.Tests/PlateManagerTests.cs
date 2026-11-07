@@ -703,4 +703,117 @@ public class PlateManagerTests
         Assert.Same(configured, mgr.CurrentPlate);
         Assert.DoesNotContain(empty, nest.Plates);
     }
+
+    [Fact]
+    public void DuplicatePlate_InsertsACopyAtTheSlotAndMakesItCurrent()
+    {
+        var (nest, mgr, filled) = NestWithFilledPlates(2);
+        using var _ = mgr;
+        var source = filled[1];
+        source.Parts[0].Offset(new Vector(5, 7));
+        source.Quantity = 3;
+        var drawing = source.Parts[0].BaseDrawing;
+        var nested = drawing.Quantity.Nested;
+
+        var copy = mgr.DuplicatePlate(1, 0);
+
+        Assert.NotNull(copy);
+        Assert.Equal(new[] { copy, filled[0], filled[1] }, nest.Plates.Take(3));
+        Assert.Equal(4, nest.Plates.Count);
+        Assert.Empty(nest.Plates[^1].Parts);
+        Assert.Same(copy, mgr.CurrentPlate);
+        Assert.Equal(0, mgr.CurrentIndex);
+        Assert.Equal(1, copy.Quantity);
+        var part = Assert.Single(copy.Parts);
+        Assert.NotSame(source.Parts[0], part);
+        Assert.Same(drawing, part.BaseDrawing);
+        Assert.Equal(source.Parts[0].Location, part.Location);
+        Assert.Equal(nested + 1, drawing.Quantity.Nested);
+    }
+
+    [Fact]
+    public void DuplicatePlate_AtTheEndLandsBeforeTheSentinel()
+    {
+        var (nest, mgr, filled) = NestWithFilledPlates(2);
+        using var _ = mgr;
+        var sentinel = nest.Plates[^1];
+
+        var copy = mgr.DuplicatePlate(0, 2);
+
+        Assert.Equal(new[] { filled[0], filled[1], copy, sentinel }, nest.Plates);
+        Assert.Same(copy, mgr.CurrentPlate);
+    }
+
+    [Theory]
+    [InlineData(2, 0)]
+    [InlineData(-1, 0)]
+    [InlineData(0, 3)]
+    [InlineData(0, -1)]
+    public void DuplicatePlate_RefusesTheSentinelAndSlotsPastIt(int from, int to)
+    {
+        var (nest, mgr, _) = NestWithFilledPlates(2);
+        using var __ = mgr;
+        var before = nest.Plates.ToArray();
+
+        Assert.Null(mgr.DuplicatePlate(from, to));
+        Assert.Equal(before, nest.Plates);
+    }
+
+    [Fact]
+    public void CopyLayout_CopiesTheSheetAndRemapsCommonLines()
+    {
+        var plate = new Plate(48, 96)
+        {
+            Quantity = 2,
+            Quadrant = 3,
+            PartSpacing = 0.25,
+            EdgeSpacing = new Spacing(0.5, 0.5, 0.5, 0.5),
+            GrainAngle = 1.5,
+            CutCommonLinesTwice = true,
+        };
+        plate.StockItemCodes = new[] { "A", "B" };
+        var a = MakePart();
+        var b = MakePart();
+        b.Offset(new Vector(10.1, 0));
+        plate.Parts.Add(a);
+        plate.Parts.Add(b);
+        plate.CommonLines.Add(new CommonLineGroup(new[] { a, b }, 0.1));
+
+        var copy = plate.CopyLayout();
+
+        Assert.Equal(plate.Size, copy.Size);
+        Assert.Equal(3, copy.Quadrant);
+        Assert.Equal(0.25, copy.PartSpacing);
+        Assert.Equal(plate.EdgeSpacing, copy.EdgeSpacing);
+        Assert.Equal(1.5, copy.GrainAngle);
+        Assert.True(copy.CutCommonLinesTwice);
+        Assert.Equal(1, copy.Quantity);
+        Assert.Empty(copy.StockItemCodes);
+        Assert.Equal(2, copy.Parts.Count);
+        var group = Assert.Single(copy.CommonLines);
+        Assert.Equal(new[] { copy.Parts[0], copy.Parts[1] }, group.Members);
+        Assert.Equal(0.1, group.Kerf);
+    }
+
+    [Fact]
+    public void CopyLayout_RegeneratesCutOffsInTheirPlaces()
+    {
+        var plate = new Plate(48, 96) { Quantity = 1 };
+        plate.Parts.Add(MakePart());
+        var second = MakePart();
+        second.Offset(new Vector(30, 0));
+        plate.Parts.Add(second);
+        plate.CutOffs.Add(new CutOff(new Vector(20, 0), CutOffAxis.Vertical));
+        plate.RegenerateCutOffs(new CutOffSettings());
+        var order = plate.Parts.Select(p => p.BaseDrawing.IsCutOff).ToArray();
+        Assert.Contains(true, order);
+
+        var copy = plate.CopyLayout();
+
+        var cutoff = Assert.Single(copy.CutOffs);
+        Assert.NotSame(plate.CutOffs[0], cutoff);
+        Assert.Equal(plate.CutOffs[0].Position, cutoff.Position);
+        Assert.Equal(order, copy.Parts.Select(p => p.BaseDrawing.IsCutOff));
+        Assert.All(copy.Parts.Where(p => p.BaseDrawing.IsCutOff), p => Assert.Same(cutoff.Drawing, p.BaseDrawing));
+    }
 }

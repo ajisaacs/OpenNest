@@ -5,6 +5,7 @@ using System.Windows.Forms;
 namespace OpenNest.Forms
 {
     // Reordering plates in the Plates list: drag a row to a new position, or Alt+Up/Alt+Down.
+    // Ctrl+drag drops a copy of the plate instead, as does Duplicate Plate on the row's menu.
     // The trailing empty new-plate sentinel stays last and cannot be dragged.
     public partial class EditNestForm
     {
@@ -43,6 +44,48 @@ namespace OpenNest.Forms
                 Enabled = false,
             };
             platesListView.Controls.Add(plateDropIndicator);
+
+            var duplicateItem = new ToolStripMenuItem("Duplicate Plate", null, (sender, e) => DuplicateCurrentPlate());
+            var menu = new ContextMenuStrip();
+            menu.Items.Add(duplicateItem);
+            menu.Opening += (sender, e) =>
+            {
+                var index = PlateManager.CurrentIndex;
+                duplicateItem.Enabled = !IsInspecting && PlateManager.CanDuplicatePlate(index, index + 1);
+            };
+            platesListView.ContextMenuStrip = menu;
+        }
+
+        /// <summary>
+        /// Inserts a copy of the plate at <paramref name="fromIndex"/> so it lands at
+        /// <paramref name="toIndex"/>, as one undoable step; the copy becomes the current plate.
+        /// </summary>
+        /// <returns>Whether a plate was added.</returns>
+        public bool DuplicatePlate(int fromIndex, int toIndex)
+        {
+            if (IsInspecting || !PlateManager.CanDuplicatePlate(fromIndex, toIndex))
+                return false;
+
+            using (var change = BeginChange("Duplicate Plate"))
+            {
+                change.MarkChanged();
+                var copy = PlateManager.DuplicatePlate(fromIndex, toIndex);
+                // The copy gets its own parameters, so editing one sheet's leaves the other's alone.
+                if (copy.CuttingParameters != null)
+                    copy.CuttingParameters = IO.CuttingParametersSerializer.FromDto(
+                        IO.CuttingParametersSerializer.ToDto(copy.CuttingParameters));
+                change.Complete();
+            }
+
+            FirePlateChanged();
+            return true;
+        }
+
+        /// <summary>Inserts a copy of the current plate right after it.</summary>
+        public bool DuplicateCurrentPlate()
+        {
+            var index = PlateManager.CurrentIndex;
+            return DuplicatePlate(index, index + 1);
         }
 
         /// <summary>
@@ -83,12 +126,20 @@ namespace OpenNest.Forms
         {
             if (IsInspecting || e.Button != MouseButtons.Left || e.Item is not ListViewItem item)
                 return;
-            if (item.Index >= PlateManager.MovableCount || PlateManager.MovableCount < 2)
+            if (item.Index >= PlateManager.MovableCount)
+                return;
+
+            var effects = DragDropEffects.None;
+            if (PlateManager.MovableCount >= 2)
+                effects |= DragDropEffects.Move;
+            if (PlateManager.CanDuplicatePlate(item.Index, item.Index + 1))
+                effects |= DragDropEffects.Copy;
+            if (effects == DragDropEffects.None)
                 return;
 
             try
             {
-                platesListView.DoDragDrop(new PlateDragData(this, item.Index), DragDropEffects.Move);
+                platesListView.DoDragDrop(new PlateDragData(this, item.Index), effects);
             }
             finally
             {
@@ -115,17 +166,25 @@ namespace OpenNest.Forms
             AutoScrollPlateList(client);
 
             var slot = GetPlateDropSlot(client);
-            var to = PlateDropTarget(data.Index, slot);
-            if (!PlateManager.CanMovePlate(data.Index, to))
+            var copying = IsCopyDrag(e);
+            var allowed = copying
+                ? PlateManager.CanDuplicatePlate(data.Index, slot)
+                : (e.AllowedEffect & DragDropEffects.Move) != 0
+                    && PlateManager.CanMovePlate(data.Index, PlateDropTarget(data.Index, slot));
+            if (!allowed)
             {
                 e.Effect = DragDropEffects.None;
                 HidePlateDropIndicator();
                 return;
             }
 
-            e.Effect = DragDropEffects.Move;
+            e.Effect = copying ? DragDropEffects.Copy : DragDropEffects.Move;
             ShowPlateDropIndicator(slot);
         }
+
+        // Ctrl (key state bit 8) during the drag drops a copy where the plate allows one.
+        private static bool IsCopyDrag(DragEventArgs e) =>
+            (e.KeyState & 8) != 0 && (e.AllowedEffect & DragDropEffects.Copy) != 0;
 
         private void PlatesListView_DragDrop(object sender, DragEventArgs e)
         {
@@ -135,7 +194,11 @@ namespace OpenNest.Forms
                 return;
 
             var client = platesListView.PointToClient(new Point(e.X, e.Y));
-            MovePlate(data.Index, PlateDropTarget(data.Index, GetPlateDropSlot(client)));
+            var slot = GetPlateDropSlot(client);
+            if (IsCopyDrag(e))
+                DuplicatePlate(data.Index, slot);
+            else
+                MovePlate(data.Index, PlateDropTarget(data.Index, slot));
         }
 
         /// <summary>

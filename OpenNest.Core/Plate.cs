@@ -463,6 +463,81 @@ namespace OpenNest
         /// places relative to the cut-offs either way. Where only a first place is known the
         /// count is a guess, so a cut-off that splits the sheet goes last, as sequencing puts it.
         /// </summary>
+        /// <summary>
+        /// A new, unowned plate with this plate's sheet and layout: size, outline, spacing,
+        /// quadrant, grain, clamps, support bed, parts (programs and lead-in state included),
+        /// common-line groups and cut-off definitions, regenerated in their places in the
+        /// sequence. It is one sheet (<see cref="Quantity"/> 1) with no stock item codes, since
+        /// those name particular physical sheets. Adding the parts counts them as nested at once,
+        /// as every plate does, so callers add the copy to a nest.
+        /// <see cref="CuttingParameters"/> is shared; callers that need an independent copy
+        /// replace it.
+        /// </summary>
+        public Plate CopyLayout()
+        {
+            var copy = new Plate(Size)
+            {
+                Quantity = 1,
+                Quadrant = Quadrant,
+                PartSpacing = PartSpacing,
+                EdgeSpacing = EdgeSpacing,
+                GrainAngle = GrainAngle,
+                CuttingParameters = CuttingParameters,
+                SupportBed = SupportBed,
+                CutCommonLinesTwice = CutCommonLinesTwice,
+            };
+            copy.Outline = Outline;
+
+            if (ClampRail != null)
+                copy.SetClampRail(ClampRail, RemovedClamps);
+            else
+                foreach (var zone in ClampZones)
+                    copy.ClampZones.Add(new ClampZone(zone.Id, zone.Bounds));
+
+            var copies = new Dictionary<Part, Part>();
+            foreach (var part in Parts.Where(p => !p.BaseDrawing.IsCutOff))
+            {
+                var clone = (Part)part.Clone();
+                copy.Parts.Add(clone);
+                copies[part] = clone;
+            }
+
+            foreach (var group in CommonLines)
+            {
+                var members = group.Members.Where(copies.ContainsKey).Select(member => copies[member]).ToList();
+                if (members.Count >= 2)
+                    copy.CommonLines.Add(new CommonLineGroup(members, group.Kerf));
+            }
+
+            if (CutOffs.Count == 0)
+                return copy;
+
+            // Cut-off segments keep their places among the parts, as a save and reload does.
+            var places = new Dictionary<CutOff, IReadOnlyList<int>>();
+            foreach (var cutoff in CutOffs)
+            {
+                var duplicate = new CutOff(cutoff.Position, cutoff.Axis)
+                {
+                    StartLimit = cutoff.StartLimit,
+                    EndLimit = cutoff.EndLimit,
+                    HeadLockOvercut = cutoff.HeadLockOvercut,
+                    FarEdgeFirst = cutoff.FarEdgeFirst,
+                    Gaps = cutoff.Gaps,
+                };
+                copy.CutOffs.Add(duplicate);
+
+                var segments = CutOffSegments.Of(this, cutoff)
+                    .Select(segment => Parts.IndexOf(segment.Part))
+                    .Where(index => index >= 0)
+                    .ToArray();
+                if (segments.Length > 0)
+                    places[duplicate] = segments;
+            }
+
+            copy.RegenerateCutOffs(CutOffSettings ?? new CutOffSettings(), places, null);
+            return copy;
+        }
+
         public void RegenerateCutOffs(CutOffSettings settings, IReadOnlyDictionary<CutOff, IReadOnlyList<int>> places,
             IReadOnlyDictionary<CutOff, int> firstPlaces) =>
             RegenerateCutOffs(settings, (cutoff, extents) =>

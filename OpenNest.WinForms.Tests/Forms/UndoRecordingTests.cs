@@ -83,6 +83,10 @@ public class UndoRecordingTests
         env.AssertOneUndoableEdit("Move Plate", () => Assert.True(env.Editor.MovePlate(3, 0))));
 
     [Fact]
+    public void DuplicatePlateRecordsOneEntry() => UndoTestEnv.Run(env =>
+        env.AssertOneUndoableEdit("Duplicate Plate", () => Assert.True(env.Editor.DuplicatePlate(0, 1))));
+
+    [Fact]
     public void MovePlateIntoItsOwnPlaceRecordsNothing() => UndoTestEnv.Run(env =>
     {
         var count = env.Editor.History.UndoCount;
