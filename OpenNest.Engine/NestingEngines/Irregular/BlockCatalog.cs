@@ -25,6 +25,7 @@ internal sealed class BlockCatalog : IDisposable
     private readonly Dictionary<int, int> attempts = new();
     internal int PreparationCount => attempts.Values.Sum();
     private readonly Dictionary<(int Type, int Quantity, double Length, double Width), IReadOnlyList<Placed>> cache = new();
+    private readonly Dictionary<(int Type, int Quantity, double Length, double Width), IReadOnlyList<Placed>> bands = new();
 
     /// <param name="drawingFor">Shared private drawings whose best-fit entries the caller owns;
     /// null makes the catalog own one per type and release it on dispose.</param>
@@ -82,7 +83,31 @@ internal sealed class BlockCatalog : IDisposable
         return result;
     }
 
-    private IReadOnlyList<Placed> Build(PartType type, int quantity, Box rectangle, CancellationToken token)
+    /// <summary>
+    /// The type's Lattice pattern in a box of the given size, up to <paramref name="quantity"/>
+    /// copies, for a band; unlike <see cref="Get"/> it is not limited in attempts per type. The
+    /// pattern is filled one grid unit wider than the spacing: Fill sets parts exactly the spacing
+    /// apart, which the stricter certification below can reject for curved parts (a stack of
+    /// circles), and losing the band then loses its densest pattern.
+    /// </summary>
+    public IReadOnlyList<Placed> Band(PartType type, int quantity, Box rectangle, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (quantity <= 2 || type.Orientations.Count == 0 || rectangle.Length <= 0 || rectangle.Width <= 0)
+            return Array.Empty<Placed>();
+        var key = (type.Index, quantity, rectangle.Length, rectangle.Width);
+        lock (bands)
+            if (bands.TryGetValue(key, out var cached))
+                return cached;
+        // Types may build bands in parallel: each type's drawing and orientation list are its own.
+        var result = Build(type, quantity, rectangle, token, spacing + System.Math.Pow(10, -NoFitCache.Precision));
+        lock (bands)
+            bands[key] = result;
+        return result;
+    }
+
+    private IReadOnlyList<Placed> Build(PartType type, int quantity, Box rectangle, CancellationToken token,
+        double? fillSpacing = null)
     {
         // PrivatePlateFill.Run below is a full independent NFP-based pack whose own operations
         // never touch this solve's effort meter; charge it here using the same factors - demand
@@ -92,7 +117,7 @@ internal sealed class BlockCatalog : IDisposable
         var drawing = drawingFor?.Invoke(type.Part) ?? OwnDrawing(type);
         try
         {
-            var members = PrivatePlateFill.Run(drawing, type.Part.Rotation, spacing,
+            var members = PrivatePlateFill.Run(drawing, type.Part.Rotation, fillSpacing ?? spacing,
                 rectangle.Length, rectangle.Width, quantity, token);
             token.ThrowIfCancellationRequested();
             return Resolve(type, members.Take(quantity).ToArray(), orientations[type.Index], spacing, token);
@@ -106,9 +131,12 @@ internal sealed class BlockCatalog : IDisposable
 
     private Drawing OwnDrawing(PartType type)
     {
-        if (!drawings.TryGetValue(type.Index, out var drawing))
-            drawings[type.Index] = drawing = DrawingJobMapper.CreateDrawing(type.Part);
-        return drawing;
+        lock (drawings)
+        {
+            if (!drawings.TryGetValue(type.Index, out var drawing))
+                drawings[type.Index] = drawing = DrawingJobMapper.CreateDrawing(type.Part);
+            return drawing;
+        }
     }
 
     public void Dispose()

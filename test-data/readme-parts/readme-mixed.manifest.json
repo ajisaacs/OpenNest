@@ -1,0 +1,15 @@
+{
+  "sheetSizes": ["60x120"],
+  "spacing": 0.3,
+  "edgeSpacing": 0.3,
+  "quadrant": 1,
+  "parts": [
+    { "dxf": "Angle Bracket.dxf", "quantity": 18 },
+    { "dxf": "Base Plate.dxf", "quantity": 14 },
+    { "dxf": "Clamp Jaw.dxf", "quantity": 18 },
+    { "dxf": "Flange.dxf", "quantity": 12 },
+    { "dxf": "Gusset.dxf", "quantity": 24 },
+    { "dxf": "Hex Cover.dxf", "quantity": 14 },
+    { "dxf": "Link.dxf", "quantity": 30 }
+  ]
+}

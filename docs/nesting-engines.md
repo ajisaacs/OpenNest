@@ -14,7 +14,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 | Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the engine listed first here |
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; the sheet that finishes the job is also squeezed into a shorter or narrower bin; stock chosen sheet by sheet by salvage-credited look-ahead cost |
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
-| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan, then grouped variants that pack like parts together, then a sheet-reduction pass that packs edge parts first and turns a key part by its contacts; under a time limit it keeps trying seeded variants until the limit |
+| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan, then grouped variants that pack like parts together, then a banded variant that packs each sheet in full-height strips, each group as its Lattice band or each strip from the largest parts down, then a sheet-reduction pass that packs edge parts first and turns a key part by its contacts; under a time limit it keeps trying seeded variants until the limit |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
 | Lattice, Strip, Vertical Remnant, Horizontal Remnant | Many copies of a few parts | The fixed placement strategies behind interactive fill; Lattice is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder; the pairs phase fills the strip its grid leaves with rows of pairs when they hold more than single parts, and also tiles herringbone pairs: the part turned so a hull edge lies along a sheet axis, nested into its own row, with every other row reversed), and the remnant strategies run it ranked to keep the largest drop. In whole jobs, all four place a plate with any fixed or bounded part rotation by the rotation-aware ordered placer instead |
 
@@ -274,6 +274,47 @@ unchanged; a grouped plan replaces the result only by beating it, and then has i
 re-plan. The search until cancelled takes grouped decodes in turn with the variants, with the
 same seeded weights. On the help tutorial's parts (30 gussets, 20 ells, 10 plates, 12 flanges on
 60 x 120 at 0.3 spacing) the layout ends at 34.9 rather than 38.1.
+
+### Banded variant
+
+Last of the search variants, Irregular decodes the job once more in full-height strips along X
+(`BandedFill`), when the grouped variants apply and every part has the same priority. A sheet
+that cannot take all the remaining part area keeps the ordinary fill: it fills to its end anyway,
+and strips only shape where a sheet ends. Every other sheet is packed two ways and the better
+sheet kept (a tie keeps the bands). A person nesting many copies of a few parts lays them out in
+tidy columns; packing one part at a time instead leaves each group's last column ragged and
+scatters the smallest parts into the gaps between groups.
+
+- Bands: each type of three or more copies as its Lattice pattern (the pattern interactive Fill
+  gives that part alone: circles stacked or staggered, hexagons tiled, L brackets interlocked in
+  pairs) in the narrowest strip of full work-area height that holds all its copies. Bands stand
+  side by side a part spacing apart, longest first or shortest first, whichever packs better;
+  then the copies held back from them and the types with one or two copies fill the gaps under
+  the usual rule. On the better order each type's narrower bands holding fewer copies (at most
+  four, or a third, fewer; at most two per type) are tried in turn, kept when they improve the
+  sheet.
+- Strips: each strip holds the largest remaining part, as its band (full or narrower) or as a
+  column one to three copies wide, and every other part fills the strip's gaps, the largest piece
+  at its leftmost, lowest point first, looking back one part length behind the strip. A beam of
+  the four partial sheets densest so far (part area per length used) is carried strip to strip,
+  so a strip is judged by what it leaves for the rest of the sheet, not by its own density; the
+  best finished sheet wins.
+- Patterns grow in whole rows or columns, so each type's band is found by asking for the pattern
+  just short of the last one's length, at most six times, then halving three times toward the
+  area bound; types search in parallel, each on its own patterns, so the result does not depend
+  on the order. Patterns are filled one Clipper grid unit (0.0001) wider than the part spacing and
+  certified at the spacing: Fill sets parts exactly the spacing apart, which the strict
+  certification can reject for curved parts, and a stack of rings would lose its densest pattern.
+- A band member inside a clamp keep-out goes to the gap fill instead; a band shorter than the
+  sheet moves flush to the far edge when that keeps more of it off the clamps. Outlined sheets do
+  not band.
+
+Neither way wins every sheet. On the README sample parts (18 L brackets, 14 base plates, 18 clamp
+jaws, 12 flanges, 24 gussets, 14 hex covers, 30 links on 60 x 120) bands end the layout at 102.9
+(104.6 with the desktop's edge spacing and a bottom clamp rail) rather than 107.7 (108.6); with
+about twice those quantities over two sheets, strips end the second sheet at 104.7 rather than 106.2. It
+starts while the work spent stays under three work budgets and replaces the result only by
+beating it, with its own tail re-plan.
 
 ### Sheet reduction
 

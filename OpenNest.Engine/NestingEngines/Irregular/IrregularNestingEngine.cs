@@ -56,6 +56,12 @@ public sealed class IrregularNestingEngine : INestingEngine
     /// <summary>Whether the grouped variants run; off only in tests of the ungrouped search.</summary>
     internal bool GroupLikeParts { get; init; } = true;
 
+    /// <summary>Whether the banded variant runs; off only in tests of the search before it.</summary>
+    internal bool BandLikeParts { get; init; } = true;
+
+    /// <summary>Work budgets after which the banded variant does not start.</summary>
+    internal const int BandedWorkLimit = 3;
+
     /// <summary>Whether the sheet-reduction pass runs; off only in tests of the search before it.</summary>
     internal bool ReduceSheets { get; init; } = true;
 
@@ -151,6 +157,23 @@ public sealed class IrregularNestingEngine : INestingEngine
                 if (!ReferenceEquals(improved, plan))
                     ReportPlan(job, types, improved, progress, token);
             }
+        // Then full-height strips: each like-part group as a band of its Lattice pattern, or strip by
+        // strip with the largest part first and the rest in its gaps; per sheet the better wins.
+        // Strips ignore priority, so only jobs of one priority band; it starts while the work
+        // spent stays under the ungrouped and grouped budgets together.
+        if (BandLikeParts && groups && job.Parts.Select(p => p.Priority).Distinct().Count() == 1
+            && solver.Work.Value < BandedWorkLimit * WorkBudget)
+        {
+            token.ThrowIfCancellationRequested();
+            var plan = solver.Plan(demand, PackAxis.X, 1.0, banded: true);
+            if (plan.IsBetterThan(improved))
+            {
+                ReportPlan(job, types, plan, progress, token);
+                improved = solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2);
+                if (!ReferenceEquals(improved, plan))
+                    ReportPlan(job, types, improved, progress, token);
+            }
+        }
         // Then try to drop a sheet: split the parts over one sheet fewer and pack each sheet edge
         // first, the key part turned by its contacts. Replaces the result only by beating it.
         if (ReduceSheets)
@@ -319,11 +342,12 @@ public sealed class IrregularNestingEngine : INestingEngine
             return cost != 0 ? cost : Compare(Offcut(job.Options, b), Offcut(job.Options, a));
         }
 
-        public Plan Plan(int[] demand, PackAxis axis, double beta, IReadOnlyList<double>? weights = null, bool grouped = false)
+        public Plan Plan(int[] demand, PackAxis axis, double beta, IReadOnlyList<double>? weights = null, bool grouped = false,
+            bool banded = false)
         {
             groupedBudget = Work.Value + workBudget;
             var run = Decode(demand, axis, beta, new Dictionary<string, int>(StringComparer.Ordinal), job.Options.MaxPlates, null,
-                weights, grouped);
+                weights, grouped, banded);
             var unplaced = types.Sum(t => t.Part.Quantity) - run.Sheets.Sum(s => s.Parts.Count);
             var reason = run.Reason;
             if (unplaced > 0 && reason == NestJobStopReason.Completed)
@@ -377,6 +401,30 @@ public sealed class IrregularNestingEngine : INestingEngine
                 tailReplaced?.Invoke(k);
             }
             return plan;
+        }
+
+        /// <summary>
+        /// One banded sheet: like parts as full-height bands side by side, or strip by strip with
+        /// the largest part's band or column and the others in its gaps; the better sheet wins, a
+        /// tie keeping the bands. Falls back to the ordinary fill when nothing bands.
+        /// </summary>
+        private SheetFill Banded(NestPlateStock stock, int[] remaining, IReadOnlyList<double>? weights,
+            Func<IReadOnlyList<int>?, double?, FrontierPacker> packer)
+        {
+            // Bands shape where a sheet ends; a sheet that cannot take all the remaining parts
+            // fills to its end anyway, so it keeps the ordinary fill.
+            var work = stock.WorkArea;
+            if (types.Sum(t => remaining[t.Index] * t.Area) > work.Length * work.Width)
+                return packer(null, null).Fill(remaining, token);
+            var bands = new BandedFill(types, BlocksFor(stock), stock, ClampsFor(stock), () => packer(null, null),
+                CompareSheets, Work, groupedBudget).Fill(remaining, token);
+            var strips = new BandedFill(types, BlocksFor(stock), stock, ClampsFor(stock), () => packer(null, null),
+                CompareSheets, Work, Work.Value + workBudget).FillStrips(remaining, box => new FrontierPacker(types,
+                CacheFor(stock), PairsFor(stock), stock, PackAxis.Y, 1.0, Work, null, ClampsFor(stock), null, weights,
+                null, null, box), token);
+            if (bands == null)
+                return strips ?? packer(null, null).Fill(remaining, token);
+            return strips != null && CompareSheets(strips, bands) < 0 ? strips : bands;
         }
 
         /// <summary>
@@ -531,7 +579,8 @@ public sealed class IrregularNestingEngine : INestingEngine
             int? sheetCap,
             NestPlateStock? first,
             IReadOnlyList<double>? weights = null,
-            bool grouped = false
+            bool grouped = false,
+            bool banded = false
         )
         {
             var remaining = (int[])demand.Clone();
@@ -564,11 +613,14 @@ public sealed class IrregularNestingEngine : INestingEngine
                         continue;
                     progress?.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stock.Id, sheets.Count, 0, 0));
                     // Grouped fills pack groups from singles and pairs: Fill blocks cost far more per
-                    // fill there and gave no denser groups.
+                    // fill there and gave no denser groups. A banded fill's bands are Fill patterns
+                    // already; its gap fill takes singles and pairs.
                     FrontierPacker Packer(IReadOnlyList<int>? ranks, double? reach) => new(types, CacheFor(stock),
-                        PairsFor(stock), stock, axis, beta, Work, grouped ? null : BlocksFor(stock), ClampsFor(stock), BoundaryFor(stock),
+                        PairsFor(stock), stock, axis, beta, Work, grouped || banded ? null : BlocksFor(stock), ClampsFor(stock), BoundaryFor(stock),
                         weights, ranks, reach);
-                    var fill = grouped && GroupedFill.Applies(types, remaining)
+                    var fill = banded
+                        ? Banded(stock, remaining, weights, Packer)
+                        : grouped && GroupedFill.Applies(types, remaining)
                         ? new GroupedFill(types, Packer, axis, stock.Outline == null, CompareSheets, Work, groupedBudget)
                             .Fill(remaining, token)
                         : Packer(null, null).Fill(remaining, token);

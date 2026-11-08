@@ -85,6 +85,7 @@ internal sealed class FrontierPacker
     /// fitted to <paramref name="nfps"/>.</param>
     /// <param name="groupRanks">Per type, a rank served after priority: a type is placed only when
     /// no type of the same priority and lower rank can be, so each type packs as one group.</param>
+    /// <param name="within">Part of a rectangular stock's work area to fill instead of all of it.</param>
     /// <param name="reach">Farthest the packing front may go: the work area ends there along the
     /// front axis, so the fill must fit a shorter strip of the sheet.</param>
     public FrontierPacker(
@@ -100,7 +101,8 @@ internal sealed class FrontierPacker
         PackBoundary? boundary = null,
         IReadOnlyList<double>? typeWeights = null,
         IReadOnlyList<int>? groupRanks = null,
-        double? reach = null
+        double? reach = null,
+        Box? within = null
     )
     {
         if (boundary != null && !ReferenceEquals(boundary.Nfps, nfps))
@@ -122,7 +124,9 @@ internal sealed class FrontierPacker
             work = axis == PackAxis.X
                 ? new Box(work.Left, work.Bottom, System.Math.Clamp(end - work.Left, 0, work.Length), work.Width)
                 : new Box(work.Left, work.Bottom, work.Length, System.Math.Clamp(end - work.Bottom, 0, work.Width));
-        limited = reach != null;
+        if (within != null)
+            work = within;
+        limited = reach != null || within != null;
     }
 
     private readonly bool limited;
@@ -133,7 +137,10 @@ internal sealed class FrontierPacker
 
     /// <param name="seated">Parts already on the sheet: they block space and hold the packing
     /// front where they reached, so the fill starts as gap fill. They are not returned.</param>
-    public SheetFill Fill(IReadOnlyList<int> remaining, CancellationToken token, IReadOnlyList<Placed>? seated = null)
+    /// <param name="front">Packing front to start from instead of the work area's leading edge: at
+    /// the far edge, every placement is a gap fill, the largest part that fits at its lowest point.</param>
+    public SheetFill Fill(IReadOnlyList<int> remaining, CancellationToken token, IReadOnlyList<Placed>? seated = null,
+        double? front = null)
     {
         var left = remaining.ToArray();
         var states = new List<Region>();
@@ -198,11 +205,11 @@ internal sealed class FrontierPacker
                 i => snapshot[i].Subtract(nfps.Get(part.Orientation, snapshot[i].Orientation), part.X, part.Y)
             );
         }
-        var front = axis == PackAxis.X ? work.Left : work.Bottom;
+        var frontAt = System.Math.Max(axis == PackAxis.X ? work.Left : work.Bottom, front ?? double.NegativeInfinity);
         foreach (var part in seated ?? Array.Empty<Placed>())
         {
             placed.Add(part);
-            front = System.Math.Max(front, axis == PackAxis.X ? part.Right : part.Top);
+            frontAt = System.Math.Max(frontAt, axis == PackAxis.X ? part.Right : part.Top);
             Block(part);
         }
         var firstNew = placed.Count;
@@ -246,7 +253,7 @@ internal sealed class FrontierPacker
         while (states.Count > 0)
         {
             token.ThrowIfCancellationRequested();
-            var choice = Choose(states, offered, blockStates, front);
+            var choice = Choose(states, offered, blockStates, frontAt);
             if (choice == null)
                 break;
 
@@ -255,7 +262,7 @@ internal sealed class FrontierPacker
             {
                 placed.Add(part);
                 partArea += types[typeIndex].Area;
-                front = System.Math.Max(front, axis == PackAxis.X ? part.Right : part.Top);
+                frontAt = System.Math.Max(frontAt, axis == PackAxis.X ? part.Right : part.Top);
             }
 
             left[typeIndex] -= choice.Count;
