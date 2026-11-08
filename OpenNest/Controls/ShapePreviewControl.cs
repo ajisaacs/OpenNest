@@ -13,6 +13,9 @@ namespace OpenNest.Controls
     /// Shows one drawing zoomed to fit. With annotations set, it also draws each shape
     /// parameter as a dimension on the drawing (or as a note chip along the bottom) and
     /// raises <see cref="LabelClicked"/> when one is clicked, as Edit Clamps does on the plate.
+    /// Dragging a dimension's label moves the dimension; the wheel zooms, the middle button
+    /// pans, and F or a middle double-click fits the view again. Until the view is zoomed or
+    /// panned by hand, it refits whenever the drawing or its dimensions change.
     /// </summary>
     public class ShapePreviewControl : PlateView
     {
@@ -26,6 +29,9 @@ namespace OpenNest.Controls
         private const float LabelPadding = 3f;
         private const float EdgePadding = 10f;
         private const float ChipSpacing = 6f;
+        private const int DragThreshold = 3;
+        // How close a dragged linear dimension may come to the drawing's bounds.
+        private const float MinimumGap = 6f;
 
         private static readonly Color DimensionColor = Color.FromArgb(235, 230, 120, 20);
         private static readonly Color HoverColor = Color.FromArgb(255, 140, 0);
@@ -38,20 +44,35 @@ namespace OpenNest.Controls
         private AnnotationLayout layout;
         private string hoverKey;
         private string activeKey;
+        private bool userView;
+
+        // Each dimension's drag offset in pixels, keyed by its property; kept until the shape changes.
+        private readonly Dictionary<string, PointF> dragOffsets = new();
+        private string pressedKey;
+        private string clickKey;
+        private string dragKey;
+        private Point pressPoint;
+        private PointF pressOffset;
 
         public ShapePreviewControl()
         {
             DrawOrigin = false;
             DrawBounds = false;
-            AllowPan = false;
+            AllowPan = true;
             AllowSelect = false;
-            AllowZoom = false;
+            AllowZoom = true;
             AllowDrop = false;
             BackColor = ColorScheme.Default.LibraryBackgroundColor;
         }
 
         /// <summary>Raised with a label's key when an enabled dimension or note is clicked.</summary>
         public event EventHandler<string> LabelClicked;
+
+        /// <summary>Raised when labels move on screen: zoom, pan, fit or a dimension drag.</summary>
+        public event EventHandler ViewChanged;
+
+        /// <summary>True once the view was zoomed or panned by hand; fitting clears it.</summary>
+        internal bool IsUserView => userView;
 
         /// <summary>A dimension to draw: its text, and the count text after it when it has one.</summary>
         public sealed record Annotation(ShapeDimension Dimension, string Text, string CountText = null);
@@ -82,8 +103,9 @@ namespace OpenNest.Controls
             annotations = dimensions ?? Array.Empty<Annotation>();
             notes = chips ?? Array.Empty<Note>();
             hoverKey = null;
+            layout = null;
             if (Plate.Parts.Count > 0)
-                ZoomToFit(false);
+                FitUnlessUserView(false);
             Invalidate();
         }
 
@@ -97,8 +119,18 @@ namespace OpenNest.Controls
             return label == null ? null : Rectangle.Round(label.Bounds);
         }
 
-        public void ShowDrawing(Drawing drawing)
+        /// <summary>
+        /// Shows <paramref name="drawing"/>. A new shape (<paramref name="newShape"/>) fits the
+        /// view and puts dragged dimensions back; a changed parameter keeps a hand-set view.
+        /// </summary>
+        public void ShowDrawing(Drawing drawing, bool newShape = true)
         {
+            if (newShape)
+            {
+                userView = false;
+                dragOffsets.Clear();
+            }
+            pressedKey = clickKey = dragKey = null;
             Plate.Parts.Clear();
             Plate.Size = new Geometry.Size(0, 0);
             layout = null;
@@ -110,7 +142,7 @@ namespace OpenNest.Controls
                 var shown = Plate.Parts[0].BoundingBox;
                 var source = drawing.Program.BoundingBox();
                 shapeOffset = new Vector(shown.X - source.X, shown.Y - source.Y);
-                ZoomToFit();
+                FitUnlessUserView();
             }
             else
             {
@@ -124,14 +156,34 @@ namespace OpenNest.Controls
             base.OnResize(e);
 
             if (Plate.Parts.Count > 0)
-                ZoomToFit(false);
+                FitUnlessUserView(false);
+        }
+
+        private void FitUnlessUserView(bool redraw = true)
+        {
+            if (!userView)
+            {
+                Fit(redraw);
+                return;
+            }
+            layout = null;
+            if (redraw)
+                Invalidate();
+            ViewChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>Fits the drawing and its dimensions, and stops keeping a hand-set view.</summary>
+        public override void ZoomToFit(bool redraw = true)
+        {
+            userView = false;
+            Fit(redraw);
         }
 
         /// <summary>
         /// Fits the drawing with room around it for its dimensions: lays them out, measures how
         /// far they reach past the drawing and fits again until that stops changing.
         /// </summary>
-        public override void ZoomToFit(bool redraw = true)
+        private void Fit(bool redraw)
         {
             if (Plate.Parts.Count == 0 || Width <= 0 || Height <= 0)
             {
@@ -183,16 +235,59 @@ namespace OpenNest.Controls
             layout = null;
             if (redraw)
                 Invalidate();
+            ViewChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            // Zoom only: the plate view's Shift+wheel would turn selected parts.
+            if (Plate.Parts.Count == 0)
+                return;
+            var steps = System.Math.Max(1, System.Math.Abs(e.Delta / 120));
+            var factor = (float)System.Math.Pow(e.Delta > 0 ? ZoomInFactor : ZoomOutFactor, steps);
+            ZoomToControlPoint(e.Location, factor, false);
+            userView = true;
+            layout = null;
+            Invalidate();
+            ViewChanged?.Invoke(this, EventArgs.Empty);
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
+            if (e.Button == MouseButtons.Middle)
+            {
+                var moved = e.Location != lastPoint;
+                base.OnMouseMove(e); // pans
+                if (moved && Plate.Parts.Count > 0)
+                {
+                    userView = true;
+                    layout = null;
+                    ViewChanged?.Invoke(this, EventArgs.Empty);
+                }
+                return;
+            }
+
+            if (pressedKey != null && e.Button == MouseButtons.Left)
+            {
+                if (dragKey == null
+                    && System.Math.Abs(e.X - pressPoint.X) <= DragThreshold
+                    && System.Math.Abs(e.Y - pressPoint.Y) <= DragThreshold)
+                    return;
+                dragKey = pressedKey;
+                dragOffsets[dragKey] = new PointF(pressOffset.X + e.X - pressPoint.X, pressOffset.Y + e.Y - pressPoint.Y);
+                Cursor = Cursors.SizeAll;
+                layout = null;
+                Invalidate();
+                ViewChanged?.Invoke(this, EventArgs.Empty);
+                return;
+            }
+
             base.OnMouseMove(e);
             var hit = HitTest(e.Location);
-            Cursor = hit != null ? Cursors.Hand : Cursors.Default;
-            if (hit != hoverKey)
+            Cursor = hit == null ? Cursors.Default : hit.DragKey != null ? Cursors.SizeAll : Cursors.Hand;
+            if (hit?.Key != hoverKey)
             {
-                hoverKey = hit;
+                hoverKey = hit?.Key;
                 Invalidate();
             }
         }
@@ -207,19 +302,60 @@ namespace OpenNest.Controls
             }
         }
 
+        /// <summary>
+        /// A press on a dimension's label waits for the release: a click opens it for editing,
+        /// a drag moves the dimension instead. A note opens at once; it has no drag.
+        /// </summary>
         protected override void OnMouseDown(MouseEventArgs e)
         {
             var hit = e.Button == MouseButtons.Left ? HitTest(e.Location) : null;
-            if (hit != null)
+            if (hit == null)
             {
-                LabelClicked?.Invoke(this, hit);
+                base.OnMouseDown(e);
                 return;
             }
-            base.OnMouseDown(e);
+
+            if (!Focused)
+                Focus();
+            if (hit.DragKey == null)
+            {
+                LabelClicked?.Invoke(this, hit.Key);
+                return;
+            }
+            pressedKey = hit.DragKey;
+            clickKey = hit.Key;
+            dragKey = null;
+            pressPoint = e.Location;
+            pressOffset = dragOffsets.TryGetValue(pressedKey, out var offset) ? offset : PointF.Empty;
         }
 
-        private string HitTest(Point location) =>
-            CurrentLayout().Labels.FirstOrDefault(l => l.Enabled && l.Bounds.Contains(location))?.Key;
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left || pressedKey == null)
+            {
+                base.OnMouseUp(e);
+                return;
+            }
+
+            var clicked = dragKey == null ? clickKey : null;
+            pressedKey = clickKey = dragKey = null;
+            layout = null;
+            Invalidate();
+            if (clicked != null)
+                LabelClicked?.Invoke(this, clicked);
+        }
+
+        /// <summary>Moves a dimension <paramref name="offset"/> pixels from its own place, as dragging its label does.</summary>
+        internal void SetDragOffset(string property, PointF offset)
+        {
+            dragOffsets[property] = offset;
+            layout = null;
+            Invalidate();
+            ViewChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private Label HitTest(Point location) =>
+            CurrentLayout().Labels.FirstOrDefault(l => l.Enabled && l.Bounds.Contains(location));
 
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -276,6 +412,9 @@ namespace OpenNest.Controls
             public RectangleF Bounds;
             public bool Enabled = true;
             public bool IsNote;
+
+            /// <summary>The property of the dimension a drag on this label moves; null for notes.</summary>
+            public string DragKey;
         }
 
         private sealed class AnnotationLayout
@@ -365,12 +504,36 @@ namespace OpenNest.Controls
                 new PointF(shape.Left, shape.Bottom), new PointF(shape.Right, shape.Bottom),
             }.Max(c => Dot(c, side));
 
-            var lineA = Along(a, side, extreme - Dot(a, side) + Gap);
-            var lineB = Along(b, side, extreme - Dot(b, side) + Gap);
+            // A drag moves the line out (or back, never onto the drawing) and the label along it.
+            var drag = DragOffset(d.Property);
+            var gap = System.Math.Max(Gap + Dot(drag, side), MinimumGap);
+            var along = new PointF(-side.Y, side.X);
+
+            var lineA = Along(a, side, extreme - Dot(a, side) + gap);
+            var lineB = Along(b, side, extreme - Dot(b, side) + gap);
             result.Lines.Add((Along(a, side, 3), Along(lineA, side, ExtensionOverrun)));
             result.Lines.Add((Along(b, side, 3), Along(lineB, side, ExtensionOverrun)));
             AddDimensionLine(result, lineA, lineB);
-            AddLabels(result, annotation, new PointF((lineA.X + lineB.X) / 2, (lineA.Y + lineB.Y) / 2), 0.5f);
+            AddLabelAlong(result, annotation, lineA, lineB, along, Dot(drag, along));
+        }
+
+        private PointF DragOffset(string property) =>
+            dragOffsets.TryGetValue(property, out var offset) ? offset : PointF.Empty;
+
+        /// <summary>
+        /// The labels centered on the line from <paramref name="a"/> to <paramref name="b"/>,
+        /// moved <paramref name="shift"/> pixels along <paramref name="along"/>. Moved past an
+        /// end, the line runs on to them.
+        /// </summary>
+        private void AddLabelAlong(AnnotationLayout result, Annotation annotation, PointF a, PointF b, PointF along, float shift)
+        {
+            var center = Along(new PointF((a.X + b.X) / 2, (a.Y + b.Y) / 2), along, shift);
+            var (low, high) = Dot(a, along) <= Dot(b, along) ? (a, b) : (b, a);
+            if (Dot(center, along) < Dot(low, along))
+                result.Lines.Add((low, center));
+            else if (Dot(center, along) > Dot(high, along))
+                result.Lines.Add((high, center));
+            AddLabels(result, annotation, center, 0.5f);
         }
 
         private void LayoutInline(AnnotationLayout result, Annotation annotation)
@@ -378,7 +541,10 @@ namespace OpenNest.Controls
             var a = ToScreen(annotation.Dimension.Start);
             var b = ToScreen(annotation.Dimension.End);
             AddDimensionLine(result, a, b);
-            AddLabels(result, annotation, new PointF((a.X + b.X) / 2, (a.Y + b.Y) / 2), 0.5f);
+            // The line stays on its points; a drag slides only the label along it.
+            var length = (float)System.Math.Sqrt(Dot(new PointF(b.X - a.X, b.Y - a.Y), new PointF(b.X - a.X, b.Y - a.Y)));
+            var along = length > 0 ? new PointF((b.X - a.X) / length, (b.Y - a.Y) / length) : new PointF(1, 0);
+            AddLabelAlong(result, annotation, a, b, along, Dot(DragOffset(annotation.Dimension.Property), along));
         }
 
         private void LayoutLeader(AnnotationLayout result, Annotation annotation, RectangleF shape)
@@ -391,8 +557,11 @@ namespace OpenNest.Controls
             var exitX = dir.X > 0 ? (shape.Right - p.X) / dir.X : dir.X < 0 ? (shape.Left - p.X) / dir.X : float.MaxValue;
             var exitY = dir.Y > 0 ? (shape.Bottom - p.Y) / dir.Y : dir.Y < 0 ? (shape.Top - p.Y) / dir.Y : float.MaxValue;
             var length = System.Math.Max(System.Math.Min(exitX, exitY), 0) + LeaderClearance;
+            // A drag moves the label end anywhere; the leader swings to follow.
+            var drag = DragOffset(d.Property);
             var end = Along(p, dir, length);
-            var right = dir.X >= 0;
+            end = new PointF(end.X + drag.X, end.Y + drag.Y);
+            var right = end.X >= p.X;
             var shoulder = new PointF(end.X + (right ? Shoulder : -Shoulder), end.Y);
 
             result.Lines.Add((p, end));
@@ -422,11 +591,18 @@ namespace OpenNest.Controls
             var x = anchor.X - total * alignX;
             var y = anchor.Y - main.Height / 2;
 
-            result.Labels.Add(new Label { Key = d.Property, Text = annotation.Text, Bounds = new RectangleF(x, y, main.Width, main.Height) });
+            result.Labels.Add(new Label
+            {
+                Key = d.Property,
+                DragKey = d.Property,
+                Text = annotation.Text,
+                Bounds = new RectangleF(x, y, main.Width, main.Height),
+            });
             if (hasCount)
                 result.Labels.Add(new Label
                 {
                     Key = d.CountProperty,
+                    DragKey = d.Property,
                     Text = annotation.CountText,
                     Bounds = new RectangleF(x + main.Width, y, count.Width, count.Height),
                 });

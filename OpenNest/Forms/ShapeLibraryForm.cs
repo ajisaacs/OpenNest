@@ -48,6 +48,9 @@ namespace OpenNest.Forms
         private bool suppressPreview;
         private Control editor;
 
+        // The next preview shows a different shape (or configuration): fit it and reset dragged dimensions.
+        private bool newShape = true;
+
         public ShapeLibraryForm(IEnumerable<string> existingDrawingNames = null)
         {
             existingNames =
@@ -67,6 +70,7 @@ namespace OpenNest.Forms
             shapeListView.SelectedIndexChanged += ShapeListView_SelectedIndexChanged;
             configComboBox.SelectedIndexChanged += ConfigComboBox_SelectedIndexChanged;
             previewBox.LabelClicked += PreviewBox_LabelClicked;
+            previewBox.ViewChanged += PreviewBox_ViewChanged;
             addButton.Click += AddButton_Click;
             closeButton.Click += (s, e) => Close();
 
@@ -238,6 +242,7 @@ namespace OpenNest.Forms
             }
 
             suppressPreview = false;
+            newShape = true;
             UpdatePreview();
         }
 
@@ -252,6 +257,7 @@ namespace OpenNest.Forms
             suppressPreview = true;
             LoadParameters(selectedEntry.ShapeType, config);
             suppressPreview = false;
+            newShape = true;
             UpdatePreview();
         }
 
@@ -292,7 +298,8 @@ namespace OpenNest.Forms
 
                 addButton.Enabled = true;
                 nameTextBox.Text = shape.GenerateName();
-                previewBox.ShowDrawing(drawing);
+                previewBox.ShowDrawing(drawing, newShape);
+                newShape = false;
 
                 var dimensions = shape.GetDimensions()
                     .Where(d => Parameter(d.Property) != null)
@@ -393,6 +400,18 @@ namespace OpenNest.Forms
         #region On-drawing editors
 
         private void PreviewBox_LabelClicked(object sender, string key) => EditParameter(key);
+
+        /// <summary>Keeps an open editor over its label as the view zooms, pans or the dimension moves.</summary>
+        private void PreviewBox_ViewChanged(object sender, EventArgs e)
+        {
+            if (editor == null || previewBox.ActiveKey == null)
+                return;
+            var bounds = previewBox.LabelBounds(previewBox.ActiveKey);
+            if (bounds == null)
+                CloseEditor();
+            else
+                editor.Location = bounds.Value.Location;
+        }
 
         /// <summary>
         /// Opens the editor for a parameter over its label: a text box for a number, a list for

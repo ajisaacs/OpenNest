@@ -158,6 +158,74 @@ public class ShapeLibraryFormTests
     });
 
     [Fact]
+    public void DraggingADimensionLabelMovesItAndAClickStillEdits() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        SelectShape(form, typeof(RectangleShape));
+        var preview = Find<ShapePreviewControl>(form, "previewBox");
+        var before = preview.LabelBounds("Length")!.Value;
+        var grab = new Point(before.X + before.Width / 2, before.Y + before.Height / 2);
+
+        Mouse(preview, "OnMouseDown", MouseButtons.Left, grab);
+        Mouse(preview, "OnMouseMove", MouseButtons.Left, new Point(grab.X + 30, grab.Y + 40));
+        Mouse(preview, "OnMouseUp", MouseButtons.Left, new Point(grab.X + 30, grab.Y + 40));
+
+        var after = preview.LabelBounds("Length")!.Value;
+        Assert.Null(form.ActiveEditor);
+        Assert.InRange(after.Y, before.Y + 39, before.Y + 41);
+        Assert.InRange(after.X, before.X + 29, before.X + 31);
+
+        var moved = new Point(after.X + after.Width / 2, after.Y + after.Height / 2);
+        Mouse(preview, "OnMouseDown", MouseButtons.Left, moved);
+        Mouse(preview, "OnMouseUp", MouseButtons.Left, moved);
+        Assert.Equal("Length", preview.ActiveKey);
+        Assert.Equal(after.Location, form.ActiveEditor!.Location);
+    });
+
+    [Fact]
+    public void ALinearDimensionCannotBeDraggedOntoTheDrawing() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        SelectShape(form, typeof(RectangleShape));
+        var preview = Find<ShapePreviewControl>(form, "previewBox");
+        var before = preview.LabelBounds("Length")!.Value;
+
+        preview.SetDragOffset("Length", new PointF(0, -500));
+
+        // The length sits below the drawing: it may come closer, never above its bottom edge.
+        var after = preview.LabelBounds("Length")!.Value;
+        Assert.True(after.Y < before.Y);
+        Assert.True(after.Y > before.Y - 20);
+    });
+
+    [Fact]
+    public void WheelZoomIsKeptWhileEditingAndFitResetsIt() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        SelectShape(form, typeof(RectangleShape));
+        var preview = Find<ShapePreviewControl>(form, "previewBox");
+        var fitted = preview.ViewScale;
+
+        Mouse(preview, "OnMouseWheel", MouseButtons.None, new Point(100, 100), 120);
+        var zoomed = preview.ViewScale;
+        Assert.True(zoomed > fitted);
+        Assert.True(preview.IsUserView);
+
+        var box = OpenEditor(form, "Length");
+        box.Text = "20";
+        Press(box, Keys.Enter);
+        Assert.Equal(zoomed, preview.ViewScale);
+        Assert.True(preview.IsUserView);
+
+        preview.ZoomToFit();
+        Assert.False(preview.IsUserView);
+
+        Mouse(preview, "OnMouseWheel", MouseButtons.None, new Point(100, 100), 120);
+        SelectShape(form, typeof(CircleShape));
+        Assert.False(preview.IsUserView);
+    });
+
+    [Fact]
     public void ShapeGridShowsAThumbnailForEveryShape() => ArchUnitsTests.RunSta(() =>
     {
         using var form = new ShapeLibraryForm();
@@ -217,6 +285,10 @@ public class ShapeLibraryFormTests
         form.EditParameter(key);
         return Assert.IsAssignableFrom<TextBox>(form.ActiveEditor);
     }
+
+    private static void Mouse(Control control, string method, MouseButtons button, Point location, int delta = 0) =>
+        control.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(control, new object[] { new MouseEventArgs(button, 1, location.X, location.Y, delta) });
 
     private static void Press(Control control, Keys key) => typeof(Control)
         .GetMethod("OnKeyDown", BindingFlags.Instance | BindingFlags.NonPublic)!
