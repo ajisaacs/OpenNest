@@ -37,19 +37,20 @@ namespace OpenNest.Shapes
             var dimensions = new List<ShapeDimension>
             {
                 ShapeDimension.Linear(nameof(OD), new Vector(-OD / 2, 0), new Vector(OD / 2, 0), ShapeDimension.Up, "Ø"),
+                // Measures the dotted bolt circle through the hole centers.
                 ShapeDimension.Linear(nameof(HolePatternDiameter), new Vector(-HolePatternDiameter / 2, 0),
-                    new Vector(HolePatternDiameter / 2, 0), ShapeDimension.Down, "Ø"),
+                    new Vector(HolePatternDiameter / 2, 0), ShapeDimension.Down, "Ø").WithCircle(),
             };
 
-            // The leader starts on the hole nearest 45 degrees, at its edge facing out that way.
+            // The leader crosses the hole nearest 45 degrees through its center, out that way.
             if (HoleCount > 0)
             {
                 var step = 2.0 * System.Math.PI / HoleCount;
                 var angle = System.Math.Round(System.Math.PI / 4 / step) * step;
                 var out45 = new Vector(System.Math.Sqrt(0.5), System.Math.Sqrt(0.5));
                 var center = new Vector(HolePatternDiameter / 2 * System.Math.Cos(angle), HolePatternDiameter / 2 * System.Math.Sin(angle));
-                var edge = new Vector(center.X + out45.X * HoleDiameter / 2, center.Y + out45.Y * HoleDiameter / 2);
-                dimensions.Add(ShapeDimension.Leader(nameof(HoleDiameter), edge, out45, "Ø").WithCount(nameof(HoleCount), "holes"));
+                dimensions.Add(ShapeDimension.HoleLeader(nameof(HoleDiameter), center, HoleDiameter / 2, out45, "Ø")
+                    .WithCount(nameof(HoleCount), "holes"));
             }
 
             return dimensions;

@@ -56,9 +56,42 @@ namespace OpenNest.Shapes
         /// <summary>The plural noun after the count, such as "holes".</summary>
         public string CountNoun { get; private init; }
 
+        /// <summary>
+        /// The center of the hole a diameter leader calls out; null for other dimensions.
+        /// The leader's line crosses the hole through it, whichever way the label is dragged.
+        /// </summary>
+        public Vector? HoleCenter { get; private init; }
+
+        /// <summary>The radius of the hole at <see cref="HoleCenter"/>.</summary>
+        public double HoleRadius { get; private init; }
+
+        /// <summary>
+        /// True when <see cref="Start"/> and <see cref="End"/> span the diameter of a reference
+        /// circle (such as a flange's bolt circle) that the preview draws dotted.
+        /// </summary>
+        public bool DrawsCircle { get; private init; }
+
         /// <summary>This dimension with "x {count} {noun}" after its value.</summary>
         public ShapeDimension WithCount(string countProperty, string noun) =>
-            new(Property, Kind, Start, End, Side, Prefix) { CountProperty = countProperty, CountNoun = noun };
+            new(Property, Kind, Start, End, Side, Prefix)
+            {
+                CountProperty = countProperty,
+                CountNoun = noun,
+                HoleCenter = HoleCenter,
+                HoleRadius = HoleRadius,
+                DrawsCircle = DrawsCircle,
+            };
+
+        /// <summary>This dimension measuring a dotted circle whose diameter runs from <see cref="Start"/> to <see cref="End"/>.</summary>
+        public ShapeDimension WithCircle() =>
+            new(Property, Kind, Start, End, Side, Prefix)
+            {
+                CountProperty = CountProperty,
+                CountNoun = CountNoun,
+                HoleCenter = HoleCenter,
+                HoleRadius = HoleRadius,
+                DrawsCircle = true,
+            };
 
         /// <summary>
         /// Measures from <paramref name="start"/> to <paramref name="end"/> across
@@ -75,6 +108,22 @@ namespace OpenNest.Shapes
             var length = System.Math.Sqrt(direction.X * direction.X + direction.Y * direction.Y);
             return new(property, ShapeDimensionKind.Leader, point, point,
                 new Vector(direction.X / length, direction.Y / length), prefix);
+        }
+
+        /// <summary>
+        /// A diameter leader on the hole at <paramref name="center"/>: it starts on the hole's
+        /// edge facing <paramref name="direction"/>, and its line runs across the hole through the center.
+        /// </summary>
+        public static ShapeDimension HoleLeader(string property, Vector center, double radius, Vector direction, string prefix = "")
+        {
+            var length = System.Math.Sqrt(direction.X * direction.X + direction.Y * direction.Y);
+            var unit = new Vector(direction.X / length, direction.Y / length);
+            var edge = new Vector(center.X + unit.X * radius, center.Y + unit.Y * radius);
+            return new(property, ShapeDimensionKind.Leader, edge, edge, unit, prefix)
+            {
+                HoleCenter = center,
+                HoleRadius = radius,
+            };
         }
 
         /// <summary>The distance the dimension shows between its points (zero for a leader).</summary>

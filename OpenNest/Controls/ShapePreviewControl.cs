@@ -421,6 +421,9 @@ namespace OpenNest.Controls
         {
             public readonly List<(PointF A, PointF B)> Lines = new();
             public readonly List<(PointF Tip, PointF From)> Arrows = new();
+
+            /// <summary>Dotted reference circles, such as a flange's bolt circle.</summary>
+            public readonly List<(PointF Center, float Radius)> Circles = new();
             public readonly List<Label> Labels = new();
 
             /// <summary>Everything the dimensions draw (not the notes), in control pixels.</summary>
@@ -511,6 +514,9 @@ namespace OpenNest.Controls
 
             var lineA = Along(a, side, extreme - Dot(a, side) + gap);
             var lineB = Along(b, side, extreme - Dot(b, side) + gap);
+            if (d.DrawsCircle)
+                result.Circles.Add((new PointF((a.X + b.X) / 2, (a.Y + b.Y) / 2),
+                    (float)System.Math.Sqrt(Dot(new PointF(b.X - a.X, b.Y - a.Y), new PointF(b.X - a.X, b.Y - a.Y))) / 2));
             result.Lines.Add((Along(a, side, 3), Along(lineA, side, ExtensionOverrun)));
             result.Lines.Add((Along(b, side, 3), Along(lineB, side, ExtensionOverrun)));
             AddDimensionLine(result, lineA, lineB);
@@ -564,10 +570,40 @@ namespace OpenNest.Controls
             var right = end.X >= p.X;
             var shoulder = new PointF(end.X + (right ? Shoulder : -Shoulder), end.Y);
 
-            result.Lines.Add((p, end));
+            if (!AddHoleDiameter(result, d, end))
+            {
+                result.Lines.Add((p, end));
+                result.Arrows.Add((p, end));
+            }
             result.Lines.Add((end, shoulder));
-            result.Arrows.Add((p, end));
             AddLabels(result, annotation, new PointF(shoulder.X + (right ? 2 : -2), shoulder.Y), right ? 0 : 1);
+        }
+
+        /// <summary>
+        /// For a hole's diameter leader, the line from <paramref name="end"/> straight through the
+        /// hole's center to its far edge, with arrows pointing out onto both edges; false (nothing added) for
+        /// other leaders, or when the label end sits inside the hole.
+        /// </summary>
+        private bool AddHoleDiameter(AnnotationLayout result, ShapeDimension d, PointF end)
+        {
+            if (d.HoleCenter is not { } holeCenter || d.HoleRadius <= 0)
+                return false;
+
+            var center = ToScreen(holeCenter);
+            var radius = LengthWorldToGui(d.HoleRadius);
+            var toEnd = new PointF(end.X - center.X, end.Y - center.Y);
+            var distance = (float)System.Math.Sqrt(Dot(toEnd, toEnd));
+            if (distance <= radius)
+                return false;
+
+            var u = new PointF(toEnd.X / distance, toEnd.Y / distance);
+            var near = Along(center, u, radius);
+            var far = Along(center, u, -radius);
+            result.Lines.Add((far, end));
+            // Both arrows point out from the center onto the hole's edges.
+            result.Arrows.Add((near, center));
+            result.Arrows.Add((far, center));
+            return true;
         }
 
         private static void AddDimensionLine(AnnotationLayout result, PointF a, PointF b)
@@ -653,6 +689,10 @@ namespace OpenNest.Controls
             using var line = new Pen(DimensionColor, 1f);
             foreach (var (a, b) in drawn.Lines)
                 g.DrawLine(line, a, b);
+
+            using var dotted = new Pen(DimensionColor, 1f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dot };
+            foreach (var (center, radius) in drawn.Circles)
+                g.DrawEllipse(dotted, center.X - radius, center.Y - radius, 2 * radius, 2 * radius);
 
             using var arrowBrush = new SolidBrush(DimensionColor);
             foreach (var (tip, from) in drawn.Arrows)

@@ -49,6 +49,35 @@ public class ShapeDimensionTests
         Assert.Equal("holes", holes.CountNoun);
     }
 
+    [Theory]
+    [InlineData(4)]
+    [InlineData(8)]
+    public void FlangeHoleLeaderCrossesAHoleThroughItsCenter(int holeCount)
+    {
+        var flange = new PipeFlangeShape { OD = 7.5, HoleDiameter = 0.875, HolePatternDiameter = 5.5, HoleCount = holeCount };
+
+        var holes = flange.GetDimensions().Single(d => d.Property == nameof(PipeFlangeShape.HoleDiameter));
+
+        Assert.NotNull(holes.HoleCenter);
+        var center = holes.HoleCenter!.Value;
+        Assert.Equal(5.5 / 2, center.DistanceTo(new OpenNest.Geometry.Vector(0, 0)), 6);
+        Assert.Equal(0.875 / 2, holes.HoleRadius, 6);
+        Assert.Equal(holes.HoleRadius, holes.Start.DistanceTo(center), 6);
+        Assert.Equal(nameof(PipeFlangeShape.HoleCount), holes.CountProperty);
+    }
+
+    [Fact]
+    public void FlangeHolePatternMeasuresADottedBoltCircle()
+    {
+        var flange = new PipeFlangeShape();
+        flange.SetPreviewDefaults();
+
+        var pattern = flange.GetDimensions().Single(d => d.Property == nameof(PipeFlangeShape.HolePatternDiameter));
+
+        Assert.True(pattern.DrawsCircle);
+        Assert.Equal(flange.HolePatternDiameter, pattern.Start.DistanceTo(pattern.End), 6);
+    }
+
     [Fact]
     public void RoundedRectangleRadiusLeaderStartsOnTheCornerArc()
     {
