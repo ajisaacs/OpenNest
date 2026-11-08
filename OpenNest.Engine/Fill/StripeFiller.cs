@@ -1,7 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
+using System.Threading.Tasks;
 using OpenNest.Engine;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Strategies;
@@ -41,9 +44,10 @@ public class StripeFiller
             return new List<Part>();
 
         var workArea = _context.WorkArea;
-        var spacing = _context.Plate.PartSpacing;
         var drawing = _context.Item.Drawing;
         var strategyName = _primaryAxis == NestDirection.Horizontal ? "Row" : "Column";
+
+        var layouts = ComputeLayouts(bestFits, drawing);
 
         List<Part> bestParts = null;
 
@@ -51,48 +55,25 @@ public class StripeFiller
         {
             _context.Token.ThrowIfCancellationRequested();
 
-            var candidate = bestFits[i];
-            var pairParts = candidate.BuildParts(drawing);
-
-            foreach (var axis in new[] { NestDirection.Horizontal, NestDirection.Vertical })
+            for (var a = 0; a < Axes.Length; a++)
             {
-                var perpAxis =
-                    axis == NestDirection.Horizontal
-                        ? NestDirection.Vertical
-                        : NestDirection.Horizontal;
-                var sheetSpan = GetDimension(workArea, axis);
+                var axis = Axes[a];
                 var dirLabel = axis == NestDirection.Horizontal ? "Row" : "Col";
 
-                var expandResult = ConvergeStripeAngle(
-                    pairParts,
-                    sheetSpan,
-                    spacing,
-                    axis,
-                    _context.Token,
-                    _context.MaxQuantity
-                );
-                var shrinkResult = ConvergeStripeAngleShrink(
-                    pairParts,
-                    sheetSpan,
-                    spacing,
-                    axis,
-                    _context.Token,
-                    _context.MaxQuantity
-                );
-
-                foreach (var (angle, waste, count) in new[] { expandResult, shrinkResult })
+                for (var v = 0; v < VariantsPerAxis; v++)
                 {
-                    if (count <= 0)
+                    var layout = layouts[LayoutIndex(i, a, v)];
+                    if (layout.Count <= 0)
                         continue;
 
-                    var result = BuildGrid(pairParts, angle, axis, perpAxis);
+                    var result = ClaimGrid(layout, axis);
 
                     if (result == null || result.Count == 0)
                         continue;
 
                     Debug.WriteLine(
                         $"[StripeFiller] {strategyName} candidate {i} {dirLabel}: "
-                            + $"angle={Angle.ToDegrees(angle):F1}°, N={count}, waste={waste:F2}, "
+                            + $"angle={Angle.ToDegrees(layout.Angle):F1}°, N={layout.Count}, waste={layout.Waste:F2}, "
                             + $"grid={result.Count} parts"
                     );
 
@@ -112,22 +93,148 @@ public class StripeFiller
         return bestParts ?? new List<Part>();
     }
 
-    private List<Part> BuildGrid(
-        List<Part> pairParts,
-        double angle,
-        NestDirection primaryAxis,
-        NestDirection perpAxis
-    )
+    private static readonly NestDirection[] Axes = { NestDirection.Horizontal, NestDirection.Vertical };
+
+    /// <summary>Expanding (<see cref="ConvergeStripeAngle"/>) then shrinking convergence.</summary>
+    private const int VariantsPerAxis = 2;
+
+    private static int LayoutIndex(int candidate, int axis, int variant) =>
+        (candidate * Axes.Length + axis) * VariantsPerAxis + variant;
+
+    /// <summary>
+    /// A converged stripe angle and, when it holds a pattern, the rotated pattern and the grid
+    /// it tiles before the order-dependent steps (<see cref="GridDedup"/> claim, cached remnant
+    /// fill).
+    /// </summary>
+    private sealed class StripeLayout
     {
+        public double Angle;
+        public double Waste;
+        public int Count;
+        public Pattern Pattern;
+        public bool GridReady;
+        public List<Part> Grid;
+    }
+
+    /// <summary>
+    /// Converges every candidate's stripe angle per axis and variant, then tiles the grids that
+    /// <see cref="Fill"/> will claim, each step in parallel. Every layout is a pure function of
+    /// its candidate, axis and variant (fresh part clones, per-call <see cref="FillLinear"/>
+    /// state), so the results do not depend on the thread count. A grid is tiled only when its
+    /// configuration is not yet claimed and no earlier layout shares it: claims are only ever
+    /// added, so exactly those are the grids the sequential loop would have tiled.
+    /// <see cref="Fill"/> then claims, fills remnants and ranks in the original order.
+    /// </summary>
+    private StripeLayout[] ComputeLayouts(List<BestFitResult> bestFits, Drawing drawing)
+    {
+        var layouts = new StripeLayout[bestFits.Count * Axes.Length * VariantsPerAxis];
+
+        RunParallel(layouts.Length, index =>
+        {
+            var variant = index % VariantsPerAxis;
+            var axis = Axes[index / VariantsPerAxis % Axes.Length];
+            var candidate = bestFits[index / VariantsPerAxis / Axes.Length];
+            layouts[index] = Converge(candidate.BuildParts(drawing), axis, variant);
+        });
+
+        var batch = new GridDedup();
+        var toTile = new List<int>();
+        for (var index = 0; index < layouts.Length; index++)
+        {
+            var layout = layouts[index];
+            if (layout.Count <= 0)
+                continue;
+
+            var axis = Axes[index / VariantsPerAxis % Axes.Length];
+            var box = layout.Pattern.BoundingBox;
+            if (!_dedup.Contains(box, _context.WorkArea, axis) && batch.TryAdd(box, _context.WorkArea, axis))
+                toTile.Add(index);
+        }
+
+        RunParallel(toTile.Count, k =>
+        {
+            var index = toTile[k];
+            var layout = layouts[index];
+            layout.Grid = BuildGrid(layout.Pattern, Axes[index / VariantsPerAxis % Axes.Length]);
+            layout.GridReady = true;
+        });
+
+        return layouts;
+    }
+
+    private void RunParallel(int count, Action<int> body)
+    {
+        try
+        {
+            Parallel.For(0, count, new ParallelOptions { CancellationToken = _context.Token }, body);
+        }
+        catch (AggregateException ex)
+        {
+            // Surface the failure itself, cancellation included, as the sequential loop did.
+            ExceptionDispatchInfo.Capture(ex.InnerExceptions[0]).Throw();
+            throw;
+        }
+    }
+
+    private StripeLayout Converge(List<Part> pairParts, NestDirection axis, int variant)
+    {
+        var spacing = _context.Plate.PartSpacing;
+        var sheetSpan = GetDimension(_context.WorkArea, axis);
+
+        var (angle, waste, count) = variant == 0
+            ? ConvergeStripeAngle(pairParts, sheetSpan, spacing, axis, _context.Token, _context.MaxQuantity)
+            : ConvergeStripeAngleShrink(pairParts, sheetSpan, spacing, axis, _context.Token, _context.MaxQuantity);
+
+        var layout = new StripeLayout { Angle = angle, Waste = waste, Count = count };
+        if (count > 0)
+            layout.Pattern = FillHelpers.BuildRotatedPattern(pairParts, angle);
+
+        return layout;
+    }
+
+    /// <summary>
+    /// The order-dependent half of a stripe grid: claims its configuration and adds the cached
+    /// remnant fill. Null when the configuration was already evaluated or no grid fits.
+    /// </summary>
+    private List<Part> ClaimGrid(StripeLayout layout, NestDirection primaryAxis)
+    {
+        if (!_dedup.TryAdd(layout.Pattern.BoundingBox, _context.WorkArea, primaryAxis))
+            return null;
+
+        // ComputeLayouts tiled every grid a claim can succeed for; tile here should it not have.
+        var gridParts = layout.GridReady ? layout.Grid : BuildGrid(layout.Pattern, primaryAxis);
+        if (gridParts == null)
+            return null;
+
+        var allParts = new List<Part>(gridParts);
+
+        // A capped fill that already holds the quantity needs no remnant parts.
+        if (_context.MaxQuantity > 0 && gridParts.Count >= _context.MaxQuantity)
+            return allParts;
+
+        var remnantParts = FillRemnant(gridParts, primaryAxis);
+        if (remnantParts != null)
+        {
+            Debug.WriteLine($"[StripeFiller] Remnant: {remnantParts.Count} parts");
+            allParts.AddRange(remnantParts);
+        }
+
+        return allParts;
+    }
+
+    /// <summary>
+    /// Tiles the rotated pattern into a stripe and the stripe into a grid. Pure: reads only the
+    /// pattern and the context's fixed inputs.
+    /// </summary>
+    private List<Part> BuildGrid(Pattern rotatedPattern, NestDirection primaryAxis)
+    {
+        var perpAxis =
+            primaryAxis == NestDirection.Horizontal ? NestDirection.Vertical : NestDirection.Horizontal;
         var workArea = _context.WorkArea;
         var spacing = _context.Plate.PartSpacing;
 
-        var rotatedPattern = FillHelpers.BuildRotatedPattern(pairParts, angle);
         var perpDim = GetDimension(rotatedPattern.BoundingBox, perpAxis);
         var stripeBox = MakeStripeBox(workArea, perpDim, primaryAxis);
-
-        if (!_dedup.TryAdd(rotatedPattern.BoundingBox, workArea, primaryAxis))
-            return null;
 
         var stripeEngine = new FillLinear(stripeBox, spacing)
         {
@@ -187,20 +294,7 @@ public class StripeFiller
             return null;
         }
 
-        var allParts = new List<Part>(gridParts);
-
-        // A capped fill that already holds the quantity needs no remnant parts.
-        if (_context.MaxQuantity > 0 && gridParts.Count >= _context.MaxQuantity)
-            return allParts;
-
-        var remnantParts = FillRemnant(gridParts, primaryAxis);
-        if (remnantParts != null)
-        {
-            Debug.WriteLine($"[StripeFiller] Remnant: {remnantParts.Count} parts");
-            allParts.AddRange(remnantParts);
-        }
-
-        return allParts;
+        return gridParts;
     }
 
     private List<BestFitResult> GetPairCandidates()

@@ -744,15 +744,39 @@ namespace OpenNest.Geometry
             SlideContactClassifier contacts
         )
         {
+            return DirectionalDistance(
+                movingEntities,
+                ExtractEntityVertices(movingEntities),
+                stationaryEntities,
+                ExtractEntityVertices(stationaryEntities),
+                direction,
+                contacts
+            );
+        }
+
+        /// <summary>
+        /// <see cref="DirectionalDistance(List{Entity}, List{Entity}, Vector, SlideContactClassifier)"/>
+        /// with each list's <see cref="ExtractEntityVertices"/> result supplied by a caller that
+        /// slides one list against several others. The vertices must come from these exact lists.
+        /// </summary>
+        public static double DirectionalDistance(
+            List<Entity> movingEntities,
+            Vector[] movingVertices,
+            List<Entity> stationaryEntities,
+            Vector[] stationaryVertices,
+            Vector direction,
+            SlideContactClassifier contacts
+        )
+        {
             // Phases: vertex rays both ways, arc-to-line closest points (vertex sampling
             // misses interior arc contact), then native curve tangency.
             var source = new EntitySlideEvents(
                 movingEntities,
-                ExtractEntityVertices(movingEntities),
+                movingVertices,
                 0,
                 0,
                 stationaryEntities,
-                ExtractEntityVertices(stationaryEntities),
+                stationaryVertices,
                 direction.X,
                 direction.Y,
                 arcToLine: true
@@ -762,7 +786,9 @@ namespace OpenNest.Geometry
 
         public static Vector[] ExtractEntityVertices(List<Entity> entities)
         {
-            var vertices = new HashSet<Vector>();
+            // Presized: a set without removals enumerates in insertion order whatever its
+            // capacity, so this only saves the rehashes of growing from empty.
+            var vertices = new HashSet<Vector>(entities.Count * 2);
 
             for (var i = 0; i < entities.Count; i++)
             {

@@ -170,6 +170,55 @@ namespace OpenNest.Engine.Strategies
         }
 
         /// <summary>
+        /// <see cref="BestOverAngles"/> for a pure per-angle fill: every angle is filled in
+        /// parallel, then <paramref name="recordResult"/>, the ranking and the progress reports run
+        /// once per angle in angle order, so the result does not depend on the thread count.
+        /// <paramref name="fillAtAngle"/> must not touch shared state; side effects of an angle's
+        /// result belong in <paramref name="recordResult"/>.
+        /// </summary>
+        public static List<Part> BestOverAnglesInParallel(
+            FillContext context,
+            IReadOnlyList<double> angles,
+            Func<double, List<Part>> fillAtAngle,
+            Action<double, List<Part>> recordResult,
+            string phaseLabel
+        )
+        {
+            var results = new List<Part>[angles.Count];
+
+            try
+            {
+                Parallel.For(
+                    0,
+                    angles.Count,
+                    new ParallelOptions { CancellationToken = context.Token },
+                    i => results[i] = fillAtAngle(angles[i])
+                );
+            }
+            catch (AggregateException ex)
+            {
+                // Surface the failure itself, cancellation included, as the sequential sweep did.
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo
+                    .Capture(ex.InnerExceptions[0])
+                    .Throw();
+                throw;
+            }
+
+            var next = 0;
+            return BestOverAngles(
+                context,
+                angles,
+                angle =>
+                {
+                    var result = results[next++];
+                    recordResult(angle, result);
+                    return result;
+                },
+                phaseLabel
+            );
+        }
+
+        /// <summary>
         /// Checks if any pair of parts geometrically overlap. Uses bounding box
         /// pre-filtering for performance, then falls back to shape intersection.
         /// </summary>

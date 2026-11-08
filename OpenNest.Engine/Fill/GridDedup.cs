@@ -24,6 +24,13 @@ public class GridDedup
         return _seen.TryAdd(key, 0);
     }
 
+    /// <summary>
+    /// True if <see cref="TryAdd"/> already accepted this configuration. Claims are never
+    /// removed, so a configuration seen now stays rejected.
+    /// </summary>
+    public bool Contains(Box patternBox, Box workArea, NestDirection dir) =>
+        _seen.ContainsKey(new GridKey(patternBox, workArea, dir));
+
     public int Count => _seen.Count;
 
     /// <summary>

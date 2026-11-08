@@ -20,7 +20,8 @@ namespace OpenNest.Engine.Strategies
             var comparer = context.Policy?.Comparer ?? new DefaultFillComparer();
             var preferred = context.Policy?.PreferredDirection;
 
-            return FillHelpers.BestOverAngles(
+            // Each angle's fill is independent; its angle result is recorded in angle order.
+            return FillHelpers.BestOverAnglesInParallel(
                 context,
                 angles,
                 angle =>
@@ -29,13 +30,15 @@ namespace OpenNest.Engine.Strategies
                     {
                         Label = "Linear",
                     };
-                    var result = FillHelpers.FillWithDirectionPreference(
+                    return FillHelpers.FillWithDirectionPreference(
                         dir => engine.Fill(context.Item.Drawing, angle, dir),
                         preferred,
                         comparer,
                         workArea
                     );
-
+                },
+                (angle, result) =>
+                {
                     if (result != null && result.Count > 0)
                     {
                         context.AngleResults.Add(
@@ -47,8 +50,6 @@ namespace OpenNest.Engine.Strategies
                             }
                         );
                     }
-
-                    return result;
                 },
                 "Linear"
             );

@@ -33,32 +33,57 @@ namespace OpenNest.Geometry
             if (SignedArea(verts) < 0)
                 verts.Reverse();
 
-            // Build a linked list of vertex indices.
-            var indices = new List<int>(verts.Count);
+            // The remaining vertices, in their original order, as a circular linked list: head is
+            // the first remaining vertex (scan position 0), and cutting an ear unlinks one vertex
+            // instead of shifting every later index down.
+            var count = verts.Count;
+            var nextOf = new int[count];
+            var prevOf = new int[count];
+            for (var i = 0; i < count; i++)
+            {
+                nextOf[i] = (i + 1) % count;
+                prevOf[i] = (i + count - 1) % count;
+            }
 
-            for (var i = 0; i < verts.Count; i++)
-                indices.Add(i);
+            var head = 0;
+            var n = count;
 
-            var n = indices.Count;
+            // The scan restarts at the first remaining vertex after every ear. A vertex that
+            // failed the ear test keeps failing it while its two neighbors are unchanged and
+            // the vertex found inside its triangle (or none, when it was not convex) remains,
+            // since the test depends on nothing else. Remembering why it failed skips repeating
+            // the O(n) test; the vertices visited, their verdicts and the ears cut are the same.
+            var removed = new bool[count];
+            var failedPrev = new int[count];
+            var failedNext = new int[count];
+            var failedBlocker = new int[count];
+            for (var i = 0; i < count; i++)
+                failedPrev[i] = -1;
 
             // Safety counter to avoid infinite loop on degenerate polygons.
             var maxIterations = n * n;
             var iterations = 0;
-            var i0 = 0;
+            var cursor = head;
 
             while (n > 2 && iterations < maxIterations)
             {
                 iterations++;
 
-                var prevIdx = (i0 + n - 1) % n;
-                var currIdx = i0 % n;
-                var nextIdx = (i0 + 1) % n;
+                var currVertex = cursor;
+                var prevVertex = prevOf[currVertex];
+                var nextVertex = nextOf[currVertex];
 
-                var prev = verts[indices[prevIdx]];
-                var curr = verts[indices[currIdx]];
-                var next = verts[indices[nextIdx]];
+                var knownNotEar =
+                    failedPrev[currVertex] == prevVertex
+                    && failedNext[currVertex] == nextVertex
+                    && (failedBlocker[currVertex] < 0 || !removed[failedBlocker[currVertex]]);
 
-                if (IsEar(prev, curr, next, verts, indices, n))
+                var prev = verts[prevVertex];
+                var curr = verts[currVertex];
+                var next = verts[nextVertex];
+
+                var blocker = failedBlocker[currVertex];
+                if (!knownNotEar && IsEar(prev, curr, next, verts, nextOf, head, n, out blocker))
                 {
                     var tri = new Polygon();
                     tri.Vertices.Add(prev);
@@ -67,16 +92,25 @@ namespace OpenNest.Geometry
                     tri.Close();
                     triangles.Add(tri);
 
-                    indices.RemoveAt(currIdx);
+                    nextOf[prevVertex] = nextVertex;
+                    prevOf[nextVertex] = prevVertex;
+                    removed[currVertex] = true;
+                    if (head == currVertex)
+                        head = nextVertex;
                     n--;
-                    i0 = 0;
+                    cursor = head;
                 }
                 else
                 {
-                    i0++;
+                    if (!knownNotEar)
+                    {
+                        failedPrev[currVertex] = prevVertex;
+                        failedNext[currVertex] = nextVertex;
+                        failedBlocker[currVertex] = blocker;
+                    }
 
-                    if (i0 >= n)
-                        i0 = 0;
+                    // The last remaining vertex links back to head, as position n wraps to 0.
+                    cursor = nextVertex;
                 }
             }
 
@@ -85,25 +119,31 @@ namespace OpenNest.Geometry
 
         /// <summary>
         /// Tests whether the vertex at curr forms an ear (a convex vertex whose
-        /// triangle contains no other polygon vertices).
+        /// triangle contains no other polygon vertices). A vertex that fails reports the
+        /// first remaining vertex found inside its triangle, or -1 when it is not convex.
         /// </summary>
         private static bool IsEar(
             Vector prev,
             Vector curr,
             Vector next,
             List<Vector> verts,
-            List<int> indices,
-            int n
+            int[] nextOf,
+            int head,
+            int n,
+            out int blocker
         )
         {
+            // The vertex found inside the triangle, or -1 when the vertex is not convex.
+            blocker = -1;
+
             // Must be convex (CCW turn).
             if (Cross(prev, curr, next) <= 0)
                 return false;
 
             // Check that no other vertex lies inside the triangle.
-            for (var i = 0; i < n; i++)
+            for (int i = 0, index = head; i < n; i++, index = nextOf[index])
             {
-                var v = verts[indices[i]];
+                var v = verts[index];
 
                 if (v.X == prev.X && v.Y == prev.Y)
                     continue;
@@ -113,7 +153,10 @@ namespace OpenNest.Geometry
                     continue;
 
                 if (PointInTriangle(v, prev, curr, next))
+                {
+                    blocker = index;
                     return false;
+                }
             }
 
             return true;

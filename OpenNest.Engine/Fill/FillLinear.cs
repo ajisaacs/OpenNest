@@ -148,6 +148,9 @@ namespace OpenNest.Engine.Fill
             var movingBoxes = new Box[parts.Count];
             var stationaryEntities = new List<Entity>[parts.Count];
             var movingEntities = new List<Entity>[parts.Count];
+            // Each list slides against several others; extract its vertices once.
+            var stationaryVertices = new Vector[parts.Count][];
+            var movingVertices = new Vector[parts.Count][];
 
             for (var i = 0; i < parts.Count; i++)
             {
@@ -174,13 +177,25 @@ namespace OpenNest.Engine.Fill
                     if (!SpatialQuery.PerpendicularOverlap(movingBox, stationaryBox, dirVec))
                         continue;
 
-                    stationaryEntities[i] ??= cache.AtLocation(parts[i].Program, parts[i].Location);
-                    movingEntities[j] ??= cache.AtLocation(parts[j].Program, parts[j].Location + offset);
+                    if (stationaryEntities[i] == null)
+                    {
+                        stationaryEntities[i] = cache.AtLocation(parts[i].Program, parts[i].Location);
+                        stationaryVertices[i] = SpatialQuery.ExtractEntityVertices(stationaryEntities[i]);
+                    }
+
+                    if (movingEntities[j] == null)
+                    {
+                        movingEntities[j] = cache.AtLocation(parts[j].Program, parts[j].Location + offset);
+                        movingVertices[j] = SpatialQuery.ExtractEntityVertices(movingEntities[j]);
+                    }
 
                     var slideDistance = SpatialQuery.DirectionalDistance(
                         movingEntities[j],
+                        movingVertices[j],
                         stationaryEntities[i],
-                        pushDir
+                        stationaryVertices[i],
+                        dirVec,
+                        new SlideContactClassifier(movingEntities[j], stationaryEntities[i])
                     );
 
                     if (slideDistance >= double.MaxValue || slideDistance < 0)

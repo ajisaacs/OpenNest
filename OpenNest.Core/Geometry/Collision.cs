@@ -58,7 +58,7 @@ namespace OpenNest.Geometry
             // Clipping decides the verdict, including containment (one polygon entirely
             // inside another has zero edge crossings). Crossing points never affect it,
             // so this overlap-only path skips them.
-            return OverlapRegions(a, b, holesA, holesB).Count > 0;
+            return OverlapRegions(a, b, holesA, holesB, verdictOnly: true).Count > 0;
         }
 
         /// <summary>
@@ -79,7 +79,7 @@ namespace OpenNest.Geometry
             if (!BoundingBoxesOverlap(a.BoundingBox, b.BoundingBox))
                 return false;
 
-            return OverlapRegions(trianglesA(), trianglesB(), holesA, holesB).Count > 0;
+            return OverlapRegions(trianglesA(), trianglesB(), holesA, holesB, verdictOnly: true).Count > 0;
         }
 
         /// <summary>
@@ -138,35 +138,131 @@ namespace OpenNest.Geometry
             Polygon a,
             Polygon b,
             List<Polygon> holesA,
-            List<Polygon> holesB
-        ) => OverlapRegions(TriangulateWithBounds(a), TriangulateWithBounds(b), holesA, holesB);
+            List<Polygon> holesB,
+            bool verdictOnly = false
+        ) => OverlapRegions(TriangulateWithBounds(a), TriangulateWithBounds(b), holesA, holesB, verdictOnly);
 
         private static List<Polygon> OverlapRegions(
             List<Polygon> trisA,
             List<Polygon> trisB,
             List<Polygon> holesA,
-            List<Polygon> holesB
+            List<Polygon> holesB,
+            bool verdictOnly = false
         )
         {
             var regions = new List<Polygon>();
 
-            foreach (var triA in trisA)
-            {
-                foreach (var triB in trisB)
-                {
-                    if (!BoundingBoxesOverlap(triA.BoundingBox, triB.BoundingBox))
-                        continue;
-
-                    var clipped = ClipConvex(triA, triB);
-                    if (clipped != null)
-                        regions.Add(clipped);
-                }
-            }
+            // Without holes nothing is subtracted, so for a caller that needs only the verdict
+            // the first clipped region decides it. Check returns the regions, so it gets all.
+            var stopAtFirst = verdictOnly
+                && (holesA == null || holesA.Count == 0)
+                && (holesB == null || holesB.Count == 0);
+            ClipTrianglePairs(trisA, trisB, regions, stopAtFirst);
 
             if (regions.Count > 0)
                 regions = SubtractHoles(regions, holesA, holesB);
 
             return regions;
+        }
+
+        /// <summary>
+        /// Clips every triangle pair whose bounding boxes overlap, in (A, B) order, adding the
+        /// positive-area regions. A triangle whose box misses the union of the other list's
+        /// boxes overlaps none of them (min/max are exact and subtraction is monotone, so a
+        /// pair's overlap never exceeds the overlap with the union), so it is dropped before
+        /// the pair loop. The pairs clipped, their order and the regions are those of the
+        /// plain double loop.
+        /// </summary>
+        private static void ClipTrianglePairs(
+            List<Polygon> trisA,
+            List<Polygon> trisB,
+            List<Polygon> regions,
+            bool stopAtFirst
+        )
+        {
+            if (trisA.Count == 0 || trisB.Count == 0)
+                return;
+
+            var candidatesA = TrianglesTouching(trisA, UnionBounds(trisB));
+            if (candidatesA.Count == 0)
+                return;
+
+            var candidatesB = TrianglesTouching(trisB, UnionBounds(trisA));
+            if (candidatesB.Count == 0)
+                return;
+
+            // The clip loop only reads its inputs, so each triangle's open vertices serve
+            // every pair it is in.
+            var openB = new List<Vector>[candidatesB.Count];
+            for (var j = 0; j < candidatesB.Count; j++)
+                openB[j] = OpenVertices(candidatesB[j]);
+
+            foreach (var triA in candidatesA)
+            {
+                List<Vector> openA = null;
+
+                for (var j = 0; j < candidatesB.Count; j++)
+                {
+                    var triB = candidatesB[j];
+                    if (!BoundingBoxesOverlap(triA.BoundingBox, triB.BoundingBox))
+                        continue;
+
+                    openA ??= OpenVertices(triA);
+                    var clipped = ClipConvex(openA, openB[j]);
+                    if (clipped == null)
+                        continue;
+
+                    regions.Add(clipped);
+                    if (stopAtFirst)
+                        return;
+                }
+            }
+        }
+
+        private static (double Left, double Right, double Bottom, double Top) UnionBounds(
+            List<Polygon> polygons
+        )
+        {
+            var left = double.PositiveInfinity;
+            var right = double.NegativeInfinity;
+            var bottom = double.PositiveInfinity;
+            var top = double.NegativeInfinity;
+
+            foreach (var polygon in polygons)
+            {
+                var box = polygon.BoundingBox;
+                left = System.Math.Min(left, box.Left);
+                right = System.Math.Max(right, box.Right);
+                bottom = System.Math.Min(bottom, box.Bottom);
+                top = System.Math.Max(top, box.Top);
+            }
+
+            return (left, right, bottom, top);
+        }
+
+        /// <summary>
+        /// The polygons whose boxes pass <see cref="BoundingBoxesOverlap"/> against
+        /// <paramref name="union"/>, in order. Same arithmetic as that test, with the union's
+        /// sides in place of the other box's.
+        /// </summary>
+        private static List<Polygon> TrianglesTouching(
+            List<Polygon> polygons,
+            (double Left, double Right, double Bottom, double Top) union
+        )
+        {
+            var result = new List<Polygon>(polygons.Count);
+
+            foreach (var polygon in polygons)
+            {
+                var box = polygon.BoundingBox;
+                var overlapX = System.Math.Min(box.Right, union.Right) - System.Math.Max(box.Left, union.Left);
+                var overlapY = System.Math.Min(box.Top, union.Top) - System.Math.Max(box.Bottom, union.Bottom);
+
+                if (overlapX > Tolerance.Epsilon && overlapY > Tolerance.Epsilon)
+                    result.Add(polygon);
+            }
+
+            return result;
         }
 
         private static bool BoundingBoxesOverlap(Box a, Box b)
@@ -232,10 +328,9 @@ namespace OpenNest.Geometry
         /// Sutherland-Hodgman polygon clipping. Clips subject against each edge
         /// of clip. Both must be convex. Returns null if no overlap.
         /// </summary>
-        private static Polygon ClipConvex(Polygon subject, Polygon clip)
+        private static Polygon ClipConvex(List<Vector> subjectVerts, List<Vector> clipVerts)
         {
-            var output = OpenVertices(subject);
-            var clipVerts = OpenVertices(clip);
+            var output = subjectVerts;
             for (var i = 0; i < clipVerts.Count && output.Count >= 3; i++)
             {
                 output = ClipHalfSpace(output, clipVerts[i], clipVerts[(i + 1) % clipVerts.Count], true);
