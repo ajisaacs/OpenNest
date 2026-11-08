@@ -197,7 +197,7 @@ namespace OpenNest.Forms
             // previewBox
             // 
             previewBox.ActiveWorkArea = null;
-            previewBox.AllowPan = false;
+            previewBox.AllowPan = true;
             previewBox.AllowSelect = false;
             previewBox.AllowZoom = false;
             colorScheme1.BackgroundColor = System.Drawing.Color.DarkGray;

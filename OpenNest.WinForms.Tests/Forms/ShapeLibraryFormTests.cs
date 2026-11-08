@@ -199,6 +199,41 @@ public class ShapeLibraryFormTests
     });
 
     [Fact]
+    public void ASlidLabelKeepsItsPlaceBetweenTheArrowsAsTheViewZooms() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        SelectShape(form, typeof(RectangleShape));
+        var preview = Find<ShapePreviewControl>(form, "previewBox");
+        var box = preview.Plate.Parts.Single().BoundingBox;
+
+        // Where the label's center sits along the drawing's width: 0 at the left arrow, 1 at the right.
+        double Place()
+        {
+            var bounds = preview.LabelBounds("Length")!.Value;
+            var left = preview.PointWorldToControl(box.X, box.Y).X;
+            var right = preview.PointWorldToControl(box.X + box.Length, box.Y).X;
+            return (bounds.X + bounds.Width / 2.0 - left) / (right - left);
+        }
+
+        var width = preview.PointWorldToControl(box.X + box.Length, box.Y).X - preview.PointWorldToControl(box.X, box.Y).X;
+        preview.SetDragOffset("Length", new PointF(width * 0.3f, 0));
+        var place = Place();
+        Assert.InRange(place, 0.75, 0.85);
+
+        for (var i = 0; i < 4; i++)
+            Mouse(preview, "OnMouseWheel", MouseButtons.None, new Point(40, 40), -120);
+        Assert.InRange(Place(), place - 0.02, place + 0.02);
+
+        // Dragging again starts from where the label is now shown.
+        var bounds = preview.LabelBounds("Length")!.Value;
+        var grab = new Point(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2);
+        Mouse(preview, "OnMouseDown", MouseButtons.Left, grab);
+        Mouse(preview, "OnMouseMove", MouseButtons.Left, new Point(grab.X + 10, grab.Y));
+        Mouse(preview, "OnMouseUp", MouseButtons.Left, new Point(grab.X + 10, grab.Y));
+        Assert.InRange(preview.LabelBounds("Length")!.Value.X, bounds.X + 9, bounds.X + 11);
+    });
+
+    [Fact]
     public void WheelZoomIsKeptWhileEditingAndFitResetsIt() => ArchUnitsTests.RunSta(() =>
     {
         using var form = new ShapeLibraryForm();
@@ -223,6 +258,37 @@ public class ShapeLibraryFormTests
         Mouse(preview, "OnMouseWheel", MouseButtons.None, new Point(100, 100), 120);
         SelectShape(form, typeof(CircleShape));
         Assert.False(preview.IsUserView);
+    });
+
+    [Theory]
+    [InlineData(MouseButtons.Left)]
+    [InlineData(MouseButtons.Middle)]
+    public void DraggingTheViewPansItAndMovesTheLabels(MouseButtons button) => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        SelectShape(form, typeof(RectangleShape));
+        var preview = Find<ShapePreviewControl>(form, "previewBox");
+        var scale = preview.ViewScale;
+        var before = preview.LabelBounds("Length")!.Value;
+        var start = new Point(preview.Width / 2, preview.Height / 2);
+        var end = new Point(start.X + 25, start.Y - 15);
+
+        Mouse(preview, "OnMouseDown", button, start);
+        Mouse(preview, "OnMouseMove", button, end);
+        Mouse(preview, "OnMouseUp", button, end);
+
+        var after = preview.LabelBounds("Length")!.Value;
+        Assert.Null(form.ActiveEditor);
+        Assert.True(preview.IsUserView);
+        Assert.Equal(scale, preview.ViewScale);
+        Assert.InRange(after.X, before.X + 24, before.X + 26);
+        Assert.InRange(after.Y, before.Y - 16, before.Y - 14);
+
+        // A changed parameter keeps the panned view.
+        var box = OpenEditor(form, "Width");
+        box.Text = "7";
+        Press(box, Keys.Enter);
+        Assert.True(preview.IsUserView);
     });
 
     [Fact]
