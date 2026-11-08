@@ -99,7 +99,7 @@ namespace OpenNest.Engine.Fill
             this.comparer = comparer ?? new DefaultFillComparer();
             this.dedup = dedup ?? new GridDedup();
             this.candidateSelector = new PairCandidateSelector(plateSize, partSpacing);
-            this.remnantFiller = new PairRemnantFiller(partSpacing, this.comparer);
+            this.remnantFiller = new PairRemnantFiller(plate, this.comparer);
         }
 
         /// <summary>
@@ -152,6 +152,7 @@ namespace OpenNest.Engine.Fill
                 item.Drawing,
                 workArea,
                 targetCount,
+                bestFits,
                 token,
                 reportProgress
             );
@@ -174,6 +175,7 @@ namespace OpenNest.Engine.Fill
             Drawing drawing,
             Box workArea,
             int targetCount,
+            List<BestFitResult> bestFits,
             CancellationToken token,
             Action<List<Part>, string> reportProgress
         )
@@ -202,6 +204,7 @@ namespace OpenNest.Engine.Fill
                         best?.Count ?? 0,
                         maxUtilization,
                         partArea,
+                        bestFits,
                         token
                     );
 
@@ -244,6 +247,7 @@ namespace OpenNest.Engine.Fill
             int minCountToBeat,
             double maxUtilization,
             double partArea,
+            List<BestFitResult> bestFits,
             CancellationToken token
         )
         {
@@ -272,6 +276,7 @@ namespace OpenNest.Engine.Fill
                         minCountToBeat,
                         maxUtilization,
                         partArea,
+                        bestFits,
                         token
                     );
                 }
@@ -410,6 +415,7 @@ namespace OpenNest.Engine.Fill
         /// <param name="minCountToBeat">The minCountToBeat<see cref="int"/></param>
         /// <param name="maxUtilization">The maxUtilization<see cref="double"/></param>
         /// <param name="partArea">The partArea<see cref="double"/></param>
+        /// <param name="bestFits">The pairs the remnant strips are also filled with</param>
         /// <param name="token">The token<see cref="CancellationToken"/></param>
         /// <returns>The <see cref="List{Part}"/></returns>
         private List<Part> EvaluateCandidate(
@@ -419,6 +425,7 @@ namespace OpenNest.Engine.Fill
             int minCountToBeat,
             double maxUtilization,
             double partArea,
+            List<BestFitResult> bestFits,
             CancellationToken token
         )
         {
@@ -479,7 +486,7 @@ namespace OpenNest.Engine.Fill
                         break; // sorted descending, so remaining are even smaller
                 }
 
-                var remnantParts = remnantFiller.Fill(gridParts, drawing, workArea, token);
+                var remnantParts = remnantFiller.Fill(gridParts, drawing, workArea, token, bestFits);
                 List<Part> total;
                 if (remnantParts != null && remnantParts.Count > 0)
                 {

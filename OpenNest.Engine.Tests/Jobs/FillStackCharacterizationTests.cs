@@ -194,16 +194,16 @@ public class FillStackCharacterizationTests
     // --- interactive single-item fill ---
 
     [Theory]
-    [InlineData("Fill", "lshape", 52, "F1FB09254D935531")]
+    [InlineData("Fill", "lshape", 53, "C215C11EEBD3B59C")]
     [InlineData("Fill", "notched", 46, "32FB33C3C19FDCC8")]
     [InlineData("Fill", "arc", 40, "4E2F91AA3151E9E7")]
-    [InlineData("Strip", "lshape", 52, "F1FB09254D935531")]
+    [InlineData("Strip", "lshape", 53, "C215C11EEBD3B59C")]
     [InlineData("Strip", "notched", 46, "32FB33C3C19FDCC8")]
     [InlineData("Strip", "arc", 40, "4E2F91AA3151E9E7")]
-    [InlineData("Vertical Remnant", "lshape", 52, "F1FB09254D935531")]
+    [InlineData("Vertical Remnant", "lshape", 53, "C215C11EEBD3B59C")]
     [InlineData("Vertical Remnant", "notched", 46, "32FB33C3C19FDCC8")]
     [InlineData("Vertical Remnant", "arc", 40, "BBC5C583C3C7A9A7")]
-    [InlineData("Horizontal Remnant", "lshape", 52, "F1FB09254D935531")]
+    [InlineData("Horizontal Remnant", "lshape", 53, "C215C11EEBD3B59C")]
     [InlineData("Horizontal Remnant", "notched", 46, "32FB33C3C19FDCC8")]
     [InlineData("Horizontal Remnant", "arc", 40, "4E2F91AA3151E9E7")]
     public void FillItem_IrregularPart_PinnedLayout(
