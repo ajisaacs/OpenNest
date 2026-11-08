@@ -214,6 +214,7 @@ namespace OpenNest.Forms
             // 
             menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuFile, mnuEdit, mnuView, mnuTools, mnuNest, mnuPlate, mnuWindow });
             menuStrip1.Location = new System.Drawing.Point(0, 0);
+            menuStrip1.MdiWindowListItem = mnuWindow;
             menuStrip1.Name = "menuStrip1";
             menuStrip1.Padding = new System.Windows.Forms.Padding(7, 2, 0, 2);
             menuStrip1.Size = new System.Drawing.Size(1281, 24);
