@@ -16,17 +16,7 @@ namespace OpenNest.Forms
             SaveCurrentAsDefaults_Click(sender, e);
         }
 
-        private void AddPlate_Click(object sender, EventArgs e)
-        {
-            if (activeForm == null)
-                return;
-            activeForm.AddPlate();
-            NavigationEnableCheck();
-        }
-
         private void EditPlate_Click(object sender, EventArgs e) => WithActive(f => f.EditPlate());
-
-        private void RemovePlate_Click(object sender, EventArgs e) => WithActive(f => f.RemoveCurrentPlate());
 
         private void ResizeToFitParts_Click(object sender, EventArgs e)
         {

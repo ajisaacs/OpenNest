@@ -48,8 +48,6 @@
             partsColumn = new System.Windows.Forms.ColumnHeader();
             utilColumn = new System.Windows.Forms.ColumnHeader();
             toolStrip1 = new System.Windows.Forms.ToolStrip();
-            toolStripLabel1 = new System.Windows.Forms.ToolStripButton();
-            toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
             toolStripLabel2 = new System.Windows.Forms.ToolStripButton();
             tabPage2 = new System.Windows.Forms.TabPage();
             drawingListBox1 = new OpenNest.Controls.DrawingListBox();
@@ -159,27 +157,12 @@
             // 
             toolStrip1.GripStyle = System.Windows.Forms.ToolStripGripStyle.Hidden;
             toolStrip1.ImageScalingSize = new System.Drawing.Size(20, 20);
-            toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { toolStripLabel1, toolStripSeparator3, toolStripLabel2 });
+            toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { toolStripLabel2 });
             toolStrip1.Location = new System.Drawing.Point(4, 3);
             toolStrip1.Name = "toolStrip1";
             toolStrip1.Size = new System.Drawing.Size(265, 27);
             toolStrip1.TabIndex = 2;
             toolStrip1.Text = "toolStrip1";
-            // 
-            // toolStripLabel1
-            // 
-            toolStripLabel1.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            toolStripLabel1.Image = Properties.Resources.plus;
-            toolStripLabel1.Name = "toolStripLabel1";
-            toolStripLabel1.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            toolStripLabel1.Size = new System.Drawing.Size(34, 24);
-            toolStripLabel1.Text = "Remove Selected Plate";
-            toolStripLabel1.Click += toolStripLabel1_Click;
-            // 
-            // toolStripSeparator3
-            // 
-            toolStripSeparator3.Name = "toolStripSeparator3";
-            toolStripSeparator3.Size = new System.Drawing.Size(6, 27);
             // 
             // toolStripLabel2
             // 
@@ -346,8 +329,6 @@
         private System.Windows.Forms.ToolStripButton editDrawingsButton;
         private System.Windows.Forms.ToolStripButton toolStripButton3;
         private System.Windows.Forms.ToolStripButton hideNestedButton;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
-        private System.Windows.Forms.ToolStripButton toolStripLabel1;
         private System.Windows.Forms.ToolStripButton toolStripLabel2;
     }
 }

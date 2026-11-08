@@ -5,7 +5,8 @@ using System.Windows.Forms;
 namespace OpenNest.Forms
 {
     // Reordering plates in the Plates list: drag a row to a new position, or Alt+Up/Alt+Down.
-    // Ctrl+drag drops a copy of the plate instead, as does Duplicate Plate on the row's menu.
+    // Ctrl+drag drops a copy of the plate instead, as does Duplicate Plate on the row's menu;
+    // Delete Plate on the same menu removes it.
     // The trailing empty new-plate sentinel stays last and cannot be dragged.
     public partial class EditNestForm
     {
@@ -46,12 +47,16 @@ namespace OpenNest.Forms
             platesListView.Controls.Add(plateDropIndicator);
 
             var duplicateItem = new ToolStripMenuItem("Duplicate Plate", null, (sender, e) => DuplicateCurrentPlate());
+            var deleteItem = new ToolStripMenuItem("Delete Plate", null, (sender, e) => RemoveCurrentPlate());
+            deleteItem.Name = "deletePlateMenuItem";
             var menu = new ContextMenuStrip();
             menu.Items.Add(duplicateItem);
+            menu.Items.Add(deleteItem);
             menu.Opening += (sender, e) =>
             {
                 var index = PlateManager.CurrentIndex;
                 duplicateItem.Enabled = !IsInspecting && PlateManager.CanDuplicatePlate(index, index + 1);
+                deleteItem.Enabled = !IsInspecting && PlateManager.CanRemoveCurrent;
             };
             platesListView.ContextMenuStrip = menu;
         }

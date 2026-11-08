@@ -1396,11 +1396,6 @@ namespace OpenNest.Forms
 
         #region Plates/Drawings Panel Events
 
-        private void AddPlate_Click(object sender, EventArgs e)
-        {
-            AddPlate();
-        }
-
         private void EditSelectedPlate_Click(object sender, EventArgs e)
         {
             if (platesListView.SelectedIndices.Count != 0)
@@ -1972,11 +1967,6 @@ namespace OpenNest.Forms
         private void toolStripLabel2_Click(object sender, EventArgs e)
         {
             RemoveSelectedPlate_Click(sender, e);
-        }
-
-        private void toolStripLabel1_Click(object sender, EventArgs e)
-        {
-            AddPlate_Click(sender, e);
         }
     }
 }

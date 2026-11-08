@@ -69,6 +69,22 @@ public class PlateReorderTests
     });
 
     [Fact]
+    public void DeletePlateOnTheRowMenuRemovesTheCurrentPlate() => UndoTestEnv.Run(env =>
+    {
+        env.Editor.PlateManager.LoadAt(0);
+        var plate = env.Nest.Plates[0];
+        var count = env.Nest.Plates.Count;
+        var list = (ListView)Assert.Single(env.Editor.Controls.Find("platesListView", true));
+        var item = Assert.IsType<ToolStripMenuItem>(list.ContextMenuStrip!.Items["deletePlateMenuItem"]);
+        Assert.Equal("Delete Plate", item.Text);
+
+        item.PerformClick();
+
+        Assert.Equal(count - 1, env.Nest.Plates.Count);
+        Assert.DoesNotContain(plate, env.Nest.Plates);
+    });
+
+    [Fact]
     public void TheEmptySentinelCannotBeDuplicated() => UndoTestEnv.Run(env =>
     {
         var count = env.Nest.Plates.Count;

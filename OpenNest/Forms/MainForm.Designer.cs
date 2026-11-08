@@ -129,9 +129,6 @@ namespace OpenNest.Forms
             mnuPlateEdit = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateSetAsDefault = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem18 = new System.Windows.Forms.ToolStripSeparator();
-            mnuPlateAdd = new System.Windows.Forms.ToolStripMenuItem();
-            mnuPlateRemove = new System.Windows.Forms.ToolStripMenuItem();
-            toolStripMenuItem16 = new System.Windows.Forms.ToolStripSeparator();
             mnuPlateRotate = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateRotateCw = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateRotateCcw = new System.Windows.Forms.ToolStripMenuItem();
@@ -850,7 +847,7 @@ namespace OpenNest.Forms
             //
             // mnuPlate
             //
-            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateCutOff, mnuPlateTrimExtendCutOff, mnuPlateAutomaticCutOff, mnuPlateEditClamps, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateArrange, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, mnuPlateSimulateCutting, toolStripMenuItem21, mnuPlatePlanCutting, mnuPlatePlaceLeadIn, mnuPlateRemoveLeadIns, toolStripMenuItem20, mnuPlateViewInCad });
+            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateCutOff, mnuPlateTrimExtendCutOff, mnuPlateAutomaticCutOff, mnuPlateEditClamps, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateArrange, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, mnuPlateSimulateCutting, toolStripMenuItem21, mnuPlatePlanCutting, mnuPlatePlaceLeadIn, mnuPlateRemoveLeadIns, toolStripMenuItem20, mnuPlateViewInCad });
             mnuPlate.Name = "mnuPlate";
             mnuPlate.Size = new System.Drawing.Size(45, 20);
             mnuPlate.Text = "&Plate";
@@ -873,27 +870,6 @@ namespace OpenNest.Forms
             // 
             toolStripMenuItem18.Name = "toolStripMenuItem18";
             toolStripMenuItem18.Size = new System.Drawing.Size(174, 6);
-            // 
-            // mnuPlateAdd
-            // 
-            mnuPlateAdd.Image = Properties.Resources.add;
-            mnuPlateAdd.Name = "mnuPlateAdd";
-            mnuPlateAdd.Size = new System.Drawing.Size(177, 22);
-            mnuPlateAdd.Text = "Add";
-            mnuPlateAdd.Click += AddPlate_Click;
-            // 
-            // mnuPlateRemove
-            // 
-            mnuPlateRemove.Image = Properties.Resources.remove;
-            mnuPlateRemove.Name = "mnuPlateRemove";
-            mnuPlateRemove.Size = new System.Drawing.Size(177, 22);
-            mnuPlateRemove.Text = "Remove";
-            mnuPlateRemove.Click += RemovePlate_Click;
-            // 
-            // toolStripMenuItem16
-            // 
-            toolStripMenuItem16.Name = "toolStripMenuItem16";
-            toolStripMenuItem16.Size = new System.Drawing.Size(174, 6);
             //
             // mnuPlateCutOff
             //
@@ -1572,7 +1548,6 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem13;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateViewInCad;
         private System.Windows.Forms.ToolStripButton btnNew;
-        private System.Windows.Forms.ToolStripMenuItem mnuPlateAdd;
         private System.Windows.Forms.ToolStripMenuItem mnuNestRemoveEmptyPlates;
         private System.Windows.Forms.ToolStripMenuItem mnuNestClear;
         private System.Windows.Forms.ToolStripMenuItem mnuViewZoomIn;
@@ -1582,11 +1557,9 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuSetRotationIncrement;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem15;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateSetAsDefault;
-        private System.Windows.Forms.ToolStripSeparator toolStripMenuItem16;
         private System.Windows.Forms.ToolStripStatusLabel statusLabel1;
         private System.Windows.Forms.ToolStripStatusLabel spacerLabel;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem18;
-        private System.Windows.Forms.ToolStripMenuItem mnuPlateRemove;
         private System.Windows.Forms.ToolStripButton btnSave;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem19;
         private System.Windows.Forms.ToolStripMenuItem calculateCutTimeToolStripMenuItem;
