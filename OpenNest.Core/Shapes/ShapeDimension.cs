@@ -66,10 +66,16 @@ namespace OpenNest.Shapes
         public double HoleRadius { get; private init; }
 
         /// <summary>
-        /// True when <see cref="Start"/> and <see cref="End"/> span the diameter of a reference
-        /// circle (such as a flange's bolt circle) that the preview draws dotted.
+        /// The center of a reference circle (such as a flange's bolt circle) that the preview
+        /// draws dotted; null when there is none.
         /// </summary>
-        public bool DrawsCircle { get; private init; }
+        public Vector? CircleCenter { get; private init; }
+
+        /// <summary>The radius of the reference circle at <see cref="CircleCenter"/>.</summary>
+        public double CircleRadius { get; private init; }
+
+        /// <summary>True when the preview draws a dotted reference circle for this dimension.</summary>
+        public bool DrawsCircle => CircleCenter != null;
 
         /// <summary>This dimension with "x {count} {noun}" after its value.</summary>
         public ShapeDimension WithCount(string countProperty, string noun) =>
@@ -79,18 +85,8 @@ namespace OpenNest.Shapes
                 CountNoun = noun,
                 HoleCenter = HoleCenter,
                 HoleRadius = HoleRadius,
-                DrawsCircle = DrawsCircle,
-            };
-
-        /// <summary>This dimension measuring a dotted circle whose diameter runs from <see cref="Start"/> to <see cref="End"/>.</summary>
-        public ShapeDimension WithCircle() =>
-            new(Property, Kind, Start, End, Side, Prefix)
-            {
-                CountProperty = CountProperty,
-                CountNoun = CountNoun,
-                HoleCenter = HoleCenter,
-                HoleRadius = HoleRadius,
-                DrawsCircle = true,
+                CircleCenter = CircleCenter,
+                CircleRadius = CircleRadius,
             };
 
         /// <summary>
@@ -123,6 +119,23 @@ namespace OpenNest.Shapes
             {
                 HoleCenter = center,
                 HoleRadius = radius,
+            };
+        }
+
+        /// <summary>
+        /// A diameter leader on a dotted reference circle (such as a flange's bolt circle) at
+        /// <paramref name="center"/>: it starts on the circle facing <paramref name="direction"/>
+        /// and runs out from there, its arrow pointing in onto the circle; no line crosses it.
+        /// </summary>
+        public static ShapeDimension CircleLeader(string property, Vector center, double radius, Vector direction, string prefix = "")
+        {
+            var length = System.Math.Sqrt(direction.X * direction.X + direction.Y * direction.Y);
+            var unit = new Vector(direction.X / length, direction.Y / length);
+            var edge = new Vector(center.X + unit.X * radius, center.Y + unit.Y * radius);
+            return new(property, ShapeDimensionKind.Leader, edge, edge, unit, prefix)
+            {
+                CircleCenter = center,
+                CircleRadius = radius,
             };
         }
 

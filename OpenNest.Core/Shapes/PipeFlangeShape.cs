@@ -34,12 +34,19 @@ namespace OpenNest.Shapes
 
         public override IReadOnlyList<ShapeDimension> GetDimensions()
         {
+            // The dotted bolt circle through the hole centers is called out by a leader from
+            // outside, down and to the left, landing between holes rather than on one.
+            var boltAngle = 1.25 * System.Math.PI;
+            if (HoleCount > 0)
+            {
+                var holeStep = 2.0 * System.Math.PI / HoleCount;
+                boltAngle = (System.Math.Floor(boltAngle / holeStep) + 0.5) * holeStep;
+            }
             var dimensions = new List<ShapeDimension>
             {
                 ShapeDimension.Linear(nameof(OD), new Vector(-OD / 2, 0), new Vector(OD / 2, 0), ShapeDimension.Up, "Ø"),
-                // Measures the dotted bolt circle through the hole centers.
-                ShapeDimension.Linear(nameof(HolePatternDiameter), new Vector(-HolePatternDiameter / 2, 0),
-                    new Vector(HolePatternDiameter / 2, 0), ShapeDimension.Down, "Ø").WithCircle(),
+                ShapeDimension.CircleLeader(nameof(HolePatternDiameter), Vector.Zero, HolePatternDiameter / 2,
+                    new Vector(System.Math.Cos(boltAngle), System.Math.Sin(boltAngle)), "Ø"),
             };
 
             // The leader crosses the hole nearest 45 degrees through its center, out that way.

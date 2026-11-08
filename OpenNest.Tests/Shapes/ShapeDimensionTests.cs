@@ -75,7 +75,12 @@ public class ShapeDimensionTests
         var pattern = flange.GetDimensions().Single(d => d.Property == nameof(PipeFlangeShape.HolePatternDiameter));
 
         Assert.True(pattern.DrawsCircle);
-        Assert.Equal(flange.HolePatternDiameter, pattern.Start.DistanceTo(pattern.End), 6);
+        Assert.Equal(ShapeDimensionKind.Leader, pattern.Kind);
+        Assert.Equal(flange.HolePatternDiameter / 2, pattern.CircleRadius, 6);
+        Assert.Equal(pattern.CircleRadius, pattern.Start.DistanceTo(pattern.CircleCenter!.Value), 6);
+        // The leader runs out from the circle, so it never crosses the flange.
+        Assert.Equal(pattern.Start.X / pattern.CircleRadius, pattern.Side.X, 6);
+        Assert.Equal(pattern.Start.Y / pattern.CircleRadius, pattern.Side.Y, 6);
     }
 
     [Fact]

@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Shapes;
 
@@ -32,6 +33,10 @@ namespace OpenNest.Controls
         private const int DragThreshold = 3;
         // How close a dragged linear dimension may come to the drawing's bounds.
         private const float MinimumGap = 6f;
+        // How far short of the drawing an extension line stops, as on the CAD Converter.
+        private const float ExtensionClearance = 6f;
+        private const float ExtensionPrecision = 0.25f;
+        private const int MaxExtensionSteps = 64;
 
         private static readonly Color DimensionColor = Color.FromArgb(235, 230, 120, 20);
         private static readonly Color HoverColor = Color.FromArgb(255, 140, 0);
@@ -39,6 +44,9 @@ namespace OpenNest.Controls
 
         private string[] infoLines;
         private Vector shapeOffset;
+
+        // The shown drawing's cut geometry, in its own coordinates (as dimension points are).
+        private List<Entity> profile = new();
         private IReadOnlyList<Annotation> annotations = Array.Empty<Annotation>();
         private IReadOnlyList<Note> notes = Array.Empty<Note>();
         private AnnotationLayout layout;
@@ -134,6 +142,9 @@ namespace OpenNest.Controls
             Plate.Parts.Clear();
             Plate.Size = new Geometry.Size(0, 0);
             layout = null;
+            profile = drawing?.Program == null
+                ? new List<Entity>()
+                : ConvertProgram.ToGeometry(drawing.Program).Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList();
 
             if (drawing?.Program != null)
             {
@@ -512,15 +523,55 @@ namespace OpenNest.Controls
             var gap = System.Math.Max(Gap + Dot(drag, side), MinimumGap);
             var along = new PointF(-side.Y, side.X);
 
-            var lineA = Along(a, side, extreme - Dot(a, side) + gap);
-            var lineB = Along(b, side, extreme - Dot(b, side) + gap);
-            if (d.DrawsCircle)
-                result.Circles.Add((new PointF((a.X + b.X) / 2, (a.Y + b.Y) / 2),
-                    (float)System.Math.Sqrt(Dot(new PointF(b.X - a.X, b.Y - a.Y), new PointF(b.X - a.X, b.Y - a.Y))) / 2));
-            result.Lines.Add((Along(a, side, 3), Along(lineA, side, ExtensionOverrun)));
-            result.Lines.Add((Along(b, side, 3), Along(lineB, side, ExtensionOverrun)));
+            var reachA = extreme - Dot(a, side) + gap;
+            var reachB = extreme - Dot(b, side) + gap;
+            var lineA = Along(a, side, reachA);
+            var lineB = Along(b, side, reachB);
+            AddReferenceCircle(result, d);
+            result.Lines.Add((Along(a, side, ExtensionStart(d.Start, d.Side, reachA, shape)), Along(lineA, side, ExtensionOverrun)));
+            result.Lines.Add((Along(b, side, ExtensionStart(d.End, d.Side, reachB, shape)), Along(lineB, side, ExtensionOverrun)));
             AddDimensionLine(result, lineA, lineB);
             AddLabelAlong(result, annotation, lineA, lineB, along, Dot(drag, along));
+        }
+
+        /// <summary>
+        /// How far from <paramref name="point"/> (in pixels along <paramref name="side"/>; negative
+        /// past it, toward the drawing) its extension line starts: walking in from the dimension
+        /// line, <paramref name="reach"/> pixels out, by the distance known to be free at each step
+        /// until it comes <see cref="ExtensionClearance"/> pixels from the drawing, as the CAD
+        /// Converter's do. A measured point off the outline, such as a rounded corner's sharp
+        /// corner, is passed; the walk ends at the drawing's far side at the latest.
+        /// </summary>
+        private float ExtensionStart(Vector point, Vector side, float reach, RectangleF shape)
+        {
+            if (profile.Count == 0 || !(reach > 0))
+                return 0;
+
+            var limit = reach + (System.Math.Abs(side.X) > System.Math.Abs(side.Y) ? shape.Width : shape.Height);
+            var travelled = 0f;
+            for (var i = 0; i < MaxExtensionSteps && travelled < limit; i++)
+            {
+                var at = point + side * LengthGuiToWorld(reach - travelled);
+                var free = LengthWorldToGui(DistanceToProfile(at)) - ExtensionClearance;
+                if (free <= ExtensionPrecision)
+                    break;
+                travelled += free;
+            }
+            return reach - System.Math.Min(travelled, limit);
+        }
+
+        private double DistanceToProfile(Vector point)
+        {
+            var nearest = double.MaxValue;
+            foreach (var entity in profile)
+                nearest = System.Math.Min(nearest, point.DistanceTo(entity.ClosestPointTo(point)));
+            return nearest;
+        }
+
+        private void AddReferenceCircle(AnnotationLayout result, ShapeDimension d)
+        {
+            if (d.CircleCenter is { } center && d.CircleRadius > 0)
+                result.Circles.Add((ToScreen(center), LengthWorldToGui(d.CircleRadius)));
         }
 
         private PointF DragOffset(string property) =>
@@ -570,6 +621,7 @@ namespace OpenNest.Controls
             var right = end.X >= p.X;
             var shoulder = new PointF(end.X + (right ? Shoulder : -Shoulder), end.Y);
 
+            AddReferenceCircle(result, d);
             if (!AddHoleDiameter(result, d, end))
             {
                 result.Lines.Add((p, end));
