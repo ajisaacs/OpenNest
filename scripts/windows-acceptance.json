@@ -969,7 +969,7 @@
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.ShapeLibraryFormTests.InvalidShapeInputClearsOldPreviewAndBlocksAddUntilCorrected",
+          "method": "OpenNest.WinForms.Tests.Forms.ShapeLibraryFormTests.InvalidEntryStaysOpenInRedAndKeepsTheLastShape",
           "minimum_cases": 1
         }
       ],
