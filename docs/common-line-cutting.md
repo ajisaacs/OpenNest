@@ -22,6 +22,13 @@ were placed at.
   `MinSharedLength` (0.25). Only that overlap is shared; chamfers and other edges are cut as
   usual. A moved or rotated member therefore breaks its group instead of leaving a stale span.
   The tolerances are in model units and sized for inch nests.
+- **Z and L shared lines.** Spans of one pair whose ends meet at a corner chain into one shared
+  path (`CommonLineGeometry.Paths`), for example two stepped parts interlocked one kerf apart along
+  three legs. Two spans meet when their centerlines cross beyond both ends, each end short of the
+  crossing by what the kerf leaves there (`kerf/2 · tan(turn/2)`, half a kerf at a square corner),
+  and the path turns between 10° and 135° (`MinCornerTurn`, `MaxCornerTurn`). The path runs from
+  the first span's free end through each crossing to the last span's free end. Every other span
+  is a straight path of its own.
 - **Group rule:** every member shares at least one span with another member, and the members form
   one connected group. Rows, pairs and grids all qualify.
 - **Removing a part** from the plate drops it from its group. A group left with one part is
@@ -42,23 +49,29 @@ planned member's open program changes no utilization, quantity, overlap or spaci
 - **Each member is cut** as: its holes (and break cuts and tabbed cutouts, as for any part), then
   the shared cuts it owns, then its **remainder**: its perimeter minus every span it shares, in
   the perimeter's own direction, as one open piece per stretch between spans. Shared cuts are
-  never all cut first: each is cut where the route passes its owner.
+  never all cut first: each is cut where the route passes its owner. A Z or L path is one shared
+  cut, owned and cut as a whole.
 - **Shared cut:** an open cut on the centerline (`LayerType.CommonLine`), cut without kerf
-  compensation. It is pierced in scrap on the span's own axis, the external lead-in's reach
-  before the span, and entered with a straight lead-in through the end notch; it leaves the same
-  way at the far end with a straight lead-out as long as the external lead-out's reach (none with
-  no lead-out). Capture tries each end in turn: the lead-in, cut and lead-out may touch no
+  compensation. It is pierced in scrap on its first leg's axis, the external lead-in's reach
+  before the path, and entered with a straight lead-in through the end notch; a Z or L path is
+  then cut through its corners in one pass, one `CommonLine` move per leg. It leaves the same way
+  at the far end, along its last leg, with a straight lead-out as long as the external lead-out's
+  reach (none with no lead-out). At each corner the kerf leaves the member on the outside of the
+  turn a fillet of half a kerf's radius where its nominal corner is sharp; the member on the
+  inside keeps a sharp corner. Capture tries each end in turn: the lead-in, cut and lead-out may touch no
   material, and the pierce keeps the pierce zone. When no end fits, planning refuses with
   `UnsupportedGeometry` naming both parts and the span. Leads are never shortened.
 - **Remainder:** each piece starts where a shared span ends. It is pierced in that span's kerf,
   on the centerline, the external lead-in's reach back along the span, and enters along a straight
-  lead-in to the piece's start, so compensation starts inside the kerf the shared cut opened; the
+  lead-in to the piece's start, so compensation starts inside the kerf the shared cut opened (for
+  a Z or L path, the kerf of its last leg before the piece); the
   pierce meets nothing. The comment `COMMON LINE REMAINDER CW` (or `CCW`) after its rapid names
   the perimeter's winding, so posts compensate it on the perimeter's side. It has no lead-out: it
   ends in the kerf at the next span. A span shorter than the lead-in's reach, or an external
   lead-in with no length, refuses with `UnsupportedGeometry`.
 - **Accounting.** The planner marks each member's shared spans on its owned clean copy as `Tab`
-  spans (`CommonLineCutting.MarkSharedSpans`): material the member never cuts. Replay's contour
+  spans (`CommonLineCutting.MarkSharedSpans`): material the member never cuts. At a path's corner
+  each leg's span runs on to the member's own vertex there, so a Z or L is one run of tabs. Replay's contour
   accounting proves each stretch between them is cut whole, once, as for
   [tabbed cutouts](tabbed-cutouts.md#verification), and refuses a member that also cuts a span.
 - **Rapids.** A shared cut is never a rapid obstacle and takes no part in the open-cut retention
@@ -85,7 +98,9 @@ head on the second. Changing the setting after planning makes the plan stale.
 - **Plate > Arrange > Join Common Line** slides the selected parts together one kerf apart
   (`CommonLineJoiner`). The unit nearest the origin stays put. Each other part moves along the
   normal of its best facing edge pair (the longest overlap, then the smallest move) to the part it
-  is closest to joining. Facing edges up to four part spacings apart (at least 1) qualify. A part
+  is closest to joining. It then slides along that edge when a facing pair across it (the step of a
+  Z or L) is within reach, so that pair lands one kerf apart too and the shared line runs through
+  the corner. Facing edges up to four part spacings apart (at least 1) qualify. A part
   already in a group brings its whole group, which moves as one and merges into the new group.
   The kerf is the plate's cutting kerf for the nest's material and thickness (the machine's, see
   [machine cutting defaults](machine-cutting-defaults.md)). With no kerf, or any part left without
@@ -96,7 +111,7 @@ head on the second. Changing the setting after planning makes the plan stale.
   selection. Right-clicking a part keeps the selection it is in, or selects it with its group;
   right-clicking empty plate still clears the selection. Join is offered when the selection holds
   at least two units (loose parts or groups), Remove when any selected part is in a group.
-- The plate draws each shared span as a teal dashed centerline. A member that no longer shares a
+- The plate draws each shared path as a teal dashed centerline, through the corners of a Z or L. A member that no longer shares a
   span is outlined in red.
 - Selecting a member, by click or window, selects its whole group, so dragging, nudging, pushing,
   rotating and aligning move the joined parts as one and keep their shared spans. Deleting the

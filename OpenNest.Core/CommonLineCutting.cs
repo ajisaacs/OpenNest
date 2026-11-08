@@ -8,10 +8,11 @@ namespace OpenNest
 {
     /// <summary>
     /// One shared cut of a common-line group, cut once on the centerline by <see cref="Owner"/>, the
-    /// member of the pair cut first. <see cref="Partner"/> is cut later; its remainder ends in the
+    /// member of the pair cut first: a straight span, or spans chained at corners (a Z or L shared
+    /// line) cut as one open path. <see cref="Partner"/> is cut later; its remainder ends in the
     /// kerf this cut opened.
     /// </summary>
-    public sealed record CommonLineSharedCut(CommonLineSpan Span, Part Owner, Part Partner);
+    public sealed record CommonLineSharedCut(CommonLinePath Path, Part Owner, Part Partner);
 
     /// <summary>
     /// How a common-line group is cut once (see docs/common-line-cutting.md): its members in cutting
@@ -24,10 +25,10 @@ namespace OpenNest
         public IEnumerable<CommonLineSharedCut> CutsOwnedBy(Part member) =>
             Cuts.Where(cut => ReferenceEquals(cut.Owner, member));
 
-        /// <summary>Every span <paramref name="member"/> shares, whoever cuts it.</summary>
-        public IEnumerable<CommonLineSpan> SpansOf(Part member) => Cuts
+        /// <summary>Every shared path <paramref name="member"/> shares, whoever cuts it.</summary>
+        public IEnumerable<CommonLinePath> PathsOf(Part member) => Cuts
             .Where(cut => ReferenceEquals(cut.Owner, member) || ReferenceEquals(cut.Partner, member))
-            .Select(cut => cut.Span);
+            .Select(cut => cut.Path);
     }
 
     /// <summary>
@@ -76,34 +77,49 @@ namespace OpenNest
             if (order.Count != members.Count)
                 throw new ArgumentException("The common-line group has split into separate pieces.", nameof(check));
             int Rank(Part part) => order.FindIndex(member => ReferenceEquals(member, part));
-            var cuts = check.Spans
-                .Select(span => Rank(span.First) < Rank(span.Second)
-                    ? new CommonLineSharedCut(span, span.First, span.Second)
-                    : new CommonLineSharedCut(span, span.Second, span.First))
+            var cuts = CommonLineGeometry.Paths(check.Spans, group.Kerf)
+                .Select(path => Rank(path.First) < Rank(path.Second)
+                    ? new CommonLineSharedCut(path, path.First, path.Second)
+                    : new CommonLineSharedCut(path, path.Second, path.First))
                 .OrderBy(cut => Rank(cut.Owner))
                 .ToList();
             return new CommonLineCutOrder(group, order, cuts);
         }
 
         /// <summary>
-        /// A copy of <paramref name="clean"/> (a member's clean program, rotated as placed, in part
-        /// coordinates; placed at <paramref name="location"/>) whose perimeter edges are split at
-        /// every end of <paramref name="spans"/> and whose shared portions are on the
-        /// <see cref="LayerType.Tab"/> layer: material that this member never cuts, because the
-        /// shared cut does. The result is absolute. Only straight top-level moves can share.
+        /// <see cref="MarkSharedSpans(Program, Vector, IReadOnlyList{CommonLinePath}, double)"/> with
+        /// every span a straight path of its own.
         /// </summary>
-        /// <exception cref="ArgumentException">A span does not lie along the program's edges.</exception>
         public static Program MarkSharedSpans(Program clean, Vector location, IReadOnlyList<CommonLineSpan> spans,
             double kerf)
         {
-            ArgumentNullException.ThrowIfNull(clean);
             ArgumentNullException.ThrowIfNull(spans);
+            return MarkSharedSpans(clean, location, spans
+                .Select(span => new CommonLinePath(span.First, span.Second, [span], [span.Start, span.End]))
+                .ToArray(), kerf);
+        }
+
+        /// <summary>
+        /// A copy of <paramref name="clean"/> (a member's clean program, rotated as placed, in part
+        /// coordinates; placed at <paramref name="location"/>) whose perimeter edges are split at
+        /// every end of the shared <paramref name="paths"/> and whose shared portions are on the
+        /// <see cref="LayerType.Tab"/> layer: material that this member never cuts, because the
+        /// shared cut does. At a path's corner each leg's portion runs to the member's own vertex
+        /// there, so the legs' portions join. The result is absolute. Only straight top-level
+        /// moves can share.
+        /// </summary>
+        /// <exception cref="ArgumentException">A path's leg does not lie along the program's edges.</exception>
+        public static Program MarkSharedSpans(Program clean, Vector location, IReadOnlyList<CommonLinePath> paths,
+            double kerf)
+        {
+            ArgumentNullException.ThrowIfNull(clean);
+            ArgumentNullException.ThrowIfNull(paths);
             if (!double.IsFinite(kerf) || kerf <= 0)
                 throw new ArgumentOutOfRangeException(nameof(kerf));
             var program = (Program)clean.Clone();
             program.Mode = Mode.Absolute;
-            var local = spans.Select(span => (Start: span.Start - location, End: span.End - location)).ToArray();
-            var covered = new double[local.Length];
+            var legs = paths.SelectMany(path => Legs(path, location, kerf)).ToArray();
+            var covered = new double[legs.Length];
             var codes = new List<ICode>();
             Vector? position = null;
             foreach (var code in program.Codes)
@@ -111,7 +127,7 @@ namespace OpenNest
                 if (code is LinearMove line && position is { } start
                     && line.Layer is LayerType.Cut or LayerType.Display)
                 {
-                    codes.AddRange(Split(line, start, local, covered, kerf));
+                    codes.AddRange(Split(line, start, legs, covered, kerf));
                     position = line.EndPoint;
                     continue;
                 }
@@ -123,18 +139,46 @@ namespace OpenNest
                     _ => position,
                 };
             }
-            for (var i = 0; i < local.Length; i++)
-                if (System.Math.Abs(covered[i] - local[i].Start.DistanceTo(local[i].End)) > CommonLineGeometry.GapTolerance)
+            for (var i = 0; i < legs.Length; i++)
+            {
+                var leg = legs[i];
+                // At a corner the member's portion ends at its own vertex, up to the snap off the centerline's.
+                var slack = leg.StartSnap + leg.EndSnap + CommonLineGeometry.GapTolerance;
+                if (covered[i] <= Math.Tolerance.Epsilon
+                    || System.Math.Abs(covered[i] - leg.Start.DistanceTo(leg.End)) > slack)
+                {
+                    var (a, b) = (leg.Start + location, leg.End + location);
                     throw new ArgumentException(FormattableString.Invariant(
-                        $"The shared span from ({spans[i].Start.X:0.####}, {spans[i].Start.Y:0.####}) to ({spans[i].End.X:0.####}, {spans[i].End.Y:0.####}) does not lie along one straight edge of the part's program."));
+                        $"The shared span from ({a.X:0.####}, {a.Y:0.####}) to ({b.X:0.####}, {b.Y:0.####}) does not lie along one straight edge of the part's program."));
+                }
+            }
             program.Codes.Clear();
             program.Codes.AddRange(codes);
             return program;
         }
 
-        // The line split where shared spans one half kerf off it begin and end; shared pieces on Tab.
-        private static IEnumerable<ICode> Split(LinearMove line, Vector start, (Vector Start, Vector End)[] spans,
-            double[] covered, double kerf)
+        // One straight leg of a shared path in part coordinates. An end at a corner snaps to the
+        // edge's own vertex within kerf/2 · tan(turn/2) of the centerline corner's projection.
+        private readonly record struct Leg(Vector Start, Vector End, double StartSnap, double EndSnap);
+
+        private static IEnumerable<Leg> Legs(CommonLinePath path, Vector location, double kerf)
+        {
+            var points = path.Points.Select(point => point - location).ToArray();
+            var snaps = new double[points.Length];
+            for (var k = 1; k < points.Length - 1; k++)
+            {
+                var din = (points[k] - points[k - 1]).Normalize();
+                var dout = (points[k + 1] - points[k]).Normalize();
+                var turn = System.Math.Atan2(System.Math.Abs(Cross(din, dout)), Dot(din, dout));
+                snaps[k] = kerf / 2 * System.Math.Tan(turn / 2) + 2 * CommonLineGeometry.GapTolerance;
+            }
+            for (var k = 0; k + 1 < points.Length; k++)
+                yield return new Leg(points[k], points[k + 1], snaps[k], snaps[k + 1]);
+        }
+
+        // The line split where shared legs one half kerf off it begin and end; shared pieces on Tab.
+        private static IEnumerable<ICode> Split(LinearMove line, Vector start, Leg[] legs, double[] covered,
+            double kerf)
         {
             var end = line.EndPoint;
             var length = start.DistanceTo(end);
@@ -142,20 +186,20 @@ namespace OpenNest
                 return [line];
             var direction = new Vector((end.X - start.X) / length, (end.Y - start.Y) / length);
             var intervals = new List<(double From, double To)>();
-            for (var i = 0; i < spans.Length; i++)
+            for (var i = 0; i < legs.Length; i++)
             {
-                var (a, b) = spans[i];
-                var spanLength = a.DistanceTo(b);
-                if (spanLength <= Math.Tolerance.Epsilon)
+                var (a, b, snapA, snapB) = legs[i];
+                var legLength = a.DistanceTo(b);
+                if (legLength <= Math.Tolerance.Epsilon)
                     continue;
-                var along = new Vector((b.X - a.X) / spanLength, (b.Y - a.Y) / spanLength);
+                var along = new Vector((b.X - a.X) / legLength, (b.Y - a.Y) / legLength);
                 if (System.Math.Abs(Cross(direction, along)) > 1e-6)
                     continue;
                 var offset = System.Math.Abs(Cross(direction, a - start));
                 if (System.Math.Abs(offset - kerf / 2) > CommonLineGeometry.GapTolerance)
                     continue;
-                var ta = Dot(a - start, direction);
-                var tb = Dot(b - start, direction);
+                var ta = Snap(Dot(a - start, direction), snapA, length);
+                var tb = Snap(Dot(b - start, direction), snapB, length);
                 var from = System.Math.Max(0, System.Math.Min(ta, tb));
                 var to = System.Math.Min(length, System.Math.Max(ta, tb));
                 if (to - from <= Math.Tolerance.Epsilon)
@@ -188,6 +232,18 @@ namespace OpenNest
             return pieces;
 
             Vector Point(double t) => new(start.X + direction.X * t, start.Y + direction.Y * t);
+        }
+
+        // A corner end within snap of either end of the edge is that end.
+        private static double Snap(double t, double snap, double length)
+        {
+            if (snap <= 0)
+                return t;
+            if (System.Math.Abs(t) <= snap)
+                return 0;
+            if (System.Math.Abs(t - length) <= snap)
+                return length;
+            return t;
         }
 
         private static double Dot(Vector a, Vector b) => a.X * b.X + a.Y * b.Y;

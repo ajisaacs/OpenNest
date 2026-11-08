@@ -1629,23 +1629,27 @@ namespace OpenNest.CNC.CuttingStrategy
         }
 
         /// <summary>
-        /// One shared cut, absolute in its part's frame: a rapid to the pierce on the cut's axis
-        /// before its start, the straight lead-in, the open centerline cut and the straight
-        /// lead-out on past its end, each lead as long as the configured one reaches.
+        /// One shared cut, absolute in its part's frame: a rapid to the pierce on the first leg's
+        /// axis before its start, the straight lead-in, the open centerline cut through every
+        /// corner of a Z or L path, and the straight lead-out on past its end along the last leg,
+        /// each lead as long as the configured one reaches.
         /// </summary>
         internal static List<ICode> CommonLineSharedCutCodes(CuttingPlanning.CommonLineCutPath cut, LeadIn leadIn,
             LeadOut leadOut)
         {
             var codes = new List<ICode>();
-            var along = (cut.End - cut.Start).Normalize();
+            var points = cut.Points;
+            var entry = (points[1] - points[0]).Normalize();
             var reach = CommonLineLeadInReach(leadIn);
-            codes.Add(new RapidMove(cut.Start - along * reach));
+            codes.Add(new RapidMove(cut.Start - entry * reach));
             if (reach > Tolerance.Epsilon)
                 codes.Add(new LinearMove(cut.Start) { Layer = LayerType.Leadin });
-            codes.Add(new LinearMove(cut.End) { Layer = LayerType.CommonLine });
+            for (var i = 1; i < points.Count; i++)
+                codes.Add(new LinearMove(points[i]) { Layer = LayerType.CommonLine });
+            var leave = (points[^1] - points[^2]).Normalize();
             var exit = CommonLineLeadOutReach(leadOut);
             if (exit > Tolerance.Epsilon)
-                codes.Add(new LinearMove(cut.End + along * exit) { Layer = LayerType.Leadout });
+                codes.Add(new LinearMove(cut.End + leave * exit) { Layer = LayerType.Leadout });
             return codes;
         }
 

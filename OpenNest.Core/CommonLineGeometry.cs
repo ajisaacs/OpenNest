@@ -13,6 +13,31 @@ namespace OpenNest
         public double Length => Start.DistanceTo(End);
     }
 
+    /// <summary>
+    /// One shared cut's path: the spans of one pair chained end to end at corners (a Z or L shared
+    /// line), or a single straight span. <see cref="Points"/> runs from the first span's free end
+    /// through each corner, where the spans' centerlines meet, to the last span's free end.
+    /// </summary>
+    public sealed record CommonLinePath(Part First, Part Second, IReadOnlyList<CommonLineSpan> Spans,
+        IReadOnlyList<Vector> Points)
+    {
+        public Vector Start => Points[0];
+
+        public Vector End => Points[^1];
+
+        /// <summary>The kerf-centerline length of the whole path, corners included.</summary>
+        public double Length
+        {
+            get
+            {
+                var length = 0.0;
+                for (var i = 1; i < Points.Count; i++)
+                    length += Points[i - 1].DistanceTo(Points[i]);
+                return length;
+            }
+        }
+    }
+
     /// <summary>A member of a group that no longer shares a span, or could not be read.</summary>
     public readonly record struct CommonLineProblem(Part Part, string Message);
 
@@ -115,7 +140,9 @@ namespace OpenNest
             if (!double.IsFinite(kerf) || kerf <= 0)
                 throw new ArgumentOutOfRangeException(nameof(kerf));
             var cache = new ProfileCache();
-            var best = FacingEdges(Edges(anchor, cache), Edges(moving, cache), -maxGap, maxGap)
+            var anchorEdges = Edges(anchor, cache);
+            var movingEdges = Edges(moving, cache);
+            var best = FacingEdges(anchorEdges, movingEdges, -maxGap, maxGap)
                 .OrderByDescending(facing => System.Math.Round(facing.Overlap, 6))
                 .ThenBy(facing => System.Math.Abs(facing.Gap - kerf))
                 .Cast<Facing?>()
@@ -123,8 +150,140 @@ namespace OpenNest
             if (best is not { } chosen)
                 return null;
             var shift = kerf - chosen.Gap;
-            return new Vector(chosen.First.Outward.X * shift, chosen.First.Outward.Y * shift);
+            var offset = new Vector(chosen.First.Outward.X * shift, chosen.First.Outward.Y * shift);
+            return Slide(anchorEdges, movingEdges, chosen, offset, kerf, maxGap) ?? offset;
         }
+
+        // The offset slid along the chosen edge pair so that a facing pair across it (the step of a
+        // Z or L shared line) lands one kerf apart too, keeping the chosen pair's gap and span; null
+        // when no such pair is within reach.
+        private static Vector? Slide(IReadOnlyList<Edge> anchor, IReadOnlyList<Edge> moving, Facing chosen,
+            Vector offset, double kerf, double maxGap)
+        {
+            var along = chosen.First.Direction;
+            var minimum = System.Math.Sin(MinCornerTurn);
+            var shifted = Shift(moving, offset);
+            var slides = FacingEdges(anchor, shifted, -maxGap, maxGap)
+                .Select(facing => (Facing: facing, Across: Dot(along, facing.First.Outward)))
+                .Where(choice => System.Math.Abs(choice.Across) >= minimum)
+                .Select(choice => (choice.Facing, Slide: (kerf - choice.Facing.Gap) / choice.Across))
+                .Where(choice => System.Math.Abs(choice.Slide) <= maxGap)
+                .OrderByDescending(choice => System.Math.Round(choice.Facing.Overlap, 6))
+                .ThenBy(choice => System.Math.Abs(choice.Slide));
+            foreach (var (_, slide) in slides)
+            {
+                var candidate = new Vector(offset.X + along.X * slide, offset.Y + along.Y * slide);
+                var placed = Shift(moving, candidate);
+                var spans = FacingEdges(anchor, placed, kerf - GapTolerance, kerf + GapTolerance).ToList();
+                // The chosen pair must still share, and the slid pair must now share across it.
+                if (spans.Any(facing => System.Math.Abs(Cross(facing.First.Direction, along)) <= ParallelTolerance)
+                    && spans.Any(facing => System.Math.Abs(Dot(along, facing.First.Outward)) >= minimum))
+                    return candidate;
+            }
+            return null;
+        }
+
+        private static IReadOnlyList<Edge> Shift(IReadOnlyList<Edge> edges, Vector offset) =>
+            edges.Select(edge => edge with { Start = edge.Start + offset, End = edge.End + offset }).ToArray();
+
+        /// <summary>The sharpest corner a shared path may turn (radians): 135°.</summary>
+        public const double MaxCornerTurn = 3 * System.Math.PI / 4;
+
+        /// <summary>The gentlest corner a shared path may turn (radians): 10°. Gentler meets are not corners.</summary>
+        public const double MinCornerTurn = System.Math.PI / 18;
+
+        /// <summary>
+        /// The shared cuts of <paramref name="spans"/> at <paramref name="kerf"/>: spans of one pair
+        /// whose ends meet at a corner (a Z or L shared line) chain into one path; every other span
+        /// is a path of its own. Two spans meet when their centerlines cross beyond both ends, each
+        /// end short of the crossing by what the kerf leaves there, <c>kerf/2 · tan(turn/2)</c>, and
+        /// the path turns between <see cref="MinCornerTurn"/> and <see cref="MaxCornerTurn"/>. Paths
+        /// keep the spans' order of first appearance.
+        /// </summary>
+        public static IReadOnlyList<CommonLinePath> Paths(IReadOnlyList<CommonLineSpan> spans, double kerf)
+        {
+            ArgumentNullException.ThrowIfNull(spans);
+            if (!double.IsFinite(kerf) || kerf <= 0)
+                throw new ArgumentOutOfRangeException(nameof(kerf));
+            // links[i, end]: the span and end met at span i's end (0 = Start, 1 = End), and the corner.
+            var links = new (int Span, int End, Vector Corner)?[spans.Count, 2];
+            for (var i = 0; i < spans.Count; i++)
+                for (var j = i + 1; j < spans.Count; j++)
+                {
+                    if (!SamePair(spans[i], spans[j]))
+                        continue;
+                    for (var ei = 0; ei < 2; ei++)
+                        for (var ej = 0; ej < 2; ej++)
+                            if (links[i, ei] == null && links[j, ej] == null
+                                && Corner(spans[i], ei, spans[j], ej, kerf) is { } corner)
+                            {
+                                links[i, ei] = (j, ej, corner);
+                                links[j, ej] = (i, ei, corner);
+                            }
+                }
+            var used = new bool[spans.Count];
+            var paths = new List<CommonLinePath>();
+            for (var i = 0; i < spans.Count; i++)
+            {
+                if (used[i])
+                    continue;
+                // Walk back to a free end (or round a loop back to this span), then trace forward.
+                var (span, entry) = (i, links[i, 0] == null ? 0 : links[i, 1] == null ? 1 : 0);
+                for (var guard = 0; guard < spans.Count && links[span, entry] is { } back && back.Span != i; guard++)
+                    (span, entry) = (back.Span, 1 - back.End);
+                var chain = new List<CommonLineSpan>();
+                var points = new List<Vector> { EndOf(spans[span], entry) };
+                while (true)
+                {
+                    used[span] = true;
+                    chain.Add(spans[span]);
+                    var exit = 1 - entry;
+                    if (links[span, exit] is not { } next || used[next.Span])
+                    {
+                        points.Add(EndOf(spans[span], exit));
+                        break;
+                    }
+                    points.Add(next.Corner);
+                    (span, entry) = (next.Span, next.End);
+                }
+                paths.Add(new CommonLinePath(spans[i].First, spans[i].Second, chain, points));
+            }
+            return paths;
+        }
+
+        // Where span a's end ea meets span b's end eb at a corner, or null.
+        private static Vector? Corner(CommonLineSpan a, int ea, CommonLineSpan b, int eb, double kerf)
+        {
+            var aEnd = EndOf(a, ea);
+            var aOther = EndOf(a, 1 - ea);
+            var bEnd = EndOf(b, eb);
+            var bOther = EndOf(b, 1 - eb);
+            var aLength = aEnd.DistanceTo(aOther);
+            var bLength = bEnd.DistanceTo(bOther);
+            if (aLength <= Math.Tolerance.Epsilon || bLength <= Math.Tolerance.Epsilon)
+                return null;
+            // Travel along a into its end, then out along b from its end.
+            var din = new Vector((aEnd.X - aOther.X) / aLength, (aEnd.Y - aOther.Y) / aLength);
+            var dout = new Vector((bOther.X - bEnd.X) / bLength, (bOther.Y - bEnd.Y) / bLength);
+            var cross = Cross(din, dout);
+            var turn = System.Math.Atan2(System.Math.Abs(cross), Dot(din, dout));
+            if (turn < MinCornerTurn || turn > MaxCornerTurn)
+                return null;
+            // aEnd + din·s = bEnd − dout·t: the corner lies s past a's end and t before b's end.
+            var gap = bEnd - aEnd;
+            var s = Cross(gap, dout) / cross;
+            var t = Cross(din, gap) / cross;
+            var reach = kerf / 2 * System.Math.Tan(turn / 2) + 2 * GapTolerance;
+            if (s < -GapTolerance || t < -GapTolerance || s > reach || t > reach)
+                return null;
+            return new Vector(aEnd.X + din.X * s, aEnd.Y + din.Y * s);
+        }
+
+        private static Vector EndOf(CommonLineSpan span, int end) => end == 0 ? span.Start : span.End;
+
+        private static bool SamePair(CommonLineSpan a, CommonLineSpan b) =>
+            (ReferenceEquals(a.First, b.First) && ReferenceEquals(a.Second, b.Second))
+            || (ReferenceEquals(a.First, b.Second) && ReferenceEquals(a.Second, b.First));
 
         private static IReadOnlyList<CommonLineSpan> Spans(Part first, IReadOnlyList<Edge> a, Part second,
             IReadOnlyList<Edge> b, double kerf)

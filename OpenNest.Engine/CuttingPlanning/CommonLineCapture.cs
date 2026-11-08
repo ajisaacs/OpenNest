@@ -48,7 +48,7 @@ internal sealed class CommonLineCapture
                 var part = order.Members[i];
                 if (IndexOf(request.Parts, part) < 0)
                     throw new ArgumentException("A common-line member is not among the planned parts.");
-                capture.members[part] = new Member(order, part, order.SpansOf(part).ToArray(),
+                capture.members[part] = new Member(order, part, order.PathsOf(part).ToArray(),
                     order.CutsOwnedBy(part).ToArray());
             }
         }
@@ -75,7 +75,7 @@ internal sealed class CommonLineCapture
         var member = members[part];
         try
         {
-            return CommonLineCutting.MarkSharedSpans(ownedClean, location, member.Spans, member.Order.Group.Kerf);
+            return CommonLineCutting.MarkSharedSpans(ownedClean, location, member.Paths, member.Order.Group.Kerf);
         }
         catch (ArgumentException exception)
         {
@@ -102,8 +102,8 @@ internal sealed class CommonLineCapture
         foreach (var cut in member.Owned)
         {
             token.ThrowIfCancellationRequested();
-            var forward = new CommonLineCutPath(cut.Span.Start - location, cut.Span.End - location);
-            var reverse = new CommonLineCutPath(forward.End, forward.Start);
+            var forward = new CommonLineCutPath(cut.Path.Points.Select(point => point - location).ToArray());
+            var reverse = forward.Reversed();
             string reason = null;
             CommonLineCutPath chosen = null;
             foreach (var path in new[] { forward, reverse })
@@ -121,7 +121,7 @@ internal sealed class CommonLineCapture
             }
             if (chosen == null)
                 throw new NotSupportedException(FormattableString.Invariant(
-                    $"No lead fits the common line between parts {ordinal + 1} and {IndexOf(parts, cut.Partner) + 1} from ({cut.Span.Start.X:0.####}, {cut.Span.Start.Y:0.####}) to ({cut.Span.End.X:0.####}, {cut.Span.End.Y:0.####}) at either end: ")
+                    $"No lead fits the common line between parts {ordinal + 1} and {IndexOf(parts, cut.Partner) + 1} from ({cut.Path.Start.X:0.####}, {cut.Path.Start.Y:0.####}) to ({cut.Path.End.X:0.####}, {cut.Path.End.Y:0.####}) at either end: ")
                     + reason + " Shorten the external lead-in or lead-out, or cut the plate's common lines twice.");
             cuts.Add(chosen);
         }
@@ -136,6 +136,6 @@ internal sealed class CommonLineCapture
         return -1;
     }
 
-    private sealed record Member(CommonLineCutOrder Order, Part Part, IReadOnlyList<CommonLineSpan> Spans,
+    private sealed record Member(CommonLineCutOrder Order, Part Part, IReadOnlyList<CommonLinePath> Paths,
         IReadOnlyList<CommonLineSharedCut> Owned);
 }

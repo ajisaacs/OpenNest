@@ -31,8 +31,34 @@ public sealed record ContourChoice(int ContourOrdinal, int EntityOrdinal, Vector
 /// </summary>
 public sealed record CommonLinePerimeter(double Kerf, IReadOnlyList<CommonLineCutPath> SharedCuts);
 
-/// <summary>One shared cut on a common line's centerline, in part coordinates and cut direction.</summary>
-public sealed record CommonLineCutPath(Vector Start, Vector End);
+/// <summary>
+/// One shared cut on a common line's centerline, in part coordinates and cut direction: straight,
+/// or through the corners of a Z or L shared line.
+/// </summary>
+public sealed record CommonLineCutPath(IReadOnlyList<Vector> Points)
+{
+    public CommonLineCutPath(Vector start, Vector end) : this(new[] { start, end })
+    {
+    }
+
+    public Vector Start => Points[0];
+
+    public Vector End => Points[^1];
+
+    /// <summary>The same path cut from its other end.</summary>
+    public CommonLineCutPath Reversed() => new(Points.Reverse().ToArray());
+
+    /// <summary>Whether the path has two or more points and no degenerate leg.</summary>
+    internal bool IsNondegenerate(double epsilon)
+    {
+        if (Points is not { Count: >= 2 })
+            return false;
+        for (var i = 1; i < Points.Count; i++)
+            if (Points[i - 1].DistanceTo(Points[i]) <= epsilon)
+                return false;
+        return true;
+    }
+}
 
 /// <summary>
 /// Immutable owned clean contours and settings. Callers supply the clean, already-rotated
@@ -342,7 +368,7 @@ public sealed class PreparedContours
             if (displayPerimeter != null || current.Entities.Count != 0)
                 throw new ArgumentException("A common-line member needs one closed cut perimeter.");
             if (!double.IsFinite(commonLine.Kerf) || commonLine.Kerf <= 0 || commonLine.SharedCuts == null
-                || commonLine.SharedCuts.Any(c => c == null || c.Start.DistanceTo(c.End) <= PostVerificationGeometry.Epsilon))
+                || commonLine.SharedCuts.Any(c => c == null || !c.IsNondegenerate(PostVerificationGeometry.Epsilon)))
                 throw new ArgumentException("A common-line member needs a positive kerf and nondegenerate shared cuts.");
             // The outside carries the shared spans as tabs; every other contour lies inside it.
             var outside = tabbedCutouts.Concat(contours).MaxBy(shape => shape.BoundingBox.Width * shape.BoundingBox.Length);

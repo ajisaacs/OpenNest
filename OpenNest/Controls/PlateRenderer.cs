@@ -358,8 +358,10 @@ namespace OpenNest.Controls
                     cached = (state, CommonLineGeometry.Check(group));
                     commonLineChecks[group] = cached;
                 }
-                foreach (var span in cached.Check.Spans)
-                    DrawLine(g, span.Start, span.End, pen);
+                // A Z or L shared line is drawn through its corners, as it is cut.
+                foreach (var path in CommonLineGeometry.Paths(cached.Check.Spans, group.Kerf))
+                    for (var i = 1; i < path.Points.Count; i++)
+                        DrawLine(g, path.Points[i - 1], path.Points[i], pen);
                 foreach (var problem in cached.Check.Problems)
                     DrawBox(g, problem.Part.BoundingBox, broken);
             }
