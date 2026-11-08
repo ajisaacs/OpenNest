@@ -47,7 +47,8 @@ internal static class ContourProgramVerifier
         if (material == null || !material.IsComplete) return false;
         if (selected != null && !SameEmission(actual, selected.Expected, token, ref budget)) return false;
         var visited = new HashSet<int>();
-        var piecesCut = new Dictionary<int, HashSet<int>>();
+        // Per tabbed ring: what each run cut, as (span start, from, to) along its span.
+        var piecesCut = new Dictionary<int, List<(int Span, double From, double To)>>();
         foreach (var run in Runs(actual).Where(r => !r.Rapid && r.Kind == LayerType.Cut))
         {
             token.ThrowIfCancellationRequested();
@@ -76,12 +77,13 @@ internal static class ContourProgramVerifier
             var tabs = material.Tabs[ringIndex];
             if (tabs.Any(tab => tab))
             {
-                // A tabbed cutout: each run cuts exactly one span between tabs, whole and once.
-                if (!CutsTabbedSpan(run.Curves, material.Rings[ringIndex], tabs, entityIndex, token, ref budget)
-                    || !(piecesCut.TryGetValue(ringIndex, out var cut) ? cut : piecesCut[ringIndex] = new()).Add(entityIndex))
+                // A tabbed ring: each run follows one span between tabs and never crosses a tab. A
+                // span is usually one run; a common-line member that starts on its common line cuts
+                // the span holding that start in two, each from where the other began or ended.
+                if (CutTabbedSpan(run.Curves, material.Rings[ringIndex], tabs, entityIndex, token, ref budget)
+                    is not { } piece)
                     return false;
-                if (piecesCut[ringIndex].Count == SpanStarts(tabs).Count)
-                    visited.Add(ringIndex);
+                (piecesCut.TryGetValue(ringIndex, out var cut) ? cut : piecesCut[ringIndex] = new()).Add(piece);
                 continue;
             }
             if (!visited.Add(ringIndex)) return false;
@@ -109,6 +111,27 @@ internal static class ContourProgramVerifier
             if (!Follows(run.Curves, ring, entityIndex, ring[entityIndex].DistanceAlong(first.Start),
                 true, tolerance, token, ref budget)) return false;
         }
+        // Every span of a tabbed ring is cut exactly once: its pieces tile it with no gap or overlap.
+        foreach (var (ringIndex, pieces) in piecesCut)
+        {
+            var ring = material.Rings[ringIndex];
+            var tabs = material.Tabs[ringIndex];
+            var tolerance = AdmittedClosureSlack(ring);
+            foreach (var start in SpanStarts(tabs))
+            {
+                var length = Span(ring, tabs, start).Sum(c => c.Length);
+                var at = 0.0;
+                foreach (var piece in pieces.Where(p => p.Span == start).OrderBy(p => p.From))
+                {
+                    if (System.Math.Abs(piece.From - at) > tolerance)
+                        return false;
+                    at = piece.To;
+                }
+                if (System.Math.Abs(length - at) > tolerance)
+                    return false;
+            }
+            visited.Add(ringIndex);
+        }
         return visited.Count == material.Rings.Count - (material.HasDisplayPerimeter ? 1 : 0);
     }
 
@@ -116,19 +139,41 @@ internal static class ContourProgramVerifier
     private static List<int> SpanStarts(bool[] tabs) => Enumerable.Range(0, tabs.Length)
         .Where(i => !tabs[i] && tabs[(i + tabs.Length - 1) % tabs.Length]).ToList();
 
-    // A run that starts exactly where a span between tabs starts and covers that span exactly,
-    // stopping at the next tab.
-    private static bool CutsTabbedSpan(IReadOnlyList<Curve> run, IReadOnlyList<Curve> ring, bool[] tabs,
-        int entityIndex, CancellationToken token, ref int budget)
+    // What a run along a tabbed ring cuts: its span (by the span's first curve) and where along the
+    // span it starts and ends. Null unless the run follows the ring from its start without
+    // reaching past the span's next tab.
+    private static (int Span, double From, double To)? CutTabbedSpan(IReadOnlyList<Curve> run,
+        IReadOnlyList<Curve> ring, bool[] tabs, int entityIndex, CancellationToken token, ref int budget)
     {
+        if (tabs[entityIndex])
+            return null;
         var tolerance = AdmittedClosureSlack(ring);
-        if (!SpanStarts(tabs).Contains(entityIndex) || ring[entityIndex].DistanceAlong(run[0].Start) > tolerance)
-            return false;
+        var count = tabs.Length;
+        var start = entityIndex;
+        var from = ring[entityIndex].DistanceAlong(run[0].Start);
+        for (var guard = 0; guard < count && !tabs[(start + count - 1) % count]; guard++)
+        {
+            start = (start + count - 1) % count;
+            from += ring[start].Length;
+        }
+        var rest = new List<Curve>();
+        for (var e = entityIndex; !tabs[e % count] && rest.Count < count; e++)
+            rest.Add(ring[e % count]);
+        var length = run.Sum(c => c.Length);
+        var offset = ring[entityIndex].DistanceAlong(run[0].Start);
+        if (length > rest.Sum(c => c.Length) - offset + tolerance
+            || !Follows(run, rest, 0, offset, false, tolerance, token, ref budget, partial: true))
+            return null;
+        return (start, from, from + length);
+    }
+
+    // The curves of the span between tabs that starts at curve start.
+    private static List<Curve> Span(IReadOnlyList<Curve> ring, bool[] tabs, int start)
+    {
         var span = new List<Curve>();
-        for (var e = entityIndex; !tabs[e % tabs.Length]; e++)
+        for (var e = start; !tabs[e % tabs.Length] && span.Count < tabs.Length; e++)
             span.Add(ring[e % tabs.Length]);
-        return System.Math.Abs(run.Sum(c => c.Length) - span.Sum(c => c.Length)) <= tolerance
-            && Follows(run, span, 0, 0, false, tolerance, token, ref budget);
+        return span;
     }
 
     // Zero for an exactly closed ring: a ring may lawfully close within the nominal closure
@@ -163,8 +208,10 @@ internal static class ContourProgramVerifier
     // collinear moves and a cyclic ring's reindexing do not change coverage.
     // `tolerance` is the admitted positional slack for this pair of streams (the exact epsilon
     // unless the nominal ring closes only within the nominal closure tolerance).
+    // `partial` accepts an actual stream that ends before the expected one does.
     private static bool Follows(IReadOnlyList<Curve> actual, IReadOnlyList<Curve> expected,
-        int index, double offset, bool cyclic, double tolerance, CancellationToken token, ref int budget)
+        int index, double offset, bool cyclic, double tolerance, CancellationToken token, ref int budget,
+        bool partial = false)
     {
         foreach (var curve in actual)
         {
@@ -201,7 +248,7 @@ internal static class ContourProgramVerifier
                 }
             }
         }
-        return cyclic || index == expected.Count || index == expected.Count - 1
+        return cyclic || partial || index == expected.Count || index == expected.Count - 1
             && expected[index].Length - offset <= tolerance;
     }
 

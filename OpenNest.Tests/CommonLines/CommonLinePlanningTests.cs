@@ -10,8 +10,10 @@ namespace OpenNest.Tests.CommonLines;
 
 /// <summary>
 /// Plan Cutting cuts each common line once (docs/common-line-cutting.md): a group is cut member by
-/// member, each cutting its holes, then the shared cuts it owns on the centerline, then its
-/// remainder, which ends in the kerf the shared cut opened. The parts are PT42-like.
+/// member, each cutting its holes, then its outside compensated. A member that cuts a common line
+/// starts its outside there, entered along the shared edge from the scrap, so the line leads
+/// straight into its perimeter; its partner cuts only its remainder, which starts and ends in the
+/// kerf the common line opened. The parts are PT42-like.
 /// </summary>
 public class CommonLinePlanningTests
 {
@@ -87,7 +89,7 @@ public class CommonLinePlanningTests
     private static bool IsCut(ExecutionMotion m) => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display;
 
     [Fact]
-    public void Pair_CutsTheSharedLineOnceOnTheCenterline()
+    public void Pair_TheFirstPartCutsTheCommonLineAsTheStartOfItsPerimeter()
     {
         var plate = Row(2);
 
@@ -95,16 +97,27 @@ public class CommonLinePlanningTests
 
         Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
         Assert.True(result.IndependentlyReplayed);
-        var cut = Assert.Single(result.ProposedOrder.SelectMany(Motions), m => m.Layer == LayerType.CommonLine);
-        Assert.Equal(Centerline(0), cut.Curve.Start.X, 9);
-        Assert.Equal(Centerline(0), cut.End.X, 9);
-        Assert.Equal(Height - 2 * Chamfer, cut.Length, 9);
-        // The member that cuts it comes first; its partner's remainder ends in its kerf.
         Assert.Same(plate.Parts[0], result.ProposedOrder[0].SourcePart);
+        var all = result.ProposedOrder.SelectMany(Motions).ToArray();
+        Assert.DoesNotContain(all, m => m.Layer == LayerType.CommonLine);
+        // One pierce below the notch, a lead-in straight up the shared edge's axis, then the shared
+        // edge itself and on round the perimeter to close where it began: no lead-out.
+        var motions = Motions(result.ProposedOrder[0]).ToList();
+        Assert.Single(motions, m => m.Layer == LayerType.Leadin);
+        var lead = motions.Single(m => m.Layer == LayerType.Leadin);
+        Assert.Equal(2 + Width, lead.Start!.Value.X, 9);
+        Assert.Equal(2 + Width, lead.End.X, 9);
+        Assert.Equal(2 + Chamfer, lead.End.Y, 9);
+        var cuts = motions.Where(IsCut).ToList();
+        Assert.Equal(2 + Width, cuts[0].End.X, 9);
+        Assert.Equal(2 + Height - Chamfer, cuts[0].End.Y, 9);
+        Assert.Equal(0, cuts[^1].End.DistanceTo(lead.End), 9);
+        Assert.DoesNotContain(motions, m => m.Layer == LayerType.Leadout);
+        Assert.False(CommonLineCuts.IsSinglePass(result.ProposedOrder[0].CopyProgram()));
     }
 
     [Fact]
-    public void Row_CutsEachMembersHolesThenItsSharedCutsThenItsRemainder()
+    public void Row_CutsEachMembersHolesThenItsOutside_StartingOnItsCommonLine()
     {
         var plate = Row(3, hole: true);
 
@@ -113,20 +126,34 @@ public class CommonLinePlanningTests
         Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
         // The group is cut contiguously, owners before partners.
         Assert.Equal(plate.Parts, result.ProposedOrder.Select(p => p.SourcePart));
+        Assert.DoesNotContain(result.ProposedOrder.SelectMany(Motions), m => m.Layer == LayerType.CommonLine);
         for (var i = 0; i < 3; i++)
         {
-            var motions = Motions(result.ProposedOrder[i]);
-            var hole = motions.ToList().FindLastIndex(m => IsCut(m) && !m.Curve.IsLine);
-            var shared = motions.ToList().FindIndex(m => m.Layer == LayerType.CommonLine);
-            var remainder = motions.ToList().FindIndex(m => IsCut(m) && m.Curve.IsLine);
-            Assert.True(hole >= 0, $"Part {i + 1} cuts no hole.");
-            Assert.True(remainder > hole, $"Part {i + 1} cuts its remainder before its hole.");
+            var motions = Motions(result.ProposedOrder[i]).ToList();
+            var hole = motions.FindLastIndex(m => IsCut(m) && !m.Curve.IsLine);
+            var outside = motions.FindIndex(m => IsCut(m) && m.Curve.IsLine);
+            Assert.True(hole >= 0 && outside > hole, $"Part {i + 1} does not cut its hole before its outside.");
+            var lead = motions[outside - 1];
+            Assert.Equal(LayerType.Leadin, lead.Layer);
             if (i < 2)
-                Assert.True(shared > hole && shared < remainder, $"Part {i + 1} does not cut hole, shared cut, remainder in order.");
+            {
+                // Entered from below the notch along its right edge, the common line it cuts.
+                var edge = 2 + (i + 1) * Width + i * Kerf;
+                Assert.Equal(edge, lead.Start!.Value.X, 9);
+                Assert.Equal(edge, motions[outside].End.X, 9);
+                Assert.Equal(2 + Height - Chamfer, motions[outside].End.Y, 9);
+            }
             else
-                Assert.Equal(-1, shared); // The last member owns no shared cut.
+                Assert.Equal(Centerline(1), lead.Start!.Value.X, 9); // The last only cuts a remainder.
         }
-        Assert.Equal(2, result.ProposedOrder.SelectMany(Motions).Count(m => m.Layer == LayerType.CommonLine));
+        // The middle part stops at the kerf its left neighbour opened, then cuts the stretch below
+        // from that kerf, ending where it began, beside the part it is cut before.
+        var middle = Motions(result.ProposedOrder[1]).ToList();
+        var entries = middle.Where((m, i) => m.Layer == LayerType.Leadin && i + 1 < middle.Count
+            && IsCut(middle[i + 1]) && middle[i + 1].Curve.IsLine).ToList();
+        Assert.Equal(2, entries.Count);
+        var start = entries[0].End;
+        Assert.Equal(0, middle.Last(IsCut).End.DistanceTo(start), 9);
     }
 
     [Fact]
@@ -136,60 +163,59 @@ public class CommonLinePlanningTests
         var result = Plan(plate);
         Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
 
-        foreach (var proposal in result.ProposedOrder)
-        {
-            var motions = Motions(proposal);
-            var lead = motions.Last(m => m.Layer == LayerType.Leadin);
-            // Pierced on the centerline (nothing left to pierce), entering the member's own edge.
-            Assert.Equal(Centerline(0), lead.Start!.Value.X, 9);
-            var edge = ReferenceEquals(proposal.SourcePart, plate.Parts[0]) ? 2 + Width : 2 + Width + Kerf;
-            Assert.Equal(edge, lead.End.X, 9);
-            // The remainder ends at the other end of its shared span, on the member's edge.
-            var last = motions.Last(IsCut);
-            Assert.Equal(edge, last.End.X, 9);
-        }
+        var motions = Motions(result.ProposedOrder[1]);
+        var lead = motions.Last(m => m.Layer == LayerType.Leadin);
+        // Pierced on the centerline (nothing left to pierce), entering the partner's own edge.
+        Assert.Equal(Centerline(0), lead.Start!.Value.X, 9);
+        Assert.Equal(2 + Width + Kerf, lead.End.X, 9);
+        // The remainder ends at the other end of its shared span, on the partner's edge.
+        Assert.Equal(2 + Width + Kerf, motions.Last(IsCut).End.X, 9);
+        Assert.True(CommonLineCuts.IsSinglePass(result.ProposedOrder[1].CopyProgram()));
     }
 
     [Fact]
-    public void Members_CutTheirPerimeterExactlyOnce_SharedSpansByTheSharedCut()
+    public void Members_CutTheirPerimeterExactlyOnce_SharedSpansByTheFirstPart()
     {
         var plate = Row(2);
-        var part = plate.Parts[0];
-        var spans = CommonLineGeometry.Check(plate.CommonLines[0]).Spans;
-        var marked = CommonLineCutting.MarkSharedSpans(part.BaseDrawing.Program, part.Location, spans, Kerf);
-        var material = LeadMaterialSnapshot.Capture(marked, part.Location, default, sharedSpans: true);
-        Assert.True(material.IsComplete, material.Reason);
-
+        var order = CommonLineCutting.Order(plate.CommonLines[0], CommonLineGeometry.Check(plate.CommonLines[0]));
         var result = Plan(plate);
         Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
-        var planned = ExecutionMotionReader.Read(result.ProposedOrder[0].CopyProgram(), part.Location, null, default);
-        Assert.True(ContourProgramVerifier.Verify(planned, material, null, default));
 
-        // Cutting the whole perimeter would cut the shared span a second time.
-        var whole = ExecutionMotionReader.Read(part.BaseDrawing.Program, part.Location, null, default);
-        Assert.False(ContourProgramVerifier.Verify(whole, material, null, default));
+        foreach (var proposal in result.ProposedOrder)
+        {
+            var part = proposal.SourcePart;
+            var marked = CommonLineCutting.MarkSharedSpans(part.BaseDrawing.Program, part.Location,
+                order.PathsCutBefore(part).ToArray(), Kerf);
+            var material = LeadMaterialSnapshot.Capture(marked, part.Location, default, sharedSpans: true);
+            Assert.True(material.IsComplete, material.Reason);
+            var planned = ExecutionMotionReader.Read(proposal.CopyProgram(), part.Location, null, default);
+            Assert.True(ContourProgramVerifier.Verify(planned, material, null, default));
+            if (ReferenceEquals(part, plate.Parts[1]))
+            {
+                // The partner cutting its whole perimeter would cut the common line a second time.
+                var whole = ExecutionMotionReader.Read(part.BaseDrawing.Program, part.Location, null, default);
+                Assert.False(ContourProgramVerifier.Verify(whole, material, null, default));
+            }
+        }
     }
 
     [Fact]
-    public void SharedCutLeadBlockedAtBothEnds_RefusesNamingTheSpan()
+    public void CommonLineStartBlocked_RefusesNamingTheLine()
     {
         var plate = Row(2, x: 2, y: 2);
-        // Strips just past both notches stop the axial lead-ins and lead-outs.
-        foreach (var y in new[] { 2 - 0.3, 2 + Height + 0.1 })
-        {
-            var strip = new Program();
-            strip.Codes.Add(new RapidMove(0, 0));
-            strip.Codes.Add(new LinearMove(0, 0.2));
-            strip.Codes.Add(new LinearMove(4, 0.2));
-            strip.Codes.Add(new LinearMove(4, 0));
-            strip.Codes.Add(new LinearMove(0, 0));
-            plate.Parts.Add(new Part(new Drawing("strip", strip), new Vector(Centerline(0) - 2, y)));
-        }
+        // A strip just below the notch stops the straight lead-in up the shared edge.
+        var strip = new Program();
+        strip.Codes.Add(new RapidMove(0, 0));
+        strip.Codes.Add(new LinearMove(0, 0.2));
+        strip.Codes.Add(new LinearMove(4, 0.2));
+        strip.Codes.Add(new LinearMove(4, 0));
+        strip.Codes.Add(new LinearMove(0, 0));
+        plate.Parts.Add(new Part(new Drawing("strip", strip), new Vector(Centerline(0) - 2, 2 - 0.3)));
 
         var result = Plan(plate, Parameters(leadIn: 0.5));
 
         Assert.Equal(CuttingPlanStatus.UnsupportedGeometry, result.Status);
-        Assert.Contains(result.Findings, f => f.Message.Contains("No lead fits the common line between parts 1 and 2"));
+        Assert.Contains(result.Findings, f => f.Message.Contains("No lead fits the start of the common line between parts 1 and 2"));
     }
 
     [Fact]
@@ -236,7 +262,9 @@ public class CommonLinePlanningTests
         Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
         Assert.Equal(CuttingCommitStatus.Applied, CuttingPlanService.Apply([result]).Status);
 
-        Assert.All(plate.Parts.Take(2), p => Assert.True(CommonLineCuts.IsSinglePass(p.Program)));
+        // The first part cuts a normal closed perimeter; the others cut remainders.
+        Assert.False(CommonLineCuts.IsSinglePass(plate.Parts[0].Program));
+        Assert.All(plate.Parts.Skip(1), p => Assert.True(CommonLineCuts.IsSinglePass(p.Program)));
         Assert.Equal(utilization, plate.Utilization(), 12);
         Assert.Equal(nested, drawing.Quantity.Nested);
         Assert.Equal(overlaps, plate.HasOverlappingParts(out _));
@@ -263,7 +291,7 @@ public class CommonLinePlanningTests
     }
 
     [Fact]
-    public void PrePost_ReportsACommonLineLeftUncut()
+    public void PrePost_ReportsACommonLineCutTwice()
     {
         var nest = new Nest("N26-295");
         var plate = Row(2);
@@ -277,7 +305,7 @@ public class CommonLinePlanningTests
 
         var finding = Assert.Single(PostVerificationAnalyzer.Analyze(nest).Findings,
             f => f.Kind == PostVerificationKind.CommonLine);
-        Assert.Contains("not cut once", finding.Message);
+        Assert.Contains("cut more than once", finding.Message);
     }
 
     [Fact]
@@ -356,11 +384,11 @@ public class CommonLinePlanningTests
         var perimeter = 2 * (Width + Height) - 8 * Chamfer + 4 * Chamfer * System.Math.Sqrt(2);
         var alone = result.ProposedOrder.Single(p => ReferenceEquals(p.SourcePart, single));
         Assert.True(Motions(alone).Where(IsCut).Sum(m => m.Length) < perimeter - 0.05, "The lone part is not tabbed.");
-        foreach (var member in result.ProposedOrder.Where(p => !ReferenceEquals(p.SourcePart, single)))
-        {
-            var cut = Motions(member).Where(IsCut).Sum(m => m.Length);
-            Assert.Equal(perimeter - (Height - 2 * Chamfer), cut, 6);
-        }
+        // The first member cuts its whole perimeter, common line included; its partner the rest.
+        var first = result.ProposedOrder.Single(p => ReferenceEquals(p.SourcePart, plate.Parts[0]));
+        var partner = result.ProposedOrder.Single(p => ReferenceEquals(p.SourcePart, plate.Parts[1]));
+        Assert.Equal(perimeter, Motions(first).Where(IsCut).Sum(m => m.Length), 6);
+        Assert.Equal(perimeter - (Height - 2 * Chamfer), Motions(partner).Where(IsCut).Sum(m => m.Length), 6);
     }
 
     [Fact]
@@ -399,7 +427,7 @@ public class CommonLinePlanningTests
             Assert.True(read.Plates[1].CutCommonLinesTwice);
             var parts = read.Plates[0].Parts;
             Assert.Equal(Motions(plate.Parts[0]).Select(m => (m.Layer, m.End)), Motions(parts[0]).Select(m => (m.Layer, m.End)));
-            Assert.True(CommonLineCuts.IsSinglePass(parts[0].Program));
+            Assert.False(CommonLineCuts.IsSinglePass(parts[0].Program));
             Assert.True(CommonLineCuts.IsSinglePass(parts[1].Program));
             Assert.DoesNotContain(PostVerificationAnalyzer.Analyze(read).Findings, f => f.PlateNumber == 1
                 && f.Kind is PostVerificationKind.CommonLine or PostVerificationKind.RapidCrossing);

@@ -57,8 +57,10 @@ and before the contours, never in single-contour probes:
 ## Verification
 
 Plan Cutting certifies tabbed cutouts. Its contour accounting
-(`ContourProgramVerifier`) requires each piece to start exactly where a span between tabs
-starts and to cover that span whole, once; the ring counts as cut when every span is.
+(`ContourProgramVerifier`) requires each piece to follow one span between tabs without
+crossing a tab, and the pieces to tile every span with no gap or overlap; the ring counts as cut
+when every span is. A tabbed cutout's pieces each cover their span whole; only a
+[common-line](common-line-cutting.md) member that starts on its common line cuts one span in two.
 Lead validation treats a piece's start like any contour joint. The released-contour check
 proves the open pieces retain their slug with the same open-cut proof pre-post review uses
 (see [pre-post verification](post-verification.md)); planning still refuses its own tabs

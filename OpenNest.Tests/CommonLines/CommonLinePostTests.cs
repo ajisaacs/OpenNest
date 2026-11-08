@@ -9,9 +9,10 @@ using OpenNest.Posts.GravographIS;
 namespace OpenNest.Tests.CommonLines;
 
 /// <summary>
-/// Posting common lines cut once (docs/common-line-cutting.md): the CI Fiber post writes each
-/// shared cut in the cut-off form with its lead-in and each remainder in the contour form,
-/// compensated on its perimeter's side; posts that cannot write them refuse the nest.
+/// Posting common lines cut once (docs/common-line-cutting.md): the part cut first is a normal
+/// compensated perimeter that starts on its common line; the CI Fiber post writes each remainder
+/// in the contour form, compensated on its perimeter's side; posts that cannot write remainders
+/// refuse the nest.
 /// </summary>
 public class CommonLinePostTests
 {
@@ -35,7 +36,7 @@ public class CommonLinePostTests
     }
 
     [Fact]
-    public void CIFiber_WritesTheSharedCutUncompensatedAndEachRemainderOnItsPerimetersSide()
+    public void CIFiber_WritesTheCommonLineAsThePerimetersStart_AndTheRemainderOnItsPerimetersSide()
     {
         var nest = PlannedPair();
         var post = new CIFiberPostProcessor(new CIFiberPostConfig { ConfigurationName = "CI FIBER 4020" });
@@ -43,9 +44,10 @@ public class CommonLinePostTests
 
         post.Post(nest, stream);
 
-        // Part 1 cuts the shared line on the centerline (x 8.006), no G41/G42, entered and left
-        // through the notches; then its remainder, pierced in that kerf and compensated G42 as its
-        // counterclockwise perimeter would be. Part 2's remainder enters the same kerf at its other end.
+        // Part 1 enters below the notch straight up its shared edge (x 8, compensated G42 onto the
+        // centerline), cuts the common line and carries on round its perimeter, closing where it
+        // began. Part 2's remainder is pierced in that kerf and compensated G42 as its
+        // counterclockwise perimeter would be.
         const string golden = """
             ( Sheet number - 1 )
             ( Part #1 )
@@ -54,20 +56,12 @@ public class CommonLinePostTests
             N1:
             /L "L0"
             V.E.R3=1
-            G0X8.006Y2.13
-            /L "L4"
-            G1X8.006Y2.38
-            /L "L6"
-            G1X8.006Y14.06
-            /L "ZHSOFF"
-            N2:
-            /L "L0"
-            V.E.R3=2
-            G0X8.006Y13.81
+            G0X8Y2.13
             /L "L4"
             G42
-            G1X8Y14.06
+            G1X8Y2.38
             /L "L6"
+            G1X8Y14.06
             G1X7.62Y14.44
             G1X2.38Y14.44
             G1X2Y14.06
@@ -80,9 +74,9 @@ public class CommonLinePostTests
             ( Part #2 )
             ( PART:PT42 )
             V.E.R4=2
-            N3:
+            N2:
             /L "L0"
-            V.E.R3=3
+            V.E.R3=2
             G0X8.006Y2.63
             /L "L4"
             G42
@@ -147,7 +141,7 @@ public class CommonLinePostTests
 
         var refused = Assert.Throws<InvalidOperationException>(() =>
             CommonLineCuts.EnsurePostable(nest, new NoCommonLinePost()));
-        Assert.Contains("Plate 1, part 1 cuts a common line once", refused.Message);
+        Assert.Contains("Plate 1, part 2 cuts a common line once", refused.Message);
         CommonLineCuts.EnsurePostable(nest, new CIFiberPostProcessor());
 
         // Cut twice, nothing is single-pass, so any post may write it.

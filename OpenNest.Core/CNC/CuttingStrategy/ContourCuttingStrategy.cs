@@ -318,6 +318,26 @@ namespace OpenNest.CNC.CuttingStrategy
                 var inSlug = false;
                 foreach (var choice in choices)
                 {
+                    if (commonLine is { StartsOnCommonLine: true } && choice.ContourOrdinal == perimeterOrdinal
+                        && !IsTabbedCutout(shapes[perimeterOrdinal]))
+                    {
+                        // Cut whole from its common line: the straight lead-in from the choice's
+                        // pierce runs along the shared edge, and the perimeter ends where it began,
+                        // beside its partner, so it has no lead-out and no tab.
+                        var whole = CuttingPlanning.OwnedCuttingParameters.Copy(shared);
+                        whole.ExternalLeadOut = new NoLeadOut();
+                        whole.TabsEnabled = false;
+                        Parameters = whole;
+                        var start = result.Codes.Count;
+                        EmitContour(result, shapes[perimeterOrdinal], choice.Point,
+                            shapes[perimeterOrdinal].Entities[choice.EntityOrdinal], ContourType.External,
+                            exactCirclePrograms: true, scrapPierce: choice.Pierce, stopAtCenterLine: false,
+                            memoContour: choice.ContourOrdinal);
+                        if (inSlug && start < result.Codes.Count && result.Codes[start] is RapidMove)
+                            result.Codes.Insert(start, new Comment(HeadRaise.Marker));
+                        inSlug = false;
+                        continue;
+                    }
                     if (commonLine != null && choice.ContourOrdinal == perimeterOrdinal)
                     {
                         // The rapid out of a cutout's slug before it is still made head up.
@@ -1581,25 +1601,45 @@ namespace OpenNest.CNC.CuttingStrategy
         }
 
         /// <summary>
-        /// A common-line member's outside, cut once per shared edge (docs/common-line-cutting.md):
-        /// first each shared cut the member owns, an open centerline cut entered and left along
-        /// its own axis with straight leads as long as the external lead-in's and lead-out's
-        /// reach; then each remainder piece (the perimeter between its shared spans, which lie
-        /// on the Tab layer) in the perimeter's own direction. A piece starts where a shared span
-        /// ends. It is pierced in that span's opened kerf on the centerline, the external lead-in's
-        /// reach back along the span, and enters along a straight lead-in that ends at the piece's
-        /// start, so compensation starts in the kerf. It has no lead-out: it ends in the kerf
-        /// at the next shared span. Capture checks that every lead fits; emission never shortens one.
+        /// A common-line member's outside around the shared spans earlier members cut (on the Tab
+        /// layer; docs/common-line-cutting.md), each piece in the perimeter's own direction. With a
+        /// common-line entry, the first piece starts there, pierced in scrap with a straight lead-in
+        /// along the shared edge, and runs to the next span; the stretch before the entry is cut
+        /// last and ends at it. Every other piece starts where a shared span ends. It is pierced in that span's opened
+        /// kerf on the centerline, the external lead-in's reach back along the span, and enters along
+        /// a straight lead-in that ends at the piece's start, so compensation starts in the kerf. It
+        /// has no lead-out: it ends in the kerf at the next shared span. Capture checks that every
+        /// lead fits; emission never shortens one.
         /// </summary>
         private void EmitCommonLinePerimeter(Program program, Shape perimeter, CuttingPlanning.CommonLinePerimeter commonLine)
         {
             var winding = DetermineWinding(perimeter);
             var leadIn = Parameters?.ExternalLeadIn ?? new NoLeadIn();
-            var leadOut = Parameters?.ExternalLeadOut ?? new NoLeadOut();
-            foreach (var cut in commonLine.SharedCuts)
-                program.Codes.AddRange(CommonLineSharedCutCodes(cut, leadIn, leadOut));
             var entities = perimeter.Entities;
-            foreach (var piece in TabbedCutoutPieces(perimeter))
+            var pieces = TabbedCutoutPieces(perimeter);
+            if (commonLine.Entry is { } start && commonLine.Pierce is { } pierce)
+            {
+                // The piece holding the entry is cut from it to its end first, then the pieces after
+                // it in travel order, and its stretch before the entry last.
+                var at = pieces.FindIndex(p => p.Entities.Exists(e => EntityStartPoint(e).DistanceTo(start) <= Tolerance.Epsilon));
+                var piece = pieces[at];
+                var split = piece.Entities.FindIndex(e => EntityStartPoint(e).DistanceTo(start) <= Tolerance.Epsilon);
+                var head = new Shape();
+                head.Entities.AddRange(piece.Entities.Skip(split));
+                program.Codes.Add(new RapidMove(pierce));
+                program.Codes.Add(new Comment(CommonLineCuts.RemainderMarker(winding)));
+                program.Codes.Add(new LinearMove(start) { Layer = LayerType.Leadin });
+                program.Codes.AddRange(ConvertShapeToMoves(head, start));
+                var rest = pieces.Skip(at + 1).Concat(pieces.Take(at)).ToList();
+                if (split > 0)
+                {
+                    var tail = new Shape();
+                    tail.Entities.AddRange(piece.Entities.Take(split));
+                    rest.Add(tail);
+                }
+                pieces = rest;
+            }
+            foreach (var piece in pieces)
             {
                 var first = piece.Entities[0];
                 var index = entities.IndexOf(first);
@@ -1628,44 +1668,9 @@ namespace OpenNest.CNC.CuttingStrategy
             return span.EndPoint - along * reach + outward * (kerf / 2);
         }
 
-        /// <summary>
-        /// One shared cut, absolute in its part's frame: a rapid to the pierce on the first leg's
-        /// axis before its start, the straight lead-in, the open centerline cut through every
-        /// corner of a Z or L path, and the straight lead-out on past its end along the last leg,
-        /// each lead as long as the configured one reaches.
-        /// </summary>
-        internal static List<ICode> CommonLineSharedCutCodes(CuttingPlanning.CommonLineCutPath cut, LeadIn leadIn,
-            LeadOut leadOut)
-        {
-            var codes = new List<ICode>();
-            var points = cut.Points;
-            var entry = (points[1] - points[0]).Normalize();
-            var reach = CommonLineLeadInReach(leadIn);
-            codes.Add(new RapidMove(cut.Start - entry * reach));
-            if (reach > Tolerance.Epsilon)
-                codes.Add(new LinearMove(cut.Start) { Layer = LayerType.Leadin });
-            for (var i = 1; i < points.Count; i++)
-                codes.Add(new LinearMove(points[i]) { Layer = LayerType.CommonLine });
-            var leave = (points[^1] - points[^2]).Normalize();
-            var exit = CommonLineLeadOutReach(leadOut);
-            if (exit > Tolerance.Epsilon)
-                codes.Add(new LinearMove(cut.End + leave * exit) { Layer = LayerType.Leadout });
-            return codes;
-        }
-
         /// <summary>How far a common-line lead-in reaches: the external lead-in's pierce distance.</summary>
         internal static double CommonLineLeadInReach(LeadIn leadIn) =>
             leadIn.GetPiercePoint(Vector.Zero, 0, RotationType.CW).DistanceTo(Vector.Zero);
-
-        /// <summary>How far a common-line shared cut's lead-out reaches: the external lead-out's.</summary>
-        internal static double CommonLineLeadOutReach(LeadOut leadOut)
-        {
-            var reach = 0.0;
-            foreach (var code in leadOut.Generate(Vector.Zero, 0, RotationType.CW))
-                if (code is Motion motion)
-                    reach = System.Math.Max(reach, motion.EndPoint.DistanceTo(Vector.Zero));
-            return reach;
-        }
 
         /// <summary>Whether <paramref name="shape"/> has <see cref="SpecialLayers.Tab"/> spans: a tabbed cutout.</summary>
         internal static bool IsTabbedCutout(Shape shape) => shape.Entities.Exists(e => e.Layer == SpecialLayers.Tab);

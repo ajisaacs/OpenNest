@@ -130,11 +130,12 @@ their canonical content, like the other nesting settings, so it never changes a 
 
 A plate's optional `cutCommonLinesTwice` (`Plate.CutCommonLinesTwice`) is `true` when its
 common lines are cut twice; it is omitted when false, the default, in which Plan Cutting cuts
-each shared span once. A program planned that way saves its shared cuts as motions tagged
-`:COMMONLINE` and puts a `COMMON LINE REMAINDER CW` or `CCW` comment after the rapid into each
-remainder piece. Versions without single-pass support read those motions as ordinary cuts,
-which a post would cut with compensation, so such a nest must not be posted from an older
-version.
+each shared span once. A program planned that way puts a `COMMON LINE REMAINDER CW` or `CCW`
+comment after the rapid into each remainder piece; the part that cuts the common line saves an
+ordinary compensated perimeter. Programs planned by earlier versions may also hold uncompensated
+shared cuts as motions tagged `:COMMONLINE`, which still read and post. Versions without
+single-pass support read a remainder as an ordinary open cut, so such a nest must not be posted
+from an older version.
 
 ## Plate cutting parameters
 

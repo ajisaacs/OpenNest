@@ -46,44 +46,52 @@ planned member's open program changes no utilization, quantity, overlap or spaci
   order that cuts the partner first is a `ConstraintConflict` naming "the common-line partner").
   The tour treats each such pair like a nested part and its host, so a group is cut as one run.
   A rule the search learns later may still separate members; the dependency always holds.
+- **The common line is the owner's own edge.** Each member cuts its outside compensated like any
+  perimeter. Because the parts lie exactly one kerf apart, the owner's compensated shared edge
+  runs on the kerf centerline: that cut is the common line, and it opens the partner's edge too.
+  No cut is made without compensation. A Z or L path is cut through its corners as the owner's
+  own edges; at each corner the kerf leaves the member on the outside of the turn a fillet of
+  about half a kerf's radius where its nominal corner is sharp.
 - **Each member is cut** as: its holes (and break cuts and tabbed cutouts, as for any part), then
-  the shared cuts it owns, then its **remainder**: its perimeter minus every span it shares, in
-  the perimeter's own direction, as one open piece per stretch between spans. Shared cuts are
-  never all cut first: each is cut where the route passes its owner. A Z or L path is one shared
-  cut, owned and cut as a whole.
-- **Shared cut:** an open cut on the centerline (`LayerType.CommonLine`), cut without kerf
-  compensation. It is pierced in scrap on its first leg's axis, the external lead-in's reach
-  before the path, and entered with a straight lead-in through the end notch; a Z or L path is
-  then cut through its corners in one pass, one `CommonLine` move per leg. It leaves the same way
-  at the far end, along its last leg, with a straight lead-out as long as the external lead-out's
-  reach (none with no lead-out). At each corner the kerf leaves the member on the outside of the
-  turn a fillet of half a kerf's radius where its nominal corner is sharp; the member on the
-  inside keeps a sharp corner. Capture tries each end in turn: the lead-in, cut and lead-out may touch no
-  material, and the pierce keeps the pierce zone. When no end fits, planning refuses with
-  `UnsupportedGeometry` naming both parts and the span. Leads are never shortened.
-- **Remainder:** each piece starts where a shared span ends. It is pierced in that span's kerf,
-  on the centerline, the external lead-in's reach back along the span, and enters along a straight
-  lead-in to the piece's start, so compensation starts inside the kerf the shared cut opened (for
-  a Z or L path, the kerf of its last leg before the piece); the
-  pierce meets nothing. The comment `COMMON LINE REMAINDER CW` (or `CCW`) after its rapid names
-  the perimeter's winding, so posts compensate it on the perimeter's side. It has no lead-out: it
-  ends in the kerf at the next span. A span shorter than the lead-in's reach, or an external
-  lead-in with no length, refuses with `UnsupportedGeometry`.
-- **Accounting.** The planner marks each member's shared spans on its owned clean copy as `Tab`
-  spans (`CommonLineCutting.MarkSharedSpans`): material the member never cuts. At a path's corner
-  each leg's span runs on to the member's own vertex there, so a Z or L is one run of tabs. Replay's contour
-  accounting proves each stretch between them is cut whole, once, as for
-  [tabbed cutouts](tabbed-cutouts.md#verification), and refuses a member that also cuts a span.
-- **Rapids.** A shared cut is never a rapid obstacle and takes no part in the open-cut retention
-  proof. When a member's program ends, its remainder pieces, joined across its spans, become one
-  obstacle: the part is cut free then.
+  its outside, in the perimeter's own direction, never cutting a span an earlier member cut:
+  - **Starting on its common line.** A member that owns a shared cut starts its outside there:
+    pierced in scrap the external lead-in's reach back along the axis of the edge on which its
+    travel enters the path, a straight lead-in to that edge's start vertex, then the common line
+    and on round its perimeter with no lead-out. With no span cut before it (the group's first
+    member), that is its whole perimeter, closing where it began: a normal closed contour. Otherwise
+    it stops in the first earlier member's kerf it reaches, and its other stretches follow as
+    remainder pieces, the stretch before its start last, ending at it, beside the partner it is
+    cut before. Capture tries the start of each path it owns: the lead-in may touch no material and
+    the pierce keeps the pierce zone. When none fits, planning refuses with `UnsupportedGeometry`
+    naming both parts and the line. Leads are never shortened, and an external lead-in with no
+    length refuses.
+  - **Remainder:** a member that owns nothing cuts only its perimeter minus the spans earlier
+    members cut, as one open piece per stretch between them. Each piece starts where such a span
+    ends. It is pierced in that span's kerf, on the centerline, the external lead-in's reach back
+    along the span, and enters along a straight lead-in to the piece's start, so compensation
+    starts inside the opened kerf (for a Z or L path, the kerf of its last leg before the piece);
+    the pierce meets nothing. It has no lead-out: it ends in the kerf at the next span. A span
+    shorter than the lead-in's reach refuses with `UnsupportedGeometry`.
+  - Every open piece (a remainder, or a starting stretch that stops in a kerf) is preceded by the
+    comment `COMMON LINE REMAINDER CW` (or `CCW`), naming the perimeter's winding, so posts
+    compensate it on the perimeter's side.
+- **Accounting.** The planner marks the spans earlier members cut on each member's owned clean
+  copy as `Tab` spans (`CommonLineCutting.MarkSharedSpans`): material the member never cuts. At a
+  path's corner each leg's span runs on to the member's own vertex there, so a Z or L is one run
+  of tabs. Replay's contour accounting proves each stretch between them is cut exactly once, as
+  for [tabbed cutouts](tabbed-cutouts.md#verification): its pieces tile it with no gap or overlap
+  (two pieces where a member starts on its common line inside a stretch), and it refuses a member
+  that also cuts a span.
+- **Rapids.** When a member's program ends, its pieces, joined across the spans earlier members
+  cut, become one obstacle: the part is cut free then. Older programs' uncompensated `CommonLine`
+  centerline cuts are never rapid obstacles.
 - **Refusals.** A broken group, and a locked member or one a caller left out of the plan, cannot
   be cut once: rejoin, unlock or include it, or cut the plate's lines twice. A drawing pin on a
   member's outside is not applied (a warning makes the plan UNVERIFIED); pins on its holes are.
   Members are never support-tabbed. Remainder pierces in the kerf are held to the pierce zone like
   any other, so a pierce diameter wider than the kerf refuses them.
-- **Apply** installs each member's program (holes, shared cuts, remainder); nothing is added to
-  the plate.
+- **Apply** installs each member's program (holes, then its outside); nothing is added to the
+  plate.
 
 ### Cut common lines twice
 
@@ -181,14 +189,16 @@ Auto Nest, the server's nesting worker and Fill Area can place parts on common l
   - a group whose kerf differs from the plate's cutting parameters' kerf (when the plate has
     them) by more than `GapTolerance`. A group at the wrong kerf would leave a web or cut a sliver.
     Rejoin it at the current kerf;
-  - a lead-in, lead-out or shared cut of a member that touches or enters another member's
+  - a lead-in, lead-out or (older programs') centerline shared cut of a member that touches or enters another member's
     material. A lead on a shared edge would cut the partner one kerf away. An unreadable lead
     check is incomplete, never clear;
-  - on a plate that cuts its lines once, a span no member's program cuts on its centerline (for
-    example a plate never planned, which would cut it twice), a span cut more than once, and a
-    span cut after the partner whose remainder ends in it;
-  - on a plate set to cut its lines twice, a member program that still cuts one once.
-- The rapid check treats members' remainders and shared cuts as planning does.
+  - on a plate that cuts its lines once, a span no member's program cuts, a span cut more than
+    once (both members cutting their edge along it, as a plate not planned since the parts were
+    joined does), and a span cut after the partner whose remainder ends in it. A span counts as cut
+    by a member whose compensated edge covers it half a kerf off the centerline, or by an older
+    program's uncompensated centerline cut;
+  - on a plate set to cut its lines twice, a member program that still cuts one once (a remainder).
+- The rapid check treats members' remainders as planning does.
 
 ## Posting
 

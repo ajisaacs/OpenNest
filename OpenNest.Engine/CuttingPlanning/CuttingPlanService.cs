@@ -139,7 +139,7 @@ public static class CuttingPlanService
                 IncrementalClosureDrift.Close(ownedClean);
                 // A baked-in seam overcut encloses no area; left in, the ring touches itself.
                 SeamOvercut.Trim(ownedClean);
-                // A common-line member never cuts its shared spans: they are its material's tabs.
+                // A common-line member never cuts the spans earlier members cut: they are its material's tabs.
                 var member = request.ConfirmedParameters != null && commonLines?.IsMember(source) == true;
                 if (member)
                 {
@@ -238,7 +238,7 @@ public static class CuttingPlanService
     }
 
     // A common-line member regenerates from its marked clean program: holes as usual, then its
-    // shared cuts and remainder from one fixed entry. Its leads are checked here, so a lead that
+    // whole perimeter from its common line, or its remainder, from one fixed entry. Its leads are checked here, so a lead that
     // fits nowhere refuses with the span named rather than as a search that ran out.
     private static FixedProgramPlacement CaptureMember(FixedProgramPlacement placed, Program clean,
         CommonLineCapture commonLines, CuttingPlanRequest request, IReadOnlyList<LeadMaterialSnapshot> materials,
@@ -252,8 +252,8 @@ public static class CuttingPlanService
         PreparedContours prepared;
         try
         {
-            var perimeter = commonLines.Perimeter(source, index, request.Parts, material, materials, parameters,
-                pierceRadius, token);
+            var perimeter = commonLines.Perimeter(source, index, request.Parts, clean, material, materials,
+                parameters, pierceRadius, token);
             prepared = DrawingPinCapture.Prepare(source, index, clean, parameters, warnings, token, perimeter);
             if (!bestEffort)
             {
@@ -262,8 +262,9 @@ public static class CuttingPlanService
                     source.Location, null, token);
                 var lead = LeadPathValidator.Check(probe, material, materials, pierceRadius, token);
                 if (!lead.IsComplete || !lead.IsClear)
-                    throw new NotSupportedException("no lead-in fits its common-line remainder in the shared kerf: "
-                        + lead.Reason);
+                    throw new NotSupportedException((perimeter.StartsOnCommonLine
+                        ? "no lead-in fits the start of its common line: "
+                        : "no lead-in fits its common-line remainder in the shared kerf: ") + lead.Reason);
             }
         }
         catch (NotSupportedException exception) when (!exception.Message.StartsWith("Part ", StringComparison.Ordinal)

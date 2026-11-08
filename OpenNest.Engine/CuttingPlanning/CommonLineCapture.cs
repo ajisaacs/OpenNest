@@ -11,10 +11,10 @@ namespace OpenNest.Engine.CuttingPlanning;
 
 /// <summary>
 /// Capture of a plate's common-line groups cut once (docs/common-line-cutting.md). Each group is
-/// cut member by member in <see cref="CommonLineCutting.Order"/>'s order: a member's holes, the
-/// shared cuts it owns (open centerline cuts), then its remainder pieces, which end in kerf those
-/// shared cuts, or an earlier member's, opened. The owner of a shared cut therefore precedes its
-/// partner. Shared spans are derived from the placed geometry at capture; a broken group refuses.
+/// cut member by member in <see cref="CommonLineCutting.Order"/>'s order: a member's holes, then
+/// its outside. A member no earlier member shares with cuts its whole perimeter from one of its
+/// common lines; any other cuts its remainder pieces, which end in kerf an earlier member opened.
+/// The owner of a shared cut therefore precedes its partner. Shared spans are derived from the placed geometry at capture; a broken group refuses.
 /// </summary>
 internal sealed class CommonLineCapture
 {
@@ -48,7 +48,7 @@ internal sealed class CommonLineCapture
                 var part = order.Members[i];
                 if (IndexOf(request.Parts, part) < 0)
                     throw new ArgumentException("A common-line member is not among the planned parts.");
-                capture.members[part] = new Member(order, part, order.PathsOf(part).ToArray(),
+                capture.members[part] = new Member(order, part, order.PathsCutBefore(part).ToArray(),
                     order.CutsOwnedBy(part).ToArray());
             }
         }
@@ -68,7 +68,7 @@ internal sealed class CommonLineCapture
 
     internal bool IsMember(Part part) => members.ContainsKey(part);
 
-    /// <summary>The member's owned clean program with its shared spans on the Tab layer.</summary>
+    /// <summary>The member's owned clean program with the spans earlier members cut on the Tab layer.</summary>
     /// <exception cref="NotSupportedException">A span does not lie along the program's edges.</exception>
     internal Program Mark(Part part, Program ownedClean, Vector location, int ordinal)
     {
@@ -84,48 +84,47 @@ internal sealed class CommonLineCapture
     }
 
     /// <summary>
-    /// The member's shared cuts in part coordinates, each cut from whichever end its straight
-    /// leads fit: the cut, its lead-in and its lead-out may touch no material, and the pierce keeps
-    /// the pierce zone. Leads are never shortened: a cut whose leads fit at neither end refuses,
-    /// naming the span.
+    /// How the member's outside is cut once. A member that cuts a common line itself starts its
+    /// outside where its travel enters one, with a straight lead-in along that edge from the scrap:
+    /// the first whose lead-in touches no material and keeps the pierce zone. Leads are never
+    /// shortened: when none fits, planning refuses, naming the common line. A member that cuts none
+    /// cuts its remainder from the kerf earlier members opened.
     /// </summary>
-    /// <exception cref="NotSupportedException">No lead fits a shared cut.</exception>
-    internal CommonLinePerimeter Perimeter(Part part, int ordinal, IReadOnlyList<Part> parts,
+    /// <exception cref="NotSupportedException">No lead fits the start of any of its common lines.</exception>
+    internal CommonLinePerimeter Perimeter(Part part, int ordinal, IReadOnlyList<Part> parts, Program clean,
         LeadMaterialSnapshot own, IReadOnlyList<LeadMaterialSnapshot> materials, CuttingParameters parameters,
         double pierceRadius, CancellationToken token)
     {
         var member = members[part];
+        var kerf = member.Order.Group.Kerf;
+        if (member.Owned.Count == 0)
+            return new CommonLinePerimeter(kerf);
+        var reach = ContourCuttingStrategy.CommonLineLeadInReach(parameters.ExternalLeadIn ?? new NoLeadIn());
+        if (reach <= Math.Tolerance.Epsilon)
+            throw new NotSupportedException($"Part {ordinal + 1} starts its perimeter on its common line, which "
+                + "needs an external lead-in with length to reach it from the scrap. Choose an external lead-in "
+                + "with length, or cut the plate's common lines twice.");
         var location = part.Location;
-        var leadIn = parameters.ExternalLeadIn ?? new NoLeadIn();
-        var leadOut = parameters.ExternalLeadOut ?? new NoLeadOut();
-        var cuts = new List<CommonLineCutPath>();
-        foreach (var cut in member.Owned)
+        var owned = member.Owned.Select(cut => cut.Path).ToArray();
+        string reason = null;
+        foreach (var (entry, pierce, next) in CommonLineCutting.PerimeterEntries(clean, location, owned, kerf, reach))
         {
             token.ThrowIfCancellationRequested();
-            var forward = new CommonLineCutPath(cut.Path.Points.Select(point => point - location).ToArray());
-            var reverse = forward.Reversed();
-            string reason = null;
-            CommonLineCutPath chosen = null;
-            foreach (var path in new[] { forward, reverse })
-            {
-                var program = new Program(Mode.Absolute);
-                program.Codes.AddRange(ContourCuttingStrategy.CommonLineSharedCutCodes(path, leadIn, leadOut));
-                var execution = ExecutionMotionReader.ReadSupported(program, location, null, token);
-                var result = LeadPathValidator.Check(execution, own, materials, pierceRadius, token);
-                if (result.IsComplete && result.IsClear)
-                {
-                    chosen = path;
-                    break;
-                }
-                reason ??= result.Reason;
-            }
-            if (chosen == null)
-                throw new NotSupportedException(FormattableString.Invariant(
-                    $"No lead fits the common line between parts {ordinal + 1} and {IndexOf(parts, cut.Partner) + 1} from ({cut.Path.Start.X:0.####}, {cut.Path.Start.Y:0.####}) to ({cut.Path.End.X:0.####}, {cut.Path.End.Y:0.####}) at either end: ")
-                    + reason + " Shorten the external lead-in or lead-out, or cut the plate's common lines twice.");
-            cuts.Add(chosen);
+            var program = new Program(Mode.Absolute);
+            program.Codes.Add(new RapidMove(pierce));
+            program.Codes.Add(new LinearMove(entry) { Layer = LayerType.Leadin });
+            program.Codes.Add(new LinearMove(next) { Layer = LayerType.Display });
+            var execution = ExecutionMotionReader.ReadSupported(program, location, null, token);
+            var result = LeadPathValidator.Check(execution, own, materials, pierceRadius, token);
+            if (result.IsComplete && result.IsClear)
+                return new CommonLinePerimeter(kerf, entry, pierce);
+            reason ??= result.Reason;
         }
-        return new CommonLinePerimeter(member.Order.Group.Kerf, cuts);
+        var first = member.Owned[0];
+        throw new NotSupportedException(FormattableString.Invariant(
+            $"No lead fits the start of the common line between parts {ordinal + 1} and {IndexOf(parts, first.Partner) + 1} from ({first.Path.Start.X:0.####}, {first.Path.Start.Y:0.####}) to ({first.Path.End.X:0.####}, {first.Path.End.Y:0.####}): ")
+            + (reason ?? "it does not run along a straight edge of the part's program.")
+            + " Shorten the external lead-in, or cut the plate's common lines twice.");
     }
 
     private static int IndexOf(IReadOnlyList<Part> parts, Part part)

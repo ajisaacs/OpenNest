@@ -7,10 +7,10 @@ using OpenNest.Geometry;
 namespace OpenNest
 {
     /// <summary>
-    /// One shared cut of a common-line group, cut once on the centerline by <see cref="Owner"/>, the
-    /// member of the pair cut first: a straight span, or spans chained at corners (a Z or L shared
-    /// line) cut as one open path. <see cref="Partner"/> is cut later; its remainder ends in the
-    /// kerf this cut opened.
+    /// One shared cut of a common-line group: a straight span, or spans chained at corners (a Z or
+    /// L shared line). <see cref="Owner"/>, the member of the pair cut first, cuts it as part of its
+    /// own compensated perimeter, which lands on the kerf centerline. <see cref="Partner"/> is cut
+    /// later; its remainder ends in the kerf this cut opened.
     /// </summary>
     public sealed record CommonLineSharedCut(CommonLinePath Path, Part Owner, Part Partner);
 
@@ -24,6 +24,14 @@ namespace OpenNest
         /// <summary>The shared cuts <paramref name="member"/> cuts.</summary>
         public IEnumerable<CommonLineSharedCut> CutsOwnedBy(Part member) =>
             Cuts.Where(cut => ReferenceEquals(cut.Owner, member));
+
+        /// <summary>
+        /// The shared paths an earlier member cuts and <paramref name="member"/> therefore never
+        /// does: its remainder ends in their kerf.
+        /// </summary>
+        public IEnumerable<CommonLinePath> PathsCutBefore(Part member) => Cuts
+            .Where(cut => ReferenceEquals(cut.Partner, member))
+            .Select(cut => cut.Path);
 
         /// <summary>Every shared path <paramref name="member"/> shares, whoever cuts it.</summary>
         public IEnumerable<CommonLinePath> PathsOf(Part member) => Cuts
@@ -155,6 +163,67 @@ namespace OpenNest
             program.Codes.Clear();
             program.Codes.AddRange(codes);
             return program;
+        }
+
+        /// <summary>
+        /// Where a member that cuts <paramref name="paths"/> as part of its own perimeter can start,
+        /// so that each common line leads straight into the rest of the perimeter: for each path,
+        /// the start of the perimeter edge (a top-level straight move of <paramref name="clean"/>)
+        /// along which the member's own travel enters the path, a pierce <paramref name="reach"/>
+        /// back along that edge's axis, and the edge's end. Part coordinates (the program placed at
+        /// <paramref name="location"/>), in path order.
+        /// </summary>
+        public static IReadOnlyList<(Vector Entry, Vector Pierce, Vector Next)> PerimeterEntries(Program clean,
+            Vector location, IReadOnlyList<CommonLinePath> paths, double kerf, double reach)
+        {
+            ArgumentNullException.ThrowIfNull(clean);
+            ArgumentNullException.ThrowIfNull(paths);
+            if (!double.IsFinite(kerf) || kerf <= 0)
+                throw new ArgumentOutOfRangeException(nameof(kerf));
+            var program = (Program)clean.Clone();
+            program.Mode = Mode.Absolute;
+            var edges = new List<(Vector Start, Vector End)>();
+            Vector? position = null;
+            foreach (var code in program.Codes)
+            {
+                if (code is LinearMove line && position is { } from && line.Layer is LayerType.Cut or LayerType.Display)
+                    edges.Add((from, line.EndPoint));
+                position = code switch
+                {
+                    Motion motion => motion.EndPoint,
+                    SubProgramCall => null,
+                    _ => position,
+                };
+            }
+            var entries = new List<(Vector Entry, Vector Pierce, Vector Next)>();
+            foreach (var path in paths)
+            {
+                var points = path.Points.Select(point => point - location).ToArray();
+                // Each end of the path, with the direction into the path from there.
+                foreach (var (end, inward) in new[]
+                {
+                    (points[0], (points[1] - points[0]).Normalize()),
+                    (points[^1], (points[^2] - points[^1]).Normalize()),
+                })
+                    foreach (var (start, stop) in edges)
+                    {
+                        var length = start.DistanceTo(stop);
+                        if (length <= Math.Tolerance.Epsilon)
+                            continue;
+                        var along = new Vector((stop.X - start.X) / length, (stop.Y - start.Y) / length);
+                        if (System.Math.Abs(Cross(along, inward)) > 1e-6 || Dot(along, inward) <= 0)
+                            continue;
+                        if (System.Math.Abs(System.Math.Abs(Cross(along, end - start)) - kerf / 2) > CommonLineGeometry.GapTolerance)
+                            continue;
+                        var t = Dot(end - start, along);
+                        if (t < -CommonLineGeometry.GapTolerance || t > length + CommonLineGeometry.GapTolerance)
+                            continue;
+                        var entry = (start, start - along * reach, stop);
+                        if (!entries.Contains(entry))
+                            entries.Add(entry);
+                    }
+            }
+            return entries;
         }
 
         // One straight leg of a shared path in part coordinates. An end at a corner snaps to the

@@ -12,8 +12,9 @@ namespace OpenNest.Diagnostics;
 /// Pre-post review of a plate's common-line groups (<see cref="Plate.CommonLines"/>): every member
 /// still shares a span one kerf from another member, the group's kerf is still the plate's, and no
 /// member's lead or shared cut runs into a partner one kerf away (a lead on a shared edge would cut
-/// the partner). A plate that cuts its common lines once must cut each shared span exactly once,
-/// on its centerline, by the member cut first; one set to cut them twice must have no shared cuts.
+/// the partner). A plate that cuts its common lines once must cut each shared span exactly once, by
+/// the member cut first (its own compensated edge, or a centerline cut in older programs); one set
+/// to cut them twice must have no single-pass member programs.
 /// Reports only; nothing is repaired, and an unreadable lead check is incomplete, never clear.
 /// </summary>
 internal static class CommonLineReview
@@ -48,13 +49,17 @@ internal static class CommonLineReview
         List<PostVerificationFinding> findings, CancellationToken token)
     {
         var cuts = new List<(Part Part, ExecutionMotion Motion)>();
+        Part singlePass = null;
         foreach (var member in group.Members)
         {
             token.ThrowIfCancellationRequested();
+            if (singlePass == null && CommonLineCuts.IsSinglePass(member.Program))
+                singlePass = member;
             try
             {
                 cuts.AddRange(ExecutionMotionReader.Read(member.Program, member.Location, null, token).Motions
-                    .Where(motion => !motion.Rapid && motion.Layer == LayerType.CommonLine && motion.Curve != null)
+                    .Where(motion => !motion.Rapid && motion.Curve != null
+                        && motion.Layer is LayerType.CommonLine or LayerType.Cut or LayerType.Display)
                     .Select(motion => (member, motion)));
             }
             catch (Exception exception) when (IsInvalid(exception))
@@ -64,32 +69,36 @@ internal static class CommonLineReview
         }
         if (plate.CutCommonLinesTwice)
         {
-            if (cuts.Count > 0)
-                findings.Add(new(PostVerificationKind.CommonLine, plateNumber, Number(plate, cuts[0].Part), null,
+            if (singlePass != null)
+                findings.Add(new(PostVerificationKind.CommonLine, plateNumber, Number(plate, singlePass), null,
                     "The plate is set to cut its common lines twice, but this part's program cuts a shared line "
                     + "once. Plan cutting again before posting.")
-                { Location = cuts[0].Motion.Curve.Midpoint });
+                { Location = singlePass.BoundingBox?.Center });
             return;
         }
         foreach (var span in check.Spans)
         {
             token.ThrowIfCancellationRequested();
-            var covering = cuts.Where(cut => Covers(cut.Motion, span)).ToList();
+            var covering = cuts.Where(cut => Covers(cut.Motion, span, group.Kerf)).ToList();
             var first = Number(plate, span.First);
             var second = Number(plate, span.Second);
             var middle = (span.Start + span.End) * 0.5;
             if (covering.Count == 0)
             {
                 findings.Add(new(PostVerificationKind.CommonLine, plateNumber, first, second,
-                    "This common line is not cut once on its centerline. Plan cutting cuts each shared line once; "
+                    "This common line is not cut. Plan cutting cuts each shared line once; "
                     + "or set the plate to cut its common lines twice.")
                 { Location = middle });
                 continue;
             }
             if (covering.Count > 1)
+            {
                 findings.Add(new(PostVerificationKind.CommonLine, plateNumber, first, second,
-                    "This common line is cut more than once. Plan cutting again before posting.")
+                    "This common line is cut more than once (a plate not planned since the parts were joined cuts "
+                    + "it twice). Plan cutting again before posting, or set the plate to cut its common lines twice.")
                 { Location = middle });
+                continue;
+            }
             // The partner's remainder ends in this kerf, so the part that cuts it must come first.
             var owner = covering[0].Part;
             var partner = ReferenceEquals(owner, span.First) ? span.Second : span.First;
@@ -101,18 +110,23 @@ internal static class CommonLineReview
         }
     }
 
-    // A shared cut on the span's centerline that covers the whole span.
-    private static bool Covers(ExecutionMotion motion, CommonLineSpan span)
+    // A straight cut covering the whole span: a member's own compensated edge half a kerf off its
+    // centerline, or a centerline cut made without compensation.
+    private static bool Covers(ExecutionMotion motion, CommonLineSpan span, double kerf)
     {
         var curve = motion.Curve;
         if (curve.IsFiniteArc)
             return false;
         var length = span.Length;
         var along = (span.End - span.Start) * (1 / length);
-        double Offset(Vector point) => System.Math.Abs((point.X - span.Start.X) * along.Y - (point.Y - span.Start.Y) * along.X);
+        double Offset(Vector point) => (point.X - span.Start.X) * along.Y - (point.Y - span.Start.Y) * along.X;
         double At(Vector point) => (point.X - span.Start.X) * along.X + (point.Y - span.Start.Y) * along.Y;
         var tolerance = CommonLineGeometry.GapTolerance;
-        if (Offset(curve.Start) > tolerance || Offset(curve.End) > tolerance)
+        var offset = Offset(curve.Start);
+        if (System.Math.Abs(Offset(curve.End) - offset) > tolerance)
+            return false;
+        var expected = motion.Layer == LayerType.CommonLine ? 0 : kerf / 2;
+        if (System.Math.Abs(System.Math.Abs(offset) - expected) > tolerance)
             return false;
         var from = System.Math.Min(At(curve.Start), At(curve.End));
         var to = System.Math.Max(At(curve.Start), At(curve.End));

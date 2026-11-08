@@ -10,7 +10,8 @@ namespace OpenNest.Tests.CommonLines;
 /// <summary>
 /// A Z-shaped common line (docs/common-line-cutting.md): two stepped bars, the second turned half
 /// a turn, interlock one kerf apart along three straight legs. The legs' spans chain at their
-/// corners into one shared path, cut once as one open centerline cut.
+/// corners into one shared path. The part cut first starts its perimeter on it, entered along its
+/// first leg from the scrap, and cuts the whole Z straight into the rest of its perimeter.
 /// </summary>
 public class CommonLineZTests
 {
@@ -99,33 +100,38 @@ public class CommonLineZTests
     }
 
     [Fact]
-    public void Plan_CutsTheZOnceAsOneOpenPath()
+    public void Plan_TheFirstPartStartsOnTheZAndRunsStraightIntoItsPerimeter()
     {
-        var (plate, _, _) = Pair();
+        var (plate, a, _) = Pair();
 
         var result = Plan(plate);
 
         Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
         Assert.True(result.IndependentlyReplayed);
+        Assert.DoesNotContain(result.ProposedOrder.SelectMany(Motions), m => m.Layer == LayerType.CommonLine);
         var owner = result.ProposedOrder[0];
+        Assert.Same(a, owner.SourcePart);
         var motions = Motions(owner).ToList();
-        var shared = motions.Where(m => m.Layer == LayerType.CommonLine).ToList();
-        Assert.Equal(3, shared.Count);
-        // One pierce: the three legs are cut in a row, each starting where the last ended.
-        var first = motions.IndexOf(shared[0]);
-        Assert.Equal(LayerType.Leadin, motions[first - 1].Layer);
-        for (var i = 1; i < shared.Count; i++)
-        {
-            Assert.Same(shared[i], motions[first + i]);
-            Assert.Equal(0, shared[i - 1].End.DistanceTo(shared[i].Curve.Start), 9);
-        }
-        Assert.Equal(Step + 2 * (Low - K / 2), shared.Sum(m => m.Length), 9);
-        // The partner cuts none of it.
-        Assert.DoesNotContain(Motions(result.ProposedOrder[1]), m => m.Layer == LayerType.CommonLine);
+        // One lead-in, up the Z's first leg from below, then its three legs in a row.
+        var lead = Assert.Single(motions, m => m.Layer == LayerType.Leadin);
+        Assert.Equal(2, lead.Start!.Value.X, 9);
+        Assert.Equal(2, lead.End.X, 9);
+        Assert.Equal(2, lead.End.Y, 9);
+        var cuts = motions.Where(IsCut).ToList();
+        Assert.Equal(new Vector(2, 2 + Low), cuts[0].End);
+        Assert.Equal(new Vector(2 + Step, 2 + Low), cuts[1].End);
+        Assert.Equal(new Vector(2 + Step, 2 + High), cuts[2].End);
+        Assert.Equal(0, cuts[^1].End.DistanceTo(lead.End), 9);
+        Assert.DoesNotContain(motions, m => m.Layer == LayerType.Leadout);
+        // The partner cuts only its remainder.
+        var partner = Motions(result.ProposedOrder[1]).Where(IsCut).Sum(m => m.Length);
+        Assert.True(partner < 2 * (Length + High) - (Step + 2 * Low) + 2 * K);
     }
 
+    private static bool IsCut(ExecutionMotion m) => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display;
+
     [Fact]
-    public void Members_CutTheirPerimeterExactlyOnce_TheZByTheSharedCut()
+    public void Members_CutTheirPerimeterExactlyOnce_TheZByTheFirstPart()
     {
         var (plate, _, _) = Pair();
         var order = CommonLineCutting.Order(plate.CommonLines[0], CommonLineGeometry.Check(plate.CommonLines[0]));
@@ -135,11 +141,12 @@ public class CommonLineZTests
         foreach (var proposal in result.ProposedOrder)
         {
             var part = proposal.SourcePart;
-            var marked = CommonLineCutting.MarkSharedSpans(part.Program, part.Location, order.PathsOf(part).ToArray(), K);
-            // The Z is one tab run on each member: its legs join at the member's own corners.
+            var cutBefore = order.PathsCutBefore(part).ToArray();
+            var marked = CommonLineCutting.MarkSharedSpans(part.Program, part.Location, cutBefore, K);
+            // The partner's Z is one tab run: its legs join at its own corners.
             var layers = marked.Codes.OfType<LinearMove>().Select(m => m.Layer).ToList();
-            Assert.Single(layers.Where((layer, i) => layer == LayerType.Tab
-                && layers[(i + layers.Count - 1) % layers.Count] != LayerType.Tab));
+            Assert.Equal(cutBefore.Length, layers.Where((layer, i) => layer == LayerType.Tab
+                && layers[(i + layers.Count - 1) % layers.Count] != LayerType.Tab).Count());
             var material = LeadMaterialSnapshot.Capture(marked, part.Location, default, sharedSpans: true);
             Assert.True(material.IsComplete, material.Reason);
             var planned = ExecutionMotionReader.Read(proposal.CopyProgram(), part.Location, null, default);

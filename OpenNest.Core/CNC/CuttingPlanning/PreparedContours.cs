@@ -25,39 +25,20 @@ public sealed record ContourChoice(int ContourOrdinal, int EntityOrdinal, Vector
 }
 
 /// <summary>
-/// The shared cuts a common-line member makes before its remainder (see
-/// docs/common-line-cutting.md): open centerline cuts in part coordinates, each from
-/// <see cref="CommonLineCutPath.Start"/> to <see cref="CommonLineCutPath.End"/>, with the group's kerf.
+/// How a common-line member's outside is cut once (see docs/common-line-cutting.md), with the
+/// group's kerf. The member cuts its outside compensated, so each shared edge it cuts lands on the
+/// kerf centerline: that edge is the common line. Spans an earlier member cut carry the Tab layer
+/// and are never cut again. A member that cuts a common line itself (<see cref="Entry"/> set)
+/// starts there: at <see cref="Entry"/> (part coordinates), the vertex where its shared edge
+/// begins, with a straight lead-in from <see cref="Pierce"/> along that edge's axis, and runs on
+/// round its perimeter with no lead-out, closing at the entry or stopping in an earlier member's
+/// kerf. Its other stretches, and every stretch of a member without an entry, are remainder pieces
+/// entered in the kerf before them.
 /// </summary>
-public sealed record CommonLinePerimeter(double Kerf, IReadOnlyList<CommonLineCutPath> SharedCuts);
-
-/// <summary>
-/// One shared cut on a common line's centerline, in part coordinates and cut direction: straight,
-/// or through the corners of a Z or L shared line.
-/// </summary>
-public sealed record CommonLineCutPath(IReadOnlyList<Vector> Points)
+public sealed record CommonLinePerimeter(double Kerf, Vector? Entry = null, Vector? Pierce = null)
 {
-    public CommonLineCutPath(Vector start, Vector end) : this(new[] { start, end })
-    {
-    }
-
-    public Vector Start => Points[0];
-
-    public Vector End => Points[^1];
-
-    /// <summary>The same path cut from its other end.</summary>
-    public CommonLineCutPath Reversed() => new(Points.Reverse().ToArray());
-
-    /// <summary>Whether the path has two or more points and no degenerate leg.</summary>
-    internal bool IsNondegenerate(double epsilon)
-    {
-        if (Points is not { Count: >= 2 })
-            return false;
-        for (var i = 1; i < Points.Count; i++)
-            if (Points[i - 1].DistanceTo(Points[i]) <= epsilon)
-                return false;
-        return true;
-    }
+    /// <summary>Whether the member starts its outside on a common line it cuts.</summary>
+    public bool StartsOnCommonLine => Entry != null;
 }
 
 /// <summary>
@@ -91,8 +72,8 @@ public sealed class PreparedContours
     // never-executed DisplayPerimeterTail. Null for an ordinary cut perimeter.
     private readonly Shape displayOutline;
     private bool hasCutPerimeter => displayOutline == null;
-    // Set for a common-line member: the perimeter's shared spans are Tab entities, never cut by
-    // this part. It is cut as its shared cuts, then its remainder pieces, from one fixed entry.
+    // Set for a common-line member, cut from one fixed entry: its whole perimeter from where its
+    // first shared edge begins, or its remainder pieces between the Tab spans earlier members cut.
     private readonly CommonLinePerimeter commonLine;
     private readonly ContourChoice commonLineEntry;
 
@@ -116,7 +97,19 @@ public sealed class PreparedContours
         this.parameters = parameters;
         pinned = new ContourChoice[shapes.Length];
         pinNumbers = new int[shapes.Length];
-        if (commonLine != null)
+        if (commonLine is { Entry: { } entry })
+        {
+            // The outside starts where a shared edge it cuts begins, pierced off it.
+            var perimeter = shapes[^1];
+            var entity = perimeter.Entities.FindIndex(e => e.Layer != SpecialLayers.Tab
+                && Start(e).DistanceTo(entry) <= PostVerificationGeometry.Epsilon);
+            commonLineEntry = new ContourChoice(shapes.Length - 1, entity, Start(perimeter.Entities[entity]))
+            {
+                Owner = this,
+                Pierce = commonLine.Pierce,
+            };
+        }
+        else if (commonLine != null)
         {
             // The remainder's first piece starts where a shared span ends: the one fixed entry.
             var perimeter = shapes[^1];
@@ -225,11 +218,11 @@ public sealed class PreparedContours
 
     /// <summary>
     /// True for a common-line member (see <see cref="CommonLinePerimeter"/>): its perimeter has one
-    /// fixed entry and is emitted as its shared cuts, then its remainder pieces.
+    /// fixed entry and is emitted whole from its common line, or as its remainder pieces.
     /// </summary>
     public bool IsCommonLinePerimeter => commonLine != null;
 
-    /// <summary>The member's shared cuts and kerf, or null for any other part.</summary>
+    /// <summary>How the member's outside is cut once, or null for any other part.</summary>
     public CommonLinePerimeter CommonLine => commonLine;
 
     public int Count => shapes.Length;
@@ -296,9 +289,10 @@ public sealed class PreparedContours
 
     private CuttingParameters ParametersFor(int contourOrdinal) => contourParameters?[contourOrdinal] ?? parameters;
 
-    /// <param name="commonLine">For a common-line member: its shared cuts. The program's perimeter
-    /// must carry the member's shared spans on the Tab layer (CommonLineCutting.MarkSharedSpans); it
-    /// is then the perimeter, cut in pieces between them, rather than a tabbed cutout.</param>
+    /// <param name="commonLine">For a common-line member: how its outside is cut once. With an
+    /// entry, the program's perimeter is closed and starts there. Without one, it must carry the
+    /// spans earlier members cut on the Tab layer (CommonLineCutting.MarkSharedSpans); it is then
+    /// the perimeter, cut in pieces between them, rather than a tabbed cutout.</param>
     public static PreparedContours Capture(Program program, CuttingParameters parameters, CancellationToken token = default,
         CommonLinePerimeter commonLine = null)
     {
@@ -367,12 +361,32 @@ public sealed class PreparedContours
         {
             if (displayPerimeter != null || current.Entities.Count != 0)
                 throw new ArgumentException("A common-line member needs one closed cut perimeter.");
-            if (!double.IsFinite(commonLine.Kerf) || commonLine.Kerf <= 0 || commonLine.SharedCuts == null
-                || commonLine.SharedCuts.Any(c => c == null || !c.IsNondegenerate(PostVerificationGeometry.Epsilon)))
-                throw new ArgumentException("A common-line member needs a positive kerf and nondegenerate shared cuts.");
-            // The outside carries the shared spans as tabs; every other contour lies inside it.
+            if (!double.IsFinite(commonLine.Kerf) || commonLine.Kerf <= 0
+                || (commonLine.Entry == null) != (commonLine.Pierce == null))
+                throw new ArgumentException("A common-line member needs a positive kerf, and an entry with its pierce.");
             var outside = tabbedCutouts.Concat(contours).MaxBy(shape => shape.BoundingBox.Width * shape.BoundingBox.Length);
-            if (outside == null || !tabbedCutouts.Contains(outside)
+            if (commonLine is { Entry: { } entry, Pierce: { } pierce })
+            {
+                // Cut from its entry vertex on a common line; every other contour lies inside it.
+                PostVerificationGeometry.Validate(entry);
+                PostVerificationGeometry.Validate(pierce);
+                if (outside == null
+                    || !outside.Entities.Exists(e => e.Layer != SpecialLayers.Tab
+                        && Start(e).DistanceTo(entry) <= PostVerificationGeometry.Epsilon)
+                    || pierce.DistanceTo(entry) <= PostVerificationGeometry.Epsilon)
+                    throw new ArgumentException("A common-line member's perimeter does not start at its common line.");
+                if (contours.Contains(outside))
+                {
+                    contours.Remove(outside);
+                    contours.Add(outside);
+                    foreach (var cut in breakCuts)
+                        cut.UpdateBounds();
+                    return new(contours.ToArray(), scribes, breakCuts, tabbedCutouts, ownedParameters, null, null,
+                        commonLine);
+                }
+            }
+            // The outside carries the shared spans earlier members cut as tabs; every other contour lies inside it.
+            else if (outside == null || !tabbedCutouts.Contains(outside)
                 || ContourCuttingStrategy.TabbedCutoutPieces(outside).Count == 0)
                 throw new ArgumentException("A common-line member's perimeter does not carry its shared spans.");
             // Each remainder piece is pierced in the kerf of the span before it, the external
@@ -395,7 +409,7 @@ public sealed class PreparedContours
             foreach (var cut in breakCuts)
                 cut.UpdateBounds();
             return new(contours.ToArray(), scribes, breakCuts, tabbedCutouts, ownedParameters, null, null,
-                commonLine with { SharedCuts = commonLine.SharedCuts.ToArray() });
+                commonLine);
         }
         if (displayPerimeter != null)
         {
@@ -1068,10 +1082,10 @@ public sealed class PreparedContours
         // A pinned contour is cut exactly as pinned: no other entry may be emitted for it.
         if (pinned[choice.ContourOrdinal] is { } pin && pin != choice)
             throw new ArgumentException("A pinned contour keeps its drawing pin's entry.");
-        // A common-line perimeter is cut from its one fixed entry, after its shared cuts.
+        // A common-line perimeter is cut from its one fixed entry.
         if (commonLineEntry != null && choice.ContourOrdinal == PerimeterOrdinal
             && (choice.EntityOrdinal != commonLineEntry.EntityOrdinal || choice.Point != commonLineEntry.Point
-                || choice.Pierce != null))
+                || choice.Pierce != commonLineEntry.Pierce))
             throw new ArgumentException("A common-line member's perimeter is cut from its fixed entry.");
         if (choice.Pierce is { } pierce)
         {
