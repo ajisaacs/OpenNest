@@ -65,6 +65,8 @@ internal sealed class BandedFill(
         {
             bands.Values.OrderByDescending(b => b.Length).ThenBy(b => b.Type).Select(b => b.Type).ToArray(),
             bands.Values.OrderBy(b => b.Length).ThenBy(b => b.Type).Select(b => b.Type).ToArray(),
+            // Largest part first: small parts stay last, as filler for the gaps.
+            bands.Values.OrderByDescending(b => types[b.Type].Area).ThenBy(b => b.Type).Select(b => b.Type).ToArray(),
         };
         int[]? bestOrder = null;
         SheetFill? best = null;
@@ -100,7 +102,8 @@ internal sealed class BandedFill(
     /// carried strip to strip, so a strip is judged by what it leaves for the rest of the sheet,
     /// not by its own density alone; the best finished sheet wins.
     /// </summary>
-    public SheetFill? FillStrips(IReadOnlyList<int> remaining, Func<Box, FrontierPacker> within, CancellationToken token)
+    public SheetFill? FillStrips(IReadOnlyList<int> remaining, Func<Box, FrontierPacker> within, CancellationToken token,
+        int beamWidth = Beam)
     {
         if (stock.Outline != null)
             return null;
@@ -175,8 +178,20 @@ internal sealed class BandedFill(
                         if (!widths.Any(w => System.Math.Abs(w - width) < 0.05))
                             widths.Add(width);
                     }
+                // The strip's own part fills its column first, then the others fill around it.
                 foreach (var width in widths.OrderBy(w => w))
-                    Offer(new List<Placed>(), start + width);
+                {
+                    var reach = System.Math.Min(region.Right, start + width + 1e-6);
+                    if (reach <= state.Front)
+                        continue;
+                    var own = new int[types.Count];
+                    own[t] = state.Rest[t];
+                    var left = System.Math.Max(region.Left, start - lookBack);
+                    var column = within(new Box(left, region.Bottom, reach - left, region.Width))
+                        .Fill(own, token, state.Placed, region.Top);
+                    if (column.Parts.Count > 0)
+                        Offer(column.Parts.ToList(), start + width);
+                }
                 if (offered == 0)
                     finished.Add(state);
             }
@@ -184,7 +199,7 @@ internal sealed class BandedFill(
             beam = new List<StripState>();
             foreach (var child in children.OrderBy(Rank).ThenBy(c => c.Front))
             {
-                if (beam.Count >= Beam)
+                if (beam.Count >= beamWidth)
                     break;
                 if (beam.Any(b => System.Math.Abs(b.Front - child.Front) < 1e-6 && System.Math.Abs(b.Area - child.Area) < 1e-6
                     && b.Rest.SequenceEqual(child.Rest)))

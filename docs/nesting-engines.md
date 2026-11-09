@@ -279,23 +279,27 @@ same seeded weights. On the help tutorial's parts (30 gussets, 20 ells, 10 plate
 
 Last of the search variants, Irregular decodes the job once more in full-height strips along X
 (`BandedFill`), when the grouped variants apply and every part has the same priority. A sheet
-that cannot take all the remaining part area keeps the ordinary fill: it fills to its end anyway,
-and strips only shape where a sheet ends. Every other sheet is packed two ways and the better
-sheet kept (a tie keeps the bands). A person nesting many copies of a few parts lays them out in
+that cannot take all the remaining part area keeps whichever places more part area, the ordinary
+fill or strips largest part first with one partial sheet carried: large and awkward parts go on
+the early sheets, and small, skinny parts stay for the gaps of the later ones. Every other sheet
+is packed two ways and the better sheet kept (a tie keeps the bands). A person nesting many copies of a few parts lays them out in
 tidy columns; packing one part at a time instead leaves each group's last column ragged and
 scatters the smallest parts into the gaps between groups.
 
 - Bands: each type of three or more copies as its Lattice pattern (the pattern interactive Fill
   gives that part alone: circles stacked or staggered, hexagons tiled, L brackets interlocked in
   pairs) in the narrowest strip of full work-area height that holds all its copies. Bands stand
-  side by side a part spacing apart, longest first or shortest first, whichever packs better;
+  side by side a part spacing apart, longest first, shortest first or largest part first,
+  whichever packs better;
   then the copies held back from them and the types with one or two copies fill the gaps under
   the usual rule. On the better order each type's narrower bands holding fewer copies (at most
   four, or a third, fewer; at most two per type) are tried in turn, kept when they improve the
   sheet.
 - Strips: each strip holds the largest remaining part, as its band (full or narrower) or as a
-  column one to three copies wide, and every other part fills the strip's gaps, the largest piece
-  at its leftmost, lowest point first, looking back one part length behind the strip. A beam of
+  column one to three copies wide that the part fills first, and every other part fills the
+  strip's gaps, the largest piece at its leftmost, lowest point first, looking back one part
+  length behind the strip. A pair counts as twice its part's area there, so without the part
+  filling its own column first, pairs of smaller parts would take its strip. A beam of
   the four partial sheets densest so far (part area per length used) is carried strip to strip,
   so a strip is judged by what it leaves for the rest of the sheet, not by its own density; the
   best finished sheet wins.
@@ -312,7 +316,8 @@ scatters the smallest parts into the gaps between groups.
 Neither way wins every sheet. On the README sample parts (18 L brackets, 14 base plates, 18 clamp
 jaws, 12 flanges, 24 gussets, 14 hex covers, 30 links on 60 x 120) bands end the layout at 102.9
 (104.6 with the desktop's edge spacing and a bottom clamp rail) rather than 107.7 (108.6); with
-about twice those quantities over two sheets, strips end the second sheet at 104.7 rather than 106.2. It
+about twice those quantities over two sheets, strips end the second sheet at 99.9 rather than 106.2,
+and on the help tutorial's parts at 33.6 rather than 34.9. It
 starts while the work spent stays under three work budgets and replaces the result only by
 beating it, with its own tail re-plan.
 

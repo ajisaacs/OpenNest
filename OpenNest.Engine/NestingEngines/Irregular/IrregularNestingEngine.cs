@@ -411,11 +411,19 @@ public sealed class IrregularNestingEngine : INestingEngine
         private SheetFill Banded(NestPlateStock stock, int[] remaining, IReadOnlyList<double>? weights,
             Func<IReadOnlyList<int>?, double?, FrontierPacker> packer)
         {
-            // Bands shape where a sheet ends; a sheet that cannot take all the remaining parts
-            // fills to its end anyway, so it keeps the ordinary fill.
+            // A sheet that cannot take all the remaining parts fills to its end anyway: it keeps
+            // whichever places more, the ordinary fill or strips largest part first (one partial
+            // sheet carried), which leave the small parts for the gaps of the sheets after it.
             var work = stock.WorkArea;
+            FrontierPacker Within(OpenNest.Geometry.Box box) => new(types, CacheFor(stock), PairsFor(stock), stock,
+                PackAxis.Y, 1.0, Work, null, ClampsFor(stock), null, weights, null, null, box);
             if (types.Sum(t => remaining[t.Index] * t.Area) > work.Length * work.Width)
-                return packer(null, null).Fill(remaining, token);
+            {
+                var plain = packer(null, null).Fill(remaining, token);
+                var full = new BandedFill(types, BlocksFor(stock), stock, ClampsFor(stock), () => packer(null, null),
+                    CompareSheets, Work, Work.Value + workBudget).FillStrips(remaining, Within, token, 1);
+                return full != null && CompareSheets(full, plain) < 0 ? full : plain;
+            }
             var bands = new BandedFill(types, BlocksFor(stock), stock, ClampsFor(stock), () => packer(null, null),
                 CompareSheets, Work, groupedBudget).Fill(remaining, token);
             var strips = new BandedFill(types, BlocksFor(stock), stock, ClampsFor(stock), () => packer(null, null),
