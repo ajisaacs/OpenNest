@@ -23,7 +23,7 @@ public static class NestReportBuilder
 
         var plateCount = ReportedPlateCount(nest);
         for (var index = 0; index < plateCount; index++)
-            plates.Add(CapturePlate(nest.Plates[index], index + 1, registry, cutParameters));
+            plates.Add(CapturePlate(nest.Plates[index], index + 1, registry, cutParameters, nest, catalogDensity));
 
         // OrderBy is stable, so the original enumeration breaks equal name/path ties.
         foreach (var drawing in nest.Drawings
@@ -60,7 +60,8 @@ public static class NestReportBuilder
         return plateCount;
     }
 
-    private static ReportPlate CapturePlate(Plate plate, int number, DrawingRegistry registry, CutParameters? cutParameters)
+    private static ReportPlate CapturePlate(Plate plate, int number, DrawingRegistry registry, CutParameters? cutParameters,
+        Nest nest, double catalogDensity)
     {
         ValidatePlate(plate, number);
         var bounds = CaptureBounds(plate, number);
@@ -103,6 +104,7 @@ public static class NestReportBuilder
             utilization, parts.ToImmutable(), cutoffs.ToImmutable())
         {
             CutTime = cutParameters == null ? null : EstimateCutTime(plate, cutParameters, number),
+            Weight = Weight(plate.Area(), nest, SheetDensity(nest, catalogDensity)),
         };
     }
 
@@ -156,12 +158,22 @@ public static class NestReportBuilder
     /// </summary>
     internal static double? PartWeight(Drawing drawing, Nest nest, double catalogDensity = 0)
     {
-        var density = nest.Material?.Density ?? 0;
-        if (!(density > 0))
-            density = catalogDensity;
+        var density = SheetDensity(nest, catalogDensity);
         if (!(density > 0))
             density = drawing.Material?.Density ?? 0;
-        var area = drawing.Area;
+        return Weight(drawing.Area, nest, density);
+    }
+
+    /// <summary>The nest material's density, then the machine catalog's; zero when neither has one.</summary>
+    private static double SheetDensity(Nest nest, double catalogDensity)
+    {
+        var density = nest.Material?.Density ?? 0;
+        return density > 0 ? density : catalogDensity;
+    }
+
+    /// <summary>Area x nest thickness x density (lb/in^3); null when any of them is missing.</summary>
+    private static double? Weight(double area, Nest nest, double density)
+    {
         if (!PositiveFinite(density) || !PositiveFinite(nest.Thickness) || !double.IsFinite(area) || area < 0)
             return null;
         var volume = area * nest.Thickness;

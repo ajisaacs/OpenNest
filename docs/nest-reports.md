@@ -61,6 +61,9 @@ the selected plate, or certify that a layout passed geometry/pre-post checks.
   fallback. Millimeter jobs convert the volume to
   cubic inches and report kilograms. With no thickness or no density the weight
   is unknown, never zero.
+- A plate's sheet weight is one full sheet (its outline area for an irregular
+  sheet) times the nest thickness and density, from the nest material or the
+  catalog only: a drawing's own material does not say what the stock is.
 
 ## Layout, pagination and dense-label fallback
 
@@ -81,9 +84,14 @@ beside the ID; complete drawings show no status. Cards without a weight show
 "-" with a note under the Parts heading saying what is missing. A card row is
 a table row, so a card never splits across pages.
 
+The summary's header lists the job and material on the left and the dates and
+totals on the right, to leave room for part cards on the first page.
+
 Stock sizes read **width x length** in job units. Plate tables use **Quantity**
 and **Parts per plate**; the plate quantity multiplies per-plate part counts for
-the totals.
+the totals. The summary's Plates table adds a **Sheet weight** column when any
+plate's weight is known; a plate with copies shows one sheet's weight, then all
+copies on a second line.
 
 Individual IDs use 7 pt text centered on the part's pole of inaccessibility
 (`PolyLabel`, as in `PlateView`), clear of edges, holes, cutoffs and other labels.
@@ -136,7 +144,8 @@ settings last used in Calculate Cut Time or the simulator), each plate gets an
 estimated time per copy from `CutSimulation`, plus clamp-removal minutes, the same
 as Calculate Cut Time (see [cut-time estimates](cut-time-estimates.md)). The summary
 shows the job total over all sheets, and the plates table gains an "Est. cut time"
-column. Each plate page shows the time per plate and for all its copies. The report
+column (a plate with copies gives the time for each, then the total on a second
+line). Each plate page shows the time per plate and for all its copies. The report
 does not state the settings behind the estimate. These are estimates, not
 machine-reported times. Without `CutParameters` the report has no timing rows or column.
 

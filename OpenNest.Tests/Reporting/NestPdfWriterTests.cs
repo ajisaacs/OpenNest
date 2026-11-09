@@ -48,6 +48,9 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Matches(@"Distinct layouts:\s+1", summary);
         Assert.Matches(@"Total physical sheets:\s+2", summary);
         Assert.Matches(@"1\s+24 x 48 in\s+2\s+4\s+\d+\.\d%", summary);
+        Assert.Contains("40.8 lb each", summary);
+        Assert.Contains("Sheet weight", summary);
+        Assert.Contains("81.7 lb total", summary);
         Assert.Equal(new[]
         {
             "1 SHORT 1\nBracket\nSize: 10 x 10 in\nWeight: 3.43 lb ea\nTotal weight: 13.7 lb\nRequired 5, nested 4\nPlates: 1",
@@ -227,6 +230,10 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Contains("Estimated cut time:", summary);
         Assert.DoesNotContain("basis", summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Est. cut time", summary);
+        // A plate with copies puts its total on a second line, not after a comma.
+        Assert.Matches(@"\d+s each", summary);
+        Assert.Matches(@"\d+s total", summary);
+        Assert.DoesNotContain("each,", summary);
         Assert.Contains("per plate", plate);
         Assert.Contains("Total cut time:", plate);
     }

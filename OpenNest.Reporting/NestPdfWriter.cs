@@ -146,23 +146,8 @@ public static class NestPdfWriter
         AddHeading(section, "Plates");
         if (snapshot.Plates.Length == 0)
             section.AddParagraph("No plates in this job.");
-        else if (!snapshot.HasCutTimes)
-        {
-            var plates = AddTable(section, 60, 200, 80, 100, 100);
-            AddHeader(plates, "Plate", "Stock size", "Quantity", "Parts per plate", "Utilization");
-            foreach (var plate in snapshot.Plates)
-                AddRow(plates, $"Plate {plate.Number}", false, plate.Number.ToString(Invariant), SheetSize(snapshot, plate),
-                    plate.Copies.ToString(Invariant), plate.Parts.Length.ToString(Invariant), Percent(plate.Utilization));
-        }
         else
-        {
-            var plates = AddTable(section, 44, 150, 60, 96, 74, 116);
-            AddHeader(plates, "Plate", "Stock size", "Quantity", "Parts per plate", "Utilization", "Est. cut time");
-            foreach (var plate in snapshot.Plates)
-                AddRow(plates, $"Plate {plate.Number}", false, plate.Number.ToString(Invariant), SheetSize(snapshot, plate),
-                    plate.Copies.ToString(Invariant), plate.Parts.Length.ToString(Invariant), Percent(plate.Utilization),
-                    PlateCutTime(plate));
-        }
+            AddPlatesTable(section, snapshot);
 
         AddHeading(section, "Parts");
         if (snapshot.Drawings.Length == 0)
@@ -178,6 +163,50 @@ public static class NestPdfWriter
         }
         AddPartCards(section, snapshot);
     }
+
+    /// <summary>
+    /// Sheet weight and cut time columns appear only when the report has them; the stock size
+    /// column takes whatever width they leave.
+    /// </summary>
+    private static void AddPlatesTable(Section section, NestReportSnapshot snapshot)
+    {
+        var hasWeights = snapshot.Plates.Any(plate => plate.Weight != null);
+        var widths = new List<double> { 40, 0, 56, 92, 68 };
+        var headings = new List<string> { "Plate", "Stock size", "Quantity", "Parts per plate", "Utilization" };
+        if (hasWeights)
+        {
+            widths.Add(92);
+            headings.Add("Sheet weight");
+        }
+        if (snapshot.HasCutTimes)
+        {
+            widths.Add(92);
+            headings.Add("Est. cut time");
+        }
+        widths[1] = PortraitWidth - widths.Sum();
+
+        var plates = AddTable(section, widths.ToArray());
+        AddHeader(plates, headings.ToArray());
+        foreach (var plate in snapshot.Plates)
+        {
+            var cells = new List<string>
+            {
+                plate.Number.ToString(Invariant), SheetSize(snapshot, plate), plate.Copies.ToString(Invariant),
+                plate.Parts.Length.ToString(Invariant), Percent(plate.Utilization),
+            };
+            if (hasWeights)
+                cells.Add(SheetWeight(snapshot, plate));
+            if (snapshot.HasCutTimes)
+                cells.Add(PlateCutTime(plate));
+            AddRow(plates, $"Plate {plate.Number}", false, cells.ToArray());
+        }
+    }
+
+    /// <summary>One sheet, then all its copies on a second line.</summary>
+    private static string SheetWeight(NestReportSnapshot snapshot, ReportPlate plate) =>
+        plate.Weight is not { } each ? "-"
+        : plate.Copies == 1 ? $"{Weight(each)} {snapshot.WeightUnits}"
+        : $"{Weight(each)} {snapshot.WeightUnits} each\n{Weight(each * plate.Copies)} {snapshot.WeightUnits} total";
 
     /// <summary>
     /// One card per drawing, <see cref="CardsPerRow"/> to a row. Cards are table cells with
@@ -612,7 +641,7 @@ public static class NestPdfWriter
     private static string PlateCutTime(ReportPlate plate) =>
         plate.CutTime is not { } time ? ""
         : plate.Copies == 1 ? Duration(time)
-        : $"{Duration(time)} each, {Duration(time * plate.Copies)} total";
+        : $"{Duration(time)} each\n{Duration(time * plate.Copies)} total";
 
     /// <summary>Whole seconds as "1h 02m 03s", "4m 05s" or "45s".</summary>
     private static string Duration(TimeSpan time)

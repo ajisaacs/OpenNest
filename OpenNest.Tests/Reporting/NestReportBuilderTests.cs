@@ -30,6 +30,32 @@ public class NestReportBuilderTests
     }
 
     [Fact]
+    public void Capture_WeighsEachFullSheetFromItsAreaThicknessAndTheNestDensity()
+    {
+        var snapshot = NestReportBuilder.Capture(NestReportTestData.CreateNest(), NestReportTestData.GeneratedAt);
+
+        // One copy of the whole 24 x 48 sheet, not just the parts on it.
+        Assert.Equal(24 * 48 * 0.125 * 0.2836, snapshot.Plates[0].Weight!.Value, 9);
+    }
+
+    [Fact]
+    public void Capture_SheetWeightIgnoresTheDrawingsOwnMaterial()
+    {
+        var nest = new Nest("Weights") { Units = Units.Inches, Thickness = 0.125, Material = new Material("Steel", "", 0) };
+        var drawing = NestReportTestData.Rectangle("Plate", 1, 1);
+        drawing.Material = new Material("Steel", "", 0.2836);
+        nest.Drawings.Add(drawing);
+        var plate = new Plate(24, 48) { Quantity = 1 };
+        plate.Parts.Add(new Part(drawing));
+        nest.Plates.Add(plate);
+
+        var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
+
+        Assert.NotNull(snapshot.Drawings[0].Weight);
+        Assert.Null(snapshot.Plates[0].Weight);
+    }
+
+    [Fact]
     public void Capture_MillimeterJobConvertsTheVolumeAndReportsKilograms()
     {
         var nest = new Nest("Metric") { Units = Units.Millimeters, Thickness = 10, Material = new Material("Steel", "", 0.2836) };

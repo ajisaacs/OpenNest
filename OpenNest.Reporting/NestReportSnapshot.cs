@@ -38,6 +38,12 @@ public sealed record ReportPlate(int Number, ReportBounds Bounds, int Copies, do
 {
     /// <summary>Estimated time to cut one copy of this plate; null when no estimate was requested.</summary>
     public TimeSpan? CutTime { get; init; }
+
+    /// <summary>
+    /// Weight of one full sheet (outline area x nest thickness x the nest material's density) in
+    /// <see cref="NestReportSnapshot.WeightUnits"/>; null when the thickness or density is unknown.
+    /// </summary>
+    public double? Weight { get; init; }
 }
 
 /// <summary>A detached value snapshot. No domain objects or mutable geometry are retained.</summary>
