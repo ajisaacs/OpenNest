@@ -13,9 +13,9 @@ namespace OpenNest.Engine.Tests.NestingEngines;
 /// </summary>
 public class IrregularSearchUntilCancelledTests
 {
-    private static NestJob MixedJob(bool searchUntilCancelled) =>
+    private static NestJob MixedJob(bool searchUntilCancelled, int ells = 10) =>
         Job(
-            new[] { Part("disc", Disc(3), 10), Part("ell", LShape(12, 8, 4), 10), Part("tri", Triangle(9, 7), 8) },
+            new[] { Part("disc", Disc(3), 10), Part("ell", LShape(12, 8, 4), ells), Part("tri", Triangle(9, 7), 8) },
             new[] { Stock("sheet", 40, 60, spacing: 0.5) },
             new NestJobOptions(searchUntilCancelled: searchUntilCancelled)
         );
@@ -49,12 +49,14 @@ public class IrregularSearchUntilCancelledTests
     [Fact]
     public void KeepsSearchingAfterTheNormalSearchUntilCancelled()
     {
+        const int Ells = 12;
         var plain = new Recorder();
-        // Grouped, this job's normal search already finds a plan the seeds do not beat within the
-        // sheets allowed here; this test is of the seeded search, so it runs ungrouped.
-        var plainResult = new IrregularNestingEngine { GroupLikeParts = false }.Solve(MixedJob(false), plain);
+        // Grouped, or with ten ells (whose blocks Fill nests as herringbone pairs), this job's
+        // normal search already finds a plan the seeds do not beat within the sheets allowed
+        // here; this test is of the seeded search, so it runs ungrouped with twelve.
+        var plainResult = new IrregularNestingEngine { GroupLikeParts = false }.Solve(MixedJob(false, Ells), plain);
         var normalSheets = 0;
-        new IrregularNestingEngine { GroupLikeParts = false, SheetPacked = () => normalSheets++ }.Solve(MixedJob(false));
+        new IrregularNestingEngine { GroupLikeParts = false, SheetPacked = () => normalSheets++ }.Solve(MixedJob(false, Ells));
 
         var extendedSheets = 0;
         var extendedTailBudgets = new List<long>();
@@ -77,7 +79,7 @@ public class IrregularSearchUntilCancelledTests
         };
         var extended = new Recorder();
 
-        Assert.ThrowsAny<OperationCanceledException>(() => engine.Solve(MixedJob(true), extended, cancel.Token));
+        Assert.ThrowsAny<OperationCanceledException>(() => engine.Solve(MixedJob(true, Ells), extended, cancel.Token));
 
         Assert.True(extendedSheets >= normalSheets * 12);
         // The normal search runs first, unchanged; the extended search improves on it and
@@ -88,7 +90,7 @@ public class IrregularSearchUntilCancelledTests
         Assert.All(extendedTailBudgets, b => Assert.Equal(2 * new IrregularNestingEngine().WorkBudget, b));
         for (var i = 0; i < plain.Plans.Count; i++)
             Assert.Equal(Placements(plain.Plans[i]), Placements(extended.Plans[i]));
-        var job = MixedJob(false);
+        var job = MixedJob(false, Ells);
         var last = CandidateScore.Of(job, extended.Plans[^1], 0);
         Assert.False(CandidateScore.Of(job, plainResult, 0).IsBetterThan(last));
         foreach (var plan in extended.Plans)
