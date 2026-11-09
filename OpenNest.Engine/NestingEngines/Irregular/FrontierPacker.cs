@@ -206,11 +206,27 @@ internal sealed class FrontierPacker
             );
         }
         var frontAt = System.Math.Max(axis == PackAxis.X ? work.Left : work.Bottom, front ?? double.NegativeInfinity);
-        foreach (var part in seated ?? Array.Empty<Placed>())
+        if (seated is { Count: > 0 })
         {
-            placed.Add(part);
-            frontAt = System.Math.Max(frontAt, axis == PackAxis.X ? part.Right : part.Top);
-            Block(part);
+            foreach (var part in seated)
+            {
+                placed.Add(part);
+                frontAt = System.Math.Max(frontAt, axis == PackAxis.X ? part.Right : part.Top);
+            }
+            // As Block for each seated part in turn, in one parallel pass: each region loses the
+            // same positions in the same order.
+            var snapshot = states.ToArray();
+            counter.Add((long)snapshot.Length * seated.Count);
+            Parallel.For(
+                0,
+                snapshot.Length,
+                new ParallelOptions { CancellationToken = token },
+                i =>
+                {
+                    foreach (var part in seated)
+                        snapshot[i].Subtract(nfps.Get(part.Orientation, snapshot[i].Orientation), part.X, part.Y);
+                }
+            );
         }
         var firstNew = placed.Count;
         states.RemoveAll(s => s.IsEmpty);

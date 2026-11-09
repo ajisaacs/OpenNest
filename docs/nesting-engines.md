@@ -306,7 +306,10 @@ scatters the smallest parts into the gaps between groups.
 - Patterns grow in whole rows or columns, so each type's band is found by asking for the pattern
   just short of the last one's length, at most six times, then halving three times toward the
   area bound; types search in parallel, each on its own patterns, so the result does not depend
-  on the order. Patterns are filled one Clipper grid unit (0.0001) wider than the part spacing and
+  on the order. Before each strip, the searches the beam's partial sheets will need run ahead in
+  parallel, each filling its own copy of the drawing; a pattern built ahead charges no work and
+  adds no orientation until a search in strip order asks for it, so the work meter and the layout
+  are those of building each pattern in turn. Patterns are filled one Clipper grid unit (0.0001) wider than the part spacing and
   certified at the spacing: Fill sets parts exactly the spacing apart, which the strict
   certification can reject for curved parts, and a stack of rings would lose its densest pattern.
 - A band member inside a clamp keep-out goes to the gap fill instead; a band shorter than the

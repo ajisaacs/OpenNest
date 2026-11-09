@@ -118,6 +118,19 @@ internal sealed class BandedFill(
         {
             token.ThrowIfCancellationRequested();
             var children = new List<StripState>();
+            // The band searches this level needs, run ahead in parallel.
+            var searches = new List<(int Type, int Copies)>();
+            foreach (var state in beam)
+            {
+                var next = types.Where(t => state.Rest[t.Index] > 0 && t.Orientations.Count > 0)
+                    .OrderByDescending(t => t.Area).ThenBy(t => t.Index).FirstOrDefault();
+                if (next == null || state.Front >= region.Right || state.Rest[next.Index] < GroupedFill.MinGroup)
+                    continue;
+                var search = (next.Index, state.Rest[next.Index]);
+                if (!bandCache.ContainsKey(search) && !searches.Contains(search))
+                    searches.Add(search);
+            }
+            Prefetch(searches, region, token);
             foreach (var state in beam)
             {
                 var largest = types.Where(t => state.Rest[t.Index] > 0 && t.Orientations.Count > 0)
@@ -312,7 +325,7 @@ internal sealed class BandedFill(
     /// columns, so each next band is asked for just short of the last one's length, and a few
     /// halvings toward the area bound catch patterns the steps skip.
     /// </summary>
-    private List<Band> Bands(int t, int copies, Box region, CancellationToken token)
+    private List<Band> Bands(int t, int copies, Box region, CancellationToken token, Drawing? prefetch = null)
     {
         var type = types[t];
         var fewest = copies - HeldBack(copies);
@@ -328,7 +341,7 @@ internal sealed class BandedFill(
         var length = region.Length;
         for (var step = 0; step < MaxSteps; step++)
         {
-            var band = Pattern(t, copies, length, region.Width, token);
+            var band = Pattern(t, copies, length, region.Width, token, prefetch);
             if (band == null || band.Copies < fewest)
                 break;
             Keep(band);
@@ -343,7 +356,7 @@ internal sealed class BandedFill(
         for (var probe = 0; probe < Probes && hi - lo > StepShort; probe++)
         {
             var mid = (lo + hi) / 2;
-            var band = Pattern(t, copies, mid, region.Width, token);
+            var band = Pattern(t, copies, mid, region.Width, token, prefetch);
             if (band != null)
                 Keep(band);
             if (band != null && band.Copies >= copies)
@@ -369,6 +382,32 @@ internal sealed class BandedFill(
         return result;
     }
 
+    /// <summary>
+    /// Builds the patterns of each (type, copies) band search ahead of need, the searches in
+    /// parallel, so the ordinary searches that follow find them cached. Each search fills its
+    /// own drawing and charges no work, so the work meter, the orientations and every result
+    /// read as without it.
+    /// </summary>
+    private void Prefetch(IReadOnlyList<(int Type, int Copies)> searches, Box region, CancellationToken token)
+    {
+        if (searches.Count < 2)
+            return;
+        System.Threading.Tasks.Parallel.For(0, searches.Count,
+            new System.Threading.Tasks.ParallelOptions { CancellationToken = token },
+            i =>
+            {
+                var drawing = BlockCatalog.PrefetchDrawing(types[searches[i].Type]);
+                try
+                {
+                    Bands(searches[i].Type, searches[i].Copies, region, token, drawing);
+                }
+                finally
+                {
+                    BlockCatalog.ReleasePrefetch(drawing);
+                }
+            });
+    }
+
     /// <summary>Most copies a narrower band may leave to the gap fill.</summary>
     private static int HeldBack(int copies) => System.Math.Max(MaxHeldBack, copies / 3);
 
@@ -379,10 +418,12 @@ internal sealed class BandedFill(
     private const int Probes = 3;
     private const double StepShort = 0.01;
 
-    /// <summary>The type's Lattice pattern in a length x width box, up to the copies wanted.</summary>
-    private Band? Pattern(int t, int copies, double length, double width, CancellationToken token)
+    /// <summary>The type's Lattice pattern in a length x width box, up to the copies wanted; with a
+    /// <paramref name="prefetch"/> drawing, built ahead of need (see <see cref="Prefetch"/>).</summary>
+    private Band? Pattern(int t, int copies, double length, double width, CancellationToken token,
+        Drawing? prefetch = null)
     {
-        var members = blocks.Band(types[t], copies, new Box(0, 0, length, width), token);
+        var members = blocks.Band(types[t], copies, new Box(0, 0, length, width), token, prefetch);
         // Bounds carry the arc flattening padding; a pattern they push past the box is no band.
         if (members.Count == 0 || members.Max(p => p.Top) - members.Min(p => p.Bottom) > width + 1e-9)
             return null;

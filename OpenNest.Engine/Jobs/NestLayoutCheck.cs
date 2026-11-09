@@ -156,6 +156,19 @@ public static class NestLayoutCheck
             || !Overlaps(a.Inflated, br);
     }
 
+    /// <summary>Same answer as <c>Clears(a, pa, b, pb, spacing)</c> for two parts prepared with
+    /// that spacing, without outlining either part again: each part's inflated outline is built
+    /// at most once however many parts it is tested against.</summary>
+    internal static bool Clears(PreparedPlacement a, PreparedPlacement b)
+    {
+        // Ties inflate a, as in the pairwise overload.
+        var (left, right) = a.Raw.Perimeter.BoundingBox.Left > b.Raw.Perimeter.BoundingBox.Left
+            ? (b, a)
+            : (a, b);
+        return !BoxesTouch(left.Inflated.Perimeter.BoundingBox, right.Raw.Perimeter.BoundingBox)
+            || !Overlaps(left.Inflated, right.Raw);
+    }
+
     /// <summary>
     /// The layout check's spacing verdict for two prepared parts, prepared with the same positive
     /// spacing: true unless the leftmost part's inflated outline overlaps the other's raw outline

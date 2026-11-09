@@ -25,7 +25,19 @@ internal sealed class BlockCatalog : IDisposable
     private readonly Dictionary<int, int> attempts = new();
     internal int PreparationCount => attempts.Values.Sum();
     private readonly Dictionary<(int Type, int Quantity, double Length, double Width), IReadOnlyList<Placed>> cache = new();
-    private readonly Dictionary<(int Type, int Quantity, double Length, double Width), IReadOnlyList<Placed>> bands = new();
+    private readonly Dictionary<(int Type, int Quantity, double Length, double Width), BandEntry> bands = new();
+
+    /// <summary>
+    /// A built band pattern: its members, or while only prefetched, its certified poses awaiting
+    /// orientations. The work it cost is charged on its first ordinary request.
+    /// </summary>
+    private sealed class BandEntry(IReadOnlyList<Placed>? members, NestJobPlacement[]? poses, long cost)
+    {
+        public IReadOnlyList<Placed>? Members { get; set; } = members;
+        public NestJobPlacement[]? Poses { get; } = poses;
+        public long Cost { get; } = cost;
+        public bool Charged { get; set; }
+    }
 
     /// <param name="drawingFor">Shared private drawings whose best-fit entries the caller owns;
     /// null makes the catalog own one per type and release it on dispose.</param>
@@ -90,42 +102,103 @@ internal sealed class BlockCatalog : IDisposable
     /// apart, which the stricter certification below can reject for curved parts (a stack of
     /// circles), and losing the band then loses its densest pattern.
     /// </summary>
-    public IReadOnlyList<Placed> Band(PartType type, int quantity, Box rectangle, CancellationToken token)
+    public IReadOnlyList<Placed> Band(PartType type, int quantity, Box rectangle, CancellationToken token) =>
+        Band(type, quantity, rectangle, token, prefetch: null);
+
+    /// <summary>
+    /// <see cref="Band(PartType, int, Box, CancellationToken)"/>, or with a <paramref name="prefetch"/>
+    /// drawing (see <see cref="PrefetchDrawing"/>) a build ahead of need that may run in parallel
+    /// with other prefetches, even of the same type, each with its own drawing. A prefetch charges
+    /// no work and adds no orientations: the pattern's first ordinary request charges it and binds
+    /// its poses to the catalog's orientations, so the work meter and the orientations read as if
+    /// the pattern were built then.
+    /// </summary>
+    public IReadOnlyList<Placed> Band(PartType type, int quantity, Box rectangle, CancellationToken token,
+        Drawing? prefetch)
     {
         token.ThrowIfCancellationRequested();
         if (quantity <= 2 || type.Orientations.Count == 0 || rectangle.Length <= 0 || rectangle.Width <= 0)
             return Array.Empty<Placed>();
         var key = (type.Index, quantity, rectangle.Length, rectangle.Width);
+        BandEntry? entry;
         lock (bands)
-            if (bands.TryGetValue(key, out var cached))
-                return cached;
-        // Types may build bands in parallel: each type's drawing and orientation list are its own.
-        var result = Build(type, quantity, rectangle, token, spacing + System.Math.Pow(10, -NoFitCache.Precision));
+            bands.TryGetValue(key, out entry);
+        if (entry == null)
+        {
+            // Types may build bands in parallel: each type's drawing and orientation list are its
+            // own. Prefetches of one type fill their own drawings and only read the orientations.
+            var (members, poses) = Propose(type, quantity, rectangle, token,
+                spacing + System.Math.Pow(10, -NoFitCache.Precision), prefetch ?? DrawingOf(type));
+            lock (bands)
+                if (!bands.TryGetValue(key, out entry))
+                    bands[key] = entry = new BandEntry(members, poses, Cost(type, quantity));
+        }
+        if (prefetch != null)
+            return entry.Members ?? Bind(type, entry.Poses!, orientations[type.Index].ToList(), token);
         lock (bands)
-            bands[key] = result;
-        return result;
+        {
+            if (!entry.Charged)
+            {
+                counter.Add(entry.Cost);
+                entry.Charged = true;
+            }
+            if (entry.Members != null)
+                return entry.Members;
+        }
+        // Ordinary requests of one type run on one thread at a time.
+        var bound = Bind(type, entry.Poses!, orientations[type.Index], token);
+        lock (bands)
+            entry.Members = bound;
+        return bound;
     }
 
-    private IReadOnlyList<Placed> Build(PartType type, int quantity, Box rectangle, CancellationToken token,
-        double? fillSpacing = null)
+    /// <summary>
+    /// A private drawing of the type for one prefetching thread: Fill sorts a drawing's cached
+    /// best-fit list in place, so two fills of one drawing must not run at once. It draws the same
+    /// best-fit candidates from the geometry pool; release it with <see cref="ReleasePrefetch"/>.
+    /// </summary>
+    public static Drawing PrefetchDrawing(PartType type) => DrawingJobMapper.CreateDrawing(type.Part);
+
+    public static void ReleasePrefetch(Drawing drawing) => BestFitCache.Invalidate(drawing);
+
+    /// <summary>Work charged for one Fill proposal; see <see cref="Build"/>.</summary>
+    private static long Cost(PartType type, int quantity)
+    {
+        var vertices = type.Orientations.Count > 0 ? type.Orientations[0].Outline.Count : 1;
+        return (long)quantity * quantity * System.Math.Max(1, vertices);
+    }
+
+    private IReadOnlyList<Placed> Build(PartType type, int quantity, Box rectangle, CancellationToken token)
     {
         // PrivatePlateFill.Run below is a full independent NFP-based pack whose own operations
         // never touch this solve's effort meter; charge it here using the same factors - demand
         // and outline complexity - that drive its real cost, so the shared budget actually sees it.
-        var vertices = type.Orientations.Count > 0 ? type.Orientations[0].Outline.Count : 1;
-        counter.Add((long)quantity * quantity * System.Math.Max(1, vertices));
-        var drawing = drawingFor?.Invoke(type.Part) ?? OwnDrawing(type);
+        counter.Add(Cost(type, quantity));
+        var (members, poses) = Propose(type, quantity, rectangle, token, spacing, DrawingOf(type));
+        return members ?? Bind(type, poses!, orientations[type.Index], token);
+    }
+
+    private Drawing DrawingOf(PartType type) => drawingFor?.Invoke(type.Part) ?? OwnDrawing(type);
+
+    /// <summary>
+    /// The Fill proposal's certified poses, or its members when there are none to bind: empty
+    /// when Fill fails or certification rejects it.
+    /// </summary>
+    private (IReadOnlyList<Placed>? Members, NestJobPlacement[]? Poses) Propose(PartType type, int quantity,
+        Box rectangle, CancellationToken token, double fillSpacing, Drawing drawing)
+    {
         try
         {
-            var members = PrivatePlateFill.Run(drawing, type.Part.Rotation, fillSpacing ?? spacing,
+            var members = PrivatePlateFill.Run(drawing, type.Part.Rotation, fillSpacing,
                 rectangle.Length, rectangle.Width, quantity, token);
             token.ThrowIfCancellationRequested();
-            return Resolve(type, members.Take(quantity).ToArray(), orientations[type.Index], spacing, token);
+            var poses = Certify(type, members.Take(quantity).ToArray(), spacing, token);
+            return poses == null ? (Array.Empty<Placed>(), null) : (null, poses);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException
             or NotSupportedException or ArithmeticException)
         {
-            return Array.Empty<Placed>();
+            return (Array.Empty<Placed>(), null);
         }
     }
 
@@ -146,15 +219,28 @@ internal sealed class BlockCatalog : IDisposable
         drawings.Clear();
     }
 
+    /// <summary>The members certified and bound to <paramref name="orientations"/>; empty when they
+    /// cannot form a block.</summary>
     internal static IReadOnlyList<Placed> Resolve(PartType type, IReadOnlyList<Part> members,
         List<Orientation> orientations, double spacing, CancellationToken token = default)
     {
+        var poses = Certify(type, members, spacing, token);
+        return poses == null ? Array.Empty<Placed>() : Bind(type, poses, orientations, token);
+    }
+
+    /// <summary>
+    /// The members' poses, quantized and ordered, when every pair keeps the spacing; null when
+    /// they cannot form a block.
+    /// </summary>
+    private static NestJobPlacement[]? Certify(PartType type, IReadOnlyList<Part> members, double spacing,
+        CancellationToken token)
+    {
         token.ThrowIfCancellationRequested();
         if (members.Count <= 2)
-            return Array.Empty<Placed>();
+            return null;
         var geometry = JobPartGeometry.TryRead(type.Part.Geometry);
         if (geometry == null)
-            return Array.Empty<Placed>();
+            return null;
         // Canonical rebinding is already performed by FillItem. Quantization removes sub-grid
         // arithmetic differences from equivalent Fill proposals; certify the resulting poses.
         var poses = members.Select(p => new NestJobPlacement(type.Part.Id, 0,
@@ -163,28 +249,49 @@ internal sealed class BlockCatalog : IDisposable
             .OrderBy(p => p.X).ThenBy(p => p.Y).ThenBy(p => p.Rotation).ToArray();
         if (poses.Any(p => !double.IsFinite(p.X) || !double.IsFinite(p.Y) || !double.IsFinite(p.Rotation)
             || !type.Part.Rotation.Allows(p.Rotation)))
-            return Array.Empty<Placed>();
+            return null;
+        // Each member outlined once, not once per pair it is tested in.
+        var prepared = poses.Select(p => NestLayoutCheck.Prepare(geometry, p, spacing)).ToArray();
         for (var i = 0; i < poses.Length; i++)
             for (var j = i + 1; j < poses.Length; j++)
             {
                 token.ThrowIfCancellationRequested();
-                if (!NestLayoutCheck.Clears(geometry, poses[i], geometry, poses[j], spacing))
-                    return Array.Empty<Placed>();
+                if (!NestLayoutCheck.Clears(prepared[i], prepared[j]))
+                    return null;
             }
-        var result = new List<Placed>();
-        foreach (var pose in poses)
+        return poses;
+    }
+
+    /// <summary>
+    /// The certified poses as members relative to the first, each at the orientation of its
+    /// rotation, which is added to <paramref name="orientations"/> when missing; empty when one
+    /// cannot be made.
+    /// </summary>
+    private static IReadOnlyList<Placed> Bind(PartType type, NestJobPlacement[] poses, List<Orientation> orientations,
+        CancellationToken token)
+    {
+        try
         {
-            token.ThrowIfCancellationRequested();
-            var orientation = orientations.FirstOrDefault(o => o.Rotation == pose.Rotation);
-            if (orientation == null)
+            var result = new List<Placed>();
+            foreach (var pose in poses)
             {
-                orientation = PartCatalog.CreateOrientation(type, orientations.Max(o => o.Index) + 1, pose.Rotation);
+                token.ThrowIfCancellationRequested();
+                var orientation = orientations.FirstOrDefault(o => o.Rotation == pose.Rotation);
                 if (orientation == null)
-                    return Array.Empty<Placed>();
-                orientations.Add(orientation);
+                {
+                    orientation = PartCatalog.CreateOrientation(type, orientations.Max(o => o.Index) + 1, pose.Rotation);
+                    if (orientation == null)
+                        return Array.Empty<Placed>();
+                    orientations.Add(orientation);
+                }
+                result.Add(new Placed(orientation, pose.X - poses[0].X, pose.Y - poses[0].Y));
             }
-            result.Add(new Placed(orientation, pose.X - poses[0].X, pose.Y - poses[0].Y));
+            return result;
         }
-        return result;
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException
+            or NotSupportedException or ArithmeticException)
+        {
+            return Array.Empty<Placed>();
+        }
     }
 }
