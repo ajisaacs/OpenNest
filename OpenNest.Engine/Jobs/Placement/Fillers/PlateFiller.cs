@@ -657,6 +657,8 @@ internal class PlateFiller
                     );
                 }
             }
+
+            RefineEndRow(context);
         }
         catch (OperationCanceledException)
         {
@@ -670,6 +672,49 @@ internal class PlateFiller
         }
 
         angleBuilder.RecordProductive(context.AngleResults);
+    }
+
+    /// <summary>
+    /// Gives the winning layout's outermost row a chance to make room for more parts at its end
+    /// (<see cref="EndRowRefiller"/>); the policy's comparer must prefer the result.
+    /// </summary>
+    private void RefineEndRow(FillContext context)
+    {
+        var current = context.CurrentBest;
+        if (current == null || current.Count < 2)
+            return;
+
+        var stopwatch = Stopwatch.StartNew();
+        var refined = EndRowRefiller.Improve(
+            current,
+            context.WorkArea,
+            Plate.PartSpacing,
+            context.Policy.Comparer,
+            context.MaxQuantity,
+            context.Token
+        );
+        stopwatch.Stop();
+        Debug.WriteLine(
+            $"[RunPipeline] End-row refill: {current.Count} -> {refined.Count} in {stopwatch.ElapsedMilliseconds}ms"
+        );
+
+        if (ReferenceEquals(refined, current))
+            return;
+
+        context.CurrentBest = refined;
+        context.CurrentBestScore = FillScore.Compute(refined, context.WorkArea);
+        NestProgressReporter.Report(
+            context.Progress,
+            new ProgressReport
+            {
+                Phase = context.WinnerPhase,
+                PlateNumber = PlateNumber,
+                Parts = context.ToOriginalFrame(refined),
+                WorkArea = context.WorkArea,
+                Description = BuildProgressSummary(),
+                IsOverallBest = true,
+            }
+        );
     }
 
     /// <summary>

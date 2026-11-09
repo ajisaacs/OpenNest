@@ -85,7 +85,7 @@ namespace OpenNest.Engine.Fill
         /// Pushes movingParts to the first contact with the work-area edge or an obstacle,
         /// keeping each obstacle set's own spacing.
         /// </summary>
-        private static double Push(
+        internal static double Push(
             List<Part> movingParts,
             Box workArea,
             Vector direction,
@@ -122,7 +122,7 @@ namespace OpenNest.Engine.Fill
         /// Obstacles kept at one spacing, with their bounds and spacing-offset contours
         /// cached for one push.
         /// </summary>
-        private sealed class ObstacleSet
+        internal sealed class ObstacleSet
         {
             private readonly List<Part> parts;
             private readonly Box[] spacingBoxes;

@@ -124,6 +124,17 @@ the part at the most upright angles that fit the remnant's height and keeps only
 the part spacing from the layout, tested on the outlines `NestLayoutCheck` uses. It is skipped
 for circles, for an explicit rotation range, and once the layout holds the requested quantity.
 
+After the strategies, the end-row refill (`EndRowRefiller`) works on the winning layout's
+outermost row on each side. It pushes the row out into the slack before the work-area edge,
+then slides it toward one end of the row. Copies of the row's end part then slide in from the
+freed end, each at whichever position across the row lets it travel deepest. Every move is a
+`Compactor` push, so parts keep the part spacing, and a copy counts only when it stops inside
+the work area. The layout is kept only when the policy's comparer prefers it, and the refill
+never goes past the requested quantity. A 7-inch hexagon cover on a 60 x 120 sheet at 0.25
+spacing fills 180 in ten staggered rows of 18 with 2.7 inches above the top row. Lifting that
+row straight over the one below opens a notch at its end where one more hexagon nests, so the
+plate holds 181.
+
 On a plate with clamps, interactive Fill (Fill Area and filling from a part) fills as if the
 clamps were absent, then drops every part that enters a clamp keep-out or sits too close to an
 existing part, and a whole copy of a multi-part group when any member does. Packing around
