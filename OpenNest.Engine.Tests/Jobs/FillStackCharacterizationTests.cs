@@ -37,6 +37,9 @@ namespace OpenNest.Engine.Tests.Jobs;
 /// strip with pair grids (and strips narrower than the part's bounding box) and trying skipped
 /// candidates whose remnant could win: Fill now places 34 instead of 33, and Strip keeps 35 with
 /// its L-shapes laid out differently (both layouts pass NestLayoutCheck).
+/// Re-captured when the pairs phase began tiling herringbone pairs (<c>HerringbonePatterns</c>):
+/// the mixed Strip nest keeps 35 laid out differently, and herringbone pairs won the chevron of
+/// the learned-angle nests whatever angles were learned, so a cross replaced it.
 /// Not pinned: richer mixes that pair parallelogram, chevron or tee parts at oblique angles
 /// with other irregular items. Their Fill and Vertical Remnant nests vary between runs, most
 /// likely because best-fit pair candidates are gathered in a <c>ConcurrentBag</c> and equal
@@ -78,19 +81,20 @@ public class FillStackCharacterizationTests
     }
 
     /// <summary>
-    /// 6 x 4 chevron. Filled after <see cref="LongBar"/>, its layout differs between the learned
-    /// (pruned) angle list and a full sweep.
+    /// 6 x 6 cross with 2" arms. Filled after <see cref="LongBar"/>, its layout differs between
+    /// the learned (pruned) angle list and a full sweep. (A chevron did until herringbone pairs,
+    /// which do not depend on learned angles, began to win it.)
     /// </summary>
-    private static Program Chevron()
+    private static Program Cross()
     {
         var program = new Program();
-        program.MoveTo(0, 0);
-        program.LineTo(3, 2);
-        program.LineTo(6, 0);
-        program.LineTo(6, 2);
-        program.LineTo(3, 4);
-        program.LineTo(0, 2);
-        program.LineTo(0, 0);
+        program.MoveTo(2, 0);
+        foreach (var (x, y) in new[]
+        {
+            (4.0, 0.0), (4.0, 2.0), (6.0, 2.0), (6.0, 4.0), (4.0, 4.0), (4.0, 6.0),
+            (2.0, 6.0), (2.0, 4.0), (0.0, 4.0), (0.0, 2.0), (2.0, 2.0), (2.0, 0.0),
+        })
+            program.LineTo(x, y);
         return program;
     }
 
@@ -101,7 +105,7 @@ public class FillStackCharacterizationTests
             "notched" => Notched(),
             "arc" => TestDrawingFactory.ArcPart(),
             "bar" => LongBar(),
-            "chevron" => Chevron(),
+            "cross" => Cross(),
             _ => TestDrawingFactory.Rectangle(4, 3),
         };
 
@@ -258,13 +262,13 @@ public class FillStackCharacterizationTests
 
     /// <summary>
     /// The bar fills first and is productive only near 0 and 180 degrees, so the Fill filler
-    /// prunes the chevron and notched fills to the angles it learned (see
+    /// prunes the cross and notched fills to the angles it learned (see
     /// <see cref="Nest_LearnedAngleItems_DependsOnLearnedAngles"/>).
     /// </summary>
     private static List<NestItem> LearnedAngleItems() =>
         [
             new() { Drawing = new Drawing("bar", LongBar()), Quantity = 3 },
-            new() { Drawing = new Drawing("chevron", Chevron()), Quantity = 20 },
+            new() { Drawing = new Drawing("cross", Cross()), Quantity = 20 },
             new() { Drawing = new Drawing("notched", Notched()), Quantity = 4 },
             new() { Drawing = new Drawing("rect", TestDrawingFactory.Rectangle(4, 3)), Quantity = 1 },
         ];
@@ -281,7 +285,7 @@ public class FillStackCharacterizationTests
 
     [Theory]
     [InlineData("Fill", 34, "D3D54E9116D96ACF")]
-    [InlineData("Strip", 35, "D5A35DDDE6A5B36A")]
+    [InlineData("Strip", 35, "55A0EE3EDF28E68E")]
     [InlineData("Vertical Remnant", 35, "8CC17C7708C8049F")]
     [InlineData("Horizontal Remnant", 30, "A0700052AE771E06")]
     public void Nest_MixedIrregularItems_PinnedLayout(
@@ -296,10 +300,10 @@ public class FillStackCharacterizationTests
     }
 
     [Theory]
-    [InlineData("Fill", 28, "2D424BF0DBA7CD32")]
-    [InlineData("Strip", 28, "E13C9185F4206BA8")]
-    [InlineData("Vertical Remnant", 28, "2D424BF0DBA7CD32")]
-    [InlineData("Horizontal Remnant", 28, "5E349DF948B78808")]
+    [InlineData("Fill", 28, "BE363E3A47E9B036")]
+    [InlineData("Strip", 23, "E4AA82327508D538")]
+    [InlineData("Vertical Remnant", 28, "DB2409DB39642666")]
+    [InlineData("Horizontal Remnant", 24, "883BD209AE87E2C5")]
     public void Nest_LearnedAngleItems_PinnedLayout(
         string strategy,
         int expectedCount,

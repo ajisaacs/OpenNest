@@ -157,7 +157,82 @@ namespace OpenNest.Engine.Fill
                 reportProgress
             );
 
+            parts = EvaluateHerringbones(
+                item.Drawing,
+                workArea,
+                parts,
+                candidates,
+                bestFits,
+                token,
+                reportProgress
+            );
+
             return new PairFillResult { Parts = parts, BestFits = bestFits };
+        }
+
+        /// <summary>
+        /// Tiles the drawing's herringbone pairs (<see cref="HerringbonePatterns"/>), one group
+        /// per part rotation, with the same grid and remnant fill as the best-fit pairs, and
+        /// returns the better of them and <paramref name="best"/> by the comparer; a tie keeps
+        /// <paramref name="best"/>.
+        /// </summary>
+        private List<Part> EvaluateHerringbones(
+            Drawing drawing,
+            Box workArea,
+            List<Part> best,
+            List<BestFitResult> candidates,
+            List<BestFitResult> bestFits,
+            CancellationToken token,
+            Action<List<Part>, string> reportProgress
+        )
+        {
+            try
+            {
+                var groups = HerringbonePatterns.Build(drawing, partSpacing, token);
+                if (groups.Count == 0)
+                    return best;
+
+                var maxUtilization = candidates.Count > 0 ? candidates.Max(c => c.Utilization) : 1.0;
+                var partBox = drawing.Program.BoundingBox();
+                var partArea = System.Math.Max(partBox.Width * partBox.Length, 1);
+                var minCountToBeat = best?.Count ?? 0;
+
+                var results = new List<Part>[groups.Count];
+                Parallel.For(
+                    0,
+                    groups.Count,
+                    new ParallelOptions { CancellationToken = token },
+                    i =>
+                    {
+                        results[i] = EvaluateCandidate(
+                            groups[i],
+                            drawing,
+                            workArea,
+                            minCountToBeat,
+                            maxUtilization,
+                            partArea,
+                            bestFits,
+                            token
+                        );
+                    }
+                );
+
+                // In rotation order, so the same layout wins however the workers finish.
+                foreach (var result in results)
+                {
+                    if (comparer.IsBetter(result, best, workArea))
+                    {
+                        best = result;
+                        reportProgress?.Invoke(best, $"Pairs: herringbone, best = {best.Count} parts");
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.WriteLine("[PairFiller] Canceled during herringbone pairs, using results so far");
+            }
+
+            return best ?? new List<Part>();
         }
 
         /// <summary>
