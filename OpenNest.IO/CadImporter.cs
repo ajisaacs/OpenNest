@@ -114,7 +114,7 @@ namespace OpenNest.IO
         {
             Span<byte> input = stackalloc byte[32 + 4];
             Span<byte> digest = stackalloc byte[32];
-            using (var stream = File.OpenRead(path))
+            using (var stream = SharedFile.OpenRead(path))
                 SHA256.HashData(stream, input[..32]);
 
             for (var i = 0; i < entities.Count; i++)

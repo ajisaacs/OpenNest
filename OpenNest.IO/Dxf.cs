@@ -54,7 +54,14 @@ namespace OpenNest.IO
             GetGeometry(stream, null);
 
         public static List<Entity> GetGeometry(string path, Func<string, bool> layerFilter) =>
-            ReadGeometry(() => ReadDxf(new DxfReader(path)), layerFilter);
+            ReadGeometry(
+                () =>
+                {
+                    using var stream = SharedFile.OpenRead(path);
+                    return ReadDxf(new DxfReader(stream));
+                },
+                layerFilter
+            );
 
         public static List<Entity> GetGeometry(Stream stream, Func<string, bool> layerFilter) =>
             ReadGeometry(() => ReadDxf(new DxfReader(stream)), layerFilter);
@@ -128,16 +135,18 @@ namespace OpenNest.IO
                 return reader.Read();
         }
 
+        // Read through a shared stream so a drawing still open in AutoCAD can be imported.
         private static CadDocument ReadDocument(string path)
         {
+            using var stream = SharedFile.OpenRead(path);
             if (IsDwg(path))
             {
-                using var reader = new DwgReader(path);
+                using var reader = new DwgReader(stream);
                 return reader.Read();
             }
             else
             {
-                using var reader = new DxfReader(path);
+                using var reader = new DxfReader(stream);
                 return reader.Read();
             }
         }

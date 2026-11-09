@@ -116,7 +116,8 @@ namespace OpenNest.IO
 
             try
             {
-                using var reader = XmlReader.Create(path, settings);
+                using var stream = SharedFile.OpenRead(path);
+                using var reader = XmlReader.Create(stream, settings);
                 var root = XDocument.Load(reader).Root;
                 if (root?.Name.LocalName != "svg")
                     throw new InvalidDataException($"\"{Path.GetFileName(path)}\" is not an SVG file.");
