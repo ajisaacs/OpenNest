@@ -29,6 +29,15 @@ namespace OpenNest.Engine.Fill
         private readonly ConcurrentDictionary<(double Width, double Length), List<Part>> pairStrips =
             new();
 
+        /// <summary>Pairs tried when tiling a strip with one pair as a grid.</summary>
+        private const int MaxGridCandidates = 50;
+
+        /// <summary>Grid candidates tried in a row without improvement before giving up.</summary>
+        private const int GridStaleLimit = 10;
+
+        private readonly ConcurrentDictionary<Drawing, double> minimumWidths =
+            new(ReferenceEqualityComparer.Instance);
+
         public PairRemnantFiller(double partSpacing, IFillComparer comparer)
         {
             this.partSpacing = partSpacing;
@@ -72,6 +81,11 @@ namespace OpenNest.Engine.Fill
             var gridBox = ((IEnumerable<IBoundable>)gridParts).GetBoundingBox();
             var partBox = drawing.Program.BoundingBox();
             var minDim = System.Math.Min(partBox.Width, partBox.Length) + 2 * partSpacing;
+
+            // With pairs to tile, a strip narrower than the part's bounding box can still hold
+            // it turned, as a gusset turned 45 degrees fits beside a column of gusset pairs.
+            if (bestFits != null && plate != null)
+                minDim = System.Math.Min(minDim, MinimumWidth(drawing));
 
             List<Part> bestRemnant = null;
 
@@ -214,11 +228,87 @@ namespace OpenNest.Engine.Fill
             // The stripe filler lays rows along both axes itself; its axis only names it.
             var best = new StripeFiller(context, NestDirection.Horizontal).Fill();
 
+            // A grid replaces the stripes only when it places more; a tie keeps the stripes.
+            var grid = TilePairs(drawing, area, bestFits, token);
+            if (grid != null && grid.Count > (best?.Count ?? 0))
+                best = grid;
+
             Debug.WriteLine(
                 $"[PairFiller] Remnant pairs: {best?.Count ?? 0} parts in "
                     + $"{area.Width:F2}x{area.Length:F2}"
             );
             return best;
         }
+
+        /// <summary>
+        /// The strip tiled with one pair as a grid, as <see cref="PairFiller"/> tiles a work area,
+        /// trying the pairs whose short side fits the strip. Finds layouts the stripe filler's
+        /// turned rows miss, such as gusset pairs at 45 degrees zigzagging up a narrow strip.
+        /// </summary>
+        private List<Part> TilePairs(
+            Drawing drawing,
+            Box area,
+            List<BestFitResult> bestFits,
+            CancellationToken token
+        )
+        {
+            var shortSide = System.Math.Min(area.Width, area.Length);
+            var candidates = bestFits
+                .Where(fit => fit.Keep && fit.ShortestSide <= shortSide + Tolerance.Epsilon)
+                .OrderByDescending(fit => EstimateTileCount(fit, area))
+                .ThenByDescending(fit => fit.Utilization)
+                .Take(MaxGridCandidates);
+
+            var engine = new FillLinear(area, partSpacing) { Label = "Pairs-Remnant" };
+            List<Part> best = null;
+            var sinceImproved = 0;
+            foreach (var fit in candidates)
+            {
+                token.ThrowIfCancellationRequested();
+                if (sinceImproved >= GridStaleLimit)
+                    break;
+
+                var improved = false;
+                var pairParts = fit.BuildParts(drawing);
+                foreach (var angle in PairFiller.BuildTilingAngles(fit))
+                {
+                    var pattern = FillHelpers.BuildRotatedPattern(pairParts, angle);
+                    if (pattern.Parts.Count == 0)
+                        continue;
+
+                    foreach (var dir in new[] { NestDirection.Horizontal, NestDirection.Vertical })
+                    {
+                        var parts = engine.Fill(pattern, dir);
+                        if (parts == null || parts.Count == 0 || !comparer.IsBetter(parts, best, area))
+                            continue;
+
+                        best = parts;
+                        improved = true;
+                    }
+                }
+
+                sinceImproved = improved ? 0 : sinceImproved + 1;
+            }
+
+            return best;
+        }
+
+        private int EstimateTileCount(BestFitResult fit, Box area)
+        {
+            int Count(double pairW, double pairH) =>
+                pairW <= 0 || pairH <= 0
+                    ? 0
+                    : (int)((area.Width + partSpacing) / (pairW + partSpacing))
+                        * (int)((area.Length + partSpacing) / (pairH + partSpacing))
+                        * 2;
+
+            return System.Math.Max(
+                Count(fit.BoundingWidth, fit.BoundingHeight),
+                Count(fit.BoundingHeight, fit.BoundingWidth)
+            );
+        }
+
+        private double MinimumWidth(Drawing drawing) =>
+            minimumWidths.GetOrAdd(drawing, RotationAnalysis.MinimumWidth);
     }
 }

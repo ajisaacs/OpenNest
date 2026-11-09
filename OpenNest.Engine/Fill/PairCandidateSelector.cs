@@ -77,6 +77,44 @@ namespace OpenNest.Engine.Fill
             );
         }
 
+        /// <summary>
+        /// An optimistic count for the candidate's grid plus its leftover strips: each strip at
+        /// least <paramref name="minWidth"/> wide (the narrowest the part fits turned) is packed
+        /// at <paramref name="maxUtilization"/> of parts of <paramref name="partArea"/>.
+        /// </summary>
+        public int EstimateWithRemnant(
+            BestFitResult r,
+            Box workArea,
+            double minWidth,
+            double maxUtilization,
+            double partArea
+        )
+        {
+            int Estimate(double pairW, double pairH)
+            {
+                if (pairW <= 0 || pairH <= 0 || partArea <= 0)
+                    return 0;
+
+                var areaW = workArea.Width;
+                var areaL = workArea.Length;
+                var cols = (int)((areaW + partSpacing) / (pairW + partSpacing));
+                var rows = (int)((areaL + partSpacing) / (pairH + partSpacing));
+                if (cols == 0 || rows == 0)
+                    return 0;
+
+                var leftW = areaW - cols * (pairW + partSpacing);
+                var leftL = areaL - rows * (pairH + partSpacing);
+                var strips = (leftW >= minWidth ? leftW * areaL : 0)
+                    + (leftL >= minWidth ? leftL * areaW : 0);
+                return cols * rows * 2 + (int)(strips * maxUtilization / partArea);
+            }
+
+            return System.Math.Max(
+                Estimate(r.BoundingWidth, r.BoundingHeight),
+                Estimate(r.BoundingHeight, r.BoundingWidth)
+            );
+        }
+
         private int EstimateTileCount(BestFitResult r, double areaW, double areaL)
         {
             var h = EstimateCount(r.BoundingWidth, r.BoundingHeight, areaW, areaL);

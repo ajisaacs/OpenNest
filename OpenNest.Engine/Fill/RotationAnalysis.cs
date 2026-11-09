@@ -85,6 +85,46 @@ namespace OpenNest.Engine.Fill
             return GetHullEdgeAngles(hull);
         }
 
+        /// <summary>
+        /// The narrowest strip the drawing's material fits in at any rotation: the least width of
+        /// its convex hull, which is found across one of the hull's edges. A right-angle gusset
+        /// fits a strip narrower than either side of its bounding box when turned 45 degrees.
+        /// Zero when the drawing has no material outline.
+        /// </summary>
+        public static double MinimumWidth(Drawing drawing)
+        {
+            var shapes = ShapeBuilder.GetShapes(
+                ConvertProgram.ToGeometry(drawing.Program).ForNesting()
+            );
+            var points = shapes
+                .SelectMany(s => s.ToPolygonWithTolerance(0.01)?.Vertices ?? new List<Vector>())
+                .ToList();
+            if (points.Count < 3)
+                return 0;
+
+            var vertices = ConvexHull.Compute(points).Vertices;
+            var minimum = double.MaxValue;
+            for (var i = 0; i < vertices.Count; i++)
+            {
+                var a = vertices[i];
+                var b = vertices[(i + 1) % vertices.Count];
+                var length = a.DistanceTo(b);
+                if (length < Tolerance.Epsilon)
+                    continue;
+
+                var width = 0.0;
+                foreach (var v in vertices)
+                {
+                    var cross = (b.X - a.X) * (v.Y - a.Y) - (b.Y - a.Y) * (v.X - a.X);
+                    width = System.Math.Max(width, System.Math.Abs(cross) / length);
+                }
+
+                minimum = System.Math.Min(minimum, width);
+            }
+
+            return minimum == double.MaxValue ? 0 : minimum;
+        }
+
         public static List<double> GetHullEdgeAngles(Polygon hull)
         {
             var vertices = hull.Vertices;

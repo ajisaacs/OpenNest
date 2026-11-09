@@ -185,18 +185,26 @@ namespace OpenNest.Engine.Fill
             var effectiveWorkArea = workArea;
 
             var maxUtilization = candidates.Count > 0 ? candidates.Max(c => c.Utilization) : 1.0;
+            // The remnant bound packs parts at the best pair utilization, which is measured against
+            // the part's true area: its bounding box would undercount parts that interlock, such
+            // as gussets, and prune candidates whose remnant could win.
             var partBox = drawing.Program.BoundingBox();
-            var partArea = System.Math.Max(partBox.Width * partBox.Length, 1);
+            var partArea = drawing.Area > 0
+                ? drawing.Area
+                : System.Math.Max(partBox.Width * partBox.Length, 1);
 
-            try
+            // Evaluates the batches of a candidate list; with early exit, stops once that many
+            // candidates in a row failed to improve and returns where it stopped. With requireMore,
+            // a candidate replaces the best only with more parts, so a tie keeps the layout.
+            int RunBatches(List<BestFitResult> list, bool earlyExit, bool requireMore)
             {
-                for (var batchStart = 0; batchStart < candidates.Count; batchStart += CandidateBatchSize)
+                for (var batchStart = 0; batchStart < list.Count; batchStart += CandidateBatchSize)
                 {
                     token.ThrowIfCancellationRequested();
 
-                    var batchEnd = System.Math.Min(batchStart + CandidateBatchSize, candidates.Count);
+                    var batchEnd = System.Math.Min(batchStart + CandidateBatchSize, list.Count);
                     var results = EvaluateBatch(
-                        candidates,
+                        list,
                         drawing,
                         effectiveWorkArea,
                         batchStart,
@@ -215,17 +223,47 @@ namespace OpenNest.Engine.Fill
                         workArea,
                         effectiveWorkArea,
                         targetCount,
-                        candidates.Count,
+                        list.Count,
                         batchStart,
-                        reportProgress
+                        reportProgress,
+                        requireMore
                     );
 
-                    if (batchEnd >= EarlyExitMinTried && sinceImproved >= EarlyExitStaleLimit)
+                    if (earlyExit && batchEnd >= EarlyExitMinTried && sinceImproved >= EarlyExitStaleLimit)
                     {
                         Debug.WriteLine(
-                            $"[PairFiller] Early exit at {batchEnd}/{candidates.Count} — no improvement in last {sinceImproved} candidates"
+                            $"[PairFiller] Early exit at {batchEnd}/{list.Count} — no improvement in last {sinceImproved} candidates"
                         );
-                        break;
+                        return batchEnd;
+                    }
+                }
+
+                return list.Count;
+            }
+
+            try
+            {
+                var stoppedAt = RunBatches(candidates, earlyExit: true, requireMore: false);
+
+                // The candidates are ranked by their grids alone, so the early exit can skip a
+                // narrower grid whose leftover strip holds more parts than a fuller grid gains:
+                // a column of gusset pairs slid to leave a strip for gussets turned 45 degrees.
+                // Those whose grid and remnant estimate could still win are tried anyway.
+                if (stoppedAt < candidates.Count && best != null
+                    && (targetCount <= 0 || best.Count < targetCount))
+                {
+                    var minWidth = RotationAnalysis.MinimumWidth(drawing);
+                    var promising = candidates
+                        .Skip(stoppedAt)
+                        .Where(c => candidateSelector.EstimateWithRemnant(
+                            c, workArea, minWidth, maxUtilization, partArea) > best.Count)
+                        .ToList();
+                    if (promising.Count > 0)
+                    {
+                        Debug.WriteLine(
+                            $"[PairFiller] Trying {promising.Count} skipped candidates whose remnant could win"
+                        );
+                        RunBatches(promising, earlyExit: false, requireMore: true);
                     }
                 }
             }
@@ -293,12 +331,15 @@ namespace OpenNest.Engine.Fill
             int targetCount,
             int totalCandidates,
             int batchStart,
-            Action<List<Part>, string> reportProgress
+            Action<List<Part>, string> reportProgress,
+            bool requireMore = false
         )
         {
             for (var j = 0; j < results.Length; j++)
             {
-                if (comparer.IsBetter(results[j], best, effectiveWorkArea))
+                var placesMore = !requireMore || best == null
+                    || (results[j]?.Count ?? 0) > best.Count;
+                if (placesMore && comparer.IsBetter(results[j], best, effectiveWorkArea))
                 {
                     best = results[j];
                     sinceImproved = 0;
@@ -511,7 +552,7 @@ namespace OpenNest.Engine.Fill
         /// </summary>
         /// <param name="candidate">The candidate<see cref="BestFitResult"/></param>
         /// <returns>The <see cref="List{double}"/></returns>
-        private static List<double> BuildTilingAngles(BestFitResult candidate)
+        internal static List<double> BuildTilingAngles(BestFitResult candidate)
         {
             var angles = new List<double>(candidate.HullAngles);
             var optAngle = -candidate.OptimalRotation;

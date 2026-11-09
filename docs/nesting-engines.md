@@ -115,6 +115,16 @@ included, and keeps whichever places the most; a tie stays staggered. A 9-inch c
 60 x 120 sheet at 0.2 spacing fits 89 that way (five staggered rows of 13 and 12, then two
 straight rows of 13) against 88 staggered throughout.
 
+Lattice's pairs phase also tiles the strip its grid leaves with one best-fit pair as a grid, and
+tries a strip narrower than the part's bounding box when the part fits it turned (the least width
+of its convex hull); the grid replaces the rows of pairs only when it places more. Its candidates
+are ranked by grid count alone and it stops after ten in a row fail to improve, so it then also
+tries the skipped candidates whose grid plus an optimistic estimate of their leftover strips could
+still win, keeping one only when it places more parts; the estimate counts parts by their true
+area, not their bounding box. An 8" gusset on a 16.85 x 60 strip fills 20 that way: six pairs slid
+along their hypotenuse in an 8.75" column, and eight gussets at 45 degrees zigzagging up the strip
+beside it, against 14 in a 10.35" column of seven pairs.
+
 Lattice's last strategy, TiltedRemnant, adds tilted parts beside the best layout when the room
 left past it on the right or top is too narrow for the part at 0 or 90 degrees, such as a long
 part beside a grid of the same part turned 90 degrees. It moves the layout flush to the low end

@@ -33,6 +33,10 @@ namespace OpenNest.Engine.Tests.Jobs;
 /// The learned-angle nests were re-captured when the best-fit aspect limit began allowing a
 /// part's own aspect: the long bar now nests as an interlocked pair, and the notched quantity
 /// dropped from 6 to 4 so the Fill nest still differs from a full sweep.
+/// The mixed Fill and Strip nests were re-captured when the pairs phase began tiling its leftover
+/// strip with pair grids (and strips narrower than the part's bounding box) and trying skipped
+/// candidates whose remnant could win: Fill now places 34 instead of 33, and Strip keeps 35 with
+/// its L-shapes laid out differently (both layouts pass NestLayoutCheck).
 /// Not pinned: richer mixes that pair parallelogram, chevron or tee parts at oblique angles
 /// with other irregular items. Their Fill and Vertical Remnant nests vary between runs, most
 /// likely because best-fit pair candidates are gathered in a <c>ConcurrentBag</c> and equal
@@ -276,8 +280,8 @@ public class FillStackCharacterizationTests
     }
 
     [Theory]
-    [InlineData("Fill", 33, "5F41788D261A5085")]
-    [InlineData("Strip", 35, "865B16D4365A2492")]
+    [InlineData("Fill", 34, "D3D54E9116D96ACF")]
+    [InlineData("Strip", 35, "D5A35DDDE6A5B36A")]
     [InlineData("Vertical Remnant", 35, "8CC17C7708C8049F")]
     [InlineData("Horizontal Remnant", 30, "A0700052AE771E06")]
     public void Nest_MixedIrregularItems_PinnedLayout(
