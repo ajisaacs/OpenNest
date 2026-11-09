@@ -109,19 +109,33 @@ public static class NestPdfWriter
         title.Format.Font.Bold = true;
         title.Format.SpaceAfter = Unit.FromPoint(6);
 
-        var info = AddTable(section, 130, 410);
-        info.Borders.Visible = false;
-        AddInfoRow(info, "Nest:", snapshot.Name);
+        // Two key/value columns keep the header short so more part cards fit on the first page:
+        // the job and material on the left, the report's totals on the right.
+        var left = new List<(string Key, string Value)> { ("Nest:", snapshot.Name) };
         if (snapshot.Customer.Length > 0)
-            AddInfoRow(info, "Customer:", snapshot.Customer);
-        AddInfoRow(info, "Material:", Material(snapshot));
-        AddInfoRow(info, "Thickness:", Thickness(snapshot));
-        AddInfoRow(info, "Units:", snapshot.Units == "mm" ? "millimeters (mm)" : "inches (in)");
-        AddInfoRow(info, "Generated:", snapshot.GeneratedAt.ToString("yyyy-MM-dd HH:mm zzz", Invariant));
-        AddInfoRow(info, "Distinct layouts:", snapshot.Plates.Length.ToString(Invariant));
-        AddInfoRow(info, "Total physical sheets:", snapshot.TotalSheets.ToString(Invariant));
+            left.Add(("Customer:", snapshot.Customer));
+        left.Add(("Material:", Material(snapshot)));
+        left.Add(("Thickness:", Thickness(snapshot)));
+        left.Add(("Units:", snapshot.Units == "mm" ? "millimeters (mm)" : "inches (in)"));
+        var right = new List<(string Key, string Value)>
+        {
+            ("Generated:", snapshot.GeneratedAt.ToString("yyyy-MM-dd HH:mm zzz", Invariant)),
+            ("Distinct layouts:", snapshot.Plates.Length.ToString(Invariant)),
+            ("Total physical sheets:", snapshot.TotalSheets.ToString(Invariant)),
+        };
         if (snapshot.TotalCutTime is { } total)
-            AddInfoRow(info, "Estimated cut time:", Duration(total) + " (all sheets)");
+            right.Add(("Estimated cut time:", Duration(total) + " (all sheets)"));
+
+        var info = AddTable(section, 72, 182, 136, 150);
+        info.Borders.Visible = false;
+        // The left column always has at least as many rows as the right.
+        for (var index = 0; index < left.Count; index++)
+        {
+            string[] cells = index < right.Count
+                ? [left[index].Key, left[index].Value, right[index].Key, right[index].Value]
+                : [left[index].Key, left[index].Value];
+            AddInfoRow(info, cells);
+        }
         if (snapshot.Notes.Length > 0)
         {
             // Free paragraphs split across pages; a table row taller than a page would be clipped.
