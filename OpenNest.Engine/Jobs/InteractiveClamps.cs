@@ -140,15 +140,21 @@ internal static class InteractiveClamps
         return holes;
     }
 
+    // Built from lines, never a program: a program's opening rapid from the origin would join
+    // the outline and stretch the keep-out into a wedge back to (0, 0), rejecting clear parts.
     private static List<Entity> RectangleEntities(Box box)
     {
-        var program = new Program();
-        program.MoveTo(box.Left, box.Bottom);
-        program.LineTo(box.Right, box.Bottom);
-        program.LineTo(box.Right, box.Top);
-        program.LineTo(box.Left, box.Top);
-        program.LineTo(box.Left, box.Bottom);
-        return ConvertProgram.ToGeometry(program);
+        var bottomLeft = new Vector(box.Left, box.Bottom);
+        var bottomRight = new Vector(box.Right, box.Bottom);
+        var topRight = new Vector(box.Right, box.Top);
+        var topLeft = new Vector(box.Left, box.Top);
+        return new List<Entity>
+        {
+            new Line(bottomLeft, bottomRight),
+            new Line(bottomRight, topRight),
+            new Line(topRight, topLeft),
+            new Line(topLeft, bottomLeft),
+        };
     }
 
     private static Box Copy(Box box) => new(box.X, box.Y, box.Length, box.Width);

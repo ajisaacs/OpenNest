@@ -294,4 +294,16 @@ public class TinyClampZoneTests
         Assert.NotEmpty(ClampViolations(job, result));
         Assert.True(InteractiveClamps.MaterialInKeepOut(new Part(new Drawing("notch", program)), zone));
     }
+
+    // A rail clamp inflated by its clearance reaches below the sheet's origin. The keep-out
+    // once kept its program's opening rapid from (0, 0), a wedge that rejected parts clear of
+    // the clamp along the edge toward the origin. The square is 1 clear of the keep-out.
+    [Theory]
+    [InlineData(10, 0.1, false)]
+    [InlineData(12.5, 0.1, true)]
+    public void InteractiveKeepOutHasNoWedgeBackToTheOrigin(double x, double y, bool overlaps)
+    {
+        var part = new Part(new Drawing("square", SquareProgram()), new Vector(x, y));
+        Assert.Equal(overlaps, InteractiveClamps.MaterialInKeepOut(part, new Box(13, -0.25, 2, 1.125)));
+    }
 }
