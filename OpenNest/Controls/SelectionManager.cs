@@ -350,6 +350,9 @@ namespace OpenNest.Controls
                 var fixedPairs = result.FlaggedPairs - result.RemainingPairs;
                 view.Status = $"Fixed {fixedPairs} of {Pairs(result.FlaggedPairs)} - moved {result.MovedParts.Count} "
                     + $"part{(result.MovedParts.Count == 1 ? "" : "s")}, largest move {result.LargestMove:0.####}"
+                    + (result.TurnedParts.Count > 0
+                        ? $", {result.TurnedParts.Count} tilted up to {OpenNest.Math.Angle.ToDegrees(result.LargestTurn):0.##} deg"
+                        : "")
                     + (result.RemainingPairs > 0 ? $" - {Pairs(result.RemainingPairs)} left" : "");
             }
 

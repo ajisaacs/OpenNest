@@ -2,8 +2,8 @@
 
 `Plate > Fix Spacing` clears the pairs the overlap check flags (parts sharing material, and
 parts closer than the plate's `PartSpacing`, or than their kerf for common-line partners) with
-the smallest moves it can find. It moves parts by translation only and never changes
-`PartSpacing` or `EdgeSpacing`. Unlike [Expand Spacing](expand-spacing.md) it needs no
+the smallest moves it can find. It moves parts by translation, tilts them slightly only as a
+last resort (below), and never changes `PartSpacing` or `EdgeSpacing`. Unlike [Expand Spacing](expand-spacing.md) it needs no
 selection and does not open up the rest of the layout: parts nothing crowds stay where they
 are. With parts selected, only flagged pairs that include a selected part are fixed. The
 engine entry point is `SpacingFixer.Fix`.
@@ -24,9 +24,15 @@ coarser for speed; that understates gaps, so a push errs slightly long.
    pair is pushed apart along the normal between its closest points, the shortfall shared
    between its two parts; a part held by the work-area edge or locked passes its share to the
    other. Passes repeat until every gap holds, so the moves can differ in direction (one part
-   right and up, its partner down and left). Relaxation cannot separate parts that overlap or
-   touch, since they have no normal; straight chains handle those. A move under 0.0001 that the
-   layout does not need is undone.
+   right and up, its partner down and left). Parts that share material have no contact normal;
+   they are pushed along their shortest straight way out (16 directions) instead. A move under
+   0.0001 that the layout does not need is undone.
+3. **Tilt.** When moves alone cannot settle, the relaxation runs again as a rigid one: a push
+   at a contact off a part's center also turns it about that center, by up to
+   `SpacingFixer.DefaultMaxTilt` (3 degrees) from where it started. Only parts whose drawing is
+   free to rotate tilt (no rotation constraints, or a full turn allowed); the rest only move.
+   A tilted part's lead-ins turn with it. The status bar names how many parts tilted and by
+   how much. Moves are always tried first: tilting turns every part the push reaches.
 
 A pair's **floor** is its required gap, or its gap before the fix when that is already
 smaller (another flagged pair never gets worse), less 0.00001 of rounding allowance.

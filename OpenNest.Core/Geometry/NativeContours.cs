@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -66,10 +67,15 @@ namespace OpenNest.Geometry
             other.InMaterial(perimeter.Vertices[0]) || InMaterial(other.perimeter.Vertices[0]);
 
         /// <summary>These contours moved by <paramref name="offset"/>, reusing the flattening.</summary>
-        public NativeContours Translated(Vector offset)
+        public NativeContours Translated(Vector offset) => Transformed(0, offset);
+
+        /// <summary>These contours turned by <paramref name="angle"/> (radians) about the origin,
+        /// then moved by <paramref name="offset"/>, reusing the flattening: a rigid turn keeps
+        /// every chord within its tolerance.</summary>
+        public NativeContours Transformed(double angle, Vector offset)
         {
-            var moved = Moved(perimeter, offset);
-            var movedHoles = holes.Select(hole => Moved(hole, offset)).ToList();
+            var moved = Moved(perimeter, angle, offset);
+            var movedHoles = holes.Select(hole => Moved(hole, angle, offset)).ToList();
             return new NativeContours
             {
                 perimeter = moved,
@@ -80,10 +86,18 @@ namespace OpenNest.Geometry
             };
         }
 
-        private static Polygon Moved(Polygon polygon, Vector offset)
+        private static Polygon Moved(Polygon polygon, double angle, Vector offset)
         {
             var moved = new Polygon();
-            moved.Vertices.AddRange(polygon.Vertices.Select(vertex => vertex + offset));
+            if (angle == 0)
+                moved.Vertices.AddRange(polygon.Vertices.Select(vertex => vertex + offset));
+            else
+            {
+                var cos = PortableMath.Cos(angle);
+                var sin = PortableMath.Sin(angle);
+                moved.Vertices.AddRange(polygon.Vertices.Select(vertex =>
+                    new Vector(vertex.X * cos - vertex.Y * sin + offset.X, vertex.X * sin + vertex.Y * cos + offset.Y)));
+            }
             moved.UpdateBounds();
             return moved;
         }
