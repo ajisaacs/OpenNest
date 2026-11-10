@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Configuration;
 using System.IO;
-using System.Text.Json;
+using OpenNest.Data;
 
 namespace OpenNest.Properties
 {
@@ -20,8 +20,6 @@ namespace OpenNest.Properties
     /// </remarks>
     public sealed class AppDataSettingsProvider : SettingsProvider
     {
-        private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
-
         private readonly string _path;
         private readonly Func<SettingsProvider> _legacyProvider;
 
@@ -40,9 +38,7 @@ namespace OpenNest.Properties
         internal static string PathOverride { get; set; }
 
         /// <summary>%APPDATA%\OpenNest\user-settings.json.</summary>
-        public static string DefaultPath => PathOverride ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "OpenNest", "user-settings.json");
+        public static string DefaultPath => PathOverride ?? UserSettingsFile.DefaultPath;
 
         public override string ApplicationName { get; set; } = "OpenNest";
 
@@ -91,19 +87,7 @@ namespace OpenNest.Properties
             Write(stored);
         }
 
-        private Dictionary<string, string> Load()
-        {
-            try
-            {
-                return File.Exists(_path)
-                    ? JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(_path)) ?? new()
-                    : new();
-            }
-            catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
-            {
-                return new();
-            }
-        }
+        private Dictionary<string, string> Load() => UserSettingsFile.Read(_path);
 
         private Dictionary<string, string> Migrate(SettingsContext context, SettingsPropertyCollection collection)
         {
@@ -135,19 +119,8 @@ namespace OpenNest.Properties
             return stored;
         }
 
-        private void Write(Dictionary<string, string> stored)
-        {
-            try
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_path)));
-                var temp = _path + ".tmp";
-                File.WriteAllText(temp, JsonSerializer.Serialize(stored, JsonOptions));
-                File.Move(temp, _path, overwrite: true);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                // Settings are a convenience: keep running with the in-memory values.
-            }
-        }
+        // Settings are a convenience: a failed write keeps running with the in-memory values.
+        private void Write(Dictionary<string, string> stored) =>
+            UserSettingsFile.Write(_path, stored);
     }
 }
