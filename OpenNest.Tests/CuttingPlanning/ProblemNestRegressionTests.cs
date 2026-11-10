@@ -245,19 +245,22 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
                 continue;
             }
 
+            // Shaped like the planning test's line, so a nightly runner parses every area alike.
+            var subject = strategy == PlateFillService.DefaultStrategy
+                ? $"{name} plate {number}" : $"{name} plate {number} ({strategy})";
             var watch = Stopwatch.StartNew();
             var (parts, problem) = Fill(strategy, plate, drawings[0], limit);
             var expected = listed ? counts[number] : (int?)null;
-            output.WriteLine($"{label}: plate {number} {problem ?? $"{parts} parts"} (baseline {expected?.ToString() ?? "none"}), "
+            output.WriteLine($"{subject}: {problem ?? $"{parts} parts"} (baseline {expected?.ToString() ?? "none"}), "
                 + $"{watch.Elapsed.TotalSeconds:0.0} s");
             if (problem != null)
             {
-                failures.Add($"{label} plate {number}: {problem}");
+                failures.Add($"{subject}: {problem}");
                 continue;
             }
             observed[number] = parts.ToString();
             if (parts < expected)
-                failures.Add($"{label} plate {number}: {parts} parts, worse than baseline {expected}.");
+                failures.Add($"{subject}: {parts} parts, worse than baseline {expected}.");
             else if (parts > expected)
                 output.WriteLine($"  better than {expected}; update the baseline.");
         }

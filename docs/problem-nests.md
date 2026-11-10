@@ -76,7 +76,8 @@ plate's parts are removed (its cut-offs stay), and the strategy fills the plate'
 the plate's one drawing at unlimited quantity, using the plate's own size, spacing, edge spacing,
 quadrant and clamps as saved. Lattice fills unless the line names another strategy in
 parentheses: `fill (Strip): 1=33`. Each plate prints one line:
-`<nest>: plate 1 33 parts (baseline 33), 61.2 s`.
+`<nest> plate 1: 33 parts (baseline 33), 61.2 s`, or `<nest> plate 1 (Strip): ...` for another
+strategy, shaped like the planning test's line so a nightly runner parses every area alike.
 
 A plate fails when it places fewer parts than its baseline, its layout breaks the layout check
 (bounds, spacing, clamps), or the fill times out (the same per-plate limit as planning: 120 s, or
