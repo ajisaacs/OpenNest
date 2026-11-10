@@ -356,23 +356,21 @@ public static class NestPdfWriter
         var overview = AddReservedArea(section, plan.Size.Height);
         areas.Add((overview, [(gfx, _) => DrawRulers(gfx, plate, plan, snapshot.Units), (gfx, _) => DrawView(gfx, plate, plan)]));
 
-        var legend = section.AddParagraph("Filled outlines are closed parts; open material paths such as tab gaps are shown without fill. Dashed lines are scrap cutoffs.");
-        legend.Format.Font.Size = 7.5;
-        legend.Format.SpaceBefore = Unit.FromPoint(4);
+        var notes = new List<string>();
         if (plate.Clamps.Length > 0)
-        {
-            var clamps = section.AddParagraph(plate.Clamps.Any(clamp => clamp.Removed)
+            notes.Add(plate.Clamps.Any(clamp => clamp.Removed)
                 ? "Hatched rectangles are machine clamps. A dashed rectangle crossed out is a clamp to remove before cutting."
                 : "Hatched rectangles are machine clamps.");
-            clamps.Format.Font.Size = 7.5;
+        notes.Add($"Rulers show sheet coordinates in {UnitsName(snapshot)}.");
+        for (var i = 0; i < notes.Count; i++)
+        {
+            var note = section.AddParagraph(notes[i]);
+            note.Format.Font.Size = 7.5;
+            if (i == 0)
+                note.Format.SpaceBefore = Unit.FromPoint(4);
+            if (i == notes.Count - 1)
+                note.Format.SpaceAfter = Unit.FromPoint(4);
         }
-        var rulers = section.AddParagraph($"Rulers show sheet coordinates in {UnitsName(snapshot)}.");
-        rulers.Format.Font.Size = 7.5;
-        var labelsNote = section.AddParagraph("Part IDs are shown where space permits. A dotted outline groups like parts under one ID.");
-        labelsNote.Format.Font.Size = 7.5;
-        var approval = section.AddParagraph("Verify geometry and CNC output separately before cutting.");
-        approval.Format.Font.Size = 7.5;
-        approval.Format.SpaceAfter = Unit.FromPoint(4);
 
         var names2 = snapshot.Drawings.ToDictionary(drawing => drawing.Id, drawing => drawing.Name, StringComparer.Ordinal);
         var perSheet = plate.Parts.GroupBy(part => part.ReportId, StringComparer.Ordinal)

@@ -72,7 +72,9 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Matches(@"3\s+Bracket\s+1\s+2", plate);
         Assert.DoesNotMatch(@"(?m)^4\s+Unplaced", plate);
         Assert.DoesNotContain("Cutoff test", plate + summary);
-        Assert.Contains("Verify geometry and CNC output separately", plate);
+        Assert.DoesNotContain("Verify geometry and CNC output separately", plate);
+        Assert.DoesNotContain("Filled outlines are closed parts", plate);
+        Assert.DoesNotContain("Part IDs are shown where space permits", plate);
         Assert.Contains("Page 2 of 2", plate);
 
         // Repeated export of the same snapshot is textually identical.

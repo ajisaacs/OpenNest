@@ -192,7 +192,6 @@ public sealed class NestPdfLayoutTests : IDisposable
         var path = Write(nest);
         var pages = ReportPdf.Pages(path);
         Assert.Equal(2, pages.Length);
-        Assert.Contains("A dotted outline groups like parts under one ID", pages[1]);
         Assert.DoesNotContain("detail", pages[1]);
         using var pdf = PdfReader.Open(path, PdfDocumentOpenMode.Import);
         var diagram = ReportPdf.ContentStreams(pdf.Pages[1]).Last();
