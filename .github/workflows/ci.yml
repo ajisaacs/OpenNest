@@ -32,7 +32,7 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - name: Run ${{ matrix.project }}
-        run: dotnet test "${{ matrix.project }}/${{ matrix.project }}.csproj"
+        run: dotnet test "${{ matrix.project }}/${{ matrix.project }}.csproj" -c Release
 
   synthetic-nests:
     name: Six synthetic Irregular nests
