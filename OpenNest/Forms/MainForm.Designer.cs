@@ -152,6 +152,7 @@ namespace OpenNest.Forms
             toolStripMenuItem24 = new System.Windows.Forms.ToolStripSeparator();
             mnuPlatePatternTile = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateExpandSpacing = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateFixSpacing = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItemCommonLine = new System.Windows.Forms.ToolStripSeparator();
             mnuPlateJoinCommonLine = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateRemoveCommonLine = new System.Windows.Forms.ToolStripMenuItem();
@@ -949,7 +950,7 @@ namespace OpenNest.Forms
             //
             // mnuPlateArrange
             //
-            mnuPlateArrange.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateAlignLeft, mnuPlateAlignRight, mnuPlateAlignTop, mnuPlateAlignBottom, toolStripMenuItem11, mnuPlateAlignHorizontal, mnuPlateAlignVertically, toolStripMenuItem8, mnuPlateEvenlySpaceHorizontal, mnuPlateEvenlySpaceVertical, toolStripMenuItem23, centerPartsToolStripMenuItem, toolStripMenuItem24, mnuPlatePatternTile, mnuPlateExpandSpacing, toolStripMenuItemCommonLine, mnuPlateJoinCommonLine, mnuPlateRemoveCommonLine, mnuPlateCutCommonLinesTwice });
+            mnuPlateArrange.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateAlignLeft, mnuPlateAlignRight, mnuPlateAlignTop, mnuPlateAlignBottom, toolStripMenuItem11, mnuPlateAlignHorizontal, mnuPlateAlignVertically, toolStripMenuItem8, mnuPlateEvenlySpaceHorizontal, mnuPlateEvenlySpaceVertical, toolStripMenuItem23, centerPartsToolStripMenuItem, toolStripMenuItem24, mnuPlatePatternTile, mnuPlateExpandSpacing, mnuPlateFixSpacing, toolStripMenuItemCommonLine, mnuPlateJoinCommonLine, mnuPlateRemoveCommonLine, mnuPlateCutCommonLinesTwice });
             mnuPlateArrange.Name = "mnuPlateArrange";
             mnuPlateArrange.Size = new System.Drawing.Size(177, 22);
             mnuPlateArrange.Text = "Arrange";
@@ -1051,6 +1052,14 @@ namespace OpenNest.Forms
             mnuPlateExpandSpacing.Size = new System.Drawing.Size(209, 22);
             mnuPlateExpandSpacing.Text = "Expand Spacing";
             mnuPlateExpandSpacing.Click += ExpandSpacing_Click;
+            //
+            // mnuPlateFixSpacing
+            //
+            mnuPlateFixSpacing.Name = "mnuPlateFixSpacing";
+            mnuPlateFixSpacing.Size = new System.Drawing.Size(209, 22);
+            mnuPlateFixSpacing.Text = "Fix Spacing";
+            mnuPlateFixSpacing.ToolTipText = "Push apart only the overlapping or too-close parts, rippling into the parts they crowd";
+            mnuPlateFixSpacing.Click += FixSpacing_Click;
             //
             // toolStripMenuItemCommonLine
             //
@@ -1578,6 +1587,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuToolsBestFitViewer;
         private System.Windows.Forms.ToolStripMenuItem mnuPlatePatternTile;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateExpandSpacing;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateFixSpacing;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItemCommonLine;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateJoinCommonLine;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateRemoveCommonLine;

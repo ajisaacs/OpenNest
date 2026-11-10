@@ -1,6 +1,6 @@
 # Expand Spacing
 
-`Plate > Expand Spacing` moves selected parts by translation only. The first selected part is the anchor for selected pairs; the later selected member moves, and nonselected parts remain fixed. The plate retains its own `EdgeSpacing` floor; the command does not change `PartSpacing` or `EdgeSpacing`.
+`Plate > Expand Spacing` moves selected parts by translation only. The first selected part is the anchor for selected pairs; the later selected member moves, and nonselected parts remain fixed. The plate retains its own `EdgeSpacing` floor; the command does not change `PartSpacing` or `EdgeSpacing`. To push apart only the parts the overlap check flags, use [Fix Spacing](fix-spacing.md).
 
 ## Repeating patterns
 

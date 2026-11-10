@@ -28,10 +28,15 @@ namespace OpenNest.Geometry
         public Box Bounds { get; private set; }
 
         /// <summary>Flattens <paramref name="profile"/> (already rotated) at <paramref name="location"/>.</summary>
-        public static NativeContours Of(ShapeProfile profile, Vector location)
+        public static NativeContours Of(ShapeProfile profile, Vector location) =>
+            Of(profile, location, ChordTolerance);
+
+        /// <summary>As <see cref="Of(ShapeProfile, Vector)"/> at a coarser
+        /// <paramref name="chordTolerance"/>, for searches that confirm their answer at the fine one.</summary>
+        public static NativeContours Of(ShapeProfile profile, Vector location, double chordTolerance)
         {
-            var perimeter = World(profile.Perimeter, location);
-            var holes = profile.Cutouts.Select(cutout => World(cutout, location)).ToList();
+            var perimeter = World(profile.Perimeter, location, chordTolerance);
+            var holes = profile.Cutouts.Select(cutout => World(cutout, location, chordTolerance)).ToList();
             return new NativeContours
             {
                 perimeter = perimeter,
@@ -52,7 +57,35 @@ namespace OpenNest.Geometry
             if (GapTo(other, spacing, out _) < spacing - SpacingOutline.SpacingSlack)
                 return true;
             // No boundaries meet, so either part is wholly inside or outside the other's material.
-            return other.InMaterial(perimeter.Vertices[0]) || InMaterial(other.perimeter.Vertices[0]);
+            return Nested(other);
+        }
+
+        /// <summary>True when a vertex of either part lies in the other's material rather than in
+        /// a cutout or outside: with no boundary crossing, one part is inside the other.</summary>
+        public bool Nested(NativeContours other) =>
+            other.InMaterial(perimeter.Vertices[0]) || InMaterial(other.perimeter.Vertices[0]);
+
+        /// <summary>These contours moved by <paramref name="offset"/>, reusing the flattening.</summary>
+        public NativeContours Translated(Vector offset)
+        {
+            var moved = Moved(perimeter, offset);
+            var movedHoles = holes.Select(hole => Moved(hole, offset)).ToList();
+            return new NativeContours
+            {
+                perimeter = moved,
+                holes = movedHoles,
+                perimeterLines = moved.ToLines(),
+                holeLines = movedHoles.Select(hole => hole.ToLines()).ToList(),
+                Bounds = moved.BoundingBox,
+            };
+        }
+
+        private static Polygon Moved(Polygon polygon, Vector offset)
+        {
+            var moved = new Polygon();
+            moved.Vertices.AddRange(polygon.Vertices.Select(vertex => vertex + offset));
+            moved.UpdateBounds();
+            return moved;
         }
 
         /// <summary>Closest boundary approach between two parts, including a part inside the other's
@@ -61,8 +94,18 @@ namespace OpenNest.Geometry
         /// skipped. Infinity when no edges are that near.</summary>
         public double GapTo(NativeContours other, double reach, out Vector marker)
         {
+            var gap = GapTo(other, reach, out var onThis, out var onOther);
+            marker = double.IsPositiveInfinity(gap) ? Bounds.Center : (onThis + onOther) * 0.5;
+            return gap;
+        }
+
+        /// <summary>As <see cref="GapTo(NativeContours, double, out Vector)"/>, returning the closest
+        /// points themselves: the gap runs from <paramref name="onOther"/> to <paramref name="onThis"/>.</summary>
+        public double GapTo(NativeContours other, double reach, out Vector onThis, out Vector onOther)
+        {
             var best = double.PositiveInfinity;
-            var middle = Bounds.Center;
+            var bestThis = Bounds.Center;
+            var bestOther = Bounds.Center;
             var perimeterA = Near(perimeterLines, other.Bounds, reach);
             var perimeterB = Near(other.perimeterLines, Bounds, reach);
             Measure(perimeterA, perimeterB);
@@ -70,7 +113,8 @@ namespace OpenNest.Geometry
                 Measure(Near(hole, other.Bounds, reach), perimeterB);
             foreach (var hole in other.holeLines)
                 Measure(perimeterA, Near(hole, Bounds, reach));
-            marker = middle;
+            onThis = bestThis;
+            onOther = bestOther;
             return best;
 
             void Measure(List<Line> ringA, List<Line> ringB)
@@ -81,7 +125,8 @@ namespace OpenNest.Geometry
                 if (distance < best)
                 {
                     best = distance;
-                    middle = (onA + onB) * 0.5;
+                    bestThis = onA;
+                    bestOther = onB;
                 }
             }
         }
@@ -96,9 +141,9 @@ namespace OpenNest.Geometry
                 && System.Math.Min(line.StartPoint.Y, line.EndPoint.Y) <= other.Top + reach
                 && System.Math.Max(line.StartPoint.Y, line.EndPoint.Y) >= other.Bottom - reach).ToList();
 
-        private static Polygon World(Shape shape, Vector location)
+        private static Polygon World(Shape shape, Vector location, double chordTolerance)
         {
-            var polygon = ClipperBridge.Flatten(shape, ChordTolerance, true);
+            var polygon = ClipperBridge.Flatten(shape, chordTolerance, true);
             polygon.Offset(location);
             polygon.UpdateBounds();
             return polygon;

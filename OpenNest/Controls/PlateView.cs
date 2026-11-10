@@ -1264,6 +1264,10 @@ namespace OpenNest.Controls
             Func<Func<CancellationToken, Expander.Result>, Expander.Result> run = null
         ) => selection.ExpandSelected(run);
 
+        public SpacingFixer.Result FixSpacing(
+            Func<Func<CancellationToken, SpacingFixer.Result>, SpacingFixer.Result> run = null
+        ) => selection.FixSpacing(run);
+
         public void RotateSelectedParts(double angle) => selection.RotateSelectedParts(angle);
 
         protected override void UpdateMatrix()

@@ -103,6 +103,19 @@ public class UndoRecordingTests
         env.AssertOneUndoableEdit("Center Parts", () => env.Click("CenterParts_Click"));
     });
 
+    [Fact]
+    public void FixSpacingRecordsOneEntry() => UndoTestEnv.Run(env =>
+    {
+        env.Editor.PlateManager.LoadAt(0);
+        env.AssertOneUndoableEdit("Fix Spacing", () => env.Click("FixSpacing_Click"));
+    }, () =>
+    {
+        // The two squares on plate 0 sit 10 apart; a 12 spacing flags them.
+        var nest = UndoTestEnv.BuildNest();
+        nest.Plates[0].PartSpacing = 12;
+        return nest;
+    });
+
     // Plate
 
     [Theory]

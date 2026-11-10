@@ -73,10 +73,33 @@ namespace OpenNest.Forms
                 ShowExpandSpacingNotice("Select at least two parts on the plate to expand.");
         }
 
+        private void FixSpacing_Click(object sender, EventArgs e)
+        {
+            var editForm = activeForm;
+            if (editForm?.PlateView?.Plate == null)
+                return;
+
+            // The search reads the plate on a worker, like Expand Spacing.
+            if (IsExpandSpacingBusy(editForm))
+            {
+                ShowExpandSpacingNotice("Finish or cancel the current nesting or fill before Fix Spacing.", "Fix Spacing");
+                return;
+            }
+
+            editForm.PlateView.FixSpacing(work =>
+                OperationProgressForm.Run(
+                    this,
+                    "Fix Spacing",
+                    "Pushing apart the overlapping and too-close parts...",
+                    work
+                )
+            );
+        }
+
         // Native tests capture this notice without opening a modal dialog in session zero.
         internal System.Action<string> ExpandSpacingNotice { get; set; }
 
-        private void ShowExpandSpacingNotice(string message)
+        private void ShowExpandSpacingNotice(string message, string caption = "Expand Spacing")
         {
             if (ExpandSpacingNotice != null)
                 ExpandSpacingNotice(message);
@@ -84,7 +107,7 @@ namespace OpenNest.Forms
                 MessageBox.Show(
                     this,
                     message,
-                    "Expand Spacing",
+                    caption,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );

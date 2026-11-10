@@ -314,6 +314,51 @@ namespace OpenNest.Controls
             return true;
         }
 
+        /// <summary>
+        /// Pushes apart only the parts the overlap check flags, by just enough to reach the part
+        /// spacing, rippling into neighbors they crowd (<see cref="SpacingFixer"/>). With parts
+        /// selected, only flagged pairs touching the selection are fixed. <paramref name="run"/>
+        /// executes the search and may cancel it; a canceled run moves no part.
+        /// </summary>
+        public SpacingFixer.Result FixSpacing(
+            Func<Func<CancellationToken, SpacingFixer.Result>, SpacingFixer.Result> run = null
+        )
+        {
+            var plate = view.Plate;
+            var scope = selectedParts.Select(p => p.BasePart).ToList();
+            SpacingFixer.Result Work(CancellationToken token) => SpacingFixer.Fix(plate, scope, token);
+
+            using var change = view.BeginChange("Fix Spacing");
+            var result = run != null ? run(Work) : Work(CancellationToken.None);
+            var where = scope.Count > 0 ? " among the selected parts" : "";
+
+            if (result.Canceled)
+                view.Status = "Fix Spacing canceled - no parts were moved";
+            else if (result.FlaggedPairs == 0)
+                view.Status = $"No overlapping or too-close parts{where} to fix";
+            else if (result.MovedParts.Count == 0)
+                view.Status = $"Fix Spacing found no room to clear the {Pairs(result.FlaggedPairs)}{where}";
+            else
+            {
+                change.MarkChanged();
+                foreach (var part in view.LayoutParts)
+                    if (result.MovedParts.Contains(part.BasePart))
+                        part.IsDirty = true;
+                if (plate.CutOffs.Count > 0)
+                    plate.RegenerateCutOffs(view.CutOffSettings);
+                view.Invalidate();
+                var fixedPairs = result.FlaggedPairs - result.RemainingPairs;
+                view.Status = $"Fixed {fixedPairs} of {Pairs(result.FlaggedPairs)} - moved {result.MovedParts.Count} "
+                    + $"part{(result.MovedParts.Count == 1 ? "" : "s")}, largest move {result.LargestMove:0.####}"
+                    + (result.RemainingPairs > 0 ? $" - {Pairs(result.RemainingPairs)} left" : "");
+            }
+
+            change.Complete();
+            return result;
+
+            static string Pairs(int count) => $"{count} flagged pair{(count == 1 ? "" : "s")}";
+        }
+
         public LayoutPart GetPartAtControlPoint(Point pt)
         {
             var pt2 = view.PointControlToGraph(pt);
