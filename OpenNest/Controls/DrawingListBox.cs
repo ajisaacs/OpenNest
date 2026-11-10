@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Size = System.Drawing.Size;
 
@@ -340,26 +341,32 @@ namespace OpenNest.Controls
         {
             if (m.Msg == WM_ERASEBKGND)
             {
+                // Windows erases a resized window before WinForms hears the new size, so the
+                // cached ClientSize still holds the old one; filling to it left the newly
+                // exposed strip unpainted (and validated, so nothing repainted it later).
+                GetClientRect(Handle, out var client);
+                var clientWidth = client.Right - client.Left;
+                var clientHeight = client.Bottom - client.Top;
                 var itemBottom = 0;
 
                 if (Items.Count > 0)
                 {
                     var lastVisible = System.Math.Min(
-                        TopIndex + (ClientSize.Height / ItemHeight),
+                        TopIndex + (clientHeight / ItemHeight),
                         Items.Count - 1
                     );
                     itemBottom = GetItemRectangle(lastVisible).Bottom;
                 }
 
-                if (itemBottom < ClientSize.Height)
+                if (itemBottom < clientHeight)
                 {
                     using var g = Graphics.FromHdc(m.WParam);
                     g.FillRectangle(
                         Brushes.White,
                         0,
                         itemBottom,
-                        ClientSize.Width,
-                        ClientSize.Height - itemBottom
+                        clientWidth,
+                        clientHeight - itemBottom
                     );
                 }
 
@@ -372,6 +379,19 @@ namespace OpenNest.Controls
             if (m.Msg == WM_PAINT && IsShowingEmptyText)
                 DrawEmptyText();
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetClientRect(IntPtr hWnd, out RECT rect);
     }
 
     public static class PointExtensions
