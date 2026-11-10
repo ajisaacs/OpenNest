@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 
 namespace OpenNest.Math
 {
@@ -23,6 +24,7 @@ namespace OpenNest.Math
     /// </remarks>
     public static class PortableMath
     {
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public static double Sin(double x)
         {
             var ix = High(x) & 0x7fffffff;
@@ -44,6 +46,8 @@ namespace OpenNest.Math
                     return -KernelCos(y0, y1);
             }
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
 
         public static double Cos(double x)
         {
@@ -67,7 +71,11 @@ namespace OpenNest.Math
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+
         public static double Tan(double x) => Sin(x) / Cos(x);
+
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
 
         public static double Asin(double x)
         {
@@ -75,6 +83,8 @@ namespace OpenNest.Math
                 return double.NaN;
             return Atan2(x, System.Math.Sqrt((1 - x) * (1 + x)));
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
 
         public static double Acos(double x)
         {
@@ -113,6 +123,8 @@ namespace OpenNest.Math
             -3.65315727442169155270e-02,
             1.62858201153657823623e-02,
         };
+
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
 
         public static double Atan(double x)
         {
@@ -179,6 +191,8 @@ namespace OpenNest.Math
         private const double PiO2 = 1.5707963267948965580E+00;
         private const double Pi = 3.1415926535897931160E+00;
         private const double PiLo = 1.2246467991473531772E-16;
+
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
 
         public static double Atan2(double y, double x)
         {
@@ -279,6 +293,7 @@ namespace OpenNest.Math
         private const double S6 = 1.58969099521155010221e-10;
 
         /// <summary>sin(x + y) for |x| ≤ π/4, y the tail of x.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         private static double KernelSin(double x, double y, bool hasTail)
         {
             var ix = High(x) & 0x7fffffff;
@@ -301,6 +316,7 @@ namespace OpenNest.Math
         private const double C6 = -1.13596475577881948265e-11;
 
         /// <summary>cos(x + y) for |x| ≤ π/4, y the tail of x.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         private static double KernelCos(double x, double y)
         {
             var ix = High(x) & 0x7fffffff;
@@ -330,6 +346,7 @@ namespace OpenNest.Math
         /// <summary>
         /// Reduces x to y0 + y1 in [-π/4, π/4] and returns the number of quarter turns removed.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         private static int RemPio2(double x, out double y0, out double y1)
         {
             var hx = High(x);
