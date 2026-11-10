@@ -1,7 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:c="using:OpenNest.Avalonia.Controls"
-        xmlns:local="using:OpenNest.Avalonia"
         x:Class="OpenNest.Avalonia.MainWindow"
         Title="OpenNest (Avalonia prototype)"
         Width="1400" Height="860">
@@ -9,6 +7,8 @@
     <Menu DockPanel.Dock="Top">
       <MenuItem Header="_File">
         <MenuItem x:Name="OpenMenuItem" Header="_Open..." InputGesture="Ctrl+O" Click="OnOpen" />
+        <MenuItem x:Name="CloseMenuItem" Header="_Close" Click="OnCloseNest" />
+        <MenuItem x:Name="CloseAllMenuItem" Header="Close A_ll" Click="OnCloseAll" />
         <Separator />
         <MenuItem Header="E_xit" Click="OnExit" />
       </MenuItem>
@@ -19,6 +19,9 @@
         <MenuItem Header="Zoom to _Fit" InputGesture="F" Click="OnFit" />
         <MenuItem Header="_Previous Plate" InputGesture="PageUp" Click="OnPreviousPlate" />
         <MenuItem Header="_Next Plate" InputGesture="PageDown" Click="OnNextPlate" />
+        <Separator />
+        <MenuItem Header="Next N_est" InputGesture="Ctrl+Tab" Click="OnNextNest" />
+        <MenuItem Header="Previous Ne_st" InputGesture="Ctrl+Shift+Tab" Click="OnPreviousNest" />
       </MenuItem>
     </Menu>
 
@@ -36,25 +39,17 @@
       <TextBlock x:Name="Status" Text="Open a .nest file to begin." />
     </Border>
 
-    <Grid ColumnDefinitions="260,4,*,4,320">
-      <DockPanel Grid.Column="0">
-        <TextBlock DockPanel.Dock="Top" Margin="6,6,6,2" FontWeight="SemiBold" Text="Plates" />
-        <ListBox x:Name="PlateList" SelectionChanged="OnPlateSelected" />
-      </DockPanel>
-      <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
-      <c:PlateCanvas Grid.Column="2" x:Name="Canvas" />
-      <GridSplitter Grid.Column="3" ResizeDirection="Columns" />
-      <DockPanel Grid.Column="4">
-        <TextBlock DockPanel.Dock="Top" Margin="6,6,6,2" FontWeight="SemiBold" Text="Drawings on plate" />
-        <DataGrid x:Name="DrawingGrid" x:DataType="local:DrawingRow" IsReadOnly="True"
-                  AutoGenerateColumns="False" GridLinesVisibility="Horizontal" CanUserSortColumns="True">
-          <DataGrid.Columns>
-            <DataGridTextColumn Header="Drawing" Binding="{Binding Name}" Width="*" />
-            <DataGridTextColumn Header="Qty" Binding="{Binding Count}" />
-            <DataGridTextColumn Header="Size" Binding="{Binding Size}" />
-          </DataGrid.Columns>
-        </DataGrid>
-      </DockPanel>
-    </Grid>
+    <!-- One tab per open nest, along the bottom of the window. -->
+    <Border DockPanel.Dock="Bottom" Background="#E4E7EA">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <StackPanel x:Name="TabStrip" Orientation="Horizontal" Margin="6,0,6,6" />
+      </ScrollViewer>
+    </Border>
+
+    <Panel>
+      <TextBlock x:Name="EmptyHint" Text="Open a .nest file to begin." Foreground="#6B7280"
+                 HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="15" />
+      <ContentControl x:Name="NestHost" />
+    </Panel>
   </DockPanel>
 </Window>

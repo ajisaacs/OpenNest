@@ -15,8 +15,13 @@ namespace OpenNest.Avalonia
                 var window = new MainWindow();
                 desktop.MainWindow = window;
                 var args = desktop.Args ?? System.Array.Empty<string>();
-                if (args.Length > 0)
-                    window.OpenNest(args[0]);
+                // Each nest path before the first --option opens in its own tab; the last is shown.
+                foreach (var path in args)
+                {
+                    if (path.StartsWith("--"))
+                        break;
+                    window.OpenNest(path);
+                }
                 // --auto-nest: run Auto Nest on the opened nest (with --snapshot, before rendering).
                 if (System.Array.IndexOf(args, "--auto-nest") >= 0)
                     window.AutoNestOnOpen();

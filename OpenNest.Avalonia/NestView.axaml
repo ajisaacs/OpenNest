@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:OpenNest.Avalonia.Controls"
+             xmlns:local="using:OpenNest.Avalonia"
+             x:Class="OpenNest.Avalonia.NestView">
+  <Grid ColumnDefinitions="290,4,*">
+    <Border Grid.Column="0" Background="White">
+      <TabControl x:Name="SideTabs" Padding="0">
+        <TabItem Header="Plates" FontSize="14" MinHeight="34">
+          <ListBox x:Name="PlateList" SelectionChanged="OnPlateSelected" />
+        </TabItem>
+        <TabItem Header="Drawings" FontSize="14" MinHeight="34">
+          <DataGrid x:Name="DrawingGrid" x:DataType="local:DrawingRow" IsReadOnly="True"
+                    FontSize="13" AutoGenerateColumns="False"
+                    GridLinesVisibility="Horizontal" CanUserSortColumns="True">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Drawing" Binding="{Binding Name}" Width="*" />
+              <DataGridTextColumn Header="Nested" Binding="{Binding Nested}" />
+              <DataGridTextColumn Header="Required" Binding="{Binding Required}" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </TabItem>
+      </TabControl>
+    </Border>
+    <GridSplitter Grid.Column="1" ResizeDirection="Columns" Background="#D0D4D8" />
+    <DockPanel Grid.Column="2">
+      <Border DockPanel.Dock="Top" Padding="8,4" Background="White"
+              BorderBrush="#D0D4D8" BorderThickness="0,0,0,1">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Button Content="&#x23EE;" ToolTip.Tip="First plate" Click="OnFirstPlate" />
+          <Button Content="&#x25C0;" ToolTip.Tip="Previous plate (Page Up)"
+                  Click="OnPreviousPlate" />
+          <TextBlock x:Name="PlateLabel" VerticalAlignment="Center" FontSize="13" Margin="6,0" />
+          <Button Content="&#x25B6;" ToolTip.Tip="Next plate (Page Down)" Click="OnNextPlate" />
+          <Button Content="&#x23ED;" ToolTip.Tip="Last plate" Click="OnLastPlate" />
+        </StackPanel>
+      </Border>
+      <c:PlateCanvas x:Name="Canvas" />
+    </DockPanel>
+  </Grid>
+</UserControl>
