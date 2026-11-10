@@ -515,6 +515,9 @@ internal class PlateFiller
             return new List<Part>();
 
         var workArea = Plate.WorkArea();
+        // Clamp keep-outs (zones grown by the clamp clearance) are occupied space for the
+        // strips, the settle and the pack remnant alike, as in the Lattice orchestration.
+        var clampKeepOuts = InteractiveClamps.ClearanceRectangles(Plate);
         var fillItems = items
             .Where(item => item.Quantity != 1)
             .OrderByDescending(item => item.Priority)
@@ -546,11 +549,15 @@ internal class PlateFiller
                 token,
                 progress,
                 PlateNumber,
-                widthFillFunc
+                widthFillFunc,
+                clampKeepOuts
             );
 
             allParts.AddRange(shrinkResult.Parts);
-            Compactor.Settle(allParts, workArea, Plate.PartSpacing);
+            if (clampKeepOuts.Count > 0)
+                Compactor.Settle(allParts, Plate, workArea);
+            else
+                Compactor.Settle(allParts, workArea, Plate.PartSpacing);
             packItems.AddRange(shrinkResult.Leftovers);
         }
 
@@ -558,11 +565,12 @@ internal class PlateFiller
         if (packItems.Count > 0 && !token.IsCancellationRequested)
         {
             var packArea = workArea;
-            if (allParts.Count > 0)
+            if (allParts.Count > 0 || clampKeepOuts.Count > 0)
             {
                 var obstacles = allParts
                     .Select(part => part.BoundingBox.Offset(Plate.PartSpacing))
                     .ToList();
+                obstacles.AddRange(clampKeepOuts);
                 var finder = new RemnantFinder(workArea, obstacles);
                 var remnants = finder.FindRemnants();
                 packArea = remnants.Count > 0 ? remnants[0] : new Box(0, 0, 0, 0);

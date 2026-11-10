@@ -34,7 +34,8 @@ namespace OpenNest.Engine.Fill
             CancellationToken token = default,
             IProgress<NestProgress> progress = null,
             int plateNumber = 0,
-            Func<NestItem, Box, List<Part>> widthFillFunc = null
+            Func<NestItem, Box, List<Part>> widthFillFunc = null,
+            IEnumerable<Box> keepOuts = null
         )
         {
             if (items == null || items.Count == 0)
@@ -71,7 +72,7 @@ namespace OpenNest.Engine.Fill
                 }
             }
 
-            var filler = new RemnantFiller(workArea, spacing);
+            var filler = new RemnantFiller(workArea, spacing, keepOuts);
 
             // Track parts placed by previous items so ShrinkFiller can
             // include them in progress reports.

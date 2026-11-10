@@ -51,6 +51,36 @@ public class FixedStrategyNestingEngineTests
         Assert.Single(result.Plates);
     }
 
+    public static TheoryData<string> Strategies =>
+        new() { "Lattice", "Strip", "Vertical Remnant", "Horizontal Remnant" };
+
+    [Theory]
+    [MemberData(nameof(Strategies))]
+    public void ClampedSheet_KeepsTheClampClearance(string strategy)
+    {
+        // N26-2A5 rev 5: a 26 x 26 sheet with one rail clamp on its front edge. Strip used to
+        // lay its strips and pack its leftovers across the clamp, so the runner's validation
+        // threw every layout away.
+        var clamp = new ClampZone("clamp-1", new Box(19.25, 0, 1.5, 0.625));
+        var stock = new NestPlateStock("sheet", new Size(26, 26), 1, 0.25,
+            new Spacing(0.25, 0.25, 0.25, 0.25), 1, null, [clamp]);
+        var parts = new[]
+        {
+            new NestJobPart("stop",
+                PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(3, 1.5)), 14),
+            new NestJobPart("plate",
+                PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(4, 2.5)), 14),
+        };
+        var job = new NestJob(parts, new[] { stock }, new NestJobOptions(strategy));
+
+        var result = new FixedStrategyNestingEngine(strategy).Solve(job);
+
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        Assert.Equal(28, result.Plates.Sum(p => p.Placements.Count));
+        // NestLayoutCheck holds every part the clamp clearance away from the zone.
+        LayoutAssert.Valid(job, result);
+    }
+
     [Fact]
     public void RejectsNullOrWhitespaceStrategyAtConstruction()
     {
