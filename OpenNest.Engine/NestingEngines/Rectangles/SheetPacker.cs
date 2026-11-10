@@ -49,19 +49,36 @@ internal static class SheetPacker
     public static double PackSize(double size, double sheet) =>
         size > sheet && size <= sheet + OverhangAllowance ? sheet : size;
 
+    /// <summary>Packing bin size for a stock: its work area grown by one part spacing per axis.</summary>
+    public static (double Width, double Height) BinSize(NestPlateStock stock)
+    {
+        var work = stock.WorkArea;
+        return (work.Right - work.Left + stock.PartSpacing, work.Top - work.Bottom + stock.PartSpacing);
+    }
+
+    /// <param name="maxBinWidth">When set, a squeeze limit: bin-local packing width (box plus its
+    /// spacing tail) no box may pass, so material ends one part spacing short of it.</param>
+    /// <param name="maxBinHeight">The same limit along Y.</param>
     public static SheetPlan Pack(
         IReadOnlyList<BoxType> types, IReadOnlyList<int> remaining, NestPlateStock stock,
-        FitRule rule, PickMode mode, CancellationToken token)
+        FitRule rule, PickMode mode, CancellationToken token,
+        double? maxBinWidth = null, double? maxBinHeight = null)
     {
         var work = stock.WorkArea;
         var s = stock.PartSpacing;
-        var sheet = new MaxRectsSheet(work.Right - work.Left + s, work.Top - work.Bottom + s);
-        BlockClamps(sheet, stock, work, s);
+        var (binWidth, binHeight) = BinSize(stock);
+        // A squeeze packs a smaller bin from the same corner, exactly as on a smaller sheet (the
+        // contact rule scores its edges too); the overhang allowance and clamp side choice still
+        // measure the real sheet.
+        var sheet = new MaxRectsSheet(
+            maxBinWidth is double w && w < binWidth ? w : binWidth,
+            maxBinHeight is double h && h < binHeight ? h : binHeight);
+        BlockClamps(sheet, stock, work, s, binWidth, binHeight);
         var packTypes = types
             .Select(t => new PackType(
                 t.Priority,
                 t.Orientations
-                    .Select(o => (PackSize(o.Width + s, sheet.Width), PackSize(o.Height + s, sheet.Height)))
+                    .Select(o => (PackSize(o.Width + s, binWidth), PackSize(o.Height + s, binHeight)))
                     .ToList(),
                 t.BoxArea))
             .ToList();
@@ -104,7 +121,8 @@ internal static class SheetPacker
     /// exactly on the centerline with material inside the clamp.
     /// Empty zone lists change nothing: the free list evolves bit-identically (C2).
     /// </summary>
-    private static void BlockClamps(MaxRectsSheet sheet, NestPlateStock stock, Box work, double s)
+    private static void BlockClamps(
+        MaxRectsSheet sheet, NestPlateStock stock, Box work, double s, double binWidth, double binHeight)
     {
         if (stock.ClampZones.Count == 0)
             return;
@@ -121,7 +139,7 @@ internal static class SheetPacker
             {
                 var center = x0((b.Left + b.Right) * 0.5);
                 // D11: the interior-facing clamp edge (toward the farther sheet edge).
-                var line = center < sheet.Width * 0.5
+                var line = center < binWidth * 0.5
                     ? x0(b.Right) + clearance
                     : x0(b.Left) - clearance + s;
                 left = line;
@@ -132,7 +150,7 @@ internal static class SheetPacker
             if (top <= bottom)
             {
                 var center = y0((b.Bottom + b.Top) * 0.5);
-                var line = center < sheet.Height * 0.5
+                var line = center < binHeight * 0.5
                     ? y0(b.Top) + clearance
                     : y0(b.Bottom) - clearance + s;
                 bottom = line;

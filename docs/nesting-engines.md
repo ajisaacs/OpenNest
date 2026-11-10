@@ -12,7 +12,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 | Engine | Best for | Method |
 |---|---|---|
 | Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the engine listed first here |
-| Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; stock chosen sheet by sheet by salvage-credited look-ahead cost |
+| Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; the sheet that finishes the job is also squeezed into a shorter or narrower bin; stock chosen sheet by sheet by salvage-credited look-ahead cost |
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
 | Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan, then grouped variants that pack like parts together, then a sheet-reduction pass that packs edge parts first and turns a key part by its contacts; under a time limit it keeps trying seeded variants until the limit |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
@@ -55,6 +55,26 @@ other parts goes to Irregular and Rectangles.
 Rectangles places irregular parts validly, but only as their bounding boxes; it never nests into a
 notch or hole. Box sides account for how the layout check flattens arcs, so round-edged parts stay
 valid at box contact.
+
+#### Squeezing the last sheet
+
+The fit rules pack into the whole sheet, so when the last sheet has room to spare they spread the
+remaining parts out and rarely find the shortest strip that holds them. On N26-2A5 (14 door stops
+and 14 lock plates on a clamped 26 x 26 sheet) every rule stopped 8.0 high, while the hand layout
+holds all 28 under 7.5 and leaves a half-inch-deeper drop. So when some rule places all the
+remaining demand on a sheet, Rectangles packs that demand again into a bin cut shorter, and
+separately narrower, running every rule and mode at each size. It keeps the tightest complete
+layout along each axis that beats the whole-sheet ones, and the stock loop then picks among all of
+them by cost and offcut as before (`SheetSqueeze`).
+
+Whether a greedy packing fits is far from monotonic in the bin size (N26-2A5 packs at 7.5 but not
+at 7.62 or 7.74), so the sizes probed are stack heights, not halves of a range: sums of the parts'
+spaced sides along the axis, starting at the bin edge or at the far side of a clamp the layout
+reaches. The probes walk down from the best extent so far, spread over the probes left, and a probe
+that fails never raises the floor. With more than 2048 stack heights the walk steps through the
+size range instead. Each probe repacks every rule and mode, so the squeeze is capped by a count of
+box placements (at most 12 probes per axis and 50,000 placements in all): a sheet finishing more
+than about 2,000 parts is not squeezed. Sheets that do not finish the job are never squeezed.
 
 ### Best plan so far
 

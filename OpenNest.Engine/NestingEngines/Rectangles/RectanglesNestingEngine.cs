@@ -64,14 +64,29 @@ public sealed class RectanglesNestingEngine : INestingEngine
         {
             // Both private MaxRects modes return only after their normal demand/no-fit search;
             // neither returns partial/budget-limited output. This is not a geometric impossibility proof.
+            var plans = PackAll(stock, left, null, null);
+            foreach (var plan in plans)
+                yield return Layout(plan);
+            // A sheet that finishes the job is also tried squeezed into a shorter or narrower bin.
+            foreach (var plan in SheetSqueeze.Run(types, left, stock, plans,
+                         (width, height) => PackAll(stock, left, width, height), token))
+                yield return Layout(plan);
+        }
+
+        IReadOnlyList<SheetPlan> PackAll(NestPlateStock stock, IReadOnlyList<int> left, double? width, double? height)
+        {
+            var plans = new List<SheetPlan>(Modes.Length * Rules.Length);
             foreach (var mode in Modes)
                 foreach (var rule in Rules)
                 {
-                    var plan = SheetPacker.Pack(types, left, stock, rule, mode, token);
+                    plans.Add(SheetPacker.Pack(types, left, stock, rule, mode, token, width, height));
                     SheetPacked?.Invoke(mode);
-                    yield return new SheetLayout(stock, plan.Poses().ToArray(), plan.MaterialArea, plan.Envelope);
                 }
+            return plans;
         }
+
+        static SheetLayout Layout(SheetPlan plan) =>
+            new(plan.Stock, plan.Poses().ToArray(), plan.MaterialArea, plan.Envelope);
     }
 
     private static bool FitsStock(NestPlateStock stock, BoxOrientation o)

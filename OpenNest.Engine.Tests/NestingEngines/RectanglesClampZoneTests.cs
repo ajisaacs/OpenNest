@@ -36,8 +36,10 @@ public class RectanglesClampZoneTests
 
     [Theory]
     // Pre-clamp baseline hashes, captured from the unchanged packer at commit a3f1124 and
-    // re-captured when equal-cost sheet layouts began preferring the larger free offcut.
-    [InlineData("3D389D6B993B69634EB45FC2CB0309273DE1BCF57A7C2BD980C63B535667B0C6")]
+    // re-captured when equal-cost sheet layouts began preferring the larger free offcut, then
+    // when the finishing sheet began squeezing into a narrower bin (twelve parts now reach
+    // 20.25 along X instead of spreading over the sheet).
+    [InlineData("578D350691FF80C768BD4AE245F03863885669B7E9AB86A9CDCB0302B1F1DD01")]
     public void ZeroClampLayoutIsBitIdenticalToBaseline(string hash) =>
         Assert.Equal(hash, LayoutHash(Engine().Solve(Job(
             new[] { Part("rect", Rectangle(10, 5), 12) },
@@ -64,6 +66,13 @@ public class RectanglesClampZoneTests
         Assert.Equal(hash, LayoutHash(Engine().Solve(Job(
             new[] { Part("square", Rectangle(10, 10), 30) },
             new[] { Stock("sheet", 25, 45, spacing: 0.25) }))));
+
+    private static string[] Poses(NestJobResult result) => result.Plates
+        .SelectMany(sheet => sheet.Placements.Select(p => string.Join('|', sheet.PlateIndex, sheet.StockId, p.PartId,
+            p.X.ToString("R", CultureInfo.InvariantCulture), p.Y.ToString("R", CultureInfo.InvariantCulture),
+            p.Rotation.ToString("R", CultureInfo.InvariantCulture))))
+        .Order(StringComparer.Ordinal)
+        .ToArray();
 
     // ---- clamp avoidance ---------------------------------------------------------------
 
@@ -149,7 +158,10 @@ public class RectanglesClampZoneTests
         var plain = Engine().Solve(jobPlain);
 
         LayoutAssert.Valid(jobClamped, clamped);
-        Assert.Equal(LayoutHash(plain), LayoutHash(clamped));
+        // No part may move. The zone splits the packer's free list, so the finishing-sheet
+        // squeeze can reach the same poses through a different rule and list them in another
+        // order; compare the poses, not their order.
+        Assert.Equal(Poses(plain), Poses(clamped));
     }
 
     // ---- large part spacing vs shallow clamp spans (PM d86d22c9, decision D11) --------
