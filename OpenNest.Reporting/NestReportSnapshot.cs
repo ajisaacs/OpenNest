@@ -33,6 +33,12 @@ public sealed record ReportDrawing(string Id, string Name, long Required, long N
 
 public sealed record ReportPlacement(string ReportId, ReportGeometry Geometry);
 
+/// <summary>
+/// A machine clamp footprint in the parts' placement frame. <paramref name="Removed"/> marks a
+/// rail clamp taken off this sheet (by Auto Nest or by hand), which the operator pulls before cutting.
+/// </summary>
+public sealed record ReportClamp(string Id, ReportBounds Bounds, bool Removed);
+
 public sealed record ReportPlate(int Number, ReportBounds Bounds, int Copies, double PartSpacing,
     double Utilization, ImmutableArray<ReportPlacement> Parts, ImmutableArray<ReportGeometry> Cutoffs)
 {
@@ -44,6 +50,9 @@ public sealed record ReportPlate(int Number, ReportBounds Bounds, int Copies, do
     /// <see cref="NestReportSnapshot.WeightUnits"/>; null when the thickness or density is unknown.
     /// </summary>
     public double? Weight { get; init; }
+
+    /// <summary>Clamps on this sheet, active and removed; display only, never material.</summary>
+    public ImmutableArray<ReportClamp> Clamps { get; init; } = ImmutableArray<ReportClamp>.Empty;
 }
 
 /// <summary>A detached value snapshot. No domain objects or mutable geometry are retained.</summary>

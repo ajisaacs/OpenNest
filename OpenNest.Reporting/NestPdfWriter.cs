@@ -64,7 +64,7 @@ public static class NestPdfWriter
             ?? throw new InvalidOperationException("MigraDoc normal style is unavailable.");
         normal.Font.Name = ReportFonts.Family;
         normal.Font.Size = BodyFontSize;
-        var areas = new List<(Table Table, Action<XGraphics, XRect> Draw)>();
+        var areas = new List<(Table Table, Action<XGraphics, XRect>[] Layers)>();
         AddSummary(document, snapshot);
         for (var index = 0; index < snapshot.Plates.Length; index++)
             AddPlate(document, snapshot, snapshot.Plates[index], plans[index], areas);
@@ -74,14 +74,19 @@ public static class NestPdfWriter
         using var pdf = renderer.PdfDocument;
         // PDFsharp 6.2.4 disallows reading the page count after Save.
         var pageCount = pdf.PageCount;
-        foreach (var (page, area, draw) in LocateAreas(renderer, pageCount, areas))
+        foreach (var (page, area, layers) in LocateAreas(renderer, pageCount, areas))
         {
-            using var gfx = XGraphics.FromPdfPage(pdf.Pages[page - 1]);
-            var state = gfx.Save();
-            gfx.TranslateTransform(area.X, area.Y);
-            gfx.IntersectClip(new XRect(0, 0, area.Width, area.Height));
-            draw(gfx, area);
-            gfx.Restore(state);
+            // Each layer is its own content stream, so the diagram's stream holds only the sheet
+            // and what is on it, never the rulers around it.
+            foreach (var draw in layers)
+            {
+                using var gfx = XGraphics.FromPdfPage(pdf.Pages[page - 1]);
+                var state = gfx.Save();
+                gfx.TranslateTransform(area.X, area.Y);
+                gfx.IntersectClip(new XRect(0, 0, area.Width, area.Height));
+                draw(gfx, area);
+                gfx.Restore(state);
+            }
         }
 
         pdf.Info.Title = snapshot.Name;
@@ -116,7 +121,7 @@ public static class NestPdfWriter
             left.Add(("Customer:", snapshot.Customer));
         left.Add(("Material:", Material(snapshot)));
         left.Add(("Thickness:", Thickness(snapshot)));
-        left.Add(("Units:", snapshot.Units == "mm" ? "millimeters (mm)" : "inches (in)"));
+        left.Add(("Units:", UnitsName(snapshot)));
         var right = new List<(string Key, string Value)>
         {
             ("Generated:", snapshot.GeneratedAt.ToString("yyyy-MM-dd HH:mm zzz", Invariant)),
@@ -322,7 +327,7 @@ public static class NestPdfWriter
     };
 
     private static void AddPlate(Document document, NestReportSnapshot snapshot, ReportPlate plate,
-        DiagramView plan, List<(Table, Action<XGraphics, XRect>)> areas)
+        DiagramView plan, List<(Table, Action<XGraphics, XRect>[])> areas)
     {
         var heading = $"Plate {plate.Number} of {snapshot.Plates.Length}";
         var header = new List<string> { $"Nest report: {snapshot.Name}", heading, SheetSize(snapshot, plate) };
@@ -349,11 +354,20 @@ public static class NestPdfWriter
                 Duration(cutTime * plate.Copies) + (plate.Copies == 1 ? " (1 plate)" : $" ({plate.Copies} plates)"));
 
         var overview = AddReservedArea(section, plan.Size.Height);
-        areas.Add((overview, (gfx, _) => DrawView(gfx, plate, plan)));
+        areas.Add((overview, [(gfx, _) => DrawRulers(gfx, plate, plan, snapshot.Units), (gfx, _) => DrawView(gfx, plate, plan)]));
 
         var legend = section.AddParagraph("Filled outlines are closed parts; open material paths such as tab gaps are shown without fill. Dashed lines are scrap cutoffs.");
         legend.Format.Font.Size = 7.5;
         legend.Format.SpaceBefore = Unit.FromPoint(4);
+        if (plate.Clamps.Length > 0)
+        {
+            var clamps = section.AddParagraph(plate.Clamps.Any(clamp => clamp.Removed)
+                ? "Hatched rectangles are machine clamps. A dashed rectangle crossed out is a clamp to remove before cutting."
+                : "Hatched rectangles are machine clamps.");
+            clamps.Format.Font.Size = 7.5;
+        }
+        var rulers = section.AddParagraph($"Rulers show sheet coordinates in {UnitsName(snapshot)}.");
+        rulers.Format.Font.Size = 7.5;
         var labelsNote = section.AddParagraph("Part IDs are shown where space permits. A dotted outline groups like parts under one ID.");
         labelsNote.Format.Font.Size = 7.5;
         var approval = section.AddParagraph("Verify geometry and CNC output separately before cutting.");
@@ -387,8 +401,8 @@ public static class NestPdfWriter
         return table;
     }
 
-    private static IEnumerable<(int Page, XRect Area, Action<XGraphics, XRect> Draw)> LocateAreas(
-        PdfDocumentRenderer renderer, int pageCount, List<(Table Table, Action<XGraphics, XRect> Draw)> areas)
+    private static IEnumerable<(int Page, XRect Area, Action<XGraphics, XRect>[] Layers)> LocateAreas(
+        PdfDocumentRenderer renderer, int pageCount, List<(Table Table, Action<XGraphics, XRect>[] Layers)> areas)
     {
         var found = new (int Page, XRect Area)?[areas.Count];
         for (var page = 1; page <= pageCount; page++)
@@ -416,7 +430,7 @@ public static class NestPdfWriter
         {
             var (page, area) = found[index]
                 ?? throw new InvalidOperationException($"Report drawing area {index + 1} was not laid out.");
-            yield return (page, area, areas[index].Draw);
+            yield return (page, area, areas[index].Layers);
         }
     }
 
@@ -424,9 +438,22 @@ public static class NestPdfWriter
     {
         var fit = view.Fit;
         gfx.DrawRectangle(new XPen(XColors.Black, 1), fit.Rect(plate.Bounds));
+        // Active clamps lie under the parts; a removed clamp's area may hold parts, so its
+        // cross goes on top where the operator sees it.
+        foreach (var clamp in plate.Clamps.Where(clamp => !clamp.Removed))
+            DrawClamp(gfx, fit.Rect(clamp.Bounds));
         var outline = new XPen(XColors.Black, 0.6);
         foreach (var part in plate.Parts)
             DrawGeometry(gfx, part.Geometry, fit, outline);
+        var removed = new XPen(XColors.Black, 0.6) { DashPattern = [5, 3] };
+        var cross = new XPen(XColors.Black, 0.4);
+        foreach (var clamp in plate.Clamps.Where(clamp => clamp.Removed))
+        {
+            var box = fit.Rect(clamp.Bounds);
+            gfx.DrawRectangle(removed, box);
+            gfx.DrawLine(cross, box.TopLeft, box.BottomRight);
+            gfx.DrawLine(cross, box.TopRight, box.BottomLeft);
+        }
         // PDFsharp multiplies dash patterns by the pen width; the preset styles are so short at
         // these thin widths that they print as solid lines.
         var cutoff = new XPen(XColors.Black, 0.75) { DashPattern = [9, 3] };
@@ -441,6 +468,71 @@ public static class NestPdfWriter
             gfx.DrawRectangle(XBrushes.White, label.Box);
             gfx.DrawString(label.Id, font, XBrushes.Black, label.Box, XStringFormats.Center);
         }
+    }
+
+    /// <summary>A machine clamp: white, hatched with diagonal lines, outlined.</summary>
+    private static void DrawClamp(XGraphics gfx, XRect box)
+    {
+        const double spacing = 2.5;
+        gfx.DrawRectangle(XBrushes.White, box);
+        var state = gfx.Save();
+        gfx.IntersectClip(box);
+        var hatch = new XPen(XColors.Black, 0.35);
+        for (var offset = -box.Height; offset < box.Width; offset += spacing)
+            gfx.DrawLine(hatch, box.X + offset, box.Bottom, box.X + offset + box.Height, box.Y);
+        gfx.Restore(state);
+        gfx.DrawRectangle(new XPen(XColors.Black, 0.75), box);
+    }
+
+    /// <summary>
+    /// A horizontal ruler under the drawing and a vertical one left of it, each spanning the
+    /// sheet and reading its plate coordinates, with the units in the corner between them.
+    /// </summary>
+    private static void DrawRulers(XGraphics gfx, ReportPlate plate, DiagramView view, string units)
+    {
+        var fit = view.Fit;
+        var rulers = view.Rulers;
+        var sheet = plate.Bounds;
+        var pen = new XPen(XColors.Black, 0.5);
+        var font = NestReportDiagram.RulerFont();
+        var textHeight = font.GetHeight();
+        var low = fit.Point(sheet.Left, sheet.Top);
+        var high = fit.Point(sheet.Right, sheet.Bottom);
+        const double textBox = 100;
+
+        var baseY = rulers.Horizontal.Top;
+        var textY = baseY + NestReportDiagram.MajorTick + NestReportDiagram.RulerTextGap;
+        gfx.DrawLine(pen, low.X, baseY, high.X, baseY);
+        foreach (var value in rulers.Minors(sheet.Left, sheet.Right))
+        {
+            var x = fit.Point(value, 0).X;
+            gfx.DrawLine(pen, x, baseY, x, baseY + NestReportDiagram.MinorTick);
+        }
+        foreach (var value in rulers.Majors(sheet.Left, sheet.Right))
+        {
+            var x = fit.Point(value, 0).X;
+            gfx.DrawLine(pen, x, baseY, x, baseY + NestReportDiagram.MajorTick);
+            gfx.DrawString(rulers.Format(value), font, XBrushes.Black,
+                new XRect(x - textBox / 2, textY, textBox, textHeight), XStringFormats.TopCenter);
+        }
+
+        var baseX = rulers.Vertical.Right;
+        var textRight = baseX - NestReportDiagram.MajorTick - NestReportDiagram.RulerTextGap;
+        gfx.DrawLine(pen, baseX, low.Y, baseX, high.Y);
+        foreach (var value in rulers.Minors(sheet.Bottom, sheet.Top))
+        {
+            var y = fit.Point(0, value).Y;
+            gfx.DrawLine(pen, baseX, y, baseX - NestReportDiagram.MinorTick, y);
+        }
+        foreach (var value in rulers.Majors(sheet.Bottom, sheet.Top))
+        {
+            var y = fit.Point(0, value).Y;
+            gfx.DrawLine(pen, baseX, y, baseX - NestReportDiagram.MajorTick, y);
+            gfx.DrawString(rulers.Format(value), font, XBrushes.Black,
+                new XRect(textRight - textBox, y - textHeight / 2, textBox, textHeight), XStringFormats.CenterRight);
+        }
+        gfx.DrawString(units, font, XBrushes.Black, new XRect(textRight - textBox, textY, textBox, textHeight),
+            XStringFormats.TopRight);
     }
 
     private static string Thumbnail(ReportGeometry geometry, double width, double height)
@@ -622,6 +714,9 @@ public static class NestPdfWriter
             paragraph.AddText(lines[line]);
         }
     }
+
+    private static string UnitsName(NestReportSnapshot snapshot) =>
+        snapshot.Units == "mm" ? "millimeters (mm)" : "inches (in)";
 
     private static string Material(NestReportSnapshot snapshot)
     {

@@ -105,8 +105,41 @@ public static class NestReportBuilder
         {
             CutTime = cutParameters == null ? null : EstimateCutTime(plate, cutParameters, number),
             Weight = Weight(plate.Area(), nest, SheetDensity(nest, catalogDensity)),
+            Clamps = CaptureClamps(plate, number),
         };
     }
+
+    /// <summary>
+    /// The sheet's clamp zones, then the rail clamps taken off it, both moved into the parts'
+    /// placement frame as <see cref="ClampZoneFrame"/> does. Footprints are kept whole.
+    /// </summary>
+    private static ImmutableArray<ReportClamp> CaptureClamps(Plate plate, int number)
+    {
+        var clamps = ImmutableArray.CreateBuilder<ReportClamp>();
+        try
+        {
+            foreach (var zone in ClampZoneFrame.ToPlacement(plate))
+                clamps.Add(new ReportClamp(zone.Id, ToBounds(zone.Bounds), false));
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidOperationException($"Plate {number}: {exception.Message}", exception);
+        }
+
+        if (plate.ClampRail != null && plate.RemovedClamps.Count > 0)
+        {
+            var left = plate.Quadrant is 2 or 3 ? -plate.Size.Length : 0;
+            var bottom = plate.Quadrant is 3 or 4 ? -plate.Size.Width : 0;
+            foreach (var zone in plate.ClampRail.ResolveFor(plate.Size, plate.Quadrant))
+            {
+                if (plate.RemovedClamps.Contains(zone.Id))
+                    clamps.Add(new ReportClamp(zone.Id, ToBounds(zone.Bounds.Translate(left, bottom)), true));
+            }
+        }
+        return clamps.ToImmutable();
+    }
+
+    private static ReportBounds ToBounds(Box box) => new(box.Left, box.Bottom, box.Right, box.Top);
 
     private static void ValidatePlate(Plate plate, int number)
     {

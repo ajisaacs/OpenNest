@@ -64,6 +64,10 @@ the selected plate, or certify that a layout passed geometry/pre-post checks.
 - A plate's sheet weight is one full sheet (its outline area for an irregular
   sheet) times the nest thickness and density, from the nest material or the
   catalog only: a drawing's own material does not say what the stock is.
+- A plate's clamps are its clamp zones moved into the parts' frame with
+  `ClampZoneFrame`, then any rail clamps taken off that sheet (`RemovedClamps`,
+  resolved by the rail for the sheet), flagged as removed. Footprints stay whole,
+  even where they hang past the sheet.
 
 ## Layout, pagination and dense-label fallback
 
@@ -113,6 +117,21 @@ sits across the sheet outline. A group is omitted if its rectangle includes any
 other part or cutoff, or if even that fallback finds no place for its label.
 Clearance is tested against real contours, not bounding boxes, so a cluster nested
 in a larger part's cutout or notch is still grouped and labeled. Dotted group outlines are distinct from dashed scrap cutoffs.
+
+Machine clamps appear on the plate diagram as white, diagonally hatched
+rectangles drawn under the parts, and IDs keep clear of them like any other
+obstacle. A clamp taken off the sheet is a dashed rectangle crossed out, drawn
+over the parts (they may sit where it was) so the operator sees it must come off
+before cutting. A legend line explains them only on plates that have clamps.
+
+Rulers sit beside the diagram: a horizontal one below it and a vertical one to its
+left, each spanning the sheet and reading its plate coordinates (negative in
+quadrants 2-4) in job units, with the unit in the corner between them. Numbered
+ticks use the smallest 1-2-5 step at least 40 pt apart whose numbers do not touch,
+subdivided as finely as stays legible. The diagram is fitted in two passes so the
+ruler bands are sized to their numbers, and labels never enter those bands. The
+rulers are drawn as their own content stream before the diagram's, so the
+diagram's stream holds only the sheet and what is on it.
 
 The writer still rejects, with `NotSupportedException` and before touching
 the destination:
