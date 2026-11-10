@@ -34,7 +34,11 @@ namespace OpenNest
         private double _cachedOffsetTolerance;
         private double _cachedOffsetRotation = double.NaN;
 
+        // The label point is in the frame of the drawing program it was computed from; editing a
+        // drawing replaces that program, so the cache is kept only while the program is the same.
         private Vector? _labelPoint;
+        private CNC.Program _labelProgram;
+        private double _labelProgramRotation;
         private PointF _labelScreenPoint;
 
         internal PointF LabelScreenPoint => _labelScreenPoint;
@@ -456,8 +460,16 @@ namespace OpenNest
 
         private Vector PlacedLabelPoint()
         {
-            _labelPoint ??= ComputeLabelPoint();
-            var baseRotation = BasePart.BaseDrawing.Program.Rotation;
+            var drawingProgram = BasePart.BaseDrawing.Program;
+            var baseRotation = drawingProgram.Rotation;
+            if (_labelPoint == null
+                || !ReferenceEquals(_labelProgram, drawingProgram)
+                || _labelProgramRotation != baseRotation)
+            {
+                _labelPoint = ComputeLabelPoint();
+                _labelProgram = drawingProgram;
+                _labelProgramRotation = baseRotation;
+            }
             return _labelPoint.Value.Rotate(BasePart.Rotation - baseRotation) + BasePart.Location;
         }
 

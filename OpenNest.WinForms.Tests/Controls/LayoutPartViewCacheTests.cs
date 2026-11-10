@@ -57,6 +57,42 @@ public class LayoutPartViewCacheTests
         AssertMatchesFreshBuild(layout, view);
     }, TimeSpan.FromMinutes(1), "Layout part rebuild test timed out.");
 
+    [Fact]
+    public void LabelFollowsAReplacedDrawingProgram() => StaTestThread.Run(() =>
+    {
+        // Editing a drawing replaces its program, possibly in another frame; the part's sequence
+        // label must be found again in the new frame, not kept from the old program.
+        var drawing = new Drawing("Door stop", LShape(Vector.Zero));
+        var part = new Part(drawing, new Vector(5, 7));
+        using var view = new PlateView(ColorSchemeRegistry.Get("Workshop"));
+        view.Matrix = new Matrix(2, 0, 0, -2, 0, 0);
+        var layout = LayoutPart.Create(part, view);
+        var before = layout.LabelScreenPoint;
+
+        drawing.Program = LShape(new Vector(-10, -5));
+        layout.IsDirty = true;
+        layout.UpdateView(view);
+
+        var fresh = LayoutPart.Create(part, view);
+        Assert.NotEqual(before, fresh.LabelScreenPoint);
+        Assert.Equal(fresh.LabelScreenPoint.X, layout.LabelScreenPoint.X, 2);
+        Assert.Equal(fresh.LabelScreenPoint.Y, layout.LabelScreenPoint.Y, 2);
+        fresh.ReleaseDisplayResources();
+    }, TimeSpan.FromMinutes(1), "Layout part label test timed out.");
+
+    private static Program LShape(Vector origin)
+    {
+        var program = new Program();
+        program.MoveTo(origin.X, origin.Y);
+        program.LineTo(origin.X + 10, origin.Y);
+        program.LineTo(origin.X + 10, origin.Y + 30);
+        program.LineTo(origin.X + 40, origin.Y + 30);
+        program.LineTo(origin.X + 40, origin.Y + 40);
+        program.LineTo(origin.X, origin.Y + 40);
+        program.LineTo(origin.X, origin.Y);
+        return program;
+    }
+
     private static void AssertMatchesFreshBuild(LayoutPart layout, PlateView view)
     {
         var fresh = LayoutPart.Create(layout.BasePart, view);
