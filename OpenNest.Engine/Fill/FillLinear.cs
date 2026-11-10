@@ -128,7 +128,11 @@ namespace OpenNest.Engine.Fill
         /// geometry inflated by half-spacing — same primitive the Compactor uses — so arcs
         /// are exact and no bbox clamp is needed.
         /// </summary>
-        private double FindPatternCopyDistance(Pattern patternA, NestDirection direction, OffsetPerimeterCache cache)
+        /// <param name="useful">Farthest distance the caller can use. The search stops with
+        /// positive infinity as soon as one part pair proves the copy must move farther; the
+        /// exact distance is returned whenever it is within this bound.</param>
+        private double FindPatternCopyDistance(Pattern patternA, NestDirection direction, OffsetPerimeterCache cache,
+            double useful = double.PositiveInfinity)
         {
             if (patternA.Parts.Count == 1)
                 return FindCopyDistance(patternA.Parts[0], direction, cache);
@@ -205,6 +209,10 @@ namespace OpenNest.Engine.Fill
 
                     if (copyDist > maxCopyDistance)
                         maxCopyDistance = copyDist;
+
+                    // The copy distance is the maximum over every pair, so it can only grow.
+                    if (maxCopyDistance > useful)
+                        return double.PositiveInfinity;
                 }
             }
 
@@ -232,9 +240,10 @@ namespace OpenNest.Engine.Fill
             int maxParts = 0
         )
         {
-            var copyDistance = FindPatternCopyDistance(basePattern, direction, cache);
+            var copyDistance = FindPatternCopyDistance(basePattern, direction, cache,
+                UsefulCopyDistance(basePattern, direction, maxParts));
 
-            if (copyDistance <= 0)
+            if (copyDistance <= 0 || double.IsPositiveInfinity(copyDistance))
                 return new List<Part>();
 
             var dim = GetDimension(basePattern.BoundingBox, direction);
@@ -289,6 +298,27 @@ namespace OpenNest.Engine.Fill
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Farthest copy distance at which <see cref="TilePattern"/> can still add a part: the
+        /// first whole copy must end within the limit, or, for a multi-part pattern, one part of
+        /// it within the work area. Padded by <see cref="Tolerance.Epsilon"/> beyond the
+        /// placement checks' own tolerance, so rounding in the clones' bounds never matters.
+        /// A row tiled across a strip it already fills (Stripe's estimate rows) needs no exact
+        /// copy distance: one slide past this bound settles that nothing fits.
+        /// </summary>
+        private double UsefulCopyDistance(Pattern basePattern, NestDirection direction, int maxParts)
+        {
+            var box = basePattern.BoundingBox;
+            var useful = GetLimit(direction) - GetStart(box, direction) - GetDimension(box, direction);
+            var partial = basePattern.Parts.Count > 1 && !(maxParts > 0 && basePattern.Parts.Count >= maxParts);
+            if (partial)
+                foreach (var part in basePattern.Parts)
+                    useful = System.Math.Max(useful, direction == NestDirection.Horizontal
+                        ? WorkArea.Right - part.BoundingBox.Right
+                        : WorkArea.Top - part.BoundingBox.Top);
+            return useful + 2 * Tolerance.Epsilon;
         }
 
         /// <summary>

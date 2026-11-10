@@ -181,9 +181,10 @@ public class StripeFiller
         var spacing = _context.Plate.PartSpacing;
         var sheetSpan = GetDimension(_context.WorkArea, axis);
 
+        var bounds = new RotatedBounds(pairParts);
         var (angle, waste, count) = variant == 0
-            ? ConvergeStripeAngle(pairParts, sheetSpan, spacing, axis, _context.Token, _context.MaxQuantity)
-            : ConvergeStripeAngleShrink(pairParts, sheetSpan, spacing, axis, _context.Token, _context.MaxQuantity);
+            ? ConvergeStripeAngle(bounds, sheetSpan, spacing, axis, _context.Token, _context.MaxQuantity)
+            : ConvergeStripeAngleShrink(bounds, sheetSpan, spacing, axis, _context.Token, _context.MaxQuantity);
 
         var layout = new StripeLayout { Angle = angle, Waste = waste, Count = count };
         if (count > 0)
@@ -392,8 +393,36 @@ public class StripeFiller
         return null;
     }
 
+    /// <summary>
+    /// Bounding boxes of one pattern's parts rotated about their common center, by angle. A
+    /// box is a pure function of the parts and the angle, and the angle searches sample the
+    /// same angles over and over (every <see cref="FindAngleForTargetSpan"/> scans the same
+    /// grid), so each is built once. The parts must not change while it is in use.
+    /// </summary>
+    private sealed class RotatedBounds
+    {
+        private readonly Dictionary<double, Box> boxes = new();
+
+        public RotatedBounds(List<Part> parts) => Parts = parts;
+
+        public List<Part> Parts { get; }
+
+        public Box At(double angle)
+        {
+            if (!boxes.TryGetValue(angle, out var box))
+                boxes[angle] = box = FillHelpers.BuildRotatedPattern(Parts, angle).BoundingBox;
+            return box;
+        }
+    }
+
     public static double FindAngleForTargetSpan(
         List<Part> patternParts,
+        double targetSpan,
+        NestDirection axis
+    ) => FindAngleForTargetSpan(new RotatedBounds(patternParts), targetSpan, axis);
+
+    private static double FindAngleForTargetSpan(
+        RotatedBounds patternParts,
         double targetSpan,
         NestDirection axis
     )
@@ -445,9 +474,9 @@ public class StripeFiller
     /// Returns the rotation angle that orients the pair with its short side
     /// along the given axis. Returns 0 if already oriented, PI/2 if rotated.
     /// </summary>
-    private static double OrientShortSideAlong(List<Part> patternParts, NestDirection axis)
+    private static double OrientShortSideAlong(RotatedBounds patternParts, NestDirection axis)
     {
-        var box = FillHelpers.BuildRotatedPattern(patternParts, 0).BoundingBox;
+        var box = patternParts.At(0);
         var span0 = GetDimension(box, axis);
         var perpSpan0 = axis == NestDirection.Horizontal ? box.Width : box.Length;
 
@@ -470,6 +499,15 @@ public class StripeFiller
         NestDirection axis,
         CancellationToken token = default,
         int maxParts = 0
+    ) => ConvergeStripeAngle(new RotatedBounds(patternParts), sheetSpan, spacing, axis, token, maxParts);
+
+    private static (double Angle, double Waste, int Count) ConvergeStripeAngle(
+        RotatedBounds patternParts,
+        double sheetSpan,
+        double spacing,
+        NestDirection axis,
+        CancellationToken token,
+        int maxParts
     )
     {
         var startAngle = OrientShortSideAlong(patternParts, axis);
@@ -487,11 +525,19 @@ public class StripeFiller
         NestDirection axis,
         CancellationToken token = default,
         int maxParts = 0
+    ) => ConvergeStripeAngleShrink(new RotatedBounds(patternParts), sheetSpan, spacing, axis, token, maxParts);
+
+    private static (double Angle, double Waste, int Count) ConvergeStripeAngleShrink(
+        RotatedBounds patternParts,
+        double sheetSpan,
+        double spacing,
+        NestDirection axis,
+        CancellationToken token,
+        int maxParts
     )
     {
         var baseAngle = OrientShortSideAlong(patternParts, axis);
-        var naturalPattern = FillHelpers.BuildRotatedPattern(patternParts, baseAngle);
-        var naturalSpan = GetDimension(naturalPattern.BoundingBox, axis);
+        var naturalSpan = GetDimension(patternParts.At(baseAngle), axis);
 
         if (naturalSpan + spacing <= 0)
             return (0, double.MaxValue, 0);
@@ -508,7 +554,7 @@ public class StripeFiller
     }
 
     private static (double Angle, double Waste, int Count) ConvergeFromAngle(
-        List<Part> patternParts,
+        RotatedBounds patternParts,
         double startAngle,
         double sheetSpan,
         double spacing,
@@ -527,7 +573,7 @@ public class StripeFiller
         {
             token.ThrowIfCancellationRequested();
 
-            var rotated = FillHelpers.BuildRotatedPattern(patternParts, currentAngle);
+            var rotated = FillHelpers.BuildRotatedPattern(patternParts.Parts, currentAngle);
             var pairSpan = GetDimension(rotated.BoundingBox, axis);
             var perpDim =
                 axis == NestDirection.Horizontal
@@ -587,7 +633,7 @@ public class StripeFiller
     }
 
     private static double BisectForTarget(
-        List<Part> patternParts,
+        RotatedBounds patternParts,
         double lo,
         double hi,
         double targetSpan,
@@ -625,12 +671,12 @@ public class StripeFiller
         return bestAngle;
     }
 
-    private static double GetRotatedSpan(List<Part> patternParts, double angle, NestDirection axis)
+    private static double GetRotatedSpan(RotatedBounds patternParts, double angle, NestDirection axis)
     {
-        var rotated = FillHelpers.BuildRotatedPattern(patternParts, angle);
+        var box = patternParts.At(angle);
         return axis == NestDirection.Horizontal
-            ? rotated.BoundingBox.Length
-            : rotated.BoundingBox.Width;
+            ? box.Length
+            : box.Width;
     }
 
     private static double GetDimension(Box box, NestDirection axis)
