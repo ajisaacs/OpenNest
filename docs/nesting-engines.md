@@ -612,6 +612,10 @@ Use the [engine benchmarking guide](performance/engine-benchmarking.md) for the 
   jobs that engine targets, with every layout valid. Report cost, validity, unplaced parts and time.
 - Placement must be deterministic: no clocks, unseeded randomness or environment variables. Budget
   work by counting it; wall time may stop work only through the cancellation token.
+- Layouts must also match across platforms. Call `PortableMath` (`OpenNest.Math`) for Sin, Cos,
+  Tan, Atan, Atan2, Asin and Acos in Core, Engine, IO and Data: `System.Math` calls the C runtime,
+  whose last bit differs between Windows and Linux, and that bit was enough to nest the same job
+  differently. `PortableMathTests.LayoutProjects_UsePortableTrigOnly` fails on a runtime call.
 - Keep each engine's tests passing, including `EngineContractTests<TEngine>` (quadrants, overflow,
   priority, cancellation, stock and plate limits, determinism). Every layout in those tests is
   checked with `NestLayoutCheck`, the benchmark's validator.
