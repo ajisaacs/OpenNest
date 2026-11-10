@@ -74,6 +74,15 @@ namespace OpenNest.Avalonia
             PlateList.SelectedIndex = nest.Plates.Count > 0 ? System.Math.Clamp(selectIndex, 0, nest.Plates.Count - 1) : -1;
         }
 
+        /// <summary>
+        /// Restores the window's size, position and maximized state from the user settings the
+        /// WinForms app shares, and saves them on close. Not used for --snapshot, whose image
+        /// must not depend on the user's settings.
+        /// </summary>
+        public void RememberPlacement() =>
+            WindowPlacementBinding.Remember(
+                this, WindowPlacement.MainWindow, Data.UserSettingsFile.DefaultPath);
+
         /// <summary>Runs Auto Nest once the window opens, for --auto-nest.</summary>
         public void AutoNestOnOpen() => Opened += (_, _) => autoNest = RunAutoNestAsync();
 
