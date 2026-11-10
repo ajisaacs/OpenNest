@@ -3,7 +3,10 @@ using System.Text.RegularExpressions;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.CutOffs;
 using OpenNest.Data;
+using OpenNest.Engine;
 using OpenNest.Engine.CuttingPlanning;
+using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Engine.Sequencing;
 using OpenNest.IO;
 using Xunit.Abstractions;
@@ -37,11 +40,14 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
     /// <summary>The area of a nest whose problem was Auto Nest's layout, not its cutting plan.</summary>
     internal const string AutoNestArea = "auto-nest";
 
+    /// <summary>The area of a nest whose problem was a plate fill's layout.</summary>
+    internal const string FillArea = "fill";
+
     /// <summary>The planner areas a nest can guard; docs/problem-nests.md says which changes touch each.</summary>
     internal static readonly string[] PlannerAreas = ["part-order", "entries", "contours", "geometry-checks", "cut-offs", "grid"];
 
-    /// <summary>Every area a nest can guard: the planner's and Auto Nest's.</summary>
-    internal static readonly string[] Areas = [.. PlannerAreas, AutoNestArea];
+    /// <summary>Every area a nest can guard: the planner's, Auto Nest's and the plate fill's.</summary>
+    internal static readonly string[] Areas = [.. PlannerAreas, AutoNestArea, FillArea];
 
     /// <summary>
     /// Areas whose changes reorder the search on every plate, not just the nests tagged with them:
@@ -174,6 +180,152 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
     internal static int? SheetBaseline(string comments) =>
         CommentLine(comments, AutoNestLine) is { } line && Regex.Match(line, @"\d+") is { Success: true } count
             ? int.Parse(count.Value) : null;
+
+    /// <summary>
+    /// Fills each plate listed in the "fill: 1=33" baseline of every nest that guards
+    /// <see cref="FillArea"/> with that plate's one drawing, the way Fill Plate does: the plate's
+    /// parts are cleared and the strategy fills its work area with the plate's own size, spacing,
+    /// edge spacing, quadrant and clamps. Fails when a plate places fewer parts than its baseline,
+    /// its layout breaks the layout check or the fill times out; more parts are only reported.
+    /// </summary>
+    [SkippableFact]
+    public async Task ProblemNests_FillNoWorseThanTheirBaselines()
+    {
+        var server = Environment.GetEnvironmentVariable(ServerVariable);
+        Skip.If(string.IsNullOrWhiteSpace(server), $"Set {ServerVariable} to the OpenNest server URL to fill its problem nests.");
+        var named = Checks(Environment.GetEnvironmentVariable(ChecksVariable));
+        Skip.If(named.Length != 0 && !named.Contains(FillArea), $"{string.Join(", ", named)} does not name {FillArea}.");
+        using var repository = new RemoteNestRepository(server!);
+        var records = await ProblemNests(repository);
+        var limit = TimeSpan.FromSeconds(int.TryParse(Environment.GetEnvironmentVariable(TimeoutVariable), out var seconds)
+            && seconds > 0 ? seconds : 120);
+
+        var failures = new List<string>();
+        var filled = 0;
+        foreach (var record in records)
+        {
+            if (!Checks(CommentLine(record.Comments, ChecksLine)).Contains(FillArea))
+                continue;
+            filled++;
+            var bytes = await repository.GetFileAsync(record.Id)
+                ?? throw new InvalidOperationException($"'{record.Name}' has no file.");
+            FillAll(record.Name, bytes, FillBaseline(record.Comments), limit, failures);
+        }
+        Skip.If(filled == 0, $"No nest on {server} checks {FillArea}.");
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+    }
+
+    // Fills the baseline's plates, or every single-drawing plate when there is no baseline.
+    private void FillAll(string name, byte[] bytes, FillBaselineLine baseline, TimeSpan limit, List<string> failures)
+    {
+        using var stream = new MemoryStream(bytes);
+        var nest = new NestReader(stream).Read();
+        var strategy = baseline?.Strategy ?? PlateFillService.DefaultStrategy;
+        var label = strategy == PlateFillService.DefaultStrategy ? name : $"{name} ({strategy})";
+        // A line naming no plate is no baseline: every single-drawing plate is filled to record one.
+        var counts = baseline?.Counts ?? new Dictionary<int, int>();
+        var observed = new SortedDictionary<int, string>();
+        var mismatched = new List<string>();
+        for (var index = 0; index < nest.Plates.Count; index++)
+        {
+            var number = index + 1;
+            var listed = counts.ContainsKey(number);
+            if (counts.Count != 0 && !listed)
+                continue;
+            var plate = nest.Plates[index];
+            var drawings = plate.Parts.Select(p => p.BaseDrawing).Where(d => !d.IsCutOff)
+                .Distinct<Drawing>(ReferenceEqualityComparer.Instance).ToList();
+            if (drawings.Count != 1)
+            {
+                var why = $"plate {number} holds {drawings.Count} drawings; a fill baseline takes plates holding one";
+                if (listed)
+                    mismatched.Add(why);
+                else if (drawings.Count > 1)
+                    output.WriteLine($"{label}: skipped {why}.");
+                continue;
+            }
+
+            var watch = Stopwatch.StartNew();
+            var (parts, problem) = Fill(strategy, plate, drawings[0], limit);
+            var expected = listed ? counts[number] : (int?)null;
+            output.WriteLine($"{label}: plate {number} {problem ?? $"{parts} parts"} (baseline {expected?.ToString() ?? "none"}), "
+                + $"{watch.Elapsed.TotalSeconds:0.0} s");
+            if (problem != null)
+            {
+                failures.Add($"{label} plate {number}: {problem}");
+                continue;
+            }
+            observed[number] = parts.ToString();
+            if (parts < expected)
+                failures.Add($"{label} plate {number}: {parts} parts, worse than baseline {expected}.");
+            else if (parts > expected)
+                output.WriteLine($"  better than {expected}; update the baseline.");
+        }
+        foreach (var number in counts.Keys.Where(n => n < 1 || n > nest.Plates.Count))
+            mismatched.Add($"the nest has no plate {number}");
+
+        var line = FillLinePrefix(strategy) + " " + string.Join(" ", observed.Select(p => $"{p.Key}={p.Value}"));
+        if (mismatched.Count != 0)
+            failures.Add($"{label}: baseline plates do not match the nest's plates ({string.Join("; ", mismatched)}). "
+                + $"Observed: {line}");
+        else if (counts.Count == 0)
+            failures.Add(observed.Count == 0
+                ? $"{label} has no fill baseline and no plate holding a single drawing to fill."
+                : $"{label} has no fill baseline. Add this line to its comments: {line}");
+    }
+
+    // Fill Plate on a cleared plate: the part count, or why the fill cannot be kept.
+    private static (int Parts, string Problem) Fill(string strategy, Plate plate, Drawing drawing, TimeSpan limit)
+    {
+        // Cut-offs stay: Fill Plate fills around the plate's cut-offs.
+        for (var i = plate.Parts.Count - 1; i >= 0; i--)
+            if (!plate.Parts[i].BaseDrawing.IsCutOff)
+                plate.Parts.RemoveAt(i);
+        using var cancellation = new CancellationTokenSource(limit);
+        List<Part> parts;
+        try
+        {
+            parts = PlateFillService.FillItem(strategy, plate, new NestItem { Drawing = drawing, Quantity = 0 },
+                plate.WorkArea(), null, cancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return (0, Timeout);
+        }
+        if (cancellation.IsCancellationRequested)
+            return (parts.Count, Timeout);
+        var violations = NestLayoutCheck.Validate([(plate, parts)],
+            new Dictionary<Drawing, (string Name, int Quantity)>(ReferenceEqualityComparer.Instance)
+            {
+                [drawing] = (drawing.Name, int.MaxValue),
+            });
+        return violations.Count != 0
+            ? (parts.Count, $"invalid layout ({parts.Count} parts): " + string.Join(" | ", violations.Take(3)))
+            : (parts.Count, null);
+    }
+
+    /// <summary>A "fill: 1=33" or "fill (Strip): 1=33" baseline: the strategy and each plate's part count.</summary>
+    internal sealed record FillBaselineLine(string Strategy, IReadOnlyDictionary<int, int> Counts);
+
+    /// <summary>
+    /// The first "fill: 1=33 3=120" comment line, plate number (counted from 1) to part count, with
+    /// the strategy named in parentheses ("fill (Strip): 1=33") or Lattice; null when there is none.
+    /// An unknown strategy throws, so a misspelt line cannot quietly fill with another.
+    /// </summary>
+    internal static FillBaselineLine FillBaseline(string comments)
+    {
+        var match = (comments ?? "").Split('\n').Select(l => FillLinePattern().Match(l.Trim())).FirstOrDefault(m => m.Success);
+        if (match == null)
+            return null;
+        var strategy = match.Groups["strategy"].Success
+            ? PlateFillService.ResolveStrategy(match.Groups["strategy"].Value.Trim())
+            : PlateFillService.DefaultStrategy;
+        return new FillBaselineLine(strategy, FillEntry().Matches(match.Groups["counts"].Value)
+            .ToDictionary(m => int.Parse(m.Groups[1].Value), m => int.Parse(m.Groups[2].Value)));
+    }
+
+    internal static string FillLinePrefix(string strategy) =>
+        strategy == PlateFillService.DefaultStrategy ? $"{FillArea}:" : $"{FillArea} ({strategy}):";
 
     // Plates near their budget pass today but are the first a reordered search pushes over it.
     private void ReportNearBudget(List<(string Plate, double Share)> usage)
@@ -347,6 +499,12 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
 
     [GeneratedRegex(@"(\d+)\s*=\s*(\w+)")]
     private static partial Regex BaselineEntry();
+
+    [GeneratedRegex(@"^fill\s*(?:\((?<strategy>[^)]*)\))?\s*:(?<counts>.*)$", RegexOptions.IgnoreCase)]
+    private static partial Regex FillLinePattern();
+
+    [GeneratedRegex(@"(\d+)\s*=\s*(\d+)")]
+    private static partial Regex FillEntry();
 }
 
 public class ProblemNestBaselineTests
@@ -391,6 +549,37 @@ public class ProblemNestBaselineTests
         Assert.Equal(2, ProblemNestRegressionTests.SheetBaseline("Three sheets before the fix.\nchecks: auto-nest\nauto-nest: 2 sheets"));
         Assert.Null(ProblemNestRegressionTests.SheetBaseline("planning: 1=Ready"));
         Assert.Equal(["auto-nest"], ProblemNestRegressionTests.Checks("auto-nest"));
+    }
+
+    [Fact]
+    public void FillBaseline_ReadsPlateCountsWithLatticeByDefault()
+    {
+        var baseline = ProblemNestRegressionTests.FillBaseline(
+            "Fill placed 30 before the fix.\r\nchecks: fill\nfill: 1=33 3 = 120\nnotes");
+
+        Assert.Equal("Lattice", baseline.Strategy);
+        Assert.Equal(new Dictionary<int, int> { [1] = 33, [3] = 120 }, baseline.Counts);
+        Assert.Equal(["fill"], ProblemNestRegressionTests.Checks("fill"));
+        Assert.Equal("fill:", ProblemNestRegressionTests.FillLinePrefix(baseline.Strategy));
+    }
+
+    [Fact]
+    public void FillBaseline_ReadsTheStrategyInParentheses()
+    {
+        var baseline = ProblemNestRegressionTests.FillBaseline("Fill (strip): 2=48");
+
+        Assert.Equal("Strip", baseline.Strategy);
+        Assert.Equal(new Dictionary<int, int> { [2] = 48 }, baseline.Counts);
+        Assert.Equal("fill (Strip):", ProblemNestRegressionTests.FillLinePrefix(baseline.Strategy));
+        Assert.Throws<NotSupportedException>(() => ProblemNestRegressionTests.FillBaseline("fill (Spiral): 1=10"));
+    }
+
+    [Fact]
+    public void FillBaseline_IgnoresOtherLinesAndIsNullWithoutOne()
+    {
+        Assert.Null(ProblemNestRegressionTests.FillBaseline("Fill placed 30.\nchecks: fill\nauto-nest: 2 sheets\nplanning: 1=Ready"));
+        Assert.Null(ProblemNestRegressionTests.FillBaseline(null));
+        Assert.Empty(ProblemNestRegressionTests.FillBaseline("fill:").Counts);
     }
 
     [Fact]

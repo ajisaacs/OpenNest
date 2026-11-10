@@ -4,8 +4,8 @@ Every real nest that ever caused a problem is kept on a dedicated OpenNest serve
 nothing else, not in this repository: they carry customer geometry and names. Each nest's comments
 say what went wrong and which commit fixed it, and its `checks:` line names the areas it guards, so
 a change runs only the nests that guard what it touches: plan or nest them and confirm none got
-worse. Most guard Plan Cutting; `auto-nest` nests guard the nesting engines. Fills, the UI, posts
-and file formats never need the corpus.
+worse. Most guard Plan Cutting; `auto-nest` nests guard the nesting engines and `fill` nests the
+plate fill engine. The UI, posts and file formats never need the corpus.
 
 ## Areas
 
@@ -23,6 +23,7 @@ nest: a plate tagged with another area can still run out of budget after such a 
 | `cut-offs` | Cut-off segments in the plan (`CutOffInsertion`, `CutOffSegments`, `PlateSequencing` cut-off placement, automatic scrap cut-offs) |
 | `grid` | Large plates: the aligned-grid serpentine, or any work done once per part or per pair that would grow on thousands of parts (`CuttingGridOrder`, per-part capture and checks) |
 | `auto-nest` | Auto Nest's layout, not its cutting plan: the whole-job nesting engines (`OpenNest.Engine/NestingEngines/`) and what they share. Guarded by sheet count, not by planning |
+| `fill` | The plate fill engine: `OpenNest.Engine/Fill/`, `OpenNest.Engine/Strategies/`, `OpenNest.Engine/BestFit/`, `PlateFiller` and `PlateFillService`. Guarded by part count per plate, not by planning. Best fits also feed Auto Nest, so a best-fit change runs `auto-nest` too |
 
 A new planner area goes in `ProblemNestRegressionTests.PlannerAreas` and this table together. A misspelt area,
 in a comment or the filter, fails the run rather than skipping nests.
@@ -67,6 +68,26 @@ fewer sheets are only reported. Run it with `OPENNEST_PROBLEM_NESTS_CHECKS=auto-
 naming only planner areas skips it, and the planning test skips nests guarding only `auto-nest`
 and runs not at all for a filter naming only `auto-nest`.
 
+### Fill nests
+
+`ProblemNests_FillNoWorseThanTheirBaselines` takes the nests whose `checks:` line names `fill`
+and fills each plate its `fill: 1=33 3=120` comment line lists, the way **Fill Plate** does: the
+plate's parts are removed (its cut-offs stay), and the strategy fills the plate's work area with
+the plate's one drawing at unlimited quantity, using the plate's own size, spacing, edge spacing,
+quadrant and clamps as saved. Lattice fills unless the line names another strategy in
+parentheses: `fill (Strip): 1=33`. Each plate prints one line:
+`<nest>: plate 1 33 parts (baseline 33), 61.2 s`.
+
+A plate fails when it places fewer parts than its baseline, its layout breaks the layout check
+(bounds, spacing, clamps), or the fill times out (the same per-plate limit as planning: 120 s, or
+`OPENNEST_PROBLEM_NESTS_TIMEOUT` seconds). More parts are only reported; update the baseline.
+A fill baseline takes plates holding one drawing: a listed plate holding several, or none, or a
+plate number the nest lacks, fails and prints the observed line. A nest without the line fills
+every plate holding one drawing and fails with the line to paste. A full Lattice fill of a large
+plate takes about a minute, so run the fill area alone. Run it with
+`OPENNEST_PROBLEM_NESTS_CHECKS=fill`; a filter naming only planner areas or `auto-nest` skips it,
+and the planning and Auto Nest tests skip nests guarding only `fill`.
+
 ## Budget headroom
 
 The planner's budget counts search expansions, not time, so a plate's outcome is repeatable, but
@@ -100,7 +121,9 @@ Plates use their own cutting parameters. A plate without them uses line lead-ins
    and which commit fixed it, if any.
 3. Add a baseline line to the comments, with plate numbers counted from the first plate:
    `planning: 1=NoSolutionWithinBudget 2=BestEffort`. An Auto Nest problem takes
-   `auto-nest: 2 sheets` instead, the sheet count Auto Nest reaches today.
+   `auto-nest: 2 sheets` instead, the sheet count Auto Nest reaches today, and a fill problem
+   `fill: 1=33`, the part count each listed plate's fill reaches today (`fill (Strip): 1=33` for
+   a strategy other than Lattice). A fill plate must hold one drawing: the fill uses it.
    To get the line, save without one and run the test: the failure prints the observed line.
    Add a `checks:` line naming the [areas](#areas) the problem was in, such as `checks: part-order`.
 4. Save. Every save keeps the earlier versions, so a baseline change can be reviewed later.
