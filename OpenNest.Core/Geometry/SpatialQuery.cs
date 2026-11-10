@@ -179,7 +179,7 @@ namespace OpenNest.Geometry
             if (t1 > -Tolerance.Epsilon)
             {
                 var hitAngle = Angle.NormalizeRad(
-                    System.Math.Atan2(vy + t1 * dirY - cy, vx + t1 * dirX - cx)
+                    PortableMath.Atan2(vy + t1 * dirY - cy, vx + t1 * dirX - cx)
                 );
                 if (Angle.IsBetweenRad(hitAngle, startAngle, endAngle, reversed))
                     best = t1 > Tolerance.Epsilon ? t1 : 0;
@@ -188,7 +188,7 @@ namespace OpenNest.Geometry
             if (t2 > -Tolerance.Epsilon && t2 < best)
             {
                 var hitAngle = Angle.NormalizeRad(
-                    System.Math.Atan2(vy + t2 * dirY - cy, vx + t2 * dirX - cx)
+                    PortableMath.Atan2(vy + t2 * dirY - cy, vx + t2 * dirX - cx)
                 );
                 if (Angle.IsBetweenRad(hitAngle, startAngle, endAngle, reversed))
                     best = t2 > Tolerance.Epsilon ? t2 : 0;

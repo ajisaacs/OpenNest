@@ -102,8 +102,8 @@ namespace OpenNest.Geometry
                 return (Vector.Invalid, 0, double.MaxValue);
 
             var halfChord = chordLen / 2;
-            var radius = halfChord / System.Math.Abs(System.Math.Sin(theta));
-            var d = -halfChord / System.Math.Tan(theta);
+            var radius = halfChord / System.Math.Abs(PortableMath.Sin(theta));
+            var d = -halfChord / PortableMath.Tan(theta);
 
             var cx = (p1.X + pn.X) / 2 + d * -uy;
             var cy = (p1.Y + pn.Y) / 2 + d * ux;
@@ -116,7 +116,7 @@ namespace OpenNest.Geometry
             var len = System.Math.Sqrt(to.X * to.X + to.Y * to.Y);
             if (len < 1e-10)
                 return 0;
-            return System.Math.Atan2(ux * to.Y - uy * to.X, ux * to.X + uy * to.Y);
+            return PortableMath.Atan2(ux * to.Y - uy * to.X, ux * to.X + uy * to.Y);
         }
 
         /// <summary>
@@ -128,8 +128,8 @@ namespace OpenNest.Geometry
             var total = 0.0;
             for (var i = 0; i < points.Count - 1; i++)
             {
-                var a1 = System.Math.Atan2(points[i].Y - center.Y, points[i].X - center.X);
-                var a2 = System.Math.Atan2(points[i + 1].Y - center.Y, points[i + 1].X - center.X);
+                var a1 = PortableMath.Atan2(points[i].Y - center.Y, points[i].X - center.X);
+                var a2 = PortableMath.Atan2(points[i + 1].Y - center.Y, points[i + 1].X - center.X);
                 var da = a2 - a1;
                 while (da > System.Math.PI)
                     da -= Angle.TwoPI;

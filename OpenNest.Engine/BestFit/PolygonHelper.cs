@@ -54,8 +54,8 @@ namespace OpenNest.Engine.BestFit
                 return polygon;
 
             var result = new Polygon();
-            var cos = System.Math.Cos(angle);
-            var sin = System.Math.Sin(angle);
+            var cos = PortableMath.Cos(angle);
+            var sin = PortableMath.Sin(angle);
 
             foreach (var v in polygon.Vertices)
             {

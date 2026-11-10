@@ -163,8 +163,8 @@ internal static class SeamOvercut
     /// <summary>The angle traveled around <paramref name="center"/> from one point to another, in [0, 2pi).</summary>
     private static double Travel(Vector center, Vector from, Vector to, bool clockwise)
     {
-        var start = System.Math.Atan2(from.Y - center.Y, from.X - center.X);
-        var end = System.Math.Atan2(to.Y - center.Y, to.X - center.X);
+        var start = PortableMath.Atan2(from.Y - center.Y, from.X - center.X);
+        var end = PortableMath.Atan2(to.Y - center.Y, to.X - center.X);
         var travel = (clockwise ? start - end : end - start) % (2 * System.Math.PI);
         return travel < 0 ? travel + 2 * System.Math.PI : travel;
     }

@@ -42,7 +42,7 @@ namespace OpenNest.Geometry
             {
                 var dx = vertices[1].X - vertices[0].X;
                 var dy = vertices[1].Y - vertices[0].Y;
-                var angle = System.Math.Atan2(dy, dx);
+                var angle = PortableMath.Atan2(dy, dx);
                 var length = System.Math.Sqrt(dx * dx + dy * dy);
                 return new BoundingRectangleResult(angle, length, 0);
             }
@@ -100,7 +100,7 @@ namespace OpenNest.Geometry
 
                 if (best == null || area < best.Area - margin)
                 {
-                    var edgeAngle = System.Math.Atan2(edgeY, edgeX);
+                    var edgeAngle = PortableMath.Atan2(edgeY, edgeX);
                     best = new BoundingRectangleResult(edgeAngle, width, height);
                 }
             }
@@ -137,7 +137,7 @@ namespace OpenNest.Geometry
                 if (edgeLen.IsEqualTo(0))
                     continue;
 
-                var edgeAngle = Angle.NormalizeRad(System.Math.Atan2(edgeY, edgeX));
+                var edgeAngle = Angle.NormalizeRad(PortableMath.Atan2(edgeY, edgeX));
 
                 // Each edge produces 4 candidate angles (0, 90, 180, 270 relative to edge)
                 for (int k = 0; k < 4; k++)
@@ -172,8 +172,8 @@ namespace OpenNest.Geometry
             double angle
         )
         {
-            var cos = System.Math.Cos(angle);
-            var sin = System.Math.Sin(angle);
+            var cos = PortableMath.Cos(angle);
+            var sin = PortableMath.Sin(angle);
 
             double minU = double.MaxValue,
                 maxU = double.MinValue;

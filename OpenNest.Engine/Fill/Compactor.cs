@@ -29,7 +29,7 @@ namespace OpenNest.Engine.Fill
         /// Pushes movingParts along an arbitrary angle (radians, 0 = right, π/2 = up).
         /// </summary>
         public static double Push(List<Part> movingParts, Plate plate, double angle) =>
-            Push(movingParts, plate, new Vector(System.Math.Cos(angle), System.Math.Sin(angle)));
+            Push(movingParts, plate, new Vector(PortableMath.Cos(angle), PortableMath.Sin(angle)));
 
         private static double Push(List<Part> movingParts, Plate plate, Vector direction)
         {

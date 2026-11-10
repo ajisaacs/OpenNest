@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Dimensions
 {
@@ -80,7 +81,7 @@ namespace OpenNest.Dimensions
             var dx = point.X - Center.X;
             var dy = point.Y - Center.Y;
             var distance = System.Math.Sqrt(dx * dx + dy * dy);
-            var angle = distance > 0 ? System.Math.Atan2(dy, dx) : Angle;
+            var angle = distance > 0 ? PortableMath.Atan2(dy, dx) : Angle;
             if (Arc != null && Kind == DimensionKind.Radius)
                 angle = DimensionBuilder.ClampToSweep(Arc, angle);
 

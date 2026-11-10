@@ -4,6 +4,7 @@ using System.Linq;
 using OpenNest.CNC;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest
 {
@@ -161,7 +162,7 @@ namespace OpenNest
             Vector offset, double kerf, double maxGap)
         {
             var along = chosen.First.Direction;
-            var minimum = System.Math.Sin(MinCornerTurn);
+            var minimum = PortableMath.Sin(MinCornerTurn);
             var shifted = Shift(moving, offset);
             var slides = FacingEdges(anchor, shifted, -maxGap, maxGap)
                 .Select(facing => (Facing: facing, Across: Dot(along, facing.First.Outward)))
@@ -266,14 +267,14 @@ namespace OpenNest
             var din = new Vector((aEnd.X - aOther.X) / aLength, (aEnd.Y - aOther.Y) / aLength);
             var dout = new Vector((bOther.X - bEnd.X) / bLength, (bOther.Y - bEnd.Y) / bLength);
             var cross = Cross(din, dout);
-            var turn = System.Math.Atan2(System.Math.Abs(cross), Dot(din, dout));
+            var turn = PortableMath.Atan2(System.Math.Abs(cross), Dot(din, dout));
             if (turn < MinCornerTurn || turn > MaxCornerTurn)
                 return null;
             // aEnd + din·s = bEnd − dout·t: the corner lies s past a's end and t before b's end.
             var gap = bEnd - aEnd;
             var s = Cross(gap, dout) / cross;
             var t = Cross(din, gap) / cross;
-            var reach = kerf / 2 * System.Math.Tan(turn / 2) + 2 * GapTolerance;
+            var reach = kerf / 2 * PortableMath.Tan(turn / 2) + 2 * GapTolerance;
             if (s < -GapTolerance || t < -GapTolerance || s > reach || t > reach)
                 return null;
             return new Vector(aEnd.X + din.X * s, aEnd.Y + din.Y * s);

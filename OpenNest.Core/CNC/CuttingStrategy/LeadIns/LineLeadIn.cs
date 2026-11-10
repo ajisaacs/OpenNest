@@ -29,8 +29,8 @@ namespace OpenNest.CNC.CuttingStrategy
         {
             var approachAngle = contourNormalAngle - Angle.HalfPI + Angle.ToRadians(ApproachAngle);
             return new Vector(
-                contourStartPoint.X + Length * System.Math.Cos(approachAngle),
-                contourStartPoint.Y + Length * System.Math.Sin(approachAngle)
+                contourStartPoint.X + Length * PortableMath.Cos(approachAngle),
+                contourStartPoint.Y + Length * PortableMath.Sin(approachAngle)
             );
         }
 

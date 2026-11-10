@@ -146,11 +146,11 @@ namespace OpenNest.Geometry
                 }
                 else
                 {
-                    var angleA = System.Math.Atan2(orderedA[ia].Y, orderedA[ia].X);
+                    var angleA = PortableMath.Atan2(orderedA[ia].Y, orderedA[ia].X);
                     if (angleA < 0)
                         angleA += Angle.TwoPI;
 
-                    var angleB = System.Math.Atan2(orderedB[ib].Y, orderedB[ib].X);
+                    var angleB = PortableMath.Atan2(orderedB[ib].Y, orderedB[ib].X);
                     if (angleB < 0)
                         angleB += Angle.TwoPI;
 

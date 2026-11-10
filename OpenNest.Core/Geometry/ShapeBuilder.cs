@@ -176,7 +176,7 @@ namespace OpenNest.Geometry
                     var arc = (Arc)entity;
                     var deltaX = weldedPoint.X - arc.Center.X;
                     var deltaY = weldedPoint.Y - arc.Center.Y;
-                    var angle = System.Math.Atan2(deltaY, deltaX);
+                    var angle = PortableMath.Atan2(deltaY, deltaX);
 
                     if (isStart)
                         arc.StartAngle = angle;

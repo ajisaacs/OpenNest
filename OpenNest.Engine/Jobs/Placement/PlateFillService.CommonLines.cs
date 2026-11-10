@@ -5,6 +5,7 @@ using System.Threading;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.Jobs.CommonLines;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.Jobs.Placement;
 
@@ -83,8 +84,8 @@ public static partial class PlateFillService
         {
             var rotation = placed.Rotation;
             var first = Place(item.Drawing, rotation, placed.Location);
-            var sine = System.Math.Sin(rotation);
-            var cosine = System.Math.Cos(rotation);
+            var sine = PortableMath.Sin(rotation);
+            var cosine = PortableMath.Cos(rotation);
             var second = Place(item.Drawing, rotation + CommonLinePair.SecondRotation,
                 new Vector(placed.Location.X + pair.SecondX * cosine - pair.SecondY * sine,
                     placed.Location.Y + pair.SecondX * sine + pair.SecondY * cosine));

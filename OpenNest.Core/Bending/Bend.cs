@@ -62,8 +62,8 @@ namespace OpenNest.Bending
             else
             {
                 var angle = StartPoint.AngleTo(EndPoint);
-                var dx = System.Math.Cos(angle) * etchLength;
-                var dy = System.Math.Sin(angle) * etchLength;
+                var dx = PortableMath.Cos(angle) * etchLength;
+                var dy = PortableMath.Sin(angle) * etchLength;
 
                 result.Add(
                     CreateEtchLine(StartPoint, new Vector(StartPoint.X + dx, StartPoint.Y + dy))

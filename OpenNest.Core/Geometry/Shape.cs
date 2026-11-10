@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -661,8 +662,8 @@ namespace OpenNest.Geometry
 
         private static Vector ArcTangent(Arc arc, double angle)
         {
-            var sin = System.Math.Sin(angle);
-            var cos = System.Math.Cos(angle);
+            var sin = PortableMath.Sin(angle);
+            var cos = PortableMath.Cos(angle);
             return arc.IsReversed ? new Vector(sin, -cos) : new Vector(-sin, cos);
         }
 

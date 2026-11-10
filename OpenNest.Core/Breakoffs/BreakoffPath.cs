@@ -153,8 +153,8 @@ namespace OpenNest.Breakoffs
             }
             var arc = (Arc)e;
             var angle = ArcAngleAt(arc, local);
-            return new Vector(arc.Center.X + arc.Radius * System.Math.Cos(angle),
-                arc.Center.Y + arc.Radius * System.Math.Sin(angle));
+            return new Vector(arc.Center.X + arc.Radius * PortableMath.Cos(angle),
+                arc.Center.Y + arc.Radius * PortableMath.Sin(angle));
         }
 
         private static Vector TangentOn(Entity e, double local)
@@ -168,8 +168,8 @@ namespace OpenNest.Breakoffs
             var arc = (Arc)e;
             var angle = ArcAngleAt(arc, local);
             return arc.IsReversed
-                ? new Vector(System.Math.Sin(angle), -System.Math.Cos(angle))
-                : new Vector(-System.Math.Sin(angle), System.Math.Cos(angle));
+                ? new Vector(PortableMath.Sin(angle), -PortableMath.Cos(angle))
+                : new Vector(-PortableMath.Sin(angle), PortableMath.Cos(angle));
         }
 
         private static double ArcAngleAt(Arc arc, double local) =>

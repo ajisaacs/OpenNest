@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Shapes
 {
@@ -46,7 +47,7 @@ namespace OpenNest.Shapes
             {
                 ShapeDimension.Linear(nameof(OD), new Vector(-OD / 2, 0), new Vector(OD / 2, 0), ShapeDimension.Up, "Ø"),
                 ShapeDimension.CircleLeader(nameof(HolePatternDiameter), Vector.Zero, HolePatternDiameter / 2,
-                    new Vector(System.Math.Cos(boltAngle), System.Math.Sin(boltAngle)), "Ø"),
+                    new Vector(PortableMath.Cos(boltAngle), PortableMath.Sin(boltAngle)), "Ø"),
             };
 
             // The leader crosses the hole nearest 45 degrees through its center, out that way.
@@ -55,7 +56,7 @@ namespace OpenNest.Shapes
                 var step = 2.0 * System.Math.PI / HoleCount;
                 var angle = System.Math.Round(System.Math.PI / 4 / step) * step;
                 var out45 = new Vector(System.Math.Sqrt(0.5), System.Math.Sqrt(0.5));
-                var center = new Vector(HolePatternDiameter / 2 * System.Math.Cos(angle), HolePatternDiameter / 2 * System.Math.Sin(angle));
+                var center = new Vector(HolePatternDiameter / 2 * PortableMath.Cos(angle), HolePatternDiameter / 2 * PortableMath.Sin(angle));
                 dimensions.Add(ShapeDimension.HoleLeader(nameof(HoleDiameter), center, HoleDiameter / 2, out45, "Ø")
                     .WithCount(nameof(HoleCount), "holes"));
             }
@@ -76,8 +77,8 @@ namespace OpenNest.Shapes
             for (var i = 0; i < HoleCount; i++)
             {
                 var angle = i * angleStep;
-                var cx = boltCircleRadius * System.Math.Cos(angle);
-                var cy = boltCircleRadius * System.Math.Sin(angle);
+                var cx = boltCircleRadius * PortableMath.Cos(angle);
+                var cy = boltCircleRadius * PortableMath.Sin(angle);
                 entities.Add(new Circle(cx, cy, holeRadius));
             }
 

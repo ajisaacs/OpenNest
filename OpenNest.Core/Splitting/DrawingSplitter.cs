@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest;
 
@@ -470,8 +471,8 @@ public static class DrawingSplitter
         {
             var midAngle = (arc.StartAngle + arc.EndAngle) / 2;
             return new Vector(
-                arc.Center.X + arc.Radius * System.Math.Cos(midAngle),
-                arc.Center.Y + arc.Radius * System.Math.Sin(midAngle)
+                arc.Center.X + arc.Radius * PortableMath.Cos(midAngle),
+                arc.Center.Y + arc.Radius * PortableMath.Sin(midAngle)
             );
         }
 

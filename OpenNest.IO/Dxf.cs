@@ -398,9 +398,9 @@ namespace OpenNest.IO
                     center = new XYZ(center.X + CurPos.X, center.Y + CurPos.Y, 0);
                 }
 
-                var startAngle = System.Math.Atan2(CurPos.Y - center.Y, CurPos.X - center.X);
+                var startAngle = PortableMath.Atan2(CurPos.Y - center.Y, CurPos.X - center.X);
 
-                var endAngle = System.Math.Atan2(endpt.Y - center.Y, endpt.X - center.X);
+                var endAngle = PortableMath.Atan2(endpt.Y - center.Y, endpt.X - center.X);
 
                 if (arc.Rotation == RotationType.CW)
                     Generic.Swap(ref startAngle, ref endAngle);

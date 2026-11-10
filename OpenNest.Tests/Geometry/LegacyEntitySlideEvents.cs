@@ -2,7 +2,8 @@
 // commit ad5f2a9041ee14d0a85aab00e0c8a9f5082d5b6b, before the axis band filter, used only as
 // the differential oracle in SlideBandTests. Mechanical edits only: renamed types, internal
 // visibility, calls to unchanged SlideEvents members qualified, the private Eps constant
-// spelled Tolerance.Epsilon, and the four-space indentation of the original kept.
+// spelled Tolerance.Epsilon, trig spelled PortableMath as production now is, and the
+// four-space indentation of the original kept.
 #nullable disable
 using System.Collections.Generic;
 using OpenNest.Geometry;
@@ -54,7 +55,7 @@ namespace OpenNest.Tests.Geometry
                     // The directional distance from an arc point at angle θ to the
                     // line is t(θ) = [A + r·(ey·cosθ − ex·sinθ)] / det.
                     // dt/dθ = 0 at θ = atan2(−ex, ey) and θ + π.
-                    var theta1 = Angle.NormalizeRad(System.Math.Atan2(-ex, ey));
+                    var theta1 = Angle.NormalizeRad(PortableMath.Atan2(-ex, ey));
                     var theta2 = Angle.NormalizeRad(theta1 + System.Math.PI);
 
                     for (var k = 0; k < 2; k++)
@@ -64,8 +65,8 @@ namespace OpenNest.Tests.Geometry
                         if (arc != null && !Angle.IsBetweenRad(theta, arc.StartAngle, arc.EndAngle, arc.IsReversed))
                             continue;
 
-                        var qx = cx + r * System.Math.Cos(theta);
-                        var qy = cy + r * System.Math.Sin(theta);
+                        var qx = cx + r * PortableMath.Cos(theta);
+                        var qy = cy + r * PortableMath.Sin(theta);
 
                         SlideEvents.RayLine(ref sink, qx, qy, p1x, p1y, p2x, p2y, rayX, rayY, arcMoves);
                         if (sink.IsDone)

@@ -516,8 +516,8 @@ namespace OpenNest.CNC.CuttingStrategy
 
                     var outwardAngle = normal - System.Math.PI;
                     point = new Vector(
-                        circle.Center.X + circle.Radius * System.Math.Cos(outwardAngle),
-                        circle.Center.Y + circle.Radius * System.Math.Sin(outwardAngle)
+                        circle.Center.X + circle.Radius * PortableMath.Cos(outwardAngle),
+                        circle.Center.Y + circle.Radius * PortableMath.Sin(outwardAngle)
                     );
                 }
 
@@ -974,13 +974,13 @@ namespace OpenNest.CNC.CuttingStrategy
             var adjacentNormal = ComputeNormal(point, corner.Incoming, contourType, winding);
             // Sum unit normals rather than averaging angles (which fails at 0/2Ï€).
             // Winding makes this point into the scrap even at reflex corners.
-            var x = System.Math.Cos(normal) + System.Math.Cos(adjacentNormal);
-            var y = System.Math.Sin(normal) + System.Math.Sin(adjacentNormal);
+            var x = PortableMath.Cos(normal) + PortableMath.Cos(adjacentNormal);
+            var y = PortableMath.Sin(normal) + PortableMath.Sin(adjacentNormal);
             if (!double.IsFinite(x) || !double.IsFinite(y)
                 || x * x + y * y <= Tolerance.Epsilon * Tolerance.Epsilon)
                 return null; // Opposing normals at a cusp have no unique bisector.
 
-            return Angle.NormalizeRad(System.Math.Atan2(y, x));
+            return Angle.NormalizeRad(PortableMath.Atan2(y, x));
         }
 
         /// <summary>
@@ -1009,12 +1009,12 @@ namespace OpenNest.CNC.CuttingStrategy
                 || ClassifyTurn(tangentEnd, tangentStart, winding) != CornerKind.Convex)
                 return null;
 
-            var x = System.Math.Cos(startNormal) + System.Math.Cos(endNormal);
-            var y = System.Math.Sin(startNormal) + System.Math.Sin(endNormal);
+            var x = PortableMath.Cos(startNormal) + PortableMath.Cos(endNormal);
+            var y = PortableMath.Sin(startNormal) + PortableMath.Sin(endNormal);
             if (x * x + y * y <= Tolerance.Epsilon * Tolerance.Epsilon)
                 return null;
 
-            var normal = Angle.NormalizeRad(System.Math.Atan2(y, x));
+            var normal = Angle.NormalizeRad(PortableMath.Atan2(y, x));
             var pierce = leadIn.GetPiercePoint(start, normal, turn);
             var leadOutEnd = ((LinearMove)leadOut.Generate(end, normal, turn)[0]).EndPoint;
             return IsClearStraightLead(shape, start, pierce, clearance)
@@ -1248,7 +1248,7 @@ namespace OpenNest.CNC.CuttingStrategy
             var length = pierce.DistanceTo(point);
             if (length <= Math.Tolerance.Epsilon)
                 return leadIn;
-            var direction = System.Math.Atan2(pierce.Y - point.Y, pierce.X - point.X);
+            var direction = PortableMath.Atan2(pierce.Y - point.Y, pierce.X - point.X);
             return new LineLeadIn
             {
                 Length = length,
@@ -1352,7 +1352,7 @@ namespace OpenNest.CNC.CuttingStrategy
 
         private static double Clearance(Shape hole, Vector point) => hole.ClosestPointTo(point, out _).DistanceTo(point);
 
-        private static Vector Inward(double normal) => new(System.Math.Cos(normal), System.Math.Sin(normal));
+        private static Vector Inward(double normal) => new(PortableMath.Cos(normal), PortableMath.Sin(normal));
 
         /// <summary>
         /// A straight lead-in from <paramref name="pierce"/> to <paramref name="point"/>, with the
@@ -1360,7 +1360,7 @@ namespace OpenNest.CNC.CuttingStrategy
         /// </summary>
         private static LeadIn StraightLeadIn(Vector point, Vector pierce, out double normal)
         {
-            normal = System.Math.Atan2(pierce.Y - point.Y, pierce.X - point.X);
+            normal = PortableMath.Atan2(pierce.Y - point.Y, pierce.X - point.X);
             return new LineLeadIn { Length = pierce.DistanceTo(point), ApproachAngle = 90 };
         }
 
@@ -1397,7 +1397,7 @@ namespace OpenNest.CNC.CuttingStrategy
             if (shape.Entities is [Circle round] && round.Radius > tabSize / 2)
             {
                 var entry = round.Center.AngleTo(center);
-                var gap = 2 * System.Math.Asin(tabSize / (2 * round.Radius));
+                var gap = 2 * PortableMath.Asin(tabSize / (2 * round.Radius));
                 var reversed = round.Rotation == RotationType.CW;
                 var arc = new Arc(round.Center, round.Radius, entry, reversed ? entry + gap : entry - gap, reversed)
                 {
@@ -1577,7 +1577,7 @@ namespace OpenNest.CNC.CuttingStrategy
                     path = (Shape)cut.Clone();
                     path.Reverse();
                 }
-                var normal = Angle.NormalizeRad(System.Math.Atan2(scrap.Y, scrap.X));
+                var normal = Angle.NormalizeRad(PortableMath.Atan2(scrap.Y, scrap.X));
                 program.Codes.AddRange(leadIn.Generate(entry, normal, fromEnd ? RotationType.CW : RotationType.CCW));
                 program.Codes.AddRange(ConvertShapeToMoves(path, entry, LayerType.Break));
             }
@@ -1782,9 +1782,9 @@ namespace OpenNest.CNC.CuttingStrategy
 
         private static bool OnArc(Vector center, Vector start, Vector end, Vector point, RotationType rotation)
         {
-            var a0 = System.Math.Atan2(start.Y - center.Y, start.X - center.X);
-            var a1 = System.Math.Atan2(end.Y - center.Y, end.X - center.X);
-            var ap = System.Math.Atan2(point.Y - center.Y, point.X - center.X);
+            var a0 = PortableMath.Atan2(start.Y - center.Y, start.X - center.X);
+            var a1 = PortableMath.Atan2(end.Y - center.Y, end.X - center.X);
+            var ap = PortableMath.Atan2(point.Y - center.Y, point.X - center.X);
             var sign = rotation == RotationType.CCW ? 1 : -1;
             var sweep = Angle.NormalizeRad(sign * (a1 - a0));
             if (sweep <= Tolerance.Epsilon)
@@ -1841,8 +1841,8 @@ namespace OpenNest.CNC.CuttingStrategy
             {
                 var angle = atEnd ? arc.EndAngle : arc.StartAngle;
                 return arc.IsReversed
-                    ? new Vector(System.Math.Sin(angle), -System.Math.Cos(angle))
-                    : new Vector(-System.Math.Sin(angle), System.Math.Cos(angle));
+                    ? new Vector(PortableMath.Sin(angle), -PortableMath.Cos(angle))
+                    : new Vector(-PortableMath.Sin(angle), PortableMath.Cos(angle));
             }
             var line = (Line)entity;
             return line.EndPoint - line.StartPoint;

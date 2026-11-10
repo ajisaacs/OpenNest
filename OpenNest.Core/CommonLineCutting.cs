@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using OpenNest.CNC;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest
 {
@@ -238,8 +239,8 @@ namespace OpenNest
             {
                 var din = (points[k] - points[k - 1]).Normalize();
                 var dout = (points[k + 1] - points[k]).Normalize();
-                var turn = System.Math.Atan2(System.Math.Abs(Cross(din, dout)), Dot(din, dout));
-                snaps[k] = kerf / 2 * System.Math.Tan(turn / 2) + 2 * CommonLineGeometry.GapTolerance;
+                var turn = PortableMath.Atan2(System.Math.Abs(Cross(din, dout)), Dot(din, dout));
+                snaps[k] = kerf / 2 * PortableMath.Tan(turn / 2) + 2 * CommonLineGeometry.GapTolerance;
             }
             for (var k = 0; k + 1 < points.Length; k++)
                 yield return new Leg(points[k], points[k + 1], snaps[k], snaps[k + 1]);

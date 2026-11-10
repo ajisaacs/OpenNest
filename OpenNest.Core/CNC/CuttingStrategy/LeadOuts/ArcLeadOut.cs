@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.CNC.CuttingStrategy
 {
@@ -17,16 +18,16 @@ namespace OpenNest.CNC.CuttingStrategy
             RotationType winding = RotationType.CW
         )
         {
-            var arcCenterX = contourEndPoint.X + Radius * System.Math.Cos(contourNormalAngle);
-            var arcCenterY = contourEndPoint.Y + Radius * System.Math.Sin(contourNormalAngle);
+            var arcCenterX = contourEndPoint.X + Radius * PortableMath.Cos(contourNormalAngle);
+            var arcCenterY = contourEndPoint.Y + Radius * PortableMath.Sin(contourNormalAngle);
             var arcCenter = new Vector(arcCenterX, arcCenterY);
 
             // The contour point sits opposite the normal from the center; turn a quarter on.
             var endAngle = contourNormalAngle
                 + (winding == RotationType.CCW ? -System.Math.PI / 2 : System.Math.PI / 2);
             var endPoint = new Vector(
-                arcCenterX + Radius * System.Math.Cos(endAngle),
-                arcCenterY + Radius * System.Math.Sin(endAngle)
+                arcCenterX + Radius * PortableMath.Cos(endAngle),
+                arcCenterY + Radius * PortableMath.Sin(endAngle)
             );
 
             return new List<ICode>

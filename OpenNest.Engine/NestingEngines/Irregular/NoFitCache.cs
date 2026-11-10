@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using Clipper2Lib;
 using OpenNest.Engine.Jobs;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.NestingEngines.Irregular;
 
@@ -202,7 +203,7 @@ internal sealed class NoFitCache
 
     private static double EdgeAngle(PointD edge)
     {
-        var angle = System.Math.Atan2(edge.y, edge.x);
+        var angle = PortableMath.Atan2(edge.y, edge.x);
         return angle < 0 ? angle + System.Math.PI * 2 : angle;
     }
 

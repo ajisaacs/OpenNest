@@ -237,8 +237,8 @@ namespace OpenNest.Geometry
             if (IsZero(inTangent) || IsZero(outTangent))
                 return ContactSide.Ambiguous;
 
-            var outAngle = System.Math.Atan2(outTangent.Y, outTangent.X);
-            var inAngle = System.Math.Atan2(-inTangent.Y, -inTangent.X);
+            var outAngle = PortableMath.Atan2(outTangent.Y, outTangent.X);
+            var inAngle = PortableMath.Atan2(-inTangent.Y, -inTangent.X);
             var left = materialLeft[loopOf[best]];
 
             start = left ? outAngle : inAngle;
@@ -326,7 +326,7 @@ namespace OpenNest.Geometry
         private static Vector ArcTangent(double angle, bool clockwise)
         {
             var sign = clockwise ? -1.0 : 1.0;
-            return new Vector(-System.Math.Sin(angle) * sign, System.Math.Cos(angle) * sign);
+            return new Vector(-PortableMath.Sin(angle) * sign, PortableMath.Cos(angle) * sign);
         }
 
         private static Vector Direction(Vector from, Vector to)
@@ -380,7 +380,7 @@ namespace OpenNest.Geometry
                         var sweep = arc.IsReversed ? -arc.SweepAngle() : arc.SweepAngle();
                         var r = arc.Radius;
                         area += Cross(arc.StartPoint(), arc.EndPoint()) / 2;
-                        area += r * r / 2 * (sweep - System.Math.Sin(sweep));
+                        area += r * r / 2 * (sweep - PortableMath.Sin(sweep));
                         break;
                 }
             }
@@ -432,13 +432,13 @@ namespace OpenNest.Geometry
                     {
                         var a = arc.StartAngle + sign * cuts[k - 1];
                         var b = arc.StartAngle + sign * cuts[k];
-                        var y1 = arc.Center.Y + arc.Radius * System.Math.Sin(a);
-                        var y2 = arc.Center.Y + arc.Radius * System.Math.Sin(b);
+                        var y1 = arc.Center.Y + arc.Radius * PortableMath.Sin(a);
+                        var y2 = arc.Center.Y + arc.Radius * PortableMath.Sin(b);
                         if ((y1 > point.Y) == (y2 > point.Y))
                             continue;
                         var dy = point.Y - arc.Center.Y;
                         var dx = System.Math.Sqrt(System.Math.Max(0, arc.Radius * arc.Radius - dy * dy));
-                        var x = arc.Center.X + (System.Math.Cos((a + b) / 2) >= 0 ? dx : -dx);
+                        var x = arc.Center.X + (PortableMath.Cos((a + b) / 2) >= 0 ? dx : -dx);
                         if (point.X < x)
                             inside = !inside;
                     }
@@ -752,7 +752,7 @@ namespace OpenNest.Geometry
             if (stationarySide == ContactSide.Ambiguous || movingSide == ContactSide.Ambiguous)
                 return true;
 
-            var direction = System.Math.Atan2(dirY, dirX);
+            var direction = PortableMath.Atan2(dirY, dirX);
             var stationaryPieces = Split(stationaryStart, stationaryWidth);
             var movingPieces = Split(movingStart + System.Math.PI, movingWidth);
             var onBoundary = false;

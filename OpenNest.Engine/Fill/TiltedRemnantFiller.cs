@@ -260,8 +260,8 @@ namespace OpenNest.Engine.Fill
 
         private static (double Along, double Cross) Extents(List<Vector> hull, double angle, bool alongX)
         {
-            var cos = System.Math.Cos(angle);
-            var sin = System.Math.Sin(angle);
+            var cos = PortableMath.Cos(angle);
+            var sin = PortableMath.Sin(angle);
             double minX = double.MaxValue, maxX = double.MinValue;
             double minY = double.MaxValue, maxY = double.MinValue;
 

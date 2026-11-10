@@ -214,7 +214,7 @@ namespace OpenNest.Geometry
         {
             var m1 = Slope();
             var m2 = line.Slope();
-            return System.Math.Atan(System.Math.Abs((m2 - m1) / (1 + m2 * m1)));
+            return PortableMath.Atan(System.Math.Abs((m2 - m1) / (1 + m2 * m1)));
         }
 
         /// <summary>
@@ -395,8 +395,8 @@ namespace OpenNest.Geometry
         {
             var angle = OpenNest.Math.Angle.NormalizeRad(Angle() + OpenNest.Math.Angle.HalfPI);
 
-            var x = System.Math.Cos(angle) * distance;
-            var y = System.Math.Sin(angle) * distance;
+            var x = PortableMath.Cos(angle) * distance;
+            var y = PortableMath.Sin(angle) * distance;
 
             var pt = side == OffsetSide.Left ? new Vector(x, y) : new Vector(-x, -y);
 

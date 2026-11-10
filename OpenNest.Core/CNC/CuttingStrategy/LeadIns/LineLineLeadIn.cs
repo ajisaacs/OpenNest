@@ -21,8 +21,8 @@ namespace OpenNest.CNC.CuttingStrategy
 
             var secondAngle = contourNormalAngle - Angle.HalfPI + Angle.ToRadians(ApproachAngle1);
             var midPoint = new Vector(
-                contourStartPoint.X + Length2 * System.Math.Cos(secondAngle),
-                contourStartPoint.Y + Length2 * System.Math.Sin(secondAngle)
+                contourStartPoint.X + Length2 * PortableMath.Cos(secondAngle),
+                contourStartPoint.Y + Length2 * PortableMath.Sin(secondAngle)
             );
 
             return new List<ICode>
@@ -37,13 +37,13 @@ namespace OpenNest.CNC.CuttingStrategy
             RotationType winding = RotationType.CW)
         {
             var secondAngle = contourNormalAngle - Angle.HalfPI + Angle.ToRadians(ApproachAngle1);
-            var midX = contourStartPoint.X + Length2 * System.Math.Cos(secondAngle);
-            var midY = contourStartPoint.Y + Length2 * System.Math.Sin(secondAngle);
+            var midX = contourStartPoint.X + Length2 * PortableMath.Cos(secondAngle);
+            var midY = contourStartPoint.Y + Length2 * PortableMath.Sin(secondAngle);
 
             var firstAngle = secondAngle + Angle.ToRadians(ApproachAngle2);
             return new Vector(
-                midX + Length1 * System.Math.Cos(firstAngle),
-                midY + Length1 * System.Math.Sin(firstAngle)
+                midX + Length1 * PortableMath.Cos(firstAngle),
+                midY + Length1 * PortableMath.Sin(firstAngle)
             );
         }
 

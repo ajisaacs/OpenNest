@@ -10,7 +10,7 @@ namespace OpenNest.Geometry
             // A zero-radius curve is a point: its angular range has no geometric meaning.
             if (arc == null || radius == 0)
                 return true;
-            var angle = Angle.NormalizeRad(System.Math.Atan2(y, x));
+            var angle = Angle.NormalizeRad(PortableMath.Atan2(y, x));
             return Angle.IsBetweenRad(angle, arc.StartAngle, arc.EndAngle, arc.IsReversed);
         }
 

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.IO
 {
@@ -383,9 +384,9 @@ namespace OpenNest.IO
                 ) / d;
             var radius = System.Math.Sqrt((ax - ux) * (ax - ux) + (ay - uy) * (ay - uy));
 
-            var a0 = System.Math.Atan2(ay - uy, ax - ux);
-            var am = System.Math.Atan2(by - uy, bx - ux);
-            var a1 = System.Math.Atan2(cy - uy, cx - ux);
+            var a0 = PortableMath.Atan2(ay - uy, ax - ux);
+            var am = PortableMath.Atan2(by - uy, bx - ux);
+            var a1 = PortableMath.Atan2(cy - uy, cx - ux);
 
             var ccwSweep = a1 - a0;
             while (ccwSweep <= 0)
@@ -403,8 +404,8 @@ namespace OpenNest.IO
                 var angle = a0 + sweep * t;
                 output.Add(
                     new Vector(
-                        ux + radius * System.Math.Cos(angle),
-                        uy + radius * System.Math.Sin(angle)
+                        ux + radius * PortableMath.Cos(angle),
+                        uy + radius * PortableMath.Sin(angle)
                     )
                 );
             }

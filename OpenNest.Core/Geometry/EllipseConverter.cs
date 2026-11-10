@@ -17,11 +17,11 @@ namespace OpenNest.Geometry
             double t
         )
         {
-            var x = semiMajor * System.Math.Cos(t);
-            var y = semiMinor * System.Math.Sin(t);
+            var x = semiMajor * PortableMath.Cos(t);
+            var y = semiMinor * PortableMath.Sin(t);
 
-            var cos = System.Math.Cos(rotation);
-            var sin = System.Math.Sin(rotation);
+            var cos = PortableMath.Cos(rotation);
+            var sin = PortableMath.Sin(rotation);
 
             return new Vector(center.X + x * cos - y * sin, center.Y + x * sin + y * cos);
         }
@@ -33,11 +33,11 @@ namespace OpenNest.Geometry
             double t
         )
         {
-            var tx = -semiMajor * System.Math.Sin(t);
-            var ty = semiMinor * System.Math.Cos(t);
+            var tx = -semiMajor * PortableMath.Sin(t);
+            var ty = semiMinor * PortableMath.Cos(t);
 
-            var cos = System.Math.Cos(rotation);
-            var sin = System.Math.Sin(rotation);
+            var cos = PortableMath.Cos(rotation);
+            var sin = PortableMath.Sin(rotation);
 
             return new Vector(tx * cos - ty * sin, tx * sin + ty * cos);
         }
@@ -51,11 +51,11 @@ namespace OpenNest.Geometry
         {
             // Inward normal: perpendicular to tangent, pointing toward center of curvature.
             // In local coords: N(t) = (-b*cos(t), -a*sin(t))
-            var nx = -semiMinor * System.Math.Cos(t);
-            var ny = -semiMajor * System.Math.Sin(t);
+            var nx = -semiMinor * PortableMath.Cos(t);
+            var ny = -semiMajor * PortableMath.Sin(t);
 
-            var cos = System.Math.Cos(rotation);
-            var sin = System.Math.Sin(rotation);
+            var cos = PortableMath.Cos(rotation);
+            var sin = PortableMath.Sin(rotation);
 
             return new Vector(nx * cos - ny * sin, nx * sin + ny * cos);
         }
@@ -326,8 +326,8 @@ namespace OpenNest.Geometry
                 radius = p0.DistanceTo(cc);
             }
 
-            var startAngle = System.Math.Atan2(p0.Y - arcCenter.Y, p0.X - arcCenter.X);
-            var endAngle = System.Math.Atan2(p1.Y - arcCenter.Y, p1.X - arcCenter.X);
+            var startAngle = PortableMath.Atan2(p0.Y - arcCenter.Y, p0.X - arcCenter.X);
+            var endAngle = PortableMath.Atan2(p1.Y - arcCenter.Y, p1.X - arcCenter.X);
 
             var points = new List<Vector> { p0, pMid, p1 };
             var isReversed = ArcFit.SumSignedAngles(arcCenter, points) < 0;

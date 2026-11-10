@@ -333,10 +333,10 @@ public class GeometrySimplifier
 
         // Mirroring reverses winding — swap start/end to preserve arc direction
         var mirrorStart = NormalizeAngle(
-            System.Math.Atan2(mirrorEp.Y - mirrorCenter.Y, mirrorEp.X - mirrorCenter.X)
+            PortableMath.Atan2(mirrorEp.Y - mirrorCenter.Y, mirrorEp.X - mirrorCenter.X)
         );
         var mirrorEnd = NormalizeAngle(
-            System.Math.Atan2(mirrorSp.Y - mirrorCenter.Y, mirrorSp.X - mirrorCenter.X)
+            PortableMath.Atan2(mirrorSp.Y - mirrorCenter.Y, mirrorSp.X - mirrorCenter.X)
         );
 
         var result = new Arc(mirrorCenter, arc.Radius, mirrorStart, mirrorEnd, arc.IsReversed);
@@ -653,8 +653,8 @@ public class GeometrySimplifier
     /// <summary>The direction of travel along an arc at <paramref name="angle"/>.</summary>
     private static Vector ArcTangent(Arc arc, double angle) =>
         arc.IsReversed
-            ? new Vector(System.Math.Sin(angle), -System.Math.Cos(angle))
-            : new Vector(-System.Math.Sin(angle), System.Math.Cos(angle));
+            ? new Vector(PortableMath.Sin(angle), -PortableMath.Cos(angle))
+            : new Vector(-PortableMath.Sin(angle), PortableMath.Cos(angle));
 
     /// <summary>
     /// Computes the tangent direction at the last point of a fitted arc,
@@ -779,10 +779,10 @@ public class GeometrySimplifier
         var lastPoint = points[^1];
 
         var startAngle = NormalizeAngle(
-            System.Math.Atan2(firstPoint.Y - center.Y, firstPoint.X - center.X)
+            PortableMath.Atan2(firstPoint.Y - center.Y, firstPoint.X - center.X)
         );
         var endAngle = NormalizeAngle(
-            System.Math.Atan2(lastPoint.Y - center.Y, lastPoint.X - center.X)
+            PortableMath.Atan2(lastPoint.Y - center.Y, lastPoint.X - center.X)
         );
         var isReversed = ArcFit.SumSignedAngles(center, points) < 0;
 
@@ -815,8 +815,8 @@ public class GeometrySimplifier
         bool isReversed
     )
     {
-        var startAngle = System.Math.Atan2(points[0].Y - center.Y, points[0].X - center.X);
-        var endAngle = System.Math.Atan2(points[^1].Y - center.Y, points[^1].X - center.X);
+        var startAngle = PortableMath.Atan2(points[0].Y - center.Y, points[0].X - center.X);
+        var endAngle = PortableMath.Atan2(points[^1].Y - center.Y, points[^1].X - center.X);
 
         var sweep = endAngle - startAngle;
         if (isReversed)
@@ -838,8 +838,8 @@ public class GeometrySimplifier
         {
             var t = (double)i / sampleCount;
             var angle = startAngle + sweep * t;
-            var px = center.X + radius * System.Math.Cos(angle);
-            var py = center.Y + radius * System.Math.Sin(angle);
+            var px = center.X + radius * PortableMath.Cos(angle);
+            var py = center.Y + radius * PortableMath.Sin(angle);
             var arcPt = new Vector(px, py);
 
             var minDist = double.MaxValue;

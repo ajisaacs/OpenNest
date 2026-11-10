@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Shapes
 {
@@ -27,7 +28,7 @@ namespace OpenNest.Shapes
         {
             var n = Sides < 3 ? 3 : Sides;
             var center = Width / 2.0;
-            var circumRadius = Width / (2.0 * System.Math.Cos(System.Math.PI / n));
+            var circumRadius = Width / (2.0 * PortableMath.Cos(System.Math.PI / n));
             var step = 2.0 * System.Math.PI / n;
             var start = System.Math.PI / n;
 
@@ -36,8 +37,8 @@ namespace OpenNest.Shapes
             {
                 var angle = start + i * step;
                 vertices[i] = new Vector(
-                    center + circumRadius * System.Math.Cos(angle),
-                    center + circumRadius * System.Math.Sin(angle)
+                    center + circumRadius * PortableMath.Cos(angle),
+                    center + circumRadius * PortableMath.Sin(angle)
                 );
             }
 

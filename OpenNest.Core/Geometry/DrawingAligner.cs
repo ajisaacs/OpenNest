@@ -786,7 +786,7 @@ namespace OpenNest.Geometry
             if (!(covXX > 0) || double.IsNaN(covXY) || double.IsNaN(covXX))
                 return false;
 
-            dTheta = System.Math.Atan2(covXY, covXX);
+            dTheta = PortableMath.Atan2(covXY, covXX);
             if (double.IsNaN(dTheta) || double.IsInfinity(dTheta))
                 return false;
 

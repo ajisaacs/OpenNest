@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using OpenNest.Engine.CirclePacking;
 using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.Jobs.Cutouts;
 
@@ -317,8 +318,8 @@ internal sealed class CutoutPipelinePrepass : IPipelinePrepass
     private void Expand(Bundle bundle, double x, double y, double rotation,
         List<(string PartId, double X, double Y, double Rotation)> poses)
     {
-        var sine = System.Math.Sin(rotation);
-        var cosine = System.Math.Cos(rotation);
+        var sine = PortableMath.Sin(rotation);
+        var cosine = PortableMath.Cos(rotation);
         foreach (var local in bundle.LocalInserts)
         {
             var insertX = x + local.X * cosine - local.Y * sine;

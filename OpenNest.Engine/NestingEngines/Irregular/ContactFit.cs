@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Clipper2Lib;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.NestingEngines.Irregular;
 
@@ -83,8 +84,8 @@ internal static class ContactFit
 
         double theta = 0, x = centerX, y = centerY;
         Pose At() => new(start.Rotation + theta,
-            x - (System.Math.Cos(theta) * pivotX - System.Math.Sin(theta) * pivotY),
-            y - (System.Math.Sin(theta) * pivotX + System.Math.Cos(theta) * pivotY));
+            x - (PortableMath.Cos(theta) * pivotX - PortableMath.Sin(theta) * pivotY),
+            y - (PortableMath.Sin(theta) * pivotX + PortableMath.Cos(theta) * pivotY));
         Pose? best = null;
         var bestWorst = double.PositiveInfinity;
         var cap = MaxStep;
@@ -205,8 +206,8 @@ internal static class ContactFit
 
     private static PathD Place(PathD local, double theta, double x, double y)
     {
-        var cos = System.Math.Cos(theta);
-        var sin = System.Math.Sin(theta);
+        var cos = PortableMath.Cos(theta);
+        var sin = PortableMath.Sin(theta);
         var result = new PathD(local.Count);
         foreach (var p in local)
             result.Add(new PointD(cos * p.x - sin * p.y + x, sin * p.x + cos * p.y + y));

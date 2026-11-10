@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Diagnostics;
 
@@ -243,8 +244,8 @@ internal static class PostVerificationGeometry
                 System.Math.Max(Start.X, End.X), System.Math.Max(Start.Y, End.Y));
 
         internal Vector Midpoint => Center is { } center
-            ? new Vector(center.X + Radius * System.Math.Cos(StartAngle + Sweep / 2),
-                center.Y + Radius * System.Math.Sin(StartAngle + Sweep / 2))
+            ? new Vector(center.X + Radius * PortableMath.Cos(StartAngle + Sweep / 2),
+                center.Y + Radius * PortableMath.Sin(StartAngle + Sweep / 2))
             : (Start + End) * 0.5;
 
         /// <summary>
@@ -287,7 +288,7 @@ internal static class PostVerificationGeometry
 
         internal double DistanceAlong(Vector point) => Center is { } center
             ? point.DistanceTo(Start) <= Epsilon ? 0
-                : Travel(System.Math.Atan2(point.Y - center.Y, point.X - center.X)) * Radius
+                : Travel(PortableMath.Atan2(point.Y - center.Y, point.X - center.X)) * Radius
             : Dot(point - Start, (End - Start) * (1 / Length));
 
         /// <summary>Unit direction of travel at the curve's start or end.</summary>
@@ -314,8 +315,8 @@ internal static class PostVerificationGeometry
             if (distance <= 0) return Start;
             if (distance >= Length) return End;
             return Center is { } center
-                ? center + new Vector(System.Math.Cos(StartAngle + System.Math.Sign(Sweep) * distance / Radius),
-                    System.Math.Sin(StartAngle + System.Math.Sign(Sweep) * distance / Radius)) * Radius
+                ? center + new Vector(PortableMath.Cos(StartAngle + System.Math.Sign(Sweep) * distance / Radius),
+                    PortableMath.Sin(StartAngle + System.Math.Sign(Sweep) * distance / Radius)) * Radius
                 : Start + (End - Start) * (distance / Length);
         }
 
@@ -331,7 +332,7 @@ internal static class PostVerificationGeometry
         /// </summary>
         internal Curve Until(Vector point) => Center is { } center
             ? new Curve(Start, point, center, Radius,
-                System.Math.Sign(Sweep) * Travel(System.Math.Atan2(point.Y - center.Y, point.X - center.X)))
+                System.Math.Sign(Sweep) * Travel(PortableMath.Atan2(point.Y - center.Y, point.X - center.X)))
             : new Curve(Start, point, null, 0, 0);
 
         internal bool Contains(Vector point) => Contains(point, Epsilon);
@@ -524,16 +525,16 @@ internal static class PostVerificationGeometry
             if (radius <= Epsilon || !double.IsFinite(radius)
                 || System.Math.Abs(radius - end.DistanceTo(c)) > Epsilon * System.Math.Max(1, radius))
                 throw new ArgumentException("Arc has zero or inconsistent radius.");
-            var a = System.Math.Atan2(start.Y - c.Y, start.X - c.X);
-            var b = System.Math.Atan2(end.Y - c.Y, end.X - c.X);
+            var a = PortableMath.Atan2(start.Y - c.Y, start.X - c.X);
+            var b = PortableMath.Atan2(end.Y - c.Y, end.X - c.X);
             var sweep = start.DistanceTo(end) <= Epsilon ? TwoPi
                 : Normalize(clockwise ? a - b : b - a);
             return new Curve(start, end, c, radius, clockwise ? -sweep : sweep);
         }
 
-        private double StartAngle => System.Math.Atan2(Start.Y - Center.Value.Y, Start.X - Center.Value.X);
+        private double StartAngle => PortableMath.Atan2(Start.Y - Center.Value.Y, Start.X - Center.Value.X);
         private double Travel(double angle) => Normalize(Sweep < 0 ? StartAngle - angle : angle - StartAngle);
-        private bool OnArc(Vector point) => Travel(System.Math.Atan2(point.Y - Center.Value.Y,
+        private bool OnArc(Vector point) => Travel(PortableMath.Atan2(point.Y - Center.Value.Y,
             point.X - Center.Value.X)) <= System.Math.Abs(Sweep) + Epsilon / Radius
             || point.DistanceTo(Start) <= Epsilon || point.DistanceTo(End) <= Epsilon;
 
@@ -637,13 +638,13 @@ internal static class PostVerificationGeometry
             {
                 var a = StartAngle + System.Math.Sign(Sweep) * breaks[i - 1];
                 var b = StartAngle + System.Math.Sign(Sweep) * breaks[i];
-                var ya = i == 1 ? Start.Y : center.Y + Radius * System.Math.Sin(a);
-                var yb = i == breaks.Count - 1 ? End.Y : center.Y + Radius * System.Math.Sin(b);
+                var ya = i == 1 ? Start.Y : center.Y + Radius * PortableMath.Sin(a);
+                var yb = i == breaks.Count - 1 ? End.Y : center.Y + Radius * PortableMath.Sin(b);
                 if ((ya > rayY) == (yb > rayY))
                     continue;
                 var dy = point.Y - center.Y;
                 var dx = System.Math.Sqrt(System.Math.Max(0, Radius * Radius - dy * dy));
-                var x = center.X + (System.Math.Cos((a + b) / 2) >= 0 ? dx : -dx);
+                var x = center.X + (PortableMath.Cos((a + b) / 2) >= 0 ? dx : -dx);
                 if (x > point.X)
                     inside = !inside;
             }

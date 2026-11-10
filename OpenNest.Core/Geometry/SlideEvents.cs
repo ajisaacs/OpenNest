@@ -63,7 +63,7 @@ namespace OpenNest.Geometry
                                 continue;
 
                             var hitAngle = Angle.NormalizeRad(
-                                System.Math.Atan2(vy + t * rayY - cy, vx + t * rayX - cx)
+                                PortableMath.Atan2(vy + t * rayY - cy, vx + t * rayX - cx)
                             );
                             if (!Angle.IsBetweenRad(hitAngle, arc.StartAngle, arc.EndAngle, arc.IsReversed))
                                 continue;
@@ -281,7 +281,7 @@ namespace OpenNest.Geometry
                     // The directional distance from an arc point at angle θ to the
                     // line is t(θ) = [A + r·(ey·cosθ − ex·sinθ)] / det.
                     // dt/dθ = 0 at θ = atan2(−ex, ey) and θ + π.
-                    var theta1 = Angle.NormalizeRad(System.Math.Atan2(-ex, ey));
+                    var theta1 = Angle.NormalizeRad(PortableMath.Atan2(-ex, ey));
                     var theta2 = Angle.NormalizeRad(theta1 + System.Math.PI);
 
                     for (var k = 0; k < 2; k++)
@@ -291,8 +291,8 @@ namespace OpenNest.Geometry
                         if (arc != null && !Angle.IsBetweenRad(theta, arc.StartAngle, arc.EndAngle, arc.IsReversed))
                             continue;
 
-                        var qx = cx + r * System.Math.Cos(theta);
-                        var qy = cy + r * System.Math.Sin(theta);
+                        var qx = cx + r * PortableMath.Cos(theta);
+                        var qy = cy + r * PortableMath.Sin(theta);
 
                         RayLine(ref sink, qx, qy, p1x, p1y, p2x, p2y, rayX, rayY, arcMoves);
                         if (sink.IsDone)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Support
 {
@@ -177,7 +178,7 @@ namespace OpenNest.Support
         {
             var box = BoundingRectangle(outline);
             var angle = box.Width >= box.Height ? box.Angle : box.Angle + Math.Angle.HalfPI;
-            return new Vector(System.Math.Cos(angle), System.Math.Sin(angle));
+            return new Vector(PortableMath.Cos(angle), PortableMath.Sin(angle));
         }
 
         // The minimum-area rectangle over every hull edge. Shapes such as a right isosceles
@@ -211,7 +212,7 @@ namespace OpenNest.Support
                     minV = System.Math.Min(minV, pv);
                     maxV = System.Math.Max(maxV, pv);
                 }
-                candidates.Add(new BoundingRectangleResult(System.Math.Atan2(edge.Y, edge.X), maxU - minU, maxV - minV));
+                candidates.Add(new BoundingRectangleResult(PortableMath.Atan2(edge.Y, edge.X), maxU - minU, maxV - minV));
             }
             if (candidates.Count == 0)
                 return RotatingCalipers.MinimumBoundingRectangle(outline.ToList());
@@ -262,7 +263,7 @@ namespace OpenNest.Support
                 var outOf = outline[(i + 1) % count] - outline[i];
                 var cross = into.X * outOf.Y - into.Y * outOf.X;
                 var dot = into.X * outOf.X + into.Y * outOf.Y;
-                turns[i] = System.Math.Atan2(cross, dot) * System.Math.Sign(area);
+                turns[i] = PortableMath.Atan2(cross, dot) * System.Math.Sign(area);
             }
 
             // Start after a vertex that does not turn inward so no run is split by the wrap.

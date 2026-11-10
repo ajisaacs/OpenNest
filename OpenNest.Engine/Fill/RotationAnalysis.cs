@@ -143,7 +143,7 @@ namespace OpenNest.Engine.Fill
                 if (lengthSq < Tolerance.Epsilon)
                     continue;
 
-                var angle = -System.Math.Atan2(dy, dx);
+                var angle = -PortableMath.Atan2(dy, dx);
 
                 if (!edges.Any(e => e.angle.IsEqualTo(angle)))
                     edges.Add((angle, lengthSq));

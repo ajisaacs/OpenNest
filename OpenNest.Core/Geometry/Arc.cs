@@ -141,8 +141,8 @@ namespace OpenNest.Geometry
         public Vector StartPoint()
         {
             return new Vector(
-                Center.X + Radius * System.Math.Cos(StartAngle),
-                Center.Y + Radius * System.Math.Sin(StartAngle)
+                Center.X + Radius * PortableMath.Cos(StartAngle),
+                Center.Y + Radius * PortableMath.Sin(StartAngle)
             );
         }
 
@@ -153,8 +153,8 @@ namespace OpenNest.Geometry
         public Vector EndPoint()
         {
             return new Vector(
-                Center.X + Radius * System.Math.Cos(EndAngle),
-                Center.Y + Radius * System.Math.Sin(EndAngle)
+                Center.X + Radius * PortableMath.Cos(EndAngle),
+                Center.Y + Radius * PortableMath.Sin(EndAngle)
             );
         }
 
@@ -165,8 +165,8 @@ namespace OpenNest.Geometry
         {
             var midAngle = StartAngle + (IsReversed ? -SweepAngle() / 2 : SweepAngle() / 2);
             return new Vector(
-                Center.X + Radius * System.Math.Cos(midAngle),
-                Center.Y + Radius * System.Math.Sin(midAngle)
+                Center.X + Radius * PortableMath.Cos(midAngle),
+                Center.Y + Radius * PortableMath.Sin(midAngle)
             );
         }
 
@@ -231,7 +231,7 @@ namespace OpenNest.Geometry
             if (tolerance >= Radius)
                 return 1;
 
-            var maxAngle = 2.0 * System.Math.Acos(1.0 - tolerance / Radius);
+            var maxAngle = 2.0 * PortableMath.Acos(1.0 - tolerance / Radius);
             return System.Math.Max(
                 1,
                 (int)System.Math.Ceiling(System.Math.Abs(SweepAngle()) / maxAngle)
@@ -250,7 +250,7 @@ namespace OpenNest.Geometry
 
             var r =
                 circumscribe && segments > 0
-                    ? Radius / System.Math.Cos(System.Math.Abs(stepAngle) / 2.0)
+                    ? Radius / PortableMath.Cos(System.Math.Abs(stepAngle) / 2.0)
                     : Radius;
 
             for (int i = 0; i <= segments; ++i)
@@ -259,8 +259,8 @@ namespace OpenNest.Geometry
 
                 points.Add(
                     new Vector(
-                        System.Math.Cos(angle) * r + Center.X,
-                        System.Math.Sin(angle) * r + Center.Y
+                        PortableMath.Cos(angle) * r + Center.X,
+                        PortableMath.Sin(angle) * r + Center.Y
                     )
                 );
             }
@@ -479,8 +479,8 @@ namespace OpenNest.Geometry
             if (Angle.IsBetweenRad(angle, StartAngle, EndAngle, IsReversed))
             {
                 return new Vector(
-                    System.Math.Cos(angle) * Radius + Center.X,
-                    System.Math.Sin(angle) * Radius + Center.Y
+                    PortableMath.Cos(angle) * Radius + Center.X,
+                    PortableMath.Sin(angle) * Radius + Center.Y
                 );
             }
             else

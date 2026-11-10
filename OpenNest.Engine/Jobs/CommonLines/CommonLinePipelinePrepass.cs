@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.Jobs.CommonLines;
 
@@ -138,8 +139,8 @@ internal sealed class CommonLinePipelinePrepass : IPipelinePrepass
                     poses.Add((pose.PartId, pose.X, pose.Y, pose.Rotation));
                     continue;
                 }
-                var sine = System.Math.Sin(pose.Rotation);
-                var cosine = System.Math.Cos(pose.Rotation);
+                var sine = PortableMath.Sin(pose.Rotation);
+                var cosine = PortableMath.Cos(pose.Rotation);
                 var pair = proxy.Pair;
                 groups.Add(new NestJobCommonLine(kerf, new[] { poses.Count, poses.Count + 1 }));
                 poses.Add((proxy.PartId, pose.X, pose.Y, pose.Rotation));

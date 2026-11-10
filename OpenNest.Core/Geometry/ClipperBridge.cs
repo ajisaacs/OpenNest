@@ -299,7 +299,7 @@ namespace OpenNest.Geometry
             var sweep = arc.SweepAngle();
             var segments = CircumscribedSegments(arc.Radius, sweep, tolerance);
             var step = (arc.IsReversed ? -sweep : sweep) / segments;
-            var r = arc.Radius / System.Math.Cos(System.Math.Abs(step) / 2);
+            var r = arc.Radius / PortableMath.Cos(System.Math.Abs(step) / 2);
 
             points.Add(arc.StartPoint());
 
@@ -308,8 +308,8 @@ namespace OpenNest.Geometry
                 var angle = arc.StartAngle + step * (i + 0.5);
                 points.Add(
                     new Vector(
-                        arc.Center.X + r * System.Math.Cos(angle),
-                        arc.Center.Y + r * System.Math.Sin(angle)
+                        arc.Center.X + r * PortableMath.Cos(angle),
+                        arc.Center.Y + r * PortableMath.Sin(angle)
                     )
                 );
             }
@@ -332,14 +332,14 @@ namespace OpenNest.Geometry
 
             var segments = CircumscribedSegments(circle.Radius, Angle.TwoPI, tolerance);
             var step = Angle.TwoPI / segments;
-            var r = circle.Radius / System.Math.Cos(step / 2);
+            var r = circle.Radius / PortableMath.Cos(step / 2);
 
             for (var i = 0; i < segments; i++)
             {
                 points.Add(
                     new Vector(
-                        circle.Center.X + r * System.Math.Cos(step * i),
-                        circle.Center.Y + r * System.Math.Sin(step * i)
+                        circle.Center.X + r * PortableMath.Cos(step * i),
+                        circle.Center.Y + r * PortableMath.Sin(step * i)
                     )
                 );
             }
@@ -352,7 +352,7 @@ namespace OpenNest.Geometry
         /// </summary>
         private static int CircumscribedSegments(double radius, double sweep, double tolerance)
         {
-            var maxHalfStep = System.Math.Acos(radius / (radius + tolerance));
+            var maxHalfStep = PortableMath.Acos(radius / (radius + tolerance));
             var segments = (int)System.Math.Ceiling(System.Math.Abs(sweep) / (2 * maxHalfStep));
             var quarters = (int)System.Math.Ceiling(System.Math.Abs(sweep) / Angle.HalfPI);
 

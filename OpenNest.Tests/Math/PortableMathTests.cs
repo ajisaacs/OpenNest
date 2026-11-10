@@ -88,6 +88,47 @@ public class PortableMathTests
     }
 
     /// <summary>
+    /// Geometry and nesting code must not call the runtime's trig: one call is enough for the
+    /// same job to nest differently on Windows and Linux.
+    /// </summary>
+    [Fact]
+    public void LayoutProjects_UsePortableTrigOnly()
+    {
+        var root = CuttingPlanning.PlanningCharacterizationTests.RepositoryRoot();
+        var runtimeTrig = new System.Text.RegularExpressions.Regex(
+            @"\bMath\.(Sin|Cos|Tan|Atan2|Atan|Asin|Acos|SinCos)\("
+        );
+        var offenders = new List<string>();
+        var projects = new[] { "OpenNest.Core", "OpenNest.Engine", "OpenNest.IO", "OpenNest.Data" };
+        foreach (var project in projects)
+        {
+            var files = Directory.EnumerateFiles(
+                Path.Combine(root, project),
+                "*.cs",
+                SearchOption.AllDirectories
+            );
+            foreach (var file in files)
+            {
+                var parts = Path.GetRelativePath(root, file).Split(Path.DirectorySeparatorChar);
+                var generated = parts.Contains("bin") || parts.Contains("obj");
+                if (generated || parts[^1] == "PortableMath.cs")
+                    continue;
+                var lines = File.ReadAllLines(file);
+                for (var i = 0; i < lines.Length; i++)
+                {
+                    if (runtimeTrig.IsMatch(lines[i]))
+                        offenders.Add($"{string.Join('/', parts)}:{i + 1}");
+                }
+            }
+        }
+
+        Assert.True(
+            offenders.Count == 0,
+            "use PortableMath instead:\n" + string.Join("\n", offenders)
+        );
+    }
+
+    /// <summary>
     /// The point of PortableMath: the same bits on every platform. The digest was captured on
     /// Linux and must also pass on Windows (Project Memory 518f3b58).
     /// </summary>

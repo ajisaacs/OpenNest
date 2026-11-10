@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest;
 
@@ -25,8 +26,8 @@ public class SpikeGrooveSplit : ISplitFeature
         var spikeDepth = parameters.SpikeDepth;
         var grooveDepth = parameters.GrooveDepth;
         var angleRad = OpenNest.Math.Angle.ToRadians(parameters.SpikeAngle / 2);
-        var spikeHalfWidth = spikeDepth * System.Math.Tan(angleRad);
-        var grooveHalfWidth = grooveDepth * System.Math.Tan(angleRad);
+        var spikeHalfWidth = spikeDepth * PortableMath.Tan(angleRad);
+        var grooveHalfWidth = grooveDepth * PortableMath.Tan(angleRad);
 
         var isVertical = line.Axis == CutOffAxis.Vertical;
         var pos = line.Position;

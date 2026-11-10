@@ -103,8 +103,8 @@ namespace OpenNest.CNC
 
                     if (subpgm.Offset.X != 0 || subpgm.Offset.Y != 0)
                     {
-                        var cos = System.Math.Cos(angle);
-                        var sin = System.Math.Sin(angle);
+                        var cos = PortableMath.Cos(angle);
+                        var sin = PortableMath.Sin(angle);
                         var dx = subpgm.Offset.X - origin.X;
                         var dy = subpgm.Offset.Y - origin.Y;
                         subpgm.Offset = new Geometry.Vector(

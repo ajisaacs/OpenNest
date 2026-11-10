@@ -112,11 +112,12 @@ public class BoundingBoxHelperTests
         return new Box(l, bo, r - l, t - bo);
     }
 
-    // Frozen from DiscPacker.Rotate / CutoutCirclePacker.Rotate / DrawingAligner.Rotate.
+    // Frozen from DiscPacker.Rotate / CutoutCirclePacker.Rotate / DrawingAligner.Rotate,
+    // trig spelled PortableMath as production now is.
     private static Vector FrozenRotate(Vector v, double angle)
     {
-        var sine = System.Math.Sin(angle);
-        var cosine = System.Math.Cos(angle);
+        var sine = OpenNest.Math.PortableMath.Sin(angle);
+        var cosine = OpenNest.Math.PortableMath.Cos(angle);
         return new Vector(v.X * cosine - v.Y * sine, v.X * sine + v.Y * cosine);
     }
 }

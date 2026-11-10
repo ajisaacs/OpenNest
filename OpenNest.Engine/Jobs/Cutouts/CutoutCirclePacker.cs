@@ -247,7 +247,7 @@ internal static class CutoutCirclePacker
     {
         if (p.DistanceTo(0, 0) < Epsilon)
             return -1;
-        var angle = System.Math.Atan2(p.X, -p.Y);
+        var angle = PortableMath.Atan2(p.X, -p.Y);
         return angle < 0 ? angle + 2 * System.Math.PI : angle;
     }
 }

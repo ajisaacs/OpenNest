@@ -80,7 +80,7 @@ namespace OpenNest.Geometry
 
             var dirX = dx / length;
             var dirY = dy / length;
-            var tangent = System.Math.Atan2(dirY, dirX);
+            var tangent = PortableMath.Atan2(dirY, dirX);
 
             var count = System.Math.Max(1, (int)(length / spacing));
             var step = length / (count + 1);
@@ -114,8 +114,8 @@ namespace OpenNest.Geometry
             if (radius < Tolerance.Epsilon)
                 return;
 
-            var startAngle = System.Math.Atan2(start.Y - center.Y, start.X - center.X);
-            var endAngle = System.Math.Atan2(end.Y - center.Y, end.X - center.X);
+            var startAngle = PortableMath.Atan2(start.Y - center.Y, start.X - center.X);
+            var endAngle = PortableMath.Atan2(end.Y - center.Y, end.X - center.X);
 
             double sweep;
             if (rotation == RotationType.CCW)
@@ -147,8 +147,8 @@ namespace OpenNest.Geometry
                     angle = startAngle - stepAngle * i;
 
                 var pt = new Vector(
-                    center.X + radius * System.Math.Cos(angle),
-                    center.Y + radius * System.Math.Sin(angle)
+                    center.X + radius * PortableMath.Cos(angle),
+                    center.Y + radius * PortableMath.Sin(angle)
                 );
 
                 double tangent;
@@ -157,7 +157,7 @@ namespace OpenNest.Geometry
                 else
                     tangent = angle - System.Math.PI / 2;
 
-                var dir = new Vector(System.Math.Cos(tangent), System.Math.Sin(tangent));
+                var dir = new Vector(PortableMath.Cos(tangent), PortableMath.Sin(tangent));
                 var at = radius * System.Math.Abs(stepAngle * i);
                 output.Add(new ContourSample(pt, dir, tangent, at));
             }
@@ -325,7 +325,7 @@ namespace OpenNest.Geometry
                 var local = segLen > 0 ? (s - segStart) / segLen : 0.0;
                 var dir = SegmentDirection(a, b);
                 var pt = new Vector(a.X + (b.X - a.X) * local, a.Y + (b.Y - a.Y) * local);
-                output.Add(new ContourSample(pt, dir, System.Math.Atan2(dir.Y, dir.X), s));
+                output.Add(new ContourSample(pt, dir, PortableMath.Atan2(dir.Y, dir.X), s));
             }
         }
 
@@ -357,8 +357,8 @@ namespace OpenNest.Geometry
 
             // Same sweep convention as ArcMoves: always in (0, 2*PI], so a full
             // circle counts its whole circumference toward the walk's arclength.
-            var startAngle = System.Math.Atan2(start.Y - center.Y, start.X - center.X);
-            var endAngle = System.Math.Atan2(end.Y - center.Y, end.X - center.X);
+            var startAngle = PortableMath.Atan2(start.Y - center.Y, start.X - center.X);
+            var endAngle = PortableMath.Atan2(end.Y - center.Y, end.X - center.X);
             var sweep =
                 rotation == RotationType.CCW ? endAngle - startAngle : startAngle - endAngle;
             if (sweep <= 0)

@@ -148,7 +148,7 @@ public sealed class JobPartGeometry
                 var arc = (Arc)entity;
                 var angle = arc.StartAngle + (arc.IsReversed ? -1 : 1) * arc.SweepAngle() * value;
                 return arc.Center
-                    + new Vector(System.Math.Cos(angle), System.Math.Sin(angle)) * arc.Radius;
+                    + new Vector(PortableMath.Cos(angle), PortableMath.Sin(angle)) * arc.Radius;
             }
             void Check(Vector point)
             {

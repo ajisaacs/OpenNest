@@ -1,6 +1,7 @@
 using System.Linq;
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest
 {
@@ -123,7 +124,7 @@ namespace OpenNest
             // keeps offsets lying exactly on an axis (mirror-symmetric parts) away from the
             // interval edge so floating-point noise cannot flip the choice.
             var halfPi = System.Math.PI / 2.0;
-            var direction = System.Math.Atan2(dy, dx);
+            var direction = PortableMath.Atan2(dy, dx);
             for (var turns = 0; turns < 4; turns++)
             {
                 var relative = direction + turns * halfPi - (System.Math.PI - PreferenceMargin);

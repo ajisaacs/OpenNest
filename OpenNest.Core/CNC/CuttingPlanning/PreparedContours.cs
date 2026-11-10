@@ -5,6 +5,7 @@ using System.Threading;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
+using OpenNest.Math;
 using OpenNest.Support;
 
 namespace OpenNest.CNC.CuttingPlanning;
@@ -511,8 +512,8 @@ public sealed class PreparedContours
             if (entity is Circle circle)
             {
                 for (var angle = 0; angle < 8 && entries.Count < maxEntries; angle++)
-                    Add(i, circle.Center + new Vector(System.Math.Cos(angle * System.Math.PI / 4),
-                        System.Math.Sin(angle * System.Math.PI / 4)) * circle.Radius);
+                    Add(i, circle.Center + new Vector(PortableMath.Cos(angle * System.Math.PI / 4),
+                        PortableMath.Sin(angle * System.Math.PI / 4)) * circle.Radius);
             }
             else
             {
@@ -764,8 +765,8 @@ public sealed class PreparedContours
                     // The legacy eight compass points, same native construction.
                     for (var angle = 0; angle < 8; angle++)
                         fallbacks.Add(Fallback(i, circle.Center + new Vector(
-                            System.Math.Cos(angle * System.Math.PI / 4),
-                            System.Math.Sin(angle * System.Math.PI / 4)) * circle.Radius,
+                            PortableMath.Cos(angle * System.Math.PI / 4),
+                            PortableMath.Sin(angle * System.Math.PI / 4)) * circle.Radius,
                             AutomaticEntryKind.CircleCompass));
                     break;
             }
@@ -977,7 +978,7 @@ public sealed class PreparedContours
         if (ContourCuttingStrategy.ClassifyTurn((before.EndPoint - before.StartPoint).Normalize(),
                 (after.EndPoint - after.StartPoint).Normalize(), winding) != ContourCuttingStrategy.CornerKind.Convex)
             return null;
-        var reach = arc.Radius * System.Math.Tan(sweep / 2);
+        var reach = arc.Radius * PortableMath.Tan(sweep / 2);
         return reach <= System.Math.Min(before.Length, after.Length) ? reach : null;
 
         bool IsSmooth(Vector vertex, Entity entity) =>

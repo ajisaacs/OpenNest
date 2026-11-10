@@ -40,6 +40,10 @@ namespace OpenNest.Engine.Tests.Jobs;
 /// Re-captured when the pairs phase began tiling herringbone pairs (<c>HerringbonePatterns</c>):
 /// the mixed Strip nest keeps 35 laid out differently, and herringbone pairs won the chevron of
 /// the learned-angle nests whatever angles were learned, so a cross replaced it.
+/// The learned-angle nests were re-captured when geometry moved to <c>PortableMath</c>: their
+/// herringbone-era pins came from Windows, whose runtime trig differs from Linux in the last
+/// bit, and the cross nested differently on each (Strip 23 there, 28 here). Both platforms
+/// now give these layouts, which pass the overlap and work-area checks.
 /// Not pinned: richer mixes that pair parallelogram, chevron or tee parts at oblique angles
 /// with other irregular items. Their Fill and Vertical Remnant nests vary between runs, most
 /// likely because best-fit pair candidates are gathered in a <c>ConcurrentBag</c> and equal
@@ -47,16 +51,6 @@ namespace OpenNest.Engine.Tests.Jobs;
 /// </remarks>
 public class FillStackCharacterizationTests
 {
-    /// <summary>A theory that runs only on Windows.</summary>
-    private sealed class WindowsOnlyTheoryAttribute : TheoryAttribute
-    {
-        public WindowsOnlyTheoryAttribute()
-        {
-            if (!OperatingSystem.IsWindows())
-                Skip = "Layout differs off Windows (Project Memory 518f3b58)";
-        }
-    }
-
     /// <summary>6x4 block with a 2x2 notch cut into the middle of its top edge.</summary>
     private static Program Notched()
     {
@@ -309,17 +303,11 @@ public class FillStackCharacterizationTests
         AssertPinned(layout, expectedCount, expectedDigest);
     }
 
-    /// <remarks>
-    /// Windows-only: these pins were captured on Windows, and Linux lays this nest out
-    /// differently (Strip places 28, not 23) because the two platforms' trig differs in the last
-    /// bit and the fill stack turns that into different tie and threshold decisions (Project
-    /// Memory 518f3b58). Unskip on every platform when that is fixed.
-    /// </remarks>
-    [WindowsOnlyTheory]
-    [InlineData("Fill", 28, "BE363E3A47E9B036")]
-    [InlineData("Strip", 23, "E4AA82327508D538")]
-    [InlineData("Vertical Remnant", 28, "DB2409DB39642666")]
-    [InlineData("Horizontal Remnant", 24, "883BD209AE87E2C5")]
+    [Theory]
+    [InlineData("Fill", 28, "58E544673B69F3CB")]
+    [InlineData("Strip", 28, "BB448C553CFECBD8")]
+    [InlineData("Vertical Remnant", 28, "E146E6F08C26C375")]
+    [InlineData("Horizontal Remnant", 24, "5D5B0413007B0B07")]
     public void Nest_LearnedAngleItems_PinnedLayout(
         string strategy,
         int expectedCount,

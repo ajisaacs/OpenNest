@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.IO
 {
@@ -126,12 +127,12 @@ namespace OpenNest.IO
         private static SvgTransform Rotation(double degrees)
         {
             var radians = degrees * System.Math.PI / 180;
-            var cos = System.Math.Cos(radians);
-            var sin = System.Math.Sin(radians);
+            var cos = PortableMath.Cos(radians);
+            var sin = PortableMath.Sin(radians);
             return new SvgTransform(cos, sin, -sin, cos, 0, 0);
         }
 
         private static double Tan(double degrees) =>
-            System.Math.Tan(degrees * System.Math.PI / 180);
+            PortableMath.Tan(degrees * System.Math.PI / 180);
     }
 }

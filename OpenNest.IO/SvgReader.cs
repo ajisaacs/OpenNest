@@ -703,8 +703,8 @@ namespace OpenNest.IO
                 return;
             }
 
-            var cos = System.Math.Cos(rotation);
-            var sin = System.Math.Sin(rotation);
+            var cos = PortableMath.Cos(rotation);
+            var sin = PortableMath.Sin(rotation);
             var halfX = (from.X - to.X) / 2;
             var halfY = (from.Y - to.Y) / 2;
             var x = cos * halfX + sin * halfY;
@@ -731,8 +731,8 @@ namespace OpenNest.IO
                 sin * centerX + cos * centerY + (from.Y + to.Y) / 2
             );
 
-            var startAngle = System.Math.Atan2((y - centerY) / ry, (x - centerX) / rx);
-            var endAngle = System.Math.Atan2((-y - centerY) / ry, (-x - centerX) / rx);
+            var startAngle = PortableMath.Atan2((y - centerY) / ry, (x - centerX) / rx);
+            var endAngle = PortableMath.Atan2((-y - centerY) / ry, (-x - centerX) / rx);
             var delta = endAngle - startAngle;
             if (sweep && delta < 0)
                 delta += Angle.TwoPI;
@@ -758,17 +758,17 @@ namespace OpenNest.IO
             Layer layer
         )
         {
-            var cos = System.Math.Cos(rotation);
-            var sin = System.Math.Sin(rotation);
+            var cos = PortableMath.Cos(rotation);
+            var sin = PortableMath.Sin(rotation);
             var axisX = t.ApplyLinear(new Vector(rx * cos, rx * sin));
             var axisY = t.ApplyLinear(new Vector(-ry * sin, ry * cos));
 
-            var offset = 0.5 * System.Math.Atan2(
+            var offset = 0.5 * PortableMath.Atan2(
                 2 * (axisX.X * axisY.X + axisX.Y * axisY.Y),
                 axisX.X * axisX.X + axisX.Y * axisX.Y - axisY.X * axisY.X - axisY.Y * axisY.Y
             );
-            var major = axisX * System.Math.Cos(offset) + axisY * System.Math.Sin(offset);
-            var minor = axisY * System.Math.Cos(offset) - axisX * System.Math.Sin(offset);
+            var major = axisX * PortableMath.Cos(offset) + axisY * PortableMath.Sin(offset);
+            var minor = axisY * PortableMath.Cos(offset) - axisX * PortableMath.Sin(offset);
 
             var semiMajor = Length2(major);
             var semiMinor = Length2(minor);
@@ -784,7 +784,7 @@ namespace OpenNest.IO
                     t.Apply(center),
                     semiMajor,
                     semiMinor,
-                    System.Math.Atan2(major.Y, major.X),
+                    PortableMath.Atan2(major.Y, major.X),
                     System.Math.Min(from, to),
                     System.Math.Max(from, to),
                     tolerance

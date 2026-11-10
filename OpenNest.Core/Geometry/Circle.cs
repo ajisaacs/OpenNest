@@ -126,7 +126,7 @@ namespace OpenNest.Geometry
             if (tolerance >= Radius)
                 return 3;
 
-            var maxAngle = 2.0 * System.Math.Acos(1.0 - tolerance / Radius);
+            var maxAngle = 2.0 * PortableMath.Acos(1.0 - tolerance / Radius);
             return System.Math.Max(3, (int)System.Math.Ceiling(Angle.TwoPI / maxAngle));
         }
 
@@ -137,7 +137,7 @@ namespace OpenNest.Geometry
                 Rotation == RotationType.CW ? -Angle.TwoPI / segments : Angle.TwoPI / segments;
 
             var r =
-                circumscribe && segments > 0 ? Radius / System.Math.Cos(stepAngle / 2.0) : Radius;
+                circumscribe && segments > 0 ? Radius / PortableMath.Cos(stepAngle / 2.0) : Radius;
 
             for (int i = 0; i <= segments; ++i)
             {
@@ -145,8 +145,8 @@ namespace OpenNest.Geometry
 
                 points.Add(
                     new Vector(
-                        System.Math.Cos(angle) * r + Center.X,
-                        System.Math.Sin(angle) * r + Center.Y
+                        PortableMath.Cos(angle) * r + Center.X,
+                        PortableMath.Sin(angle) * r + Center.Y
                     )
                 );
             }
@@ -312,8 +312,8 @@ namespace OpenNest.Geometry
             var angle = Center.AngleTo(pt);
 
             return new Vector(
-                System.Math.Cos(angle) * Radius + Center.X,
-                System.Math.Sin(angle) * Radius + Center.Y
+                PortableMath.Cos(angle) * Radius + Center.X,
+                PortableMath.Sin(angle) * Radius + Center.Y
             );
         }
 

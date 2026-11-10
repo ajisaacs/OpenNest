@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.CNC.CuttingStrategy
 {
@@ -23,8 +24,8 @@ namespace OpenNest.CNC.CuttingStrategy
 
             var scoreAngle = contourNormalAngle + System.Math.PI;
             var scoreEnd = new Vector(
-                tabStartPoint.X + BreakerDepth * System.Math.Cos(scoreAngle),
-                tabStartPoint.Y + BreakerDepth * System.Math.Sin(scoreAngle)
+                tabStartPoint.X + BreakerDepth * PortableMath.Cos(scoreAngle),
+                tabStartPoint.Y + BreakerDepth * PortableMath.Sin(scoreAngle)
             );
             codes.Add(new LinearMove(scoreEnd));
             codes.Add(new RapidMove(tabEndPoint));

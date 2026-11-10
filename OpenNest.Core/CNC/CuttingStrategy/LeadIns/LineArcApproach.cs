@@ -28,22 +28,22 @@ namespace OpenNest.CNC.CuttingStrategy
         public static LineArcApproach Create(Vector contourStartPoint, double contourNormalAngle,
             double arcRadius, double approachAngle, double lineLength, RotationType winding)
         {
-            var arcCenterX = contourStartPoint.X + arcRadius * System.Math.Cos(contourNormalAngle);
-            var arcCenterY = contourStartPoint.Y + arcRadius * System.Math.Sin(contourNormalAngle);
+            var arcCenterX = contourStartPoint.X + arcRadius * PortableMath.Cos(contourNormalAngle);
+            var arcCenterY = contourStartPoint.Y + arcRadius * PortableMath.Sin(contourNormalAngle);
 
             // The approach angle is measured back from the normal against the turn, so the arc
             // runs the short way round to the contour point whichever way it turns.
             var approach = Angle.ToRadians(approachAngle);
             var lineAngle = contourNormalAngle + (winding == RotationType.CCW ? approach : -approach);
-            var arcStartX = arcCenterX + arcRadius * System.Math.Cos(lineAngle);
-            var arcStartY = arcCenterY + arcRadius * System.Math.Sin(lineAngle);
+            var arcStartX = arcCenterX + arcRadius * PortableMath.Cos(lineAngle);
+            var arcStartY = arcCenterY + arcRadius * PortableMath.Sin(lineAngle);
 
             return new LineArcApproach(
                 new Vector(arcCenterX, arcCenterY),
                 new Vector(arcStartX, arcStartY),
                 new Vector(
-                    arcStartX + lineLength * System.Math.Cos(lineAngle),
-                    arcStartY + lineLength * System.Math.Sin(lineAngle)));
+                    arcStartX + lineLength * PortableMath.Cos(lineAngle),
+                    arcStartY + lineLength * PortableMath.Sin(lineAngle)));
         }
 
         /// <summary>Rapid to the pierce point, then the line and arc on the lead-in layer.</summary>

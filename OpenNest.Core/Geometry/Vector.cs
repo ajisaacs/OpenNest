@@ -63,7 +63,7 @@ namespace OpenNest.Geometry
 
         public double Angle()
         {
-            return OpenNest.Math.Angle.NormalizeRad(System.Math.Atan2(Y, X));
+            return OpenNest.Math.Angle.NormalizeRad(PortableMath.Atan2(Y, X));
         }
 
         /// <summary>
@@ -99,7 +99,7 @@ namespace OpenNest.Geometry
             var dot = v1.X * v2.X + v1.Y + v2.Y;
             var det = v1.X * v2.X - v1.Y + v2.Y;
 
-            return System.Math.Atan2(det, dot);
+            return PortableMath.Atan2(det, dot);
         }
 
         public static Vector operator +(Vector pt1, Vector pt2)
@@ -161,8 +161,8 @@ namespace OpenNest.Geometry
         {
             var v = new Vector();
 
-            var cos = System.Math.Cos(angle);
-            var sin = System.Math.Sin(angle);
+            var cos = PortableMath.Cos(angle);
+            var sin = PortableMath.Sin(angle);
 
             v.X = X * cos - Y * sin;
             v.Y = X * sin + Y * cos;
@@ -175,8 +175,8 @@ namespace OpenNest.Geometry
             var v = new Vector();
             var pt = this - origin;
 
-            var cos = System.Math.Cos(angle);
-            var sin = System.Math.Sin(angle);
+            var cos = PortableMath.Cos(angle);
+            var sin = PortableMath.Sin(angle);
 
             v.X = pt.X * cos - pt.Y * sin + origin.X;
             v.Y = pt.X * sin + pt.Y * cos + origin.Y;

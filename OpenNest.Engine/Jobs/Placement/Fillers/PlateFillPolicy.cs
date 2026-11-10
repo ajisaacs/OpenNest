@@ -83,16 +83,16 @@ internal sealed class PlateFillPolicy
     private static double RotatedWidth(NestItem item, double angle)
     {
         var boundingBox = item.Drawing.Program.BoundingBox();
-        var cos = System.Math.Abs(System.Math.Cos(angle));
-        var sin = System.Math.Abs(System.Math.Sin(angle));
+        var cos = System.Math.Abs(PortableMath.Cos(angle));
+        var sin = System.Math.Abs(PortableMath.Sin(angle));
         return boundingBox.Length * cos + boundingBox.Width * sin;
     }
 
     private static double RotatedHeight(NestItem item, double angle)
     {
         var boundingBox = item.Drawing.Program.BoundingBox();
-        var cos = System.Math.Abs(System.Math.Cos(angle));
-        var sin = System.Math.Abs(System.Math.Sin(angle));
+        var cos = System.Math.Abs(PortableMath.Cos(angle));
+        var sin = System.Math.Abs(PortableMath.Sin(angle));
         return boundingBox.Width * cos + boundingBox.Length * sin;
     }
 }

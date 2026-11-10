@@ -46,8 +46,8 @@ namespace OpenNest.CNC.CuttingStrategy
             var angle = contourNormalAngle + (winding == RotationType.CCW ? shortfall : -shortfall);
             var center = ArcCenter(contourStartPoint, contourNormalAngle);
             return new Vector(
-                center.X + Radius * System.Math.Cos(angle),
-                center.Y + Radius * System.Math.Sin(angle)
+                center.X + Radius * PortableMath.Cos(angle),
+                center.Y + Radius * PortableMath.Sin(angle)
             );
         }
 
@@ -55,8 +55,8 @@ namespace OpenNest.CNC.CuttingStrategy
             new ArcLeadIn { Radius = Radius * factor, SweepAngle = SweepAngle };
 
         private Vector ArcCenter(Vector contourStartPoint, double contourNormalAngle) => new Vector(
-            contourStartPoint.X + Radius * System.Math.Cos(contourNormalAngle),
-            contourStartPoint.Y + Radius * System.Math.Sin(contourNormalAngle)
+            contourStartPoint.X + Radius * PortableMath.Cos(contourNormalAngle),
+            contourStartPoint.Y + Radius * PortableMath.Sin(contourNormalAngle)
         );
     }
 }

@@ -189,7 +189,7 @@ namespace OpenNest.Dimensions
             var angle = arc != null && kind == DimensionKind.Radius
                 ? ClampToSweep(arc, dimension.Angle)
                 : dimension.Angle;
-            var direction = new Vector(System.Math.Cos(angle), System.Math.Sin(angle));
+            var direction = new Vector(PortableMath.Cos(angle), PortableMath.Sin(angle));
             var arrow = center + direction * radius;
             var far = center - direction * radius;
             return new DimensionLayout

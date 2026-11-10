@@ -4,6 +4,7 @@ using System.Drawing;
 using ACadSharp.Entities;
 using CSMath;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.IO
 {
@@ -210,7 +211,7 @@ namespace OpenNest.IO
 
             var semiMajor = System.Math.Sqrt(majorAxis.X * majorAxis.X + majorAxis.Y * majorAxis.Y);
             var semiMinor = semiMajor * ellipse.RadiusRatio;
-            var rotation = System.Math.Atan2(majorAxis.Y, majorAxis.X);
+            var rotation = PortableMath.Atan2(majorAxis.Y, majorAxis.X);
 
             var layer = ellipse.Layer.ToOpenNest();
             var color = ellipse.ResolveColor();

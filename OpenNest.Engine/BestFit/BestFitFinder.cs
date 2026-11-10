@@ -213,7 +213,7 @@ namespace OpenNest.Engine.BestFit
                 if (dx * dx + dy * dy < Tolerance.Epsilon)
                     continue;
 
-                var angle = Angle.NormalizeRad(System.Math.Atan2(dy, dx));
+                var angle = Angle.NormalizeRad(PortableMath.Atan2(dy, dx));
                 AddUniqueAngle(hullAngles, angle);
             }
 

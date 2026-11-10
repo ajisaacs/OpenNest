@@ -17,8 +17,8 @@ namespace OpenNest.CNC.CuttingStrategy
         {
             var overcutAngle = contourNormalAngle + Angle.HalfPI - Angle.ToRadians(ApproachAngle);
             var endPoint = new Vector(
-                contourEndPoint.X + Length * System.Math.Cos(overcutAngle),
-                contourEndPoint.Y + Length * System.Math.Sin(overcutAngle)
+                contourEndPoint.X + Length * PortableMath.Cos(overcutAngle),
+                contourEndPoint.Y + Length * PortableMath.Sin(overcutAngle)
             );
 
             return new List<ICode> { new LinearMove(endPoint) { Layer = LayerType.Leadout } };

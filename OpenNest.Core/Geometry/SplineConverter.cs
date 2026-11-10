@@ -167,8 +167,8 @@ namespace OpenNest.Geometry
             var firstPoint = points[0];
             var lastPoint = points[^1];
 
-            var startAngle = System.Math.Atan2(firstPoint.Y - center.Y, firstPoint.X - center.X);
-            var endAngle = System.Math.Atan2(lastPoint.Y - center.Y, lastPoint.X - center.X);
+            var startAngle = PortableMath.Atan2(firstPoint.Y - center.Y, firstPoint.X - center.X);
+            var endAngle = PortableMath.Atan2(lastPoint.Y - center.Y, lastPoint.X - center.X);
             var isReversed = ArcFit.SumSignedAngles(center, points) < 0;
 
             if (startAngle < 0)

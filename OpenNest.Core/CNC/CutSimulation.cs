@@ -123,7 +123,7 @@ namespace OpenNest.CNC
             {
                 var angle = StartAngle + Sweep * fraction;
                 var sign = System.Math.Sign(Sweep);
-                return new Vector(-System.Math.Sin(angle) * sign, System.Math.Cos(angle) * sign);
+                return new Vector(-PortableMath.Sin(angle) * sign, PortableMath.Cos(angle) * sign);
             }
             return Length > 0 ? new Vector((End.X - Start.X) / Length, (End.Y - Start.Y) / Length) : Vector.Zero;
         }
@@ -137,8 +137,8 @@ namespace OpenNest.CNC
             {
                 var angle = StartAngle + Sweep * fraction;
                 return new Vector(
-                    Center.X + Radius * System.Math.Cos(angle),
-                    Center.Y + Radius * System.Math.Sin(angle));
+                    Center.X + Radius * PortableMath.Cos(angle),
+                    Center.Y + Radius * PortableMath.Sin(angle));
             }
 
             return new Vector(

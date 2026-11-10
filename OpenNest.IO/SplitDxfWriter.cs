@@ -7,6 +7,7 @@ using ACadSharp.Tables;
 using CSMath;
 using OpenNest.Bending;
 using OpenNest.Converters;
+using OpenNest.Math;
 // Disambiguate Entity — both ACadSharp.Entities and OpenNest.Geometry define it
 using GeoEntity = OpenNest.Geometry.Entity;
 
@@ -174,8 +175,8 @@ namespace OpenNest.IO
             else
             {
                 var angle = start.AngleTo(end);
-                var dx = System.Math.Cos(angle) * EtchLength;
-                var dy = System.Math.Sin(angle) * EtchLength;
+                var dx = PortableMath.Cos(angle) * EtchLength;
+                var dy = PortableMath.Sin(angle) * EtchLength;
 
                 doc.Entities.Add(
                     new ACadSharp.Entities.Line

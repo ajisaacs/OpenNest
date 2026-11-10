@@ -148,7 +148,7 @@ namespace OpenNest.Geometry
                 System.Math.Abs(point.DistanceTo(center) - circle.Radius) <= Tolerance.ChainTolerance;
             bool OnOverlap(Vector point)
             {
-                var angle = System.Math.Atan2(point.Y - center.Y, point.X - center.X);
+                var angle = PortableMath.Atan2(point.Y - center.Y, point.X - center.X);
                 return spans.Count(s =>
                     {
                         var offset = Angle.NormalizeRad(angle - s.Start);
