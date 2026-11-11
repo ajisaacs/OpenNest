@@ -32,6 +32,15 @@ namespace OpenNest.Avalonia
         private NestTab nestingTab;
         private Task autoNest = Task.CompletedTask;
         private bool closeConfirmed;
+        private bool snapshotMode;
+        // A save or export waiting on its file picker or write; another one waits for it.
+        private bool writingFile;
+        // True while Exit asks about unsaved nests, so a second close request is ignored.
+        private bool askingToExit;
+        // Load warnings shown one dialog at a time, once the window is open.
+        private readonly Queue<(string Name, IReadOnlyList<string> Warnings)> pendingWarnings =
+            new();
+        private bool showingWarnings;
 
         public MainWindow()
         {
@@ -47,11 +56,21 @@ namespace OpenNest.Avalonia
                 Gesture = new KeyGesture(Key.O, KeyModifiers.Control),
                 Command = new Command(() => OnOpen(null, null)),
             });
+            KeyBindings.Add(new KeyBinding
+            {
+                Gesture = new KeyGesture(Key.S, KeyModifiers.Control),
+                Command = new Command(() => OnSave(null, null)),
+            });
             KeyBindings.Add(new KeyBinding { Gesture = new KeyGesture(Key.PageUp), Command = new Command(() => StepPlate(-1)) });
             KeyBindings.Add(new KeyBinding { Gesture = new KeyGesture(Key.PageDown), Command = new Command(() => StepPlate(1)) });
             // Ctrl+Tab before focus navigation takes the Tab key.
             AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
             Closing += OnWindowClosing;
+            Opened += (_, _) =>
+            {
+                if (!snapshotMode)
+                    _ = ShowLoadWarningsAsync();
+            };
             ShowActiveTab();
         }
 
@@ -64,8 +83,14 @@ namespace OpenNest.Avalonia
         {
             try
             {
-                var tab = tabs.Open(
-                    path, file => new Document { Nest = new NestReader(file).Read() });
+                IReadOnlyList<string> warnings = Array.Empty<string>();
+                var tab = tabs.Open(path, file =>
+                {
+                    var reader = new NestReader(file);
+                    var document = new Document { Nest = reader.Read() };
+                    warnings = reader.Warnings;
+                    return document;
+                });
                 if (!views.ContainsKey(tab))
                 {
                     var view = new NestView(tab);
@@ -73,6 +98,16 @@ namespace OpenNest.Avalonia
                     views[tab] = view;
                     notice = null;
                     ShowActiveTab();
+                }
+                if (warnings.Count > 0)
+                {
+                    var count = warnings.Count == 1
+                        ? "1 load warning"
+                        : $"{warnings.Count} load warnings";
+                    ShowNotice($"{tab.Name}: {count}");
+                    pendingWarnings.Enqueue((tab.Name, warnings));
+                    if (IsVisible && !snapshotMode)
+                        _ = ShowLoadWarningsAsync();
                 }
             }
             catch (Exception ex)
@@ -95,6 +130,8 @@ namespace OpenNest.Avalonia
 
         public void SaveSnapshotAndClose(string path, int plateNumber)
         {
+            // No dialogs: the image is taken and the window closes unattended.
+            snapshotMode = true;
             Opened += async (_, _) =>
             {
                 ActiveView?.ShowPlate(plateNumber - 1);
@@ -117,6 +154,11 @@ namespace OpenNest.Avalonia
             NestHost.Content = view;
             EmptyHint.IsVisible = view == null;
             CloseMenuItem.IsEnabled = view != null;
+            SaveMenuItem.IsEnabled = view != null;
+            SaveAsMenuItem.IsEnabled = view != null;
+            ExportNestMenuItem.IsEnabled = view != null;
+            SaveButton.IsEnabled = view != null;
+            SaveAsButton.IsEnabled = view != null;
             CloseAllMenuItem.IsEnabled = view != null;
             Title = view == null
                 ? "OpenNest (Avalonia prototype)"
@@ -201,11 +243,13 @@ namespace OpenNest.Avalonia
                 ShowNotice($"Auto Nest is running on {tab.Name}. Stop it before closing the nest.");
                 return false;
             }
+            if (writingFile)
+            {
+                ShowNotice("A nest is being saved or exported. Close the nest once that finishes.");
+                return false;
+            }
 
-            if (tab.Modified && !await ConfirmDialog.AskAsync(this, "Close Nest",
-                    $"{tab.Name} has Auto Nest results that are not saved. This version of "
-                    + "OpenNest cannot save nests yet, so closing it discards them.",
-                    "Discard and Close"))
+            if (!await ConfirmUnsavedAsync(tab))
                 return false;
 
             tabs.Close(tab);
@@ -230,22 +274,221 @@ namespace OpenNest.Avalonia
 
         private async void OnWindowClosing(object sender, WindowClosingEventArgs e)
         {
-            if (closeConfirmed || !tabs.AnyModified)
+            if (closeConfirmed || (!tabs.AnyModified && !writingFile))
             {
                 nesting?.Cancel();
                 return;
             }
 
             e.Cancel = true;
-            var count = tabs.Tabs.Count(t => t.Modified);
-            var what = count == 1 ? "One open nest has" : $"{count} open nests have";
-            if (await ConfirmDialog.AskAsync(this, "Exit OpenNest",
-                    $"{what} Auto Nest results that are not saved. This version of OpenNest "
-                    + "cannot save nests yet, so exiting discards them.",
-                    "Discard and Exit"))
+            if (askingToExit)
+                return;
+            if (writingFile)
             {
-                closeConfirmed = true;
-                Close();
+                ShowNotice("A nest is being saved or exported. Exit again once that finishes.");
+                return;
+            }
+
+            // As closing each WinForms nest window: ask about every unsaved nest in turn,
+            // showing it; Cancel, or a save that does not happen, keeps the app open. The list
+            // is read again after each answer: Auto Nest can finish while a question is open.
+            askingToExit = true;
+            try
+            {
+                var answered = new HashSet<NestTab>();
+                while (tabs.Tabs.FirstOrDefault(t => t.Modified && !answered.Contains(t))
+                    is { } tab)
+                {
+                    tabs.Activate(tabs.Tabs.ToList().IndexOf(tab));
+                    if (tab == nestingTab)
+                    {
+                        await ConfirmDialog.ShowAsync(this, "Exit OpenNest",
+                            $"Auto Nest is running on {tab.Name}, which has unsaved changes. "
+                            + "Stop Auto Nest (Nest > Stop Auto Nest) or let it finish, then "
+                            + "exit again.");
+                        return;
+                    }
+                    if (!await ConfirmUnsavedAsync(tab))
+                        return;
+                    answered.Add(tab);
+                }
+            }
+            finally
+            {
+                askingToExit = false;
+            }
+            closeConfirmed = true;
+            Close();
+        }
+
+        /// <summary>
+        /// For a nest with unsaved changes, asks Save / Don't Save / Cancel. True when it may
+        /// close: saved, or the user chose not to save.
+        /// </summary>
+        private async Task<bool> ConfirmUnsavedAsync(NestTab tab)
+        {
+            if (!tab.Modified)
+                return true;
+            var choice = await ConfirmDialog.ChooseAsync(this, "Unsaved Changes",
+                $"Save changes to '{tab.Name}' before closing?", "Save", "Don't Save");
+            return choice switch
+            {
+                0 => await SaveAsync(tab, askForFile: false),
+                1 => true,
+                _ => false,
+            };
+        }
+
+        private async void OnSave(object sender, RoutedEventArgs e)
+        {
+            if (tabs.Active != null)
+                await SaveAsync(tabs.Active, askForFile: false);
+        }
+
+        private async void OnSaveAs(object sender, RoutedEventArgs e)
+        {
+            if (tabs.Active != null)
+                await SaveAsync(tabs.Active, askForFile: true);
+        }
+
+        /// <summary>
+        /// Saves the nest to the file it was saved to this session, else (or for Save As) to a
+        /// file the user picks. True when it was saved.
+        /// </summary>
+        private async Task<bool> SaveAsync(NestTab tab, bool askForFile)
+        {
+            if (!CanWrite(tab, "saving"))
+                return false;
+            writingFile = true;
+            try
+            {
+                var path = askForFile ? null : tab.SavePath;
+                path ??= await PickNestFileAsync(tab, "Save Nest As");
+                // Auto Nest may have started on it while the file picker was open.
+                if (path == null || IsNesting(tab, "saving"))
+                    return false;
+                try
+                {
+                    tabs.SaveAs(tab, path);
+                }
+                catch (SaveTargetRefusedException ex)
+                {
+                    await ConfirmDialog.ShowAsync(
+                        this, "Save Nest", $"The nest was not saved. {ex.Message}");
+                    return false;
+                }
+                catch (Exception ex)
+                {
+                    await ConfirmDialog.ShowAsync(this, "Save Nest",
+                        "The nest was not saved. Any copy already at that path was left as it "
+                        + $"was.\n\n{path}\n\n{ex.Message}\n\nChoose File > Save As to save "
+                        + "it to another folder or name.");
+                    return false;
+                }
+                ShowNotice($"Saved {tab.Name} to {path}");
+                return true;
+            }
+            finally
+            {
+                writingFile = false;
+            }
+        }
+
+        private async void OnExportNest(object sender, RoutedEventArgs e)
+        {
+            var tab = tabs.Active;
+            if (tab == null || !CanWrite(tab, "exporting"))
+                return;
+            writingFile = true;
+            try
+            {
+                var path = await PickNestFileAsync(tab, "Export .nest");
+                if (path == null || IsNesting(tab, "exporting"))
+                    return;
+                try
+                {
+                    // Export never changes the nest's file, name or unsaved mark.
+                    tabs.ExportCopy(tab, path);
+                    ShowNotice($"Exported .nest to {path}");
+                }
+                catch (SaveTargetRefusedException ex)
+                {
+                    await ConfirmDialog.ShowAsync(
+                        this, "Export .nest", $"The nest was not exported. {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    await ConfirmDialog.ShowAsync(this, "Export .nest",
+                        $"The nest was not exported.\n\n{path}\n\n{ex.Message}\n\nChoose "
+                        + "File > Export .nest again to pick another folder or name.");
+                }
+            }
+            finally
+            {
+                writingFile = false;
+            }
+        }
+
+        // Whether the tab's nest can be written now: not while Auto Nest works on it, and one
+        // save or export at a time.
+        private bool CanWrite(NestTab tab, string doing)
+        {
+            if (IsNesting(tab, doing))
+                return false;
+            if (writingFile)
+            {
+                ShowNotice("A nest is already being saved or exported. "
+                    + $"Finish that before {doing}.");
+                return false;
+            }
+            return true;
+        }
+
+        private bool IsNesting(NestTab tab, string doing)
+        {
+            if (tab != nestingTab)
+                return false;
+            ShowNotice($"Auto Nest is running on {tab.Name}. "
+                + $"Stop it or let it finish before {doing}.");
+            return true;
+        }
+
+        // A .nest file to write, named after the nest, starting in the folder of its file.
+        private async Task<string> PickNestFileAsync(NestTab tab, string title)
+        {
+            var folder = tab.Path != null ? Path.GetDirectoryName(tab.Path) : null;
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = title,
+                SuggestedFileName = tab.Name,
+                DefaultExtension = "nest",
+                ShowOverwritePrompt = true,
+                FileTypeChoices = new[] { NestFiles },
+                SuggestedStartLocation = folder != null
+                    ? await StorageProvider.TryGetFolderFromPathAsync(folder)
+                    : null,
+            });
+            return file?.TryGetLocalPath();
+        }
+
+        private static readonly FilePickerFileType NestFiles =
+            new("Nest files") { Patterns = new[] { "*.nest" } };
+
+        // Shows the queued load warnings one dialog at a time, as WinForms does after each open.
+        private async Task ShowLoadWarningsAsync()
+        {
+            if (showingWarnings)
+                return;
+            showingWarnings = true;
+            try
+            {
+                while (pendingWarnings.TryDequeue(out var item))
+                    await ConfirmDialog.ShowAsync(this, "Nest Load Warnings",
+                        $"{item.Name}:\n\n" + string.Join(Environment.NewLine, item.Warnings));
+            }
+            finally
+            {
+                showingWarnings = false;
             }
         }
 
@@ -275,7 +518,7 @@ namespace OpenNest.Avalonia
             {
                 Title = "Open Nest",
                 AllowMultiple = true,
-                FileTypeFilter = new[] { new FilePickerFileType("Nest files") { Patterns = new[] { "*.nest" } } },
+                FileTypeFilter = new[] { NestFiles },
             });
             foreach (var path in files.Select(f => f.TryGetLocalPath()).Where(p => p != null))
                 OpenNest(path);
