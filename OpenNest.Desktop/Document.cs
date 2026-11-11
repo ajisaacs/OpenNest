@@ -77,6 +77,17 @@ namespace OpenNest
                 History.MarkSaved();
         }
 
+        /// <summary>
+        /// Writes a copy of the nest to <paramref name="path"/>. The nest's name, save path,
+        /// server identity and undo save point stay as they were (the writer still stamps its
+        /// last-modified date, as every save does).
+        /// </summary>
+        public void ExportCopy(string path)
+        {
+            // A write that fails throws and leaves any file already at the path as it was.
+            new NestWriter(Nest) { BestFitStore = BestFitCacheStore.Shared }.Write(path);
+        }
+
         /// <summary>Serializes the current nest to a .nest archive in memory.</summary>
         public byte[] Serialize()
         {

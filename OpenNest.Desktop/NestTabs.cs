@@ -16,8 +16,14 @@ namespace OpenNest.Desktop
 
         public Document Document { get; }
 
-        /// <summary>The full path of the file it was opened from, else null.</summary>
-        public string Path { get; }
+        /// <summary>The full path of the file it was opened from or saved to, else null.</summary>
+        public string Path { get; internal set; }
+
+        /// <summary>
+        /// The file Save writes without asking: the one saved to this session, if it still
+        /// exists. Null for a nest only opened, as in the WinForms app, so the first Save asks.
+        /// </summary>
+        public string SavePath => Document.HasSavePath ? Document.LastSavePath : null;
 
         /// <summary>True after a change this session that is not saved.</summary>
         public bool Modified { get; private set; }
@@ -30,6 +36,18 @@ namespace OpenNest.Desktop
         public void MarkModified() => Modified = true;
 
         public void MarkSaved() => Modified = false;
+    }
+
+    /// <summary>
+    /// A save or export refused before anything was written; the message says why and what to
+    /// do instead.
+    /// </summary>
+    public sealed class SaveTargetRefusedException : InvalidOperationException
+    {
+        public SaveTargetRefusedException(string message)
+            : base(message)
+        {
+        }
     }
 
     /// <summary>
@@ -102,6 +120,52 @@ namespace OpenNest.Desktop
             else if (index == ActiveIndex)
                 ActiveIndex = System.Math.Min(index, tabs.Count - 1);
             Changed?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Saves the tab's nest to <paramref name="path"/>, which becomes its file and name, and
+        /// clears its unsaved mark. Refuses a file another open tab shows, so one file never has
+        /// two tabs. A failed write throws and changes nothing.
+        /// </summary>
+        public void SaveAs(NestTab tab, string path)
+        {
+            var fullPath = CheckTarget(tab, path, export: false);
+            tab.Document.SaveAs(fullPath);
+            tab.Path = fullPath;
+            tab.MarkSaved();
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Writes a copy of the tab's nest to <paramref name="path"/> without changing its file,
+        /// name or unsaved mark. Refuses the tab's own file, which only Save may write, and a
+        /// file another open tab shows.
+        /// </summary>
+        public void ExportCopy(NestTab tab, string path)
+        {
+            var fullPath = CheckTarget(tab, path, export: true);
+            tab.Document.ExportCopy(fullPath);
+        }
+
+        private string CheckTarget(NestTab tab, string path, bool export)
+        {
+            ArgumentNullException.ThrowIfNull(tab);
+            ArgumentNullException.ThrowIfNull(path);
+            if (!tabs.Contains(tab))
+                throw new SaveTargetRefusedException(
+                    $"{tab.Name} was closed before it could be written. Open it again to save it.");
+            var fullPath = System.IO.Path.GetFullPath(path);
+            if (export && tab.Path != null && SamePath(tab.Path, fullPath))
+                throw new SaveTargetRefusedException(
+                    $"{System.IO.Path.GetFileName(fullPath)} is this nest's own file. Use "
+                    + "File > Save to save it there, or export the copy under another name.");
+            var other = tabs.FirstOrDefault(
+                t => t != tab && t.Path != null && SamePath(t.Path, fullPath));
+            if (other != null)
+                throw new SaveTargetRefusedException(
+                    $"{System.IO.Path.GetFileName(fullPath)} is open in the {other.Name} tab. "
+                    + "Close that tab first, or choose another file name.");
+            return fullPath;
         }
 
         // Windows paths ignore case; Linux and macOS paths do not.
