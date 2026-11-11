@@ -116,5 +116,8 @@
     <Setting Name="MadeBy" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="ClonePlacementOrder" Type="System.String" Scope="User">
+      <Value Profile="(Default)">ClosestToCorner</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

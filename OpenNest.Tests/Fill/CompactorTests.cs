@@ -644,6 +644,58 @@ namespace OpenNest.Tests.Fill
             Assert.Equal(start, moving.Location);
         }
 
+        // Two pockets: pushing left first parks the part on the tall block at (20, 55);
+        // pushing down first parks it on the low floor at (55, 10), nearer the origin.
+        private static Plate TwoPocketPlate()
+        {
+            var plate = new Plate(100, 100);
+            plate.Parts.Add(MakeRectPart(0, 0, 20, 100));
+            plate.Parts.Add(MakeRectPart(20, 0, 35, 55));
+            plate.Parts.Add(MakeRectPart(55, 0, 45, 10));
+            return plate;
+        }
+
+        [Theory]
+        [InlineData(SettleOrder.ClosestToCorner, 55, 10)]
+        [InlineData(SettleOrder.HorizontalFirst, 20, 55)]
+        [InlineData(SettleOrder.VerticalFirst, 55, 10)]
+        public void SettlePlacement_OrderChoosesThePocket(SettleOrder order, double left, double bottom)
+        {
+            var plate = TwoPocketPlate();
+            var moving = MakeRectPart(60, 60, 10, 10);
+
+            Compactor.SettlePlacement(new List<Part> { moving }, plate,
+                PushDirection.Left, PushDirection.Down, order: order);
+
+            Assert.Equal(left, moving.BoundingBox.Left, 3);
+            Assert.Equal(bottom, moving.BoundingBox.Bottom, 3);
+            Assert.All(plate.Parts, obstacle => Assert.False(moving.Intersects(obstacle, out _)));
+        }
+
+        [Fact]
+        public void SettlePlacement_BoundingBoxesOnlyStopsAtTheObstacleBox()
+        {
+            // Triangle material is below the diagonal; geometry lets the square slide in
+            // over the hypotenuse, boxes stop it square to the triangle's bounds. The floor
+            // keeps both above y = 5.
+            var plate = new Plate(100, 100);
+            plate.Parts.Add(MakeTrianglePart(new Vector(0, 0),
+                new Vector(40, 0), new Vector(0, 40)));
+            plate.Parts.Add(MakeRectPart(40, 0, 60, 5));
+            var geometry = MakeRectPart(50, 6, 5, 5);
+            var boxes = MakeRectPart(50, 6, 5, 5);
+
+            Compactor.SettlePlacement(new List<Part> { geometry }, plate,
+                PushDirection.Left, PushDirection.Down, order: SettleOrder.HorizontalFirst);
+            Compactor.SettlePlacement(new List<Part> { boxes }, plate,
+                PushDirection.Left, PushDirection.Down, order: SettleOrder.HorizontalFirst,
+                boundingBoxesOnly: true);
+
+            Assert.True(geometry.BoundingBox.Left < 39, $"geometry left {geometry.BoundingBox.Left}");
+            Assert.InRange(boxes.BoundingBox.Left, 40, 40.01);
+            Assert.InRange(boxes.BoundingBox.Bottom, 5, 5.01);
+        }
+
         [Fact]
         public void PushBoundingBox_Left_MovesPartTowardEdge()
         {

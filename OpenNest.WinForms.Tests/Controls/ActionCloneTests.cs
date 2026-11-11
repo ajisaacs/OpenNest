@@ -92,6 +92,28 @@ public class ActionCloneTests
         Assert.Single(plate.Parts);
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
 
+    [Theory]
+    [InlineData(Keys.Shift)]
+    [InlineData(Keys.Control)]
+    public void ModifiedClickPushesTheCopyAgainstPlacedParts(Keys modifiers) => StaTestThread.Run(() =>
+    {
+        var plate = new Plate(48, 96) { PartSpacing = 0 };
+        plate.Parts.Add(new Part(Square("placed")));
+        using var view = new PlateView { Plate = plate, Size = new System.Drawing.Size(600, 600) };
+        view.ZoomToFit();
+        view.SetAction(typeof(ActionClone), Square("new"));
+        var action = Assert.IsType<ActionClone>(view.Actions.CurrentAction);
+        action.PlacementOrder = OpenNest.Engine.Fill.SettleOrder.VerticalFirst;
+        var preview = Assert.Single(view.SelectedParts);
+        preview.BasePart.Location = new Vector(20, 1);
+
+        action.Apply(modifiers);
+
+        var copy = plate.Parts[1].BoundingBox;
+        Assert.InRange(copy.Left, 4, 4.01);
+        Assert.Equal(0, copy.Bottom, 6);
+    }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
+
     [Fact]
     public void ADialogsFakeMouseMoveLeavesNudgedPreviewsInPlace() => StaTestThread.Run(() =>
     {

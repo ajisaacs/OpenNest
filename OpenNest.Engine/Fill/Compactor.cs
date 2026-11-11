@@ -390,29 +390,43 @@ namespace OpenNest.Engine.Fill
         }
 
         /// <summary>
-        /// Settles a copied placement against the plate in both axis orders, choosing
-        /// the group closest to the quadrant's work-area corner. A coarse box pass
-        /// runs only when no moving box starts inside an existing part's box.
+        /// Settles a copied placement against the plate. <see cref="SettleOrder.ClosestToCorner"/>
+        /// tries both axis orders and keeps the group closest to the quadrant's work-area
+        /// corner; the other orders push along the named axis first. A coarse box pass
+        /// runs only when no moving box starts inside an existing part's box. With
+        /// <paramref name="boundingBoxesOnly"/> every push uses bounding boxes alone, so the
+        /// group stops at the part spacing from obstacles' boxes, never nesting into their shapes.
         /// </summary>
         public static void SettlePlacement(
             List<Part> movingParts,
             Plate plate,
             PushDirection horizontal,
             PushDirection vertical,
-            int maxIterations = 20
+            int maxIterations = 20,
+            SettleOrder order = SettleOrder.ClosestToCorner,
+            bool boundingBoxesOnly = false
         )
         {
             if (movingParts.Count == 0)
                 return;
 
             var workArea = plate.WorkArea();
-            var skipBoxes = movingParts.Any(moving =>
+            var skipBoxes = boundingBoxesOnly || movingParts.Any(moving =>
                 plate.Parts.Any(obstacle => moving.BoundingBox.Intersects(obstacle.BoundingBox))
             );
+            double PushOnce(List<Part> trial, PushDirection direction) => boundingBoxesOnly
+                ? PushBoundingBox(trial, plate, direction)
+                : Push(trial, plate, direction);
             var bestScore = double.MaxValue;
             Vector[] best = null;
+            var firstAxes = order switch
+            {
+                SettleOrder.HorizontalFirst => new[] { horizontal },
+                SettleOrder.VerticalFirst => new[] { vertical },
+                _ => new[] { horizontal, vertical },
+            };
 
-            foreach (var first in new[] { horizontal, vertical })
+            foreach (var first in firstAxes)
             {
                 var second = first == horizontal ? vertical : horizontal;
                 var trial = movingParts.Select(p => (Part)p.Clone()).ToList();
@@ -424,7 +438,7 @@ namespace OpenNest.Engine.Fill
 
                 for (var i = 0; i < maxIterations; i++)
                 {
-                    var moved = Push(trial, plate, first) + Push(trial, plate, second);
+                    var moved = PushOnce(trial, first) + PushOnce(trial, second);
                     if (moved < 0.01)
                         break;
                 }

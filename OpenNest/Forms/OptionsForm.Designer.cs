@@ -43,6 +43,8 @@
             this.strategyGroupBox = new System.Windows.Forms.GroupBox();
             this.colorSchemeLabel = new System.Windows.Forms.Label();
             this.colorSchemeCombo = new System.Windows.Forms.ComboBox();
+            this.clonePlacementLabel = new System.Windows.Forms.Label();
+            this.clonePlacementCombo = new System.Windows.Forms.ComboBox();
             this.serverGroupBox = new System.Windows.Forms.GroupBox();
             this.serverUrlBox = new System.Windows.Forms.TextBox();
             this.setServerButton = new System.Windows.Forms.Button();
@@ -71,7 +73,7 @@
             this.checkBox1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this.checkBox1.AutoSize = true;
             this.tableLayoutPanel1.SetColumnSpan(this.checkBox1, 2);
-            this.checkBox1.Location = new System.Drawing.Point(3, 165);
+            this.checkBox1.Location = new System.Drawing.Point(3, 213);
             this.checkBox1.Name = "checkBox1";
             this.checkBox1.Size = new System.Drawing.Size(281, 20);
             this.checkBox1.TabIndex = 7;
@@ -143,16 +145,19 @@
             this.tableLayoutPanel1.Controls.Add(this.colorSchemeCombo, 1, 1);
             this.tableLayoutPanel1.Controls.Add(this.planningEffortLabel, 0, 2);
             this.tableLayoutPanel1.Controls.Add(this.planningEffortBox, 1, 2);
-            this.tableLayoutPanel1.Controls.Add(this.checkBox1, 0, 3);
+            this.tableLayoutPanel1.Controls.Add(this.clonePlacementLabel, 0, 3);
+            this.tableLayoutPanel1.Controls.Add(this.clonePlacementCombo, 1, 3);
+            this.tableLayoutPanel1.Controls.Add(this.checkBox1, 0, 4);
             this.tableLayoutPanel1.Controls.Add(this.numericUpDown1, 1, 0);
             this.tableLayoutPanel1.Location = new System.Drawing.Point(12, 12);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
-            this.tableLayoutPanel1.RowCount = 4;
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.tableLayoutPanel1.Size = new System.Drawing.Size(684, 200);
+            this.tableLayoutPanel1.RowCount = 5;
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
+            this.tableLayoutPanel1.Size = new System.Drawing.Size(684, 240);
             this.tableLayoutPanel1.TabIndex = 0;
             // 
             // saveButton
@@ -185,7 +190,7 @@
             this.bottomPanel1.Controls.Add(this.cancelButton);
             this.bottomPanel1.Controls.Add(this.saveButton);
             this.bottomPanel1.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.bottomPanel1.Location = new System.Drawing.Point(0, 647);
+            this.bottomPanel1.Location = new System.Drawing.Point(0, 715);
             this.bottomPanel1.Name = "bottomPanel1";
             this.bottomPanel1.Size = new System.Drawing.Size(708, 50);
             this.bottomPanel1.TabIndex = 1;
@@ -204,7 +209,7 @@
             // strategyGroupBox
             //
             this.strategyGroupBox.Controls.Add(this.strategyGrid);
-            this.strategyGroupBox.Location = new System.Drawing.Point(12, 485);
+            this.strategyGroupBox.Location = new System.Drawing.Point(12, 525);
             this.strategyGroupBox.Name = "strategyGroupBox";
             this.strategyGroupBox.Size = new System.Drawing.Size(684, 180);
             this.strategyGroupBox.TabIndex = 2;
@@ -230,11 +235,32 @@
             this.colorSchemeCombo.Size = new System.Drawing.Size(130, 24);
             this.colorSchemeCombo.TabIndex = 11;
             //
+            // clonePlacementLabel
+            //
+            this.clonePlacementLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.clonePlacementLabel.AutoSize = true;
+            this.clonePlacementLabel.Location = new System.Drawing.Point(3, 172);
+            this.clonePlacementLabel.Name = "clonePlacementLabel";
+            this.clonePlacementLabel.Size = new System.Drawing.Size(145, 16);
+            this.clonePlacementLabel.TabIndex = 14;
+            this.clonePlacementLabel.Text = "Clone push placement:";
+            //
+            // clonePlacementCombo
+            //
+            this.clonePlacementCombo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.clonePlacementCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.clonePlacementCombo.Location = new System.Drawing.Point(154, 168);
+            this.clonePlacementCombo.Name = "clonePlacementCombo";
+            this.clonePlacementCombo.Size = new System.Drawing.Size(130, 24);
+            this.clonePlacementCombo.TabIndex = 15;
+            this.toolTip1.SetToolTip(this.clonePlacementCombo, "Where Clone Parts pushes the copy on Shift+click (part geometry) "
+                + "or Ctrl+click (bounding boxes). Left and down mirror for plates whose origin is in another corner.");
+            //
             // serverGroupBox
             //
             this.serverGroupBox.Controls.Add(this.serverUrlBox);
             this.serverGroupBox.Controls.Add(this.setServerButton);
-            this.serverGroupBox.Location = new System.Drawing.Point(12, 218);
+            this.serverGroupBox.Location = new System.Drawing.Point(12, 258);
             this.serverGroupBox.Name = "serverGroupBox";
             this.serverGroupBox.Size = new System.Drawing.Size(684, 69);
             this.serverGroupBox.TabIndex = 1;
@@ -264,7 +290,7 @@
             this.updateGroupBox.Controls.Add(this.updateFeedUrlBox);
             this.updateGroupBox.Controls.Add(this.setUpdateFeedButton);
             this.updateGroupBox.Controls.Add(this.includeDevBuildsBox);
-            this.updateGroupBox.Location = new System.Drawing.Point(12, 391);
+            this.updateGroupBox.Location = new System.Drawing.Point(12, 431);
             this.updateGroupBox.Name = "updateGroupBox";
             this.updateGroupBox.Size = new System.Drawing.Size(684, 88);
             this.updateGroupBox.TabIndex = 3;
@@ -307,7 +333,7 @@
             this.ledgerGroupBox.Controls.Add(this.ledgerKeyBox);
             this.ledgerGroupBox.Controls.Add(this.testLedgerButton);
             this.ledgerGroupBox.Controls.Add(this.saveLedgerButton);
-            this.ledgerGroupBox.Location = new System.Drawing.Point(12, 293);
+            this.ledgerGroupBox.Location = new System.Drawing.Point(12, 333);
             this.ledgerGroupBox.Name = "ledgerGroupBox";
             this.ledgerGroupBox.Size = new System.Drawing.Size(684, 92);
             this.ledgerGroupBox.TabIndex = 4;
@@ -374,7 +400,7 @@
             this.AcceptButton = this.saveButton;
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.CancelButton = this.cancelButton;
-            this.ClientSize = new System.Drawing.Size(708, 725);
+            this.ClientSize = new System.Drawing.Size(708, 765);
             this.Controls.Add(this.strategyGroupBox);
             this.Controls.Add(this.updateGroupBox);
             this.Controls.Add(this.ledgerGroupBox);
@@ -421,6 +447,8 @@
         private System.Windows.Forms.GroupBox strategyGroupBox;
         private System.Windows.Forms.Label colorSchemeLabel;
         private System.Windows.Forms.ComboBox colorSchemeCombo;
+        private System.Windows.Forms.Label clonePlacementLabel;
+        private System.Windows.Forms.ComboBox clonePlacementCombo;
         private System.Windows.Forms.GroupBox serverGroupBox;
         private System.Windows.Forms.TextBox serverUrlBox;
         private System.Windows.Forms.Button setServerButton;

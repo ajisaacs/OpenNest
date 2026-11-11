@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
+using OpenNest.Actions;
 using OpenNest.Controls;
 using OpenNest.Data;
 using OpenNest.Data.MaterialLedger;
 using OpenNest.Engine.CuttingPlanning;
+using OpenNest.Engine.Fill;
 using OpenNest.Engine.Strategies;
 using OpenNest.Properties;
 
@@ -14,6 +16,14 @@ namespace OpenNest.Forms
 {
     public partial class OptionsForm : Form
     {
+        // Combo order matches these; the setting stores the enum name.
+        private static readonly (SettleOrder Order, string Text)[] ClonePlacements =
+        {
+            (SettleOrder.ClosestToCorner, "Closest to origin"),
+            (SettleOrder.HorizontalFirst, "Push left, then down"),
+            (SettleOrder.VerticalFirst, "Push down, then left"),
+        };
+
         public OptionsForm()
         {
             InitializeComponent();
@@ -96,6 +106,13 @@ namespace OpenNest.Forms
             var idx = colorSchemeCombo.Items.IndexOf(active);
             colorSchemeCombo.SelectedIndex = idx >= 0 ? idx : 0;
 
+            clonePlacementCombo.Items.Clear();
+            foreach (var (_, text) in ClonePlacements)
+                clonePlacementCombo.Items.Add(text);
+            var placement = ActionClone.ReadPlacementOrder();
+            clonePlacementCombo.SelectedIndex = System.Math.Max(0,
+                System.Array.FindIndex(ClonePlacements, p => p.Order == placement));
+
             var disabledNames = ParseDisabledStrategies(Settings.Default.DisabledStrategies);
             foreach (DataGridViewRow row in strategyGrid.Rows)
                 row.Cells["Enabled"].Value = !disabledNames.Contains(
@@ -111,6 +128,8 @@ namespace OpenNest.Forms
             Settings.Default.CuttingPlanEffort = (double)planningEffortBox.Value;
             Settings.Default.ActiveColorScheme =
                 colorSchemeCombo.SelectedItem as string ?? "Classic";
+            Settings.Default.ClonePlacementOrder =
+                ClonePlacements[System.Math.Max(0, clonePlacementCombo.SelectedIndex)].Order.ToString();
 
             var disabledNames = new List<string>();
             foreach (DataGridViewRow row in strategyGrid.Rows)

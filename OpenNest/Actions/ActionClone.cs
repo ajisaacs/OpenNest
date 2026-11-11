@@ -200,11 +200,30 @@ namespace OpenNest.Actions
             change.Complete();
         }
 
-        public void Apply()
+        /// <summary>
+        /// Which way Shift+click and Ctrl+click push the copy; null reads the user's Options
+        /// setting at each click, so a change there applies without restarting the action.
+        /// </summary>
+        public SettleOrder? PlacementOrder { get; set; }
+
+        // An unknown stored name falls back to the closest-to-origin search.
+        internal static SettleOrder ReadPlacementOrder() =>
+            System.Enum.TryParse<SettleOrder>(Properties.Settings.Default.ClonePlacementOrder, out var order)
+                && System.Enum.IsDefined(order)
+                ? order
+                : SettleOrder.ClosestToCorner;
+
+        public void Apply() => Apply(Control.ModifierKeys);
+
+        // Shift settles on the parts' geometry (a box pass first when clear); Ctrl settles on
+        // bounding boxes alone, so the copy stops square to its neighbors' boxes.
+        internal void Apply(Keys modifiers)
         {
             using var change = plateView.BeginChange(parts.Count == 1 ? "Add Part" : "Add Parts");
             change.MarkChanged();
-            if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
+            var shift = (modifiers & Keys.Shift) == Keys.Shift;
+            var boxesOnly = !shift && (modifiers & Keys.Control) == Keys.Control;
+            if (shift || boxesOnly)
             {
                 var movingParts = parts.Select(p => p.BasePart).ToList();
 
@@ -234,7 +253,8 @@ namespace OpenNest.Actions
                         break;
                 }
 
-                Compactor.SettlePlacement(movingParts, plateView.Plate, hDir, vDir);
+                Compactor.SettlePlacement(movingParts, plateView.Plate, hDir, vDir,
+                    order: PlacementOrder ?? ReadPlacementOrder(), boundingBoxesOnly: boxesOnly);
 
                 parts.ForEach(p => p.IsDirty = true);
                 plateView.Invalidate();

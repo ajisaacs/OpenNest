@@ -488,5 +488,18 @@ namespace OpenNest.Properties {
                 this["MadeBy"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("ClosestToCorner")]
+        // Where Shift+click in Clone Parts pushes the copy: an OpenNest.Engine.Fill.SettleOrder name.
+        public string ClonePlacementOrder {
+            get {
+                return ((string)(this["ClonePlacementOrder"]));
+            }
+            set {
+                this["ClonePlacementOrder"] = value;
+            }
+        }
     }
 }
