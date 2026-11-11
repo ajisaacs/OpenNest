@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using OpenNest;
 using OpenNest.CNC;
+using OpenNest.CNC.Posting;
 using OpenNest.Geometry;
 
 namespace OpenNest.Posts.CincinnatiCIFiber
@@ -220,26 +221,25 @@ namespace OpenNest.Posts.CincinnatiCIFiber
 
             CIFiberFormatter.Line(w, $"V.E.R4={partNumber}");
 
-            var contours = CIFiberContourExtractor.Extract(part);
+            var contours = PostContours.Extract(part);
             if (_config.SkipScribe)
-                contours = contours.Where(c => !IsScribeContour(c)).ToList();
+                contours = contours.Where(c => !c.IsMark).ToList();
 
             var isCutOff = part.BaseDrawing.IsCutOff;
-            var perimeter = CIFiberWinding.PerimeterIndex(contours);
-            for (var i = 0; i < contours.Count; i++)
+            foreach (var contour in contours)
             {
                 contourNumber++;
                 if (isCutOff)
-                    WriteCutOffContour(contours[i], contourNumber, w);
+                    WriteCutOffContour(contour, contourNumber, w);
                 else
-                    WriteContour(contours[i], contours[i].IsExterior || i == perimeter, contourNumber, w);
+                    WriteContour(contour, contourNumber, w);
             }
 
             CIFiberFormatter.Line(w, "( PART END )");
             return contourNumber;
         }
 
-        private void WriteContour(CIFiberContour contour, bool isExterior, int contourNumber, TextWriter w)
+        private void WriteContour(PostContour contour, int contourNumber, TextWriter w)
         {
             CIFiberFormatter.Line(w, $"N{contourNumber}:");
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerCancel));
@@ -263,16 +263,13 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             CIFiberFormatter.Line(
                 w,
                 SkippableLine(
-                    isExterior ? _config.LayerExteriorLeadin : _config.LayerInteriorLeadin
+                    contour.IsPerimeter ? _config.LayerExteriorLeadin : _config.LayerInteriorLeadin
                 )
             );
             // G41 leaves the product right of travel, G42 left (Cincinnati CNC
-            // handbook). Pick the side that puts the kerf in the scrap for the
-            // way this contour actually runs.
-            CIFiberFormatter.Line(
-                w,
-                CIFiberWinding.CompensatesLeft(contour, isExterior) ? "G41" : "G42"
-            );
+            // handbook); the contour's kerf side puts the kerf in the scrap. A
+            // posted scribe mark has none and keeps G41.
+            CIFiberFormatter.Line(w, contour.Kerf == KerfType.Right ? "G42" : "G41");
 
             var prev = contour.LeadIn.EndPoint;
             CIFiberFormatter.Line(
@@ -306,7 +303,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         /// and the §13.2.4.1 linear-lead-in rule does not apply. The exterior
         /// lead layer still runs so the pierce sequence matches a perimeter.
         /// </summary>
-        private void WriteCutOffContour(CIFiberContour contour, int contourNumber, TextWriter w)
+        private void WriteCutOffContour(PostContour contour, int contourNumber, TextWriter w)
         {
             CIFiberFormatter.Line(w, $"N{contourNumber}:");
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerCancel));
@@ -352,27 +349,6 @@ namespace OpenNest.Posts.CincinnatiCIFiber
 
             return name;
         }
-
-        private static bool IsScribeContour(CIFiberContour contour)
-        {
-            var hasAny = false;
-            foreach (var cut in contour.Cuts)
-            {
-                var layer = LayerOf(cut);
-                if (layer != LayerType.Scribe)
-                    return false;
-                hasAny = true;
-            }
-            return hasAny;
-        }
-
-        private static LayerType LayerOf(Motion motion) =>
-            motion switch
-            {
-                LinearMove l => l.Layer,
-                ArcMove a => a.Layer,
-                _ => LayerType.Cut,
-            };
 
         private string Fmt(double value) => _fmt.Coord(value);
 

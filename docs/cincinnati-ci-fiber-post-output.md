@@ -55,8 +55,12 @@ uses the Cincinnati machine-sample convention, not a generic TF5200 laser API:
   `G1` toward the origin. Both blocks are blank by default, and a nest with a
   head-locked cut-off is refused while either is blank. Whether `ZHSOFF` and the
   next contour's `L0` keep a locked head down for the rapid back is unconfirmed.
-- Hole subprogram geometry is inlined. Suppressed moves and, by default,
-  wholly scribe contours are omitted.
+- Contour geometry comes from Core's shared `PostContours` (`OpenNest.CNC.Posting`):
+  hole subprograms and incremental programs are flattened to sheet coordinates,
+  and it picks the perimeter (never a scribe mark) and each contour's kerf side.
+  Suppressed moves are omitted; a cut that resumes after them starts a new contour
+  pierced where they end, which this post refuses without a lead-in rather than
+  cutting a chord across the gap. By default, wholly scribe contours are omitted.
 - Files use UTF-8 without a BOM and CRLF lines. Default accuracy is three decimal
   places: coordinates trim trailing zeros; dimensional header values retain them.
 
