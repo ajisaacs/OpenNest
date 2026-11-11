@@ -41,14 +41,25 @@ public static class PostContours
     /// </summary>
     public static List<PostContour> Extract(Program program, Vector origin)
     {
-        var contours = new List<PostContour>();
-        Flatten(program, origin, contours);
+        var contours = Flatten(program, origin);
         Classify(contours);
         return contours;
     }
 
-    /// <summary>Picks the perimeter (marks excluded) and each contour's kerf side.</summary>
-    private static void Classify(List<PostContour> contours)
+    /// <summary>
+    /// The program's contours in the <paramref name="origin"/> frame, with no perimeter or kerf
+    /// side chosen yet. A post that splits one part across several calls gathers them here and
+    /// classifies the whole part with <see cref="Classify"/>.
+    /// </summary>
+    public static List<PostContour> Flatten(Program program, Vector origin)
+    {
+        var contours = new List<PostContour>();
+        FlattenInto(program, origin, contours);
+        return contours;
+    }
+
+    /// <summary>Picks one part's perimeter (marks excluded) and each contour's kerf side.</summary>
+    public static void Classify(IReadOnlyList<PostContour> contours)
     {
         var perimeter = ContourWinding.PerimeterIndex(contours);
         for (var i = 0; i < contours.Count; i++)
@@ -68,7 +79,7 @@ public static class PostContours
     /// suppressed moves starts a new contour pierced where the run ends, so the gap is crossed
     /// with the beam off rather than cut as a chord.
     /// </summary>
-    private static void Flatten(Program program, Vector origin, List<PostContour> contours)
+    private static void FlattenInto(Program program, Vector origin, List<PostContour> contours)
     {
         if (program == null)
             return;
@@ -118,7 +129,7 @@ public static class PostContours
                     // A hole call is its own contour.
                     Flush();
                     resumeAt = null;
-                    Flatten(call.Program, origin + call.Offset, contours);
+                    FlattenInto(call.Program, origin + call.Offset, contours);
                     break;
 
                 case Motion motion:

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using OpenNest.CNC;
+using OpenNest.CNC.Posting;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -237,6 +238,52 @@ public static class FeatureUtils
         for (var i = 0; i < features.Count; i++)
             result[i] = bounds[i] != null && SameExtents(bounds[i], all);
         return result;
+    }
+
+    /// <summary>
+    /// Each feature's kerf side from Core's shared winding rule (<see cref="PostContours"/>):
+    /// the side that keeps the kerf in the scrap the way the contour actually runs. The part's
+    /// perimeter is picked across all its cut features; with <paramref name="holes"/> every
+    /// feature is a hole, as in a hole sub-program. Etch features and hole calls get
+    /// <see cref="KerfType.None"/>: etch is never compensated and a hole sub-program picks its own.
+    /// </summary>
+    public static KerfType[] KerfSides(
+        IReadOnlyList<(List<ICode> codes, bool isEtch)> features,
+        bool holes = false
+    )
+    {
+        var contours = new List<PostContour>();
+        var owners = new List<int>();
+        for (var i = 0; i < features.Count; i++)
+        {
+            var (codes, isEtch) = features[i];
+            if (isEtch || (codes.Count == 1 && codes[0] is SubProgramCall))
+                continue;
+
+            var program = new Program(Mode.Absolute);
+            program.Codes.AddRange(codes);
+            foreach (var contour in PostContours.Flatten(program, Vector.Zero))
+            {
+                contours.Add(contour);
+                owners.Add(i);
+            }
+        }
+
+        if (holes)
+        {
+            foreach (var contour in contours)
+                contour.Kerf = ContourWinding.CompensationSide(contour, isPerimeter: false);
+        }
+        else
+        {
+            PostContours.Classify(contours);
+        }
+
+        // A feature is one contour; its first contour decides if it ever splits.
+        var sides = new KerfType[features.Count];
+        for (var k = contours.Count - 1; k >= 0; k--)
+            sides[owners[k]] = contours[k].Kerf;
+        return sides;
     }
 
     private static Box CutBounds(List<ICode> codes)

@@ -43,12 +43,20 @@ internal static class CincinnatiReplay
         /// <summary>Every cutting move, start to end, in machine coordinates.</summary>
         public List<(Vector From, Vector To)> Cuts { get; } = new();
 
+        /// <summary>
+        /// Every cutting move with the pierce it follows (1-based), its arc centre (null for
+        /// a line), direction and the compensation in force: "G41", "G42" or null after G40.
+        /// </summary>
+        public List<CutMove> Moves { get; } = new();
+
         /// <summary>Head raises posted while the head was already raised.</summary>
         public int DoubleRaises { get; set; }
 
         /// <summary>Rapids taken after a cut with no head raise since.</summary>
         public int HeadDownRapids { get; set; }
     }
+
+    internal sealed record CutMove(int Pierce, Vector From, Vector To, Vector? Center, bool Clockwise, string? Compensation);
 
     /// <summary>
     /// Minimal replay of the post's own dialect: M98/M99 calls, G52/G92 frames,
@@ -74,6 +82,7 @@ internal static class CincinnatiReplay
         var cutSincePierce = false;
         string? raise = null; // raise posted since the last pierce
         var headDown = false;
+        string? compensation = null;
         var pc = 0;
 
         while (pc < lines.Count)
@@ -89,6 +98,10 @@ internal static class CincinnatiReplay
                 line = line[1..];
 
             var words = Words(line);
+            if (line.Contains("G41", System.StringComparison.Ordinal))
+                compensation = "G41";
+            else if (line.Contains("G42", System.StringComparison.Ordinal))
+                compensation = "G42";
             if (words.TryGetValue("M", out var m))
             {
                 if (m == "30")
@@ -127,6 +140,9 @@ internal static class CincinnatiReplay
 
             switch (g)
             {
+                case "40":
+                    compensation = null;
+                    break;
                 case "84":
                 case "85":
                     run.Pierces++;
@@ -150,9 +166,11 @@ internal static class CincinnatiReplay
                 case "3":
                     {
                         var target = g92 + g52 + new Vector(Num(words["X"]), Num(words["Y"]));
+                        Vector? arcCenter = null;
                         if (g is "2" or "3")
                         {
                             var center = position + new Vector(Num(words["I"]), Num(words["J"]));
+                            arcCenter = center;
                             var radius = position.DistanceTo(center);
                             Assert.True(
                                 System.Math.Abs(target.DistanceTo(center) - radius) < 1e-3,
@@ -167,7 +185,10 @@ internal static class CincinnatiReplay
                         {
                             cutSincePierce = true;
                             if (pierced)
+                            {
                                 run.Cuts.Add((position, target));
+                                run.Moves.Add(new CutMove(run.Pierces, position, target, arcCenter, g == "2", compensation));
+                            }
                         }
                         position = target;
                         break;

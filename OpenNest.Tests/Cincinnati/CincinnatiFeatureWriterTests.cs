@@ -13,7 +13,6 @@ public class CincinnatiFeatureWriterTests
             FeatureLineNumberStart = 1,
             UseAntiDive = true,
             KerfCompensation = KerfMode.ControllerSide,
-            DefaultKerfSide = KerfSide.Left,
             InteriorM47 = M47Mode.Always,
             ExteriorM47 = M47Mode.Always,
             UseSpeedGas = false,
@@ -112,8 +111,8 @@ public class CincinnatiFeatureWriterTests
     {
         var config = DefaultConfig();
         config.KerfCompensation = KerfMode.ControllerSide;
-        config.DefaultKerfSide = KerfSide.Left;
         var ctx = SimpleContext();
+        ctx.Kerf = KerfType.Left;
         var output = WriteFeature(config, ctx);
 
         Assert.Contains("G41", output);
@@ -125,8 +124,8 @@ public class CincinnatiFeatureWriterTests
     {
         var config = DefaultConfig();
         config.KerfCompensation = KerfMode.ControllerSide;
-        config.DefaultKerfSide = KerfSide.Right;
         var ctx = SimpleContext();
+        ctx.Kerf = KerfType.Right;
         var output = WriteFeature(config, ctx);
 
         Assert.Contains("G42", output);
