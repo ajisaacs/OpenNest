@@ -254,7 +254,7 @@
             this.clonePlacementCombo.Size = new System.Drawing.Size(130, 24);
             this.clonePlacementCombo.TabIndex = 15;
             this.toolTip1.SetToolTip(this.clonePlacementCombo, "Where Clone Parts pushes the copy on Shift+click (part geometry) "
-                + "or Ctrl+click (bounding boxes). Left and down mirror for plates whose origin is in another corner.");
+                + "or Ctrl+click (bounding boxes). Every push goes toward the plate's origin corner.");
             //
             // serverGroupBox
             //

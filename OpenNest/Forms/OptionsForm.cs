@@ -20,8 +20,8 @@ namespace OpenNest.Forms
         private static readonly (SettleOrder Order, string Text)[] ClonePlacements =
         {
             (SettleOrder.ClosestToCorner, "Closest to origin"),
-            (SettleOrder.HorizontalFirst, "Push left, then down"),
-            (SettleOrder.VerticalFirst, "Push down, then left"),
+            (SettleOrder.HorizontalFirst, "Push horizontally first"),
+            (SettleOrder.VerticalFirst, "Push vertically first"),
         };
 
         public OptionsForm()
