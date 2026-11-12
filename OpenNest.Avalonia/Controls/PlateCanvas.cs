@@ -16,18 +16,13 @@ using Vector = OpenNest.Geometry.Vector;
 namespace OpenNest.Avalonia.Controls
 {
     /// <summary>
-    /// Draws one plate with Skia: pans with a left or middle drag, zooms at the cursor with the
-    /// wheel, fits on a double click, and highlights the part under the cursor.
+    /// Draws one plate with Skia in the colours of <see cref="Scheme"/>: pans with a left or
+    /// middle drag, zooms at the cursor with the wheel, fits on a double click, and highlights the
+    /// part under the cursor.
     /// </summary>
     public sealed class PlateCanvas : Control
     {
-        private static readonly SKColor BackgroundColor = new(169, 169, 169);
-        private static readonly SKColor PlateFillColor = new(245, 245, 245);
-        private static readonly SKColor PlateOutlineColor = new(128, 128, 128);
-        private static readonly SKColor EdgeSpacingColor = new(180, 180, 180);
         private static readonly SKColor LeadColor = new(255, 0, 0);
-        private static readonly SKColor EtchColor = new(0, 150, 60);
-        private static readonly SKColor SelectedColor = new(150, 200, 255, 90 * 255 / 100);
 
         // Paths are built once per program and only read afterwards, so the render thread may draw
         // them while the UI thread builds others. Keyed by reference: a rotation replaces the program.
@@ -51,6 +46,9 @@ namespace OpenNest.Avalonia.Controls
                 InvalidateVisual();
             }
         }
+
+        /// <summary>The colours drawn with: the application's active scheme unless set.</summary>
+        public ColorScheme Scheme { get; set; } = ColorScheme.Default;
 
         public Part HoveredPart { get; private set; }
 
@@ -131,21 +129,23 @@ namespace OpenNest.Avalonia.Controls
             if (fitPending && Fit())
                 global::Avalonia.Threading.Dispatcher.UIThread.Post(() => ViewChanged?.Invoke(this, EventArgs.Empty));
 
+            var palette = SkiaSchemePalette.For(Scheme ?? ColorScheme.Default);
             var items = new List<PartItem>();
             if (plate != null)
             {
                 for (var i = 0; i < plate.Parts.Count; i++)
                 {
                     var part = plate.Parts[i];
+                    var color = ToSkColor(part.BaseDrawing.Color);
                     items.Add(new PartItem(PathsFor(part), part.Location, part.BoundingBox,
-                        ToSkColor(part.BaseDrawing.Color), (i + 1).ToString(),
+                        color, palette.PartOutline(color), (i + 1).ToString(),
                         ReferenceEquals(part, SelectedPart), ReferenceEquals(part, HoveredPart),
                         part.BaseDrawing.IsCutOff, part.HasManualLeadIns));
                 }
             }
 
             context.Custom(new PlateDrawOperation(new Rect(Bounds.Size), plate == null ? null : PlateRect(plate),
-                plate?.EdgeSpacing, WorldMatrix, items));
+                plate?.EdgeSpacing, WorldMatrix, items, palette));
         }
 
         private static SKColor ToSkColor(System.Drawing.Color color) =>
@@ -257,7 +257,7 @@ namespace OpenNest.Avalonia.Controls
         }
 
         private sealed record PartItem(ProgramPaths Paths, Vector Location, Box Bounds, SKColor Color,
-            string Label, bool Selected, bool Hovered, bool IsCutOff, bool ShowLeads);
+            SKColor Outline, string Label, bool Selected, bool Hovered, bool IsCutOff, bool ShowLeads);
 
         private sealed class PlateDrawOperation : ICustomDrawOperation
         {
@@ -265,10 +265,12 @@ namespace OpenNest.Avalonia.Controls
             private readonly Spacing? edgeSpacing;
             private readonly SKMatrix matrix;
             private readonly List<PartItem> items;
+            private readonly SkiaSchemePalette palette;
 
             public PlateDrawOperation(Rect bounds, Box plateRect, Spacing? edgeSpacing, SKMatrix matrix,
-                List<PartItem> items)
+                List<PartItem> items, SkiaSchemePalette palette)
             {
+                this.palette = palette;
                 Bounds = bounds;
                 this.plateRect = plateRect;
                 this.edgeSpacing = edgeSpacing;
@@ -295,7 +297,7 @@ namespace OpenNest.Avalonia.Controls
                 var canvas = api.SkCanvas;
                 canvas.Save();
                 canvas.ClipRect(new SKRect(0, 0, (float)Bounds.Width, (float)Bounds.Height));
-                canvas.Clear(BackgroundColor);
+                canvas.Clear(palette.Background);
 
                 if (plateRect != null)
                     Draw(canvas);
@@ -315,16 +317,16 @@ namespace OpenNest.Avalonia.Controls
 
                 var plate = new SKRect((float)plateRect.Left, (float)plateRect.Bottom,
                     (float)plateRect.Right, (float)plateRect.Top);
-                fill.Color = PlateFillColor;
+                fill.Color = palette.PlateFill;
                 canvas.DrawRect(plate, fill);
                 if (edgeSpacing is { } spacing)
                 {
-                    stroke.Color = EdgeSpacingColor;
+                    stroke.Color = palette.EdgeSpacing;
                     canvas.DrawRect(new SKRect(plate.Left + (float)spacing.Left,
                         plate.Top + (float)spacing.Bottom, plate.Right - (float)spacing.Right,
                         plate.Bottom - (float)spacing.Top), stroke);
                 }
-                stroke.Color = PlateOutlineColor;
+                stroke.Color = palette.PlateOutline;
                 canvas.DrawRect(plate, stroke);
 
                 var view = canvas.LocalClipBounds;
@@ -337,13 +339,14 @@ namespace OpenNest.Avalonia.Controls
                     canvas.Save();
                     canvas.Translate((float)item.Location.X, (float)item.Location.Y);
 
-                    fill.Color = item.Selected ? SelectedColor
+                    fill.Color = item.Selected ? palette.SelectedFill
                         : item.Hovered ? Lighten(item.Color) : item.Color;
                     canvas.DrawPath(item.Paths.Fill, fill);
 
-                    stroke.Color = EtchColor;
+                    stroke.Color = palette.Etch;
                     canvas.DrawPath(item.Paths.Etch, stroke);
-                    stroke.Color = item.Selected ? new SKColor(30, 90, 200) : Darken(item.Color);
+                    // Keep real cuts visible even where an etch overlaps them.
+                    stroke.Color = item.Selected ? palette.SelectedOutline : item.Outline;
                     canvas.DrawPath(item.Paths.Cut, stroke);
                     // As on the desktop, only manually placed lead-ins are shown.
                     if (item.ShowLeads)
@@ -376,9 +379,6 @@ namespace OpenNest.Avalonia.Controls
                     canvas.DrawText(item.Label, center.X - measured / 2, center.Y + text.TextSize / 3, text);
                 }
             }
-
-            private static SKColor Darken(SKColor c) =>
-                new((byte)(c.Red * 0.55), (byte)(c.Green * 0.55), (byte)(c.Blue * 0.55), 255);
 
             private static SKColor Lighten(SKColor c) =>
                 new((byte)(c.Red + (255 - c.Red) / 2), (byte)(c.Green + (255 - c.Green) / 2),

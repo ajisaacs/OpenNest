@@ -50,6 +50,8 @@ namespace OpenNest.Avalonia
             var engineWarning = EngineSelection.LoadSavedSelection();
             if (!string.IsNullOrEmpty(engineWarning))
                 notice = engineWarning;
+            // The colour scheme chosen in the WinForms app's options, from the shared user settings.
+            ColorSchemeRegistry.ApplySaved(Data.UserSettingsFile.Read(Data.UserSettingsFile.DefaultPath));
             tabs.Changed += (_, _) => ShowActiveTab();
             KeyBindings.Add(new KeyBinding
             {
@@ -99,6 +101,8 @@ namespace OpenNest.Avalonia
                     var reader = new NestReader(file);
                     var document = new Document { Nest = reader.Read() };
                     warnings = reader.Warnings;
+                    // The view follows the application's scheme, not the one the file was saved under.
+                    ColorSchemeRegistry.RecolorDrawings(document.Nest);
                     return document;
                 });
                 if (!views.ContainsKey(tab))
