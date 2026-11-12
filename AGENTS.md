@@ -73,7 +73,7 @@ Read the relevant contract before changing its behavior:
 - [Tabbed cutouts](docs/tabbed-cutouts.md): holes cut in pieces around `Tab`-layer spans that are material but never cut; nesting reads material through `NestingMaterial.ForNesting`, so nothing nests in them
 - [Dimensions](docs/dimensions.md): CAD Converter annotations that store placement only, are measured from the cut geometry when shown and never affect the program
 - [Common-line cutting](docs/common-line-cutting.md): parts one kerf apart in `Plate.CommonLines` share an edge; spans are derived, never stored, and spacing checks hold group members to the kerf. Plan Cutting cuts each shared span once (the owner, cut first, starts its compensated outside on the common line; partners cut only their remainders) unless the plate is set to cut them twice; only posts implementing `ICommonLinePostProcessor` (CI Fiber) may write it, others refuse. Machine trial pending. Auto Nest and Fill Area pair `AllowCommonLine` drawings at the nest's `CommonLineUsage` (Off by default, byte-identical to no common lines); `NestLayoutCheck` exempts only explicit result groups
-- [Support tabs](docs/support-tabs.md): the nest's support grid, the center-of-gravity check, and Plan Cutting's tab placement for parts the grid cannot hold level
+- [Support tabs](docs/support-tabs.md): the nest's support grid, the center-of-gravity check, Plan Cutting's tab placement for parts the grid cannot hold level, and its opt-in slicing of slugs the grid cannot hold level
 - [Material-overlap diagnostics](docs/geometry/visual-overlap-check.md)
 - [Automatic cutoffs and sequencing](docs/automatic-scrap-cutoffs.md)
 - [Pre-post verification](docs/post-verification.md)

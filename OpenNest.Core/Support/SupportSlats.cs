@@ -112,6 +112,24 @@ namespace OpenNest.Support
             return slats;
         }
 
+        /// <summary>
+        /// The center line of every slat that crosses <paramref name="region"/>. Material between
+        /// two neighboring center lines touches at most those slats' edges.
+        /// </summary>
+        public override IReadOnlyList<ContactLine> ContactLines(Box region, int quadrant)
+        {
+            ArgumentNullException.ThrowIfNull(region);
+            var lines = new List<ContactLine>();
+            var alongX = Axis == SlatAxis.X;
+            var baseline = alongX ? SignY(quadrant) * Offset : SignX(quadrant) * Offset;
+            var low = alongX ? region.Bottom : region.Left;
+            var high = alongX ? region.Top : region.Right;
+            for (var slat = System.Math.Ceiling((low - baseline) / Pitch);
+                 slat <= System.Math.Floor((high - baseline) / Pitch); slat++)
+                lines.Add(new ContactLine(alongX, baseline + slat * Pitch));
+            return lines;
+        }
+
         public override SupportBed Scaled(double factor) =>
             new SupportSlats(Axis, Pitch * factor, Thickness * factor, Offset * factor,
                 RegistrationTolerance * factor, StabilityMargin * factor);

@@ -12,6 +12,12 @@ namespace OpenNest.Support
     /// The laser grid (<see cref="SupportGrid"/>) is the built-in layout; straight or curved
     /// slats imported from a CAD layout can follow as further subclasses.
     /// </summary>
+    /// <summary>
+    /// A line a support bed's contacts lie on: along X at Y = <see cref="At"/> when
+    /// <see cref="AlongX"/>, else along Y at X = <see cref="At"/> (world coordinates).
+    /// </summary>
+    public readonly record struct ContactLine(bool AlongX, double At);
+
     public abstract class SupportBed : IEquatable<SupportBed>
     {
         protected SupportBed(double registrationTolerance, double stabilityMargin)
@@ -46,6 +52,14 @@ namespace OpenNest.Support
         /// </summary>
         public abstract IReadOnlyList<Vector> Contacts(SupportMaterial material, int quadrant, Vector shift,
             bool extremesOnly = false);
+
+        /// <summary>
+        /// The straight lines every contact lies on across <paramref name="region"/> (world
+        /// coordinates) on a sheet in <paramref name="quadrant"/>: a grid's rows and columns, a
+        /// slat's center line. Material cut along all of them keeps no contact, so it drops
+        /// between the supports (see <see cref="SlugSlicer"/>).
+        /// </summary>
+        public abstract IReadOnlyList<ContactLine> ContactLines(Box region, int quadrant);
 
         /// <summary>This layout with every length multiplied by <paramref name="factor"/> (a unit change).</summary>
         public abstract SupportBed Scaled(double factor);

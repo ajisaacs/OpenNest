@@ -105,6 +105,14 @@ namespace OpenNest.CNC.CuttingStrategy
             TabHeldMaxLength > 0 && double.IsFinite(TabHeldMaxLength)
             && length <= TabHeldMaxLength + Math.Tolerance.Epsilon;
 
+        /// <summary>
+        /// Slices the slug of each cutout its plate's support bed cannot hold level along the
+        /// bed's contact lines before the cutout is cut, so the slug drops as pieces between the
+        /// supports instead of tipping (see docs/support-tabs.md#slug-slices). Each slice stops
+        /// <see cref="Kerf"/> short of the cutout, so nothing is sliced without a kerf.
+        /// </summary>
+        public bool SliceTippingSlugs { get; set; }
+
         public SequenceParameters Sequencing { get; set; } = new SequenceParameters();
         public AssignmentParameters Assignment { get; set; } = new AssignmentParameters();
     }

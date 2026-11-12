@@ -316,9 +316,13 @@ public sealed class ReleasedContourState
         // A common-line member's open cuts are its remainder pieces: they end in shared kerf, not at
         // tabs, and the planner's contour accounting proves they cut its outside exactly once.
         var remainders = member && !cutoff && unfinished.Count > 0;
+        // Slug slices (docs/support-tabs.md#slug-slices) cross one another inside one of the part's
+        // own holes: what they enclose is that hole's slug, scrap, so they take no part in the proof.
         var retained = !cutoff && (unfinished.Count > 1 || deferred.Count > 0)
             && (remainders || unfinished.All(LeadsClearOpenEnds)
-                && OpenCutsEncloseNothing(closed, unfinished.Concat(otherOpen).Append(loose).ToList(), token));
+                && OpenCutsEncloseNothing(closed, unfinished
+                    .Concat(otherOpen.Where(group => !CutsOnlySlug(group, closed, unfinished, token)))
+                    .Append(loose).ToList(), token));
         for (var i = deferred.Count - 1; i >= 0 && !retained; i--)
             deferred[i].Target.Insert(deferred[i].Index, deferred[i].Finding);
         // Only one open fragment per part can be the planner's own certified tab, so a
@@ -459,6 +463,35 @@ public sealed class ReleasedContourState
         static bool Touches(PostVerificationGeometry.Curve lead, Vector point) =>
             lead.Start.DistanceTo(point) <= PostVerificationGeometry.Epsilon
             || lead.End.DistanceTo(point) <= PostVerificationGeometry.Epsilon;
+    }
+
+    /// <summary>
+    /// Whether break cut <paramref name="group"/>, its leads included, lies wholly inside one of
+    /// the part's closed holes and touches none of it: whatever it frees is that hole's slug. Only
+    /// straight cuts qualify. The part's outside is its largest cut, never a hole.
+    /// </summary>
+    private static bool CutsOnlySlug(CutGroup group, IReadOnlyList<CutGroup> closed, IReadOnlyList<CutGroup> unfinished,
+        CancellationToken token)
+    {
+        var cuts = group.Curves.Concat(group.Leads).ToList();
+        if (cuts.Count == 0 || !cuts.TrueForAll(cut => cut.IsLine))
+            return false;
+        var outside = closed.Concat(unfinished).Where(cut => cut.Curves.Count > 0).MaxBy(cut =>
+        {
+            var extent = cut.Curves.Aggregate(PostVerificationGeometry.Extent.None, (sum, curve) => sum.Union(curve.Extent));
+            return (extent.MaxX - extent.MinX) * (extent.MaxY - extent.MinY);
+        });
+        foreach (var hole in closed)
+        {
+            token.ThrowIfCancellationRequested();
+            if (ReferenceEquals(hole, outside) || !PostVerificationGeometry.Closed(hole.Curves))
+                continue;
+            if (cuts.TrueForAll(cut => PostVerificationGeometry.Inside(cut.Start, hole.Curves, token)
+                && PostVerificationGeometry.Inside(cut.End, hole.Curves, token)
+                && PostVerificationGeometry.ContactPoints(cut.Start, cut.End, hole.Curves, token).Count == 0))
+                return true;
+        }
+        return false;
     }
 
     private static bool OpenCutsEncloseNothing(IReadOnlyList<CutGroup> closed, IReadOnlyList<CutGroup> open,

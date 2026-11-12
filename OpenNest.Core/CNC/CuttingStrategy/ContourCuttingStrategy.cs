@@ -268,11 +268,12 @@ namespace OpenNest.CNC.CuttingStrategy
             IReadOnlyList<CuttingPlanning.ContourChoice> choices,
             IReadOnlyList<CuttingParameters> contourParameters = null, IReadOnlyList<Shape> breakCuts = null,
             IReadOnlyList<Shape> tabbedCutouts = null, int? perimeterOrdinal = null, Shape displayTail = null,
-            CuttingPlanning.CommonLinePerimeter commonLine = null)
+            CuttingPlanning.CommonLinePerimeter commonLine = null, IReadOnlyList<Support.SlugSlice> slugSlices = null)
         {
             var result = new Program(Mode.Absolute);
             EmitScribeContours(result, scribes);
             EmitBreakCuts(result, breakCuts, shapes);
+            EmitSlugSlices(result, slugSlices);
             foreach (var cutout in tabbedCutouts ?? Array.Empty<Shape>())
                 EmitTabbedCutout(result, cutout);
             EmitChosenContours(result, shapes, choices, contourParameters, perimeterOrdinal ?? shapes.Length - 1,
@@ -1580,6 +1581,22 @@ namespace OpenNest.CNC.CuttingStrategy
                 var normal = Angle.NormalizeRad(PortableMath.Atan2(scrap.Y, scrap.X));
                 program.Codes.AddRange(leadIn.Generate(entry, normal, fromEnd ? RotationType.CW : RotationType.CCW));
                 program.Codes.AddRange(ConvertShapeToMoves(path, entry, LayerType.Break));
+            }
+        }
+
+        // Each slug slice is a break cut inside its cutout's slug: pierced on itself, led straight
+        // back along itself to its start, then cut. It has no lead-out and keeps the kerf from
+        // the cutout, so its slug's pieces stay attached until the cutout is cut.
+        private static void EmitSlugSlices(Program program, IReadOnlyList<Support.SlugSlice> slices)
+        {
+            if (slices == null)
+                return;
+            foreach (var slice in slices)
+            {
+                program.Codes.Add(new RapidMove(slice.Pierce));
+                if (slice.Pierce.DistanceTo(slice.Start) > Tolerance.Epsilon)
+                    program.Codes.Add(new LinearMove(slice.Start) { Layer = LayerType.Leadin });
+                program.Codes.Add(new LinearMove(slice.End) { Layer = LayerType.Break });
             }
         }
 

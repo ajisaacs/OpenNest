@@ -130,6 +130,7 @@ public static class MachineCuttingDefaults
             TabHeldMaxLength = parameters.TabHeldMaxLength * scale,
             TabSizeMinWidth = parameters.TabSizeMinWidth * scale,
             TabSizeMaxWidth = parameters.TabSizeMaxWidth * scale,
+            SliceTippingSlugs = parameters.SliceTippingSlugs,
             PierceClearance = parameters.PierceClearance * scale,
             PierceDiameter = parameters.PierceDiameter * scale,
             Unknown = previous?.Unknown,
@@ -147,6 +148,7 @@ public static class MachineCuttingDefaults
         parameters.TabHeldMaxLength = cutting.TabHeldMaxLength * scale;
         parameters.TabSizeMinWidth = cutting.TabSizeMinWidth * scale;
         parameters.TabSizeMaxWidth = cutting.TabSizeMaxWidth * scale;
+        parameters.SliceTippingSlugs = cutting.SliceTippingSlugs;
         parameters.PierceClearance = cutting.PierceClearance * scale;
         parameters.PierceDiameter = cutting.PierceDiameter * scale;
     }

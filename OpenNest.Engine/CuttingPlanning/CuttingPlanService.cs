@@ -65,6 +65,8 @@ public static class CuttingPlanService
             var nodes = new List<DependencyNode>();
             // Reuse the reader's coordinate validation without publishing its native kernel.
             var identities = new HashSet<Part>(ReferenceEqualityComparer.Instance);
+            // Every part's box, read once, for slug slices to keep clear of parts nested in a cutout.
+            Box[] partBoxes = null;
             for (var index = 0; index < request.Parts.Count; index++)
             {
                 token.ThrowIfCancellationRequested();
@@ -170,6 +172,11 @@ public static class CuttingPlanService
                         prepared = DrawingPinCapture.Prepare(source, index, ownedClean, request.ConfirmedParameters,
                             warnings, token);
                         prepared = SupportTabCapture.Prepare(prepared, ownedClean, location, request, token);
+                        if (request.ConfirmedParameters.SliceTippingSlugs)
+                        {
+                            partBoxes ??= request.Parts.Select(part => part?.BoundingBox).ToArray();
+                            prepared = SlugSliceCapture.Prepare(prepared, location, request, partBoxes, token);
+                        }
                     }
                     else if (source.HasActiveDrawingPins)
                         warnings.Add(DrawingPinCapture.NotApplied(source, index));

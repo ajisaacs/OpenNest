@@ -91,6 +91,22 @@ namespace OpenNest.Support
             return points;
         }
 
+        /// <summary>Every row and column of contacts that crosses <paramref name="region"/>.</summary>
+        public override IReadOnlyList<ContactLine> ContactLines(Box region, int quadrant)
+        {
+            ArgumentNullException.ThrowIfNull(region);
+            var lines = new List<ContactLine>();
+            var baseX = SignX(quadrant) * OffsetX;
+            var baseY = SignY(quadrant) * OffsetY;
+            for (var row = System.Math.Ceiling((region.Bottom - baseY) / PitchY);
+                 row <= System.Math.Floor((region.Top - baseY) / PitchY); row++)
+                lines.Add(new ContactLine(true, baseY + row * PitchY));
+            for (var column = System.Math.Ceiling((region.Left - baseX) / PitchX);
+                 column <= System.Math.Floor((region.Right - baseX) / PitchX); column++)
+                lines.Add(new ContactLine(false, baseX + column * PitchX));
+            return lines;
+        }
+
         public override SupportBed Scaled(double factor) =>
             new SupportGrid(PitchX * factor, PitchY * factor, OffsetX * factor, OffsetY * factor,
                 RegistrationTolerance * factor, StabilityMargin * factor);

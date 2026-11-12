@@ -31,6 +31,7 @@ namespace OpenNest.Controls
         private readonly NumericUpDown nudTabSizeMin;
         private readonly NumericUpDown nudTabSizeMax;
         private readonly NumericUpDown nudTabHeldMax;
+        private readonly CheckBox chkSliceSlugs;
         private readonly NumericUpDown nudPierceClearance;
         private readonly NumericUpDown nudPierceDiameter;
 
@@ -267,6 +268,21 @@ namespace OpenNest.Controls
             nudTabSizeMax.ValueChanged += (s, e) => OnParametersChanged();
             nudTabHeldMax.ValueChanged += (s, e) => OnParametersChanged();
 
+            // Cutouts: slugs that would tip are cut in pieces that drop between the supports.
+            AddSection("Cutouts");
+
+            chkSliceSlugs = new CheckBox
+            {
+                Text = "Slice slugs the support grid can't hold level",
+                AutoSize = true,
+                Margin = new Padding(0, 3, 0, 3),
+            };
+            toolTip.SetToolTip(chkSliceSlugs,
+                "Plan Cutting first cuts each cutout slug that would tip along the support grid's lines, "
+                + "stopping a kerf short of the cutout, so its pieces drop between the supports.");
+            layout.Controls.Add(chkSliceSlugs);
+            chkSliceSlugs.CheckedChanged += (s, e) => OnParametersChanged();
+
             // Pierce
             AddSection("Pierce");
 
@@ -356,6 +372,7 @@ namespace OpenNest.Controls
             parameters.TabSizeMinWidth = (double)nudTabSizeMin.Value;
             parameters.TabSizeMaxWidth = (double)nudTabSizeMax.Value;
             parameters.TabHeldMaxLength = (double)nudTabHeldMax.Value;
+            parameters.SliceTippingSlugs = chkSliceSlugs.Checked;
             return parameters;
         }
 
@@ -382,6 +399,7 @@ namespace OpenNest.Controls
             nudTabHeldMax.Value = Clamp(nudTabHeldMax, p.TabHeldMaxLength);
             tabOptions.Enabled = chkTabsEnabled.Checked;
             UpdateSupportTabOptions();
+            chkSliceSlugs.Checked = p.SliceTippingSlugs;
             nudPierceClearance.Value = Clamp(nudPierceClearance, p.PierceClearance);
             nudPierceDiameter.Value = Clamp(nudPierceDiameter, p.PierceDiameter);
             chkRoundLeadInAngles.Checked = p.RoundLeadInAngles;

@@ -29,6 +29,10 @@ public class ThicknessCuttingConfig
     /// <summary>The widest part tabbed by size; 0 tabs nothing by size.</summary>
     public double TabSizeMaxWidth { get; set; }
 
+    /// <summary>Whether cutouts the support grid can't hold level have their slugs sliced; written only when on.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool SliceTippingSlugs { get; set; }
+
     public double PierceClearance { get; set; } = 0.0625;
 
     /// <summary>The pierce zone's diameter; 0 turns it off.</summary>

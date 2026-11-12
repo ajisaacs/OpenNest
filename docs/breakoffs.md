@@ -50,6 +50,9 @@ every full or prefix emission, never in single-contour probes) and the manual le
   scrap direction (`BreakCutEntry`), because the scrap narrows to a wedge near the
   outline. Entering at the far end cuts it in reverse.
 
+Plan Cutting also cuts [slug slices](support-tabs.md#slug-slices) on the `Break` layer: open
+cuts inside a cutout's slug, pierced on themselves with a straight lead-in along the cut.
+
 Checks treat them as intentional open cuts retained by tabs: `ReleasedContourState`
 never makes them rapid obstacles or "open fragment" warnings, but reports a missing
 lead-in like any contour. `LeadPathValidator` lets a lead into a break cut run
