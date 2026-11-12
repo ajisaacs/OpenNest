@@ -14,12 +14,14 @@ using OpenNest.Collections;
 using OpenNest.Controls;
 using OpenNest.Data;
 using OpenNest.Data.MaterialLedger;
+using OpenNest.Desktop;
 using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.Sequencing;
 using OpenNest.IO;
 using OpenNest.Math;
 using OpenNest.Properties;
+using OpenNest.Reporting;
 using OpenNest.Reporting;
 using Timer = System.Timers.Timer;
 
@@ -694,7 +696,7 @@ namespace OpenNest.Forms
 
         public bool Export()
         {
-            var suggestedFileName = string.Format("{0}-P{1}", Nest.Name, PlateManager.CurrentIndex + 1);
+            var suggestedFileName = PlateExport.SuggestedFileName(Nest.Name, PlateManager.CurrentIndex + 1);
             var target = ShowPlateExportDialog(suggestedFileName);
             if (target == null)
                 return false;
@@ -731,46 +733,15 @@ namespace OpenNest.Forms
             }
         }
 
-        internal virtual void WritePlateExport(Plate plate, string destination, int filterIndex)
-        {
-            switch (filterIndex)
-            {
-                case 1:
-                    Dxf.ExportPlate(plate, destination);
-                    break;
-                case 2:
-                    using (var img = new Bitmap(PlateView.Width, PlateView.Height))
-                    {
-                        PlateView.DrawToBitmap(
-                            img,
-                            new Rectangle(0, 0, PlateView.Width, PlateView.Height)
-                        );
-                        img.Save(destination, System.Drawing.Imaging.ImageFormat.Jpeg);
-                    }
-                    break;
-                case 3:
-                    using (var writer = new StreamWriter(destination))
-                    {
-                        foreach (var part in plate.Parts)
-                        {
-                            var pt = part.BaseDrawing.Source.Offset.Rotate(part.Rotation);
+        internal virtual void WritePlateExport(Plate plate, string destination, int filterIndex) =>
+            PlateExport.Write(plate, Nest.Units, destination, PlateExport.FromFilterIndex(filterIndex), WriteViewImage);
 
-                            writer.WriteLine(
-                                "{0}|{1},{2}|{3}",
-                                part.BaseDrawing.Source.Path,
-                                System.Math.Round(part.Location.X - pt.X, 8),
-                                System.Math.Round(part.Location.Y - pt.Y, 8),
-                                Angle.ToDegrees(part.Rotation)
-                            );
-                        }
-                    }
-                    break;
-                case 4:
-                    Svg.ExportPlate(plate, destination, Nest.Units);
-                    break;
-                default:
-                    throw new ArgumentException("Unsupported plate export format.", nameof(filterIndex));
-            }
+        // The image of the plate view as shown, as a JPEG the size of the view.
+        private void WriteViewImage(string destination)
+        {
+            using var img = new Bitmap(PlateView.Width, PlateView.Height);
+            PlateView.DrawToBitmap(img, new Rectangle(0, 0, PlateView.Width, PlateView.Height));
+            img.Save(destination, System.Drawing.Imaging.ImageFormat.Jpeg);
         }
 
         internal virtual void ReportPlateExportFailure(string destination, Exception error) =>
@@ -801,24 +772,15 @@ namespace OpenNest.Forms
         {
             ArgumentNullException.ThrowIfNull(isJobBusy);
             var nest = Nest;
-            if (nest == null)
-                throw new InvalidOperationException("No nest is available to report.");
-
             // The nest name becomes the suggested file name; reject unusable names before the dialog.
-            if (
-                string.IsNullOrWhiteSpace(nest.Name)
-                || nest.Name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
-            )
-                throw new InvalidOperationException(
-                    $"The nest name '{nest.Name}' cannot be used as a report file name. Rename the nest first."
-                );
+            var fileName = NestReportExport.ReportFileName(nest);
 
             if (isJobBusy() || IsReportTargetBusy(nest))
                 throw new InvalidOperationException(
                     $"Finish or cancel the current nesting or plate action before creating the report for '{nest.Name}'."
                 );
 
-            return new NestReportTargets(nest, $"{nest.Name}.report.pdf");
+            return new NestReportTargets(nest, fileName);
         }
 
         /// <summary>
@@ -847,29 +809,15 @@ namespace OpenNest.Forms
 
             // Reporting must have no accounting side effects: no quantity refresh, no
             // selection or dirty-state change. Only the detached snapshot reaches the writer.
-            var material = targets.Nest.Material;
-            var machine = MachineSettings.FindMachine(targets.Nest.Machine);
-            var catalogDensity = Data.MaterialDensityLookup.Resolve(
-                material?.Name,
-                material?.Grade,
-                machine,
-                MachineSettings.LoadMaterials()
-            );
-            var snapshot = NestReportBuilder.Capture(
+            var snapshot = NestReportExport.Capture(
                 targets.Nest,
                 DateTimeOffset.Now,
-                SavedCutParameters.Load(targets.Nest.Units),
-                catalogDensity
-            ) with
-            {
-                ThicknessName = MachineThicknessName(machine, targets.Nest),
-            };
-            NestPdfWriter.Write(snapshot, destination);
+                MachineSettings.FindMachine(targets.Nest.Machine),
+                MachineSettings.LoadMaterials(),
+                SavedCutParameters.Load(targets.Nest.Units)
+            );
+            NestReportExport.Write(snapshot, destination);
         }
-
-        /// <summary>The name the machine config gives the nest's thickness ("16 ga"), or empty.</summary>
-        private static string MachineThicknessName(Data.MachineConfig machine, Nest nest) =>
-            Data.MachineCuttingDefaults.Find(machine, nest)?.Name?.Trim() ?? "";
 
         /// <summary>
         /// Writes one printout page per drawing, in order. Capture is synchronous on the UI thread
@@ -889,7 +837,7 @@ namespace OpenNest.Forms
             );
             var snapshot = PartPrintoutBuilder.Capture(Nest, drawings, DateTimeOffset.Now, catalogDensity) with
             {
-                ThicknessName = MachineThicknessName(machine, Nest),
+                ThicknessName = NestReportExport.MachineThicknessName(machine, Nest),
             };
             PartPrintoutWriter.Write(snapshot, destination);
         }
@@ -1143,23 +1091,13 @@ namespace OpenNest.Forms
         /// <summary>
         /// Temp DXF name for View in CAD; characters a file name cannot hold become underscores.
         /// </summary>
-        internal static string ExternalCadFileName(string nestName, int plateNumber)
-        {
-            var baseName = string.IsNullOrWhiteSpace(nestName) ? "Nest" : nestName.Trim();
-            var invalid = Path.GetInvalidFileNameChars();
-            var chars = baseName.Select(c => Array.IndexOf(invalid, c) >= 0 ? '_' : c).ToArray();
-            return $"{new string(chars)}-P{plateNumber}.dxf";
-        }
+        internal static string ExternalCadFileName(string nestName, int plateNumber) =>
+            PlateExport.ExternalCadFileName(nestName, plateNumber);
 
-        // .NET 8 defaults UseShellExecute to false, which tries to run the DXF as an executable;
-        // the shell opens it in the program associated with .dxf instead.
-        internal static ProcessStartInfo ExternalCadStartInfo(string path) =>
-            new ProcessStartInfo(path) { UseShellExecute = true };
+        // The shell opens the DXF in the program associated with .dxf.
+        internal static ProcessStartInfo ExternalCadStartInfo(string path) => ExternalFileLauncher.StartInfo(path);
 
-        internal virtual void LaunchExternalCad(string path)
-        {
-            using var process = Process.Start(ExternalCadStartInfo(path));
-        }
+        internal virtual void LaunchExternalCad(string path) => ExternalFileLauncher.Open(path);
 
         internal virtual void ReportExternalCadFailure(string path, Exception error) =>
             MessageBox.Show(this, $"Could not open '{path}' in CAD: {error.Message}",

@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using OpenNest.Desktop;
 
 namespace OpenNest.Forms
 {
@@ -142,17 +143,6 @@ namespace OpenNest.Forms
         }
 
         /// <summary>Best effort: a leftover temp report is harmless.</summary>
-        internal static void DeleteReportFolder(string pdfPath)
-        {
-            try
-            {
-                var folder = Path.GetDirectoryName(pdfPath);
-                if (folder != null && Directory.Exists(folder))
-                    Directory.Delete(folder, true);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-            }
-        }
+        internal static void DeleteReportFolder(string pdfPath) => NestReportExport.DeleteReportFolder(pdfPath);
     }
 }
