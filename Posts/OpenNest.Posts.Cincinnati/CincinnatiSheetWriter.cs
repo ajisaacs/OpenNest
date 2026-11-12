@@ -117,6 +117,7 @@ public sealed class CincinnatiSheetWriter
         public List<ICode> Codes { get; init; }
         public bool IsEtch { get; init; }
         public bool IsExterior { get; init; }
+        public KerfType Kerf { get; init; }
         public PartSubprogram Subprogram { get; init; }
 
         /// <summary>First rapid target: the sub-program corner, else the first pierce.</summary>
@@ -170,6 +171,7 @@ public sealed class CincinnatiSheetWriter
 
             var features = FeatureUtils.SplitAndClassify(part);
             var exterior = FeatureUtils.FindExterior(features);
+            var kerf = FeatureUtils.KerfSides(features);
             for (var f = 0; f < features.Count; f++)
             {
                 var (codes, isEtch) = features[f];
@@ -182,6 +184,7 @@ public sealed class CincinnatiSheetWriter
                         Codes = codes,
                         IsEtch = isEtch,
                         IsExterior = exterior[f],
+                        Kerf = kerf[f],
                         Entry = start,
                         Start = start,
                         End = end,
@@ -267,6 +270,7 @@ public sealed class CincinnatiSheetWriter
                 IsFirstFeatureOfPart = isFirstFeatureOfPart,
                 IsLastFeatureOnSheet = isLastFeature,
                 IsExteriorFeature = item.IsExterior,
+                Kerf = item.Kerf,
                 IsEtch = item.IsEtch,
                 LibraryFile = item.IsEtch ? etchLibrary : cutLibrary,
                 CutDistance = FeatureUtils.ComputeCutDistance(codes),

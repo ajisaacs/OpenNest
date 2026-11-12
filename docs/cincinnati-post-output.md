@@ -124,7 +124,13 @@ block in a sheet or sub-program output follows this order
 5. `M130 (ANTI DIVE OFF)` — disable anti-dive, only if configured (§3.130).
 6. Contour moves:
    - `G41` (left) or `G42` (right) kerf compensation on the first cut move
-     (§1.41 / §1.42), suppressed for etch features.
+     (§1.41 / §1.42), suppressed for etch features. The side comes from Core's
+     shared `PostContours` winding rule, the same one the CI Fiber post uses:
+     whichever keeps the kerf in the scrap for the way the contour runs. Imported
+     drawings (perimeter CW, holes CCW) get `G41` throughout; a contour wound the
+     other way gets `G42`. The perimeter is the part's cut feature with the
+     largest bounding box; contours in a hole sub-program are always holes.
+     Paths that enclose no area, such as cut-off lines, keep `G41`.
    - `G1 X_ Y_ [F<feedvar>]` — linear cut move (§1.01). Feedrate references a
      machine variable such as `#148` and is emitted only when it changes.
    - `G2 X_ Y_ I_ J_ [F<feedvar>]` (CW) or `G3` (CCW) — arc (§1.02 / §1.03).
@@ -279,9 +285,9 @@ next time the post is edited.
 ### Common lines
 
 The post cannot write a [common line cut once](common-line-cutting.md#cutting-each-shared-line-once):
-it applies one configured `G41`/`G42` side (`DefaultKerfSide`) to every feature and, in
-`KerfMode.PreApplied`, offsets no geometry, so a shared cut would be compensated into a part and a
-remainder could not be offset on its perimeter's side. It refuses such a nest before writing
+it compensates every feature from its own winding and, in `KerfMode.PreApplied`, offsets no
+geometry, so a shared cut would be compensated into a part and a remainder could not be offset on
+its perimeter's side. It refuses such a nest before writing
 anything. Set the plate to cut its common lines twice and plan cutting again to post it here.
 
 ### Kerf compensation

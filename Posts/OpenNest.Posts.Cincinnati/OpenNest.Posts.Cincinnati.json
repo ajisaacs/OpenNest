@@ -15,7 +15,6 @@
   "UseAntiDive": true,
   "UseSmartRapids": false,
   "KerfCompensation": "ControllerSide",
-  "DefaultKerfSide": "Left",
   "InteriorM47": "Always",
   "ExteriorM47": "Always",
   "M47OverrideDistanceThreshold": null,

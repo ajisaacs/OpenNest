@@ -19,18 +19,6 @@ namespace OpenNest.Posts.Cincinnati
     }
 
     /// <summary>
-    /// Specifies which side of the cut line kerf compensation is applied to.
-    /// </summary>
-    public enum KerfSide
-    {
-        /// <summary>Kerf applied to the left side of the cut.</summary>
-        Left,
-
-        /// <summary>Kerf applied to the right side of the cut.</summary>
-        Right,
-    }
-
-    /// <summary>
     /// Specifies how the M47 head raise before each rapid is posted.
     /// </summary>
     public enum M47Mode
@@ -208,11 +196,6 @@ namespace OpenNest.Posts.Cincinnati
         [Description("ControllerSide posts cutter compensation codes; PreApplied offsets the part geometry while posting.")]
         [PostSetting(KerfSection, 0)]
         public KerfMode KerfCompensation { get; set; } = KerfMode.ControllerSide;
-
-        [DisplayName("Default kerf side")]
-        [Description("Default side for kerf compensation (Left or Right).")]
-        [PostSetting(KerfSection, 1)]
-        public KerfSide DefaultKerfSide { get; set; } = KerfSide.Left;
 
         [DisplayName("Interior M47")]
         [Description("How M47 is posted after features other than a part's exterior, such as cutouts and etch.")]

@@ -42,6 +42,7 @@ public sealed class CincinnatiPartSubprogramWriter
     /// <summary>
     /// Writes a complete part sub-program for the given normalized program.
     /// The program must be in absolute mode with coordinates normalized to origin (0,0).
+    /// With <paramref name="holes"/> every contour is a hole, as in a hole sub-program.
     /// </summary>
     public void Write(
         TextWriter w,
@@ -50,7 +51,8 @@ public sealed class CincinnatiPartSubprogramWriter
         int subNumber,
         string cutLibrary,
         string etchLibrary,
-        double sheetDiagonal
+        double sheetDiagonal,
+        bool holes = false
     )
     {
         var allFeatures = FeatureUtils.SplitByRapids(normalizedProgram.Codes);
@@ -60,6 +62,7 @@ public sealed class CincinnatiPartSubprogramWriter
         // Classify and order: etch features first, then cut features
         var ordered = FeatureUtils.ClassifyAndOrder(allFeatures);
         var exterior = FeatureUtils.FindExterior(ordered);
+        var kerf = FeatureUtils.KerfSides(ordered, holes);
 
         w.WriteLine("(*****************************************************)");
         w.WriteLine($":{subNumber}");
@@ -90,6 +93,7 @@ public sealed class CincinnatiPartSubprogramWriter
                 IsFirstFeatureOfPart = false,
                 IsLastFeatureOnSheet = isLastFeature,
                 IsExteriorFeature = exterior[i],
+                Kerf = kerf[i],
                 IsEtch = isEtch,
                 LibraryFile = isEtch ? etchLibrary : cutLibrary,
                 CutDistance = cutDistance,

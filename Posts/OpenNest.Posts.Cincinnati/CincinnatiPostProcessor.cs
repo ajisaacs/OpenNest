@@ -247,7 +247,8 @@ namespace OpenNest.Posts.Cincinnati
                         subNum,
                         initialCutLibrary,
                         etchLibrary,
-                        sheetDiagonal
+                        sheetDiagonal,
+                        holes: true
                     );
                 }
             }

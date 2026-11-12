@@ -21,6 +21,12 @@ public sealed class FeatureContext
     /// <summary>True when this feature cuts the part's exterior (selects ExteriorM47).</summary>
     public bool IsExteriorFeature { get; set; }
     public bool IsEtch { get; set; }
+
+    /// <summary>
+    /// Compensation that keeps the kerf in the scrap for the way this contour runs
+    /// (<see cref="FeatureUtils.KerfSides"/>): Left posts G41, Right G42, None neither.
+    /// </summary>
+    public KerfType Kerf { get; set; } = KerfType.Left;
     public string LibraryFile { get; set; } = "";
     public double CutDistance { get; set; }
     public double SheetDiagonal { get; set; }
@@ -151,13 +157,9 @@ public sealed class CincinnatiFeatureWriter
                 var sb = new StringBuilder();
 
                 // Kerf compensation on first cutting move (skip for etch)
-                if (
-                    !ctx.IsEtch
-                    && !kerfEmitted
-                    && _config.KerfCompensation == KerfMode.ControllerSide
-                )
+                if (!kerfEmitted && Compensates(ctx))
                 {
-                    sb.Append(_config.DefaultKerfSide == KerfSide.Left ? "G41 " : "G42 ");
+                    sb.Append(ctx.Kerf == KerfType.Left ? "G41 " : "G42 ");
                     kerfEmitted = true;
                 }
 
@@ -191,13 +193,9 @@ public sealed class CincinnatiFeatureWriter
                 var sb = new StringBuilder();
 
                 // Kerf compensation on first cutting move (skip for etch)
-                if (
-                    !ctx.IsEtch
-                    && !kerfEmitted
-                    && _config.KerfCompensation == KerfMode.ControllerSide
-                )
+                if (!kerfEmitted && Compensates(ctx))
                 {
-                    sb.Append(_config.DefaultKerfSide == KerfSide.Left ? "G41 " : "G42 ");
+                    sb.Append(ctx.Kerf == KerfType.Left ? "G41 " : "G42 ");
                     kerfEmitted = true;
                 }
 
@@ -305,6 +303,9 @@ public sealed class CincinnatiFeatureWriter
 
         return null;
     }
+
+    private bool Compensates(FeatureContext ctx) =>
+        !ctx.IsEtch && ctx.Kerf != KerfType.None && _config.KerfCompensation == KerfMode.ControllerSide;
 
     private Vector FindPiercePoint(List<ICode> codes)
     {

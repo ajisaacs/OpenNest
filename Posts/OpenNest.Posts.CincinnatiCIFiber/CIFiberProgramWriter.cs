@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using OpenNest;
 using OpenNest.CNC;
+using OpenNest.CNC.Posting;
 using OpenNest.Geometry;
 
 namespace OpenNest.Posts.CincinnatiCIFiber
@@ -243,26 +244,20 @@ namespace OpenNest.Posts.CincinnatiCIFiber
 
             CIFiberFormatter.Line(w, $"V.E.R4={partNumber}");
 
-            var contours = CIFiberContourExtractor.Extract(part);
+            var contours = PostContours.Extract(part);
             if (_config.SkipScribe)
-                contours = contours.Where(c => !IsScribeContour(c)).ToList();
+                contours = contours.Where(c => !c.IsMark).ToList();
 
             var isCutOff = part.BaseDrawing.IsCutOff;
-            // A common-line member's outside is its remainders; every closed contour is a hole.
-            var remainders = contours.Any(c => c.RemainderWinding != null);
-            var perimeter = remainders ? -1 : CIFiberWinding.PerimeterIndex(contours);
-            for (var i = 0; i < contours.Count; i++)
+            foreach (var contour in contours)
             {
                 contourNumber++;
                 if (isCutOff)
-                    WriteCutOffContour(contours[i], contourNumber, w);
-                else if (contours[i].IsCommonLine)
-                    WriteCommonLineContour(contours[i], contourNumber, w);
-                else if (contours[i].RemainderWinding is { } winding)
-                    // G41 leaves the product right of travel: a clockwise perimeter's side.
-                    WriteContour(contours[i], true, contourNumber, w, winding == RotationType.CW);
+                    WriteCutOffContour(contour, contourNumber, w);
+                else if (contour.IsCommonLine)
+                    WriteCommonLineContour(contour, contourNumber, w);
                 else
-                    WriteContour(contours[i], contours[i].IsExterior || i == perimeter, contourNumber, w);
+                    WriteContour(contour, contourNumber, w);
             }
 
             CIFiberFormatter.Line(w, "( PART END )");
@@ -270,15 +265,14 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         }
 
         // A rapid marked to pass over parts already cut is made with the head raised.
-        private void WriteRapidToPierce(CIFiberContour contour, TextWriter w)
+        private void WriteRapidToPierce(PostContour contour, TextWriter w)
         {
             if (contour.Raised)
                 CIFiberFormatter.Line(w, _config.HeadRaiseCode);
             CIFiberFormatter.Line(w, $"G0X{Fmt(contour.Pierce.X)}Y{Fmt(contour.Pierce.Y)}");
         }
 
-        private void WriteContour(CIFiberContour contour, bool isExterior, int contourNumber, TextWriter w,
-            bool? compensatesLeft = null)
+        private void WriteContour(PostContour contour, int contourNumber, TextWriter w)
         {
             CIFiberFormatter.Line(w, $"N{contourNumber}:");
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerCancel));
@@ -302,16 +296,13 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             CIFiberFormatter.Line(
                 w,
                 SkippableLine(
-                    isExterior ? _config.LayerExteriorLeadin : _config.LayerInteriorLeadin
+                    contour.IsPerimeter ? _config.LayerExteriorLeadin : _config.LayerInteriorLeadin
                 )
             );
             // G41 leaves the product right of travel, G42 left (Cincinnati CNC
-            // handbook). Pick the side that puts the kerf in the scrap for the
-            // way this contour actually runs.
-            CIFiberFormatter.Line(
-                w,
-                compensatesLeft ?? CIFiberWinding.CompensatesLeft(contour, isExterior) ? "G41" : "G42"
-            );
+            // handbook); the contour's kerf side puts the kerf in the scrap. A
+            // posted scribe mark has none and keeps G41.
+            CIFiberFormatter.Line(w, contour.Kerf == KerfType.Right ? "G42" : "G41");
 
             var prev = contour.LeadIn.EndPoint;
             CIFiberFormatter.Line(
@@ -345,7 +336,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         /// and the §13.2.4.1 linear-lead-in rule does not apply. The exterior
         /// lead layer still runs so the pierce sequence matches a perimeter.
         /// </summary>
-        private void WriteCutOffContour(CIFiberContour contour, int contourNumber, TextWriter w)
+        private void WriteCutOffContour(PostContour contour, int contourNumber, TextWriter w)
         {
             CIFiberFormatter.Line(w, $"N{contourNumber}:");
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerCancel));
@@ -388,7 +379,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         /// layer, the cut and its lead-out. Unconfirmed on the machine: that a contour after a
         /// compensated one starts uncompensated, as the post never writes G40.
         /// </summary>
-        private void WriteCommonLineContour(CIFiberContour contour, int contourNumber, TextWriter w)
+        private void WriteCommonLineContour(PostContour contour, int contourNumber, TextWriter w)
         {
             if (contour.LeadIn is not (null or LinearMove) || contour.LeadInExtra.Count > 0)
                 throw new InvalidOperationException(
@@ -428,27 +419,6 @@ namespace OpenNest.Posts.CincinnatiCIFiber
 
             return name;
         }
-
-        private static bool IsScribeContour(CIFiberContour contour)
-        {
-            var hasAny = false;
-            foreach (var cut in contour.Cuts)
-            {
-                var layer = LayerOf(cut);
-                if (layer != LayerType.Scribe)
-                    return false;
-                hasAny = true;
-            }
-            return hasAny;
-        }
-
-        private static LayerType LayerOf(Motion motion) =>
-            motion switch
-            {
-                LinearMove l => l.Layer,
-                ArcMove a => a.Layer,
-                _ => LayerType.Cut,
-            };
 
         private string Fmt(double value) => _fmt.Coord(value);
 
