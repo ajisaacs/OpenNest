@@ -19,7 +19,9 @@ A thickness's **Name / Gauge** ("16 ga") is display only: the tree shows it and 
 put it before the decimal. In Machine Configuration a blank name, or one still the standard
 name of the old value, follows the thickness value to its standard steel gauge or plate
 fraction (`StandardThicknesses`, matched to the displayed precision); a typed name is kept.
-A new thickness starts with the name of its default value.
+A new thickness starts with the name of its default value. Opening Machine Configuration
+names every blank thickness that matches a standard one and, when it named any, offers to
+save them on close; thicknesses matching none stay blank.
 
 ## Where the Cutting Parameters dialog saves
 

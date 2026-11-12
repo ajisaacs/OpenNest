@@ -182,6 +182,64 @@ public class MachineCutsFormsTests
         });
     }
 
+    [Fact]
+    public void Opening_NamesBlankStandardThicknessesAndOffersToSaveThem()
+    {
+        RunSta(() =>
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "OpenNestTests", Guid.NewGuid().ToString());
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var provider = new LocalJsonProvider(directory);
+                provider.SaveMachine(new MachineConfig
+                {
+                    Name = "Laser",
+                    Units = UnitSystem.Inches,
+                    Materials =
+                    {
+                        new MaterialConfig
+                        {
+                            Name = "Mild Steel",
+                            Thicknesses =
+                            {
+                                new ThicknessConfig { Value = 0.25 },
+                                new ThicknessConfig { Value = 0.0598, Name = "Shop sheet" },
+                                new ThicknessConfig { Value = 0.3 },
+                            },
+                        },
+                    },
+                });
+
+                using (var form = new MachineConfigForm(provider))
+                {
+                    var names = Descendants(Find<TreeView>(form, "_tree").Nodes)
+                        .Where(n => n.Tag is ThicknessConfig).Select(n => n.Text).ToList();
+                    Assert.Equal(new[] { "0.25 (1/4\")", "0.0598 (Shop sheet)", "0.3" }, names);
+                    Assert.True(Dirty(form));
+                }
+
+                // Closed without saving, so the file is still blank; once the names are saved,
+                // opening again finds nothing to name and changes nothing.
+                var saved = provider.GetMachine(provider.GetMachines().Single().Id)!;
+                Assert.True(MachineConfigForm.FillBlankThicknessNames(saved));
+                provider.SaveMachine(saved);
+                Assert.Equal("1/4\"", provider.GetMachine(saved.Id)!.Materials[0].Thicknesses[0].Name);
+                using (var reopened = new MachineConfigForm(provider))
+                    Assert.False(Dirty(reopened));
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        });
+    }
+
+    private static bool Dirty(MachineConfigForm form) =>
+        (bool)typeof(MachineConfigForm)
+            .GetField("_dirty", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(form)!;
+
     private static IEnumerable<TreeNode> Descendants(TreeNodeCollection nodes) =>
         nodes.Cast<TreeNode>().SelectMany(n => Descendants(n.Nodes).Prepend(n));
 

@@ -81,6 +81,10 @@ namespace OpenNest.Forms
                 if (machine is null)
                     continue;
 
+                // Blank names get their standard gauge or fraction now, so the tree and nest
+                // reports show them; closing then offers to save what was filled.
+                if (FillBlankThicknessNames(machine))
+                    MarkDirty();
                 _tree.Nodes.Add(BuildMachineNode(machine));
             }
 
@@ -1176,10 +1180,33 @@ namespace OpenNest.Forms
         /// matches, such as "16 ga" or "1/4\"", or empty when it matches none.
         /// </summary>
         private string StandardThicknessName(double value) =>
+            StandardThicknessName(value, _currentMachine?.Units ?? UnitSystem.Inches);
+
+        private static string StandardThicknessName(double value, UnitSystem units) =>
             StandardThicknesses.Find(
                 value,
-                _currentMachine?.Units == UnitSystem.Millimeters ? Units.Millimeters : Units.Inches
+                units == UnitSystem.Millimeters ? Units.Millimeters : Units.Inches
             )?.Name ?? "";
+
+        /// <summary>
+        /// Names every unnamed thickness of <paramref name="machine"/> that matches a standard
+        /// gauge or plate fraction; true when it named any.
+        /// </summary>
+        internal static bool FillBlankThicknessNames(MachineConfig machine)
+        {
+            var filled = false;
+            foreach (var thickness in machine.Materials.SelectMany(m => m.Thicknesses))
+            {
+                if (!string.IsNullOrWhiteSpace(thickness.Name))
+                    continue;
+                var name = StandardThicknessName(thickness.Value, machine.Units);
+                if (name.Length == 0)
+                    continue;
+                thickness.Name = name;
+                filled = true;
+            }
+            return filled;
+        }
 
         private string LengthUnitSuffix(object _) =>
             _currentMachine?.Units == UnitSystem.Millimeters ? "mm" : "in";
