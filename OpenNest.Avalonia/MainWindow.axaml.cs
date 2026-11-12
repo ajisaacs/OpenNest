@@ -426,25 +426,25 @@ namespace OpenNest.Avalonia
             writingFile = true;
             try
             {
-                var path = await PickNestFileAsync(tab, "Export .nest");
+                var path = await PickNestFileAsync(tab, "Save Copy as .nest File");
                 if (path == null || IsNesting(tab, "exporting"))
                     return;
                 try
                 {
                     // Export never changes the nest's file, name or unsaved mark.
                     tabs.ExportCopy(tab, path);
-                    ShowNotice($"Exported .nest to {path}");
+                    ShowNotice($"Saved a copy to {path}");
                 }
                 catch (SaveTargetRefusedException ex)
                 {
                     await ConfirmDialog.ShowAsync(
-                        this, "Export .nest", $"The nest was not exported. {ex.Message}");
+                        this, "Save Copy", $"The copy was not saved. {ex.Message}");
                 }
                 catch (Exception ex)
                 {
-                    await ConfirmDialog.ShowAsync(this, "Export .nest",
-                        $"The nest was not exported.\n\n{path}\n\n{ex.Message}\n\nChoose "
-                        + "File > Export .nest again to pick another folder or name.");
+                    await ConfirmDialog.ShowAsync(this, "Save Copy",
+                        $"The copy was not saved.\n\n{path}\n\n{ex.Message}\n\nChoose "
+                        + "File > Save Copy as .nest File again to pick another folder or name.");
                 }
             }
             finally

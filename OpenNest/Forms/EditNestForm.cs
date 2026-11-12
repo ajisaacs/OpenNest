@@ -815,16 +815,16 @@ namespace OpenNest.Forms
 
             if (isJobBusy() || IsReportTargetBusy(nest))
                 throw new InvalidOperationException(
-                    $"Finish or cancel the current nesting or plate action before exporting the report for '{nest.Name}'."
+                    $"Finish or cancel the current nesting or plate action before creating the report for '{nest.Name}'."
                 );
 
             return new NestReportTargets(nest, $"{nest.Name}.report.pdf");
         }
 
         /// <summary>
-        /// Revalidate the fixed target after the dialog closed, then synchronously capture the
-        /// snapshot on the UI thread and write it. The dialog pumps messages, so an async fill
-        /// could have committed or started meanwhile; once capture begins nothing yields.
+        /// Revalidate the fixed target, then synchronously capture the snapshot on the UI thread
+        /// and write it. A caller that pumps messages between capture and write (a dialog) lets an
+        /// async fill commit or start meanwhile; once capture begins nothing yields.
         /// </summary>
         internal void WriteNestReport(
             NestReportTargets targets,

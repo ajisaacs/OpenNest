@@ -304,7 +304,7 @@ namespace OpenNest.Forms
             {
                 // Export never changes the document's save path, remote id, or nest name.
                 new NestWriter(form.Nest) { BestFitStore = BestFitCacheStore.Shared }.Write(dlg.FileName);
-                statusLabel1.Text = $"Exported .nest to {dlg.FileName}";
+                statusLabel1.Text = $"Saved a copy to {dlg.FileName}";
             }
             catch (Exception ex)
             {
@@ -316,23 +316,10 @@ namespace OpenNest.Forms
 
         private void ExportAll_Click(object sender, EventArgs e) => WithActive(f => f.ExportAll());
 
-        private void ExportNestReport_Click(object sender, EventArgs e)
-        {
-            var form = activeForm;
-            if (form == null || !TryCaptureReportTargets(form, out var targets))
-                return;
-
-            var destination = ShowReportSaveDialog(targets.SuggestedFileName);
-            if (destination == null)
-                return; // Cancel: nothing written, job untouched.
-
-            if (!TryWriteNestReport(form, targets, destination))
-                return;
-            statusLabel1.Text = $"Saved nest report to {destination}";
-            ReportSuccess(destination);
-        }
-
-        /// <summary>Renders the report to a private temporary file and opens it in a viewer to save or print.</summary>
+        /// <summary>
+        /// Renders the report to a private temporary file and opens it in a viewer to save or
+        /// print. The viewer's Save As is the only way to keep the PDF, with or without WebView2.
+        /// </summary>
         private void ViewNestReport_Click(object sender, EventArgs e)
         {
             var form = activeForm;
@@ -467,32 +454,13 @@ namespace OpenNest.Forms
             viewer.Show(this);
         }
 
-        /// <summary>Returns the chosen path, or null on cancel. Overwrite consent is the dialog prompt.</summary>
-        internal virtual string ShowReportSaveDialog(string suggestedFileName)
-        {
-            using var dlg = new SaveFileDialog
-            {
-                Filter = "PDF report (*.pdf)|*.pdf",
-                FileName = suggestedFileName,
-                AddExtension = true,
-                DefaultExt = ".pdf",
-                OverwritePrompt = true,
-            };
-            return dlg.ShowDialog(this) == DialogResult.OK ? dlg.FileName : null;
-        }
-
         /// <summary>Failure notice naming the fixed target; internal so tests observe it without dialogs.</summary>
         internal virtual void ReportFailure(
             EditNestForm.NestReportTargets targets,
             Exception error) =>
             MessageBox.Show(this,
-                $"Could not export the nest report{(targets == null ? "" : $" for '{targets.Nest.Name}'")}: {error.Message}",
-                "Export Nest Report", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-
-        /// <summary>Success notice; internal so tests observe completion without dialogs.</summary>
-        internal virtual void ReportSuccess(string destination) =>
-            MessageBox.Show(this, $"Nest report saved to:\n\n{destination}", "Export Nest Report",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                $"Could not create the nest report{(targets == null ? "" : $" for '{targets.Nest.Name}'")}: {error.Message}",
+                "Nest Report", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
         private void Exit_Click(object sender, EventArgs e)
         {

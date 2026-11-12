@@ -51,7 +51,7 @@ namespace OpenNest.Forms
             mnuFileExport = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileExportAll = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileViewNestReport = new System.Windows.Forms.ToolStripMenuItem();
-            mnuFileExportNestReport = new System.Windows.Forms.ToolStripMenuItem();
+            mnuFileReportsSeparator = new System.Windows.Forms.ToolStripSeparator();
             mnuFileViewPartPrintouts = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem3 = new System.Windows.Forms.ToolStripSeparator();
             mnuFileExit = new System.Windows.Forms.ToolStripMenuItem();
@@ -222,7 +222,7 @@ namespace OpenNest.Forms
             // 
             // mnuFile
             // 
-            mnuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuFileNew, mnuFileOpen, mnuFileImportBom, mnuFileDrawingLibrary, mnuFileDrawingSets, mnuFileReleases, toolStripMenuItem1, mnuFileSave, mnuFileSaveAs, toolStripMenuItem2, mnuFileExport, mnuFileExportAll, mnuFileViewNestReport, mnuFileExportNestReport, mnuFileViewPartPrintouts, toolStripMenuItem3, mnuFileExit });
+            mnuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuFileNew, mnuFileOpen, mnuFileImportBom, mnuFileDrawingLibrary, mnuFileDrawingSets, mnuFileReleases, toolStripMenuItem1, mnuFileSave, mnuFileSaveAs, toolStripMenuItem2, mnuFileExport, mnuFileExportAll, mnuFileReportsSeparator, mnuFileViewNestReport, mnuFileViewPartPrintouts, toolStripMenuItem3, mnuFileExit });
             mnuFile.Name = "mnuFile";
             mnuFile.DropDownOpening += FileMenu_Opening;
             mnuFile.Size = new System.Drawing.Size(37, 20);
@@ -307,38 +307,35 @@ namespace OpenNest.Forms
             // 
             mnuFileExport.Name = "mnuFileExport";
             mnuFileExport.Size = new System.Drawing.Size(146, 22);
-            mnuFileExport.Text = "Export";
+            mnuFileExport.Text = "Export Plate...";
             mnuFileExport.Click += Export_Click;
             // 
             // mnuFileExportAll
             // 
             mnuFileExportAll.Name = "mnuFileExportAll";
             mnuFileExportAll.Size = new System.Drawing.Size(146, 22);
-            mnuFileExportAll.Text = "Export All";
+            mnuFileExportAll.Text = "Export All Plates...";
             mnuFileExportAll.Click += ExportAll_Click;
+            // 
+            // mnuFileReportsSeparator
+            // 
+            mnuFileReportsSeparator.Name = "mnuFileReportsSeparator";
+            mnuFileReportsSeparator.Size = new System.Drawing.Size(143, 6);
             // 
             // mnuFileViewNestReport
             // 
             mnuFileViewNestReport.Enabled = false;
             mnuFileViewNestReport.Name = "mnuFileViewNestReport";
             mnuFileViewNestReport.Size = new System.Drawing.Size(146, 22);
-            mnuFileViewNestReport.Text = "View Nest Report...";
+            mnuFileViewNestReport.Text = "Nest Report...";
             mnuFileViewNestReport.Click += ViewNestReport_Click;
-            // 
-            // mnuFileExportNestReport
-            // 
-            mnuFileExportNestReport.Enabled = false;
-            mnuFileExportNestReport.Name = "mnuFileExportNestReport";
-            mnuFileExportNestReport.Size = new System.Drawing.Size(146, 22);
-            mnuFileExportNestReport.Text = "Export Nest Report...";
-            mnuFileExportNestReport.Click += ExportNestReport_Click;
             // 
             // mnuFileViewPartPrintouts
             // 
             mnuFileViewPartPrintouts.Enabled = false;
             mnuFileViewPartPrintouts.Name = "mnuFileViewPartPrintouts";
             mnuFileViewPartPrintouts.Size = new System.Drawing.Size(146, 22);
-            mnuFileViewPartPrintouts.Text = "View Part Printouts...";
+            mnuFileViewPartPrintouts.Text = "Part Printouts...";
             mnuFileViewPartPrintouts.Click += ViewPartPrintouts_Click;
             // 
             // toolStripMenuItem3
@@ -1538,7 +1535,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripStatusLabel plateUtilStatusLabel;
         private System.Windows.Forms.ToolStripMenuItem mnuFileExportAll;
         private System.Windows.Forms.ToolStripMenuItem mnuFileViewNestReport;
-        private System.Windows.Forms.ToolStripMenuItem mnuFileExportNestReport;
+        private System.Windows.Forms.ToolStripSeparator mnuFileReportsSeparator;
         private System.Windows.Forms.ToolStripMenuItem mnuFileViewPartPrintouts;
         private System.Windows.Forms.ToolStripMenuItem openNestToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem pEPToolStripMenuItem;

@@ -25,7 +25,7 @@ namespace OpenNest.Forms
         private CancellationTokenSource nestingCts;
         private readonly NestStorageController storage;
         private readonly ToolStripMenuItem storageModeMenu = new("Storage Mode...");
-        private readonly ToolStripMenuItem exportNestMenu = new("Export .nest...");
+        private readonly ToolStripMenuItem exportNestMenu = new("Save Copy as .nest File...");
         private readonly ToolStripButton btnCutPlanner;
         private readonly ToolStripButton btnSimulateCutting;
         private readonly ToolStripButton btnSequenceByPath;
@@ -131,8 +131,11 @@ namespace OpenNest.Forms
             toolStrip1.Items.Add(postButton);
             storageModeMenu.Click += StorageMode_Click;
             exportNestMenu.Click += ExportNest_Click;
-            mnuFile.DropDownItems.Insert(mnuFile.DropDownItems.IndexOf(mnuFileExport), exportNestMenu);
-            mnuFile.DropDownItems.Insert(mnuFile.DropDownItems.IndexOf(mnuFileExit), storageModeMenu);
+            // A local .nest copy is a save, not a plate export, so it sits with Save and Save As.
+            mnuFile.DropDownItems.Insert(mnuFile.DropDownItems.IndexOf(mnuFileSaveAs) + 1, exportNestMenu);
+            var exitIndex = mnuFile.DropDownItems.IndexOf(mnuFileExit);
+            mnuFile.DropDownItems.Insert(exitIndex, new ToolStripSeparator());
+            mnuFile.DropDownItems.Insert(exitIndex, storageModeMenu);
             InitializeAlignMenu();
             InitializeHelpMenu();
             UpdateOverlapMenu();

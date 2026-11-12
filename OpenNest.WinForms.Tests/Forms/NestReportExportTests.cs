@@ -47,25 +47,21 @@ public class NestReportExportTests
     {
         using var host = new TestMainForm();
         host.Show();
-        var item = Menu(host, "mnuFileExportNestReport");
         var view = Menu(host, "mnuFileViewNestReport");
-        Assert.False(item.Enabled);
         Assert.False(view.Enabled);
 
         using var form = new EditNestForm(new Nest("enabled job")) { MdiParent = host };
         form.PlateView.SetOverlapAutoCheck(null); // Background overlap workers are irrelevant here.
         form.Show();
-        Assert.True(item.Enabled);
         Assert.True(view.Enabled);
 
         form.Close();
         host.Activate();
-        Assert.False(item.Enabled);
         Assert.False(view.Enabled);
     });
 
     [Fact]
-    public void JobBusyRejectsBeforeAnyDialog() => RunSta(() =>
+    public void JobBusyRejectsBeforeRendering() => RunSta(() =>
     {
         using var host = new TestMainForm();
         host.Show();
@@ -75,14 +71,14 @@ public class NestReportExportTests
         SetField(host, "nestingInProgress", true);
         try
         {
-            Menu(host, "mnuFileExportNestReport").PerformClick();
+            Menu(host, "mnuFileViewNestReport").PerformClick();
         }
         finally
         {
             SetField(host, "nestingInProgress", false);
         }
 
-        Assert.Empty(host.DialogRequests);
+        Assert.Empty(host.Viewed);
         var failure = Assert.Single(host.Failures);
         Assert.Contains("busy job", failure);
         Assert.Contains("Finish or cancel", failure);
@@ -99,8 +95,8 @@ public class NestReportExportTests
         SetBackingField(form.PlateView, "IsFillInProgress", true);
         try
         {
-            Menu(host, "mnuFileExportNestReport").PerformClick();
-            Assert.Empty(host.DialogRequests);
+            Menu(host, "mnuFileViewNestReport").PerformClick();
+            Assert.Empty(host.Viewed);
             Assert.Contains("Finish or cancel", Assert.Single(host.Failures));
         }
         finally
@@ -108,9 +104,9 @@ public class NestReportExportTests
             SetBackingField(form.PlateView, "IsFillInProgress", false);
         }
 
-        // Cleared guard: the command now reaches the (test-intercepted) dialog.
-        Menu(host, "mnuFileExportNestReport").PerformClick();
-        Assert.Single(host.DialogRequests);
+        // Cleared guard: the command now reaches the (test-intercepted) viewer.
+        Menu(host, "mnuFileViewNestReport").PerformClick();
+        NestReportViewerForm.DeleteReportFolder(Assert.Single(host.Viewed));
     });
 
     [Fact]
@@ -126,8 +122,8 @@ public class NestReportExportTests
         Assert.True(form.PlateView.Actions.CurrentAction!.IsBusy());
         try
         {
-            Menu(host, "mnuFileExportNestReport").PerformClick();
-            Assert.Empty(host.DialogRequests);
+            Menu(host, "mnuFileViewNestReport").PerformClick();
+            Assert.Empty(host.Viewed);
             Assert.Contains("Finish or cancel", Assert.Single(host.Failures));
         }
         finally
@@ -138,7 +134,7 @@ public class NestReportExportTests
     });
 
     [Fact]
-    public void InvalidNestNameRejectsBeforeAnyDialog() => RunSta(() =>
+    public void InvalidNestNameRejectsBeforeRendering() => RunSta(() =>
     {
         using var host = new TestMainForm();
         host.Show();
@@ -146,87 +142,58 @@ public class NestReportExportTests
         form.PlateView.SetOverlapAutoCheck(null); // Background overlap workers are irrelevant here.
         form.Show();
 
-        Menu(host, "mnuFileExportNestReport").PerformClick();
+        Menu(host, "mnuFileViewNestReport").PerformClick();
 
-        Assert.Empty(host.DialogRequests);
+        Assert.Empty(host.Viewed);
         Assert.Contains("bad/name", Assert.Single(host.Failures));
     });
 
     [Fact]
-    public void CancelWritesNothingAndNotifiesNothing() => RunSta(() =>
+    public void ViewLeavesJobStateUntouched() => RunSta(() =>
     {
-        using var host = new TestMainForm { NextDialogPath = null };
+        using var host = new TestMainForm();
         host.Show();
-        using var form = new EditNestForm(CreateJob("cancel job")) { MdiParent = host };
-        form.PlateView.SetOverlapAutoCheck(null); // Background overlap workers are irrelevant here.
-        form.Show();
-        var path = Path.Combine(Path.GetTempPath(), $"opennest-report-cancel-{Guid.NewGuid():N}.pdf");
-
-        host.NextDialogPath = path;
-        host.NextDialogResult = DialogResult.Cancel;
-        Menu(host, "mnuFileExportNestReport").PerformClick();
-
-        Assert.False(File.Exists(path));
-        Assert.Empty(host.Failures);
-        Assert.Empty(host.Successes);
-    });
-
-    [Fact]
-    public void SuccessfulExportWritesPdfAndLeavesJobStateUntouched() => RunSta(() =>
-    {
-        using var host = new TestMainForm { NextDialogResult = DialogResult.OK };
-        host.Show();
-        var nest = CreateJob("export job");
+        var nest = CreateJob("state job");
         using var form = new EditNestForm(nest) { MdiParent = host };
         form.PlateView.SetOverlapAutoCheck(null); // Background overlap workers are irrelevant here.
         form.Show();
         form.PlateManager.LoadAt(1);
         // EnsureSentinel already appended a trailing empty plate behind the two loaded here.
-        var plateCountBeforeExport = nest.Plates.Count;
-        var path = Path.Combine(Path.GetTempPath(), $"opennest-report-ok-{Guid.NewGuid():N}.pdf");
+        var plateCountBeforeView = nest.Plates.Count;
+
+        Menu(host, "mnuFileViewNestReport").PerformClick();
+
+        var path = Assert.Single(host.Viewed);
         try
         {
-            host.NextDialogPath = path;
-            Menu(host, "mnuFileExportNestReport").PerformClick();
-
-            Assert.Equal(path, Assert.Single(host.Successes));
-            var bytes = File.ReadAllBytes(path);
-            Assert.Equal("%PDF-", System.Text.Encoding.ASCII.GetString(bytes, 0, 5));
-            Assert.True(bytes.Length > 1000);
             // Selected plate and job contents are untouched by reporting.
             Assert.Equal(1, form.PlateManager.CurrentIndex);
-            Assert.Equal(plateCountBeforeExport, nest.Plates.Count);
+            Assert.Equal(plateCountBeforeView, nest.Plates.Count);
             Assert.Single(nest.Plates[0].Parts);
             Assert.Equal(2, nest.Drawings.Count);
         }
         finally
         {
-            File.Delete(path);
+            NestReportViewerForm.DeleteReportFolder(path);
         }
     });
 
     [Fact]
     public void RenderFailureLeavesExistingDestinationUnchanged() => RunSta(() =>
     {
-        using var host = new TestMainForm { NextDialogResult = DialogResult.OK };
-        host.Show();
         var nest = CreateJob("failure job");
         // Outside the report's supported text contract: fails font validation before layout.
         nest.Notes = "em\u2014dash";
-        using var form = new EditNestForm(nest) { MdiParent = host };
-        form.PlateView.SetOverlapAutoCheck(null); // Background overlap workers are irrelevant here.
-        form.Show();
+        using var form = new EditNestForm(nest);
+        form.PlateView.SetOverlapAutoCheck(null);
+        var targets = form.CaptureReportTargets(() => false);
         var path = Path.Combine(Path.GetTempPath(), $"opennest-report-fail-{Guid.NewGuid():N}.pdf");
         var original = new byte[] { 1, 2, 3, 4 };
         File.WriteAllBytes(path, original);
         try
         {
-            host.NextDialogPath = path;
-            Menu(host, "mnuFileExportNestReport").PerformClick();
+            Assert.ThrowsAny<Exception>(() => form.WriteNestReport(targets, path, () => false));
 
-            Assert.Empty(host.Successes);
-            var failure = Assert.Single(host.Failures);
-            Assert.Contains("failure job", failure);
             Assert.Equal(original, File.ReadAllBytes(path));
             Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path)!, ".*report-fail*.tmp"));
         }
@@ -248,7 +215,6 @@ public class NestReportExportTests
 
         Menu(host, "mnuFileViewNestReport").PerformClick();
 
-        Assert.Empty(host.DialogRequests);
         Assert.Empty(host.Failures);
         var path = Assert.Single(host.Viewed);
         try
@@ -421,27 +387,15 @@ public class NestReportExportTests
     // Same reflection precedent PlateViewFillLifetimeTests uses for fill-lifetime state.
     private sealed class TestMainForm : MainForm
     {
-        public List<string> DialogRequests { get; } = [];
-        public string? NextDialogPath { get; set; }
-        public DialogResult NextDialogResult { get; set; } = DialogResult.OK;
         public List<string> Failures { get; } = [];
-        public List<string> Successes { get; } = [];
         public List<string> Viewed { get; } = [];
 
         // No startup migrations/automatic new document, and no settings save at close.
         protected override void OnLoad(EventArgs e) { }
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e) { }
 
-        internal override string? ShowReportSaveDialog(string suggestedFileName)
-        {
-            DialogRequests.Add(suggestedFileName);
-            return NextDialogResult == DialogResult.OK ? NextDialogPath : null;
-        }
-
         internal override void ReportFailure(EditNestForm.NestReportTargets? targets, Exception error) =>
             Failures.Add($"{targets?.Nest.Name}|{error.Message}");
-
-        internal override void ReportSuccess(string destination) => Successes.Add(destination);
 
         internal override void ShowReportViewer(string pdfPath, EditNestForm.NestReportTargets targets) =>
             Viewed.Add(pdfPath);

@@ -10,7 +10,7 @@
         <Separator />
         <MenuItem x:Name="SaveMenuItem" Header="_Save" InputGesture="Ctrl+S" Click="OnSave" />
         <MenuItem x:Name="SaveAsMenuItem" Header="Save _As..." Click="OnSaveAs" />
-        <MenuItem x:Name="ExportNestMenuItem" Header="_Export .nest..." Click="OnExportNest" />
+        <MenuItem x:Name="ExportNestMenuItem" Header="Save _Copy as .nest File..." Click="OnExportNest" />
         <Separator />
         <MenuItem x:Name="CloseMenuItem" Header="_Close" Click="OnCloseNest" />
         <MenuItem x:Name="CloseAllMenuItem" Header="Close A_ll" Click="OnCloseAll" />

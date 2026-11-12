@@ -1,23 +1,23 @@
 # Nest report PDF export
 
-Desktop: **File -> Export Nest Report...** writes `<nest-name>.report.pdf` for the
-active nest's whole job through an overwrite-confirming save dialog. The command
-is disabled without an open document and during a background database save, and
-it refuses to run while whole-job nesting, an open progress window, interactive
-fill or a busy plate action holds the nest or any second window sharing it. After
-the dialog closes, the target and those conditions are revalidated; the snapshot
-is then captured synchronously on the UI thread and only that detached snapshot
-reaches the renderer. Export never changes the selected plate, dirty state,
-timestamps or quantities, and it never touches post selection, verification or
-CNC output. There are no persisted report settings or templates.
+Desktop: **File -> Nest Report...** renders `<nest-name>.report.pdf` for the
+active nest's whole job. The command is disabled without an open document and
+during a background database save, and it refuses to run while whole-job
+nesting, an open progress window, interactive fill or a busy plate action holds
+the nest or any second window sharing it. The target and those conditions are
+revalidated before the write; the snapshot is then captured synchronously on the
+UI thread and only that detached snapshot reaches the renderer. Reporting never
+changes the selected plate, dirty state, timestamps or quantities, and it never
+touches post selection, verification or CNC output. There are no persisted report
+settings or templates.
 
-**File -> View Nest Report...** runs the same guards and capture without a dialog,
-renders to a private folder under `%TEMP%\OpenNest\Reports\` and opens a modeless
-viewer window (WebView2's PDF viewer, sharing Help's WebView2 data folder) with
-**Save As...**, which copies the rendered file to a chosen path, and **Print...**,
-the WebView2 print dialog. Closing the window deletes its temporary folder; a
-render failure opens no viewer and leaves no folder. Without the WebView2 Runtime
-the window still offers Save As.
+The report renders to a private folder under `%TEMP%\OpenNest\Reports\` and opens
+a modeless viewer window (WebView2's PDF viewer, sharing Help's WebView2 data
+folder) with **Save As...**, which copies the rendered file to a chosen path, and
+**Print...**, the WebView2 print dialog. Save As is the only way to keep the PDF;
+there is no separate direct-save command. Closing the window deletes its temporary
+folder; a render failure opens no viewer and leaves no folder. Without the WebView2
+Runtime the window still offers Save As.
 
 The same two calls back the command and any future integration:
 
@@ -31,7 +31,7 @@ the selected plate, or certify that a layout passed geometry/pre-post checks.
 
 ## Part printouts
 
-**File -> View Part Printouts...** prints every non-cutoff drawing of the active
+**File -> Part Printouts...** prints every non-cutoff drawing of the active
 nest; **View Part Printout...** on the drawing list's right-click menu prints the
 selected one. Both render to `%TEMP%\OpenNest\Reports\` and open the report viewer,
 suggesting `<nest-name>.printout.pdf` or `<drawing-name>.printout.pdf`. Each part
@@ -191,7 +191,7 @@ concurrent calls cannot lay out text differently from a sequential export.
 
 ## Estimated cut time
 
-When the caller passes `CutParameters` (the desktop export always does, from the
+When the caller passes `CutParameters` (the desktop always does, from the
 settings last used in Calculate Cut Time or the simulator), each plate gets an
 estimated time per copy from `CutSimulation`, plus clamp-removal minutes, the same
 as Calculate Cut Time (see [cut-time estimates](cut-time-estimates.md)). The summary
@@ -253,10 +253,9 @@ Pixel inspection supplements geometry assertions; it is not a CNC-validation
 result.
 
 Windows compilation is not runtime acceptance. `OpenNest.WinForms.Tests/Forms/NestReportExportTests.cs`
-covers enablement, busy/cancel/failure/success adapter behavior, but it only
-compiles on Linux. Windows runtime acceptance still owes: exporting a real nest
+covers enablement, busy/failure/viewer adapter behavior, but it only
+compiles on Linux. Windows runtime acceptance still owes: reporting a real nest
 (and the packaged application, so bundled fonts/notices are verified), checking
 page sizes/labels/copies and embedded fonts with `pdffonts`, a tabbed part with a
-hole, opening and printing the PDF, and exercising fill/nesting rejection, cancel,
-overwrite and invalid-path behavior with job state and any existing destination
-unchanged.
+hole, saving and printing the PDF from the viewer, and exercising fill/nesting
+rejection with job state unchanged.

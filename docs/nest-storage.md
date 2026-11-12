@@ -44,9 +44,9 @@ The desktop app can save nests two ways:
   the record from ordinary browsing but retains every archive; **Deleted nests...**
   opens an explicit recovery view. Neither action purges data. An old desktop
   without a revision precondition cannot update or delete on an upgraded server.
-  A separate **File > Export .nest...** command is always available (in both
-  modes) for producing a local file to share or back up. Export does not change
-  the document's file save path or database record association.
+  A separate **File > Save Copy as .nest File...** command is always available
+  (in both modes) for producing a local file to share or back up. The copy does
+  not change the document's file save path or database record association.
 
 Dragging one or more `.nest` files onto the main window (or onto an open
 plate) opens them from disk directly, in either mode — this is the only way
