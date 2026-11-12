@@ -1,6 +1,6 @@
 using System.Drawing;
 
-namespace OpenNest.WinForms.Tests;
+namespace OpenNest.Desktop.Tests;
 
 public class FestiveColorSchemeTests
 {

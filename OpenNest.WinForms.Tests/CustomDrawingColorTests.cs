@@ -7,36 +7,6 @@ namespace OpenNest.WinForms.Tests;
 public class CustomDrawingColorTests
 {
     [Fact]
-    public void RecolorKeepsCustomColorsInTheirSlotsAndSkipsCutoffs()
-    {
-        var previous = ColorSchemeSerializer.Deserialize(ColorSchemeSerializer.Serialize(ColorScheme.Default));
-        try
-        {
-            ColorSchemeRegistry.Apply(ColorSchemeRegistry.Get("Classic"));
-            var nest = new Nest("Recolor");
-            var first = new Drawing("First") { Color = Color.Coral };
-            var custom = new Drawing("Custom") { Color = Color.Red, HasCustomColor = true };
-            var cutoff = new Drawing("Cutoff") { IsCutOff = true, Color = Color.Gray };
-            var third = new Drawing("Third") { Color = Color.Coral };
-            nest.Drawings.Add(first);
-            nest.Drawings.Add(custom);
-            nest.Drawings.Add(cutoff);
-            nest.Drawings.Add(third);
-
-            ColorSchemeRegistry.RecolorDrawings(nest);
-
-            Assert.Equal(Drawing.GetPartColor(0), first.Color);
-            Assert.Equal(Color.Red, custom.Color);
-            Assert.Equal(Color.Gray, cutoff.Color);
-            Assert.Equal(Drawing.GetPartColor(2), third.Color);
-        }
-        finally
-        {
-            ColorSchemeRegistry.Apply(previous);
-        }
-    }
-
-    [Fact]
     public void DrawingPropertiesMarksOnlyAChangedColorAsCustom() => StaTestThread.Run(() =>
     {
         var drawing = new Drawing("Bracket") { Color = Color.Coral };

@@ -92,14 +92,14 @@ namespace OpenNest.Controls
             plateRect.Y -= plateRect.Height;
             edgeSpacingRect.Y -= edgeSpacingRect.Height;
 
-            g.FillRectangle(view.ColorScheme.LayoutFillBrush, plateRect);
+            g.FillRectangle(view.ColorScheme.Gdi().LayoutFillBrush, plateRect);
 
             var viewBounds = view.GetViewBounds();
 
             if (!edgeSpacingRect.Contains(viewBounds))
             {
                 g.DrawRectangle(
-                    view.ColorScheme.EdgeSpacingPen,
+                    view.ColorScheme.Gdi().EdgeSpacingPen,
                     edgeSpacingRect.X,
                     edgeSpacingRect.Y,
                     edgeSpacingRect.Width,
@@ -108,7 +108,7 @@ namespace OpenNest.Controls
             }
 
             g.DrawRectangle(
-                view.ColorScheme.LayoutOutlinePen,
+                view.ColorScheme.Gdi().LayoutOutlinePen,
                 plateRect.X,
                 plateRect.Y,
                 plateRect.Width,
@@ -259,7 +259,7 @@ namespace OpenNest.Controls
             sheet.AddPolygon(ToGraph(outline.Points, origin));
             foreach (var obstacle in outline.Obstacles)
                 sheet.AddPolygon(ToGraph(obstacle, origin));
-            g.FillPath(view.ColorScheme.LayoutFillBrush, sheet);
+            g.FillPath(view.ColorScheme.Gdi().LayoutFillBrush, sheet);
 
             if (outline.Obstacles.Count > 0)
             {
@@ -277,10 +277,10 @@ namespace OpenNest.Controls
                 System.Math.Max(plate.EdgeSpacing.Top, plate.EdgeSpacing.Bottom));
             if (edge > 0)
                 foreach (var path in outline.Usable(edge, origin))
-                    g.DrawPolygon(view.ColorScheme.EdgeSpacingPen,
+                    g.DrawPolygon(view.ColorScheme.Gdi().EdgeSpacingPen,
                         path.Select(p => view.PointWorldToGraph(p.x, p.y)).ToArray());
 
-            g.DrawPath(view.ColorScheme.LayoutOutlinePen, sheet);
+            g.DrawPath(view.ColorScheme.Gdi().LayoutOutlinePen, sheet);
         }
 
         private PointF[] ToGraph(IReadOnlyList<Vector> points, Vector origin) =>
@@ -684,7 +684,7 @@ namespace OpenNest.Controls
 
         private void DrawRapids(Graphics g)
         {
-            var pen = view.ColorScheme.RapidPen;
+            var pen = view.ColorScheme.Gdi().RapidPen;
             foreach (var segment in RapidEnumerator.Enumerate(view.DisplayPlate.Parts))
                 DrawLine(g, segment.From, segment.To, pen);
         }
@@ -782,7 +782,7 @@ namespace OpenNest.Controls
             g.DrawLine(pen, point1, point2);
         }
 
-        private void DrawBox(Graphics g, Box box) => DrawBox(g, box, view.ColorScheme.BoundingBoxPen);
+        private void DrawBox(Graphics g, Box box) => DrawBox(g, box, view.ColorScheme.Gdi().BoundingBoxPen);
 
         private void DrawBox(Graphics g, Box box, Pen pen)
         {

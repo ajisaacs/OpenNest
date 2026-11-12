@@ -15,9 +15,9 @@ namespace OpenNest.Controls
 
         public IReadOnlyList<LayoutPart> PreviewParts => activeParts;
 
-        public Brush PreviewBrush => view.ColorScheme.ActivePreviewPartBrush;
+        public Brush PreviewBrush => view.ColorScheme.Gdi().ActivePreviewPartBrush;
 
-        public Pen PreviewPen => view.ColorScheme.ActivePreviewPartPen;
+        public Pen PreviewPen => view.ColorScheme.Gdi().ActivePreviewPartPen;
 
         public void SetActiveParts(List<Part> parts)
         {

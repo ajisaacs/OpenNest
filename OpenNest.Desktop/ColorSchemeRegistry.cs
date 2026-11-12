@@ -3,14 +3,21 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Windows.Forms;
-using OpenNest.Forms;
-using OpenNest.Properties;
 
 namespace OpenNest
 {
+    /// <summary>
+    /// The built-in colour schemes plus any scheme JSON files in <see cref="SchemesDirectory"/>,
+    /// and the active scheme, which lives in <see cref="ColorScheme.Default"/>.
+    /// </summary>
     public static class ColorSchemeRegistry
     {
+        /// <summary>The user setting that names the chosen scheme, as the WinForms app stores it.</summary>
+        public const string SettingName = "ActiveColorScheme";
+
+        /// <summary>The scheme used when none is chosen, or the chosen one no longer exists.</summary>
+        public const string DefaultSchemeName = "Classic";
+
         private static readonly Dictionary<string, ColorScheme> builtIns = new(
             StringComparer.OrdinalIgnoreCase
         )
@@ -25,6 +32,27 @@ namespace OpenNest
         };
 
         private static List<ColorScheme> diskCache;
+        private static string schemesDirectory = Path.Combine(AppContext.BaseDirectory, "Schemes");
+
+        /// <summary>
+        /// Raised after <see cref="Apply"/> copies a scheme into <see cref="ColorScheme.Default"/>
+        /// and the drawing palette, so each front end can recolour its open nests and repaint.
+        /// </summary>
+        public static event EventHandler<ColorScheme> Applied;
+
+        /// <summary>
+        /// The folder of scheme JSON files: Schemes beside the application. A file that does not
+        /// parse is skipped, and one named like a built-in scheme never replaces it.
+        /// </summary>
+        public static string SchemesDirectory
+        {
+            get => schemesDirectory;
+            set
+            {
+                schemesDirectory = value;
+                Refresh();
+            }
+        }
 
         public static IEnumerable<ColorScheme> AllSchemes
         {
@@ -40,19 +68,27 @@ namespace OpenNest
         public static ColorScheme Get(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
-                return builtIns["Classic"];
+                return builtIns[DefaultSchemeName];
 
             var hit = AllSchemes.FirstOrDefault(s =>
                 string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)
             );
-            return hit ?? builtIns["Classic"];
+            return hit ?? builtIns[DefaultSchemeName];
         }
 
-        public static void ApplyActiveFromSettings()
+        /// <summary>
+        /// The scheme name saved in the user settings (<see cref="SettingName"/>), or the default
+        /// scheme's name when none is saved, as the WinForms setting defaults.
+        /// </summary>
+        public static string SavedSchemeName(IReadOnlyDictionary<string, string> settings) =>
+            settings != null && settings.TryGetValue(SettingName, out var name) ? name : DefaultSchemeName;
+
+        /// <summary>Applies the scheme saved in the user settings.</summary>
+        public static ColorScheme ApplySaved(IReadOnlyDictionary<string, string> settings)
         {
-            var name = Settings.Default.ActiveColorScheme;
-            var scheme = Get(name);
+            var scheme = Get(SavedSchemeName(settings));
             Apply(scheme);
+            return scheme;
         }
 
         public static void Apply(ColorScheme scheme)
@@ -81,20 +117,13 @@ namespace OpenNest
             Drawing.PartColors = scheme.PartColors;
             Drawing.UseGoldenAngleColors = scheme.UseGoldenAngleColors;
 
-            RecolorOpenNests();
-        }
-
-        private static void RecolorOpenNests()
-        {
-            foreach (Form f in Application.OpenForms)
-            {
-                if (f is EditNestForm enf)
-                    RecolorDrawings(enf.Nest);
-            }
+            Applied?.Invoke(null, scheme);
         }
 
         /// <summary>
-        /// Gives each non-cutoff drawing its palette color by position. Custom colors are kept,
+        /// Gives each non-cutoff drawing its palette color by position: on opening a nest, so the
+        /// view follows the application's scheme rather than the one the file was saved under,
+        /// and when a scheme is applied. Custom colors are kept,
         /// but still take their slot so the other drawings' colors don't shift around them.
         /// </summary>
         public static void RecolorDrawings(Nest nest)
@@ -112,8 +141,8 @@ namespace OpenNest
 
         private static IEnumerable<ColorScheme> LoadDiskSchemes()
         {
-            var dir = Path.Combine(AppContext.BaseDirectory, "Schemes");
-            if (!Directory.Exists(dir))
+            var dir = schemesDirectory;
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
                 yield break;
 
             foreach (var path in Directory.GetFiles(dir, "*.json"))

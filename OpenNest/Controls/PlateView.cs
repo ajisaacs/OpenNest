@@ -805,8 +805,8 @@ namespace OpenNest.Controls
 
             if (DrawOrigin)
             {
-                e.Graphics.DrawLine(ColorScheme.OriginPen, origin.X, 0, origin.X, Height);
-                e.Graphics.DrawLine(ColorScheme.OriginPen, 0, origin.Y, Width, origin.Y);
+                e.Graphics.DrawLine(ColorScheme.Gdi().OriginPen, origin.X, 0, origin.X, Height);
+                e.Graphics.DrawLine(ColorScheme.Gdi().OriginPen, 0, origin.Y, Width, origin.Y);
             }
 
             e.Graphics.TranslateTransform(origin.X, origin.Y);

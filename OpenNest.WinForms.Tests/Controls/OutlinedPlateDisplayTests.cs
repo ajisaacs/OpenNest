@@ -35,7 +35,7 @@ public class OutlinedPlateDisplayTests
 
         view.Renderer.DrawPlate(g);
 
-        var fill = ((SolidBrush)view.ColorScheme.LayoutFillBrush).Color;
+        var fill = ((SolidBrush)view.ColorScheme.Gdi().LayoutFillBrush).Color;
         Assert.Equal(Color.White.ToArgb(), image.GetPixel(75, 25).ToArgb()); // the missing corner
         Assert.Equal(fill.ToArgb(), image.GetPixel(25, 75).ToArgb()); // the sheet
         Assert.Equal(fill.ToArgb(), image.GetPixel(75, 75).ToArgb()); // the arm

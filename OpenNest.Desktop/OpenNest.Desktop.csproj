@@ -15,4 +15,10 @@
     <ProjectReference Include="..\OpenNest.Api\OpenNest.Api.csproj" />
     <ProjectReference Include="..\OpenNest.Reporting\OpenNest.Reporting.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Colour scheme files; they copy beside both desktop apps, which read them from Schemes. -->
+    <None Update="Schemes\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

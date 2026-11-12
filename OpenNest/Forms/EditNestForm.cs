@@ -453,6 +453,20 @@ namespace OpenNest.Forms
             };
         }
 
+        // Applying a colour scheme recolours the drawings of every open nest window. Subscribed
+        // once, before any nest window can exist.
+        static EditNestForm()
+        {
+            ColorSchemeRegistry.Applied += (_, _) =>
+            {
+                foreach (Form f in Application.OpenForms)
+                {
+                    if (f is EditNestForm enf)
+                        ColorSchemeRegistry.RecolorDrawings(enf.Nest);
+                }
+            };
+        }
+
         public EditNestForm(Nest nest)
             : this()
         {

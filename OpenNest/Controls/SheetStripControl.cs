@@ -161,7 +161,7 @@ namespace OpenNest.Controls
                 var sheetHeight = (float)(tile.Sheet.Width * scale);
                 var left = x + (width - sheetWidth) / 2;
                 var sheetRect = new RectangleF(left, baseline - sheetHeight, sheetWidth, sheetHeight);
-                g.FillRectangle(colorScheme.LayoutFillBrush, sheetRect);
+                g.FillRectangle(colorScheme.Gdi().LayoutFillBrush, sheetRect);
 
                 var state = g.Save();
                 // World Y grows up; the sheet's lower-left corner sits at the rectangle's bottom-left.
@@ -177,7 +177,7 @@ namespace OpenNest.Controls
                 }
                 g.Restore(state);
 
-                g.DrawRectangle(colorScheme.LayoutOutlinePen, sheetRect.X, sheetRect.Y, sheetRect.Width, sheetRect.Height);
+                g.DrawRectangle(colorScheme.Gdi().LayoutOutlinePen, sheetRect.X, sheetRect.Y, sheetRect.Width, sheetRect.Height);
                 var caption = new Rectangle(x, (int)baseline + 4, width, CaptionHeight);
                 TextRenderer.DrawText(g, tile.Title + "\n" + tile.Detail, Font, caption, ForeColor,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.Top);

@@ -162,7 +162,7 @@ namespace OpenNest.Forms
                 Shown += (_, _) => statusLabel1.Text = engineWarning;
 
             OptionsForm.ApplyDisabledStrategies();
-            ColorSchemeRegistry.ApplyActiveFromSettings();
+            ColorSchemeRegistry.Apply(ColorSchemeRegistry.Get(Settings.Default.ActiveColorScheme));
 
             foreach (var name in EngineSelection.UiEngineNames)
                 engineComboBox.Items.Add(name);

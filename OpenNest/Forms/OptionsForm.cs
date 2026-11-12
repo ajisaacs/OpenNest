@@ -141,7 +141,7 @@ namespace OpenNest.Forms
 
             Settings.Default.Save();
             ApplyDisabledStrategies();
-            ColorSchemeRegistry.ApplyActiveFromSettings();
+            ColorSchemeRegistry.Apply(ColorSchemeRegistry.Get(Settings.Default.ActiveColorScheme));
 
             foreach (Form f in Application.OpenForms)
                 f.Invalidate(invalidateChildren: true);
