@@ -862,11 +862,14 @@ namespace OpenNest.Forms
                 catalogDensity
             ) with
             {
-                // The name the machine config gives the nest's thickness ("16 ga"), if any.
-                ThicknessName = Data.MachineCuttingDefaults.Find(machine, targets.Nest)?.Name?.Trim() ?? "",
+                ThicknessName = MachineThicknessName(machine, targets.Nest),
             };
             NestPdfWriter.Write(snapshot, destination);
         }
+
+        /// <summary>The name the machine config gives the nest's thickness ("16 ga"), or empty.</summary>
+        private static string MachineThicknessName(Data.MachineConfig machine, Nest nest) =>
+            Data.MachineCuttingDefaults.Find(machine, nest)?.Name?.Trim() ?? "";
 
         /// <summary>
         /// Writes one printout page per drawing, in order. Capture is synchronous on the UI thread
@@ -877,13 +880,17 @@ namespace OpenNest.Forms
             ArgumentNullException.ThrowIfNull(drawings);
             ArgumentException.ThrowIfNullOrWhiteSpace(destination);
             var material = Nest.Material;
+            var machine = MachineSettings.FindMachine(Nest.Machine);
             var catalogDensity = Data.MaterialDensityLookup.Resolve(
                 material?.Name,
                 material?.Grade,
-                MachineSettings.FindMachine(Nest.Machine),
+                machine,
                 MachineSettings.LoadMaterials()
             );
-            var snapshot = PartPrintoutBuilder.Capture(Nest, drawings, DateTimeOffset.Now, catalogDensity);
+            var snapshot = PartPrintoutBuilder.Capture(Nest, drawings, DateTimeOffset.Now, catalogDensity) with
+            {
+                ThicknessName = MachineThicknessName(machine, Nest),
+            };
             PartPrintoutWriter.Write(snapshot, destination);
         }
 

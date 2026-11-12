@@ -20,6 +20,12 @@ public sealed record PrintoutPart(string Name, string Customer, double Width, do
 public sealed record PartPrintoutSnapshot(string Title, string Material, double Thickness, string Units,
     DateTimeOffset GeneratedAt, ImmutableArray<PrintoutPart> Parts)
 {
+    /// <summary>
+    /// The name the nest machine's config gives this thickness ("16 ga"), shown before the
+    /// decimal; empty when it has none. The caller supplies it, as for the nest report.
+    /// </summary>
+    public string ThicknessName { get; init; } = "";
+
     /// <summary>"lb" for inch jobs, "kg" for millimeter jobs.</summary>
     public string WeightUnits => Units == "mm" ? "kg" : "lb";
 }

@@ -103,6 +103,7 @@ public static class NestPdfWriter
         ReportFonts.ValidateText(snapshot.Notes, "Notes");
         ReportFonts.ValidateText(snapshot.Material, "Material");
         ReportFonts.ValidateText(snapshot.Grade, "Material grade");
+        ReportFonts.ValidateText(snapshot.ThicknessName, "Thickness name");
         foreach (var drawing in snapshot.Drawings)
             ReportFonts.ValidateText(drawing.Name, $"Drawing {drawing.Id} name");
     }

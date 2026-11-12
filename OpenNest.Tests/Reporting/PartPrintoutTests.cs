@@ -122,6 +122,40 @@ public sealed class PartPrintoutTests : IDisposable
         Assert.Contains("Generated 9/29/2026 12:00 PM", text);
     }
 
+    [SkippableFact]
+    public void Write_NamedThicknessLeadsTheDecimal()
+    {
+        var nest = NestReportTestData.CreateNest();
+        var bracket = nest.Drawings.Single(drawing => drawing.Name == "Bracket");
+        var path = Path.Combine(directory, "named.pdf");
+
+        PartPrintoutWriter.Write(PartPrintoutBuilder.Capture(nest, [bracket], NestReportTestData.GeneratedAt)
+            with
+        { ThicknessName = "11 ga" }, path);
+
+        Assert.Matches(@"THICKNESS\s+11 ga - 0\.125""\s+CUT LENGTH", ReportPdf.Text(path, 1));
+    }
+
+    [Fact]
+    public void Write_RejectsAThicknessNameTheBundledFontCannotShow()
+    {
+        var nest = NestReportTestData.CreateNest();
+        var printout = Path.Combine(directory, "bad-printout.pdf");
+        var report = Path.Combine(directory, "bad-report.pdf");
+
+        var printoutError = Assert.Throws<InvalidOperationException>(() => PartPrintoutWriter.Write(
+            PartPrintoutBuilder.Capture(nest, null, NestReportTestData.GeneratedAt) with { ThicknessName = "1/4—plate" },
+            printout));
+        var reportError = Assert.Throws<InvalidOperationException>(() => NestPdfWriter.Write(
+            NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt) with { ThicknessName = "1/4—plate" },
+            report));
+
+        Assert.Contains("Thickness name", printoutError.Message);
+        Assert.Contains("Thickness name", reportError.Message);
+        Assert.False(File.Exists(printout));
+        Assert.False(File.Exists(report));
+    }
+
     [Fact]
     public void Write_RejectsTextTheBundledFontCannotShow()
     {

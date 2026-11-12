@@ -62,6 +62,7 @@ public static class PartPrintoutWriter
     {
         ReportFonts.ValidateText(snapshot.Title, "Printout title");
         ReportFonts.ValidateText(snapshot.Material, "Material");
+        ReportFonts.ValidateText(snapshot.ThicknessName, "Thickness name");
         foreach (var part in snapshot.Parts)
         {
             ReportFonts.ValidateText(part.Name, $"Drawing '{part.Name}' name");
@@ -99,7 +100,7 @@ public static class PartPrintoutWriter
         var rows = new (string, string, string, string)[]
         {
             ("DIMENSIONS", $"{Length(part.Width, units)} x {Length(part.Length, units)}", "MATERIAL", Dash(snapshot.Material)),
-            ("THICKNESS", snapshot.Thickness > 0 ? Length(snapshot.Thickness, units, "0.####") : "-",
+            ("THICKNESS", Thickness(snapshot),
                 "CUT LENGTH", Length(part.CutLength, units)),
             ("PIERCE COUNT", part.PierceCount.ToString(Invariant), "WEIGHT",
                 part.Weight is { } weight ? $"{Number(weight)} {snapshot.WeightUnits}" : "-"),
@@ -176,6 +177,15 @@ public static class PartPrintoutWriter
     /// <summary>Inches get an inch mark, as on CutSend's printout; millimeters spell the unit.</summary>
     private static string Length(double value, string units, string format = "0.00") =>
         units == "mm" ? $"{value.ToString(format, Invariant)} mm" : $"{value.ToString(format, Invariant)}\"";
+
+    /// <summary>The machine config's name for the thickness leads: 16 ga - 0.0598".</summary>
+    private static string Thickness(PartPrintoutSnapshot snapshot)
+    {
+        if (snapshot.Thickness <= 0)
+            return "-";
+        var value = Length(snapshot.Thickness, snapshot.Units, "0.####");
+        return snapshot.ThicknessName.Length > 0 ? $"{snapshot.ThicknessName} - {value}" : value;
+    }
 
     private static string Number(double value) => value.ToString("0.00", Invariant);
 

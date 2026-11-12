@@ -38,7 +38,8 @@ suggesting `<nest-name>.printout.pdf` or `<drawing-name>.printout.pdf`. Each par
 gets one Letter portrait page, bookmarked by name, with the name and customer (the drawing's, else the
 nest's) as the header, the part's material contours stroked to fit (leads, rapids
 and marks omitted), a details table and the generated time. The table shows the
-bounding box (Y extent x X extent), nest material and thickness, cut length and
+bounding box (Y extent x X extent), nest material and thickness (led by the
+machine config's thickness name, as in the nest report), cut length and
 pierce count, net area, weight
 (the nest report's density rules) and required quantity. Cut length sums the moves the head cuts (cut, break, common-line and lead layers); each run of
 them is one pierce, so scribe marks, tab spans, display moves and a display
