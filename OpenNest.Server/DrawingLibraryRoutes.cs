@@ -20,6 +20,48 @@ internal static class DrawingLibraryRoutes
                 ? Results.Ok(db.QueryDrawings(query))
                 : Results.BadRequest(error));
 
+        // Measurement for the worker: the server never parses packages (see NestDatabase.DrawingGeometry).
+        app.MapGet("/api/drawing-packages/unmeasured", (HttpRequest request, NestDatabase db) =>
+        {
+            var version = 0;
+            var limit = 100;
+            foreach (var key in request.Query.Keys)
+            {
+                if (key is not ("version" or "limit") || request.Query[key].Count > 1)
+                    return Results.BadRequest($"Unknown or repeated parameter '{key}'.");
+            }
+            if (!DrawingLibraryRequest.TryInteger(request.Query, "version", ref version, out var error)
+                || !DrawingLibraryRequest.TryInteger(request.Query, "limit", ref limit, out error))
+                return Results.BadRequest(error);
+            if (version < 1 || limit < 1 || limit > RemoteDrawingGeometry.MaxBatch)
+                return Results.BadRequest($"version must be 1 or greater and limit 1 to {RemoteDrawingGeometry.MaxBatch}.");
+            return Results.Ok(db.GetUnmeasuredPackages(version, limit));
+        });
+
+        app.MapGet("/api/drawing-packages/{sha}", (string sha, NestDatabase db) =>
+            !RemoteDrawingGeometry.IsSha256(sha) ? Results.BadRequest("Invalid package hash.") :
+            db.GetPackageBySha(sha) is { } package ? Results.File(package, "application/zip", $"{sha}.nest") : Results.NotFound());
+
+        app.MapPut("/api/drawing-packages/{sha}/geometry", async (string sha, HttpRequest request, NestDatabase db) =>
+        {
+            if (!RemoteDrawingGeometry.IsSha256(sha))
+                return Results.BadRequest("Invalid package hash.");
+            DrawingGeometrySummary? summary;
+            try
+            {
+                summary = await request.ReadFromJsonAsync<DrawingGeometrySummary>(request.HttpContext.RequestAborted);
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return Results.BadRequest("Invalid geometry JSON.");
+            }
+            if (summary is null)
+                return Results.BadRequest("Missing geometry.");
+            if (summary.GetValidationError() is { } invalid)
+                return Results.BadRequest(invalid);
+            return db.SetPackageGeometry(sha, summary) ? Results.NoContent() : Results.NotFound();
+        });
+
         app.MapGet("/api/drawings/{id:guid}", (Guid id, NestDatabase db) =>
             db.GetDrawing(id) is { } record ? Results.Ok(record) : Results.NotFound());
 

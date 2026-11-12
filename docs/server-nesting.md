@@ -4,6 +4,9 @@ In Database mode, Auto Nest can send the job to the nest server instead of nesti
 workstation. A worker container solves queued jobs one at a time under its own CPU and memory
 limits, and the workstation reviews and keeps the result exactly as it would a local run.
 Local nesting stays the default and the fallback when the server cannot take a job.
+Between and beside jobs the worker also measures library drawings for the library's size and
+hole filters (see [measured sizes](nest-storage.md#measured-sizes)); it polls every 60 seconds
+when none are waiting.
 
 ## Desktop
 

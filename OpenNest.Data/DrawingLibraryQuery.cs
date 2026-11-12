@@ -37,6 +37,16 @@ public sealed class DrawingLibraryQuery
 
     public bool IncludeArchived { get; init; }
 
+    /// <summary>
+    /// Thickness, size, hole and saved-date ranges; <see cref="DrawingLibraryFilter.None"/>
+    /// means none. Its customer applies only when <see cref="Customer"/> is blank.
+    /// </summary>
+    public DrawingLibraryFilter Filter { get; init; } = DrawingLibraryFilter.None;
+
+    /// <summary>The customer matched: <see cref="Customer"/>, or the filter's when that is blank.</summary>
+    public string EffectiveCustomer =>
+        string.IsNullOrWhiteSpace(Customer) ? (Filter?.Customer ?? "") : Customer;
+
     /// <summary>Column to order by; ties are broken by id in the same direction.</summary>
     public DrawingSortField Sort { get; init; } = DrawingSortField.SavedAt;
 
@@ -59,6 +69,8 @@ public sealed class DrawingLibraryQuery
             return "cutType must be Laser, Waterjet or Plasma.";
         if (Thickness is { } thickness && (!double.IsFinite(thickness) || thickness < 0))
             return "thickness must be a finite number, zero or greater.";
+        if (Filter is null)
+            return "filter must not be null.";
         if (Offset < 0)
             return "offset must be zero or greater.";
         if (Limit < 1 || Limit > MaxLimit)
@@ -66,6 +78,7 @@ public sealed class DrawingLibraryQuery
         return DrawingLibraryRules.TextError("search", NormalizedSearch, MaxSearchLength)
             ?? DrawingLibraryRules.TextError("customer", Customer ?? "", DrawingLibraryRules.MaxTextLength)
             ?? DrawingLibraryRules.TextError("materialName", MaterialName ?? "", DrawingLibraryRules.MaxTextLength)
-            ?? DrawingLibraryRules.TextError("materialGrade", MaterialGrade ?? "", DrawingLibraryRules.MaxTextLength);
+            ?? DrawingLibraryRules.TextError("materialGrade", MaterialGrade ?? "", DrawingLibraryRules.MaxTextLength)
+            ?? Filter.GetValidationError();
     }
 }

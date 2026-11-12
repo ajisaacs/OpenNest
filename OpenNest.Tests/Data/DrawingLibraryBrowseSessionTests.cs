@@ -99,6 +99,34 @@ public class DrawingLibraryBrowseSessionTests
         Assert.Equal((DrawingSortField.Name, true), (library.Queries[^1].Sort, library.Queries[^1].Descending));
     }
 
+    [Fact]
+    public async Task Filter_IsSentWithTheNestFilterAndReturnsToTheFirstPage()
+    {
+        var library = new PagedLibrary(25);
+        using var session = new DrawingLibraryBrowseSession(library, SyntheticNest(), pageSize: 10);
+        await session.RefreshAsync();
+        await session.NextPageAsync();
+        var filter = new DrawingLibraryFilter { Customer = "Synthetic Co", MaxLength = 4, MinHoles = 2 };
+
+        await session.SetFilterAsync(filter);
+
+        var query = library.Queries[^1];
+        Assert.Same(filter, query.Filter);
+        Assert.Equal(("Synthetic Co", "Synthetic Steel", 0), (query.EffectiveCustomer, query.MaterialName, query.Offset));
+        await Assert.ThrowsAsync<ArgumentException>(() => session.SetFilterAsync(new DrawingLibraryFilter { MinHoles = 3, MaxHoles = 2 }));
+        Assert.Same(filter, session.Filter);
+    }
+
+    [Fact]
+    public async Task Summary_NamesTheFilterWhenItLeavesNothing()
+    {
+        using var session = new DrawingLibraryBrowseSession(new PagedLibrary(0), null);
+
+        await session.SetFilterAsync(new DrawingLibraryFilter { MaxLength = 4 });
+
+        Assert.Equal("No drawings match the filter.", session.Summary);
+    }
+
     [Theory]
     [InlineData(false, "", "No library drawings match this nest's material and thickness. Tick Show all materials to see every drawing.")]
     [InlineData(true, "", "No drawings in the library.")]

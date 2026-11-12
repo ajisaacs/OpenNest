@@ -103,6 +103,9 @@ public sealed partial class NestDatabase
         cutFirst, priority, stepAngle, startAngle, endAngle, allow180Equivalent, colorArgb
         """;
 
+    // The number of DrawingColumns, so joined columns can follow them.
+    private const int DrawingColumnCount = 22;
+
     private const string DrawingStoredColumns = DrawingColumns + ", nameKey, customerKey, materialKey, gradeKey";
 
     // Case-insensitive (ASCII) substring; the text is always a bound, escaped LIKE parameter.
@@ -147,26 +150,27 @@ public sealed partial class NestDatabase
         var conditions = new List<string>();
         if (!query.IncludeArchived) conditions.Add("archived=0");
         if (query.NormalizedSearch.Length > 0) conditions.Add("(" + DrawingSearchPredicate + ")");
-        if (SharedListNames.Key(query.Customer).Length > 0) conditions.Add("customerKey=$customer");
+        if (SharedListNames.Key(query.EffectiveCustomer).Length > 0) conditions.Add("customerKey=$customer");
         // A drawing saved without a material, grade or thickness (0) suits any, so it matches every filter value.
         if (SharedListNames.Key(query.MaterialName).Length > 0) conditions.Add("(materialKey=$material OR materialKey='')");
         if (SharedListNames.Key(query.MaterialGrade).Length > 0) conditions.Add("(gradeKey=$grade OR gradeKey='')");
         if (query.Thickness is not null) conditions.Add("(thickness=$thickness OR thickness=0)");
         if (query.CutType is not null) conditions.Add("cutType=$cutType");
         if (query.CutFirst is not null) conditions.Add("cutFirst=$cutFirst");
+        AddRangeConditions(conditions, query.Filter);
         var where = conditions.Count == 0 ? "" : "WHERE " + string.Join(" AND ", conditions);
 
         lock (_sync)
         {
             using var count = _connection.CreateCommand();
-            count.CommandText = $"SELECT COUNT(*) FROM drawings {where}";
+            count.CommandText = $"SELECT COUNT(*) FROM drawings {GeometryJoin} {where}";
             AddDrawingFilterParameters(count, query);
             var total = checked((int)(long)count.ExecuteScalar()!);
 
             using var command = _connection.CreateCommand();
             var direction = query.Descending ? "DESC" : "ASC";
             command.CommandText = $"""
-                SELECT {DrawingColumns} FROM drawings {where}
+                SELECT {DrawingColumns}, {GeometryColumns} FROM drawings {GeometryJoin} {where}
                 ORDER BY {DrawingSortColumn(query.Sort)} {direction}, id {direction}
                 LIMIT $limit OFFSET $offset
                 """;
@@ -176,7 +180,11 @@ public sealed partial class NestDatabase
             var records = new List<DrawingLibraryRecord>();
             using var reader = command.ExecuteReader();
             while (reader.Read())
-                records.Add(ReadDrawing(reader));
+            {
+                var record = ReadDrawing(reader);
+                record.Geometry = ReadGeometry(reader, DrawingColumnCount);
+                records.Add(record);
+            }
             return new DrawingLibraryPage { Items = records, Total = total, Offset = query.Offset, Limit = query.Limit };
         }
     }
@@ -367,8 +375,9 @@ public sealed partial class NestDatabase
     private static void AddDrawingFilterParameters(SqliteCommand command, DrawingLibraryQuery query)
     {
         AddSearchParameter(command, query.NormalizedSearch);
-        if (SharedListNames.Key(query.Customer).Length > 0)
-            command.Parameters.AddWithValue("$customer", SharedListNames.Key(query.Customer));
+        if (SharedListNames.Key(query.EffectiveCustomer).Length > 0)
+            command.Parameters.AddWithValue("$customer", SharedListNames.Key(query.EffectiveCustomer));
+        AddRangeParameters(command, query.Filter);
         if (SharedListNames.Key(query.MaterialName).Length > 0)
             command.Parameters.AddWithValue("$material", SharedListNames.Key(query.MaterialName));
         if (SharedListNames.Key(query.MaterialGrade).Length > 0)
@@ -392,6 +401,8 @@ public sealed partial class NestDatabase
         DrawingSortField.Thickness => "thickness",
         DrawingSortField.CutType => "cutType",
         DrawingSortField.Revision => "revision",
+        DrawingSortField.Length => "g.length",
+        DrawingSortField.Holes => "g.holes",
         _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Unsupported sort column."),
     };
 

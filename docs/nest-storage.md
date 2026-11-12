@@ -304,7 +304,8 @@ first upload), `revision`, `name`, `customer`, `materialName`, `materialGrade`,
 `thickness` (stored rounded to 4 decimals), `units` (`inches` | `millimeters`),
 `cutType` (`laser` | `waterjet` | `plasma`), `notes`, `settings`, `archived`,
 `savedBy`, and the server-computed `packageSha256` (lower-case hex), `packageSize`
-and `savedAt`.
+and `savedAt`. Queries also return `geometry`, the package's measured size
+([below](#measured-sizes)), or null until it is measured; uploads ignore it.
 
 `settings` holds the drawing's nesting settings, applied when it is added to a
 nest: `cutFirst` (sequence its parts first, for example test squares), `nestPriority`
@@ -320,7 +321,7 @@ each nest.
 | Method | Path | Body | Response |
 |---|---|---|---|
 | POST | `/api/drawings` | multipart: `metadata` (JSON record with a nonempty `id`) + `package` | Revision 1; 409 with the current record when the id exists |
-| GET | `/api/drawings/query?search=&customer=&materialName=&materialGrade=&thickness=&cutType=&cutFirst=&includeArchived=&sort=&order=&offset=&limit=` | — | `{ items, total, offset, limit }` |
+| GET | `/api/drawings/query?search=&customer=&materialName=&materialGrade=&thickness=&cutType=&cutFirst=&includeArchived=&sort=&order=&offset=&limit=` plus the ranges below | — | `{ items, total, offset, limit }` |
 | GET | `/api/drawings/{id}` / `/{id}/file` | — | Current record / package bytes (archived drawings included), or 404 |
 | GET | `/api/drawings/{id}/revisions?offset=0&limit=100` | — | Revision page, newest first; limit 1–200 |
 | GET | `/api/drawings/{id}/revisions/{revision}/file` | — | Exact immutable package bytes |
@@ -356,8 +357,19 @@ each nest.
   every `materialName`, `materialGrade` or `thickness` filter (for example a
   test square added to every nest). `sort` is one of `savedAt`
   (default), `name`, `customer`, `materialName`, `materialGrade`, `thickness`,
-  `cutType`, `revision`; ties break by `id`. `cutFirst=true|false` keeps only
-  drawings with that setting. Paging, `order` and the refusal of
+  `cutType`, `revision`, `length`, `holes` (unmeasured drawings sort as
+  smallest); ties break by `id`. `cutFirst=true|false` keeps only
+  drawings with that setting.
+- Ranges (the desktop's Filter dialog), each optional and inclusive:
+  `minThickness`/`maxThickness` in inches (a millimeter drawing's thickness is
+  converted); a drawing saved without a thickness still matches unless
+  `includeBlankThickness=false`, which also leaves such drawings out with no
+  range. `minLength`/`maxLength` (longer side), `minWidth`/`maxWidth` (shorter
+  side) in inches and `minHoles`/`maxHoles` match only measured drawings.
+  `savedFrom`/`savedTo` (`yyyy-MM-dd`) compare the server's local save date.
+  A reversed range, a negative or nonfinite number, a fractional hole count or
+  another date format is a 400. An older server refuses these parameters as
+  unknown. Paging, `order` and the refusal of
   unknown, repeated or out-of-range parameters follow the nest query.
 - An older server answers 404 on these routes; the client reports that the
   server must be updated and never falls back to another store.
@@ -374,6 +386,30 @@ to open a v5 database, so rolling back after the upgrade needs the pre-upgrade b
 [Backup, restore, and upgrade](#backup-restore-and-upgrade)). The stopped-volume
 `tar` backup includes the drawing tables, but `nest_manifest.py` and
 `restore_check` do not verify drawings yet.
+
+### Measured sizes
+
+The server never parses packages, so the server worker
+([server nesting](server-nesting.md)) measures them beside its nest jobs: it asks
+for packages of current drawings (archived included) without a summary at the
+current measurement version, downloads each, reads it with
+`DrawingPackage.Read` and stores an `OpenNest.Data.DrawingGeometrySummary`.
+The summary is the material's bounding box (marks excluded) as `length` (longer
+side) and `width` (shorter side) in inches, the net `area` in square inches and
+`holes`, the closed contours inside the largest one. A package that cannot be
+read, has no closed cut geometry or takes over 30 s to measure is stored with
+an `error` and never retried at that version; a server or network failure stores
+nothing. Summaries are keyed by package hash (schema v19,
+`drawing_package_geometry`), so identical geometry is measured once and a
+details-only revision keeps its summary. Raising
+`DrawingGeometrySummary.CurrentVersion` re-measures every package. Without a
+running worker nothing is measured, and size or hole limits match nothing.
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| GET | `/api/drawing-packages/unmeasured?version=&limit=` | — | Up to `limit` (1–500) package hashes, in hash order |
+| GET | `/api/drawing-packages/{sha256}` | — | Package bytes, or 404 |
+| PUT | `/api/drawing-packages/{sha256}/geometry` | summary JSON | 204; 404 for an unknown package; 400 when invalid. An older `version` than the stored one is ignored |
 
 ### Add from Drawing Library (desktop)
 
@@ -415,7 +451,19 @@ is edited in place (0 to 99,999; one click starts editing, a bad number keeps
 the editor open with an error) and applies to the nest at once, like an add;
 the main window's drawing list refreshes when the dialog closes.
 
-The browser's **Cut first** column shows the setting.
+The browser's **Cut first** column shows the setting; **Size (in)** (longer x
+shorter side) and **Holes** show the measured summary, blank until it is measured
+and "?" when it could not be.
+
+**Filter...** opens a dialog (`DrawingLibraryFilterForm`) for a customer and
+inclusive ranges of thickness, longer side, shorter side, holes and saved date,
+sent as the query ranges above together with the search box and the nest filter.
+Thickness takes gauges and fractions (16 ga, 3/16) and sizes take fractions, all
+in inches; a blank box sets no limit, a box that does not read or a reversed
+range keeps the dialog open with the reason, and **Clear** empties every box.
+While a filter is set the button reads **Filter (on)...** and the line under the
+search box describes it. The customer list offers the customers on the current
+page; the customer matches exactly, like the query's `customer`.
 
 **File > Drawing Library...** (Database mode only, like Drawing Sets) opens the
 drawing sets window on its **Library** tab ([below](#drawing-sets-desktop)),

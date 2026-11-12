@@ -72,6 +72,12 @@ namespace OpenNest.Controls
         /// </summary>
         internal Func<(bool Ok, DrawingSetRecord Listed)> ChooseSet { get; set; }
 
+        /// <summary>
+        /// Shows the Filter dialog for the current filter and the customers to offer; returns the
+        /// chosen filter, or null when canceled. Replaced by tests.
+        /// </summary>
+        internal Func<DrawingLibraryFilter, IReadOnlyList<string>, DrawingLibraryFilter> ChooseFilter { get; set; }
+
         /// <summary>Shows the set editor and returns the saved record, or null; replaced by tests.</summary>
         internal Func<DrawingSetEditSession, DrawingSetRecord> EditSet { get; set; }
 
@@ -151,6 +157,11 @@ namespace OpenNest.Controls
                 _ = form.ShowReleasesAsync(drawing: record);
                 form.ShowDialog(DialogOwner);
             };
+            ChooseFilter = (filter, customers) =>
+            {
+                using var form = new DrawingLibraryFilterForm(filter, customers);
+                return form.ShowDialog(DialogOwner) == DialogResult.OK ? form.Filter : null;
+            };
             LoadPreview = async (record, token) =>
             {
                 var bytes = await library.GetRevisionPackageAsync(record.Id, record.Revision, token);
@@ -164,6 +175,8 @@ namespace OpenNest.Controls
             materialColumn.Tag = DrawingSortField.MaterialName;
             gradeColumn.Tag = DrawingSortField.MaterialGrade;
             thicknessColumn.Tag = DrawingSortField.Thickness;
+            sizeColumn.Tag = DrawingSortField.Length;
+            holesColumn.Tag = DrawingSortField.Holes;
             cutTypeColumn.Tag = DrawingSortField.CutType;
             revisionColumn.Tag = DrawingSortField.Revision;
             savedColumn.Tag = DrawingSortField.SavedAt;
@@ -220,6 +233,26 @@ namespace OpenNest.Controls
             var showAll = showAllCheckBox.Checked;
             UpdateFilterLabel(showAll);
             await RunAsync(() => session.SetShowAllAsync(showAll));
+        }
+
+        private async void FilterButton_Click(object sender, EventArgs e) => await ChangeFilterAsync();
+
+        /// <summary>Shows the Filter dialog and, unless canceled, lists the first page that matches.</summary>
+        internal async Task ChangeFilterAsync()
+        {
+            var customers = (session.Page?.Items ?? Array.Empty<DrawingLibraryRecord>())
+                .Select(record => record.Customer.Trim())
+                .Append(session.Filter.Customer.Trim())
+                .Where(customer => customer.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(customer => customer, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+            var chosen = ChooseFilter(session.Filter, customers);
+            if (chosen == null || chosen == session.Filter)
+                return;
+            var request = session.SetFilterAsync(chosen);
+            UpdateFilterLabel(showAllCheckBox.Checked);
+            await RunAsync(() => request);
         }
 
         private async void DrawingGrid_ColumnHeaderMouseClick(
@@ -759,6 +792,8 @@ namespace OpenNest.Controls
                     record.MaterialName,
                     record.MaterialGrade,
                     FormatThickness(record.Thickness),
+                    FormatSize(record.Geometry),
+                    record.Geometry is { IsMeasured: true } geometry ? geometry.Holes : null,
                     record.CutType.ToString(),
                     record.Settings?.CutFirst == true ? "Yes" : "",
                     record.Revision,
@@ -782,19 +817,22 @@ namespace OpenNest.Controls
 
         private void UpdateFilterLabel(bool showAll = false)
         {
+            var text = BaseFilterText(showAll);
+            filterLabel.Text = session.Filter.IsEmpty ? text : $"{text.TrimEnd('.')}. Filter: {session.Filter.Describe()}.";
+            filterButton.Text = session.Filter.IsEmpty ? "Filter..." : "Filter (on)...";
+        }
+
+        private string BaseFilterText(bool showAll)
+        {
             if (nest == null)
             {
-                filterLabel.Text = AddToRelease != null
+                return AddToRelease != null
                     ? "Showing every active drawing. Double-click one to add it to the release."
                     : "Showing every active drawing. Double-click one to edit it.";
-                return;
             }
 
             if (!session.IsFilteredToNest && !showAll)
-            {
-                filterLabel.Text = "This nest has no material or thickness; showing every drawing.";
-                return;
-            }
+                return "This nest has no material or thickness; showing every drawing.";
 
             var parts = new[]
             {
@@ -802,10 +840,16 @@ namespace OpenNest.Controls
                 session.MaterialName,
                 session.MaterialGrade,
             }.Where(part => part.Length > 0);
-            filterLabel.Text = showAll
+            return showAll
                 ? "Showing every drawing, including other materials and thicknesses."
                 : $"Showing drawings for this nest: {string.Join(" ", parts)}";
         }
+
+        // "4.25 x 2" in inches; blank until the server has measured the drawing, "?" when it could not.
+        private static string FormatSize(DrawingGeometrySummary geometry) =>
+            geometry == null ? ""
+            : !geometry.IsMeasured ? "?"
+            : $"{geometry.Length.ToString("0.###", CultureInfo.CurrentCulture)} x {geometry.Width.ToString("0.###", CultureInfo.CurrentCulture)}";
 
         private static string FormatThickness(double value) =>
             value.ToString("0.####", CultureInfo.CurrentCulture);

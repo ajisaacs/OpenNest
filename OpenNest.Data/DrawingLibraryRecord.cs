@@ -53,4 +53,10 @@ public sealed class DrawingLibraryRecord
 
     /// <summary>Who saved this revision, as reported by the client.</summary>
     public string SavedBy { get; set; } = "";
+
+    /// <summary>
+    /// The package's measured size and holes, returned by queries once the server worker has
+    /// measured it; null until then. Server-computed and ignored on upload.
+    /// </summary>
+    public DrawingGeometrySummary? Geometry { get; set; }
 }

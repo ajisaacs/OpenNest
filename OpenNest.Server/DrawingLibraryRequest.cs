@@ -16,6 +16,8 @@ internal static class DrawingLibraryRequest
     {
         "search", "customer", "materialName", "materialGrade", "thickness", "cutType", "cutFirst",
         "includeArchived", "sort", "order", "offset", "limit",
+        "minThickness", "maxThickness", "includeBlankThickness", "minLength", "maxLength", "minWidth", "maxWidth",
+        "minHoles", "maxHoles", "savedFrom", "savedTo",
     };
 
     // Integer enum values are refused; names are additionally checked before deserializing.
@@ -113,6 +115,9 @@ internal static class DrawingLibraryRequest
         if (!TryInteger(values, "offset", ref offset, out error) || !TryInteger(values, "limit", ref limit, out error))
             return false;
 
+        if (!TryReadFilter(values, out var filter, out error))
+            return false;
+
         query = new DrawingLibraryQuery
         {
             Search = values["search"].ToString(),
@@ -127,9 +132,93 @@ internal static class DrawingLibraryRequest
             Descending = descending,
             Offset = offset,
             Limit = limit,
+            Filter = filter,
         };
         error = query.GetValidationError() ?? "";
         return error.Length == 0;
+    }
+
+    // Thickness and sizes are inches; holes whole numbers; dates yyyy-MM-dd. The customer stays on the query.
+    private static bool TryReadFilter(IQueryCollection values, out DrawingLibraryFilter filter, out string error)
+    {
+        filter = DrawingLibraryFilter.None;
+        double? minThickness = null, maxThickness = null, minLength = null, maxLength = null, minWidth = null, maxWidth = null;
+        int? minHoles = null, maxHoles = null;
+        DateOnly? savedFrom = null, savedTo = null;
+        var includeBlank = true;
+        if (!TryNumber(values, "minThickness", ref minThickness, out error) || !TryNumber(values, "maxThickness", ref maxThickness, out error)
+            || !TryNumber(values, "minLength", ref minLength, out error) || !TryNumber(values, "maxLength", ref maxLength, out error)
+            || !TryNumber(values, "minWidth", ref minWidth, out error) || !TryNumber(values, "maxWidth", ref maxWidth, out error)
+            || !TryCount(values, "minHoles", ref minHoles, out error) || !TryCount(values, "maxHoles", ref maxHoles, out error)
+            || !TryDate(values, "savedFrom", ref savedFrom, out error) || !TryDate(values, "savedTo", ref savedTo, out error))
+            return false;
+
+        if (values.TryGetValue("includeBlankThickness", out var blankText) && !bool.TryParse(blankText.ToString(), out includeBlank))
+        {
+            error = "includeBlankThickness must be true or false.";
+            return false;
+        }
+
+        filter = new DrawingLibraryFilter
+        {
+            MinThickness = minThickness,
+            MaxThickness = maxThickness,
+            IncludeBlankThickness = includeBlank,
+            MinLength = minLength,
+            MaxLength = maxLength,
+            MinWidth = minWidth,
+            MaxWidth = maxWidth,
+            MinHoles = minHoles,
+            MaxHoles = maxHoles,
+            SavedFrom = savedFrom,
+            SavedTo = savedTo,
+        };
+        return true;
+    }
+
+    private static bool TryNumber(IQueryCollection values, string key, ref double? value, out string error)
+    {
+        error = "";
+        if (!values.TryGetValue(key, out var text))
+            return true;
+        if (double.TryParse(text.ToString(), NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent, CultureInfo.InvariantCulture, out var parsed)
+            && double.IsFinite(parsed))
+        {
+            value = parsed;
+            return true;
+        }
+
+        error = $"{key} must be a finite number, zero or greater.";
+        return false;
+    }
+
+    private static bool TryCount(IQueryCollection values, string key, ref int? value, out string error)
+    {
+        var parsed = 0;
+        if (!values.ContainsKey(key))
+        {
+            error = "";
+            return true;
+        }
+        if (!TryInteger(values, key, ref parsed, out error))
+            return false;
+        value = parsed;
+        return true;
+    }
+
+    private static bool TryDate(IQueryCollection values, string key, ref DateOnly? value, out string error)
+    {
+        error = "";
+        if (!values.TryGetValue(key, out var text))
+            return true;
+        if (DateOnly.TryParseExact(text.ToString(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+        {
+            value = parsed;
+            return true;
+        }
+
+        error = $"{key} must be a date written yyyy-MM-dd.";
+        return false;
     }
 
     /// <summary>Reads and validates one metadata JSON object.</summary>

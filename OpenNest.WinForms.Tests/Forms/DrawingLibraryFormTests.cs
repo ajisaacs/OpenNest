@@ -538,6 +538,46 @@ public class DrawingLibraryFormTests
             "The library-only dialog test did not complete.");
     }
 
+    [Fact]
+    public void FilterButton_SendsTheChosenFilter_AndListsMeasuredSizeAndHoles()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var record = library.Add("SYN-WASHER", "Synthetic Steel", "Grade A", 0.1046, Units.Inches, "");
+                record.Geometry = new DrawingGeometrySummary { Version = 1, Length = 3.5, Width = 2, Area = 6, Holes = 2 };
+                var chosen = new DrawingLibraryFilter { MinThickness = 0.0598, MaxThickness = 0.1875, MaxLength = 4, MinHoles = 2 };
+                DrawingLibraryFilter offered = null!;
+                IReadOnlyList<string> customers = null!;
+
+                using var form = new DrawingLibraryForm(library, Server, nest: null);
+                form.View.LoadPreview = (_, _) => Task.FromResult<Drawing>(null!);
+                form.View.ChooseFilter = (filter, names) => { offered = filter; customers = names; return chosen; };
+                form.Show();
+                var grid = Field<DataGridView>(form, "drawingGrid");
+                PumpUntilListed(grid, "the library page");
+                Assert.Equal("3.5 x 2", grid.Rows[0].Cells["sizeColumn"].Value);
+                Assert.Equal(2, grid.Rows[0].Cells["holesColumn"].Value);
+
+                Run(form.View.ChangeFilterAsync());
+
+                Assert.Same(DrawingLibraryFilter.None, offered);
+                Assert.Equal(new[] { "Synthetic customer" }, customers);
+                Assert.Same(chosen, library.Queries[^1].Filter);
+                Assert.Equal("Filter (on)...", Field<Button>(form, "filterButton").Text);
+                Assert.EndsWith("Filter: Thickness 0.0598-0.1875 in (or none); Length up to 4 in; Holes 2+.",
+                    Field<Label>(form, "filterLabel").Text);
+
+                // Choosing the same filter again sends nothing.
+                var sent = library.Queries.Count;
+                Run(form.View.ChangeFilterAsync());
+                Assert.Equal(sent, library.Queries.Count);
+            },
+            TestTimeout,
+            "The drawing library filter test did not complete.");
+    }
+
     private static Nest MatchingNest() => new("Synthetic job")
     {
         Units = Units.Inches,

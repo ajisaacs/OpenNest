@@ -246,7 +246,7 @@ public sealed class RemoteDrawingLibrary : NestServerClient, IDrawingLibraryStor
             .Append("&order=").Append(query.Descending ? "desc" : "asc")
             .Append("&offset=").Append(query.Offset.ToString(CultureInfo.InvariantCulture))
             .Append("&limit=").Append(query.Limit.ToString(CultureInfo.InvariantCulture));
-        AppendFilter(text, "customer", query.Customer);
+        AppendFilter(text, "customer", query.EffectiveCustomer);
         AppendFilter(text, "materialName", query.MaterialName);
         AppendFilter(text, "materialGrade", query.MaterialGrade);
         if (query.Thickness is { } thickness)
@@ -257,7 +257,33 @@ public sealed class RemoteDrawingLibrary : NestServerClient, IDrawingLibraryStor
             text.Append("&cutFirst=").Append(cutFirst ? "true" : "false");
         if (query.IncludeArchived)
             text.Append("&includeArchived=true");
+        AppendRanges(text, query.Filter);
         return text.ToString();
+    }
+
+    // Only the limits that are set, so an unfiltered query stays readable by older servers.
+    private static void AppendRanges(StringBuilder text, DrawingLibraryFilter filter)
+    {
+        AppendNumber(text, "minThickness", filter.MinThickness);
+        AppendNumber(text, "maxThickness", filter.MaxThickness);
+        if (!filter.IncludeBlankThickness)
+            text.Append("&includeBlankThickness=false");
+        AppendNumber(text, "minLength", filter.MinLength);
+        AppendNumber(text, "maxLength", filter.MaxLength);
+        AppendNumber(text, "minWidth", filter.MinWidth);
+        AppendNumber(text, "maxWidth", filter.MaxWidth);
+        AppendNumber(text, "minHoles", filter.MinHoles);
+        AppendNumber(text, "maxHoles", filter.MaxHoles);
+        if (filter.SavedFrom is { } from)
+            text.Append("&savedFrom=").Append(from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        if (filter.SavedTo is { } to)
+            text.Append("&savedTo=").Append(to.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+    }
+
+    private static void AppendNumber(StringBuilder text, string key, double? value)
+    {
+        if (value is { } number)
+            text.Append('&').Append(key).Append('=').Append(number.ToString("R", CultureInfo.InvariantCulture));
     }
 
     private static void AppendFilter(StringBuilder text, string key, string? value)

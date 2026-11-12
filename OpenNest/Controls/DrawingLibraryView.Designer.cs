@@ -42,6 +42,7 @@ namespace OpenNest.Controls
             searchLabel = new System.Windows.Forms.Label();
             searchBox = new System.Windows.Forms.TextBox();
             showAllCheckBox = new System.Windows.Forms.CheckBox();
+            filterButton = new System.Windows.Forms.Button();
             filterLabel = new System.Windows.Forms.Label();
             splitContainer = new System.Windows.Forms.SplitContainer();
             browseTable = new System.Windows.Forms.TableLayoutPanel();
@@ -51,6 +52,8 @@ namespace OpenNest.Controls
             materialColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             gradeColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             thicknessColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            sizeColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            holesColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             cutTypeColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             cutFirstColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             revisionColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
@@ -268,15 +271,17 @@ namespace OpenNest.Controls
             // filterTable
             //
             filterTable.AutoSize = true;
-            filterTable.ColumnCount = 3;
+            filterTable.ColumnCount = 4;
             filterTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             filterTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             filterTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            filterTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             filterTable.Controls.Add(searchLabel, 0, 0);
             filterTable.Controls.Add(searchBox, 1, 0);
-            filterTable.Controls.Add(showAllCheckBox, 2, 0);
+            filterTable.Controls.Add(filterButton, 2, 0);
+            filterTable.Controls.Add(showAllCheckBox, 3, 0);
             filterTable.Controls.Add(filterLabel, 1, 1);
-            filterTable.SetColumnSpan(filterLabel, 2);
+            filterTable.SetColumnSpan(filterLabel, 3);
             filterTable.Dock = System.Windows.Forms.DockStyle.Fill;
             filterTable.Margin = new System.Windows.Forms.Padding(0, 0, 0, 6);
             filterTable.Name = "filterTable";
@@ -307,10 +312,21 @@ namespace OpenNest.Controls
             showAllCheckBox.AutoSize = true;
             showAllCheckBox.Margin = new System.Windows.Forms.Padding(12, 3, 3, 3);
             showAllCheckBox.Name = "showAllCheckBox";
-            showAllCheckBox.TabIndex = 2;
+            showAllCheckBox.TabIndex = 3;
             showAllCheckBox.Text = "Show all materials";
             showAllCheckBox.UseVisualStyleBackColor = true;
             showAllCheckBox.CheckedChanged += ShowAllCheckBox_CheckedChanged;
+            //
+            // filterButton
+            //
+            filterButton.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            filterButton.AutoSize = true;
+            filterButton.Margin = new System.Windows.Forms.Padding(6, 2, 3, 2);
+            filterButton.Name = "filterButton";
+            filterButton.TabIndex = 2;
+            filterButton.Text = "Filter...";
+            filterButton.UseVisualStyleBackColor = true;
+            filterButton.Click += FilterButton_Click;
             //
             // filterLabel
             //
@@ -319,7 +335,7 @@ namespace OpenNest.Controls
             filterLabel.ForeColor = System.Drawing.SystemColors.GrayText;
             filterLabel.Margin = new System.Windows.Forms.Padding(3, 2, 3, 0);
             filterLabel.Name = "filterLabel";
-            filterLabel.TabIndex = 3;
+            filterLabel.TabIndex = 4;
             //
             // splitContainer
             //
@@ -349,7 +365,7 @@ namespace OpenNest.Controls
             //
             drawingGrid.AllowUserToAddRows = false;
             drawingGrid.AllowUserToDeleteRows = false;
-            drawingGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { nameColumn, customerColumn, materialColumn, gradeColumn, thicknessColumn, cutTypeColumn, cutFirstColumn, revisionColumn, savedColumn });
+            drawingGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { nameColumn, customerColumn, materialColumn, gradeColumn, thicknessColumn, sizeColumn, holesColumn, cutTypeColumn, cutFirstColumn, revisionColumn, savedColumn });
             drawingGrid.Dock = System.Windows.Forms.DockStyle.Fill;
             drawingGrid.Margin = new System.Windows.Forms.Padding(0);
             drawingGrid.MultiSelect = false;
@@ -401,6 +417,24 @@ namespace OpenNest.Controls
             thicknessColumn.Name = "thicknessColumn";
             thicknessColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.Programmatic;
             thicknessColumn.Width = 80;
+            //
+            // sizeColumn
+            //
+            sizeColumn.DefaultCellStyle = rightAligned;
+            sizeColumn.HeaderText = "Size (in)";
+            sizeColumn.Name = "sizeColumn";
+            sizeColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.Programmatic;
+            sizeColumn.ToolTipText = "Longer x shorter side, measured by the server; blank until measured";
+            sizeColumn.Width = 100;
+            //
+            // holesColumn
+            //
+            holesColumn.DefaultCellStyle = rightAligned;
+            holesColumn.HeaderText = "Holes";
+            holesColumn.Name = "holesColumn";
+            holesColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.Programmatic;
+            holesColumn.ToolTipText = "Closed cutouts inside the outline, measured by the server";
+            holesColumn.Width = 55;
             //
             // cutTypeColumn
             //
@@ -854,6 +888,7 @@ namespace OpenNest.Controls
         private System.Windows.Forms.Label searchLabel;
         private System.Windows.Forms.TextBox searchBox;
         private System.Windows.Forms.CheckBox showAllCheckBox;
+        private System.Windows.Forms.Button filterButton;
         private System.Windows.Forms.Label filterLabel;
         private System.Windows.Forms.SplitContainer splitContainer;
         private System.Windows.Forms.TableLayoutPanel browseTable;
@@ -863,6 +898,8 @@ namespace OpenNest.Controls
         private System.Windows.Forms.DataGridViewTextBoxColumn materialColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn gradeColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn thicknessColumn;
+        private System.Windows.Forms.DataGridViewTextBoxColumn sizeColumn;
+        private System.Windows.Forms.DataGridViewTextBoxColumn holesColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn cutTypeColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn cutFirstColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn revisionColumn;

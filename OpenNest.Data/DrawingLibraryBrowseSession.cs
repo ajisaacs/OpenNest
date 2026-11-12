@@ -38,6 +38,9 @@ public sealed class DrawingLibraryBrowseSession : BrowseSession<DrawingLibraryPa
     /// <summary>True when the nest filter is lifted and every active drawing is listed.</summary>
     public bool ShowAll { get; private set; }
 
+    /// <summary>The Filter dialog's customer and ranges, applied with the nest filter; <see cref="DrawingLibraryFilter.None"/> by default.</summary>
+    public DrawingLibraryFilter Filter { get; private set; } = DrawingLibraryFilter.None;
+
     /// <summary>True when the latest request narrows by the nest's material, grade or thickness.</summary>
     public bool IsFilteredToNest =>
         !ShowAll && (MaterialName.Length > 0 || MaterialGrade.Length > 0 || Thickness is not null);
@@ -45,7 +48,8 @@ public sealed class DrawingLibraryBrowseSession : BrowseSession<DrawingLibraryPa
     /// <inheritdoc />
     public override string Summary =>
         PageSummary("drawings",
-            Search.Length > 0 ? "No drawings match the search."
+            !Filter.IsEmpty ? (Search.Length > 0 ? "No drawings match the search and filter." : "No drawings match the filter.")
+            : Search.Length > 0 ? "No drawings match the search."
             : IsFilteredToNest ? "No library drawings match this nest's material and thickness. Tick Show all materials to see every drawing."
             : "No drawings in the library.");
 
@@ -53,6 +57,17 @@ public sealed class DrawingLibraryBrowseSession : BrowseSession<DrawingLibraryPa
     public Task<bool> SetShowAllAsync(bool showAll)
     {
         ShowAll = showAll;
+        return FirstPageAsync();
+    }
+
+    /// <summary>Applies the Filter dialog's choices and returns to the first page.</summary>
+    public Task<bool> SetFilterAsync(DrawingLibraryFilter filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        var error = filter.GetValidationError();
+        if (error is not null)
+            throw new ArgumentException(error, nameof(filter));
+        Filter = filter;
         return FirstPageAsync();
     }
 
@@ -64,6 +79,7 @@ public sealed class DrawingLibraryBrowseSession : BrowseSession<DrawingLibraryPa
                 MaterialName = ShowAll ? "" : MaterialName,
                 MaterialGrade = ShowAll ? "" : MaterialGrade,
                 Thickness = ShowAll ? null : Thickness,
+                Filter = Filter,
                 Sort = Sort,
                 Descending = Descending,
                 Offset = Offset,

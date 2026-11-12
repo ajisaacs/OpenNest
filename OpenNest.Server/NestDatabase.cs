@@ -344,7 +344,7 @@ public sealed partial class NestDatabase : IDisposable
             command.Transaction = transaction;
             command.CommandText = "PRAGMA user_version";
             var version = (long)command.ExecuteScalar()!;
-            if (version > 18) throw new InvalidOperationException("Database schema is newer than this server.");
+            if (version > 19) throw new InvalidOperationException("Database schema is newer than this server.");
             if (version == 0)
             {
                 command.CommandText = """
@@ -453,6 +453,12 @@ public sealed partial class NestDatabase : IDisposable
             {
                 // Drawing priority now nests higher numbers first; negating keeps every order.
                 command.CommandText = DrawingPriorityUpgradeToV18;
+                command.ExecuteNonQuery();
+            }
+            if (version < 19)
+            {
+                // Measured package sizes, empty until the worker measures them.
+                command.CommandText = DrawingGeometrySchema;
                 command.ExecuteNonQuery();
             }
             transaction.Commit();

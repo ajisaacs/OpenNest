@@ -65,6 +65,34 @@ public class RemoteDrawingLibraryTests
         Assert.Equal(7, page.Total);
     }
 
+    [Fact]
+    public async Task QueryAsync_SendsOnlyTheFilterLimitsThatAreSet()
+    {
+        var handler = new StubHandler(_ => StubHandler.Json(new { items = Array.Empty<DrawingLibraryRecord>(), total = 0 }));
+        using var library = Library(handler);
+
+        await library.QueryAsync(new DrawingLibraryQuery
+        {
+            Filter = new DrawingLibraryFilter
+            {
+                Customer = "Synthetic Co",
+                MinThickness = 0.0598,
+                MaxThickness = 0.1875,
+                IncludeBlankThickness = false,
+                MaxLength = 4,
+                MinHoles = 2,
+                SavedFrom = new DateOnly(2026, 1, 2),
+                SavedTo = new DateOnly(2026, 3, 4),
+            },
+        });
+
+        Assert.Equal(
+            "http://server:8090/base/api/drawings/query?search=&sort=savedAt&order=desc&offset=0&limit=100"
+            + "&customer=Synthetic%20Co&minThickness=0.0598&maxThickness=0.1875&includeBlankThickness=false"
+            + "&maxLength=4&minHoles=2&savedFrom=2026-01-02&savedTo=2026-03-04",
+            handler.Requests[0].RequestUri!.AbsoluteUri);
+    }
+
     public static TheoryData<DrawingLibraryQuery> OutOfBoundsQueries() => new()
     {
         new DrawingLibraryQuery { Offset = -1 },
@@ -76,6 +104,9 @@ public class RemoteDrawingLibraryTests
         new DrawingLibraryQuery { CutType = (CutType)9 },
         new DrawingLibraryQuery { Thickness = double.NaN },
         new DrawingLibraryQuery { Thickness = -0.1 },
+        new DrawingLibraryQuery { Filter = new DrawingLibraryFilter { MinLength = 5, MaxLength = 4 } },
+        new DrawingLibraryQuery { Filter = new DrawingLibraryFilter { MinHoles = -1 } },
+        new DrawingLibraryQuery { Filter = null! },
     };
 
     [Theory]

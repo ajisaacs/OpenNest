@@ -13,6 +13,9 @@ public sealed class WorkerOptions
     /// <summary>How long to wait before asking again when no job was queued.</summary>
     public TimeSpan PollInterval { get; init; } = TimeSpan.FromSeconds(5);
 
+    /// <summary>How long library measurement waits before asking again when nothing was waiting.</summary>
+    public TimeSpan GeometryPollInterval { get; init; } = TimeSpan.FromSeconds(60);
+
     /// <summary>Touched every round; the container health check fails when it goes stale.</summary>
     public string AliveFile { get; init; } = Path.Combine(Path.GetTempPath(), "opennest-worker.alive");
 

@@ -11,4 +11,10 @@ public enum DrawingSortField
     Thickness,
     CutType,
     Revision,
+
+    /// <summary>The measured longer side; unmeasured drawings sort as smallest.</summary>
+    Length,
+
+    /// <summary>The measured hole count; unmeasured drawings sort as fewest.</summary>
+    Holes,
 }
