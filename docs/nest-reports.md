@@ -37,7 +37,12 @@ selected one. Both render to `%TEMP%\OpenNest\Reports\` and open the report view
 suggesting `<nest-name>.printout.pdf` or `<drawing-name>.printout.pdf`. Each part
 gets one Letter portrait page, bookmarked by name, with the name and customer (the drawing's, else the
 nest's) as the header, the part's material contours stroked to fit (leads, rapids
-and marks omitted), a details table and the generated time. The table shows the
+and marks omitted) with its overall dimensions, a details table and the generated
+time. The dimensions follow the Shape Library's: X extent below the part, Y extent
+to its right, each line at least 18 pt out with arrows and a boxed label kept
+14 pt clear of the part, and extension lines that stop 6 pt short of the outline
+itself (not its bounding box). The part and its dimensions are scaled and
+centered together 28 pt inside the drawing border. The table shows the
 bounding box (Y extent x X extent), nest material and thickness (led by the
 machine config's thickness name, as in the nest report), cut length and
 pierce count, net area, weight

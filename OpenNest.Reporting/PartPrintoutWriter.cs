@@ -17,13 +17,15 @@ public static class PartPrintoutWriter
     private const double RowHeight = 22;
     private const double LabelWidth = 100;
     private const double ValueWidth = ContentWidth / 2 - LabelWidth;
-    private const double DrawingPadding = 14;
+    private const double DrawingPadding = 28;
     private const double FooterTop = PageHeight - Margin - 10;
 
     private static readonly XColor Ink = XColor.FromArgb(0x1a, 0x1a, 0x1a);
     private static readonly XColor Muted = XColor.FromArgb(0x64, 0x74, 0x8b);
     private static readonly XColor Line = XColor.FromArgb(0xcb, 0xd5, 0xe1);
     private static readonly XColor LabelFill = XColor.FromArgb(0xf8, 0xfa, 0xfc);
+    // The Shape Library's dimension color.
+    private static readonly XColor Dimension = XColor.FromArgb(230, 120, 20);
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
 
     /// <summary>Thread-safe; renders are serialized with nest reports.</summary>
@@ -111,7 +113,7 @@ public static class PartPrintoutWriter
         var drawing = new XRect(Margin, y, ContentWidth, tableTop - 14 - y);
 
         gfx.DrawRoundedRectangle(new XPen(Line, 1.5), drawing, new XSize(10, 10));
-        DrawGeometry(gfx, part.Geometry, Inset(drawing, DrawingPadding));
+        DrawPart(gfx, part, units, Inset(drawing, DrawingPadding));
 
         var rowTop = tableTop;
         foreach (var (l1, v1, l2, v2) in rows)
@@ -140,14 +142,18 @@ public static class PartPrintoutWriter
     }
 
     /// <summary>
-    /// Strokes every contour, scaled uniformly and centered in the area. Each contour is its own
-    /// path so a tab gap never gets a false joining segment.
+    /// Strokes every contour and the overall dimensions around them, scaled uniformly and
+    /// centered in the area together. Each contour is its own path so a tab gap never gets a
+    /// false joining segment.
     /// </summary>
-    private static void DrawGeometry(XGraphics gfx, ReportGeometry geometry, XRect area)
+    private static void DrawPart(XGraphics gfx, PrintoutPart part, string units, XRect area)
     {
-        var fit = Fit.Create(geometry.Bounds, area);
+        var labelFont = Font(8, false);
+        var layout = PrintoutDimensions.Layout(part.Geometry, area, Length(part.Length, units),
+            Length(part.Width, units), text => ReportText.Size(text, labelFont));
+        var fit = layout.Fit;
         var pen = new XPen(Ink, 0.75) { LineCap = XLineCap.Round, LineJoin = XLineJoin.Round };
-        foreach (var contour in geometry.Contours)
+        foreach (var contour in part.Geometry.Contours)
         {
             var path = new XGraphicsPath();
             NestPdfWriter.AddContour(path, contour, fit);
@@ -155,6 +161,30 @@ public static class PartPrintoutWriter
                 path.CloseFigure();
             gfx.DrawPath(pen, path);
         }
+
+        var dimensionPen = new XPen(Dimension, 0.75);
+        var dimensionBrush = new XSolidBrush(Dimension);
+        foreach (var (a, b) in layout.Lines)
+            gfx.DrawLine(dimensionPen, a, b);
+        foreach (var (tip, from) in layout.Arrows)
+            DrawArrow(gfx, dimensionBrush, tip, from);
+        var ink = new XSolidBrush(Ink);
+        foreach (var label in layout.Labels)
+        {
+            gfx.DrawRectangle(dimensionPen, XBrushes.White, label.Box);
+            gfx.DrawString(label.Text, labelFont, ink, label.Box, XStringFormats.Center);
+        }
+    }
+
+    private static void DrawArrow(XGraphics gfx, XBrush brush, XPoint tip, XPoint from)
+    {
+        var direction = from - tip;
+        if (direction.Length < 1)
+            return;
+        direction.Normalize();
+        var back = tip + direction * PrintoutDimensions.ArrowLength;
+        var across = new XVector(-direction.Y, direction.X) * PrintoutDimensions.ArrowHalfWidth;
+        gfx.DrawPolygon(brush, [tip, back + across, back - across], XFillMode.Winding);
     }
 
     private static XFont Font(double size, bool bold) =>

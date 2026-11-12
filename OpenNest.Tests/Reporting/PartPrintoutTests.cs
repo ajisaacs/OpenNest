@@ -1,5 +1,7 @@
 using OpenNest.CNC;
+using OpenNest.Geometry;
 using OpenNest.Reporting;
+using PdfSharp.Drawing;
 using PdfSharp.Pdf.IO;
 
 namespace OpenNest.Tests.Reporting;
@@ -155,6 +157,59 @@ public sealed class PartPrintoutTests : IDisposable
         Assert.False(File.Exists(printout));
         Assert.False(File.Exists(report));
     }
+
+    [Theory]
+    [InlineData(10, 10)]
+    [InlineData(40, 0.75)]
+    [InlineData(0.5, 30)]
+    public void Dimensions_StayInsideTheAreaWithThePartBetweenThem(double length, double width)
+    {
+        var geometry = Capture(NestReportTestData.Rectangle("part", length, width).Program);
+        var area = new XRect(100, 100, 400, 300);
+
+        var layout = PrintoutDimensions.Layout(geometry, area, "L", "W", _ => new XSize(30, 9));
+
+        var part = layout.Fit.Rect(geometry.Bounds);
+        Assert.True(Contains(area, part));
+        foreach (var (a, b) in layout.Lines)
+            Assert.True(Contains(area, a) && Contains(area, b));
+        foreach (var label in layout.Labels)
+            Assert.True(Contains(area, label.Box), $"{label.Text} {label.Box}");
+        // X extent below the part, Y extent to its right, each label box clear of the part.
+        var (lengthLabel, widthLabel) = (layout.Labels[0], layout.Labels[1]);
+        Assert.Equal(part.Bottom + PrintoutDimensions.LabelClearance, lengthLabel.Box.Top, 6);
+        Assert.Equal(part.Right + PrintoutDimensions.LabelClearance, widthLabel.Box.Left, 6);
+    }
+
+    [Fact]
+    public void Dimensions_ExtensionLinesStopShortOfTheOutlineNotTheBounds()
+    {
+        var disc = new Program();
+        disc.Codes.Add(new RapidMove(10, 5));
+        disc.Codes.Add(new ArcMove(new Vector(10, 5), new Vector(5, 5), RotationType.CW));
+        var geometry = Capture(disc);
+
+        var layout = PrintoutDimensions.Layout(geometry, new XRect(0, 0, 500, 500), "L", "W", _ => new XSize(30, 9));
+
+        var fit = layout.Fit;
+        var extensions = layout.Lines.Where((_, index) => index % 3 != 2).ToList(); // two per dimension, then its line
+        Assert.Equal(4, extensions.Count);
+        foreach (var (start, _) in extensions)
+        {
+            var model = fit.Model(start);
+            var clearance = PrintoutDimensions.Distance(geometry, new ReportPoint(model.X, model.Y)) * fit.Scale;
+            Assert.InRange(clearance, PrintoutDimensions.ExtensionClearance - 0.01, PrintoutDimensions.ExtensionClearance + 0.5);
+        }
+    }
+
+    private static ReportGeometry Capture(Program program) =>
+        NestReportGeometry.Capture(program, new Vector(), "test");
+
+    private static bool Contains(XRect area, XRect rect) =>
+        rect.Left >= area.Left - 1e-6 && rect.Right <= area.Right + 1e-6
+        && rect.Top >= area.Top - 1e-6 && rect.Bottom <= area.Bottom + 1e-6;
+
+    private static bool Contains(XRect area, XPoint point) => Contains(area, new XRect(point, new XSize()));
 
     [Fact]
     public void Write_RejectsTextTheBundledFontCannotShow()
