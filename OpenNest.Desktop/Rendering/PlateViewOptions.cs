@@ -45,11 +45,22 @@ public sealed class PlateViewOptions
         return options;
     }
 
-    /// <summary>Stores the rapids and bounds toggles in the WinForms format.</summary>
+    /// <summary>
+    /// Stores the rapids and bounds toggles in the WinForms format. As the WinForms settings
+    /// provider does, a toggle still at its default is left out unless the file already holds it,
+    /// so a later default change still applies.
+    /// </summary>
     public void WriteTo(IDictionary<string, string> settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        settings[DrawRapidName] = UserSettingText.Format(DrawRapid);
-        settings[DrawBoundsName] = UserSettingText.Format(DrawBounds);
+        var defaults = new PlateViewOptions();
+        Write(settings, DrawRapidName, DrawRapid, defaults.DrawRapid);
+        Write(settings, DrawBoundsName, DrawBounds, defaults.DrawBounds);
+    }
+
+    private static void Write(IDictionary<string, string> settings, string name, bool value, bool fallback)
+    {
+        if (value != fallback || settings.ContainsKey(name))
+            settings[name] = UserSettingText.Format(value);
     }
 }

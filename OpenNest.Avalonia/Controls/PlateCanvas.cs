@@ -98,11 +98,15 @@ namespace OpenNest.Avalonia.Controls
             if (plate == null)
             {
                 paths.Clear();
+                labelPoints.Clear();
                 return;
             }
             var shown = new HashSet<Part>(plate.Parts);
             foreach (var stale in paths.Keys.Where(part => !shown.Contains(part)).ToList())
                 paths.Remove(stale);
+            var drawings = new HashSet<Drawing>(plate.Parts.Select(part => part.BaseDrawing));
+            foreach (var stale in labelPoints.Keys.Where(drawing => !drawings.Contains(drawing)).ToList())
+                labelPoints.Remove(stale);
         }
 
         public void ZoomToFit()
@@ -263,7 +267,11 @@ namespace OpenNest.Avalonia.Controls
                 foreach (var path in CommonLineGeometry.Paths(cached.Check.Spans, group.Kerf))
                     scene.CommonLines.Add(path.Points);
                 foreach (var problem in cached.Check.Problems)
-                    scene.CommonLineProblems.Add(problem.Part.BoundingBox);
+                {
+                    // A copy: moving the part changes its box in place while the render thread draws.
+                    var box = problem.Part.BoundingBox;
+                    scene.CommonLineProblems.Add(new Box(box.X, box.Y, box.Length, box.Width));
+                }
             }
         }
 

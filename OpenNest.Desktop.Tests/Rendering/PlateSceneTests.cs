@@ -256,6 +256,25 @@ public class PlateViewOptionsTests
     }
 
     [Fact]
+    public void Untouched_defaults_stay_out_of_the_settings()
+    {
+        var settings = new Dictionary<string, string> { ["Other"] = "kept" };
+        new PlateViewOptions().WriteTo(settings);
+
+        Assert.Single(settings);
+    }
+
+    [Fact]
+    public void A_saved_toggle_set_back_to_its_default_is_written()
+    {
+        var settings = new Dictionary<string, string> { ["PlateViewDrawRapid"] = "True" };
+        new PlateViewOptions().WriteTo(settings);
+
+        Assert.Equal("False", settings["PlateViewDrawRapid"]);
+        Assert.False(settings.ContainsKey("PlateViewDrawBounds"));
+    }
+
+    [Fact]
     public void Unreadable_values_are_defaults()
     {
         var read = PlateViewOptions.Read(new Dictionary<string, string>
