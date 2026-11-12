@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Data;
+using OpenNest.Desktop;
 
 namespace OpenNest.Forms
 {
@@ -12,8 +13,6 @@ namespace OpenNest.Forms
     /// </summary>
     internal sealed class CutTimeMachineBox : ComboBox
     {
-        private const string ConstantSpeed = "none";
-
         private sealed record Choice(MachineConfig Machine)
         {
             public override string ToString() =>
@@ -27,7 +26,7 @@ namespace OpenNest.Forms
             DropDownStyle = ComboBoxStyle.DropDownList;
             Width = 200;
 
-            var machines = SortedByName(MachineSettings.LoadMachines());
+            var machines = SavedCutTimeSettings.SortedByName(MachineSettings.LoadMachines());
             Items.Add(new Choice(null));
             foreach (var machine in machines)
                 Items.Add(new Choice(machine));
@@ -36,18 +35,9 @@ namespace OpenNest.Forms
             SelectedItem = Items.Cast<Choice>().First(c => c.Machine == saved);
         }
 
-        private static List<MachineConfig> SortedByName(IEnumerable<MachineConfig> machines) =>
-            machines.OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
-
         /// <summary>The remembered machine, the first one until a choice is saved, or null for full speed.</summary>
-        public static MachineConfig SavedMachine(IEnumerable<MachineConfig> machines)
-        {
-            var sorted = SortedByName(machines);
-            var saved = Properties.Settings.Default.CutTimeMachine;
-            return saved == ConstantSpeed
-                ? null
-                : sorted.FirstOrDefault(m => m.Id.ToString() == saved) ?? sorted.FirstOrDefault();
-        }
+        public static MachineConfig SavedMachine(IEnumerable<MachineConfig> machines) =>
+            SavedCutTimeSettings.ChooseMachine(machines, Properties.Settings.Default.CutTimeMachine);
 
         public MachineConfig Machine => (SelectedItem as Choice)?.Machine;
 
@@ -57,7 +47,7 @@ namespace OpenNest.Forms
 
         public void SaveChoice()
         {
-            Properties.Settings.Default.CutTimeMachine = Machine?.Id.ToString() ?? ConstantSpeed;
+            Properties.Settings.Default.CutTimeMachine = SavedCutTimeSettings.MachineChoice(Machine);
             Properties.Settings.Default.Save();
         }
     }

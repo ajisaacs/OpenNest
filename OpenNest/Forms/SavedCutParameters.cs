@@ -1,11 +1,11 @@
-using System;
-using OpenNest.Data;
+using OpenNest.Desktop;
 
 namespace OpenNest.Forms
 {
     /// <summary>
     /// The cut-time settings last used in Calculate Cut Time or the simulator, shared with
-    /// anything else that estimates cut time (such as reports).
+    /// anything else that estimates cut time (such as reports). The rules live in
+    /// <see cref="SavedCutTimeSettings"/>; this reads and writes them through the app settings.
     /// </summary>
     internal static class SavedCutParameters
     {
@@ -16,33 +16,33 @@ namespace OpenNest.Forms
         /// </summary>
         public static CutParameters Load(Units units)
         {
-            var settings = Properties.Settings.Default;
-            var unset = settings.LastFeedrate == 1 && settings.LastRapidFeedrate == 1 && settings.LastPierceTime == 0;
-            var defaults = CutParameters.Default;
-            var feed = unset ? defaults.Feedrate : (double)settings.LastFeedrate;
-            var machine = CutTimeMachineBox.SavedMachine(MachineSettings.LoadMachines());
-
-            return new CutParameters
-            {
-                Feedrate = feed,
-                HoleFeedrate = settings.LastHoleFeedrate > 0 ? (double)settings.LastHoleFeedrate : feed,
-                RapidTravelRate = unset ? defaults.RapidTravelRate : (double)settings.LastRapidFeedrate,
-                PierceTime = unset ? defaults.PierceTime : TimeSpan.FromSeconds((double)settings.LastPierceTime),
-                SkipScribe = settings.CutTimeSkipEtch,
-                Units = units,
-                Motion = machine?.GetMotionOrPlaceholder().ToProfile(machine.Units, units),
-            };
+            var saved = Current();
+            var machine = SavedCutTimeSettings.ChooseMachine(MachineSettings.LoadMachines(), saved.Machine);
+            return saved.ToCutParameters(units, machine);
         }
 
         public static void Save(CutParameters parameters)
         {
+            var saved = Current().With(parameters);
             var settings = Properties.Settings.Default;
-            settings.LastFeedrate = (decimal)parameters.Feedrate;
-            settings.LastHoleFeedrate = (decimal)(parameters.HoleFeedrate ?? 0);
-            settings.LastRapidFeedrate = (decimal)parameters.RapidTravelRate;
-            settings.LastPierceTime = (decimal)parameters.PierceTime.TotalSeconds;
-            settings.CutTimeSkipEtch = parameters.SkipScribe;
+            settings.LastFeedrate = saved.Feedrate;
+            settings.LastHoleFeedrate = saved.HoleFeedrate;
+            settings.LastRapidFeedrate = saved.RapidFeedrate;
+            settings.LastPierceTime = saved.PierceSeconds;
+            settings.CutTimeSkipEtch = saved.SkipEtch;
             settings.Save();
+        }
+
+        private static SavedCutTimeSettings Current()
+        {
+            var settings = Properties.Settings.Default;
+            return new SavedCutTimeSettings(
+                settings.LastFeedrate,
+                settings.LastHoleFeedrate,
+                settings.LastRapidFeedrate,
+                settings.LastPierceTime,
+                settings.CutTimeSkipEtch,
+                settings.CutTimeMachine);
         }
     }
 }
