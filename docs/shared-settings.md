@@ -11,7 +11,9 @@ building nests and posts the same way:
 | `clamps` | `default` | Legacy clamp settings, read only to copy them onto a machine once (machines now hold their clamps) | `%APPDATA%\OpenNest\clamps.json` |
 | `nest-defaults` | `default` | Tools > Nest Defaults: units, sheet size, quadrant, spacing, default machine, common-line usage | `%APPDATA%\OpenNest\defaults.json` |
 
-File mode, the console, MCP and API front ends use only this PC's copies.
+File mode, the console, MCP and API front ends use only this PC's copies. Both desktop apps
+read these settings through `OpenNest.Desktop` (`SharedSettingsSource`, `MachineSettingsSource`); the
+Avalonia app follows the storage mode in `storage.json` but does not offer uploads yet.
 
 Nest defaults are saved by Tools > Nest Defaults, Tools > Save Current Plate as Defaults,
 Plate > Set as Default, and Nest > Edit's Defaults tab with "Use these defaults for new nests"

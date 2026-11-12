@@ -1,137 +1,57 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Controls;
 using OpenNest.Data;
-using OpenNest.IO;
+using OpenNest.Desktop;
 
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// The desktop entry points for the persisted machines (with their clamps) and nest
-    /// defaults. In Database mode each comes from the nest server once it holds a shared copy
-    /// (<see cref="SharedSettings"/>), otherwise from this PC's files. The warning variants
-    /// report unusable settings once per session.
+    /// The WinForms entry points for the persisted machines (with their clamps) and nest
+    /// defaults. The rules live in the shared <see cref="MachineSettingsSource"/>, reading this
+    /// app's settings; this shows its warnings (once per session where noted) and questions.
     /// </summary>
     internal static class MachineSettings
     {
+        /// <summary>The shared machine settings, reading and saving through <see cref="Properties.Settings"/>.</summary>
+        internal static MachineSettingsSource Source { get; } = new(SharedSettings.Source, new AppUserSettings());
+
         /// <summary>
         /// The machine configurations edited in Tools > Machine Configuration: the server's when
         /// it holds any, otherwise this PC's. <paramref name="refresh"/> re-reads the server first.
         /// </summary>
-        public static IDataProvider CreateMachineProvider(bool refresh = false) =>
-            SharedSettings.Holding(SharedSettingKinds.Machine, refresh) is { } shared
-                ? new SharedMachineProvider(shared)
-                : CreateLocalMachineProvider();
-
-        /// <summary>This PC's machine configurations, under %APPDATA%\OpenNest\Machines.</summary>
-        private static LocalJsonProvider CreateLocalMachineProvider()
-        {
-            var provider = new LocalJsonProvider(Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "OpenNest",
-                "Machines"));
-            provider.EnsureDefaults();
-            return provider;
-        }
+        public static IDataProvider CreateMachineProvider(bool refresh = false) => Source.CreateMachineProvider(refresh);
 
         /// <summary>Every readable machine configuration, for choosing acceleration limits.</summary>
-        public static List<MachineConfig> LoadMachines() => ReadMachines(() => CreateMachineProvider());
+        public static List<MachineConfig> LoadMachines() => Source.LoadMachines();
 
         /// <summary>Every readable machine configuration on this PC, shared or not, for uploading.</summary>
-        public static List<MachineConfig> LoadLocalMachines() => ReadMachines(CreateLocalMachineProvider);
-
-        private static List<MachineConfig> ReadMachines(Func<IDataProvider> createProvider)
-        {
-            var machines = new List<MachineConfig>();
-            try
-            {
-                var provider = createProvider();
-                foreach (var summary in provider.GetMachines())
-                {
-                    if (provider.GetMachine(summary.Id) is { } machine)
-                        machines.Add(machine);
-                }
-            }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
-            return machines;
-        }
+        public static List<MachineConfig> LoadLocalMachines() => Source.LoadLocalMachines();
 
         /// <summary>Every material and grade on file across the readable machine configurations.</summary>
-        public static IEnumerable<MaterialConfig> LoadMaterials() =>
-            LoadMachines().SelectMany(machine => machine.Materials);
+        public static IEnumerable<MaterialConfig> LoadMaterials() => Source.LoadMaterials();
 
-        private static bool defaultsWarned;
-        private static bool clampMigrationAsked;
-
-        /// <summary>
-        /// The clamps new nests assigned <paramref name="machine"/> receive (New, BOM import, Load
-        /// Machine Defaults); off when there is no machine or it has no clamps.
-        /// </summary>
+        /// <summary>The clamps new nests assigned <paramref name="machine"/> receive.</summary>
         public static ClampSettings LoadClampSettings(MachineConfig machine) =>
-            machine?.GetClampSettings() ?? ClampSettings.Fallback;
+            MachineSettingsSource.LoadClampSettings(machine);
 
         /// <summary>Saves <paramref name="settings"/> as the clamps of the machine with <paramref name="machineId"/>.</summary>
-        public static void SaveClampSettings(Guid machineId, ClampSettings settings)
-        {
-            var provider = CreateMachineProvider();
-            var machine = provider.GetMachine(machineId)
-                ?? throw new IOException("The machine configuration is no longer on file.");
-            machine.Clamps = MachineClamps.FromSettings(settings, machine.Units);
-            provider.SaveMachine(machine);
-        }
+        public static void SaveClampSettings(Guid machineId, ClampSettings settings) =>
+            Source.SaveClampSettings(machineId, settings);
 
         /// <summary>
-        /// Copies the legacy clamps.json (or the server's shared copy) onto a machine once, while
-        /// no machine has clamps of its own: the nest defaults' machine, or the only machine. With
-        /// several machines and no default the user picks one, asked once per session.
+        /// Copies the legacy clamps onto a machine once (see
+        /// <see cref="MachineSettingsSource.MigrateLegacyClamps"/>), asking which machine when
+        /// it cannot tell and warning when the copy fails.
         /// </summary>
         public static void MigrateLegacyClamps(IWin32Window owner)
         {
-            try
-            {
-                var legacy = LoadLegacyClampSettings();
-                var provider = CreateMachineProvider();
-                var machines = ReadMachines(() => provider)
-                    .OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase)
-                    .ToList();
-                if (!LegacyClampMigration.IsNeeded(legacy, machines))
-                    return;
-
-                var target = LegacyClampMigration.Target(machines, LoadSavedNestDefaults(out _).MachineId);
-                if (target == null)
-                {
-                    if (clampMigrationAsked)
-                        return;
-                    clampMigrationAsked = true;
-                    target = AskClampMachine(owner, machines);
-                    if (target == null)
-                        return;
-                }
-
-                LegacyClampMigration.Apply(legacy, target);
-                provider.SaveMachine(target);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                MessageBox.Show(owner,
-                    $"The clamp settings could not be copied to a machine:\n\n{ex.Message}\n\n"
-                    + "New nests get no clamps until a machine has them (Tools > Machine Configuration).",
-                    "Clamps", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        }
-
-        // The pre-machine clamp settings: the server's shared copy once it holds one, otherwise
-        // this PC's clamps.json; null when neither exists.
-        private static ClampSettings LoadLegacyClampSettings()
-        {
-            if (SharedSettings.Find(SharedSettingKinds.Clamps, SharedSettingKinds.DefaultKey) is { } shared)
-                return ClampSettings.Parse(shared.Json, out _);
-            return File.Exists(ClampSettings.DefaultPath) ? ClampSettings.Load(ClampSettings.DefaultPath) : null;
+            var warning = Source.MigrateLegacyClamps(machines => AskClampMachine(owner, machines));
+            if (warning != null)
+                MessageBox.Show(owner, warning, "Clamps", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
         private static MachineConfig AskClampMachine(IWin32Window owner, IReadOnlyList<MachineConfig> machines)
@@ -160,174 +80,47 @@ namespace OpenNest.Forms
                 : null;
         }
 
-        /// <summary>
-        /// The machine new nests are assigned: the nest defaults' machine when it is on file,
-        /// otherwise the first by name, or null when there are none.
-        /// </summary>
-        public static MachineConfig DefaultMachine(NestDefaults defaults, IEnumerable<MachineConfig> machines)
-        {
-            var sorted = machines.OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
-            return sorted.FirstOrDefault(m => m.Id == defaults?.MachineId) ?? sorted.FirstOrDefault();
-        }
+        /// <summary>The machine new nests are assigned (see <see cref="MachineSettingsSource.DefaultMachine"/>).</summary>
+        public static MachineConfig DefaultMachine(NestDefaults defaults, IEnumerable<MachineConfig> machines) =>
+            MachineSettingsSource.DefaultMachine(defaults, machines);
 
         /// <summary>The configuration of <paramref name="machine"/>, or null when none is assigned or it is not on file.</summary>
-        public static MachineConfig FindMachine(NestMachine machine)
-        {
-            if (machine == null)
-                return null;
-            try
-            {
-                return CreateMachineProvider().GetMachine(machine.Id);
-            }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
-            return null;
-        }
+        public static MachineConfig FindMachine(NestMachine machine) => Source.FindMachine(machine);
 
-        /// <summary>
-        /// Assigns <paramref name="machine"/> to <paramref name="nest"/> (null for none) and gives
-        /// every sheet that machine's support grid, or none when the machine gives nests no grid.
-        /// </summary>
-        public static void AssignMachine(Nest nest, MachineConfig machine)
-        {
-            nest.Machine = machine == null ? null : new NestMachine(machine.Id, machine.Name);
-            var grid = LoadSupportGridSettings(machine);
-            nest.SetSupportBed(grid.Enabled ? grid.BedFor(nest.Units) : null);
-        }
+        /// <summary>Assigns <paramref name="machine"/> and its support grid to <paramref name="nest"/>.</summary>
+        public static void AssignMachine(Nest nest, MachineConfig machine) => Source.AssignMachine(nest, machine);
 
-        /// <summary>
-        /// The cutting parameters a plate of <paramref name="nest"/> without its own starts from:
-        /// the last ones applied (or the built-in defaults), with the lead-ins, lead-outs and kerf
-        /// of the nest's machine for its material and thickness when the machine has them. Last
-        /// parameters already taken from that machine, material and thickness keep the user's
-        /// edits to them.
-        /// </summary>
-        public static CuttingParameters DefaultCuttingParameters(Nest nest)
-        {
-            var parameters = LastCuttingParameters();
-            var machine = FindMachine(nest.Machine);
-            if (!MachineCuttingDefaults.IsRecordedFor(parameters, machine, nest))
-                MachineCuttingDefaults.ApplyTo(parameters, machine, nest);
-            return parameters;
-        }
+        /// <summary>See <see cref="MachineSettingsSource.DefaultCuttingParameters"/>.</summary>
+        public static CuttingParameters DefaultCuttingParameters(Nest nest) => Source.DefaultCuttingParameters(nest);
 
-        /// <summary>
-        /// The cutting parameters to plan or place lead-ins on <paramref name="plate"/> with: the
-        /// user's (see <see cref="DefaultCuttingParameters"/>), so an edit reaches nests already
-        /// planned. The plate's own are used only when no user settings are saved or readable.
-        /// </summary>
-        public static CuttingParameters CuttingParametersFor(Plate plate, Nest nest) =>
-            plate?.CuttingParameters != null && ReadLastCuttingParameters() == null
-                ? plate.CuttingParameters
-                : DefaultCuttingParameters(nest);
+        /// <summary>See <see cref="MachineSettingsSource.CuttingParametersFor"/>.</summary>
+        public static CuttingParameters CuttingParametersFor(Plate plate, Nest nest) => Source.CuttingParametersFor(plate, nest);
 
         /// <summary>Whether the cutting settings of <paramref name="nest"/> are kept on its machine's thickness.</summary>
-        public static bool HasMachineThickness(Nest nest) =>
-            nest != null && MachineCuttingDefaults.Find(FindMachine(nest.Machine), nest) != null;
+        public static bool HasMachineThickness(Nest nest) => Source.HasMachineThickness(nest);
+
+        /// <summary>See <see cref="MachineSettingsSource.DescribeCuttingSource"/>.</summary>
+        public static string DescribeCuttingSource(Nest nest) => Source.DescribeCuttingSource(nest);
 
         /// <summary>
-        /// Where the cutting settings of <paramref name="nest"/> are kept, for the settings
-        /// dialogs: the machine's thickness, or why this PC's settings are used instead.
-        /// </summary>
-        public static string DescribeCuttingSource(Nest nest)
-        {
-            var machine = FindMachine(nest?.Machine);
-            if (nest == null || machine == null)
-                return "This PC's settings: the nest has no machine.";
-            var material = nest.Material?.Name;
-            if (string.IsNullOrWhiteSpace(material) || !double.IsFinite(nest.Thickness) || nest.Thickness <= 0)
-                return "This PC's settings: the nest has no material and thickness.";
-            var job = $"{material}{(string.IsNullOrWhiteSpace(nest.Material.Grade) ? "" : " " + nest.Material.Grade)} "
-                + $"{nest.Thickness:0.####} {(nest.Units == Units.Millimeters ? "mm" : "in")}";
-            return MachineCuttingDefaults.Find(machine, nest) == null
-                ? $"This PC's settings: {machine.Name} has no {job}."
-                : $"Saved for {machine.Name} · {job}";
-        }
-
-        /// <summary>
-        /// Saves cutting settings edited for <paramref name="nest"/>: on the machine's thickness
-        /// when it has one, otherwise as this PC's settings. When the machine cannot be saved
-        /// (the nest server is offline, or someone else changed the machine), the settings are
-        /// kept on this PC for this job and the user is told why. Returns whether they reached the machine.
+        /// Saves cutting settings edited for <paramref name="nest"/> (see
+        /// <see cref="MachineSettingsSource.SaveCuttingParameters(Nest, CuttingParameters, Action{string})"/>),
+        /// telling the user why they could not reach the machine. Returns whether they did.
         /// </summary>
         public static bool SaveCuttingParameters(IWin32Window owner, Nest nest, CuttingParameters parameters) =>
-            SaveCuttingParameters(nest, parameters, CreateMachineProvider(), error => MessageBox.Show(owner, error,
+            Source.SaveCuttingParameters(nest, parameters, error => MessageBox.Show(owner, error,
                 "Cutting Parameters", MessageBoxButtons.OK, MessageBoxIcon.Warning));
 
-        /// <summary>
-        /// <see cref="SaveCuttingParameters(IWin32Window, Nest, CuttingParameters)"/> with the
-        /// machines of <paramref name="provider"/>, telling <paramref name="warn"/> why a machine
-        /// save failed.
-        /// </summary>
-        internal static bool SaveCuttingParameters(Nest nest, CuttingParameters parameters, IDataProvider provider, Action<string> warn)
-        {
-            MachineConfig machine = null;
-            string error;
-            try
-            {
-                machine = nest?.Machine == null ? null : provider.GetMachine(nest.Machine.Id);
-                if (machine == null || !MachineCuttingDefaults.WriteTo(machine, nest, parameters))
-                {
-                    SaveLastCuttingParameters(parameters);
-                    return false;
-                }
-                provider.SaveMachine(machine);
-                // A copy kept on this PC for this job would hide the machine's from now on.
-                var last = ReadLastCuttingParameters();
-                if (last != null && MachineCuttingDefaults.IsRecordedFor(last, machine, nest))
-                {
-                    last.MachineName = null;
-                    SaveLastCuttingParameters(last);
-                }
-                return true;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-            {
-                error = ex.Message;
-            }
-
-            // Stamped for this job, so the edit sticks on this PC until the machine takes it.
-            var kept = CuttingParametersSerializer.Deserialize(CuttingParametersSerializer.Serialize(parameters));
-            kept.MachineName = machine?.Name ?? nest.Machine.Name;
-            kept.MaterialName = nest.Material?.Name;
-            kept.Grade = nest.Material?.Grade;
-            kept.Thickness = nest.Thickness;
-            SaveLastCuttingParameters(kept);
-            warn($"The cutting settings could not be saved to {kept.MachineName}:\n\n{error}\n\n"
-                + "They are kept on this PC for this material and thickness.");
-            return false;
-        }
+        /// <summary>The save above with the machines of <paramref name="provider"/>.</summary>
+        internal static bool SaveCuttingParameters(Nest nest, CuttingParameters parameters, IDataProvider provider, Action<string> warn) =>
+            Source.SaveCuttingParameters(nest, parameters, provider, warn);
 
         /// <summary>Saves <paramref name="parameters"/> as this PC's last cutting settings.</summary>
-        public static void SaveLastCuttingParameters(CuttingParameters parameters)
-        {
-            Properties.Settings.Default.CuttingParametersJson = CuttingParametersSerializer.Serialize(parameters);
-            Properties.Settings.Default.Save();
-        }
+        public static void SaveLastCuttingParameters(CuttingParameters parameters) =>
+            Source.SaveLastCuttingParameters(parameters);
 
         /// <summary>The cutting parameters last applied, or the built-in defaults when none are saved or readable.</summary>
-        public static CuttingParameters LastCuttingParameters() =>
-            ReadLastCuttingParameters() ?? new CuttingParameters();
-
-        private static CuttingParameters ReadLastCuttingParameters()
-        {
-            var json = Properties.Settings.Default.CuttingParametersJson;
-            if (!string.IsNullOrEmpty(json))
-            {
-                try
-                {
-                    // Settings saved with the retired "Tab every part" read as tabs by size over
-                    // every width. A plate's recorded parameters are never migrated.
-                    var parameters = CuttingParametersSerializer.Deserialize(json);
-                    Support.SupportTabSettings.MigrateTabEveryPart(parameters);
-                    return parameters;
-                }
-                catch
-                { /* fall through */
-                }
-            }
-            return null;
-        }
+        public static CuttingParameters LastCuttingParameters() => Source.LastCuttingParameters();
 
         /// <summary>
         /// Saves a Nest Info dialog to <paramref name="nest"/>: a changed material or thickness
@@ -344,24 +137,15 @@ namespace OpenNest.Forms
         /// they regenerate.
         /// </summary>
         public static void ApplyCutOffDefaults(PlateView view, Nest nest) =>
-            MachineCuttingDefaults.ApplyTo(view.CutOffSettings, FindMachine(nest.Machine), nest);
+            Source.ApplyCutOffDefaults(view.CutOffSettings, nest);
 
-        /// <summary>
-        /// The support grid of <paramref name="machine"/>; a machine without one saved yet, or no
-        /// machine, uses the legacy shared support-grid.json. Never throws, and loads as off when unreadable.
-        /// </summary>
+        /// <summary>See <see cref="MachineSettingsSource.LoadSupportGridSettings"/>.</summary>
         public static SupportGridSettings LoadSupportGridSettings(MachineConfig machine) =>
-            machine?.SupportGrid ?? SupportGridSettings.Load(SupportGridSettings.DefaultPath);
+            Source.LoadSupportGridSettings(machine);
 
         /// <summary>Saves <paramref name="settings"/> as the support grid of the machine with <paramref name="machineId"/>.</summary>
-        public static void SaveSupportGridSettings(Guid machineId, SupportGridSettings settings)
-        {
-            var provider = CreateMachineProvider();
-            var machine = provider.GetMachine(machineId)
-                ?? throw new IOException("The machine configuration is no longer on file.");
-            machine.SupportGrid = settings;
-            provider.SaveMachine(machine);
-        }
+        public static void SaveSupportGridSettings(Guid machineId, SupportGridSettings settings) =>
+            Source.SaveSupportGridSettings(machineId, settings);
 
         /// <summary>
         /// Loads the persisted nest defaults (see <see cref="LoadSavedNestDefaults"/>);
@@ -369,49 +153,24 @@ namespace OpenNest.Forms
         /// </summary>
         public static NestDefaults LoadNestDefaults()
         {
-            var defaults = LoadSavedNestDefaults(out var status);
-
-            if (status == NestDefaultsStatus.Invalid && !defaultsWarned)
-            {
-                defaultsWarned = true;
-                var source = SharedNestDefaults() != null ? "on the nest server" : NestDefaults.DefaultPath;
-                MessageBox.Show(
-                    $"The nest defaults could not be read:\n{source}\n\nBuilt-in defaults will be used. Re-save your defaults from Tools > Nest Defaults.",
-                    "Nest Defaults",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
-            }
+            var defaults = Source.LoadNestDefaults(out var warning);
+            if (warning != null)
+                MessageBox.Show(warning, "Nest Defaults", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return defaults;
         }
 
-        /// <summary>
-        /// The single desktop entry point for persisted nest defaults. Units
-        /// fall back to the legacy DefaultUnit setting whenever the file is
-        /// missing or unusable or has no valid unit, so New, BOM import and
-        /// the defaults dialog always agree.
-        /// </summary>
+        /// <summary>See <see cref="MachineSettingsSource.LoadSavedNestDefaults"/>.</summary>
         public static NestDefaults LoadSavedNestDefaults(out NestDefaultsStatus status) =>
-            SharedNestDefaults() is { } shared
-                ? NestDefaults.Parse(shared.Json, Properties.Settings.Default.DefaultUnit, out status)
-                : NestDefaults.Load(NestDefaults.DefaultPath, Properties.Settings.Default.DefaultUnit, out status);
+            Source.LoadSavedNestDefaults(out status);
 
         /// <summary>This PC's own nest defaults, shared or not, for uploading.</summary>
-        public static NestDefaults LoadLocalNestDefaults() =>
-            NestDefaults.Load(NestDefaults.DefaultPath, Properties.Settings.Default.DefaultUnit, out _);
+        public static NestDefaults LoadLocalNestDefaults() => Source.LoadLocalNestDefaults();
 
         /// <summary>
         /// Saves the nest defaults where they are read: the server once it holds them, otherwise
-        /// this PC's file. Throws <see cref="IOException"/> when the server cannot take them.
+        /// this PC's file. Throws <see cref="System.IO.IOException"/> when the server cannot take them.
         /// </summary>
-        public static void SaveNestDefaults(NestDefaults defaults)
-        {
-            if (SharedSettings.Current() is { } current
-                && current.Get(SharedSettingKinds.NestDefaults, SharedSettingKinds.DefaultKey) != null)
-                current.Save(SharedSettingKinds.NestDefaults, SharedSettingKinds.DefaultKey, defaults.ToJson());
-            else
-                defaults.Save(NestDefaults.DefaultPath);
-        }
+        public static void SaveNestDefaults(NestDefaults defaults) => Source.SaveNestDefaults(defaults);
 
         /// <summary>Saves the nest defaults, telling the user when they could not be saved.</summary>
         public static void SaveNestDefaults(IWin32Window owner, NestDefaults defaults)
@@ -420,7 +179,7 @@ namespace OpenNest.Forms
             {
                 SaveNestDefaults(defaults);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
             {
                 MessageBox.Show(owner, "The nest defaults could not be saved.\n\n" + ex.Message, "Nest Defaults",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -437,7 +196,20 @@ namespace OpenNest.Forms
             SaveNestDefaults(owner, defaults);
         }
 
-        private static SharedSettingRecord SharedNestDefaults() =>
-            SharedSettings.Find(SharedSettingKinds.NestDefaults, SharedSettingKinds.DefaultKey);
+        /// <summary>The app settings the shared rules read and save.</summary>
+        private sealed class AppUserSettings : IMachineUserSettings
+        {
+            public Units DefaultUnit => Properties.Settings.Default.DefaultUnit;
+
+            public string CuttingParametersJson
+            {
+                get => Properties.Settings.Default.CuttingParametersJson;
+                set
+                {
+                    Properties.Settings.Default.CuttingParametersJson = value;
+                    Properties.Settings.Default.Save();
+                }
+            }
+        }
     }
 }
