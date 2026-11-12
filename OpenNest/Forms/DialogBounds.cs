@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Windows.Forms;
+using OpenNest.Desktop;
 
 namespace OpenNest.Forms;
 
@@ -20,12 +21,10 @@ internal static class DialogBounds
     public static void FitToOwnerScreen(Form form)
     {
         var area = Screen.FromControl(form.Owner ?? form).WorkingArea;
-        var width = System.Math.Max(form.MinimumSize.Width, area.Width * 9 / 10);
-        var height = System.Math.Max(form.MinimumSize.Height, area.Height * 9 / 10);
-        form.Bounds = new Rectangle(
-            System.Math.Max(area.Left, area.Left + (area.Width - width) / 2),
-            System.Math.Max(area.Top, area.Top + (area.Height - height) / 2),
-            width,
-            height);
+        var bounds = LargeDialogBounds.Centered(
+            new PixelRect(area.X, area.Y, area.Width, area.Height),
+            form.MinimumSize.Width,
+            form.MinimumSize.Height);
+        form.Bounds = new Rectangle(bounds.X, bounds.Y, bounds.Width, bounds.Height);
     }
 }
