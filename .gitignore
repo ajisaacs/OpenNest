@@ -208,7 +208,9 @@ FakesAssemblies/
 *.db-journal
 
 # Local agent state and temporary planning/progress documents
-.claude/
+# (shared Claude Code agent definitions stay tracked)
+.claude/*
+!.claude/agents/
 /.hermes/plans/
 /.hermes/progress/
 .superpowers/
