@@ -643,24 +643,6 @@ namespace OpenNest.Forms
             var layout = CreateDetailLayout();
             var row = 0;
 
-            AddField(
-                layout,
-                ref row,
-                "Thickness:",
-                CreateLabeledNumeric(
-                    thickness.Value,
-                    v =>
-                    {
-                        thickness.Value = v;
-                        node.Text = ThicknessLabel(thickness);
-                        MarkDirty();
-                    },
-                    4,
-                    LengthUnitSuffix,
-                    100,
-                    0.001m
-                )
-            );
             var nameBox = CreateTextBox(
                 thickness.Name,
                 v =>
@@ -671,6 +653,30 @@ namespace OpenNest.Forms
                 }
             );
             nameBox.PlaceholderText = "e.g. 16 ga";
+            AddField(
+                layout,
+                ref row,
+                "Thickness:",
+                CreateLabeledNumeric(
+                    thickness.Value,
+                    v =>
+                    {
+                        // A blank name, or one still the standard name of the old value, follows
+                        // the value to its standard gauge or fraction; a typed name stays.
+                        var name = nameBox.Text.Trim();
+                        var follows = name.Length == 0 || name == StandardThicknessName(thickness.Value);
+                        thickness.Value = v;
+                        if (follows && StandardThicknessName(v) is var standard && standard != name)
+                            nameBox.Text = standard;
+                        node.Text = ThicknessLabel(thickness);
+                        MarkDirty();
+                    },
+                    4,
+                    LengthUnitSuffix,
+                    100,
+                    0.001m
+                )
+            );
             AddField(layout, ref row, "Name / Gauge:", nameBox);
             AddField(
                 layout,
@@ -1165,6 +1171,16 @@ namespace OpenNest.Forms
             return panel;
         }
 
+        /// <summary>
+        /// The standard gauge or plate fraction <paramref name="value"/> (in the machine's units)
+        /// matches, such as "16 ga" or "1/4\"", or empty when it matches none.
+        /// </summary>
+        private string StandardThicknessName(double value) =>
+            StandardThicknesses.Find(
+                value,
+                _currentMachine?.Units == UnitSystem.Millimeters ? Units.Millimeters : Units.Inches
+            )?.Name ?? "";
+
         private string LengthUnitSuffix(object _) =>
             _currentMachine?.Units == UnitSystem.Millimeters ? "mm" : "in";
 
@@ -1538,6 +1554,7 @@ namespace OpenNest.Forms
 
             var materialNode = _tree.SelectedNode;
             var thickness = new ThicknessConfig { Value = 0.250 };
+            thickness.Name = StandardThicknessName(thickness.Value);
             material.Thicknesses.Add(thickness);
             var node = BuildThicknessNode(thickness);
             materialNode.Nodes.Add(node);

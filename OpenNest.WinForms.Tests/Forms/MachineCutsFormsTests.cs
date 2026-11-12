@@ -132,6 +132,56 @@ public class MachineCutsFormsTests
         });
     }
 
+    [Fact]
+    public void GeneralTab_BlankNameFollowsTheValueToItsStandardGaugeUntilOneIsTyped()
+    {
+        RunSta(() =>
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "OpenNestTests", Guid.NewGuid().ToString());
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var provider = new LocalJsonProvider(directory);
+                provider.SaveMachine(new MachineConfig
+                {
+                    Name = "Laser",
+                    Units = UnitSystem.Inches,
+                    Materials = { new MaterialConfig { Name = "Mild Steel", Thicknesses = { new ThicknessConfig { Value = 0.3 } } } },
+                });
+
+                using var form = new MachineConfigForm(provider);
+                var node = Descendants(Find<TreeView>(form, "_tree").Nodes).Single(n => n.Tag is ThicknessConfig);
+                typeof(MachineConfigForm)
+                    .GetMethod("Tree_AfterSelect", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .Invoke(form, new object[] { null, new TreeViewEventArgs(node) });
+                var shown = (ThicknessConfig)node.Tag;
+
+                var page = All<TabControl>(form).Single().TabPages.Cast<TabPage>().Single(p => p.Text == "General");
+                var value = All<NumericUpDown>(page).First();
+                var name = All<TextBox>(page).Single(b => b.PlaceholderText == "e.g. 16 ga");
+                Assert.Equal("", shown.Name);
+
+                value.Value = 0.0598m;
+                Assert.Equal("16 ga", shown.Name);
+                Assert.Equal("0.0598 (16 ga)", node.Text);
+
+                // Still the old value's standard name, so it follows; no standard match clears it.
+                value.Value = 0.25m;
+                Assert.Equal("1/4\"", shown.Name);
+                value.Value = 0.3m;
+                Assert.Equal("", shown.Name);
+
+                name.Text = "Shop plate";
+                value.Value = 0.0598m;
+                Assert.Equal("Shop plate", shown.Name);
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        });
+    }
+
     private static IEnumerable<TreeNode> Descendants(TreeNodeCollection nodes) =>
         nodes.Cast<TreeNode>().SelectMany(n => Descendants(n.Nodes).Prepend(n));
 

@@ -15,6 +15,12 @@ decimals (PEP stores 3/16 as 0.188) finds the machine's 0.1875; the nearest one 
 file, nothing changes and the previous behavior applies. Lengths are converted from the
 machine's units to the nest's.
 
+A thickness's **Name / Gauge** ("16 ga") is display only: the tree shows it and nest reports
+put it before the decimal. In Machine Configuration a blank name, or one still the standard
+name of the old value, follows the thickness value to its standard steel gauge or plate
+fraction (`StandardThicknesses`, matched to the displayed precision); a typed name is kept.
+A new thickness starts with the name of its default value.
+
 ## Where the Cutting Parameters dialog saves
 
 Every setting in Plan Cutting's Cutting Parameters dialog and the Place Lead-in panel is kept on
