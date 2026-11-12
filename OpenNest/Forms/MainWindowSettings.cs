@@ -1,9 +1,8 @@
 using System;
-using System.IO;
 using System.Windows.Forms;
 using OpenNest.Data;
+using OpenNest.Desktop;
 using OpenNest.Engine.BestFit;
-using OpenNest.IO;
 using OpenNest.Properties;
 
 namespace OpenNest.Forms
@@ -80,33 +79,22 @@ namespace OpenNest.Forms
         /// </summary>
         public static void MigrateNestTemplate()
         {
-            var templatePath = Settings.Default.NestTemplatePath;
-            if (string.IsNullOrWhiteSpace(templatePath))
-                return;
+            var result = NestTemplateMigration.Run(
+                Settings.Default.NestTemplatePath, NestDefaults.DefaultPath, BestFitCacheStore.Shared);
 
             // A failed conversion keeps the setting populated so the user
             // can still find their template file.
-            var converted = true;
-            if (File.Exists(templatePath) && !File.Exists(NestDefaults.DefaultPath))
+            if (result.Warning != null)
             {
-                try
-                {
-                    var nest = new NestReader(templatePath) { BestFitStore = BestFitCacheStore.Shared }.Read();
-                    NestDefaults.FromNest(nest).Save(NestDefaults.DefaultPath);
-                }
-                catch (Exception ex)
-                {
-                    converted = false;
-                    MessageBox.Show(
-                        $"The nest template could not be converted to the new defaults file:\n{templatePath}\n\n{ex.Message}\n\nIt will no longer be loaded automatically. Set defaults under Tools > Nest Defaults.",
-                        "Nest Template",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning
-                    );
-                }
+                MessageBox.Show(
+                    result.Warning,
+                    "Nest Template",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
             }
 
-            if (!converted)
+            if (!result.ClearSetting)
                 return;
 
             Settings.Default.NestTemplatePath = "";
