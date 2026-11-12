@@ -305,7 +305,7 @@
     },
     {
       "id": "pdf-report",
-      "title": "Desktop PDF export",
+      "title": "Desktop PDF report",
       "required_tests": [
         {
           "project": "OpenNest.WinForms.Tests",
@@ -319,22 +319,17 @@
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.CancelWritesNothingAndNotifiesNothing",
-          "minimum_cases": 1
-        },
-        {
-          "project": "OpenNest.WinForms.Tests",
           "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.InteractiveFillOnAnyViewOfTheNestRejects",
           "minimum_cases": 1
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.InvalidNestNameRejectsBeforeAnyDialog",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.InvalidNestNameRejectsBeforeRendering",
           "minimum_cases": 1
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.JobBusyRejectsBeforeAnyDialog",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.JobBusyRejectsBeforeRendering",
           "minimum_cases": 1
         },
         {
@@ -349,7 +344,17 @@
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.SuccessfulExportWritesPdfAndLeavesJobStateUntouched",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.ViewLeavesJobStateUntouched",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.ViewRenderFailureOpensNoViewerAndLeavesNoTempFolder",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.ViewRendersATemporaryPdfForTheViewer",
           "minimum_cases": 1
         },
         {
