@@ -29,6 +29,9 @@ namespace OpenNest.Avalonia.Rendering
             PlateOutline = ToSk(scheme.LayoutOutlineColor);
             EdgeSpacing = ToSk(scheme.EdgeSpacingColor);
             Etch = ToSk(scheme.EtchColor);
+            Origin = ToSk(scheme.OriginColor);
+            Rapid = ToSk(scheme.RapidColor);
+            BoundingBox = ToSk(scheme.BoundingBoxColor);
             var selected = scheme.SelectedPartColor.IsEmpty ? LegacySelectedColor : scheme.SelectedPartColor;
             SelectedFill = ToSk(selected);
             // As WinForms: the scheme's outline, else the legacy selection fill darkened.
@@ -48,6 +51,12 @@ namespace OpenNest.Avalonia.Rendering
         public SKColor EdgeSpacing { get; }
 
         public SKColor Etch { get; }
+
+        public SKColor Origin { get; }
+
+        public SKColor Rapid { get; }
+
+        public SKColor BoundingBox { get; }
 
         public SKColor SelectedFill { get; }
 

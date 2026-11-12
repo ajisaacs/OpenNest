@@ -113,6 +113,7 @@ namespace OpenNest.Avalonia
                 if (!views.ContainsKey(tab))
                 {
                     var view = new NestView(tab);
+                    RestoreViewToggles(view);
                     view.ViewChanged += (_, _) => { if (view == ActiveView) UpdateStatus(); };
                     views[tab] = view;
                     notice = null;
@@ -151,6 +152,7 @@ namespace OpenNest.Avalonia
         {
             // No dialogs: the image is taken and the window closes unattended.
             snapshotMode = true;
+            UseDefaultViewToggles();
             Opened += async (_, _) =>
             {
                 ActiveView?.ShowPlate(plateNumber - 1);
@@ -183,6 +185,7 @@ namespace OpenNest.Avalonia
                 ? "OpenNest (Avalonia prototype)"
                 : $"{view.Tab.Name} - OpenNest (Avalonia prototype)";
             RebuildTabStrip();
+            UpdateViewToggles();
             UpdateStatus();
         }
 
@@ -272,7 +275,8 @@ namespace OpenNest.Avalonia
                 return false;
 
             tabs.Close(tab);
-            views.Remove(tab);
+            if (views.Remove(tab, out var closed))
+                SaveViewToggles(closed);
             return true;
         }
 
@@ -296,6 +300,7 @@ namespace OpenNest.Avalonia
             if (closeConfirmed || (!tabs.AnyModified && !writingFile))
             {
                 nesting?.Cancel();
+                SaveAllViewToggles();
                 return;
             }
 

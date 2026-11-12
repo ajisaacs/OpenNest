@@ -21,6 +21,19 @@
         <MenuItem x:Name="AutoNestMenuItem" Header="_Auto Nest" Click="OnAutoNest" />
       </MenuItem>
       <MenuItem Header="_View">
+        <MenuItem x:Name="DrawRapidsMenuItem" Header="Draw _Rapids" ToggleType="CheckBox"
+                  Click="OnToggleDrawRapids" />
+        <MenuItem x:Name="DrawPiercePointsMenuItem" Header="Draw _Pierce Points" ToggleType="CheckBox"
+                  Click="OnToggleDrawPiercePoints" />
+        <MenuItem x:Name="DrawBoundsMenuItem" Header="Draw _Bounds" ToggleType="CheckBox"
+                  Click="OnToggleDrawBounds" />
+        <MenuItem x:Name="DrawOffsetMenuItem" Header="Draw _Offset" ToggleType="CheckBox"
+                  Click="OnToggleDrawOffset" />
+        <MenuItem x:Name="DrawCutDirectionMenuItem" Header="Draw _Cut Direction" ToggleType="CheckBox"
+                  Click="OnToggleDrawCutDirection" />
+        <MenuItem x:Name="DrawSupportMenuItem" Header="Draw _Support" ToggleType="CheckBox"
+                  Click="OnToggleDrawSupport" />
+        <Separator />
         <MenuItem Header="Zoom to _Fit" InputGesture="F" Click="OnFit" />
         <MenuItem Header="_Previous Plate" InputGesture="PageUp" Click="OnPreviousPlate" />
         <MenuItem Header="_Next Plate" InputGesture="PageDown" Click="OnNextPlate" />
