@@ -729,7 +729,7 @@ public static class NestPdfWriter
     }
 
     // Zero thickness means "unset" in a new nest; never present it as a genuine value.
-    // A standard gauge or plate fraction leads, as the thickness box lists it: "16 ga - 0.0598 in".
+    // The machine config's name for the thickness leads: "16 ga - 0.0598 in".
     private static string Thickness(NestReportSnapshot snapshot) =>
         snapshot.Thickness <= 0 ? "Not specified"
         : snapshot.ThicknessName.Length > 0 ? $"{snapshot.ThicknessName} - {Number(snapshot.Thickness)} {snapshot.Units}"

@@ -112,10 +112,11 @@ beside the ID; complete drawings show no status. Cards without a weight show
 a table row, so a card never splits across pages.
 
 The summary's header lists the job and material on the left and the totals on
-the right, to leave room for part cards on the first page. A thickness that
-matches a standard gauge or plate fraction leads with its name, as the
-thickness box lists it ("16 ga - 0.0598 in"); the desktop supplies the name,
-since Reporting has no thickness table of its own.
+the right, to leave room for part cards on the first page. When the nest
+machine's config names the thickness (its **Name / Gauge**, matched as the
+[machine cutting defaults](machine-cutting-defaults.md) match it), the name
+leads the decimal: "16 ga - 0.0598 in". The desktop supplies it, since
+Reporting does not read machine configs.
 
 Stock sizes read **width x length** in job units. Plate tables use **Quantity**
 and **Parts per plate**; the plate quantity multiplies per-plate part counts for

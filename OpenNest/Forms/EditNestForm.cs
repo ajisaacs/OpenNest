@@ -848,10 +848,11 @@ namespace OpenNest.Forms
             // Reporting must have no accounting side effects: no quantity refresh, no
             // selection or dirty-state change. Only the detached snapshot reaches the writer.
             var material = targets.Nest.Material;
+            var machine = MachineSettings.FindMachine(targets.Nest.Machine);
             var catalogDensity = Data.MaterialDensityLookup.Resolve(
                 material?.Name,
                 material?.Grade,
-                MachineSettings.FindMachine(targets.Nest.Machine),
+                machine,
                 MachineSettings.LoadMaterials()
             );
             var snapshot = NestReportBuilder.Capture(
@@ -861,8 +862,8 @@ namespace OpenNest.Forms
                 catalogDensity
             ) with
             {
-                ThicknessName =
-                    Data.StandardThicknesses.Find(targets.Nest.Thickness, targets.Nest.Units)?.Name ?? "",
+                // The name the machine config gives the nest's thickness ("16 ga"), if any.
+                ThicknessName = Data.MachineCuttingDefaults.Find(machine, targets.Nest)?.Name?.Trim() ?? "",
             };
             NestPdfWriter.Write(snapshot, destination);
         }

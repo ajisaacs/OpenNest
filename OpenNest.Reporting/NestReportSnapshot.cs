@@ -63,9 +63,9 @@ public sealed record NestReportSnapshot(string Name, string Customer, string Not
     public long TotalSheets => Plates.Aggregate(0L, (total, plate) => checked(total + plate.Copies));
 
     /// <summary>
-    /// The standard gauge or plate fraction the thickness matches ("16 ga", "1/4\""), shown
-    /// before the decimal; empty when it matches none. Reporting has no thickness table of its
-    /// own, so the caller supplies it.
+    /// The name the nest machine's config gives this thickness ("16 ga"), shown before the
+    /// decimal; empty when it has none. Reporting does not read machine configs, so the caller
+    /// supplies it.
     /// </summary>
     public string ThicknessName { get; init; } = "";
 
