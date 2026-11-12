@@ -50,6 +50,11 @@ namespace OpenNest.Avalonia
             var engineWarning = EngineSelection.LoadSavedSelection();
             if (!string.IsNullOrEmpty(engineWarning))
                 notice = engineWarning;
+            // Post processors from Posts/ (their materials registered), then the machines,
+            // reported in the status line as the WinForms app reports them in dialogs.
+            if (DesktopSettings.LoadPosts(Path.Combine(AppContext.BaseDirectory, "Posts")) is { } postWarning)
+                notice = notice == null ? postWarning : $"{notice}   {postWarning}";
+            MachinesLoaded = LoadMachinesAsync();
             // The colour scheme chosen in the WinForms app's options, from the shared user settings.
             ColorSchemeRegistry.ApplySaved(Data.UserSettingsFile.Read(Data.UserSettingsFile.DefaultPath));
             tabs.Changed += (_, _) => ShowActiveTab();
@@ -647,6 +652,24 @@ namespace OpenNest.Avalonia
         {
             AutoNestButton.Content = running ? "Stop" : "Auto Nest";
             AutoNestMenuItem.Header = running ? "_Stop Auto Nest" : "_Auto Nest";
+        }
+
+        /// <summary>Completes once the machines are read (see <see cref="DesktopSettings.LoadMachinesAsync"/>).</summary>
+        internal Task MachinesLoaded { get; }
+
+        private async Task LoadMachinesAsync()
+        {
+            string warning;
+            try
+            {
+                warning = await DesktopSettings.LoadMachinesAsync();
+            }
+            catch (Exception ex)
+            {
+                warning = $"The machines could not be read: {ex.Message}";
+            }
+            if (warning != null)
+                ShowNotice(warning);
         }
 
         private void ShowNotice(string text)

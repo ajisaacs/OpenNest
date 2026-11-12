@@ -18,4 +18,23 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.0" />
     <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.0" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The posts the WinForms app ships, built with this app and copied to its Posts/ directory. -->
+    <ProjectReference Include="..\Posts\OpenNest.Posts.Cincinnati\OpenNest.Posts.Cincinnati.csproj" ReferenceOutputAssembly="false" IsPost="true" />
+    <ProjectReference Include="..\Posts\OpenNest.Posts.CincinnatiCIFiber\OpenNest.Posts.CincinnatiCIFiber.csproj" ReferenceOutputAssembly="false" IsPost="true" />
+  </ItemGroup>
+  <!-- As for the WinForms app: each post DLL, and its shipped settings JSON unless one is already
+       deployed (an edited copy is kept), go to Posts/ beside the app, which loads them at startup. -->
+  <Target Name="CopyPostsToOutput" AfterTargets="Build">
+    <MSBuild Projects="@(ProjectReference)" Condition="'%(ProjectReference.IsPost)' == 'true'" Targets="GetTargetPath">
+      <Output TaskParameter="TargetOutputs" ItemName="PostAssembly" />
+    </MSBuild>
+    <ItemGroup>
+      <PostConfig Include="@(PostAssembly->'%(RootDir)%(Directory)%(Filename).json')" />
+      <PostConfigToCopy Include="@(PostConfig)" Condition="Exists('%(FullPath)') and !Exists('$(OutDir)Posts\%(Filename)%(Extension)')" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)Posts" />
+    <Copy SourceFiles="@(PostAssembly)" DestinationFolder="$(OutDir)Posts" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(PostConfigToCopy)" DestinationFolder="$(OutDir)Posts" SkipUnchangedFiles="true" />
+  </Target>
 </Project>
