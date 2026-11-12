@@ -48,6 +48,13 @@ namespace OpenNest.Controls
                     OpenInConverterRequested?.Invoke(this, drawing);
             };
             var openInConverterSeparator = new ToolStripSeparator();
+            var printoutItem = new ToolStripMenuItem("View Part Printout...") { Name = "mnuPartPrintout" };
+            printoutItem.Click += (s, e) =>
+            {
+                if (SelectedItem is Drawing drawing)
+                    PartPrintoutRequested?.Invoke(this, drawing);
+            };
+            var printoutSeparator = new ToolStripSeparator();
             menu.ShowItemToolTips = true;
             menu.Opening += (s, e) =>
             {
@@ -65,12 +72,15 @@ namespace OpenNest.Controls
                 addToSetItem.Enabled = SaveToLibraryUnavailableReason == null;
                 addToSetItem.ToolTipText = SaveToLibraryUnavailableReason ?? "";
                 openInConverterItem.Visible = openInConverterSeparator.Visible = OpenInConverterRequested != null;
+                printoutItem.Visible = printoutSeparator.Visible = PartPrintoutRequested != null;
             };
             menu.Items.Add(saveToLibraryItem);
             menu.Items.Add(addToSetItem);
             menu.Items.Add(saveToLibrarySeparator);
             menu.Items.Add(openInConverterItem);
             menu.Items.Add(openInConverterSeparator);
+            menu.Items.Add(printoutItem);
+            menu.Items.Add(printoutSeparator);
             menu.Items.Add(deleteItem);
             ContextMenuStrip = menu;
         }
@@ -94,6 +104,9 @@ namespace OpenNest.Controls
 
         /// <summary>Raised when Open in CAD Converter is chosen for the selected drawing.</summary>
         public event EventHandler<Drawing> OpenInConverterRequested;
+
+        /// <summary>Raised when View Part Printout is chosen for the selected drawing.</summary>
+        public event EventHandler<Drawing> PartPrintoutRequested;
 
         /// <summary>
         /// Raised when the left button is pressed on a drawing's row.

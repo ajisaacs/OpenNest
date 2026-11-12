@@ -34,7 +34,8 @@ public static class NestPdfWriter
 
     // PDFsharp/MigraDoc layout and font state is process-wide and not safe for concurrent
     // documents: parallel exports laid out text differently. Reports are rare, so serialize them.
-    private static readonly object RenderLock = new();
+    // Shared with PartPrintoutWriter for the same reason.
+    internal static readonly object RenderLock = new();
 
     /// <summary>Thread-safe; concurrent calls are serialized.</summary>
     public static void Write(NestReportSnapshot snapshot, string destination) =>
@@ -584,7 +585,7 @@ public static class NestPdfWriter
         }
     }
 
-    private static void AddContour(XGraphicsPath path, ReportContour contour, Fit fit)
+    internal static void AddContour(XGraphicsPath path, ReportContour contour, Fit fit)
     {
         foreach (var segment in contour.Segments)
         {

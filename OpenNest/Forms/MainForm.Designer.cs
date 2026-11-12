@@ -52,6 +52,7 @@ namespace OpenNest.Forms
             mnuFileExportAll = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileViewNestReport = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileExportNestReport = new System.Windows.Forms.ToolStripMenuItem();
+            mnuFileViewPartPrintouts = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem3 = new System.Windows.Forms.ToolStripSeparator();
             mnuFileExit = new System.Windows.Forms.ToolStripMenuItem();
             mnuEdit = new System.Windows.Forms.ToolStripMenuItem();
@@ -221,7 +222,7 @@ namespace OpenNest.Forms
             // 
             // mnuFile
             // 
-            mnuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuFileNew, mnuFileOpen, mnuFileImportBom, mnuFileDrawingLibrary, mnuFileDrawingSets, mnuFileReleases, toolStripMenuItem1, mnuFileSave, mnuFileSaveAs, toolStripMenuItem2, mnuFileExport, mnuFileExportAll, mnuFileViewNestReport, mnuFileExportNestReport, toolStripMenuItem3, mnuFileExit });
+            mnuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuFileNew, mnuFileOpen, mnuFileImportBom, mnuFileDrawingLibrary, mnuFileDrawingSets, mnuFileReleases, toolStripMenuItem1, mnuFileSave, mnuFileSaveAs, toolStripMenuItem2, mnuFileExport, mnuFileExportAll, mnuFileViewNestReport, mnuFileExportNestReport, mnuFileViewPartPrintouts, toolStripMenuItem3, mnuFileExit });
             mnuFile.Name = "mnuFile";
             mnuFile.DropDownOpening += FileMenu_Opening;
             mnuFile.Size = new System.Drawing.Size(37, 20);
@@ -331,6 +332,14 @@ namespace OpenNest.Forms
             mnuFileExportNestReport.Size = new System.Drawing.Size(146, 22);
             mnuFileExportNestReport.Text = "Export Nest Report...";
             mnuFileExportNestReport.Click += ExportNestReport_Click;
+            // 
+            // mnuFileViewPartPrintouts
+            // 
+            mnuFileViewPartPrintouts.Enabled = false;
+            mnuFileViewPartPrintouts.Name = "mnuFileViewPartPrintouts";
+            mnuFileViewPartPrintouts.Size = new System.Drawing.Size(146, 22);
+            mnuFileViewPartPrintouts.Text = "View Part Printouts...";
+            mnuFileViewPartPrintouts.Click += ViewPartPrintouts_Click;
             // 
             // toolStripMenuItem3
             // 
@@ -1530,6 +1539,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuFileExportAll;
         private System.Windows.Forms.ToolStripMenuItem mnuFileViewNestReport;
         private System.Windows.Forms.ToolStripMenuItem mnuFileExportNestReport;
+        private System.Windows.Forms.ToolStripMenuItem mnuFileViewPartPrintouts;
         private System.Windows.Forms.ToolStripMenuItem openNestToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem pEPToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem mnuViewZoomTo;

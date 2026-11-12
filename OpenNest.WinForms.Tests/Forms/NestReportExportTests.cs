@@ -286,6 +286,68 @@ public class NestReportExportTests
     });
 
     [Fact]
+    public void PartPrintoutsRenderEveryPartDrawingWithoutTouchingTheJob() => RunSta(() =>
+    {
+        using var host = new TestMainForm();
+        host.Show();
+        var nest = CreateJob("printout job");
+        using var form = new EditNestForm(nest) { MdiParent = host };
+        form.PlateView.SetOverlapAutoCheck(null); // Background overlap workers are irrelevant here.
+        form.Show();
+        var plateCount = nest.Plates.Count;
+        var menu = Menu(host, "mnuFileViewPartPrintouts");
+        Assert.True(menu.Enabled);
+
+        menu.PerformClick();
+
+        Assert.Empty(host.Failures);
+        var path = Assert.Single(host.Viewed);
+        try
+        {
+            Assert.Equal("printout job.printout.pdf", Path.GetFileName(path));
+            using var pdf = PdfSharp.Pdf.IO.PdfReader.Open(path, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+            Assert.Equal(nest.Drawings.Count, pdf.PageCount);
+            Assert.Equal(plateCount, nest.Plates.Count);
+            Assert.Equal(2, nest.Drawings.Count);
+        }
+        finally
+        {
+            NestReportViewerForm.DeleteReportFolder(path);
+        }
+    });
+
+    [Fact]
+    public void DrawingListPrintoutRendersOnlyThatDrawing() => RunSta(() =>
+    {
+        using var host = new TestMainForm();
+        host.Show();
+        var nest = CreateJob("list job");
+        var drawing = nest.Drawings.First();
+        // Opened as BOM import does, without MainForm.LoadNest's wiring.
+        using var form = new EditNestForm(nest) { MdiParent = host };
+        form.PlateView.SetOverlapAutoCheck(null); // Background overlap workers are irrelevant here.
+        form.Show();
+        var list = (DrawingListBox)typeof(EditNestForm)
+            .GetField("drawingListBox1", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(form)!;
+        list.SelectedItem = drawing;
+
+        list.ContextMenuStrip!.Items["mnuPartPrintout"]!.PerformClick();
+
+        var path = Assert.Single(host.Viewed);
+        try
+        {
+            Assert.Equal($"{drawing.Name}.printout.pdf", Path.GetFileName(path));
+            using var pdf = PdfSharp.Pdf.IO.PdfReader.Open(path, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+            Assert.Equal(1, pdf.PageCount);
+        }
+        finally
+        {
+            NestReportViewerForm.DeleteReportFolder(path);
+        }
+    });
+
+    [Fact]
     public void ViewerCentersOnItsOwnerInsideTheScreen()
     {
         var area = Screen.PrimaryScreen!.WorkingArea;
@@ -383,6 +445,11 @@ public class NestReportExportTests
 
         internal override void ShowReportViewer(string pdfPath, EditNestForm.NestReportTargets targets) =>
             Viewed.Add(pdfPath);
+
+        internal override void ShowPrintoutViewer(string pdfPath, string nestName, string suggestedFileName) =>
+            Viewed.Add(pdfPath);
+
+        internal override void PrintoutFailure(Exception error) => Failures.Add(error.Message);
     }
 
     private static void RunSta(System.Action action) =>

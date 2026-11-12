@@ -491,6 +491,9 @@ namespace OpenNest.Forms
             drawingListBox1.SaveToLibraryRequested += drawingListBox1_SaveToLibraryRequested;
             drawingListBox1.AddToSetRequested += drawingListBox1_AddToSetRequested;
             drawingListBox1.OpenInConverterRequested += drawingListBox1_OpenInConverterRequested;
+            // Every nest window (opened, new or from BOM import) lives in the main window.
+            drawingListBox1.PartPrintoutRequested += (_, drawing) =>
+                (MdiParent as MainForm)?.ViewPartPrintouts(this, new[] { drawing });
             drawingListBox1.DrawingPickedUp += drawingListBox1_DrawingPickedUp;
             drawingListBox1.DrawingDropped += drawingListBox1_DrawingDropped;
             drawingListBox1.EmptyTextClicked += (_, _) => hideNestedButton.Checked = false;
@@ -858,6 +861,25 @@ namespace OpenNest.Forms
                 catalogDensity
             );
             NestPdfWriter.Write(snapshot, destination);
+        }
+
+        /// <summary>
+        /// Writes one printout page per drawing, in order. Capture is synchronous on the UI thread
+        /// and reads only drawings, so it has no accounting or dirty-state side effects.
+        /// </summary>
+        internal void WritePartPrintouts(IReadOnlyList<Drawing> drawings, string destination)
+        {
+            ArgumentNullException.ThrowIfNull(drawings);
+            ArgumentException.ThrowIfNullOrWhiteSpace(destination);
+            var material = Nest.Material;
+            var catalogDensity = Data.MaterialDensityLookup.Resolve(
+                material?.Name,
+                material?.Grade,
+                MachineSettings.FindMachine(Nest.Machine),
+                MachineSettings.LoadMaterials()
+            );
+            var snapshot = PartPrintoutBuilder.Capture(Nest, drawings, DateTimeOffset.Now, catalogDensity);
+            PartPrintoutWriter.Write(snapshot, destination);
         }
 
         private bool IsReportTargetBusy(Nest nest) =>

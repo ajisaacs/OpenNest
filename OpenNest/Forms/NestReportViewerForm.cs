@@ -9,21 +9,25 @@ using Microsoft.Web.WebView2.WinForms;
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// Shows a rendered nest report PDF in WebView2 with Save As and Print. The PDF is a private
+    /// Shows a rendered nest report or part printout PDF in WebView2 with Save As and Print. The PDF is a private
     /// temporary copy owned by this window: saving copies it, and closing deletes it.
     /// </summary>
     public sealed class NestReportViewerForm : Form
     {
         private readonly string pdfPath;
         private readonly string suggestedFileName;
+        private readonly string documentName;
         private readonly WebView2 browser = new() { Dock = DockStyle.Fill };
         private readonly ToolStripButton printButton;
 
-        public NestReportViewerForm(string pdfPath, string nestName, string suggestedFileName)
+        /// <param name="documentName">What the PDF is, for the title and messages, e.g. "Part Printouts".</param>
+        public NestReportViewerForm(string pdfPath, string nestName, string suggestedFileName,
+            string documentName = "Nest Report")
         {
             this.pdfPath = pdfPath ?? throw new ArgumentNullException(nameof(pdfPath));
             this.suggestedFileName = suggestedFileName;
-            Text = $"Nest Report - {nestName}";
+            this.documentName = documentName;
+            Text = $"{documentName} - {nestName}";
             Icon = Properties.Resources.app_icon;
             // CenterParent is ignored for modeless windows; OnLoad centers on the owner instead.
             StartPosition = FormStartPosition.Manual;
@@ -60,8 +64,8 @@ namespace OpenNest.Forms
             {
                 // Saving needs no viewer; only the preview and Print are unavailable.
                 MessageBox.Show(this,
-                    "The report preview needs the Microsoft Edge WebView2 Runtime, which could not be started. "
-                    + "Use Save As to keep the report.\n\n" + ex.Message,
+                    $"The {documentName.ToLowerInvariant()} preview needs the Microsoft Edge WebView2 Runtime, "
+                    + "which could not be started. Use Save As to keep the PDF.\n\n" + ex.Message,
                     Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -71,7 +75,7 @@ namespace OpenNest.Forms
             var core = browser.CoreWebView2;
             core.Settings.AreDevToolsEnabled = false;
             core.Settings.IsStatusBarEnabled = false;
-            // The report is the only page this window shows.
+            // The PDF is the only page this window shows.
             core.NewWindowRequested += (_, args) => args.Handled = true;
             core.Navigate(new Uri(pdfPath).AbsoluteUri);
             printButton.Enabled = true;
@@ -96,7 +100,7 @@ namespace OpenNest.Forms
         {
             using var dlg = new SaveFileDialog
             {
-                Filter = "PDF report (*.pdf)|*.pdf",
+                Filter = "PDF (*.pdf)|*.pdf",
                 FileName = suggestedFileName,
                 AddExtension = true,
                 DefaultExt = ".pdf",
@@ -111,7 +115,7 @@ namespace OpenNest.Forms
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
             {
-                MessageBox.Show(this, $"Could not save the nest report: {ex.Message}", Text,
+                MessageBox.Show(this, $"Could not save the {documentName.ToLowerInvariant()}: {ex.Message}", Text,
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
@@ -124,7 +128,7 @@ namespace OpenNest.Forms
             }
             catch (Exception ex) when (ex is COMException or InvalidOperationException)
             {
-                MessageBox.Show(this, $"Could not print the nest report: {ex.Message}", Text,
+                MessageBox.Show(this, $"Could not print the {documentName.ToLowerInvariant()}: {ex.Message}", Text,
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }

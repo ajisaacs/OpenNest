@@ -24,6 +24,7 @@ namespace OpenNest.Forms
             mnuFileExportAll.Enabled = hasValue;
             mnuFileExportNestReport.Enabled = hasValue && !storage.IsSaving;
             mnuFileViewNestReport.Enabled = mnuFileExportNestReport.Enabled;
+            mnuFileViewPartPrintouts.Enabled = hasValue;
             mnuEdit.Visible = hasValue;
             mnuView.Visible = hasValue;
             mnuNest.Visible = hasValue;

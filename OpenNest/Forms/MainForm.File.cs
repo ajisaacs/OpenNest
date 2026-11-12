@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -357,6 +358,69 @@ namespace OpenNest.Forms
             }
             ShowReportViewer(path, targets);
         }
+
+        /// <summary>Every part drawing of the active nest, one printout page each.</summary>
+        private void ViewPartPrintouts_Click(object sender, EventArgs e)
+        {
+            var form = activeForm;
+            if (form == null)
+                return;
+            ViewPartPrintouts(form, form.Nest.Drawings.Where(drawing => !drawing.IsCutOff).ToList());
+        }
+
+        /// <summary>
+        /// Renders printouts to a private temporary file and opens them in the report viewer to
+        /// save or print. Printouts read drawings only, so a running fill does not block them.
+        /// </summary>
+        internal void ViewPartPrintouts(EditNestForm form, IReadOnlyList<Drawing> drawings)
+        {
+            if (drawings.Count == 0)
+            {
+                PrintoutFailure(new InvalidOperationException("The nest has no part drawings to print."));
+                return;
+            }
+
+            var name = drawings.Count == 1 ? drawings[0].Name : form.Nest.Name;
+            var suggested = $"{SafeFileName(name, "parts")}.printout.pdf";
+            var path = Path.Combine(Path.GetTempPath(), "OpenNest", "Reports", Guid.NewGuid().ToString("N"), suggested);
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                form.WritePartPrintouts(drawings, path);
+            }
+            catch (Exception ex)
+                when (ex is InvalidOperationException
+                    or NotSupportedException
+                    or IOException
+                    or UnauthorizedAccessException
+                    or ArgumentException)
+            {
+                NestReportViewerForm.DeleteReportFolder(path);
+                PrintoutFailure(ex);
+                return;
+            }
+            ShowPrintoutViewer(path, form.Nest.Name, suggested);
+        }
+
+        private static string SafeFileName(string name, string fallback)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return fallback;
+            var invalid = Path.GetInvalidFileNameChars();
+            return new string(name.Trim().Select(c => Array.IndexOf(invalid, c) >= 0 ? '_' : c).ToArray());
+        }
+
+        /// <summary>Opens rendered printouts; internal so tests observe it without a WebView2 window.</summary>
+        internal virtual void ShowPrintoutViewer(string pdfPath, string nestName, string suggestedFileName)
+        {
+            var viewer = new NestReportViewerForm(pdfPath, nestName, suggestedFileName, "Part Printouts");
+            viewer.Show(this);
+        }
+
+        /// <summary>Failure notice; internal so tests observe it without dialogs.</summary>
+        internal virtual void PrintoutFailure(Exception error) =>
+            MessageBox.Show(this, $"Could not create the part printout: {error.Message}",
+                "Part Printouts", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
         // The report never depends on a selected post or NC output; it only needs a
         // quiescent nest so the snapshot is coherent.

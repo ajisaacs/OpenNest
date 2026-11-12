@@ -29,6 +29,28 @@ NestPdfWriter.Write(snapshot, destinationPath);
 Reporting does not select a post, generate CNC, refresh drawing quantities, change
 the selected plate, or certify that a layout passed geometry/pre-post checks.
 
+## Part printouts
+
+**File -> View Part Printouts...** prints every non-cutoff drawing of the active
+nest; **View Part Printout...** on the drawing list's right-click menu prints the
+selected one. Both render to `%TEMP%\OpenNest\Reports\` and open the report viewer,
+suggesting `<nest-name>.printout.pdf` or `<drawing-name>.printout.pdf`. Each part
+gets one Letter portrait page, bookmarked by name, with the name and customer (the drawing's, else the
+nest's) as the header, the part's material contours stroked to fit (leads, rapids
+and marks omitted), a details table and the generated time. The table shows the
+bounding box (Y extent x X extent), nest material and thickness, cut length and
+pierce count, net area, weight
+(the nest report's density rules) and required quantity. Cut length sums the moves the head cuts (cut, break, common-line and lead layers); each run of
+them is one pierce, so scribe marks, tab spans, display moves and a display
+perimeter's tail add neither length nor pierces, and a tabbed cutout counts one
+pierce per piece. Printouts read drawings only, so running fills do not block them, and they share the nest report's
+Latin-1 text limit and render lock.
+
+```csharp
+var snapshot = PartPrintoutBuilder.Capture(nest, drawingsOrNull, DateTimeOffset.Now, catalogDensity);
+PartPrintoutWriter.Write(snapshot, destinationPath);
+```
+
 ## Snapshot contract
 
 - IDs (`1`, `2`, ...) are local to the report. Visit non-cutoff placements in plate
