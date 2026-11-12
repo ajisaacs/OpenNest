@@ -266,6 +266,8 @@ public class ProgramGeometryTests
         hole.Codes.Add(new RapidMove(new Vector(1, 0)));
         hole.Codes.Add(new ArcMove(Vector.Zero, new Vector(-1, 0), RotationType.CW));
         var program = Square();
+        // The tool is elsewhere when the call runs; the offset is from the frame origin.
+        program.Codes.Add(new RapidMove(new Vector(20, 20)));
         program.Codes.Add(new SubProgramCall(hole, 0) { Offset = new Vector(5, 5) });
 
         var cut = ProgramGeometry.Layers(program).Cut;

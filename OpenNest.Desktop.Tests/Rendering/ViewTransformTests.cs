@@ -44,6 +44,10 @@ public class ViewTransformTests
         var centre = view.WorldToScreen(new Vector(60, 45));
         Assert.Equal(400, centre.X, 9);
         Assert.Equal(300, centre.Y, 9);
+
+        // Height-limited: (600 - 50) / 100.
+        Assert.True(view.ZoomToArea(new Box(0, 0, 10, 100)));
+        Assert.Equal(5.5, view.Scale, 9);
     }
 
     [Fact]
