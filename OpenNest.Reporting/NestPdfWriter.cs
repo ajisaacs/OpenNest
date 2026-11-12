@@ -121,8 +121,8 @@ public static class NestPdfWriter
         if (snapshot.Customer.Length > 0)
             left.Add(("Customer:", snapshot.Customer));
         left.Add(("Material:", Material(snapshot)));
+        // No units row: every size, thickness and weight carries its own unit.
         left.Add(("Thickness:", Thickness(snapshot)));
-        left.Add(("Units:", UnitsName(snapshot)));
         var right = new List<(string Key, string Value)>
         {
             ("Distinct layouts:", snapshot.Plates.Length.ToString(Invariant)),

@@ -146,8 +146,10 @@ public sealed class NestPdfLayoutTests : IDisposable
         var pages = ReportPdf.Pages(path);
 
         Assert.Equal(5, pages.Length);
-        Assert.Contains("millimeters (mm)", pages[0]);
+        // Values carry their own units; only the plate page's ruler note names them.
+        Assert.DoesNotContain("Units:", pages[0]);
         Assert.Contains("3 mm", pages[0]);
+        Assert.Contains("millimeters (mm)", pages[1]);
         Assert.Matches(@"24 x 48 mm", pages[2]);
         using var pdf = PdfReader.Open(path, PdfDocumentOpenMode.Import);
         var stream = ReportPdf.ContentStreams(pdf.Pages[1]).Last();
