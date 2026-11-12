@@ -232,20 +232,9 @@ namespace OpenNest.Forms
         }
 
         /// <summary>
-        /// Fills a blank Made By: the name the user last typed there, else their Windows user name.
-        /// </summary>
-        public static string DefaultMadeBy
-        {
-            get
-            {
-                var remembered = Properties.Settings.Default.MadeBy;
-                return string.IsNullOrWhiteSpace(remembered) ? Environment.UserName : remembered.Trim();
-            }
-        }
-
-        /// <summary>
-        /// Remembers a Made By the user typed, so later blank nests start from it; clearing
-        /// the box falls back to the Windows user name again.
+        /// Remembers a Made By the user typed, so later new nests start from it
+        /// (<see cref="NewNestFactory.DefaultMadeBy"/>); clearing the box falls back to the
+        /// Windows user name again.
         /// </summary>
         private void RememberMadeBy()
         {
@@ -357,7 +346,9 @@ namespace OpenNest.Forms
             MaterialName = nest.Material?.Name ?? "";
             MaterialGrade = nest.Material?.Grade ?? "";
             Status = nest.Status;
-            MadeBy = string.IsNullOrWhiteSpace(nest.MadeBy) ? DefaultMadeBy : nest.MadeBy;
+            // Shown as stored: a new nest got its author when it was made, and viewing an
+            // existing nest's info must not sign it.
+            MadeBy = nest.MadeBy ?? "";
             shownMadeBy = MadeBy;
             SizeString = nest.PlateDefaults.Size.ToString();
             PartSpacing = nest.PlateDefaults.PartSpacing;

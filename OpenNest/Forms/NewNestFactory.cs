@@ -31,8 +31,23 @@ namespace OpenNest.Forms
 
             nest.DateCreated = now;
             nest.DateLastModified = now;
+            nest.MadeBy = DefaultMadeBy;
             nest.Name = NestNames.Format(now.Year, await AllocateNumberAsync(now));
             return nest;
+        }
+
+        /// <summary>
+        /// The author a new nest starts with: the name the user last typed in Nest Info's Made By,
+        /// else their Windows user name. Only new nests get it; opening an existing nest's info
+        /// leaves a blank Made By blank.
+        /// </summary>
+        public static string DefaultMadeBy
+        {
+            get
+            {
+                var remembered = Settings.Default.MadeBy;
+                return string.IsNullOrWhiteSpace(remembered) ? Environment.UserName : remembered.Trim();
+            }
         }
 
         private static Nest CreateDefaultNest(SetReleaseGroup release)

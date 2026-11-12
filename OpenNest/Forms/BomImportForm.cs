@@ -450,6 +450,7 @@ namespace OpenNest.Forms
                         _defaults.ApplyTo(nest);
                         clamps.ApplyToNewNest(nest);
                         MachineSettings.AssignMachine(nest, machine);
+                        nest.MadeBy = NewNestFactory.DefaultMadeBy;
                     }
                 );
                 importErrors.AddRange(result.Errors);

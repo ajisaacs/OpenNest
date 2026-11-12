@@ -311,7 +311,7 @@ public class EditNestInfoFormTests
     }
 
     [Fact]
-    public void BlankMadeBy_StartsFromTheUserName_AndRemembersATypedName()
+    public void NewNestMadeBy_StartsFromTheUserName_AndRemembersATypedName()
     {
         RunSta(() =>
         {
@@ -320,20 +320,27 @@ public class EditNestInfoFormTests
             try
             {
                 settings.MadeBy = "";
+                Assert.Equal(Environment.UserName, NewNestFactory.DefaultMadeBy);
+
+                // Viewing an existing nest's info leaves a blank author blank.
+                var existing = new Nest();
                 using (var form = new EditNestInfoForm())
                 {
-                    form.LoadNestInfo(new Nest());
-                    Assert.Equal(Environment.UserName, form.MadeBy);
-                    form.MadeBy = "Synthetic operator";
-                    form.SaveNestInfo(new Nest());
+                    form.LoadNestInfo(existing);
+                    Assert.Equal("", form.MadeBy);
+                    form.SaveNestInfo(existing);
                 }
-                Assert.Equal("Synthetic operator", settings.MadeBy);
+                Assert.Equal("", existing.MadeBy);
+                Assert.Equal("", settings.MadeBy);
 
                 using (var form = new EditNestInfoForm())
                 {
                     form.LoadNestInfo(new Nest());
-                    Assert.Equal("Synthetic operator", form.MadeBy);
+                    form.MadeBy = "Synthetic operator";
+                    form.SaveNestInfo(new Nest());
                 }
+                Assert.Equal("Synthetic operator", settings.MadeBy);
+                Assert.Equal("Synthetic operator", NewNestFactory.DefaultMadeBy);
 
                 // A nest's own author is shown as is and, left alone, is not remembered.
                 using (var form = new EditNestInfoForm())
