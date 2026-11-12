@@ -44,7 +44,12 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Contains("Test customer", summary);
         Assert.Contains("Steel A36", summary);
         Assert.Contains("0.125 in", summary);
-        Assert.Contains("2026-09-29 12:00 +00:00", summary);
+        // The generation time is in every page's footer, in this computer's time zone, no offset.
+        var generated = "Generated " + NestReportTestData.GeneratedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        Assert.Contains(generated, summary);
+        Assert.Contains(generated, plate);
+        Assert.DoesNotContain("Generated:", summary);
+        Assert.DoesNotContain("+00:00", summary + plate);
         Assert.Matches(@"Distinct layouts:\s+1", summary);
         Assert.Matches(@"Total physical sheets:\s+2", summary);
         Assert.Matches(@"1\s+24 x 48 in\s+2\s+4\s+\d+\.\d%", summary);
@@ -80,6 +85,19 @@ public sealed class NestPdfWriterTests : IDisposable
         // Repeated export of the same snapshot is textually identical.
         Assert.Equal(summary + plate, ReportPdf.Text(WriteReport(NestReportTestData.CreateNest(), "again.pdf"), 1)
             + ReportPdf.Text(Path.Combine(directory, "again.pdf"), 2));
+    }
+
+    [SkippableFact]
+    public void Write_NamedThicknessLeadsTheDecimalOnSummaryAndPlatePages()
+    {
+        var path = Path.Combine(directory, "named-thickness.pdf");
+        var snapshot = NestReportBuilder.Capture(NestReportTestData.CreateNest(), NestReportTestData.GeneratedAt)
+            with
+        { ThicknessName = "1/8\"" };
+        NestPdfWriter.Write(snapshot, path);
+
+        Assert.Contains("1/8\" - 0.125 in", ReportPdf.Text(path, 1));
+        Assert.Contains("1/8\" - 0.125 in", ReportPdf.Text(path, 2));
     }
 
     [SkippableFact]

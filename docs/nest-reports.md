@@ -95,8 +95,9 @@ PartPrintoutWriter.Write(snapshot, destinationPath);
 
 An empty/demand-only job, a single plate, or many plates and drawings all
 produce one document: a Letter portrait summary followed by one Letter
-landscape section per plate, every page carrying a repeated header and
-"Page X of Y". Long notes, long drawing names, many drawings and many parts
+landscape section per plate, every page carrying a repeated header and a
+footer with the generation time (left, in the computer's time zone, no offset)
+and "Page X of Y" (right). Long notes, long drawing names, many drawings and many parts
 per sheet paginate naturally: MigraDoc continues the Plates table and each
 plate's part table across pages with the heading row repeated, the summary's
 part cards continue row by row, and notes flow as an ordinary paragraph. No
@@ -110,8 +111,11 @@ beside the ID; complete drawings show no status. Cards without a weight show
 "-" with a note under the Parts heading saying what is missing. A card row is
 a table row, so a card never splits across pages.
 
-The summary's header lists the job and material on the left and the dates and
-totals on the right, to leave room for part cards on the first page.
+The summary's header lists the job and material on the left and the totals on
+the right, to leave room for part cards on the first page. A thickness that
+matches a standard gauge or plate fraction leads with its name, as the
+thickness box lists it ("16 ga - 0.0598 in"); the desktop supplies the name,
+since Reporting has no thickness table of its own.
 
 Stock sizes read **width x length** in job units. Plate tables use **Quantity**
 and **Parts per plate**; the plate quantity multiplies per-plate part counts for

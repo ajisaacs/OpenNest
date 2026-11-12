@@ -109,7 +109,7 @@ public static class NestPdfWriter
 
     private static void AddSummary(Document document, NestReportSnapshot snapshot)
     {
-        var section = AddSection(document, Orientation.Portrait, PortraitWidth, $"Nest report: {snapshot.Name}");
+        var section = AddSection(document, snapshot, Orientation.Portrait, PortraitWidth, $"Nest report: {snapshot.Name}");
         var title = section.AddParagraph("Nest Report");
         title.Format.Font.Size = 14;
         title.Format.Font.Bold = true;
@@ -125,7 +125,6 @@ public static class NestPdfWriter
         left.Add(("Units:", UnitsName(snapshot)));
         var right = new List<(string Key, string Value)>
         {
-            ("Generated:", snapshot.GeneratedAt.ToString("yyyy-MM-dd HH:mm zzz", Invariant)),
             ("Distinct layouts:", snapshot.Plates.Length.ToString(Invariant)),
             ("Total physical sheets:", snapshot.TotalSheets.ToString(Invariant)),
         };
@@ -337,7 +336,7 @@ public static class NestPdfWriter
             header.Add(Material(snapshot));
         if (snapshot.Thickness > 0)
             header.Add(Thickness(snapshot));
-        var section = AddSection(document, Orientation.Landscape, LandscapeWidth, string.Join("  |  ", header));
+        var section = AddSection(document, snapshot, Orientation.Landscape, LandscapeWidth, string.Join("  |  ", header));
         var title = section.AddParagraph(heading);
         title.Format.Font.Size = 13;
         title.Format.Font.Bold = true;
@@ -610,7 +609,8 @@ public static class NestPdfWriter
     private static XFont CardFont(bool bold) =>
         new(ReportFonts.Family, CardFontSize, bold ? XFontStyleEx.Bold : XFontStyleEx.Regular);
 
-    private static Section AddSection(Document document, Orientation orientation, double width, string header)
+    private static Section AddSection(Document document, NestReportSnapshot snapshot, Orientation orientation,
+        double width, string header)
     {
         var section = document.AddSection();
         var setup = section.PageSetup;
@@ -633,7 +633,12 @@ public static class NestPdfWriter
         top.Format.Font.Color = Colors.DimGray;
         AddLines(top, lines);
 
-        var footer = section.Footers.Primary.AddParagraph("Page ");
+        // When it was generated on the left, in this computer's time zone; the page on the right.
+        var footer = section.Footers.Primary.AddParagraph();
+        footer.Format.TabStops.AddTabStop(Unit.FromPoint(width), TabAlignment.Right);
+        footer.AddText("Generated " + snapshot.GeneratedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", Invariant));
+        footer.AddTab();
+        footer.AddText("Page ");
         footer.AddPageField();
         footer.AddText(" of ");
         footer.AddNumPagesField();
@@ -724,8 +729,11 @@ public static class NestPdfWriter
     }
 
     // Zero thickness means "unset" in a new nest; never present it as a genuine value.
+    // A standard gauge or plate fraction leads, as the thickness box lists it: "16 ga - 0.0598 in".
     private static string Thickness(NestReportSnapshot snapshot) =>
-        snapshot.Thickness > 0 ? $"{Number(snapshot.Thickness)} {snapshot.Units}" : "Not specified";
+        snapshot.Thickness <= 0 ? "Not specified"
+        : snapshot.ThicknessName.Length > 0 ? $"{snapshot.ThicknessName} - {Number(snapshot.Thickness)} {snapshot.Units}"
+        : $"{Number(snapshot.Thickness)} {snapshot.Units}";
 
     private static string SheetSize(NestReportSnapshot snapshot, ReportPlate plate) =>
         $"{Number(plate.Bounds.Width)} x {Number(plate.Bounds.Length)} {snapshot.Units}";

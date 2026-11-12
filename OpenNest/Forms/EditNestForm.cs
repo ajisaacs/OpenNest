@@ -859,7 +859,11 @@ namespace OpenNest.Forms
                 DateTimeOffset.Now,
                 SavedCutParameters.Load(targets.Nest.Units),
                 catalogDensity
-            );
+            ) with
+            {
+                ThicknessName =
+                    Data.StandardThicknesses.Find(targets.Nest.Thickness, targets.Nest.Units)?.Name ?? "",
+            };
             NestPdfWriter.Write(snapshot, destination);
         }
 

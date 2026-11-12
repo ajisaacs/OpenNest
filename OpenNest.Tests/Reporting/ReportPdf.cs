@@ -81,7 +81,7 @@ public static class ReportPdf
             var excluded = rows.Where(row => Join(row.Words) is var text
                     && (text.StartsWith("Weights need", StringComparison.Ordinal)
                         || text.StartsWith("Nest report:", StringComparison.Ordinal)
-                        || Regex.IsMatch(text, @"^Page \d+ of \d+$")))
+                        || Regex.IsMatch(text, @"^(Generated \S+ \S+ )?Page \d+ of \d+$")))
                 .Select(row => row.Top).ToList();
             for (var column = 0; column < CardsPerRow; column++)
             {
