@@ -169,9 +169,10 @@ namespace OpenNest.Desktop
         }
 
         // Windows paths ignore case; Linux and macOS paths do not.
-        private static bool SamePath(string a, string b) => string.Equals(a, b,
-            OperatingSystem.IsWindows()
-                ? StringComparison.OrdinalIgnoreCase
-                : StringComparison.Ordinal);
+        internal static StringComparer PathComparer => OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+
+        private static bool SamePath(string a, string b) => PathComparer.Equals(a, b);
     }
 }
