@@ -61,10 +61,20 @@ namespace OpenNest.Avalonia
                 Gesture = new KeyGesture(Key.S, KeyModifiers.Control),
                 Command = new Command(() => OnSave(null, null)),
             });
+            KeyBindings.Add(new KeyBinding
+            {
+                Gesture = new KeyGesture(Key.Q, KeyModifiers.Control),
+                Command = new Command(() => OnExit(null, null)),
+            });
             KeyBindings.Add(new KeyBinding { Gesture = new KeyGesture(Key.PageUp), Command = new Command(() => StepPlate(-1)) });
             KeyBindings.Add(new KeyBinding { Gesture = new KeyGesture(Key.PageDown), Command = new Command(() => StepPlate(1)) });
             // Ctrl+Tab before focus navigation takes the Tab key.
             AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
+            // .nest files dropped anywhere on the window, the nest view included, open in tabs.
+            DragDrop.SetAllowDrop(this, true);
+            AddHandler(DragDrop.DragEnterEvent, OnDragOver);
+            AddHandler(DragDrop.DragOverEvent, OnDragOver);
+            AddHandler(DragDrop.DropEvent, OnDrop);
             Closing += OnWindowClosing;
             Opened += (_, _) =>
             {
@@ -523,6 +533,30 @@ namespace OpenNest.Avalonia
             foreach (var path in files.Select(f => f.TryGetLocalPath()).Where(p => p != null))
                 OpenNest(path);
         }
+
+        // As the WinForms main window: a drop is taken only when it holds a .nest file.
+        private void OnDragOver(object sender, DragEventArgs e)
+        {
+            e.DragEffects = DroppedNestFiles.Any(DroppedPaths(e))
+                ? DragDropEffects.Copy
+                : DragDropEffects.None;
+            e.Handled = true;
+        }
+
+        // Each dropped .nest file opens in a tab (or shows its tab); other files are ignored.
+        // As File > Open, this works while Auto Nest runs.
+        private void OnDrop(object sender, DragEventArgs e)
+        {
+            var paths = DroppedNestFiles.Select(DroppedPaths(e));
+            e.DragEffects = paths.Count > 0 ? DragDropEffects.Copy : DragDropEffects.None;
+            e.Handled = true;
+            foreach (var path in paths)
+                OpenNest(path);
+        }
+
+        private static IEnumerable<string> DroppedPaths(DragEventArgs e) =>
+            e.Data.GetFiles()?.Select(file => file.TryGetLocalPath())
+            ?? Enumerable.Empty<string>();
 
         private void OnExit(object sender, RoutedEventArgs e) => Close();
 

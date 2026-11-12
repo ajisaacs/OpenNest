@@ -15,7 +15,7 @@
         <MenuItem x:Name="CloseMenuItem" Header="_Close" Click="OnCloseNest" />
         <MenuItem x:Name="CloseAllMenuItem" Header="Close A_ll" Click="OnCloseAll" />
         <Separator />
-        <MenuItem Header="E_xit" Click="OnExit" />
+        <MenuItem Header="E_xit" InputGesture="Ctrl+Q" Click="OnExit" />
       </MenuItem>
       <MenuItem Header="_Nest">
         <MenuItem x:Name="AutoNestMenuItem" Header="_Auto Nest" Click="OnAutoNest" />
