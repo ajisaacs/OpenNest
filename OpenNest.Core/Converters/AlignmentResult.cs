@@ -1,6 +1,7 @@
 using System;
+using OpenNest.Geometry;
 
-namespace OpenNest.Geometry
+namespace OpenNest.Converters
 {
     /// <summary>
     /// Tuning for <see cref="DrawingAligner"/>. Every default is a design choice

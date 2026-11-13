@@ -3,7 +3,7 @@ using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 
-namespace OpenNest.Tests.Geometry;
+namespace OpenNest.Tests.Converters;
 
 /// <summary>
 /// Slice-1 tests for <see cref="DrawingAligner"/>: one rigid asymmetric line/arc

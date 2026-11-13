@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using OpenNest.CNC;
+using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest.Geometry
+namespace OpenNest.CNC
 {
     /// <summary>
     /// One world-space point on a cut contour together with the cut direction there.

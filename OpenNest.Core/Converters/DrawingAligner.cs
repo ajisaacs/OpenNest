@@ -4,11 +4,11 @@ using System.Linq;
 using System.Threading;
 using Clipper2Lib;
 using OpenNest.CNC;
-using OpenNest.Converters;
+using OpenNest.Geometry;
 using OpenNest.Math;
 
 
-namespace OpenNest.Geometry
+namespace OpenNest.Converters
 {
     /// <summary>
     /// Seed-aligns a revised drawing's geometry to an old drawing's drawing-local
