@@ -85,13 +85,14 @@ public class StrategyOverlapTests
             foreach (var g in rotGroups)
                 _output.WriteLine($"  Rotation {g.Key:F1}°: {g.Count()} parts");
 
-            var hasOverlaps = plate.HasOverlappingParts(out var pts);
-            _output.WriteLine($"  Overlaps: {hasOverlaps} ({pts.Count} collision pts)");
+            var pairs = PartOverlapChecker.FindOverlappingPairs(plate.Parts);
+            var hasOverlaps = pairs.Count > 0;
+            _output.WriteLine($"  Overlaps: {hasOverlaps} ({pairs.Count} overlapping pairs)");
 
             if (hasOverlaps)
             {
                 failures.Add(
-                    $"{strategy.GetType().Name} ({strategy.Phase}): {pts.Count} collision pts, {count} parts"
+                    $"{strategy.GetType().Name} ({strategy.Phase}): {pairs.Count} overlapping pairs, {count} parts"
                 );
 
                 // Show overlapping pair details

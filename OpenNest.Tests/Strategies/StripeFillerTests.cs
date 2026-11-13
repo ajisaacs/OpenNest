@@ -178,7 +178,7 @@ public class StripeFillerTests
         if (parts.Count > 0)
         {
             plate.Parts.AddRange(parts);
-            var hasOverlaps = plate.HasOverlappingParts(out _);
+            var hasOverlaps = PartOverlapChecker.FindOverlappingPairs(plate.Parts).Count > 0;
             Assert.False(hasOverlaps, "Stripe fill should not produce overlapping parts");
         }
     }
@@ -211,7 +211,7 @@ public class StripeFillerTests
         if (parts.Count > 0)
         {
             plate.Parts.AddRange(parts);
-            var hasOverlaps = plate.HasOverlappingParts(out _);
+            var hasOverlaps = PartOverlapChecker.FindOverlappingPairs(plate.Parts).Count > 0;
             Assert.False(hasOverlaps, "Column fill should not produce overlapping parts");
         }
     }
@@ -244,7 +244,7 @@ public class StripeFillerTests
         Assert.InRange(capped.Count, 6, full.Count - 1);
         var plate = new Plate(60, 120) { PartSpacing = 0.5 };
         plate.Parts.AddRange(capped);
-        Assert.False(plate.HasOverlappingParts(out _), "Capped stripe fill overlaps");
+        Assert.Empty(PartOverlapChecker.FindOverlappingPairs(plate.Parts));
     }
 
     [Fact]
