@@ -5,107 +5,60 @@ using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.CutOffs;
 using OpenNest.Data;
-using OpenNest.IO;
 using OpenNest.Undo;
 
 namespace OpenNest.Forms
 {
-    // Undo and Redo: the history holds whole-nest copies and a restore swaps one in.
+    // Undo and Redo: the history holds whole-nest copies and a restore swaps one in. Recording,
+    // the fingerprint check and stepping are the shared NestUndoRecorder; this window rebinds.
     public partial class EditNestForm
     {
-        private ChangeScope openChange;
-        private int recordedFingerprint;
-        private bool restoringNest;
+        private NestUndoRecorder undo;
 
         /// <summary>Raised after <see cref="RestoreNest"/> swapped a nest in, for windows that show it.</summary>
         public event EventHandler NestRestored;
 
         public UndoHistory<NestUndoState> History => Document.History;
 
+        /// <summary>The shared recorder of this window's nest edits.</summary>
+        internal NestUndoRecorder UndoRecorder => undo ??= CreateRecorder();
+
         /// <summary>True while a change scope is open or a nest is being swapped in.</summary>
-        public bool IsChangeInProgress => openChange != null || restoringNest;
+        public bool IsChangeInProgress => UndoRecorder.IsChangeInProgress;
 
         /// <summary>
         /// Opens a scope that records one undoable edit named <paramref name="label"/>. Mark it
         /// changed and complete it; a scope opened inside another merges into the outermost one.
         /// Repeated edits with an equal <paramref name="coalesceKey"/> within a second undo as one.
         /// </summary>
-        public ChangeScope BeginChange(string label, object coalesceKey = null)
-        {
-            ArgumentException.ThrowIfNullOrEmpty(label);
-            if (openChange != null)
-                return ChangeScope.Nested(openChange);
-            // Swapping a nest in rebinds the view; nothing it does is an edit.
-            if (restoringNest)
-                return ChangeScope.Detached();
-
-            RecordUnrecordedChange();
-            openChange = ChangeScope.Root(label, coalesceKey, EndChange);
-            return openChange;
-        }
+        public ChangeScope BeginChange(string label, object coalesceKey = null) =>
+            UndoRecorder.BeginChange(label, coalesceKey);
 
         /// <summary>Runs <paramref name="edit"/>, which changes the nest, as one undoable step.</summary>
-        public void RecordChange(string label, System.Action edit)
-        {
-            ArgumentNullException.ThrowIfNull(edit);
-            using var change = BeginChange(label);
-            change.MarkChanged();
-            edit();
-            change.Complete();
-        }
+        public void RecordChange(string label, System.Action edit) => UndoRecorder.RecordChange(label, edit);
 
         /// <summary>Whether <see cref="Undo"/> would step back: no edit or inspection is open.</summary>
-        public bool CanUndo => History.CanUndo && CanRestore;
+        public bool CanUndo => UndoRecorder.CanUndo && !IsInspecting;
 
-        public bool CanRedo => History.CanRedo && CanRestore;
-
-        private bool CanRestore => !IsChangeInProgress && !IsInspecting;
+        public bool CanRedo => UndoRecorder.CanRedo && !IsInspecting;
 
         public void Undo()
         {
-            if (!CanRestore)
-                return;
-            RecordUnrecordedChange();
-            if (History.CanUndo)
-                Restore(History.Undo(), History.Redo);
+            if (!IsInspecting)
+                UndoRecorder.Undo();
         }
 
         public void Redo()
         {
-            if (!CanRestore)
-                return;
-            // An edit made since the undo drops what could be redone.
-            RecordUnrecordedChange();
-            if (History.CanRedo)
-                Restore(History.Redo(), History.Undo);
-        }
-
-        /// <summary>
-        /// Reads <paramref name="state"/> back and swaps it in; when the copy cannot be read the
-        /// live nest is untouched, so <paramref name="moveBack"/> points the history back at it.
-        /// </summary>
-        private void Restore(NestUndoState state, Func<NestUndoState> moveBack)
-        {
-            Nest restored;
-            try
-            {
-                restored = state.Snapshot.Restore(Nest);
-            }
-            catch
-            {
-                moveBack();
-                throw;
-            }
-            RestoreNest(restored);
+            if (!IsInspecting)
+                UndoRecorder.Redo();
         }
 
         /// <summary>
         /// True when the nest differs from the state last saved (or opened): the history has
         /// moved off its save point, or an edit no scope recorded is pending.
         /// </summary>
-        public bool HasUnsavedChanges =>
-            History.Current != null
-            && (!History.IsAtSavePoint || NestFingerprint.Compute(Nest) != recordedFingerprint);
+        public bool HasUnsavedChanges => UndoRecorder.HasUnsavedChanges;
 
         /// <summary>
         /// Marks the nest as it stands saved, for a nest something else wrote to the server
@@ -113,42 +66,28 @@ namespace OpenNest.Forms
         /// </summary>
         internal void MarkSaved()
         {
-            RecordUnrecordedChange();
-            if (History.Current != null)
-                History.MarkSaved();
+            UndoRecorder.MarkSaved();
             UpdateTitle();
         }
 
         /// <summary>Shows the nest's name, marked with an asterisk while it has unsaved changes.</summary>
         internal void UpdateTitle() => Text = HasUnsavedChanges ? $"{Nest.Name} *" : Nest.Name;
 
+        private NestUndoRecorder CreateRecorder()
+        {
+            var recorder = new NestUndoRecorder(Document) { SwapIn = SwapInRestoredNest };
+            recorder.Changed += (_, _) => UpdateTitle();
+            recorder.Restored += (_, _) => NestRestored?.Invoke(this, EventArgs.Empty);
+            return recorder;
+        }
+
         private void InitializeHistory()
         {
-            History.Reset(new NestUndoState(NestSnapshot.Capture(Nest)));
-            recordedFingerprint = NestFingerprint.Compute(Nest);
-            History.Changed += (_, _) => UpdateTitle();
+            UndoRecorder.Reset();
 #if DEBUG
             Application.Idle += CheckForUnrecordedChange;
             FormClosed += (_, _) => Application.Idle -= CheckForUnrecordedChange;
 #endif
-        }
-
-        private void EndChange(ChangeScope scope)
-        {
-            openChange = null;
-            if (!scope.IsChanged)
-                return;
-            if (scope.Succeeded)
-                Commit(scope.Label, scope.CoalesceKey);
-            else
-                RestoreNest(History.Current.Snapshot.Restore(Nest));
-        }
-
-        private void Commit(string label, object coalesceKey)
-        {
-            History.Commit(label, new NestUndoState(NestSnapshot.Capture(Nest)), coalesceKey);
-            recordedFingerprint = NestFingerprint.Compute(Nest);
-            UpdateTitle();
         }
 
         /// <summary>
@@ -156,11 +95,7 @@ namespace OpenNest.Forms
         /// does not silently discard it, and a save marks it saved. Detected by fingerprint, so
         /// best effort.
         /// </summary>
-        internal void RecordUnrecordedChange()
-        {
-            if (History.Current != null && NestFingerprint.Compute(Nest) != recordedFingerprint)
-                Commit("Change", null);
-        }
+        internal void RecordUnrecordedChange() => UndoRecorder.RecordUnrecordedChange();
 
         /// <summary>
         /// Replaces the document's nest with <paramref name="restored"/>, a copy read back from
@@ -168,19 +103,15 @@ namespace OpenNest.Forms
         /// identity (name, status, author, creation date), the plate shown, the viewport and the
         /// selection (by part index) are kept.
         /// </summary>
-        public void RestoreNest(Nest restored)
+        public void RestoreNest(Nest restored) => UndoRecorder.RestoreNest(restored);
+
+        // The recorder's swap-in, run with the identity already carried over and nothing recorded.
+        private void SwapInRestoredNest(Nest restored)
         {
-            ArgumentNullException.ThrowIfNull(restored);
             // Apply after a restore would commit to plates no longer in the nest.
             CuttingInspection?.RequestClose();
             if (CuttingInspection != null)
                 throw new InvalidOperationException("Close Cutting Inspection before undoing.");
-
-            var live = Nest;
-            restored.Name = live.Name;
-            restored.Status = live.Status;
-            restored.MadeBy = live.MadeBy;
-            restored.DateCreated = live.DateCreated;
 
             var plateIndex = PlateManager.CurrentIndex;
             var partCount = PlateView.Plate?.Parts.Count ?? 0;
@@ -190,55 +121,43 @@ namespace OpenNest.Forms
                 .ToArray();
             var viewport = PlateView.CaptureViewport();
 
-            restoringNest = true;
+            // Actions, previews and side panels hold parts and plates of the old nest.
+            PlateView.EndAction();
+            PlateView.ClearPreviewParts();
+            PlateView.CancelOverlapCheck();
+            drawingListBox1.CancelPickup();
+            addPart = false;
+            if (IsSidePanelVisible)
+                HideSidePanel();
+
+            UnbindNest();
+            Document.Nest = restored;
+            BindNest(restored);
+            // Reading regenerates cut-offs with default settings; the view's apply here.
+            // Regenerating empties a cut-off-only plate for a moment, so the batch keeps
+            // the new-plate sentinel from adding or dropping plates until all are done.
+            PlateManager.BeginBatch();
             try
             {
-                // Actions, previews and side panels hold parts and plates of the old nest.
-                PlateView.EndAction();
-                PlateView.ClearPreviewParts();
-                PlateView.CancelOverlapCheck();
-                drawingListBox1.CancelPickup();
-                addPart = false;
-                if (IsSidePanelVisible)
-                    HideSidePanel();
-
-                UnbindNest();
-                Document.Nest = restored;
-                BindNest(restored);
-                // Reading regenerates cut-offs with default settings; the view's apply here.
-                // Regenerating empties a cut-off-only plate for a moment, so the batch keeps
-                // the new-plate sentinel from adding or dropping plates until all are done.
-                PlateManager.BeginBatch();
-                try
-                {
-                    foreach (var plate in restored.Plates.Where(plate => plate.CutOffs.Count > 0).ToArray())
-                        plate.RegenerateCutOffs(PlateView.CutOffSettings);
-                }
-                finally
-                {
-                    PlateManager.EndBatch();
-                }
-                ColorSchemeRegistry.RecolorDrawings(restored);
-
-                // Loading a plate zooms to fit; an undo keeps the view where it was.
-                PlateManager.LoadAt(System.Math.Clamp(plateIndex, 0, System.Math.Max(0, PlateManager.Count - 1)));
-                PlateView.RestoreViewport(viewport);
-                if (PlateView.Plate.Parts.Count == partCount && selected.Length > 0)
-                    Reselect(selected);
-
-                UpdatePlateList();
-                UpdatePlateHeader();
-                UpdateRemovePlateButton();
-                PlateView.Invalidate();
+                foreach (var plate in restored.Plates.Where(plate => plate.CutOffs.Count > 0).ToArray())
+                    plate.RegenerateCutOffs(PlateView.CutOffSettings);
             }
             finally
             {
-                restoringNest = false;
+                PlateManager.EndBatch();
             }
+            ColorSchemeRegistry.RecolorDrawings(restored);
 
-            recordedFingerprint = NestFingerprint.Compute(Nest);
-            UpdateTitle();
-            NestRestored?.Invoke(this, EventArgs.Empty);
+            // Loading a plate zooms to fit; an undo keeps the view where it was.
+            PlateManager.LoadAt(System.Math.Clamp(plateIndex, 0, System.Math.Max(0, PlateManager.Count - 1)));
+            PlateView.RestoreViewport(viewport);
+            if (PlateView.Plate.Parts.Count == partCount && selected.Length > 0)
+                Reselect(selected);
+
+            UpdatePlateList();
+            UpdatePlateHeader();
+            UpdateRemovePlateButton();
+            PlateView.Invalidate();
         }
 
         private void Reselect(int[] indices)
@@ -255,7 +174,6 @@ namespace OpenNest.Forms
 
 #if DEBUG
         private DateTime nextUnrecordedCheck;
-        private int warnedFingerprint;
 
         // Every edit should open a change scope; one that does not folds into the next entry.
         private void CheckForUnrecordedChange(object sender, EventArgs e)
@@ -263,11 +181,8 @@ namespace OpenNest.Forms
             if (IsDisposed || IsChangeInProgress || PlateView.IsFillInProgress || DateTime.UtcNow < nextUnrecordedCheck)
                 return;
             nextUnrecordedCheck = DateTime.UtcNow.AddMilliseconds(500);
-            var fingerprint = NestFingerprint.Compute(Nest);
-            if (fingerprint == recordedFingerprint || fingerprint == warnedFingerprint)
-                return;
-            warnedFingerprint = fingerprint;
-            Debug.WriteLine($"Undo: '{Nest.Name}' changed outside a change scope; the edit is not recorded yet.");
+            if (UndoRecorder.TakeUnrecordedChangeWarning())
+                Debug.WriteLine($"Undo: '{Nest.Name}' changed outside a change scope; the edit is not recorded yet.");
         }
 #endif
     }

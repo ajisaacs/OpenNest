@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Controls;
+using OpenNest.Undo;
 
 namespace OpenNest.Forms
 {
@@ -119,8 +120,8 @@ namespace OpenNest.Forms
             var history = form?.History;
             mnuEditUndo.Enabled = available && form.CanUndo;
             mnuEditRedo.Enabled = available && form.CanRedo;
-            mnuEditUndo.Text = history?.UndoLabel is { } undo ? $"Undo {undo}" : "Undo";
-            mnuEditRedo.Text = history?.RedoLabel is { } redo ? $"Redo {redo}" : "Redo";
+            mnuEditUndo.Text = NestUndoRecorder.UndoMenuText(history);
+            mnuEditRedo.Text = NestUndoRecorder.RedoMenuText(history);
         }
 
         private void EditForm_NestRestored(object sender, EventArgs e)
