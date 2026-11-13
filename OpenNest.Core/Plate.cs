@@ -664,6 +664,11 @@ namespace OpenNest
         /// </summary>
         public static Geometry.Entity BuildPartPerimeter(Part part)
         {
+            // Null is the conservative answer: the cut-off then excludes the part's whole
+            // bounding-box span. Only malformed geometry earns it; anything else propagates.
+            if (part?.Program == null)
+                return null;
+
             try
             {
                 var entities = Converters
@@ -683,7 +688,10 @@ namespace OpenNest
                     e.Layer != SpecialLayers.Leadout).ToList();
                 if (outline.Count == 0)
                     return null;
-                var profile = new Geometry.ShapeProfile(outline);
+                var shapes = Geometry.ShapeBuilder.GetShapes(outline);
+                if (shapes.Count == 0)
+                    return null;
+                var profile = Geometry.ShapeProfile.FromShapes(shapes);
 
                 if (profile.Perimeter.IsClosed())
                 {
@@ -700,7 +708,7 @@ namespace OpenNest
                 hull.Offset(part.Location);
                 return hull;
             }
-            catch
+            catch (Exception e) when (Diagnostics.PlateOverlapAnalyzer.IsGeometryFailure(e))
             {
                 return null;
             }

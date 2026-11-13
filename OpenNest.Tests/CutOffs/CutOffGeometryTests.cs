@@ -382,4 +382,71 @@ public class CutOffGeometryTests
         Assert.Equal(20.0, bb.Width, 1);
         Assert.Equal(20.0, bb.Length, 1);
     }
+
+    private static Program MakeSingleLine(double size)
+    {
+        var pgm = new Program();
+        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(size, size)));
+        return pgm;
+    }
+
+    [Fact]
+    public void NoFormableOutline_YieldsNullCacheEntry()
+    {
+        // One open cut has too few points for a closed profile or a hull.
+        var plate = new Plate(100, 100);
+        var part = new Part(new Drawing("line", MakeSingleLine(10)), new Vector(20, 20));
+        plate.Parts.Add(part);
+
+        var cache = Plate.BuildPerimeterCache(plate);
+
+        Assert.True(cache.ContainsKey(part));
+        Assert.Null(cache[part]);
+        Assert.Null(Plate.BuildPartPerimeter(part));
+    }
+
+    [Fact]
+    public void NoMaterial_YieldsNullCacheEntry()
+    {
+        var pgm = new Program();
+        pgm.Codes.Add(new RapidMove(new Vector(10, 10)));
+        var plate = new Plate(100, 100);
+        var part = new Part(new Drawing("rapid only", pgm), new Vector(20, 20));
+        plate.Parts.Add(part);
+
+        Assert.Null(Plate.BuildPerimeterCache(plate)[part]);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void NoFormableOutline_CutOffStillExcludesTheBoundingBoxSpan(bool cached)
+    {
+        // Part bounding box is (20,20)-(30,30). A vertical cut at X=22 crosses the
+        // diagonal only at Y=22, but with no perimeter to intersect the cut-off must
+        // stay out of the whole Y=[20,30] span.
+        var plate = new Plate(100, 100);
+        var part = new Part(new Drawing("line", MakeSingleLine(10)), new Vector(20, 20));
+        plate.Parts.Add(part);
+        var box = part.BoundingBox;
+        Assert.Equal(20.0, box.Bottom, 6);
+        Assert.Equal(30.0, box.Top, 6);
+
+        var cutoff = new CutOff(new Vector(22, 0), CutOffAxis.Vertical);
+        cutoff.Regenerate(plate, ZeroClearance, cached ? Plate.BuildPerimeterCache(plate) : null);
+
+        var codes = cutoff.Drawing.Program.Codes;
+        for (var i = 0; i < codes.Count - 1; i += 2)
+        {
+            var rapid = Assert.IsType<RapidMove>(codes[i]);
+            var linear = Assert.IsType<LinearMove>(codes[i + 1]);
+            var low = System.Math.Min(rapid.EndPoint.Y, linear.EndPoint.Y);
+            var high = System.Math.Max(rapid.EndPoint.Y, linear.EndPoint.Y);
+            Assert.True(high <= 20.0 + 1e-6 || low >= 30.0 - 1e-6,
+                $"Cut segment Y=[{low:F4},{high:F4}] enters the part's bounding-box span");
+        }
+
+        Assert.Equal(90.0, TotalCutLength(cutoff.Drawing.Program), 3);
+    }
 }
