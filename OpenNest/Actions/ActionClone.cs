@@ -209,10 +209,7 @@ namespace OpenNest.Actions
 
         // An unknown stored name falls back to the closest-to-origin search.
         internal static SettleOrder ReadPlacementOrder() =>
-            System.Enum.TryParse<SettleOrder>(Properties.Settings.Default.ClonePlacementOrder, out var order)
-                && System.Enum.IsDefined(order)
-                ? order
-                : SettleOrder.ClosestToCorner;
+            Desktop.ClonePlacement.Parse(Properties.Settings.Default.ClonePlacementOrder);
 
         public void Apply() => Apply(Control.ModifierKeys);
 

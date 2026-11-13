@@ -1,29 +1,18 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
-using OpenNest.Actions;
 using OpenNest.Controls;
 using OpenNest.Data;
 using OpenNest.Data.MaterialLedger;
+using OpenNest.Desktop;
 using OpenNest.Engine.CuttingPlanning;
-using OpenNest.Engine.Fill;
-using OpenNest.Engine.Strategies;
 using OpenNest.Properties;
 
 namespace OpenNest.Forms
 {
     public partial class OptionsForm : Form
     {
-        // Combo order matches these; the setting stores the enum name.
-        private static readonly (SettleOrder Order, string Text)[] ClonePlacements =
-        {
-            (SettleOrder.ClosestToCorner, "Closest to origin"),
-            (SettleOrder.HorizontalFirst, "Push horizontally first"),
-            (SettleOrder.VerticalFirst, "Push vertically first"),
-        };
-
         public OptionsForm()
         {
             InitializeComponent();
@@ -82,7 +71,7 @@ namespace OpenNest.Forms
                 }
             );
 
-            foreach (var strategy in FillStrategyRegistry.AllStrategies)
+            foreach (var strategy in FillStrategyOptions.Rows)
             {
                 strategyGrid.Rows.Add(true, strategy.Name, strategy.Phase, strategy.Order);
             }
@@ -90,30 +79,28 @@ namespace OpenNest.Forms
 
         private void LoadSettings()
         {
+            var options = ReadOptions();
             serverUrlBox.Text = NestStorage.Settings.ServerUrl;
             updateFeedUrlBox.Text = Settings.Default.UpdateFeedUrl;
-            includeDevBuildsBox.Checked = Settings.Default.UpdateIncludeDevBuilds;
+            includeDevBuildsBox.Checked = options.UpdateIncludeDevBuilds;
             ledgerUrlBox.Text = MaterialLedgerStore.Settings.BaseUrl;
             ledgerKeyBox.Text = MaterialLedgerStore.Settings.ApiKey;
-            checkBox1.Checked = Settings.Default.CreateNewNestOnOpen;
-            numericUpDown1.Value = (decimal)Settings.Default.AutoSizePlateFactor;
-            planningEffortBox.Value = (decimal)CuttingPlanBatch.ClampBudgetMultiplier(Settings.Default.CuttingPlanEffort);
+            checkBox1.Checked = options.CreateNewNestOnOpen;
+            numericUpDown1.Value = (decimal)options.AutoSizePlateFactorForEditing;
+            planningEffortBox.Value = (decimal)options.CuttingPlanEffortForEditing;
 
             colorSchemeCombo.Items.Clear();
-            foreach (var scheme in ColorSchemeRegistry.AllSchemes)
-                colorSchemeCombo.Items.Add(scheme.Name);
-            var active = Settings.Default.ActiveColorScheme;
-            var idx = colorSchemeCombo.Items.IndexOf(active);
-            colorSchemeCombo.SelectedIndex = idx >= 0 ? idx : 0;
+            var schemes = DesktopOptions.ColorSchemeNames;
+            foreach (var name in schemes)
+                colorSchemeCombo.Items.Add(name);
+            colorSchemeCombo.SelectedIndex = options.ColorSchemeIndex(schemes);
 
             clonePlacementCombo.Items.Clear();
-            foreach (var (_, text) in ClonePlacements)
+            foreach (var (_, text) in ClonePlacement.Choices)
                 clonePlacementCombo.Items.Add(text);
-            var placement = ActionClone.ReadPlacementOrder();
-            clonePlacementCombo.SelectedIndex = System.Math.Max(0,
-                System.Array.FindIndex(ClonePlacements, p => p.Order == placement));
+            clonePlacementCombo.SelectedIndex = ClonePlacement.IndexOf(options.ClonePlacementOrder);
 
-            var disabledNames = ParseDisabledStrategies(Settings.Default.DisabledStrategies);
+            var disabledNames = new HashSet<string>(options.DisabledStrategies, StringComparer.OrdinalIgnoreCase);
             foreach (DataGridViewRow row in strategyGrid.Rows)
                 row.Cells["Enabled"].Value = !disabledNames.Contains(
                     (string)row.Cells["Name"].Value
@@ -122,83 +109,82 @@ namespace OpenNest.Forms
 
         private void SaveSettings()
         {
-            Settings.Default.CreateNewNestOnOpen = checkBox1.Checked;
-            Settings.Default.UpdateIncludeDevBuilds = includeDevBuildsBox.Checked;
-            Settings.Default.AutoSizePlateFactor = (double)numericUpDown1.Value;
-            Settings.Default.CuttingPlanEffort = (double)planningEffortBox.Value;
-            Settings.Default.ActiveColorScheme =
-                colorSchemeCombo.SelectedItem as string ?? "Classic";
-            Settings.Default.ClonePlacementOrder =
-                ClonePlacements[System.Math.Max(0, clonePlacementCombo.SelectedIndex)].Order.ToString();
-
             var disabledNames = new List<string>();
             foreach (DataGridViewRow row in strategyGrid.Rows)
             {
                 if (row.Cells["Enabled"].Value is false)
                     disabledNames.Add((string)row.Cells["Name"].Value);
             }
-            Settings.Default.DisabledStrategies = string.Join(",", disabledNames);
 
+            var options = new DesktopOptions
+            {
+                CreateNewNestOnOpen = checkBox1.Checked,
+                UpdateIncludeDevBuilds = includeDevBuildsBox.Checked,
+                AutoSizePlateFactor = (double)numericUpDown1.Value,
+                CuttingPlanEffort = (double)planningEffortBox.Value,
+                ColorScheme = colorSchemeCombo.SelectedItem as string ?? ColorSchemeRegistry.DefaultSchemeName,
+                ClonePlacementOrder = ClonePlacement.At(clonePlacementCombo.SelectedIndex),
+                DisabledStrategies = disabledNames,
+            };
+            WriteOptions(options);
             Settings.Default.Save();
-            ApplyDisabledStrategies();
-            ColorSchemeRegistry.Apply(ColorSchemeRegistry.Get(Settings.Default.ActiveColorScheme));
+            options.Apply();
 
             foreach (Form f in Application.OpenForms)
                 f.Invalidate(invalidateChildren: true);
+        }
+
+        // The app settings in the shared Options model; they persist to user-settings.json under
+        // the same names through AppDataSettingsProvider.
+        private static DesktopOptions ReadOptions() => new()
+        {
+            CreateNewNestOnOpen = Settings.Default.CreateNewNestOnOpen,
+            UpdateIncludeDevBuilds = Settings.Default.UpdateIncludeDevBuilds,
+            AutoSizePlateFactor = Settings.Default.AutoSizePlateFactor,
+            CuttingPlanEffort = Settings.Default.CuttingPlanEffort,
+            ColorScheme = Settings.Default.ActiveColorScheme,
+            ClonePlacementOrder = ClonePlacement.Parse(Settings.Default.ClonePlacementOrder),
+            DisabledStrategies = FillStrategyOptions.ParseDisabled(Settings.Default.DisabledStrategies),
+        };
+
+        private static void WriteOptions(DesktopOptions options)
+        {
+            Settings.Default.CreateNewNestOnOpen = options.CreateNewNestOnOpen;
+            Settings.Default.UpdateIncludeDevBuilds = options.UpdateIncludeDevBuilds;
+            Settings.Default.AutoSizePlateFactor = options.AutoSizePlateFactor;
+            Settings.Default.CuttingPlanEffort = options.CuttingPlanEffort;
+            Settings.Default.ActiveColorScheme = options.ColorScheme;
+            Settings.Default.ClonePlacementOrder = options.ClonePlacementOrder.ToString();
+            Settings.Default.DisabledStrategies = FillStrategyOptions.FormatDisabled(options.DisabledStrategies);
         }
 
         /// <summary>
         /// Applies the DisabledStrategies setting to the FillStrategyRegistry.
         /// Called on save and at startup from MainForm.
         /// </summary>
-        public static void ApplyDisabledStrategies()
-        {
-            // Re-enable all, then disable the persisted set.
-            var all = FillStrategyRegistry.AllStrategies.Select(s => s.Name).ToArray();
-            FillStrategyRegistry.Enable(all);
-
-            var disabled = ParseDisabledStrategies(Settings.Default.DisabledStrategies);
-            if (disabled.Count > 0)
-                FillStrategyRegistry.Disable(disabled.ToArray());
-        }
-
-        private static HashSet<string> ParseDisabledStrategies(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            return new HashSet<string>(
-                value.Split(',').Select(s => s.Trim()).Where(s => s.Length > 0),
-                StringComparer.OrdinalIgnoreCase
-            );
-        }
+        public static void ApplyDisabledStrategies() =>
+            FillStrategyOptions.Apply(FillStrategyOptions.ParseDisabled(Settings.Default.DisabledStrategies));
 
         private void SaveSettings_Click(object sender, EventArgs e)
         {
             SaveSettings();
         }
 
+        private void ShowNotice(OptionNotice notice) =>
+            MessageBox.Show(this, notice.Text, notice.Title, MessageBoxButtons.OK, notice.Kind switch
+            {
+                OptionNoticeKind.Warning => MessageBoxIcon.Warning,
+                OptionNoticeKind.Error => MessageBoxIcon.Error,
+                _ => MessageBoxIcon.Information,
+            });
+
         private void SetServer_Click(object sender, EventArgs e)
         {
-            if (!NestStorageSettings.TryNormalizeServerUrl(serverUrlBox.Text, out var url))
-            {
-                MessageBox.Show(this, "Enter a valid http or https server URL.",
-                    "Server URL", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            try
-            {
-                NestStorage.Save(NestStorage.Settings.Mode, url);
+            var (notice, url) = NestServerUrlOption.Save(serverUrlBox.Text,
+                next => NestStorage.Save(NestStorage.Settings.Mode, next));
+            if (url != null)
                 serverUrlBox.Text = NestStorage.Settings.ServerUrl;
-                MessageBox.Show(this, "Server URL saved. Storage mode has not changed.",
-                    "Server URL", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, $"Could not save the server URL: {ex.Message}",
-                    "Server URL", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            ShowNotice(notice);
         }
 
         private void SaveLedger_Click(object sender, EventArgs e)
@@ -267,33 +253,14 @@ namespace OpenNest.Forms
 
         private void SetUpdateFeed_Click(object sender, EventArgs e)
         {
-            var text = updateFeedUrlBox.Text?.Trim() ?? "";
-            if (text.Length == 0)
+            var (notice, url) = UpdateFeedOption.Save(updateFeedUrlBox.Text, next =>
             {
-                Settings.Default.UpdateFeedUrl = "";
+                Settings.Default.UpdateFeedUrl = next;
                 Settings.Default.Save();
-                updateFeedUrlBox.Text = "";
-                MessageBox.Show(this, "Update feed URL cleared. After a restart, updates come from "
-                    + "the nest server's mirror in Database mode (GitHub Releases if it has none), "
-                    + "otherwise from GitHub Releases.",
-                    "Update Feed URL", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            if (!NestStorageSettings.TryNormalizeServerUrl(text, out var url))
-            {
-                MessageBox.Show(this, "Enter a valid http or https feed URL, or clear the field to "
-                    + "use the default source: the nest server's mirror in Database mode, "
-                    + "otherwise GitHub Releases.",
-                    "Update Feed URL", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            Settings.Default.UpdateFeedUrl = url;
-            Settings.Default.Save();
-            updateFeedUrlBox.Text = url;
-            MessageBox.Show(this, "Update feed URL saved. Restart OpenNest for the new feed to take effect.",
-                "Update Feed URL", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            });
+            if (url != null)
+                updateFeedUrlBox.Text = url;
+            ShowNotice(notice);
         }
     }
 }
