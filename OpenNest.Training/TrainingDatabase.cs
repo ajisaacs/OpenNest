@@ -174,7 +174,9 @@ namespace OpenNest.Training
             {
                 try
                 {
-                    _db.Database.ExecuteSql($"ALTER TABLE Runs ADD COLUMN {name} {type}");
+                    // Raw on purpose: ExecuteSql would send the column name and type as
+                    // parameters, which SQLite rejects. Both come from the list above.
+                    _db.Database.ExecuteSqlRaw($"ALTER TABLE Runs ADD COLUMN {name} {type}");
                 }
                 catch
                 {
