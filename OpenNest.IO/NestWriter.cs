@@ -11,6 +11,7 @@ using OpenNest.BestFit;
 using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.CommonLines;
+using OpenNest.CutOffs;
 using OpenNest.Support;
 using static OpenNest.IO.NestFormat;
 

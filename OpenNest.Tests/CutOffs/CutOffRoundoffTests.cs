@@ -1,5 +1,6 @@
 using OpenNest.CNC;
 using OpenNest.Converters;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using OpenNest.IO;
 

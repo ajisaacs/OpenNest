@@ -7,7 +7,7 @@ using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest;
+namespace OpenNest.CutOffs;
 
 public sealed class AutomaticCutOffOptions
 {

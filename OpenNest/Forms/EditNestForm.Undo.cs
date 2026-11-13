@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Actions;
+using OpenNest.CutOffs;
 using OpenNest.Data;
 using OpenNest.IO;
 using OpenNest.Undo;

@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using OpenNest.Controls;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 
 namespace OpenNest.WinForms.Tests.Controls;

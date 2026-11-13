@@ -1,5 +1,6 @@
 using OpenNest.Clamps;
 using OpenNest.CNC;
+using OpenNest.CutOffs;
 using OpenNest.Desktop.Rendering;
 using OpenNest.Geometry;
 using OpenNest.Support;

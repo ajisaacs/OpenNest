@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 using OpenNest.Clamps;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using static OpenNest.IO.Tests.NestArchiveJson;
 

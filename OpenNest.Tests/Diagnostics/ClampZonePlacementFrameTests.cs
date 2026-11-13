@@ -1,6 +1,7 @@
 using System.Linq;
 using OpenNest.Clamps;
 using OpenNest.CNC;
+using OpenNest.CutOffs;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
 using Xunit;

@@ -1,4 +1,4 @@
-namespace OpenNest
+namespace OpenNest.CutOffs
 {
     public enum CutDirection
     {

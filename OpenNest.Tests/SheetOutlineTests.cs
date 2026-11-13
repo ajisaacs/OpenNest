@@ -1,4 +1,5 @@
 using Clipper2Lib;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using OpenNest.Shapes;
 

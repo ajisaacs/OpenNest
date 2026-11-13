@@ -1,3 +1,5 @@
+using OpenNest.CutOffs;
+
 namespace OpenNest.Tests.CutOffs;
 
 public class AutomaticCutOffStripSearchTests

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.CutOffs;
 using OpenNest.Data;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Engine.Sequencing;

@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.CutOffs;
 using OpenNest.Engine;
 using OpenNest.Engine.Sequencing;
 using OpenNest.Geometry;

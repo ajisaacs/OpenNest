@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Controls;
+using OpenNest.CutOffs;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 using OpenNest.Undo;

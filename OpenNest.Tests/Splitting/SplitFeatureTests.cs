@@ -1,4 +1,5 @@
 using System.Linq;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 
 namespace OpenNest.Tests.Splitting;

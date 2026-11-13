@@ -1,4 +1,5 @@
 using System.Text;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using OpenNest.Posts.Cincinnati;
 using OpenNest.Posts.CincinnatiCIFiber;

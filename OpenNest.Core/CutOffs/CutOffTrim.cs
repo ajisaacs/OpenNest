@@ -3,7 +3,7 @@ using System.Linq;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.CutOffs
 {
     /// <summary>
     /// The limits and gaps one cut-off takes when a <see cref="CutOffEdit"/> is applied; null

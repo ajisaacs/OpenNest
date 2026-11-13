@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using OpenNest.CNC;
+using OpenNest.CutOffs;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 

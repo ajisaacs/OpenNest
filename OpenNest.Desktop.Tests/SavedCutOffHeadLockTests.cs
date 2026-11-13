@@ -1,3 +1,5 @@
+using OpenNest.CutOffs;
+
 namespace OpenNest.Desktop.Tests;
 
 public class SavedCutOffHeadLockTests

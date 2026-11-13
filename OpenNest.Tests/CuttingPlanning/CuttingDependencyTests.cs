@@ -1,6 +1,7 @@
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.CutOffs;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Geometry;
 using static OpenNest.Tests.TestHelpers;

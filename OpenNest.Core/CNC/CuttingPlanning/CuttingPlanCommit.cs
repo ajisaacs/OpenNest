@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 
 namespace OpenNest.CNC.CuttingPlanning;

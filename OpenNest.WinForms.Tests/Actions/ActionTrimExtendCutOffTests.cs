@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Controls;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using static OpenNest.WinForms.Tests.FormTesting;
 

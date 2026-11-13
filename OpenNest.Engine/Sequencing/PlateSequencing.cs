@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.CutOffs;
 using OpenNest.Engine.CuttingPlanning;
 
 namespace OpenNest.Engine.Sequencing

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using OpenNest.CNC;
 using OpenNest.Converters;
+using OpenNest.CutOffs;
 using OpenNest.Engine.Fill;
 using OpenNest.Engine.Tests.Jobs;
 using OpenNest.Geometry;

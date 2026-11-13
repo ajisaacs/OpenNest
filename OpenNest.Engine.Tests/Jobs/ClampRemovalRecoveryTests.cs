@@ -1,4 +1,5 @@
 using OpenNest.Clamps;
+using OpenNest.CutOffs;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.NestingEngines.Rectangles;
 using OpenNest.Engine.Tests.NestingEngines;

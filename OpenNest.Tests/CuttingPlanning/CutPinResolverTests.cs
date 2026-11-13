@@ -2,6 +2,7 @@ using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Converters;
+using OpenNest.CutOffs;
 using OpenNest.Engine;
 using OpenNest.Geometry;
 using OpenNest.Math;

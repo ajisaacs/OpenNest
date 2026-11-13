@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using OpenNest.Shapes;
 using static OpenNest.IO.Tests.NestArchiveJson;

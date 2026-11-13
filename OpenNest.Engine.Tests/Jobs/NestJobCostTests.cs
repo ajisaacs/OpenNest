@@ -1,4 +1,5 @@
 using OpenNest.CNC;
+using OpenNest.CutOffs;
 using OpenNest.Engine.Jobs;
 using OpenNest.Geometry;
 

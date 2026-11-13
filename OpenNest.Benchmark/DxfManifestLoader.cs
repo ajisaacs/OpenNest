@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using OpenNest.IO;
 

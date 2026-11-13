@@ -1,4 +1,5 @@
 using OpenNest.Clamps;
+using OpenNest.CutOffs;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
 

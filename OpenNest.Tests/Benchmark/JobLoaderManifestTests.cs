@@ -1,4 +1,5 @@
 using OpenNest.Benchmark;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using OpenNest.Engine.Jobs;
 

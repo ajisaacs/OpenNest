@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.CNC;
+using OpenNest.CutOffs;
 using OpenNest.Engine.Sequencing;
 using OpenNest.Geometry;
 using OpenNest.Undo;

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
 
-namespace OpenNest;
+namespace OpenNest.CutOffs;
 
 /// <summary>Exact layered search over sorted positions; each transition uses a sliding minimum.</summary>
 internal static class AutomaticCutOffStripSearch

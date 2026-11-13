@@ -3,6 +3,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using OpenNest.CNC;
 using OpenNest.Converters;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using OpenNest.Support;
 

@@ -1,3 +1,4 @@
+using OpenNest.CutOffs;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.NestingEngines;
 using OpenNest.Engine.NestingEngines.Default;

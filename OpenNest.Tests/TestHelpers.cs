@@ -1,5 +1,6 @@
 using System.Text.Json;
 using OpenNest.CNC;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 
 namespace OpenNest.Tests;

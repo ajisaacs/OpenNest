@@ -1,6 +1,7 @@
 using System;
 using OpenNest;
 using OpenNest.CommonLines;
+using OpenNest.CutOffs;
 
 namespace OpenNest.Engine.Jobs;
 

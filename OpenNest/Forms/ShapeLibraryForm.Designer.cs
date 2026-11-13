@@ -1,3 +1,5 @@
+using OpenNest.CutOffs;
+
 namespace OpenNest.Forms
 {
     partial class ShapeLibraryForm

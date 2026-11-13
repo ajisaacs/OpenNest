@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Controls;
+using OpenNest.CutOffs;
 
 namespace OpenNest.Forms;
 

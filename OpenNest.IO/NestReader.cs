@@ -14,6 +14,7 @@ using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.CommonLines;
 using OpenNest.Converters;
+using OpenNest.CutOffs;
 using OpenNest.Dimensions;
 using OpenNest.Geometry;
 using OpenNest.Support;

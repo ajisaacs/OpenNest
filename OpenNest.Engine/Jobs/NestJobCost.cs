@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using OpenNest.CutOffs;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Geometry;
 

@@ -2,6 +2,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using OpenNest.CNC;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.Posts.Cincinnati;

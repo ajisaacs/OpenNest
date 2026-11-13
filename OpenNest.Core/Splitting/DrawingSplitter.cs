@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.Converters;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using OpenNest.Math;
 

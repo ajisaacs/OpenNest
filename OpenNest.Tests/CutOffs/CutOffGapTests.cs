@@ -1,6 +1,7 @@
 using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
+using OpenNest.CutOffs;
 using OpenNest.Diagnostics;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Engine.Sequencing;

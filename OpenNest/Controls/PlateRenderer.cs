@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using OpenNest.Bending;
 using OpenNest.CNC;
 using OpenNest.CommonLines;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using OpenNest.Math;
 

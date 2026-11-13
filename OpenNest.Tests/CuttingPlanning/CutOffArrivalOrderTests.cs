@@ -1,5 +1,6 @@
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
+using OpenNest.CutOffs;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Engine.Sequencing;
 using OpenNest.Geometry;

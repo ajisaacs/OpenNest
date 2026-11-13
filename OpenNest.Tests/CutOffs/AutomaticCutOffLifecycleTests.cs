@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using OpenNest.CNC;
 using OpenNest.Converters;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.Math;

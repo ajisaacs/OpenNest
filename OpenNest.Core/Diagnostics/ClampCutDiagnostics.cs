@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using OpenNest.Clamps;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 
 namespace OpenNest.Diagnostics;

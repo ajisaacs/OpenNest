@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 
-namespace OpenNest
+namespace OpenNest.CutOffs
 {
     /// <summary>
     /// One placed cutting segment of a cut-off: the part that cuts it, where its cut runs along

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using OpenNest.Clamps;
 using OpenNest.CNC;
+using OpenNest.CutOffs;
 using OpenNest.Diagnostics;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;

@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.CNC;
 using OpenNest.Controls;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 
 namespace OpenNest.WinForms.Tests;

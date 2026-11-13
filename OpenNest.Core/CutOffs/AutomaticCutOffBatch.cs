@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace OpenNest;
+namespace OpenNest.CutOffs;
 
 /// <summary>
 /// Plans and applies the same automatic-cutoff settings to a stable, ordered set of plates.

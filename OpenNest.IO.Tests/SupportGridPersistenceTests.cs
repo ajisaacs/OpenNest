@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using OpenNest.Support;
 using static OpenNest.IO.Tests.NestArchiveJson;

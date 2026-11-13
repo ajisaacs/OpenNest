@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
 using OpenNest.Controls;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 
 namespace OpenNest.Actions

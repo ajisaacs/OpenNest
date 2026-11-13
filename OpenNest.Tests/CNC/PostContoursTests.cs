@@ -1,5 +1,6 @@
 using OpenNest.CNC;
 using OpenNest.CNC.Posting;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 
 namespace OpenNest.Tests.CNC;

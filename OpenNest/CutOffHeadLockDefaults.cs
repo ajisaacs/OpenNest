@@ -1,3 +1,4 @@
+using OpenNest.CutOffs;
 using OpenNest.Desktop;
 
 namespace OpenNest

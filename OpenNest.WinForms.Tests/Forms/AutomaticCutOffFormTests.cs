@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Windows.Forms;
 using OpenNest.CNC;
 using OpenNest.Controls;
+using OpenNest.CutOffs;
 using OpenNest.Forms;
 using OpenNest.Geometry;
 

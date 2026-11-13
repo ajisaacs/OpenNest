@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using OpenNest.Clamps;
+using OpenNest.CutOffs;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Geometry;

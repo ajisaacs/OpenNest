@@ -9,6 +9,7 @@ using System.Windows.Forms;
 using OpenNest.CNC.CuttingPlanning;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Controls;
+using OpenNest.CutOffs;
 using OpenNest.Diagnostics;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Engine.Sequencing;

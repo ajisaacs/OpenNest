@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Converters;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 
 namespace OpenNest.Forms;

@@ -1,3 +1,4 @@
+using OpenNest.CutOffs;
 using OpenNest.Data;
 
 using Vector = OpenNest.Geometry.Vector;

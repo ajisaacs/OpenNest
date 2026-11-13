@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using OpenNest.Clamps;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using static OpenNest.IO.Tests.NestArchiveJson;
 

@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Windows.Forms;
 using OpenNest.Controls;
+using OpenNest.CutOffs;
 using OpenNest.Forms;
 using OpenNest.Geometry;
 using static OpenNest.WinForms.Tests.TestReflection;

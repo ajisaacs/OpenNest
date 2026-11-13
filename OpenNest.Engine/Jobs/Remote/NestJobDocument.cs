@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using OpenNest.CommonLines;
+using OpenNest.CutOffs;
 
 namespace OpenNest.Engine.Jobs.Remote;
 

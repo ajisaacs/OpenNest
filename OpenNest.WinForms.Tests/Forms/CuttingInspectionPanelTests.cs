@@ -1,5 +1,6 @@
 using System.Windows.Forms;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.CutOffs;
 using OpenNest.Forms;
 using OpenNest.Geometry;
 

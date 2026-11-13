@@ -5,6 +5,7 @@ using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using OpenNest.CNC;
 using OpenNest.Controls;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 
 namespace OpenNest.Actions

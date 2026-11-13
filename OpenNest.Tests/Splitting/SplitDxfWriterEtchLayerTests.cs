@@ -1,5 +1,6 @@
 using ACadSharp.IO;
 using OpenNest.Bending;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.Shapes;

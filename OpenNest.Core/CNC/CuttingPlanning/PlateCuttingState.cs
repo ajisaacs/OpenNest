@@ -5,6 +5,7 @@ using System.Threading;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Collections;
 using OpenNest.CommonLines;
+using OpenNest.CutOffs;
 using OpenNest.Geometry;
 
 namespace OpenNest.CNC.CuttingPlanning;
