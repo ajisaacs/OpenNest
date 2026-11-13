@@ -95,6 +95,20 @@ namespace OpenNest.Desktop
             return tab;
         }
 
+        /// <summary>
+        /// Adds <paramref name="document"/>, a nest with no file yet (File > New), in a new
+        /// active tab after the others. Its first Save asks for a file.
+        /// </summary>
+        public NestTab Add(Document document)
+        {
+            ArgumentNullException.ThrowIfNull(document);
+            var tab = new NestTab(document, null);
+            tabs.Add(tab);
+            ActiveIndex = tabs.Count - 1;
+            Changed?.Invoke(this, EventArgs.Empty);
+            return tab;
+        }
+
         public void Activate(int index)
         {
             if (index < 0 || index >= tabs.Count)

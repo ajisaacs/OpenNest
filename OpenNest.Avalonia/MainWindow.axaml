@@ -6,6 +6,7 @@
   <DockPanel>
     <Menu DockPanel.Dock="Top">
       <MenuItem Header="_File">
+        <MenuItem x:Name="NewMenuItem" Header="_New" InputGesture="Ctrl+N" Click="OnNew" />
         <MenuItem x:Name="OpenMenuItem" Header="_Open..." InputGesture="Ctrl+O" Click="OnOpen" />
         <Separator />
         <MenuItem x:Name="SaveMenuItem" Header="_Save" InputGesture="Ctrl+S" Click="OnSave" />
@@ -45,6 +46,7 @@
 
     <Border DockPanel.Dock="Top" Padding="4" BorderThickness="0,0,0,1" BorderBrush="#D0D0D0">
       <StackPanel Orientation="Horizontal" Spacing="4">
+        <Button x:Name="NewButton" Content="New" Click="OnNew" />
         <Button x:Name="OpenButton" Content="Open" Click="OnOpen" />
         <Button x:Name="SaveButton" Content="Save" Click="OnSave" />
         <Button x:Name="SaveAsButton" Content="Save As" Click="OnSaveAs" />
@@ -56,7 +58,7 @@
     </Border>
 
     <Border DockPanel.Dock="Bottom" Padding="6,3" Background="#F0F0F0">
-      <TextBlock x:Name="Status" Text="Open a .nest file to begin." />
+      <TextBlock x:Name="Status" Text="Create a new nest or open a .nest file to begin." />
     </Border>
 
     <!-- One tab per open nest, along the bottom of the window. -->
@@ -67,7 +69,7 @@
     </Border>
 
     <Panel>
-      <TextBlock x:Name="EmptyHint" Text="Open a .nest file to begin." Foreground="#6B7280"
+      <TextBlock x:Name="EmptyHint" Text="Create a new nest or open a .nest file to begin." Foreground="#6B7280"
                  HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="15" />
       <ContentControl x:Name="NestHost" />
     </Panel>

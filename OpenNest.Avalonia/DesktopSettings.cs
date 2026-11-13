@@ -21,6 +21,20 @@ namespace OpenNest.Avalonia
         public static MachineSettingsSource Machines { get; } =
             new(Shared, new MachineUserSettingsFile(UserSettingsFile.DefaultPath));
 
+        /// <summary>The storage mode and nest server, read once from storage.json as <see cref="Shared"/> does.</summary>
+        private static readonly NestStorageSettings Storage = NestStorageSettings.Load(NestStorageSettings.DefaultPath);
+
+        private static RemoteNestRepository repository;
+
+        /// <summary>
+        /// File > New nests, numbered by the nest server in Database mode and otherwise by the
+        /// counter both apps keep in user-settings.json.
+        /// </summary>
+        public static NewNestSource NewNests { get; } = new(
+            Machines,
+            new NewNestUserSettingsFile(UserSettingsFile.DefaultPath),
+            () => Storage.IsDatabaseMode ? repository ??= new RemoteNestRepository(Storage.ServerUrl) : null);
+
         /// <summary>The post processors loaded from Posts/ beside the app, by load order.</summary>
         public static IReadOnlyList<IPostProcessor> PostProcessors { get; private set; } = [];
 

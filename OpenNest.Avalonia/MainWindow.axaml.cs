@@ -32,6 +32,8 @@ namespace OpenNest.Avalonia
         private NestTab nestingTab;
         private Task autoNest = Task.CompletedTask;
         private bool closeConfirmed;
+        // A File > New waiting on the machines or the nest number.
+        private bool creatingNest;
         private bool snapshotMode;
         // A save or export waiting on its file picker or write; another one waits for it.
         private bool writingFile;
@@ -58,6 +60,11 @@ namespace OpenNest.Avalonia
             // The colour scheme chosen in the WinForms app's options, from the shared user settings.
             ColorSchemeRegistry.ApplySaved(Data.UserSettingsFile.Read(Data.UserSettingsFile.DefaultPath));
             tabs.Changed += (_, _) => ShowActiveTab();
+            KeyBindings.Add(new KeyBinding
+            {
+                Gesture = new KeyGesture(Key.N, KeyModifiers.Control),
+                Command = new Command(() => OnNew(null, null)),
+            });
             KeyBindings.Add(new KeyBinding
             {
                 Gesture = new KeyGesture(Key.O, KeyModifiers.Control),
@@ -111,14 +118,7 @@ namespace OpenNest.Avalonia
                     return document;
                 });
                 if (!views.ContainsKey(tab))
-                {
-                    var view = new NestView(tab);
-                    RestoreViewToggles(view);
-                    view.ViewChanged += (_, _) => { if (view == ActiveView) UpdateStatus(); };
-                    views[tab] = view;
-                    notice = null;
-                    ShowActiveTab();
-                }
+                    AddView(tab);
                 if (warnings.Count > 0)
                 {
                     var count = warnings.Count == 1
@@ -134,6 +134,48 @@ namespace OpenNest.Avalonia
             {
                 ShowNotice($"Could not open {Path.GetFileName(path)}: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Opens a new nest from the nest defaults, the default machine with its clamps and
+        /// support grid, and the year's next name, in a new tab, as File > New does in WinForms.
+        /// </summary>
+        public async Task NewNestAsync()
+        {
+            // One at a time, so two nests never take the same number.
+            if (creatingNest)
+                return;
+            creatingNest = true;
+            NewNest created;
+            try
+            {
+                // The machines finish loading first; reading them and the nest number may wait
+                // on the nest server, so neither runs on the UI thread.
+                await MachinesLoaded;
+                created = await Task.Run(() => DesktopSettings.NewNests.CreateAsync());
+            }
+            catch (Exception ex)
+            {
+                ShowNotice($"Could not create a new nest: {ex.Message}");
+                return;
+            }
+            finally
+            {
+                creatingNest = false;
+            }
+            AddView(tabs.Add(new Document { Nest = created.Nest }));
+            if (created.Warning != null)
+                await ConfirmDialog.ShowAsync(this, "Nest Defaults", created.Warning);
+        }
+
+        private void AddView(NestTab tab)
+        {
+            var view = new NestView(tab);
+            RestoreViewToggles(view);
+            view.ViewChanged += (_, _) => { if (view == ActiveView) UpdateStatus(); };
+            views[tab] = view;
+            notice = null;
+            ShowActiveTab();
         }
 
         /// <summary>
@@ -204,8 +246,8 @@ namespace OpenNest.Avalonia
                 Background = Brushes.Transparent,
                 VerticalAlignment = VerticalAlignment.Top,
             };
-            ToolTip.SetTip(add, "Open a nest");
-            add.Click += OnOpen;
+            ToolTip.SetTip(add, "New nest");
+            add.Click += OnNew;
             TabStrip.Children.Add(add);
         }
 
@@ -536,6 +578,8 @@ namespace OpenNest.Avalonia
                 tabs.Activate(((tabs.ActiveIndex + step) % count + count) % count);
         }
 
+        private async void OnNew(object sender, RoutedEventArgs e) => await NewNestAsync();
+
         private async void OnOpen(object sender, RoutedEventArgs e)
         {
             var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -698,7 +742,7 @@ namespace OpenNest.Avalonia
             if (canvas?.Plate == null)
             {
                 var empty = view == null
-                    ? "Open a .nest file to begin."
+                    ? "Create a new nest or open a .nest file to begin."
                     : $"{view.Tab.Name}   No plates";
                 Status.Text = notice ?? empty;
                 return;

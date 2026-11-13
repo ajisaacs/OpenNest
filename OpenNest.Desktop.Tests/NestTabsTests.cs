@@ -36,6 +36,24 @@ public class NestTabsTests
     }
 
     [Fact]
+    public void Add_ANewNestTakesATabWithNoFileUntilSaved()
+    {
+        var tabs = new NestTabs();
+        tabs.Open(FullPath("a.nest"), Load);
+        var changes = 0;
+        tabs.Changed += (_, _) => changes++;
+
+        var created = tabs.Add(new Document { Nest = new Nest { Name = "N26-223" } });
+
+        Assert.Same(created, tabs.Active);
+        Assert.Equal(["a", "N26-223"], tabs.Tabs.Select(t => t.Name));
+        Assert.Null(created.Path);
+        Assert.Null(created.SavePath);
+        Assert.False(created.Modified);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
     public void Open_AFileAlreadyOpen_ActivatesItsTabWithoutLoadingAgain()
     {
         var tabs = new NestTabs();

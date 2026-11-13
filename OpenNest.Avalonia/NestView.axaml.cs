@@ -43,6 +43,10 @@ namespace OpenNest.Avalonia
         public void Refresh(int selectIndex)
         {
             var nest = Tab.Document.Nest;
+            // As the WinForms nest window: one empty plate stays at the end to nest onto, so a
+            // new nest shows Plate 1. Files leave empty plates out, so saving is unchanged.
+            using (var plates = new PlateManager(nest))
+                plates.EnsureSentinel();
             Canvas.ClearCache();
             PlateList.ItemsSource = nest.Plates
                 .Select((plate, i) =>

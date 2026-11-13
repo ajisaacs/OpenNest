@@ -1,23 +1,22 @@
 using System;
-using System.IO;
-using System.Net.Http;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Data;
+using OpenNest.Desktop;
 using OpenNest.Properties;
 
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// Creates File > New nests: nest defaults, clamps, the default machine and its support grid, then the year's next name
-    /// (<see cref="NestNames"/>). In Database mode the nest server allocates the number so
-    /// every PC shares one sequence; when it cannot, <see cref="Settings.NestNumber"/> is the
-    /// local fallback, kept above every number the server handed out and reset each year.
+    /// The WinForms entry point for File > New nests. The rules live in the shared
+    /// <see cref="Desktop.NewNestSource"/>, reading this app's settings; this shows its warning.
     /// </summary>
     internal static class NewNestFactory
     {
-        private static readonly TimeSpan ServerTimeout = TimeSpan.FromSeconds(3);
+        private static readonly Desktop.NewNestSource Factory = new(
+            MachineSettings.Source,
+            new AppUserSettings(),
+            () => NestStorage.Settings.IsDatabaseMode ? NestStorage.CreateRepository() : null);
 
         /// <param name="release">
         /// The drawing set release group the nest is for: its units, with the saved plate
@@ -26,72 +25,33 @@ namespace OpenNest.Forms
         /// </param>
         public static async Task<Nest> CreateAsync(IWin32Window owner, SetReleaseGroup release = null)
         {
-            var nest = CreateDefaultNest(release);
-            var now = DateTime.Now;
-
-            nest.DateCreated = now;
-            nest.DateLastModified = now;
-            nest.MadeBy = DefaultMadeBy;
-            nest.Name = NestNames.Format(now.Year, await AllocateNumberAsync(now));
-            return nest;
+            var created = await Factory.CreateAsync(release);
+            if (created.Warning != null)
+                MessageBox.Show(owner, created.Warning, "Nest Defaults", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return created.Nest;
         }
 
-        /// <summary>
-        /// The author a new nest starts with: the name the user last typed in Nest Info's Made By,
-        /// else their Windows user name. Only new nests get it; opening an existing nest's info
-        /// leaves a blank Made By blank.
-        /// </summary>
-        public static string DefaultMadeBy
-        {
-            get
-            {
-                var remembered = Settings.Default.MadeBy;
-                return string.IsNullOrWhiteSpace(remembered) ? Environment.UserName : remembered.Trim();
-            }
-        }
+        /// <summary>See <see cref="Desktop.NewNestSource.DefaultMadeBy"/>.</summary>
+        public static string DefaultMadeBy => Desktop.NewNestSource.MadeByOrUserName(Settings.Default.MadeBy);
 
-        private static Nest CreateDefaultNest(SetReleaseGroup release)
+        /// <summary>The app settings the shared rules read and save.</summary>
+        private sealed class AppUserSettings : INewNestUserSettings
         {
-            var nest = new Nest();
-            var defaults = MachineSettings.LoadNestDefaults();
-            (release != null ? defaults.ConvertedTo(release.Units) : defaults).ApplyTo(nest);
-            // After the defaults so the rail and grid are converted to the new nest's units.
-            var machine = MachineSettings.DefaultMachine(defaults, MachineSettings.LoadMachines());
-            MachineSettings.LoadClampSettings(machine).ApplyToNewNest(nest);
-            MachineSettings.AssignMachine(nest, machine);
-            if (release != null)
+            public int NestNumber
             {
-                nest.Material = new Material(release.MaterialName, release.MaterialGrade);
-                nest.Thickness = release.Thickness;
-                MachineCuttingDefaults.ApplySpacingTo(nest, machine);
-            }
-            return nest;
-        }
-
-        private static async Task<int> AllocateNumberAsync(DateTime now)
-        {
-            if (now.Year != Settings.Default.LastNestCreatedDate.Year)
-                Settings.Default.NestNumber = 1;
-            Settings.Default.LastNestCreatedDate = now.Date;
-
-            if (NestStorage.Settings.IsDatabaseMode)
-            {
-                try
-                {
-                    using var timeout = new CancellationTokenSource(ServerTimeout);
-                    var number = await NestStorage.CreateRepository()
-                        .AllocateNestNumberAsync(now.Year, timeout.Token);
-                    Settings.Default.NestNumber = System.Math.Max(Settings.Default.NestNumber, number + 1);
-                    return number;
-                }
-                catch (Exception ex) when (ex is HttpRequestException or IOException
-                    or OperationCanceledException or NotSupportedException or ArgumentException)
-                {
-                    // Offline or an older server: fall back to this PC's counter.
-                }
+                get => Settings.Default.NestNumber;
+                set => Settings.Default.NestNumber = value;
             }
 
-            return Settings.Default.NestNumber++;
+            public DateTime LastNestCreatedDate
+            {
+                get => Settings.Default.LastNestCreatedDate;
+                set => Settings.Default.LastNestCreatedDate = value;
+            }
+
+            public string MadeBy => Settings.Default.MadeBy;
+
+            public void Save() => Settings.Default.Save();
         }
     }
 }
