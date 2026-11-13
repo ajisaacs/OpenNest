@@ -185,7 +185,7 @@ public class DrawingCanonicalAngleWiringTests
     }
 
     [Fact]
-    public void RecomputeCanonicalAngle_UpdatesAfterMutation()
+    public void ProgramChanged_UpdatesAngleAfterMutation()
     {
         var d = new Drawing("r", RotatedRectProgram(100, 50, 0.0));
         Assert.Equal(0.0, d.Source.Angle, precision: 6);
@@ -194,7 +194,7 @@ public class DrawingCanonicalAngleWiringTests
         d.Program.Rotate(0.5, d.Program.BoundingBox().Center);
         Assert.Equal(0.0, d.Source.Angle, precision: 6); // still stale
 
-        d.RecomputeCanonicalAngle();
+        d.ProgramChanged();
         Assert.InRange(d.Source.Angle, -0.52, -0.48);
     }
 }

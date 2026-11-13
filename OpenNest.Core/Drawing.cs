@@ -79,17 +79,24 @@ namespace OpenNest
             set
             {
                 program = value;
-                UpdateArea();
-                RecomputeCanonicalAngle();
+                ProgramChanged();
             }
         }
 
         /// <summary>
-        /// Recomputes and stores the canonical angle from the current Program.
-        /// Callers that mutate Program in place (rather than reassigning it) must invoke this explicitly.
-        /// Cut-off drawings are left with Angle=0.
+        /// Refreshes everything derived from <see cref="Program"/>: <see cref="Area"/> and the
+        /// canonical angle in <see cref="SourceInfo.Angle"/>. Assigning <see cref="Program"/>
+        /// calls it; callers that mutate the program in place (rather than reassigning it) must
+        /// call it afterwards.
         /// </summary>
-        public void RecomputeCanonicalAngle()
+        public void ProgramChanged()
+        {
+            UpdateArea();
+            RecomputeCanonicalAngle();
+        }
+
+        // Cut-off drawings are left with Angle=0.
+        private void RecomputeCanonicalAngle()
         {
             if (Source == null)
                 Source = new SourceInfo();
@@ -188,15 +195,25 @@ namespace OpenNest
 
         public double Area { get; protected set; }
 
-        public void UpdateArea()
+        private void UpdateArea()
         {
+            if (program == null)
+            {
+                Area = 0;
+                return;
+            }
+
             var geometry = ConvertProgram
-                .ToGeometry(Program)
+                .ToGeometry(program)
                 .Where(entity => SpecialLayers.IsMaterial(entity.Layer));
             var shapes = ShapeBuilder.GetShapes(geometry);
 
+            // No material left (e.g. only marks): a stale area would still count as material.
             if (shapes.Count == 0)
+            {
+                Area = 0;
                 return;
+            }
 
             var areas = new double[shapes.Count];
 
@@ -255,7 +272,7 @@ namespace OpenNest
         /// setter via <see cref="CanonicalAngle.Compute"/>. A value of 0 means the drawing is
         /// already canonical or <see cref="Drawing.IsCutOff"/> is true. Callers that mutate
         /// <see cref="Drawing.Program"/> in place must invoke
-        /// <see cref="Drawing.RecomputeCanonicalAngle"/> to refresh.
+        /// <see cref="Drawing.ProgramChanged"/> to refresh.
         /// </summary>
         public double Angle { get; set; }
     }

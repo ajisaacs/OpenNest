@@ -237,7 +237,7 @@ public class BestFitPersistenceTests
     {
         var drawing = MakeTShape();
         drawing.Program.Rotate(Angle.ToRadians(30), drawing.Program.BoundingBox().Center);
-        drawing.RecomputeCanonicalAngle();
+        drawing.ProgramChanged();
         return drawing;
     }
 

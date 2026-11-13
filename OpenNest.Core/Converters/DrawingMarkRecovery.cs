@@ -57,8 +57,7 @@ public static class DrawingMarkRecovery
             return false;
 
         AppendMarks(drawing.Program, marks);
-        drawing.UpdateArea();
-        drawing.RecomputeCanonicalAngle();
+        drawing.ProgramChanged();
 
         foreach (var part in placedParts.Where(part => ReferenceEquals(part.BaseDrawing, drawing)
                      && !part.HasManualLeadIns))

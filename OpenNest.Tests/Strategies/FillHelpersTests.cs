@@ -34,7 +34,7 @@ public class FillHelpersTests
         {
             // Program.Rotate mutates in place; refresh the canonical angle the same way
             // a rotated CAD import carries it, or AsCanonicalCopy takes the zero-angle path.
-            drawing.RecomputeCanonicalAngle();
+            drawing.ProgramChanged();
             canonicalAngle = drawing.Source.Angle;
             Assert.False(OpenNest.Math.Tolerance.IsEqualTo(canonicalAngle, 0));
             drawing = CanonicalFrame.AsCanonicalCopy(drawing);

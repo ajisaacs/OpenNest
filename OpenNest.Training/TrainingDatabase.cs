@@ -4,10 +4,10 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using OpenNest.Engine;
 using OpenNest.Engine.ML;
 using OpenNest.IO;
 using OpenNest.Training.Data;
-using OpenNest.Engine;
 
 namespace OpenNest.Training
 {
@@ -137,7 +137,6 @@ namespace OpenNest.Training
                     var program = programReader.Read();
 
                     var drawing = new Drawing("backfill") { Program = program };
-                    drawing.UpdateArea();
 
                     var features = FeatureExtractor.Extract(drawing);
                     if (features == null)
@@ -175,7 +174,7 @@ namespace OpenNest.Training
             {
                 try
                 {
-                    _db.Database.ExecuteSqlRaw($"ALTER TABLE Runs ADD COLUMN {name} {type}");
+                    _db.Database.ExecuteSql($"ALTER TABLE Runs ADD COLUMN {name} {type}");
                 }
                 catch
                 {

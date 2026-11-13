@@ -167,7 +167,6 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                 continue;
             }
 
-            drawing.UpdateArea();
             drawing.Color = PartColors[colorIndex % PartColors.Length];
             colorIndex++;
 

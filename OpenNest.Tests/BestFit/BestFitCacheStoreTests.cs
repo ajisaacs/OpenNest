@@ -194,7 +194,7 @@ public class BestFitCacheStoreTests
     {
         var drawing = MakeDrawing();
         drawing.Program.Rotate(0.5, drawing.Program.BoundingBox().Center);
-        drawing.RecomputeCanonicalAngle();
+        drawing.ProgramChanged();
         Assert.NotEqual(0.0, drawing.Source.Angle);
         return drawing;
     }

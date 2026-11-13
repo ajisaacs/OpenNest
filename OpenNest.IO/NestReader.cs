@@ -336,8 +336,7 @@ namespace OpenNest.IO
                         && ScribeLayerRepair.Apply(drawing.Program, marks, drawing.Source.Offset) > 0
                     )
                     {
-                        drawing.UpdateArea();
-                        drawing.RecomputeCanonicalAngle();
+                        drawing.ProgramChanged();
                     }
                 }
 

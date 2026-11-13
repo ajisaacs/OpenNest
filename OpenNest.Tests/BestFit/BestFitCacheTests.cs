@@ -22,7 +22,7 @@ public class BestFitCacheTests
     {
         var drawing = new TShape { Width = 10, Height = 8 }.GetDrawing();
         drawing.Program.Rotate(Angle.ToRadians(30), drawing.Program.BoundingBox().Center);
-        drawing.RecomputeCanonicalAngle();
+        drawing.ProgramChanged();
         return drawing;
     }
 
