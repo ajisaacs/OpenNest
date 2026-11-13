@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using OpenNest.CommonLines;
 using OpenNest.Data.MaterialLedger;
 using OpenNest.Diagnostics;
 using OpenNest.Engine;

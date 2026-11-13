@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using OpenNest;
 using OpenNest.Benchmark;
+using OpenNest.CommonLines;
 using OpenNest.Engine.Jobs;
 using OpenNest.Geometry;
 

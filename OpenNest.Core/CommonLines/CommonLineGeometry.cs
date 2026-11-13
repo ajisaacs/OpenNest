@@ -6,7 +6,7 @@ using OpenNest.Diagnostics;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.CommonLines
 {
     /// <summary>One shared cut: the centerline between two parts' facing edges, one kerf apart.</summary>
     public readonly record struct CommonLineSpan(Part First, Part Second, Vector Start, Vector End)

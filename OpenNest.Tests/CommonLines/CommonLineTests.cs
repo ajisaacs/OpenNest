@@ -1,5 +1,6 @@
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.CommonLines;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
 

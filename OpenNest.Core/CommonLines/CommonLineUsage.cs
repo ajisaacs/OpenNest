@@ -1,4 +1,4 @@
-namespace OpenNest
+namespace OpenNest.CommonLines
 {
     /// <summary>
     /// When automatic nesting and fills may place parts one kerf apart on a common line (see
@@ -23,7 +23,7 @@ namespace OpenNest
     }
 }
 
-namespace OpenNest
+namespace OpenNest.CommonLines
 {
     /// <summary>The names <see cref="CommonLineUsage"/> is saved under (nest files and defaults.json).</summary>
     public static class CommonLineUsageNames

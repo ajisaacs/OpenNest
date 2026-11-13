@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Clipper2Lib;
 using OpenNest.CNC;
+using OpenNest.CommonLines;
 using OpenNest.Converters;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Geometry;

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace OpenNest
+namespace OpenNest.CommonLines
 {
     /// <summary>
     /// Parts placed exactly one kerf apart along collinear straight edges, so one centerline cut

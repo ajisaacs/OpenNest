@@ -1,4 +1,5 @@
 using System.Windows.Forms;
+using OpenNest.CommonLines;
 using OpenNest.Data;
 using OpenNest.Forms;
 using OpenNest.Geometry;

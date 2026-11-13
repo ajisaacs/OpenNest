@@ -1,5 +1,6 @@
 using System.Windows.Forms;
 using OpenNest.CNC;
+using OpenNest.CommonLines;
 using OpenNest.Forms;
 
 namespace OpenNest.WinForms.Tests.Forms;

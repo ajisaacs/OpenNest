@@ -5,7 +5,7 @@ using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.CommonLines
 {
     /// <summary>
     /// One shared cut of a common-line group: a straight span, or spans chained at corners (a Z or

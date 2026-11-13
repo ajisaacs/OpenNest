@@ -10,6 +10,7 @@ using System.Text.Json;
 using OpenNest.BestFit;
 using OpenNest.Clamps;
 using OpenNest.CNC;
+using OpenNest.CommonLines;
 using OpenNest.Support;
 using static OpenNest.IO.NestFormat;
 

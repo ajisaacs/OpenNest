@@ -1,3 +1,4 @@
+using OpenNest.CommonLines;
 using OpenNest.Engine;
 using OpenNest.Engine.Jobs;
 using OpenNest.Geometry;

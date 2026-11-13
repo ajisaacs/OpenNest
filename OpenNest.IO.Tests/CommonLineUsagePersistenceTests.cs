@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json.Nodes;
+using OpenNest.CommonLines;
 
 namespace OpenNest.IO.Tests;
 

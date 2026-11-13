@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using OpenNest.CommonLines;
 using OpenNest.Controls;
 using OpenNest.Engine;
 using OpenNest.Engine.Jobs.Placement;

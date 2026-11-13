@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using OpenNest.Geometry;
 
-namespace OpenNest
+namespace OpenNest.CommonLines
 {
     /// <summary>The outcome of <see cref="CommonLineJoiner.Join"/>: the group made, or why not.</summary>
     public sealed record CommonLineJoinResult(CommonLineGroup Group, string Failure)

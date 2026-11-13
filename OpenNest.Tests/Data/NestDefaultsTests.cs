@@ -1,3 +1,4 @@
+using OpenNest.CommonLines;
 using OpenNest.Data;
 using OpenNest.Geometry;
 

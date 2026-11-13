@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Collections;
+using OpenNest.CommonLines;
 using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.Fill;

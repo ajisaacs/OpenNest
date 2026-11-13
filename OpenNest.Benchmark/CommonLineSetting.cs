@@ -1,4 +1,5 @@
 using System.Linq;
+using OpenNest.CommonLines;
 using OpenNest.Engine.Jobs;
 
 namespace OpenNest.Benchmark

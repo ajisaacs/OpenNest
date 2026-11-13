@@ -1,5 +1,6 @@
 using System.Threading;
 using OpenNest.CNC;
+using OpenNest.CommonLines;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.CommonLines;
 using OpenNest.Engine.Jobs.Placement;

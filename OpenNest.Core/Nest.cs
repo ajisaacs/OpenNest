@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using OpenNest.Clamps;
 using OpenNest.Collections;
+using OpenNest.CommonLines;
 using OpenNest.Geometry;
 using OpenNest.Support;
 

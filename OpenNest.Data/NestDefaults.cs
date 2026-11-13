@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using OpenNest.CommonLines;
 using OpenNest.Geometry;
 
 namespace OpenNest.Data;

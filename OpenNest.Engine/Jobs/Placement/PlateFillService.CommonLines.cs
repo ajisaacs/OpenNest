@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using OpenNest.CommonLines;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.Jobs.CommonLines;
 using OpenNest.Geometry;

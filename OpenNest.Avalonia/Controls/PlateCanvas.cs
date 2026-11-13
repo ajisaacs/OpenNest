@@ -10,6 +10,7 @@ using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
 using OpenNest.Avalonia.Rendering;
 using OpenNest.CNC;
+using OpenNest.CommonLines;
 using OpenNest.Desktop.Rendering;
 using OpenNest.Geometry;
 using OpenNest.Support;

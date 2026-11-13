@@ -1,5 +1,6 @@
 using System;
 using OpenNest;
+using OpenNest.CommonLines;
 
 namespace OpenNest.Engine.Jobs;
 

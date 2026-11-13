@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json.Nodes;
 using OpenNest.CNC;
+using OpenNest.CommonLines;
 using OpenNest.Geometry;
 using static OpenNest.IO.Tests.NestArchiveJson;
 

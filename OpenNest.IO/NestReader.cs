@@ -12,6 +12,7 @@ using OpenNest.Breakoffs;
 using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.CommonLines;
 using OpenNest.Converters;
 using OpenNest.Dimensions;
 using OpenNest.Geometry;

@@ -1,5 +1,6 @@
 using OpenNest.CNC;
 using OpenNest.Collections;
+using OpenNest.CommonLines;
 using OpenNest.Geometry;
 
 namespace OpenNest.Tests;

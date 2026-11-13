@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.Collections;
+using OpenNest.CommonLines;
 
 namespace OpenNest
 {

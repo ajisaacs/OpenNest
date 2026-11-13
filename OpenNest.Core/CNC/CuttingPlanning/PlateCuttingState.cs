@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Collections;
+using OpenNest.CommonLines;
 using OpenNest.Geometry;
 
 namespace OpenNest.CNC.CuttingPlanning;
