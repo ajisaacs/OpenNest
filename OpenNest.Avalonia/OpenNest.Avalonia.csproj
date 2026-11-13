@@ -19,6 +19,10 @@
     <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.0" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The WinForms app's empty-workspace logo, shared rather than copied. -->
+    <AvaloniaResource Include="..\OpenNest\Resources\watermark.png" Link="Assets\watermark.png" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- The posts the WinForms app ships, built with this app and copied to its Posts/ directory. -->
     <ProjectReference Include="..\Posts\OpenNest.Posts.Cincinnati\OpenNest.Posts.Cincinnati.csproj" ReferenceOutputAssembly="false" IsPost="true" />
     <ProjectReference Include="..\Posts\OpenNest.Posts.CincinnatiCIFiber\OpenNest.Posts.CincinnatiCIFiber.csproj" ReferenceOutputAssembly="false" IsPost="true" />

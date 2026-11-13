@@ -69,8 +69,11 @@
     </Border>
 
     <Panel>
-      <TextBlock x:Name="EmptyHint" Text="Create a new nest or open a .nest file to begin." Foreground="#6B7280"
-                 HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="15" />
+      <!-- The empty workspace, as in the WinForms app: dark, with the OpenNest logo centered. -->
+      <Panel x:Name="EmptyHint" Background="#2B2B2B">
+        <Image Source="avares://OpenNest.Avalonia/Assets/watermark.png" Stretch="None"
+               HorizontalAlignment="Center" VerticalAlignment="Center" />
+      </Panel>
       <ContentControl x:Name="NestHost" />
     </Panel>
   </DockPanel>
