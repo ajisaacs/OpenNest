@@ -72,7 +72,7 @@ public class EngineRefactorSmokeTests
 
         Assert.Equal(23, parts.Count);
         plate.Parts.AddRange(parts);
-        Assert.False(plate.HasOverlappingParts(out _), "Fill overlaps");
+        Assert.Empty(PartOverlapChecker.FindOverlappingPairs(plate.Parts));
         var area = plate.WorkArea();
         Assert.All(parts, p => Assert.True(
             p.BoundingBox.Left >= area.Left - 1e-6 && p.BoundingBox.Right <= area.Right + 1e-6

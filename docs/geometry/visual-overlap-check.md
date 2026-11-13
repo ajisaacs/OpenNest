@@ -91,9 +91,11 @@ material), even if the dialog is later canceled. There is no check during export
 
 `OpenNest.Diagnostics.PlateOverlapAnalyzer` in OpenNest.Core checks a group of placed
 parts and returns the shared material for each overlapping pair as connected
-islands. It clips with Clipper2. Existing `Part.Intersects`, `PartOverlapChecker`,
-`Plate.HasOverlappingParts`, engine validators, and CLI entry points are unchanged
-and still use the hand-written `Collision` kernel (its GPU port is on hold).
+islands. It clips with Clipper2. Existing `Part.Intersects`, `PartOverlapChecker` and
+engine validators are unchanged and still use the hand-written `Collision` kernel (its
+GPU port is on hold). The console's overlap check and the MCP `check_overlaps` tool list
+overlapping pairs through `PartOverlapChecker.FindOverlappingPairs`, which skips cut-off
+parts and reports a contained or stacked part even though no outlines cross.
 
 ## Synchronous use
 

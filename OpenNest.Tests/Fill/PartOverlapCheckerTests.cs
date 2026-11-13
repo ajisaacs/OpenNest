@@ -411,6 +411,76 @@ public class PartOverlapCheckerTests
         return pattern;
     }
 
+    [Fact]
+    public void FindOverlappingPairs_ReportsAContainedPart()
+    {
+        // The small square sits wholly inside the large one: no outlines cross, so there
+        // are no crossing points to count, but the material overlaps.
+        var outer = TestHelpers.MakePartAt(0, 0, 10);
+        var inner = TestHelpers.MakePartAt(4, 4, 2);
+
+        Assert.True(outer.Intersects(inner, out var points));
+        Assert.Empty(points);
+
+        var pair = Assert.Single(PartOverlapChecker.FindOverlappingPairs(new[] { outer, inner }));
+        Assert.Same(outer, pair.First);
+        Assert.Same(inner, pair.Second);
+    }
+
+    [Fact]
+    public void FindOverlappingPairs_IgnoresEdgeTouchingParts()
+    {
+        var parts = new[]
+        {
+            TestHelpers.MakePartAt(0, 0, 10),
+            TestHelpers.MakePartAt(10, 0, 10),
+            TestHelpers.MakePartAt(0, 10, 10),
+            TestHelpers.MakePartAt(10, 10, 10),
+        };
+
+        Assert.Empty(PartOverlapChecker.FindOverlappingPairs(parts));
+    }
+
+    [Fact]
+    public void FindOverlappingPairs_ExcludesCutOffParts()
+    {
+        var real = TestHelpers.MakePartAt(0, 0, 10);
+        var other = TestHelpers.MakePartAt(5, 5, 10);
+        var cutOff = TestHelpers.MakePartAt(2, 2, 10);
+        cutOff.BaseDrawing.IsCutOff = true;
+
+        var pair = Assert.Single(PartOverlapChecker.FindOverlappingPairs(new[] { real, cutOff, other }));
+        Assert.Same(real, pair.First);
+        Assert.Same(other, pair.Second);
+    }
+
+    [Fact]
+    public void FindOverlappingPairs_MatchesPartIntersectsOnASmallGrid()
+    {
+        // 10-wide squares on a 7 pitch: neighbors (diagonal ones too) overlap, squares two
+        // steps apart are clear, and one small square is contained in the middle one.
+        var parts = new List<Part>();
+        for (var row = 0; row < 3; row++)
+            for (var column = 0; column < 3; column++)
+                parts.Add(TestHelpers.MakePartAt(column * 7, row * 7, 10));
+        parts.Add(TestHelpers.MakePartAt(11, 11, 2));
+
+        var expected = new List<(int, int)>();
+        for (var i = 0; i < parts.Count; i++)
+            for (var j = i + 1; j < parts.Count; j++)
+                if (parts[i].Intersects(parts[j], out _))
+                    expected.Add((i, j));
+
+        var actual = PartOverlapChecker.FindOverlappingPairs(parts)
+            .Select(pair => (parts.IndexOf(pair.First), parts.IndexOf(pair.Second)))
+            .ToList();
+
+        Assert.Contains((0, 1), expected);
+        Assert.DoesNotContain((0, 2), expected);
+        Assert.Contains((4, 9), expected);
+        Assert.Equal(expected, actual);
+    }
+
     private static long Bits(double value) => BitConverter.DoubleToInt64Bits(value);
 
     private static long[] PolygonBits(Polygon polygon) => new[]

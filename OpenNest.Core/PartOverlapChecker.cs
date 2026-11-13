@@ -57,6 +57,54 @@ namespace OpenNest
             );
         }
 
+        /// <summary>
+        /// Every overlapping pair among <paramref name="parts"/>, in list order (First precedes
+        /// Second). Cut-off parts are skipped. Each verdict is <see cref="Overlaps"/>, so a part
+        /// contained in or stacked on another is reported even though their outlines never cross.
+        /// </summary>
+        public static List<(Part First, Part Second)> FindOverlappingPairs(IEnumerable<Part> parts)
+        {
+            var pairs = new List<(Part First, Part Second)>();
+            var realParts = new List<Part>();
+
+            foreach (var part in parts)
+            {
+                if (!part.BaseDrawing.IsCutOff)
+                    realParts.Add(part);
+            }
+
+            var checker = new PartOverlapChecker();
+
+            for (var i = 0; i < realParts.Count; i++)
+            {
+                var part1 = realParts[i];
+                var b1 = part1.BoundingBox;
+
+                for (var j = i + 1; j < realParts.Count; j++)
+                {
+                    var part2 = realParts[j];
+                    var b2 = part2.BoundingBox;
+
+                    // Skip pairs whose bounding boxes don't meaningfully overlap.
+                    // Floating-point rounding can produce sub-epsilon overlaps for
+                    // parts that are merely edge-touching, so require the overlap
+                    // region to exceed Epsilon in both dimensions.
+                    var overlapX =
+                        System.Math.Min(b1.Right, b2.Right) - System.Math.Max(b1.Left, b2.Left);
+                    var overlapY =
+                        System.Math.Min(b1.Top, b2.Top) - System.Math.Max(b1.Bottom, b2.Bottom);
+
+                    if (overlapX <= Math.Tolerance.Epsilon || overlapY <= Math.Tolerance.Epsilon)
+                        continue;
+
+                    if (checker.Overlaps(part1, part2))
+                        pairs.Add((part1, part2));
+                }
+            }
+
+            return pairs;
+        }
+
         private PreparedProgram Prepare(CNC.Program program)
         {
             if (!programs.TryGetValue(program, out var prepared))

@@ -109,7 +109,7 @@ namespace OpenNest.Mcp.Tools
         }
 
         [McpServerTool(Name = "check_overlaps")]
-        [Description("Check a plate for overlapping parts. Reports collision points if any.")]
+        [Description("Check a plate for overlapping parts. Reports the overlapping pairs by part index if any.")]
         public string CheckOverlaps([Description("Index of the plate")] int plateIndex)
         {
             var plate = _session.GetPlate(plateIndex);
@@ -119,24 +119,26 @@ namespace OpenNest.Mcp.Tools
             if (plate.Parts.Count < 2)
                 return $"Plate {plateIndex}: no overlaps possible (fewer than 2 parts)";
 
-            var hasOverlaps = plate.HasOverlappingParts(out var pts);
+            var pairs = PartOverlapChecker.FindOverlappingPairs(plate.Parts);
 
-            if (!hasOverlaps)
+            if (pairs.Count == 0)
                 return $"Plate {plateIndex}: no overlapping parts detected";
 
             var sb = new StringBuilder();
-            sb.AppendLine($"Plate {plateIndex}: {pts.Count} collision point(s) detected!");
+            sb.AppendLine($"Plate {plateIndex}: {pairs.Count} overlapping pair(s) detected!");
 
-            var limit = System.Math.Min(pts.Count, 20);
+            var limit = System.Math.Min(pairs.Count, 20);
 
             for (var i = 0; i < limit; i++)
             {
-                var pt = pts[i];
-                sb.AppendLine($"  Collision at ({pt.X:F2}, {pt.Y:F2})");
+                var (first, second) = pairs[i];
+                sb.AppendLine(
+                    $"  Part {plate.Parts.IndexOf(first)} overlaps part {plate.Parts.IndexOf(second)}"
+                );
             }
 
-            if (pts.Count > limit)
-                sb.AppendLine($"  ... and {pts.Count - limit} more collision points");
+            if (pairs.Count > limit)
+                sb.AppendLine($"  ... and {pairs.Count - limit} more overlapping pairs");
 
             return sb.ToString();
         }

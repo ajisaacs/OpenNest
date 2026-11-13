@@ -79,7 +79,7 @@ public class FillLinearMaxPartsTests
         Assert.Equal(3, parts.Count);
         var plate = new Plate(width, length) { PartSpacing = Spacing };
         plate.Parts.AddRange(parts);
-        Assert.False(plate.HasOverlappingParts(out _));
+        Assert.Empty(PartOverlapChecker.FindOverlappingPairs(plate.Parts));
         Assert.All(parts, part => Assert.True(part.BoundingBox.Right <= area.Right
             && part.BoundingBox.Top <= area.Top));
     }

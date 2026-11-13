@@ -254,7 +254,7 @@ public class CommonLinePlanningTests
         nest.Drawings.Add(drawing);
         var utilization = plate.Utilization();
         var nested = drawing.Quantity.Nested;
-        var overlaps = plate.HasOverlappingParts(out _);
+        var overlaps = PartOverlapChecker.FindOverlappingPairs(plate.Parts).Count;
         var pairs = PlateOverlapAnalyzer.Analyze(plate.Parts.ToList()).Pairs.Count;
         var area = plate.Parts.Sum(p => p.BaseDrawing.Area);
 
@@ -267,7 +267,7 @@ public class CommonLinePlanningTests
         Assert.All(plate.Parts.Skip(1), p => Assert.True(CommonLineCuts.IsSinglePass(p.Program)));
         Assert.Equal(utilization, plate.Utilization(), 12);
         Assert.Equal(nested, drawing.Quantity.Nested);
-        Assert.Equal(overlaps, plate.HasOverlappingParts(out _));
+        Assert.Equal(overlaps, PartOverlapChecker.FindOverlappingPairs(plate.Parts).Count);
         Assert.Equal(pairs, PlateOverlapAnalyzer.Analyze(plate.Parts.ToList()).Pairs.Count);
         Assert.Equal(area, plate.Parts.Sum(p => p.BaseDrawing.Area), 12);
         Assert.True(CommonLineGeometry.Check(plate.CommonLines[0]).IsIntact);

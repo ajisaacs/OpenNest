@@ -62,18 +62,15 @@ public class EngineOverlapTests
         foreach (var g in rotGroups)
             _output.WriteLine($"  Rotation {g.Key:F1}°: {g.Count()} parts");
 
-        var hasOverlaps = plate.HasOverlappingParts(out var collisionPoints);
-        _output.WriteLine($"Overlaps: {hasOverlaps} ({collisionPoints.Count} collision pts)");
+        var pairs = PartOverlapChecker.FindOverlappingPairs(plate.Parts);
+        _output.WriteLine($"Overlaps: {pairs.Count > 0} ({pairs.Count} overlapping pair(s))");
 
-        if (hasOverlaps)
-        {
-            for (var i = 0; i < System.Math.Min(collisionPoints.Count, 10); i++)
-                _output.WriteLine($"  ({collisionPoints[i].X:F2}, {collisionPoints[i].Y:F2})");
-        }
+        foreach (var (first, second) in pairs.Take(10))
+            _output.WriteLine($"  part {plate.Parts.IndexOf(first)} overlaps part {plate.Parts.IndexOf(second)}");
 
-        Assert.False(
-            hasOverlaps,
-            $"Strategy '{strategy}' produced {collisionPoints.Count} collision point(s) with {plate.Parts.Count} parts"
+        Assert.True(
+            pairs.Count == 0,
+            $"Strategy '{strategy}' produced {pairs.Count} overlapping pair(s) with {plate.Parts.Count} parts"
         );
     }
 
@@ -87,11 +84,11 @@ public class EngineOverlapTests
             TestHelpers.MakePartAt(10, 0, 10)
         );
 
-        var hasOverlaps = plate.HasOverlappingParts(out var pts);
-        _output.WriteLine($"Adjacent squares: overlaps={hasOverlaps}, collision count={pts.Count}");
+        var pairs = PartOverlapChecker.FindOverlappingPairs(plate.Parts);
+        _output.WriteLine($"Adjacent squares: overlapping pairs={pairs.Count}");
 
-        Assert.False(
-            hasOverlaps,
+        Assert.True(
+            pairs.Count == 0,
             "Adjacent edge-touching parts should not be reported as overlapping"
         );
     }

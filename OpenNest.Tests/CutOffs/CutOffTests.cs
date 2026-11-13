@@ -44,7 +44,7 @@ public class CutOffTests
     }
 
     [Fact]
-    public void Plate_HasOverlappingParts_SkipsCutOffParts()
+    public void FindOverlappingPairs_SkipsCutOffParts()
     {
         var pgm = new Program();
         pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
@@ -60,8 +60,30 @@ public class CutOffTests
         plate.Parts.Add(new Part(realDrawing));
         plate.Parts.Add(new Part(cutoffDrawing));
 
-        var hasOverlap = plate.HasOverlappingParts(out var pts);
-        Assert.False(hasOverlap);
+        Assert.Empty(PartOverlapChecker.FindOverlappingPairs(plate.Parts));
+    }
+
+    [Fact]
+    public void FindOverlappingPairs_ReportsTheSameStackedPartsWhenNeitherIsACutOff()
+    {
+        // Control for the test above: the same two stacked squares overlap, so only the
+        // cut-off flag keeps that pair out of the result.
+        var pgm = new Program();
+        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(10, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(10, 10)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 10)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
+
+        var plate = new Plate(100, 100);
+        var first = new Part(new Drawing("real", pgm));
+        var second = new Part(new Drawing("also real", pgm));
+        plate.Parts.Add(first);
+        plate.Parts.Add(second);
+
+        var pair = Assert.Single(PartOverlapChecker.FindOverlappingPairs(plate.Parts));
+        Assert.Same(first, pair.First);
+        Assert.Same(second, pair.Second);
     }
 
     [Fact]

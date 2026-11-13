@@ -789,14 +789,14 @@ static class NestConsole
         var total = 0;
         foreach (var plate in plates.Where(p => p.Parts.Count > 0))
         {
-            var hasOverlaps = plate.HasOverlappingParts(out var overlapPts);
+            var overlapping = PartOverlapChecker.FindOverlappingPairs(plate.Parts);
             var label = plates.Count > 1 ? $"Plate {nest.Plates.IndexOf(plate)}: " : "";
             Console.WriteLine(
-                hasOverlaps
-                    ? $"{label}OVERLAPS DETECTED: {overlapPts.Count} intersection points"
+                overlapping.Count > 0
+                    ? $"{label}OVERLAPS DETECTED: {overlapping.Count} overlapping pair(s)"
                     : $"{label}Overlap check: PASS"
             );
-            total += overlapPts.Count;
+            total += overlapping.Count;
         }
 
         return total;

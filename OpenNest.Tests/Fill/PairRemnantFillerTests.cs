@@ -59,7 +59,7 @@ public class PairRemnantFillerTests
 
         var check = new Plate { Size = new Size(60, 120), PartSpacing = Spacing };
         check.Parts.AddRange(withPairs);
-        Assert.False(check.HasOverlappingParts(out _));
+        Assert.Empty(PartOverlapChecker.FindOverlappingPairs(check.Parts));
     }
 
     [Fact]
