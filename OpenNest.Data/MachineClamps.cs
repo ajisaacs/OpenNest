@@ -1,3 +1,5 @@
+using OpenNest.Clamps;
+
 namespace OpenNest.Data;
 
 /// <summary>

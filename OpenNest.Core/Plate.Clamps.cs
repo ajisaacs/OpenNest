@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using OpenNest.Clamps;
 using OpenNest.Collections;
 using OpenNest.Geometry;
 
@@ -35,7 +36,7 @@ namespace OpenNest
 
         /// <summary>
         /// The gap part material keeps from every clamp zone: the rail's own
-        /// <see cref="OpenNest.ClampRail.Clearance"/>, else the bottom edge spacing (D6), never
+        /// <see cref="OpenNest.Clamps.ClampRail.Clearance"/>, else the bottom edge spacing (D6), never
         /// negative. Part spacing never applies to clamps.
         /// </summary>
         public double ClampClearance =>
@@ -57,7 +58,7 @@ namespace OpenNest
         /// <summary>
         /// Minutes this sheet's cut-time estimate gains from <see cref="RemovedClamps"/> (D9):
         /// each listed clamp the rail places on this sheet adds
-        /// <see cref="OpenNest.ClampRail.RemovalMinutes"/> once; a listed clamp that is beyond
+        /// <see cref="OpenNest.Clamps.ClampRail.RemovalMinutes"/> once; a listed clamp that is beyond
         /// the sheet (or unknown to the rail) is not pulled and costs nothing. Zero when there
         /// is no rail (removal is meaningless without one to remove clamps from).
         /// </summary>

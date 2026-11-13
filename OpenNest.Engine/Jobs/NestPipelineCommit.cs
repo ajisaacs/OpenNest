@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using OpenNest.Clamps;
 using OpenNest.Engine.Jobs.Adapters;
 
 namespace OpenNest.Engine.Jobs;

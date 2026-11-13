@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;

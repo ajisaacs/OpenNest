@@ -1,3 +1,4 @@
+using OpenNest.Clamps;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Tests.Jobs;
 using OpenNest.Geometry;

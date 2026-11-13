@@ -1,4 +1,5 @@
 using System.Reflection;
+using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;

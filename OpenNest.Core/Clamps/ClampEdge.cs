@@ -1,6 +1,6 @@
 using System;
 
-namespace OpenNest
+namespace OpenNest.Clamps
 {
     /// <summary>
     /// The sheet edge a <see cref="ClampRail"/> clamp sits on, named relative to the plate

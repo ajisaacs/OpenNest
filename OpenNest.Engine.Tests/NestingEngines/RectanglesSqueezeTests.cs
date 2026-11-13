@@ -1,3 +1,4 @@
+using OpenNest.Clamps;
 using OpenNest.Converters;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;

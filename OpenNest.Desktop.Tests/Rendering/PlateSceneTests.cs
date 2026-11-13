@@ -1,3 +1,4 @@
+using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.Desktop.Rendering;
 using OpenNest.Geometry;

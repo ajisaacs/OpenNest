@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Placement;

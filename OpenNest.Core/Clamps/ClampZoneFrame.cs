@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using OpenNest.Geometry;
 
-namespace OpenNest;
+namespace OpenNest.Clamps;
 
 /// <summary>
 /// Maps a plate's <see cref="Plate.ClampZones"/>, stored in the sheet's lower-left frame

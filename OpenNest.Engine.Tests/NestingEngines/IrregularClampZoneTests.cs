@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using OpenNest.Clamps;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.NestingEngines.Default;
 using OpenNest.Engine.NestingEngines.Irregular;

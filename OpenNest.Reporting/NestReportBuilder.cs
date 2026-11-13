@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 

@@ -1,3 +1,5 @@
+using OpenNest.Clamps;
+
 namespace OpenNest.Forms;
 
 /// <summary>Operator-facing names for <see cref="ClampEdge"/>, relative to the plate origin.</summary>

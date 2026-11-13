@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Clipper2Lib;
+using OpenNest.Clamps;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Jobs;

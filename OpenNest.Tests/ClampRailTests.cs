@@ -1,3 +1,4 @@
+using OpenNest.Clamps;
 using OpenNest.Geometry;
 
 namespace OpenNest.Tests;

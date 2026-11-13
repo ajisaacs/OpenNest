@@ -1,7 +1,7 @@
 using System;
 using OpenNest.Geometry;
 
-namespace OpenNest
+namespace OpenNest.Clamps
 {
     /// <summary>
     /// A fixed rectangular keep-out region in plate coordinates (the sheet's own frame:

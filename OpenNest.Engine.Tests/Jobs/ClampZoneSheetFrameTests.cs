@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading;
+using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.Diagnostics;
 using OpenNest.Engine.Jobs;

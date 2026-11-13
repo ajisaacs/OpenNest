@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using OpenNest.Clamps;
 using OpenNest.Engine.Jobs;
 using OpenNest.Geometry;
 using static OpenNest.Engine.Tests.NestingEngines.JobBuilder;

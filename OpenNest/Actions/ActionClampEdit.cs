@@ -6,6 +6,7 @@ using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Clamps;
 using OpenNest.Controls;
 using OpenNest.Data;
 using OpenNest.Forms;

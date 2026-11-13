@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;

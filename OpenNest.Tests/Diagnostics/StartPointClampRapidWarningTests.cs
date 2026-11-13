@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;

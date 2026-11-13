@@ -1,3 +1,4 @@
+using OpenNest.Clamps;
 using OpenNest.Data;
 
 namespace OpenNest.Tests.Data;

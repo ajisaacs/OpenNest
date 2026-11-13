@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.Engine.Fill;
 using OpenNest.Engine.Tests.Jobs;

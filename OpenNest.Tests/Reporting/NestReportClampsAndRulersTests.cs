@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using OpenNest.Clamps;
 using OpenNest.Geometry;
 using OpenNest.Reporting;
 using PdfSharp.Drawing;

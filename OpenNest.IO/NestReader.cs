@@ -9,6 +9,7 @@ using System.Text.Json.Nodes;
 using OpenNest.Bending;
 using OpenNest.BestFit;
 using OpenNest.Breakoffs;
+using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Converters;

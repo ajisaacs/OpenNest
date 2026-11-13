@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Windows.Forms;
+using OpenNest.Clamps;
 using OpenNest.Data;
 using OpenNest.Shapes;
 using OpenNest.Support;

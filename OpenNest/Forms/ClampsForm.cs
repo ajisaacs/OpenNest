@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Windows.Forms;
+using OpenNest.Clamps;
 using OpenNest.Data;
 
 namespace OpenNest.Forms;

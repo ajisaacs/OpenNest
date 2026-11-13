@@ -1,5 +1,6 @@
 using System.Windows.Forms;
 using OpenNest.Actions;
+using OpenNest.Clamps;
 using OpenNest.Controls;
 using OpenNest.Engine;
 using OpenNest.Engine.Strategies;

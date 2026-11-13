@@ -1,4 +1,5 @@
 using OpenNest.Actions;
+using OpenNest.Clamps;
 using OpenNest.Controls;
 using OpenNest.Geometry;
 

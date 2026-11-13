@@ -424,12 +424,12 @@ namespace OpenNest.IO
 
             /// <summary>
             /// Minutes to remove one clamp and put it back after cutting (D9). Null in older
-            /// files and readers fall back to <see cref="OpenNest.ClampRail.DefaultRemovalMinutes"/>.
+            /// files and readers fall back to <see cref="OpenNest.Clamps.ClampRail.DefaultRemovalMinutes"/>.
             /// </summary>
             public double? RemovalMinutes { get; init; }
 
             /// <summary>
-            /// The gap parts keep from every clamp (<see cref="OpenNest.ClampRail.Clearance"/>).
+            /// The gap parts keep from every clamp (<see cref="OpenNest.Clamps.ClampRail.Clearance"/>).
             /// Omitted when the rail uses the sheet's bottom edge spacing, as older files do.
             /// </summary>
             public double? Clearance { get; init; }

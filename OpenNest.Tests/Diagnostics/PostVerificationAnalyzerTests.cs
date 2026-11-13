@@ -1,4 +1,5 @@
 using System.Text;
+using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Diagnostics;

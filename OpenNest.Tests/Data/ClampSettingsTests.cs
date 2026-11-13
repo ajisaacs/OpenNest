@@ -1,4 +1,5 @@
 using System.Text.Json;
+using OpenNest.Clamps;
 using OpenNest.Data;
 using OpenNest.Geometry;
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using OpenNest.Clamps;
 using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
 using OpenNest.IO;

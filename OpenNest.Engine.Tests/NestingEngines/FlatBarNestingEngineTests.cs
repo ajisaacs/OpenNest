@@ -1,4 +1,5 @@
 using System.Linq;
+using OpenNest.Clamps;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.NestingEngines.FlatBar;
 using OpenNest.Engine.NestingEngines.Rectangles;

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.Engine.Fill;
 using OpenNest.Engine.Tests.Jobs;

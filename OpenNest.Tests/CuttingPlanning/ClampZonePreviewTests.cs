@@ -1,3 +1,4 @@
+using OpenNest.Clamps;
 using OpenNest.Engine.CuttingPlanning;
 
 namespace OpenNest.Tests.CuttingPlanning;

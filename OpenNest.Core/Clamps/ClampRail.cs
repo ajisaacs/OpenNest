@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using OpenNest.Geometry;
 
-namespace OpenNest
+namespace OpenNest.Clamps
 {
     /// <summary>
     /// The machine's fixed clamp rail: identical rectangular clamps, each on one sheet edge
