@@ -389,25 +389,6 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Moves the start point to the given coordinates.
-        /// </summary>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        public override void MoveTo(double x, double y)
-        {
-            throw new NotImplementedException();
-        }
-
-        /// <summary>
-        /// Moves the start point to the given point.
-        /// </summary>
-        /// <param name="pt"></param>
-        public override void MoveTo(Vector pt)
-        {
-            throw new NotImplementedException();
-        }
-
-        /// <summary>
         /// Offsets the shape location by the given distances.
         /// </summary>
         /// <param name="x"></param>
@@ -719,11 +700,6 @@ namespace OpenNest.Geometry
 
                 offsetShape.Entities.Add(arc);
             }
-        }
-
-        public override Entity OffsetEntity(double distance, Vector pt)
-        {
-            throw new NotImplementedException();
         }
 
         /// <summary>

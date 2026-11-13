@@ -112,19 +112,6 @@ namespace OpenNest.Geometry
         public abstract void Reverse();
 
         /// <summary>
-        /// Moves the entity location to the given coordinates.
-        /// </summary>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        public abstract void MoveTo(double x, double y);
-
-        /// <summary>
-        /// Moves the entity location to the given point.
-        /// </summary>
-        /// <param name="pt"></param>
-        public abstract void MoveTo(Vector pt);
-
-        /// <summary>
         /// Offsets the entity location by the given distances.
         /// </summary>
         /// <param name="x"></param>
@@ -175,14 +162,6 @@ namespace OpenNest.Geometry
         /// <param name="side"></param>
         /// <returns></returns>
         public abstract Entity OffsetEntity(double distance, OffsetSide side);
-
-        /// <summary>
-        /// Gets a new entity offset the given distance from this entity. Offset side determined by point.
-        /// </summary>
-        /// <param name="distance"></param>
-        /// <param name="pt"></param>
-        /// <returns></returns>
-        public abstract Entity OffsetEntity(double distance, Vector pt);
 
         /// <summary>
         /// Gets the closest point on the entity to the given point.

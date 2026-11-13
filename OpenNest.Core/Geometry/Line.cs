@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using OpenNest.Math;
 
@@ -267,36 +267,6 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Moves the start point to the given coordinates.
-        /// </summary>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        public override void MoveTo(double x, double y)
-        {
-            var xoffset = pt1.X - x;
-            var yoffset = pt1.Y - y;
-
-            pt2.X += xoffset;
-            pt2.Y += yoffset;
-            pt1.X = x;
-            pt1.Y = y;
-            boundingBox.Offset(xoffset, yoffset);
-        }
-
-        /// <summary>
-        /// Moves the start point to the given point.
-        /// </summary>
-        /// <param name="pt"></param>
-        public override void MoveTo(Vector pt)
-        {
-            var offset = pt1 - pt;
-
-            pt2 += offset;
-            pt1 = pt;
-            boundingBox.Offset(offset);
-        }
-
-        /// <summary>
         /// Offsets the line location by the given distances.
         /// </summary>
         /// <param name="x"></param>
@@ -401,16 +371,6 @@ namespace OpenNest.Geometry
             var pt = side == OffsetSide.Left ? new Vector(x, y) : new Vector(-x, -y);
 
             return new Line(StartPoint + pt, EndPoint + pt);
-        }
-
-        public override Entity OffsetEntity(double distance, Vector pt)
-        {
-            var a = pt - StartPoint;
-            var b = EndPoint - StartPoint;
-            var c = a.DotProduct(b);
-            var side = c < 0 ? OffsetSide.Left : OffsetSide.Right;
-
-            return OffsetEntity(distance, side);
         }
 
         /// <summary>

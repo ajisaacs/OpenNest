@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using OpenNest.Math;
 
 namespace OpenNest.Geometry
@@ -181,25 +181,6 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Moves the center point to the given coordinates.
-        /// </summary>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        public override void MoveTo(double x, double y)
-        {
-            Center = new Vector(x, y);
-        }
-
-        /// <summary>
-        /// Moves the center point to the given point.
-        /// </summary>
-        /// <param name="pt"></param>
-        public override void MoveTo(Vector pt)
-        {
-            Center = pt;
-        }
-
-        /// <summary>
         /// Offsets the center point by the given distances.
         /// </summary>
         /// <param name="x"></param>
@@ -285,20 +266,6 @@ namespace OpenNest.Geometry
             else
             {
                 return new Circle(center, Radius + distance) { Layer = Layer, Rotation = Rotation };
-            }
-        }
-
-        public override Entity OffsetEntity(double distance, Vector pt)
-        {
-            if (ContainsPoint(pt))
-            {
-                return Radius <= distance
-                    ? null
-                    : new Circle(center, Radius - distance) { Layer = Layer, Rotation = Rotation };
-            }
-            else
-            {
-                return new Circle(center, Radius + distance) { Layer = Layer };
             }
         }
 

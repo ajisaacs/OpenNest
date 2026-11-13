@@ -186,39 +186,6 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Moves the start point to the given coordinates.
-        /// </summary>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        public override void MoveTo(double x, double y)
-        {
-            if (Vertices.Count == 0)
-                return;
-
-            var first = Vertices[0];
-            var offset = new Vector(x - first.X, y - first.Y);
-
-            Vertices.ForEach(vertex => vertex += offset);
-            boundingBox.Offset(offset);
-        }
-
-        /// <summary>
-        /// Moves the start point to the given point.
-        /// </summary>
-        /// <param name="pt"></param>
-        public override void MoveTo(Vector pt)
-        {
-            if (Vertices.Count == 0)
-                return;
-
-            var first = Vertices[0];
-            var offset = pt - first;
-
-            Vertices.ForEach(vertex => vertex += offset);
-            boundingBox.Offset(offset);
-        }
-
-        /// <summary>
         /// Offsets the location by the given distances.
         /// </summary>
         /// <param name="x"></param>
@@ -352,22 +319,6 @@ namespace OpenNest.Geometry
                 result.Reverse();
 
             return result;
-        }
-
-        public override Entity OffsetEntity(double distance, Vector pt)
-        {
-            var left = OffsetEntity(distance, OffsetSide.Left);
-            var right = OffsetEntity(distance, OffsetSide.Right);
-
-            if (left == null)
-                return right;
-            if (right == null)
-                return left;
-
-            var distLeft = left.ClosestPointTo(pt).DistanceTo(pt);
-            var distRight = right.ClosestPointTo(pt).DistanceTo(pt);
-
-            return distLeft > distRight ? left : right;
         }
 
         /// <summary>
