@@ -17,7 +17,7 @@ public class DrawingMetadataColorTests
         bool updateGeometry, bool changeName) => StaTestThread.Run(() =>
     {
         var previousScheme = ColorSchemeSerializer.Deserialize(ColorSchemeSerializer.Serialize(ColorScheme.Default));
-        var previousPartColors = Drawing.PartColors;
+        var previousPalette = PartColorPalette.Current;
         try
         {
             var program = new CNC.Program();
@@ -71,7 +71,7 @@ public class DrawingMetadataColorTests
         finally
         {
             ColorSchemeRegistry.Apply(previousScheme);
-            Drawing.PartColors = previousPartColors;
+            PartColorPalette.Use(previousPalette);
         }
     }, TimeSpan.FromMinutes(1), "Metadata color test timed out.");
 }

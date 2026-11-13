@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Threading;
 
 namespace OpenNest
 {
@@ -25,6 +26,20 @@ namespace OpenNest
         private const double HueSpan = 295.0;
         private const double BandStart = 95.0;
         private const double BandWidth = 75.0;
+
+        private static PartPalette current = PartPalette.Classic;
+
+        /// <summary>
+        /// The palette drawings take their colors from, process-wide. Replaced as a whole by
+        /// <see cref="Use"/>, so a reader never sees one palette's colors with another's flag.
+        /// </summary>
+        public static PartPalette Current => Volatile.Read(ref current);
+
+        public static void Use(PartPalette palette)
+        {
+            ArgumentNullException.ThrowIfNull(palette);
+            Volatile.Write(ref current, palette);
+        }
 
         public static Color GoldenAngle(int index)
         {

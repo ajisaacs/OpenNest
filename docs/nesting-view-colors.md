@@ -69,7 +69,10 @@ The schemes, their JSON format, the `Schemes/` folder and the recolor rule live 
 `OpenNest.Desktop` (`ColorScheme`, `ColorSchemeRegistry`, `ColorSchemeSerializer`,
 and `ColorShade`, a port of `ControlPaint.Dark` for the legacy part outline), so
 both desktop apps share them; `Schemes/*.json` in that project copies beside both
-apps. WinForms draws with per-thread GDI+ pens from `GdiSchemeTools`; the Avalonia
+apps. Applying a scheme hands Core an immutable copy of its drawing colors through
+`PartColorPalette.Use(new PartPalette(...))`; `Drawing.GetPartColor` and `GetNextColor`
+read `PartColorPalette.Current`, so editing a scheme's array later changes nothing until
+it is applied again. WinForms draws with per-thread GDI+ pens from `GdiSchemeTools`; the Avalonia
 plate canvas draws with Skia colours from `SkiaSchemePalette`. The Avalonia app
 applies the scheme saved as `ActiveColorScheme` in the shared user-settings file
 when it starts, and recolors a nest's drawings when it opens one; it has no

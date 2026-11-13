@@ -114,8 +114,8 @@ namespace OpenNest
             d.LibraryEtchColor = scheme.LibraryEtchColor;
             d.LibraryBendColor = scheme.LibraryBendColor;
 
-            Drawing.PartColors = scheme.PartColors;
-            Drawing.UseGoldenAngleColors = scheme.UseGoldenAngleColors;
+            // A copy: editing the scheme's array afterwards must not recolor drawings.
+            PartColorPalette.Use(new PartPalette(scheme.PartColors ?? [], scheme.UseGoldenAngleColors));
 
             Applied?.Invoke(null, scheme);
         }

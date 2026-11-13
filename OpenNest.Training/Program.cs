@@ -79,8 +79,6 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
         Console.WriteLine($"Using template: {template}");
     }
 
-    var PartColors = Drawing.PartColors;
-
     var sheetSuite = new[]
     {
         new Size(96, 48),
@@ -167,7 +165,7 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                 continue;
             }
 
-            drawing.Color = PartColors[colorIndex % PartColors.Length];
+            drawing.Color = PartPalette.Classic.ColorAt(colorIndex);
             colorIndex++;
 
             var features = FeatureExtractor.Extract(drawing);

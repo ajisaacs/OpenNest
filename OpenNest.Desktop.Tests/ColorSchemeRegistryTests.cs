@@ -124,7 +124,38 @@ public class ColorSchemeRegistryTests : IDisposable
         Assert.Equal("Halloween", applied.Name);
         Assert.Equal("Halloween", ColorScheme.Default.Name);
         Assert.Equal(applied.BackgroundColor, ColorScheme.Default.BackgroundColor);
-        Assert.Equal(applied.PartColors, Drawing.PartColors);
+        Assert.Equal(applied.PartColors, PartColorPalette.Current.Colors);
+    }
+
+    [Fact]
+    public void EditingASchemesColorsAfterApplyingDoesNotRecolorDrawings()
+    {
+        var scheme = new ColorScheme
+        {
+            Name = "Mutable",
+            PartColors = [Color.FromArgb(10, 20, 30), Color.FromArgb(40, 50, 60)],
+        };
+        ColorSchemeRegistry.Apply(scheme);
+        var palette = PartColorPalette.Current;
+
+        scheme.PartColors[0] = Color.Black;
+        scheme.UseGoldenAngleColors = true;
+
+        Assert.Same(palette, PartColorPalette.Current);
+        Assert.Equal(Color.FromArgb(10, 20, 30), Drawing.GetPartColor(0));
+        Assert.Equal(Color.FromArgb(40, 50, 60), Drawing.GetPartColor(3));
+    }
+
+    [Fact]
+    public void ANewSchemeOwnsItsOwnCopyOfTheClassicColors()
+    {
+        var first = new ColorScheme();
+        var second = new ColorScheme();
+
+        first.PartColors[0] = Color.Black;
+
+        Assert.Equal(PartPalette.Classic.Colors, second.PartColors);
+        Assert.NotEqual(Color.Black, PartPalette.Classic.ColorAt(0));
     }
 
     [Theory]
@@ -163,7 +194,7 @@ public class ColorSchemeRegistryTests : IDisposable
         Assert.Same(workshop, raised);
         Assert.Equal(Snapshot(workshop), Snapshot(ColorScheme.Default));
         Assert.NotEqual(defaultVersion, ColorScheme.Default.Version);
-        Assert.True(Drawing.UseGoldenAngleColors);
+        Assert.True(PartColorPalette.Current.UseGoldenAngle);
         Assert.Equal(PartColorPalette.GoldenAngle(30), Drawing.GetPartColor(30));
     }
 
@@ -230,15 +261,13 @@ public sealed class ColorSchemeState
 
     private readonly ColorScheme previous =
         ColorSchemeSerializer.Deserialize(ColorSchemeSerializer.Serialize(ColorScheme.Default));
-    private readonly Color[] previousPartColors = Drawing.PartColors;
-    private readonly bool previousGoldenAngle = Drawing.UseGoldenAngleColors;
+    private readonly PartPalette previousPalette = PartColorPalette.Current;
     private readonly string previousDirectory = ColorSchemeRegistry.SchemesDirectory;
 
     public void Restore()
     {
         ColorSchemeRegistry.Apply(previous);
-        Drawing.PartColors = previousPartColors;
-        Drawing.UseGoldenAngleColors = previousGoldenAngle;
+        PartColorPalette.Use(previousPalette);
         ColorSchemeRegistry.SchemesDirectory = previousDirectory;
     }
 }

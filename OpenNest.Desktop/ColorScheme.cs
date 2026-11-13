@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Linq;
 using System.Threading;
 
 namespace OpenNest
@@ -19,7 +20,7 @@ namespace OpenNest
         private Color originColor;
         private Color edgeSpacingColor;
         private Color previewPartColor;
-        private Color[] partColors = Drawing.PartColors;
+        private Color[] partColors = PartPalette.Classic.Colors.ToArray();
         private bool useGoldenAngleColors;
         private Color partOutlineColor = Color.Empty;
         private Color selectedPartColor = Color.Empty;
