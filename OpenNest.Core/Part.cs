@@ -105,6 +105,7 @@ namespace OpenNest
             };
             var result = strategy.Apply(Program, approachPoint, nextPartStart);
             Program = result.Program;
+            ownsProgram = true;
             CuttingParameters = parameters;
             HasManualLeadIns = true;
             UpdateBounds();
@@ -124,6 +125,7 @@ namespace OpenNest
             };
             var result = strategy.ApplySingle(Program, point, entity, contourType);
             Program = result.Program;
+            ownsProgram = true;
             CuttingParameters = parameters;
             HasManualLeadIns = true;
             UpdateBounds();
@@ -315,6 +317,7 @@ namespace OpenNest
         {
             var rotation = Rotation;
             Program = BaseDrawing.Program.Clone() as Program;
+            ownsProgram = true;
 
             if (!Math.Tolerance.IsEqualTo(rotation, 0))
                 Program.Rotate(rotation);
@@ -428,12 +431,19 @@ namespace OpenNest
         /// <summary>
         /// Creates an offset copy of the part. Clones from the already-rotated
         /// program (skips re-rotation) and computes the bounding box arithmetically
-        /// (skips Program.BoundingBox walk).
+        /// (skips Program.BoundingBox walk). The copy shares this part's program instance, so
+        /// the program is marked shared and neither part turns it in place afterwards.
         /// </summary>
         public Part CloneAtOffset(Vector offset)
         {
             // Share the Program instance — offset-only copies don't modify the program codes.
-            // This is a major performance win for tiling large patterns.
+            // This is a major performance win for tiling large patterns, and the fill and
+            // overlap caches key on the instance. Tiling copies one program many times, possibly
+            // from several threads: the flag only ever goes to true, so racing writers agree,
+            // and testing first keeps the hot loop from rewriting a line other threads read.
+            if (!Program.SharedByParts)
+                Program.SharedByParts = true;
+
             var part = new Part(
                 BaseDrawing,
                 Program,
@@ -465,9 +475,15 @@ namespace OpenNest
             preLeadInRotation = source.preLeadInRotation;
         }
 
+        /// <summary>
+        /// Gives the part a program no other part holds before it is changed in place. Owning
+        /// the program is not enough: <see cref="CloneAtOffset"/> hands the same instance to
+        /// its copies and leaves the source an owner, and a restored cutting state can make a
+        /// part an owner of a shared program again.
+        /// </summary>
         private void EnsureOwnedProgram()
         {
-            if (!ownsProgram)
+            if (!ownsProgram || Program.SharedByParts)
             {
                 Program = Program.Clone() as Program;
                 ownsProgram = true;

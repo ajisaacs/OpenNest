@@ -37,6 +37,16 @@ namespace OpenNest.CNC
 
         public double Rotation { get; protected set; }
 
+        /// <summary>
+        /// True once <see cref="Part.CloneAtOffset"/> has handed this instance to a second
+        /// part. A part must copy a shared program before changing it in place, whether or not
+        /// it owns it. Never cleared: the parts sharing it are not tracked, so a program that
+        /// was shared once is treated as shared for good, at the cost of one copy. It belongs
+        /// to the instance, not its content: <see cref="Clone"/> and <see cref="HeadCopy"/>
+        /// build a new program and leave it unset.
+        /// </summary>
+        internal bool SharedByParts { get; set; }
+
         private void SetModeInc()
         {
             if (mode == Mode.Incremental)
