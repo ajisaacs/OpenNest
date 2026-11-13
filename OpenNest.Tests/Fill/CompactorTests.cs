@@ -644,6 +644,48 @@ namespace OpenNest.Tests.Fill
             Assert.Equal(start, moving.Location);
         }
 
+        // The obstacle's box is beside the path, not in it, so only its spacing can stop the
+        // push: nearer than the spacing blocks, exactly at the spacing is slid along.
+        [Theory]
+        [InlineData(10.5, 21.002)]
+        [InlineData(11, 0)]
+        public void PushBoundingBox_StopsAtAnObstacleBesideThePathInsideTheSpacing(
+            double obstacleLeft, double expectedBottom)
+        {
+            var workArea = new Box(0, 0, 100, 100);
+            var moving = MakeRectPart(0, 50, 10, 10);
+            var obstacles = new List<Part> { MakeRectPart(obstacleLeft, 0, 10, 20) };
+
+            Compactor.PushBoundingBox(new List<Part> { moving }, obstacles, workArea, 1, PushDirection.Down);
+
+            Assert.Equal(expectedBottom, moving.BoundingBox.Bottom, 6);
+        }
+
+        // The copy starts on the block at the right, which a push therefore ignores. Pushing
+        // down first lands it on the floor part and then left against the low wall, half a
+        // spacing from that block; pushing left first stops it on the high wall, clear of it.
+        [Theory]
+        [InlineData(SettleOrder.ClosestToCorner)]
+        [InlineData(SettleOrder.HorizontalFirst)]
+        [InlineData(SettleOrder.VerticalFirst)]
+        public void SettlePlacement_StartingOnAPartNeverEndsInsideItsSpacing(SettleOrder order)
+        {
+            var plate = new Plate(100, 100) { PartSpacing = 1 };
+            plate.Parts.Add(MakeRectPart(0, 35, 9, 65));
+            plate.Parts.Add(MakeRectPart(0, 0, 10, 34));
+            plate.Parts.Add(MakeRectPart(11, 0, 10, 29));
+            var block = MakeRectPart(21.5, 20, 18.5, 20);
+            plate.Parts.Add(block);
+            var moving = MakeRectPart(20, 39.5, 10, 10);
+            Assert.True(moving.Intersects(block, out _));
+
+            Compactor.SettlePlacement(new List<Part> { moving }, plate,
+                PushDirection.Left, PushDirection.Down, order: order);
+
+            Assert.Equal(10, moving.BoundingBox.Left, 3);
+            Assert.Equal(35, moving.BoundingBox.Bottom, 3);
+        }
+
         // Two pockets: pushing left first parks the part on the tall block at (20, 55);
         // pushing down first parks it on the low floor at (55, 10), nearer the origin.
         private static Plate TwoPocketPlate()

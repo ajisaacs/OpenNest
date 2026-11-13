@@ -361,11 +361,16 @@ namespace OpenNest.Engine.Fill
                         if (IsBehind(reverseGap))
                             continue;
 
-                        var perpOverlap = isHorizontal
-                            ? movingBox.IsHorizontalTo(obstacleBoxes[i], out _)
-                            : movingBox.IsVerticalTo(obstacleBoxes[i], out _);
+                        // An obstacle beside the path but nearer than the spacing blocks
+                        // too: passing it would leave the boxes closer than the spacing.
+                        // One exactly at the spacing is slid along.
+                        var sideGap = isHorizontal
+                            ? System.Math.Max(movingBox.Bottom - obstacleBoxes[i].Top,
+                                obstacleBoxes[i].Bottom - movingBox.Top)
+                            : System.Math.Max(movingBox.Left - obstacleBoxes[i].Right,
+                                obstacleBoxes[i].Left - movingBox.Right);
 
-                        if (!perpOverlap)
+                        if (sideGap >= (spacing > 0 ? spacing - Tolerance.Epsilon : 0))
                             continue;
 
                         var gap = SpatialQuery.DirectionalGap(movingBox, obstacleBoxes[i], direction);
@@ -393,7 +398,10 @@ namespace OpenNest.Engine.Fill
         /// Settles a copied placement against the plate. <see cref="SettleOrder.ClosestToCorner"/>
         /// tries both axis orders and keeps the group closest to the quadrant's work-area
         /// corner; the other orders push along the named axis first. A coarse box pass
-        /// runs only when no moving box starts inside an existing part's box. With
+        /// runs only when no moving box starts inside an existing part's box. A push ignores
+        /// a part the group starts on, so it can end clear of that part yet inside its
+        /// spacing: an order that keeps the part spacing always beats one that does not, and
+        /// a named order that does not falls back to the other one. With
         /// <paramref name="boundingBoxesOnly"/> every push uses bounding boxes alone, so the
         /// group stops at the part spacing from obstacles' boxes, never nesting into their shapes.
         /// </summary>
@@ -418,16 +426,24 @@ namespace OpenNest.Engine.Fill
                 ? PushBoundingBox(trial, plate, direction)
                 : Push(trial, plate, direction);
             var bestScore = double.MaxValue;
+            var bestKeepsSpacing = false;
             Vector[] best = null;
+            // A named order's opposite comes last, tried only when the named one ends too close.
             var firstAxes = order switch
             {
-                SettleOrder.HorizontalFirst => new[] { horizontal },
-                SettleOrder.VerticalFirst => new[] { vertical },
+                SettleOrder.HorizontalFirst => new[] { horizontal, vertical },
+                SettleOrder.VerticalFirst => new[] { vertical, horizontal },
                 _ => new[] { horizontal, vertical },
             };
+            var fallbacks = order == SettleOrder.ClosestToCorner ? 0 : 1;
 
-            foreach (var first in firstAxes)
+            for (var attempt = 0; attempt < firstAxes.Length; attempt++)
             {
+                var isFallback = attempt >= firstAxes.Length - fallbacks;
+                if (isFallback && bestKeepsSpacing)
+                    break;
+
+                var first = firstAxes[attempt];
                 var second = first == horizontal ? vertical : horizontal;
                 var trial = movingParts.Select(p => (Part)p.Clone()).ToList();
                 if (!skipBoxes)
@@ -449,15 +465,60 @@ namespace OpenNest.Engine.Fill
                 var dy = vertical == PushDirection.Down
                     ? bounds.Bottom - workArea.Bottom : workArea.Top - bounds.Top;
                 var score = dx * dx + dy * dy;
-                if (score < bestScore)
+                var keepsSpacing = KeepsSpacing(trial, movingParts, plate);
+                if (best == null || (keepsSpacing && !bestKeepsSpacing)
+                    || (!isFallback && keepsSpacing == bestKeepsSpacing && score < bestScore))
                 {
                     bestScore = score;
+                    bestKeepsSpacing = keepsSpacing;
                     best = trial.Select(p => p.Location).ToArray();
                 }
             }
 
             for (var i = 0; i < movingParts.Count; i++)
                 movingParts[i].Location = best[i];
+        }
+
+        /// <summary>
+        /// True when no settled part shares material with a placed part or sits closer to it
+        /// than the plate's part spacing, measured as the spacing review measures it. Zero
+        /// spacing enforces nothing, so every placement keeps it.
+        /// </summary>
+        private static bool KeepsSpacing(List<Part> settled, List<Part> movingParts, Plate plate)
+        {
+            var spacing = plate.PartSpacing;
+            if (!Diagnostics.PartSpacingReview.Enforces(spacing))
+                return true;
+
+            var contours = new Dictionary<Part, NativeContours>();
+            foreach (var part in settled)
+            {
+                var reach = SpacingBounds(part.BoundingBox, spacing);
+                foreach (var obstacle in plate.Parts)
+                {
+                    if (obstacle.BaseDrawing.IsCutOff || movingParts.Contains(obstacle)
+                        || settled.Contains(obstacle) || !reach.Intersects(obstacle.BoundingBox))
+                        continue;
+                    if (Contours(part, contours) is { } moved && Contours(obstacle, contours) is { } placed
+                        && moved.TooClose(placed, spacing))
+                        return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>A part's world-space material; null when it has no closed perimeter.</summary>
+        private static NativeContours Contours(Part part, Dictionary<Part, NativeContours> cache)
+        {
+            if (cache.TryGetValue(part, out var cached))
+                return cached;
+
+            var entities = PartGeometry.GetPartEntities(part);
+            var profile = entities.Count == 0 ? null : new ShapeProfile(entities);
+            var contours = profile?.Perimeter == null ? null : NativeContours.Of(profile, new Vector(0, 0));
+            cache[part] = contours;
+            return contours;
         }
 
         /// <summary>
