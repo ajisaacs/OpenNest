@@ -13,6 +13,12 @@
         <MenuItem x:Name="SaveAsMenuItem" Header="Save _As..." Click="OnSaveAs" />
         <MenuItem x:Name="ExportNestMenuItem" Header="Save _Copy as .nest File..." Click="OnExportNest" />
         <Separator />
+        <MenuItem x:Name="ExportPlateMenuItem" Header="_Export Plate..." Click="OnExportPlate" />
+        <MenuItem x:Name="ExportAllPlatesMenuItem" Header="Export All _Plates..." Click="OnExportAllPlates" />
+        <Separator />
+        <MenuItem x:Name="ViewNestReportMenuItem" Header="Nest _Report..." Click="OnViewNestReport" />
+        <MenuItem x:Name="ExportNestReportMenuItem" Header="Expor_t Nest Report..." Click="OnExportNestReport" />
+        <Separator />
         <MenuItem x:Name="CloseMenuItem" Header="_Close" Click="OnCloseNest" />
         <MenuItem x:Name="CloseAllMenuItem" Header="Close A_ll" Click="OnCloseAll" />
         <Separator />
@@ -20,6 +26,9 @@
       </MenuItem>
       <MenuItem Header="_Nest">
         <MenuItem x:Name="AutoNestMenuItem" Header="_Auto Nest" Click="OnAutoNest" />
+      </MenuItem>
+      <MenuItem Header="_Plate">
+        <MenuItem x:Name="ViewInCadMenuItem" Header="View in _CAD" Click="OnViewInCad" />
       </MenuItem>
       <MenuItem Header="_View">
         <MenuItem x:Name="DrawRapidsMenuItem" Header="Draw _Rapids" ToggleType="CheckBox"

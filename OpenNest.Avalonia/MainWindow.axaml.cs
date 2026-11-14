@@ -223,6 +223,7 @@ namespace OpenNest.Avalonia
             SaveButton.IsEnabled = view != null;
             SaveAsButton.IsEnabled = view != null;
             CloseAllMenuItem.IsEnabled = view != null;
+            UpdateExportCommands(view != null);
             Title = view == null
                 ? "OpenNest (Avalonia prototype)"
                 : $"{view.Tab.Name} - OpenNest (Avalonia prototype)";
