@@ -95,6 +95,9 @@ namespace OpenNest.Avalonia
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
             AddHandler(DragDrop.DropEvent, OnDrop);
             Closing += OnWindowClosing;
+#if DEBUG
+            StartUnrecordedChangeCheck();
+#endif
             Opened += (_, _) =>
             {
                 if (!snapshotMode)
@@ -179,6 +182,7 @@ namespace OpenNest.Avalonia
             RestoreViewToggles(view);
             view.ViewChanged += (_, _) => { if (view == ActiveView) UpdateStatus(); };
             views[tab] = view;
+            WatchHistory(tab);
             notice = null;
             ShowActiveTab();
         }
@@ -234,6 +238,8 @@ namespace OpenNest.Avalonia
                 : $"{view.Tab.Name} - OpenNest (Avalonia prototype)";
             RebuildTabStrip();
             UpdateViewToggles();
+            // The Edit menu follows the active nest's history.
+            UpdateUndoMenu();
             UpdateStatus();
         }
 
@@ -322,6 +328,7 @@ namespace OpenNest.Avalonia
             if (!await ConfirmUnsavedAsync(tab))
                 return false;
 
+            UnwatchHistory(tab);
             tabs.Close(tab);
             if (views.Remove(tab, out var closed))
                 SaveViewToggles(closed);
@@ -566,6 +573,11 @@ namespace OpenNest.Avalonia
 
         private void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
+            if (ProcessUndoKeys(e))
+            {
+                e.Handled = true;
+                return;
+            }
             if (e.Key == Key.Tab && e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
                 StepNest(e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? -1 : 1);
@@ -675,12 +687,27 @@ namespace OpenNest.Avalonia
                 // Engines that ignore cancellation still have their proposal discarded.
                 token.ThrowIfCancellationRequested();
                 var firstNew = nest.Plates.Count(p => p.Parts.Count > 0);
-                var kept = AutoNestJob.Keep(nest, result);
-                if (kept.Nested)
+                // One undo step for the whole result, as in the WinForms app; the history change
+                // updates the tab's unsaved mark.
+                NestRenestResult kept;
+                using (var change = tab.Undo.BeginChange("Auto Nest"))
                 {
-                    tab.MarkModified();
-                    view.Refresh(firstNew);
-                    RebuildTabStrip();
+                    try
+                    {
+                        kept = AutoNestJob.Keep(nest, result);
+                    }
+                    catch
+                    {
+                        // A commit that failed part way is rolled back.
+                        change.MarkChanged();
+                        throw;
+                    }
+                    if (kept.Nested)
+                    {
+                        change.MarkChanged();
+                        view.Refresh(firstNew);
+                    }
+                    change.Complete();
                 }
                 ShowNotice(kept.Nested
                     ? $"{tab.Name}: {engineName}: {kept.Note}"
@@ -707,6 +734,7 @@ namespace OpenNest.Avalonia
         {
             AutoNestButton.Content = running ? "Stop" : "Auto Nest";
             AutoNestMenuItem.Header = running ? "_Stop Auto Nest" : "_Auto Nest";
+            UpdateUndoMenu();
         }
 
         /// <summary>Completes once the machines are read (see <see cref="DesktopSettings.LoadMachinesAsync"/>).</summary>

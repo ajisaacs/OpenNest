@@ -2,19 +2,31 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using OpenNest.Undo;
 
 namespace OpenNest.Desktop
 {
-    /// <summary>An open nest: its document, its file and whether it has unsaved changes.</summary>
+    /// <summary>
+    /// An open nest: its document, its file, its undo history and whether it has unsaved changes.
+    /// </summary>
     public sealed class NestTab
     {
         internal NestTab(Document document, string path)
         {
             Document = document;
             Path = path;
+            // As the WinForms nest window binds the nest before its history starts: the empty
+            // plate kept at the end to nest onto belongs to the opened state, not to an edit.
+            using (var plates = new PlateManager(document.Nest))
+                plates.EnsureSentinel();
+            Undo = new NestUndoRecorder(document);
+            Undo.Reset();
         }
 
         public Document Document { get; }
+
+        /// <summary>Records this nest's edits and steps its Undo and Redo.</summary>
+        public NestUndoRecorder Undo { get; }
 
         /// <summary>The full path of the file it was opened from or saved to, else null.</summary>
         public string Path { get; internal set; }
@@ -25,17 +37,20 @@ namespace OpenNest.Desktop
         /// </summary>
         public string SavePath => Document.HasSavePath ? Document.LastSavePath : null;
 
-        /// <summary>True after a change this session that is not saved.</summary>
-        public bool Modified { get; private set; }
+        /// <summary>
+        /// True when the nest differs from the state last saved or opened: off the history's
+        /// save point, or changed by an edit no scope recorded yet. Undoing back to the saved
+        /// state clears it.
+        /// </summary>
+        public bool Modified => Undo.HasUnsavedChanges;
 
         /// <summary>The nest's name, else the file name.</summary>
         public string Name => !string.IsNullOrWhiteSpace(Document.Name)
             ? Document.Name
             : System.IO.Path.GetFileNameWithoutExtension(Path ?? string.Empty);
 
-        public void MarkModified() => Modified = true;
-
-        public void MarkSaved() => Modified = false;
+        /// <summary>Marks the nest as it stands saved, recording any unscoped edit first.</summary>
+        public void MarkSaved() => Undo.MarkSaved();
     }
 
     /// <summary>
@@ -144,9 +159,10 @@ namespace OpenNest.Desktop
         public void SaveAs(NestTab tab, string path)
         {
             var fullPath = CheckTarget(tab, path, export: false);
+            // The save marks the history's current state saved, so it must hold every edit.
+            tab.Undo.RecordUnrecordedChange();
             tab.Document.SaveAs(fullPath);
             tab.Path = fullPath;
-            tab.MarkSaved();
             Changed?.Invoke(this, EventArgs.Empty);
         }
 

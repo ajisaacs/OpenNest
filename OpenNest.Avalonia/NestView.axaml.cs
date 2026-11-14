@@ -25,8 +25,39 @@ namespace OpenNest.Avalonia
         {
             Tab = tab;
             Canvas.ViewChanged += (_, _) => ViewChanged?.Invoke(this, EventArgs.Empty);
+            tab.Undo.SwapIn = SwapIn;
             Refresh(0);
         }
+
+        // Undo and Redo: puts the copy read back from the history in the document and shows it
+        // on the same plate, keeping the zoom, pan and selection (by part index while the part
+        // count is unchanged). Every list is rebuilt: each held the old nest's objects.
+        private void SwapIn(Nest restored)
+        {
+            var plateIndex = System.Math.Max(0, PlateList.SelectedIndex);
+            var shown = Canvas.Plate;
+            keptSelection = shown != null && Canvas.SelectedPart != null
+                ? (shown.Parts.IndexOf(Canvas.SelectedPart), shown.Parts.Count)
+                : (-1, -1);
+            Tab.Document.Nest = restored;
+            // Reading recolours drawings from the file; the view keeps the application's scheme.
+            // Cut-offs stay as reading regenerated them, as when the nest was opened.
+            ColorSchemeRegistry.RecolorDrawings(restored);
+            keepView = true;
+            try
+            {
+                Refresh(plateIndex);
+            }
+            finally
+            {
+                keepView = false;
+            }
+        }
+
+        // While an Undo or Redo swaps its copy in: the plate is shown without zooming to fit,
+        // and the part selected before (its index, the plate's part count then) is selected again.
+        private bool keepView;
+        private (int Index, int PartCount) keptSelection = (-1, -1);
 
         /// <summary>Raised when the shown plate, zoom, hover or selection changes.</summary>
         public event EventHandler ViewChanged;
@@ -77,7 +108,11 @@ namespace OpenNest.Avalonia
             var nest = Tab.Document.Nest;
             var index = PlateList.SelectedIndex;
             var plate = index >= 0 && index < nest.Plates.Count ? nest.Plates[index] : null;
-            Canvas.Plate = plate;
+            if (keepView)
+                Canvas.ReplacePlate(plate,
+                    plate?.Parts.Count == keptSelection.PartCount ? keptSelection.Index : -1);
+            else
+                Canvas.Plate = plate;
             PlateLabel.Text = plate == null
                 ? "No plates"
                 : $"Plate {index + 1} of {nest.Plates.Count}    "

@@ -36,7 +36,7 @@ public sealed class NestTabsSaveTests : IDisposable
     {
         var tabs = new NestTabs();
         var tab = OpenSaved(tabs, "opened.nest");
-        tab.MarkModified();
+        TestNests.Edit(tab);
         var changed = 0;
         tabs.Changed += (_, _) => changed++;
         var target = InDir("Renamed Job.nest");
@@ -74,7 +74,7 @@ public sealed class NestTabsSaveTests : IDisposable
         var tabs = new NestTabs();
         var a = OpenSaved(tabs, "a.nest");
         var b = OpenSaved(tabs, "b.nest");
-        a.MarkModified();
+        TestNests.Edit(a);
         var before = File.ReadAllBytes(b.Path);
 
         var ex = Assert.Throws<SaveTargetRefusedException>(() => tabs.SaveAs(a, b.Path));
@@ -87,11 +87,55 @@ public sealed class NestTabsSaveTests : IDisposable
     }
 
     [Fact]
+    public void AnOpenedNest_IsUnmodifiedWithItsEmptyPlateToNestOnto()
+    {
+        var tabs = new NestTabs();
+
+        var tab = OpenSaved(tabs, "opened.nest");
+
+        // The file has one plate; the empty one kept at the end is part of the opened state.
+        Assert.Equal(2, tab.Document.Nest.Plates.Count);
+        Assert.False(tab.Modified);
+        Assert.False(tab.Undo.History.CanUndo);
+    }
+
+    [Fact]
+    public void Modified_ClearsWhenTheEditsAreUndoneBackToTheSavedState()
+    {
+        var tabs = new NestTabs();
+        var tab = OpenSaved(tabs, "undo.nest");
+        tab.Undo.RecordChange("Move", () => tab.Document.Nest.Plates[0].Parts[0].Offset(4, 0));
+        Assert.True(tab.Modified);
+
+        tab.Undo.Undo();
+
+        Assert.False(tab.Modified);
+        tab.Undo.Redo();
+        Assert.True(tab.Modified);
+    }
+
+    [Fact]
+    public void SaveAs_RecordsAnEditNoScopeRecorded_SoTheSaveCoversIt()
+    {
+        var tabs = new NestTabs();
+        var tab = OpenSaved(tabs, "unscoped.nest");
+        tab.Document.Nest.Plates[0].Parts[0].Offset(4, 0);
+        Assert.True(tab.Modified);
+
+        tabs.SaveAs(tab, InDir("saved.nest"));
+
+        Assert.False(tab.Modified);
+        Assert.Equal("Undo Change", tab.Undo.UndoText);
+        tab.Undo.Undo();
+        Assert.True(tab.Modified);
+    }
+
+    [Fact]
     public void SaveAs_OntoItsOwnFile_IsAllowed()
     {
         var tabs = new NestTabs();
         var tab = OpenSaved(tabs, "own.nest");
-        tab.MarkModified();
+        TestNests.Edit(tab);
 
         tabs.SaveAs(tab, tab.Path);
 
@@ -104,7 +148,7 @@ public sealed class NestTabsSaveTests : IDisposable
     {
         var tabs = new NestTabs();
         var tab = OpenSaved(tabs, "kept.nest");
-        tab.MarkModified();
+        TestNests.Edit(tab);
         var changed = 0;
         tabs.Changed += (_, _) => changed++;
 
@@ -123,7 +167,7 @@ public sealed class NestTabsSaveTests : IDisposable
     {
         var tabs = new NestTabs();
         var tab = OpenSaved(tabs, "job.nest");
-        tab.MarkModified();
+        TestNests.Edit(tab);
         var target = InDir("copy.nest");
 
         tabs.ExportCopy(tab, target);

@@ -5,6 +5,10 @@ namespace OpenNest.Desktop.Tests;
 
 internal static class TestNests
 {
+    /// <summary>Records an edit of the tab's nest, as a desktop command does.</summary>
+    public static void Edit(NestTab tab) =>
+        tab.Undo.RecordChange("Edit", () => tab.Document.Nest.Notes += "edited");
+
     /// <summary>A nest with one 48x96 plate holding one 10x10 square part.</summary>
     public static Nest OneSquare()
     {
