@@ -84,6 +84,86 @@ public class NestStorageSettingsTests : IDisposable
         Assert.Equal("", url);
     }
 
+    [Fact]
+    public void Load_FileWithoutServers_ListsTheServerInUse()
+    {
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(FilePath, """{ "mode": 1, "serverUrl": "http://barge.lan:8090/" }""");
+
+        var loaded = NestStorageSettings.Load(FilePath);
+
+        Assert.Equal(new SavedNestServer("", "http://barge.lan:8090"), Assert.Single(loaded.Servers));
+    }
+
+    [Fact]
+    public void SaveThenLoad_KeepsNamedServersInOrder()
+    {
+        var settings = new NestStorageSettings { Mode = NestStorageMode.Database, ServerUrl = "http://work:8090" };
+        settings.RememberServer("http://barge.lan:8090/", " Home test ");
+        settings.RememberServer("http://work:8090", "Work production");
+
+        settings.Save(FilePath);
+        var loaded = NestStorageSettings.Load(FilePath);
+
+        Assert.Equal(
+            new[]
+            {
+                new SavedNestServer("Home test", "http://barge.lan:8090"),
+                new SavedNestServer("Work production", "http://work:8090"),
+            },
+            loaded.Servers);
+        Assert.Equal("Work production — http://work:8090", loaded.Servers[1].ToString());
+        Assert.Equal("http://x", new SavedNestServer("", "http://x").ToString());
+    }
+
+    [Fact]
+    public void Load_DropsInvalidAndRepeatedServers()
+    {
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(FilePath, """
+            { "mode": 0, "serverUrl": "", "servers": [
+                { "name": "Work", "url": "http://work:8090/" },
+                { "name": "Again", "url": "HTTP://WORK:8090" },
+                { "url": "http://unnamed:8090" },
+                { "name": "Bad", "url": "not-a-url" },
+                null ] }
+            """);
+
+        var loaded = NestStorageSettings.Load(FilePath);
+
+        Assert.Equal(
+            new[] { new SavedNestServer("Work", "http://work:8090"), new SavedNestServer("", "http://unnamed:8090") },
+            loaded.Servers);
+    }
+
+    [Fact]
+    public void RememberServer_RenamesOnlyWhenGivenAName()
+    {
+        var settings = new NestStorageSettings();
+        settings.RememberServer("http://work:8090", "Work");
+
+        settings.RememberServer("http://work:8090/", null);
+        Assert.Equal("Work", Assert.Single(settings.Servers).Name);
+
+        settings.RememberServer("http://WORK:8090", "Work production");
+        Assert.Equal("Work production", Assert.Single(settings.Servers).Name);
+
+        settings.RememberServer("not-a-url", "Bad");
+        Assert.Single(settings.Servers);
+    }
+
+    [Fact]
+    public void ForgetServer_RemovesOnlyTheMatchingServer()
+    {
+        var settings = new NestStorageSettings();
+        settings.RememberServer("http://work:8090", "Work");
+        settings.RememberServer("http://home:8090", "Home");
+
+        Assert.True(settings.ForgetServer("http://work:8090/"));
+        Assert.False(settings.ForgetServer("http://work:8090"));
+        Assert.Equal("Home", Assert.Single(settings.Servers).Name);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_directory))

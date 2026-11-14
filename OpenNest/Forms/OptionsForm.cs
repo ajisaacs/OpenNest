@@ -80,7 +80,8 @@ namespace OpenNest.Forms
         private void LoadSettings()
         {
             var options = ReadOptions();
-            serverUrlBox.Text = NestStorage.Settings.ServerUrl;
+            serverPicker.ForgetServer = NestStorage.ForgetServer;
+            serverPicker.Bind(NestStorage.Settings);
             updateFeedUrlBox.Text = Settings.Default.UpdateFeedUrl;
             includeDevBuildsBox.Checked = options.UpdateIncludeDevBuilds;
             ledgerUrlBox.Text = MaterialLedgerStore.Settings.BaseUrl;
@@ -180,10 +181,10 @@ namespace OpenNest.Forms
 
         private void SetServer_Click(object sender, EventArgs e)
         {
-            var (notice, url) = NestServerUrlOption.Save(serverUrlBox.Text,
-                next => NestStorage.Save(NestStorage.Settings.Mode, next));
+            var (notice, url) = NestServerUrlOption.Save(serverPicker.ServerUrl,
+                next => NestStorage.Save(NestStorage.Settings.Mode, next, serverPicker.ServerName));
             if (url != null)
-                serverUrlBox.Text = NestStorage.Settings.ServerUrl;
+                serverPicker.Bind(NestStorage.Settings);
             ShowNotice(notice);
         }
 

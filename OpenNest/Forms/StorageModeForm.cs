@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using OpenNest.Controls;
 using OpenNest.Data;
 
 namespace OpenNest.Forms;
@@ -13,14 +14,13 @@ public sealed class StorageModeForm : Form
 {
     private readonly RadioButton fileModeRadio;
     private readonly RadioButton databaseModeRadio;
-    private readonly TextBox serverUrlBox;
-    private readonly Label serverUrlLabel;
+    private readonly NestServerPicker serverPicker;
 
     public StorageModeForm()
     {
         Text = "Storage Mode";
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(420, 190);
+        ClientSize = new Size(420, 256);
         MinimizeBox = false;
         MaximizeBox = false;
         ShowInTaskbar = false;
@@ -48,19 +48,12 @@ public sealed class StorageModeForm : Form
             Location = new Point(14, 80),
         };
 
-        serverUrlLabel = new Label
+        serverPicker = new NestServerPicker
         {
-            Text = "Server URL:",
-            AutoSize = true,
-            Location = new Point(32, 112),
+            Location = new Point(32, 108),
+            Size = new Size(374, 90),
             Enabled = false,
-        };
-        serverUrlBox = new TextBox
-        {
-            Location = new Point(110, 108),
-            Width = 280,
-            PlaceholderText = "http://barge.lan:8090",
-            Enabled = false,
+            ForgetServer = NestStorage.ForgetServer,
         };
 
         fileModeRadio.CheckedChanged += (_, _) => UpdateServerUrlEnabled();
@@ -81,8 +74,7 @@ public sealed class StorageModeForm : Form
 
         Controls.Add(databaseModeRadio);
         Controls.Add(fileModeRadio);
-        Controls.Add(serverUrlBox);
-        Controls.Add(serverUrlLabel);
+        Controls.Add(serverPicker);
         Controls.Add(info);
         Controls.Add(buttons);
 
@@ -95,21 +87,23 @@ public sealed class StorageModeForm : Form
     public NestStorageMode SelectedMode =>
         databaseModeRadio.Checked ? NestStorageMode.Database : NestStorageMode.File;
 
-    public string ServerUrl => serverUrlBox.Text.Trim();
+    public string ServerUrl => serverPicker.ServerUrl;
+
+    /// <summary>The operator's name for the chosen server; may be empty.</summary>
+    public string ServerName => serverPicker.ServerName;
 
     private void LoadCurrentSettings()
     {
         var settings = NestStorage.Settings;
         databaseModeRadio.Checked = settings.Mode == NestStorageMode.Database;
         fileModeRadio.Checked = !databaseModeRadio.Checked;
-        serverUrlBox.Text = settings.ServerUrl;
+        serverPicker.Bind(settings);
         UpdateServerUrlEnabled();
     }
 
     private void UpdateServerUrlEnabled()
     {
-        serverUrlBox.Enabled = databaseModeRadio.Checked;
-        serverUrlLabel.Enabled = databaseModeRadio.Checked;
+        serverPicker.Enabled = databaseModeRadio.Checked;
     }
 
     private void Ok_Click(object sender, EventArgs e)

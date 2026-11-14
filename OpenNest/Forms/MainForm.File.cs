@@ -277,7 +277,9 @@ namespace OpenNest.Forms
                 return;
             try
             {
-                NestStorage.Save(dlg.SelectedMode, dlg.ServerUrl);
+                // A File-mode save leaves the server's saved name alone: its boxes were disabled.
+                NestStorage.Save(dlg.SelectedMode, dlg.ServerUrl,
+                    dlg.SelectedMode == NestStorageMode.Database ? dlg.ServerName : null);
                 statusLabel1.Text = $"Nest storage: {dlg.SelectedMode}";
                 foreach (var form in MdiChildren.OfType<EditNestForm>())
                     form.UpdateDrawingLibraryCommand();

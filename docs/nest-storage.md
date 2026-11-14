@@ -58,6 +58,12 @@ record on first save, same as any other unbound document.
 The mode and server address are stored per-PC at `%APPDATA%\OpenNest\storage.json`
 (`OpenNest.Data.NestStorageSettings`), defaulting to File mode so existing
 installs are unaffected until an operator opts in via **File > Storage Mode...**.
+The same file keeps a `servers` list (`name`, `url`) of every server the PC has been
+set to. Storage Mode and **Tools > Options** both show it as a **Saved** dropdown
+above the URL box, with a **Name** box for a note on what the server is for; picking
+an entry fills both boxes, and setting a server adds or renames its entry. **Forget**
+removes the selected entry at once (it is not undone by Cancel) and is unavailable
+for the server in use.
 
 ## Wire contract
 
@@ -1299,7 +1305,7 @@ curl --fail http://<bind-address>:<port>/healthz  # {"status":"ok"}
 In the desktop app choose **File > Storage Mode...**, Database, and enter the base
 URL `http://<bind-address>:<port>`, without `/healthz` or `/api/nests`.
 To set or change just the saved server address without changing File/Database mode,
-use **Tools > Options > Nest server URL > Set / Change Server**. This saves the URL
+use **Tools > Options > Nest server > Set / Change Server**. This saves the URL
 immediately, independently of the Options Save button; it does not migrate nests
 or enable Database mode. Canceling Options afterward does not undo that address.
 

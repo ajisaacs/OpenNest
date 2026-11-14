@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using OpenNest.Data;
 
 namespace OpenNest.Forms
@@ -29,11 +30,36 @@ namespace OpenNest.Forms
         /// <summary>
         /// Persists new settings and invalidates the cached repository so the next
         /// <see cref="CreateRepository"/> call picks up a changed server URL.
-        /// If persistence fails the current mode remains unchanged.
+        /// The server joins the saved list under <paramref name="serverName"/>; null keeps
+        /// the name it already has. If persistence fails the current mode remains unchanged.
         /// </summary>
-        public static void Save(NestStorageMode mode, string serverUrl)
+        public static void Save(NestStorageMode mode, string serverUrl, string serverName = null)
         {
-            var next = new NestStorageSettings { Mode = mode, ServerUrl = serverUrl };
+            var next = new NestStorageSettings
+            {
+                Mode = mode,
+                ServerUrl = serverUrl,
+                Servers = new List<SavedNestServer>(settings.Servers),
+            };
+            next.RememberServer(serverUrl, serverName);
+            next.Save(NestStorageSettings.DefaultPath);
+            settings = next;
+        }
+
+        /// <summary>
+        /// Removes a server from the saved list without changing the mode or the server in
+        /// use. If persistence fails the list remains unchanged.
+        /// </summary>
+        public static void ForgetServer(string serverUrl)
+        {
+            var next = new NestStorageSettings
+            {
+                Mode = settings.Mode,
+                ServerUrl = settings.ServerUrl,
+                Servers = new List<SavedNestServer>(settings.Servers),
+            };
+            if (!next.ForgetServer(serverUrl))
+                return;
             next.Save(NestStorageSettings.DefaultPath);
             settings = next;
         }

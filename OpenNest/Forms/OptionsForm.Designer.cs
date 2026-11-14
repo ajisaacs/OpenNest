@@ -46,7 +46,7 @@
             this.clonePlacementLabel = new System.Windows.Forms.Label();
             this.clonePlacementCombo = new System.Windows.Forms.ComboBox();
             this.serverGroupBox = new System.Windows.Forms.GroupBox();
-            this.serverUrlBox = new System.Windows.Forms.TextBox();
+            this.serverPicker = new OpenNest.Controls.NestServerPicker();
             this.setServerButton = new System.Windows.Forms.Button();
             this.updateGroupBox = new System.Windows.Forms.GroupBox();
             this.updateFeedUrlBox = new System.Windows.Forms.TextBox();
@@ -190,7 +190,7 @@
             this.bottomPanel1.Controls.Add(this.cancelButton);
             this.bottomPanel1.Controls.Add(this.saveButton);
             this.bottomPanel1.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.bottomPanel1.Location = new System.Drawing.Point(0, 715);
+            this.bottomPanel1.Location = new System.Drawing.Point(0, 772);
             this.bottomPanel1.Name = "bottomPanel1";
             this.bottomPanel1.Size = new System.Drawing.Size(708, 50);
             this.bottomPanel1.TabIndex = 1;
@@ -209,7 +209,7 @@
             // strategyGroupBox
             //
             this.strategyGroupBox.Controls.Add(this.strategyGrid);
-            this.strategyGroupBox.Location = new System.Drawing.Point(12, 525);
+            this.strategyGroupBox.Location = new System.Drawing.Point(12, 582);
             this.strategyGroupBox.Name = "strategyGroupBox";
             this.strategyGroupBox.Size = new System.Drawing.Size(684, 180);
             this.strategyGroupBox.TabIndex = 2;
@@ -258,22 +258,21 @@
             //
             // serverGroupBox
             //
-            this.serverGroupBox.Controls.Add(this.serverUrlBox);
+            this.serverGroupBox.Controls.Add(this.serverPicker);
             this.serverGroupBox.Controls.Add(this.setServerButton);
             this.serverGroupBox.Location = new System.Drawing.Point(12, 258);
             this.serverGroupBox.Name = "serverGroupBox";
-            this.serverGroupBox.Size = new System.Drawing.Size(684, 69);
+            this.serverGroupBox.Size = new System.Drawing.Size(684, 126);
             this.serverGroupBox.TabIndex = 1;
             this.serverGroupBox.TabStop = false;
-            this.serverGroupBox.Text = "Nest server URL (File / Database mode is selected under File > Storage Mode)";
+            this.serverGroupBox.Text = "Nest server (File / Database mode is selected under File > Storage Mode)";
             //
-            // serverUrlBox
+            // serverPicker
             //
-            this.serverUrlBox.Location = new System.Drawing.Point(12, 29);
-            this.serverUrlBox.Name = "serverUrlBox";
-            this.serverUrlBox.PlaceholderText = "http://server:8090";
-            this.serverUrlBox.Size = new System.Drawing.Size(485, 22);
-            this.serverUrlBox.TabIndex = 0;
+            this.serverPicker.Location = new System.Drawing.Point(12, 24);
+            this.serverPicker.Name = "serverPicker";
+            this.serverPicker.Size = new System.Drawing.Size(485, 90);
+            this.serverPicker.TabIndex = 0;
             //
             // setServerButton
             //
@@ -290,7 +289,7 @@
             this.updateGroupBox.Controls.Add(this.updateFeedUrlBox);
             this.updateGroupBox.Controls.Add(this.setUpdateFeedButton);
             this.updateGroupBox.Controls.Add(this.includeDevBuildsBox);
-            this.updateGroupBox.Location = new System.Drawing.Point(12, 431);
+            this.updateGroupBox.Location = new System.Drawing.Point(12, 488);
             this.updateGroupBox.Name = "updateGroupBox";
             this.updateGroupBox.Size = new System.Drawing.Size(684, 88);
             this.updateGroupBox.TabIndex = 3;
@@ -333,7 +332,7 @@
             this.ledgerGroupBox.Controls.Add(this.ledgerKeyBox);
             this.ledgerGroupBox.Controls.Add(this.testLedgerButton);
             this.ledgerGroupBox.Controls.Add(this.saveLedgerButton);
-            this.ledgerGroupBox.Location = new System.Drawing.Point(12, 333);
+            this.ledgerGroupBox.Location = new System.Drawing.Point(12, 390);
             this.ledgerGroupBox.Name = "ledgerGroupBox";
             this.ledgerGroupBox.Size = new System.Drawing.Size(684, 92);
             this.ledgerGroupBox.TabIndex = 4;
@@ -400,7 +399,7 @@
             this.AcceptButton = this.saveButton;
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.CancelButton = this.cancelButton;
-            this.ClientSize = new System.Drawing.Size(708, 765);
+            this.ClientSize = new System.Drawing.Size(708, 822);
             this.Controls.Add(this.strategyGroupBox);
             this.Controls.Add(this.updateGroupBox);
             this.Controls.Add(this.ledgerGroupBox);
@@ -450,7 +449,7 @@
         private System.Windows.Forms.Label clonePlacementLabel;
         private System.Windows.Forms.ComboBox clonePlacementCombo;
         private System.Windows.Forms.GroupBox serverGroupBox;
-        private System.Windows.Forms.TextBox serverUrlBox;
+        private Controls.NestServerPicker serverPicker;
         private System.Windows.Forms.Button setServerButton;
         private System.Windows.Forms.GroupBox updateGroupBox;
         private System.Windows.Forms.TextBox updateFeedUrlBox;
