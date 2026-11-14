@@ -39,10 +39,12 @@ namespace OpenNest.Avalonia
         private bool writingFile;
         // True while Exit asks about unsaved nests, so a second close request is ignored.
         private bool askingToExit;
-        // Load warnings shown one dialog at a time, once the window is open.
-        private readonly Queue<(string Name, IReadOnlyList<string> Warnings)> pendingWarnings =
-            new();
+        // Load and start-up warnings shown one dialog at a time, once the window is open.
+        private readonly Queue<(string Title, string Message)> pendingWarnings = new();
         private bool showingWarnings;
+        private Task warningsShown = Task.CompletedTask;
+        // The window is closing (its close went ahead) or closed.
+        private bool closed;
 
         public MainWindow()
         {
@@ -64,6 +66,7 @@ namespace OpenNest.Avalonia
             FillStrategyOptions.ApplySaved(userSettings);
             ColorSchemeRegistry.Applied += OnColorSchemeApplied;
             Closed += (_, _) => ColorSchemeRegistry.Applied -= OnColorSchemeApplied;
+            Closed += (_, _) => closed = true;
             tabs.Changed += (_, _) => ShowActiveTab();
             KeyBindings.Add(new KeyBinding
             {
@@ -138,7 +141,8 @@ namespace OpenNest.Avalonia
                         ? "1 load warning"
                         : $"{warnings.Count} load warnings";
                     ShowNotice($"{tab.Name}: {count}");
-                    pendingWarnings.Enqueue((tab.Name, warnings));
+                    pendingWarnings.Enqueue(("Nest Load Warnings",
+                        $"{tab.Name}:\n\n" + string.Join(Environment.NewLine, warnings)));
                     if (IsVisible && !snapshotMode)
                         _ = ShowLoadWarningsAsync();
                 }
@@ -178,7 +182,11 @@ namespace OpenNest.Avalonia
             }
             AddView(tabs.Add(new Document { Nest = created.Nest }));
             if (created.Warning != null)
-                await ConfirmDialog.ShowAsync(this, "Nest Defaults", created.Warning);
+            {
+                // Through the queue, so it never stacks on a load warning already showing.
+                pendingWarnings.Enqueue(("Nest Defaults", created.Warning));
+                await ShowLoadWarningsAsync();
+            }
         }
 
         private void AddView(NestTab tab)
@@ -200,6 +208,56 @@ namespace OpenNest.Avalonia
         public void RememberPlacement() =>
             WindowPlacementBinding.Remember(
                 this, WindowPlacement.MainWindow, Data.UserSettingsFile.DefaultPath);
+
+        /// <summary>
+        /// Once the window opens, converts a legacy nest template into the nest defaults and
+        /// opens a new nest when Tools > Options asks for one, as the WinForms main window does
+        /// on load. No new nest beside nests already open (from the command line, or opened or
+        /// dropped while the template converted). Not used for --snapshot, which must neither
+        /// change settings nor take a nest number.
+        /// </summary>
+        public void RunStartupOnOpen() => Opened += async (_, _) => await RunStartupAsync();
+
+        // The window is closing, or asking about unsaved nests before exit: start-up stops.
+        private bool StartupInterrupted => closed || closeConfirmed || askingToExit;
+
+        private async Task RunStartupAsync()
+        {
+            DesktopStartupResult startup;
+            try
+            {
+                // Reads the template's nest and writes the defaults file: off the UI thread.
+                startup = await Task.Run(() => DesktopStartup.Run(
+                    Data.UserSettingsFile.DefaultPath, Data.NestDefaults.DefaultPath,
+                    Engine.BestFit.BestFitCacheStore.Shared));
+            }
+            catch (Exception ex)
+            {
+                ShowNotice(
+                    $"Start-up could not finish: {ex.Message} Use File > New to start a nest.");
+                return;
+            }
+            // On the UI thread, as the window's other user-settings writers are.
+            if (startup.ClearTemplateSetting)
+                DesktopStartup.ClearTemplateSetting(Data.UserSettingsFile.DefaultPath);
+            if (StartupInterrupted)
+                return;
+            if (startup.TemplateWarning != null)
+            {
+                pendingWarnings.Enqueue(("Nest Template", startup.TemplateWarning));
+                // Waits for every queued warning, including ones already showing.
+                await ShowLoadWarningsAsync();
+            }
+            if (!startup.CreateNewNest)
+                return;
+            // The machines load first, so the check below is close to the nest-number request.
+            await MachinesLoaded;
+            // Closed meanwhile (a window closed in code takes its dialogs with it), or nests
+            // opened from the command line, or opened or dropped meanwhile: no new nest.
+            if (StartupInterrupted || tabs.Tabs.Count > 0)
+                return;
+            await NewNestAsync();
+        }
 
         /// <summary>Runs Auto Nest once the window opens, for --auto-nest.</summary>
         public void AutoNestOnOpen() => Opened += (_, _) => autoNest = RunAutoNestAsync();
@@ -359,6 +417,8 @@ namespace OpenNest.Avalonia
         {
             if (closeConfirmed || (!tabs.AnyModified && !writingFile))
             {
+                // Set before Avalonia closes the owned dialogs, whose awaiters then resume.
+                closed = true;
                 nesting?.Cancel();
                 SaveAllViewToggles();
                 return;
@@ -558,17 +618,23 @@ namespace OpenNest.Avalonia
         private static readonly FilePickerFileType NestFiles =
             new("Nest files") { Patterns = new[] { "*.nest" } };
 
-        // Shows the queued load warnings one dialog at a time, as WinForms does after each open.
-        private async Task ShowLoadWarningsAsync()
+        /// <summary>Shows the queued warnings one at a time; finishes when the queue is empty,
+        /// also when called while they are already showing.</summary>
+        private Task ShowLoadWarningsAsync()
         {
-            if (showingWarnings)
-                return;
+            if (!showingWarnings)
+                warningsShown = ShowQueuedWarningsAsync();
+            return warningsShown;
+        }
+
+        private async Task ShowQueuedWarningsAsync()
+        {
             showingWarnings = true;
             try
             {
-                while (pendingWarnings.TryDequeue(out var item))
-                    await ConfirmDialog.ShowAsync(this, "Nest Load Warnings",
-                        $"{item.Name}:\n\n" + string.Join(Environment.NewLine, item.Warnings));
+                // None once the window has closed: a dialog needs a live owner.
+                while (!closed && pendingWarnings.TryDequeue(out var item))
+                    await ConfirmDialog.ShowAsync(this, item.Title, item.Message);
             }
             finally
             {

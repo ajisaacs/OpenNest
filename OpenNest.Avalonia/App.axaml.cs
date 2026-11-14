@@ -31,7 +31,10 @@ namespace OpenNest.Avalonia
                     window.SaveSnapshotAndClose(args[snapshot + 1],
                         snapshot + 2 < args.Length && int.TryParse(args[snapshot + 2], out var plate) ? plate : 1);
                 else
+                {
                     window.RememberPlacement();
+                    window.RunStartupOnOpen();
+                }
             }
 
             base.OnFrameworkInitializationCompleted();
