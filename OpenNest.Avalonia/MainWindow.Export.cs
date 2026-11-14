@@ -10,8 +10,8 @@ using OpenNest.Desktop;
 namespace OpenNest.Avalonia
 {
     /// <summary>
-    /// File &gt; Export Plate, Export All Plates, Nest Report and Export Nest Report, and Plate &gt;
-    /// View in CAD, as the WinForms app has them: the same suggested file names and writers
+    /// File &gt; Export Plate, Export All Plates and Nest Report, and Plate &gt; View in CAD, as
+    /// the WinForms app has them: the same suggested file names and writers
     /// (<see cref="PlateExport"/>, <see cref="NestReportExport"/>). A viewed report opens in the
     /// system's PDF viewer, which saves and prints it; View in CAD opens the plate's DXF in the
     /// program the system associates with .dxf.
@@ -30,15 +30,11 @@ namespace OpenNest.Avalonia
         private static readonly FilePickerFileType SvgFiles =
             new("SVG file") { Patterns = new[] { "*.svg" } };
 
-        private static readonly FilePickerFileType PdfFiles =
-            new("PDF file") { Patterns = new[] { "*.pdf" } };
-
         private void UpdateExportCommands(bool hasNest)
         {
             ExportPlateMenuItem.IsEnabled = hasNest;
             ExportAllPlatesMenuItem.IsEnabled = hasNest;
             ViewNestReportMenuItem.IsEnabled = hasNest;
-            ExportNestReportMenuItem.IsEnabled = hasNest;
             ViewInCadMenuItem.IsEnabled = hasNest;
         }
 
@@ -242,51 +238,6 @@ namespace OpenNest.Avalonia
             ShowNotice($"Opening the nest report for {tab.Name}");
             await ReportOpenFailureAsync(opened, "Nest Report",
                 $"The nest report was written to '{path}', but it could not be opened");
-        }
-
-        /// <summary>Saves the nest report as a PDF file the user picks.</summary>
-        private async void OnExportNestReport(object sender, RoutedEventArgs e)
-        {
-            var tab = tabs.Active;
-            if (tab == null || !TryReportFileName(tab, out var fileName))
-                return;
-            if (!CanWrite(tab, "exporting the report"))
-                return;
-            writingFile = true;
-            try
-            {
-                var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-                {
-                    Title = "Export Nest Report",
-                    SuggestedFileName = fileName,
-                    DefaultExtension = "pdf",
-                    ShowOverwritePrompt = true,
-                    FileTypeChoices = new[] { PdfFiles },
-                    SuggestedStartLocation = await NestFolderAsync(tab),
-                });
-                if (file == null)
-                    return;
-                var path = file.TryGetLocalPath();
-                if (path == null)
-                {
-                    ShowNotice("The nest report can only be saved to a folder on this computer.");
-                    return;
-                }
-                await MachinesLoaded;
-                // Auto Nest may have started on it while the file picker was open.
-                if (IsNesting(tab, "exporting the report"))
-                    return;
-                await WriteReportAsync(tab, path);
-                ShowNotice($"Saved nest report to {path}");
-            }
-            catch (Exception ex) when (IsReportFailure(ex))
-            {
-                await ReportFailureAsync(tab, ex);
-            }
-            finally
-            {
-                writingFile = false;
-            }
         }
 
         // The report's file name, or false (after saying why) when the nest's name cannot be one.

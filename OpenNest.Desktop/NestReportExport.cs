@@ -8,9 +8,9 @@ using OpenNest.Reporting;
 namespace OpenNest.Desktop;
 
 /// <summary>
-/// File &gt; Export Nest Report and View Nest Report for both desktop apps: the checks before a
-/// report is written, the report file name, capturing and writing the PDF, and the private
-/// temporary folders a viewed report is rendered into. Whether the nest is busy (nesting, a fill
+/// View Nest Report for both desktop apps: the checks before a report is written, the report
+/// file name, capturing and writing the PDF, and the private temporary folders a viewed report is
+/// rendered into. Whether the nest is busy (nesting, a fill
 /// or plate action) is the front end's to say; see docs/nest-reports.md.
 /// </summary>
 public static class NestReportExport

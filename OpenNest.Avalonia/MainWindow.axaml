@@ -17,7 +17,6 @@
         <MenuItem x:Name="ExportAllPlatesMenuItem" Header="Export All _Plates..." Click="OnExportAllPlates" />
         <Separator />
         <MenuItem x:Name="ViewNestReportMenuItem" Header="Nest _Report..." Click="OnViewNestReport" />
-        <MenuItem x:Name="ExportNestReportMenuItem" Header="Expor_t Nest Report..." Click="OnExportNestReport" />
         <Separator />
         <MenuItem x:Name="CloseMenuItem" Header="_Close" Click="OnCloseNest" />
         <MenuItem x:Name="CloseAllMenuItem" Header="Close A_ll" Click="OnCloseAll" />

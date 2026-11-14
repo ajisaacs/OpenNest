@@ -25,9 +25,9 @@ own: **File -> Nest Report...** writes the PDF to a private folder under the
 system temp folder's `OpenNest/Reports/` and opens it in the system's PDF viewer
 (`ExternalFileLauncher`: the Windows shell, `open` on macOS, `xdg-open`
 elsewhere), which saves and prints it. Because that viewer's closing cannot be
-seen, each view removes viewed-report folders older than a day instead. **File ->
-Export Nest Report...** saves the PDF straight to a chosen file. Either refuses
-while Auto Nest runs on the nest, checked before and after the file picker.
+seen, each view removes viewed-report folders older than a day instead. Like
+WinForms it has no separate direct-save command. It refuses while Auto Nest runs
+on the nest, checked again once the machines are read.
 
 The same two calls back the command and any future integration:
 
