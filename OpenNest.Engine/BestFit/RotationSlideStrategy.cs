@@ -1,10 +1,14 @@
 using System.Collections.Generic;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.BestFit
 {
     public class RotationSlideStrategy : IBestFitStrategy
     {
+        /// <summary>Settled positions closer than this to an earlier one are duplicates.</summary>
+        private const double PositionResolution = 1e-4;
+
         private readonly IDistanceComputer _distanceComputer;
 
         private static readonly (double DirX, double DirY)[] PushDirections =
@@ -61,7 +65,8 @@ namespace OpenNest.Engine.BestFit
                 offsets
             );
 
-            var testNumber = 0;
+            // Where each slide came to rest, as an offset of the part 2 template.
+            var rests = new List<SlideOffset>();
 
             for (var i = 0; i < offsets.Length; i++)
             {
@@ -69,26 +74,109 @@ namespace OpenNest.Engine.BestFit
                 if (slideDist >= double.MaxValue || slideDist < 0)
                     continue;
 
-                var finalPosition = new Vector(
-                    part2Template.Location.X + offsets[i].Dx + offsets[i].DirX * slideDist,
-                    part2Template.Location.Y + offsets[i].Dy + offsets[i].DirY * slideDist
-                );
-
-                candidates.Add(
-                    new PairCandidate
-                    {
-                        Drawing = drawing,
-                        Part1Rotation = 0,
-                        Part2Rotation = Part2Rotation,
-                        Part2Offset = finalPosition,
-                        StrategyIndex = StrategyIndex,
-                        TestNumber = testNumber++,
-                        Spacing = spacing,
-                    }
+                rests.Add(
+                    new SlideOffset(
+                        offsets[i].Dx + offsets[i].DirX * slideDist,
+                        offsets[i].Dy + offsets[i].DirY * slideDist,
+                        offsets[i].DirX,
+                        offsets[i].DirY
+                    )
                 );
             }
 
+            var testNumber = 0;
+
+            foreach (var rest in rests)
+                candidates.Add(CreateCandidate(drawing, part2Template, rest, spacing, testNumber++));
+
+            foreach (var settled in Settle(part1Entities, part2Entities, rests))
+                candidates.Add(CreateCandidate(drawing, part2Template, settled, spacing, testNumber++));
+
             return candidates;
+        }
+
+        /// <summary>
+        /// Slides every resting position sideways, both ways, until part 2 meets part 1 again.
+        /// The first slide starts on the step grid, so it can stop up to a step short of a
+        /// corner that locks the pair tighter (two interlocking channels, say); the sideways
+        /// slide closes that gap exactly. Positions that cannot move, never meet part 1 again
+        /// or repeat an earlier one are dropped.
+        /// </summary>
+        private List<SlideOffset> Settle(
+            List<Entity> part1Entities,
+            List<Entity> part2Entities,
+            List<SlideOffset> rests
+        )
+        {
+            var settled = new List<SlideOffset>();
+
+            if (rests.Count == 0)
+                return settled;
+
+            var sideways = new SlideOffset[rests.Count * 2];
+
+            for (var i = 0; i < rests.Count; i++)
+            {
+                var rest = rests[i];
+                // Perpendicular to the first slide: (x, y) -> (-y, x) and its opposite.
+                sideways[i * 2] = new SlideOffset(rest.Dx, rest.Dy, -rest.DirY, rest.DirX);
+                sideways[i * 2 + 1] = new SlideOffset(rest.Dx, rest.Dy, rest.DirY, -rest.DirX);
+            }
+
+            var distances = _distanceComputer.ComputeDistances(
+                part1Entities,
+                part2Entities,
+                sideways
+            );
+
+            var seen = new HashSet<(long X, long Y)>();
+
+            foreach (var rest in rests)
+                seen.Add(PositionKey(rest.Dx, rest.Dy));
+
+            for (var i = 0; i < sideways.Length; i++)
+            {
+                var slideDist = distances[i];
+                if (slideDist >= double.MaxValue || slideDist <= Tolerance.Epsilon)
+                    continue;
+
+                var dx = sideways[i].Dx + sideways[i].DirX * slideDist;
+                var dy = sideways[i].Dy + sideways[i].DirY * slideDist;
+
+                if (seen.Add(PositionKey(dx, dy)))
+                    settled.Add(new SlideOffset(dx, dy, sideways[i].DirX, sideways[i].DirY));
+            }
+
+            return settled;
+        }
+
+        private static (long X, long Y) PositionKey(double dx, double dy) =>
+            (
+                (long)System.Math.Round(dx / PositionResolution),
+                (long)System.Math.Round(dy / PositionResolution)
+            );
+
+        private PairCandidate CreateCandidate(
+            Drawing drawing,
+            Part part2Template,
+            SlideOffset rest,
+            double spacing,
+            int testNumber
+        )
+        {
+            return new PairCandidate
+            {
+                Drawing = drawing,
+                Part1Rotation = 0,
+                Part2Rotation = Part2Rotation,
+                Part2Offset = new Vector(
+                    part2Template.Location.X + rest.Dx,
+                    part2Template.Location.Y + rest.Dy
+                ),
+                StrategyIndex = StrategyIndex,
+                TestNumber = testNumber,
+                Spacing = spacing,
+            };
         }
 
         private static SlideOffset[] BuildOffsets(
