@@ -87,8 +87,8 @@
     </Border>
 
     <Panel>
-      <!-- The empty workspace, as in the WinForms app: dark, with the OpenNest logo centered. -->
-      <Panel x:Name="EmptyHint" Background="#2B2B2B">
+      <!-- The empty workspace, as in the WinForms app: the Windows AppWorkspace gray, with the OpenNest logo centered. -->
+      <Panel x:Name="EmptyHint" Background="#ABABAB">
         <Image Source="avares://OpenNest.Avalonia/Assets/watermark.png" Stretch="None"
                HorizontalAlignment="Center" VerticalAlignment="Center" />
       </Panel>
