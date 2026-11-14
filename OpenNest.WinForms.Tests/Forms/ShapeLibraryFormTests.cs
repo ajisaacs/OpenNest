@@ -259,6 +259,46 @@ public class ShapeLibraryFormTests
         Assert.InRange(preview.LabelBounds("Length")!.Value.X, bounds.X + 9, bounds.X + 11);
     });
 
+    [Theory]
+    [InlineData(120, false)]
+    [InlineData(-120, false)]
+    [InlineData(120, true)]
+    [InlineData(-120, true)]
+    public void DimensionsKeepTheirPlaceOnTheDrawingAsTheViewZooms(int wheel, bool dragged) => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        SelectShape(form, typeof(RectangleShape));
+        var preview = Find<ShapePreviewControl>(form, "previewBox");
+        var box = preview.Plate.Parts.Single().BoundingBox;
+        if (dragged)
+        {
+            preview.SetDragOffset("Length", new PointF(0, 25));
+            preview.SetDragOffset("Width", new PointF(30, 0));
+        }
+
+        // Each dimension line's distance from the drawing's corner, in drawing units.
+        (double Length, double Width) Standoffs()
+        {
+            var corner = preview.PointWorldToControl(box.X, box.Y);
+            var length = preview.LabelBounds("Length")!.Value;
+            var width = preview.LabelBounds("Width")!.Value;
+            return ((length.Y + length.Height / 2.0 - corner.Y) / preview.ViewScale,
+                (width.X + width.Width / 2.0 - corner.X) / preview.ViewScale);
+        }
+
+        var before = Standoffs();
+        var fitted = preview.ViewScale;
+        for (var i = 0; i < 2; i++)
+            Mouse(preview, "OnMouseWheel", MouseButtons.None, new Point(60, 60), wheel);
+        var after = Standoffs();
+
+        Assert.NotEqual(fitted, preview.ViewScale);
+        // Label bounds round to whole pixels.
+        var pixel = 1.5 / System.Math.Min(fitted, preview.ViewScale);
+        Assert.InRange(after.Length, before.Length - pixel, before.Length + pixel);
+        Assert.InRange(after.Width, before.Width - pixel, before.Width + pixel);
+    });
+
     [Fact]
     public void WheelZoomIsKeptWhileEditingAndFitResetsIt() => ArchUnitsTests.RunSta(() =>
     {

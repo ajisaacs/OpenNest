@@ -16,11 +16,14 @@ namespace OpenNest.Controls
     /// raises <see cref="LabelClicked"/> when one is clicked, as Edit Clamps does on the plate.
     /// Dragging a dimension's label moves the dimension; the wheel zooms, the middle button
     /// pans, and F or a middle double-click fits the view again. Until the view is zoomed or
-    /// panned by hand, it refits whenever the drawing or its dimensions change.
+    /// panned by hand, it refits whenever the drawing or its dimensions change. Dimension lines
+    /// and labels keep their place on the drawing as the view zooms; only text, arrows and
+    /// extension-line ends keep their pixel size.
     /// </summary>
     public class ShapePreviewControl : PlateView
     {
-        // Screen sizes, in pixels.
+        // Screen sizes, in pixels. Gap, MinimumGap, LeaderClearance and Shoulder are sizes at the
+        // fitted view: they grow and shrink with the zoom, so dimensions stay put on the drawing.
         private const float Gap = 18f;
         private const float ExtensionOverrun = 5f;
         private const float ArrowLength = 8f;
@@ -56,6 +59,8 @@ namespace OpenNest.Controls
         private string hoverKey;
         private string activeKey;
         private bool userView;
+        // The zoom of the last fit, where the standoffs are their nominal pixel sizes.
+        private float fitScale;
 
         // Each dimension's drag offset, keyed by its property; kept until the shape changes.
         private readonly Dictionary<string, LabelDrag> dragOffsets = new();
@@ -203,6 +208,7 @@ namespace OpenNest.Controls
             if (Plate.Parts.Count == 0 || Width <= 0 || Height <= 0)
             {
                 base.ZoomToFit(redraw);
+                fitScale = ViewScale;
                 return;
             }
 
@@ -210,6 +216,7 @@ namespace OpenNest.Controls
             if (box.Length <= 0 || box.Width <= 0)
             {
                 base.ZoomToFit(redraw);
+                fitScale = ViewScale;
                 return;
             }
 
@@ -231,6 +238,7 @@ namespace OpenNest.Controls
                     break;
 
                 ViewScale = scale;
+                fitScale = scale;
                 origin.X = ml + (w - (float)box.Length * scale) / 2 - (float)box.X * scale;
                 origin.Y = mt + (h - (float)box.Width * scale) / 2 + (float)(box.Y + box.Width) * scale;
                 UpdateMatrix();
@@ -480,8 +488,7 @@ namespace OpenNest.Controls
 
         /// <summary>
         /// A dimension's drag: <see cref="Pixels"/> from its own place when it was dragged at
-        /// <see cref="Scale"/>. The slide along a dimension line scales with the drawing so the
-        /// label keeps its place between the arrows; the standoff from the drawing stays in pixels.
+        /// <see cref="Scale"/>. It scales with the drawing, so the dimension keeps its place on it.
         /// </summary>
         private readonly record struct LabelDrag(PointF Pixels, float Scale);
 
@@ -581,9 +588,10 @@ namespace OpenNest.Controls
             // A drag moves the line out (or back, never onto the drawing) and the label along it.
             var drag = DragPixels(d.Property);
             var standoff = Dot(drag, side);
-            var gap = System.Math.Max(Gap + standoff, MinimumGap);
+            var zoom = Zoom;
+            var gap = System.Math.Max(Gap * zoom + standoff, MinimumGap * zoom);
             var along = new PointF(-side.Y, side.X);
-            var shift = AlongShift(d.Property, along);
+            var shift = Dot(drag, along);
 
             var reachA = extreme - Dot(a, side) + gap;
             var reachB = extreme - Dot(b, side) + gap;
@@ -636,17 +644,20 @@ namespace OpenNest.Controls
                 result.Circles.Add((ToScreen(center), LengthWorldToGui(d.CircleRadius)));
         }
 
-        private PointF DragPixels(string property) =>
-            dragOffsets.TryGetValue(property, out var drag) ? drag.Pixels : PointF.Empty;
+        /// <summary>The current zoom relative to the fitted view: 1 until zoomed by hand.</summary>
+        private float Zoom => fitScale > 0 ? ViewScale / fitScale : 1;
 
         /// <summary>
-        /// How far a drag slid the label along <paramref name="along"/>, in pixels at this zoom:
-        /// it grows and shrinks with the drawing, so the label keeps its place between the arrows.
+        /// A dimension's drag in pixels at this zoom: it grows and shrinks with the drawing, so
+        /// the dimension keeps its place on it.
         /// </summary>
-        private float AlongShift(string property, PointF along) =>
-            dragOffsets.TryGetValue(property, out var drag) && drag.Scale > 0
-                ? Dot(drag.Pixels, along) * ViewScale / drag.Scale
-                : 0;
+        private PointF DragPixels(string property)
+        {
+            if (!dragOffsets.TryGetValue(property, out var drag))
+                return PointF.Empty;
+            var zoom = drag.Scale > 0 ? ViewScale / drag.Scale : 1;
+            return new PointF(drag.Pixels.X * zoom, drag.Pixels.Y * zoom);
+        }
 
         /// <summary>
         /// The labels centered on the line from <paramref name="a"/> to <paramref name="b"/>,
@@ -672,7 +683,7 @@ namespace OpenNest.Controls
             // The line stays on its points; a drag slides only the label along it.
             var length = (float)System.Math.Sqrt(Dot(new PointF(b.X - a.X, b.Y - a.Y), new PointF(b.X - a.X, b.Y - a.Y)));
             var along = length > 0 ? new PointF((b.X - a.X) / length, (b.Y - a.Y) / length) : new PointF(1, 0);
-            var shift = AlongShift(annotation.Dimension.Property, along);
+            var shift = Dot(DragPixels(annotation.Dimension.Property), along);
             AddLabelAlong(result, annotation, a, b, along, shift, Along(PointF.Empty, along, shift));
         }
 
@@ -685,13 +696,14 @@ namespace OpenNest.Controls
             // Run out of the drawing's bounds, then a short level shoulder to the label.
             var exitX = dir.X > 0 ? (shape.Right - p.X) / dir.X : dir.X < 0 ? (shape.Left - p.X) / dir.X : float.MaxValue;
             var exitY = dir.Y > 0 ? (shape.Bottom - p.Y) / dir.Y : dir.Y < 0 ? (shape.Top - p.Y) / dir.Y : float.MaxValue;
-            var length = System.Math.Max(System.Math.Min(exitX, exitY), 0) + LeaderClearance;
+            var zoom = Zoom;
+            var length = System.Math.Max(System.Math.Min(exitX, exitY), 0) + LeaderClearance * zoom;
             // A drag moves the label end anywhere; the leader swings to follow.
             var drag = DragPixels(d.Property);
             var end = Along(p, dir, length);
             end = new PointF(end.X + drag.X, end.Y + drag.Y);
             var right = end.X >= p.X;
-            var shoulder = new PointF(end.X + (right ? Shoulder : -Shoulder), end.Y);
+            var shoulder = new PointF(end.X + (right ? Shoulder : -Shoulder) * zoom, end.Y);
 
             AddReferenceCircle(result, d);
             if (!AddHoleDiameter(result, d, end, dir))
