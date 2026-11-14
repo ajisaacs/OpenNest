@@ -28,6 +28,8 @@
         <!-- Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z are routed in MainWindow.Undo.cs, so text boxes keep theirs. -->
         <MenuItem x:Name="UndoMenuItem" Header="_Undo" InputGesture="Ctrl+Z" Click="OnUndo" />
         <MenuItem x:Name="RedoMenuItem" Header="_Redo" InputGesture="Ctrl+Y" Click="OnRedo" />
+        <Separator />
+        <MenuItem x:Name="SelectAllMenuItem" Header="Select _All" InputGesture="Ctrl+A" Click="OnSelectAll" />
       </MenuItem>
       <MenuItem Header="_Nest">
         <MenuItem x:Name="AutoNestMenuItem" Header="_Auto Nest" Click="OnAutoNest" />

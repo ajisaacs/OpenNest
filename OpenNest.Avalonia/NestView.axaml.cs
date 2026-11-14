@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -36,9 +37,9 @@ namespace OpenNest.Avalonia
         {
             var plateIndex = System.Math.Max(0, PlateList.SelectedIndex);
             var shown = Canvas.Plate;
-            keptSelection = shown != null && Canvas.SelectedPart != null
-                ? (shown.Parts.IndexOf(Canvas.SelectedPart), shown.Parts.Count)
-                : (-1, -1);
+            keptSelection = shown != null
+                ? (Canvas.Selection.PartIndices, shown.Parts.Count)
+                : (Array.Empty<int>(), -1);
             Tab.Document.Nest = restored;
             // Reading recolours drawings from the file; the view keeps the application's scheme.
             // Cut-offs stay as reading regenerated them, as when the nest was opened.
@@ -55,9 +56,9 @@ namespace OpenNest.Avalonia
         }
 
         // While an Undo or Redo swaps its copy in: the plate is shown without zooming to fit,
-        // and the part selected before (its index, the plate's part count then) is selected again.
+        // and the parts selected before (their indices, the plate's part count then) are selected again.
         private bool keepView;
-        private (int Index, int PartCount) keptSelection = (-1, -1);
+        private (IReadOnlyList<int> Indices, int PartCount) keptSelection = (Array.Empty<int>(), -1);
 
         /// <summary>Raised when the shown plate, zoom, hover or selection changes.</summary>
         public event EventHandler ViewChanged;
@@ -110,7 +111,7 @@ namespace OpenNest.Avalonia
             var plate = index >= 0 && index < nest.Plates.Count ? nest.Plates[index] : null;
             if (keepView)
                 Canvas.ReplacePlate(plate,
-                    plate?.Parts.Count == keptSelection.PartCount ? keptSelection.Index : -1);
+                    plate?.Parts.Count == keptSelection.PartCount ? keptSelection.Indices : Array.Empty<int>());
             else
                 Canvas.Plate = plate;
             PlateLabel.Text = plate == null
