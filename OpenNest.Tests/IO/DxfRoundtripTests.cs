@@ -1,3 +1,4 @@
+using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO;
@@ -147,5 +148,72 @@ public class DxfRoundtripTests
         Assert.Equal(origMaxX, rtMaxX, Tolerance);
         Assert.Equal(origMinY, rtMinY, Tolerance);
         Assert.Equal(origMaxY, rtMaxY, Tolerance);
+    }
+
+    [Fact]
+    public void PlateExport_PlacesSubProgramHolesAtTheirOffsets()
+    {
+        // A planned part: each hole is a sub-program called at an offset from the part origin.
+        var hole = new Program(Mode.Incremental);
+        hole.Codes.Add(new RapidMove(0.5, 0));
+        hole.Codes.Add(new ArcMove(new Vector(0, 0), new Vector(-0.5, 0), RotationType.CCW));
+
+        var pgm = new Program(Mode.Incremental);
+        pgm.SubPrograms[1] = hole;
+        pgm.Codes.Add(new SubProgramCall { Id = 1, Program = hole, Offset = new Vector(2, 2) });
+        pgm.Codes.Add(new SubProgramCall { Id = 1, Program = hole, Offset = new Vector(8, 3) });
+        pgm.Codes.Add(new RapidMove(-8.5, -3));
+        pgm.Codes.Add(new LinearMove(10, 0));
+        pgm.Codes.Add(new LinearMove(0, 5));
+        pgm.Codes.Add(new LinearMove(-10, 0));
+        pgm.Codes.Add(new LinearMove(0, -5));
+
+        var plate = new Plate(100, 50) { Quadrant = 1 };
+        var part = new Part(new Drawing("Holes") { Program = pgm });
+        part.Location = new Vector(20, 30);
+        plate.Parts.Add(part);
+
+        using var stream = new MemoryStream();
+        Dxf.ExportPlate(plate, stream);
+        var exported = Dxf.GetGeometry(new MemoryStream(stream.ToArray()));
+
+        // The exporter must agree with the geometry the plate view draws.
+        var expected = ConvertProgram.ToGeometry(part.Program).OfType<Circle>().ToList();
+        foreach (var circle in expected)
+            circle.Offset(part.Location);
+        var actual = FilterByLayer<Circle>(exported, "Cut");
+
+        Assert.Equal(2, expected.Count);
+        Assert.Equal(expected.Count, actual.Count);
+        foreach (var circle in expected)
+            Assert.Contains(
+                actual,
+                c =>
+                    c.Center.DistanceTo(circle.Center) < Tolerance
+                    && System.Math.Abs(c.Radius - circle.Radius) < Tolerance
+            );
+
+        var cutLines = FilterByLayer<Line>(exported, "Cut");
+        Assert.Equal(part.BoundingBox.Left, cutLines.Min(l => l.BoundingBox.Left), Tolerance);
+        Assert.Equal(part.BoundingBox.Bottom, cutLines.Min(l => l.BoundingBox.Bottom), Tolerance);
+
+        // Rapids follow the tool from pierce to pierce: none detours through the part origin
+        // or a hole center, which the tool never visits.
+        var rapids = FilterByLayer<Line>(exported, "Rapid");
+        var stops = new[]
+        {
+            new Vector(0, 0),
+            new Vector(22.5, 32),
+            new Vector(28.5, 33),
+            new Vector(20, 30),
+        };
+        Assert.Equal(stops.Length - 1, rapids.Count);
+        for (var i = 0; i < rapids.Count; i++)
+            Assert.Contains(
+                rapids,
+                r =>
+                    r.StartPoint.DistanceTo(stops[i]) < Tolerance
+                    && r.EndPoint.DistanceTo(stops[i + 1]) < Tolerance
+            );
     }
 }

@@ -98,9 +98,7 @@ namespace OpenNest.IO
 
             foreach (var part in plate.Parts)
             {
-                var endpt = part.Location.ToAcadXYZ();
-                ctx.AddLine(ctx.CurPos, endpt, ctx.RapidLayer);
-                ctx.CurPos = part.Location.ToAcadXYZ();
+                ctx.MoveFrame(part.Location.ToAcadXYZ());
                 ctx.AddProgram(part.Program);
             }
 
@@ -248,6 +246,10 @@ namespace OpenNest.IO
 
             private Mode mode;
 
+            // Where the tool really is while CurPos has jumped to a part or sub-program origin
+            // that the tool never visits. The next move is drawn as a rapid from here.
+            private XYZ? travelFrom;
+
             public ExportContext()
             {
                 Document = new CadDocument();
@@ -271,6 +273,27 @@ namespace OpenNest.IO
                     Layer = layer,
                 };
                 Document.Entities.Add(ln);
+            }
+
+            /// <summary>
+            /// Makes <paramref name="origin"/> the reference for the next moves without drawing
+            /// a rapid to it: the travel is drawn to where the next move actually goes.
+            /// </summary>
+            public void MoveFrame(XYZ origin)
+            {
+                travelFrom ??= CurPos;
+                CurPos = origin;
+            }
+
+            // Draws the pending travel as a rapid to the start of a cut.
+            private void FlushTravel()
+            {
+                if (travelFrom is not XYZ from)
+                    return;
+
+                travelFrom = null;
+                if (from.X != CurPos.X || from.Y != CurPos.Y)
+                    AddLine(from, CurPos, RapidLayer);
             }
 
             public void AddPlateOutline(Plate plate)
@@ -336,6 +359,9 @@ namespace OpenNest.IO
 
             public void AddProgram(Program program)
             {
+                // A sub-program's Offset is measured from where this program started, not from
+                // the tool position at the call (the same frame ConvertProgram.ToGeometry uses).
+                var frameOrigin = CurPos;
                 mode = program.Mode;
 
                 for (var i = 0; i < program.Length; ++i)
@@ -358,7 +384,15 @@ namespace OpenNest.IO
 
                         case CodeType.SubProgramCall:
                             var tmpmode = mode;
-                            AddProgram(((SubProgramCall)code).Program);
+                            var call = (SubProgramCall)code;
+                            MoveFrame(
+                                new XYZ(
+                                    frameOrigin.X + call.Offset.X,
+                                    frameOrigin.Y + call.Offset.Y,
+                                    0
+                                )
+                            );
+                            AddProgram(call.Program);
                             mode = tmpmode;
                             break;
                     }
@@ -372,6 +406,7 @@ namespace OpenNest.IO
                 if (mode == Mode.Incremental)
                     pt = new XYZ(pt.X + CurPos.X, pt.Y + CurPos.Y, 0);
 
+                FlushTravel();
                 AddLine(CurPos, pt, CutLayer);
                 CurPos = pt;
             }
@@ -383,7 +418,8 @@ namespace OpenNest.IO
                 if (mode == Mode.Incremental)
                     pt = new XYZ(pt.X + CurPos.X, pt.Y + CurPos.Y, 0);
 
-                AddLine(CurPos, pt, RapidLayer);
+                AddLine(travelFrom ?? CurPos, pt, RapidLayer);
+                travelFrom = null;
                 CurPos = pt;
             }
 
@@ -397,6 +433,8 @@ namespace OpenNest.IO
                     endpt = new XYZ(endpt.X + CurPos.X, endpt.Y + CurPos.Y, 0);
                     center = new XYZ(center.X + CurPos.X, center.Y + CurPos.Y, 0);
                 }
+
+                FlushTravel();
 
                 var startAngle = PortableMath.Atan2(CurPos.Y - center.Y, CurPos.X - center.X);
 
