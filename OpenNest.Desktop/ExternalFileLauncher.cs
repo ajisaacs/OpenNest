@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace OpenNest.Desktop;
 
@@ -37,6 +38,34 @@ public static class ExternalFileLauncher
     {
         using var process = Process.Start(StartInfo(path));
     }
+
+    /// <summary>
+    /// Opens <paramref name="path"/> and, where an opener program reports the result
+    /// (<c>xdg-open</c>, <c>open</c>), waits for it without blocking and returns why it failed,
+    /// or null once it opened. The Windows shell reports a failure by throwing instead. Throws
+    /// when the opener cannot start.
+    /// </summary>
+    public static async Task<string> OpenAsync(string path)
+    {
+        var info = StartInfo(path);
+        using var process = Process.Start(info);
+        if (info.UseShellExecute || process == null)
+            return null;
+        await process.WaitForExitAsync().ConfigureAwait(false);
+        return FailureMessage(process.ExitCode, path);
+    }
+
+    /// <summary>
+    /// What an <c>xdg-open</c> or <c>open</c> exit code means for <paramref name="path"/>, or
+    /// null for success (0).
+    /// </summary>
+    public static string FailureMessage(int exitCode, string path) => exitCode switch
+    {
+        0 => null,
+        2 => $"'{path}' was not found.",
+        3 => $"No program is set up to open '{System.IO.Path.GetFileName(path)}'.",
+        _ => $"The system could not open '{path}' (exit code {exitCode}).",
+    };
 
     private static OSPlatform CurrentPlatform() =>
         RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? OSPlatform.Windows

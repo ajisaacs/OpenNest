@@ -53,7 +53,6 @@ public sealed class PlateExportTests : IDisposable
     [InlineData("a.png", PlateExportFormat.Image)]
     [InlineData("a.JPG", PlateExportFormat.Image)]
     [InlineData("a.jpeg", PlateExportFormat.Image)]
-    [InlineData("a.bmp", PlateExportFormat.Image)]
     [InlineData("dir.v2/a.txt", PlateExportFormat.PlacementText)]
     [InlineData("a.svg", PlateExportFormat.Svg)]
     public void FromPath_ReadsTheExtension(string path, PlateExportFormat expected) =>
@@ -62,6 +61,7 @@ public sealed class PlateExportTests : IDisposable
     [Theory]
     [InlineData("a")]
     [InlineData("a.pdf")]
+    [InlineData("a.bmp")]
     [InlineData("a.dxf.bak")]
     [InlineData("")]
     [InlineData(null)]
@@ -255,6 +255,14 @@ public sealed class PlateExportTests : IDisposable
     [Fact]
     public void Launcher_RefusesABlankPath() =>
         Assert.ThrowsAny<ArgumentException>(() => ExternalFileLauncher.StartInfo(" ", OSPlatform.Linux));
+
+    [Theory]
+    [InlineData(0, null)]
+    [InlineData(2, "'/tmp/job-P1.dxf' was not found.")]
+    [InlineData(3, "No program is set up to open 'job-P1.dxf'.")]
+    [InlineData(4, "The system could not open '/tmp/job-P1.dxf' (exit code 4).")]
+    public void FailureMessage_ExplainsTheOpenersExitCode(int exitCode, string expected) =>
+        Assert.Equal(expected, ExternalFileLauncher.FailureMessage(exitCode, "/tmp/job-P1.dxf"));
 
     internal static Program Square(double size)
     {

@@ -57,14 +57,15 @@ public static class PlateExport
             : throw new ArgumentException("Unsupported plate export format.", nameof(filterIndex));
 
     /// <summary>
-    /// The format a chosen file's extension asks for (.dxf, .png/.jpg/.jpeg/.bmp, .txt, .svg,
-    /// any case), or null for any other extension or none.
+    /// The format a chosen file's extension asks for (.dxf, .png/.jpg/.jpeg, .txt, .svg, any
+    /// case), or null for any other extension or none. Bitmap (.bmp) is not offered: no
+    /// cross-platform encoder writes it.
     /// </summary>
     public static PlateExportFormat? FromPath(string path) =>
         Path.GetExtension(path ?? "").ToLowerInvariant() switch
         {
             ".dxf" => PlateExportFormat.Dxf,
-            ".png" or ".jpg" or ".jpeg" or ".bmp" => PlateExportFormat.Image,
+            ".png" or ".jpg" or ".jpeg" => PlateExportFormat.Image,
             ".txt" => PlateExportFormat.PlacementText,
             ".svg" => PlateExportFormat.Svg,
             _ => null,
