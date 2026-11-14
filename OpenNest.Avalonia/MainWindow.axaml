@@ -18,6 +18,9 @@
         <Separator />
         <MenuItem Header="E_xit" InputGesture="Ctrl+Q" Click="OnExit" />
       </MenuItem>
+      <MenuItem Header="_Edit">
+        <MenuItem x:Name="SelectAllMenuItem" Header="Select _All" InputGesture="Ctrl+A" Click="OnSelectAll" />
+      </MenuItem>
       <MenuItem Header="_Nest">
         <MenuItem x:Name="AutoNestMenuItem" Header="_Auto Nest" Click="OnAutoNest" />
       </MenuItem>

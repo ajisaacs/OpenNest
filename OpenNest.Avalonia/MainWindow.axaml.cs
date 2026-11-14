@@ -80,6 +80,11 @@ namespace OpenNest.Avalonia
                 Gesture = new KeyGesture(Key.Q, KeyModifiers.Control),
                 Command = new Command(() => OnExit(null, null)),
             });
+            KeyBindings.Add(new KeyBinding
+            {
+                Gesture = new KeyGesture(Key.A, KeyModifiers.Control),
+                Command = new Command(() => OnSelectAll(null, null)),
+            });
             KeyBindings.Add(new KeyBinding { Gesture = new KeyGesture(Key.PageUp), Command = new Command(() => StepPlate(-1)) });
             KeyBindings.Add(new KeyBinding { Gesture = new KeyGesture(Key.PageDown), Command = new Command(() => StepPlate(1)) });
             // Ctrl+Tab before focus navigation takes the Tab key.
@@ -729,6 +734,8 @@ namespace OpenNest.Avalonia
 
         private void OnFit(object sender, RoutedEventArgs e) => ActiveView?.PlateView.ZoomToFit();
 
+        private void OnSelectAll(object sender, RoutedEventArgs e) => ActiveView?.PlateView.SelectAll();
+
         private void OnPreviousPlate(object sender, RoutedEventArgs e) => StepPlate(-1);
 
         private void OnNextPlate(object sender, RoutedEventArgs e) => StepPlate(1);
@@ -748,16 +755,16 @@ namespace OpenNest.Avalonia
                 return;
             }
 
-            var text = $"{view.Tab.Name}   Plate {view.PlateIndex + 1} of {view.PlateCount}"
+            // The active tool's name and hint first, as the WinForms status label shows them.
+            var text = $"{canvas.Tools.Status}   {view.Tab.Name}   Plate {view.PlateIndex + 1} of {view.PlateCount}"
                 + $"   Zoom {canvas.Zoom:0.##} px/unit";
             if (canvas.CursorWorld is { } at)
                 text += $"   X {at.X:0.000}  Y {at.Y:0.000}";
-            var part = canvas.HoveredPart ?? canvas.SelectedPart;
-            if (part != null)
-            {
-                var how = ReferenceEquals(part, canvas.SelectedPart) ? "Selected" : "Over";
-                text += $"   {how}: {part.BaseDrawing.Name}";
-            }
+            var selected = canvas.Selection.Parts.Where(canvas.Plate.Parts.Contains).ToList();
+            if (selected.Count > 0)
+                text += "   " + Desktop.Interaction.SelectionStatus.Text(selected);
+            if (canvas.HoveredPart is { } part)
+                text += $"   Over: {part.BaseDrawing.Name}";
             if (notice != null)
                 text += $"   |   {notice}";
             Status.Text = text;

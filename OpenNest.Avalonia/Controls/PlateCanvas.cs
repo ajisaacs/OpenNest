@@ -11,6 +11,8 @@ using Avalonia.Skia;
 using OpenNest.Avalonia.Rendering;
 using OpenNest.CNC;
 using OpenNest.CommonLines;
+using OpenNest.CutOffs;
+using OpenNest.Desktop.Interaction;
 using OpenNest.Desktop.Rendering;
 using OpenNest.Geometry;
 using OpenNest.Support;
@@ -24,10 +26,11 @@ namespace OpenNest.Avalonia.Controls
     /// Draws one plate with Skia as the WinForms plate view does, in the colours of
     /// <see cref="Scheme"/>: the sheet (or irregular outline), edge spacing, filled parts with their
     /// numbers, cut-offs, clamps, common lines and the View toggles in <see cref="Options"/>. Pans
-    /// with a left or middle drag, zooms at the cursor with the wheel, fits on a double click, and
-    /// highlights the part under the cursor.
+    /// with a middle drag, zooms at the cursor with the wheel, fits on a middle double click, and
+    /// highlights the part under the cursor. Left and right clicks go to the active plate tool
+    /// (<see cref="Tools"/>, Select by default); Escape steps out of it.
     /// </summary>
-    public sealed class PlateCanvas : Control
+    public sealed class PlateCanvas : Control, IPlateToolHost
     {
         // Paths are built once per part pose and only read afterwards, so the render thread may draw
         // them while the UI thread builds others.
@@ -38,8 +41,12 @@ namespace OpenNest.Avalonia.Controls
         private readonly Dictionary<CommonLineGroup, (string State, CommonLineCheck Check)> commonLineChecks = new();
         private readonly ViewTransform view = new();
 
+        private readonly PlateSelection selection = new();
+        private readonly PlateHitTester hitTester;
+        private readonly PlateToolManager tools;
+
         private Plate plate;
-        private Point? dragStart;
+        private Point? panStart;
         private bool fitPending = true;
 
         private sealed record OffsetEntry(CNC.Program Program, double Rotation, double Spacing, double Tolerance,
@@ -50,9 +57,14 @@ namespace OpenNest.Avalonia.Controls
             get => plate;
             set
             {
+                var changed = !ReferenceEquals(plate, value);
                 plate = value;
                 HoveredPart = null;
-                SelectedPart = null;
+                if (changed)
+                {
+                    selection.Plate = value;
+                    tools.OnPlateChanged();
+                }
                 fitPending = true;
                 TrimCache();
                 InvalidateVisual();
@@ -67,7 +79,13 @@ namespace OpenNest.Avalonia.Controls
 
         public Part HoveredPart { get; private set; }
 
-        public Part SelectedPart { get; private set; }
+        /// <summary>The parts and cut-offs selected on the shown plate.</summary>
+        public PlateSelection Selection => selection;
+
+        /// <summary>The active plate tool and its status text.</summary>
+        public PlateToolManager Tools => tools;
+
+        public PlateHitTester HitTester => hitTester;
 
         /// <summary>The cursor in plate coordinates, or null when it is outside the view.</summary>
         public Vector? CursorWorld { get; private set; }
@@ -84,7 +102,20 @@ namespace OpenNest.Avalonia.Controls
         {
             ClipToBounds = true;
             Focusable = true;
+            hitTester = new PlateHitTester(part => PathsFor(part).Geometry);
+            tools = new PlateToolManager(this);
+            selection.Changed += (_, _) =>
+            {
+                InvalidateVisual();
+                ViewChanged?.Invoke(this, EventArgs.Empty);
+            };
+            tools.StatusChanged += (_, _) => ViewChanged?.Invoke(this, EventArgs.Empty);
         }
+
+        void IPlateToolHost.Invalidate() => InvalidateVisual();
+
+        /// <summary>Edit &gt; Select All: every part on the plate, cut-off segments excepted.</summary>
+        public void SelectAll() => selection.SelectAll();
 
         public void ClearCache()
         {
@@ -221,7 +252,7 @@ namespace OpenNest.Avalonia.Controls
                     continue;
                 var color = ToSkColor(part.BaseDrawing.Color);
                 scene.Parts.Add(new PartItem(partPaths, part.Location, placed, color, palette.PartOutline(color),
-                    (i + 1).ToString(), LabelPoint(part), ReferenceEquals(part, SelectedPart),
+                    (i + 1).ToString(), LabelPoint(part), selection.Contains(part),
                     ReferenceEquals(part, HoveredPart), part.BaseDrawing.IsCutOff));
             }
 
@@ -230,8 +261,8 @@ namespace OpenNest.Avalonia.Controls
                 foreach (var part in plate.Parts)
                     scene.Offsets.Add((OffsetFor(part, plate.PartSpacing, options.OffsetTolerance), part.Location));
             }
-            if (options.DrawBounds && SelectedPart != null)
-                scene.SelectionBounds = PlateOverlays.SelectionBounds(new[] { SelectedPart });
+            if (options.DrawBounds)
+                scene.SelectionBounds = PlateOverlays.SelectionBounds(selection.Parts.Where(plate.Parts.Contains));
             if (options.DrawRapid)
                 scene.Rapids = PlateOverlays.Rapids(plate);
             if (options.DrawPiercePoints)
@@ -241,10 +272,25 @@ namespace OpenNest.Avalonia.Controls
 
             scene.Clamps = PlateOverlays.Clamps(plate);
             scene.RemovedClamps = PlateOverlays.RemovedClamps(plate);
-            scene.CutOffStrokes = PlateOverlays.CutOffStrokes(plate);
+            BuildCutOffs(scene);
+            if (tools.Current is SelectTool { Window: { } window })
+                scene.Window = window;
             BuildCommonLines(scene);
             if (options.DrawSupport)
                 BuildSupport(scene);
+        }
+
+        // A selected cut-off is drawn solid blue in place of its dashes, as in WinForms.
+        private void BuildCutOffs(Scene scene)
+        {
+            foreach (var cutOff in plate.CutOffs)
+            {
+                var program = cutOff.Drawing?.Program;
+                if (program == null || program.Codes.Count == 0)
+                    continue;
+                var strokes = selection.Contains(cutOff) ? scene.SelectedCutOffStrokes : scene.CutOffStrokes;
+                strokes.AddRange(CutOff.CutStrokes(program, Vector.Zero));
+            }
         }
 
         private void BuildCommonLines(Scene scene)
@@ -321,64 +367,110 @@ namespace OpenNest.Avalonia.Controls
         {
             Focus();
             var point = e.GetCurrentPoint(this);
-            if (e.ClickCount == 2)
+            var properties = point.Properties;
+            if (properties.IsMiddleButtonPressed)
             {
-                ZoomToFit();
+                if (e.ClickCount == 2)
+                {
+                    ZoomToFit();
+                    return;
+                }
+                panStart = point.Position;
+                e.Pointer.Capture(this);
                 return;
             }
-            if (point.Properties.IsLeftButtonPressed)
-            {
-                SelectedPart = HitTest(ToWorld(point.Position));
-                InvalidateVisual();
-                ViewChanged?.Invoke(this, EventArgs.Empty);
-            }
-            if (point.Properties.IsLeftButtonPressed || point.Properties.IsMiddleButtonPressed)
-            {
-                dragStart = point.Position;
+
+            var button = properties.IsLeftButtonPressed ? ToolButton.Left
+                : properties.IsRightButtonPressed ? ToolButton.Right : ToolButton.None;
+            if (button == ToolButton.None)
+                return;
+            ClearHover();
+            if (tools.Current.PointerPressed(ToolPointerAt(point.Position, button, e.KeyModifiers)))
+                e.Handled = true;
+            if (button == ToolButton.Left)
                 e.Pointer.Capture(this);
-            }
         }
 
         protected override void OnPointerMoved(PointerEventArgs e)
         {
-            var at = e.GetPosition(this);
-            if (dragStart is { } start)
+            var point = e.GetCurrentPoint(this);
+            var at = point.Position;
+            CursorWorld = ToWorld(at);
+            if (panStart is { } start)
             {
                 view.Pan(at.X - start.X, at.Y - start.Y);
-                dragStart = at;
+                panStart = at;
                 InvalidateVisual();
             }
-
-            CursorWorld = ToWorld(at);
-            var hovered = dragStart == null ? HitTest(CursorWorld.Value) : HoveredPart;
-            if (!ReferenceEquals(hovered, HoveredPart))
+            else
             {
-                HoveredPart = hovered;
-                InvalidateVisual();
+                var button = point.Properties.IsLeftButtonPressed ? ToolButton.Left
+                    : point.Properties.IsRightButtonPressed ? ToolButton.Right : ToolButton.None;
+                tools.Current.PointerMoved(ToolPointerAt(at, button, e.KeyModifiers));
+                // As WinForms: the part under the cursor is highlighted only while no button is held.
+                var hovered = button == ToolButton.None ? hitTester.PartAt(plate, CursorWorld.Value) : null;
+                if (!ReferenceEquals(hovered, HoveredPart))
+                {
+                    HoveredPart = hovered;
+                    InvalidateVisual();
+                }
             }
             ViewChanged?.Invoke(this, EventArgs.Empty);
         }
 
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
         {
-            dragStart = null;
+            var button = e.InitialPressMouseButton switch
+            {
+                MouseButton.Left => ToolButton.Left,
+                MouseButton.Right => ToolButton.Right,
+                MouseButton.Middle => ToolButton.Middle,
+                _ => ToolButton.None,
+            };
+            if (button == ToolButton.Middle)
+                panStart = null;
+            else if (button != ToolButton.None
+                && tools.Current.PointerReleased(ToolPointerAt(e.GetPosition(this), button, e.KeyModifiers)))
+                e.Handled = true;
             e.Pointer.Capture(null);
         }
 
         protected override void OnPointerExited(PointerEventArgs e)
         {
             CursorWorld = null;
-            if (HoveredPart != null)
-            {
-                HoveredPart = null;
-                InvalidateVisual();
-            }
+            ClearHover();
             ViewChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void ClearHover()
+        {
+            if (HoveredPart == null)
+                return;
+            HoveredPart = null;
+            InvalidateVisual();
+        }
+
+        private ToolPointer ToolPointerAt(Point at, ToolButton button, KeyModifiers keys)
+        {
+            var modifiers = ToolModifiers.None;
+            if (keys.HasFlag(KeyModifiers.Shift))
+                modifiers |= ToolModifiers.Shift;
+            // Command on macOS stands in for Ctrl, as Avalonia's own gestures do.
+            if (keys.HasFlag(KeyModifiers.Control) || keys.HasFlag(KeyModifiers.Meta))
+                modifiers |= ToolModifiers.Control;
+            if (keys.HasFlag(KeyModifiers.Alt))
+                modifiers |= ToolModifiers.Alt;
+            return new ToolPointer(ToWorld(at), new ScreenPoint(at.X, at.Y), button, modifiers);
         }
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
-            if (e.Key == Key.F)
+            if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None)
+            {
+                tools.Escape();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.F && e.KeyModifiers == KeyModifiers.None)
             {
                 ZoomToFit();
                 e.Handled = true;
@@ -390,24 +482,6 @@ namespace OpenNest.Avalonia.Controls
             base.OnSizeChanged(e);
             view.Resize(e.NewSize.Width, e.NewSize.Height);
             InvalidateVisual();
-        }
-
-        /// <summary>The topmost part whose material (or, for an etch-only part, closed mark) holds <paramref name="world"/>.</summary>
-        private Part HitTest(Vector world)
-        {
-            if (plate == null)
-                return null;
-            for (var i = plate.Parts.Count - 1; i >= 0; i--)
-            {
-                var part = plate.Parts[i];
-                var box = part.BoundingBox;
-                if (world.X < box.Left || world.X > box.Right || world.Y < box.Bottom || world.Y > box.Top)
-                    continue;
-                var local = world - part.Location;
-                if (PathsFor(part).Selection.Contains((float)local.X, (float)local.Y))
-                    return part;
-            }
-            return null;
         }
 
         private sealed record PartItem(PartPaths Paths, Vector Location, Box Bounds, SKColor Color, SKColor Outline,
@@ -437,7 +511,9 @@ namespace OpenNest.Avalonia.Controls
             public IReadOnlyList<ContourSample> Arrows;
             public IReadOnlyList<Box> Clamps;
             public IReadOnlyList<Box> RemovedClamps;
-            public IReadOnlyList<Line> CutOffStrokes;
+            public readonly List<Line> CutOffStrokes = new();
+            public readonly List<Line> SelectedCutOffStrokes = new();
+            public SelectionWindow? Window;
             public readonly List<IReadOnlyList<Vector>> CommonLines = new();
             public readonly List<Box> CommonLineProblems = new();
             public IReadOnlyList<Vector> GridPoints;
@@ -498,6 +574,11 @@ namespace OpenNest.Avalonia.Controls
             private static readonly SKColor ObstacleHatch = new(120, 60, 60, 170);
             private static readonly SKColor ObstacleBack = new(200, 80, 80, 60);
             private static readonly SKColor CutOffColor = new(255, 69, 0); // OrangeRed
+            private static readonly SKColor SelectedCutOffColor = new(0, 120, 255);
+            private static readonly SKColor WindowContainsBorder = new(99, 162, 228);
+            private static readonly SKColor WindowContainsFill = new(150, 200, 255, 90);
+            private static readonly SKColor WindowIntersectBorder = new(50, 255, 50);
+            private static readonly SKColor WindowIntersectFill = new(50, 255, 50, 50);
             private static readonly SKColor CommonLineColor = new(0, 150, 136);
             private static readonly SKColor BrokenCommonLineColor = new(255, 0, 0);
             private static readonly SKColor GridColor = new(120, 120, 120, 110);
@@ -580,6 +661,7 @@ namespace OpenNest.Avalonia.Controls
                 DrawCutOffs();
                 DrawCommonLines();
                 DrawSupport();
+                DrawSelectionWindow();
             }
 
             private void DrawSheet()
@@ -796,6 +878,9 @@ namespace OpenNest.Avalonia.Controls
                 using var pen = Stroke(CutOffColor, 2, new float[] { 6, 2 });
                 foreach (var stroke in scene.CutOffStrokes)
                     canvas.DrawLine(Screen(stroke.StartPoint), Screen(stroke.EndPoint), pen);
+                using var selectedPen = Stroke(SelectedCutOffColor, 3.5f);
+                foreach (var stroke in scene.SelectedCutOffStrokes)
+                    canvas.DrawLine(Screen(stroke.StartPoint), Screen(stroke.EndPoint), selectedPen);
 
                 // Each segment's number over the line, on a disc of the line's colour.
                 using var disc = Fill(CutOffColor);
@@ -821,6 +906,22 @@ namespace OpenNest.Avalonia.Controls
                     canvas.DrawCircle(at, diameter / 2, disc);
                     canvas.DrawText(item.Label, at.X, at.Y - (metrics.Ascent + metrics.Descent) / 2, text);
                 }
+            }
+
+            // The Select tool's window: blue while it selects what it contains, green while it
+            // selects what it touches, in the WinForms colours.
+            private void DrawSelectionWindow()
+            {
+                if (scene.Window is not { } window)
+                    return;
+                var contains = window.Mode == WindowSelectionMode.Contains;
+                var rect = Screen(window.Box);
+                using var fill = Fill(contains ? WindowContainsFill : WindowIntersectFill);
+                fill.IsAntialias = false;
+                canvas.DrawRect(rect, fill);
+                using var border = Stroke(contains ? WindowContainsBorder : WindowIntersectBorder);
+                border.IsAntialias = false;
+                canvas.DrawRect(rect, border);
             }
 
             private void DrawCommonLines()
