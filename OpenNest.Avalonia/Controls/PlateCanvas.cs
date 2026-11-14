@@ -59,6 +59,20 @@ namespace OpenNest.Avalonia.Controls
             }
         }
 
+        /// <summary>
+        /// Shows <paramref name="value"/>, a copy of the shown plate an Undo or Redo read back,
+        /// keeping the zoom and pan, and selects its part at <paramref name="selectedIndex"/>
+        /// (none when out of range).
+        /// </summary>
+        public void ReplacePlate(Plate value, int selectedIndex)
+        {
+            var fit = fitPending;
+            Plate = value;
+            fitPending = fit;
+            if (value != null && selectedIndex >= 0 && selectedIndex < value.Parts.Count)
+                SelectedPart = value.Parts[selectedIndex];
+        }
+
         /// <summary>The colours drawn with: the application's active scheme unless set.</summary>
         public ColorScheme Scheme { get; set; } = ColorScheme.Default;
 

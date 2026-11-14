@@ -10,10 +10,11 @@ once its entry point records it.
 |---|---|
 | History engine (states, cursor, limits, coalescing, save point) | `OpenNest.Data/UndoHistory.cs` |
 | State codec | `OpenNest.IO/NestSnapshot.cs` |
-| Recording scope, fingerprint, history state | `OpenNest.Desktop/Undo/` (shared with `OpenNest.Avalonia`) |
-| Recording, restore, safety net | `OpenNest/Forms/EditNestForm.Undo.cs` |
-| Menu, keys, guards | `OpenNest/Forms/MainForm.Undo.cs`, `MainForm.Guards.cs` (`IsUndoBusy`) |
-| Tests | `OpenNest.WinForms.Tests/Forms/UndoRedoTests.cs`, `UndoRecordingTests.cs`; scope and fingerprint on Linux in `OpenNest.Desktop.Tests/Undo/` |
+| Recording, stepping, safety net, menu labels (`NestUndoRecorder`), scope, fingerprint, history state | `OpenNest.Desktop/Undo/` (shared with `OpenNest.Avalonia`) |
+| WinForms restore (rebinding the window), DEBUG idle check | `OpenNest/Forms/EditNestForm.Undo.cs` |
+| WinForms menu, keys, guards | `OpenNest/Forms/MainForm.Undo.cs`, `MainForm.Guards.cs` (`IsUndoBusy`) |
+| Avalonia: one recorder per tab (`NestTab.Undo`), restore, menu, keys, guards | `OpenNest.Desktop/NestTabs.cs`, `OpenNest.Avalonia/MainWindow.Undo.cs`, `NestView.axaml.cs` |
+| Tests | `OpenNest.WinForms.Tests/Forms/UndoRedoTests.cs`, `UndoRecordingTests.cs`; recorder, scope and fingerprint on Linux in `OpenNest.Desktop.Tests/Undo/` |
 
 ## What is undoable
 
@@ -155,6 +156,14 @@ Keys are routed in `MainForm.ProcessCmdKey`; the menu items show shortcut text b
 the program editor keeps its own Ctrl+Z and Ctrl+Y (`KeepsOwnUndo`). Otherwise Ctrl+Z first
 asks the current action's `TryUndoStep()`: Sequence by Path removes its last line, and only
 when it has none does the nest undo.
+
+The Avalonia app follows the same rules through the shared recorder: each tab's `NestTab.Undo`
+starts its history when the nest opens (after the trailing empty plate is added), the tab's
+unsaved dot is `HasUnsavedChanges`, Save records any unscoped edit first, and Auto Nest's commit
+is one "Auto Nest" step. Its window routes the keys in a tunnelling key handler, leaves them to
+a focused `TextBox` (numeric and editable combo boxes and grid editors contain one), disables
+Undo and Redo while Auto Nest runs on the nest, and rebinds the Edit menu when the active tab
+changes. A restore keeps the shown plate, zoom, pan and selection (by part index).
 
 ## Limits and cost
 
