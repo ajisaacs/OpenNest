@@ -41,6 +41,9 @@ namespace OpenNest.Controls
         private static readonly Color DimensionColor = Color.FromArgb(235, 230, 120, 20);
         private static readonly Color HoverColor = Color.FromArgb(255, 140, 0);
         private static readonly Color ActiveColor = Color.FromArgb(220, 30, 110, 200);
+        // Reference geometry, such as a bolt circle: not a cut, and not a dimension line.
+        private static readonly Color ReferenceColor = Color.FromArgb(0, 120, 140);
+        private static readonly float[] ReferenceDashes = { 7f, 5f };
 
         private string[] infoLines;
         private Vector shapeOffset;
@@ -402,6 +405,13 @@ namespace OpenNest.Controls
             ViewChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        /// <summary>
+        /// For a leader on a circle or arc: its arrow tip, its label end and the curve's center
+        /// on the control; null for other dimensions.
+        /// </summary>
+        internal (PointF Tip, PointF End, PointF Center)? RadialLeader(string property) =>
+            CurrentLayout().Radials.TryGetValue(property, out var radial) ? radial : null;
+
         private Label HitTest(Point location) =>
             CurrentLayout().Labels.FirstOrDefault(l => l.Enabled && l.Bounds.Contains(location));
 
@@ -480,8 +490,11 @@ namespace OpenNest.Controls
             public readonly List<(PointF A, PointF B)> Lines = new();
             public readonly List<(PointF Tip, PointF From)> Arrows = new();
 
-            /// <summary>Dotted reference circles, such as a flange's bolt circle.</summary>
+            /// <summary>Dashed reference circles, such as a flange's bolt circle.</summary>
             public readonly List<(PointF Center, float Radius)> Circles = new();
+
+            /// <summary>Each leader on a circle or arc: its arrow tip, label end and the curve's center.</summary>
+            public readonly Dictionary<string, (PointF Tip, PointF End, PointF Center)> Radials = new();
             public readonly List<Label> Labels = new();
 
             /// <summary>Everything the dimensions draw (not the notes), in control pixels.</summary>
@@ -681,21 +694,72 @@ namespace OpenNest.Controls
             var shoulder = new PointF(end.X + (right ? Shoulder : -Shoulder), end.Y);
 
             AddReferenceCircle(result, d);
-            if (!AddHoleDiameter(result, d, end))
+            if (!AddHoleDiameter(result, d, end, dir))
             {
-                result.Lines.Add((p, end));
-                result.Arrows.Add((p, end));
+                // On a circle or arc the arrow moves round the curve, so the leader stays radial.
+                var tip = RadialTip(result, d, end, p);
+                result.Lines.Add((tip, end));
+                result.Arrows.Add((tip, end));
             }
             result.Lines.Add((end, shoulder));
             AddLabels(result, annotation, new PointF(shoulder.X + (right ? 2 : -2), shoulder.Y), right ? 0 : 1, drag);
         }
 
         /// <summary>
-        /// For a hole's diameter leader, the line from <paramref name="end"/> straight through the
-        /// hole's center to its far edge, with arrows pointing out onto both edges; false (nothing added) for
-        /// other leaders, or when the label end sits inside the hole.
+        /// Where a leader's arrow touches its curve with the label end at <paramref name="end"/>:
+        /// on the reference circle or arc where the line from the center to the label crosses
+        /// it, so the leader points at the center. Past an arc's ends the arrow stops at the
+        /// nearer end. Other leaders keep <paramref name="start"/>.
         /// </summary>
-        private bool AddHoleDiameter(AnnotationLayout result, ShapeDimension d, PointF end)
+        private PointF RadialTip(AnnotationLayout result, ShapeDimension d, PointF end, PointF start)
+        {
+            Vector center;
+            double radius;
+            var isArc = false;
+            if (d.CircleCenter is { } circleCenter && d.CircleRadius > 0)
+                (center, radius) = (circleCenter, d.CircleRadius);
+            else if (d.ArcCenter is { } arcCenter && d.ArcRadius > 0)
+                (center, radius, isArc) = (arcCenter, d.ArcRadius, true);
+            else
+                return start;
+
+            var c = ToScreen(center);
+            var tip = start;
+            var toEnd = new PointF(end.X - c.X, end.Y - c.Y);
+            if (Dot(toEnd, toEnd) >= 1)
+            {
+                // Screen Y runs down; shape angles are counterclockwise with Y up.
+                var angle = System.Math.Atan2(-toEnd.Y, toEnd.X);
+                if (isArc)
+                    angle = ClampToArc(angle, d.ArcStartAngle, d.ArcEndAngle);
+                tip = ToScreen(new Vector(center.X + radius * System.Math.Cos(angle), center.Y + radius * System.Math.Sin(angle)));
+            }
+            result.Radials[d.Property] = (tip, end, c);
+            return tip;
+        }
+
+        /// <summary>The angle on the arc from <paramref name="start"/> to <paramref name="end"/> nearest <paramref name="angle"/>.</summary>
+        private static double ClampToArc(double angle, double start, double end)
+        {
+            const double turn = 2 * System.Math.PI;
+            var sweep = end - start;
+            if (sweep >= turn)
+                return angle;
+            var offset = (angle - start) % turn;
+            if (offset < 0)
+                offset += turn;
+            if (offset <= sweep)
+                return start + offset;
+            return offset - sweep < turn - offset ? end : start;
+        }
+
+        /// <summary>
+        /// For a hole's diameter leader, the line from <paramref name="end"/> straight through the
+        /// hole's center to its far edge, with arrows pointing out onto both edges; with the label
+        /// end inside the hole, the line spans the hole through that end. False (nothing added)
+        /// for other leaders.
+        /// </summary>
+        private bool AddHoleDiameter(AnnotationLayout result, ShapeDimension d, PointF end, PointF fallback)
         {
             if (d.HoleCenter is not { } holeCenter || d.HoleRadius <= 0)
                 return false;
@@ -704,16 +768,15 @@ namespace OpenNest.Controls
             var radius = LengthWorldToGui(d.HoleRadius);
             var toEnd = new PointF(end.X - center.X, end.Y - center.Y);
             var distance = (float)System.Math.Sqrt(Dot(toEnd, toEnd));
-            if (distance <= radius)
-                return false;
 
-            var u = new PointF(toEnd.X / distance, toEnd.Y / distance);
+            var u = distance >= 1 ? new PointF(toEnd.X / distance, toEnd.Y / distance) : fallback;
             var near = Along(center, u, radius);
             var far = Along(center, u, -radius);
-            result.Lines.Add((far, end));
+            result.Lines.Add((far, distance > radius ? end : near));
             // Both arrows point out from the center onto the hole's edges.
             result.Arrows.Add((near, center));
             result.Arrows.Add((far, center));
+            result.Radials[d.Property] = (near, end, center);
             return true;
         }
 
@@ -803,9 +866,9 @@ namespace OpenNest.Controls
             foreach (var (a, b) in drawn.Lines)
                 g.DrawLine(line, a, b);
 
-            using var dotted = new Pen(DimensionColor, 1f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dot };
+            using var dashed = new Pen(ReferenceColor, 1f) { DashPattern = ReferenceDashes };
             foreach (var (center, radius) in drawn.Circles)
-                g.DrawEllipse(dotted, center.X - radius, center.Y - radius, 2 * radius, 2 * radius);
+                g.DrawEllipse(dashed, center.X - radius, center.Y - radius, 2 * radius, 2 * radius);
 
             using var arrowBrush = new SolidBrush(DimensionColor);
             foreach (var (tip, from) in drawn.Arrows)

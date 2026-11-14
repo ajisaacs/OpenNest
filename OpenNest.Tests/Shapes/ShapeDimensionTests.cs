@@ -67,7 +67,7 @@ public class ShapeDimensionTests
     }
 
     [Fact]
-    public void FlangeHolePatternMeasuresADottedBoltCircle()
+    public void FlangeHolePatternMeasuresADashedBoltCircle()
     {
         var flange = new PipeFlangeShape();
         flange.SetPreviewDefaults();
@@ -90,6 +90,11 @@ public class ShapeDimensionTests
         var radius = shape.GetDimensions().Single(d => d.Property == nameof(RoundedRectangleShape.Radius));
 
         Assert.Equal(2, radius.Start.DistanceTo(new OpenNest.Geometry.Vector(2, 4)), 6);
+        // It calls out the top-left corner arc and starts out in line with that arc's center.
+        Assert.Equal(new OpenNest.Geometry.Vector(2, 4), radius.ArcCenter);
+        Assert.Equal(2, radius.ArcRadius, 6);
+        Assert.Equal(-System.Math.Sqrt(0.5), radius.Side.X, 6);
+        Assert.Equal(System.Math.Sqrt(0.5), radius.Side.Y, 6);
     }
 
     [Theory]

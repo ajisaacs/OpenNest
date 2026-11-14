@@ -27,9 +27,8 @@ namespace OpenNest.Shapes
                 ShapeDimension.Linear(nameof(Width), new Vector(Length, 0), new Vector(Length, Width), ShapeDimension.Right),
                 // On the top-left corner arc, pointing out along its 45-degree radius, clear of
                 // the width dimension on the right.
-                ShapeDimension.Leader(nameof(Radius),
-                    new Vector(Radius * (1 - System.Math.Sqrt(0.5)), Width - Radius * (1 - System.Math.Sqrt(0.5))),
-                    new Vector(-1, 1), "R"),
+                ShapeDimension.ArcLeader(nameof(Radius), new Vector(Radius, Width - Radius), Radius,
+                    Angle.ToRadians(90), Angle.ToRadians(180), "R"),
             };
 
         public override Drawing GetDrawing()

@@ -116,6 +116,32 @@ public class ShapeLibraryFormTests
         Assert.Equal(15, preview.Plate.Parts.Single().BoundingBox.Length, 6);
     });
 
+    [Theory]
+    [InlineData(typeof(PipeFlangeShape), "HolePatternDiameter")]
+    [InlineData(typeof(PipeFlangeShape), "HoleDiameter")]
+    [InlineData(typeof(RoundedRectangleShape), "Radius")]
+    public void ADraggedDiameterOrRadiusLeaderStillPointsAtTheCenter(Type shapeType, string property) => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        SelectShape(form, shapeType);
+        var preview = Find<ShapePreviewControl>(form, "previewBox");
+
+        // Off the default radius, but still within a corner arc's quarter turn.
+        foreach (var offset in new[] { PointF.Empty, new PointF(-25, -60), new PointF(-70, 10) })
+        {
+            preview.SetDragOffset(property, offset);
+            var (tip, end, center) = preview.RadialLeader(property)!.Value;
+
+            var toTip = new PointF(tip.X - center.X, tip.Y - center.Y);
+            var toEnd = new PointF(end.X - center.X, end.Y - center.Y);
+            var cross = toTip.X * toEnd.Y - toTip.Y * toEnd.X;
+            var lengths = System.Math.Sqrt(toTip.X * toTip.X + toTip.Y * toTip.Y) * System.Math.Sqrt(toEnd.X * toEnd.X + toEnd.Y * toEnd.Y);
+            Assert.True(lengths > 0);
+            Assert.True(System.Math.Abs(cross) / lengths < 0.01, $"{property} at {offset}: leader misses the center");
+            Assert.True(toTip.X * toEnd.X + toTip.Y * toEnd.Y > 0);
+        }
+    });
+
     [Fact]
     public void FlangeHoleCountSitsBesideTheHoleDiameter() => ArchUnitsTests.RunSta(() =>
     {

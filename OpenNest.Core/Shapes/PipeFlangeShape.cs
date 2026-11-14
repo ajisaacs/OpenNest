@@ -35,7 +35,7 @@ namespace OpenNest.Shapes
 
         public override IReadOnlyList<ShapeDimension> GetDimensions()
         {
-            // The dotted bolt circle through the hole centers is called out by a leader from
+            // The dashed bolt circle through the hole centers is called out by a leader from
             // outside, down and to the left, landing between holes rather than on one.
             var boltAngle = 1.25 * System.Math.PI;
             if (HoleCount > 0)

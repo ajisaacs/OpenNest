@@ -1,4 +1,5 @@
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Shapes
 {
@@ -58,7 +59,7 @@ namespace OpenNest.Shapes
 
         /// <summary>
         /// The center of the hole a diameter leader calls out; null for other dimensions.
-        /// The leader's line crosses the hole through it, whichever way the label is dragged.
+        /// The leader's line crosses the hole through it, wherever the label is dragged.
         /// </summary>
         public Vector? HoleCenter { get; private init; }
 
@@ -67,15 +68,31 @@ namespace OpenNest.Shapes
 
         /// <summary>
         /// The center of a reference circle (such as a flange's bolt circle) that the preview
-        /// draws dotted; null when there is none.
+        /// draws dashed; null when there is none. A leader on it points at this center
+        /// wherever the label is dragged.
         /// </summary>
         public Vector? CircleCenter { get; private init; }
 
         /// <summary>The radius of the reference circle at <see cref="CircleCenter"/>.</summary>
         public double CircleRadius { get; private init; }
 
-        /// <summary>True when the preview draws a dotted reference circle for this dimension.</summary>
+        /// <summary>True when the preview draws a dashed reference circle for this dimension.</summary>
         public bool DrawsCircle => CircleCenter != null;
+
+        /// <summary>
+        /// The center of the arc a radius leader calls out; null for other dimensions. The
+        /// leader points at it, its arrow sliding along the arc as the label is dragged.
+        /// </summary>
+        public Vector? ArcCenter { get; private init; }
+
+        /// <summary>The radius of the arc at <see cref="ArcCenter"/>.</summary>
+        public double ArcRadius { get; private init; }
+
+        /// <summary>The angle the arc at <see cref="ArcCenter"/> starts at, in radians counterclockwise.</summary>
+        public double ArcStartAngle { get; private init; }
+
+        /// <summary>The angle the arc at <see cref="ArcCenter"/> ends at; never less than <see cref="ArcStartAngle"/>.</summary>
+        public double ArcEndAngle { get; private init; }
 
         /// <summary>This dimension with "x {count} {noun}" after its value.</summary>
         public ShapeDimension WithCount(string countProperty, string noun) =>
@@ -87,6 +104,10 @@ namespace OpenNest.Shapes
                 HoleRadius = HoleRadius,
                 CircleCenter = CircleCenter,
                 CircleRadius = CircleRadius,
+                ArcCenter = ArcCenter,
+                ArcRadius = ArcRadius,
+                ArcStartAngle = ArcStartAngle,
+                ArcEndAngle = ArcEndAngle,
             };
 
         /// <summary>
@@ -123,9 +144,10 @@ namespace OpenNest.Shapes
         }
 
         /// <summary>
-        /// A diameter leader on a dotted reference circle (such as a flange's bolt circle) at
+        /// A diameter leader on a dashed reference circle (such as a flange's bolt circle) at
         /// <paramref name="center"/>: it starts on the circle facing <paramref name="direction"/>
         /// and runs out from there, its arrow pointing in onto the circle; no line crosses it.
+        /// Dragged, the arrow moves around the circle so the leader keeps pointing at the center.
         /// </summary>
         public static ShapeDimension CircleLeader(string property, Vector center, double radius, Vector direction, string prefix = "")
         {
@@ -136,6 +158,25 @@ namespace OpenNest.Shapes
             {
                 CircleCenter = center,
                 CircleRadius = radius,
+            };
+        }
+
+        /// <summary>
+        /// A radius leader on the arc at <paramref name="center"/> from <paramref name="startAngle"/>
+        /// counterclockwise to <paramref name="endAngle"/> (radians): it starts at the arc's middle
+        /// and runs out along that radius, in line with the center.
+        /// </summary>
+        public static ShapeDimension ArcLeader(string property, Vector center, double radius, double startAngle, double endAngle, string prefix = "")
+        {
+            var middle = (startAngle + endAngle) / 2;
+            var unit = new Vector(PortableMath.Cos(middle), PortableMath.Sin(middle));
+            var edge = new Vector(center.X + unit.X * radius, center.Y + unit.Y * radius);
+            return new(property, ShapeDimensionKind.Leader, edge, edge, unit, prefix)
+            {
+                ArcCenter = center,
+                ArcRadius = radius,
+                ArcStartAngle = startAngle,
+                ArcEndAngle = endAngle,
             };
         }
 
