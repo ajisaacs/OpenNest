@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Data;
+using OpenNest.Desktop;
 using OpenNest.Engine.BestFit;
 using OpenNest.Forms.Commands;
 using OpenNest.IO;
@@ -326,11 +327,10 @@ namespace OpenNest.Forms
             if (form == null || !TryCaptureReportTargets(form, out var targets))
                 return;
 
-            var path = Path.Combine(Path.GetTempPath(), "OpenNest", "Reports",
-                Guid.NewGuid().ToString("N"), targets.SuggestedFileName);
+            string path;
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                path = NestReportExport.CreateViewPath(targets.SuggestedFileName);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {

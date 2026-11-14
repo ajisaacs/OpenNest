@@ -19,6 +19,16 @@ there is no separate direct-save command. Closing the window deletes its tempora
 folder; a render failure opens no viewer and leaves no folder. Without the WebView2
 Runtime the window still offers Save As.
 
+The cross-platform desktop (`OpenNest.Avalonia`) shares the file name check,
+capture and writer (`OpenNest.Desktop.NestReportExport`) but has no viewer of its
+own: **File -> Nest Report...** writes the PDF to a private folder under the
+system temp folder's `OpenNest/Reports/` and opens it in the system's PDF viewer
+(`ExternalFileLauncher`: the Windows shell, `open` on macOS, `xdg-open`
+elsewhere), which saves and prints it. Because that viewer's closing cannot be
+seen, each view removes viewed-report folders older than a day instead. **File ->
+Export Nest Report...** saves the PDF straight to a chosen file. Either refuses
+while Auto Nest runs on the nest, checked before and after the file picker.
+
 The same two calls back the command and any future integration:
 
 ```csharp
