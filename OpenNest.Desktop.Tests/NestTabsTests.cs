@@ -131,7 +131,7 @@ public class NestTabsTests
     {
         var tabs = Three(out var a, out var b, out _);
 
-        b.MarkModified();
+        TestNests.Edit(b);
 
         Assert.True(tabs.AnyModified);
         Assert.False(a.Modified);
