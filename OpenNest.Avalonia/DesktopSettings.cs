@@ -16,15 +16,16 @@ namespace OpenNest.Avalonia
     /// </summary>
     internal static class DesktopSettings
     {
-        public static SharedSettingsSource Shared { get; } = SharedSettingsSource.FromStorageFile();
+        /// <summary>The storage mode and nest server from storage.json; Tools > Options can change the server.</summary>
+        private static NestStorageSettings storage = NestStorageSettings.Load(NestStorageSettings.DefaultPath);
+
+        public static SharedSettingsSource Shared { get; } = new(() => storage);
 
         public static MachineSettingsSource Machines { get; } =
             new(Shared, new MachineUserSettingsFile(UserSettingsFile.DefaultPath));
 
-        /// <summary>The storage mode and nest server, read once from storage.json as <see cref="Shared"/> does.</summary>
-        private static readonly NestStorageSettings Storage = NestStorageSettings.Load(NestStorageSettings.DefaultPath);
-
         private static RemoteNestRepository repository;
+        private static string repositoryUrl;
 
         /// <summary>
         /// File > New nests, numbered by the nest server in Database mode and otherwise by the
@@ -33,7 +34,29 @@ namespace OpenNest.Avalonia
         public static NewNestSource NewNests { get; } = new(
             Machines,
             new NewNestUserSettingsFile(UserSettingsFile.DefaultPath),
-            () => Storage.IsDatabaseMode ? repository ??= new RemoteNestRepository(Storage.ServerUrl) : null);
+            () => storage.IsDatabaseMode ? Repository(storage.ServerUrl) : null);
+
+        /// <summary>The nest server URL saved in storage.json (blank when none).</summary>
+        public static string ServerUrl => storage.ServerUrl;
+
+        /// <summary>
+        /// Saves <paramref name="serverUrl"/> as the nest server in storage.json, keeping the
+        /// storage mode, as the WinForms Options form does; the next request uses it.
+        /// </summary>
+        public static void SaveServerUrl(string serverUrl) =>
+            storage = NestServerUrlOption.SaveToFile(NestStorageSettings.DefaultPath, serverUrl);
+
+        // One client per server, recreated when the URL changes.
+        private static RemoteNestRepository Repository(string url)
+        {
+            if (repository == null || repositoryUrl != url)
+            {
+                repository?.Dispose();
+                repository = new RemoteNestRepository(url);
+                repositoryUrl = url;
+            }
+            return repository;
+        }
 
         /// <summary>The post processors loaded from Posts/ beside the app, by load order.</summary>
         public static IReadOnlyList<IPostProcessor> PostProcessors { get; private set; } = [];

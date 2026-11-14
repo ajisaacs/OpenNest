@@ -42,6 +42,9 @@
         <MenuItem Header="Next N_est" InputGesture="Ctrl+Tab" Click="OnNextNest" />
         <MenuItem Header="Previous Ne_st" InputGesture="Ctrl+Shift+Tab" Click="OnPreviousNest" />
       </MenuItem>
+      <MenuItem Header="_Tools">
+        <MenuItem x:Name="OptionsMenuItem" Header="_Options..." Click="OnOptions" />
+      </MenuItem>
     </Menu>
 
     <Border DockPanel.Dock="Top" Padding="4" BorderThickness="0,0,0,1" BorderBrush="#D0D0D0">

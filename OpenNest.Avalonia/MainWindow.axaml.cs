@@ -57,8 +57,13 @@ namespace OpenNest.Avalonia
             if (DesktopSettings.LoadPosts(Path.Combine(AppContext.BaseDirectory, "Posts")) is { } postWarning)
                 notice = notice == null ? postWarning : $"{notice}   {postWarning}";
             MachinesLoaded = LoadMachinesAsync();
-            // The colour scheme chosen in the WinForms app's options, from the shared user settings.
-            ColorSchemeRegistry.ApplySaved(Data.UserSettingsFile.Read(Data.UserSettingsFile.DefaultPath));
+            // The colour scheme and fill strategies chosen in Tools > Options (either app's), from
+            // the shared user settings; applying a scheme later recolours the open nests.
+            var userSettings = Data.UserSettingsFile.Read(Data.UserSettingsFile.DefaultPath);
+            ColorSchemeRegistry.ApplySaved(userSettings);
+            FillStrategyOptions.ApplySaved(userSettings);
+            ColorSchemeRegistry.Applied += OnColorSchemeApplied;
+            Closed += (_, _) => ColorSchemeRegistry.Applied -= OnColorSchemeApplied;
             tabs.Changed += (_, _) => ShowActiveTab();
             KeyBindings.Add(new KeyBinding
             {
@@ -734,6 +739,21 @@ namespace OpenNest.Avalonia
         private void OnNextPlate(object sender, RoutedEventArgs e) => StepPlate(1);
 
         private void StepPlate(int step) => ActiveView?.StepPlate(step);
+
+        // Tools > Options. Settings for features the app does not have yet (Database mode, the
+        // update feed) are still saved, for the WinForms app and later milestones.
+        private async void OnOptions(object sender, RoutedEventArgs e) =>
+            await OptionsDialog.ShowAsync(this, Data.UserSettingsFile.DefaultPath);
+
+        // As the WinForms nest windows: every open nest takes the new scheme's drawing colours.
+        private void OnColorSchemeApplied(object sender, ColorScheme scheme)
+        {
+            foreach (var (tab, view) in views)
+            {
+                ColorSchemeRegistry.RecolorDrawings(tab.Document.Nest);
+                view.PlateView.InvalidateVisual();
+            }
+        }
 
         private void UpdateStatus()
         {
