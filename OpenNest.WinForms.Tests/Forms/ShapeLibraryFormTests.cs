@@ -221,7 +221,7 @@ public class ShapeLibraryFormTests
         // The length sits below the drawing: it may come closer, never above its bottom edge.
         var after = preview.LabelBounds("Length")!.Value;
         Assert.True(after.Y < before.Y);
-        Assert.True(after.Y > before.Y - 20);
+        Assert.True(after.Y > before.Y - 50);
     });
 
     [Fact]

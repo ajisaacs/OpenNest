@@ -24,14 +24,19 @@ namespace OpenNest.Controls
     {
         // Screen sizes, in pixels. Gap, MinimumGap, LeaderClearance and Shoulder are sizes at the
         // fitted view: they grow and shrink with the zoom, so dimensions stay put on the drawing.
-        private const float Gap = 18f;
+        private const float Gap = 50f;
         private const float ExtensionOverrun = 5f;
         private const float ArrowLength = 8f;
         private const float ArrowHalfWidth = 3f;
-        private const float LeaderClearance = 20f;
+        private const float LeaderClearance = 30f;
         private const float Shoulder = 12f;
         private const float LabelPadding = 3f;
+        // Between the control's border and the note chips.
         private const float EdgePadding = 10f;
+        // Between the control's border and the fitted drawing and its dimensions.
+        private const float FitPadding = 30f;
+        // Between the info lines or note chips and the fitted drawing and its dimensions.
+        private const float FitClearance = 20f;
         private const float ChipSpacing = 6f;
         private const int DragThreshold = 3;
         // How close a dragged linear dimension may come to the drawing's bounds.
@@ -220,9 +225,11 @@ namespace OpenNest.Controls
                 return;
             }
 
-            var top = EdgePadding + InfoHeight();
-            var bottom = EdgePadding + ChipRowsHeight();
-            float left = EdgePadding, right = EdgePadding;
+            var info = InfoHeight();
+            var chips = ChipRowsHeight();
+            var top = info > 0 ? System.Math.Max(FitPadding, info + FitClearance) : FitPadding;
+            var bottom = chips > 0 ? System.Math.Max(FitPadding, EdgePadding + chips + FitClearance) : FitPadding;
+            float left = FitPadding, right = FitPadding;
             float reachLeft = 0, reachRight = 0, reachTop = 0, reachBottom = 0;
 
             for (var pass = 0; pass < 3; pass++)
