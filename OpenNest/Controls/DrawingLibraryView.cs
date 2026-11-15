@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Data;
+using OpenNest.Desktop;
 using OpenNest.Forms;
 using OpenNest.IO;
 
@@ -80,6 +81,15 @@ namespace OpenNest.Controls
 
         /// <summary>Shows the set editor and returns the saved record, or null; replaced by tests.</summary>
         internal Func<DrawingSetEditSession, DrawingSetRecord> EditSet { get; set; }
+
+        /// <summary>
+        /// Asks where to save one drawing: the chosen file and format, or null when canceled;
+        /// replaced by tests.
+        /// </summary>
+        internal Func<DrawingLibraryRecord, (string Path, LibraryExportFormat Format)?> ChooseExportFile { get; set; }
+
+        /// <summary>Asks for the folder Export Listed Drawings writes to, or null when canceled; replaced by tests.</summary>
+        internal Func<string> ChooseExportFolder { get; set; }
 
         /// <summary>
         /// Adds a drawing read from the library, at a quantity, to the release: the host's
@@ -161,6 +171,28 @@ namespace OpenNest.Controls
             {
                 using var form = new DrawingLibraryFilterForm(filter, customers);
                 return form.ShowDialog(DialogOwner) == DialogResult.OK ? form.Filter : null;
+            };
+            ChooseExportFile = record =>
+            {
+                using var dialog = new SaveFileDialog
+                {
+                    Title = $"Export '{record.Name}'",
+                    Filter = LibraryDrawingExport.DialogFilter,
+                    FileName = LibraryDrawingExport.SuggestedFileName(record, LibraryExportFormat.Dxf),
+                };
+                if (dialog.ShowDialog(DialogOwner) != DialogResult.OK)
+                    return null;
+                var format = LibraryDrawingExport.FromFilterIndex(dialog.FilterIndex);
+                return (Path.ChangeExtension(dialog.FileName, LibraryDrawingExport.Extension(format)), format);
+            };
+            ChooseExportFolder = () =>
+            {
+                using var dialog = new FolderBrowserDialog
+                {
+                    Description = "Export the listed drawings to",
+                    UseDescriptionForTitle = true,
+                };
+                return dialog.ShowDialog(DialogOwner) == DialogResult.OK ? dialog.SelectedPath : null;
             };
             LoadPreview = async (record, token) =>
             {
@@ -498,6 +530,119 @@ namespace OpenNest.Controls
             addToSetMenuItem.Enabled = record != null && !adding;
             releaseMenuItem.Enabled = record is { Archived: false } && !adding && AddToRelease != null;
             releasesMenuItem.Enabled = record != null && !adding;
+            exportMenuItem.Enabled = record != null && !adding;
+            exportListedMenuItem.Enabled = session.Page?.Items.Count > 0 && !adding;
+        }
+
+        private async void ExportButton_Click(object sender, EventArgs e) => await ExportSelectedAsync();
+
+        private async void ExportListedDxfMenuItem_Click(object sender, EventArgs e) =>
+            await ExportListedAsync(LibraryExportFormat.Dxf);
+
+        private async void ExportListedSvgMenuItem_Click(object sender, EventArgs e) =>
+            await ExportListedAsync(LibraryExportFormat.Svg);
+
+        private async void ExportListedNestMenuItem_Click(object sender, EventArgs e) =>
+            await ExportListedAsync(LibraryExportFormat.Nest);
+
+        /// <summary>
+        /// Saves the selected drawing's listed revision as DXF, SVG or its .nest package; the
+        /// save dialog asks before replacing a file.
+        /// </summary>
+        internal async Task ExportSelectedAsync()
+        {
+            var record = SelectedRecord();
+            if (record == null || adding)
+                return;
+
+            var choice = ChooseExportFile(record);
+            if (choice is not { } chosen || IsDisposed)
+                return;
+
+            var result = await RunExportAsync(new[] { new LibraryExportTarget(record, chosen.Path) }, chosen.Format);
+            if (result == null || IsDisposed)
+                return;
+            if (result.Written.Count == 1)
+            {
+                statusLabel.Text = $"Exported '{record.Name}' revision {record.Revision} to {chosen.Path}.";
+                return;
+            }
+
+            statusLabel.Text = "";
+            if (result.Missing.Count > 0)
+            {
+                ShowMessage($"Revision {record.Revision} of '{record.Name}' is no longer on the server.",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                await RunAsync(session.RefreshAsync);
+            }
+            else
+            {
+                ShowMessage($"Could not export '{record.Name}': {result.Failed[0].Reason}",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Saves every drawing on the current page to a chosen folder in <paramref name="format"/>,
+        /// one file per drawing named after it. Asks once before replacing files already there.
+        /// </summary>
+        internal async Task ExportListedAsync(LibraryExportFormat format)
+        {
+            var records = session.Page?.Items ?? Array.Empty<DrawingLibraryRecord>();
+            if (records.Count == 0 || adding)
+                return;
+
+            var folder = ChooseExportFolder();
+            if (string.IsNullOrWhiteSpace(folder) || IsDisposed)
+                return;
+
+            var targets = LibraryDrawingExport.PlanFolder(records, folder, format);
+            var existing = targets.Count(target => File.Exists(target.Path));
+            if (existing > 0 && ShowMessage(
+                    $"{existing:N0} of the {targets.Count:N0} files already exist in {folder}. Replace them?",
+                    MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK)
+                return;
+
+            var result = await RunExportAsync(targets, format);
+            if (result == null || IsDisposed)
+                return;
+
+            statusLabel.Text = $"Exported {result.Written.Count:N0} of {targets.Count:N0} drawings to {folder}.";
+            var problems = result.Missing.Select(record => $"- {record.Name}: revision {record.Revision} is no longer on the server")
+                .Concat(result.Failed.Select(failure => $"- {failure.Record.Name}: {failure.Reason}"))
+                .ToList();
+            if (problems.Count > 0)
+            {
+                const int shown = 15;
+                var more = problems.Count > shown ? $"{Environment.NewLine}...and {problems.Count - shown:N0} more." : "";
+                ShowMessage($"{problems.Count:N0} drawing{(problems.Count == 1 ? "" : "s")} could not be exported:"
+                    + Environment.NewLine + string.Join(Environment.NewLine, problems.Take(shown)) + more,
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        // Runs an export with the commands disabled and progress in the status line; null if the view closed.
+        private async Task<LibraryExportResult> RunExportAsync(IReadOnlyList<LibraryExportTarget> targets, LibraryExportFormat format)
+        {
+            adding = true;
+            UpdateCommands();
+            statusLabel.Text = targets.Count == 1 ? $"Exporting '{targets[0].Record.Name}'..." : $"Exporting 0 of {targets.Count:N0} drawings...";
+            var progress = new Progress<int>(done =>
+            {
+                if (!IsDisposed && targets.Count > 1)
+                    statusLabel.Text = $"Exporting {done:N0} of {targets.Count:N0} drawings...";
+            });
+            try
+            {
+                var result = await LibraryDrawingExport.ExportAsync(library, targets, format, progress);
+                return IsDisposed ? null : result;
+            }
+            finally
+            {
+                adding = false;
+                if (!IsDisposed)
+                    UpdateCommands();
+            }
         }
 
         private async void ReleaseMenuItem_Click(object sender, EventArgs e) => await AddSelectedToReleaseAsync();
@@ -813,6 +958,7 @@ namespace OpenNest.Controls
             addButton.Enabled = !adding && (nest != null ? SelectedRecord() != null
                 : AddToRelease != null && SelectedRecord() is { Archived: false });
             editButton.Enabled = !adding && SelectedRecord() is { Archived: false };
+            exportButton.Enabled = !adding && SelectedRecord() != null;
         }
 
         private void UpdateFilterLabel(bool showAll = false)

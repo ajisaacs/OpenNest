@@ -480,6 +480,29 @@ release panel ([below](#make-nests-the-release-panel)); **Edit Drawing...** (the
 button or the right-click menu) edits it. Its right-click menu also has the set
 and release items below.
 
+### Export from the Drawing Library (desktop)
+
+Both forms of the browser can export without changing the library or any nest
+(`OpenNest.Desktop.LibraryDrawingExport`). Each export downloads the listed
+revision's exact package:
+
+- **Export...** (the button under the details pane, or the drawing's right-click
+  menu) saves the selected drawing, archived ones included, as **DXF** (the
+  drawing's program), **SVG** (in the units the drawing was saved in, so it needs
+  no scale on import) or **OpenNest nest** (the package as stored: a `.nest`
+  holding the one drawing). The package leaves customer, color and nesting
+  settings to the library record, so a `.nest` export carries geometry, units,
+  bends and cut settings only.
+- **Export Listed Drawings > As DXF / As SVG / As OpenNest Nests...** (right-click
+  menu) writes every drawing on the current page to a chosen folder, one file
+  per drawing named after it; names the batch already used get " (2)", " (3)"...
+  If files of those names are already there it asks once before replacing them.
+  A revision no longer on the server or a file that cannot be written is listed
+  at the end, and the rest still export.
+
+Each file is written under a temporary name beside it and then moved into
+place, so a failure never leaves a partial file or damages one already there.
+
 ### Edit Drawing (desktop)
 
 **Edit Drawing...** (`OpenNest.Data.DrawingLibraryEditSession`) edits one active

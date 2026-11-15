@@ -84,6 +84,7 @@ namespace OpenNest.Controls
             quantityBox = new System.Windows.Forms.NumericUpDown();
             addButton = new System.Windows.Forms.Button();
             editButton = new System.Windows.Forms.Button();
+            exportButton = new System.Windows.Forms.Button();
             statusLabel = new System.Windows.Forms.Label();
             searchTimer = new System.Windows.Forms.Timer(components);
             previewTimer = new System.Windows.Forms.Timer(components);
@@ -95,6 +96,12 @@ namespace OpenNest.Controls
             releaseSeparator = new System.Windows.Forms.ToolStripSeparator();
             releaseMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             releasesMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            exportSeparator = new System.Windows.Forms.ToolStripSeparator();
+            exportMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            exportListedMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            exportListedDxfMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            exportListedSvgMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            exportListedNestMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             rootTable.SuspendLayout();
             tabControl.SuspendLayout();
             drawingsTab.SuspendLayout();
@@ -704,6 +711,8 @@ namespace OpenNest.Controls
             actionTable.Controls.Add(quantityLabel, 0, 0);
             actionTable.Controls.Add(quantityBox, 1, 0);
             actionTable.Controls.Add(addButton, 2, 0);
+            actionTable.Controls.Add(exportButton, 0, 1);
+            actionTable.SetColumnSpan(exportButton, 2);
             actionTable.Controls.Add(editButton, 2, 1);
             actionTable.Dock = System.Windows.Forms.DockStyle.Fill;
             actionTable.Margin = new System.Windows.Forms.Padding(0);
@@ -758,6 +767,18 @@ namespace OpenNest.Controls
             editButton.UseVisualStyleBackColor = true;
             editButton.Click += EditButton_Click;
             //
+            // exportButton
+            //
+            exportButton.AutoSize = true;
+            exportButton.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            exportButton.Enabled = false;
+            exportButton.Margin = new System.Windows.Forms.Padding(0, 3, 0, 0);
+            exportButton.Name = "exportButton";
+            exportButton.TabIndex = 4;
+            exportButton.Text = "Export...";
+            exportButton.UseVisualStyleBackColor = true;
+            exportButton.Click += ExportButton_Click;
+            //
             // statusLabel
             //
             statusLabel.AutoEllipsis = true;
@@ -779,7 +800,7 @@ namespace OpenNest.Controls
             //
             // drawingMenu
             //
-            drawingMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { editMenuItem, editSeparator, usedInSetsMenuItem, addToSetMenuItem, releaseSeparator, releaseMenuItem, releasesMenuItem });
+            drawingMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { editMenuItem, editSeparator, usedInSetsMenuItem, addToSetMenuItem, releaseSeparator, releaseMenuItem, releasesMenuItem, exportSeparator, exportMenuItem, exportListedMenuItem });
             drawingMenu.Name = "drawingMenu";
             drawingMenu.Opening += DrawingMenu_Opening;
             //
@@ -824,6 +845,42 @@ namespace OpenNest.Controls
             releasesMenuItem.Text = "Releases...";
             releasesMenuItem.ToolTipText = "The releases that had this drawing on its own";
             releasesMenuItem.Click += ReleasesMenuItem_Click;
+            //
+            // exportSeparator
+            //
+            exportSeparator.Name = "exportSeparator";
+            //
+            // exportMenuItem
+            //
+            exportMenuItem.Name = "exportMenuItem";
+            exportMenuItem.Text = "Export...";
+            exportMenuItem.ToolTipText = "Save this drawing's listed revision as DXF, SVG or an OpenNest nest";
+            exportMenuItem.Click += ExportButton_Click;
+            //
+            // exportListedMenuItem
+            //
+            exportListedMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { exportListedDxfMenuItem, exportListedSvgMenuItem, exportListedNestMenuItem });
+            exportListedMenuItem.Name = "exportListedMenuItem";
+            exportListedMenuItem.Text = "Export Listed Drawings";
+            exportListedMenuItem.ToolTipText = "Save every drawing on this page to a folder";
+            //
+            // exportListedDxfMenuItem
+            //
+            exportListedDxfMenuItem.Name = "exportListedDxfMenuItem";
+            exportListedDxfMenuItem.Text = "As DXF...";
+            exportListedDxfMenuItem.Click += ExportListedDxfMenuItem_Click;
+            //
+            // exportListedSvgMenuItem
+            //
+            exportListedSvgMenuItem.Name = "exportListedSvgMenuItem";
+            exportListedSvgMenuItem.Text = "As SVG...";
+            exportListedSvgMenuItem.Click += ExportListedSvgMenuItem_Click;
+            //
+            // exportListedNestMenuItem
+            //
+            exportListedNestMenuItem.Name = "exportListedNestMenuItem";
+            exportListedNestMenuItem.Text = "As OpenNest Nests...";
+            exportListedNestMenuItem.Click += ExportListedNestMenuItem_Click;
             //
             // DrawingLibraryView
             //
@@ -941,5 +998,12 @@ namespace OpenNest.Controls
         private System.Windows.Forms.ToolStripSeparator releaseSeparator;
         private System.Windows.Forms.ToolStripMenuItem releaseMenuItem;
         private System.Windows.Forms.ToolStripMenuItem releasesMenuItem;
+        private System.Windows.Forms.Button exportButton;
+        private System.Windows.Forms.ToolStripSeparator exportSeparator;
+        private System.Windows.Forms.ToolStripMenuItem exportMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem exportListedMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem exportListedDxfMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem exportListedSvgMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem exportListedNestMenuItem;
     }
 }

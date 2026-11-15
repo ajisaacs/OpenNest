@@ -578,6 +578,56 @@ public class DrawingLibraryFormTests
             "The drawing library filter test did not complete.");
     }
 
+    [Fact]
+    public void Export_SavesTheSelectedDrawing_AndTheListedPageToAFolder()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), $"opennest-library-export-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(folder);
+        try
+        {
+            StaTestThread.Run(
+                () =>
+                {
+                    var library = new FakeLibrary();
+                    var record = library.Add("SYN-EXPORT", "", "", 0, Units.Millimeters, "");
+                    var messages = new List<string>();
+
+                    using var form = new DrawingLibraryForm(library, Server, nest: null);
+                    form.View.ShowMessage = (text, _, _) => { messages.Add(text); return DialogResult.OK; };
+                    form.View.LoadPreview = (_, _) => Task.FromResult<Drawing>(null!);
+                    var single = Path.Combine(folder, "one.svg");
+                    form.View.ChooseExportFile = chosen =>
+                    {
+                        Assert.Same(record, chosen);
+                        return (single, OpenNest.Desktop.LibraryExportFormat.Svg);
+                    };
+                    form.View.ChooseExportFolder = () => folder;
+                    form.Show();
+                    var grid = Field<DataGridView>(form, "drawingGrid");
+                    PumpUntilListed(grid, "the library page");
+                    Assert.True(Field<Button>(form, "exportButton").Enabled);
+
+                    Run(form.View.ExportSelectedAsync());
+                    Assert.Contains("mm", File.ReadAllText(single));
+                    Assert.StartsWith("Exported 'SYN-EXPORT' revision 2", Field<Label>(form, "statusLabel").Text);
+
+                    Run(form.View.ExportListedAsync(OpenNest.Desktop.LibraryExportFormat.Dxf));
+                    Assert.NotEmpty(Dxf.GetGeometry(Path.Combine(folder, "SYN-EXPORT.dxf")));
+
+                    // A second run asks once before replacing the file it wrote.
+                    Run(form.View.ExportListedAsync(OpenNest.Desktop.LibraryExportFormat.Dxf));
+                    Assert.Contains("1 of the 1 files already exist", Assert.Single(messages));
+                    Assert.Equal(3, library.Downloads.Count);
+                },
+                TestTimeout,
+                "The drawing library export test did not complete.");
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
     private static Nest MatchingNest() => new("Synthetic job")
     {
         Units = Units.Inches,

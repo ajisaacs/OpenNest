@@ -76,11 +76,17 @@ public static class PlateExport
     /// "-P" with the 1-based plate number ("job-P2"). Characters a file name cannot hold on any
     /// platform become underscores; a blank nest name is "Nest".
     /// </summary>
-    public static string SuggestedFileName(string nestName, int plateNumber)
+    public static string SuggestedFileName(string nestName, int plateNumber) =>
+        $"{SafeFileName(nestName, "Nest")}-P{plateNumber}";
+
+    /// <summary>
+    /// <paramref name="name"/> trimmed, with characters a file name cannot hold on any platform
+    /// turned into underscores; <paramref name="fallback"/> when it is blank.
+    /// </summary>
+    internal static string SafeFileName(string name, string fallback)
     {
-        var baseName = string.IsNullOrWhiteSpace(nestName) ? "Nest" : nestName.Trim();
-        var chars = baseName.Select(c => Array.IndexOf(InvalidFileNameChars, c) >= 0 ? '_' : c).ToArray();
-        return $"{new string(chars)}-P{plateNumber}";
+        var baseName = string.IsNullOrWhiteSpace(name) ? fallback : name.Trim();
+        return new string(baseName.Select(c => Array.IndexOf(InvalidFileNameChars, c) >= 0 ? '_' : c).ToArray());
     }
 
     /// <summary>The DXF that View in CAD writes for the plate and opens: <see cref="SuggestedFileName"/>.dxf.</summary>
