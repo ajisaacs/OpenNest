@@ -59,6 +59,9 @@
       </MenuItem>
       <MenuItem Header="_Tools">
         <MenuItem x:Name="OptionsMenuItem" Header="_Options..." Click="OnOptions" />
+        <Separator />
+        <MenuItem x:Name="SetOffsetIncrementMenuItem" Header="Set Offset Increment" InputGesture="F5" Click="OnSetOffsetIncrement" />
+        <MenuItem x:Name="SetRotationIncrementMenuItem" Header="Set Rotation Increment" InputGesture="F6" Click="OnSetRotationIncrement" />
       </MenuItem>
     </Menu>
 

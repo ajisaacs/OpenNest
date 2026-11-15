@@ -95,6 +95,16 @@ namespace OpenNest.Avalonia
             });
             KeyBindings.Add(new KeyBinding { Gesture = new KeyGesture(Key.PageUp), Command = new Command(() => StepPlate(-1)) });
             KeyBindings.Add(new KeyBinding { Gesture = new KeyGesture(Key.PageDown), Command = new Command(() => StepPlate(1)) });
+            KeyBindings.Add(new KeyBinding
+            {
+                Gesture = new KeyGesture(Key.F5),
+                Command = new Command(() => OnSetOffsetIncrement(null, null)),
+            });
+            KeyBindings.Add(new KeyBinding
+            {
+                Gesture = new KeyGesture(Key.F6),
+                Command = new Command(() => OnSetRotationIncrement(null, null)),
+            });
             // Ctrl+Tab before focus navigation takes the Tab key.
             AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
             // .nest files dropped anywhere on the window, the nest view included, open in tabs.
@@ -295,6 +305,8 @@ namespace OpenNest.Avalonia
             SaveButton.IsEnabled = view != null;
             SaveAsButton.IsEnabled = view != null;
             CloseAllMenuItem.IsEnabled = view != null;
+            SetOffsetIncrementMenuItem.IsEnabled = view != null;
+            SetRotationIncrementMenuItem.IsEnabled = view != null;
             UpdateExportCommands(view != null);
             Title = view == null
                 ? "OpenNest (Avalonia prototype)"
@@ -848,6 +860,37 @@ namespace OpenNest.Avalonia
         private void OnNextPlate(object sender, RoutedEventArgs e) => StepPlate(1);
 
         private void StepPlate(int step) => ActiveView?.StepPlate(step);
+
+        // Tools > Set Offset Increment (F5), as WinForms: how far an arrow key nudges the active
+        // nest's selection, or the calculated step (selection size plus part spacing). Each nest
+        // keeps its own increments for the session, as each WinForms nest window does.
+        private async void OnSetOffsetIncrement(object sender, RoutedEventArgs e)
+        {
+            if (ActiveView is not { } view)
+                return;
+            var edits = view.PlateView.Edits;
+            var result = await SetValueDialog.ShowAsync(this, "Set Offset Increment",
+                edits.OffsetIncrement,
+                optionText: "Calculated distance (selection size + part spacing)",
+                optionChecked: edits.CalculatedOffset);
+            if (result == null)
+                return;
+            edits.OffsetIncrement = result.Value;
+            edits.CalculatedOffset = result.OptionChecked;
+        }
+
+        // Tools > Set Rotation Increment (F6): the Shift+wheel turn, at most 360 degrees.
+        private async void OnSetRotationIncrement(object sender, RoutedEventArgs e)
+        {
+            if (ActiveView is not { } view)
+                return;
+            var edits = view.PlateView.Edits;
+            var result = await SetValueDialog.ShowAsync(this, "Set Rotation Increment",
+                edits.RotateIncrementDegrees, maximum: 360);
+            if (result == null)
+                return;
+            edits.RotateIncrementDegrees = result.Value;
+        }
 
         // Tools > Options. Settings for features the app does not have yet (Database mode, the
         // update feed) are still saved, for the WinForms app and later milestones.
