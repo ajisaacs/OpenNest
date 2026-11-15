@@ -743,6 +743,11 @@ namespace OpenNest.Avalonia
 
             nesting = new CancellationTokenSource();
             nestingTab = tab;
+            // As WinForms behind its modal progress window: the nest's plate takes no edits
+            // while Auto Nest works on it.
+            var lockedView = views.GetValueOrDefault(tab);
+            if (lockedView != null)
+                lockedView.PlateView.EditsLocked = true;
             var token = nesting.Token;
             SetNesting(true);
             ShowNotice($"{engineName}: starting...");
@@ -797,6 +802,8 @@ namespace OpenNest.Avalonia
                 nesting.Dispose();
                 nesting = null;
                 nestingTab = null;
+                if (lockedView != null)
+                    lockedView.PlateView.EditsLocked = false;
                 SetNesting(false);
             }
         }

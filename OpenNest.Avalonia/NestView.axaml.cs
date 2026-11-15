@@ -26,7 +26,14 @@ namespace OpenNest.Avalonia
         {
             Tab = tab;
             Canvas.ViewChanged += (_, _) => ViewChanged?.Invoke(this, EventArgs.Empty);
+            Canvas.BeginChangeHandler = (label, key) => tab.Undo.BeginChange(label, key);
             tab.Undo.SwapIn = SwapIn;
+            // Deleting parts changes the plate and drawing counts the lists show.
+            tab.Undo.Changed += (_, _) => RefreshCounts();
+            Canvas.CutOffSettings = CutOffSettingsFor(tab.Document.Nest);
+            plates = new PlateManager(tab.Document.Nest);
+            // Starts watching the last two plates (the tab already put the empty plate there).
+            plates.EnsureSentinel();
             Refresh(0);
         }
 
@@ -40,7 +47,13 @@ namespace OpenNest.Avalonia
             keptSelection = shown != null
                 ? (Canvas.Selection.PartIndices, shown.Parts.Count)
                 : (Array.Empty<int>(), -1);
+            // Read first: a throw here leaves the live nest in place, as the recorder expects.
+            var cutOffSettings = CutOffSettingsFor(restored);
             Tab.Document.Nest = restored;
+            Canvas.CutOffSettings = cutOffSettings;
+            plates.Dispose();
+            plates = new PlateManager(restored);
+            plates.EnsureSentinel();
             // Reading recolours drawings from the file; the view keeps the application's scheme.
             // Cut-offs stay as reading regenerated them, as when the nest was opened.
             ColorSchemeRegistry.RecolorDrawings(restored);
@@ -58,6 +71,10 @@ namespace OpenNest.Avalonia
         // While an Undo or Redo swaps its copy in: the plate is shown without zooming to fit,
         // and the parts selected before (their indices, the plate's part count then) are selected again.
         private bool keepView;
+
+        // Keeps one empty plate at the end of the nest as edits add or remove parts on the last
+        // two plates, inside the edit's own undo step, as the WinForms nest window's manager does.
+        private PlateManager plates;
         private (IReadOnlyList<int> Indices, int PartCount) keptSelection = (Array.Empty<int>(), -1);
 
         /// <summary>Raised when the shown plate, zoom, hover or selection changes.</summary>
@@ -76,9 +93,8 @@ namespace OpenNest.Avalonia
         {
             var nest = Tab.Document.Nest;
             // As the WinForms nest window: one empty plate stays at the end to nest onto, so a
-            // new nest shows Plate 1. Files leave empty plates out, so saving is unchanged.
-            using (var plates = new PlateManager(nest))
-                plates.EnsureSentinel();
+            // new nest shows Plate 1. Files leave empty plates out, so saving is unchanged. The
+            // tab put it there on opening and the manager keeps it, so this only reads.
             Canvas.ClearCache();
             PlateList.ItemsSource = nest.Plates
                 .Select((plate, i) =>
@@ -91,8 +107,49 @@ namespace OpenNest.Avalonia
                 .Where(d => !d.IsCutOff)
                 .Select(d => new DrawingRow(d.Name, d.Quantity.Nested, d.Quantity.Required))
                 .ToList();
+            shownCounts = CountsText(nest);
             ShowPlate();
         }
+
+        // As the WinForms nest window binding a nest: the saved head-lock defaults in the nest's
+        // units, then the machine's cut-off defaults for its material and thickness.
+        private static CutOffs.CutOffSettings CutOffSettingsFor(Nest nest)
+        {
+            var settings = new CutOffs.CutOffSettings();
+            SavedCutOffHeadLock.Read(Data.UserSettingsFile.Read(Data.UserSettingsFile.DefaultPath))
+                .ApplyTo(settings, nest.Units);
+            DesktopSettings.Machines.ApplyCutOffDefaults(settings, nest);
+            return settings;
+        }
+
+        // After an edit: rebuilds the lists only when their counts changed, keeping the shown
+        // plate, its zoom and the selection, as an Undo does.
+        private void RefreshCounts()
+        {
+            var nest = Tab.Document.Nest;
+            var counts = CountsText(nest);
+            if (counts == shownCounts)
+                return;
+            var shown = Canvas.Plate;
+            keptSelection = shown != null
+                ? (Canvas.Selection.PartIndices, shown.Parts.Count)
+                : (Array.Empty<int>(), -1);
+            keepView = true;
+            try
+            {
+                Refresh(System.Math.Max(0, PlateList.SelectedIndex));
+            }
+            finally
+            {
+                keepView = false;
+            }
+        }
+
+        private string shownCounts;
+
+        private static string CountsText(Nest nest) =>
+            string.Join(",", nest.Plates.Select(p => p.Parts.Count)) + "|"
+            + string.Join(",", nest.Drawings.Select(d => d.Quantity.Nested));
 
         public void ShowPlate(int index)
         {

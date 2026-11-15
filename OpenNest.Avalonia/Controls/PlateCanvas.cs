@@ -47,6 +47,8 @@ namespace OpenNest.Avalonia.Controls
 
         private Plate plate;
         private Point? panStart;
+        // Where the middle button went down: a press released within 5 px turns the selection.
+        private Point? middleDown;
         private bool fitPending = true;
 
         private sealed record OffsetEntry(CNC.Program Program, double Rotation, double Spacing, double Tolerance,
@@ -100,6 +102,9 @@ namespace OpenNest.Avalonia.Controls
 
         public PlateHitTester HitTester => hitTester;
 
+        /// <summary>Delete, nudge, push and rotate the selection, as WinForms does.</summary>
+        public PlateEdits Edits { get; }
+
         /// <summary>
         /// Opens one undoable edit of the shown nest (its tab's history); unset, edits are not
         /// recorded.
@@ -132,6 +137,7 @@ namespace OpenNest.Avalonia.Controls
             Focusable = true;
             hitTester = new PlateHitTester(part => PathsFor(part).Geometry);
             tools = new PlateToolManager(this);
+            Edits = new PlateEdits(this);
             selection.Changed += (_, _) =>
             {
                 InvalidateVisual();
@@ -384,6 +390,17 @@ namespace OpenNest.Avalonia.Controls
 
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
         {
+            // As WinForms: Shift+wheel turns the selection (Ctrl+Shift by a tenth); without a
+            // selection the wheel zooms. Some platforms report Shift+wheel as horizontal.
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && selection.Parts.Count > 0
+                && !EditsLocked)
+            {
+                var delta = e.Delta.Y != 0 ? e.Delta.Y : e.Delta.X;
+                Edits.RotateByWheel(
+                    (int)System.Math.Truncate(delta), fine: IsControl(e.KeyModifiers));
+                e.Handled = true;
+                return;
+            }
             var at = e.GetPosition(this);
             view.ZoomAt(new ScreenPoint(at.X, at.Y), System.Math.Pow(1.2, e.Delta.Y));
             InvalidateVisual();
@@ -398,12 +415,15 @@ namespace OpenNest.Avalonia.Controls
             var properties = point.Properties;
             if (properties.IsMiddleButtonPressed)
             {
-                if (e.ClickCount == 2)
+                // As WinForms: a middle double-click fits only with nothing selected; with a
+                // selection each click turns it, so a double-click turns it 180 degrees.
+                if (e.ClickCount == 2 && selection.Parts.Count == 0)
                 {
                     ZoomToFit();
                     return;
                 }
                 panStart = point.Position;
+                middleDown = point.Position;
                 e.Pointer.Capture(this);
                 return;
             }
@@ -456,11 +476,34 @@ namespace OpenNest.Avalonia.Controls
                 _ => ToolButton.None,
             };
             if (button == ToolButton.Middle)
+            {
                 panStart = null;
+                // A middle click, not a drag, turns the selection 90 degrees.
+                var at = e.GetPosition(this);
+                if (middleDown is { } down && selection.Parts.Count > 0
+                    && (at.X - down.X) * (at.X - down.X) + (at.Y - down.Y) * (at.Y - down.Y) < 25)
+                    Edits.RotateQuarterTurn();
+                middleDown = null;
+            }
             else if (button != ToolButton.None
                 && tools.Current.PointerReleased(ToolPointerAt(e.GetPosition(this), button, e.KeyModifiers)))
                 e.Handled = true;
-            e.Pointer.Capture(null);
+            // Kept while another button is still down: a middle click during a left drag must
+            // not end the drag.
+            var held = e.GetCurrentPoint(this).Properties;
+            if (!held.IsLeftButtonPressed && !held.IsMiddleButtonPressed
+                && !held.IsRightButtonPressed)
+                e.Pointer.Capture(null);
+        }
+
+        // The pointer was taken away mid-gesture (Alt+Tab during a drag): the tool ends what it
+        // was doing, and a pan or middle click stops.
+        protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+        {
+            base.OnPointerCaptureLost(e);
+            panStart = null;
+            middleDown = null;
+            tools.Current.PointerCaptureLost();
         }
 
         protected override void OnPointerExited(PointerEventArgs e)
@@ -484,7 +527,7 @@ namespace OpenNest.Avalonia.Controls
             if (keys.HasFlag(KeyModifiers.Shift))
                 modifiers |= ToolModifiers.Shift;
             // Command on macOS stands in for Ctrl, as Avalonia's own gestures do.
-            if (keys.HasFlag(KeyModifiers.Control) || keys.HasFlag(KeyModifiers.Meta))
+            if (IsControl(keys))
                 modifiers |= ToolModifiers.Control;
             if (keys.HasFlag(KeyModifiers.Alt))
                 modifiers |= ToolModifiers.Alt;
@@ -503,7 +546,36 @@ namespace OpenNest.Avalonia.Controls
                 ZoomToFit();
                 e.Handled = true;
             }
+            else if (EditFor(e.Key, e.KeyModifiers) is { } edit)
+            {
+                edit();
+                e.Handled = true;
+            }
         }
+
+        private static bool IsControl(KeyModifiers keys) =>
+            keys.HasFlag(KeyModifiers.Control) || keys.HasFlag(KeyModifiers.Meta);
+
+        // The WinForms plate view's editing keys: Delete; arrows nudge; Shift+arrows, X, Shift+X,
+        // Shift+Y and Y push to contact.
+        private Action EditFor(Key key, KeyModifiers modifiers) => (key, modifiers) switch
+        {
+            // WinForms deletes on the Delete key whatever modifiers are held.
+            (Key.Delete, _) => Edits.Delete,
+            (Key.Left, KeyModifiers.None) => () => Edits.Nudge(PushDirection.Left),
+            (Key.Right, KeyModifiers.None) => () => Edits.Nudge(PushDirection.Right),
+            (Key.Up, KeyModifiers.None) => () => Edits.Nudge(PushDirection.Up),
+            (Key.Down, KeyModifiers.None) => () => Edits.Nudge(PushDirection.Down),
+            (Key.Left, KeyModifiers.Shift) or (Key.X, KeyModifiers.None) =>
+                () => Edits.Push(PushDirection.Left),
+            (Key.Right, KeyModifiers.Shift) or (Key.X, KeyModifiers.Shift) =>
+                () => Edits.Push(PushDirection.Right),
+            (Key.Up, KeyModifiers.Shift) or (Key.Y, KeyModifiers.Shift) =>
+                () => Edits.Push(PushDirection.Up),
+            (Key.Down, KeyModifiers.Shift) or (Key.Y, KeyModifiers.None) =>
+                () => Edits.Push(PushDirection.Down),
+            _ => null,
+        };
 
         protected override void OnSizeChanged(global::Avalonia.Controls.SizeChangedEventArgs e)
         {
