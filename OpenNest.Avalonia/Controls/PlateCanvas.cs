@@ -100,6 +100,21 @@ namespace OpenNest.Avalonia.Controls
 
         public PlateHitTester HitTester => hitTester;
 
+        /// <summary>
+        /// Opens one undoable edit of the shown nest (its tab's history); unset, edits are not
+        /// recorded.
+        /// </summary>
+        public Func<string, object, Undo.ChangeScope> BeginChangeHandler { get; set; }
+
+        /// <summary>The nest's settings that cut-offs regenerate with after an edit.</summary>
+        public CutOffSettings CutOffSettings { get; set; } = new();
+
+        /// <summary>No edits while Auto Nest works on the nest (WinForms EditsLocked).</summary>
+        public bool EditsLocked { get; set; }
+
+        Undo.ChangeScope IPlateToolHost.BeginChange(string label, object coalesceKey) =>
+            BeginChangeHandler?.Invoke(label, coalesceKey) ?? Undo.ChangeScope.Detached();
+
         /// <summary>The cursor in plate coordinates, or null when it is outside the view.</summary>
         public Vector? CursorWorld { get; private set; }
 

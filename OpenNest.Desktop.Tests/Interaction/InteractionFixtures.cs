@@ -4,6 +4,7 @@ using OpenNest.CutOffs;
 using OpenNest.Desktop.Interaction;
 using OpenNest.Desktop.Rendering;
 using OpenNest.Geometry;
+using OpenNest.Undo;
 
 namespace OpenNest.Desktop.Tests.Interaction;
 
@@ -33,6 +34,48 @@ internal sealed class TestToolHost : IPlateToolHost
     public int Invalidations { get; private set; }
 
     public void Invalidate() => Invalidations++;
+
+    /// <summary>The history edits record into, or null to record nothing.</summary>
+    public NestUndoRecorder Recorder { get; set; }
+
+    /// <summary>The label of every change begun, in order.</summary>
+    public List<string> ChangeLabels { get; } = new();
+
+    private CutOffSettings cutOffSettings = new();
+
+    public CutOffSettings CutOffSettings
+    {
+        get => ThrowOnCutOffSettings
+            ? throw new InvalidOperationException("cut-off settings unavailable")
+            : cutOffSettings;
+        set => cutOffSettings = value;
+    }
+
+    /// <summary>Makes reading <see cref="CutOffSettings"/> throw, as a failed rebuild.</summary>
+    public bool ThrowOnCutOffSettings { get; set; }
+
+    public bool EditsLocked { get; set; }
+
+    public ChangeScope BeginChange(string label, object coalesceKey = null)
+    {
+        ChangeLabels.Add(label);
+        return Recorder?.BeginChange(label, coalesceKey) ?? ChangeScope.Detached();
+    }
+
+    /// <summary>Puts the plate in a nest with a fresh history that the edits record into.</summary>
+    public NestUndoRecorder RecordHistory()
+    {
+        var nest = new Nest { Name = "test" };
+        foreach (var drawing in Plate.Parts.Select(p => p.BaseDrawing).Distinct())
+        {
+            if (!drawing.IsCutOff)
+                nest.Drawings.Add(drawing);
+        }
+        nest.Plates.Add(Plate);
+        Recorder = new NestUndoRecorder(new Document { Nest = nest });
+        Recorder.Reset();
+        return Recorder;
+    }
 
     public ToolPointer At(double x, double y, ToolButton button = ToolButton.Left,
         ToolModifiers modifiers = ToolModifiers.None) =>

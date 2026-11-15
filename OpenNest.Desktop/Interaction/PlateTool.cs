@@ -1,6 +1,8 @@
 using System;
+using OpenNest.CutOffs;
 using OpenNest.Desktop.Rendering;
 using OpenNest.Geometry;
+using OpenNest.Undo;
 
 namespace OpenNest.Desktop.Interaction;
 
@@ -44,6 +46,24 @@ public interface IPlateToolHost
 
     /// <summary>Requests a redraw.</summary>
     void Invalidate();
+
+    /// <summary>
+    /// Opens one undoable edit of the plate (see <see cref="NestUndoRecorder.BeginChange"/>). A
+    /// view without a nest history records nothing.
+    /// </summary>
+    ChangeScope BeginChange(string label, object coalesceKey = null);
+
+    /// <summary>
+    /// The settings cut-offs are rebuilt with after an edit moves or removes parts.
+    /// </summary>
+    CutOffSettings CutOffSettings { get; }
+
+    /// <summary>
+    /// True while the plate must not be edited, as the WinForms view's <c>EditsLocked</c>: the
+    /// nest is locked (Auto Nest is running on it; later, an inspection panel shows it). Edits
+    /// and drag-moves are refused; panning and zooming stay live.
+    /// </summary>
+    bool EditsLocked { get; }
 }
 
 /// <summary>
@@ -98,6 +118,12 @@ public abstract class PlateTool
 
     /// <returns>Whether the tool used the event.</returns>
     public virtual bool PointerReleased(ToolPointer pointer) => false;
+
+    /// <summary>
+    /// The view lost the pointer mid-gesture (Alt+Tab during a drag, say), so no release will
+    /// follow: the tool ends the gesture in progress.
+    /// </summary>
+    public virtual void PointerCaptureLost() { }
 
     protected void RaiseHintChanged() => HintChanged?.Invoke(this, EventArgs.Empty);
 }
