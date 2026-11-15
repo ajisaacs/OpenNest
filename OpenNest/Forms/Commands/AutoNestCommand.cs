@@ -128,7 +128,7 @@ namespace OpenNest.Forms.Commands
                 }
                 else
                 {
-                    result = await SolveAsync(owner, target, request, cts);
+                    result = await SolveAsync(owner, target, request, cts, chooseLayout: true);
                 }
                 cts.Token.ThrowIfCancellationRequested();
 
@@ -226,34 +226,58 @@ namespace OpenNest.Forms.Commands
         /// <paramref name="cts"/>. Nothing is committed: the caller keeps or discards the result.
         /// Make Nests uses it too, to nest each released nest in its tab as Auto Nest would.
         /// </summary>
+        /// <param name="chooseLayout">Lets the user use any of the top layouts shown: one picked
+        /// during the run stops the search, and a finished run with more than one waits for the
+        /// pick. The layout used is validated and bound like the engine's own result. Off, the
+        /// engine's result is returned as soon as it is known.</param>
         internal static async Task<NestPipelineResult> SolveAsync(IWin32Window owner, EditNestForm target,
-            NestPipelineRequest request, CancellationTokenSource cts)
+            NestPipelineRequest request, CancellationTokenSource cts, bool chooseLayout = false)
         {
             using var progressForm = new NestProgressForm(cts, showPlateRow: true)
             {
                 AllowAccept = false,
                 HoldOpenUntilCompleted = true,
             };
-            progressForm.ShowPlanStrip(target.PlateView.ColorScheme);
+            // Using a layout stops the search only; the caller's source still discards everything.
+            using var search = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+            progressForm.ShowPlanStrip(target.PlateView.ColorScheme, chooseLayout ? search.Cancel : null);
             var receivingProgress = true;
-            bool Receiving() => receivingProgress && !target.IsDisposed && !cts.IsCancellationRequested;
+            bool Receiving() => receivingProgress && !target.IsDisposed && !search.IsCancellationRequested;
             var progress = new Progress<NestProgress>(p =>
             {
                 if (Receiving())
                     progressForm.UpdateProgress(p);
             });
-            var plans = new Progress<IReadOnlyList<ProposedPlate>>(sheets =>
+            var layouts = new Progress<NestLayoutReport>(report =>
             {
                 if (Receiving())
-                    progressForm.UpdatePlan(sheets);
+                    progressForm.AddLayout(report.Layout, report.Best);
             });
-            var jobProgress = JobEngineNest.CreateProgress(request.EngineName, progress, plans);
+            var jobProgress = JobEngineNest.CreateLayoutProgress(request.EngineName, progress, layouts);
 
             async Task<NestPipelineResult> RunSolveAsync()
             {
                 try
                 {
-                    return await Task.Run(() => NestPipeline.Run(request, jobProgress, cts.Token));
+                    NestPipelineResult result = null;
+                    try
+                    {
+                        result = await Task.Run(() => NestPipeline.Run(request, jobProgress, search.Token));
+                    }
+                    catch (OperationCanceledException)
+                        when (progressForm.ChosenLayout != null && !cts.IsCancellationRequested)
+                    {
+                        // The user stopped the search to use a layout it had already found.
+                    }
+                    receivingProgress = false;
+                    if (result != null
+                        && !await progressForm.ChooseLayoutAsync(new NestLayoutChoice(result.Plates, _ => result)))
+                    {
+                        cts.Cancel();
+                        throw new OperationCanceledException(cts.Token);
+                    }
+                    var chosen = progressForm.ChosenLayout;
+                    return chosen == null ? result : await Task.Run(() => chosen.Accept(cts.Token));
                 }
                 finally
                 {

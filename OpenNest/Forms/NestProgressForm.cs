@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Engine;
 
@@ -87,7 +88,7 @@ namespace OpenNest.Forms
             SetValueWithFlash(plateValue, progress.PlateNumber.ToString());
 
             // In plan mode the results rows describe the whole-job plan, not a part preview.
-            if (progress.IsOverallBest && planStrip == null)
+            if (progress.IsOverallBest && layoutList == null)
             {
                 SetValueWithFlash(partsValue, progress.BestPartCount.ToString());
 
@@ -107,54 +108,179 @@ namespace OpenNest.Forms
                 : progress.Phase.DisplayName();
         }
 
-        private Controls.SheetStripControl planStrip;
+        private Controls.LayoutChoiceList layoutList;
+        private NestLayoutChoices layouts;
+        private Button useLayoutButton;
+        private Action stopSearch;
+        private TaskCompletionSource<bool> choice;
 
         /// <summary>
-        /// Adds the "best plan so far" sheet strip for whole-job runs, whose result is a set of
-        /// sheets rather than parts on the current plate. The results rows then describe that plan.
+        /// Switches the window to whole-job layouts: the run's top layouts as cards, the best
+        /// first, each with its sheets and the free strip its last sheet leaves, over a status
+        /// line. A whole-job result is a set of sheets rather than parts on the current plate.
+        /// With <paramref name="stopSearch"/> the user may pick a card and use that layout: during
+        /// the run it stops the search (<paramref name="stopSearch"/>), and afterwards
+        /// <see cref="ChooseLayoutAsync"/> waits for the pick. Without it the cards only show.
         /// </summary>
-        public void ShowPlanStrip(ColorScheme colorScheme)
+        public void ShowPlanStrip(ColorScheme colorScheme, Action stopSearch = null)
         {
-            if (planStrip != null)
+            if (layoutList != null)
                 return;
+            this.stopSearch = stopSearch;
+            layouts = new NestLayoutChoices();
+            var choosing = stopSearch != null;
+
+            SuspendLayout();
+            Controls.Remove(statsPanel);
             var header = new Label
             {
                 Dock = DockStyle.Top,
                 AutoSize = true,
                 Font = resultsHeader.Font,
                 ForeColor = resultsHeader.ForeColor,
-                Padding = new Padding(14, 8, 0, 4),
-                Text = "BEST PLAN SO FAR",
+                Padding = new Padding(10, 8, 0, 0),
+                Text = choosing ? "TOP LAYOUTS" : "BEST PLAN SO FAR",
             };
-            planStrip = new Controls.SheetStripControl
+            layoutList = new Controls.LayoutChoiceList
             {
                 Dock = DockStyle.Fill,
                 ColorScheme = colorScheme,
+                AllowSelection = choosing,
                 EmptyText = "Waiting for the first complete plan…",
             };
-            var panel = new Panel { Dock = DockStyle.Right, Width = 520 };
-            panel.Controls.Add(planStrip);
-            panel.Controls.Add(header);
-            Controls.Add(panel);
-            nestedAreaLabel.Text = "Sheets:";
-            densityLabel.Text = "Utilization:";
-            // Read the size first: raising the minimum would otherwise widen the form twice.
-            var client = ClientSize;
-            MinimumSize = new System.Drawing.Size(MinimumSize.Width + panel.Width, MinimumSize.Height);
-            ClientSize = new System.Drawing.Size(client.Width + panel.Width, client.Height);
+
+            // Status and buttons share one line: the detail text gets the whole width.
+            var footer = new TableLayoutPanel
+            {
+                Dock = DockStyle.Bottom,
+                AutoSize = true,
+                BackColor = Color.White,
+                ColumnCount = 4,
+                RowCount = 1,
+                Padding = new Padding(10, 2, 0, 2),
+            };
+            footer.ColumnStyles.Add(new ColumnStyle());
+            footer.ColumnStyles.Add(new ColumnStyle());
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            footer.ColumnStyles.Add(new ColumnStyle());
+            elapsedLabel.Anchor = elapsedValue.Anchor = AnchorStyles.Left;
+            elapsedValue.Margin = new Padding(0, 3, 12, 3);
+            descriptionValue.AutoSize = false;
+            descriptionValue.AutoEllipsis = true;
+            descriptionValue.Dock = DockStyle.Fill;
+            descriptionValue.TextAlign = ContentAlignment.MiddleLeft;
+            buttonPanel.Dock = DockStyle.None;
+            buttonPanel.Anchor = AnchorStyles.Right;
+            buttonPanel.WrapContents = false;
+            if (choosing)
+            {
+                useLayoutButton = new Button
+                {
+                    Name = "useLayoutButton",
+                    Enabled = false,
+                    Font = stopButton.Font,
+                    Margin = new Padding(0, 3, 6, 3),
+                    Size = new System.Drawing.Size(132, 27),
+                    Text = "Use This Layout",
+                    UseVisualStyleBackColor = true,
+                };
+                useLayoutButton.Click += (s, e) => UseSelectedLayout();
+                buttonPanel.Controls.Add(useLayoutButton);
+                layoutList.SelectionChanged += (s, e) => UpdateUseLayout();
+                layoutList.ChoiceActivated += (s, e) => UseSelectedLayout();
+            }
+            footer.Controls.Add(elapsedLabel, 0, 0);
+            footer.Controls.Add(elapsedValue, 1, 0);
+            footer.Controls.Add(descriptionValue, 2, 0);
+            footer.Controls.Add(buttonPanel, 3, 0);
+
+            Controls.Add(layoutList);
+            Controls.Add(header);
+            Controls.Add(footer);
+            MinimumSize = new System.Drawing.Size(640, 420);
+            ClientSize = new System.Drawing.Size(920, 600);
+            ResumeLayout(true);
         }
 
-        /// <summary>Shows a whole-job plan in the strip added by <see cref="ShowPlanStrip"/>.</summary>
-        public void UpdatePlan(IReadOnlyList<Engine.Jobs.ProposedPlate> sheets)
+        /// <summary>The layouts offered now, best first; empty outside plan mode.</summary>
+        internal IReadOnlyList<NestLayoutChoice> Layouts => layouts?.Top ?? Array.Empty<NestLayoutChoice>();
+
+        /// <summary>The layout the user chose to use; null when none was chosen.</summary>
+        internal NestLayoutChoice ChosenLayout { get; private set; }
+
+        /// <summary>
+        /// Adds a layout from the running solve to the cards added by <see cref="ShowPlanStrip"/>;
+        /// <paramref name="best"/> marks the engine's best so far.
+        /// </summary>
+        internal void AddLayout(NestLayoutChoice layout, bool best)
         {
-            if (planStrip == null || IsDisposed || !IsHandleCreated)
+            if (layoutList == null || IsDisposed || !IsHandleCreated)
                 return;
-            planStrip.SetSheets(sheets);
-            SetValueWithFlash(partsValue, planStrip.PartCount.ToString());
-            var utilization = planStrip.Utilization;
-            SetValueWithFlash(densityValue, utilization.ToString("P1"), GetDensityColor(utilization));
-            densityBar.Value = utilization;
-            SetValueWithFlash(nestedAreaValue, planStrip.SheetCount.ToString());
+            if (layouts.Add(layout, best))
+                layoutList.SetChoices(layouts.Top, ReferenceEquals(layouts.Top[0], layouts.Best));
+        }
+
+        /// <summary>Shows a whole-job plan as the best layout so far.</summary>
+        public void UpdatePlan(IReadOnlyList<Engine.Jobs.ProposedPlate> sheets) =>
+            AddLayout(new NestLayoutChoice(sheets), best: true);
+
+        /// <summary>
+        /// The search is over and <paramref name="final"/> is its result: with other layouts to
+        /// pick from, waits until the user uses one (true, in <see cref="ChosenLayout"/>) or
+        /// discards them all (false). With nothing to pick from, or a layout already chosen
+        /// during the run, returns at once.
+        /// </summary>
+        internal Task<bool> ChooseLayoutAsync(NestLayoutChoice final)
+        {
+            if (ChosenLayout != null)
+                return Task.FromResult(true);
+            if (layoutList == null || useLayoutButton == null || IsDisposed || !Visible)
+            {
+                ChosenLayout = final;
+                return Task.FromResult(true);
+            }
+            AddLayout(final, best: true);
+            if (layouts.Top.Count < 2)
+            {
+                ChosenLayout = final;
+                return Task.FromResult(true);
+            }
+
+            choice = new TaskCompletionSource<bool>();
+            stopwatch.Stop();
+            elapsedTimer.Stop();
+            UpdateElapsed();
+            Text = "Nesting Finished";
+            layoutList.BestLabel = "Best";
+            descriptionValue.Text = "Search finished. Pick the layout to use.";
+            stopButton.Text = "Discard";
+            stopButton.Enabled = true;
+            UpdateUseLayout();
+            return choice.Task;
+        }
+
+        private void UpdateUseLayout()
+        {
+            if (useLayoutButton != null && ChosenLayout == null)
+                useLayoutButton.Enabled = layoutList.Selected?.Accept != null;
+        }
+
+        private void UseSelectedLayout()
+        {
+            if (useLayoutButton == null || ChosenLayout != null || layoutList.Selected?.Accept == null)
+                return;
+            ChosenLayout = layoutList.Selected;
+            layoutList.AllowSelection = false;
+            useLayoutButton.Enabled = false;
+            stopButton.Enabled = false;
+            if (choice != null)
+            {
+                choice.TrySetResult(true);
+                return;
+            }
+            // Still searching: stop, then the caller validates the chosen layout.
+            useLayoutButton.Text = "Stopping...";
+            stopSearch();
         }
 
         public void ShowCompleted()
@@ -201,6 +327,15 @@ namespace OpenNest.Forms
 
         private void StopButton_Click(object sender, EventArgs e)
         {
+            if (choice != null)
+            {
+                // The search is over: this is Discard.
+                stopButton.Enabled = false;
+                choice.TrySetResult(false);
+                return;
+            }
+            if (useLayoutButton != null)
+                useLayoutButton.Enabled = false;
             cts.Cancel();
             acceptButton.Enabled = false;
             stopButton.Enabled = false;
@@ -211,7 +346,11 @@ namespace OpenNest.Forms
         {
             if (HoldOpenUntilCompleted && !completed)
             {
-                cts.Cancel();
+                // Closing while picking a layout discards them all, as Discard does.
+                if (choice != null)
+                    choice.TrySetResult(false);
+                else
+                    cts.Cancel();
                 e.Cancel = true;
                 return;
             }

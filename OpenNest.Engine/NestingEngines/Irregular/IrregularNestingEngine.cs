@@ -129,6 +129,8 @@ public sealed class IrregularNestingEngine : INestingEngine
                 best = plan;
                 ReportPlan(job, types, best, progress, token);
             }
+            else
+                ReportAlternative(job, types, plan, progress, token);
             if (best.Unplaced == 0 && best.Sheets.Count == 0)
                 break;
         }
@@ -151,7 +153,10 @@ public sealed class IrregularNestingEngine : INestingEngine
                     break;
                 var plan = solver.Plan(demand, axis, 1.0, grouped: true);
                 if (!plan.IsBetterThan(improved))
+                {
+                    ReportAlternative(job, types, plan, progress, token);
                     continue;
+                }
                 ReportPlan(job, types, plan, progress, token);
                 improved = solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2);
                 if (!ReferenceEquals(improved, plan))
@@ -173,6 +178,8 @@ public sealed class IrregularNestingEngine : INestingEngine
                 if (!ReferenceEquals(improved, plan))
                     ReportPlan(job, types, improved, progress, token);
             }
+            else
+                ReportAlternative(job, types, plan, progress, token);
         }
         // Then try to drop a sheet: split the parts over one sheet fewer and pack each sheet edge
         // first, the key part turned by its contacts. Replaces the result only by beating it.
@@ -247,6 +254,16 @@ public sealed class IrregularNestingEngine : INestingEngine
         if (progress == null)
             return;
         CandidateProgress.ReportPlan(BuildResult(job, types, plan, null, token), progress);
+    }
+
+    /// <summary>Reports a whole-job plan that lost to the best so far, as another layout a front
+    /// end may offer; reporting never changes the search.</summary>
+    private static void ReportAlternative(NestJob job, IReadOnlyList<PartType> types, Plan plan,
+        IProgress<NestJobProgress>? progress, CancellationToken token)
+    {
+        if (progress == null || plan.Sheets.Count == 0)
+            return;
+        CandidateProgress.ReportAlternative(BuildResult(job, types, plan, null, token), progress);
     }
 
     /// <summary>Exercises the production physical-tail lifecycle from a test-owned incumbent.

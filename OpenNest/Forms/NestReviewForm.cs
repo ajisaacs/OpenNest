@@ -24,7 +24,7 @@ namespace OpenNest.Forms
             MinimumSize = new Size(560, 360);
             Font = new Font("Segoe UI", 9.75F);
 
-            var strip = new SheetStripControl { Dock = DockStyle.Fill, ColorScheme = colorScheme };
+            var strip = new SheetStripControl { Dock = DockStyle.Fill, ColorScheme = colorScheme, ShowRemnant = true };
             strip.SetSheets(result.Plates);
             Strip = strip;
 

@@ -114,7 +114,8 @@ public static class NestPipeline
     {
         public void Report(NestJobProgress value)
         {
-            if (value != null && value.Stage is NestJobStage.EvaluatingCandidate or NestJobStage.PlanImproved)
+            if (value != null && value.Stage is NestJobStage.EvaluatingCandidate or NestJobStage.PlanImproved
+                or NestJobStage.PlanAlternative)
                 inner.Report(value with { CommittedPlates = 0, CommittedParts = 0 });
         }
     }
@@ -125,7 +126,8 @@ public static class NestPipeline
     /// one per part, so a preview never touches the caller's drawings or their quantities.
     /// </summary>
     private sealed class PlanProgress(IProgress<NestJobProgress> inner, NestJob engineJob,
-        IReadOnlyDictionary<string, Drawing> callerDrawings, CancellationToken token)
+        IReadOnlyDictionary<string, Drawing> callerDrawings, CancellationToken token,
+        Func<NestJobResult, CancellationToken, NestPipelineResult> accept)
         : IProgress<NestJobProgress>
     {
         private readonly Dictionary<string, NestJobPart> parts =
@@ -134,14 +136,20 @@ public static class NestPipeline
 
         public void Report(NestJobProgress value)
         {
-            if (value?.Stage == NestJobStage.PlanImproved && value.Plan != null && value.PlanSheets == null)
+            if (value?.Stage is NestJobStage.PlanImproved or NestJobStage.PlanAlternative
+                && value.Plan != null && value.PlanSheets == null)
             {
                 lock (drawings)
                 {
                     // A plan naming unknown parts has nothing to draw; validation reports it later.
                     if (value.Plan.Plates.Any(s => s.Placements.Any(p => p.PartId == null || !parts.ContainsKey(p.PartId))))
                         return;
-                    value = value with { PlanSheets = PlanSheets(value.Plan, parts, callerDrawings, drawings, token) };
+                    var plan = value.Plan;
+                    value = value with
+                    {
+                        PlanSheets = PlanSheets(plan, parts, callerDrawings, drawings, token),
+                        AcceptPlan = t => accept(plan, t),
+                    };
                 }
             }
             inner.Report(value);
@@ -397,13 +405,17 @@ public static class NestPipeline
     )
     {
         var engineJob = prepass?.EngineJob ?? job;
-        IReadOnlyDictionary<string, int> released = new Dictionary<string, int>();
         if (prepass != null)
             NestJobValidator.Validate(engineJob);
 
         var clock = Stopwatch.StartNew();
+        // A reported plan is accepted against the job as it was asked: last-resort clamp
+        // removal belongs to the engine's own result.
+        var askedJob = job;
         var engineProgress = progress == null ? null
-            : new PlanProgress(prepass == null ? progress : new PreviewProgress(progress), engineJob, drawingsByPartId, token);
+            : new PlanProgress(prepass == null ? progress : new PreviewProgress(progress), engineJob, drawingsByPartId, token,
+                (plan, accepting) => Finish(engineName, askedJob, prepass?.EngineJob ?? askedJob, prepass, plan,
+                    drawingsByPartId, clock.Elapsed, accepting));
         var raw =
             engine.Solve(engineJob, engineProgress, token)
             ?? throw new InvalidOperationException($"Engine '{engineName}' returned no result.");
@@ -423,8 +435,27 @@ public static class NestPipeline
             }
         }
         token.ThrowIfCancellationRequested();
+        return Finish(engineName, job, engineJob, prepass, raw, drawingsByPartId, solveTime, token);
+    }
 
-        clock.Restart();
+    /// <summary>
+    /// Validates <paramref name="raw"/> (an engine's result, or a plan it reported that the
+    /// caller chose instead) and binds it to the caller's drawings.
+    /// </summary>
+    private static NestPipelineResult Finish(
+        string engineName,
+        NestJob job,
+        NestJob engineJob,
+        IPipelinePrepass prepass,
+        NestJobResult raw,
+        IReadOnlyDictionary<string, Drawing> drawingsByPartId,
+        TimeSpan solveTime,
+        CancellationToken token
+    )
+    {
+        token.ThrowIfCancellationRequested();
+        IReadOnlyDictionary<string, int> released = new Dictionary<string, int>();
+        var clock = Stopwatch.StartNew();
         var names = drawingsByPartId.ToDictionary(
             kv => kv.Key,
             kv => kv.Value.Name ?? kv.Key,

@@ -6,3 +6,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("OpenNest")]
 [assembly: InternalsVisibleTo("OpenNest.Avalonia")]
 [assembly: InternalsVisibleTo("OpenNest.Desktop.Tests")]
+[assembly: InternalsVisibleTo("OpenNest.WinForms.Tests")]

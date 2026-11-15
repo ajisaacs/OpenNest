@@ -188,11 +188,16 @@ public sealed class DefaultNestingEngine : INestingEngine
             Offer(plan);
         }
 
-        /// <summary>Reports the plan when it beats every plan reported so far.</summary>
+        /// <summary>Reports the plan when it beats every plan reported so far; a valid plan that
+        /// does not is reported as an alternative.</summary>
         public void Offer(CandidateScore plan)
         {
             if (shown != null && !plan.IsBetterThan(shown))
+            {
+                if (plan.Valid && !CandidateProgress.SameLayout(plan.Result, shown.Result))
+                    CandidateProgress.ReportAlternative(plan.Result, inner);
                 return;
+            }
             shown = plan;
             CandidateProgress.ReportPlan(plan.Result, inner);
         }

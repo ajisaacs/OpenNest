@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace OpenNest.Engine.Jobs;
 
@@ -12,6 +14,13 @@ public enum NestJobStage
     /// validated and possibly replaced by a later plan; never counts as committed.
     /// </summary>
     PlanImproved,
+
+    /// <summary>
+    /// Another complete whole-job plan the engine found that is not its best, in
+    /// <see cref="NestJobProgress.Plan"/>: a different layout a front end may offer beside the
+    /// best. Optional, unranked, not validated, and never the engine's result.
+    /// </summary>
+    PlanAlternative,
 }
 
 /// <summary>
@@ -30,8 +39,17 @@ public sealed record NestJobProgress(
 {
     /// <summary>
     /// <see cref="Plan"/> as displayable sheets, filled in by <see cref="NestPipeline"/> for
-    /// <see cref="NestJobStage.PlanImproved"/> reports. Parts use detached drawings built from
-    /// the job geometry, so they never touch the caller's drawings or quantities.
+    /// <see cref="NestJobStage.PlanImproved"/> and <see cref="NestJobStage.PlanAlternative"/>
+    /// reports. Parts use detached drawings built from the job geometry, so they never touch
+    /// the caller's drawings or quantities.
     /// </summary>
     public IReadOnlyList<ProposedPlate> PlanSheets { get; init; }
+
+    /// <summary>
+    /// Turns <see cref="Plan"/> into a proposal exactly as the pipeline does an engine's result:
+    /// validated, then bound to the caller's drawings. Filled in with <see cref="PlanSheets"/>,
+    /// for a caller that stops the search to use this plan. Call it only once the solve that
+    /// reported the plan has ended.
+    /// </summary>
+    public Func<CancellationToken, NestPipelineResult> AcceptPlan { get; init; }
 }

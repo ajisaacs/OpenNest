@@ -96,6 +96,14 @@ progress sink.
 
 Plug-ins may report plans the same way; FlatBar and the fixed-strategy engines do not.
 
+An engine may also report a complete plan that lost to its best as `NestJobStage.PlanAlternative`:
+another layout the desktop may offer beside the best (see [automatic nesting](automatic-nesting.md)).
+Alternatives are optional, unranked and unvalidated, never the engine's result, and reporting
+them never changes the search. Irregular reports the strategy, grouped and banded variants that
+did not beat its best (not the seeded decodes of a search until cancelled); Default and a
+time-limited solve report a valid plan or candidate result that did not beat the one shown. The
+nest server's worker drops them.
+
 ### Time limits
 
 `DeadlineNestingEngine` wraps any engine with a wall-clock limit. An engine that finishes in time

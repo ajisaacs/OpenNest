@@ -151,7 +151,11 @@ public sealed class DeadlineNestingEngine : INestingEngine
                 return;
             }
             if (Best != null && Best.IsBetterThan(plan))
+            {
+                if (plan.Valid)
+                    CandidateProgress.ReportAlternative(plan.Result, inner);
                 return;
+            }
             Best = plan;
             inner?.Report(value);
         }

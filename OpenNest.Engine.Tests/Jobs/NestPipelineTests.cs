@@ -80,6 +80,73 @@ public class NestPipelineTests
         Assert.Equal(0, item.Drawing.Quantity.Nested);
     }
 
+    [Fact]
+    public void AnAlternativePlanCanBeAcceptedAsAValidatedProposalBoundToCallerDrawings()
+    {
+        var item = Item("bracket", 2);
+        var engine = new AlternativeEngine(
+            job => OnePlate(job,
+                new NestJobPlacement(job.Parts[0].Id, 0, 1, 1, 0),
+                new NestJobPlacement(job.Parts[0].Id, 1, 20, 1, 0)),
+            job => OnePlate(job,
+                new NestJobPlacement(job.Parts[0].Id, 0, 1, 25, 0),
+                new NestJobPlacement(job.Parts[0].Id, 1, 20, 25, 0)));
+        var reports = new List<NestJobProgress>();
+
+        var result = NestPipeline.Run(engine, "Stub", Request("Stub", item), new InlineProgress(reports.Add));
+
+        var alternative = Assert.Single(reports, r => r.Stage == NestJobStage.PlanAlternative);
+        Assert.Equal(new[] { 25.0, 25.0 }, Assert.Single(alternative.PlanSheets).Parts.Select(p => p.Location.Y));
+        Assert.NotNull(Assert.Single(reports, r => r.Stage == NestJobStage.PlanImproved).AcceptPlan);
+
+        var accepted = alternative.AcceptPlan(CancellationToken.None);
+
+        Assert.True(accepted.IsValid, string.Join("; ", accepted.Violations));
+        Assert.True(accepted.CanKeep);
+        var parts = Assert.Single(accepted.Plates).Parts;
+        Assert.Equal(new[] { 25.0, 25.0 }, parts.Select(p => p.Location.Y));
+        Assert.All(parts, part => Assert.Same(item.Drawing, part.BaseDrawing));
+        Assert.Empty(accepted.Unplaced);
+        // The engine's own result is untouched by the accepted alternative.
+        Assert.Equal(new[] { 1.0, 1.0 }, Assert.Single(result.Plates).Parts.Select(p => p.Location.Y));
+        Assert.Equal(0, item.Drawing.Quantity.Nested);
+    }
+
+    [Fact]
+    public void AnAcceptedPlanThatBreaksLayoutRulesIsReportedInvalid()
+    {
+        var item = Item("bracket", 2);
+        var engine = new AlternativeEngine(
+            job => OnePlate(job,
+                new NestJobPlacement(job.Parts[0].Id, 0, 1, 1, 0),
+                new NestJobPlacement(job.Parts[0].Id, 1, 20, 1, 0)),
+            job => OnePlate(job,
+                new NestJobPlacement(job.Parts[0].Id, 0, 1, 1, 0),
+                new NestJobPlacement(job.Parts[0].Id, 1, 1, 1, 0)));
+        var reports = new List<NestJobProgress>();
+
+        NestPipeline.Run(engine, "Stub", Request("Stub", item), new InlineProgress(reports.Add));
+        var accepted = reports.Single(r => r.Stage == NestJobStage.PlanAlternative).AcceptPlan(CancellationToken.None);
+
+        Assert.False(accepted.IsValid);
+    }
+
+    private sealed class AlternativeEngine(Func<NestJob, NestJobResult> solve, Func<NestJob, NestJobResult> alternative)
+        : INestingEngine
+    {
+        public NestJobResult Solve(
+            NestJob job,
+            IProgress<NestJobProgress>? progress = null,
+            CancellationToken token = default
+        )
+        {
+            var result = solve(job);
+            progress?.Report(new NestJobProgress(NestJobStage.PlanImproved, string.Empty, -1, 0, 0, Plan: result));
+            progress?.Report(new NestJobProgress(NestJobStage.PlanAlternative, string.Empty, -1, 0, 0, Plan: alternative(job)));
+            return result;
+        }
+    }
+
     private sealed class ReportingEngine(Func<NestJob, NestJobResult> solve) : INestingEngine
     {
         public NestJobResult Solve(

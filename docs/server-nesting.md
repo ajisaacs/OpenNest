@@ -21,7 +21,7 @@ With the box ticked, `ServerAutoNest`:
    this PC instead; declining discards the run.
 3. Follows the job (`NestJobWatch`) behind the same owned modal progress window a local run
    uses: the queue position, then the worker's stage ("On the nest server: …"), and the
-   worker's **Best plan so far** in the same sheet strip a local run fills
+   worker's **Best plan so far** as the one layout card of the window a local run fills
    (`RemoteNestPlanPreview`, below). Updates come from the job's event stream; when it drops,
    the client polls once and reconnects with the last event id, and a server without the
    stream is polled every two seconds throughout. Connection trouble only shows a waiting

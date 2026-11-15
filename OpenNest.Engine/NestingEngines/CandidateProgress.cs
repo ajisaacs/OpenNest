@@ -39,6 +39,11 @@ internal sealed class CandidateProgress(IProgress<NestJobProgress> inner) : IPro
     public static void ReportPlan(NestJobResult plan, IProgress<NestJobProgress>? progress) =>
         progress?.Report(new NestJobProgress(NestJobStage.PlanImproved, string.Empty, -1, 0, 0, Plan: plan));
 
+    /// <summary>Reports a whole-job plan that is not the best so far as
+    /// <see cref="NestJobStage.PlanAlternative"/>. Reporting never changes the search.</summary>
+    public static void ReportAlternative(NestJobResult plan, IProgress<NestJobProgress>? progress) =>
+        progress?.Report(new NestJobProgress(NestJobStage.PlanAlternative, string.Empty, -1, 0, 0, Plan: plan));
+
     /// <summary>True when both results place the same parts at the same poses on the same stock,
     /// sheet by sheet.</summary>
     public static bool SameLayout(NestJobResult a, NestJobResult b) =>

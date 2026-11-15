@@ -32,7 +32,23 @@ namespace OpenNest.Forms
             string engineName,
             IProgress<NestProgress> progress,
             IProgress<IReadOnlyList<ProposedPlate>> plans
-        ) => new ProgressAdapter(engineName, progress, plans);
+        ) => new ProgressAdapter(engineName, progress, plans == null ? null : value =>
+        {
+            if (value.Stage == NestJobStage.PlanImproved)
+                plans.Report(value.PlanSheets);
+        });
+
+        /// <summary>
+        /// As <see cref="CreateProgress(string, IProgress{NestProgress})"/>, and also sends every
+        /// plan the engine reports to <paramref name="layouts"/> as a layout the user may choose:
+        /// its best so far and the alternatives beside it.
+        /// </summary>
+        public static IProgress<NestJobProgress> CreateLayoutProgress(
+            string engineName,
+            IProgress<NestProgress> progress,
+            IProgress<NestLayoutReport> layouts
+        ) => new ProgressAdapter(engineName, progress, value => layouts.Report(new NestLayoutReport(
+            new NestLayoutChoice(value.PlanSheets, value.AcceptPlan), value.Stage == NestJobStage.PlanImproved)));
 
         public static string Describe(string engineName, NestJobProgress value) => value.Stage switch
         {
@@ -50,7 +66,7 @@ namespace OpenNest.Forms
         private sealed class ProgressAdapter(
             string engineName,
             IProgress<NestProgress> progress,
-            IProgress<IReadOnlyList<ProposedPlate>> plans
+            Action<NestJobProgress> plans
         ) : IProgress<NestJobProgress>
         {
             public void Report(NestJobProgress value)
@@ -59,10 +75,12 @@ namespace OpenNest.Forms
                     return;
 
                 // A plan sink shows plans as sheets; the plate row keeps tracking the search.
-                if (value.Stage == NestJobStage.PlanImproved && plans != null)
+                // An alternative plan is never a stage of the search.
+                if (value.Stage == NestJobStage.PlanAlternative
+                    || (value.Stage == NestJobStage.PlanImproved && plans != null))
                 {
                     if (value.PlanSheets != null)
-                        plans.Report(value.PlanSheets);
+                        plans?.Invoke(value);
                     return;
                 }
 

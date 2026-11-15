@@ -18,7 +18,8 @@ public sealed class NestJobReporter : IProgress<NestJobProgress>
 
     public void Report(NestJobProgress value)
     {
-        if (value is null)
+        // Alternative plans stay on the worker: the job stores only its best plan.
+        if (value is null || value.Stage == NestJobStage.PlanAlternative)
             return;
         // Copied here, on the engine's thread, so later changes to its objects cannot leak in;
         // serialized later, off that thread.

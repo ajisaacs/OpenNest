@@ -5,6 +5,7 @@ using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Engine.Jobs;
+using OpenNest.Forms;
 
 namespace OpenNest.Controls
 {
@@ -20,6 +21,7 @@ namespace OpenNest.Controls
 
         private readonly List<Tile> tiles = new();
         private ColorScheme colorScheme = ColorScheme.Default;
+        private bool showRemnant;
 
         public SheetStripControl()
         {
@@ -42,6 +44,21 @@ namespace OpenNest.Controls
 
         /// <summary>The text shown when there are no sheets.</summary>
         public string EmptyText { get; set; } = "No sheets yet";
+
+        /// <summary>
+        /// Shows each sheet's free strip: a dimension across it and its distance in the caption
+        /// (to the right edge for vertical strips, to the top for horizontal ones).
+        /// </summary>
+        public bool ShowRemnant
+        {
+            get => showRemnant;
+            set
+            {
+                showRemnant = value;
+                UpdateScrollSize();
+                Invalidate();
+            }
+        }
 
         public int SheetCount => tiles.Sum(t => t.Quantity);
 
@@ -90,7 +107,11 @@ namespace OpenNest.Controls
             tiles.Clear();
         }
 
-        private int CaptionHeight => Font.Height * 2 + 4;
+        private int CaptionHeight => Font.Height * (showRemnant ? 3 : 2) + 4;
+
+        private string Caption(Tile tile) => showRemnant && tile.Remnant is { } remnant
+            ? $"{tile.Title}\n{tile.Detail}\n{remnant}"
+            : $"{tile.Title}\n{tile.Detail}";
 
         /// <summary>
         /// Pixels per world unit, shared by every sheet. All sheets fit the width when they can;
@@ -130,7 +151,7 @@ namespace OpenNest.Controls
         }
 
         private int TileWidth(Tile tile, float scale) =>
-            System.Math.Max((int)System.Math.Ceiling(tile.Sheet.Length * scale), TextRenderer.MeasureText(tile.Detail, Font).Width);
+            System.Math.Max((int)System.Math.Ceiling(tile.Sheet.Length * scale), TextRenderer.MeasureText(Caption(tile), Font).Width);
 
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -158,6 +179,12 @@ namespace OpenNest.Controls
             using var obstacleBrush = new HatchBrush(HatchStyle.WideUpwardDiagonal,
                 Color.FromArgb(170, 120, 60, 60), Color.FromArgb(60, 200, 80, 80));
             using var obstaclePen = new Pen(Color.FromArgb(170, 120, 60, 60), 1.5f);
+            using var remnantCap = new AdjustableArrowCap(3, 4);
+            using var remnantPen = new Pen(Color.FromArgb(20, 100, 190), 1.5f)
+            {
+                CustomStartCap = remnantCap,
+                CustomEndCap = remnantCap,
+            };
             foreach (var tile in tiles)
             {
                 var width = TileWidth(tile, scale);
@@ -205,8 +232,16 @@ namespace OpenNest.Controls
                     g.DrawPath(colorScheme.Gdi().LayoutOutlinePen, outline);
                 else
                     g.DrawRectangle(colorScheme.Gdi().LayoutOutlinePen, sheetRect.X, sheetRect.Y, sheetRect.Width, sheetRect.Height);
+                if (showRemnant && tile.Remnant != null)
+                {
+                    // Device space, so the arrows keep their pixel size.
+                    var ends = (PointF[])tile.RemnantSpan.Clone();
+                    toDevice.TransformPoints(ends);
+                    if (System.Math.Abs(ends[1].X - ends[0].X) + System.Math.Abs(ends[1].Y - ends[0].Y) >= 14)
+                        g.DrawLine(remnantPen, ends[0], ends[1]);
+                }
                 var caption = new Rectangle(x, (int)baseline + 4, width, CaptionHeight);
-                TextRenderer.DrawText(g, tile.Title + "\n" + tile.Detail, Font, caption, ForeColor,
+                TextRenderer.DrawText(g, Caption(tile), Font, caption, ForeColor,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.Top);
                 x += width + Gap;
             }
@@ -261,6 +296,21 @@ namespace OpenNest.Controls
                     Parts.Add((part.Program.GetFillPath(part.Location), new SolidBrush(Color.FromArgb(200, color))));
                 }
 
+                Remnant = SheetRemnant.Of(plate);
+                if (Remnant is { } remnant)
+                {
+                    // Across the free strip, through the sheet's middle.
+                    var (midX, midY) = ((float)(x + length / 2), (float)(y + width / 2));
+                    var distance = (float)remnant.Distance;
+                    RemnantSpan = remnant.Edge switch
+                    {
+                        SheetEdge.Right => new[] { new PointF((float)(x + length) - distance, midY), new PointF((float)(x + length), midY) },
+                        SheetEdge.Left => new[] { new PointF((float)x, midY), new PointF((float)x + distance, midY) },
+                        SheetEdge.Top => new[] { new PointF(midX, (float)(y + width) - distance), new PointF(midX, (float)(y + width)) },
+                        _ => new[] { new PointF(midX, (float)y), new PointF(midX, (float)y + distance) },
+                    };
+                }
+
                 Title = Quantity == 1 ? $"Sheet {firstNumber}" : $"Sheets {firstNumber}–{firstNumber + Quantity - 1} (×{Quantity})";
                 var utilization = SheetArea > 0 ? PartArea / SheetArea : 0;
                 Detail = $"{stock.Size} · {PartCount} parts · {utilization:P0}";
@@ -281,6 +331,12 @@ namespace OpenNest.Controls
             public double PartArea { get; }
             public string Title { get; }
             public string Detail { get; }
+
+            /// <summary>The sheet's free strip; null when it has none to measure.</summary>
+            public SheetRemnant? Remnant { get; }
+
+            /// <summary>The two world points the free strip's dimension runs between.</summary>
+            public PointF[] RemnantSpan { get; }
             public List<RectangleF> Clamps { get; } = new();
             public List<(GraphicsPath Path, Brush Brush)> Parts { get; } = new();
 

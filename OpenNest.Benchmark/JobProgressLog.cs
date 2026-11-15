@@ -52,7 +52,7 @@ namespace OpenNest.Benchmark
 
         public void Report(NestJobProgress value)
         {
-            if (value == null)
+            if (value == null || value.Stage == NestJobStage.PlanAlternative)
                 return;
 
             if (value.Stage == NestJobStage.PlateCommitted)

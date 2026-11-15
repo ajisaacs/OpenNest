@@ -57,7 +57,7 @@ namespace OpenNest.Forms.Commands
                     $"The nest server could not take this nest:\n\n{ex.Message}\n\nNest on this PC instead?",
                     Caption, MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                 if (choice == DialogResult.Yes)
-                    return (await AutoNestCommand.SolveAsync(owner, target, request, cts), null);
+                    return (await AutoNestCommand.SolveAsync(owner, target, request, cts, chooseLayout: true), null);
                 cts.Cancel();
                 throw new OperationCanceledException(cts.Token);
             }
