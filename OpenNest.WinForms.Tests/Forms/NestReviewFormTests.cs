@@ -51,6 +51,41 @@ public class NestReviewFormTests
         Assert.Equal(3, strip.PartCount);
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
 
+    [Fact]
+    public void AnOutlinedSheetShowsItsShapeAndMeasuresUtilizationOnItsMaterial() => StaTestThread.Run(() =>
+    {
+        // A right triangle: half of its 96 x 48 bounding box.
+        var outline = new SheetOutline(new[] { new Vector(0, 0), new Vector(96, 0), new Vector(0, 48) });
+        var outlined = new NestPlateStock("remnant", outline.Size, quantity: null, partSpacing: 0.25,
+            edgeSpacing: default, quadrant: 1, cost: null, outline: outline);
+        var rectangle = new NestPlateStock("sheet", outline.Size, quantity: null, partSpacing: 0.25);
+        var part = new Part(new Drawing("bracket", Rectangle()), new Vector(1, 1));
+        using var strip = new OpenNest.Controls.SheetStripControl { Size = new System.Drawing.Size(600, 400) };
+
+        strip.SetSheets(new[] { new ProposedPlate(0, rectangle, Array.Empty<Part>()) });
+        var whole = SheetPixels(strip);
+        strip.SetSheets(new[] { new ProposedPlate(0, outlined, Array.Empty<Part>()) });
+        var shaped = SheetPixels(strip);
+
+        Assert.InRange(shaped / (double)whole, 0.45, 0.55);
+
+        strip.SetSheets(new[] { new ProposedPlate(0, outlined, new[] { part }) });
+        Assert.Equal(200.0 / outline.Area, strip.Utilization, 6);
+    }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
+
+    private static int SheetPixels(OpenNest.Controls.SheetStripControl strip)
+    {
+        using var bitmap = new System.Drawing.Bitmap(strip.Width, strip.Height);
+        strip.DrawToBitmap(bitmap, new System.Drawing.Rectangle(0, 0, strip.Width, strip.Height));
+        var fill = ColorScheme.Default.LayoutFillColor.ToArgb();
+        var count = 0;
+        for (var y = 0; y < bitmap.Height; y++)
+            for (var x = 0; x < bitmap.Width; x++)
+                if (bitmap.GetPixel(x, y).ToArgb() == fill)
+                    count++;
+        return count;
+    }
+
     private sealed class StubEngine(Func<NestJob, NestJobResult> solve) : INestingEngine
     {
         public NestJobResult Solve(NestJob job, IProgress<NestJobProgress> progress = null,

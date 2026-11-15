@@ -50,7 +50,7 @@ namespace OpenNest.Controls
         {
             get
             {
-                var sheetArea = tiles.Sum(t => t.Quantity * t.Sheet.Width * t.Sheet.Length);
+                var sheetArea = tiles.Sum(t => t.Quantity * t.SheetArea);
                 return sheetArea > 0 ? tiles.Sum(t => t.Quantity * t.PartArea) / sheetArea : 0;
             }
         }
@@ -154,6 +154,10 @@ namespace OpenNest.Controls
             var baseline = (room - content) / 2 + (content - CaptionHeight);
             using var partPen = new Pen(Color.FromArgb(60, 60, 60), 0);
             using var clampBrush = new SolidBrush(Color.FromArgb(90, 230, 170, 40));
+            // The plate view's obstacle colors.
+            using var obstacleBrush = new HatchBrush(HatchStyle.WideUpwardDiagonal,
+                Color.FromArgb(170, 120, 60, 60), Color.FromArgb(60, 200, 80, 80));
+            using var obstaclePen = new Pen(Color.FromArgb(170, 120, 60, 60), 1.5f);
             foreach (var tile in tiles)
             {
                 var width = TileWidth(tile, scale);
@@ -161,13 +165,33 @@ namespace OpenNest.Controls
                 var sheetHeight = (float)(tile.Sheet.Width * scale);
                 var left = x + (width - sheetWidth) / 2;
                 var sheetRect = new RectangleF(left, baseline - sheetHeight, sheetWidth, sheetHeight);
-                g.FillRectangle(colorScheme.Gdi().LayoutFillBrush, sheetRect);
 
                 var state = g.Save();
                 // World Y grows up; the sheet's lower-left corner sits at the rectangle's bottom-left.
                 g.TranslateTransform(left, baseline);
                 g.ScaleTransform(scale, -scale);
                 g.TranslateTransform((float)-tile.Sheet.X, (float)-tile.Sheet.Y);
+                using var toDevice = g.Transform;
+                g.Restore(state);
+
+                // An outlined sheet shows its real shape, as the plate view draws it; its
+                // paths go to device space so the pens and the hatch keep their pixel size.
+                using var outline = Transformed(tile.Outline, toDevice);
+                using var obstacles = Transformed(tile.Obstacles, toDevice);
+                if (outline != null)
+                {
+                    g.FillPath(colorScheme.Gdi().LayoutFillBrush, outline);
+                    if (obstacles != null)
+                    {
+                        g.FillPath(obstacleBrush, obstacles);
+                        g.DrawPath(obstaclePen, obstacles);
+                    }
+                }
+                else
+                    g.FillRectangle(colorScheme.Gdi().LayoutFillBrush, sheetRect);
+
+                state = g.Save();
+                g.Transform = toDevice;
                 foreach (var zone in tile.Clamps)
                     g.FillRectangle(clampBrush, zone);
                 foreach (var (path, brush) in tile.Parts)
@@ -177,12 +201,24 @@ namespace OpenNest.Controls
                 }
                 g.Restore(state);
 
-                g.DrawRectangle(colorScheme.Gdi().LayoutOutlinePen, sheetRect.X, sheetRect.Y, sheetRect.Width, sheetRect.Height);
+                if (outline != null)
+                    g.DrawPath(colorScheme.Gdi().LayoutOutlinePen, outline);
+                else
+                    g.DrawRectangle(colorScheme.Gdi().LayoutOutlinePen, sheetRect.X, sheetRect.Y, sheetRect.Width, sheetRect.Height);
                 var caption = new Rectangle(x, (int)baseline + 4, width, CaptionHeight);
                 TextRenderer.DrawText(g, tile.Title + "\n" + tile.Detail, Font, caption, ForeColor,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.Top);
                 x += width + Gap;
             }
+        }
+
+        private static GraphicsPath Transformed(GraphicsPath world, Matrix toDevice)
+        {
+            if (world == null)
+                return null;
+            var path = (GraphicsPath)world.Clone();
+            path.Transform(toDevice);
+            return path;
         }
 
         /// <summary>One distinct sheet layout with its world-space paths, built once per update.</summary>
@@ -199,6 +235,20 @@ namespace OpenNest.Controls
                 var x = stock.Quadrant is 2 or 3 ? -length : 0;
                 var y = stock.Quadrant is 3 or 4 ? -width : 0;
                 Sheet = new Geometry.Box(x, y, length, width);
+                SheetArea = stock.Area;
+                if (stock.Outline != null)
+                {
+                    // The outline is in plate coordinates; the sheet's corner moves it to the parts' frame.
+                    Outline = new GraphicsPath(FillMode.Alternate);
+                    Outline.AddPolygon(ToPoints(stock.Outline.Points, x, y));
+                    if (stock.Outline.Obstacles.Count > 0)
+                        Obstacles = new GraphicsPath(FillMode.Winding);
+                    foreach (var obstacle in stock.Outline.Obstacles)
+                    {
+                        Outline.AddPolygon(ToPoints(obstacle, x, y));
+                        Obstacles.AddPolygon(ToPoints(obstacle, x, y));
+                    }
+                }
                 // Clamp zones are already in the placement frame, like the parts.
                 foreach (var zone in stock.ClampZones)
                     Clamps.Add(new RectangleF((float)zone.Bounds.X, (float)zone.Bounds.Y,
@@ -212,11 +262,20 @@ namespace OpenNest.Controls
                 }
 
                 Title = Quantity == 1 ? $"Sheet {firstNumber}" : $"Sheets {firstNumber}–{firstNumber + Quantity - 1} (×{Quantity})";
-                var utilization = length * width > 0 ? PartArea / (length * width) : 0;
+                var utilization = SheetArea > 0 ? PartArea / SheetArea : 0;
                 Detail = $"{stock.Size} · {PartCount} parts · {utilization:P0}";
             }
 
             public Geometry.Box Sheet { get; }
+
+            /// <summary>The sheet's material area: inside the outline when it has one.</summary>
+            public double SheetArea { get; }
+
+            /// <summary>An outlined sheet's shape with its obstacles as holes, in the parts' frame; null for a rectangle.</summary>
+            public GraphicsPath Outline { get; }
+
+            /// <summary>The outlined sheet's obstacles; null without any.</summary>
+            public GraphicsPath Obstacles { get; }
             public int Quantity { get; }
             public int PartCount { get; }
             public double PartArea { get; }
@@ -225,8 +284,13 @@ namespace OpenNest.Controls
             public List<RectangleF> Clamps { get; } = new();
             public List<(GraphicsPath Path, Brush Brush)> Parts { get; } = new();
 
+            private static PointF[] ToPoints(IReadOnlyList<Geometry.Vector> points, double x, double y) =>
+                points.Select(p => new PointF((float)(p.X + x), (float)(p.Y + y))).ToArray();
+
             public void Dispose()
             {
+                Outline?.Dispose();
+                Obstacles?.Dispose();
                 foreach (var (path, brush) in Parts)
                 {
                     path.Dispose();
