@@ -26,6 +26,8 @@ Open/incomplete chains and ambiguous contacts conservatively block. Loops are re
 
 `CompactorTests` covers the reported sequence (push left with spacing, then right/up/down), genuine zero-distance blocking, zero/nonzero-spacing later hooks, and inside-hole pushes through both direct and plate entry points. Physical spacing is measured from raw outlines rather than the inflated contours used by the solver.
 
+`CrescentPairSpacingTests` covers an arc-only part with round spacing caps on two sharp tips: the first contact of a small convex cap against a large convex arc away from every vertex, and every pair the best-fit search builds at five part 2 rotations. Its spacing oracle flattens material entities only; counting a program's opening rapid as outline reports false violations (see [pair-spacing checks](pair-spacing.md)).
+
 Verification commands:
 
 ```sh
