@@ -315,18 +315,31 @@ public class JointCuttingPlanTests
     }
 
     [Fact]
-    public void TabbedArcCandidate_UncertifiedTabGap_IsRefusedWithoutRepairOrException()
+    public void TabbedArcCandidate_LeadOutThatWouldCutTheTab_IsLeftOutAndPlanned()
     {
-        // The arc lead-out is now well formed; the open tab gap is still not certified.
+        // The arc lead-out would run over the tab gap into the lead-in, so the cut stops at its tab.
         var parameters = ExplicitContourTests.Parameters();
         parameters.TabsEnabled = true; parameters.TabConfig = new NormalTab { Size = 0.2 };
         parameters.ExternalLeadOut = new ArcLeadOut { Radius = 0.2 };
         var part = new Part(new Drawing("tabbed", LeadPathValidationTests.Rectangle(0, 0, 10, 10)));
         var result = CuttingPlanService.Plan(new CuttingPlanRequest([part], new Vector(-2, 5), confirmedParameters: parameters));
-        Assert.Equal(CuttingPlanStatus.NoSolutionWithinBudget, result.Status);
-        Assert.Empty(result.ProposedOrder); Assert.True(result.Expansions > 0);
-        Assert.Contains(result.Findings, f => f.Kind == PostVerificationKind.Incomplete);
-        Assert.Contains(result.Findings, f => f.Message.Contains("retention gap"));
+        Assert.Equal(CuttingPlanStatus.Ready, result.Status);
+        Assert.True(result.IndependentlyReplayed);
+        Assert.DoesNotContain(Assert.Single(result.ProposedOrder).Execution.Motions, m => m.Layer == LayerType.Leadout);
+    }
+
+    [Fact]
+    public void TabbedPerimeter_LeadOutCrossingItsLeadIn_IsRefusedAsCuttingTheRetentionGap()
+    {
+        // Wound counterclockwise, entered at (0, 5) and stopped 0.2 short of it: the lead-out runs
+        // forward over the tab gap and crosses the lead-in, cutting the tab free.
+        var program = new Program(Mode.Absolute);
+        program.Codes.Add(new RapidMove(-0.3, 5.5));
+        program.Codes.Add(new LinearMove(0, 5) { Layer = LayerType.Leadin });
+        program.LineTo(0, 0); program.LineTo(10, 0); program.LineTo(10, 10); program.LineTo(0, 10); program.LineTo(0, 5.2);
+        program.Codes.Add(new LinearMove(-0.3, 4.9) { Layer = LayerType.Leadout });
+        var findings = new ReleasedContourState().Check(Read(program, Vector.Zero), Vector.Zero, 1);
+        Assert.Contains(findings, f => f.Kind == PostVerificationKind.Incomplete && f.Message.Contains("retention gap"));
     }
 
     [Fact]

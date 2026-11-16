@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -630,9 +631,15 @@ namespace OpenNest.CNC.CuttingStrategy
                     Parameters.GetEffectivePierceClearance(), out leadOutNormal);
             }
 
-            program.Codes.AddRange(leadIn.Generate(point, leadInNormal, turn));
+            var leadInCodes = leadIn.Generate(point, leadInNormal, turn);
+            program.Codes.AddRange(leadInCodes);
             program.Codes.AddRange(ConvertShapeToMoves(reindexedShape, point));
             var leadOutCodes = leadOut.Generate(leadOutPoint, leadOutNormal, turn);
+            // A run-out angled toward the tab can reach the lead-in on the tab's far side, and the
+            // two cuts then sever the tab: the cut stops at its tab instead.
+            if (tabbed && Parameters.TabConfig.Size > Tolerance.Epsilon
+                && LeadsMeet(leadInCodes, point, leadOutCodes, leadOutPoint, Parameters.Kerf))
+                leadOutCodes = [];
             program.Codes.AddRange(leadOutCodes);
             return contourType != ContourType.External && leadOutCodes.Count > 0;
         }
@@ -1049,6 +1056,60 @@ namespace OpenNest.CNC.CuttingStrategy
 
             return true;
         }
+
+        /// <summary>
+        /// Whether a tabbed outside's lead-out, leaving from <paramref name="leadOutStart"/>,
+        /// touches its lead-in, which enters at <paramref name="entry"/>, or passes within
+        /// <paramref name="kerf"/> of it. Either way the two cuts close across the tab gap
+        /// and cut the part free.
+        /// </summary>
+        private static bool LeadsMeet(List<ICode> leadInCodes, Vector entry, List<ICode> leadOutCodes,
+            Vector leadOutStart, double kerf)
+        {
+            var leadIn = LeadEntities(leadInCodes, entry);
+            var leadOut = LeadEntities(leadOutCodes, leadOutStart);
+            if (leadIn.Count == 0 || leadOut.Count == 0)
+                return false;
+            var reach = double.IsFinite(kerf) && kerf > 0 ? kerf : 0;
+            foreach (var cut in leadOut)
+            {
+                foreach (var lead in leadIn)
+                {
+                    if (Crosses(cut, lead) || reach > 0 && (Near(cut, lead) || Near(lead, cut)))
+                        return true;
+                }
+            }
+            return false;
+
+            static bool Crosses(Entity a, Entity b) => b switch
+            {
+                Line line => a.Intersects(line),
+                Arc arc => a.Intersects(arc),
+                _ => false,
+            };
+
+            bool Near(Entity a, Entity b) =>
+                Ends(a).Any(end => b.ClosestPointTo(end).DistanceTo(end) < reach - Tolerance.Epsilon);
+        }
+
+        // A lead's cutting motions as entities; a lead-in starts at its own rapid to the pierce.
+        private static List<Entity> LeadEntities(List<ICode> codes, Vector start)
+        {
+            var program = new Program(Mode.Absolute);
+            if (codes.Count == 0 || codes[0] is not RapidMove)
+                program.Codes.Add(new RapidMove(start));
+            program.Codes.AddRange(codes);
+            return ConvertProgram.ToGeometry(program)
+                .Where(e => e.Layer != SpecialLayers.Rapid && e is Line or Arc)
+                .ToList();
+        }
+
+        private static IEnumerable<Vector> Ends(Entity entity) => entity switch
+        {
+            Line line => [line.StartPoint, line.EndPoint],
+            Arc arc => [arc.StartPoint(), arc.EndPoint()],
+            _ => [],
+        };
 
         private static Vector EntityEndPoint(Entity entity)
         {

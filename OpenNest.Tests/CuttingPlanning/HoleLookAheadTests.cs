@@ -156,7 +156,7 @@ public class HoleLookAheadTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void HoleProgramsRetainScribesOnceAndNeverInstallOnFailure(bool tabs)
+    public void HoleProgramsRetainScribesOnceAndNeverInstall(bool tabs)
     {
         var clean = MixedHoles();
         clean.MoveTo(-2, -2);
@@ -169,21 +169,14 @@ public class HoleLookAheadTests
         var fingerprint = ExplicitContourTests.Fingerprint(part.Program);
         var result = CuttingPlanService.Plan(new CuttingPlanRequest([part], Start,
             confirmedParameters: parameters, preservePartOrder: true));
-        if (tabs)
-        {
-            Assert.NotEqual(CuttingPlanStatus.Ready, result.Status);
-            Assert.Empty(result.ProposedOrder);
-            Assert.Contains(result.Findings, f => f.Kind == PostVerificationKind.Incomplete);
-        }
-        else
-        {
-            Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
-            Assert.True(result.IndependentlyReplayed);
-            var actual = result.ProposedOrder[0];
-            Assert.Equal(2, actual.ContourChoices[^1].ContourOrdinal);
-            Assert.Equal(3, actual.ContourChoices.Select(c => c.ContourOrdinal).Distinct().Count());
-            Assert.Single(actual.Execution.Motions.Where(m => !m.Rapid && m.Layer == LayerType.Scribe));
-        }
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.True(result.IndependentlyReplayed);
+        var actual = result.ProposedOrder[0];
+        Assert.Equal(2, actual.ContourChoices[^1].ContourOrdinal);
+        Assert.Equal(3, actual.ContourChoices.Select(c => c.ContourOrdinal).Distinct().Count());
+        Assert.Single(actual.Execution.Motions.Where(m => !m.Rapid && m.Layer == LayerType.Scribe));
+        // The arc lead-out would cut through the tab into the lead-in, so a tabbed outside has none.
+        Assert.Equal(!tabs, actual.Execution.Motions.Any(m => m.Layer == LayerType.Leadout));
         Assert.Equal(fingerprint, ExplicitContourTests.Fingerprint(part.Program));
     }
 

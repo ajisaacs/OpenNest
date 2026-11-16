@@ -104,6 +104,11 @@ plate settings, so parts that need no tab are not tabbed.
 
 The emitter tabs a perimeter at its entry: the cut stops short of the entry by the tab size. A
 round perimeter, one circle, is cut as an arc that stops the tab's chord short of its entry.
+The lead-out leaves from where the cut stops. One that touches the lead-in, or passes within the
+kerf of it, would cut the tab free, so the emitter leaves it out and the cut ends at its tab. A
+line lead-out angled forward does that whenever its run along the edge is longer than the tab,
+as a 0.1 lead-out at 60 degrees (0.05 along the edge) beside a 0.03 tab does. This holds for every
+tabbed outside, support-tabbed or not.
 A support-tabbed perimeter's automatic entries are therefore limited to catalog points the
 analysis accepts, plus the closest native point to its best tab point (`AutomaticEntryKind.SupportTab`,
 never on a reflex or cusp vertex). Ranking and lead checks are unchanged.
