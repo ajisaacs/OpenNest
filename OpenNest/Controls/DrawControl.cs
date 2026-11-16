@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -163,11 +163,52 @@ namespace OpenNest.Controls
         {
             base.OnResize(e);
 
-            origin.X += (Size.Width - lastSize.Width) * 0.5f;
-            origin.Y += (Size.Height - lastSize.Height) * 0.5f;
+            if (CanScaleOnResize(lastSize) && CanScaleOnResize(Size))
+                ScaleViewToSize();
+            else
+            {
+                origin.X += (Size.Width - lastSize.Width) * 0.5f;
+                origin.Y += (Size.Height - lastSize.Height) * 0.5f;
+            }
 
             lastSize = Size;
             Invalidate();
+        }
+
+        // The view the resize scaling is measured from: the control size and scale when the
+        // user last zoomed. Measuring from it, not from the previous size, lets a panel that
+        // opens and closes beside the view hand back exactly the zoom it took away.
+        private System.Drawing.Size resizeReferenceSize;
+        private float resizeReferenceScale;
+        private float resizeAppliedScale = float.NaN;
+
+        private static bool CanScaleOnResize(System.Drawing.Size size) =>
+            size.Width > BorderWidth && size.Height > BorderWidth;
+
+        /// <summary>
+        /// Keeps what the user was looking at in view as the control resizes: the world point at
+        /// the center stays at the center, and the scale follows the control's usable size, so a
+        /// view that fit the plate still fits it when a side panel takes part of the width.
+        /// </summary>
+        private void ScaleViewToSize()
+        {
+            if (ViewScale != resizeAppliedScale || !CanScaleOnResize(resizeReferenceSize))
+            {
+                resizeReferenceSize = lastSize;
+                resizeReferenceScale = ViewScale;
+            }
+
+            var center = PointControlToWorld(lastSize.Width / 2, lastSize.Height / 2);
+            var ratio = System.Math.Min(
+                (Size.Width - BorderWidth) / (float)(resizeReferenceSize.Width - BorderWidth),
+                (Size.Height - BorderWidth) / (float)(resizeReferenceSize.Height - BorderWidth));
+            var scale = System.Math.Clamp(resizeReferenceScale * ratio, ViewScaleMin, ViewScaleMax);
+
+            ViewScale = scale;
+            origin.X = Size.Width * 0.5f - (float)center.X * scale;
+            origin.Y = Size.Height * 0.5f + (float)center.Y * scale;
+            UpdateMatrix();
+            resizeAppliedScale = ViewScale;
         }
 
         public float LengthWorldToGui(double length)
