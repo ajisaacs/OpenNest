@@ -51,9 +51,13 @@ namespace OpenNest.Shapes
 
         protected static string Dim(double value) => value.ToString("0.###");
 
+        /// <summary>
+        /// Builds the shape's drawing with the CAD converter's cut directions: the outside
+        /// clockwise and every cutout counter-clockwise (see <see cref="ShapeProfile.NormalizeEntities"/>).
+        /// </summary>
         protected Drawing CreateDrawing(List<Entity> entities)
         {
-            var pgm = ConvertGeometry.ToProgram(entities);
+            var pgm = ConvertGeometry.ToProgram(ShapeProfile.NormalizeEntities(entities));
 
             if (pgm == null)
                 throw new InvalidOperationException(
