@@ -71,17 +71,79 @@ public static partial class PlateFillService
         // is requested.
         var result = new List<Part>();
         var request = item.Quantity;
+        var dropped = false;
         for (var attempt = 0; attempt <= MaxClampRefills; attempt++)
         {
             var proposed = fill(CopyDemand(item, request), area, progress);
             result = new List<Part>();
             AddClear(result, proposed, plate, area, demand);
+            dropped = result.Count < proposed.Count;
             if (item.Quantity <= 0 || result.Count >= item.Quantity
                 || proposed.Count < request || token.IsCancellationRequested)
                 break;
             request += item.Quantity - result.Count;
         }
+        if (dropped)
+        {
+            var before = result.Count;
+            FillGapsBesideClamps(fill, plate, item, demand, area, result, token);
+            // The progress sink re-certifies these and promotes them only over its floor.
+            if (result.Count > before)
+                progress?.Report(new NestProgress
+                {
+                    BestParts = result,
+                    ActiveWorkArea = area,
+                    IsOverallBest = true,
+                    Description = $"Filled gaps beside clamps: {result.Count} parts",
+                });
+        }
         return result;
+    }
+
+    /// <summary>Gap-fill rounds after dropping clamp hits; a round that adds nothing ends it.</summary>
+    private const int MaxGapFillRounds = 3;
+
+    /// <summary>
+    /// Fills the clear rectangles left once the parts that hit a clamp are dropped: the
+    /// clamp-blind layout put a part across each clamp, and dropping it can leave room for a
+    /// part between two clamps or beside one. Each free rectangle large enough for the part is
+    /// filled with the remaining demand and every proposal is certified like the main fill.
+    /// Only adds parts; the main layout is never moved.
+    /// </summary>
+    private static void FillGapsBesideClamps(
+        Func<NestItem, Box, IProgress<NestProgress>, List<Part>> fill, Plate plate,
+        NestItem item, List<NestItem> demand, Box area, List<Part> result,
+        CancellationToken token)
+    {
+        var size = item.Drawing.Program.BoundingBox();
+        var keepOuts = InteractiveClamps.ClearanceRectangles(plate);
+        for (var round = 0; round < MaxGapFillRounds; round++)
+        {
+            var before = result.Count;
+            var obstacles = keepOuts.ToList();
+            obstacles.AddRange(plate.Parts.Where(part => !part.BaseDrawing.IsCutOff)
+                .Concat(result)
+                .Select(part => part.BoundingBox.Offset(plate.PartSpacing)));
+            foreach (var gap in new RemnantFinder(area, obstacles).FindRemnants())
+            {
+                if (token.IsCancellationRequested
+                    || (item.Quantity > 0 && result.Count >= item.Quantity))
+                    return;
+                if (!Fits(gap, size))
+                    continue;
+                var remaining = item.Quantity > 0 ? item.Quantity - result.Count : item.Quantity;
+                AddClear(result, fill(CopyDemand(item, remaining), gap, null), plate, gap, demand);
+            }
+            if (result.Count == before)
+                return;
+        }
+    }
+
+    private static bool Fits(Box gap, Box size)
+    {
+        const double slack = 1e-6;
+        return (gap.Length + slack >= size.Length && gap.Width + slack >= size.Width)
+            || (gap.Length + slack >= size.Width && gap.Width + slack >= size.Length);
     }
 
     /// <summary>

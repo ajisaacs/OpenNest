@@ -368,6 +368,37 @@ public class ClampZoneInteractiveFillTests
         AssertClearOfClamps(parts, ZoneA, ZoneB);
     }
 
+    [Fact]
+    public void DroppedClampHitsLeaveNoGapThePartStillFits()
+    {
+        // A 120 x 60 sheet with four front clamps 20 apart. Nine 6.1-high rows fit only with
+        // the front row beside the clamps, so the parts that straddle a clamp are dropped, which
+        // opens room for one between two clamps that the fill must take.
+        var zones = new[] { 20.0, 40.0, 60.0, 80.0 }
+            .Select(x => new Box(x, 0, 1.5, 0.625)).ToArray();
+        var plate = new Plate(new Size(60, 120))
+        {
+            EdgeSpacing = new Spacing(Edge, Edge),
+            PartSpacing = PartSpacing,
+        };
+        for (var i = 0; i < zones.Length; i++)
+            plate.ClampZones.Add(new ClampZone($"front-{i}", zones[i]));
+        var drawing = RectDrawing(12, 6.1);
+        var item = new NestItem { Drawing = drawing };
+
+        var parts = PlateFillService.FillItem("Fill", plate, item, plate.WorkArea(),
+            null, CancellationToken.None);
+
+        AssertClearOfClamps(parts, zones);
+        var obstacles = zones.Select(zone => Inflated(zone, Edge))
+            .Concat(parts.Select(part => part.BoundingBox.Offset(PartSpacing))).ToList();
+        var gaps = new RemnantFinder(plate.WorkArea(), obstacles).FindRemnants();
+        Assert.DoesNotContain(gaps, gap =>
+            (gap.Length >= 12 - 1e-6 && gap.Width >= 6.1 - 1e-6)
+            || (gap.Length >= 6.1 - 1e-6 && gap.Width >= 12 - 1e-6));
+        Assert.Contains(parts, part => part.BoundingBox.Bottom < zones[0].Top + Edge);
+    }
+
     private sealed class InlineProgress(System.Action<NestProgress> report) : System.IProgress<NestProgress>
     {
         public void Report(NestProgress value) => report(value);
