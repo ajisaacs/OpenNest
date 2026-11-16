@@ -107,10 +107,18 @@ namespace OpenNest.Forms
         }
 
         /// <summary>
-        /// Layouts alike enough that only the better one is offered: the same number of sheets,
-        /// leaving the free strip the same way.
+        /// Layouts alike enough that only the better one is offered: the same number of sheets
+        /// of the same sizes, leaving the free strip the same way.
         /// </summary>
-        internal (int Sheets, bool? AlongLength) Family => (SheetCount, Remnant?.AlongLength);
+        internal (int Sheets, string Sizes, bool? AlongLength) Family => (SheetCount, sizes ??= SizeKey(), Remnant?.AlongLength);
+
+        private string sizes;
+
+        /// <summary>The sheet sizes with their counts, in a fixed order: "1x48x144" or "1x48x96|1x60x120".</summary>
+        private string SizeKey() => string.Join("|", Sheets
+            .GroupBy(s => FormattableString.Invariant($"{s.Stock.Size.Width:R}x{s.Stock.Size.Length:R}"), StringComparer.Ordinal)
+            .Select(g => FormattableString.Invariant($"{g.Sum(s => s.Quantity)}x{g.Key}"))
+            .OrderBy(k => k, StringComparer.Ordinal));
 
         /// <summary>True when both place the same parts at the same poses on the same stock.</summary>
         public bool SameLayoutAs(NestLayoutChoice other)
@@ -153,7 +161,7 @@ namespace OpenNest.Forms
 
     /// <summary>
     /// The layouts a run offers: the engine's best first, then the best layout of every other
-    /// family (sheet count and free-strip direction), so the list holds real alternatives rather
+    /// family (sheet count, sheet sizes and free-strip direction), so the list holds real alternatives rather
     /// than near copies of the best. Not thread-safe: use it from one thread.
     /// </summary>
     internal sealed class NestLayoutChoices

@@ -124,6 +124,25 @@ public class NestLayoutChoicesTests
     }
 
     [Fact]
+    public void AnotherSheetSize_IsAFamilyOfItsOwn()
+    {
+        var stock = Stock();
+        var wider = new NestPlateStock("wide", new Size(60, 120), quantity: null, partSpacing: 0.25, quadrant: 1);
+        var sameSizeOtherRow = new NestPlateStock("drop", new Size(48, 96), quantity: null, partSpacing: 0.25, quadrant: 1);
+        var choices = new NestLayoutChoices();
+        var best = Layout(Sheet(stock, (0, 0), (0, 28), (10, 0)));
+        var onWider = Layout(Sheet(wider, (0, 0), (0, 28), (10, 0)));
+
+        choices.Add(best, best: true);
+        // Same count and direction as the best, but on a different size: a real alternative.
+        Assert.True(choices.Add(onWider, best: false));
+        // The size is what counts, not the stock row it came from.
+        Assert.False(choices.Add(Layout(Sheet(sameSizeOtherRow, (0, 0), (0, 28), (10, 0))), best: false));
+
+        Assert.Equal(new[] { best, onWider }, choices.Top);
+    }
+
+    [Fact]
     public void TheListIsCappedBestFirstThenByPartsPlaced()
     {
         var stock = Stock();

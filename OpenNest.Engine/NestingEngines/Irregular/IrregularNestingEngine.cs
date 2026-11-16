@@ -124,6 +124,7 @@ public sealed class IrregularNestingEngine : INestingEngine
             if (best != null && solver.Work.Value >= WorkBudget)
                 break;
             var plan = solver.Plan(demand, axis, beta);
+            ReportAlternatives(job, types, solver.Alternatives, progress, token);
             if (best == null || plan.IsBetterThan(best))
             {
                 best = plan;
@@ -152,6 +153,7 @@ public sealed class IrregularNestingEngine : INestingEngine
                 if (solver.Work.Value >= WorkBudget)
                     break;
                 var plan = solver.Plan(demand, axis, 1.0, grouped: true);
+                ReportAlternatives(job, types, solver.Alternatives, progress, token);
                 if (!plan.IsBetterThan(improved))
                 {
                     ReportAlternative(job, types, plan, progress, token);
@@ -171,6 +173,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         {
             token.ThrowIfCancellationRequested();
             var plan = solver.Plan(demand, PackAxis.X, 1.0, banded: true);
+            ReportAlternatives(job, types, solver.Alternatives, progress, token);
             if (plan.IsBetterThan(improved))
             {
                 ReportPlan(job, types, plan, progress, token);
@@ -264,6 +267,14 @@ public sealed class IrregularNestingEngine : INestingEngine
         if (progress == null || plan.Sheets.Count == 0)
             return;
         CandidateProgress.ReportAlternative(BuildResult(job, types, plan, null, token), progress);
+    }
+
+    /// <summary>Reports the complete plans a pass found beside the one it returned.</summary>
+    private static void ReportAlternatives(NestJob job, IReadOnlyList<PartType> types, IReadOnlyList<Plan> plans,
+        IProgress<NestJobProgress>? progress, CancellationToken token)
+    {
+        foreach (var plan in plans)
+            ReportAlternative(job, types, plan, progress, token);
     }
 
     /// <summary>Exercises the production physical-tail lifecycle from a test-owned incumbent.
@@ -363,8 +374,40 @@ public sealed class IrregularNestingEngine : INestingEngine
             bool banded = false)
         {
             groupedBudget = Work.Value + workBudget;
+            var finishers = new List<Run>();
             var run = Decode(demand, axis, beta, new Dictionary<string, int>(StringComparer.Ordinal), job.Options.MaxPlates, null,
-                weights, grouped, banded);
+                weights, grouped, banded, finishers);
+            // The decode picks each sheet's stock on an estimate of what the leftovers will cost,
+            // so a stock that finished the job outright can lose the pick to a plan that ends up
+            // dearer. Each such finished plan competes with the decode's own; a tie keeps the decode.
+            var decoded = ToPlan(run);
+            var best = decoded;
+            var plans = new List<Plan> { decoded };
+            foreach (var finisher in finishers)
+            {
+                var plan = ToPlan(finisher);
+                plans.Add(plan);
+                if (plan.IsBetterThan(best))
+                    best = plan;
+            }
+            plans.Remove(best);
+            plans.Sort((a, b) => a.IsBetterThan(b) ? -1 : b.IsBetterThan(a) ? 1 : 0);
+            Alternatives = plans.Take(MaxAlternatives).ToList();
+            return best;
+        }
+
+        /// <summary>Most plans one <see cref="Plan"/> call keeps beside the one it returns.</summary>
+        private const int MaxAlternatives = 6;
+
+        /// <summary>
+        /// The complete plans the last <see cref="Plan"/> call found beside the one it returned,
+        /// best first: the job finished on another stock at some sheet, or the decode's own plan
+        /// when one of those beat it.
+        /// </summary>
+        public IReadOnlyList<Plan> Alternatives { get; private set; } = Array.Empty<Plan>();
+
+        private Plan ToPlan(Run run)
+        {
             var unplaced = types.Sum(t => t.Part.Quantity) - run.Sheets.Sum(s => s.Parts.Count);
             var reason = run.Reason;
             if (unplaced > 0 && reason == NestJobStopReason.Completed)
@@ -595,6 +638,9 @@ public sealed class IrregularNestingEngine : INestingEngine
         /// Greedy sheet-by-sheet decode. <paramref name="usedBefore"/> seeds finite-stock
         /// accounting, <paramref name="sheetCap"/> bounds the sheets this run may add, and
         /// <paramref name="first"/>, when set, forces the stock of the first sheet.
+        /// <paramref name="finishers"/>, when set, receives every complete run the decode passed
+        /// over: the sheets chosen so far plus a trial sheet that took all the remaining parts
+        /// but was not the sheet chosen. Collecting them never changes the decode.
         /// </summary>
         private Run Decode(
             int[] demand,
@@ -605,7 +651,8 @@ public sealed class IrregularNestingEngine : INestingEngine
             NestPlateStock? first,
             IReadOnlyList<double>? weights = null,
             bool grouped = false,
-            bool banded = false
+            bool banded = false,
+            List<Run>? finishers = null
         )
         {
             var remaining = (int[])demand.Clone();
@@ -672,6 +719,19 @@ public sealed class IrregularNestingEngine : INestingEngine
                     .ThenByDescending(t => NestJobCost.TieBreakKey(Offcut(job.Options, t.Fill)))
                     .ThenBy(t => t.order)
                     .First();
+
+                if (finishers != null)
+                {
+                    var left = remaining.Sum();
+                    for (var i = 0; i < trials.Count; i++)
+                    {
+                        if (i == chosen.order || trials[i].Fill.Parts.Count != left)
+                            continue;
+                        // Each run owns its sheets' part lists, as the chosen copies below do.
+                        var finished = sheets.Select(s => s with { Parts = s.Parts.ToList() }).Append(trials[i].Fill).ToList();
+                        finishers.Add(new Run(finished, NestJobCost.RequireFinite(net + trials[i].Net), NestJobStopReason.Completed));
+                    }
+                }
 
                 var outstanding = types.ToDictionary(t => t.Part.Id, t => remaining[t.Index], StringComparer.Ordinal);
                 var counts = chosen.Fill.Parts.GroupBy(p => types[p.Orientation.TypeIndex].Part.Id, StringComparer.Ordinal)
