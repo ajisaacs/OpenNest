@@ -388,6 +388,85 @@ public class ShapeLibraryFormTests
         Assert.NotEmpty(Find<ShapePreviewControl>(form, "previewBox").Plate.Parts);
     });
 
+    [Fact]
+    public void LastInputsReopenOnTheLastShapeWithEachShapesValues() => ArchUnitsTests.RunSta(() =>
+    {
+        string json;
+        using (var form = new ShapeLibraryForm(lastInputs: new ShapeLibraryInputs()))
+        {
+            SelectShape(form, typeof(RectangleShape));
+            var box = OpenEditor(form, "Length");
+            box.Text = "20 1/2";
+            Press(box, Keys.Enter);
+            Find<OpenNest.Controls.NumericUpDown>(form, "quantityUpDown").Value = 5;
+            SelectShape(form, typeof(CircleShape));
+            json = form.LastInputs.ToJson();
+        }
+
+        using var reopened = new ShapeLibraryForm(lastInputs: ShapeLibraryInputs.Parse(json));
+        var preview = Find<ShapePreviewControl>(reopened, "previewBox");
+        Assert.Equal(nameof(CircleShape), reopened.LastInputs.LastShape);
+        Assert.Equal(5, Find<OpenNest.Controls.NumericUpDown>(reopened, "quantityUpDown").Value);
+
+        SelectShape(reopened, typeof(RectangleShape));
+        Assert.Equal(20.5, preview.Plate.Parts.Single().BoundingBox.Length, 6);
+    });
+
+    [Fact]
+    public void LastInputsKeepTheChosenConfigurationAndItsEditedValues() => ArchUnitsTests.RunSta(() =>
+    {
+        string json;
+        string configuration;
+        using (var form = new ShapeLibraryForm(lastInputs: new ShapeLibraryInputs()))
+        {
+            SelectShape(form, typeof(PipeFlangeShape));
+            var configs = Find<ComboBox>(form, "configComboBox");
+            Assert.True(configs.Items.Count > 1);
+            configs.SelectedIndex = configs.Items.Count - 1;
+            configuration = (string)configs.SelectedItem!;
+            form.EditParameter("Blind");
+            json = form.LastInputs.ToJson();
+        }
+
+        using var reopened = new ShapeLibraryForm(lastInputs: ShapeLibraryInputs.Parse(json));
+        Assert.Equal(configuration, Find<ComboBox>(reopened, "configComboBox").SelectedItem);
+        var blind = Assert.Single(reopened.LastInputs.Shapes[nameof(PipeFlangeShape)].Values, v => v.Key == "Blind");
+        var saved = ShapeLibraryInputs.Parse(json).Shapes[nameof(PipeFlangeShape)].Values["Blind"];
+        Assert.Equal(saved.GetBoolean(), blind.Value.GetBoolean());
+    });
+
+    [Fact]
+    public void SavedValuesThatNoLongerMakeAShapeFallBackToTheDefaults() => ArchUnitsTests.RunSta(() =>
+    {
+        double defaultLength;
+        using (var form = new ShapeLibraryForm())
+        {
+            SelectShape(form, typeof(RectangleShape));
+            defaultLength = Find<ShapePreviewControl>(form, "previewBox").Plate.Parts.Single().BoundingBox.Length;
+        }
+
+        var inputs = ShapeLibraryInputs.Parse(
+            """{"LastShape":"RectangleShape","Shapes":{"RectangleShape":{"Values":{"Length":0,"Width":"wide"}}}}""");
+        using var reopened = new ShapeLibraryForm(lastInputs: inputs);
+
+        Assert.Equal(defaultLength, Find<ShapePreviewControl>(reopened, "previewBox").Plate.Parts.Single().BoundingBox.Length, 6);
+        Assert.True(Find<Button>(reopened, "addButton").Enabled);
+    });
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("not json")]
+    [InlineData("""{"Shapes":null}""")]
+    public void UnreadableSavedInputsStartAfresh(string? json)
+    {
+        var inputs = ShapeLibraryInputs.Parse(json);
+        Assert.Null(inputs.LastShape);
+        Assert.Equal(1, inputs.Quantity);
+        Assert.NotNull(inputs.Shapes);
+        Assert.Empty(inputs.Shapes);
+    }
+
     private static void SelectShape(ShapeLibraryForm form, Type shapeType)
     {
         var grid = Find<ListView>(form, "shapeListView");

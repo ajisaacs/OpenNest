@@ -501,5 +501,18 @@ namespace OpenNest.Properties {
                 this["ClonePlacementOrder"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        // The Shape Library's last shape, quantity and per-shape inputs: OpenNest.Forms.ShapeLibraryInputs JSON.
+        public string ShapeLibraryInputs {
+            get {
+                return ((string)(this["ShapeLibraryInputs"]));
+            }
+            set {
+                this["ShapeLibraryInputs"] = value;
+            }
+        }
     }
 }

@@ -21,8 +21,9 @@ namespace OpenNest.Forms
             if (activeForm == null)
                 return;
 
-            using var form = new ShapeLibraryForm(activeForm.Nest.Drawings.Select(d => d.Name));
+            using var form = new ShapeLibraryForm(activeForm.Nest.Drawings.Select(d => d.Name), ShapeLibraryInputs.Load());
             form.ShowDialog(this);
+            form.LastInputs.Save();
 
             activeForm.AddDrawings("Shape Library", form.GetDrawings());
         }

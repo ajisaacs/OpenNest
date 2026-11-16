@@ -119,5 +119,8 @@
     <Setting Name="ClonePlacementOrder" Type="System.String" Scope="User">
       <Value Profile="(Default)">ClosestToCorner</Value>
     </Setting>
+    <Setting Name="ShapeLibraryInputs" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
   </Settings>
 </SettingsFile>

@@ -43,6 +43,7 @@ namespace OpenNest.Forms
         private readonly List<PropertyInfo> parameters = new List<PropertyInfo>();
         private readonly Dictionary<string, object> values = new Dictionary<string, object>();
         private readonly HashSet<string> existingNames;
+        private readonly ShapeLibraryInputs lastInputs;
 
         private ShapeEntry selectedEntry;
         private bool suppressPreview;
@@ -51,12 +52,18 @@ namespace OpenNest.Forms
         // The next preview shows a different shape (or configuration): fit it and reset dragged dimensions.
         private bool newShape = true;
 
-        public ShapeLibraryForm(IEnumerable<string> existingDrawingNames = null)
+        /// <param name="existingDrawingNames">Names already in the nest, so added shapes get unique names.</param>
+        /// <param name="lastInputs">
+        /// Inputs from an earlier session to start from: the last shape, the quantity and each
+        /// shape's values. The form records into it as it goes; read <see cref="LastInputs"/> to save.
+        /// </param>
+        public ShapeLibraryForm(IEnumerable<string> existingDrawingNames = null, ShapeLibraryInputs lastInputs = null)
         {
             existingNames =
                 existingDrawingNames != null
                     ? new HashSet<string>(existingDrawingNames, StringComparer.OrdinalIgnoreCase)
                     : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            this.lastInputs = lastInputs ?? new ShapeLibraryInputs();
 
             InitializeComponent();
             Load += (_, _) =>
@@ -74,16 +81,33 @@ namespace OpenNest.Forms
             addButton.Click += AddButton_Click;
             closeButton.Click += (s, e) => Close();
 
+            quantityUpDown.Value = System.Math.Clamp(this.lastInputs.Quantity, quantityUpDown.Minimum, quantityUpDown.Maximum);
+
             if (shapeListView.Items.Count > 0)
             {
-                shapeListView.Items[0].Selected = true;
-                shapeListView.Items[0].Focused = true;
+                var item =
+                    shapeListView.Items.Cast<ListViewItem>()
+                        .FirstOrDefault(i => ((ShapeEntry)i.Tag).ShapeType.Name == this.lastInputs.LastShape)
+                    ?? shapeListView.Items[0];
+                item.Selected = true;
+                item.Focused = true;
+                item.EnsureVisible();
                 // The list raises selection events only once its window exists.
-                ShowShape((ShapeEntry)shapeListView.Items[0].Tag);
+                ShowShape((ShapeEntry)item.Tag);
             }
         }
 
         public List<Drawing> GetDrawings() => addedDrawings;
+
+        /// <summary>The shape shown, the quantity and each shape's inputs, for the next session to start from.</summary>
+        public ShapeLibraryInputs LastInputs
+        {
+            get
+            {
+                RememberInputs();
+                return lastInputs;
+            }
+        }
 
         private void DiscoverShapes()
         {
@@ -218,12 +242,14 @@ namespace OpenNest.Forms
         private void ShowShape(ShapeEntry entry)
         {
             CloseEditor();
+            RememberInputs();
             selectedEntry = entry;
             suppressPreview = true;
 
             var hasConfigs = selectedEntry.HasConfigurations;
             configLabel.Visible = hasConfigs;
             configComboBox.Visible = hasConfigs;
+            lastInputs.Shapes.TryGetValue(entry.ShapeType.Name, out var saved);
 
             if (hasConfigs)
             {
@@ -231,7 +257,16 @@ namespace OpenNest.Forms
                 foreach (var cfg in selectedEntry.Configurations)
                     configComboBox.Items.Add(cfg.Name);
 
-                configComboBox.SelectedIndex = 0;
+                var index = saved?.Configuration != null ? configComboBox.Items.IndexOf(saved.Configuration) : -1;
+                if (index < 0)
+                {
+                    // No saved configuration, or it is gone: saved values no longer apply.
+                    saved = null;
+                    index = 0;
+                }
+                configComboBox.SelectedIndex = index;
+                // Selecting the configuration loaded its values and ended the suppression.
+                suppressPreview = true;
             }
             else
             {
@@ -241,9 +276,64 @@ namespace OpenNest.Forms
                 LoadParameters(selectedEntry.ShapeType, defaults);
             }
 
+            if (saved != null)
+                RestoreValues(saved);
+
             suppressPreview = false;
             newShape = true;
             UpdatePreview();
+        }
+
+        /// <summary>Records the shown shape's inputs into <see cref="lastInputs"/>.</summary>
+        private void RememberInputs()
+        {
+            lastInputs.Quantity = (int)quantityUpDown.Value;
+            if (selectedEntry == null)
+                return;
+
+            lastInputs.LastShape = selectedEntry.ShapeType.Name;
+            lastInputs.Shapes[selectedEntry.ShapeType.Name] = new ShapeLibraryInputs.ShapeInputs
+            {
+                Configuration = selectedEntry.HasConfigurations ? configComboBox.SelectedItem as string : null,
+                Values = values.ToDictionary(v => v.Key, v => JsonSerializer.SerializeToElement(v.Value), StringComparer.Ordinal),
+            };
+        }
+
+        /// <summary>
+        /// Puts saved values over the loaded ones. A value that no longer reads as its parameter's
+        /// type is skipped; if the result no longer makes a shape, the loaded values stay.
+        /// </summary>
+        private void RestoreValues(ShapeLibraryInputs.ShapeInputs saved)
+        {
+            if (saved.Values == null)
+                return;
+
+            var restored = new Dictionary<string, object>(values);
+            foreach (var prop in parameters)
+            {
+                if (!saved.Values.TryGetValue(prop.Name, out var element))
+                    continue;
+                try
+                {
+                    var value = element.Deserialize(prop.PropertyType);
+                    if (value == null && prop.PropertyType.IsValueType)
+                        continue;
+                    if (value is double d && (!double.IsFinite(d) || d < 0))
+                        continue;
+                    if (value is int i && i < 0)
+                        continue;
+                    restored[prop.Name] = value;
+                }
+                catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException)
+                {
+                    // Keep the loaded value.
+                }
+            }
+
+            if (ShapeError(restored) != null)
+                return;
+            foreach (var pair in restored)
+                values[pair.Key] = pair.Value;
         }
 
         private void ConfigComboBox_SelectedIndexChanged(object sender, EventArgs e)

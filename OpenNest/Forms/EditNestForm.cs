@@ -1485,8 +1485,9 @@ namespace OpenNest.Forms
 
         private void ShapeLibrary_Click(object sender, EventArgs e)
         {
-            using var form = new ShapeLibraryForm(Nest.Drawings.Select(d => d.Name));
+            using var form = new ShapeLibraryForm(Nest.Drawings.Select(d => d.Name), ShapeLibraryInputs.Load());
             form.ShowDialog();
+            form.LastInputs.Save();
 
             AddDrawings("Shape Library", form.GetDrawings());
         }
