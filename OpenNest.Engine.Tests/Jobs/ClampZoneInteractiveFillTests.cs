@@ -371,11 +371,11 @@ public class ClampZoneInteractiveFillTests
     [Fact]
     public void DroppedClampHitsLeaveNoGapThePartStillFits()
     {
-        // A 120 x 60 sheet with four front clamps 20 apart. Nine 6.1-high rows fit only with
+        // A 120 x 60 sheet with four front clamps 20 apart. 15 x 7 parts hold the most with
         // the front row beside the clamps, so the parts that straddle a clamp are dropped, which
-        // opens room for one between two clamps that the fill must take.
+        // opens room for one between two clamps that the fill must take (57 parts without it).
         var plate = RailPlate(out var zones);
-        var drawing = RectDrawing(12, 6.1);
+        var drawing = RectDrawing(15, 7);
         var item = new NestItem { Drawing = drawing };
 
         var parts = PlateFillService.FillItem("Fill", plate, item, plate.WorkArea(),
@@ -386,9 +386,10 @@ public class ClampZoneInteractiveFillTests
             .Concat(parts.Select(part => part.BoundingBox.Offset(PartSpacing))).ToList();
         var gaps = new RemnantFinder(plate.WorkArea(), obstacles).FindRemnants();
         Assert.DoesNotContain(gaps, gap =>
-            (gap.Length >= 12 - 1e-6 && gap.Width >= 6.1 - 1e-6)
-            || (gap.Length >= 6.1 - 1e-6 && gap.Width >= 12 - 1e-6));
+            (gap.Length >= 15 - 1e-6 && gap.Width >= 7 - 1e-6)
+            || (gap.Length >= 7 - 1e-6 && gap.Width >= 15 - 1e-6));
         Assert.Contains(parts, part => part.BoundingBox.Bottom < zones[0].Top + Edge);
+        Assert.Equal(58, parts.Count);
     }
 
     [Fact]

@@ -291,7 +291,7 @@ public class FillStackCharacterizationTests
     [Theory]
     [InlineData("Fill", 34, "D3D54E9116D96ACF")]
     [InlineData("Strip", 35, "55A0EE3EDF28E68E")]
-    [InlineData("Vertical Remnant", 35, "8CC17C7708C8049F")]
+    [InlineData("Vertical Remnant", 35, "285AF7AF9B9573C5")]
     [InlineData("Horizontal Remnant", 30, "A0700052AE771E06")]
     public void Nest_MixedIrregularItems_PinnedLayout(
         string strategy,
