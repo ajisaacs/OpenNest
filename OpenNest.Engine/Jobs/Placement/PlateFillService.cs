@@ -5,6 +5,7 @@ using System.Threading;
 using OpenNest.Engine.Fill;
 using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.Jobs.Placement;
 
@@ -86,7 +87,7 @@ public static partial class PlateFillService
         if (dropped)
         {
             var before = result.Count;
-            FillGapsBesideClamps(fill, plate, item, demand, area, result, token);
+            result = RefillBesideClamps(fill, plate, item, demand, area, result, token);
             // The progress sink re-certifies these and promotes them only over its floor.
             if (result.Count > before)
                 progress?.Report(new NestProgress
@@ -98,6 +99,120 @@ public static partial class PlateFillService
                 });
         }
         return result;
+    }
+
+    /// <summary>
+    /// The better of two refills of a layout that lost parts at the clamps: its gaps filled
+    /// with every part left in place, or the clamped edge's row taken out and refilled
+    /// between the clamps, which lines the row up with the space the clamps leave instead
+    /// of the grid the clamp-blind fill chose. The repacked row wins only with more parts.
+    /// </summary>
+    private static List<Part> RefillBesideClamps(
+        Func<NestItem, Box, IProgress<NestProgress>, List<Part>> fill, Plate plate,
+        NestItem item, List<NestItem> demand, Box area, List<Part> layout,
+        CancellationToken token)
+    {
+        var gapFilled = new List<Part>(layout);
+        FillGapsBesideClamps(fill, plate, item, demand, area, gapFilled, token);
+        var band = ClampedEdgeBand(plate, area);
+        if (band == null || token.IsCancellationRequested)
+            return gapFilled;
+
+        var repacked = layout.Where(part => !Overlaps(part.BoundingBox, band)).ToList();
+        if (repacked.Count == layout.Count)
+            return gapFilled;
+        foreach (var slot in ClampedEdgeSlots(plate, area, band, repacked))
+        {
+            if (token.IsCancellationRequested
+                || (item.Quantity > 0 && repacked.Count >= item.Quantity))
+                break;
+            if (!Fits(slot, item.Drawing.Program.BoundingBox()))
+                continue;
+            var remaining = item.Quantity > 0 ? item.Quantity - repacked.Count : item.Quantity;
+            AddClear(repacked, fill(CopyDemand(item, remaining), slot, null), plate, slot, demand);
+        }
+        FillGapsBesideClamps(fill, plate, item, demand, area, repacked, token);
+        return repacked.Count > gapFilled.Count ? repacked : gapFilled;
+    }
+
+    /// <summary>
+    /// The free space along the clamped edge once its row is taken out, one slot between each
+    /// pair of clamp keep-outs (and one past each end), each running from the edge to the
+    /// nearest part beyond the band at the part spacing. Slots never overlap, so filling one
+    /// never steals another's space.
+    /// </summary>
+    private static List<Box> ClampedEdgeSlots(Plate plate, Box area, Box band,
+        List<Part> remaining)
+    {
+        var alongX = band.Length >= area.Length - Tolerance.Epsilon;
+        var keepOuts = InteractiveClamps.ClearanceRectangles(plate)
+            .Where(keepOut => Overlaps(keepOut, band))
+            .Select(keepOut => alongX ? (Low: keepOut.Left, High: keepOut.Right)
+                : (Low: keepOut.Bottom, High: keepOut.Top))
+            .OrderBy(span => span.Low);
+        var occupied = plate.Parts.Where(part => !part.BaseDrawing.IsCutOff)
+            .Concat(remaining).Select(part => part.BoundingBox).ToList();
+        var spacing = plate.PartSpacing;
+        var slots = new List<Box>();
+
+        void Add(double low, double high)
+        {
+            if (high - low <= Tolerance.Epsilon)
+                return;
+            var beside = occupied.Where(box => alongX
+                ? box.Left < high && box.Right > low
+                : box.Bottom < high && box.Top > low).ToList();
+            Box slot;
+            if (alongX && band.Bottom <= area.Bottom)
+            {
+                var top = beside.Select(box => box.Bottom - spacing).Append(area.Top).Min();
+                slot = new Box(low, area.Bottom, high - low, top - area.Bottom);
+            }
+            else if (alongX)
+            {
+                var bottom = beside.Select(box => box.Top + spacing).Append(area.Bottom).Max();
+                slot = new Box(low, bottom, high - low, area.Top - bottom);
+            }
+            else if (band.Left <= area.Left)
+            {
+                var right = beside.Select(box => box.Left - spacing).Append(area.Right).Min();
+                slot = new Box(area.Left, low, right - area.Left, high - low);
+            }
+            else
+            {
+                var left = beside.Select(box => box.Right + spacing).Append(area.Left).Max();
+                slot = new Box(left, low, area.Right - left, high - low);
+            }
+            if (slot.Length > 0 && slot.Width > 0)
+                slots.Add(slot);
+        }
+
+        var start = alongX ? area.Left : area.Bottom;
+        foreach (var span in keepOuts)
+        {
+            Add(start, span.Low);
+            start = System.Math.Max(start, span.High);
+        }
+        Add(start, alongX ? area.Right : area.Top);
+        return slots;
+    }
+
+    /// <summary>
+    /// The strip of <paramref name="area"/> between its clamped edge and the far side of the
+    /// clamp keep-outs, or null when <see cref="ClampFreeArea"/> finds no single clamped edge.
+    /// </summary>
+    internal static Box ClampedEdgeBand(Plate plate, Box area)
+    {
+        var free = ClampFreeArea(plate, area);
+        if (free == null)
+            return null;
+        if (free.Bottom > area.Bottom)
+            return new Box(area.Left, area.Bottom, area.Length, free.Bottom - area.Bottom);
+        if (free.Top < area.Top)
+            return new Box(area.Left, free.Top, area.Length, area.Top - free.Top);
+        if (free.Left > area.Left)
+            return new Box(area.Left, area.Bottom, free.Left - area.Left, area.Width);
+        return new Box(free.Right, area.Bottom, area.Right - free.Right, area.Width);
     }
 
     /// <summary>Gap-fill rounds after dropping clamp hits; a round that adds nothing ends it.</summary>

@@ -374,15 +374,7 @@ public class ClampZoneInteractiveFillTests
         // A 120 x 60 sheet with four front clamps 20 apart. Nine 6.1-high rows fit only with
         // the front row beside the clamps, so the parts that straddle a clamp are dropped, which
         // opens room for one between two clamps that the fill must take.
-        var zones = new[] { 20.0, 40.0, 60.0, 80.0 }
-            .Select(x => new Box(x, 0, 1.5, 0.625)).ToArray();
-        var plate = new Plate(new Size(60, 120))
-        {
-            EdgeSpacing = new Spacing(Edge, Edge),
-            PartSpacing = PartSpacing,
-        };
-        for (var i = 0; i < zones.Length; i++)
-            plate.ClampZones.Add(new ClampZone($"front-{i}", zones[i]));
+        var plate = RailPlate(out var zones);
         var drawing = RectDrawing(12, 6.1);
         var item = new NestItem { Drawing = drawing };
 
@@ -397,6 +389,43 @@ public class ClampZoneInteractiveFillTests
             (gap.Length >= 12 - 1e-6 && gap.Width >= 6.1 - 1e-6)
             || (gap.Length >= 6.1 - 1e-6 && gap.Width >= 12 - 1e-6));
         Assert.Contains(parts, part => part.BoundingBox.Bottom < zones[0].Top + Edge);
+    }
+
+    [Fact]
+    public void TheClampedRowLinesUpBetweenTheClamps()
+    {
+        // 8-wide parts on the clamp-blind grid straddle the clamps, and the gaps dropping them
+        // leaves fit at most one more. Refilled between the clamps, the front row holds two
+        // parts in each 18-wide space and four past the last clamp.
+        var plate = RailPlate(out var zones);
+        var unclamped = RailPlate(out _);
+        unclamped.ClampZones.Clear();
+        var item = new NestItem { Drawing = RectDrawing(8, 6.1) };
+        var demand = new List<NestItem> { item };
+
+        var parts = PlateFillService.FillDroppingClampHits(
+            (demanded, box, _) => PlateFillService.FillItem("Fill", unclamped, demanded, box,
+                null, CancellationToken.None),
+            plate, item, demand, plate.WorkArea(), null, CancellationToken.None);
+
+        AssertClearOfClamps(parts, zones);
+        var band = PlateFillService.ClampedEdgeBand(plate, plate.WorkArea());
+        Assert.Equal(12, parts.Count(part => part.BoundingBox.Bottom < band.Top));
+    }
+
+    /// <summary>A 120 x 60 sheet with four 1.5 x 0.625 front clamps 20 apart.</summary>
+    private static Plate RailPlate(out Box[] zones)
+    {
+        zones = new[] { 20.0, 40.0, 60.0, 80.0 }
+            .Select(x => new Box(x, 0, 1.5, 0.625)).ToArray();
+        var plate = new Plate(new Size(60, 120))
+        {
+            EdgeSpacing = new Spacing(Edge, Edge),
+            PartSpacing = PartSpacing,
+        };
+        for (var i = 0; i < zones.Length; i++)
+            plate.ClampZones.Add(new ClampZone($"front-{i}", zones[i]));
+        return plate;
     }
 
     private sealed class InlineProgress(System.Action<NestProgress> report) : System.IProgress<NestProgress>
