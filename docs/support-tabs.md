@@ -104,11 +104,17 @@ plate settings, so parts that need no tab are not tabbed.
 
 The emitter tabs a perimeter at its entry: the cut stops short of the entry by the tab size. A
 round perimeter, one circle, is cut as an arc that stops the tab's chord short of its entry.
-The lead-out leaves from where the cut stops. One that touches the lead-in, or passes within the
-kerf of it, would cut the tab free, so the emitter leaves it out and the cut ends at its tab. A
-line lead-out angled forward does that whenever its run along the edge is longer than the tab,
-as a 0.1 lead-out at 60 degrees (0.05 along the edge) beside a 0.03 tab does. This holds for every
-tabbed outside, support-tabbed or not.
+The lead-out leaves from where the cut stops, as configured; Plan Cutting never shortens or drops
+it. A line lead-out angled forward runs toward the lead-in whenever its run along the edge is
+longer than the tab, as a 0.1 lead-out at 60 degrees (0.05 along the edge) beside a 0.03 tab
+does on a counterclockwise outside, and can then cut the tab free. The strict search refuses
+such an entry and looks for another. Only when that refusal is all that stops a plan does Plan
+Cutting plan again keeping those lead-outs (`CuttingPlanSnapshot.WithTabLeadOuts`): each such
+part gets a `PostVerificationKind.TabLeadOut` warning (Plan Cutting's "Tab lead-out" issue), is
+treated as cut free for later rapids, and the plan is UNVERIFIED, so applying it needs explicit
+acceptance. A lead-out that would cut its tab is fixed in the cutting settings: shorten or turn
+it, or enlarge the tab. Programs judged as they are (locked, fixed or posted) keep the
+incomplete-check finding.
 A support-tabbed perimeter's automatic entries are therefore limited to catalog points the
 analysis accepts, plus the closest native point to its best tab point (`AutomaticEntryKind.SupportTab`,
 never on a reflex or cusp vertex). Ranking and lead checks are unchanged.
@@ -173,22 +179,20 @@ entry is only a preference: its other fitting entries clear of inside corners fo
 toward the next cut, in the search and in contour recovery (ranked steadiest first, the shortlist
 of a long strip resting on one line of contacts would all lie on its far side). A part boxed in
 by its neighbors, such as the upper of two strips nested in a cutout, can then be left toward the
-next cut instead of blocking the plan. It is still tabbed and still warned about as one that may
-tip. A part a tab can hold level keeps to its steadying entries.
+next cut instead of blocking the plan. It is still tabbed. A part a tab can hold level keeps to
+its steadying entries.
 
-Once cut, such a part may tip into the head's path, so Plan Cutting treats its tabbed outside as a
-rapid obstacle, closed across its tab gap, exactly as an untabbed part: no later rapid may cross
-it, and the search reorders around it (a row of long strips is cut after the parts beside them,
-each strip left toward the next). Parts their tab holds level stay crossable, as the retained
-material allows. The pre-post review does not read support settings for rapids, so it still
-checks rapid crossings against untabbed contours only.
+A tabbed part counts as steady wherever its tab is: the steadiest entries above are preferences,
+never a warning. No message says a tab cannot steady its part, and once cut a tabbed part stays
+crossable, as its retained material allows, whether or not its tab holds it level. The pre-post
+review does not read support settings for rapids, so it checks rapid crossings against untabbed
+contours only.
 
 A drawing pin on the perimeter wins: its entry, leads and tab are kept as pinned, and the
 analysis is only carried for review. Replay and best-effort plans (`SupportTabCapture.Review`)
-warn with `PostVerificationKind.PartSupport` whenever an unsupported part's emitted perimeter is
-untabbed or its entry does not steady the part: its pin has no tab or a tab elsewhere, no
-steadying entry had a lead-in that fits, or no single tab can steady it. Like every planner
-warning, this makes the proposal UNVERIFIED, so applying it needs explicit acceptance.
+warn with `PostVerificationKind.PartSupport` only when an unsupported part's emitted perimeter
+is untabbed, which happens when its pin has no tab. Like every planner warning, this makes the
+proposal UNVERIFIED, so applying it needs explicit acceptance.
 
 A planned tab that sits in an inside corner, because no lead-in fits clear of one, gets an
 advisory note instead (`SupportTabCapture.Notes`; never for a pin): a Ready plan keeps its
@@ -252,13 +256,14 @@ settings (its own, else the plate's) ask for support tabs and that needs one (th
 cannot hold it level or, by size, its width is in the size range) is checked, however its
 program was made. The tab is the gap between
 the end and the start of the program's outside cut (the chain of cutting motions with the
-largest extent). A part with no such gap, or whose gap does not steady it (by size,
-or for a part its tab alone holds, any gap does), gets a `PartSupport` warning at its center of gravity naming the best tab point; posting needs
-consent as for every warning. A part whose material cannot be read is reported as not checked.
+largest extent). A part with no such gap gets a `PartSupport` warning at its center of gravity
+naming the best tab point; posting needs consent as for every warning. Any gap counts as a tab
+that steadies the part, wherever it is. A part whose material cannot be read is reported as not
+checked.
 
 Not covered yet:
 
 - Locked or ineligible parts keep their programs in Plan Cutting; the pre-post review still
   checks them.
 - Only one perimeter tab per part. A part that needs more (one tab cannot reach the stability
-  margin) gets the best single tab and a warning.
+  margin) gets the best single tab, and no warning.

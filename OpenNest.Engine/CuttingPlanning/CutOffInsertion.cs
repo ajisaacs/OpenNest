@@ -58,7 +58,7 @@ internal static class CutOffInsertion
             var placement = planned[gap];
             states[gap + 1] = states[gap].Copy();
             states[gap + 1].Check(placement.Execution, arrivals[gap], placement.SourceOrdinal + 1,
-                placement.IsCutOff, placement.FixedMotions(placement.Execution), token);
+                placement.IsCutOff, placement.FixedMotions(placement.Execution), token, snapshot.WarnsTabLeadOuts(placement));
             arrivals[gap + 1] = placement.Execution.DeparturePoint;
         }
         var position = new Dictionary<int, int>();
@@ -91,7 +91,8 @@ internal static class CutOffInsertion
                     {
                         var next = planned[gap];
                         var findings = states[gap].Copy().Check(next.Execution, cut.Execution.DeparturePoint,
-                            next.SourceOrdinal + 1, next.IsCutOff, next.FixedMotions(next.Execution), token).Strict;
+                            next.SourceOrdinal + 1, next.IsCutOff, next.FixedMotions(next.Execution), token,
+                            snapshot.WarnsTabLeadOuts(next)).Strict;
                         if (findings.Count != 0)
                             continue;
                     }

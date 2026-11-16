@@ -37,10 +37,10 @@ var result = CuttingPlanService.Plan(snapshot, cancellationToken);
 - `preservePartOrder` fixes whole-part order, not eligible internal contour choices.
 - With `CuttingParameters.SupportTabs` and a support bed (`CuttingPlanRequest.SupportBed`,
   the plate's own under `ForPlate`), each regenerated part the bed cannot hold level gets a
-  tabbed perimeter whose automatic entries keep to points where the tab steadies it. A tab
-  that still cannot hold its part level, or sits in an inside corner, is noted on the plan
-  without changing its status. A part no single tab can hold level may tip once cut, so its
-  tabbed outside is a rapid obstacle from then on, like an untabbed one. A part no longer than `TabHeldMaxLength` is held by its tab
+  tabbed perimeter whose automatic entries prefer points where the tab steadies it. A tabbed
+  part counts as steady wherever its tab is: it is never warned about and stays crossable once
+  cut. A tab in an inside corner is noted on the plan without changing its status. A part no
+  longer than `TabHeldMaxLength` is held by its tab
   alone, so any tab clear of inside corners steadies it. Without a bed, or with
   `CuttingParameters.TabBySize`, the parts whose width is in `TabSizeMinWidth`..`TabSizeMaxWidth`
   are tabbed instead, and with no range set the plan notes that nothing was tabbed; see

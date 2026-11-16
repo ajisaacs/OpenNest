@@ -36,7 +36,7 @@ internal static class RaisedRapids
             var execution = ExecutionMotionReader.Read(program, proposal.Location, position, token);
             var placement = proposal;
             var rapids = proposal.Prepared == null || proposal.IsCutOff ? []
-                : Crossing(checker.Copy(), proposal, execution, position, token);
+                : Crossing(checker.Copy(), proposal, execution, position, snapshot.WarnsTabLeadOuts(proposal), token);
             if (rapids.Count != 0)
             {
                 var raised = HeadRaise.Mark(program, rapids);
@@ -44,7 +44,7 @@ internal static class RaisedRapids
                 placement = proposal.Propose(raised, execution, proposal.ContourChoices, token);
             }
             checker.Check(execution, position, proposal.SourceOrdinal + 1, proposal.IsCutOff,
-                proposal.FixedMotions(execution), token);
+                proposal.FixedMotions(execution), token, snapshot.WarnsTabLeadOuts(proposal));
             marked.Add(placement);
             position = execution.DeparturePoint;
         }
@@ -54,10 +54,11 @@ internal static class RaisedRapids
     // The own-code indices of the planner's rapids that cross parts already cut: the rapid itself,
     // or the call of the sub-program the rapid arrives at.
     private static HashSet<int> Crossing(ReleasedContourState checker, FixedProgramPlacement proposal,
-        OwnedExecution execution, Vector arrival, CancellationToken token)
+        OwnedExecution execution, Vector arrival, bool tabLeadOuts, CancellationToken token)
     {
         var isFixed = proposal.FixedMotions(execution);
-        var strict = checker.Check(execution, arrival, proposal.SourceOrdinal + 1, false, isFixed, token).Strict;
+        var strict = checker.Check(execution, arrival, proposal.SourceOrdinal + 1, false, isFixed, token,
+            tabLeadOuts).Strict;
         var codes = new HashSet<int>();
         foreach (var finding in strict)
         {

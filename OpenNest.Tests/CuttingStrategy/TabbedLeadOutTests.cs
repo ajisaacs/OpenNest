@@ -9,18 +9,19 @@ namespace OpenNest.Tests.CuttingStrategy;
 /// <summary>
 /// A tab trims the perimeter short of its entry, so the lead-out leaves from where the
 /// trimmed cut actually ends. Generating it from the nominal entry emitted an arc whose
-/// start was off its own radius. A lead-out that would reach the lead-in across the tab gap
-/// would cut the tab free, so the cut then stops at its tab with no lead-out.
+/// start was off its own radius.
 /// </summary>
 public class TabbedLeadOutTests
 {
     private const double TabSize = 0.2;
     private const double LeadRadius = 0.2;
 
-    [Fact]
-    public void ArcLeadOut_LeavesTangentlyFromTheTrimmedCutEnd()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ArcLeadOut_LeavesTangentlyFromTheTrimmedCutEnd(bool reversed)
     {
-        var execution = Emit(ExplicitContourTests.Square(false), new Vector(-2, 5),
+        var execution = Emit(ExplicitContourTests.Square(reversed), new Vector(-2, 5),
             new ArcLeadOut { Radius = LeadRadius }, tabs: true);
         var (cuts, leadout) = Split(execution);
 
@@ -30,63 +31,9 @@ public class TabbedLeadOutTests
         Assert.Equal(end, leadout.Start!.Value);
         var arc = Assert.IsType<Arc>(leadout.Curve.ToEntity());
         Assert.Equal(LeadRadius, arc.Radius, 9);
-        // Centered on the actual end's outward normal, so it touches the edge only where it starts.
+        // Centerd on the actual end's outward normal, so it touches the edge only where it starts.
         Assert.Equal(-LeadRadius, arc.Center.X, 9);
         Assert.Equal(end.Y, arc.Center.Y, 9);
-    }
-
-    [Fact]
-    public void ArcLeadOut_ThatWouldCrossTheLeadIn_IsLeftOut()
-    {
-        // Wound the other way, the arc runs forward over the tab gap and through the lead-in.
-        var execution = Emit(ExplicitContourTests.Square(true), new Vector(-2, 5),
-            new ArcLeadOut { Radius = LeadRadius }, tabs: true);
-
-        var cuts = execution.Motions.Where(m => m.Layer == LayerType.Display && !m.Rapid).ToArray();
-        Assert.Equal(TabSize, System.Math.Abs(cuts[^1].End.Y - 5), 9);
-        Assert.DoesNotContain(execution.Motions, m => m.Layer == LayerType.Leadout);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void LineLeadOut_AngledIntoASmallTab_IsLeftOutOnlyWhenItWouldCrossTheLeadIn(bool reversed)
-    {
-        // A strip tabbed for support with 60 degree leads and a tab shorter than the lead-out's
-        // forward run: wound one way the lead-out angles away from the tab, the other way it
-        // crosses the lead-in and would cut the tab free.
-        var clean = new Program(Mode.Absolute);
-        if (reversed)
-        {
-            clean.MoveTo(0, 0); clean.LineTo(11.8, 0); clean.LineTo(11.8, 3.8); clean.LineTo(0, 3.8); clean.LineTo(0, 0);
-        }
-        else
-        {
-            clean.MoveTo(0, 0); clean.LineTo(0, 3.8); clean.LineTo(11.8, 3.8); clean.LineTo(11.8, 0); clean.LineTo(0, 0);
-        }
-        var parameters = new CuttingParameters
-        {
-            Kerf = 0.014,
-            ExternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 60 },
-            ExternalLeadOut = new LineLeadOut { Length = 0.1, ApproachAngle = 60 },
-            InternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 60 },
-            InternalLeadOut = new NoLeadOut(),
-            TabsEnabled = true,
-            TabConfig = new NormalTab { Size = 0.03 },
-        };
-        var emitted = new ContourCuttingStrategy { Parameters = parameters }.Apply(clean, new Vector(5, -2));
-        var execution = ExecutionMotionReader.Read(emitted.Program, Vector.Zero, null, default);
-
-        var leadIn = Assert.Single(execution.Motions.Where(m => m.Layer == LayerType.Leadin));
-        var leadOuts = execution.Motions.Where(m => m.Layer == LayerType.Leadout).ToArray();
-        if (reversed)
-            Assert.Empty(leadOuts);
-        else
-        {
-            var leadOut = Assert.Single(leadOuts);
-            Assert.False(new Line(leadIn.Start!.Value, leadIn.End).Intersects(new Line(leadOut.Start!.Value, leadOut.End)));
-        }
-        Assert.Empty(new ReleasedContourState().Check(execution, new Vector(5, -2), 1));
     }
 
     [Fact]
@@ -137,20 +84,30 @@ public class TabbedLeadOutTests
         Assert.Equal(5, arc.Center.Y, 9);
     }
 
-    [Fact]
-    public void LineLeads_TabWrappingAFilletedCorner_ShareTheCornerBisector()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LineLeads_TabWrappingAFilletedCorner_ShareTheCornerBisector(bool reversed)
     {
         // Entered at the fillet joint the tab trims back around: on its own edge's normal the
         // lead-in and lead-out would sit 150 degrees apart, not the 60 degree V of a straight edge.
         const double fillet = 0.015;
         const double tab = 0.03;
         var clean = new Program(Mode.Absolute);
-        clean.MoveTo(0, 0); clean.LineTo(0, 10 - fillet);
-        clean.ArcTo(fillet, 10, fillet, 10 - fillet, RotationType.CW);
-        clean.LineTo(10, 10); clean.LineTo(10, 0); clean.LineTo(0, 0);
+        if (reversed)
+        {
+            clean.MoveTo(fillet, 10); clean.ArcTo(0, 10 - fillet, fillet, 10 - fillet, RotationType.CCW);
+            clean.LineTo(0, 0); clean.LineTo(10, 0); clean.LineTo(10, 10); clean.LineTo(fillet, 10);
+        }
+        else
+        {
+            clean.MoveTo(0, 0); clean.LineTo(0, 10 - fillet);
+            clean.ArcTo(fillet, 10, fillet, 10 - fillet, RotationType.CW);
+            clean.LineTo(10, 10); clean.LineTo(10, 0); clean.LineTo(0, 0);
+        }
         var part = new Part(new Drawing("tabbed-fillet", clean));
         var perimeter = LeadInTestHelpers.Profile(part).Perimeter;
-        var entry = new Vector(fillet, 10);
+        var entry = reversed ? new Vector(0, 10 - fillet) : new Vector(fillet, 10);
         var entity = perimeter.Entities.OfType<Line>().First(l => l.StartPoint.DistanceTo(entry) < 1e-9);
         var parameters = new CuttingParameters
         {
@@ -168,42 +125,12 @@ public class TabbedLeadOutTests
         LeadInTestHelpers.AssertPoint(entry, leadIn.EndPoint);
         Assert.Equal(tab, leadOut.StartPoint.DistanceTo(entry), 9);
         // The cut stops on the other edge, past the corner.
-        Assert.Equal(0, leadOut.StartPoint.X, 9);
+        Assert.Equal(0, reversed ? 10 - leadOut.StartPoint.Y : leadOut.StartPoint.X, 9);
 
         const double bisector = 3 * System.Math.PI / 4;
         var spread = OpenNest.Math.Angle.ToRadians(30);
         LeadInTestHelpers.AssertPoint(entry + Polar(0.15, bisector - spread), leadIn.StartPoint);
         LeadInTestHelpers.AssertPoint(leadOut.StartPoint + Polar(0.1, bisector + spread), leadOut.EndPoint);
-    }
-
-    [Fact]
-    public void LineLeads_TabWrappingAFilletedCornerTheOtherWay_LeaveOutTheLeadOutThatCrossesTheLeadIn()
-    {
-        // Wound the other way, the shared bisector puts the lead-out across the lead-in.
-        const double fillet = 0.015;
-        var clean = new Program(Mode.Absolute);
-        clean.MoveTo(fillet, 10); clean.ArcTo(0, 10 - fillet, fillet, 10 - fillet, RotationType.CCW);
-        clean.LineTo(0, 0); clean.LineTo(10, 0); clean.LineTo(10, 10); clean.LineTo(fillet, 10);
-        var part = new Part(new Drawing("tabbed-fillet", clean));
-        var perimeter = LeadInTestHelpers.Profile(part).Perimeter;
-        var entry = new Vector(0, 10 - fillet);
-        var entity = perimeter.Entities.OfType<Line>().First(l => l.StartPoint.DistanceTo(entry) < 1e-9);
-        var parameters = new CuttingParameters
-        {
-            ExternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 60 },
-            ExternalLeadOut = new LineLeadOut { Length = 0.1, ApproachAngle = 60 },
-            TabsEnabled = true,
-            TabConfig = new NormalTab { Size = 0.03 },
-        };
-
-        part.ApplySingleLeadIn(parameters, entry, entity, ContourType.External);
-
-        var geometry = part.Program.ToGeometry();
-        var leadIn = Assert.IsType<Line>(Assert.Single(geometry.Where(e => e.Layer == SpecialLayers.Leadin)));
-        LeadInTestHelpers.AssertPoint(entry, leadIn.EndPoint);
-        LeadInTestHelpers.AssertPoint(entry + Polar(0.15, 3 * System.Math.PI / 4 - OpenNest.Math.Angle.ToRadians(30)),
-            leadIn.StartPoint);
-        Assert.DoesNotContain(geometry, e => e.Layer == SpecialLayers.Leadout);
     }
 
     private static Vector Polar(double length, double angle) =>

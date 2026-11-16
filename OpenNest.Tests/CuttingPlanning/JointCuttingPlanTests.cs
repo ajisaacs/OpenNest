@@ -315,21 +315,29 @@ public class JointCuttingPlanTests
     }
 
     [Fact]
-    public void TabbedArcCandidate_LeadOutThatWouldCutTheTab_IsLeftOutAndPlanned()
+    public void TabbedArcCandidate_LeadOutThatMayCutTheTab_IsRefusedStrictlyThenKeptAndWarned()
     {
-        // The arc lead-out would run over the tab gap into the lead-in, so the cut stops at its tab.
+        // The arc lead-out runs over the tab gap into the lead-in. The strict search refuses it;
+        // planning then keeps the settings' lead-out and warns instead of changing it.
         var parameters = ExplicitContourTests.Parameters();
         parameters.TabsEnabled = true; parameters.TabConfig = new NormalTab { Size = 0.2 };
         parameters.ExternalLeadOut = new ArcLeadOut { Radius = 0.2 };
         var part = new Part(new Drawing("tabbed", LeadPathValidationTests.Rectangle(0, 0, 10, 10)));
-        var result = CuttingPlanService.Plan(new CuttingPlanRequest([part], new Vector(-2, 5), confirmedParameters: parameters));
-        Assert.Equal(CuttingPlanStatus.Ready, result.Status);
+        var request = new CuttingPlanRequest([part], new Vector(-2, 5), confirmedParameters: parameters);
+        var strict = JointCuttingPlanSearch.Run(CuttingPlanService.Capture(request), default);
+        Assert.Equal(CuttingPlanStatus.NoSolutionWithinBudget, strict.Status);
+        Assert.Contains(strict.Findings, f => f.Kind == PostVerificationKind.Incomplete && f.Message.Contains("retention gap"));
+
+        var result = CuttingPlanService.Plan(request);
+
+        Assert.Equal(CuttingPlanStatus.BestEffort, result.Status);
         Assert.True(result.IndependentlyReplayed);
-        Assert.DoesNotContain(Assert.Single(result.ProposedOrder).Execution.Motions, m => m.Layer == LayerType.Leadout);
+        Assert.Equal(PostVerificationKind.TabLeadOut, Assert.Single(result.Findings).Kind);
+        Assert.Contains(Assert.Single(result.ProposedOrder).Execution.Motions, m => m.Layer == LayerType.Leadout);
     }
 
     [Fact]
-    public void TabbedPerimeter_LeadOutCrossingItsLeadIn_IsRefusedAsCuttingTheRetentionGap()
+    public void TabbedPerimeter_LeadOutCrossingItsLeadIn_IsIncompleteUnlessEmittedFromSettings()
     {
         // Wound counterclockwise, entered at (0, 5) and stopped 0.2 short of it: the lead-out runs
         // forward over the tab gap and crosses the lead-in, cutting the tab free.
@@ -338,8 +346,20 @@ public class JointCuttingPlanTests
         program.Codes.Add(new LinearMove(0, 5) { Layer = LayerType.Leadin });
         program.LineTo(0, 0); program.LineTo(10, 0); program.LineTo(10, 10); program.LineTo(0, 10); program.LineTo(0, 5.2);
         program.Codes.Add(new LinearMove(-0.3, 4.9) { Layer = LayerType.Leadout });
-        var findings = new ReleasedContourState().Check(Read(program, Vector.Zero), Vector.Zero, 1);
+        var execution = Read(program, Vector.Zero);
+        var findings = new ReleasedContourState().Check(execution, Vector.Zero, 1);
         Assert.Contains(findings, f => f.Kind == PostVerificationKind.Incomplete && f.Message.Contains("retention gap"));
+
+        // Emitted from the settings, the lead-out is a warning and the part counts as cut free.
+        var checker = new ReleasedContourState(false);
+        var (strict, _, _, warnings) = checker.Check(execution, Vector.Zero, 1, false, null, default, settingsLeadOuts: true);
+        Assert.Empty(strict);
+        Assert.Equal(PostVerificationKind.TabLeadOut, Assert.Single(warnings).Kind);
+        var across = new Program(Mode.Absolute);
+        across.Codes.Add(new RapidMove(5, -1));
+        across.Codes.Add(new RapidMove(5, 11));
+        Assert.Contains(checker.Check(Read(across, Vector.Zero), new Vector(-0.3, 4.9), 2),
+            f => f.Kind == PostVerificationKind.RapidCrossing && f.Message.Contains("may cut its tab free"));
     }
 
     [Fact]

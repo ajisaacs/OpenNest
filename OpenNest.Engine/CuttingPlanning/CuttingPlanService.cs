@@ -292,6 +292,22 @@ public static class CuttingPlanService
     {
         var result = PlanCaptured(snapshot, token);
         result.Snapshot = snapshot;
+        // Refused only for configured lead-outs that may cut their tabs free: plan again keeping
+        // them as warnings, since the settings give no other lead-out. A clean plan always wins.
+        if (snapshot is { AcceptsTabLeadOuts: false, Regeneration: true }
+            && result.Status is CuttingPlanStatus.NoSolutionWithinBudget or CuttingPlanStatus.ConstraintConflict
+                or CuttingPlanStatus.UnsupportedGeometry
+            && result.Findings.Any(f => f.Kind == PostVerificationKind.Incomplete
+                && f.Message == ReleasedContourState.LeadOutRetentionMessage))
+        {
+            var relaxed = snapshot.WithTabLeadOuts();
+            var retry = PlanCaptured(relaxed, token);
+            if (retry.Status is CuttingPlanStatus.Ready or CuttingPlanStatus.BestEffort or CuttingPlanStatus.Canceled)
+            {
+                retry.Snapshot = relaxed;
+                return retry;
+            }
+        }
         return result;
     }
 
@@ -528,12 +544,14 @@ public static class CuttingPlanService
                     findings: [JointCuttingPlanSearch.Finding(source, PostVerificationKind.Incomplete, ex.Message)], expansions: expansions);
             }
             var isFixed = proposal.FixedMotions(execution);
-            var (strict, fixedFindings, raised) = checker.Check(execution, position, source.SourceOrdinal + 1,
-                source.IsCutOff, isFixed, token);
+            var (strict, fixedFindings, raised, tabLeadOuts) = checker.Check(execution, position,
+                source.SourceOrdinal + 1, source.IsCutOff, isFixed, token, snapshot.WarnsTabLeadOuts(source));
             raises.AddRange(RaisedRapids.Notes(snapshot, source, raised));
             raisedRapids += RaisedRapids.Count(raised);
             findings.AddRange(JointCuttingPlanSearch.Map(snapshot, strict));
             warnings.AddRange(fixedFindings.Select(f => FixedLeadWarnings.FromChecker(snapshot, source, f)));
+            // A configured lead-out that cuts its tab free is kept and reported, never refused.
+            warnings.AddRange(JointCuttingPlanSearch.Map(snapshot, tabLeadOuts));
             var fixedLeads = new List<FixedLeadFailure>();
             var lead = source.IsCutOff ? new LeadPathValidationResult(true, true, null)
                 : LeadPathValidator.Check(execution, source.Material, materials, isFixed, fixedLeads, token,

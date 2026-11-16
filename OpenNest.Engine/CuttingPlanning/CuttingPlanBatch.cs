@@ -264,7 +264,10 @@ public sealed class CuttingPlanBatch
             var first = CuttingPlanService.Plan(snapshot.WithSearchLimits(firstPassBudget, FirstPassEntries), token);
             // A replayed proposal whose only warnings are fixed emissions passed every strict
             // check; fixed emissions never steer the search, so the full pass cannot improve it.
+            // A plan keeping tab lead-outs is not taken from the short pass: the full pass may
+            // still find a clean route.
             if (first.IndependentlyReplayed && first.Status is CuttingPlanStatus.Ready or CuttingPlanStatus.BestEffort
+                    && !first.Findings.Any(f => f.Kind == PostVerificationKind.TabLeadOut)
                 || first.Status == CuttingPlanStatus.Canceled)
                 return first;
         }
@@ -510,16 +513,25 @@ public sealed class CuttingPlanProposal
     }
 
     // What an unverified plan whose motions all passed asks the operator to review: its fixed
-    // lead-ins, parts its support bed cannot hold level, or both.
+    // lead-ins, lead-outs that may cut their tabs free, parts its support bed cannot hold level.
     private static (string Headline, string Plate) Unverified(IEnumerable<CuttingPlanPlateResult> plates)
     {
         var kinds = plates.SelectMany(p => p.Result.Findings).Select(f => f.Kind).Where(k => k != null).ToHashSet();
-        return kinds.Count == 1 && kinds.Contains(PostVerificationKind.PartSupport)
-            ? ("a part may tip once cut free.", "a part may tip once cut free.")
-            : kinds.Contains(PostVerificationKind.PartSupport)
-                ? ("fixed lead-ins could not be certified, and a part may tip once cut free.",
-                    "fixed lead-ins need review, and a part may tip once cut free.")
-                : ("fixed lead-ins could not be certified.", "fixed lead-ins need review.");
+        var named = new[] { PostVerificationKind.TabLeadOut, PostVerificationKind.PartSupport };
+        var reasons = new List<(string Headline, string Plate)>();
+        if (kinds.Any(k => !named.Contains(k.Value)) || !kinds.Overlaps(named.Cast<PostVerificationKind?>()))
+            reasons.Add(("fixed lead-ins could not be certified", "fixed lead-ins need review"));
+        if (kinds.Contains(PostVerificationKind.TabLeadOut))
+            reasons.Add(("a lead-out may cut its tab free", "a lead-out may cut its tab free"));
+        if (kinds.Contains(PostVerificationKind.PartSupport))
+            reasons.Add(("a part may tip once cut free", "a part may tip once cut free"));
+        return (Join(reasons.Select(r => r.Headline)), Join(reasons.Select(r => r.Plate)));
+
+        static string Join(IEnumerable<string> parts)
+        {
+            var list = parts.ToList();
+            return (list.Count == 1 ? list[0] : string.Join(", ", list.Take(list.Count - 1)) + ", and " + list[^1]) + ".";
+        }
     }
 
     private static IEnumerable<string> DescribePlate(CuttingPlanPlateResult plate, string unit, string changeSettings)

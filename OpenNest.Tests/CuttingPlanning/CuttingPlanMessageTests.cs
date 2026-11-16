@@ -94,21 +94,26 @@ public class CuttingPlanMessageTests
         Assert.Same(program, part.Program);
     }
     [Fact]
-    public void Describe_OnlyAnUnsteadyPart_SaysItMayTipNotThatLeadsNeedReview()
+    public void Describe_OnlyTabLeadOuts_SaysALeadOutMayCutItsTabNotThatLeadsNeedReview()
     {
-        // Nothing of the grid runs under the strip, so no single tab can hold it level.
-        var plate = new Plate(20, 20) { SupportBed = new OpenNest.Support.SupportGrid(1, 1, 0, 0.9, stabilityMargin: 0.1) };
-        plate.Parts.Add(new Part(new Drawing("strip", LeadPathValidationTests.Rectangle(0, 0, 10, 0.8)), new Vector(2, 2)));
+        // Wound counterclockwise and support-tabbed, the strip's 60 degree lead-out runs past its
+        // 0.03 tab into the lead-in, at every entry.
+        var plate = new Plate(20, 20) { SupportBed = new OpenNest.Support.SupportGrid(2, 4, 0, 2.25, stabilityMargin: 0.1) };
+        var clean = new OpenNest.CNC.Program(OpenNest.CNC.Mode.Absolute);
+        clean.MoveTo(0, 0); clean.LineTo(10, 0); clean.LineTo(10, 1); clean.LineTo(0, 1); clean.LineTo(0, 0);
+        plate.Parts.Add(new Part(new Drawing("strip", clean), new Vector(2, 2)));
         var settings = ExplicitContourTests.Parameters();
         settings.SupportTabs = true;
-        settings.TabConfig = new NormalTab { Size = 0.2 };
+        settings.TabConfig = new NormalTab { Size = 0.03 };
+        settings.ExternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 60 };
+        settings.ExternalLeadOut = new LineLeadOut { Length = 0.1, ApproachAngle = 60 };
 
         var proposal = CuttingPlanBatch.Capture([plate], settings, false).Plan();
         var text = string.Join("\n", proposal.Describe("in"));
 
         Assert.True(proposal.RequiresWarningAcceptance, text);
-        Assert.StartsWith("Unverified plan available: a part may tip once cut free.", text);
-        Assert.Contains("Plate 1: unverified: a part may tip once cut free.", text);
+        Assert.StartsWith("Unverified plan available: a lead-out may cut its tab free.", text);
+        Assert.Contains("Plate 1: unverified: a lead-out may cut its tab free.", text);
         Assert.DoesNotContain("fixed lead-ins", text);
     }
 

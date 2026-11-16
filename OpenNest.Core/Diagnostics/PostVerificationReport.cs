@@ -58,7 +58,13 @@ public enum PostVerificationKind
     /// A common-line group (see docs/common-line-cutting.md) no longer shares its spans one kerf
     /// apart, was placed for another kerf, or a member's lead runs into its partner.
     /// </summary>
-    CommonLine
+    CommonLine,
+
+    /// <summary>
+    /// A tabbed outside's configured lead-out crosses its lead-in, or meets it past the tab gap, so
+    /// it may cut the tab free (see docs/support-tabs.md). The lead-out is kept as configured.
+    /// </summary>
+    TabLeadOut
 }
 
 /// <summary>Plate and part numbers are one-based; plate zero denotes a whole-post limitation.</summary>
@@ -116,6 +122,8 @@ public sealed class PostVerificationReport
             Summary(PostVerificationKind.EdgeSpacing, "Outside work area");
         if (Findings.Any(finding => finding.Kind == PostVerificationKind.CommonLine))
             Summary(PostVerificationKind.CommonLine, "Common lines");
+        if (Findings.Any(finding => finding.Kind == PostVerificationKind.TabLeadOut))
+            Summary(PostVerificationKind.TabLeadOut, "Tab lead-outs");
         foreach (var finding in Findings)
         {
             text.Append(finding.PlateNumber == 0 ? "Post processor" : $"Plate {finding.PlateNumber}");

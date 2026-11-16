@@ -46,7 +46,7 @@ internal static class SupportTabCapture
     /// <summary>
     /// A note for a planned support-tabbed part whose tab, at its perimeter entry, sits in an
     /// inside corner because no lead-in fits clear of one. Advisory: it never refuses or
-    /// downgrades a plan. A tab that cannot steady its part is <see cref="Review"/>'s warning.
+    /// downgrades a plan. A part cut with no tab at all is <see cref="Review"/>'s warning.
     /// </summary>
     internal static IEnumerable<CuttingPlanFinding> Notes(FixedProgramPlacement planned)
     {
@@ -64,9 +64,9 @@ internal static class SupportTabCapture
 
     /// <summary>
     /// A <see cref="PostVerificationKind.PartSupport"/> warning when a regenerated part its bed
-    /// cannot hold level is cut without a tab that keeps it level: its pin has no tab or a tab
-    /// elsewhere, no steadying entry had a lead-in that fits, or no single tab can steady it.
-    /// Null otherwise. Like other warnings it makes the proposal UNVERIFIED.
+    /// cannot hold level is cut with no tab at all: its drawing pin cuts its outside untabbed.
+    /// A tabbed part counts as steady wherever its tab is. Null otherwise. Like other warnings it
+    /// makes the proposal UNVERIFIED.
     /// </summary>
     internal static CuttingPlanFinding Review(FixedProgramPlacement source, IReadOnlyList<ContourChoice> choices)
     {
@@ -76,8 +76,7 @@ internal static class SupportTabCapture
         var perimeter = choices.FirstOrDefault(c => c.ContourOrdinal == prepared.PerimeterOrdinal);
         if (perimeter == null)
             return null;
-        var tab = perimeter.Point + prepared.SupportOrigin;
-        if (prepared.PerimeterTabbed && support.IsSteadiedByTabAt(tab))
+        if (prepared.PerimeterTabbed)
             return null;
         var part = source.SourceOrdinal + 1;
         var held = !support.HasBed
@@ -89,13 +88,7 @@ internal static class SupportTabCapture
             : support.Margin < 0
                 ? FormattableString.Invariant($"has its center of gravity {-support.Margin:0.####} outside its support contacts")
                 : FormattableString.Invariant($"has its center of gravity only {support.Margin:0.####} inside its support contacts");
-        var why = !prepared.PerimeterTabbed
-            ? $"drawing pin {prepared.PinNumberOf(prepared.PerimeterOrdinal)} cuts its outside without a tab"
-            : prepared.IsPinned(prepared.PerimeterOrdinal)
-                ? $"drawing pin {prepared.PinNumberOf(prepared.PerimeterOrdinal)} puts its tab where it does not steady the part"
-                : support.TabCanSupport
-                    ? "no lead-in fits at a point where its tab would steady the part"
-                    : "no single tab can steady it";
+        var why = $"drawing pin {prepared.PinNumberOf(prepared.PerimeterOrdinal)} cuts its outside without a tab";
         var needs = support.HasBed && !support.IsHeldByTab ? FormattableString.Invariant($" (needs {support.RequiredMargin:0.####})") : "";
         return new CuttingPlanFinding(source.SourceOrdinal, source.SourcePart, null, null,
             PostVerificationKind.PartSupport, $"Part {part} {held}{needs} and {why}; it may tip once cut free.");

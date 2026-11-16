@@ -99,7 +99,7 @@ public class CutoutLeadOutTests
     [Fact]
     public void ARaisedRapidOutOfASlugIsTheDesignedWayOut()
     {
-        var (strict, _, raised) = new ReleasedContourState()
+        var (strict, _, raised, _) = new ReleasedContourState()
             .Check(SlugExit(raised: true), Vector.Zero, 1, false, null, default);
 
         Assert.Empty(strict);
@@ -124,7 +124,7 @@ public class CutoutLeadOutTests
         program.Codes.Add(new RapidMove(4.2, 2));
         var execution = ExecutionMotionReader.Read(program, Vector.Zero, Vector.Zero, default);
 
-        var (_, _, raised) = new ReleasedContourState().Check(execution, Vector.Zero, 1, false, null, default);
+        var (_, _, raised, _) = new ReleasedContourState().Check(execution, Vector.Zero, 1, false, null, default);
 
         Assert.Contains(raised, f => f.Kind == PostVerificationKind.RapidCrossing);
     }

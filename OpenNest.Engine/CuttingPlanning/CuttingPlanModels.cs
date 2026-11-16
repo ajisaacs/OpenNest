@@ -87,23 +87,14 @@ public sealed class CuttingPlanSnapshot
         PreservePartOrder = preservePartOrder;
         MaxEntries = maxEntries;
         ExpansionObserver = expansionObserver;
-        tabMayNotHold = Placements
-            .Where(p => p.Prepared is { Support.TabCanSupport: false, PerimeterTabbed: true })
-            .Select(p => p.SourceOrdinal + 1).ToHashSet();
     }
 
-    // Part numbers (source ordinal + 1, as every checker is keyed) of support-tabbed parts that no
-    // single tab can steady.
-    private readonly HashSet<int> tabMayNotHold;
-
     /// <summary>
-    /// An empty rapid checker for this capture. A support-tabbed part no single tab can steady may
-    /// tip once cut, so its tabbed outside is an obstacle from then on, as an untabbed one is;
-    /// rapids may still cross parts their tab holds level.
+    /// An empty rapid checker for this capture. A tabbed part counts as steady once cut, so
+    /// rapids may cross it as its retained material allows.
     /// </summary>
     internal ReleasedContourState NewReleasedState() =>
-        new(reportMissingLeadIns: false, tabMayNotHold.Count == 0 ? null : tabMayNotHold.Contains,
-            CommonLineMembers.Count == 0 ? null : CommonLineMembers.Contains);
+        new(reportMissingLeadIns: false, null, CommonLineMembers.Count == 0 ? null : CommonLineMembers.Contains);
 
     /// <summary>
     /// Part numbers (source ordinal + 1) of the members of common-line groups cut once
@@ -154,7 +145,30 @@ public sealed class CuttingPlanSnapshot
             SupportTabsSkipped = SupportTabsSkipped,
             CommonLineMembers = CommonLineMembers,
             CommonLineOrder = CommonLineOrder,
+            AcceptsTabLeadOuts = AcceptsTabLeadOuts,
         };
+
+    /// <summary>
+    /// The same capture planned again accepting tab lead-outs: a regenerated tabbed outside whose
+    /// configured lead-out may cut its tab free is kept, warned about
+    /// (<see cref="PostVerificationKind.TabLeadOut"/>) and counted as cut free, instead of refused.
+    /// </summary>
+    internal CuttingPlanSnapshot WithTabLeadOuts() =>
+        new(Placements, StartPoint, ExpansionBudget, Failure, Findings, Regeneration,
+            PreservePartOrder, MaxEntries, ExpansionObserver, PlateState, OwnedParameters,
+            Dependencies, BestEffort)
+        {
+            SupportTabsSkipped = SupportTabsSkipped,
+            CommonLineMembers = CommonLineMembers,
+            CommonLineOrder = CommonLineOrder,
+            AcceptsTabLeadOuts = true,
+        };
+
+    /// <summary>Whether this capture accepts tab lead-outs (see <see cref="WithTabLeadOuts"/>).</summary>
+    internal bool AcceptsTabLeadOuts { get; init; }
+
+    /// <summary>Whether the checker may report <paramref name="placement"/>'s tab lead-outs as warnings.</summary>
+    internal bool WarnsTabLeadOuts(FixedProgramPlacement placement) => AcceptsTabLeadOuts && placement.Prepared != null;
 
     /// <summary>The same capture planned along its current part order.</summary>
     internal CuttingPlanSnapshot WithPreservedOrder() =>
@@ -165,6 +179,7 @@ public sealed class CuttingPlanSnapshot
             SupportTabsSkipped = SupportTabsSkipped,
             CommonLineMembers = CommonLineMembers,
             CommonLineOrder = CommonLineOrder,
+            AcceptsTabLeadOuts = AcceptsTabLeadOuts,
         };
 }
 

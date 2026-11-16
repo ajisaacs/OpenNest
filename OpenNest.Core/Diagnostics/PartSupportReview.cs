@@ -44,11 +44,11 @@ internal static class PartSupportReview
                 }
                 if (support.IsSupported)
                     continue;
-                var tab = OutsideTab(ExecutionMotionReader.Read(part.Program, part.Location, null, token));
-                if (tab is { } point && support.IsSteadiedByTabAt(point))
+                // A tabbed part counts as steady wherever its tab is.
+                if (OutsideTab(ExecutionMotionReader.Read(part.Program, part.Location, null, token)) != null)
                     continue;
                 findings.Add(new(PostVerificationKind.PartSupport, plateNumber, partNumber, null,
-                    Message(support, tab))
+                    Message(support))
                 { Location = support.CenterOfGravity });
             }
             catch (Exception exception) when (exception is ArgumentException or InvalidOperationException
@@ -100,32 +100,22 @@ internal static class PartSupportReview
         return (first + last) * 0.5;
     }
 
-    private static string Message(PartSupport support, Vector? tab)
+    private static string Message(PartSupport support)
     {
-        // Without a bed, or for a part its tab alone holds, any tab steadies the part, so the only
-        // failure is no tab at all.
-        if (!support.HasBed || support.IsHeldByTab)
-            return (support.HasBed
-                    ? FormattableString.Invariant(
-                        $"The part is {support.Length:0.####} long, short enough for its tab alone to hold, ")
-                    : FormattableString.Invariant(
-                        $"The part is {support.Width:0.####} wide, in the width range tabbed by size, "))
-                + "and it has no tab; it may tip once cut free."
-                + (support.BestTabPoint is { } suggested
-                    ? FormattableString.Invariant($" Tab it near ({suggested.X:0.####}, {suggested.Y:0.####}).")
-                    : "");
-        var held = support.Margin == double.NegativeInfinity
+        var held = !support.HasBed
+            ? FormattableString.Invariant($"is {support.Width:0.####} wide, in the width range tabbed by size,")
+            : support.IsHeldByTab
+            ? FormattableString.Invariant($"is {support.Length:0.####} long, short enough for its tab alone to hold,")
+            : support.Margin == double.NegativeInfinity
             ? "rests on no support contact"
             : support.Margin < 0
                 ? FormattableString.Invariant($"has its center of gravity {-support.Margin:0.####} outside its support contacts")
                 : FormattableString.Invariant($"has its center of gravity only {support.Margin:0.####} inside its support contacts");
-        var tabText = tab is { } point
-            ? FormattableString.Invariant($"its tab at ({point.X:0.####}, {point.Y:0.####}) does not steady it")
-            : "it has no tab";
-        var best = support.BestTabPoint is { } bestPoint && support.TabCanSupport
-            ? FormattableString.Invariant($" A tab near ({bestPoint.X:0.####}, {bestPoint.Y:0.####}) would.")
-            : " No single tab can steady it.";
-        return FormattableString.Invariant($"The part {held} (needs {support.RequiredMargin:0.####}) and {tabText}; ")
-            + "it may tip once cut free." + best;
+        var needs = support.HasBed && !support.IsHeldByTab
+            ? FormattableString.Invariant($" (needs {support.RequiredMargin:0.####})") : "";
+        return $"The part {held}{needs} and it has no tab; it may tip once cut free."
+            + (support.BestTabPoint is { } suggested
+                ? FormattableString.Invariant($" Tab it near ({suggested.X:0.####}, {suggested.Y:0.####}).")
+                : "");
     }
 }

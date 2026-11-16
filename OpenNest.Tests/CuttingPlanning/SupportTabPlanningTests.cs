@@ -92,7 +92,7 @@ public class SupportTabPlanningTests
     }
 
     [Fact]
-    public void BlockedSteadyingSide_TabsTheSteadiestEntryThatFitsAndReportsIt()
+    public void BlockedSteadyingSide_TabsTheSteadiestEntryThatFits()
     {
         // Only the middle of the top edge steadies the strip by 0.2. Parts 0.1 above it and beside
         // its upper half leave no room for a lead-in there or at its top corners.
@@ -105,7 +105,8 @@ public class SupportTabPlanningTests
         var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(7, 0),
             confirmedParameters: Parameters()));
 
-        Assert.True(result.Status == CuttingPlanStatus.BestEffort, string.Join("\n", result.Findings.Select(f => f.Message)));
+        // Tabbed, the strip counts as steady even where its tab cannot hold it level.
+        Assert.True(result.Status == CuttingPlanStatus.Ready, string.Join("\n", result.Findings.Select(f => f.Message)));
         var proposal = result.ProposedOrder.Single(p => ReferenceEquals(p.SourcePart, strip));
         var (entry, cutEnd) = EntryAndCutEnd(proposal);
         Assert.Equal(TabSize, entry.DistanceTo(cutEnd), 6);
@@ -115,13 +116,11 @@ public class SupportTabPlanningTests
         Assert.True(entry.Y > 2.5 - 1e-9, $"entry {entry}");
         Assert.True(support.MarginWith(entry) > support.MarginWith(new Vector(12, 2)), $"entry {entry}");
         Assert.False(support.HoldsLevelWithTabAt(entry));
-        Assert.Contains(result.Findings, f => ReferenceEquals(f.SourcePart, strip)
-            && f.Kind == PostVerificationKind.PartSupport
-            && f.Message.Contains("no lead-in fits at a point where its tab would steady the part"));
+        Assert.DoesNotContain(result.Findings, f => f.Kind == PostVerificationKind.PartSupport);
     }
 
     [Fact]
-    public void PartNoSingleTabCanHold_IsTabbedAndReported()
+    public void PartNoSingleTabCanHold_IsTabbedWithoutAWarning()
     {
         // The grid's rows run either side of the strip: nothing under it, so one tab can only balance it.
         var bed = new SupportGrid(1, 1, 0, 0.9, stabilityMargin: 0.1);
@@ -132,13 +131,10 @@ public class SupportTabPlanningTests
         var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(0, 0),
             confirmedParameters: Parameters()));
 
-        Assert.Equal(CuttingPlanStatus.BestEffort, result.Status);
+        Assert.True(result.Status == CuttingPlanStatus.Ready, string.Join("\n", result.Findings.Select(f => f.Message)));
         var (entry, cutEnd) = EntryAndCutEnd(Assert.Single(result.ProposedOrder));
         Assert.Equal(TabSize, entry.DistanceTo(cutEnd), 6);
-        var warning = Assert.Single(result.Findings);
-        Assert.Same(strip, warning.SourcePart);
-        Assert.Equal(PostVerificationKind.PartSupport, warning.Kind);
-        Assert.Contains("no single tab can steady it", warning.Message);
+        Assert.DoesNotContain(result.Findings, f => f.Kind == PostVerificationKind.PartSupport);
     }
 
     [Fact]
@@ -160,6 +156,39 @@ public class SupportTabPlanningTests
         Assert.Equal(TabSize, entry.DistanceTo(cutEnd), 6);
         var motions = ExecutionMotionReader.Read(proposal.CopyProgram(), proposal.Location, null, default).Motions;
         Assert.Equal(LayerType.Leadout, motions[^1].Layer);
+    }
+
+    [Fact]
+    public void StripWhoseLeadOutMayCutItsTab_KeepsTheLeadOutAndWarns()
+    {
+        // Wound counterclockwise, every entry's 60 degree lead-out runs 0.05 along the edge, past
+        // the 0.03 tab, into the lead-in. The settings' lead-out is kept as configured and the
+        // plan is unverified, with a warning on the part.
+        var bed = new SupportGrid(2, 4, 0, 2.25, stabilityMargin: 0.1);
+        var plate = new Plate(20, 20) { SupportBed = bed };
+        var clean = new Program(Mode.Absolute);
+        clean.MoveTo(0, 0); clean.LineTo(10, 0); clean.LineTo(10, 1); clean.LineTo(0, 1); clean.LineTo(0, 0);
+        plate.Parts.Add(new Part(new Drawing("strip", clean), new Vector(2, 2)));
+        var parameters = Parameters();
+        parameters.Kerf = 0.014;
+        parameters.TabConfig = new NormalTab { Size = 0.03 };
+        parameters.ExternalLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 60 };
+        parameters.ExternalLeadOut = new LineLeadOut { Length = 0.1, ApproachAngle = 60 };
+
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(0, 0),
+            confirmedParameters: parameters));
+
+        Assert.Equal(CuttingPlanStatus.BestEffort, result.Status);
+        Assert.True(result.IndependentlyReplayed);
+        var warning = Assert.Single(result.Findings);
+        Assert.Equal(PostVerificationKind.TabLeadOut, warning.Kind);
+        var proposal = Assert.Single(result.ProposedOrder);
+        var (entry, cutEnd) = EntryAndCutEnd(proposal);
+        Assert.Equal(0.03, entry.DistanceTo(cutEnd), 6);
+        var motions = ExecutionMotionReader.Read(proposal.CopyProgram(), proposal.Location, null, default).Motions;
+        var leadOut = motions[^1];
+        Assert.Equal(LayerType.Leadout, leadOut.Layer);
+        Assert.Equal(0.1, leadOut.Start!.Value.DistanceTo(leadOut.End), 6);
     }
 
     // A 10 x 0.8 strip with a 9 x 0.4 slot near its bottom edge: no rapid from its top edge
@@ -189,12 +218,11 @@ public class SupportTabPlanningTests
         var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(0, 0),
             confirmedParameters: Parameters(), preservePartOrder: true));
 
-        Assert.True(result.Status == CuttingPlanStatus.BestEffort, string.Join("\n", result.Findings.Select(f => f.Message)));
+        Assert.True(result.Status == CuttingPlanStatus.Ready, string.Join("\n", result.Findings.Select(f => f.Message)));
         var (entry, cutEnd) = EntryAndCutEnd(result.ProposedOrder.Single(p => ReferenceEquals(p.SourcePart, slotted)));
         Assert.Equal(TabSize, entry.DistanceTo(cutEnd), 6);
         Assert.True(entry.Y < 2.4, $"entry {entry}");
-        Assert.Contains(result.Findings, f => ReferenceEquals(f.SourcePart, slotted)
-            && f.Kind == PostVerificationKind.PartSupport && f.Message.Contains("no single tab can steady it"));
+        Assert.DoesNotContain(result.Findings, f => f.Kind == PostVerificationKind.PartSupport);
     }
 
     // A 0.8 x 10 upright strip at x 4..4.8 between squares cut before and after it on either side.
@@ -212,32 +240,26 @@ public class SupportTabPlanningTests
     }
 
     [Theory]
-    // No grid column runs under the strip: no single tab can hold it, so once cut it may tip.
+    // No grid column runs under the strip: no single tab can hold it level, yet tabbed it counts as steady.
     [InlineData(0.9, false)]
-    // A column runs under it, off its center line: its tab holds it level, so it stays crossable.
+    // A column runs under it, off its center line: its tab holds it level.
     [InlineData(0.25, true)]
-    public void PartNoSingleTabCanHold_IsNotCrossedOnceCut(double columnOffset, bool crossable)
+    public void TabbedPart_StaysCrossableOnceCut_WhetherOrNotItsTabHoldsItLevel(double columnOffset, bool holdsLevel)
     {
         var bed = new SupportGrid(1, 1, columnOffset, 0, stabilityMargin: 0.1);
         var (plate, strip) = StripBetweenSquares(bed);
         var support = SupportAnalyzer.Analyze(bed, plate.Quadrant, strip);
         Assert.False(support.IsSupported);
-        Assert.Equal(crossable, support.TabCanSupport);
+        Assert.Equal(holdsLevel, support.TabCanSupport);
 
         var kept = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(0, 0),
             confirmedParameters: Parameters(), preservePartOrder: true));
         var free = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(0, 0),
             confirmedParameters: Parameters()));
 
-        Assert.Equal(crossable, kept.ProposedOrder.Count != 0);
-        Assert.True(free.ProposedOrder.Count == plate.Parts.Count,
-            string.Join("\n", free.Findings.Select(f => f.Message)));
+        Assert.True(kept.Status == CuttingPlanStatus.Ready, string.Join("\n", kept.Findings.Select(f => f.Message)));
+        Assert.True(free.Status == CuttingPlanStatus.Ready, string.Join("\n", free.Findings.Select(f => f.Message)));
         Assert.True(free.IndependentlyReplayed);
-        if (crossable)
-            return;
-        // Free to reorder, the squares on the strip's left side are both cut before it.
-        var stripAt = free.ProposedOrder.ToList().FindIndex(p => ReferenceEquals(p.SourcePart, strip));
-        Assert.All(free.ProposedOrder.Skip(stripAt + 1), p => Assert.True(p.Location.X > 5, $"{p.Location} after the strip"));
     }
 
     [Fact]

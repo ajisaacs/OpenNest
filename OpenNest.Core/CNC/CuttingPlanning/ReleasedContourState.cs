@@ -24,6 +24,11 @@ public sealed class ReleasedContourState
     private int partContours;
     private bool partClosed;
 
+    /// <summary>Why a lead-out after an open cut is refused when the open-cut proof cannot clear it.</summary>
+    internal const string LeadOutRetentionMessage =
+        "A lead-out follows an open cutting contour and may cut through its retention gap. "
+        + "Rapid safety for that contour requires manual review.";
+
     public ReleasedContourState() : this(true) { }
 
     /// <param name="reportMissingLeadIns">Keep pre-post warnings by default. Planning
@@ -69,8 +74,17 @@ public sealed class ReleasedContourState
     /// being open, never become obstacles.
     /// </summary>
     public IReadOnlyList<PostVerificationFinding> Check(OwnedExecution execution, Vector? arrival,
-        int partNumber, bool cutoff, CancellationToken token = default) =>
-        Check(execution, arrival, partNumber, cutoff, null, token).Strict;
+        int partNumber, bool cutoff, CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(execution);
+        if (arrival is { } point)
+            PostVerificationGeometry.Validate(point);
+        var moves = execution.Motions.ToArray();
+        moves[0] = moves[0].WithStart(arrival);
+        var findings = new List<PostVerificationFinding>();
+        AnalyzeMoves(moves, cutoff, findings, 1, partNumber, token, fixedFindings: new(), raisedFindings: new());
+        return findings.AsReadOnly();
+    }
 
     /// <summary>
     /// As <see cref="Check(OwnedExecution, Vector?, int, bool, CancellationToken)"/>, but a
@@ -78,11 +92,15 @@ public sealed class ReleasedContourState
     /// returned apart: a fixed emission is accepted as given and only reported. The checker
     /// state advances exactly as it would without ownership. Crossings made by a rapid with the
     /// head raised are returned apart as well, as Raised: they are the raise's reason, not a fault.
+    /// With <paramref name="settingsLeadOuts"/>, the program was emitted from the cutting settings:
+    /// a lead-out no fixed emission owns that may cut its tabbed outside free is returned apart as
+    /// Warnings (<see cref="PostVerificationKind.TabLeadOut"/>), kept as configured and reported,
+    /// and the part then counts as cut free. Otherwise such a lead-out stays an incomplete check.
     /// </summary>
     internal (IReadOnlyList<PostVerificationFinding> Strict, IReadOnlyList<PostVerificationFinding> Fixed,
-        IReadOnlyList<PostVerificationFinding> Raised) Check(
+        IReadOnlyList<PostVerificationFinding> Raised, IReadOnlyList<PostVerificationFinding> Warnings) Check(
         OwnedExecution execution, Vector? arrival, int partNumber, bool cutoff, Func<int, bool> isFixed,
-        CancellationToken token)
+        CancellationToken token, bool settingsLeadOuts = false)
     {
         ArgumentNullException.ThrowIfNull(execution);
         if (arrival is { } point)
@@ -92,9 +110,10 @@ public sealed class ReleasedContourState
         var findings = new List<PostVerificationFinding>();
         var fixedFindings = new List<PostVerificationFinding>();
         var raisedFindings = new List<PostVerificationFinding>();
+        var warnings = new List<PostVerificationFinding>();
         AnalyzeMoves(moves, cutoff, findings, 1, partNumber, token, isFixed, fixedFindings,
-            raisedFindings: raisedFindings);
-        return (findings.AsReadOnly(), fixedFindings.AsReadOnly(), raisedFindings.AsReadOnly());
+            raisedFindings: raisedFindings, warnings: settingsLeadOuts ? warnings : null);
+        return (findings.AsReadOnly(), fixedFindings.AsReadOnly(), raisedFindings.AsReadOnly(), warnings.AsReadOnly());
     }
 
     /// <summary>
@@ -120,10 +139,13 @@ public sealed class ReleasedContourState
         return partClosed ? findings.AsReadOnly() : null;
     }
 
+    // warnings: where a configured lead-out that may cut its tabbed outside free is reported (see
+    // Check); without it, as for programs judged as they are, it stays an incomplete check.
     internal void AnalyzeMoves(IReadOnlyList<ExecutionMotion> moves, bool cutoff,
         List<PostVerificationFinding> findings, int plate, int part, CancellationToken token,
         Func<int, bool> isFixed = null, List<PostVerificationFinding> fixedFindings = null,
-        int contoursBefore = 0, List<PostVerificationFinding> raisedFindings = null)
+        int contoursBefore = 0, List<PostVerificationFinding> raisedFindings = null,
+        List<PostVerificationFinding> warnings = null)
     {
         var current = new CutGroup();
         var unfinished = new List<CutGroup>();
@@ -135,6 +157,8 @@ public sealed class ReleasedContourState
         var leadIns = new List<PostVerificationGeometry.Curve>();
         CutGroup previous = null;
         var deferred = new List<(List<PostVerificationFinding> Target, int Index, PostVerificationFinding Finding)>();
+        // The lead-outs those findings withheld, with the cut each was added to.
+        var deferredLeadOuts = new List<(CutGroup Group, PostVerificationGeometry.Curve Curve, bool Fixed)>();
         var hasLead = false;
         var contourNumber = contoursBefore;
         var inBreakCut = false;
@@ -218,6 +242,8 @@ public sealed class ReleasedContourState
                         obstacle.Part, (move.HeadRaised ? "Head-raised" : "Direct") + " XY rapid crosses or touches "
                         + (obstacle.TabMayNotHold
                             ? $"the tabbed outside of part {obstacle.Part}, which its tab may not hold level."
+                            : obstacle.TabCutFree
+                            ? $"the tabbed outside of part {obstacle.Part}, whose lead-out may cut its tab free."
                             : $"completed untabbed contour {obstacle.Contour} of part {obstacle.Part}."))
                     {
                         Location = (start + move.End) * 0.5,
@@ -246,9 +272,10 @@ public sealed class ReleasedContourState
                 {
                     // Withheld until the part ends, where the open-cut proof may show it cuts no gap.
                     if (current.Curves.Count > 0 && !PostVerificationGeometry.Closed(current.Curves))
-                        Defer(new(PostVerificationKind.Incomplete, plate, part, null,
-                            "A lead-out follows an open cutting contour and may cut through its retention gap. " +
-                            "Rapid safety for that contour requires manual review."), owned);
+                    {
+                        Defer(new(PostVerificationKind.Incomplete, plate, part, null, LeadOutRetentionMessage), owned);
+                        deferredLeadOuts.Add((previous ?? loose, move.Curve, owned));
+                    }
                     (previous ?? loose).Leads.Add(move.Curve);
                     if (previous != null && ReferenceEquals(previous, lastClosed))
                     {
@@ -323,6 +350,21 @@ public sealed class ReleasedContourState
                 && OpenCutsEncloseNothing(closed, unfinished
                     .Concat(otherOpen.Where(group => !CutsOnlySlug(group, closed, unfinished, token)))
                     .Append(loose).ToList(), token));
+        // A tabbed outside whose configured lead-out the proof cannot clear: the lead-out may run
+        // over the tab gap into the lead-in and cut the part free. The lead-out is kept as
+        // configured and reported, and the part counts as cut free from here on.
+        var cutFree = warnings != null && !retained && !cutoff && !member && unfinished.Count == 1
+            && deferredLeadOuts.Count > 0 && !deferredLeadOuts.Any(lead => lead.Fixed) && !unfinished[0].Fixed
+            && IsOutside(unfinished[0], closed);
+        if (cutFree)
+        {
+            deferred.Clear();
+            warnings.Add(new(PostVerificationKind.TabLeadOut, plate, part, null,
+                "The lead-out of this tabbed outside runs past its tab gap toward the lead-in and may cut the "
+                + "tab free, so the part is treated as cut free. Shorten or turn the lead-out, or enlarge the tab, "
+                + "to keep the part in the sheet.")
+            { Location = deferredLeadOuts[0].Curve.Start });
+        }
         for (var i = deferred.Count - 1; i >= 0 && !retained; i--)
             deferred[i].Target.Insert(deferred[i].Index, deferred[i].Finding);
         // Only one open fragment per part can be the planner's own certified tab, so a
@@ -349,13 +391,13 @@ public sealed class ReleasedContourState
                 curves.Add(PostVerificationGeometry.Curve.Create(curves[^1].End, curves[0].Start, null, false));
             obstacles.Add(new(part, contourNumber, curves, null));
         }
-        else if (!cutoff && unfinished.Count > 0 && tabMayNotHold?.Invoke(part) == true)
+        else if (!cutoff && unfinished.Count > 0 && (cutFree || tabMayNotHold?.Invoke(part) == true))
         {
             var perimeter = unfinished.MaxBy(chain => chain.Curves.Sum(curve => curve.Length));
             var curves = perimeter.Curves.ToList();
             if (curves[^1].End.DistanceTo(curves[0].Start) > PostVerificationGeometry.Epsilon)
                 curves.Add(PostVerificationGeometry.Curve.Create(curves[^1].End, curves[0].Start, null, false));
-            obstacles.Add(new(part, contourNumber, curves, null) { TabMayNotHold = true });
+            obstacles.Add(new(part, contourNumber, curves, null) { TabMayNotHold = !cutFree, TabCutFree = cutFree });
         }
         partContours = contourNumber;
         partClosed = !cutoff && isFixed == null && unfinished.Count == 0 && deferred.Count == 0 && !reportedTab
@@ -445,6 +487,16 @@ public sealed class ReleasedContourState
     /// behind the start it enters. A lead that curls into the gap can cut the tab with its kerf
     /// even where its centerline does not touch the next cut.
     /// </summary>
+    // Whether the open cut is the part's outside: no closed cut's extent reaches beyond its own.
+    private static bool IsOutside(CutGroup open, IReadOnlyList<CutGroup> closed)
+    {
+        static PostVerificationGeometry.Extent Extent(CutGroup cut) =>
+            cut.Curves.Aggregate(PostVerificationGeometry.Extent.None, (sum, curve) => sum.Union(curve.Extent));
+        var outside = Extent(open);
+        return closed.All(cut => Extent(cut) is var inner && inner.MinX >= outside.MinX && inner.MinY >= outside.MinY
+            && inner.MaxX <= outside.MaxX && inner.MaxY <= outside.MaxY);
+    }
+
     private static bool LeadsClearOpenEnds(CutGroup group)
     {
         var start = group.Curves[0].Start;
@@ -627,5 +679,8 @@ public sealed class ReleasedContourState
 
         /// <summary>A tabbed perimeter closed across its tab gap, for a part its tab may not hold level.</summary>
         internal bool TabMayNotHold { get; init; }
+
+        /// <summary>A tabbed perimeter closed across its tab gap, whose lead-out may cut the tab free.</summary>
+        internal bool TabCutFree { get; init; }
     }
 }

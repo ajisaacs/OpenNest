@@ -1,4 +1,5 @@
 using OpenNest.CNC;
+using OpenNest.CNC.CuttingPlanning;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Diagnostics;
 using OpenNest.Engine.CuttingPlanning;
@@ -9,8 +10,8 @@ using OpenNest.Tests.CuttingPlanning;
 namespace OpenNest.Tests.Support;
 
 /// <summary>
-/// Parts the support grid cannot hold level: hand-placed lead-ins tab them, Plan Cutting warns
-/// when it cannot steady them, and the pre-post review warns about any without a steadying tab.
+/// Parts the support grid cannot hold level: hand-placed lead-ins tab them, and a tabbed part
+/// counts as steady wherever its tab is, so only one cut with no tab at all is warned about.
 /// </summary>
 public class SupportReviewTests
 {
@@ -79,18 +80,18 @@ public class SupportReviewTests
     }
 
     [Fact]
-    public void PrePost_AcceptsATabThatSteadiesThePart_AndWarnsAboutOneThatDoesNot()
+    public void PrePost_AcceptsATabAnywhere_EvenWhereItDoesNotHoldThePartLevel()
     {
         var (steadied, _, top) = Strip(OneRow);
         PlaceLeadIn(top, Parameters(tabs: true), new Vector(5, 1), new Line(new Vector(0, 1), new Vector(10, 1)));
+        // On the edge beside the row of contacts the tab cannot hold the strip level; tabbed, it still counts as steady.
         var (unsteady, _, bottom) = Strip(OneRow);
         PlaceLeadIn(bottom, Parameters(tabs: true), new Vector(5, 0), new Line(new Vector(10, 0), new Vector(0, 0)));
 
         Assert.DoesNotContain(PostVerificationAnalyzer.Analyze(steadied).Findings,
             f => f.Kind == PostVerificationKind.PartSupport);
-        var finding = Assert.Single(PostVerificationAnalyzer.Analyze(unsteady).Findings,
+        Assert.DoesNotContain(PostVerificationAnalyzer.Analyze(unsteady).Findings,
             f => f.Kind == PostVerificationKind.PartSupport);
-        Assert.Contains("does not steady it", finding.Message);
     }
 
     [Fact]
@@ -109,16 +110,18 @@ public class SupportReviewTests
     }
 
     [Fact]
-    public void PlanCutting_WarnsWhenNoSingleTabCanSteadyThePart()
+    public void PlanCutting_TabsAPartNoSingleTabCanSteady_WithoutAWarning()
     {
-        // The 10 x 0.8 strip lies between grid rows: it rests on nothing, so a tab only hangs it.
+        // The 10 x 0.8 strip lies between grid rows: it rests on nothing. Tabbed, it counts as steady.
         var (_, plate, _) = Strip(new SupportGrid(1, 1, 0, 0.9, stabilityMargin: 0.1), height: 0.8);
 
         var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, Vector.Zero,
             confirmedParameters: Parameters()));
 
-        Assert.Equal(CuttingPlanStatus.BestEffort, result.Status);
-        var finding = Assert.Single(result.Findings, f => f.Kind == PostVerificationKind.PartSupport);
-        Assert.Contains("no single tab can steady it", finding.Message);
+        Assert.True(result.Status == CuttingPlanStatus.Ready, string.Join("\n", result.Findings.Select(f => f.Message)));
+        Assert.DoesNotContain(result.Findings, f => f.Kind == PostVerificationKind.PartSupport);
+        var proposal = Assert.Single(result.ProposedOrder);
+        Assert.NotNull(PartSupportReview.OutsideTab(
+            ExecutionMotionReader.Read(proposal.CopyProgram(), proposal.Location, null, default)));
     }
 }

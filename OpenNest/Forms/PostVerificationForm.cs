@@ -32,6 +32,7 @@ public partial class PostVerificationForm : Form
         (PostVerificationKind.EdgeSpacing, "Outside work area"),
         (PostVerificationKind.PartSupport, "Part support"),
         (PostVerificationKind.CommonLine, "Common lines"),
+        (PostVerificationKind.TabLeadOut, "Tab lead-outs"),
     };
 
     internal static PostVerificationKind[] ListedKinds => Categories.Select(c => c.Kind).ToArray();

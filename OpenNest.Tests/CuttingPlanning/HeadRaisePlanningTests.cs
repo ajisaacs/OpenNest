@@ -72,7 +72,7 @@ public class HeadRaisePlanningTests
         checker.Check(ExecutionMotionReader.Read(wall, Vector.Zero, null, default), null, 1);
 
         var execution = ExecutionMotionReader.Read(program, Vector.Zero, new Vector(0, 11), default);
-        var (strict, _, raised) = checker.Check(execution, new Vector(0, 11), 2, false, null, default);
+        var (strict, _, raised, _) = checker.Check(execution, new Vector(0, 11), 2, false, null, default);
 
         Assert.True(execution.Motions[0].HeadRaised);
         Assert.Null(execution.Motions[0].Code);
@@ -133,7 +133,7 @@ public class HeadRaisePlanningTests
         checker.Check(ExecutionMotionReader.Read(wall, Vector.Zero, null, default), null, 1);
 
         var execution = ExecutionMotionReader.Read(rapid, Vector.Zero, new Vector(0, 11), default);
-        var (strict, _, raised) = checker.Check(execution, new Vector(0, 11), 2, false, null, default);
+        var (strict, _, raised, _) = checker.Check(execution, new Vector(0, 11), 2, false, null, default);
 
         Assert.True(execution.Motions[0].HeadRaised);
         Assert.Equal(1, execution.Motions[0].Code);

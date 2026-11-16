@@ -1733,7 +1733,8 @@ internal static class JointCuttingPlanSearch
             ReleasedContourState checker, IReadOnlyList<ContourChoice> choices = null)
         {
             var isFixed = source.FixedMotions(execution, choices);
-            var findings = checker.Check(execution, arrival, source.SourceOrdinal + 1, source.IsCutOff, isFixed, token).Strict;
+            var findings = checker.Check(execution, arrival, source.SourceOrdinal + 1, source.IsCutOff, isFixed, token,
+                snapshot.WarnsTabLeadOuts(source)).Strict;
             var lead = source.IsCutOff ? new LeadPathValidationResult(true, true, null)
                 : LeadPathValidator.Check(execution, source.Material, materials, isFixed, [], token, leadContacts,
                     snapshot.PierceZoneRadius);
@@ -1753,7 +1754,8 @@ internal static class JointCuttingPlanSearch
             // violations neither reject this candidate nor teach an order rule. Final replay
             // reports them as warnings. Every planner-chosen motion stays strict.
             var isFixed = source.FixedMotions(execution, choices);
-            var findings = checker.Check(execution, arrival, source.SourceOrdinal + 1, source.IsCutOff, isFixed, token).Strict;
+            var findings = checker.Check(execution, arrival, source.SourceOrdinal + 1, source.IsCutOff, isFixed, token,
+                snapshot.WarnsTabLeadOuts(source)).Strict;
             rejected.AddRange(Map(snapshot, findings));
             attempt.NoteCrossings(source.SourceOrdinal, findings);
             // A fixed cutoff has no material or leads to certify; its rapids are still checked.

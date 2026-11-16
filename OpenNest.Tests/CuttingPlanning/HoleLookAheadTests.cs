@@ -169,14 +169,15 @@ public class HoleLookAheadTests
         var fingerprint = ExplicitContourTests.Fingerprint(part.Program);
         var result = CuttingPlanService.Plan(new CuttingPlanRequest([part], Start,
             confirmedParameters: parameters, preservePartOrder: true));
-        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        // Tabbed, the arc lead-out may cut through the tab into the lead-in: it is kept as set and warned.
+        Assert.True(result.Status == (tabs ? CuttingPlanStatus.BestEffort : CuttingPlanStatus.Ready), Describe(result));
         Assert.True(result.IndependentlyReplayed);
+        Assert.Equal(tabs, result.Findings.Any(f => f.Kind == PostVerificationKind.TabLeadOut));
         var actual = result.ProposedOrder[0];
         Assert.Equal(2, actual.ContourChoices[^1].ContourOrdinal);
         Assert.Equal(3, actual.ContourChoices.Select(c => c.ContourOrdinal).Distinct().Count());
         Assert.Single(actual.Execution.Motions.Where(m => !m.Rapid && m.Layer == LayerType.Scribe));
-        // The arc lead-out would cut through the tab into the lead-in, so a tabbed outside has none.
-        Assert.Equal(!tabs, actual.Execution.Motions.Any(m => m.Layer == LayerType.Leadout));
+        Assert.Contains(actual.Execution.Motions, m => m.Layer == LayerType.Leadout);
         Assert.Equal(fingerprint, ExplicitContourTests.Fingerprint(part.Program));
     }
 

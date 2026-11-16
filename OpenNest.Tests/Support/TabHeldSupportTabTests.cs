@@ -124,15 +124,16 @@ public class TabHeldSupportTabTests
     }
 
     [Fact]
-    public void PlanCutting_WarnsAboutAShortPartNoTabCanSteady_WithoutTheLimit()
+    public void PlanCutting_TabsAShortPartNoTabCanSteady_WithoutTheLimit_AndDoesNotWarn()
     {
         var (_, plate, _) = Square(Parameters(0));
 
         var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, Vector.Zero,
             confirmedParameters: Parameters(0)));
 
-        Assert.Equal(CuttingPlanStatus.BestEffort, result.Status);
-        Assert.Contains("no single tab can steady it", Assert.Single(result.Findings).Message);
+        // Tabbed, a part counts as steady wherever its tab is.
+        Assert.True(result.Status == CuttingPlanStatus.Ready, string.Join("\n", result.Findings.Select(f => f.Message)));
+        Assert.Empty(result.Findings);
     }
 
     [Fact]

@@ -646,6 +646,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         PostVerificationKind.OffPlate => "Off the plate",
         PostVerificationKind.EdgeSpacing => "Outside work area",
         PostVerificationKind.CommonLine => "Common line",
+        PostVerificationKind.TabLeadOut => "Tab lead-out",
         _ => kind.ToString(),
     };
 
@@ -715,6 +716,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         PostVerificationKind.OffPlate => "The ring marks where the part leaves the plate.",
         PostVerificationKind.EdgeSpacing => "The ring marks where the part leaves the work area, inside the edge spacing.",
         PostVerificationKind.CommonLine => "The ring marks the common-line part or lead to review.",
+        PostVerificationKind.TabLeadOut => "The ring marks where the lead-out leaves the tab.",
         _ => "The ring marks the affected part; the exact spot is not known."
     };
 
