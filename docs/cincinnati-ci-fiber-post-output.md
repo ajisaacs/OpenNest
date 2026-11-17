@@ -90,7 +90,7 @@ order, member by member, each member's holes first:
 - **Shared cut** (`CommonLine` motions, programs planned before the owner cut its own edge): the
   cut-off form with a real lead-in, no `G41`/`G42`.
 
-**Unconfirmed on the machine** (release gate, see [common-line cutting](common-line-cutting.md)):
+**Not yet confirmed on a machine** (see [common-line cutting](common-line-cutting.md)):
 
 - compensation start-up on a remainder whose lead-in starts in void (the kerf the owner's cut
   opened) and runs along it, and on the owner's lead-in collinear with its shared edge;
@@ -98,7 +98,7 @@ order, member by member, each member's holes first:
   uncompensated, since the post writes no `G40` (the macros cancel compensation);
 - whether `L4` runs correctly before an older program's uncompensated shared cut, as for cut-offs.
 
-Verify on a 3/16 stainless coupon pair on the CI FIBER 4020 and record the result here.
+Verify these on a test pair before production use.
 
 ## Configuration and boundaries
 

@@ -82,7 +82,7 @@ Cutting inspects a proposal, the overlay shows the proposal's parts on the same 
 
 ## Support tabs in Plan Cutting
 
-Cutting Settings > Tabs > "Add tabs to hold parts in the sheet" sets
+Cutting Parameters > Tabs > "Add tabs to hold parts in the sheet" sets
 `CuttingParameters.SupportTabs`, and its two choices say which parts need a tab. Like every
 cutting setting they are kept per machine thickness (Tools > Machine Configuration > Tabs &
 Pierce), so thick plate can go untabbed; see [machine cutting defaults](machine-cutting-defaults.md):
@@ -122,7 +122,7 @@ never on a reflex or cusp vertex). Ranking and lead checks are unchanged.
 ## Parts the tab alone holds
 
 A tabbed part stays in the sheet on its tab, and a part short enough does not need the bed at
-all: the tab holds it wherever it goes. Cutting Settings > Tabs > "Tab alone holds parts up to"
+all: the tab holds it wherever it goes. Cutting Parameters > Tabs > "Tab alone holds parts up to"
 sets `CuttingParameters.TabHeldMaxLength`: on a plate with a support bed, a part the bed cannot
 hold level whose length (the long side of its outline's minimum-area bounding rectangle,
 `SupportAnalyzer.Length`) is at most that, bound included, is still tabbed, but
@@ -140,7 +140,7 @@ does not read cutting settings and still shows it red, since it would tip withou
 
 ## Tabbing by size
 
-Cutting Settings > Tabs > "By size, or with no support bed, tab parts whose narrow side is" sets
+Cutting Parameters > Tabs > "By size, or with no support bed, tab parts whose narrow side is" sets
 `CuttingParameters.TabSizeMinWidth` to `TabSizeMaxWidth` (stored under their earlier JSON names
 `noBedTabMinWidth` and `noBedTabMaxWidth`, so saved settings and nests read unchanged). Support
 tabs go by size under "Tab parts by size", and under the support grid choice on a plate with no
@@ -204,7 +204,7 @@ the plate.
 ## Slug slices
 
 A cutout's slug drops onto the bed too, and one the bed cannot hold level can tip up into the
-head's path. Cutting Settings > Cutouts > "Slice slugs the support grid can't hold level" sets
+head's path. Cutting Parameters > Cutouts > "Slice slugs the support grid can't hold level" sets
 `CuttingParameters.SliceTippingSlugs` (off by default, kept per machine thickness like every
 cutting setting, and written to settings and nest files only when on). With it on and a support
 bed, Plan Cutting cuts each such slug into pieces that hold no contact before it cuts the cutout,

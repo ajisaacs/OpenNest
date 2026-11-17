@@ -5,11 +5,11 @@ one cut: programs are nominal geometry and the controller offsets each contour b
 (`G41`/`G42`), so both parts' facing edges are cut on the same centerline. Placing parts this way
 saves the part spacing along every shared edge, which matters on costly plate.
 
-**Release gate.** Cutting a common line once is not yet confirmed on a machine. Before release it
-needs a 3/16 stainless coupon pair on the CI FIBER 4020: measure both parts' shared edges against
-nominal and check that compensation starts cleanly in the opened kerf and cancels where a
-remainder ends in it (see [CI Fiber output](cincinnati-ci-fiber-post-output.md#common-lines)).
-Until then, **Plate > Arrange > Cut Common Lines Twice** keeps the double cut.
+**Not yet proven on a machine.** Cutting a common line once has not been checked on a real cut.
+Before relying on it, cut a test pair: measure both parts' shared edges against nominal and check
+that compensation starts cleanly in the opened kerf and cancels where a remainder ends in it (see
+[CI Fiber output](cincinnati-ci-fiber-post-output.md#common-lines)). **Plate > Arrange > Cut
+Common Lines Twice** keeps the double cut.
 
 ## Groups
 

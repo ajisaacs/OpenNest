@@ -75,8 +75,8 @@ read `PartColorPalette.Current`, so editing a scheme's array later changes nothi
 it is applied again. WinForms draws with per-thread GDI+ pens from `GdiSchemeTools`; the Avalonia
 plate canvas draws with Skia colours from `SkiaSchemePalette`. The Avalonia app
 applies the scheme saved as `ActiveColorScheme` in the shared user-settings file
-when it starts, and recolors a nest's drawings when it opens one; it has no
-Options screen to change the scheme yet. Its plate canvas builds part paths from
+when it starts, and recolors a nest's drawings when it opens one; its Options
+dialog changes the scheme ("Color scheme:"). Its plate canvas builds part paths from
 `OpenNest.Desktop.Rendering` (a port of the WinForms `GraphicsHelper` layer routing:
 etches stroked apart from cuts, tabs filled but not cut, break cuts never filled), so
 the etch, cut and fill rules above hold there too; WinForms still draws with

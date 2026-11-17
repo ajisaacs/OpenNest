@@ -288,7 +288,7 @@ The post cannot write a [common line cut once](common-line-cutting.md#cutting-ea
 it compensates every feature from its own winding and, in `KerfMode.PreApplied`, offsets no
 geometry, so a shared cut would be compensated into a part and a remainder could not be offset on
 its perimeter's side. It refuses such a nest before writing
-anything. Set the plate to cut its common lines twice and plan cutting again to post it here.
+anything. Set the plate to cut its common lines twice and replan to post it here.
 
 ### Kerf compensation
 

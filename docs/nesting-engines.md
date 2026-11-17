@@ -59,16 +59,16 @@ valid at box contact.
 #### Squeezing the last sheet
 
 The fit rules pack into the whole sheet, so when the last sheet has room to spare they spread the
-remaining parts out and rarely find the shortest strip that holds them. On N26-2A5 (14 door stops
-and 14 lock plates on a clamped 26 x 26 sheet) every rule stopped 8.0 high, while the hand layout
+remaining parts out and rarely find the shortest strip that holds them. On one real job (14 door
+stops and 14 lock plates on a clamped 26 x 26 sheet) every rule stopped 8.0 high, while the hand layout
 holds all 28 under 7.5 and leaves a half-inch-deeper drop. So when some rule places all the
 remaining demand on a sheet, Rectangles packs that demand again into a bin cut shorter, and
 separately narrower, running every rule and mode at each size. It keeps the tightest complete
 layout along each axis that beats the whole-sheet ones, and the stock loop then picks among all of
 them by cost and offcut as before (`SheetSqueeze`).
 
-Whether a greedy packing fits is far from monotonic in the bin size (N26-2A5 packs at 7.5 but not
-at 7.62 or 7.74), so the sizes probed are stack heights, not halves of a range: sums of the parts'
+Whether a greedy packing fits is far from monotonic in the bin size (that job packs at 7.5 but
+not at 7.62 or 7.74), so the sizes probed are stack heights, not halves of a range: sums of the parts'
 spaced sides along the axis, starting at the bin edge or at the far side of a clamp the layout
 reaches. The probes walk down from the best extent so far, spread over the probes left, and a probe
 that fails never raises the floor. With more than 2048 stack heights the walk steps through the
