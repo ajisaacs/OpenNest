@@ -73,7 +73,7 @@ internal static class CommonLineReview
             if (singlePass != null)
                 findings.Add(new(PostVerificationKind.CommonLine, plateNumber, Number(plate, singlePass), null,
                     "The plate is set to cut its common lines twice, but this part's program cuts a shared line "
-                    + "once. Plan cutting again before posting.")
+                    + "once. Replan before posting.")
                 { Location = singlePass.BoundingBox?.Center });
             return;
         }
@@ -87,7 +87,7 @@ internal static class CommonLineReview
             if (covering.Count == 0)
             {
                 findings.Add(new(PostVerificationKind.CommonLine, plateNumber, first, second,
-                    "This common line is not cut. Plan cutting cuts each shared line once; "
+                    "This common line is not cut. Replan to cut each shared line once, "
                     + "or set the plate to cut its common lines twice.")
                 { Location = middle });
                 continue;
@@ -96,7 +96,7 @@ internal static class CommonLineReview
             {
                 findings.Add(new(PostVerificationKind.CommonLine, plateNumber, first, second,
                     "This common line is cut more than once (a plate not planned since the parts were joined cuts "
-                    + "it twice). Plan cutting again before posting, or set the plate to cut its common lines twice.")
+                    + "it twice). Replan before posting, or set the plate to cut its common lines twice.")
                 { Location = middle });
                 continue;
             }
@@ -105,8 +105,8 @@ internal static class CommonLineReview
             var partner = ReferenceEquals(owner, span.First) ? span.Second : span.First;
             if (Number(plate, owner) is int o && Number(plate, partner) is int p && o > p)
                 findings.Add(new(PostVerificationKind.CommonLine, plateNumber, o, p,
-                    "The shared line is cut after the partner whose remainder ends in its kerf. Plan cutting "
-                    + "again, or move the part that cuts it ahead of its partner.")
+                    "The shared line is cut after the partner whose remainder ends in its kerf. Replan, "
+                    + "or move the part that cuts it ahead of its partner.")
                 { Location = middle });
         }
     }
@@ -184,7 +184,7 @@ internal static class CommonLineReview
                 findings.Add(new(PostVerificationKind.CommonLine, plateNumber, Number(plate, members[i]),
                     Number(plate, partner), move.Layer == LayerType.CommonLine
                         ? $"A shared cut of '{members[i].BaseDrawing.Name}' runs into '{partner.BaseDrawing.Name}', its "
-                            + "common-line partner. Rejoin the parts one kerf apart and plan cutting again."
+                            + "common-line partner. Rejoin the parts one kerf apart and replan."
                         : $"A lead of '{members[i].BaseDrawing.Name}' runs into '{partner.BaseDrawing.Name}', its "
                             + "common-line partner one kerf away. Move the lead off the shared edge (Plan Cutting does).")
                 { Location = move.Curve?.Midpoint ?? move.End });

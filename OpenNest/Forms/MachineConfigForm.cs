@@ -956,6 +956,7 @@ namespace OpenNest.Forms
             {
                 Text = $"{(source.Cutting == null ? "No tabs & pierce of its own" : "Its tabs & pierce")} to:",
                 AutoSize = true,
+                UseMnemonic = false,
                 Margin = new Padding(3, 8, 6, 0),
             });
             foreach (var (text, pick) in new (string, Func<ThicknessConfig, bool>)[]
