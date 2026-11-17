@@ -48,7 +48,15 @@ namespace OpenNest.IO
         public NestReader(string file)
         {
             stream = new FileStream(file, FileMode.Open, FileAccess.Read);
-            zipArchive = new ZipArchive(stream, ZipArchiveMode.Read);
+            try
+            {
+                zipArchive = new ZipArchive(stream, ZipArchiveMode.Read);
+            }
+            catch
+            {
+                stream.Dispose();
+                throw;
+            }
         }
 
         public NestReader(Stream stream)
@@ -58,6 +66,19 @@ namespace OpenNest.IO
         }
 
         public Nest Read()
+        {
+            try
+            {
+                return ReadNest();
+            }
+            finally
+            {
+                zipArchive.Dispose();
+                stream.Close();
+            }
+        }
+
+        private Nest ReadNest()
         {
             var nestJson = ReadEntry("nest.json");
             var dto = JsonSerializer.Deserialize<NestDto>(nestJson, JsonOptions);
@@ -71,9 +92,6 @@ namespace OpenNest.IO
             // Nests converted from PEP kept etch marks only in the placed programs; give them
             // back to the drawing so removing lead-ins does not remove the marks too.
             DrawingMarkRecovery.Apply(nest);
-
-            zipArchive.Dispose();
-            stream.Close();
 
             return nest;
         }
