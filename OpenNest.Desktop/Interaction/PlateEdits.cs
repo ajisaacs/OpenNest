@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using OpenNest.Undo;
 
 namespace OpenNest.Desktop.Interaction;
 
@@ -14,6 +15,12 @@ namespace OpenNest.Desktop.Interaction;
 /// same parts, and wheel rotations, undo as one. Every edit does nothing without a plate or
 /// selected parts (Delete also acts on selected cut-offs alone) and redraws the view, and nothing
 /// at all while the host's edits are locked (<see cref="IPlateToolHost.EditsLocked"/>).
+/// <para>
+/// While a <see cref="PlaceTool"/> is active in <see cref="Tools"/>, nudge, step, push and rotate
+/// move its previews instead, which are not on the plate: no undo step is opened (WinForms
+/// records an empty one) and cut-offs are not rebuilt. Delete then removes the tool's sources
+/// (<see cref="PlaceTool.DeleteSources"/>).
+/// </para>
 /// </summary>
 public sealed class PlateEdits
 {
@@ -23,6 +30,21 @@ public sealed class PlateEdits
     }
 
     public IPlateToolHost Host { get; }
+
+    /// <summary>
+    /// The view's tools, so edits can act on a place tool's previews; null for none.
+    /// </summary>
+    public PlateToolManager Tools { get; set; }
+
+    /// <summary>
+    /// Whether nudge, push and rotate have parts to move: a place tool's previews, or selected
+    /// parts still on the plate. The view checks it before a middle click or Shift+wheel rotates.
+    /// </summary>
+    public bool HasPartsToEdit =>
+        Placing is { Previews.Count: > 0 }
+        || (Host.Plate != null && Host.Selection.Parts.Any(Host.Plate.Parts.Contains));
+
+    private PlaceTool Placing => Tools?.Current as PlaceTool;
 
     /// <summary>How far an arrow-key nudge moves the selection, in plate units.</summary>
     public double OffsetIncrement { get; set; } = 10;
@@ -45,6 +67,11 @@ public sealed class PlateEdits
         var plate = Host.Plate;
         if (plate == null || Host.EditsLocked)
             return;
+        if (Placing is { } placing)
+        {
+            placing.DeleteSources();
+            return;
+        }
         var selection = Host.Selection;
         selection.Prune();
         var parts = selection.Parts.ToList();
@@ -85,10 +112,10 @@ public sealed class PlateEdits
     /// <summary>Moves the selection by (<paramref name="dx"/>, <paramref name="dy"/>).</summary>
     public void NudgeBy(double dx, double dy)
     {
-        if (!TryGetSelectedParts(out var plate, out var parts))
+        if (!TryGetEditParts(out var plate, out var parts, out var previews))
             return;
 
-        using var change = Host.BeginChange("Nudge", new SelectionKey("Nudge", plate, parts));
+        using var change = BeginEdit(previews, "Nudge", new SelectionKey("Nudge", plate, parts));
         change.MarkChanged();
         foreach (var part in parts)
             part.Offset(dx, dy);
@@ -102,10 +129,10 @@ public sealed class PlateEdits
     /// </summary>
     public void Step(PushDirection direction)
     {
-        if (!TryGetSelectedParts(out var plate, out var parts))
+        if (!TryGetEditParts(out var plate, out var parts, out var previews))
             return;
 
-        using var change = Host.BeginChange("Nudge", new SelectionKey("Nudge", plate, parts));
+        using var change = BeginEdit(previews, "Nudge", new SelectionKey("Nudge", plate, parts));
         if (Compactor.Step(parts, plate, direction) > 0)
             change.MarkChanged();
         Host.Invalidate();
@@ -117,10 +144,10 @@ public sealed class PlateEdits
     /// </summary>
     public void Push(PushDirection direction)
     {
-        if (!TryGetSelectedParts(out var plate, out var parts))
+        if (!TryGetEditParts(out var plate, out var parts, out var previews))
             return;
 
-        using var change = Host.BeginChange("Push");
+        using var change = BeginEdit(previews, "Push");
         change.MarkChanged();
         Compactor.Push(parts, plate, direction);
         Host.Invalidate();
@@ -133,10 +160,10 @@ public sealed class PlateEdits
     /// </summary>
     public void Rotate(double radians, bool coalesce = false)
     {
-        if (!TryGetSelectedParts(out var plate, out var parts))
+        if (!TryGetEditParts(out var plate, out var parts, out var previews))
             return;
 
-        using var change = Host.BeginChange("Rotate",
+        using var change = BeginEdit(previews, "Rotate",
             coalesce ? new SelectionKey("Rotate", plate, parts) : null);
         change.MarkChanged();
         var bounds = parts.GetBoundingBox();
@@ -149,7 +176,7 @@ public sealed class PlateEdits
         foreach (var part in parts)
             part.Offset(diff);
 
-        if (plate.CutOffs.Count > 0)
+        if (!previews && plate.CutOffs.Count > 0)
             plate.RegenerateCutOffs(Host.CutOffSettings);
         Host.Invalidate();
         change.Complete();
@@ -173,16 +200,28 @@ public sealed class PlateEdits
         Rotate(angle, coalesce: true);
     }
 
-    private bool TryGetSelectedParts(out Plate plate, out List<Part> parts)
+    // The parts an edit moves: a place tool's previews (previews is true), else the selection.
+    private bool TryGetEditParts(out Plate plate, out List<Part> parts, out bool previews)
     {
         plate = Host.Plate;
         parts = null;
+        previews = false;
         if (plate == null || Host.EditsLocked)
             return false;
+        if (Placing is { } placing)
+        {
+            previews = true;
+            parts = placing.Previews.ToList();
+            return parts.Count > 0;
+        }
         Host.Selection.Prune();
         parts = Host.Selection.Parts.ToList();
         return parts.Count > 0;
     }
+
+    // Previews are not on the nest, so moving them opens no undo step.
+    private ChangeScope BeginEdit(bool previews, string label, object coalesceKey = null) =>
+        previews ? ChangeScope.Detached() : Host.BeginChange(label, coalesceKey);
 
     /// <summary>
     /// Equal for the same edit of the same parts, in the same order, on the same plate, so
