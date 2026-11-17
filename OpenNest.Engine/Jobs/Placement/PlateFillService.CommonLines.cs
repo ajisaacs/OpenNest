@@ -106,6 +106,66 @@ public static partial class PlateFillService
         return new PlateFillProposal(parts, groups);
     }
 
+    /// <summary>
+    /// <see cref="FillGroup(string, Plate, List{Part}, Box, IProgress{NestProgress}, CancellationToken)"/>
+    /// for copied parts that may be one common-line group. With <paramref name="commonLineKerf"/>
+    /// (the kerf every part in <paramref name="groupParts"/> is joined at) the area is filled with
+    /// the group's single outline (<see cref="CommonLineCompound"/>) as one part, so only whole
+    /// groups are placed, and each placed copy becomes its parts and a group. Without a kerf, or
+    /// when the parts are not one intact group with a single outline, it is the plain group fill
+    /// and proposes no groups. <paramref name="settle"/> compacts the placed units (whole groups,
+    /// or the plain fill's parts) before the proposal is built. Not committed: the caller adds the
+    /// parts, then the groups.
+    /// </summary>
+    public static PlateFillProposal FillGroup(
+        string strategy,
+        Plate plate,
+        List<Part> groupParts,
+        double? commonLineKerf,
+        Box workArea,
+        Action<List<Part>> settle,
+        IProgress<NestProgress> progress,
+        CancellationToken token
+    )
+    {
+        ArgumentNullException.ThrowIfNull(groupParts);
+        var compound = commonLineKerf is { } kerf ? CommonLineCompound.Build(groupParts, kerf) : null;
+        if (compound == null)
+        {
+            var plain = FillGroup(strategy, plate, groupParts, workArea, progress, token);
+            settle?.Invoke(plain);
+            return new PlateFillProposal(plain, Array.Empty<CommonLineGroup>());
+        }
+
+        var units = FillItem(strategy, plate, new NestItem { Drawing = compound.Proxy }, workArea,
+            progress == null ? null : new ExpandedProgress(progress, compound), token);
+        settle?.Invoke(units);
+        var parts = new List<Part>(units.Count * compound.MemberCount);
+        var groups = new List<CommonLineGroup>(units.Count);
+        foreach (var unit in units)
+        {
+            var (members, group) = compound.Expand(unit);
+            parts.AddRange(members);
+            groups.Add(group);
+        }
+        return new PlateFillProposal(parts, groups);
+    }
+
+    /// <summary>Forwards a compound fill's previews as the member parts they stand for.</summary>
+    private sealed class ExpandedProgress(IProgress<NestProgress> inner, CommonLineCompound compound)
+        : IProgress<NestProgress>
+    {
+        public void Report(NestProgress value) => inner.Report(new NestProgress
+        {
+            Phase = value.Phase,
+            PlateNumber = value.PlateNumber,
+            BestParts = value.BestParts?.SelectMany(unit => compound.Expand(unit).Parts).ToList(),
+            Description = value.Description,
+            ActiveWorkArea = value.ActiveWorkArea,
+            IsOverallBest = value.IsOverallBest,
+        });
+    }
+
     // The proxy's frame is the drawing's own: rotate about the program origin, then move.
     private static Part Place(Drawing drawing, double rotation, Vector location)
     {

@@ -1022,7 +1022,10 @@ namespace OpenNest.Controls
         /// </summary>
         private bool EditsLocked => InspectionOnly || IsFillInProgress;
 
-        public async void FillWithProgress(List<Part> groupParts, Box workArea)
+        /// <param name="commonLineKerf">The kerf <paramref name="groupParts"/> are joined at when
+        /// they are one common-line group: the area is then filled with whole groups, each joined
+        /// like the source (see docs/common-line-cutting.md).</param>
+        public async void FillWithProgress(List<Part> groupParts, Box workArea, double? commonLineKerf = null)
         {
             if (IsFillInProgress)
                 return;
@@ -1060,22 +1063,23 @@ namespace OpenNest.Controls
                     progressForm.Show(FindForm());
                     var strategy = EngineSelection.FillStrategy;
                     var spacing = Plate.PartSpacing;
-                    var parts = await Task.Run(() =>
-                    {
-                        var result = PlateFillService.FillGroup(
-                            strategy,
-                            Plate,
-                            groupParts,
-                            workArea,
-                            progress,
-                            cts.Token
-                        );
-                        if (Plate.ClampZones.Count == 0)
-                            Compactor.Settle(result, workArea, spacing);
-                        else
-                            Compactor.Settle(result, Plate, workArea);
-                        return result;
-                    });
+                    var proposal = await Task.Run(() => PlateFillService.FillGroup(
+                        strategy,
+                        Plate,
+                        groupParts,
+                        commonLineKerf,
+                        workArea,
+                        result =>
+                        {
+                            if (Plate.ClampZones.Count == 0)
+                                Compactor.Settle(result, workArea, spacing);
+                            else
+                                Compactor.Settle(result, Plate, workArea);
+                        },
+                        progress,
+                        cts.Token
+                    ));
+                    var parts = proposal.Parts;
                     operationActive = false;
 
                     if (parts.Count > 0 && (!cts.IsCancellationRequested || progressForm.Accepted))
@@ -1084,6 +1088,8 @@ namespace OpenNest.Controls
                         using var change = BeginChange("Fill");
                         SetActiveParts(parts);
                         AcceptPreviewParts(parts);
+                        foreach (var group in proposal.CommonLines)
+                            Plate.CommonLines.Add(group);
 
                         if (Plate.CutOffs.Count > 0)
                             Plate.RegenerateCutOffs(cutOffSettings);

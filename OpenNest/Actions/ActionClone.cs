@@ -274,10 +274,14 @@ namespace OpenNest.Actions
             var groupParts = parts.Select(p => p.BasePart).ToList();
 
             var bounds = plate.WorkArea();
+            // One group holding every copied part fills as whole groups, each joined again.
+            double? kerf = commonLines.Count == 1 && commonLines[0].Members.Length == parts.Count
+                ? commonLines[0].Kerf
+                : null;
 
             if (plate.Parts.Count == 0)
             {
-                plateView.FillWithProgress(groupParts, bounds);
+                plateView.FillWithProgress(groupParts, bounds, kerf);
                 return;
             }
 
@@ -314,7 +318,7 @@ namespace OpenNest.Actions
             if (bestArea == Box.Empty)
                 return;
 
-            plateView.FillWithProgress(groupParts, bestArea);
+            plateView.FillWithProgress(groupParts, bestArea, kerf);
         }
     }
 }

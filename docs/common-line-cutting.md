@@ -126,6 +126,15 @@ head on the second. Changing the setting after planning makes the plan stale.
   selection deletes the whole group. To move one member alone, remove the group first.
 - Copying or cutting joined parts and pasting them keeps each pasted copy joined at the source
   group's kerf; members copied without their partners paste as loose parts.
+- **Filling with a copied group** (Ctrl+F while pasting, `PlateFillService.FillGroup` with the
+  group's kerf): when the copied parts are exactly one group, the area is filled with the group
+  as a single part. Its outline (`CommonLineCompound`) is every member's perimeter (arcs
+  circumscribed) and the kerf along their shared spans, without holes, so copies keep the part
+  spacing from each other and only whole groups are placed. Each placed copy then becomes its
+  parts, joined at the source group's kerf; previews and the settle work on whole groups. This
+  needs no **Allow common line** setting or usage level: the user joined the group. Copied parts
+  that are not one intact group (several groups, a group with loose parts, a broken group, or an
+  outline that is not one profile) fill as loose parts, as before, and are not joined.
 - Join, Remove and Cut Common Lines Twice are undoable like any other edit.
 
 ## Automatic placement

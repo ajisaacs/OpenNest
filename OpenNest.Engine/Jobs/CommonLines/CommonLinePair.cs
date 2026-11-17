@@ -21,11 +21,11 @@ internal sealed class CommonLinePair
 {
     /// <summary>Chord tolerance of the compound outline; arcs are circumscribed, so it only
     /// controls vertex count, never makes the compound smaller than its copies.</summary>
-    private const double FlattenTolerance = 0.002;
+    internal const double FlattenTolerance = 0.002;
 
     /// <summary>How far the bridge over the kerf reaches into each copy's material, so the union
     /// joins the copies into one outline.</summary>
-    private const double BridgeOverlap = 1e-4;
+    internal const double BridgeOverlap = 1e-4;
 
     private CommonLinePair(PartGeometrySnapshot geometry, double secondX, double secondY, double sharedLength)
     {
@@ -160,7 +160,7 @@ internal sealed class CommonLinePair
         return outers.Count == 1 ? outers[0] : null;
     }
 
-    private static PartGeometrySnapshot Snapshot(PathD outline)
+    internal static PartGeometrySnapshot Snapshot(PathD outline)
     {
         // Clipper can return (nearly) repeated vertices; a zero-length edge is not usable geometry.
         var points = new PathD(outline.Count);
