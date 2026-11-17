@@ -117,8 +117,16 @@ def absent(status, headers, body):
 
 
 def package_policy(status, headers, body):
+    """Return True when GitHub reports no package yet (first publication).
+
+    The repository is public and the image carries its source label, so the first
+    GITHUB_TOKEN push creates a public package linked to it; readback and the
+    anonymous pull prove that afterwards. Any other shape fails closed."""
     data = json_body(body)
     require(isinstance(data, dict), "malformed package metadata")
+    if status == 404 and data.get("message") == "Not Found" and \
+            str(data.get("documentation_url", "")).startswith("https://docs.github.com/"):
+        return True
     require(status == 200, "package metadata inaccessible; visibility unknown")
     require(data.get("name") == PACKAGE and data.get("package_type") == "container" and
             data.get("visibility") == "public" and isinstance(data.get("repository"), dict) and
@@ -188,8 +196,12 @@ def preflight(client, release_version, sha):
     repo = json_body(body)
     require(status == 200 and isinstance(repo, dict) and repo.get("full_name") == REPO and
             repo.get("default_branch") == "master", "repository/default branch authorization unproven")
-    package_policy(*client.get(PACKAGE_API))
+    first_publication = package_policy(*client.get(PACKAGE_API))
     tags_response = client.get(registry_path("tags/list"))
+    if first_publication:
+        # A package hidden from this token would still have a registry repository.
+        require(absent(*tags_response), "package metadata missing but registry repository exists")
+        return {"package": IMAGE, "visibility": "public", "first_publication": True}
     require(tags_response[0] == 200, "existing package registry read access unproven")
     data = json_body(tags_response[2])
     require(isinstance(data, dict) and data.get("name") == REGISTRY_NAME and
@@ -439,7 +451,7 @@ def main():
     local = local_identity(os.environ.get("LOCAL_IMAGE", ""))
     if args.operation == "readback":
         client = Client()
-        package_policy(*client.get(PACKAGE_API))
+        require(not package_policy(*client.get(PACKAGE_API)), "package metadata missing after upload")
         directory = pathlib.Path(os.environ.get("METADATA_DIR", ".hermes/server-image-metadata"))
         try:
             previous = json_body((directory / "local.json").read_bytes())

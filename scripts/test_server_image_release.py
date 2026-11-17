@@ -134,10 +134,9 @@ class RegistrySafety(unittest.TestCase):
             with self.assertRaises(release.ReleaseError):
                 release.package_policy(*response(200, wrong))
 
-    def test_package_metadata_404_never_authorizes_bootstrap(self):
-        with self.assertRaises(release.ReleaseError):
-            release.package_policy(*response(404, {
-                "message": "Not Found", "documentation_url": "https://docs.github.com/rest/packages"}))
+    def test_github_not_found_metadata_means_first_publication(self):
+        self.assertTrue(release.package_policy(*response(404, {
+            "message": "Not Found", "documentation_url": "https://docs.github.com/rest/packages"})))
         for status, body in ((403, {"message": "Resource not accessible"}), (404, {}),
                              (404, {"message": "Not Found", "documentation_url": "https://evil.test"})):
             with self.assertRaises(release.ReleaseError):
@@ -171,11 +170,20 @@ class RegistrySafety(unittest.TestCase):
             with self.assertRaises(release.ReleaseError):
                 release.preflight(client, "1.2.3", SHA)
 
-    def test_missing_metadata_denies_regardless_of_registry_tags(self):
-        with self.assertRaises(release.ReleaseError):
-            release.preflight(self.preflight_client(404), "1.2.3", SHA)
-        with self.assertRaises(release.ReleaseError):
-            release.preflight(self.preflight_client(404, ["old"]), "1.2.3", SHA)
+    def test_first_publication_requires_an_absent_registry_repository(self):
+        client = self.preflight_client(404)
+        unknown = response(404, {"errors": [{"code": "NAME_UNKNOWN"}]})
+        client.responses[release.registry_path("tags/list")] = unknown
+        self.assertEqual(release.preflight(client, "1.2.3", SHA),
+                         {"package": release.IMAGE, "visibility": "public", "first_publication": True})
+        for tags in ([], ["old"]):
+            with self.subTest(tags=tags), self.assertRaises(release.ReleaseError):
+                release.preflight(self.preflight_client(404, tags), "1.2.3", SHA)
+        for denied in (response(404, {"errors": [{"code": "DENIED"}]}), response(401, {}), response(403, {})):
+            client = self.preflight_client(404)
+            client.responses[release.registry_path("tags/list")] = denied
+            with self.subTest(denied=denied[0]), self.assertRaises(release.ReleaseError):
+                release.preflight(client, "1.2.3", SHA)
 
     def test_preflight_transport_metadata_and_tag_list_errors_fail_closed(self):
         for path in (release.REPO_API, release.PACKAGE_API, release.registry_path("tags/list")):
@@ -502,6 +510,19 @@ class ArchiveIdentity(unittest.TestCase):
         with self.assertRaisesRegex(release.ReleaseError, "rootfs chain"):
             release.readback(client, "1.2.3", SHA, local)
 
+    def test_readback_refuses_a_package_still_missing_after_upload(self):
+        client, local = ReadbackSafety().fixture()
+        client.responses[release.PACKAGE_API] = response(404, {
+            "message": "Not Found", "documentation_url": "https://docs.github.com/rest/packages"})
+        with tempfile.TemporaryDirectory() as directory:
+            env = {"VERSION": "1.2.3", "SOURCE_SHA": SHA, "METADATA_DIR": directory}
+            with mock.patch.dict(os.environ, env), mock.patch.object(release, "git", return_value=SHA), \
+                    mock.patch.object(release, "Client", return_value=client), \
+                    mock.patch.object(release, "local_identity", return_value=local), \
+                    mock.patch("sys.argv", ["helper", "readback"]):
+                with self.assertRaisesRegex(release.ReleaseError, "missing after upload"):
+                    release.main()
+
     def test_readback_requires_the_pre_smoke_identity_stamp(self):
         client, local = ReadbackSafety().fixture()
         client.responses[release.PACKAGE_API] = response(200, {"name": release.PACKAGE,
@@ -535,15 +556,12 @@ class ArchiveIdentity(unittest.TestCase):
 
 
 class SpecRegressions(unittest.TestCase):
-    def test_masked_package_404_denies_even_empty_or_missing_registry(self):
-        safety = RegistrySafety()
-        for registry in (response(200, {"name": release.REGISTRY_NAME, "tags": []}),
-                         response(404, {"errors": [{"code": "NAME_UNKNOWN"}]})):
-            client = safety.preflight_client(404)
-            client.responses[release.registry_path("tags/list")] = registry
-            with self.subTest(registry=registry), self.assertRaises(release.ReleaseError):
-                release.preflight(client, "1.2.3", SHA)
-            self.assertNotIn(release.registry_path("tags/list"), client.calls)
+    def test_masked_package_404_denies_an_existing_registry_repository(self):
+        client = RegistrySafety().preflight_client(404)
+        client.responses[release.registry_path("tags/list")] = response(200, {"name": release.REGISTRY_NAME, "tags": []})
+        with self.assertRaises(release.ReleaseError):
+            release.preflight(client, "1.2.3", SHA)
+        self.assertFalse(any("/manifests/" in call for call in client.calls))
 
     def test_opaque_reduced_scope_token_cannot_authorize_masked_metadata(self):
         with mock.patch.dict("os.environ", {"GITHUB_TOKEN": "test-only", "GITHUB_REPOSITORY": release.REPO}):

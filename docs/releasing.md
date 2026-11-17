@@ -97,23 +97,24 @@ anyone may pull the image without a GitHub login. Publishing it does not make a
 server reachable; the server has no authentication and stays on a trusted LAN
 (see [nest storage](nest-storage.md#deploying-with-compose)).
 
-Publication requires an **existing public package**, linked to
-`ajisaacs/OpenNest`, with repository Actions access (normally inherited from the
-link). The job uses only its scoped `GITHUB_TOKEN`. All package metadata 404s are
-refused: a 404 proves neither absence nor visibility. Opaque registry token
-success, an empty tag list, or a registry 404 cannot override the metadata check.
-Explicit reduced scope and failed registry read access also stop the job. A
-package that is private or linked to another repository stops the job before
-upload, and the job rechecks public visibility and association after upload. The
-clean-runner verification then pulls the returned digest **without logging in**,
-which proves anonymous pulls work.
+The job uses only its scoped `GITHUB_TOKEN`. An existing package must be public
+and linked to `ajisaacs/OpenNest`; a private package or one linked to another
+repository stops the job before upload. The first publication creates the
+package: GitHub's own `Not Found` package response is accepted only when the
+registry also reports the repository unknown, because a package hidden from the
+token still has a registry repository. Every other metadata error, denial,
+reduced registry scope or failed tag-list read stops the job. Because the source
+repository is public and the image carries its `org.opencontainers.image.source`
+label, the new package is linked to the repository and public. The job rechecks
+public visibility and association after upload, and the clean-runner
+verification pulls the returned digest **without logging in**, which proves
+anonymous pulls work.
 
-First-package initialization is a one-time owner step outside this workflow:
-push any image to `ghcr.io/ajisaacs/opennest-server` under a tag that no release
-will use (never `X.Y.Z` or `sha-*`), then in the package settings link it to
-`ajisaacs/OpenNest`, give that repository Actions write access and set visibility
-to public. There is no automatic bootstrap, extra PAT or bypass setting, and no
-workflow changes visibility.
+If a first publication fails that recheck (the package came out private), the two
+tags are already uploaded and a retry refuses them: in the package settings make
+it public and confirm the anonymous pull by hand, or delete the package and
+dispatch again. There is no extra PAT or bypass setting, and no workflow changes
+visibility.
 
 The local gate reads `docker image save` to hash the actual config and verify each
 layer against its ordered uncompressed rootfs digest. It rejects unexpected
