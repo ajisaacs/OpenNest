@@ -130,7 +130,7 @@ public class CommonLinePostTests
         var gravograph = Assert.Throws<InvalidOperationException>(() => new GravographISPostProcessor().Post(nest, stream));
 
         Assert.Contains("cannot write single-pass common lines", cincinnati.Message);
-        Assert.Contains("Cut Common Lines Twice", gravograph.Message);
+        Assert.Contains("cut its common lines twice, replan", gravograph.Message);
         Assert.Equal(0, stream.Length);
     }
 

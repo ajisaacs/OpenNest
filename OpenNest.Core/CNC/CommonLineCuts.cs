@@ -57,8 +57,7 @@ namespace OpenNest.CNC
                         throw new InvalidOperationException(
                             $"Plate {p + 1}, part {i + 1} cuts a common line once, but the "
                             + $"{postProcessor?.Name ?? "selected"} post cannot write single-pass common lines. "
-                            + "Set the plate to cut its common lines twice (Plate > Arrange > Cut Common Lines Twice), "
-                            + "plan cutting again, then post.");
+                            + "Set the plate to cut its common lines twice, replan, then post.");
             }
         }
     }
