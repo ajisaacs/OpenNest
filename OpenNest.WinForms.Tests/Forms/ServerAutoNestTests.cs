@@ -13,8 +13,10 @@ namespace OpenNest.WinForms.Tests.Forms;
 /// <summary>
 /// A server Auto Nest's progress window: the streamed stage text and the worker's best plan so
 /// far in the same strip a local run fills, and the notice shown when a job ends while
-/// OpenNest is not in front.
+/// OpenNest is not in front. Runs alone: the notice walks Application.OpenForms, which the
+/// other STA tests change while they open and close forms.
 /// </summary>
+[Collection("Fill operation lifetime")]
 public class ServerAutoNestTests
 {
     private sealed class Collect : IProgress<NestJobProgress>
