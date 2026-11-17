@@ -92,23 +92,28 @@ server/image gates, and pushes the *same smoked image* to
 be absent; retries after even a partial upload stop instead of overwriting. There
 are no `latest`, major, or minor aliases. Do not dispatch just to test publication.
 
-Publication requires an **existing owner-verifiable private package**, linked to
+The image is **public** (owner decision): the source repository is public, and
+anyone may pull the image without a GitHub login. Publishing it does not make a
+server reachable; the server has no authentication and stays on a trusted LAN
+(see [nest storage](nest-storage.md#deploying-with-compose)).
+
+Publication requires an **existing public package**, linked to
 `ajisaacs/OpenNest`, with repository Actions access (normally inherited from the
 link). The job uses only its scoped `GITHUB_TOKEN`. All package metadata 404s are
-refused: GitHub can mask an inaccessible private package as `Not Found`. Opaque
-registry token success, an empty tag list, or a registry 404 proves neither package
-absence nor privacy and cannot override the metadata check. Explicit reduced
-scope and failed registry read access also stop the job. The job rechecks private
-association after upload.
+refused: a 404 proves neither absence nor visibility. Opaque registry token
+success, an empty tag list, or a registry 404 cannot override the metadata check.
+Explicit reduced scope and failed registry read access also stop the job. A
+package that is private or linked to another repository stops the job before
+upload, and the job rechecks public visibility and association after upload. The
+clean-runner verification then pulls the returned digest **without logging in**,
+which proves anonymous pulls work.
 
-First-package initialization is a separately owner-authorized prerequisite
-outside this workflow. Until the private package, repository link, and Actions
-access can be verified, publication remains blocked while read-only validation
-can pass. There
-is no automatic bootstrap, extra PAT, absence assertion, or bypass setting. A
-local credential's Packages API 403 proves neither absence nor privacy. No
-workflow changes visibility. Public availability needs separate owner approval
-and a later anonymous-pull check; it is not approved here.
+First-package initialization is a one-time owner step outside this workflow:
+push any image to `ghcr.io/ajisaacs/opennest-server` under a tag that no release
+will use (never `X.Y.Z` or `sha-*`), then in the package settings link it to
+`ajisaacs/OpenNest`, give that repository Actions write access and set visibility
+to public. There is no automatic bootstrap, extra PAT or bypass setting, and no
+workflow changes visibility.
 
 The local gate reads `docker image save` to hash the actual config and verify each
 layer against its ordered uncompressed rootfs digest. It rejects unexpected
@@ -137,6 +142,6 @@ python3 -m unittest discover -s scripts -p test_server_image_release.py -v
 ```
 
 Deployment is deliberately separate; use the verified digest and the
-[private pull/Compose procedure](nest-storage.md#deploying-with-compose). No
+[pull/Compose procedure](nest-storage.md#deploying-with-compose). No
 publication, release creation, deployment, or visibility change is implied by
 adding or validating this workflow.

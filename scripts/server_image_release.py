@@ -119,10 +119,10 @@ def absent(status, headers, body):
 def package_policy(status, headers, body):
     data = json_body(body)
     require(isinstance(data, dict), "malformed package metadata")
-    require(status == 200, "package metadata inaccessible; privacy unknown")
+    require(status == 200, "package metadata inaccessible; visibility unknown")
     require(data.get("name") == PACKAGE and data.get("package_type") == "container" and
-            data.get("visibility") == "private" and isinstance(data.get("repository"), dict) and
-            data["repository"].get("full_name") == REPO, "package privacy/association mismatch")
+            data.get("visibility") == "public" and isinstance(data.get("repository"), dict) and
+            data["repository"].get("full_name") == REPO, "package visibility/association mismatch")
     return False
 
 
@@ -200,7 +200,7 @@ def preflight(client, release_version, sha):
     require(not any(tag in (data["tags"] or []) for tag in reserved_tags), "refusing existing immutable tag")
     for tag in reserved_tags:
         require(absent(*client.get(registry_path("manifests/" + tag))), "refusing existing immutable tag")
-    return {"package": IMAGE, "visibility": "private"}
+    return {"package": IMAGE, "visibility": "public"}
 
 
 def content_digest(body):

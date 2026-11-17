@@ -123,11 +123,11 @@ class RegistrySafety(unittest.TestCase):
                 release.absent(*response(status, body))
         self.assertFalse(release.absent(*response(200, {"schemaVersion": 2})))
 
-    def test_private_associated_package(self):
-        package = {"name": release.PACKAGE, "package_type": "container", "visibility": "private",
+    def test_public_associated_package(self):
+        package = {"name": release.PACKAGE, "package_type": "container", "visibility": "public",
                    "repository": {"full_name": release.REPO}}
         self.assertFalse(release.package_policy(*response(200, package)))
-        for key, value in (("visibility", "public"), ("visibility", "internal"),
+        for key, value in (("visibility", "private"), ("visibility", "internal"),
                            ("repository", None), ("repository", {"full_name": "other/OpenNest"}),
                            ("name", "other"), ("package_type", "npm")):
             wrong = dict(package, **{key: value})
@@ -151,7 +151,7 @@ class RegistrySafety(unittest.TestCase):
                 release.registry_token(status, encoded(body))
 
     def preflight_client(self, package_status=200, tags=None):
-        package = {"name": release.PACKAGE, "package_type": "container", "visibility": "private",
+        package = {"name": release.PACKAGE, "package_type": "container", "visibility": "public",
                    "repository": {"full_name": release.REPO}}
         missing = {"message": "Not Found", "documentation_url": "https://docs.github.com/rest/packages"}
         return FakeClient({
@@ -505,7 +505,7 @@ class ArchiveIdentity(unittest.TestCase):
     def test_readback_requires_the_pre_smoke_identity_stamp(self):
         client, local = ReadbackSafety().fixture()
         client.responses[release.PACKAGE_API] = response(200, {"name": release.PACKAGE,
-            "package_type": "container", "visibility": "private", "repository": {"full_name": release.REPO}})
+            "package_type": "container", "visibility": "public", "repository": {"full_name": release.REPO}})
         with tempfile.TemporaryDirectory() as directory:
             env = {"VERSION": "1.2.3", "SOURCE_SHA": SHA, "METADATA_DIR": directory}
             stamp = pathlib.Path(directory) / "local.json"

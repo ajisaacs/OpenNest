@@ -244,16 +244,15 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
-      packages: read
     env:
       VERSION: ${{ needs.publish.outputs.version }}
       SOURCE_SHA: ${{ needs.publish.outputs.source_sha }}
       MANIFEST_DIGEST: ${{ needs.publish.outputs.manifest_digest }}
       CONFIG_DIGEST: ${{ needs.publish.outputs.config_digest }}
     steps:
-      - name: Isolate logs, safe metadata and ephemeral auth
+      - name: Isolate logs, safe metadata and an empty Docker config
         run: |
-          printf 'METADATA_DIR=%s/server-image-metadata\nRESULTS=%s/server-image-results\nDOCKER_CONFIG=%s/server-image-auth\n' \
+          printf 'METADATA_DIR=%s/server-image-metadata\nRESULTS=%s/server-image-results\nDOCKER_CONFIG=%s/server-image-anonymous\n' \
             "$RUNNER_TEMP" "$RUNNER_TEMP" "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -264,25 +263,19 @@ jobs:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet8
         with:
           dotnet-version: '8.0.x'
-      - name: Pull returned digest on a clean runner
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull returned digest anonymously on a clean runner
         run: |
           python3 -c 'import os,sys; sys.path.insert(0,"scripts"); from server_image_release import sha256,commit,version; sha256(os.environ["MANIFEST_DIGEST"]); sha256(os.environ["CONFIG_DIGEST"]); commit(os.environ["SOURCE_SHA"]); version("v"+os.environ["VERSION"])'
           mkdir -m 700 -p "$DOCKER_CONFIG"
-          printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           image="ghcr.io/ajisaacs/opennest-server@$MANIFEST_DIGEST"
           docker pull --platform linux/amd64 "$image"
           printf 'LOCAL_IMAGE=%s\n' "$image" >> "$GITHUB_ENV"
-      - name: Remove ephemeral Docker credentials
-        if: always()
-        run: rm -rf -- "$DOCKER_CONFIG"
       - name: Verify pulled digest, config, platform and provenance
         run: python3 scripts/server_image_release.py pulled
       - name: Real-client persistence smoke of pulled digest
         run: scripts/Test-ServerContainer.sh --image "$LOCAL_IMAGE" --results "$RESULTS/smoke"
       - name: Mark verified only after pulled-image smoke passes
-        run: printf 'Verified private server image `%s` from `%s`.\n' "$LOCAL_IMAGE" "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
+        run: printf 'Verified public server image `%s` from `%s`.\n' "$LOCAL_IMAGE" "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
       - name: Retain logs and safe pulled-image provenance only
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

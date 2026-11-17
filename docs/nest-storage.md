@@ -1305,17 +1305,12 @@ under a local name such as `server.env`, and set:
   one layer: verify that the network/firewall admits only trusted clients.
 - `OPENNEST_HOST_PORT` (default 8090) and `OPENNEST_DATA_VOLUME` (default `opennest-data`).
 
-Publication requires an existing verified private package; first-package
-initialization needs separate owner authorization outside the release workflow.
-An authorized deployment operator must obtain a
-`read:packages` token out of band and log in on the deployment host using
-`docker login ghcr.io -u <github-user> --password-stdin`, piping the token from a
-secret manager or a protected prompt (never a token literal in shell history).
-Keep Docker's credentials protected on that host; do not put credentials in
-`server.env`, Compose, the image, or source control. Login/pull success does not
-authorize making the package public. Until an approved image has passed the
-published-digest smoke, the reference below is only a template, not an available
-verified image.
+The published image is public, so the deployment host pulls it without a GitHub
+login or token. A public image does not make the server safe to expose: it has no
+authentication, so keep it on a trusted LAN as described above. Do not put
+credentials in `server.env`, Compose, the image, or source control. Until an
+approved image has passed the published-digest smoke, the reference below is only
+a template, not an available verified image.
 
 ```sh
 compose="docker compose --env-file server.env -f compose.server.yaml"
