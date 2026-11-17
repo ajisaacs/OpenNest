@@ -873,14 +873,21 @@ namespace OpenNest.Avalonia
         // so Enter, arrows and Delete reach the tool after a menu click.
         private void OnCut(object sender, RoutedEventArgs e)
         {
-            if (ActiveView?.PlateView is { } canvas && canvas.CutSelection())
+            if (ActiveView is { PlateView: { } canvas } view && canvas.CutSelection())
+            {
+                // Focusing the view would otherwise place a drawing picked up in the list.
+                view.CancelPickup();
                 canvas.Focus();
+            }
         }
 
         private void OnCopy(object sender, RoutedEventArgs e)
         {
-            if (ActiveView?.PlateView is { } canvas && canvas.CopySelection())
+            if (ActiveView is { PlateView: { } canvas } view && canvas.CopySelection())
+            {
+                view.CancelPickup();
                 canvas.Focus();
+            }
         }
 
         // Read at each click, as WinForms reads its setting, so a change in Options applies now.

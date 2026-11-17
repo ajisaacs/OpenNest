@@ -1,14 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using OpenNest.Avalonia.Controls;
 using OpenNest.Desktop;
+using OpenNest.Desktop.Interaction;
 
 namespace OpenNest.Avalonia
 {
-    public sealed record DrawingRow(string Name, int Nested, int Required);
+    public sealed record DrawingRow(string Name, int Nested, int Required, Drawing Drawing);
 
     /// <summary>
     /// One open nest: Plates and Drawings tabs on the left, the plate header and plate view on
@@ -35,6 +39,126 @@ namespace OpenNest.Avalonia
             // Starts watching the last two plates (the tab already put the empty plate there).
             plates.EnsureSentinel();
             Refresh(0);
+            // Adding parts from the drawing list, as the WinForms nest window: a press picks a
+            // drawing up for the plate view, a drag drops one part on the plate.
+            DrawingGrid.AddHandler(PointerPressedEvent, OnDrawingPressed, RoutingStrategies.Tunnel,
+                handledEventsToo: true);
+            DrawingGrid.AddHandler(PointerMovedEvent, OnDrawingDragged, RoutingStrategies.Tunnel,
+                handledEventsToo: true);
+            DrawingGrid.AddHandler(PointerReleasedEvent, (_, _) => pressedDrawing = null,
+                RoutingStrategies.Tunnel, handledEventsToo: true);
+            Canvas.GotFocus += OnCanvasFocused;
+            DragDrop.SetAllowDrop(Canvas, true);
+            Canvas.AddHandler(DragDrop.DragEnterEvent, OnDrawingDragOver);
+            Canvas.AddHandler(DragDrop.DragOverEvent, OnDrawingDragOver);
+            Canvas.AddHandler(DragDrop.DropEvent, OnDrawingDrop);
+        }
+
+        /// <summary>The drag format carrying a <see cref="Drawing"/> from the list.</summary>
+        public const string DrawingFormat = "OpenNest.Drawing";
+
+        private readonly DrawingPickup pickup = new();
+        private Drawing pressedDrawing;
+        private Point pressPoint;
+
+        private static Drawing DrawingUnder(PointerEventArgs e) =>
+            (e.Source as Visual)?.FindAncestorOfType<DataGridRow>(includeSelf: true)
+                ?.DataContext is DrawingRow row
+                ? row.Drawing
+                : null;
+
+        // As the WinForms list: a single left press picks the drawing up (a drag can start from
+        // it); a double-click puts it down.
+        private void OnDrawingPressed(object sender, PointerPressedEventArgs e)
+        {
+            var point = e.GetCurrentPoint(DrawingGrid);
+            pressPoint = point.Position;
+            pressedDrawing = null;
+            if (!point.Properties.IsLeftButtonPressed)
+                return;
+            if (e.ClickCount != 1)
+            {
+                pickup.PutDown();
+                return;
+            }
+            pressedDrawing = DrawingUnder(e);
+            if (pressedDrawing != null)
+                pickup.PickUp();
+        }
+
+        // A press moved more than 3 pixels drags the drawing; a drop on the plate puts it down.
+        private async void OnDrawingDragged(object sender, PointerEventArgs e)
+        {
+            var drawing = pressedDrawing;
+            var point = e.GetCurrentPoint(DrawingGrid);
+            if (drawing == null || !point.Properties.IsLeftButtonPressed)
+                return;
+            var dx = point.Position.X - pressPoint.X;
+            var dy = point.Position.Y - pressPoint.Y;
+            if (dx * dx + dy * dy <= 9)
+                return;
+            pressedDrawing = null;
+            var data = new DataObject();
+            data.Set(DrawingFormat, drawing);
+            try
+            {
+                var result = await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
+                if (result != DragDropEffects.None)
+                    pickup.PutDown();
+            }
+            catch (Exception ex)
+            {
+                // A platform drag failure leaves the drawing picked up, as a cancelled drag does.
+                System.Diagnostics.Debug.WriteLine($"Drawing drag failed: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// Puts a picked-up drawing down: Edit &gt; Cut and Copy start their own place tool and
+        /// then focus the view, which would otherwise swap in the picked drawing.
+        /// </summary>
+        public void CancelPickup()
+        {
+            pickup.PutDown();
+            pressedDrawing = null;
+        }
+
+        private void OnCanvasFocused(object sender, GotFocusEventArgs e)
+        {
+            var selected = (DrawingGrid.SelectedItem as DrawingRow)?.Drawing;
+            if (pickup.TakeOnPlateEnter(selected) is { } drawing)
+                Canvas.PlaceDrawing(drawing);
+        }
+
+        // Only this nest's drawings, and none while edits are locked (WinForms refuses the drop).
+        private Drawing DroppedDrawing(DragEventArgs e) =>
+            e.Data.Get(DrawingFormat) is Drawing drawing
+                && Tab.Document.Nest.Drawings.Any(d => ReferenceEquals(d, drawing))
+                && !Canvas.EditsLocked
+                ? drawing
+                : null;
+
+        private void OnDrawingDragOver(object sender, DragEventArgs e)
+        {
+            if (!e.Data.Contains(DrawingFormat))
+                return;
+            e.DragEffects = DroppedDrawing(e) != null ? DragDropEffects.Copy : DragDropEffects.None;
+            e.Handled = true;
+        }
+
+        private void OnDrawingDrop(object sender, DragEventArgs e)
+        {
+            if (!e.Data.Contains(DrawingFormat))
+                return;
+            var drawing = DroppedDrawing(e);
+            var dropped = drawing != null
+                && Canvas.DropDrawing(drawing, e.GetPosition(Canvas)) != null;
+            // Put down now, not when the drag returns: on X11 and macOS the pointer can enter the
+            // plate (and focus it) before the awaiting drag source resumes.
+            if (dropped)
+                pickup.PutDown();
+            e.DragEffects = dropped ? DragDropEffects.Copy : DragDropEffects.None;
+            e.Handled = true;
         }
 
         // Undo and Redo: puts the copy read back from the history in the document and shows it
@@ -52,6 +176,8 @@ namespace OpenNest.Avalonia
             // As WinForms (EditNestForm EndAction): a tool holds the old nest's parts, so it ends
             // and Escape cannot bring it back.
             Canvas.Tools.EndTool();
+            pickup.PutDown();
+            pressedDrawing = null;
             Tab.Document.Nest = restored;
             Canvas.CutOffSettings = cutOffSettings;
             plates.Dispose();
@@ -106,10 +232,15 @@ namespace OpenNest.Avalonia
             PlateList.SelectedIndex = nest.Plates.Count > 0
                 ? System.Math.Clamp(selectIndex, 0, nest.Plates.Count - 1)
                 : -1;
+            // As the WinForms list: the selected drawing stays selected when the list is rebuilt,
+            // matched as WinForms matches it (by name), so it survives an Undo's new objects.
+            var selected = (DrawingGrid.SelectedItem as DrawingRow)?.Drawing;
             DrawingGrid.ItemsSource = nest.Drawings
                 .Where(d => !d.IsCutOff)
-                .Select(d => new DrawingRow(d.Name, d.Quantity.Nested, d.Quantity.Required))
+                .Select(d => new DrawingRow(d.Name, d.Quantity.Nested, d.Quantity.Required, d))
                 .ToList();
+            DrawingGrid.SelectedItem = ((IEnumerable<DrawingRow>)DrawingGrid.ItemsSource)
+                .FirstOrDefault(row => Equals(row.Drawing, selected));
             shownCounts = CountsText(nest);
             ShowPlate();
         }

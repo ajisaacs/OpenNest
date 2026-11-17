@@ -135,6 +135,20 @@ namespace OpenNest.Avalonia.Controls
         /// </summary>
         public bool CutSelection() => PlateClipboard.Cut(this, tools, ReadPlacementOrder) != null;
 
+        /// <summary>
+        /// A drawing picked in the drawing list and carried into the view: the place tool with one
+        /// new part of it.
+        /// </summary>
+        public void PlaceDrawing(Drawing drawing) =>
+            tools.SetTool(DrawingPlacement.CreatePlaceTool(this, drawing, ReadPlacementOrder));
+
+        /// <summary>
+        /// A drawing dragged from the drawing list and dropped at <paramref name="at"/> (view
+        /// coordinates): one part centred there, or null while edits are locked.
+        /// </summary>
+        public Part DropDrawing(Drawing drawing, Point at) =>
+            DrawingPlacement.AddPart(this, drawing, ToWorld(at));
+
         private SettleOrder ReadPlacementOrder() =>
             PlacementOrder?.Invoke() ?? SettleOrder.ClosestToCorner;
 
@@ -551,6 +565,15 @@ namespace OpenNest.Avalonia.Controls
             panStart = null;
             middleDown = null;
             tools.Current.PointerCaptureLost();
+        }
+
+        // As the WinForms plate view: the pointer entering the view gives it the keyboard, which
+        // also places a drawing picked up in the drawing list.
+        protected override void OnPointerEntered(PointerEventArgs e)
+        {
+            base.OnPointerEntered(e);
+            if (!IsFocused)
+                Focus();
         }
 
         protected override void OnPointerExited(PointerEventArgs e)

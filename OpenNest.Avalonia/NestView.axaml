@@ -11,6 +11,7 @@
         </TabItem>
         <TabItem Header="Drawings" FontSize="14" MinHeight="34">
           <DataGrid x:Name="DrawingGrid" x:DataType="local:DrawingRow" IsReadOnly="True"
+                    SelectionMode="Single"
                     FontSize="13" AutoGenerateColumns="False"
                     GridLinesVisibility="Horizontal" CanUserSortColumns="True">
             <DataGrid.Columns>
