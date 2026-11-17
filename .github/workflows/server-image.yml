@@ -141,8 +141,8 @@ jobs:
     steps:
       - name: Isolate logs, safe metadata and ephemeral auth
         run: |
-          printf 'METADATA_DIR=%s/server-image-metadata\nRESULTS=%s/server-image-results\nDOCKER_CONFIG=%s/server-image-auth\n' \
-            "$RUNNER_TEMP" "$RUNNER_TEMP" "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'METADATA_DIR=%s/server-image-metadata\nRESULTS=%s/server-image-results\nDOCKER_CONFIG=%s/server-image-auth\nRELEASE_POLICY=%s/release-policy/server_image_release.py\n' \
+            "$RUNNER_TEMP" "$RUNNER_TEMP" "$RUNNER_TEMP" "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: master
@@ -153,6 +153,10 @@ jobs:
         env:
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: python3 scripts/server_image_release.py source
+      - name: Keep master's publication policy (an older tag's helper must not decide visibility)
+        run: |
+          mkdir -p "$(dirname "$RELEASE_POLICY")"
+          cp scripts/server_image_release.py "$RELEASE_POLICY"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ steps.source.outputs.source_sha }}
@@ -203,7 +207,7 @@ jobs:
       - name: Refuse unknown visibility, wrong association, and both existing tags
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 scripts/server_image_release.py preflight
+        run: python3 "$RELEASE_POLICY" preflight
       - name: Login and publish only the two immutable tags (no rebuild)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -219,7 +223,7 @@ jobs:
         id: readback
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 scripts/server_image_release.py readback
+        run: python3 "$RELEASE_POLICY" readback
       - name: Remove ephemeral Docker credentials
         if: always()
         run: rm -rf -- "$DOCKER_CONFIG"

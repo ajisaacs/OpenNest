@@ -724,6 +724,20 @@ class WorkflowBehavior(unittest.TestCase):
         self.assertNotIn("'release'", condition)
         self.assertIn("github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'", condition)
 
+    def test_publication_policy_comes_from_master_not_the_tagged_tree(self):
+        # The tag's tree is built and tested, but an older tag's helper must not
+        # decide package visibility: preflight and readback run master's copy.
+        workflow = pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/server-image.yml"
+        publish = workflow.read_text().split("\n  publish:\n", 1)[1].split("\n  verify-published:\n", 1)[0]
+        source = publish.index("server_image_release.py source")
+        copy = publish.index('cp scripts/server_image_release.py "$RELEASE_POLICY"')
+        tag_checkout = publish.index("ref: ${{ steps.source.outputs.source_sha }}")
+        self.assertLess(source, copy)
+        self.assertLess(copy, tag_checkout)
+        for operation in ("preflight", "readback"):
+            self.assertIn('python3 "$RELEASE_POLICY" ' + operation, publish)
+            self.assertNotIn("scripts/server_image_release.py " + operation, publish)
+
     def test_build_log_pipeline_preserves_docker_failure(self):
         workflow = pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/server-image.yml"
         lines = workflow.read_text().splitlines()

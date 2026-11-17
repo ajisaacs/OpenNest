@@ -97,7 +97,10 @@ anyone may pull the image without a GitHub login. Publishing it does not make a
 server reachable; the server has no authentication and stays on a trusted LAN
 (see [nest storage](nest-storage.md#deploying-with-compose)).
 
-The job uses only its scoped `GITHUB_TOKEN`. An existing package must be public
+The job builds, tests and smokes the tag's own tree, but the publication policy
+(preflight before upload and readback after it) always comes from `master`'s copy
+of `scripts/server_image_release.py`, so an older tag publishes under the current
+policy. The job uses only its scoped `GITHUB_TOKEN`. An existing package must be public
 and linked to `ajisaacs/OpenNest`; a private package or one linked to another
 repository stops the job before upload. The first publication creates the
 package: GitHub's own `Not Found` package response is accepted only when the
