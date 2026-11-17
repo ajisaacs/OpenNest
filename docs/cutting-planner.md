@@ -39,7 +39,7 @@ var result = CuttingPlanService.Plan(snapshot, cancellationToken);
   the plate's own under `ForPlate`), each regenerated part the bed cannot hold level gets a
   tabbed perimeter whose automatic entries prefer points where the tab steadies it. A tabbed
   part counts as steady wherever its tab is: it is never warned about and stays crossable once
-  cut. A tab in an inside corner is noted on the plan without changing its status. A part no
+  cut, though the plan [goes around it where it can](#tabbed-parts-are-avoided-first). A tab in an inside corner is noted on the plan without changing its status. A part no
   longer than `TabHeldMaxLength` is held by its tab
   alone, so any tab clear of inside corners steadies it. Without a bed, or with
   `CuttingParameters.TabBySize`, the parts whose width is in `TabSizeMinWidth`..`TabSizeMaxWidth`
@@ -293,6 +293,30 @@ from the kept-order retry and the safest route. Recovery shares the original tot
 expansion budget; exhausting it still returns a refusal from the service, never a
 best-effort upgrade. Only the batch then looks for the separate
 [safest route](#safest-route-fallback-when-the-search-runs-out).
+
+### Tabbed parts are avoided first
+
+A tabbed part stays in the sheet, so a rapid may pass over it, but a route around it is safer.
+When any regenerated part's outside is tabbed (support tabs or the settings' own tabs),
+`CuttingPlanService.Plan` first searches with every tabbed outside as an obstacle once its part
+is cut, closed across its tab gap (`CuttingPlanSnapshot.WithTabbedPartsAvoided`,
+`ReleasedContourState.AvoidTabbedPart`). Entry backtracking then leaves a tabbed part on a
+side that clears it, where its catalog has one.
+
+A pass along the order that stalls at a part whose approach crosses a tabbed part still avoided
+makes just the crossed parts crossable (`CuttingPlanSnapshot.CrossableTabbedParts`) and goes on
+from there along the same order. It learns no order rule from a tabbed part: on a plate of
+tabbed parts, reordering around each one spent the whole budget without finding a plan. So a
+tabbed part is passed over only where no entry of the parts on that order avoids it, typically
+a part whose only level-holding tab point faces away from the next cut. The checkers of that
+search, cut-off placement and the independent replay all read the same set, so the replayed
+plan is the one searched. Its hard obstacles are unchanged: a tabbed part's holes, parts cut
+free, and tabbed outsides whose lead-out may cut the tab free.
+
+A capture this search cannot plan is planned again as before, with every tabbed part crossable.
+The desktop batch's short first pass is kept only when it passed over no tabbed part; otherwise
+the full pass looks for a route around them. The safest-route fallback and the pre-post review
+do not avoid tabbed parts. A plate with no tabbed outside is searched once, exactly as before.
 
 ### Cutoff segments
 

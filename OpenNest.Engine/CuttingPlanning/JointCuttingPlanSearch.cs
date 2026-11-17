@@ -94,16 +94,36 @@ internal static class JointCuttingPlanSearch
             if (snapshot.PreservePartOrder)
             {
                 var keptSequence = Enumerable.Range(0, count).ToArray();
-                if (preferEndpoints)
+                // The order is fixed, so a tabbed part an approach cannot get around is passed over:
+                // each pass that stops at one goes on from there with that part crossable.
+                Node keptResume = null;
+                while (true)
                 {
-                    var preferred = walk.Follow(keptSequence, stall, null, preferredOnly: true);
-                    if (preferred.Order != null)
-                        return walk.Ready(preferred.Order);
-                    var recovered = walk.Follow(keptSequence, stall, null, contourRecovery: true);
-                    if (recovered.Order != null)
-                        return walk.Ready(recovered.Order);
+                    var stopped = new List<Attempt>();
+                    if (preferEndpoints)
+                    {
+                        var preferred = walk.Follow(keptSequence, stall, keptResume, preferredOnly: true);
+                        if (preferred.Order != null)
+                            return walk.Ready(preferred.Order);
+                        var recovered = walk.Follow(keptSequence, stall, keptResume, contourRecovery: true);
+                        if (recovered.Order != null)
+                            return walk.Ready(recovered.Order);
+                        stopped.AddRange([preferred, recovered]);
+                    }
+                    else
+                    {
+                        // The full pass below never stalls; this one only finds where a tabbed part blocks.
+                        var plain = snapshot.AvoidsTabbedParts ? walk.Follow(keptSequence, stall, keptResume) : null;
+                        if (plain?.Order != null)
+                            return walk.Ready(plain.Order);
+                        if (plain != null)
+                            stopped.Add(plain);
+                    }
+                    if (PassOver(snapshot, stopped) is not { } onward)
+                        break;
+                    keptResume = onward;
                 }
-                var kept = walk.Follow(keptSequence, null, null, expansionLimit: FallbackLimit());
+                var kept = walk.Follow(keptSequence, null, keptResume, expansionLimit: FallbackLimit());
                 return kept.Order != null ? walk.Ready(kept.Order) : walk.Exhausted();
             }
 
@@ -129,6 +149,7 @@ internal static class JointCuttingPlanSearch
                 // A pass that teaches an order rule ends the round: the heavier passes would
                 // only repeat the same blocked approach along the same order.
                 Attempt attempt = null;
+                Node onward = null;
                 foreach (var (preferredOnly, contourRecovery) in preferEndpoints
                     ? new[] { (true, false), (false, true), (false, false) }
                     : doorAlone ? [(false, true), (false, false)] : [(false, false)])
@@ -136,11 +157,23 @@ internal static class JointCuttingPlanSearch
                     var pass = walk.Follow(sequence, stall, resume, preferredOnly, contourRecovery, prerequisites);
                     if (pass.Order != null)
                         return walk.Ready(pass.Order);
+                    // Stopped at a tabbed part still avoided, after trying the entries that might
+                    // clear it: pass over it and go on from there along the same order. It teaches
+                    // no order rule, and the heavier passes are not tried first: on a plate of
+                    // tabbed parts either costs far more search than it saves crossings.
+                    onward = PassOver(snapshot, [pass]);
+                    if (onward != null)
+                        break;
                     if (Learn(pass, sequence, prerequisites, revoked, swaps))
                     {
                         attempt = pass;
                         break;
                     }
+                }
+                if (onward != null)
+                {
+                    resume = onward;
+                    continue;
                 }
                 // Nothing new to learn after a swap: take back the newest swap and learn the plain
                 // rule its attempt would have taught instead, backing up from that attempt.
@@ -230,6 +263,29 @@ internal static class JointCuttingPlanSearch
             return entities.Length == 0 ? centers[host]
                 : entities.Select(e => e.ClosestPointTo(position)).MinBy(point => point.DistanceTo(position));
         }, token, exits);
+    }
+
+    // Whether the pass stopped at a part whose approach crossed a tabbed part the capture still
+    // avoids (see CuttingPlanSnapshot.AvoidsTabbedParts).
+    private static bool StoppedAtTabbed(CuttingPlanSnapshot snapshot, Attempt pass) =>
+        snapshot.AvoidsTabbedParts && pass.Blocked != null
+        && pass.CrossedTabbed.Any(part => !snapshot.CrossableTabbedParts.Contains(part + 1));
+
+    // Lets rapids pass over the tabbed parts still avoided that the heaviest of these stopped
+    // passes crossed on its blocked approach. Returns the part boundary that pass was blocked at,
+    // to go on from; null when no pass stopped at a tabbed part still avoided.
+    private static Node PassOver(CuttingPlanSnapshot snapshot, IReadOnlyList<Attempt> stopped)
+    {
+        for (var index = stopped.Count - 1; index >= 0; index--)
+        {
+            var pass = stopped[index];
+            if (!StoppedAtTabbed(snapshot, pass))
+                continue;
+            foreach (var part in pass.CrossedTabbed.Order())
+                snapshot.AllowCrossing(part + 1);
+            return pass.Boundary;
+        }
+        return null;
     }
 
     // When the approach crossed the part cut just before the one it left from, and no part but
@@ -1791,6 +1847,15 @@ internal static class JointCuttingPlanSearch
         /// <summary>Parts whose completed contours the blocked part's motions crossed (it can be among them).</summary>
         internal HashSet<int> Crossed { get; } = [];
 
+        /// <summary>
+        /// The parts among <see cref="Crossed"/> whose tabbed outside was crossed while tabbed parts
+        /// are avoided (<see cref="ReleasedContourState.AvoidedTabbedPart"/>).
+        /// </summary>
+        internal HashSet<int> CrossedTabbed { get; } = [];
+
+        /// <summary>The deepest whole-part boundary reached, where the blocked part's approach starts.</summary>
+        internal Node Boundary => Deepest;
+
         // Records a node that gets further along the order than any before. True when it does.
         internal bool Advance(Node node)
         {
@@ -1802,6 +1867,7 @@ internal static class JointCuttingPlanSearch
             {
                 Deepest = node;
                 Crossed.Clear();
+                CrossedTabbed.Clear();
             }
             return true;
         }
@@ -1811,6 +1877,7 @@ internal static class JointCuttingPlanSearch
             progress = -1;
             Deepest = null;
             Crossed.Clear();
+            CrossedTabbed.Clear();
         }
 
         internal void NoteCrossings(int ordinal, IEnumerable<PostVerificationFinding> findings)
@@ -1819,7 +1886,11 @@ internal static class JointCuttingPlanSearch
                 return;
             foreach (var finding in findings)
                 if (finding.Kind == PostVerificationKind.RapidCrossing && finding.OtherPartNumber is int other)
+                {
                     Crossed.Add(other - 1);
+                    if (ReleasedContourState.AvoidedTabbedPart(finding) != null)
+                        CrossedTabbed.Add(other - 1);
+                }
         }
 
         /// <summary>The part boundary at <paramref name="depth"/> on the way to the deepest one.</summary>

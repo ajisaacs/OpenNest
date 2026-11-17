@@ -184,7 +184,9 @@ its steadying entries.
 
 A tabbed part counts as steady wherever its tab is: the steadiest entries above are preferences,
 never a warning. No message says a tab cannot steady its part, and once cut a tabbed part stays
-crossable, as its retained material allows, whether or not its tab holds it level. The pre-post
+crossable, as its retained material allows, whether or not its tab holds it level. Plan Cutting
+still routes around tabbed parts where it can and passes over only those it finds no way around
+(see [tabbed parts are avoided first](cutting-planner.md#tabbed-parts-are-avoided-first)). The pre-post
 review does not read support settings for rapids, so it checks rapid crossings against untabbed
 contours only.
 

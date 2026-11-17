@@ -91,10 +91,51 @@ public sealed class CuttingPlanSnapshot
 
     /// <summary>
     /// An empty rapid checker for this capture. A tabbed part counts as steady once cut, so
-    /// rapids may cross it as its retained material allows.
+    /// rapids may cross it as its retained material allows; with <see cref="AvoidsTabbedParts"/>
+    /// its outside is an obstacle all the same.
     /// </summary>
     internal ReleasedContourState NewReleasedState() =>
-        new(reportMissingLeadIns: false, null, CommonLineMembers.Count == 0 ? null : CommonLineMembers.Contains);
+        new(reportMissingLeadIns: false, null, CommonLineMembers.Count == 0 ? null : CommonLineMembers.Contains)
+        {
+            AvoidTabbedPart = AvoidsTabbedParts ? part => !CrossableTabbedParts.Contains(part) : null,
+        };
+
+    /// <summary>
+    /// Whether rapids keep off tabbed parts already cut, as they do off parts cut free. Planning
+    /// tries this first (<see cref="WithTabbedPartsAvoided"/>) and lets rapids cross only the
+    /// tabbed parts it finds no way around (<see cref="CrossableTabbedParts"/>).
+    /// </summary>
+    internal bool AvoidsTabbedParts { get; init; }
+
+    /// <summary>
+    /// With <see cref="AvoidsTabbedParts"/>, the part numbers (source ordinal + 1) of the tabbed
+    /// parts rapids may still pass over. The one search planning this capture adds the parts it
+    /// finds no route around (<see cref="AllowCrossing"/>); its checkers, cut-off placement and the
+    /// replay of its plan all read this same set. Nothing else may change it.
+    /// </summary>
+    internal HashSet<int> CrossableTabbedParts { get; init; } = [];
+
+    /// <summary>
+    /// Lets rapids pass over tabbed part <paramref name="partNumber"/> from here on. False when
+    /// this capture does not avoid tabbed parts or the part was crossable already.
+    /// </summary>
+    internal bool AllowCrossing(int partNumber) => AvoidsTabbedParts && CrossableTabbedParts.Add(partNumber);
+
+    /// <summary>Whether any regenerated part's outside is tabbed, so avoiding tabbed parts changes the search.</summary>
+    internal bool HasTabbedParts => Placements.Any(placement => placement.Prepared is { PerimeterTabbed: true });
+
+    /// <summary>The same capture planned with rapids kept off tabbed parts already cut.</summary>
+    internal CuttingPlanSnapshot WithTabbedPartsAvoided() =>
+        new(Placements, StartPoint, ExpansionBudget, Failure, Findings, Regeneration,
+            PreservePartOrder, MaxEntries, ExpansionObserver, PlateState, OwnedParameters,
+            Dependencies, BestEffort)
+        {
+            SupportTabsSkipped = SupportTabsSkipped,
+            CommonLineMembers = CommonLineMembers,
+            CommonLineOrder = CommonLineOrder,
+            AcceptsTabLeadOuts = AcceptsTabLeadOuts,
+            AvoidsTabbedParts = true,
+        };
 
     /// <summary>
     /// Part numbers (source ordinal + 1) of the members of common-line groups cut once
@@ -146,6 +187,8 @@ public sealed class CuttingPlanSnapshot
             CommonLineMembers = CommonLineMembers,
             CommonLineOrder = CommonLineOrder,
             AcceptsTabLeadOuts = AcceptsTabLeadOuts,
+            AvoidsTabbedParts = AvoidsTabbedParts,
+            CrossableTabbedParts = [.. CrossableTabbedParts],
         };
 
     /// <summary>
@@ -162,6 +205,8 @@ public sealed class CuttingPlanSnapshot
             CommonLineMembers = CommonLineMembers,
             CommonLineOrder = CommonLineOrder,
             AcceptsTabLeadOuts = true,
+            AvoidsTabbedParts = AvoidsTabbedParts,
+            CrossableTabbedParts = [.. CrossableTabbedParts],
         };
 
     /// <summary>Whether this capture accepts tab lead-outs (see <see cref="WithTabLeadOuts"/>).</summary>
@@ -180,6 +225,8 @@ public sealed class CuttingPlanSnapshot
             CommonLineMembers = CommonLineMembers,
             CommonLineOrder = CommonLineOrder,
             AcceptsTabLeadOuts = AcceptsTabLeadOuts,
+            AvoidsTabbedParts = AvoidsTabbedParts,
+            CrossableTabbedParts = [.. CrossableTabbedParts],
         };
 }
 

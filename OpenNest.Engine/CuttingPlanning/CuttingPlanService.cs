@@ -290,6 +290,22 @@ public static class CuttingPlanService
     /// <summary>Worker-only planning uses owned values; live identities are never dereferenced.</summary>
     public static CuttingPlanResult Plan(CuttingPlanSnapshot snapshot, CancellationToken token = default)
     {
+        // A tabbed part stays in the sheet and may be passed over, but a route around it is safer:
+        // look for one first, with tabbed parts as obstacles, and cross them only without it.
+        // Where the search finds no way around one, that part alone becomes crossable and the
+        // search goes on, so a boxed-in part does not give up the rest. A plan it still cannot
+        // find is searched for as before, with every tabbed part crossable.
+        if (snapshot is { AvoidsTabbedParts: false, Regeneration: true, BestEffort: false, Failure: null, HasTabbedParts: true })
+        {
+            var avoiding = snapshot.WithTabbedPartsAvoided();
+            var clear = PlanCaptured(avoiding, token);
+            if (clear.IndependentlyReplayed && clear.Status is CuttingPlanStatus.Ready or CuttingPlanStatus.BestEffort
+                || clear.Status == CuttingPlanStatus.Canceled)
+            {
+                clear.Snapshot = avoiding;
+                return clear;
+            }
+        }
         var result = PlanCaptured(snapshot, token);
         result.Snapshot = snapshot;
         // Refused only for configured lead-outs that may cut their tabs free: plan again keeping

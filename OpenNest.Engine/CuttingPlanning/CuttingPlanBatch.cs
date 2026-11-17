@@ -265,9 +265,11 @@ public sealed class CuttingPlanBatch
             // A replayed proposal whose only warnings are fixed emissions passed every strict
             // check; fixed emissions never steer the search, so the full pass cannot improve it.
             // A plan keeping tab lead-outs is not taken from the short pass: the full pass may
-            // still find a clean route.
+            // still find a clean route. Nor is one that passes over tabbed parts: the full pass
+            // may still find a route around them.
             if (first.IndependentlyReplayed && first.Status is CuttingPlanStatus.Ready or CuttingPlanStatus.BestEffort
                     && !first.Findings.Any(f => f.Kind == PostVerificationKind.TabLeadOut)
+                    && (first.Snapshot is { AvoidsTabbedParts: true, CrossableTabbedParts.Count: 0 } || !snapshot.HasTabbedParts)
                 || first.Status == CuttingPlanStatus.Canceled)
                 return first;
         }

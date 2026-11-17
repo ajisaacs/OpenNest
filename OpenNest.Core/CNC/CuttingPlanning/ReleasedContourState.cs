@@ -24,6 +24,25 @@ public sealed class ReleasedContourState
     private int partContours;
     private bool partClosed;
 
+    /// <summary>
+    /// Parts (by caller part number) whose tabbed outside is an obstacle once the part ends, closed
+    /// across its tab gap, as if the part were cut free. A tabbed part stays in the sheet and may be
+    /// passed over, but a route around it is safer: planning looks for one first and lets rapids
+    /// cross only the tabbed parts it finds no way around. It is asked at each rapid, so a part can
+    /// become crossable after it was cut, in this state and its copies alike. Null avoids none.
+    /// </summary>
+    internal Func<int, bool> AvoidTabbedPart { get; init; }
+
+    /// <summary>
+    /// The part whose tabbed outside <paramref name="finding"/>'s rapid crosses, when that outside is
+    /// an obstacle only because tabbed parts are avoided (<see cref="AvoidTabbedPart"/>); null otherwise.
+    /// </summary>
+    internal static int? AvoidedTabbedPart(PostVerificationFinding finding) =>
+        finding is { Kind: PostVerificationKind.RapidCrossing, OtherPartNumber: { } part }
+        && finding.Message.EndsWith(TabbedOutside(part), StringComparison.Ordinal) ? part : null;
+
+    private static string TabbedOutside(int part) => $"the tabbed outside of part {part}.";
+
     /// <summary>Why a lead-out after an open cut is refused when the open-cut proof cannot clear it.</summary>
     internal const string LeadOutRetentionMessage =
         "A lead-out follows an open cutting contour and may cut through its retention gap. "
@@ -58,6 +77,7 @@ public sealed class ReleasedContourState
     {
         var copy = new ReleasedContourState(reportMissingLeadIns, tabMayNotHold, commonLineMember)
         {
+            AvoidTabbedPart = AvoidTabbedPart,
             partContours = partContours,
             partClosed = partClosed,
         };
@@ -229,6 +249,9 @@ public sealed class ReleasedContourState
                     // A rapid well clear of a contour's extent can neither cross nor touch it.
                     if (reach.IsClearOf(obstacle.Extent))
                         continue;
+                    // A tabbed part is avoided only while planning still looks for a way around it.
+                    if (obstacle.Tabbed && AvoidTabbedPart?.Invoke(obstacle.Part) != true)
+                        continue;
                     // A rapid leaving an overcut departs from its retraced tail, which lies on the first
                     // cut only within the seam tolerance its arcs were matched at. Contact within that
                     // much of the departure is the departure itself.
@@ -244,6 +267,8 @@ public sealed class ReleasedContourState
                             ? $"the tabbed outside of part {obstacle.Part}, which its tab may not hold level."
                             : obstacle.TabCutFree
                             ? $"the tabbed outside of part {obstacle.Part}, whose lead-out may cut its tab free."
+                            : obstacle.Tabbed
+                            ? TabbedOutside(obstacle.Part)
                             : $"completed untabbed contour {obstacle.Contour} of part {obstacle.Part}."))
                     {
                         Location = (start + move.End) * 0.5,
@@ -391,13 +416,19 @@ public sealed class ReleasedContourState
                 curves.Add(PostVerificationGeometry.Curve.Create(curves[^1].End, curves[0].Start, null, false));
             obstacles.Add(new(part, contourNumber, curves, null));
         }
-        else if (!cutoff && unfinished.Count > 0 && (cutFree || tabMayNotHold?.Invoke(part) == true))
+        else if (!cutoff && unfinished.Count > 0 && (cutFree || AvoidTabbedPart != null || tabMayNotHold?.Invoke(part) == true))
         {
             var perimeter = unfinished.MaxBy(chain => chain.Curves.Sum(curve => curve.Length));
             var curves = perimeter.Curves.ToList();
             if (curves[^1].End.DistanceTo(curves[0].Start) > PostVerificationGeometry.Epsilon)
                 curves.Add(PostVerificationGeometry.Curve.Create(curves[^1].End, curves[0].Start, null, false));
-            obstacles.Add(new(part, contourNumber, curves, null) { TabMayNotHold = !cutFree, TabCutFree = cutFree });
+            var mayNotHold = !cutFree && tabMayNotHold?.Invoke(part) == true;
+            obstacles.Add(new(part, contourNumber, curves, null)
+            {
+                TabMayNotHold = mayNotHold,
+                TabCutFree = cutFree,
+                Tabbed = !cutFree && !mayNotHold,
+            });
         }
         partContours = contourNumber;
         partClosed = !cutoff && isFixed == null && unfinished.Count == 0 && deferred.Count == 0 && !reportedTab
@@ -682,5 +713,8 @@ public sealed class ReleasedContourState
 
         /// <summary>A tabbed perimeter closed across its tab gap, whose lead-out may cut the tab free.</summary>
         internal bool TabCutFree { get; init; }
+
+        /// <summary>A tabbed perimeter closed across its tab gap, avoided while another route exists.</summary>
+        internal bool Tabbed { get; init; }
     }
 }
