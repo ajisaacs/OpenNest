@@ -17,6 +17,8 @@ public class ShapeCutDirectionTests
     {
         var shapes = new ShapeDefinition[]
         {
+            new AngleShape(),
+            new ChannelShape(),
             new CircleShape(),
             new IsoscelesTriangleShape(),
             new LShape(),
@@ -26,6 +28,7 @@ public class ShapeCutDirectionTests
             new RectangleShape(),
             new RightTriangleShape(),
             new RingShape(),
+            new RolledPlateShape(),
             new RoundedRectangleShape(),
             new TShape(),
             new TrapezoidShape(),
@@ -75,6 +78,9 @@ public class ShapeCutDirectionTests
         Assert.True(perimeter >= 0, $"{name}: no perimeter");
         for (var i = 0; i < contours.Count; i++)
         {
+            // Marks such as etched bend lines are open: they have no winding.
+            if (contours[i].IsMark)
+                continue;
             var area = ContourWinding.SignedArea(contours[i]);
             if (i == perimeter)
                 Assert.True(area < 0, $"{name}: outside is not clockwise");
@@ -86,6 +92,7 @@ public class ShapeCutDirectionTests
     /// <summary>Each contour's winding sign, in a stable order so reordering does not matter.</summary>
     private static List<int> Directions(Program program) =>
         PostContours.Extract(program, Vector.Zero)
+            .Where(c => !c.IsMark)
             .Select(c => System.Math.Sign(ContourWinding.SignedArea(c)))
             .OrderBy(s => s)
             .ToList();

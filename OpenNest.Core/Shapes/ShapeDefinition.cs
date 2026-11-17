@@ -42,6 +42,12 @@ namespace OpenNest.Shapes
         /// </summary>
         public virtual IReadOnlyList<ShapeDimension> GetDimensions() => Array.Empty<ShapeDimension>();
 
+        /// <summary>
+        /// A sheet metal part's cross-section that the Shape Library draws beside the flat blank,
+        /// with the dimensions of parameters the blank cannot show; null for a flat shape.
+        /// </summary>
+        public virtual ShapeSideView GetSideView() => null;
+
         public static List<T> LoadFromJson<T>(string path)
             where T : ShapeDefinition
         {

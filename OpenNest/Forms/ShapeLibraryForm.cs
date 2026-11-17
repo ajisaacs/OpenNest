@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Globalization;
@@ -388,21 +389,28 @@ namespace OpenNest.Forms
 
                 addButton.Enabled = true;
                 nameTextBox.Text = shape.GenerateName();
-                previewBox.ShowDrawing(drawing, newShape);
+                var sideView = shape.GetSideView();
+                previewBox.ShowDrawing(drawing, newShape, sideView?.Entities);
                 newShape = false;
 
-                var dimensions = shape.GetDimensions()
-                    .Where(d => Parameter(d.Property) != null)
+                var dimensions = shape.GetDimensions().Select(d => (Dimension: d, OnSideView: false))
+                    .Concat((sideView?.Dimensions ?? Array.Empty<ShapeDimension>()).Select(d => (Dimension: d, OnSideView: true)))
+                    .Where(d => Parameter(d.Dimension.Property) != null)
                     .ToList();
-                var placed = dimensions.Select(d => d.Property)
-                    .Concat(dimensions.Select(d => d.CountProperty).Where(p => p != null))
+                var placed = dimensions.Select(d => d.Dimension.Property)
+                    .Concat(dimensions.Select(d => d.Dimension.CountProperty).Where(p => p != null))
                     .ToHashSet();
                 previewBox.SetAnnotations(
-                    dimensions.Select(d => new ShapePreviewControl.Annotation(d,
-                        d.Prefix + FormatLength((double)values[d.Property]),
-                        d.CountProperty != null && values.TryGetValue(d.CountProperty, out var count)
-                            ? $"x {count} {d.CountNoun}"
-                            : null)).ToList(),
+                    dimensions.Select(item =>
+                    {
+                        var d = item.Dimension;
+                        return new ShapePreviewControl.Annotation(d,
+                            d.Prefix + FormatLength((double)values[d.Property]),
+                            d.CountProperty != null && values.TryGetValue(d.CountProperty, out var count)
+                                ? $"x {count} {d.CountNoun}"
+                                : null,
+                            item.OnSideView);
+                    }).ToList(),
                     parameters.Where(p => !placed.Contains(p.Name)).Select(NoteFor).ToList());
 
                 var bb = drawing.Program.BoundingBox();
@@ -444,13 +452,17 @@ namespace OpenNest.Forms
             var text = value switch
             {
                 bool b => b ? "Yes" : "No",
+                double d when IsUnitless(prop) => d.ToString("0.####", CultureInfo.CurrentCulture),
                 double d => FormatLength(d),
                 null => "None",
                 _ => value.ToString(),
             };
             var enabled = prop.Name != nameof(PipeFlangeShape.PipeSize) || !Equals(values.GetValueOrDefault(nameof(PipeFlangeShape.Blind)), true);
-            return new ShapePreviewControl.Note(prop.Name, $"{FriendlyName(prop.Name)}: {text}", enabled);
+            var label = prop.GetCustomAttribute<DisplayNameAttribute>()?.DisplayName ?? FriendlyName(prop.Name);
+            return new ShapePreviewControl.Note(prop.Name, $"{label}: {text}", enabled);
         }
+
+        private static bool IsUnitless(PropertyInfo prop) => prop.IsDefined(typeof(UnitlessAttribute));
 
         internal static string FormatLength(double inches) => Fraction.Format(inches) + "\"";
 
@@ -666,6 +678,16 @@ namespace OpenNest.Forms
                 if (count < 0)
                     return "The value cannot be negative.";
                 value = count;
+                return null;
+            }
+
+            if (IsUnitless(prop))
+            {
+                if (!double.TryParse(text?.Trim(), NumberStyles.Float, CultureInfo.CurrentCulture, out var number) || !double.IsFinite(number))
+                    return $"'{text}' is not a number.";
+                if (number < 0)
+                    return "The value cannot be negative.";
+                value = number;
                 return null;
             }
 

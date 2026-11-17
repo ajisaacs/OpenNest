@@ -58,6 +58,16 @@ namespace OpenNest.Controls
 
         // The shown drawing's cut geometry, in its own coordinates (as dimension points are).
         private List<Entity> profile = new();
+
+        // A sheet metal part's section beside the blank, in its own coordinates, and where it is
+        // shown: view = offset + point * scale. Empty when the shape has none.
+        private List<Entity> sideProfile = new();
+        private List<Polygon> sideOutlines = new();
+        private Vector sideOffset;
+        private double sideScale = 1;
+
+        // The view the dimension being laid out belongs to.
+        private Frame frame;
         private IReadOnlyList<Annotation> annotations = Array.Empty<Annotation>();
         private IReadOnlyList<Note> notes = Array.Empty<Note>();
         private AnnotationLayout layout;
@@ -97,7 +107,7 @@ namespace OpenNest.Controls
         internal bool IsUserView => userView;
 
         /// <summary>A dimension to draw: its text, and the count text after it when it has one.</summary>
-        public sealed record Annotation(ShapeDimension Dimension, string Text, string CountText = null);
+        public sealed record Annotation(ShapeDimension Dimension, string Text, string CountText = null, bool OnSideView = false);
 
         /// <summary>A parameter with no place on the drawing, shown as a chip along the bottom.</summary>
         public sealed record Note(string Key, string Text, bool Enabled = true);
@@ -134,6 +144,9 @@ namespace OpenNest.Controls
         /// <summary>The keys of the labels on screen, in drawing order (dimensions, then notes).</summary>
         internal IReadOnlyList<string> LabelKeys => CurrentLayout().Labels.Select(l => l.Key).ToList();
 
+        /// <summary>The text of the label for <paramref name="key"/>, or null when none is shown.</summary>
+        internal string LabelText(string key) => CurrentLayout().Labels.FirstOrDefault(l => l.Key == key)?.Text;
+
         /// <summary>Where the label for <paramref name="key"/> is on the control, or null when none is shown.</summary>
         public Rectangle? LabelBounds(string key)
         {
@@ -142,11 +155,17 @@ namespace OpenNest.Controls
         }
 
         /// <summary>
-        /// Shows <paramref name="drawing"/>. A new shape (<paramref name="newShape"/>) fits the
-        /// view and puts dragged dimensions back; a changed parameter keeps a hand-set view.
+        /// Shows <paramref name="drawing"/>, and to its right <paramref name="sideView"/>, a sheet metal
+        /// part's section, enlarged when it would be too small to read beside the blank. A new
+        /// shape (<paramref name="newShape"/>) fits the view and puts dragged dimensions back; a
+        /// changed parameter keeps a hand-set view.
         /// </summary>
-        public void ShowDrawing(Drawing drawing, bool newShape = true)
+        public void ShowDrawing(Drawing drawing, bool newShape = true, IReadOnlyList<Entity> sideView = null)
         {
+            sideProfile = drawing?.Program != null && sideView != null ? sideView.ToList() : new List<Entity>();
+            sideOutlines = sideProfile.Count == 0
+                ? new List<Polygon>()
+                : ShapeBuilder.GetShapes(sideProfile).Select(s => s.ToPolygon()).ToList();
             if (newShape)
             {
                 userView = false;
@@ -167,6 +186,7 @@ namespace OpenNest.Controls
                 var shown = Plate.Parts[0].BoundingBox;
                 var source = drawing.Program.BoundingBox();
                 shapeOffset = new Vector(shown.X - source.X, shown.Y - source.Y);
+                PlaceSideView(shown);
                 FitUnlessUserView();
             }
             else
@@ -174,6 +194,54 @@ namespace OpenNest.Controls
                 annotations = Array.Empty<Annotation>();
                 Invalidate();
             }
+        }
+
+        /// <summary>
+        /// Puts the side view to the right of the blank, centered on it, a quarter of the blank's
+        /// larger size away. A section under 35% of that size is enlarged to it, so a long part's
+        /// section stays readable; its dimensions show the true sizes.
+        /// </summary>
+        private void PlaceSideView(Box blank)
+        {
+            sideScale = 1;
+            sideOffset = Vector.Zero;
+            var section = SideBounds();
+            if (section == null)
+                return;
+
+            var blankSize = System.Math.Max(blank.Length, blank.Width);
+            var sectionSize = System.Math.Max(section.Length, section.Width);
+            if (sectionSize > 0)
+                sideScale = System.Math.Max(1, 0.35 * blankSize / sectionSize);
+            var gap = 0.25 * blankSize;
+            sideOffset = new Vector(
+                blank.Right + gap - section.X * sideScale,
+                blank.Center.Y - (section.Y + section.Width / 2) * sideScale);
+        }
+
+        /// <summary>The side view's bounds in its own coordinates; null when there is none.</summary>
+        private Box SideBounds()
+        {
+            if (sideProfile.Count == 0)
+                return null;
+            var boxes = sideProfile.Select(e => e.BoundingBox).ToList();
+            var left = boxes.Min(b => b.Left);
+            var bottom = boxes.Min(b => b.Bottom);
+            return new Box(left, bottom, boxes.Max(b => b.Right) - left, boxes.Max(b => b.Top) - bottom);
+        }
+
+        /// <summary>The blank's and the side view's bounds together, in view coordinates.</summary>
+        private Box ViewBounds()
+        {
+            var blank = Plate.Parts[0].BoundingBox;
+            var section = SideBounds();
+            if (section == null)
+                return blank;
+            var left = System.Math.Min(blank.Left, sideOffset.X + section.Left * sideScale);
+            var bottom = System.Math.Min(blank.Bottom, sideOffset.Y + section.Bottom * sideScale);
+            var right = System.Math.Max(blank.Right, sideOffset.X + section.Right * sideScale);
+            var top = System.Math.Max(blank.Top, sideOffset.Y + section.Top * sideScale);
+            return new Box(left, bottom, right - left, top - bottom);
         }
 
         protected override void OnResize(EventArgs e)
@@ -217,7 +285,7 @@ namespace OpenNest.Controls
                 return;
             }
 
-            var box = Plate.Parts[0].BoundingBox;
+            var box = ViewBounds();
             if (box.Length <= 0 || box.Width <= 0)
             {
                 base.ZoomToFit(redraw);
@@ -251,7 +319,7 @@ namespace OpenNest.Controls
                 UpdateMatrix();
 
                 layout = BuildLayout();
-                var shape = ShapeRect();
+                var shape = GuiRect(box);
                 var reach = layout.DimensionBounds;
                 if (reach.IsEmpty)
                     break;
@@ -438,10 +506,32 @@ namespace OpenNest.Controls
             Renderer.DrawPlate(e.Graphics);
             Renderer.DrawLibraryParts(e.Graphics, ColorScheme.Default);
             e.Graphics.ResetTransform();
+            PaintSideView(e.Graphics);
 
             layout = BuildLayout();
             PaintAnnotations(e.Graphics, layout);
             PaintInfo(e.Graphics);
+        }
+
+        /// <summary>Fills and outlines the side view's section as the blank is drawn.</summary>
+        private void PaintSideView(Graphics g)
+        {
+            if (sideOutlines.Count == 0 || Plate.Parts.Count == 0)
+                return;
+
+            frame = SideFrame();
+            using var path = new GraphicsPath(FillMode.Alternate);
+            foreach (var outline in sideOutlines)
+            {
+                var points = outline.Vertices.Select(ToScreen).ToArray();
+                if (points.Length > 2)
+                    path.AddPolygon(points);
+            }
+            var scheme = ColorScheme.Default;
+            using var fill = new SolidBrush(scheme.LibraryFillColor);
+            using var pen = new Pen(scheme.LibraryOutlineColor);
+            g.FillPath(fill, path);
+            g.DrawPath(pen, path);
         }
 
         private void PaintInfo(Graphics g)
@@ -534,15 +624,34 @@ namespace OpenNest.Controls
             new(TextRenderer.MeasureText(text, Font, System.Drawing.Size.Empty, TextFormatFlags.NoPadding).Width + 2 * LabelPadding,
                 LabelHeight);
 
+        /// <summary>
+        /// One view's place on the control, the blank's or the side view's: its points are
+        /// shown at <see cref="Offset"/> + point x <see cref="Scale"/>.
+        /// </summary>
+        private readonly record struct Frame(Vector Offset, double Scale, List<Entity> Profile, RectangleF Rect);
+
+        private Frame BlankFrame() =>
+            new(shapeOffset, 1, profile, GuiRect(Plate.Parts[0].BoundingBox));
+
+        private Frame SideFrame()
+        {
+            var section = SideBounds();
+            var shown = new Box(sideOffset.X + section.X * sideScale, sideOffset.Y + section.Y * sideScale,
+                section.Length * sideScale, section.Width * sideScale);
+            return new(sideOffset, sideScale, sideProfile, GuiRect(shown));
+        }
+
         private PointF ToScreen(Vector shapePoint)
         {
-            var graph = PointWorldToGraph(shapePoint.X + shapeOffset.X, shapePoint.Y + shapeOffset.Y);
+            var graph = PointWorldToGraph(shapePoint.X * frame.Scale + frame.Offset.X, shapePoint.Y * frame.Scale + frame.Offset.Y);
             return new PointF(graph.X + origin.X, graph.Y + origin.Y);
         }
 
-        private RectangleF ShapeRect()
+        /// <summary>A length in the current frame's coordinates, in pixels.</summary>
+        private float FrameToGui(double length) => LengthWorldToGui(length * frame.Scale);
+
+        private RectangleF GuiRect(Box box)
         {
-            var box = Plate.Parts[0].BoundingBox;
             var graphTopLeft = PointWorldToGraph(box.X, box.Y + box.Width);
             return new RectangleF(graphTopLeft.X + origin.X, graphTopLeft.Y + origin.Y,
                 LengthWorldToGui(box.Length), LengthWorldToGui(box.Width));
@@ -554,9 +663,14 @@ namespace OpenNest.Controls
             if (Plate.Parts.Count == 0)
                 return result;
 
-            var shape = ShapeRect();
+            var blank = BlankFrame();
+            var side = sideProfile.Count > 0 ? SideFrame() : (Frame?)null;
             foreach (var annotation in annotations)
             {
+                if (annotation.OnSideView && side == null)
+                    continue;
+                frame = annotation.OnSideView ? side.Value : blank;
+                var shape = frame.Rect;
                 var d = annotation.Dimension;
                 switch (d.Kind)
                 {
@@ -572,6 +686,7 @@ namespace OpenNest.Controls
                 }
             }
 
+            frame = blank;
             result.Labels.AddRange(LayoutChips());
             return result;
         }
@@ -621,15 +736,15 @@ namespace OpenNest.Controls
         /// </summary>
         private float ExtensionStart(Vector point, Vector side, float reach, RectangleF shape)
         {
-            if (profile.Count == 0 || !(reach > 0))
+            if (frame.Profile == null || frame.Profile.Count == 0 || !(reach > 0))
                 return 0;
 
             var limit = reach + (System.Math.Abs(side.X) > System.Math.Abs(side.Y) ? shape.Width : shape.Height);
             var travelled = 0f;
             for (var i = 0; i < MaxExtensionSteps && travelled < limit; i++)
             {
-                var at = point + side * LengthGuiToWorld(reach - travelled);
-                var free = LengthWorldToGui(DistanceToProfile(at)) - ExtensionClearance;
+                var at = point + side * (LengthGuiToWorld(reach - travelled) / frame.Scale);
+                var free = FrameToGui(DistanceToProfile(at)) - ExtensionClearance;
                 if (free <= ExtensionPrecision)
                     break;
                 travelled += free;
@@ -640,7 +755,7 @@ namespace OpenNest.Controls
         private double DistanceToProfile(Vector point)
         {
             var nearest = double.MaxValue;
-            foreach (var entity in profile)
+            foreach (var entity in frame.Profile)
                 nearest = System.Math.Min(nearest, point.DistanceTo(entity.ClosestPointTo(point)));
             return nearest;
         }
@@ -648,7 +763,7 @@ namespace OpenNest.Controls
         private void AddReferenceCircle(AnnotationLayout result, ShapeDimension d)
         {
             if (d.CircleCenter is { } center && d.CircleRadius > 0)
-                result.Circles.Add((ToScreen(center), LengthWorldToGui(d.CircleRadius)));
+                result.Circles.Add((ToScreen(center), FrameToGui(d.CircleRadius)));
         }
 
         /// <summary>The current zoom relative to the fitted view: 1 until zoomed by hand.</summary>
@@ -784,7 +899,7 @@ namespace OpenNest.Controls
                 return false;
 
             var center = ToScreen(holeCenter);
-            var radius = LengthWorldToGui(d.HoleRadius);
+            var radius = FrameToGui(d.HoleRadius);
             var toEnd = new PointF(end.X - center.X, end.Y - center.Y);
             var distance = (float)System.Math.Sqrt(Dot(toEnd, toEnd));
 

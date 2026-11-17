@@ -20,7 +20,10 @@ public class ShapeDimensionTests
     {
         var shape = (ShapeDefinition)Activator.CreateInstance(shapeType)!;
         shape.SetPreviewDefaults();
-        var dimensions = shape.GetDimensions();
+        // A side view's dimensions show parameters too, each once across both views.
+        var dimensions = shape.GetDimensions()
+            .Concat(shape.GetSideView()?.Dimensions ?? Array.Empty<ShapeDimension>())
+            .ToList();
 
         Assert.NotEmpty(dimensions);
         Assert.Equal(dimensions.Count, dimensions.Select(d => d.Property).Distinct().Count());

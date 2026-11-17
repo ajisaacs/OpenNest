@@ -102,6 +102,52 @@ public class ShapeLibraryFormTests
     });
 
     [Fact]
+    public void KFactorIsAPlainNumberNotALength() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        SelectShape(form, typeof(ChannelShape));
+        var preview = Find<ShapePreviewControl>(form, "previewBox");
+        var width = preview.Plate.Parts.Single().BoundingBox.Width;
+
+        Assert.Equal("K-Factor: 0.42", preview.LabelText("KFactor"));
+
+        var box = OpenEditor(form, "KFactor");
+        box.Text = "1.5";
+        Press(box, Keys.Enter);
+        Assert.Same(box, form.ActiveEditor);
+
+        box.Text = "0.5";
+        Press(box, Keys.Enter);
+        Assert.Null(form.ActiveEditor);
+        Assert.Equal("K-Factor: 0.5", preview.LabelText("KFactor"));
+        // Two bends' allowance grows by 90° x 0.08 of the 1/8" thickness each.
+        Assert.Equal(width + System.Math.PI * 0.08 * 0.125, preview.Plate.Parts.Single().BoundingBox.Width, 6);
+    });
+
+    [Fact]
+    public void ASheetMetalPartsSideViewDimensionsItsSection() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new ShapeLibraryForm();
+        SelectShape(form, typeof(AngleShape));
+        var preview = Find<ShapePreviewControl>(form, "previewBox");
+        var blank = preview.Plate.Parts.Single().BoundingBox;
+
+        Assert.Equal(new[] { "Length", "OutsideWidth", "OutsideHeight", "Thickness", "InsideRadius", "KFactor" }, preview.LabelKeys);
+        Assert.Equal("4\"", preview.LabelText("OutsideWidth"));
+        Assert.Equal("R5/16\"", preview.LabelText("InsideRadius"));
+        // The section sits to the right of the blank, its dimensions with it.
+        Assert.True(preview.LabelBounds("OutsideWidth")!.Value.Left > preview.LabelBounds("Length")!.Value.Right);
+
+        var box = OpenEditor(form, "OutsideWidth");
+        box.Text = "6";
+        Press(box, Keys.Enter);
+
+        Assert.Null(form.ActiveEditor);
+        Assert.Equal("6\"", preview.LabelText("OutsideWidth"));
+        Assert.Equal(blank.Width + 2, preview.Plate.Parts.Single().BoundingBox.Width, 6);
+    });
+
+    [Fact]
     public void TabCommitsAndMovesToTheNextDimension() => ArchUnitsTests.RunSta(() =>
     {
         using var form = new ShapeLibraryForm();
