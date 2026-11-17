@@ -86,7 +86,7 @@ public class CincinnatiKerfAndCoordinateTests
             M35
             M99 (END OF HOLE)
 
-            """,
+            """.ReplaceLineEndings("\n"),
             body);
     }
 
