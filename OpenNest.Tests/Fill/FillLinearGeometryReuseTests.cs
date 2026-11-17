@@ -34,7 +34,7 @@ public class FillLinearGeometryReuseTests
         var drawing = Fixture(shape);
         var before = ProgramValues(drawing.Program);
         var area = new Box(3.1, -5.3, 42, 29);
-        var filler = new FillLinear(area, spacing);
+        var filler = new FillLinear(area, spacing) { LeadingParts = false };
         var legacy = new LegacyFillLinear(area, spacing);
         var inputs = new[] { drawing.Program };
         var expected = legacy.Fill(drawing, angle, direction);
@@ -59,7 +59,7 @@ public class FillLinearGeometryReuseTests
             {
                 var pattern = MakePattern(kind);
                 var before = Snapshot(pattern);
-                var filler = new FillLinear(new Box(-7.1, 11.3, 52, 39), spacing);
+                var filler = new FillLinear(new Box(-7.1, 11.3, 52, 39), spacing) { LeadingParts = false };
                 var legacy = new LegacyFillLinear(filler.WorkArea, spacing);
                 var inputs = pattern.Parts.Select(p => p.Program).ToArray();
                 var expected = legacy.Fill(pattern, direction);
@@ -99,7 +99,7 @@ public class FillLinearGeometryReuseTests
             var area = new Box(3.1, 5.3, direction == NestDirection.Horizontal ? size : 10,
                 direction == NestDirection.Vertical ? size : 8);
             var legacy = new LegacyFillLinear(area, spacing);
-            var filler = new FillLinear(area, spacing);
+            var filler = new FillLinear(area, spacing) { LeadingParts = false };
             var expected = legacy.FillRow(drawing, 0, direction).Parts;
             counts.Add(expected.Count);
             AssertLayout(expected, filler.FillRow(drawing, 0, direction).Parts, new[] { drawing.Program });
@@ -126,14 +126,14 @@ public class FillLinearGeometryReuseTests
         fallback.AddRange((List<Part>)FillExtentsTests.Invoke(legacy, "TilePatternBbox", pattern, NestDirection.Horizontal));
         var inputs = pattern.Parts.Select(p => p.Program).ToArray();
         AssertLayout(fallback, legacy.Fill(pattern, NestDirection.Horizontal), inputs);
-        AssertLayout(fallback, new FillLinear(area, 0.5).Fill(pattern, NestDirection.Horizontal), inputs);
+        AssertLayout(fallback, new FillLinear(area, 0.5) { LeadingParts = false }.Fill(pattern, NestDirection.Horizontal), inputs);
     }
 
     [Fact]
     public void EmptyAndNoFit_MatchFrozenLegacy()
     {
         var area = new Box(3, 5, 1, 1);
-        var filler = new FillLinear(area, 0.5);
+        var filler = new FillLinear(area, 0.5) { LeadingParts = false };
         var legacy = new LegacyFillLinear(area, 0.5);
         var drawing = Fixture("rectangle");
         var pattern = MakePattern("rotated");
@@ -152,7 +152,7 @@ public class FillLinearGeometryReuseTests
     {
         var patterns = new[] { MakePattern("shared"), MakePattern("rotated"), MakePattern("built-pair") };
         var before = patterns.Select(Snapshot).ToArray();
-        var filler = new FillLinear(new Box(3.1, 5.3, 52, 39), 0.5);
+        var filler = new FillLinear(new Box(3.1, 5.3, 52, 39), 0.5) { LeadingParts = false };
         var expected = patterns.Select(p => new[] { filler.Fill(p, NestDirection.Horizontal),
             filler.Fill(p, NestDirection.Vertical) }).ToArray();
         Parallel.For(0, 48, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
@@ -245,7 +245,7 @@ public class FillLinearGeometryReuseTests
         var area = mode is "row" or "drawing" ? new Box(3, 5, 31.5, 17) : new Box(3, 5, 42.5, 25);
         var pattern = MakePattern(mode == "shared" ? "shared" : "rotated", drawing);
         var legacy = new LegacyFillLinear(area, 0.5);
-        var filler = new FillLinear(area, 0.5);
+        var filler = new FillLinear(area, 0.5) { LeadingParts = false };
         PerfCounters.Reset();
         try
         {

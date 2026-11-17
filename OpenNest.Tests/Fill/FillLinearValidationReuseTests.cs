@@ -39,11 +39,12 @@ public class FillLinearValidationReuseTests
         var area = new Box(3.1, -5.3, 42, 29);
         var areaBefore = BoxBits(area);
         var expected = new PreStep3FillLinear(area, spacing).Fill(drawing, angle, direction);
-        var filler = new FillLinear(area, spacing);
+        var filler = new FillLinear(area, spacing) { LeadingParts = false };
         AssertLayout(expected, filler.Fill(drawing, angle, direction), new[] { drawing.Program });
         Assert.Equal(before, DrawingSnapshot(drawing));
         AssertLayout(expected, filler.Fill(drawing, angle, direction), new[] { drawing.Program });
         AssertValid(expected, area);
+        AssertDefaultAddsOnlyValidParts(expected, new FillLinear(area, spacing).Fill(drawing, angle, direction), area);
         Assert.Equal(before, DrawingSnapshot(drawing));
         Assert.Equal(areaBefore, BoxBits(area));
         Assert.Equal(areaBefore, BoxBits(filler.WorkArea));
@@ -153,7 +154,7 @@ public class FillLinearValidationReuseTests
         {
             var area = Area(size);
             var frozen = new PreStep3FillLinear(area, 0.5);
-            var filler = new FillLinear(area, 0.5);
+            var filler = new FillLinear(area, 0.5) { LeadingParts = false };
             var expectedPattern = frozen.Fill(pattern, direction);
             var expectedDrawing = frozen.Fill(drawing, 0, direction);
             Assert.Equal(size == rejected ? 2 : 3, expectedPattern.Count);
@@ -185,7 +186,7 @@ public class FillLinearValidationReuseTests
         PerfCounters.Reset();
         try
         {
-            parts = new FillLinear(area, 0.5).Fill(pattern, direction);
+            parts = new FillLinear(area, 0.5) { LeadingParts = false }.Fill(pattern, direction);
             observedExact = PerfCounters.PartIntersects;
             observedPreparations = PerfCounters.OverlapPolygonPreparations;
             observedTriangulations = PerfCounters.PolygonTriangulations;
@@ -226,7 +227,7 @@ public class FillLinearValidationReuseTests
         PerfCounters.Reset();
         try
         {
-            parts = new FillLinear(area, 0.5).Fill(pattern, direction);
+            parts = new FillLinear(area, 0.5) { LeadingParts = false }.Fill(pattern, direction);
             observedExact = PerfCounters.PartIntersects;
             observedPreparations = PerfCounters.OverlapPolygonPreparations;
             observedTriangulations = PerfCounters.PolygonTriangulations;
@@ -257,7 +258,7 @@ public class FillLinearValidationReuseTests
         PerfCounters.Reset();
         try
         {
-            parts = new FillLinear(area, 0.5).Fill(pattern, direction);
+            parts = new FillLinear(area, 0.5) { LeadingParts = false }.Fill(pattern, direction);
             observed = PerfCounters.PartIntersects;
             Assert.Equal(exact, observed);
             Assert.NotEmpty(parts);
@@ -284,7 +285,7 @@ public class FillLinearValidationReuseTests
         var before = PatternSnapshot(pattern);
         var area = new Box(0, 0, 35, 8.25);
         var frozen = new PreStep3FillLinear(area, 0.5) { Label = "invalid-frozen" };
-        var filler = new FillLinear(area, 0.5) { Label = "invalid-production" };
+        var filler = new FillLinear(area, 0.5) { LeadingParts = false, Label = "invalid-production" };
 #if DEBUG
         using var listener = new FallbackListener();
         Trace.Listeners.Add(listener);
@@ -345,7 +346,7 @@ public class FillLinearValidationReuseTests
     public void EmptyNoFitAndMalformedInputs_PreserveResultsAndExceptionTypes(NestDirection direction)
     {
         var area = new Box(3, 5, 1, 1);
-        var filler = new FillLinear(area, 0.5);
+        var filler = new FillLinear(area, 0.5) { LeadingParts = false };
         var frozen = new PreStep3FillLinear(area, 0.5);
         var drawing = MakeDrawing("rectangle");
         var pattern = MakePattern("concave", "rotated");
@@ -386,7 +387,7 @@ public class FillLinearValidationReuseTests
     [Fact]
     public void ConcurrentIndependentCalls_OneFiller_MatchFrozenAndPreserveInputs()
     {
-        var filler = new FillLinear(new Box(3.1, -5.3, 52, 39), 0.5);
+        var filler = new FillLinear(new Box(3.1, -5.3, 52, 39), 0.5) { LeadingParts = false };
         var frozen = new PreStep3FillLinear(filler.WorkArea, 0.5);
         var patterns = Enumerable.Range(0, 24).Select(i => MakePattern(i % 2 == 0 ? "concave" : "arc",
             i % 3 == 0 ? "shared" : i % 3 == 1 ? "rotated" : "single")).ToArray();
@@ -453,16 +454,30 @@ public class FillLinearValidationReuseTests
         Assert.False(FillHelpers.HasOverlappingParts(pattern.Parts));
         var expected = new PreStep3FillLinear(area, spacing).Fill(pattern, direction);
         Assert.Equal(before, PatternSnapshot(pattern));
-        var filler = new FillLinear(area, spacing);
+        var filler = new FillLinear(area, spacing) { LeadingParts = false };
         var actual = filler.Fill(pattern, direction);
         AssertLayout(expected, actual, inputs);
         Assert.Equal(before, PatternSnapshot(pattern));
         AssertLayout(expected, filler.Fill(pattern, direction), inputs);
         Assert.Equal(before, PatternSnapshot(pattern));
         AssertValid(actual, area);
+        AssertDefaultAddsOnlyValidParts(expected, new FillLinear(area, spacing).Fill(pattern, direction), area);
+        Assert.Equal(before, PatternSnapshot(pattern));
         Assert.Equal(areaBefore, BoxBits(area));
         Assert.Equal(areaBefore, BoxBits(filler.WorkArea));
         return actual;
+    }
+
+    /// <summary>
+    /// The frozen fillers predate <see cref="FillLinear.LeadingParts"/>, so they are compared
+    /// with it off; with it on, a fill only adds parts of the copy before its pattern, never
+    /// holding fewer parts, and stays inside the area without overlaps.
+    /// </summary>
+    private static void AssertDefaultAddsOnlyValidParts(List<Part> frozen, List<Part> current, Box area)
+    {
+        Assert.True(current.Count >= frozen.Count, $"default fill holds {current.Count}, frozen {frozen.Count}");
+        if (current.Count > 0)
+            AssertValid(current, area);
     }
 
     private static void AssertValid(List<Part> parts, Box area)

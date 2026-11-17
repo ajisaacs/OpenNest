@@ -92,10 +92,10 @@ public class FillHelpersTests
     }
 
     [Theory]
-    [InlineData(5, 9, 8, 7)]
-    [InlineData(10, 4, 7, 8)]
-    [InlineData(5, 4, 3, 3)]
-    [InlineData(7, 6, 8, 8)]
+    [InlineData(5, 9, 10, 12)]
+    [InlineData(10, 4, 8, 8)]
+    [InlineData(5, 4, 4, 4)]
+    [InlineData(7, 6, 9, 8)]
     public void FillPattern_DefaultScoring_PreservesWinningLayoutAndInputs(
         double length, double width, int horizontalCount, int verticalCount)
     {
@@ -308,12 +308,12 @@ public class FillHelpersTests
     }
 
     [Theory]
-    [InlineData(5, 9, 0, 2)]
-    [InlineData(5, 9, 1, 0)]
-    [InlineData(10, 4, 1, 0)]
-    [InlineData(5, 9, 2, 2)]
+    [InlineData(5, 9, 0, 2, 12)]
+    [InlineData(5, 9, 1, 0, 10)]
+    [InlineData(10, 4, 1, 0, 8)]
+    [InlineData(5, 9, 2, 2, 10)]
     public void FillPattern_ScoreWork_OnlyDefaultPathOrComparerComputesScores(
-        double length, double width, int comparerKind, long expectedComputations)
+        double length, double width, int comparerKind, long expectedComputations, int count)
     {
         var group = MakeGroup();
         var workArea = new Box(3, 5, length, width);
@@ -329,7 +329,7 @@ public class FillHelpersTests
             var result = FillHelpers.FillPattern(engine, group, angles, workArea,
                 comparerKind == 0 ? null : comparer);
 
-            Assert.Equal(comparerKind == 0 ? 8 : 7, result.Count);
+            Assert.Equal(count, result.Count);
             Assert.Equal(comparerKind == 0 ? 0 : 1, comparer.Calls.Count);
             Assert.Equal(expectedComputations, PerfCounters.FillScoreComputations);
         }

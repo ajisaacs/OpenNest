@@ -60,6 +60,13 @@ namespace OpenNest.Engine.Fill
         /// </summary>
         public int MaxParts { get; init; }
 
+        /// <summary>
+        /// When true (the default), a multi-part tiling may move off the work area's leading
+        /// edge to add parts of the copy before it (see <see cref="AddLeadingParts"/>). Only
+        /// characterization against fillers frozen before that change turns it off.
+        /// </summary>
+        internal bool LeadingParts { get; init; } = true;
+
         private static Vector MakeOffset(NestDirection direction, double distance)
         {
             return direction == NestDirection.Horizontal
@@ -228,6 +235,83 @@ namespace OpenNest.Engine.Fill
             FindPatternCopyDistance(pattern, direction, new OffsetPerimeterCache(HalfSpacing));
 
         /// <summary>
+        /// Tiles a pattern along the given axis, returning the whole tiling: the pattern's own
+        /// parts first, then the copies. For multi-part patterns, also adds the parts of the
+        /// copies just before and after the whole ones that fit within the work area (see
+        /// <see cref="AddLeadingParts"/>). The pattern's own parts are returned as given unless
+        /// leading parts moved the tiling.
+        /// </summary>
+        private List<Part> Tile(
+            Pattern basePattern,
+            NestDirection direction,
+            OffsetPerimeterCache cache,
+            int maxParts = 0
+        )
+        {
+            var tiling = new List<Part>(basePattern.Parts);
+            tiling.AddRange(TilePattern(basePattern, direction, cache, maxParts, out var copyDistance));
+            if (LeadingParts && basePattern.Parts.Count > 1 && !(maxParts > 0 && tiling.Count >= maxParts)
+                && copyDistance > Tolerance.Epsilon && !double.IsPositiveInfinity(copyDistance))
+                tiling = AddLeadingParts(basePattern, tiling, direction, copyDistance);
+            return tiling;
+        }
+
+        /// <summary>
+        /// Adds the parts of the copies before the pattern that fit once the whole tiling moves
+        /// forward into the room left past its far end. A tiling always starts with the
+        /// pattern's leading edge on the work area's, so the copy before it never fits, though
+        /// some of its parts may: when an interlocked pair of reversed parts can only be tiled
+        /// with one row first, its partner row below it fits with that row raised slightly. The
+        /// tiling moves the least distance that adds the most parts; with none added it stays.
+        /// </summary>
+        private List<Part> AddLeadingParts(
+            Pattern basePattern,
+            List<Part> tiling,
+            NestDirection direction,
+            double copyDistance
+        )
+        {
+            var start = GetStart(WorkArea, direction);
+            var end = double.MinValue;
+            foreach (var part in tiling)
+                end = System.Math.Max(end, GetStart(part.BoundingBox, direction)
+                    + GetDimension(part.BoundingBox, direction));
+            var room = GetLimit(direction) - end;
+            if (room < -Tolerance.Epsilon)
+                return tiling;
+
+            var leading = new List<(Part Part, double Back, double Shift)>();
+            foreach (var part in basePattern.Parts)
+            {
+                var ahead = GetStart(part.BoundingBox, direction) - start;
+                for (var copies = 1; ; copies++)
+                {
+                    var back = copies * copyDistance;
+                    var shift = back - ahead;
+                    if (shift > room + Tolerance.Epsilon)
+                        break;
+                    leading.Add((part, back, shift));
+                }
+            }
+
+            if (leading.Count == 0)
+                return tiling;
+
+            var move = 0.0;
+            foreach (var candidate in leading)
+                move = System.Math.Max(move, candidate.Shift);
+            move = System.Math.Min(move, System.Math.Max(room, 0));
+
+            var moved = new List<Part>(tiling.Count + leading.Count);
+            var offset = MakeOffset(direction, move);
+            foreach (var part in tiling)
+                moved.Add(move > 0 ? part.CloneAtOffset(offset) : part);
+            foreach (var (part, back, _) in leading)
+                moved.Add(part.CloneAtOffset(MakeOffset(direction, move - back)));
+            return moved;
+        }
+
+        /// <summary>
         /// Tiles a pattern along the given axis, returning the cloned parts
         /// (does not include the original pattern's parts). For multi-part
         /// patterns, also adds individual parts from the next incomplete copy
@@ -237,10 +321,11 @@ namespace OpenNest.Engine.Fill
             Pattern basePattern,
             NestDirection direction,
             OffsetPerimeterCache cache,
-            int maxParts = 0
+            int maxParts,
+            out double copyDistance
         )
         {
-            var copyDistance = FindPatternCopyDistance(basePattern, direction, cache,
+            copyDistance = FindPatternCopyDistance(basePattern, direction, cache,
                 UsefulCopyDistance(basePattern, direction, maxParts));
 
             if (copyDistance <= 0 || double.IsPositiveInfinity(copyDistance))
@@ -314,10 +399,20 @@ namespace OpenNest.Engine.Fill
             var useful = GetLimit(direction) - GetStart(box, direction) - GetDimension(box, direction);
             var partial = basePattern.Parts.Count > 1 && !(maxParts > 0 && basePattern.Parts.Count >= maxParts);
             if (partial)
+            {
+                // A part of the copy before the pattern fits once the tiling moves forward
+                // into the room past the pattern, which only shrinks as copies are added.
+                var room = GetLimit(direction) - GetStart(box, direction) - GetDimension(box, direction);
                 foreach (var part in basePattern.Parts)
+                {
                     useful = System.Math.Max(useful, direction == NestDirection.Horizontal
                         ? WorkArea.Right - part.BoundingBox.Right
                         : WorkArea.Top - part.BoundingBox.Top);
+                    if (LeadingParts)
+                        useful = System.Math.Max(useful,
+                            room + GetStart(part.BoundingBox, direction) - GetStart(WorkArea, direction));
+                }
+            }
             return useful + 2 * Tolerance.Epsilon;
         }
 
@@ -434,8 +529,7 @@ namespace OpenNest.Engine.Fill
             var rowIsVerified = false;
 
             // Step 1: Tile along primary axis
-            var row = new List<Part>(pattern.Parts);
-            row.AddRange(TilePattern(pattern, direction, cache));
+            var row = Tile(pattern, direction, cache);
 
             if (pattern.Parts.Count > 1 && HasOverlappingParts(row, out var a1, out var b1))
             {
@@ -451,7 +545,7 @@ namespace OpenNest.Engine.Fill
             // If primary tiling didn't produce copies, just tile along perpendicular
             if (row.Count <= pattern.Parts.Count)
             {
-                row.AddRange(TilePattern(pattern, perpAxis, cache, MaxParts));
+                row = Tile(pattern, perpAxis, cache, MaxParts);
 
                 if (pattern.Parts.Count > 1 && HasOverlappingParts(row, out var a2, out var b2))
                 {
@@ -474,8 +568,7 @@ namespace OpenNest.Engine.Fill
             rowPattern.Parts.AddRange(row);
             rowPattern.UpdateBounds();
 
-            var gridResult = new List<Part>(rowPattern.Parts);
-            gridResult.AddRange(TilePattern(rowPattern, perpAxis, cache, MaxParts));
+            var gridResult = Tile(rowPattern, perpAxis, cache, MaxParts);
 
             // Only the unchanged row is covered by Step 1's clean verdict: skip Step 2
             // only when the perpendicular tiling appended zero parts, so gridResult

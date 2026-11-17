@@ -46,7 +46,7 @@ public class FillLinearValidationPerformanceTests
         var single = FillHelpers.BuildRotatedPattern(new List<Part> { first }, 0.37);
         var patterns = new[] { pair, pair, pair, pair, single };
         var names = new[] { "horizontal-stripe", "vertical-stripe", "full-grid", "partial-only", "single-seed-stripe" };
-        var counts = new[] { 8, 19, 36, 29, 8 };
+        var counts = new[] { 8, 20, 36, 30, 8 };
         var directions = new[] { NestDirection.Horizontal, NestDirection.Vertical, NestDirection.Horizontal,
             NestDirection.Vertical, NestDirection.Horizontal };
         var areas = new[]
@@ -83,7 +83,7 @@ public class FillLinearValidationPerformanceTests
             + "pair at 0/PI, second offset=(10.5,0), BuildRotatedPattern=0.37; spacing=0.5; origin=(0,0). "
             + "Stripe primary span=96, perpendicular span=exact pattern bbox; full-grid=(96,48); "
             + "vertical partial-only perpendicular span=1.8*pair.Length; single rotated seed H stripe. "
-            + "Counts in mode order=8,19,36,29,8; full-grid row=8+28; partial-only row=19+10.");
+            + "Counts in mode order=8,20,36,30,8; full-grid row=8+28; partial-only row=20+10.");
         output.WriteLine($"warmup=2 x {warmupCalls} calls/mode; measured={repetitions} x {callsPerBatch} calls/mode. "
             + "Mode order alternates forward/reverse in warmup and measurement. Real synchronous production Fill only; "
             + "setup, correctness assertions and output excluded. Geometry, tiling, overlap checks, GC, delegate/loop, "
