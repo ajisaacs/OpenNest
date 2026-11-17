@@ -14,6 +14,7 @@ using OpenNest.CommonLines;
 using OpenNest.CutOffs;
 using OpenNest.Desktop.Interaction;
 using OpenNest.Desktop.Rendering;
+using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 using OpenNest.Support;
 using SkiaSharp;
@@ -117,6 +118,26 @@ namespace OpenNest.Avalonia.Controls
         /// <summary>No edits while Auto Nest works on the nest (WinForms EditsLocked).</summary>
         public bool EditsLocked { get; set; }
 
+        /// <summary>
+        /// Which way Shift+click and Ctrl+click settle a placed copy (Tools &gt; Options &gt; Clone
+        /// push placement), read at each click.
+        /// </summary>
+        public Func<SettleOrder> PlacementOrder { get; set; } = () => SettleOrder.ClosestToCorner;
+
+        /// <summary>
+        /// Edit &gt; Copy: places copies of the selected parts with the place tool; false when
+        /// nothing is selected or edits are locked.
+        /// </summary>
+        public bool CopySelection() => PlateClipboard.Copy(this, tools, ReadPlacementOrder) != null;
+
+        /// <summary>
+        /// Edit &gt; Cut: as <see cref="CopySelection"/>, then removes the parts as one Cut step.
+        /// </summary>
+        public bool CutSelection() => PlateClipboard.Cut(this, tools, ReadPlacementOrder) != null;
+
+        private SettleOrder ReadPlacementOrder() =>
+            PlacementOrder?.Invoke() ?? SettleOrder.ClosestToCorner;
+
         Undo.ChangeScope IPlateToolHost.BeginChange(string label, object coalesceKey) =>
             BeginChangeHandler?.Invoke(label, coalesceKey) ?? Undo.ChangeScope.Detached();
 
@@ -137,13 +158,19 @@ namespace OpenNest.Avalonia.Controls
             Focusable = true;
             hitTester = new PlateHitTester(part => PathsFor(part).Geometry);
             tools = new PlateToolManager(this);
-            Edits = new PlateEdits(this);
+            // While the place tool is active, edits move its copies.
+            Edits = new PlateEdits(this) { Tools = tools };
             selection.Changed += (_, _) =>
             {
                 InvalidateVisual();
                 ViewChanged?.Invoke(this, EventArgs.Empty);
             };
-            tools.StatusChanged += (_, _) => ViewChanged?.Invoke(this, EventArgs.Empty);
+            tools.StatusChanged += (_, _) =>
+            {
+                // A place tool's copies leave the cache when the tool ends.
+                TrimCache();
+                ViewChanged?.Invoke(this, EventArgs.Empty);
+            };
         }
 
         void IPlateToolHost.Invalidate() => InvalidateVisual();
@@ -158,7 +185,8 @@ namespace OpenNest.Avalonia.Controls
             commonLineChecks.Clear();
         }
 
-        // Keeps only the shown plate's parts, so closed plates do not hold their paths.
+        // Keeps only the shown plate's parts and the place tool's copies, so closed plates and
+        // ended tools do not hold their paths.
         private void TrimCache()
         {
             if (plate == null)
@@ -168,6 +196,8 @@ namespace OpenNest.Avalonia.Controls
                 return;
             }
             var shown = new HashSet<Part>(plate.Parts);
+            if (tools?.Current is PlaceTool place)
+                shown.UnionWith(place.Previews);
             foreach (var stale in paths.Keys.Where(part => !shown.Contains(part)).ToList())
                 paths.Remove(stale);
             var drawings = new HashSet<Drawing>(plate.Parts.Select(part => part.BaseDrawing));
@@ -289,6 +319,21 @@ namespace OpenNest.Avalonia.Controls
                     (i + 1).ToString(), LabelPoint(part), selection.Contains(part),
                     ReferenceEquals(part, HoveredPart), part.BaseDrawing.IsCutOff));
             }
+            // The place tool's copies, drawn selected and unnumbered over the plate, as WinForms.
+            if (tools.Current is PlaceTool { Previews: var previews })
+            {
+                foreach (var preview in previews)
+                {
+                    var bounds = PathsFor(preview).StrokeBounds;
+                    if (bounds == null)
+                        continue;
+                    var placed = bounds.Translate(preview.Location.X, preview.Location.Y);
+                    var color = ToSkColor(preview.BaseDrawing.Color);
+                    scene.Parts.Add(new PartItem(PathsFor(preview), preview.Location, placed, color,
+                        palette.PartOutline(color), Label: null, preview.Location, Selected: true,
+                        Hovered: false, IsCutOff: false));
+                }
+            }
 
             if (options.DrawOffset && plate.PartSpacing > 0)
             {
@@ -392,7 +437,7 @@ namespace OpenNest.Avalonia.Controls
         {
             // As WinForms: Shift+wheel turns the selection (Ctrl+Shift by a tenth); without a
             // selection the wheel zooms. Some platforms report Shift+wheel as horizontal.
-            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && selection.Parts.Count > 0
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && Edits.HasPartsToEdit
                 && !EditsLocked)
             {
                 var delta = e.Delta.Y != 0 ? e.Delta.Y : e.Delta.X;
@@ -417,7 +462,7 @@ namespace OpenNest.Avalonia.Controls
             {
                 // As WinForms: a middle double-click fits only with nothing selected; with a
                 // selection each click turns it, so a double-click turns it 180 degrees.
-                if (e.ClickCount == 2 && selection.Parts.Count == 0)
+                if (e.ClickCount == 2 && (EditsLocked || !Edits.HasPartsToEdit))
                 {
                     ZoomToFit();
                     return;
@@ -455,8 +500,10 @@ namespace OpenNest.Avalonia.Controls
                 var button = point.Properties.IsLeftButtonPressed ? ToolButton.Left
                     : point.Properties.IsRightButtonPressed ? ToolButton.Right : ToolButton.None;
                 tools.Current.PointerMoved(ToolPointerAt(at, button, e.KeyModifiers));
-                // As WinForms: the part under the cursor is highlighted only while no button is held.
-                var hovered = button == ToolButton.None ? hitTester.PartAt(plate, CursorWorld.Value) : null;
+                // As WinForms: the part under the cursor is highlighted only in Select, while no
+                // button is held.
+                var hovered = button == ToolButton.None && tools.Current is SelectTool
+                    ? hitTester.PartAt(plate, CursorWorld.Value) : null;
                 if (!ReferenceEquals(hovered, HoveredPart))
                 {
                     HoveredPart = hovered;
@@ -480,7 +527,7 @@ namespace OpenNest.Avalonia.Controls
                 panStart = null;
                 // A middle click, not a drag, turns the selection 90 degrees.
                 var at = e.GetPosition(this);
-                if (middleDown is { } down && selection.Parts.Count > 0
+                if (middleDown is { } down && Edits.HasPartsToEdit
                     && (at.X - down.X) * (at.X - down.X) + (at.Y - down.Y) * (at.Y - down.Y) < 25)
                     Edits.RotateQuarterTurn();
                 middleDown = null;
@@ -521,7 +568,10 @@ namespace OpenNest.Avalonia.Controls
             InvalidateVisual();
         }
 
-        private ToolPointer ToolPointerAt(Point at, ToolButton button, KeyModifiers keys)
+        private ToolPointer ToolPointerAt(Point at, ToolButton button, KeyModifiers keys) =>
+            new(ToWorld(at), new ScreenPoint(at.X, at.Y), button, ModifiersOf(keys));
+
+        private static ToolModifiers ModifiersOf(KeyModifiers keys)
         {
             var modifiers = ToolModifiers.None;
             if (keys.HasFlag(KeyModifiers.Shift))
@@ -531,7 +581,7 @@ namespace OpenNest.Avalonia.Controls
                 modifiers |= ToolModifiers.Control;
             if (keys.HasFlag(KeyModifiers.Alt))
                 modifiers |= ToolModifiers.Alt;
-            return new ToolPointer(ToWorld(at), new ScreenPoint(at.X, at.Y), button, modifiers);
+            return modifiers;
         }
 
         protected override void OnKeyDown(KeyEventArgs e)
@@ -544,6 +594,12 @@ namespace OpenNest.Avalonia.Controls
             else if (e.Key == Key.F && e.KeyModifiers == KeyModifiers.None)
             {
                 ZoomToFit();
+                e.Handled = true;
+            }
+            else if (e.Key is Key.Enter or Key.F1 && tools.Current is PlaceTool place)
+            {
+                // As WinForms: Enter and F1 place a copy, Shift or Ctrl held settling it.
+                place.Apply(ModifiersOf(e.KeyModifiers));
                 e.Handled = true;
             }
             else if (EditFor(e.Key, e.KeyModifiers) is { } edit)
@@ -879,7 +935,7 @@ namespace OpenNest.Avalonia.Controls
                     canvas.Restore();
 
                     // A number shows only once the part is big enough on screen to hold it.
-                    if (item.IsCutOff)
+                    if (item.IsCutOff || item.Label == null)
                         continue;
                     var bounds = Screen(item.Bounds);
                     var width = text.MeasureText(item.Label);

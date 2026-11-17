@@ -49,6 +49,9 @@ namespace OpenNest.Avalonia
                 : (Array.Empty<int>(), -1);
             // Read first: a throw here leaves the live nest in place, as the recorder expects.
             var cutOffSettings = CutOffSettingsFor(restored);
+            // As WinForms (EditNestForm EndAction): a tool holds the old nest's parts, so it ends
+            // and Escape cannot bring it back.
+            Canvas.Tools.EndTool();
             Tab.Document.Nest = restored;
             Canvas.CutOffSettings = cutOffSettings;
             plates.Dispose();

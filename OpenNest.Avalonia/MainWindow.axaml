@@ -28,6 +28,10 @@
         <MenuItem x:Name="UndoMenuItem" Header="_Undo" InputGesture="Ctrl+Z" Click="OnUndo" />
         <MenuItem x:Name="RedoMenuItem" Header="_Redo" InputGesture="Ctrl+Y" Click="OnRedo" />
         <Separator />
+        <!-- Into the place tool, not the system clipboard, as WinForms. -->
+        <MenuItem x:Name="CutMenuItem" Header="Cu_t" InputGesture="Ctrl+X" Click="OnCut" />
+        <MenuItem x:Name="CopyMenuItem" Header="_Copy" InputGesture="Ctrl+C" Click="OnCopy" />
+        <Separator />
         <MenuItem x:Name="SelectAllMenuItem" Header="Select _All" InputGesture="Ctrl+A" Click="OnSelectAll" />
       </MenuItem>
       <MenuItem Header="_Nest">

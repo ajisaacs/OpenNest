@@ -90,6 +90,16 @@ namespace OpenNest.Avalonia
             });
             KeyBindings.Add(new KeyBinding
             {
+                Gesture = new KeyGesture(Key.X, KeyModifiers.Control),
+                Command = new Command(() => OnCut(null, null)),
+            });
+            KeyBindings.Add(new KeyBinding
+            {
+                Gesture = new KeyGesture(Key.C, KeyModifiers.Control),
+                Command = new Command(() => OnCopy(null, null)),
+            });
+            KeyBindings.Add(new KeyBinding
+            {
                 Gesture = new KeyGesture(Key.A, KeyModifiers.Control),
                 Command = new Command(() => OnSelectAll(null, null)),
             });
@@ -202,6 +212,7 @@ namespace OpenNest.Avalonia
         private void AddView(NestTab tab)
         {
             var view = new NestView(tab);
+            view.PlateView.PlacementOrder = ReadClonePlacementOrder;
             RestoreViewToggles(view);
             view.ViewChanged += (_, _) => { if (view == ActiveView) UpdateStatus(); };
             views[tab] = view;
@@ -307,6 +318,8 @@ namespace OpenNest.Avalonia
             CloseAllMenuItem.IsEnabled = view != null;
             SetOffsetIncrementMenuItem.IsEnabled = view != null;
             SetRotationIncrementMenuItem.IsEnabled = view != null;
+            CutMenuItem.IsEnabled = view != null;
+            CopyMenuItem.IsEnabled = view != null;
             UpdateExportCommands(view != null);
             Title = view == null
                 ? "OpenNest (Avalonia prototype)"
@@ -854,6 +867,26 @@ namespace OpenNest.Avalonia
         private void OnFit(object sender, RoutedEventArgs e) => ActiveView?.PlateView.ZoomToFit();
 
         private void OnSelectAll(object sender, RoutedEventArgs e) => ActiveView?.PlateView.SelectAll();
+
+        // Edit > Cut and Copy, as WinForms: the selected parts go to the place tool (not the
+        // system clipboard); Cut also removes them from the plate. The view keeps the keyboard,
+        // so Enter, arrows and Delete reach the tool after a menu click.
+        private void OnCut(object sender, RoutedEventArgs e)
+        {
+            if (ActiveView?.PlateView is { } canvas && canvas.CutSelection())
+                canvas.Focus();
+        }
+
+        private void OnCopy(object sender, RoutedEventArgs e)
+        {
+            if (ActiveView?.PlateView is { } canvas && canvas.CopySelection())
+                canvas.Focus();
+        }
+
+        // Read at each click, as WinForms reads its setting, so a change in Options applies now.
+        private static Engine.Fill.SettleOrder ReadClonePlacementOrder() =>
+            DesktopOptions.Read(Data.UserSettingsFile.Read(Data.UserSettingsFile.DefaultPath))
+                .ClonePlacementOrder;
 
         private void OnPreviousPlate(object sender, RoutedEventArgs e) => StepPlate(-1);
 
