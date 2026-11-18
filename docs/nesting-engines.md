@@ -129,16 +129,19 @@ reason.
 
 Under those same conditions, where the solve can end only at the limit, Irregular first decodes
 its first variant once without Lattice blocks and reports that quick plan, then runs its normal
-search. Preparing blocks for each stock trial of the first sheet takes most of the first decode's
-time on a big job: on a job of 260 parts of 7 types over 9 stock sizes, Default showed Irregular's
-first plan after about 29 s; the quick plan comes after about 5 s and costs the normal search
-about 2 to 3 s. The quick decode spends its own work meter and shares only caches that depend on
-the job alone (no-fit polygons, pairs, clamps), so the normal search makes the same decisions as
-without it. Until a plan of the normal search beats the quick plan, its plans are reported as
-alternatives, so a worse plan never follows it. The quick plan is never a result of its own: at
-the limit the best reported plan wins, which is the quick plan only when nothing reported later
-beats it, and a solve that can finish on its own never makes one, so unlimited results are
-unchanged.
+search; a job with no type of three or more copies prepares no blocks, so it skips the quick plan.
+Preparing blocks for each stock trial of the first sheet takes most of the first decode's time on
+a big job: on a job of 260 parts of 7 types over 9 stock sizes, Default showed Irregular's first
+plan after about 27 s; the quick plan comes after about 4.5 s and delays the normal search by
+about a second, as the no-fit polygons and pairs it builds serve that search too. At a 20 s limit,
+where the normal search had shown nothing yet, the job now ends on the quick plan's three sheets
+rather than Rectangles' dearer three. The quick decode spends its own work meter and shares only
+caches that depend on the job alone (no-fit polygons, pairs, clamps), so the normal search makes
+the same decisions as without it. Until a plan of the normal search beats the quick plan, its
+plans are reported as alternatives, so a worse plan never follows it. The quick plan is never a
+result of its own: at the limit the best reported plan wins, which is the quick plan only when
+nothing reported later beats it, and a solve that can finish on its own never makes one, so
+unlimited results are unchanged.
 
 Desktop, Console and MCP do not apply a limit yet; Console can solve a job twice (with and without
 cutouts), so a limit there needs one deadline shared across both solves.
@@ -282,8 +285,8 @@ sheet, less full salvage credit) already exceeds the best estimate so far, and t
 remaining part area could not reach a better ratio than the best so far. Later trials only lower
 the ratio and the estimates, so the skipped trial could neither be chosen nor change the choice:
 each decode picks the sheets it picked before. Mostly large stocks on the last sheets are skipped:
-on the 260-part job above, about 60% of the tail re-plans' trials and a fifth of the
-ungrouped search's packing time. The work meter counts only packed trials, so later passes may
+on the 260-part job above, about 60% of the tail re-plans' trials, taking its ungrouped search
+from 49 s to 40 s (the whole solve, mostly grouped and banded passes, gains about 1%). The work meter counts only packed trials, so later passes may
 start where before the budget had stopped them. Whole-job variants still pack every trial: a
 skipped stock may have finished the job, and their finished plans compete with the decode's.
 
