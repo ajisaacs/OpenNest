@@ -131,31 +131,16 @@ public sealed class IrregularNestingEngine : INestingEngine
 
         // A solve that ends only at its limit reports a quick plan first: the first variant without
         // Lattice blocks, whose preparation takes most of the first decode's time on big jobs. It is
-        // metered apart, so the search below runs as without it. Until a plan of that search beats
-        // it, that search's plans are reported as alternatives, so no worse plan follows it. Without
-        // a type of three or more copies no block is ever prepared, and the quick plan would only
-        // repeat the first variant.
-        Plan? quick = null;
+        // metered apart, so the search below runs as without it. The search's plans are reported as
+        // before: only the deadline wrapper sets SearchUntilCancelled, and it keeps the best reported
+        // plan that passes the layout check, so a quick plan that fails the check hides none of them.
+        // Without a type of three or more copies no block is ever prepared, and the quick plan would
+        // only repeat the first variant.
         if (searchOn && demand.Any(d => d > 2))
         {
-            quick = solver.QuickPlan(demand);
+            var quick = solver.QuickPlan(demand);
             if (quick.Sheets.Count > 0)
                 ReportPlan(job, types, quick, progress, token);
-            else
-                quick = null;
-        }
-        void Improved(Plan plan)
-        {
-            if (quick != null)
-            {
-                if (!plan.IsBetterThan(quick))
-                {
-                    ReportAlternative(job, types, plan, progress, token);
-                    return;
-                }
-                quick = null;
-            }
-            ReportPlan(job, types, plan, progress, token);
         }
 
         Plan? best = null;
@@ -169,7 +154,7 @@ public sealed class IrregularNestingEngine : INestingEngine
             if (best == null || plan.IsBetterThan(best))
             {
                 best = plan;
-                Improved(best);
+                ReportPlan(job, types, best, progress, token);
             }
             else
                 ReportAlternative(job, types, plan, progress, token);
@@ -180,7 +165,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         // The last sheets hold the leftovers, which is where waste concentrates; re-plan them.
         var improved = solver.ImproveTail(best!, WorkBudget * 2);
         if (!ReferenceEquals(improved, best))
-            Improved(improved);
+            ReportPlan(job, types, improved, progress, token);
 
         // Like parts grouped, the groups' stragglers filling the gaps after them. These run last, on
         // their own budget, so the search above is the same with or without them; a grouped plan
@@ -200,10 +185,10 @@ public sealed class IrregularNestingEngine : INestingEngine
                     ReportAlternative(job, types, plan, progress, token);
                     continue;
                 }
-                Improved(plan);
+                ReportPlan(job, types, plan, progress, token);
                 improved = solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2);
                 if (!ReferenceEquals(improved, plan))
-                    Improved(improved);
+                    ReportPlan(job, types, improved, progress, token);
             }
         // Then full-height strips: each like-part group as a band of its Lattice pattern, or strip by
         // strip with the largest part first and the rest in its gaps; per sheet the better wins.
@@ -217,10 +202,10 @@ public sealed class IrregularNestingEngine : INestingEngine
             ReportAlternatives(job, types, solver.Alternatives, progress, token);
             if (plan.IsBetterThan(improved))
             {
-                Improved(plan);
+                ReportPlan(job, types, plan, progress, token);
                 improved = solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2);
                 if (!ReferenceEquals(improved, plan))
-                    Improved(improved);
+                    ReportPlan(job, types, improved, progress, token);
             }
             else
                 ReportAlternative(job, types, plan, progress, token);
@@ -233,11 +218,11 @@ public sealed class IrregularNestingEngine : INestingEngine
             if (!ReferenceEquals(reduced, improved))
             {
                 improved = reduced;
-                Improved(improved);
+                ReportPlan(job, types, improved, progress, token);
             }
         }
         if (searchOn)
-            SearchUntilCancelled(job, types, solver, demand, improved, groups, Improved, token);
+            SearchUntilCancelled(job, types, solver, demand, improved, groups, progress, token);
         return BuildResult(job, types, improved, progress, token);
     }
 
@@ -256,8 +241,7 @@ public sealed class IrregularNestingEngine : INestingEngine
 
     /// <summary>
     /// Decodes seed after seed, cycling the variants and grouped variants, and re-plans the tail of each plan that
-    /// beats the best so far, passing each to <paramref name="report"/>; ends only when the token
-    /// is cancelled.
+    /// beats the best so far; ends only when the token is cancelled.
     /// </summary>
     private void SearchUntilCancelled(
         NestJob job,
@@ -266,7 +250,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         int[] demand,
         Plan best,
         bool groups,
-        Action<Plan> report,
+        IProgress<NestJobProgress>? progress,
         CancellationToken token
     )
     {
@@ -282,10 +266,10 @@ public sealed class IrregularNestingEngine : INestingEngine
             if (!plan.IsBetterThan(best))
                 continue;
             // Report before the tail re-plan, which the limit may cut short.
-            report(plan);
+            ReportPlan(job, types, plan, progress, token);
             best = solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2);
             if (!ReferenceEquals(best, plan))
-                report(best);
+                ReportPlan(job, types, best, progress, token);
         }
     }
 
@@ -757,7 +741,9 @@ public sealed class IrregularNestingEngine : INestingEngine
                         continue;
                     if (stock.Quantity is int available && used[stock.Id] >= available)
                         continue;
-                    if (pruneTrials && finishers == null && CannotWin(stock, trials, areaLeft))
+                    // Only once the block budget is spent: before that a skipped trial would leave
+                    // block attempts and work unspent that a later trial could then use.
+                    if (pruneTrials && finishers == null && Work.Value >= workBudget && CannotWin(stock, trials, areaLeft))
                         continue;
                     progress?.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stock.Id, sheets.Count, 0, 0));
                     // Grouped fills pack groups from singles and pairs: Fill blocks cost far more per

@@ -159,11 +159,10 @@ public class IrregularSearchUntilCancelledTests
         Assert.ThrowsAny<OperationCanceledException>(() => engine.Solve(MixedJob(true, Ells), extended, cancel.Token));
 
         Assert.True(extendedSheets >= quickSheets + normalSheets * 12);
-        // The quick plan comes first. The normal search then runs unchanged, each of its plans
-        // reported (as an alternative while it does not beat the quick plan); the extended
-        // search improves on it and re-plans the tails of its plans.
+        // The quick plan comes first. The normal search then runs unchanged, reporting its plans as
+        // before; the extended search improves on it and re-plans the tails of its plans.
         Assert.Equal(Placements(quick), Placements(extended.Plans[0]));
-        Assert.True(InOrder(plain.Plans, extended.All.Skip(1)));
+        Assert.True(InOrder(plain.Plans, extended.Plans.Skip(1)));
         Assert.Contains(extended.Plans.Skip(1),
             p => !plain.Plans.Any(q => Placements(q).SequenceEqual(Placements(p))));
         // Each improvement gets a tail re-plan with its own fresh budget.
@@ -174,8 +173,9 @@ public class IrregularSearchUntilCancelledTests
         Assert.False(CandidateScore.Of(job, plainResult, 0).IsBetterThan(last));
         foreach (var plan in extended.Plans)
             LayoutAssert.Valid(job, plan);
-        // Each reported plan beats the one before it: no seed reports a worse plan.
-        for (var i = 1; i < extended.Plans.Count; i++)
+        // After the quick plan, each reported plan beats the one before it: no seed reports a
+        // worse plan. The deadline wrapper ranks the quick plan against them.
+        for (var i = 2; i < extended.Plans.Count; i++)
             Assert.True(
                 CandidateScore.Of(job, extended.Plans[i], 0)
                     .IsBetterThan(CandidateScore.Of(job, extended.Plans[i - 1], 0)),

@@ -131,17 +131,13 @@ Under those same conditions, where the solve can end only at the limit, Irregula
 its first variant once without Lattice blocks and reports that quick plan, then runs its normal
 search; a job with no type of three or more copies prepares no blocks, so it skips the quick plan.
 Preparing blocks for each stock trial of the first sheet takes most of the first decode's time on
-a big job: on a job of 260 parts of 7 types over 9 stock sizes, Default showed Irregular's first
-plan after about 27 s; the quick plan comes after about 4.5 s and delays the normal search by
-about a second, as the no-fit polygons and pairs it builds serve that search too. At a 20 s limit,
-where the normal search had shown nothing yet, the job now ends on the quick plan's three sheets
-rather than Rectangles' dearer three. The quick decode spends its own work meter and shares only
-caches that depend on the job alone (no-fit polygons, pairs, clamps), so the normal search makes
-the same decisions as without it. Until a plan of the normal search beats the quick plan, its
-plans are reported as alternatives, so a worse plan never follows it. The quick plan is never a
-result of its own: at the limit the best reported plan wins, which is the quick plan only when
-nothing reported later beats it, and a solve that can finish on its own never makes one, so
-unlimited results are unchanged.
+a big job, so the quick plan comes well before the normal search's first plan and delays it
+little, as the no-fit polygons and pairs it builds serve that search too. The quick decode spends
+its own work meter and shares only caches that depend on the job alone (no-fit polygons, pairs,
+clamps), so the normal search makes the same decisions and reports the same plans as without it.
+The quick plan is never a result of its own: the deadline wrapper keeps the best reported plan
+that passes the layout check, which is the quick plan only when nothing reported later beats it,
+and a solve that can finish on its own never makes one, so unlimited results are unchanged.
 
 Desktop, Console and MCP do not apply a limit yet; Console can solve a job twice (with and without
 cutouts), so a limit there needs one deadline shared across both solves.
@@ -280,15 +276,17 @@ remain separate sequencer/verification work.
 
 Each sheet of a decode trial-packs every stock still available and keeps the one with the lowest
 estimate: its net cost plus the part area it leaves, charged at the best cost per part area any
-trial reached. A tail re-plan's decode skips a stock whose least possible net cost (the whole
-sheet, less full salvage credit) already exceeds the best estimate so far, and that over the
-remaining part area could not reach a better ratio than the best so far. Later trials only lower
-the ratio and the estimates, so the skipped trial could neither be chosen nor change the choice:
-each decode picks the sheets it picked before. Mostly large stocks on the last sheets are skipped:
-on the 260-part job above, about 60% of the tail re-plans' trials, taking its ungrouped search
-from 49 s to 40 s (the whole solve, mostly grouped and banded passes, gains about 1%). The work meter counts only packed trials, so later passes may
-start where before the budget had stopped them. Whole-job variants still pack every trial: a
-skipped stock may have finished the job, and their finished plans compete with the decode's.
+trial reached. Once the block budget is spent, so no
+Lattice block can be prepared any more, a tail re-plan's decode skips a stock whose least
+possible net cost (the whole sheet, less full salvage credit) already exceeds the best estimate so
+far, and that over the remaining part area could not reach a better ratio than the best so far.
+Later trials only lower the ratio and the estimates, so the skipped trial could neither be chosen
+nor change the choice: each decode picks the sheets it picked before. Mostly large stocks on the
+last sheets are skipped. Before the budget is spent a skipped trial would leave block attempts and
+work unspent that a later trial could use, changing its fill. The work meter counts only packed
+trials, so later tail re-plans and passes may start where before the budget had stopped them.
+Whole-job variants still pack every trial: a skipped stock may have finished the job, and their
+finished plans compete with the decode's.
 
 ### Grouped variants
 
