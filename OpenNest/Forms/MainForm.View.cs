@@ -57,9 +57,6 @@ namespace OpenNest.Forms
         {
             var hasPlate = activeForm != null && !activeForm.IsDisposed && activeForm.PlateView.Plate != null;
             mnuViewOverlapCheck.Enabled = hasPlate;
-            mnuOverlapCheckActive.Enabled = hasPlate;
-            mnuOverlapCancel.Enabled = hasPlate && activeForm.PlateView.IsOverlapCheckRunning;
-            mnuOverlapDisplay.Enabled = hasPlate;
             mnuOverlapOff.Enabled = hasPlate;
             mnuOverlapAreas.Enabled = hasPlate;
             mnuOverlapCentroids.Enabled = hasPlate;
@@ -69,15 +66,6 @@ namespace OpenNest.Forms
             mnuOverlapCentroids.Checked = hasPlate && activeForm.OverlapDisplay == OverlapDisplayMode.Centroids;
             mnuOverlapBoth.Checked = hasPlate && activeForm.OverlapDisplay == OverlapDisplayMode.Both;
         }
-
-        private async void CheckOverlaps_Click(object sender, EventArgs e)
-        {
-            var form = activeForm;
-            if (form != null)
-                await form.CheckOverlapsAsync();
-        }
-
-        private void CancelOverlapCheck_Click(object sender, EventArgs e) => activeForm?.CancelOverlapCheck();
 
         private void OverlapOff_Click(object sender, EventArgs e)
         {

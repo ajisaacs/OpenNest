@@ -66,9 +66,6 @@ namespace OpenNest.Forms
             mnuEditSelectAll = new System.Windows.Forms.ToolStripMenuItem();
             mnuView = new System.Windows.Forms.ToolStripMenuItem();
             mnuViewOverlapCheck = new System.Windows.Forms.ToolStripMenuItem();
-            mnuOverlapCheckActive = new System.Windows.Forms.ToolStripMenuItem();
-            mnuOverlapCancel = new System.Windows.Forms.ToolStripMenuItem();
-            mnuOverlapDisplay = new System.Windows.Forms.ToolStripMenuItem();
             mnuOverlapOff = new System.Windows.Forms.ToolStripMenuItem();
             mnuOverlapAreas = new System.Windows.Forms.ToolStripMenuItem();
             mnuOverlapCentroids = new System.Windows.Forms.ToolStripMenuItem();
@@ -432,27 +429,8 @@ namespace OpenNest.Forms
             //
             mnuViewOverlapCheck.Name = "mnuViewOverlapCheck";
             mnuViewOverlapCheck.Text = "Overlap Check";
-            mnuViewOverlapCheck.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuOverlapCheckActive, mnuOverlapCancel, mnuOverlapDisplay });
+            mnuViewOverlapCheck.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuOverlapOff, mnuOverlapAreas, mnuOverlapCentroids, mnuOverlapBoth });
             mnuViewOverlapCheck.DropDownOpening += OverlapMenu_Opening;
-            //
-            // mnuOverlapCheckActive
-            //
-            mnuOverlapCheckActive.Name = "mnuOverlapCheckActive";
-            mnuOverlapCheckActive.Text = "Check Active Plate";
-            mnuOverlapCheckActive.Click += CheckOverlaps_Click;
-            //
-            // mnuOverlapCancel
-            //
-            mnuOverlapCancel.Name = "mnuOverlapCancel";
-            mnuOverlapCancel.Text = "Cancel Check";
-            mnuOverlapCancel.Click += CancelOverlapCheck_Click;
-            //
-            // mnuOverlapDisplay
-            //
-            mnuOverlapDisplay.Name = "mnuOverlapDisplay";
-            mnuOverlapDisplay.Text = "Display";
-            mnuOverlapDisplay.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuOverlapOff, mnuOverlapAreas, mnuOverlapCentroids, mnuOverlapBoth });
-            mnuOverlapDisplay.DropDownOpening += OverlapMenu_Opening;
             //
             // mnuOverlapOff
             //
@@ -1478,9 +1456,6 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuEditSelectAll;
         private System.Windows.Forms.ToolStripMenuItem mnuView;
         private System.Windows.Forms.ToolStripMenuItem mnuViewOverlapCheck;
-        private System.Windows.Forms.ToolStripMenuItem mnuOverlapCheckActive;
-        private System.Windows.Forms.ToolStripMenuItem mnuOverlapCancel;
-        private System.Windows.Forms.ToolStripMenuItem mnuOverlapDisplay;
         private System.Windows.Forms.ToolStripMenuItem mnuOverlapOff;
         private System.Windows.Forms.ToolStripMenuItem mnuOverlapAreas;
         private System.Windows.Forms.ToolStripMenuItem mnuOverlapCentroids;

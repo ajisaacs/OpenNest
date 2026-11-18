@@ -578,29 +578,28 @@ public class PlateOverlapOverlayTests
     });
 
     [Fact]
-    public void MenusFollowMdiActivationDocumentDisplayAndRunningState() => RunSta(() =>
+    public void MenusFollowMdiActivationAndDocumentDisplay() => RunSta(() =>
     {
         using var host = new MenuHost();
         host.Show();
-        var check = Menu(host, "mnuOverlapCheckActive");
-        var cancel = Menu(host, "mnuOverlapCancel");
+        var overlap = Menu(host, "mnuViewOverlapCheck");
         var off = Menu(host, "mnuOverlapOff");
         var areas = Menu(host, "mnuOverlapAreas");
         var centroids = Menu(host, "mnuOverlapCentroids");
         var both = Menu(host, "mnuOverlapBoth");
-        Assert.False(check.Enabled);
-        Assert.False(cancel.Enabled);
+        Assert.False(overlap.Enabled);
         Assert.False(off.Enabled);
         Assert.False(areas.Enabled);
         Assert.False(centroids.Enabled);
         Assert.False(both.Enabled);
-        Assert.All(new[] { check, cancel, off, areas, centroids, both }, item => Assert.Equal(Keys.None, item.ShortcutKeys));
+        Assert.All(new[] { overlap, off, areas, centroids, both }, item => Assert.Equal(Keys.None, item.ShortcutKeys));
 
         using var first = new EditNestForm(new Nest("first")) { MdiParent = host };
         // Manual-command test: an auto-check timer pumped during a wait would race its requests.
         first.PlateView.SetOverlapAutoCheck(null);
         first.Show();
-        Assert.True(check.Enabled);
+        Assert.True(overlap.Enabled);
+        Assert.True(off.Enabled);
         Assert.True(areas.Checked);
         off.PerformClick();
         Assert.Equal(OverlapDisplayMode.Off, first.OverlapDisplay);
@@ -641,10 +640,8 @@ public class PlateOverlapOverlayTests
             };
             var task = first.CheckOverlapsAsync();
             Assert.True(pending.TryTake(out var request, TimeSpan.FromSeconds(15)));
-            Assert.True(cancel.Enabled);
             Assert.True(areas.Checked); // Checking from Off selects Areas.
-            cancel.PerformClick();
-            Assert.False(cancel.Enabled);
+            first.CancelOverlapCheck();
             Assert.True(request!.Token.IsCancellationRequested);
             request.Complete();
             context.Pump(task);
@@ -656,8 +653,8 @@ public class PlateOverlapOverlayTests
         }
         first.Dispose();
         second.Dispose();
-        Assert.False(check.Enabled);
-        Assert.False(cancel.Enabled);
+        Assert.False(overlap.Enabled);
+        Assert.False(off.Enabled);
     });
 
     [Fact]
@@ -1192,7 +1189,7 @@ public class PlateOverlapOverlayTests
         Assert.Equal(OverlapDisplayMode.Off, run.View.OverlapDisplay);
 
         run.View.Plate.Parts[1].Offset(0.25, 0);
-        task = run.Start();                       // manual Check Active Plate
+        task = run.Start();                       // explicit check, as Auto Nest runs
         run.Next().Complete();
         run.Pump(task);
         Assert.Equal(OverlapDisplayMode.Areas, run.View.OverlapDisplay);

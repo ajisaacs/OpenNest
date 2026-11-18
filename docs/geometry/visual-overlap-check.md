@@ -2,13 +2,13 @@
 
 ## Desktop use
 
-Choose **View > Overlap Check > Check Active Plate** to check committed parts on
-this plate. Shared material is shaded red/magenta without changing the nest,
-selection, cutting paths, or export behavior. Cutoffs and temporary preview parts
-are excluded. **Cancel Check** discards the running request. **Display > Off /
-Areas / Markers / Both** changes visibility without rerunning analysis. Areas
-is the default; rechecking preserves a visible mode, while checking from Off
-shows Areas. Clamp overlaps are shown as part/clamp findings with the clamp ID
+A nest window checks committed parts on its active plate automatically (see below);
+there is no menu command to run or cancel a check. Shared material is shaded
+red/magenta without changing the nest, selection, cutting paths, or export
+behavior. Cutoffs and temporary preview parts are excluded. **View > Overlap
+Check > Off / Areas / Markers / Both** changes visibility without rerunning
+analysis. Areas is the default; an explicit check (the one Auto Nest runs when it
+finishes) preserves a visible mode, while checking from Off shows Areas. Clamp overlaps are shown as part/clamp findings with the clamp ID
 in hover details; clamps are not selectable parts and are not added to quantity
 or machining. A clamp edit invalidates the diagnostic and schedules a fresh
 check. Display preferences belong to the current document and are not saved.
@@ -76,12 +76,11 @@ mouse button, modal dialog, or fill progress window is active, the check reruns.
 Automatic results do not replace the status bar's message, so it keeps the last
 command's text; a separate **Layout** section beside utilization follows the check
 instead, as `Layout: OK`, `Layout: checking…` or `Layout: 1 overlap, 3 too close`,
-in red for findings or an unfinished check, with the full wording in its tooltip, and an automatic check keeps Display > Off rather than
+in red for findings or an unfinished check, with the full wording in its tooltip, and an automatic check keeps Off rather than
 switching to Areas. Rechecks are incremental: drawing material is prepared once
 and reused, and pairs whose two parts have not moved reuse the previous result,
-so only the moved parts' neighbors are clipped again. Canceling a check is
-respected until the layout changes again, and a failed layout is not retried
-until it changes. Check Active Plate remains available and always runs at once.
+so only the moved parts' neighbors are clipped again. A failed layout is not
+retried until it changes.
 
 Plate changes reset the check. Pan, zoom, selection, and display changes do not
 rerun geometry. Drawing-editor loading invalidates before loading (dropping cached
