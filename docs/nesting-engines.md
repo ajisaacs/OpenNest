@@ -14,7 +14,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 | Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the engine listed first here |
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; the sheet that finishes the job is also squeezed into a shorter or narrower bin; stock chosen sheet by sheet by salvage-credited look-ahead cost |
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
-| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants (each also keeping a stock that finished the job when the per-sheet estimate passed it over for a plan that ended up dearer) and a tail re-plan, then grouped variants that pack like parts together, then a banded variant that packs each sheet in full-height strips, each group as its Lattice band or each strip from the largest parts down, then a sheet-reduction pass that packs edge parts first and turns a key part by its contacts; under a time limit it keeps trying seeded variants until the limit |
+| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants (each also keeping a stock that finished the job when the per-sheet estimate passed it over for a plan that ended up dearer) and a tail re-plan, then grouped variants that pack like parts together, then a banded variant that packs each sheet in full-height strips, each group as its Lattice band or each strip from the largest parts down, then a sheet-reduction pass that packs edge parts first and turns a key part by its contacts; under a time limit it first reports a quick plan without Lattice blocks, and after its search keeps trying seeded variants until the limit |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
 | Lattice, Strip, Vertical Remnant, Horizontal Remnant | Many copies of a few parts | The fixed placement strategies behind interactive fill; Lattice is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder; the pairs phase fills the strip its grid leaves with rows of pairs when they hold more than single parts, and also tiles herringbone pairs: the part turned so a hull edge lies along a sheet axis, nested into its own row, with every other row reversed), and the remnant strategies run it ranked to keep the largest drop. In whole jobs, all four place a plate with any fixed or bounded part rotation by the rotation-aware ordered placer instead |
 
@@ -85,7 +85,8 @@ proposals with no committed counts, all come before the plate commits, and the l
 returned layout. Reporting never changes the search: layouts are identical with or without a
 progress sink.
 
-- Irregular reports when a strategy variant, a grouped variant or a tail re-plan beats its best plan so far.
+- Irregular reports when a strategy variant, a grouped variant or a tail re-plan beats its best plan so far;
+  under a time limit it reports a quick plan before them (see [time limits](#time-limits)).
 - Rectangles makes one sheet-by-sheet run, so it reports the finished job as its one plan.
 - Circles reports when a stock-preference run or a tail re-plan beats its best result so far.
 - Default scores each candidate plan as it ranks results (valid, fewest unplaced, lowest cost,
@@ -125,6 +126,19 @@ b-jakobs1 job this took 5 sheets down to 4 within 10 s. Default passes the optio
 candidates, and other engines ignore it; Irregular also ignores it when the token cannot be
 cancelled, nobody listens for progress, or the job has a single part type. Default runs Irregular last for this
 reason.
+
+Under those same conditions, where the solve can end only at the limit, Irregular first decodes
+its first variant once without Lattice blocks and reports that quick plan, then runs its normal
+search. Preparing blocks for each stock trial of the first sheet takes most of the first decode's
+time on a big job: on a job of 260 parts of 7 types over 9 stock sizes, Default showed Irregular's
+first plan after about 29 s; the quick plan comes after about 5 s and costs the normal search
+about 2 to 3 s. The quick decode spends its own work meter and shares only caches that depend on
+the job alone (no-fit polygons, pairs, clamps), so the normal search makes the same decisions as
+without it. Until a plan of the normal search beats the quick plan, its plans are reported as
+alternatives, so a worse plan never follows it. The quick plan is never a result of its own: at
+the limit the best reported plan wins, which is the quick plan only when nothing reported later
+beats it, and a solve that can finish on its own never makes one, so unlimited results are
+unchanged.
 
 Desktop, Console and MCP do not apply a limit yet; Console can solve a job twice (with and without
 cutouts), so a limit there needs one deadline shared across both solves.

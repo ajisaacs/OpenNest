@@ -25,12 +25,32 @@ public class IrregularSearchUntilCancelledTests
     {
         public List<NestJobResult> Plans { get; } = new();
 
+        /// <summary>Every plan reported, improved or alternative, in order.</summary>
+        public List<NestJobResult> All { get; } = new();
+
         public void Report(NestJobProgress value)
         {
             if (value.Stage == NestJobStage.PlanImproved)
                 Plans.Add(value.Plan!);
+            if (value.Stage is NestJobStage.PlanImproved or NestJobStage.PlanAlternative)
+                All.Add(value.Plan!);
             also?.Invoke(value);
         }
+    }
+
+    /// <summary>Whether <paramref name="expected"/> appears in <paramref name="reported"/> in order.</summary>
+    private static bool InOrder(IEnumerable<NestJobResult> expected, IEnumerable<NestJobResult> reported)
+    {
+        using var next = reported.GetEnumerator();
+        foreach (var plan in expected)
+        {
+            var found = false;
+            while (!found && next.MoveNext())
+                found = Placements(next.Current).SequenceEqual(Placements(plan));
+            if (!found)
+                return false;
+        }
+        return true;
     }
 
     private static List<(string, int, double, double, double)> Placements(NestJobResult result) =>
@@ -48,6 +68,57 @@ public class IrregularSearchUntilCancelledTests
     }
 
     [Fact]
+    public void ASolveThatCanEndUnlimitedReportsNoQuickPlan()
+    {
+        // The quick plan belongs to a solve that ends only at its limit: without the option, or
+        // without a token that can cancel it, the plans reported are the usual ones.
+        var plain = new Recorder();
+        var plainResult = new IrregularNestingEngine().Solve(MixedJob(false), plain);
+        var quick = new IrregularNestingEngine().QuickPlanForTesting(MixedJob(false));
+        Assert.DoesNotContain(plain.All, p => Placements(p).SequenceEqual(Placements(quick)));
+
+        using var cancel = new CancellationTokenSource();
+        var cancellable = new Recorder();
+        var flagged = new Recorder();
+        var cancellableResult = new IrregularNestingEngine().Solve(MixedJob(false), cancellable, cancel.Token);
+        var flaggedResult = new IrregularNestingEngine().Solve(MixedJob(true), flagged);
+
+        foreach (var (recorder, result) in new[] { (cancellable, cancellableResult), (flagged, flaggedResult) })
+        {
+            Assert.Equal(Placements(plainResult), Placements(result));
+            Assert.Equal(plain.All.Select(Placements), recorder.All.Select(Placements));
+        }
+    }
+
+    [Fact]
+    public void ATimeLimitedSolveReportsAQuickPlanFirst()
+    {
+        // The first variant without Lattice blocks, reported before the normal search finishes its
+        // first sheet: stopped there, the solve has the quick plan, a valid layout, to return.
+        var job = MixedJob(true);
+        var quickSheets = 0;
+        var quick = new IrregularNestingEngine { SheetPacked = () => quickSheets++ }.QuickPlanForTesting(job);
+        using var cancel = new CancellationTokenSource();
+        var sheets = 0;
+        var engine = new IrregularNestingEngine
+        {
+            SheetPacked = () =>
+            {
+                if (++sheets > quickSheets)
+                    cancel.Cancel();
+            },
+        };
+        var recorder = new Recorder();
+
+        Assert.ThrowsAny<OperationCanceledException>(() => engine.Solve(job, recorder, cancel.Token));
+
+        var plan = Assert.Single(recorder.Plans);
+        Assert.Equal(Placements(quick), Placements(plan));
+        Assert.NotEmpty(Placements(plan));
+        LayoutAssert.Valid(MixedJob(false), plan);
+    }
+
+    [Fact]
     public void KeepsSearchingAfterTheNormalSearchUntilCancelled()
     {
         const int Ells = 12;
@@ -58,6 +129,10 @@ public class IrregularSearchUntilCancelledTests
         var plainResult = new IrregularNestingEngine { GroupLikeParts = false }.Solve(MixedJob(false, Ells), plain);
         var normalSheets = 0;
         new IrregularNestingEngine { GroupLikeParts = false, SheetPacked = () => normalSheets++ }.Solve(MixedJob(false, Ells));
+        // A time-limited solve packs its quick plan before the normal search.
+        var quickSheets = 0;
+        var quick = new IrregularNestingEngine { GroupLikeParts = false, SheetPacked = () => quickSheets++ }
+            .QuickPlanForTesting(MixedJob(false, Ells));
 
         var extendedSheets = 0;
         var extendedTailBudgets = new List<long>();
@@ -65,16 +140,17 @@ public class IrregularSearchUntilCancelledTests
         var engine = new IrregularNestingEngine
         {
             GroupLikeParts = false,
-            // The normal search packs exactly normalSheets sheets; later ones are extended.
+            // The quick plan and the normal search pack exactly quickSheets + normalSheets sheets;
+            // later ones are extended.
             TailReplanning = budget =>
             {
-                if (extendedSheets > normalSheets)
+                if (extendedSheets > quickSheets + normalSheets)
                     extendedTailBudgets.Add(budget);
             },
             SheetPacked = () =>
             {
                 // Let the extended search pack several more whole plans, then stop it.
-                if (++extendedSheets >= normalSheets * 12)
+                if (++extendedSheets >= quickSheets + normalSheets * 12)
                     cancel.Cancel();
             },
         };
@@ -82,15 +158,17 @@ public class IrregularSearchUntilCancelledTests
 
         Assert.ThrowsAny<OperationCanceledException>(() => engine.Solve(MixedJob(true, Ells), extended, cancel.Token));
 
-        Assert.True(extendedSheets >= normalSheets * 12);
-        // The normal search runs first, unchanged; the extended search improves on it and
-        // re-plans the tails of its plans.
-        Assert.True(extended.Plans.Count > plain.Plans.Count);
+        Assert.True(extendedSheets >= quickSheets + normalSheets * 12);
+        // The quick plan comes first. The normal search then runs unchanged, each of its plans
+        // reported (as an alternative while it does not beat the quick plan); the extended
+        // search improves on it and re-plans the tails of its plans.
+        Assert.Equal(Placements(quick), Placements(extended.Plans[0]));
+        Assert.True(InOrder(plain.Plans, extended.All.Skip(1)));
+        Assert.Contains(extended.Plans.Skip(1),
+            p => !plain.Plans.Any(q => Placements(q).SequenceEqual(Placements(p))));
         // Each improvement gets a tail re-plan with its own fresh budget.
         Assert.NotEmpty(extendedTailBudgets);
         Assert.All(extendedTailBudgets, b => Assert.Equal(2 * new IrregularNestingEngine().WorkBudget, b));
-        for (var i = 0; i < plain.Plans.Count; i++)
-            Assert.Equal(Placements(plain.Plans[i]), Placements(extended.Plans[i]));
         var job = MixedJob(false, Ells);
         var last = CandidateScore.Of(job, extended.Plans[^1], 0);
         Assert.False(CandidateScore.Of(job, plainResult, 0).IsBetterThan(last));

@@ -23,7 +23,8 @@ namespace OpenNest.Engine.NestingEngines.Irregular;
 /// With <see cref="NestJobOptions.SearchUntilCancelled"/>, a cancellable token and a progress
 /// listener, the search then keeps decoding the variants with seeded per-type weights on the
 /// placement rule, reporting each better plan, until cancelled (not for one-type jobs, where
-/// the weights change nothing).
+/// the weights change nothing). Such a solve first reports a quick plan, the first variant
+/// without Lattice blocks, metered apart so the search after it is unchanged.
 ///
 /// Fully deterministic: no clocks or randomness influence any decision. The weights come from
 /// fixed seeds 1, 2, 3, ..., so an extended search depends only on how far it got.
@@ -117,6 +118,40 @@ public sealed class IrregularNestingEngine : INestingEngine
                 || (type.Part.Quantity > 2 && type.Orientations.Count > 0) ? type.Part.Quantity : 0;
         }
 
+        // More searching can only end in cancellation, so it needs a listener for its plans, and
+        // it needs demand and two or more types, or every weighted decode repeats a variant.
+        var searchOn = job.Options.SearchUntilCancelled && token.CanBeCanceled && progress != null
+            && types.Count > 1 && demand.Any(d => d > 0);
+
+        // A solve that ends only at its limit reports a quick plan first: the first variant without
+        // Lattice blocks, whose preparation takes most of the first decode's time on big jobs. It is
+        // metered apart, so the search below runs as without it. Until a plan of that search beats
+        // it, that search's plans are reported as alternatives, so no worse plan follows it. Without
+        // a type of three or more copies no block is ever prepared, and the quick plan would only
+        // repeat the first variant.
+        Plan? quick = null;
+        if (searchOn && demand.Any(d => d > 2))
+        {
+            quick = solver.QuickPlan(demand);
+            if (quick.Sheets.Count > 0)
+                ReportPlan(job, types, quick, progress, token);
+            else
+                quick = null;
+        }
+        void Improved(Plan plan)
+        {
+            if (quick != null)
+            {
+                if (!plan.IsBetterThan(quick))
+                {
+                    ReportAlternative(job, types, plan, progress, token);
+                    return;
+                }
+                quick = null;
+            }
+            ReportPlan(job, types, plan, progress, token);
+        }
+
         Plan? best = null;
         foreach (var (axis, beta) in Variants)
         {
@@ -128,7 +163,7 @@ public sealed class IrregularNestingEngine : INestingEngine
             if (best == null || plan.IsBetterThan(best))
             {
                 best = plan;
-                ReportPlan(job, types, best, progress, token);
+                Improved(best);
             }
             else
                 ReportAlternative(job, types, plan, progress, token);
@@ -139,7 +174,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         // The last sheets hold the leftovers, which is where waste concentrates; re-plan them.
         var improved = solver.ImproveTail(best!, WorkBudget * 2);
         if (!ReferenceEquals(improved, best))
-            ReportPlan(job, types, improved, progress, token);
+            Improved(improved);
 
         // Like parts grouped, the groups' stragglers filling the gaps after them. These run last, on
         // their own budget, so the search above is the same with or without them; a grouped plan
@@ -159,10 +194,10 @@ public sealed class IrregularNestingEngine : INestingEngine
                     ReportAlternative(job, types, plan, progress, token);
                     continue;
                 }
-                ReportPlan(job, types, plan, progress, token);
+                Improved(plan);
                 improved = solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2);
                 if (!ReferenceEquals(improved, plan))
-                    ReportPlan(job, types, improved, progress, token);
+                    Improved(improved);
             }
         // Then full-height strips: each like-part group as a band of its Lattice pattern, or strip by
         // strip with the largest part first and the rest in its gaps; per sheet the better wins.
@@ -176,10 +211,10 @@ public sealed class IrregularNestingEngine : INestingEngine
             ReportAlternatives(job, types, solver.Alternatives, progress, token);
             if (plan.IsBetterThan(improved))
             {
-                ReportPlan(job, types, plan, progress, token);
+                Improved(plan);
                 improved = solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2);
                 if (!ReferenceEquals(improved, plan))
-                    ReportPlan(job, types, improved, progress, token);
+                    Improved(improved);
             }
             else
                 ReportAlternative(job, types, plan, progress, token);
@@ -192,14 +227,11 @@ public sealed class IrregularNestingEngine : INestingEngine
             if (!ReferenceEquals(reduced, improved))
             {
                 improved = reduced;
-                ReportPlan(job, types, improved, progress, token);
+                Improved(improved);
             }
         }
-        // More searching can only end in cancellation, so it needs a listener for its plans, and
-        // it needs demand and two or more types, or every weighted decode repeats a variant.
-        if (job.Options.SearchUntilCancelled && token.CanBeCanceled && progress != null
-            && types.Count > 1 && demand.Any(d => d > 0))
-            SearchUntilCancelled(job, types, solver, demand, improved, groups, progress, token);
+        if (searchOn)
+            SearchUntilCancelled(job, types, solver, demand, improved, groups, Improved, token);
         return BuildResult(job, types, improved, progress, token);
     }
 
@@ -218,7 +250,8 @@ public sealed class IrregularNestingEngine : INestingEngine
 
     /// <summary>
     /// Decodes seed after seed, cycling the variants and grouped variants, and re-plans the tail of each plan that
-    /// beats the best so far; ends only when the token is cancelled.
+    /// beats the best so far, passing each to <paramref name="report"/>; ends only when the token
+    /// is cancelled.
     /// </summary>
     private void SearchUntilCancelled(
         NestJob job,
@@ -227,7 +260,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         int[] demand,
         Plan best,
         bool groups,
-        IProgress<NestJobProgress>? progress,
+        Action<Plan> report,
         CancellationToken token
     )
     {
@@ -243,10 +276,10 @@ public sealed class IrregularNestingEngine : INestingEngine
             if (!plan.IsBetterThan(best))
                 continue;
             // Report before the tail re-plan, which the limit may cut short.
-            ReportPlan(job, types, plan, progress, token);
+            report(plan);
             best = solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2);
             if (!ReferenceEquals(best, plan))
-                ReportPlan(job, types, best, progress, token);
+                report(best);
         }
     }
 
@@ -311,6 +344,14 @@ public sealed class IrregularNestingEngine : INestingEngine
         return BuildResult(job, types, solver.Plan(demand, axis, beta, weights), null, default);
     }
 
+    /// <summary>The quick plan a time-limited solve reports first, whole demand placeable; for tests.</summary>
+    internal NestJobResult QuickPlanForTesting(NestJob job)
+    {
+        var types = PartCatalog.Build(job);
+        using var solver = new Solver(job, types, null, default, WorkBudget, DrawingFor, SheetPacked, BatchSelected, TailReplaced);
+        return BuildResult(job, types, solver.QuickPlan(types.Select(t => t.Part.Quantity).ToArray()), null, default);
+    }
+
     /// <summary>Shared state for one solve: job, catalog, NFP caches, effort meter.</summary>
     private sealed class Solver(
         NestJob job,
@@ -350,7 +391,32 @@ public sealed class IrregularNestingEngine : INestingEngine
             return found;
         }
 
-        public WorkCounter Work { get; } = new();
+        public WorkCounter Work { get; private set; } = new();
+
+        /// <summary>Whether the decode under way is <see cref="QuickPlan"/>'s, which offers no blocks.</summary>
+        private bool quick;
+
+        /// <summary>
+        /// The first variant decoded without Lattice blocks, on a work meter of its own, so the
+        /// search after it runs as without it: what it adds to the shared caches (no-fit polygons,
+        /// pairs, clamps, boundaries) depends only on the job, never on when it was built.
+        /// </summary>
+        public Plan QuickPlan(int[] demand)
+        {
+            var meter = Work;
+            Work = new WorkCounter();
+            quick = true;
+            try
+            {
+                return Plan(demand, Variants[0].Axis, Variants[0].Beta);
+            }
+            finally
+            {
+                Work = meter;
+                quick = false;
+                Alternatives = Array.Empty<Plan>();
+            }
+        }
 
         private double Penalty => NestJobCost.UnplacedPartPenalty(job);
 
@@ -688,7 +754,7 @@ public sealed class IrregularNestingEngine : INestingEngine
                     // fill there and gave no denser groups. A banded fill's bands are Fill patterns
                     // already; its gap fill takes singles and pairs.
                     FrontierPacker Packer(IReadOnlyList<int>? ranks, double? reach) => new(types, CacheFor(stock),
-                        PairsFor(stock), stock, axis, beta, Work, grouped || banded ? null : BlocksFor(stock), ClampsFor(stock), BoundaryFor(stock),
+                        PairsFor(stock), stock, axis, beta, Work, grouped || banded || quick ? null : BlocksFor(stock), ClampsFor(stock), BoundaryFor(stock),
                         weights, ranks, reach);
                     var fill = banded
                         ? Banded(stock, remaining, weights, Packer)
