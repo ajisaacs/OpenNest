@@ -226,7 +226,23 @@ namespace OpenNest.Controls
 
         public bool DrawCutDirection { get; set; }
 
+        /// <summary>
+        /// Draws bend lines, up-bend etch marks and grain warnings, and the grain indicator
+        /// off the plate's corner that turns the grain when clicked.
+        /// </summary>
         public bool ShowBendLines { get; set; }
+
+        private bool grainIndicatorHot;
+        private bool grainIndicatorClicked;
+
+        /// <summary>Whether a click on the grain indicator would turn the live plate's grain.</summary>
+        private bool CanTurnGrain =>
+            ShowBendLines && plate != null && !HasProposalDisplay && !EditsLocked
+            && actionManager.CurrentAction is ActionSelect;
+
+        private bool HitsGrainIndicator(Point controlPoint) =>
+            plate != null
+            && GrainIndicator.Bounds(this, plate).Contains(controlPoint.X - origin.X, controlPoint.Y - origin.Y);
 
         public double OffsetTolerance { get; set; } = 0.001;
 
@@ -442,6 +458,7 @@ namespace OpenNest.Controls
             hoverPending = false;
             hoveredPart = null;
             showTooltip = false;
+            grainIndicatorHot = false;
             Invalidate();
         }
 
@@ -506,6 +523,14 @@ namespace OpenNest.Controls
             if (EditsLocked)
                 return;
 
+            if (e.Button == MouseButtons.Left && CanTurnGrain && HitsGrainIndicator(e.Location))
+            {
+                // The click is the indicator's; selection never sees it, down or up.
+                grainIndicatorClicked = true;
+                TurnGrain();
+                return;
+            }
+
             if (e.Button == MouseButtons.Left && actionManager.CurrentAction is ActionSelect)
             {
                 var hitCutOff = cutOffHandler.TryStartDrag(CurrentPoint, 5.0 / ViewScale);
@@ -530,6 +555,11 @@ namespace OpenNest.Controls
         {
             if (EditsLocked)
                 return;
+            if (e.Button == MouseButtons.Left && grainIndicatorClicked)
+            {
+                grainIndicatorClicked = false;
+                return;
+            }
             if (e.Button == MouseButtons.Middle && SelectedParts.Count > 0)
             {
                 var dx = e.X - middleMouseDownPoint.X;
@@ -630,6 +660,16 @@ namespace OpenNest.Controls
             {
                 cutOffHandler.UpdateDrag(CurrentPoint, selection.SelectedCutOffs[0]);
                 return;
+            }
+
+            if (e.Button == MouseButtons.None)
+            {
+                var hot = CanTurnGrain && HitsGrainIndicator(e.Location);
+                if (hot != grainIndicatorHot)
+                {
+                    grainIndicatorHot = hot;
+                    Invalidate();
+                }
             }
 
             if (e.Button == MouseButtons.None && actionManager.CurrentAction is ActionSelect)
@@ -832,6 +872,11 @@ namespace OpenNest.Controls
             validationOverlay.Draw(e.Graphics);
             if (!HasProposalDisplay)
                 cutSimulation.Draw(e.Graphics);
+            if (ShowBendLines && DisplayPlate != null)
+            {
+                GrainIndicator.Draw(e.Graphics, GrainIndicator.Bounds(this, DisplayPlate),
+                    DisplayPlate.GrainAngle, grainIndicatorHot, enabled: CanTurnGrain);
+            }
 
             base.OnPaint(e);
 
@@ -976,6 +1021,22 @@ namespace OpenNest.Controls
             using var change = BeginChange(twice ? "Cut Common Lines Twice" : "Cut Common Lines Once");
             change.MarkChanged();
             Plate.CutCommonLinesTwice = twice;
+            Invalidate();
+            change.Complete();
+            return true;
+        }
+
+        /// <summary>
+        /// Turns the plate's grain a quarter turn (side to side ↔ front to back), as an undoable
+        /// edit. Use it when the sheet's grain runs the other way from the plate as entered.
+        /// </summary>
+        public bool TurnGrain()
+        {
+            if (Plate == null)
+                return false;
+            using var change = BeginChange("Turn Grain");
+            change.MarkChanged();
+            Plate.GrainAngle = GrainIndicator.Turned(Plate.GrainAngle);
             Invalidate();
             change.Complete();
             return true;
