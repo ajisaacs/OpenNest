@@ -133,6 +133,103 @@ public class CollisionOverlapOnlyTests
         Assert.Equal(new[] { "a", "c" }, resolved);
     }
 
+    /// <summary>
+    /// The clip triangles PartOverlapChecker caches give the legacy verdicts, reused across many
+    /// pairs, and read every triangle exactly as the polygon triangulation does.
+    /// </summary>
+    [Fact]
+    public void SeededClippingTriangles_ReusedAcrossPairs_MatchLegacyVerdicts()
+    {
+        var random = new Random(17112026);
+        var decisions = 0;
+        var overlaps = 0;
+        var boxOverlapClear = 0;
+        for (var group = 0; group < 40; group++)
+        {
+            var polygons = new List<Polygon>();
+            var shapeA = Make(random, group % 6);
+            var shapeB = Make(random, (group / 6) % 6);
+            for (var sample = 0; sample < 25; sample++)
+            {
+                var (ax, ay, bx, by) = Offsets(random, shapeA, shapeB, sample);
+                var dx = random.NextDouble() * 4 - ax;
+                var dy = random.NextDouble() * 4 - ay;
+                polygons.Add(Move(shapeA, ax + dx, ay + dy));
+                polygons.Add(Move(shapeB, bx + dx, by + dy));
+            }
+            var triangles = polygons.Select(p => new Lazy<List<CollisionTriangle>>(() => Collision.TriangulateForClipping(p)))
+                .ToArray();
+            for (var i = 0; i < polygons.Count; i++)
+                for (var j = i + 1; j < polygons.Count; j++)
+                {
+                    var expected = LegacyCollision.HasOverlap(polygons[i], polygons[j]);
+                    var ti = triangles[i];
+                    var tj = triangles[j];
+                    var actual = Collision.HasOverlapTriangulated(polygons[i], () => ti.Value, polygons[j], () => tj.Value);
+                    Assert.True(expected == actual, $"group={group} i={i} j={j} expected={expected}");
+                    decisions++;
+                    if (expected)
+                        overlaps++;
+                    else if (BoxesOverlap(polygons[i].BoundingBox, polygons[j].BoundingBox))
+                        boxOverlapClear++;
+                }
+            for (var i = 0; i < polygons.Count; i++)
+                if (triangles[i].IsValueCreated)
+                    Assert.Equal(ClipBits(Collision.Triangulate(polygons[i])), ClipBits(triangles[i].Value));
+        }
+        output.WriteLine($"clip-triangle decisions={decisions}; overlaps={overlaps}; bbox-overlap but clear={boxOverlapClear}");
+        Assert.Equal(40 * 50 * 49 / 2, decisions);
+        Assert.True(overlaps > 10000);
+        Assert.True(boxOverlapClear > 2000);
+    }
+
+    /// <summary>
+    /// Ears whose neighbors coincide exactly, or only within the fuzzy equality that closes a
+    /// triangle polygon, keep the polygon's open vertices and bounds.
+    /// </summary>
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(1e-12)]
+    [InlineData(1e-6)]
+    public void TriangulateForClipping_DegenerateEars_MatchTriangulateBitwise(double offset)
+    {
+        var polygons = new[]
+        {
+            // A spike back onto its own vertex, and collinear runs.
+            Ring((0, 0), (4, 0), (4, 2), (2, 2), (2 + offset, 3), (2, 2), (0, 2)),
+            Ring((0, 0), (1, 0), (2, 0), (3, offset), (3, 1), (2, 1), (1, 1 + offset), (0, 1)),
+            Ring((0, 0), (5, 0), (5, 5), (5 + offset, 5), (0, 5)),
+            Move(Make(new Random(3), 4), 123.456, -78.9),
+        };
+        foreach (var polygon in polygons)
+        {
+            var expected = ClipBits(Collision.Triangulate(polygon));
+            Assert.Equal(expected, ClipBits(Collision.TriangulateForClipping(polygon)));
+        }
+    }
+
+    /// <summary>Each triangle as the clip loop reads it: open vertices, then box sides.</summary>
+    private static long[] ClipBits(List<Polygon> triangles) => triangles
+        .SelectMany(t =>
+        {
+            var open = t.Vertices.ToList();
+            if (open.Count > 1 && open[0].X == open[^1].X && open[0].Y == open[^1].Y)
+                open.RemoveAt(open.Count - 1);
+            var box = t.BoundingBox;
+            return new[] { (long)open.Count }
+                .Concat(open.SelectMany(VectorBits))
+                .Concat(new[] { Bits(box.Left), Bits(box.Right), Bits(box.Bottom), Bits(box.Top) });
+        })
+        .Prepend(triangles.Count)
+        .ToArray();
+
+    private static long[] ClipBits(List<CollisionTriangle> triangles) => triangles
+        .SelectMany(t => new[] { (long)t.Count }
+            .Concat(Enumerable.Range(0, t.Count).SelectMany(i => VectorBits(t[i])))
+            .Concat(new[] { Bits(t.Left), Bits(t.Right), Bits(t.Bottom), Bits(t.Top) }))
+        .Prepend(triangles.Count)
+        .ToArray();
+
     private static long[] TriangleBits(List<Polygon> triangles) => triangles
         .SelectMany(t => new[] { t.BoundingBox.X, t.BoundingBox.Y, t.BoundingBox.Length, t.BoundingBox.Width }
             .Concat(t.Vertices.SelectMany(v => new[] { v.X, v.Y })))

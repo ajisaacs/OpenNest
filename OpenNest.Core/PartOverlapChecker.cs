@@ -49,7 +49,7 @@ namespace OpenNest
             if (world1.Polygon == null || world2.Polygon == null)
                 return false;
 
-            return Collision.HasOverlap(
+            return Collision.HasOverlapTriangulated(
                 world1.Polygon,
                 world1.Triangles,
                 world2.Polygon,
@@ -144,7 +144,7 @@ namespace OpenNest
         /// </summary>
         private sealed class PreparedPart
         {
-            private List<Polygon> triangles;
+            private List<CollisionTriangle> triangles;
 
             public PreparedPart(Polygon polygon)
             {
@@ -154,9 +154,10 @@ namespace OpenNest
 
             public Polygon Polygon { get; }
 
-            public Func<List<Polygon>> Triangles { get; }
+            public Func<List<CollisionTriangle>> Triangles { get; }
 
-            private List<Polygon> GetTriangles() => triangles ??= Collision.Triangulate(Polygon);
+            private List<CollisionTriangle> GetTriangles() =>
+                triangles ??= Collision.TriangulateForClipping(Polygon);
         }
 
         private sealed class PreparedProgram

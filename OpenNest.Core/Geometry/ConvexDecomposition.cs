@@ -15,7 +15,45 @@ namespace OpenNest.Geometry
         /// </summary>
         public static List<Polygon> Triangulate(Polygon polygon)
         {
-            var triangles = new List<Polygon>();
+            var sink = new PolygonSink(new List<Polygon>());
+            Triangulate(polygon, ref sink);
+            return sink.Triangles;
+        }
+
+        /// <summary>
+        /// Receives each ear <see cref="Triangulate(Polygon)"/> cuts, in order, as the three
+        /// vertices it would build its triangle from (previous, ear, next).
+        /// </summary>
+        internal interface IEarSink
+        {
+            void Add(Vector prev, Vector curr, Vector next);
+        }
+
+        private struct PolygonSink : IEarSink
+        {
+            public PolygonSink(List<Polygon> triangles) => Triangles = triangles;
+
+            public List<Polygon> Triangles { get; }
+
+            public void Add(Vector prev, Vector curr, Vector next)
+            {
+                var tri = new Polygon();
+                tri.Vertices.Add(prev);
+                tri.Vertices.Add(curr);
+                tri.Vertices.Add(next);
+                tri.Close();
+                Triangles.Add(tri);
+            }
+        }
+
+        /// <summary>
+        /// The ear-clipping of <see cref="Triangulate(Polygon)"/>, handing each ear to
+        /// <paramref name="sink"/> instead of building a triangle polygon for it: the same ears,
+        /// from the same vertices, in the same order.
+        /// </summary>
+        internal static void Triangulate<TSink>(Polygon polygon, ref TSink sink)
+            where TSink : struct, IEarSink
+        {
             var verts = new List<Vector>(polygon.Vertices);
 
             // Remove closing vertex if polygon is closed.
@@ -27,7 +65,7 @@ namespace OpenNest.Geometry
                 verts.RemoveAt(verts.Count - 1);
 
             if (verts.Count < 3)
-                return triangles;
+                return;
 
             // Ensure counter-clockwise winding for ear detection.
             if (SignedArea(verts) < 0)
@@ -85,12 +123,7 @@ namespace OpenNest.Geometry
                 var blocker = failedBlocker[currVertex];
                 if (!knownNotEar && IsEar(prev, curr, next, verts, nextOf, head, n, out blocker))
                 {
-                    var tri = new Polygon();
-                    tri.Vertices.Add(prev);
-                    tri.Vertices.Add(curr);
-                    tri.Vertices.Add(next);
-                    tri.Close();
-                    triangles.Add(tri);
+                    sink.Add(prev, curr, next);
 
                     nextOf[prevVertex] = nextVertex;
                     prevOf[nextVertex] = prevVertex;
@@ -113,8 +146,6 @@ namespace OpenNest.Geometry
                     cursor = nextVertex;
                 }
             }
-
-            return triangles;
         }
 
         /// <summary>

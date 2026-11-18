@@ -168,11 +168,12 @@ public class PartOverlapCheckerTests
                 var actual = WorldPolygon(checker, p);
                 Assert.Equal(PolygonBits(expected), PolygonBits(actual));
                 // Cached triangles equal a fresh triangulation of the pre-change world polygon.
+                // The checker keeps them as clip triangles: each polygon's open vertices and box.
                 var expectedTriangles = Collision.Triangulate(expected);
                 var actualTriangles = WorldTriangles(checker, p);
                 Assert.Equal(expectedTriangles.Count, actualTriangles.Count);
                 for (var t = 0; t < expectedTriangles.Count; t++)
-                    Assert.Equal(PolygonBits(expectedTriangles[t]), PolygonBits(actualTriangles[t]));
+                    Assert.Equal(ClipBits(expectedTriangles[t]), ClipBits(actualTriangles[t]));
             }
         }
     }
@@ -367,8 +368,25 @@ public class PartOverlapCheckerTests
     private static Polygon WorldPolygon(PartOverlapChecker checker, Part part) =>
         (Polygon)PreparedPartMember(checker, part, "Polygon");
 
-    private static List<Polygon> WorldTriangles(PartOverlapChecker checker, Part part) =>
-        ((Func<List<Polygon>>)PreparedPartMember(checker, part, "Triangles"))();
+    private static List<CollisionTriangle> WorldTriangles(PartOverlapChecker checker, Part part) =>
+        ((Func<List<CollisionTriangle>>)PreparedPartMember(checker, part, "Triangles"))();
+
+    /// <summary>A triangle polygon as the clip loop reads it: open vertices, then box sides.</summary>
+    private static long[] ClipBits(Polygon triangle)
+    {
+        var open = triangle.Vertices.ToList();
+        if (open.Count > 1 && open[0].X == open[^1].X && open[0].Y == open[^1].Y)
+            open.RemoveAt(open.Count - 1);
+        var box = triangle.BoundingBox;
+        return open.SelectMany(v => new[] { v.X, v.Y })
+            .Concat(new[] { box.Left, box.Right, box.Bottom, box.Top })
+            .Select(BitConverter.DoubleToInt64Bits).ToArray();
+    }
+
+    private static long[] ClipBits(CollisionTriangle triangle) =>
+        Enumerable.Range(0, triangle.Count).SelectMany(i => new[] { triangle[i].X, triangle[i].Y })
+            .Concat(new[] { triangle.Left, triangle.Right, triangle.Bottom, triangle.Top })
+            .Select(BitConverter.DoubleToInt64Bits).ToArray();
 
     private static object PreparedPartMember(PartOverlapChecker checker, Part part, string property)
     {

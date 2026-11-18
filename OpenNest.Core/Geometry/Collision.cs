@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using OpenNest.Math;
 
 namespace OpenNest.Geometry
@@ -83,11 +84,51 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// <see cref="HasOverlap(Polygon, Polygon, List{Polygon}, List{Polygon})"/> with each
+        /// polygon's <see cref="TriangulateForClipping"/> supplied by the caller and resolved
+        /// lazily, only after the bounding boxes overlap; the verdict is then identical.
+        /// </summary>
+        internal static bool HasOverlapTriangulated(
+            Polygon a,
+            Func<List<CollisionTriangle>> trianglesA,
+            Polygon b,
+            Func<List<CollisionTriangle>> trianglesB
+        )
+        {
+            if (!BoundingBoxesOverlap(a.BoundingBox, b.BoundingBox))
+                return false;
+
+            return OverlapRegions(trianglesA(), trianglesB(), null, null, verdictOnly: true).Count > 0;
+        }
+
+        /// <summary>
         /// The triangulation <see cref="Check"/> and <see cref="HasOverlap(Polygon, Polygon, List{Polygon}, List{Polygon})"/>
         /// use for <paramref name="polygon"/>: ear-clipped triangles with bounds updated. Callers
         /// that reuse it must not mutate the polygon or the triangles.
         /// </summary>
         internal static List<Polygon> Triangulate(Polygon polygon) => TriangulateWithBounds(polygon);
+
+        /// <summary>
+        /// <see cref="Triangulate"/> as the clip loop reads it, without a polygon per triangle:
+        /// the same triangles, vertices and bounds. Callers may reuse it for the same polygon.
+        /// </summary>
+        internal static List<CollisionTriangle> TriangulateForClipping(Polygon polygon)
+        {
+            PerfCounters.CountPolygonTriangulation();
+            var sink = new TriangleSink(new List<CollisionTriangle>(polygon.Vertices.Count));
+            ConvexDecomposition.Triangulate(polygon, ref sink);
+            return sink.Triangles;
+        }
+
+        private readonly struct TriangleSink : ConvexDecomposition.IEarSink
+        {
+            public TriangleSink(List<CollisionTriangle> triangles) => Triangles = triangles;
+
+            public List<CollisionTriangle> Triangles { get; }
+
+            public void Add(Vector prev, Vector curr, Vector next) =>
+                Triangles.Add(new CollisionTriangle(prev, curr, next));
+        }
 
         public static List<CollisionResult> CheckAll(
             List<Polygon> polygons,
@@ -140,7 +181,32 @@ namespace OpenNest.Geometry
             List<Polygon> holesA,
             List<Polygon> holesB,
             bool verdictOnly = false
-        ) => OverlapRegions(TriangulateWithBounds(a), TriangulateWithBounds(b), holesA, holesB, verdictOnly);
+        ) => OverlapRegions(TriangulateForClipping(a), TriangulateForClipping(b), holesA, holesB, verdictOnly);
+
+        /// <summary>
+        /// <see cref="OverlapRegions(List{Polygon}, List{Polygon}, List{Polygon}, List{Polygon}, bool)"/>
+        /// over <see cref="TriangulateForClipping"/> triangles: the same pairs clipped in the same
+        /// order, so the same regions.
+        /// </summary>
+        private static List<Polygon> OverlapRegions(
+            List<CollisionTriangle> trisA,
+            List<CollisionTriangle> trisB,
+            List<Polygon> holesA,
+            List<Polygon> holesB,
+            bool verdictOnly = false
+        )
+        {
+            var regions = new List<Polygon>();
+            var stopAtFirst = verdictOnly
+                && (holesA == null || holesA.Count == 0)
+                && (holesB == null || holesB.Count == 0);
+            ClipTrianglePairs(trisA, trisB, regions, stopAtFirst);
+
+            if (regions.Count > 0)
+                regions = SubtractHoles(regions, holesA, holesB);
+
+            return regions;
+        }
 
         private static List<Polygon> OverlapRegions(
             List<Polygon> trisA,
@@ -217,6 +283,215 @@ namespace OpenNest.Geometry
                         return;
                 }
             }
+        }
+
+        /// <summary>
+        /// <see cref="ClipTrianglePairs(List{Polygon}, List{Polygon}, List{Polygon}, bool)"/> over
+        /// <see cref="CollisionTriangle"/>s, clipping in two reused buffers: the same pairs in the
+        /// same order with the same arithmetic, and a region polygon built only for a pair that
+        /// overlaps.
+        /// </summary>
+        private static void ClipTrianglePairs(
+            List<CollisionTriangle> trisA,
+            List<CollisionTriangle> trisB,
+            List<Polygon> regions,
+            bool stopAtFirst
+        )
+        {
+            if (trisA.Count == 0 || trisB.Count == 0)
+                return;
+
+            var candidatesA = TrianglesTouching(trisA, UnionBounds(trisB));
+            if (candidatesA.Count == 0)
+                return;
+
+            var candidatesB = TrianglesTouching(trisB, UnionBounds(trisA));
+            if (candidatesB.Count == 0)
+                return;
+
+            Span<Vector> first = stackalloc Vector[MaxClippedVertices];
+            Span<Vector> second = stackalloc Vector[MaxClippedVertices];
+            Span<double> distances = stackalloc double[MaxClippedVertices];
+            var spanA = CollectionsMarshal.AsSpan(trisA);
+            var spanB = CollectionsMarshal.AsSpan(trisB);
+
+            foreach (var a in candidatesA)
+            {
+                ref readonly var triA = ref spanA[a];
+
+                foreach (var b in candidatesB)
+                {
+                    ref readonly var triB = ref spanB[b];
+                    if (!BoundingBoxesOverlap(triA, triB))
+                        continue;
+
+                    var clipped = ClipConvex(triA, triB, first, second, distances);
+                    if (clipped == null)
+                        continue;
+
+                    regions.Add(clipped);
+                    if (stopAtFirst)
+                        return;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Most vertices clipping a triangle by a triangle's three half-spaces can leave: each
+        /// half-space keeps each vertex and adds at most one crossing after it.
+        /// </summary>
+        private const int MaxClippedVertices = 3 * 2 * 2 * 2;
+
+        private static (double Left, double Right, double Bottom, double Top) UnionBounds(
+            List<CollisionTriangle> triangles
+        )
+        {
+            var left = double.PositiveInfinity;
+            var right = double.NegativeInfinity;
+            var bottom = double.PositiveInfinity;
+            var top = double.NegativeInfinity;
+
+            foreach (var triangle in triangles)
+            {
+                left = System.Math.Min(left, triangle.Left);
+                right = System.Math.Max(right, triangle.Right);
+                bottom = System.Math.Min(bottom, triangle.Bottom);
+                top = System.Math.Max(top, triangle.Top);
+            }
+
+            return (left, right, bottom, top);
+        }
+
+        /// <summary>Indices of the triangles the polygon form of this test keeps, in order.</summary>
+        private static List<int> TrianglesTouching(
+            List<CollisionTriangle> triangles,
+            (double Left, double Right, double Bottom, double Top) union
+        )
+        {
+            var result = new List<int>(triangles.Count);
+
+            for (var i = 0; i < triangles.Count; i++)
+            {
+                var box = triangles[i];
+                var overlapX = System.Math.Min(box.Right, union.Right) - System.Math.Max(box.Left, union.Left);
+                var overlapY = System.Math.Min(box.Top, union.Top) - System.Math.Max(box.Bottom, union.Bottom);
+
+                if (overlapX > Tolerance.Epsilon && overlapY > Tolerance.Epsilon)
+                    result.Add(i);
+            }
+
+            return result;
+        }
+
+        private static bool BoundingBoxesOverlap(in CollisionTriangle a, in CollisionTriangle b)
+        {
+            var overlapX = System.Math.Min(a.Right, b.Right) - System.Math.Max(a.Left, b.Left);
+            var overlapY = System.Math.Min(a.Top, b.Top) - System.Math.Max(a.Bottom, b.Bottom);
+
+            return overlapX > Tolerance.Epsilon && overlapY > Tolerance.Epsilon;
+        }
+
+        /// <summary>
+        /// <see cref="ClipConvex(List{Vector}, List{Vector})"/> of two triangles' open vertices,
+        /// alternating between two caller buffers of <see cref="MaxClippedVertices"/>.
+        /// </summary>
+        private static Polygon ClipConvex(
+            in CollisionTriangle subject,
+            in CollisionTriangle clip,
+            Span<Vector> first,
+            Span<Vector> second,
+            Span<double> distances
+        )
+        {
+            var count = subject.Count;
+            for (var i = 0; i < count; i++)
+                first[i] = subject[i];
+
+            var output = first;
+            var spare = second;
+            for (var i = 0; i < clip.Count && count >= 3; i++)
+            {
+                count = ClipHalfSpaceInside(output.Slice(0, count), clip[i], clip[(i + 1) % clip.Count], spare,
+                    distances);
+                var swap = output;
+                output = spare;
+                spare = swap;
+            }
+
+            return PositiveAreaPolygon(output.Slice(0, count));
+        }
+
+        /// <summary>
+        /// <see cref="ClipHalfSpace"/> keeping the inside, written to <paramref name="kept"/>;
+        /// returns how many it kept. Each vertex's signed distance is computed once into
+        /// <paramref name="distances"/>, the same value ClipHalfSpace computes for it twice.
+        /// </summary>
+        private static int ClipHalfSpaceInside(
+            ReadOnlySpan<Vector> vertices,
+            Vector edgeStart,
+            Vector edgeEnd,
+            Span<Vector> kept,
+            Span<double> distances
+        )
+        {
+            var inside = false;
+            for (var i = 0; i < vertices.Length; i++)
+            {
+                distances[i] = Cross(edgeStart, edgeEnd, vertices[i]);
+                inside |= distances[i] >= 0;
+            }
+
+            // Every vertex strictly outside keeps nothing and crosses nowhere.
+            if (!inside)
+                return 0;
+
+            var count = 0;
+            for (var i = 0; i < vertices.Length; i++)
+            {
+                var current = vertices[i];
+                var nextIndex = i + 1 == vertices.Length ? 0 : i + 1;
+                var next = vertices[nextIndex];
+                var currentDistance = distances[i];
+                var nextDistance = distances[nextIndex];
+                if (currentDistance >= 0)
+                    AddDistinct(kept, ref count, current);
+
+                if ((currentDistance < 0 && nextDistance > 0) || (currentDistance > 0 && nextDistance < 0))
+                {
+                    var t = currentDistance / (currentDistance - nextDistance);
+                    AddDistinct(kept, ref count, new Vector(
+                        current.X + t * (next.X - current.X),
+                        current.Y + t * (next.Y - current.Y)));
+                }
+            }
+            if (count > 1 && SamePoint(kept[0], kept[count - 1]))
+                count--;
+            return count;
+        }
+
+        private static void AddDistinct(Span<Vector> vertices, ref int count, Vector point)
+        {
+            if (count == 0 || !SamePoint(vertices[count - 1], point))
+                vertices[count++] = point;
+        }
+
+        private static Polygon PositiveAreaPolygon(ReadOnlySpan<Vector> vertices)
+        {
+            if (vertices.Length < 3)
+                return null;
+
+            var twiceArea = 0.0;
+            for (var i = 1; i + 1 < vertices.Length; i++)
+                twiceArea += Cross(vertices[0], vertices[i], vertices[i + 1]);
+            if (System.Math.Abs(twiceArea) <= 2 * Tolerance.Epsilon)
+                return null;
+
+            var polygon = new Polygon();
+            foreach (var vertex in vertices)
+                polygon.Vertices.Add(vertex);
+            polygon.Vertices.Add(vertices[0]);
+            polygon.UpdateBounds();
+            return polygon;
         }
 
         private static (double Left, double Right, double Bottom, double Top) UnionBounds(
