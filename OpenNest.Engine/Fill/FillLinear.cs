@@ -422,16 +422,34 @@ namespace OpenNest.Engine.Fill
         /// </summary>
         private List<Part> TilePatternBbox(Pattern basePattern, NestDirection direction)
         {
+            var copies = BboxCopies(basePattern, direction);
+            var copyDistance = GetDimension(basePattern.BoundingBox, direction) + PartSpacing;
+            var result = new List<Part>();
+
+            for (var count = 1; count <= copies; count++)
+            {
+                var offset = MakeOffset(direction, copyDistance * count);
+
+                foreach (var part in basePattern.Parts)
+                    result.Add(part.CloneAtOffset(offset));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// The number of whole copies <see cref="TilePatternBbox"/> adds, found without cloning.
+        /// </summary>
+        private int BboxCopies(Pattern basePattern, NestDirection direction)
+        {
             var copyDistance = GetDimension(basePattern.BoundingBox, direction) + PartSpacing;
 
             if (copyDistance <= 0)
-                return new List<Part>();
+                return 0;
 
             var dim = GetDimension(basePattern.BoundingBox, direction);
             var start = GetStart(basePattern.BoundingBox, direction);
             var limit = GetLimit(direction);
-
-            var result = new List<Part>();
             var count = 1;
 
             while (true)
@@ -441,15 +459,10 @@ namespace OpenNest.Engine.Fill
                 if (nextPos + dim > limit + Tolerance.Epsilon)
                     break;
 
-                var offset = MakeOffset(direction, copyDistance * count);
-
-                foreach (var part in basePattern.Parts)
-                    result.Add(part.CloneAtOffset(offset));
-
                 count++;
             }
 
-            return result;
+            return count - 1;
         }
 
         private static bool HasOverlappingParts(
@@ -521,7 +534,11 @@ namespace OpenNest.Engine.Fill
         /// a row, then tiling that row along the perpendicular axis to form a grid.
         /// After the grid is formed, fills the remaining strip with individual parts.
         /// </summary>
-        private List<Part> FillGrid(Pattern pattern, NestDirection direction, OffsetPerimeterCache cache)
+        /// <remarks>
+        /// Step 1's check runs here, as it decides how the grid is built. The final check, on the
+        /// whole grid, is left to the returned grid's <see cref="DeferredGrid.Resolve"/>.
+        /// </remarks>
+        private DeferredGrid FillGrid(Pattern pattern, NestDirection direction, OffsetPerimeterCache cache)
         {
             var perpAxis = PerpendicularAxis(direction);
 
@@ -547,21 +564,16 @@ namespace OpenNest.Engine.Fill
             {
                 row = Tile(pattern, perpAxis, cache, MaxParts);
 
-                if (pattern.Parts.Count > 1 && HasOverlappingParts(row, out var a2, out var b2))
-                {
-                    LogOverlap("Step1-PerpOnly", perpAxis, pattern, row, a2, b2);
-                    row = new List<Part>(pattern.Parts);
-                    row.AddRange(TilePatternBbox(pattern, perpAxis));
-                }
-
-                return row;
+                return pattern.Parts.Count > 1
+                    ? new DeferredGrid(this, row, "Step1-PerpOnly", perpAxis, pattern)
+                    : new DeferredGrid(row);
             }
 
             // A capped fill whose first row already holds enough parts needs no more rows.
             // Step 2's check could only switch perpendicular tiling to the bbox fallback; it
             // never repairs the row itself, so returning the row loses no protection.
             if (MaxParts > 0 && row.Count >= MaxParts)
-                return row;
+                return new DeferredGrid(row);
 
             // Step 2: Build row pattern and tile along perpendicular axis
             var rowPattern = new Pattern();
@@ -573,15 +585,83 @@ namespace OpenNest.Engine.Fill
             // Only the unchanged row is covered by Step 1's clean verdict: skip Step 2
             // only when the perpendicular tiling appended zero parts, so gridResult
             // still contains the same Part objects, in the same order and poses.
-            if ((!rowIsVerified || gridResult.Count != row.Count)
-                && HasOverlappingParts(gridResult, out var a3, out var b3))
+            return !rowIsVerified || gridResult.Count != row.Count
+                ? new DeferredGrid(this, gridResult, "Step2-Perp", perpAxis, rowPattern)
+                : new DeferredGrid(gridResult);
+        }
+
+        /// <summary>
+        /// A grid tiled by <see cref="FillGrid"/> whose final overlap check may not have run yet.
+        /// Until <see cref="Resolve"/> runs it, the grid holds either its tiling, when no two
+        /// parts overlap, or the fallback that tiles the same pattern by bounding boxes
+        /// (<see cref="TilePatternBbox"/>); both part counts are known without the check.
+        /// <see cref="Resolve"/> returns exactly what the eager fill returned, so a caller may
+        /// skip the check only on a grid whose outcome it never uses. Not thread-safe.
+        /// </summary>
+        internal sealed class DeferredGrid
+        {
+            private readonly FillLinear owner;
+            private readonly string step;
+            private readonly NestDirection axis;
+            private Pattern basePattern;
+            private List<Part> parts;
+            private int? fallbackCount;
+
+            /// <summary>A grid with no check left to run.</summary>
+            internal DeferredGrid(List<Part> parts) => this.parts = parts;
+
+            /// <summary>
+            /// A grid whose tiling <paramref name="parts"/> of <paramref name="basePattern"/> along
+            /// <paramref name="axis"/> still has to pass the overlap check.
+            /// </summary>
+            internal DeferredGrid(
+                FillLinear owner,
+                List<Part> parts,
+                string step,
+                NestDirection axis,
+                Pattern basePattern
+            )
             {
-                LogOverlap("Step2-Perp", perpAxis, rowPattern, gridResult, a3, b3);
-                gridResult = new List<Part>(rowPattern.Parts);
-                gridResult.AddRange(TilePatternBbox(rowPattern, perpAxis));
+                this.owner = owner;
+                this.parts = parts;
+                this.step = step;
+                this.axis = axis;
+                this.basePattern = basePattern;
             }
 
-            return gridResult;
+            /// <summary>True until <see cref="Resolve"/> has run the overlap check.</summary>
+            public bool IsPending => basePattern != null;
+
+            /// <summary>
+            /// The part count of the grid as it stands: its tiling while the check is pending, the
+            /// checked parts once resolved.
+            /// </summary>
+            public int Count => parts.Count;
+
+            /// <summary>
+            /// While <see cref="IsPending"/>, the part count of the bounding-box fallback, should
+            /// the check fail.
+            /// </summary>
+            public int FallbackCount =>
+                fallbackCount ??= (1 + owner.BboxCopies(basePattern, axis)) * basePattern.Parts.Count;
+
+            /// <summary>Runs the overlap check if it is pending and returns the grid's parts.</summary>
+            public List<Part> Resolve()
+            {
+                if (basePattern == null)
+                    return parts;
+
+                if (HasOverlappingParts(parts, out var a, out var b))
+                {
+                    owner.LogOverlap(step, axis, basePattern, parts, a, b);
+                    var fallback = new List<Part>(basePattern.Parts);
+                    fallback.AddRange(owner.TilePatternBbox(basePattern, axis));
+                    parts = fallback;
+                }
+
+                basePattern = null;
+                return parts;
+            }
         }
 
         private void LogOverlap(
@@ -672,11 +752,18 @@ namespace OpenNest.Engine.Fill
         /// <summary>
         /// Fills the work area by tiling a pre-built pattern along both axes.
         /// </summary>
-        public List<Part> Fill(Pattern pattern, NestDirection primaryAxis)
+        public List<Part> Fill(Pattern pattern, NestDirection primaryAxis) =>
+            FillDeferred(pattern, primaryAxis).Resolve();
+
+        /// <summary>
+        /// <see cref="Fill(Pattern, NestDirection)"/> with the grid's final overlap check left to
+        /// the caller: <see cref="DeferredGrid.Resolve"/> returns exactly what Fill returns.
+        /// </summary>
+        internal DeferredGrid FillDeferred(Pattern pattern, NestDirection primaryAxis)
         {
             var cache = new OffsetPerimeterCache(HalfSpacing);
             if (pattern.Parts.Count == 0)
-                return new List<Part>();
+                return new DeferredGrid(new List<Part>());
 
             var offset = WorkArea.Location - pattern.BoundingBox.Location;
             var basePattern = pattern.Clone(offset);
@@ -685,7 +772,7 @@ namespace OpenNest.Engine.Fill
                 basePattern.BoundingBox.Width > WorkArea.Width + Tolerance.Epsilon
                 || basePattern.BoundingBox.Length > WorkArea.Length + Tolerance.Epsilon
             )
-                return new List<Part>();
+                return new DeferredGrid(new List<Part>());
 
             return FillGrid(basePattern, primaryAxis, cache);
         }
@@ -702,7 +789,7 @@ namespace OpenNest.Engine.Fill
             if (seed.Parts.Count == 0)
                 return new List<Part>();
 
-            return FillGrid(seed, primaryAxis, cache);
+            return FillGrid(seed, primaryAxis, cache).Resolve();
         }
     }
 }

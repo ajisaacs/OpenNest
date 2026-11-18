@@ -74,6 +74,12 @@ Predictor availability uses the same one-attempt session initialization as infer
 
 Whole-job before/after comparisons use `OpenNest.Benchmark` with a `*.manifest.json` corpus and `--parallel 1`. Retain input hashes, exact commands, raw results, validity, fulfillment and cost for both revisions outside source control. Record baseline failures rather than treating them as regressions or tuning the corpus around them; overlapping timing ranges are inconclusive, not proof of unchanged performance.
 
+### Deferred grid checks and stripe convergence reuse
+
+Both leave every layout bit-identical; they only skip work whose outcome is never used or already known. `FillLinear.FillDeferred` returns a `DeferredGrid` whose final overlap check (Step 2, or the perpendicular-only row) has not run; `Resolve` runs it, and `Fill` is `FillDeferred(...).Resolve()`, so eager callers do the same work as before. Step 1's check stays eager because it decides how the grid is built. While pending, a grid's count is either its tiling's or its bounding-box fallback's (`FallbackCount`, which can be lower or higher). `PairFiller.EvaluateCandidate` sorts with `CompareByCount`, which answers each comparison from those counts and runs a check only when they could order the pair differently; the early abort and Phase 2 resolve the grids they use. Every answer equals the checked comparison, so `List.Sort` (unstable) makes the same moves, ties included. Other `FillLinear` callers stay eager: a stripe trajectory feeds every row's verdict into its next angle, and the Linear, remnant and pattern sweeps rank with a pluggable `IFillComparer` that offers no count bound.
+
+`StripeConvergenceCache` lives in the pipeline's `FillContext.SharedState` and reaches pair remnant strips through `PairFiller`. It keeps each stripe convergence by pair, drawing, axis, variant, span, spacing and row cap, the pair's turned bounds by angle, and each estimate row by angle (one thread tiles a row while others wait). Row and Column converge identical layouts, remnant strips along a full side repeat spans, and trajectories revisit angles; each value is a pure function of its key. `DeferredGridCheckTests` holds both to the eager results.
+
 ## Entity identity and hot-test configuration
 
 Use `-c Release` for routine cross-platform test runs, matching CI. Continue running counter-based regressions explicitly in Debug; do not treat fewer Release test cases as lost coverage without checking the DEBUG-only methods and individual skipped outcomes.

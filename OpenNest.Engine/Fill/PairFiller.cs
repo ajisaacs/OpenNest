@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenNest.Engine;
@@ -554,30 +555,34 @@ namespace OpenNest.Engine.Fill
             CancellationToken token
         )
         {
-            // Phase 1: evaluate all grids (fast)
-            var grids = new List<(List<Part> Parts, NestDirection Dir)>();
+            // Phase 1: tile all grids (fast). Each grid's final overlap check, the bulk of the
+            // work, waits until the ranking or Phase 2 needs its outcome (see CompareByCount).
+            var grids = new List<FillLinear.DeferredGrid>();
             var engine = new FillLinear(workArea, partSpacing) { Label = "Pairs" };
             foreach (var (pattern, dir) in claimed)
             {
                 token.ThrowIfCancellationRequested();
 
-                var gridParts = engine.Fill(pattern, dir);
-                if (gridParts != null && gridParts.Count > 0)
-                    grids.Add((gridParts, dir));
+                var grid = engine.FillDeferred(pattern, dir);
+                if (grid.IsPending && (grid.Count == 0 || grid.FallbackCount == 0))
+                    grid.Resolve();
+                if (grid.IsPending || grid.Count > 0)
+                    grids.Add(grid);
             }
 
             if (grids.Count == 0)
                 return null;
 
             // Sort by count descending so we try the best grids first
-            grids.Sort((a, b) => b.Parts.Count.CompareTo(a.Parts.Count));
+            SortByCount(grids);
 
             // Early abort: if the best grid + optimistic remnant can't beat the global best, skip Phase 2
             if (minCountToBeat > 0)
             {
-                var topCount = grids[0].Parts.Count;
+                var topParts = grids[0].Resolve();
+                var topCount = topParts.Count;
                 var optimisticRemnant = remnantFiller.EstimateUpperBound(
-                    grids[0].Parts,
+                    topParts,
                     workArea,
                     maxUtilization,
                     partArea
@@ -594,9 +599,11 @@ namespace OpenNest.Engine.Fill
             // Phase 2: try remnant for each grid, skip if grid is too far behind
             List<Part> best = null;
 
-            foreach (var (gridParts, dir) in grids)
+            foreach (var grid in grids)
             {
                 token.ThrowIfCancellationRequested();
+
+                var gridParts = grid.Resolve();
 
                 // If this grid + max possible remnant can't beat current best, skip
                 if (best != null)
@@ -629,6 +636,73 @@ namespace OpenNest.Engine.Fill
             }
 
             return best;
+        }
+
+        /// <summary>
+        /// Sorts grids with <see cref="CompareByCount"/>. A check that throws during the sort
+        /// surfaces as itself, as it did when every grid was checked before sorting, rather than
+        /// wrapped by <see cref="List{T}.Sort(Comparison{T})"/>.
+        /// </summary>
+        internal static void SortByCount(List<FillLinear.DeferredGrid> grids)
+        {
+            ExceptionDispatchInfo failure = null;
+            grids.Sort((a, b) =>
+            {
+                if (failure != null)
+                    return 0;
+
+                try
+                {
+                    return CompareByCount(a, b);
+                }
+                catch (Exception ex)
+                {
+                    failure = ExceptionDispatchInfo.Capture(ex);
+                    return 0;
+                }
+            });
+            failure?.Throw();
+        }
+
+        /// <summary>
+        /// Orders grids by part count, descending, as <c>b.Count.CompareTo(a.Count)</c> on their
+        /// checked parts. A grid whose check is pending may keep its tiling or fall back to its
+        /// bounding-box tiling; when those counts could order the pair differently, the check
+        /// runs. Every answer is the one the checked counts give, so the sort makes the same
+        /// moves, ties included, as on grids checked up front, and the checks it skips are of
+        /// grids it never needed to tell apart.
+        /// </summary>
+        internal static int CompareByCount(FillLinear.DeferredGrid a, FillLinear.DeferredGrid b)
+        {
+            if (ReferenceEquals(a, b))
+                return 0;
+
+            while (true)
+            {
+                if (TryCompareByCount(a, b, out var order))
+                    return order;
+
+                if (a.IsPending)
+                    a.Resolve();
+                else
+                    b.Resolve();
+            }
+        }
+
+        /// <summary>
+        /// The order of <paramref name="a"/> and <paramref name="b"/> when every count either
+        /// grid can still have gives the same one.
+        /// </summary>
+        private static bool TryCompareByCount(
+            FillLinear.DeferredGrid a,
+            FillLinear.DeferredGrid b,
+            out int order
+        )
+        {
+            order = b.Count.CompareTo(a.Count);
+            return (!a.IsPending || b.Count.CompareTo(a.FallbackCount) == order)
+                && (!b.IsPending || b.FallbackCount.CompareTo(a.Count) == order)
+                && (!a.IsPending || !b.IsPending || b.FallbackCount.CompareTo(a.FallbackCount) == order);
         }
 
         /// <summary>
