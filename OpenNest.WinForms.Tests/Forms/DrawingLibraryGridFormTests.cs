@@ -27,7 +27,11 @@ public class DrawingLibraryGridFormTests
                 Run(form.CheckAllPagesAsync());
 
                 Assert.Equal(DrawingLibraryGridForm.PageSize + 1, form.DrawingsShown);
-                var problem = Assert.Single(form.Problems);
+                // Slow-timing reports depend on the machine (a loaded CI runner paints a tile
+                // past 500 ms); a hang is still reported as a failure.
+                var failures = form.Problems.Where(
+                    p => !p.Problem.StartsWith("Slow ", StringComparison.Ordinal));
+                var problem = Assert.Single(failures);
                 Assert.Same(missing, problem.Record);
                 Assert.Equal("Revision not on the server", problem.Problem);
                 Assert.Equal(new[] { 0, DrawingLibraryGridForm.PageSize }, library.Offsets.Skip(library.Offsets.Count - 2));
