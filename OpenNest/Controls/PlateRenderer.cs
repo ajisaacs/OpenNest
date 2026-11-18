@@ -627,42 +627,54 @@ namespace OpenNest.Controls
             )
                 return;
 
-            var grainAngle = plate.GrainAngle;
+            if (!HasBendNotAcrossGrain(part, plate.GrainAngle))
+                return;
+
+            // The placed part's world bounds, so rotated parts are outlined where they sit.
+            var box = part.BoundingBox;
+            var pt1 = view.PointWorldToGraph(box.Location);
+            var pt2 = view.PointWorldToGraph(
+                new Vector(box.X + box.Length, box.Y + box.Width)
+            );
+            using var warnPen = new Pen(muted ? Color.Gray : Color.FromArgb(180, 255, 140, 0), 2f);
+            g.DrawRectangle(
+                warnPen,
+                pt1.X,
+                pt2.Y,
+                System.Math.Abs(pt2.X - pt1.X),
+                System.Math.Abs(pt2.Y - pt1.Y)
+            );
+        }
+
+        /// <summary>
+        /// Whether any of the placed part's bends is not across the grain. Bend lines should run
+        /// perpendicular to the sheet's grain to avoid cracking on the outside of the bend, so a
+        /// bend more than 5° off perpendicular is flagged.
+        /// </summary>
+        internal static bool HasBendNotAcrossGrain(Part part, double grainAngle)
+        {
+            var bends = part.BaseDrawing.Bends;
+            if (bends == null)
+                return false;
+
             var tolerance = Angle.ToRadians(5);
-
-            foreach (var bend in part.BaseDrawing.Bends)
+            foreach (var bend in bends)
             {
-                var bendAngle = bend.LineAngle + part.Rotation;
-                bendAngle = bendAngle % System.Math.PI;
-                if (bendAngle < 0)
-                    bendAngle += System.Math.PI;
-
-                var grainNormalized = grainAngle % System.Math.PI;
-                if (grainNormalized < 0)
-                    grainNormalized += System.Math.PI;
-
-                var diff = System.Math.Abs(bendAngle - grainNormalized);
-                diff = System.Math.Min(diff, System.Math.PI - diff);
-
-                if (diff > tolerance)
-                {
-                    // The placed part's world bounds, so rotated parts are outlined where they sit.
-                    var box = part.BoundingBox;
-                    var pt1 = view.PointWorldToGraph(box.Location);
-                    var pt2 = view.PointWorldToGraph(
-                        new Vector(box.X + box.Length, box.Y + box.Width)
-                    );
-                    using var warnPen = new Pen(muted ? Color.Gray : Color.FromArgb(180, 255, 140, 0), 2f);
-                    g.DrawRectangle(
-                        warnPen,
-                        pt1.X,
-                        pt2.Y,
-                        System.Math.Abs(pt2.X - pt1.X),
-                        System.Math.Abs(pt2.Y - pt1.Y)
-                    );
-                    return;
-                }
+                var diff = LineAngleBetween(bend.LineAngle + part.Rotation, grainAngle);
+                if (System.Math.Abs(diff - Angle.HalfPI) > tolerance)
+                    return true;
             }
+
+            return false;
+        }
+
+        /// <summary>The angle between two undirected lines, in [0, π/2].</summary>
+        private static double LineAngleBetween(double a, double b)
+        {
+            var diff = (a - b) % System.Math.PI;
+            if (diff < 0)
+                diff += System.Math.PI;
+            return System.Math.Min(diff, System.Math.PI - diff);
         }
 
         private void DrawOffsetGeometry(Graphics g)

@@ -510,7 +510,7 @@ namespace OpenNest.Forms
             mnuViewShowBendLines.Name = "mnuViewShowBendLines";
             mnuViewShowBendLines.Size = new System.Drawing.Size(222, 22);
             mnuViewShowBendLines.Text = "Show Bend Lines";
-            mnuViewShowBendLines.ToolTipText = "Show bend lines on bent parts and outline parts whose bends are not parallel to the plate's grain";
+            mnuViewShowBendLines.ToolTipText = "Show bend lines on bent parts and outline parts with a bend that does not run across the plate's grain";
             mnuViewShowBendLines.Click += ToggleShowBendLines_Click;
             //
             // toolStripMenuItem5
