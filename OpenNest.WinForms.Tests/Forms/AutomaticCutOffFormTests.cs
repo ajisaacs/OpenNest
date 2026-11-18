@@ -48,13 +48,15 @@ public class AutomaticCutOffFormTests
             spacing.Text = "30";
             Assert.Equal(15, double.Parse(minimum.Text));
             minimum.Text = "20";
-            spacing.Text = "40";
+            // Not 40: the grid's second line (80) would fall within the cut clearance of the
+            // tail separator (80.5) and be dropped, leaving one line with no room to shift.
+            spacing.Text = "38";
             Assert.Equal("20", minimum.Text);
             Invoke(form, "PreviewButton_Click", null, EventArgs.Empty);
             var expected = AutomaticCutOffPlanner.Create(view.Plate,
-                new AutomaticCutOffOptions { Spacing = 40, MinimumStripLength = 20, MinimumTailLength = 12 },
+                new AutomaticCutOffOptions { Spacing = 38, MinimumStripLength = 20, MinimumTailLength = 12 },
                 view.CutOffSettings);
-            Assert.NotEqual(40, expected.Definitions.First(c => c.Axis == CutOffAxis.Vertical).Position.X);
+            Assert.NotEqual(38, expected.Definitions.First(c => c.Axis == CutOffAxis.Vertical).Position.X);
             Assert.Equal(expected.Definitions.Select(c => c.Position.X),
                 PreviewParts(view).Select(p => ((RapidMove)p.BasePart.Program.Codes[0]).EndPoint.X));
             Assert.Contains("Strip cuts:", Control<Label>(form, "stripCutsLabel").Text);

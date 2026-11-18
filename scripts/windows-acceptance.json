@@ -663,7 +663,7 @@
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.MenusFollowMdiActivationDocumentDisplayAndRunningState",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.MenusFollowMdiActivationAndDocumentDisplay",
           "minimum_cases": 1
         },
         {
