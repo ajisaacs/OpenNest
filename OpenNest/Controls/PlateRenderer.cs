@@ -165,7 +165,7 @@ namespace OpenNest.Controls
                     part.Draw(g, number.ToString(), muted);
                 DrawBendLines(g, part.BasePart, muted);
                 DrawEtchMarks(g, part.BasePart, muted);
-                DrawGrainWarning(g, part.BasePart, muted);
+                DrawGrainWarning(g, part, muted);
             }
 
             var previewParts = view.PreviewParts;
@@ -616,34 +616,29 @@ namespace OpenNest.Controls
             }
         }
 
-        private void DrawGrainWarning(Graphics g, Part part, bool muted)
+        private void DrawGrainWarning(Graphics g, LayoutPart layoutPart, bool muted)
         {
             var plate = view.DisplayPlate;
+            var part = layoutPart.BasePart;
             if (
                 !view.ShowBendLines
                 || plate == null
                 || part.BaseDrawing.Bends == null
                 || part.BaseDrawing.Bends.Count == 0
+                || layoutPart.Path == null
             )
                 return;
 
             if (!HasBendNotAcrossGrain(part, plate.GrainAngle))
                 return;
 
-            // The placed part's world bounds, so rotated parts are outlined where they sit.
-            var box = part.BoundingBox;
-            var pt1 = view.PointWorldToGraph(box.Location);
-            var pt2 = view.PointWorldToGraph(
-                new Vector(box.X + box.Length, box.Y + box.Width)
-            );
-            using var warnPen = new Pen(muted ? Color.Gray : Color.FromArgb(180, 255, 140, 0), 2f);
-            g.DrawRectangle(
-                warnPen,
-                pt1.X,
-                pt2.Y,
-                System.Math.Abs(pt2.X - pt1.X),
-                System.Math.Abs(pt2.Y - pt1.Y)
-            );
+            // Trace the part's own cut contours, not its bounding box, so the warning
+            // stays on the part instead of running across its neighbors.
+            using var warnPen = new Pen(muted ? Color.Gray : Color.FromArgb(220, 255, 140, 0), 2.5f)
+            {
+                LineJoin = LineJoin.Round,
+            };
+            g.DrawPath(warnPen, layoutPart.Path);
         }
 
         /// <summary>
