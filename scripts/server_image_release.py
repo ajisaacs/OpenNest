@@ -124,8 +124,8 @@ def package_policy(status, headers, body):
     anonymous pull prove that afterwards. Any other shape fails closed."""
     data = json_body(body)
     require(isinstance(data, dict), "malformed package metadata")
-    if status == 404 and data.get("message") == "Not Found" and \
-            str(data.get("documentation_url", "")).startswith("https://docs.github.com/"):
+    if status == 404 and data.get("message") in ("Package not found.", "Not Found") and \
+            str(data.get("documentation_url", "")).startswith("https://docs.github.com/rest/packages"):
         return True
     require(status == 200, "package metadata inaccessible; visibility unknown")
     require(data.get("name") == PACKAGE and data.get("package_type") == "container" and

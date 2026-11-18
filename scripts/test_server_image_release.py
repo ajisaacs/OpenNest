@@ -19,6 +19,8 @@ assert SPEC is not None and SPEC.loader is not None
 release = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(release)
 SHA = "a" * 40
+# GitHub's real answer for a user package that does not exist (observed 2026-11-17).
+GITHUB_PACKAGE_NOT_FOUND = {"message": "Package not found.", "documentation_url": "https://docs.github.com/rest/packages/packages#get-a-package-for-a-user", "status": "404"}
 BASE = "mcr.microsoft.com/dotnet/aspnet@sha256:" + "b" * 64
 LAYER = b"deterministic synthetic rootfs layer"
 LAYER_GZIP = gzip.compress(LAYER, mtime=0)
@@ -135,10 +137,11 @@ class RegistrySafety(unittest.TestCase):
                 release.package_policy(*response(200, wrong))
 
     def test_github_not_found_metadata_means_first_publication(self):
-        self.assertTrue(release.package_policy(*response(404, {
-            "message": "Not Found", "documentation_url": "https://docs.github.com/rest/packages"})))
+        self.assertTrue(release.package_policy(*response(404, dict(GITHUB_PACKAGE_NOT_FOUND))))
         for status, body in ((403, {"message": "Resource not accessible"}), (404, {}),
-                             (404, {"message": "Not Found", "documentation_url": "https://evil.test"})):
+                             (404, {"message": "Not Found", "documentation_url": "https://evil.test"}),
+                             (404, dict(GITHUB_PACKAGE_NOT_FOUND, message="Resource not accessible")),
+                             (404, dict(GITHUB_PACKAGE_NOT_FOUND, documentation_url="https://docs.github.com/rest/repos"))):
             with self.assertRaises(release.ReleaseError):
                 release.package_policy(*response(status, body))
 
@@ -152,7 +155,7 @@ class RegistrySafety(unittest.TestCase):
     def preflight_client(self, package_status=200, tags=None):
         package = {"name": release.PACKAGE, "package_type": "container", "visibility": "public",
                    "repository": {"full_name": release.REPO}}
-        missing = {"message": "Not Found", "documentation_url": "https://docs.github.com/rest/packages"}
+        missing = dict(GITHUB_PACKAGE_NOT_FOUND)
         return FakeClient({
             release.REPO_API: response(200, {"full_name": release.REPO, "default_branch": "master"}),
             release.PACKAGE_API: response(package_status, package if package_status == 200 else missing),
@@ -512,8 +515,7 @@ class ArchiveIdentity(unittest.TestCase):
 
     def test_readback_refuses_a_package_still_missing_after_upload(self):
         client, local = ReadbackSafety().fixture()
-        client.responses[release.PACKAGE_API] = response(404, {
-            "message": "Not Found", "documentation_url": "https://docs.github.com/rest/packages"})
+        client.responses[release.PACKAGE_API] = response(404, dict(GITHUB_PACKAGE_NOT_FOUND))
         with tempfile.TemporaryDirectory() as directory:
             env = {"VERSION": "1.2.3", "SOURCE_SHA": SHA, "METADATA_DIR": directory}
             with mock.patch.dict(os.environ, env), mock.patch.object(release, "git", return_value=SHA), \
@@ -571,7 +573,7 @@ class SpecRegressions(unittest.TestCase):
                     token["scope"] = scope
                 responses = [response(200, token),
                              response(200, {"full_name": release.REPO, "default_branch": "master"}),
-                             response(404, {"message": "Not Found", "documentation_url": "https://docs.github.com/rest/packages"}),
+                             response(404, dict(GITHUB_PACKAGE_NOT_FOUND)),
                              response(200, {"name": release.REGISTRY_NAME, "tags": []}),
                              response(404, {"errors": [{"code": "MANIFEST_UNKNOWN"}]}),
                              response(404, {"errors": [{"code": "MANIFEST_UNKNOWN"}]})]

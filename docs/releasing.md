@@ -103,7 +103,7 @@ of `scripts/server_image_release.py`, so an older tag publishes under the curren
 policy. The job uses only its scoped `GITHUB_TOKEN`. An existing package must be public
 and linked to `ajisaacs/OpenNest`; a private package or one linked to another
 repository stops the job before upload. The first publication creates the
-package: GitHub's own `Not Found` package response is accepted only when the
+package: GitHub's own package-not-found response is accepted only when the
 registry also reports the repository unknown, because a package hidden from the
 token still has a registry repository. Every other metadata error, denial,
 reduced registry scope or failed tag-list read stops the job. Because the source
