@@ -103,6 +103,15 @@ namespace OpenNest.Engine.Fill
         }
 
         /// <summary>
+        /// The fill pipeline's stripe convergences, for the stripe fills of the remnant strips.
+        /// </summary>
+        internal StripeConvergenceCache StripeConvergence
+        {
+            get => remnantFiller.StripeConvergence;
+            init => remnantFiller.StripeConvergence = value;
+        }
+
+        /// <summary>
         /// The Fill
         /// </summary>
         /// <param name="item">The item<see cref="NestItem"/></param>

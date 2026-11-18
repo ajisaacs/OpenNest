@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -23,6 +24,7 @@ public class StripeFiller
     private readonly NestDirection _primaryAxis;
     private readonly IFillComparer _comparer;
     private readonly GridDedup _dedup;
+    private readonly StripeConvergenceCache _convergence;
 
     /// <summary>
     /// When true, only complete stripes are placed — no partial rows/columns.
@@ -35,6 +37,7 @@ public class StripeFiller
         _primaryAxis = primaryAxis;
         _comparer = context.Policy?.Comparer ?? new DefaultFillComparer();
         _dedup = GridDedup.GetOrCreate(context.SharedState);
+        _convergence = StripeConvergenceCache.GetOrCreate(context.SharedState);
     }
 
     public List<Part> Fill()
@@ -124,6 +127,8 @@ public class StripeFiller
     /// configuration is not yet claimed and no earlier layout shares it: claims are only ever
     /// added, so exactly those are the grids the sequential loop would have tiled.
     /// <see cref="Fill"/> then claims, fills remnants and ranks in the original order.
+    /// Convergence goes through the pipeline's <see cref="StripeConvergenceCache"/>: the Column
+    /// strategy and pair remnant strips repeat the Row strategy's.
     /// </summary>
     private StripeLayout[] ComputeLayouts(List<BestFitResult> bestFits, Drawing drawing)
     {
@@ -134,7 +139,7 @@ public class StripeFiller
             var variant = index % VariantsPerAxis;
             var axis = Axes[index / VariantsPerAxis % Axes.Length];
             var candidate = bestFits[index / VariantsPerAxis / Axes.Length];
-            layouts[index] = Converge(candidate.BuildParts(drawing), axis, variant);
+            layouts[index] = Converge(candidate, drawing, axis, variant);
         });
 
         var batch = new GridDedup();
@@ -176,15 +181,35 @@ public class StripeFiller
         }
     }
 
-    private StripeLayout Converge(List<Part> pairParts, NestDirection axis, int variant)
+    private StripeLayout Converge(BestFitResult candidate, Drawing drawing, NestDirection axis, int variant)
     {
         var spacing = _context.Plate.PartSpacing;
         var sheetSpan = GetDimension(_context.WorkArea, axis);
+        var maxParts = _context.MaxQuantity;
 
-        var bounds = new RotatedBounds(pairParts);
-        var (angle, waste, count) = variant == 0
-            ? ConvergeStripeAngle(bounds, sheetSpan, spacing, axis, _context.Token, _context.MaxQuantity)
-            : ConvergeStripeAngleShrink(bounds, sheetSpan, spacing, axis, _context.Token, _context.MaxQuantity);
+        // Convergence only reads the parts (its rotations are clones), so the pattern below is
+        // built from parts as fresh as those a cache hit converged.
+        var pairParts = candidate.BuildParts(drawing);
+        var (angle, waste, count) = _convergence.GetOrAdd(
+            candidate,
+            drawing,
+            axis,
+            variant,
+            sheetSpan,
+            spacing,
+            maxParts,
+            () =>
+            {
+                // Both variants, and every other fill of this pipeline, share the pair's rotated
+                // bounds and the estimate rows tiled at each angle for this span: the variants
+                // revisit each other's angles, and a trajectory often cycles between two angles.
+                var bounds = new RotatedBounds(pairParts, _convergence.Bounds(candidate, drawing));
+                var rows = _convergence.Rows(candidate, drawing, axis, sheetSpan, spacing, maxParts);
+                return variant == 0
+                    ? ConvergeStripeAngle(bounds, rows, sheetSpan, spacing, axis, _context.Token, maxParts)
+                    : ConvergeStripeAngleShrink(bounds, rows, sheetSpan, spacing, axis, _context.Token, maxParts);
+            }
+        );
 
         var layout = new StripeLayout { Angle = angle, Waste = waste, Count = count };
         if (count > 0)
@@ -397,20 +422,32 @@ public class StripeFiller
     /// Bounding boxes of one pattern's parts rotated about their common center, by angle. A
     /// box is a pure function of the parts and the angle, and the angle searches sample the
     /// same angles over and over (every <see cref="FindAngleForTargetSpan"/> scans the same
-    /// grid), so each is built once. The parts must not change while it is in use.
+    /// grid), so each is built once. The parts must not change while it is in use. The boxes
+    /// may be shared, on any thread, with other instances whose parts are built alike from the
+    /// same pair.
     /// </summary>
     private sealed class RotatedBounds
     {
-        private readonly Dictionary<double, Box> boxes = new();
+        private readonly ConcurrentDictionary<double, Box> boxes;
 
-        public RotatedBounds(List<Part> parts) => Parts = parts;
+        public RotatedBounds(List<Part> parts)
+            : this(parts, new ConcurrentDictionary<double, Box>()) { }
+
+        public RotatedBounds(List<Part> parts, ConcurrentDictionary<double, Box> boxes)
+        {
+            Parts = parts;
+            this.boxes = boxes;
+        }
 
         public List<Part> Parts { get; }
 
         public Box At(double angle)
         {
             if (!boxes.TryGetValue(angle, out var box))
-                boxes[angle] = box = FillHelpers.BuildRotatedPattern(Parts, angle).BoundingBox;
+            {
+                box = FillHelpers.BuildRotatedPattern(Parts, angle).BoundingBox;
+                boxes.TryAdd(angle, box);
+            }
             return box;
         }
     }
@@ -499,10 +536,12 @@ public class StripeFiller
         NestDirection axis,
         CancellationToken token = default,
         int maxParts = 0
-    ) => ConvergeStripeAngle(new RotatedBounds(patternParts), sheetSpan, spacing, axis, token, maxParts);
+    ) => ConvergeStripeAngle(new RotatedBounds(patternParts), new ConcurrentDictionary<double, Lazy<StripeRow>>(),
+        sheetSpan, spacing, axis, token, maxParts);
 
     private static (double Angle, double Waste, int Count) ConvergeStripeAngle(
         RotatedBounds patternParts,
+        ConcurrentDictionary<double, Lazy<StripeRow>> rows,
         double sheetSpan,
         double spacing,
         NestDirection axis,
@@ -511,7 +550,7 @@ public class StripeFiller
     )
     {
         var startAngle = OrientShortSideAlong(patternParts, axis);
-        return ConvergeFromAngle(patternParts, startAngle, sheetSpan, spacing, axis, token, maxParts);
+        return ConvergeFromAngle(patternParts, rows, startAngle, sheetSpan, spacing, axis, token, maxParts);
     }
 
     /// <summary>
@@ -525,10 +564,12 @@ public class StripeFiller
         NestDirection axis,
         CancellationToken token = default,
         int maxParts = 0
-    ) => ConvergeStripeAngleShrink(new RotatedBounds(patternParts), sheetSpan, spacing, axis, token, maxParts);
+    ) => ConvergeStripeAngleShrink(new RotatedBounds(patternParts), new ConcurrentDictionary<double, Lazy<StripeRow>>(),
+        sheetSpan, spacing, axis, token, maxParts);
 
     private static (double Angle, double Waste, int Count) ConvergeStripeAngleShrink(
         RotatedBounds patternParts,
+        ConcurrentDictionary<double, Lazy<StripeRow>> rows,
         double sheetSpan,
         double spacing,
         NestDirection axis,
@@ -550,11 +591,14 @@ public class StripeFiller
             return (0, double.MaxValue, 0);
 
         var startAngle = FindAngleForTargetSpan(patternParts, targetSpan, axis);
-        return ConvergeFromAngle(patternParts, startAngle, sheetSpan, spacing, axis, token, maxParts);
+        return ConvergeFromAngle(patternParts, rows, startAngle, sheetSpan, spacing, axis, token, maxParts);
     }
 
+    /// <param name="rows">The estimate rows already tiled at each angle for these parts, span,
+    /// spacing, axis and cap (<see cref="EstimateRow"/>), shared by every convergence of them.</param>
     private static (double Angle, double Waste, int Count) ConvergeFromAngle(
         RotatedBounds patternParts,
+        ConcurrentDictionary<double, Lazy<StripeRow>> rows,
         double startAngle,
         double sheetSpan,
         double spacing,
@@ -573,33 +617,27 @@ public class StripeFiller
         {
             token.ThrowIfCancellationRequested();
 
-            var rotated = FillHelpers.BuildRotatedPattern(patternParts.Parts, currentAngle);
-            var pairSpan = GetDimension(rotated.BoundingBox, axis);
-            var perpDim =
-                axis == NestDirection.Horizontal
-                    ? rotated.BoundingBox.Width
-                    : rotated.BoundingBox.Length;
+            // Fills of this pipeline converge on several threads at once and often reach the same
+            // angle together: one tiles the row while the others wait for it.
+            var parts = patternParts.Parts;
+            var row = rows.GetOrAdd(
+                currentAngle,
+                angle => new Lazy<StripeRow>(() =>
+                    EstimateRow(parts, angle, sheetSpan, spacing, axis, maxParts))
+            ).Value;
+
+            var pairSpan = row.PairSpan;
+            var perpDim = row.PerpDim;
 
             if (pairSpan + spacing <= 0)
                 break;
 
-            var stripeBox =
-                axis == NestDirection.Horizontal
-                    ? new Box(0, 0, sheetSpan, perpDim)
-                    : new Box(0, 0, perpDim, sheetSpan);
-            var engine = new FillLinear(stripeBox, spacing)
-            {
-                Label = "Stripe-EstimateRow",
-                MaxParts = maxParts,
-            };
-            var filled = engine.Fill(rotated, axis);
-            var n = filled?.Count ?? 0;
+            var n = row.Count;
 
             if (n <= 0)
                 break;
 
-            var filledBox = ((IEnumerable<IBoundable>)filled).GetBoundingBox();
-            var remaining = sheetSpan - GetDimension(filledBox, axis);
+            var remaining = row.Remaining;
 
             Debug.WriteLine(
                 $"[Converge] iter={iteration}: angle={Angle.ToDegrees(currentAngle):F2}°, "
@@ -630,6 +668,49 @@ public class StripeFiller
         }
 
         return (bestAngle, bestWaste, bestCount);
+    }
+
+    /// <summary>
+    /// One stripe row of the parts turned to <paramref name="angle"/>, tiled across the span:
+    /// a pure function of its arguments. The row is not tiled when the turned pattern's span
+    /// leaves no room to step.
+    /// </summary>
+    private static StripeRow EstimateRow(
+        List<Part> patternParts,
+        double angle,
+        double sheetSpan,
+        double spacing,
+        NestDirection axis,
+        int maxParts
+    )
+    {
+        var rotated = FillHelpers.BuildRotatedPattern(patternParts, angle);
+        var pairSpan = GetDimension(rotated.BoundingBox, axis);
+        var perpDim =
+            axis == NestDirection.Horizontal
+                ? rotated.BoundingBox.Width
+                : rotated.BoundingBox.Length;
+
+        if (pairSpan + spacing <= 0)
+            return new StripeRow(pairSpan, perpDim, 0, double.NaN);
+
+        var stripeBox =
+            axis == NestDirection.Horizontal
+                ? new Box(0, 0, sheetSpan, perpDim)
+                : new Box(0, 0, perpDim, sheetSpan);
+        var engine = new FillLinear(stripeBox, spacing)
+        {
+            Label = "Stripe-EstimateRow",
+            MaxParts = maxParts,
+        };
+        var filled = engine.Fill(rotated, axis);
+        var n = filled?.Count ?? 0;
+
+        if (n <= 0)
+            return new StripeRow(pairSpan, perpDim, 0, double.NaN);
+
+        var filledBox = ((IEnumerable<IBoundable>)filled).GetBoundingBox();
+        return new StripeRow(pairSpan, perpDim, n, sheetSpan - GetDimension(filledBox, axis));
     }
 
     private static double BisectForTarget(

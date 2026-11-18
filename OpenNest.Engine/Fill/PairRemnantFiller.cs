@@ -50,6 +50,13 @@ namespace OpenNest.Engine.Fill
             this.plate = plate;
         }
 
+        /// <summary>
+        /// The fill pipeline's stripe convergences, shared with the strips' stripe fills: a strip
+        /// along a full side of the work area converges the same spans as the Row strategy and
+        /// as every other such strip. Null converges each strip on its own.
+        /// </summary>
+        internal StripeConvergenceCache StripeConvergence { get; set; }
+
         public int EstimateUpperBound(
             List<Part> gridParts,
             Box workArea,
@@ -224,6 +231,8 @@ namespace OpenNest.Engine.Fill
                 Policy = new FillPolicy(comparer),
             };
             context.SharedState["BestFits"] = bestFits;
+            if (StripeConvergence != null)
+                context.SharedState[StripeConvergenceCache.SharedStateKey] = StripeConvergence;
 
             // The stripe filler lays rows along both axes itself; its axis only names it.
             var best = new StripeFiller(context, NestDirection.Horizontal).Fill();
