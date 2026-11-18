@@ -76,6 +76,12 @@ public sealed class IrregularNestingEngine : INestingEngine
     internal long WorkBudget { get; init; } = 1_500_000;
 
     /// <summary>
+    /// Whether a tail re-plan's decode skips stock trials that can neither be chosen nor change the
+    /// choice; off only in tests that compare against packing every trial.
+    /// </summary>
+    internal bool PruneStockTrials { get; init; } = true;
+
+    /// <summary>
     /// One private drawing per part geometry, shared by the best-fit pair and Fill block
     /// catalogs and by every solve of this instance (a pipeline's cutout trial and its ordinary
     /// solve see the same geometry), so each part's best-fit search runs once. Entries live as
@@ -103,7 +109,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         token.ThrowIfCancellationRequested();
         var types = PartCatalog.Build(job);
         using var solver = new Solver(job, types, progress, token, WorkBudget, DrawingFor, SheetPacked, BatchSelected, TailReplaced,
-            TailReplanning);
+            TailReplanning, PruneStockTrials);
 
         // Pair-only orientations may fit stock even when the sampled single poses do not.
         // Demand that neither a single nor a pair can fit is reported unplaced.
@@ -363,7 +369,8 @@ public sealed class IrregularNestingEngine : INestingEngine
         Action? sheetPacked,
         Action<RepeatBatch>? batchSelected,
         Action<int>? tailReplaced,
-        Action<long>? tailReplanning = null
+        Action<long>? tailReplanning = null,
+        bool pruneTrials = true
     ) : IDisposable
     {
         public void Dispose()
@@ -742,12 +749,15 @@ public sealed class IrregularNestingEngine : INestingEngine
                 }
 
                 var trials = new List<(SheetFill Fill, double Net)>();
+                var areaLeft = types.Sum(t => remaining[t.Index] * t.Area);
                 foreach (var stock in job.Plates)
                 {
                     token.ThrowIfCancellationRequested();
                     if (sheets.Count == 0 && first != null && !ReferenceEquals(stock, first))
                         continue;
                     if (stock.Quantity is int available && used[stock.Id] >= available)
+                        continue;
+                    if (pruneTrials && finishers == null && CannotWin(stock, trials, areaLeft))
                         continue;
                     progress?.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stock.Id, sheets.Count, 0, 0));
                     // Grouped fills pack groups from singles and pairs: Fill blocks cost far more per
@@ -838,6 +848,27 @@ public sealed class IrregularNestingEngine : INestingEngine
             }
 
             return new Run(sheets, net, reason);
+        }
+
+        /// <summary>
+        /// Whether a trial of <paramref name="stock"/> could neither be chosen nor change the
+        /// choice, so the decode may skip it: its least possible net cost (the whole sheet, less
+        /// full salvage credit) already exceeds the best estimate so far, and over the remaining
+        /// part area it cannot have a better cost ratio than the best so far. Later trials only
+        /// lower the ratio and the estimates, so the decode picks the same sheet without it.
+        /// </summary>
+        private bool CannotWin(NestPlateStock stock, List<(SheetFill Fill, double Net)> trials, double areaLeft)
+        {
+            if (trials.Count == 0 || stock.Cost < 0 || areaLeft <= 0)
+                return false;
+            var rate = job.Options.SalvageRate != 0 && job.Options.MinimumSalvageDimension > 0 ? job.Options.SalvageRate : 0;
+            if (rate is < 0 or > 1)
+                return false;
+            var least = (stock.Cost ?? stock.Area) * (1 - rate);
+            var ratio = trials.Min(t => t.Net / System.Math.Max(t.Fill.PartArea, 1e-12));
+            var estimate = trials.Min(t => t.Net + System.Math.Max(0, areaLeft - t.Fill.PartArea) * ratio);
+            const double Margin = 1 + 1e-9;
+            return least > estimate * Margin && least >= ratio * areaLeft * Margin;
         }
     }
 

@@ -275,6 +275,18 @@ or invalid Lattice proposal leaves singles and pairs available. Large enclosed-p
 pending the hole-geometry integration; containment cutting order and shop-use safety acceptance
 remain separate sequencer/verification work.
 
+Each sheet of a decode trial-packs every stock still available and keeps the one with the lowest
+estimate: its net cost plus the part area it leaves, charged at the best cost per part area any
+trial reached. A tail re-plan's decode skips a stock whose least possible net cost (the whole
+sheet, less full salvage credit) already exceeds the best estimate so far, and that over the
+remaining part area could not reach a better ratio than the best so far. Later trials only lower
+the ratio and the estimates, so the skipped trial could neither be chosen nor change the choice:
+each decode picks the sheets it picked before. Mostly large stocks on the last sheets are skipped:
+on the 260-part job above, about 60% of the tail re-plans' trials and a fifth of the
+ungrouped search's packing time. The work meter counts only packed trials, so later passes may
+start where before the budget had stopped them. Whole-job variants still pack every trial: a
+skipped stock may have finished the job, and their finished plans compete with the decode's.
+
 ### Grouped variants
 
 After its six variants and the tail re-plan, Irregular decodes the job again with like parts
