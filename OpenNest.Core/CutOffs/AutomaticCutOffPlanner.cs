@@ -169,6 +169,9 @@ public static class AutomaticCutOffPlanner
         occupied = System.Math.Min(occupied, length);
         occupiedY = System.Math.Min(occupiedY, width);
         var margin = System.Math.Max(plate.PartSpacing, settings.PartClearance) + GeometryTolerance;
+        // A new line keeps the separator's part margin from every other parallel cut-off, so it
+        // never cuts a sliver beside one. A cut-off already within it is treated as that line.
+        var cutClearance = margin;
         var nominalSeparator = occupied + margin;
         // A separator on a clamp moves just past it, away from the origin: the tail is a
         // little shorter, but a clamp in the way no longer costs the whole remnant. Repeat
@@ -210,7 +213,7 @@ public static class AutomaticCutOffPlanner
         if (horizontalDistance.HasValue && !horizontalExists)
         {
             var y = ySign * horizontalDistance.Value;
-            var limited = plate.CutOffs.Any(c => c?.Axis == CutOffAxis.Horizontal && Near(c.Position.Y, y));
+            var limited = plate.CutOffs.Any(c => c?.Axis == CutOffAxis.Horizontal && Beside(c.Position.Y, y, cutClearance));
             var clamp = clamps.FirstOrDefault(zone =>
                 y >= zone.Bounds.Bottom - plate.ClampClearance && y <= zone.Bounds.Top + plate.ClampClearance);
             if (limited || clamp != null)
@@ -218,7 +221,7 @@ public static class AutomaticCutOffPlanner
                 diagnostics.Add(new AutomaticCutOffDiagnostic(
                     AutomaticCutOffDiagnosticCode.NoSafeHorizontalSeparator,
                     (clamp != null ? $"A horizontal separator at Y = {y:G8} would cross clamp '{clamp.Id}'"
-                        : $"A same-line manual cut at Y = {y:G8} has different limits")
+                        : $"A manual cut on or within {cutClearance:G8} of Y = {y:G8} is not a usable separator")
                     + "; vertical lines cross the full sheet width instead."));
                 horizontalDistance = null;
             }
@@ -290,9 +293,10 @@ public static class AutomaticCutOffPlanner
             foreach (var end in boundaries)
             {
                 var count = 0;
+                var guard = EndGuard(end);
                 for (var index = 1; index <= (int)candidateCount; index++)
                 {
-                    if (start + index * options.Spacing >= end - GeometryTolerance)
+                    if (start + index * options.Spacing >= end - guard)
                         break;
                     count++;
                 }
@@ -313,10 +317,11 @@ public static class AutomaticCutOffPlanner
         else
         {
             // Keep the legacy loop and certification unchanged when shifting is disabled.
+            var guard = EndGuard(usedSpan);
             for (var index = 1; index <= (int)candidateCount; index++)
             {
                 var distance = index * options.Spacing;
-                if (distance >= usedSpan - GeometryTolerance)
+                if (distance >= usedSpan - guard)
                     break;
                 AddCandidate(sign * distance, false);
             }
@@ -427,13 +432,19 @@ public static class AutomaticCutOffPlanner
             }
         }
 
+        // A gap ending at a cut (an existing full-span line or the kept separator) needs no line
+        // within the cut clearance of it: that strip may exceed the spacing by less than the
+        // clearance instead of leaving a sliver. Only the open sheet end keeps the bare tolerance.
+        double EndGuard(double end) =>
+            !keepsTail && end >= usedSpan - GeometryTolerance ? GeometryTolerance : cutClearance;
+
         bool Allowed(double distance)
         {
             RegisterCandidate(distance);
-            // Use the certification path's exact Near predicate, including its ULP
-            // allowance, so a selected line cannot rediscover a limited-cut conflict.
+            // Use the certification path's exact Beside predicate, including Near's ULP
+            // allowance, so a selected line cannot rediscover a nearby-cut match or conflict.
             var x = sign * distance;
-            return !plate.CutOffs.Any(c => c.Axis == CutOffAxis.Vertical && Near(c.Position.X, x)) &&
+            return !plate.CutOffs.Any(c => c.Axis == CutOffAxis.Vertical && Beside(c.Position.X, x, cutClearance)) &&
                 !clamps.Any(zone => CrossesClamp(zone, x));
         }
 
@@ -458,14 +469,18 @@ public static class AutomaticCutOffPlanner
 
         void AddCandidate(double x, bool isSeparator)
         {
+            // A cut-off within the clearance is this line: nearest first, so a full-span one
+            // is certified at its own X instead of a sliver being cut beside it.
             var matches = plate.CutOffs.Where(c => c.Axis == CutOffAxis.Vertical &&
-                Near(c.Position.X, x)).ToList();
+                Beside(c.Position.X, x, cutClearance))
+                .OrderBy(c => System.Math.Abs(c.Position.X - x)).ToList();
 
             if (matches.Any(c => !Spans(c)))
             {
                 diagnostics.Add(new AutomaticCutOffDiagnostic(
                     AutomaticCutOffDiagnosticCode.LimitedCutOffConflict,
-                    "A same-line manual cut has different limits. Manual review is required; no cuts may be applied.",
+                    $"A manual cut with different limits lies on or within {cutClearance:G8} of this line. "
+                    + "Manual review is required; no cuts may be applied.",
                     true, x));
                 if (isSeparator)
                     WarnNoSeparator(x);
@@ -503,7 +518,10 @@ public static class AutomaticCutOffPlanner
             if (existing != null)
                 diagnostics.Add(new AutomaticCutOffDiagnostic(
                     AutomaticCutOffDiagnosticCode.ExistingCutOff,
-                    "An equivalent full-span cut-off already exists; no duplicate was added.", X: x));
+                    Near(existing.Position.X, x)
+                        ? "An equivalent full-span cut-off already exists; no duplicate was added."
+                        : $"A full-span cut-off at {existing.Position.X:G8} lies within {cutClearance:G8} of this line; "
+                            + "it is used instead of cutting a sliver beside it.", X: x));
             if (!usable)
                 diagnostics.Add(new AutomaticCutOffDiagnostic(
                     AutomaticCutOffDiagnosticCode.EmptyCut,
@@ -746,6 +764,10 @@ public static class AutomaticCutOffPlanner
         var step = System.Math.BitIncrement(magnitude) - magnitude;
         return System.Math.Abs(a - b) <= GeometryTolerance + (double.IsFinite(step) ? 2 * step : 0);
     }
+
+    // On the same line, or closer than the clearance to it.
+    private static bool Beside(double a, double b, double clearance) =>
+        Near(a, b) || System.Math.Abs(a - b) < clearance;
 
     private static void Require(bool valid, string message, string parameter)
     {

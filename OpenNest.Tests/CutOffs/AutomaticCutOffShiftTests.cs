@@ -141,7 +141,7 @@ public class AutomaticCutOffShiftTests
             Assert.Equal(first.Diagnostics, second.Diagnostics);
             Assert.Equal(first.StripCutLength, second.StripCutLength);
             Assert.Equal(first.PreviewParts.Take(first.PreviewParts.Count - 1).Sum(p => CutLength(p.Program)), first.StripCutLength, 8);
-            AssertLimits(first, 35, 17.5);
+            AssertLimits(first, 35, 17.5, plate.PartSpacing + AutomaticCutOffPlanner.GeometryTolerance);
         }
     }
 
@@ -210,6 +210,30 @@ public class AutomaticCutOffShiftTests
         Assert.DoesNotContain(plan.Definitions, c => c.Position.X == x ||
             System.Math.Abs(c.Position.X - manualX) <= AutomaticCutOffPlanner.GeometryTolerance);
         Assert.True(plan.StripCutLength < plan.FixedGridCutLength);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void LimitedManualLine_BesideBestPosition_IsAvoidedByTheCutClearance(int quadrant)
+    {
+        var plate = UserCase(quadrant);
+        var best = AutomaticCutOffPlanner.Create(plate, Options(), new CutOffSettings());
+        var manualX = best.Definitions[0].Position.X + 0.2;
+        plate.CutOffs.Add(new CutOff(new Vector(manualX, 0), CutOffAxis.Vertical)
+        {
+            EndLimit = plate.BoundingBox(false).Bottom + 2,
+        });
+
+        var plan = AutomaticCutOffPlanner.Create(plate, Options(), new CutOffSettings());
+
+        Assert.False(plan.HasBlockingDiagnostics);
+        Assert.Equal(3, plan.Definitions.Count);
+        // The cut clearance is the 0.3 part spacing.
+        Assert.All(plan.Definitions, c => Assert.True(System.Math.Abs(c.Position.X - manualX) >= 0.3,
+            $"A line at {c.Position.X} sits beside the manual cut at {manualX}."));
     }
 
     [Theory]
@@ -345,7 +369,10 @@ public class AutomaticCutOffShiftTests
         var settings = new CutOffSettings();
         var fixedGrid = AutomaticCutOffPlanner.Create(plate,
             new AutomaticCutOffOptions { Spacing = 0.1 }, settings);
-        Assert.Equal(1101, fixedGrid.Definitions.Count);
+        // 1,099 strip lines through 109.9 and the separator just past 110.00009: the grid line
+        // at 110 would sit 0.00009 from the separator, inside the 0.02 cut clearance, so it is
+        // not cut.
+        Assert.Equal(1100, fixedGrid.Definitions.Count);
 
         var shifted = AutomaticCutOffPlanner.Create(plate,
             new AutomaticCutOffOptions { Spacing = 0.1, MinimumStripLength = 0.05 }, settings);
@@ -354,7 +381,13 @@ public class AutomaticCutOffShiftTests
         Assert.True(shifted.StripCutLength <= shifted.FixedGridCutLength + 0.000001);
     }
 
-    internal static void AssertLimits(AutomaticCutOffPlan plan, double spacing, double minimum)
+    /// <param name="cutClearance">
+    /// The planner's cut clearance (the larger of part spacing and cut-off part clearance) when a
+    /// test relies on it: the strip up to a kept separator is then never a sliver narrower than it,
+    /// and may exceed the spacing by less than it instead.
+    /// </param>
+    internal static void AssertLimits(AutomaticCutOffPlan plan, double spacing, double minimum,
+        double cutClearance = 0)
     {
         var positions = plan.Definitions.Where(c => c.Position.X != plan.TailSeparatorX)
             .Select(c => System.Math.Abs(c.Position.X)).ToArray();
@@ -365,6 +398,10 @@ public class AutomaticCutOffShiftTests
                 spacing + AutomaticCutOffPlanner.GeometryTolerance);
             previous = position;
         }
-        Assert.InRange(plan.UsedSpan - previous, 0, spacing + AutomaticCutOffPlanner.GeometryTolerance);
+        var allowance = System.Math.Max(cutClearance, AutomaticCutOffPlanner.GeometryTolerance);
+        Assert.InRange(plan.UsedSpan - previous, 0, spacing + allowance);
+        if (cutClearance > 0 && plan.HasSeparatedTail && positions.Length > 0)
+            Assert.True(plan.UsedSpan - previous >= cutClearance - AutomaticCutOffPlanner.GeometryTolerance,
+                $"A {plan.UsedSpan - previous}-wide sliver was left before the separator.");
     }
 }

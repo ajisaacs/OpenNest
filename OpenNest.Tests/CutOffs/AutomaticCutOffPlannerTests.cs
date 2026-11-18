@@ -742,12 +742,93 @@ public class AutomaticCutOffPlannerTests
     }
 
     [Fact]
-    public void DifferentAxisOrDifferentCoordinate_DoesNotSuppress()
+    public void DifferentAxisOrCoordinateBeyondClearance_DoesNotSuppress()
     {
+        // The cut clearance is the 0.5 part spacing: a vertical line 0.6 away is a separate strip.
         var plate = MakePlate();
         plate.CutOffs.Add(new CutOff(new Vector(35, 35), CutOffAxis.Horizontal));
-        plate.CutOffs.Add(new CutOff(new Vector(35.01, 0), CutOffAxis.Vertical));
-        Assert.Equal(3, Plan(plate).Definitions.Count);
+        plate.CutOffs.Add(new CutOff(new Vector(35.6, 0), CutOffAxis.Vertical));
+        AssertPositions(new[] { 35, 70, 80.5 + Tolerance.Epsilon }, Plan(plate));
+    }
+
+    [Theory]
+    [InlineData(1, 35.01)]
+    [InlineData(1, 34.6)]
+    [InlineData(2, 35.01)]
+    [InlineData(3, 34.6)]
+    [InlineData(4, 35.01)]
+    public void FullSpanCutOffBesideGridLine_StandsInForIt_InsteadOfASliver(int quadrant, double distance)
+    {
+        var plate = MakePlate(quadrant);
+        var sign = quadrant is 2 or 3 ? -1 : 1;
+        var manual = new CutOff(new Vector(sign * distance, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(manual);
+
+        var plan = Plan(plate);
+
+        Assert.False(plan.HasBlockingDiagnostics);
+        AssertPositions(new[] { sign * 70, sign * (80.5 + Tolerance.Epsilon) }, plan);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.ExistingCutOff && d.X == sign * 35);
+        Assert.Same(manual, Assert.Single(plate.CutOffs));
+    }
+
+    [Fact]
+    public void LimitedCutOffBesideGridLine_BlocksWholePlan()
+    {
+        var plate = MakePlate();
+        plate.CutOffs.Add(new CutOff(new Vector(35.3, 0), CutOffAxis.Vertical) { StartLimit = 10, EndLimit = 60 });
+
+        var plan = Plan(plate);
+
+        Assert.True(plan.HasBlockingDiagnostics);
+        Assert.Empty(plan.Definitions);
+        Assert.Contains(plan.Diagnostics, d => d.IsBlocking && d.X == 35 &&
+            d.Code == AutomaticCutOffDiagnosticCode.LimitedCutOffConflict);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void GridLineBesideTheSeparator_IsNotCut(int quadrant)
+    {
+        // Parts through 69.7 put the separator at 70.2: the grid line at 70 would leave a 0.2
+        // sliver, so the last strip runs 35 to 70.2 instead.
+        var plate = MakePlate(quadrant, occupied: 69.7);
+        var sign = quadrant is 2 or 3 ? -1 : 1;
+
+        var plan = Plan(plate);
+
+        AssertPositions(new[] { sign * 35, sign * (70.2 + Tolerance.Epsilon) }, plan);
+        Assert.True(plan.HasSeparatedTail);
+    }
+
+    [Fact]
+    public void GridLineBesideTheOpenSheetEnd_IsStillCut()
+    {
+        // Without a kept tail the strips run to the uncut sheet edge, so no clearance applies there.
+        var plate = new Plate(81, 105.2) { PartSpacing = 0.5 };
+        plate.Parts.Add(Rectangle(90, 20, new Vector(10, 20)));
+
+        var plan = AutomaticCutOffPlanner.Create(plate,
+            new AutomaticCutOffOptions { Spacing = 35, MinimumTailLength = 12 }, new CutOffSettings());
+
+        AssertPositions(new[] { 35.0, 70, 105 }, plan);
+        Assert.False(plan.HasSeparatedTail);
+    }
+
+    [Fact]
+    public void FullSpanCutOffBesideTheSeparator_IsTheSeparator()
+    {
+        var plate = MakePlate();
+        plate.CutOffs.Add(new CutOff(new Vector(80.8, 0), CutOffAxis.Vertical));
+
+        var plan = Plan(plate);
+
+        AssertPositions(new[] { 35.0, 70 }, plan);
+        Assert.True(plan.HasSeparatedTail);
+        Assert.Equal(80.8, plan.TailSeparatorX);
+        Assert.Equal(120 - 80.8, plan.TailLength, 9);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.ExistingCutOff);
     }
 
     [Theory]

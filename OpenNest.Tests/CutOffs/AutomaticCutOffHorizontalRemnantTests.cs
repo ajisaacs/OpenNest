@@ -210,4 +210,19 @@ public class AutomaticCutOffHorizontalRemnantTests
         Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.NoSafeHorizontalSeparator);
         Assert.All(plan.Definitions, c => Assert.Equal(CutOffAxis.Vertical, c.Axis));
     }
+
+    [Fact]
+    public void ManualCutBesideTheProposedLine_FallsBackToFullWidthStrips()
+    {
+        // The new separator would go at Y 21.3; a shortened manual line at 21.5 is inside the
+        // 0.3 cut clearance, so a second line is not cut beside it.
+        var plate = MakePlate(1);
+        plate.CutOffs.Add(new CutOff(new Vector(0, 21.5), CutOffAxis.Horizontal) { EndLimit = 30 });
+
+        var plan = Plan(plate);
+
+        Assert.Null(plan.HorizontalSeparatorY);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.NoSafeHorizontalSeparator);
+        Assert.All(plan.Definitions, c => Assert.Equal(CutOffAxis.Vertical, c.Axis));
+    }
 }
