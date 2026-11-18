@@ -22,6 +22,7 @@ internal sealed class BlockCatalog : IDisposable
     private readonly Dictionary<int, Drawing> drawings = new();
     private readonly Func<NestJobPart, Drawing>? drawingFor;
     private readonly Dictionary<int, List<Orientation>> orientations = new();
+    private readonly Dictionary<int, (double Width, double Area)> footprints = new();
     private readonly Dictionary<int, int> attempts = new();
     internal int PreparationCount => attempts.Values.Sum();
     private readonly Dictionary<(int Type, int Quantity, double Length, double Width), IReadOnlyList<Placed>> cache = new();
@@ -55,8 +56,52 @@ internal sealed class BlockCatalog : IDisposable
             if (pairs.TryGetValue(type.Index, out var found))
                 poses.AddRange(found.SelectMany(p => new[] { p.A, p.B }));
             orientations[type.Index] = poses.Distinct().ToList();
+            if (type.Orientations.Count > 0)
+                footprints[type.Index] = Footprint(type.Orientations[0]);
         }
     }
+
+    /// <summary>
+    /// Lower bounds on the true part's width at any rotation and on its area: the outline's
+    /// convex-hull width and area, less what flattening within the outline's tolerance (and a
+    /// margin for Fill's boundary rounding) could hide.
+    /// </summary>
+    private static (double Width, double Area) Footprint(Orientation orientation)
+    {
+        var outline = orientation.Outline;
+        var hull = ConvexHull.Compute(outline.Select(p => new Vector(p.x, p.y)).ToList()).Vertices;
+        var width = double.PositiveInfinity;
+        for (var i = 0; i < hull.Count; i++)
+        {
+            var a = hull[i];
+            var b = hull[(i + 1) % hull.Count];
+            var length = a.DistanceTo(b);
+            if (length <= Tolerance.Epsilon)
+                continue;
+            var across = hull.Max(p => System.Math.Abs((b.X - a.X) * (p.Y - a.Y) - (b.Y - a.Y) * (p.X - a.X)) / length);
+            width = System.Math.Min(width, across);
+        }
+        var perimeter = 0.0;
+        for (var i = 0; i < outline.Count; i++)
+        {
+            var a = outline[i];
+            var b = outline[(i + 1) % outline.Count];
+            perimeter += System.Math.Sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
+        }
+        const double margin = 0.001;
+        return (double.IsFinite(width) ? width - 2 * orientation.Tolerance - margin : 0,
+            System.Math.Abs(Clipper.Area(outline)) - perimeter * (orientation.Tolerance + margin));
+    }
+
+    /// <summary>
+    /// True when the rectangle cannot hold three copies of the type: it is narrower than the part
+    /// at every rotation, or smaller than three parts. Fill could return at most two members there,
+    /// which never form a block, so its proposal is known to be empty without running it.
+    /// </summary>
+    private bool CannotHoldBlock(PartType type, Box rectangle) =>
+        footprints.TryGetValue(type.Index, out var footprint)
+        && (System.Math.Min(rectangle.Length, rectangle.Width) < footprint.Width
+            || rectangle.Area() < 3 * footprint.Area);
 
     internal static IReadOnlyList<Box> Rectangles(Box work, IReadOnlyList<Placed> placed, double spacing)
     {
@@ -127,8 +172,10 @@ internal sealed class BlockCatalog : IDisposable
         {
             // Types may build bands in parallel: each type's drawing and orientation list are its
             // own. Prefetches of one type fill their own drawings and only read the orientations.
-            var (members, poses) = Propose(type, quantity, rectangle, token,
-                spacing + System.Math.Pow(10, -NoFitCache.Precision), prefetch ?? DrawingOf(type));
+            var (members, poses) = CannotHoldBlock(type, rectangle)
+                ? (Array.Empty<Placed>(), null)
+                : Propose(type, quantity, rectangle, token,
+                    spacing + System.Math.Pow(10, -NoFitCache.Precision), prefetch ?? DrawingOf(type));
             lock (bands)
                 if (!bands.TryGetValue(key, out entry))
                     bands[key] = entry = new BandEntry(members, poses, Cost(type, quantity));
@@ -173,7 +220,11 @@ internal sealed class BlockCatalog : IDisposable
         // PrivatePlateFill.Run below is a full independent NFP-based pack whose own operations
         // never touch this solve's effort meter; charge it here using the same factors - demand
         // and outline complexity - that drive its real cost, so the shared budget actually sees it.
+        // A rectangle that cannot hold a block is charged and counted as if filled, so the meter,
+        // and every later decision it steers, reads the same as when the Fill ran.
         counter.Add(Cost(type, quantity));
+        if (CannotHoldBlock(type, rectangle))
+            return Array.Empty<Placed>();
         var (members, poses) = Propose(type, quantity, rectangle, token, spacing, DrawingOf(type));
         return members ?? Bind(type, poses!, orientations[type.Index], token);
     }

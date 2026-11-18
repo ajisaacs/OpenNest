@@ -248,7 +248,10 @@ the empty work area and physical leftover space for up to two high-area rectangl
 outlines are expanded by part spacing before rectangle search. Each sheet prepares blocks initially
 and after its first placement, for up to four high-demand-area types; each type has at most eight
 new Lattice preparations per spacing per solve. Repeated rectangles reuse private drawing/candidate
-caches. Quantity-one and quantity-two requests never run Lattice blocks.
+caches. Quantity-one and quantity-two requests never run Lattice blocks. A rectangle narrower than
+the part at every rotation, or too small for three copies, cannot hold a block, so it is not
+filled (for a block or a band); it still counts as a preparation and is charged as one, so the
+layouts are those the fill would have given.
 
 Block members are trimmed to remaining demand, mapped back to source-frame rotations, and checked
 for legal rotations and internal material clearance before competing with singles and pairs.

@@ -106,6 +106,22 @@ public class IrregularBlockTests
     }
 
     [Fact]
+    public void RectangleNarrowerThanThePartIsChargedAsAnEmptyProposal()
+    {
+        var job = Job(new[] { Part("ell", LShape(9, 7, 3), 20, RotationPolicy.Automatic) },
+            new[] { Stock("sheet", 40, 200, spacing: 0.25) });
+        var types = PartCatalog.Build(job);
+        var counter = new WorkCounter();
+        using var blocks = new BlockCatalog(0.25, types, NoPairs, counter, long.MaxValue);
+        var strip = new Box(0, 0, 200, 2.5);
+        Assert.Empty(blocks.Get(types[0], 20, strip, CancellationToken.None));
+        // Counted and charged as the Fill would have been, so later decisions do not change.
+        Assert.Equal(1, blocks.PreparationCount);
+        Assert.Equal(20L * 20 * types[0].Orientations[0].Outline.Count, counter.Value);
+        Assert.Empty(blocks.Band(types[0], 20, strip, CancellationToken.None));
+    }
+
+    [Fact]
     public void ForbiddenRotationsAreRejectedBeforeAddingGroupOrientations()
     {
         var program = LShape(9, 7, 3);
