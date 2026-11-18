@@ -1538,6 +1538,8 @@ namespace OpenNest.Forms
             // The dialog adds drawings and sets quantities as the operator works in it.
             using var change = BeginChange("Drawing Library");
             var job = (Nest.Material, Nest.Thickness);
+            // Each add shows on the Drawings tab behind the dialog right away.
+            form.NestChanged += (_, drawing) => ShowLibraryChange(drawing);
             form.ShowDialog(DialogOwner);
             if (form.AddedDrawings.Count > 0 || form.QuantitiesChanged)
             {
@@ -1553,6 +1555,18 @@ namespace OpenNest.Forms
                 FirePlateChanged(false);
             }
             change.Complete();
+        }
+
+        /// <summary>
+        /// Lists a drawing the open Drawing Library dialog just added or changed: brings the
+        /// Drawings tab forward and selects it there.
+        /// </summary>
+        internal void ShowLibraryChange(Drawing drawing)
+        {
+            UpdateDrawingList();
+            tabControl1.SelectedTab = tabPage2;
+            if (drawing != null && drawingListBox1.Items.Contains(drawing))
+                drawingListBox1.SelectedItem = drawing;
         }
 
         private void drawingListBox1_SaveToLibraryRequested(object sender, Drawing drawing)

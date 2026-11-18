@@ -443,6 +443,12 @@ plans the insert (`OpenNest.Data.LibraryDrawingInsert`) before changing anything
   revisions through Update Drawings.
 - Another drawing with the same name: refused, naming both.
 
+Each add shows a green banner above the list naming what was added (or how many
+more of a drawing already in the nest, and the new required quantity); it stays
+until the next add replaces it or it is closed. The dialog stays open for more
+adds, and the main window lists the drawing on its Drawings tab behind the
+dialog at once, brings that tab forward and selects it there.
+
 The added drawing is an independent copy carrying a library link (server key,
 id, revision and a snapshot of the library details) that is saved with the nest
 (see [the nest file format](nest-file-format.md#drawing-library-links)). Editing it
@@ -454,8 +460,8 @@ library or not, cutoffs excluded: name, library revision ("Not from the library"
 or "(other server)" when it is linked elsewhere), and the Required, Nested and
 Remaining quantities, with totals below. It refreshes after every add. Required
 is edited in place (0 to 99,999; one click starts editing, a bad number keeps
-the editor open with an error) and applies to the nest at once, like an add;
-the main window's drawing list refreshes when the dialog closes.
+the editor open with an error) and applies to the nest at once, like an add,
+and the main window's drawing list shows the change at once.
 
 The browser's **Cut first** column shows the setting; **Size (in)** (longer x
 shorter side) and **Holes** show the measured summary, blank until it is measured

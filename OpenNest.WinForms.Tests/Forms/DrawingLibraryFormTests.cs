@@ -42,9 +42,9 @@ public class DrawingLibraryFormTests
                 Assert.Equal("Deburr both sides", notes.Text);
 
                 quantity.Value = 3;
-                Run(form.View.AddSelectedAsync());
+                Add(form);
                 quantity.Value = 2;
-                Run(form.View.AddSelectedAsync());
+                Add(form);
 
                 Assert.Empty(messages);
                 var drawing = Assert.Single(nest.Drawings);
@@ -55,6 +55,86 @@ public class DrawingLibraryFormTests
             },
             TestTimeout,
             "The drawing library dialog test did not complete.");
+    }
+
+    [Fact]
+    public void EachAdd_ShowsTheBannerAndRaisesNestChangedWhileTheDialogIsOpen()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                var record = library.Add("SYN-111", "Synthetic Steel", "Grade A", 0.25, Units.Inches, "");
+                var nest = MatchingNest();
+                var changed = new List<Drawing>();
+
+                using var form = new DrawingLibraryForm(library, Server, nest);
+                form.View.ShowMessage = (text, _, _) => throw new Xunit.Sdk.XunitException(text);
+                form.View.LoadPreview = (_, _) => Task.FromResult<Drawing>(null!);
+                form.NestChanged += (_, drawing) => changed.Add(drawing);
+                form.Show();
+                var grid = Field<DataGridView>(form, "drawingGrid");
+                var banner = Field<OpenNest.Controls.NoticeBanner>(form, "addedBanner");
+                var quantity = Field<NumericUpDown>(form, "quantityBox");
+
+                PumpUntilListed(grid, "the library page");
+                Assert.False(banner.Visible);
+
+                quantity.Value = 3;
+                Add(form);
+                var drawing = Assert.Single(nest.Drawings);
+                Assert.False(banner.InvokeRequired);
+                Assert.True(banner.Visible);
+                Assert.Equal($"Added 'SYN-111' revision {record.Revision} to the nest, quantity 3.", banner.Message);
+                Assert.Same(drawing, Assert.Single(changed));
+
+                quantity.Value = 2;
+                Add(form);
+                Assert.Equal("Added 2 more of 'SYN-111' to the nest (now 5 required).", banner.Message);
+                Assert.Equal(new[] { drawing, drawing }, changed);
+
+                // The In This Nest tab's quantity edits are listed behind the dialog too.
+                var nestGrid = Field<DataGridView>(form, "nestGrid");
+                Field<TabControl>(form, "tabControl").SelectedTab = Field<TabPage>(form, "nestTab");
+                nestGrid.CurrentCell = nestGrid.Rows[0].Cells["nestRequiredColumn"];
+                Assert.True(nestGrid.BeginEdit(true));
+                nestGrid.EditingControl!.Text = "7";
+                nestGrid.NotifyCurrentCellDirty(true);
+                Assert.True(nestGrid.EndEdit());
+                Assert.Equal(3, changed.Count);
+                Assert.Equal(7, drawing.Quantity.Required);
+            },
+            TestTimeout,
+            "The drawing library banner test did not complete.");
+    }
+
+    [Fact]
+    public void RefusedAdd_ShowsNoBannerAndRaisesNothing()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new FakeLibrary();
+                library.Add("SYN-313", "Synthetic Steel", "Grade A", 0.25, Units.Millimeters, "");
+                var nest = MatchingNest();
+                var changed = 0;
+
+                using var form = new DrawingLibraryForm(library, Server, nest);
+                form.View.ShowMessage = (_, _, _) => DialogResult.OK;
+                form.View.LoadPreview = (_, _) => Task.FromResult<Drawing>(null!);
+                form.NestChanged += (_, _) => changed++;
+                form.Show();
+                var grid = Field<DataGridView>(form, "drawingGrid");
+
+                PumpUntilListed(grid, "the library page");
+                Add(form);
+
+                Assert.Empty(nest.Drawings);
+                Assert.False(Field<OpenNest.Controls.NoticeBanner>(form, "addedBanner").Visible);
+                Assert.Equal(0, changed);
+            },
+            TestTimeout,
+            "The drawing library refused-add banner test did not complete.");
     }
 
     [Fact]
@@ -122,7 +202,7 @@ public class DrawingLibraryFormTests
 
                 PumpUntilListed(grid, "the library page");
                 Field<NumericUpDown>(form, "quantityBox").Value = 2;
-                Run(form.View.AddSelectedAsync());
+                Add(form);
                 Assert.Equal("In This Nest (2)", nestTab.Text);
                 Assert.Equal($"Revision {record.Revision}", nestGrid.Rows[1].Cells["nestLibraryColumn"].Value);
                 Assert.Equal(2, nestGrid.Rows[1].Cells["nestRequiredColumn"].Value);
@@ -183,9 +263,9 @@ public class DrawingLibraryFormTests
                 PumpUntilListed(grid, "the unfiltered page");
                 Assert.Equal(("", "", (double?)null), (library.Queries[^1].MaterialName, library.Queries[^1].MaterialGrade, library.Queries[^1].Thickness));
 
-                Run(form.View.AddSelectedAsync());
+                Add(form);
                 Assert.Empty(nest.Drawings);
-                Run(form.View.AddSelectedAsync());
+                Add(form);
 
                 Assert.Equal(2, messages.Count);
                 Assert.Contains("thickness 0.1875 (nest 0.25)", messages[0]);
@@ -213,7 +293,7 @@ public class DrawingLibraryFormTests
                 var grid = Field<DataGridView>(form, "drawingGrid");
 
                 PumpUntilListed(grid, "the library page");
-                Run(form.View.AddSelectedAsync());
+                Add(form);
 
                 Assert.Contains("millimeters", Assert.Single(messages));
                 Assert.Empty(nest.Drawings);
@@ -262,7 +342,7 @@ public class DrawingLibraryFormTests
                 Assert.Equal("Yes", grid.Rows[0].Cells["cutFirstColumn"].Value);
 
                 SelectFirstRow(grid);
-                Run(form.View.AddSelectedAsync());
+                Add(form);
                 Assert.True(Assert.Single(nest.Drawings).CutFirst);
             },
             TestTimeout,
@@ -524,7 +604,7 @@ public class DrawingLibraryFormTests
                 Assert.DoesNotContain(Field<TabPage>(form, "nestTab"), Field<TabControl>(form, "tabControl").TabPages.Cast<TabPage>());
                 Assert.False(Field<Button>(form, "addButton").Visible);
                 Assert.Equal("Edit Drawing...", Field<Button>(form, "editButton").Text);
-                Run(form.View.AddSelectedAsync());
+                Add(form);
                 Assert.Empty(library.Downloads);
 
                 typeof(DataGridView).GetMethod("OnCellDoubleClick", BindingFlags.Instance | BindingFlags.NonPublic)!
@@ -634,6 +714,17 @@ public class DrawingLibraryFormTests
         Thickness = 0.25,
         Material = new Material("Synthetic Steel", "Grade A"),
     };
+
+    /// <summary>
+    /// Adds the selected drawing and waits for it. Each DoEvents leaves a plain synchronization
+    /// context on the thread, so the WinForms one is put back first: as in the dialog's own
+    /// message loop, the add's awaits then return to the UI thread rather than the thread pool.
+    /// </summary>
+    private static void Add(DrawingLibraryForm form)
+    {
+        SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
+        Run(form.View.AddSelectedAsync());
+    }
 
     // A faulted task rethrows here, so a failed step reports its own error instead of a later timeout.
     private static void Run(Task task)

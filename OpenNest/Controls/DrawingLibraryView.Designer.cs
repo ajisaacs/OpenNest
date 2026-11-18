@@ -86,6 +86,7 @@ namespace OpenNest.Controls
             editButton = new System.Windows.Forms.Button();
             exportButton = new System.Windows.Forms.Button();
             statusLabel = new System.Windows.Forms.Label();
+            addedBanner = new OpenNest.Controls.NoticeBanner();
             searchTimer = new System.Windows.Forms.Timer(components);
             previewTimer = new System.Windows.Forms.Timer(components);
             drawingMenu = new System.Windows.Forms.ContextMenuStrip(components);
@@ -263,13 +264,15 @@ namespace OpenNest.Controls
             layoutTable.ColumnCount = 1;
             layoutTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             layoutTable.Controls.Add(filterTable, 0, 0);
-            layoutTable.Controls.Add(splitContainer, 0, 1);
-            layoutTable.Controls.Add(statusLabel, 0, 2);
+            layoutTable.Controls.Add(addedBanner, 0, 1);
+            layoutTable.Controls.Add(splitContainer, 0, 2);
+            layoutTable.Controls.Add(statusLabel, 0, 3);
             layoutTable.Dock = System.Windows.Forms.DockStyle.Fill;
             layoutTable.Margin = new System.Windows.Forms.Padding(0);
             layoutTable.Padding = new System.Windows.Forms.Padding(8);
             layoutTable.Name = "layoutTable";
-            layoutTable.RowCount = 3;
+            layoutTable.RowCount = 4;
+            layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             layoutTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
@@ -788,6 +791,13 @@ namespace OpenNest.Controls
             statusLabel.Size = new System.Drawing.Size(100, 20);
             statusLabel.TabIndex = 2;
             //
+            // addedBanner
+            //
+            addedBanner.Dock = System.Windows.Forms.DockStyle.Top;
+            addedBanner.Margin = new System.Windows.Forms.Padding(0, 0, 0, 6);
+            addedBanner.Name = "addedBanner";
+            addedBanner.TabIndex = 3;
+            //
             // searchTimer
             //
             searchTimer.Interval = 300;
@@ -988,6 +998,7 @@ namespace OpenNest.Controls
         private System.Windows.Forms.Button addButton;
         private System.Windows.Forms.Button editButton;
         private System.Windows.Forms.Label statusLabel;
+        private OpenNest.Controls.NoticeBanner addedBanner;
         private System.Windows.Forms.Timer searchTimer;
         private System.Windows.Forms.Timer previewTimer;
         private System.Windows.Forms.ContextMenuStrip drawingMenu;

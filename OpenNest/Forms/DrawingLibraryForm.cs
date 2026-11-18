@@ -23,6 +23,13 @@ namespace OpenNest.Forms
         /// <summary>True once the In This Nest tab changed a drawing's required quantity.</summary>
         public bool QuantitiesChanged => view.QuantitiesChanged;
 
+        /// <summary>Raised with the drawing after each add or quantity edit, while the dialog is still open.</summary>
+        public event EventHandler<Drawing> NestChanged
+        {
+            add => view.NestChanged += value;
+            remove => view.NestChanged -= value;
+        }
+
         /// <param name="nest">The nest to add drawings to.</param>
         /// <param name="sets">Enables Used in Sets and Add to Set; null hides them.</param>
         public DrawingLibraryForm(IDrawingLibraryStore library, string serverUrl, Nest nest, IDrawingSetStore sets = null)

@@ -20,8 +20,9 @@ namespace OpenNest.Controls
     /// <see cref="DrawingLibraryBrowseSession"/>, filtered to the nest's material and thickness
     /// unless Show all is ticked. Add downloads the listed revision's exact package, plans it
     /// with <see cref="LibraryDrawingInsert"/>, shows any warning or refusal first and only then
-    /// changes the nest. Opened without a nest, it lists every active drawing and has no In This
-    /// Nest tab; as the Library tab of <see cref="DrawingSetsForm"/> a double-click, Enter or Add
+    /// changes the nest; a green banner confirms each add and <see cref="NestChanged"/> lets the
+    /// host list it behind the dialog at once. Opened without a nest, it lists every active
+    /// drawing and has no In This Nest tab; as the Library tab of <see cref="DrawingSetsForm"/> a double-click, Enter or Add
     /// to Release adds the drawing on its own, at the entered quantity, to the window's
     /// <see cref="ReleasePanel"/>, and elsewhere a double-click edits it. Edit Drawing changes the
     /// selected drawing's details, notes and nesting settings (Cut first, priority, rotation,
@@ -115,6 +116,12 @@ namespace OpenNest.Controls
         /// the change is already applied to the nest when the dialog closes.
         /// </summary>
         public bool QuantitiesChanged { get; private set; }
+
+        /// <summary>
+        /// Raised each time an add or an In This Nest quantity edit changes the nest, while the
+        /// dialog is still open, so the host can show the change behind it at once.
+        /// </summary>
+        public event EventHandler<Drawing> NestChanged;
 
         /// <summary>
         /// The window that owns this view's dialogs. A dialog owned by a child control is not kept
@@ -853,6 +860,7 @@ namespace OpenNest.Controls
 
             adding = true;
             UpdateCommands();
+            addedBanner.Hide();
             statusLabel.Text = $"Downloading '{record.Name}' revision {record.Revision}...";
             var quantity = (int)quantityBox.Value;
             try
@@ -895,9 +903,11 @@ namespace OpenNest.Controls
                 if (!AddedDrawings.Contains(insert.Drawing))
                     AddedDrawings.Add(insert.Drawing);
                 RefreshNestTab();
-                statusLabel.Text = insert.Kind == LibraryInsertKind.AddQuantity
-                    ? $"Added {quantity} to '{insert.Drawing.Name}' (now {insert.Drawing.Quantity.Required})."
-                    : $"Added '{insert.Drawing.Name}' revision {record.Revision}, quantity {quantity}.";
+                statusLabel.Text = "";
+                addedBanner.Show(insert.Kind == LibraryInsertKind.AddQuantity
+                    ? $"Added {quantity:N0} more of '{insert.Drawing.Name}' to the nest (now {insert.Drawing.Quantity.Required:N0} required)."
+                    : $"Added '{insert.Drawing.Name}' revision {record.Revision} to the nest, quantity {quantity:N0}.");
+                NestChanged?.Invoke(this, insert.Drawing);
             }
             catch (ServerTooOldException ex)
             {
@@ -1101,6 +1111,7 @@ namespace OpenNest.Controls
 
             statusLabel.Text = $"'{drawing.Name}' now requires {value:N0} (was {before:N0}).";
             UpdateNestSummary();
+            NestChanged?.Invoke(this, drawing);
         }
 
         private void UpdateNestSummary()
