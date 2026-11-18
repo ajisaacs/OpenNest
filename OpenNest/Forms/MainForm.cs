@@ -302,6 +302,7 @@ namespace OpenNest.Forms
             mnuViewDrawBounds.Checked = activeForm.PlateView.DrawBounds;
             mnuViewDrawCutDirection.Checked = activeForm.PlateView.DrawCutDirection;
             mnuViewDrawSupport.Checked = activeForm.PlateView.DrawSupport;
+            mnuViewShowBendLines.Checked = activeForm.PlateView.ShowBendLines;
         }
 
         protected override void OnLoad(EventArgs e)

@@ -139,6 +139,14 @@ namespace OpenNest.Forms
             mnuViewDrawSupport.Checked = activeForm.PlateView.DrawSupport;
         }
 
+        private void ToggleShowBendLines_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null)
+                return;
+            activeForm.ToggleBendLines();
+            mnuViewShowBendLines.Checked = activeForm.PlateView.ShowBendLines;
+        }
+
         private void ZoomToArea_Click(object sender, EventArgs e) => WithActive(f => f.PlateView.SetAction(typeof(ActionZoomWindow)));
 
         private void ZoomToFit_Click(object sender, EventArgs e) => WithActive(f => f.PlateView.ZoomToFit());

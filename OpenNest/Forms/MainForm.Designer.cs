@@ -76,7 +76,8 @@ namespace OpenNest.Forms
             mnuViewDrawOffset = new System.Windows.Forms.ToolStripMenuItem();
             mnuViewDrawCutDirection = new System.Windows.Forms.ToolStripMenuItem();
             mnuViewDrawSupport = new System.Windows.Forms.ToolStripMenuItem();
-            toolStripMenuItem5 = new System.Windows.Forms.ToolStripSeparator();
+            mnuViewShowBendLines = new System.Windows.Forms.ToolStripMenuItem();
+            toolStripMenuItem5 =new System.Windows.Forms.ToolStripSeparator();
             mnuViewZoomTo = new System.Windows.Forms.ToolStripMenuItem();
             mnuViewZoomToArea = new System.Windows.Forms.ToolStripMenuItem();
             mnuViewZoomToFit = new System.Windows.Forms.ToolStripMenuItem();
@@ -419,7 +420,7 @@ namespace OpenNest.Forms
             // 
             // mnuView
             // 
-            mnuView.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuViewDrawRapids, mnuViewDrawPiercePoints, mnuViewDrawBounds, mnuViewDrawOffset, mnuViewDrawCutDirection, mnuViewDrawSupport, mnuViewOverlapCheck, toolStripMenuItem5, mnuViewZoomTo, mnuViewZoomIn, mnuViewZoomOut });
+            mnuView.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuViewDrawRapids, mnuViewDrawPiercePoints, mnuViewDrawBounds, mnuViewDrawOffset, mnuViewDrawCutDirection, mnuViewDrawSupport, mnuViewShowBendLines, mnuViewOverlapCheck, toolStripMenuItem5, mnuViewZoomTo, mnuViewZoomIn, mnuViewZoomOut });
             mnuView.Name = "mnuView";
             mnuView.Size = new System.Drawing.Size(44, 20);
             mnuView.Text = "&View";
@@ -502,6 +503,15 @@ namespace OpenNest.Forms
             mnuViewDrawSupport.Size = new System.Drawing.Size(222, 22);
             mnuViewDrawSupport.Text = "Draw Support";
             mnuViewDrawSupport.Click += ToggleDrawSupport_Click;
+            //
+            // mnuViewShowBendLines
+            //
+            mnuViewShowBendLines.CheckOnClick = true;
+            mnuViewShowBendLines.Name = "mnuViewShowBendLines";
+            mnuViewShowBendLines.Size = new System.Drawing.Size(222, 22);
+            mnuViewShowBendLines.Text = "Show Bend Lines";
+            mnuViewShowBendLines.ToolTipText = "Show bend lines on bent parts and outline parts whose bends are not parallel to the plate's grain";
+            mnuViewShowBendLines.Click += ToggleShowBendLines_Click;
             //
             // toolStripMenuItem5
             // 
@@ -1466,6 +1476,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawOffset;
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawCutDirection;
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawSupport;
+        private System.Windows.Forms.ToolStripMenuItem mnuViewShowBendLines;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem5;
         private System.Windows.Forms.ToolStripMenuItem mnuTools;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsMachineConfig;

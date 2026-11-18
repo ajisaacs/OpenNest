@@ -646,11 +646,11 @@ namespace OpenNest.Controls
 
                 if (diff > tolerance)
                 {
-                    var box = part.BaseDrawing.Program.BoundingBox();
-                    var location = part.Location;
-                    var pt1 = view.PointWorldToGraph(location);
+                    // The placed part's world bounds, so rotated parts are outlined where they sit.
+                    var box = part.BoundingBox;
+                    var pt1 = view.PointWorldToGraph(box.Location);
                     var pt2 = view.PointWorldToGraph(
-                        new Vector(location.X + box.Length, location.Y + box.Width)
+                        new Vector(box.X + box.Length, box.Y + box.Width)
                     );
                     using var warnPen = new Pen(muted ? Color.Gray : Color.FromArgb(180, 255, 140, 0), 2f);
                     g.DrawRectangle(
