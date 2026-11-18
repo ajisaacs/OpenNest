@@ -17,6 +17,9 @@ namespace OpenNest
             var turned = Outline?.Rotated90(rotationDirection);
             Size = new Size(Size.Length, Size.Width);
             Outline = turned;
+            // The grain belongs to the sheet, so it turns with it.
+            GrainAngle = NormalizeGrainAngle(
+                GrainAngle + (rotationDirection == RotationType.CW ? -Angle.HalfPI : Angle.HalfPI));
 
             // After Size swap above, new Size.Width = old Length (old X extent),
             // new Size.Length = old Width (old Y extent).
@@ -90,7 +93,20 @@ namespace OpenNest
         }
 
         /// <summary>
-        /// Rotates the plate 180 degrees along with all parts.
+        /// A grain angle as a line direction in [0, π): grain has no head or tail, so
+        /// angles π apart are the same grain.
+        /// </summary>
+        public static double NormalizeGrainAngle(double angle)
+        {
+            var normalized = angle % System.Math.PI;
+            if (normalized < 0)
+                normalized += System.Math.PI;
+            // Values a hair under π are the same line as 0.
+            return System.Math.PI - normalized < Tolerance.Epsilon ? 0 : normalized;
+        }
+
+        /// <summary>
+        /// Rotates the plate 180 degrees along with all parts. The grain's line is unchanged.
         /// </summary>
         /// <param name="keepSameQuadrant"></param>
         public void Rotate180(bool keepSameQuadrant = true)
