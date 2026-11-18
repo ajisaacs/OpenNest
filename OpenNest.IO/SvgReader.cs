@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
+using OpenNest.Bending;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -56,6 +57,7 @@ namespace OpenNest.IO
         private readonly List<Line> lines = new List<Line>();
         private readonly List<Arc> arcs = new List<Arc>();
         private readonly List<Circle> circles = new List<Circle>();
+        private readonly List<Bend> bends = new List<Bend>();
         private readonly HashSet<XElement> activeUses = new HashSet<XElement>();
 
         private SvgReader(XElement root, double tolerance)
@@ -241,6 +243,7 @@ namespace OpenNest.IO
             {
                 Entities = entities,
                 RawEntities = raw,
+                Bends = bends,
                 Warnings = skipped
                     .OrderBy(s => s.Key, StringComparer.Ordinal)
                     .Select(s => $"Skipped {s.Value} <{s.Key}> element(s); convert them to paths to import them.")
@@ -270,7 +273,9 @@ namespace OpenNest.IO
                 case "a":
                 case "switch":
                     var layer = LayerOf(element, parentLayer);
-                    if (!IsSkippedLayer(layer.Name))
+                    if (IsBendLayer(layer.Name))
+                        ReadBends(element, transform);
+                    else if (!IsSkippedLayer(layer.Name))
                         WalkChildren(element, transform, layer);
                     break;
 
@@ -355,6 +360,70 @@ namespace OpenNest.IO
             Dxf.IsNonCutLayer(name)
             || string.Equals(name, SpecialLayers.Rapid.Name, StringComparison.OrdinalIgnoreCase)
             || string.Equals(name, Svg.PlateLayerName, StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsBendLayer(string name) =>
+            string.Equals(name, CadExporter.BendLayerName, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Every <c>line</c> on a BEND layer is a bend, as a center line on a DXF's BEND layer
+        /// is; OpenNest's export adds its direction, angle, radius and note as
+        /// <c>data-bend-*</c> attributes. Other shapes and text there are only for people.
+        /// </summary>
+        private void ReadBends(XElement group, SvgTransform transform)
+        {
+            foreach (var child in group.Elements())
+            {
+                if (child.Name.Namespace != svgNamespace || IsHidden(child))
+                    continue;
+
+                var placed = transform.Then(SvgTransform.Parse(child.Attribute("transform")?.Value));
+                if (child.Name.LocalName == "g")
+                {
+                    ReadBends(child, placed);
+                    continue;
+                }
+
+                if (child.Name.LocalName != "line" || HasRelativeSize(child, "x1", "y1", "x2", "y2"))
+                    continue;
+
+                var start = placed.Apply(new Vector(Measure(child, "x1") ?? 0, Measure(child, "y1") ?? 0));
+                var end = placed.Apply(new Vector(Measure(child, "x2") ?? 0, Measure(child, "y2") ?? 0));
+                if (start.DistanceTo(end) < Tolerance.Epsilon)
+                    continue;
+
+                var direction = Enum.TryParse<BendDirection>(
+                    child.Attribute(Svg.BendDirectionAttribute)?.Value,
+                    ignoreCase: true,
+                    out var parsed
+                ) && Enum.IsDefined(parsed)
+                    ? parsed
+                    : BendDirection.Unknown;
+                var radius = Number(child, Svg.BendRadiusAttribute);
+
+                bends.Add(
+                    new Bend
+                    {
+                        StartPoint = start,
+                        EndPoint = end,
+                        Direction = direction,
+                        Angle = Number(child, Svg.BendAngleAttribute),
+                        // The radius is a length in the file's units, like the line.
+                        Radius = radius * placed.ScaleFactor,
+                        NoteText = child.Attribute(Svg.BendNoteAttribute)?.Value,
+                    }
+                );
+            }
+        }
+
+        private static double? Number(XElement element, string attribute) =>
+            double.TryParse(
+                element.Attribute(attribute)?.Value,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var value
+            ) && double.IsFinite(value)
+                ? value
+                : null;
 
         private void WalkUse(XElement use, SvgTransform transform, Layer layer)
         {

@@ -1341,9 +1341,26 @@ namespace OpenNest.Forms
             entityView1.Invalidate();
         }
 
-        private const int SvgExportFilterIndex = 8;
+        // The Export choices in dialog order; a null version is SVG.
+        private static readonly (string Label, string Extension, ACadSharp.ACadVersion? Version)[] ExportFormats =
+        {
+            ("DXF 2018", ".dxf", ACadSharp.ACadVersion.AC1032),
+            ("DXF 2013", ".dxf", ACadSharp.ACadVersion.AC1027),
+            ("DXF 2010", ".dxf", ACadSharp.ACadVersion.AC1024),
+            ("DXF 2007", ".dxf", ACadSharp.ACadVersion.AC1021),
+            ("DXF 2004", ".dxf", ACadSharp.ACadVersion.AC1018),
+            ("DXF 2000", ".dxf", ACadSharp.ACadVersion.AC1015),
+            ("DXF R14", ".dxf", ACadSharp.ACadVersion.AC1014),
+            ("DWG 2018", ".dwg", ACadSharp.ACadVersion.AC1032),
+            ("DWG 2013", ".dwg", ACadSharp.ACadVersion.AC1027),
+            ("DWG 2010", ".dwg", ACadSharp.ACadVersion.AC1024),
+            ("DWG 2004", ".dwg", ACadSharp.ACadVersion.AC1018),
+            ("SVG", ".svg", null),
+        };
 
-        private void OnExportDxfClick(object sender, EventArgs e)
+        // Writes the current drawing with its layers and bends, so importing the file again
+        // gives back the same geometry and bends.
+        private void OnExportClick(object sender, EventArgs e)
         {
             var item = CurrentItem;
             if (item == null)
@@ -1351,87 +1368,39 @@ namespace OpenNest.Forms
 
             using var dlg = new SaveFileDialog
             {
-                Filter =
-                    "DXF 2018 (*.dxf)|*.dxf|"
-                    + "DXF 2013 (*.dxf)|*.dxf|"
-                    + "DXF 2010 (*.dxf)|*.dxf|"
-                    + "DXF 2007 (*.dxf)|*.dxf|"
-                    + "DXF 2004 (*.dxf)|*.dxf|"
-                    + "DXF 2000 (*.dxf)|*.dxf|"
-                    + "DXF R14 (*.dxf)|*.dxf|"
-                    + "SVG (*.svg)|*.svg",
+                Filter = string.Join(
+                    "|",
+                    ExportFormats.Select(f => $"{f.Label} (*{f.Extension})|*{f.Extension}")
+                ),
                 FileName = Path.ChangeExtension(item.Name, ".dxf"),
             };
 
             if (dlg.ShowDialog() != DialogResult.OK)
                 return;
 
-            if (dlg.FilterIndex == SvgExportFilterIndex)
+            var format = ExportFormats[System.Math.Clamp(dlg.FilterIndex, 1, ExportFormats.Length) - 1];
+            var path = Path.ChangeExtension(dlg.FileName, format.Extension);
+
+            try
             {
-                Svg.ExportEntities(item.Entities, Path.ChangeExtension(dlg.FileName, ".svg"), DrawingUnits);
-                return;
+                CadExporter.Export(
+                    path,
+                    item.Entities,
+                    item.Bends,
+                    DrawingUnits,
+                    format.Version ?? ACadSharp.ACadVersion.AC1032
+                );
             }
-
-            var version = dlg.FilterIndex switch
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
             {
-                2 => ACadSharp.ACadVersion.AC1027,
-                3 => ACadSharp.ACadVersion.AC1024,
-                4 => ACadSharp.ACadVersion.AC1021,
-                5 => ACadSharp.ACadVersion.AC1018,
-                6 => ACadSharp.ACadVersion.AC1015,
-                7 => ACadSharp.ACadVersion.AC1014,
-                _ => ACadSharp.ACadVersion.AC1032,
-            };
-
-            var doc = new ACadSharp.CadDocument(version);
-            foreach (var entity in item.Entities)
-            {
-                switch (entity)
-                {
-                    case Geometry.Line line:
-                        doc.Entities.Add(
-                            new ACadSharp.Entities.Line
-                            {
-                                StartPoint = new CSMath.XYZ(
-                                    line.StartPoint.X,
-                                    line.StartPoint.Y,
-                                    0
-                                ),
-                                EndPoint = new CSMath.XYZ(line.EndPoint.X, line.EndPoint.Y, 0),
-                            }
-                        );
-                        break;
-
-                    case Geometry.Arc arc:
-                        var startAngle = arc.StartAngle;
-                        var endAngle = arc.EndAngle;
-                        if (arc.IsReversed)
-                            OpenNest.Math.Generic.Swap(ref startAngle, ref endAngle);
-                        doc.Entities.Add(
-                            new ACadSharp.Entities.Arc
-                            {
-                                Center = new CSMath.XYZ(arc.Center.X, arc.Center.Y, 0),
-                                Radius = arc.Radius,
-                                StartAngle = startAngle,
-                                EndAngle = endAngle,
-                            }
-                        );
-                        break;
-
-                    case Geometry.Circle circle:
-                        doc.Entities.Add(
-                            new ACadSharp.Entities.Circle
-                            {
-                                Center = new CSMath.XYZ(circle.Center.X, circle.Center.Y, 0),
-                                Radius = circle.Radius,
-                            }
-                        );
-                        break;
-                }
+                MessageBox.Show(
+                    this,
+                    $"Could not export \"{Path.GetFileName(path)}\": {ex.Message}",
+                    "Export",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
             }
-
-            using var writer = new ACadSharp.IO.DxfWriter(dlg.FileName, doc, false);
-            writer.Write();
         }
 
         #endregion

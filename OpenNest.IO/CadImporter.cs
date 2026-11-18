@@ -48,7 +48,9 @@ namespace OpenNest.IO
             }
 
             var bends = new List<Bend>();
-            if (options.DetectBends && dxf.Document != null)
+            if (options.DetectBends && dxf.Bends != null)
+                bends = dxf.Bends;
+            else if (options.DetectBends && dxf.Document != null)
             {
                 bends =
                     options.BendDetectorName == null

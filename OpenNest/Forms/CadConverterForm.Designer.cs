@@ -31,7 +31,7 @@ namespace OpenNest.Forms
             lblEntityCount = new System.Windows.Forms.Label();
             btnSplit = new System.Windows.Forms.Button();
             btnSimplify = new System.Windows.Forms.Button();
-            btnExportDxf = new System.Windows.Forms.Button();
+            btnExport = new System.Windows.Forms.Button();
             btnHoleTable = new System.Windows.Forms.Button();
             chkShowOriginal = new System.Windows.Forms.CheckBox();
             chkLabels = new System.Windows.Forms.CheckBox();
@@ -171,7 +171,7 @@ namespace OpenNest.Forms
             detailBar.Controls.Add(lblEntityCount);
             detailBar.Controls.Add(btnSplit);
             detailBar.Controls.Add(btnSimplify);
-            detailBar.Controls.Add(btnExportDxf);
+            detailBar.Controls.Add(btnExport);
             detailBar.Controls.Add(btnHoleTable);
             detailBar.Controls.Add(chkShowOriginal);
             detailBar.Controls.Add(chkLabels);
@@ -275,18 +275,18 @@ namespace OpenNest.Forms
             btnSimplify.Text = "Simplify...";
             btnSimplify.Click += OnSimplifyClick;
             // 
-            // btnExportDxf
+            // btnExport
             // 
-            btnExportDxf.AutoSize = true;
-            btnExportDxf.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            btnExportDxf.Font = new System.Drawing.Font("Segoe UI", 9F);
-            btnExportDxf.Location = new System.Drawing.Point(444, 6);
-            btnExportDxf.Margin = new System.Windows.Forms.Padding(0, 0, 10, 0);
-            btnExportDxf.Name = "btnExportDxf";
-            btnExportDxf.Size = new System.Drawing.Size(76, 27);
-            btnExportDxf.TabIndex = 8;
-            btnExportDxf.Text = "Export DXF";
-            btnExportDxf.Click += OnExportDxfClick;
+            btnExport.AutoSize = true;
+            btnExport.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            btnExport.Font = new System.Drawing.Font("Segoe UI", 9F);
+            btnExport.Location = new System.Drawing.Point(444, 6);
+            btnExport.Margin = new System.Windows.Forms.Padding(0, 0, 10, 0);
+            btnExport.Name = "btnExport";
+            btnExport.Size = new System.Drawing.Size(76, 27);
+            btnExport.TabIndex = 8;
+            btnExport.Text = "Export...";
+            btnExport.Click += OnExportClick;
             // 
             // btnHoleTable
             // 
@@ -445,7 +445,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.TextBox txtCustomer;
         private System.Windows.Forms.Button btnSplit;
         private System.Windows.Forms.Button btnSimplify;
-        private System.Windows.Forms.Button btnExportDxf;
+        private System.Windows.Forms.Button btnExport;
         private System.Windows.Forms.Button btnHoleTable;
         private System.Windows.Forms.CheckBox chkShowOriginal;
         private System.Windows.Forms.CheckBox chkLabels;

@@ -65,7 +65,7 @@ Releases: follow [the release procedure](docs/releasing.md) and `scripts/Publish
 Read the relevant contract before changing its behavior:
 
 - [Nest file format](docs/nest-file-format.md)
-- [SVG import and export](docs/svg-import-export.md): SVG numbers are not drawing units; import never guesses a scale
+- [SVG import and export](docs/svg-import-export.md): SVG numbers are not drawing units; import never guesses a scale. It also covers the CAD Converter's DXF/DWG/SVG export, whose bends import reads back
 - [Irregular stock](docs/irregular-stock.md): outlined sheets, what honors the outline and what refuses it
 - [Directional slides](docs/geometry/directional-slides.md) and [pair-spacing limits](docs/geometry/pair-spacing.md)
 - [Lead-in placement](docs/geometry/lead-in-placement.md) (including the planner's eroded pierce for cutouts too small for their lead-in and the stop at a feature's center line) and [pierce zones](docs/geometry/pierce-zone.md): opt-in `PierceDiameter` clearance, the hole pole fallback and the planner's perimeter scrap fallback

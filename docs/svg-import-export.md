@@ -24,10 +24,14 @@ Import takes path centerlines: `path`, `rect` (with rounded corners), `circle`, 
 - Malformed path data fails the import instead of importing part of a shape.
 - Elements with `display` none or `visibility` hidden or collapse are skipped, as are definition elements such as `defs` and `clipPath`. `<style>` sheets are not read, so CSS-class hiding is not honored.
 - Text, images, nested `svg`, `use` of a `symbol`, and shapes sized in percentages are skipped and listed in `CadImportResult.Warnings`.
-- Layers come from `data-layer`, an Inkscape layer label, or the `id` of a top-level group (Illustrator). `BEND`, `ETCH`, `SCRIBE`, `RAPID` and `PLATE` are dropped, so an exported plate reads back as its parts.
+- Layers come from `data-layer`, an Inkscape layer label, or the `id` of a top-level group (Illustrator). `ETCH`, `SCRIBE`, `RAPID` and `PLATE` are dropped, so an exported plate reads back as its parts.
 - The file's DTD may parse, because older Illustrator files declare namespaces in one, but external fetches are off and entity expansion is capped.
-- There is no bend detection: it reads a CAD document, which an SVG does not have.
+- Each `line` on a `BEND` layer is a bend, as a center line on a DXF's `BEND` layer is; nothing else there is read. Its `data-bend-direction` (`up` or `down`), `data-bend-angle` (degrees), `data-bend-radius` (scaled like the line) and `data-bend-note` fill in the bend when present. `CadImportOptions.DetectBends` false ignores them; the detector choice does not apply.
 
 ## What export writes
 
-`ExportProgram`, `ExportPlate` and `ExportEntities` write one `<g data-layer>` per layer. `width` and `height` are in the given units and match the `viewBox`, so one user unit is one drawing unit and the file needs no scale prompt. Arcs stay `A` commands. The plate outline and edge spacing go on `PLATE`. Plate export leaves out the rapids DXF draws between parts.
+`ExportProgram`, `ExportPlate` and `ExportEntities` write one `<g data-layer>` per layer; the `ExportEntities` overload that takes bends adds a `BEND` group with each bend's `line` and `data-bend-*` attributes, plus its note as text for people. `width` and `height` are in the given units and match the `viewBox`, so one user unit is one drawing unit and the file needs no scale prompt. Arcs stay `A` commands. The plate outline and edge spacing go on `PLATE`. Plate export leaves out the rapids DXF draws between parts.
+
+## CAD Converter export
+
+**Export...** writes the current drawing with `CadExporter`: DXF R14 to 2018, DWG 2004 to 2018 or SVG. Entities keep their layers. Bends go on `BEND` as `CENTER` lines with an MText note such as `UP 90° R 0.06`, the form `SolidWorksBendDetector` reads, so importing the file again gives back the same bends; a line picked as a bend is written only as that bend. Etch marks go on `ETCH`, which import drops and makes again from the bends. Files before 2007 write non-ASCII note characters as `\U+XXXX` escapes. ACadSharp cannot write DWG 2007, and its DWG R14 and 2000 output loses entities and layers, so those are not offered.

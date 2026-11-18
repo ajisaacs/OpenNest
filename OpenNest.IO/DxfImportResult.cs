@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using ACadSharp;
+using OpenNest.Bending;
 using OpenNest.Geometry;
 
 namespace OpenNest.IO
@@ -14,6 +15,12 @@ namespace OpenNest.IO
         /// </summary>
         public List<Entity> RawEntities { get; set; } = new();
         public CadDocument Document { get; set; }
+
+        /// <summary>
+        /// Bends the file states outright, as an SVG's BEND layer does; null when bends are
+        /// detected from <see cref="Document"/> instead.
+        /// </summary>
+        public List<Bend> Bends { get; set; }
         public List<string> Warnings { get; set; } = new();
     }
 }
