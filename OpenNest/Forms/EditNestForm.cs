@@ -1329,7 +1329,7 @@ namespace OpenNest.Forms
             // Display-only numbering: the trailing empty new-plate sentinel is excluded from the
             // total (and labeled as such); navigation and storage indexes are untouched.
             plateInfoLabel.Text = PlateDisplayNumbering.FormatHeader(
-                Nest.Plates, PlateManager.CurrentIndex, plate.Size.ToString(), plate.Quantity);
+                Nest.Plates, PlateManager.CurrentIndex, plate.Size.ToString(4), plate.Quantity);
 
             btnFirstPlate.Enabled = !PlateManager.IsFirst;
             btnPreviousPlate.Enabled = !PlateManager.IsFirst;
@@ -1862,7 +1862,7 @@ namespace OpenNest.Forms
             var item = new ListViewItem();
             item.ToolTipText = LedgerStockAssignment.Describe(plate, LedgerLocations) ?? "";
             item.Text = id.ToString();
-            item.SubItems.Add(plate.Size.ToString());
+            item.SubItems.Add(plate.Size.ToString(4));
             item.SubItems.Add(plate.Quantity.ToString());
 
             var partCount = plate.Parts.Count(p => !p.BaseDrawing.IsCutOff);

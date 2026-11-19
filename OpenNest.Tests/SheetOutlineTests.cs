@@ -139,12 +139,58 @@ public class SheetOutlineTests
 
         var outline = SheetOutline.FromGeometry(entities);
 
-        Assert.Equal(48 - 2 * SheetOutline.ChordTolerance, outline.Size.Width, 6);
-        Assert.Equal(96 - 2 * SheetOutline.ChordTolerance, outline.Size.Length, 6);
+        // Straight edges are kept exactly: the sheet keeps its drawn size and corners.
+        Assert.Equal(48, outline.Size.Width);
+        Assert.Equal(96, outline.Size.Length);
+        Assert.Equal(6, outline.Points.Count);
+        // The burn mark's polygon contains its circle.
         var obstacle = Assert.Single(outline.Obstacles);
-        var radius = obstacle.Max(p => p.X) - obstacle.Min(p => p.X);
-        Assert.InRange(radius, 6 + 2 * SheetOutline.ChordTolerance - 1e-6, 6 + 4 * SheetOutline.ChordTolerance);
+        Assert.All(obstacle, p => Assert.InRange(p.DistanceTo(new Vector(20, 20)), 3 - 1e-9, 3 + SheetOutline.ChordTolerance + 1e-9));
+        for (var i = 0; i < obstacle.Count; i++)
+        {
+            var middle = (obstacle[i] + obstacle[(i + 1) % obstacle.Count]) * 0.5;
+            Assert.True(middle.DistanceTo(new Vector(20, 20)) >= 3 - 1e-9, "an obstacle chord cuts inside its circle");
+        }
         Assert.Throws<ArgumentException>(() => SheetOutline.FromGeometry(new List<Entity> { new Line(0, 0, 10, 0) }));
+    }
+
+    [Fact]
+    public void FromGeometry_ChordsEachArcOnTheSideThatTakesMaterialAway()
+    {
+        // A 60 x 30 sheet with a rounded corner at the upper right (bulging out) and a
+        // half-round bite out of the bottom edge (bulging in).
+        var corner = new Vector(50, 20);
+        var bite = new Vector(30, 0);
+        var entities = new List<Entity>
+        {
+            new Line(0, 0, 25, 0),
+            new Arc(bite, 5, System.Math.PI, 0, true),
+            new Line(35, 0, 60, 0),
+            new Line(60, 0, 60, 20),
+            new Arc(corner, 10, 0, System.Math.PI / 2),
+            new Line(50, 30, 0, 30),
+            new Line(0, 30, 0, 0),
+        };
+
+        var outline = SheetOutline.FromGeometry(entities);
+
+        Assert.Equal(30, outline.Size.Width, 9);
+        Assert.Equal(60, outline.Size.Length, 9);
+        var points = outline.Points;
+        for (var i = 0; i < points.Count; i++)
+        {
+            // Sampled along every edge: never past the rounded corner, never in the bite.
+            for (var k = 0; k <= 4; k++)
+            {
+                var p = points[i] + (points[(i + 1) % points.Count] - points[i]) * (k / 4.0);
+                if (p.X > corner.X && p.Y > corner.Y)
+                    Assert.True(p.DistanceTo(corner) <= 10 + 1e-9, $"({p.X}, {p.Y}) is past the rounded corner");
+                Assert.True(p.DistanceTo(bite) >= 5 - 1e-9, $"({p.X}, {p.Y}) is in the bite");
+            }
+        }
+        // Within the chord tolerance of the true area: 60 x 30 less the corner and the bite.
+        var area = 60 * 30 - (100 - 25 * System.Math.PI) - 12.5 * System.Math.PI;
+        Assert.InRange(outline.Area, area - 0.1, area);
     }
 
     [Fact]

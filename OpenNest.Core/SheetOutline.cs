@@ -18,8 +18,9 @@ namespace OpenNest
     /// </summary>
     public sealed class SheetOutline : IEquatable<SheetOutline>
     {
-        /// <summary>Chord deviation when importing arcs; the outline is also eroded, and each
-        /// obstacle inflated, by this much so the stored polygons never reach past the true edges.</summary>
+        /// <summary>Chord deviation when importing arcs. An outline arc is chorded inside the
+        /// material and an obstacle arc outside the obstacle, so the stored polygons never reach
+        /// past the true edges.</summary>
         public const double ChordTolerance = SpacingOutline.ChordTolerance;
 
         private const int Precision = ClipperBridge.Precision;
@@ -147,9 +148,10 @@ namespace OpenNest
 
         /// <summary>
         /// An outline from imported geometry: the largest closed contour becomes the outline and
-        /// every other closed contour an obstacle. Arcs are chorded at <see cref="ChordTolerance"/>,
-        /// then the outline is eroded and each obstacle inflated by that much, so the stored
-        /// polygons stay within the true edges. Marks and open contours are ignored.
+        /// every other closed contour an obstacle. Arcs are chorded at <see cref="ChordTolerance"/>
+        /// on the side that takes material away (inside the outline, outside an obstacle), so the
+        /// stored polygons stay within the true edges; straight edges are kept exactly. Marks and
+        /// open contours are ignored.
         /// </summary>
         /// <exception cref="ArgumentException">No closed contour with a positive area.</exception>
         public static SheetOutline FromGeometry(IEnumerable<Entity> entities)
@@ -168,24 +170,21 @@ namespace OpenNest
             if (profile?.Perimeter == null)
                 throw new ArgumentException("The geometry has no closed outline.", nameof(entities));
 
-            var perimeter = ClipperBridge.ToPath(ClipperBridge.Flatten(profile.Perimeter, ChordTolerance, circumscribe: false), positive: true);
-            if (perimeter.Count < 3 || !(Clipper.Area(perimeter) > 0))
+            // Each arc is chorded on the side that takes material away; nothing else moves, so a
+            // sheet drawn with straight edges keeps its drawn size.
+            var outline = ClipperBridge.ToPath(
+                ClipperBridge.FlattenOneSided(profile.Perimeter, ChordTolerance, inside: true), positive: true);
+            if (outline.Count < 3 || !(Clipper.Area(outline) > 0))
                 throw new ArgumentException("The geometry has no closed outline.", nameof(entities));
-            var outer = Clipper.InflatePaths(new PathsD { perimeter },
-                -ChordTolerance, JoinType.Round, EndType.Polygon, MiterLimit, Precision, ArcTolerance);
-            var outline = outer.Where(p => p.Count >= 3).OrderByDescending(Clipper.Area).FirstOrDefault()
-                ?? throw new ArgumentException("The outline is too thin to hold material.", nameof(entities));
 
             var obstacles = new List<IEnumerable<Vector>>();
             foreach (var cutout in profile.Cutouts)
             {
-                var hole = ClipperBridge.ToPath(ClipperBridge.Flatten(cutout, ChordTolerance, circumscribe: false), positive: true);
+                var hole = ClipperBridge.ToPath(
+                    ClipperBridge.FlattenOneSided(cutout, ChordTolerance, inside: false), positive: true);
                 if (hole.Count < 3 || !(Clipper.Area(hole) > 0))
                     continue;
-                var grown = Clipper.InflatePaths(new PathsD { hole },
-                    ChordTolerance, JoinType.Round, EndType.Polygon, MiterLimit, Precision, ArcTolerance);
-                foreach (var path in grown.Where(p => p.Count >= 3 && Clipper.IsPositive(p)))
-                    obstacles.Add(path.Select(p => new Vector(p.x, p.y)).ToList());
+                obstacles.Add(hole.Select(p => new Vector(p.x, p.y)).ToList());
             }
             return new SheetOutline(outline.Select(p => new Vector(p.x, p.y)), obstacles);
         }

@@ -140,7 +140,7 @@ namespace OpenNest.Forms
                 textBoxSize.ReadOnly = value != null;
                 buttonClearOutline.Enabled = value != null;
                 if (value != null)
-                    textBoxSize.Text = value.Size.ToString();
+                    textBoxSize.Text = value.Size.ToString(4);
                 labelOutline.Text = value == null
                     ? "Rectangular sheet"
                     : $"{value.Points.Count} vertices" + (value.Obstacles.Count == 0 ? "" : $", {value.Obstacles.Count} obstacle(s)");

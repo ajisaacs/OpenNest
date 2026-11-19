@@ -11,9 +11,10 @@ keeps working on the box; the outline narrows what may hold parts.
 
 - **Import a CAD file.** `SheetOutline.FromGeometry` takes the file's entities: the largest
   closed contour (by bounding box) is the sheet and every other closed contour an obstacle;
-  marks and open contours are ignored. Arcs are chorded at 0.001 model units, then the outline is
-  eroded and each obstacle inflated by that much, so the stored polygons never reach past the
-  true edges. The file's units are taken as the nest's, exactly as drawing import does.
+  marks and open contours are ignored. Arcs are chorded at 0.001 model units on the side that
+  takes material away (inside the outline, outside an obstacle), so the stored polygons never
+  reach past the true edges; straight edges are kept exactly, so a sheet drawn 60 x 27 is
+  60 x 27. The file's units are taken as the nest's, exactly as drawing import does.
   - Desktop: Plate > Edit Plate > **Outline...** reads a DXF/DWG; **Clear** makes the sheet a
     rectangle of its current size again. The size box is read-only while there is an outline.
   - Console: `--outline <dxf>` with `--autonest` makes the target plate that sheet.
@@ -32,6 +33,8 @@ Drawing an outline in the plate view and taking the leftover of a cut plate are 
 | Rectangles, Circles, FlatBar, the fill strategies (Lattice, Strip, remnants) | Place nothing on an outlined sheet; Default then keeps Irregular's layout. `PlateFillService` throws `PlateFillService.Refusal(plate)` for an outlined plate; every caller checks it first: the desktop's Fill (Ctrl+F on a picked-up part) and Fill Area put the message in the status bar and add nothing, Pattern Tile offers a new plate only, the MCP fill/pack tools return it as an `Error:` result, and the console exits 2 with it unless `--autonest` is given |
 | Layout check and the runner's candidate validation | A part's circumscribed material must lie inside the usable area, within the shared work-area slack; a part in a missing corner or over an obstacle is a violation ("falls outside the outline ... or over one of its obstacles"). The area budget is the usable area |
 | Edge spacing | The outline is eroded by the **largest** of the four edge spacings (`NestPlateStock.OutlineInset`), so no outline edge is closer to a part than the rectangle's own sides would be. The rectangular work area still applies and is never larger than that erosion |
+| Push, clone push placement, settling | A pushed part stops at the edge of the usable area as it stops at the work-area edge: the unusable part of the work area (a missing corner, an obstacle, each grown by the outline inset) is a wall for `Compactor`'s plate pushes (`InteractiveOutline`). The part is measured as the edge review measures it, by the circumscribed perimeter of its clean material (no leads), so it rests where that review still passes. A bounding-box push (Ctrl-click clone placement, the coarse pass of a settle) stops the box 0.0012 short of a wall, because that perimeter reaches past the box by up to the chord tolerance. A part already lying in a wall, deeper than the review's slack, is not held by it and can be pushed back out; with uneven edge spacing the walls join into one, so such a part is held by none of them |
+| Nudge, drag, Expand Spacing, Fix Spacing | Do not stop at the outline: the layout check reports a part they leave outside it |
 | Clamps | Unchanged: the rail is resolved for the bounding box, zones are keep-outs as before |
 | Support bed | Unchanged: it is fixed to the machine and reports contacts under material |
 | Area, utilization, cost | `Plate.Area` and `NestPlateStock.Area` are the material area (outline less obstacles); area-based cost prices that area and utilization divides by it |
@@ -60,4 +63,9 @@ snapshots go through the same writer and reader, so a restore rebuilds the outli
   the target plate (no options), or through `NestPlateStock` directly: the console's `--outline`,
   or API callers that set `NestPlateStock.Outline`. MCP has no outline input.
 - The stored polygon is inside the true material by up to the chord tolerance (0.001) on
-  imported arcs and exactly on straight edges.
+  imported arcs and exactly on straight edges. Outlines imported before straight edges were
+  kept exactly sit 0.001 inside every edge (a 60 x 27 sheet reads 59.998 x 26.998); import the
+  outline again to get the drawn size.
+- The edge review circumscribes arcs, so a round part pushed against the sheet's own box edge
+  (held by the bounding-box work area, measured on the part's true bounds) can read up to the
+  chord tolerance inside the outline's edge spacing. Against an outline wall it stops clear.

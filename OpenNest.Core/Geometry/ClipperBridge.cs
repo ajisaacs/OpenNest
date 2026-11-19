@@ -288,6 +288,46 @@ namespace OpenNest.Geometry
             return polygon;
         }
 
+        /// <summary>
+        /// Flattens a closed shape to a polygon that lies on one side of it: with
+        /// <paramref name="inside"/> the polygon never reaches past the shape, without it the
+        /// polygon never falls inside the shape. Each arc is inscribed or circumscribed by the
+        /// side it bulges to, within <paramref name="tolerance"/>, so straight edges stay exact;
+        /// a uniform <see cref="Flatten"/> errs outward on one kind of arc and inward on the other.
+        /// </summary>
+        public static Polygon FlattenOneSided(Shape shape, double tolerance, bool inside)
+        {
+            // The shape's winding tells which way an arc bulges: an arc turning with it bulges out.
+            var counterclockwise = Clipper.Area(ToPath(Flatten(shape, tolerance, circumscribe: false), new Vector())) >= 0;
+            var polygon = new Polygon();
+
+            foreach (var entity in shape.Entities)
+            {
+                switch (entity)
+                {
+                    case Line line:
+                        polygon.Vertices.Add(line.StartPoint);
+                        polygon.Vertices.Add(line.EndPoint);
+                        break;
+
+                    case Arc arc:
+                        // A chord cuts inside an arc that bulges out and outside one that bulges in.
+                        var bulgesOut = arc.IsReversed != counterclockwise;
+                        AddArc(polygon.Vertices, arc, tolerance, circumscribe: bulgesOut != inside);
+                        break;
+
+                    case Circle circle:
+                        AddCircle(polygon.Vertices, circle, tolerance, circumscribe: !inside);
+                        break;
+                }
+            }
+
+            polygon.Close();
+            polygon.Cleanup();
+            polygon.UpdateBounds();
+            return polygon;
+        }
+
         private static void AddArc(List<Vector> points, Arc arc, double tolerance, bool circumscribe)
         {
             if (!circumscribe)

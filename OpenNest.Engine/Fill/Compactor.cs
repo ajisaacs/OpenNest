@@ -22,6 +22,10 @@ namespace OpenNest.Engine.Fill
         private static ObstacleSet ZoneObstacles(Plate plate) =>
             new(Jobs.InteractiveClamps.ObstacleParts(plate), 0);
 
+        /// <summary>
+        /// Pushes movingParts to the first contact with the work-area edge, another part, a
+        /// clamp keep-out or, on an outlined sheet, the edge of its usable material.
+        /// </summary>
         public static double Push(List<Part> movingParts, Plate plate, PushDirection direction) =>
             Push(movingParts, plate, SpatialQuery.DirectionToOffset(direction, 1.0));
 
@@ -31,13 +35,15 @@ namespace OpenNest.Engine.Fill
         public static double Push(List<Part> movingParts, Plate plate, double angle) =>
             Push(movingParts, plate, new Vector(PortableMath.Cos(angle), PortableMath.Sin(angle)));
 
-        private static double Push(List<Part> movingParts, Plate plate, Vector direction)
+        private static double Push(List<Part> movingParts, Plate plate, Vector direction,
+            Jobs.InteractiveOutline outline = null)
         {
             var obstacleParts = plate.Parts
                 .Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
                 .ToList();
 
             return Push(movingParts, plate.WorkArea(), direction,
+                outline ?? Jobs.InteractiveOutline.Of(plate),
                 new ObstacleSet(obstacleParts, plate.PartSpacing), ZoneObstacles(plate));
         }
 
@@ -90,6 +96,16 @@ namespace OpenNest.Engine.Fill
             Box workArea,
             Vector direction,
             params ObstacleSet[] obstacleSets
+        ) => Push(movingParts, workArea, direction, null, obstacleSets);
+
+        /// <summary>As the push above, also stopping at the walls of an outlined sheet
+        /// (<paramref name="outline"/>; null for none).</summary>
+        private static double Push(
+            List<Part> movingParts,
+            Box workArea,
+            Vector direction,
+            Jobs.InteractiveOutline outline,
+            params ObstacleSet[] obstacleSets
         )
         {
             var opposite = -direction;
@@ -105,6 +121,9 @@ namespace OpenNest.Engine.Fill
 
                 foreach (var set in obstacleSets)
                     distance = set.Travel(moving, direction, opposite, distance);
+
+                if (outline != null)
+                    distance = outline.Travel(moving, direction, distance);
             }
 
             if (distance < double.MaxValue && distance > 0)
@@ -296,6 +315,13 @@ namespace OpenNest.Engine.Fill
             List<Part> movingParts,
             Plate plate,
             PushDirection direction
+        ) => PushBoundingBox(movingParts, plate, direction, null);
+
+        private static double PushBoundingBox(
+            List<Part> movingParts,
+            Plate plate,
+            PushDirection direction,
+            Jobs.InteractiveOutline outline
         )
         {
             var obstacleParts = plate.Parts
@@ -307,6 +333,7 @@ namespace OpenNest.Engine.Fill
                 movingParts,
                 plate.WorkArea(),
                 direction,
+                outline ?? Jobs.InteractiveOutline.Of(plate),
                 (BoundingBoxes(obstacleParts), plate.PartSpacing),
                 (zones.Boxes, zones.Spacing)
             );
@@ -318,7 +345,7 @@ namespace OpenNest.Engine.Fill
             Box workArea,
             double partSpacing,
             PushDirection direction
-        ) => PushBoundingBox(movingParts, workArea, direction, (BoundingBoxes(obstacleParts), partSpacing));
+        ) => PushBoundingBox(movingParts, workArea, direction, null, (BoundingBoxes(obstacleParts), partSpacing));
 
         private static Box[] BoundingBoxes(List<Part> parts)
         {
@@ -332,11 +359,13 @@ namespace OpenNest.Engine.Fill
             List<Part> movingParts,
             Box workArea,
             PushDirection direction,
+            Jobs.InteractiveOutline outline,
             params (Box[] Boxes, double Spacing)[] obstacleSets
         )
         {
             var opposite = SpatialQuery.OppositeDirection(direction);
             var isHorizontal = SpatialQuery.IsHorizontalDirection(direction);
+            var vector = SpatialQuery.DirectionToOffset(direction, 1.0);
             var distance = double.MaxValue;
 
             foreach (var moving in movingParts)
@@ -381,6 +410,10 @@ namespace OpenNest.Engine.Fill
                             distance = d;
                     }
                 }
+
+                // An outlined sheet's edge is a wall for the box, as the work area is.
+                if (outline != null)
+                    distance = outline.Travel(movingBox, vector, distance);
             }
 
             if (distance < double.MaxValue && distance > 0)
@@ -419,12 +452,14 @@ namespace OpenNest.Engine.Fill
                 return;
 
             var workArea = plate.WorkArea();
+            // Built once: every push of every trial meets the same walls.
+            var outline = Jobs.InteractiveOutline.Of(plate);
             var skipBoxes = boundingBoxesOnly || movingParts.Any(moving =>
                 plate.Parts.Any(obstacle => moving.BoundingBox.Intersects(obstacle.BoundingBox))
             );
             double PushOnce(List<Part> trial, PushDirection direction) => boundingBoxesOnly
-                ? PushBoundingBox(trial, plate, direction)
-                : Push(trial, plate, direction);
+                ? PushBoundingBox(trial, plate, direction, outline)
+                : Push(trial, plate, SpatialQuery.DirectionToOffset(direction, 1.0), outline);
             var bestScore = double.MaxValue;
             var bestKeepsSpacing = false;
             Vector[] best = null;
@@ -448,8 +483,8 @@ namespace OpenNest.Engine.Fill
                 var trial = movingParts.Select(p => (Part)p.Clone()).ToList();
                 if (!skipBoxes)
                 {
-                    PushBoundingBox(trial, plate, first);
-                    PushBoundingBox(trial, plate, second);
+                    PushBoundingBox(trial, plate, first, outline);
+                    PushBoundingBox(trial, plate, second, outline);
                 }
 
                 for (var i = 0; i < maxIterations; i++)
@@ -578,12 +613,14 @@ namespace OpenNest.Engine.Fill
             var obstacles = plate.Parts.Where(part => !parts.Contains(part)
                 && !part.BaseDrawing.IsCutOff).ToList();
             var zones = Jobs.InteractiveClamps.ObstacleParts(plate);
+            var outline = Jobs.InteractiveOutline.Of(plate);
 
             for (var i = 0; i < maxIterations; i++)
             {
                 var moved = 0.0;
                 foreach (var direction in new[] { PushDirection.Left, PushDirection.Down })
                     moved += Push(parts, workArea, SpatialQuery.DirectionToOffset(direction, 1.0),
+                        outline,
                         new ObstacleSet(obstacles, plate.PartSpacing),
                         new ObstacleSet(zones, 0));
 
