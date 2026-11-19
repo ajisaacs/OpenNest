@@ -739,6 +739,8 @@ review and Save; nothing is stored before then.
 <a id="make-nests-the-release-panel"></a>
 ### Make Nests: the release panel (desktop)
 
+Agents make the same release through `OpenNest.Mcp`; see [MCP nest server tools](mcp-nest-server-tools.md).
+
 The release panel (`OpenNest.Controls.ReleasePanel`) sits beside the Library and
 Sets tabs and holds one release in progress for both. Adding is a double-click
 (or Enter) in either list: a set is read with its members' current drawings and

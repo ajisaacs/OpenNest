@@ -27,6 +27,8 @@
     <ProjectReference Include="..\OpenNest.IO\OpenNest.IO.csproj" />
     <!-- Server nesting end to end: the worker solves a job queued through the in-memory server. -->
     <ProjectReference Include="..\OpenNest.Server.Worker\OpenNest.Server.Worker.csproj" />
+    <!-- The MCP nest server tools end to end. Aliased: its top-level Program would clash with the server's. -->
+    <ProjectReference Include="..\OpenNest.Mcp\OpenNest.Mcp.csproj" Aliases="mcp" />
   </ItemGroup>
 
 </Project>

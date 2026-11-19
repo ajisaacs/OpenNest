@@ -11,6 +11,10 @@
     <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
     <ProjectReference Include="..\OpenNest.Engine\OpenNest.Engine.csproj" />
     <ProjectReference Include="..\OpenNest.IO\OpenNest.IO.csproj" />
+    <!-- Database-mode tools: drawing library, sets, releases and File > New nests, as the desktop does them. -->
+    <ProjectReference Include="..\OpenNest.Desktop\OpenNest.Desktop.csproj" />
+    <!-- Reads the MaterialLedger API key the desktop protects with DPAPI. -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
     <PackageReference Include="ModelContextProtocol" Version="0.9.0-preview.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.21" />
   </ItemGroup>

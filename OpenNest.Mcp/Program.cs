@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenNest.Engine.Jobs;
 using OpenNest.Mcp;
+using OpenNest.Mcp.Database;
 
 NestingEngineRegistry.LoadPlugins(Path.Combine(AppContext.BaseDirectory, "Engines"));
 var builder = Host.CreateApplicationBuilder(args);
@@ -14,6 +15,8 @@ builder.Logging.AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
 
 using var toolGate = new SessionToolGate();
 builder.Services.AddSingleton<NestSession>();
+// Database-mode tools read storage.json and the desktop settings once, at first use.
+builder.Services.AddSingleton(_ => NestServerContext.Load());
 builder
     .Services.AddMcpServer()
     .WithRequestFilters(filters => filters.AddCallToolFilter(
