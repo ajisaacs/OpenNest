@@ -144,10 +144,20 @@ Individual IDs use 7 pt text centered on the part's pole of inaccessibility
 (`PolyLabel`, as in `PlateView`), clear of edges, holes, cutoffs and other labels.
 The search uses a placement-independent quantized copy for consistent placement
 on identical parts. When the pole is too narrow (a ring around a large hole), the
-ID goes in the clear spot within the part's own extents with the most room, such
-as an empty hole, nearest the part's center. Labels are best effort: there are no
-closeup or grid pages, and a part too small to label never prevents export. Every
-part remains in the quantity tables even when its diagram label cannot fit.
+ID goes in the clear spot of one of the part's own enclosed holes with the most
+room, nearest the part's center. Open space beside a concave part (inside a C
+shape's opening) never holds its ID that way, since it reads as belonging to
+whatever is nearby.
+
+A part still unlabeled after the groups below (a thin strip or a narrow band with
+no hole to hold its ID) gets its ID in the nearest clear space outside it, with a
+thin leader to a dot at its pole. The label keeps the usual clearance; the leader
+crosses no other part, cutoff, clamp, label or leader. Tiny parts (under two label
+heights long) whose ID other unlabeled parts share get no leaders, so an ungroupable
+cluster does not bury the sheet in them; a lone tiny part gets one. Labels are best
+effort: there are no closeup or grid pages, and a part too small to label never
+prevents export. Every part remains in the quantity tables even when its diagram
+label cannot fit.
 
 Nearby small parts with the same report ID may share a dotted rectangular outline
 and one ID. Separate clusters get separate outlines; an outline stays within half

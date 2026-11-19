@@ -4,8 +4,11 @@ using PdfSharp.Drawing;
 
 namespace OpenNest.Reporting;
 
-/// <summary>A part ID label in canvas-local page coordinates (Y down).</summary>
-internal sealed record DiagramLabel(int Part, string Id, XRect Box);
+/// <summary>
+/// A part ID label in canvas-local page coordinates (Y down). A label set beside a part too thin
+/// to hold it has a leader <see cref="Anchor"/> on the part's material.
+/// </summary>
+internal sealed record DiagramLabel(int Part, string Id, XRect Box, XPoint? Anchor = null);
 
 /// <summary>A dotted group boundary and its shared ID, in canvas coordinates.</summary>
 internal sealed record DiagramGroup(IReadOnlyList<int> Parts, XRect Boundary, DiagramLabel Label);
@@ -108,6 +111,9 @@ internal static class NestReportDiagram
         var canvas = new Canvas(new XRect(0, 0, width, height), [rulers.Horizontal, rulers.Vertical]);
         var labels = PlaceLabels(plate, shapes, obstacles, all, fit, canvas, font, out var failed);
         var groups = PlaceGroups(plate, obstacles, failed, labels, fit, canvas, font);
+        var grouped = groups.SelectMany(group => group.Parts).ToHashSet();
+        PlaceLeaders(plate, shapes, obstacles, failed.Where(index => !grouped.Contains(index)), labels, groups,
+            fit, canvas, font);
         return new DiagramView(new XSize(width, height), fit, labels, groups, rulers);
     }
 
@@ -368,8 +374,9 @@ internal static class NestReportDiagram
                 failed.Add(index);
         }
 
-        // A part too narrow at its pole (a ring around a large hole) may still have clear room
-        // elsewhere within its own extents, such as the hole itself.
+        // A part too narrow at its pole (a ring around a large hole) may still have clear room in
+        // one of its own holes. Only an enclosed hole: open space beside a concave part (inside a
+        // C shape's opening) reads as belonging to whatever is near it, so that part gets a leader.
         foreach (var index in failed.ToList())
         {
             var id = plate.Parts[index].ReportId;
@@ -377,7 +384,7 @@ internal static class NestReportDiagram
             var area = fit.Rect(shapes[index].Bounds);
             var others = obstacles.Where((_, other) => other != index).ToList();
             var spot = BestSpot(Grid(area, size.Width + 2 * LabelPadding, size.Height + 2 * LabelPadding)
-                    .Where(area.Contains), obstacles, others, fit,
+                    .Where(area.Contains).Where(box => shapes[index].InHole(Center(fit, box))), obstacles, others, fit,
                 padded => !canvas.Holds(padded) || OnSheetEdge(fit.Rect(plate.Bounds), padded) || placed.Any(label => label.Box.IntersectsWith(padded)),
                 new XPoint(area.X + area.Width / 2, area.Y + area.Height / 2));
             if (spot is not { } found)
@@ -387,6 +394,123 @@ internal static class NestReportDiagram
         }
         return placed;
     }
+
+    /// <summary>The model-space point under a canvas rectangle's center.</summary>
+    private static Vector Center(Fit fit, XRect box)
+    {
+        var center = fit.Model(new XPoint(box.X + box.Width / 2, box.Y + box.Height / 2));
+        return new Vector(center.X, center.Y);
+    }
+
+    /// <summary>
+    /// Sets the ID of each part still unlabeled (too thin for it, with no hole to hold it and no
+    /// same-ID neighbors to share one) in the nearest clear space outside it, with a leader to
+    /// its pole. Tiny parts whose ID other unlabeled parts share are skipped. The label keeps the usual clearance from every contour and other label; the
+    /// leader crosses no other part, cutoff, clamp, label or leader. A part with no such spot
+    /// within reach stays unlabeled, as before.
+    /// </summary>
+    private static void PlaceLeaders(ReportPlate plate, List<Shape> shapes, List<Shape> obstacles,
+        IEnumerable<int> targets, List<DiagramLabel> labels, List<DiagramGroup> groups, Fit fit, Canvas canvas,
+        XFont font)
+    {
+        var sheet = fit.Rect(plate.Bounds);
+        var boxes = labels.Select(label => label.Box)
+            .Concat(groups.SelectMany(group => new[] { group.Boundary, group.Label.Box })).ToList();
+        var leaders = new List<(XPoint From, XPoint To)>();
+        var unlabeled = targets.ToList();
+        var shared = unlabeled.GroupBy(index => plate.Parts[index].ReportId)
+            .Where(group => group.Count() > 1).Select(group => group.Key).ToHashSet();
+        foreach (var index in unlabeled)
+        {
+            var id = plate.Parts[index].ReportId;
+            var size = ReportText.Size(id, font);
+            var width = size.Width + 2 * LabelPadding;
+            var height = size.Height + 2 * LabelPadding;
+            // Leaders are for thin parts. Tiny repeated parts that could not share a group label
+            // would bury the sheet in leaders, so they stay unlabeled; a lone tiny part gets one.
+            var extent = fit.Rect(shapes[index].Bounds);
+            if (shared.Contains(id) && System.Math.Max(extent.Width, extent.Height) < 2 * height)
+                continue;
+            var anchor = fit.Point(shapes[index].Pole.X, shapes[index].Pole.Y);
+            var others = obstacles.Where((_, other) => other != index).ToList();
+            var step = System.Math.Max(1, height / 3);
+            XRect? found = null;
+            XPoint end = default;
+            foreach (var reach in LeaderReach)
+            {
+                var area = fit.Rect(shapes[index].Bounds);
+                area.Inflate(reach * height, reach * height);
+                var candidates = new List<(XRect Box, double Distance)>();
+                for (var y = area.Top; y <= area.Bottom - height; y += step)
+                {
+                    for (var x = area.Left; x <= area.Right - width; x += step)
+                    {
+                        var box = new XRect(x, y, width, height);
+                        var near = Nearest(box, anchor);
+                        candidates.Add((box, System.Math.Pow(near.X - anchor.X, 2) + System.Math.Pow(near.Y - anchor.Y, 2)));
+                    }
+                }
+                foreach (var (box, _) in candidates.OrderBy(candidate => candidate.Distance))
+                {
+                    var padded = box;
+                    padded.Inflate(Clearance, Clearance);
+                    if (!canvas.Holds(padded) || OnSheetEdge(sheet, padded) || boxes.Any(other => other.IntersectsWith(padded))
+                        || leaders.Any(leader => SegmentHitsRect(leader.From, leader.To, padded)))
+                        continue;
+                    var near = Nearest(box, anchor);
+                    var model = ModelBox(fit, box);
+                    var reachBox = ModelBox(fit, padded);
+                    if (obstacles.Any(shape => shape.Overlaps(reachBox) && shape.Distance(model) * fit.Scale < Clearance))
+                        continue;
+                    var center = Center(fit, box);
+                    if (obstacles.Any(shape => shape.InMaterial(center)))
+                        continue;
+                    // The leader runs from the label's edge to the anchor: it may cross only its own
+                    // part's outline, and no other label or leader.
+                    var from = fit.Model(near);
+                    var to = fit.Model(anchor);
+                    if (others.Any(shape => shape.CrossesSegment(new Vector(from.X, from.Y), new Vector(to.X, to.Y)))
+                        || boxes.Any(other => SegmentHitsRect(near, anchor, other))
+                        || leaders.Any(leader => SegmentsCross(leader.From, leader.To, near, anchor)))
+                        continue;
+                    found = box;
+                    end = near;
+                    break;
+                }
+                if (found != null)
+                    break;
+            }
+            if (found is not { } spot)
+                continue;
+            labels.Add(new DiagramLabel(index, id, spot, anchor));
+            boxes.Add(spot);
+            leaders.Add((end, anchor));
+        }
+    }
+
+    // How far, in label heights, the leader search looks past the part: near first, then wider.
+    private static readonly double[] LeaderReach = [4, 12];
+
+    /// <summary>The point of a rectangle (its border, for an outside point) nearest to a point.</summary>
+    private static XPoint Nearest(XRect box, XPoint point) =>
+        new(System.Math.Clamp(point.X, box.Left, box.Right), System.Math.Clamp(point.Y, box.Top, box.Bottom));
+
+    /// <summary>Whether a canvas segment touches a canvas rectangle.</summary>
+    private static bool SegmentHitsRect(XPoint a, XPoint b, XRect rect)
+    {
+        if (rect.Contains(a) || rect.Contains(b))
+            return true;
+        XPoint[] corners = [rect.TopLeft, rect.TopRight, rect.BottomRight, rect.BottomLeft];
+        for (var i = 0; i < 4; i++)
+        {
+            if (SegmentsCross(a, b, corners[i], corners[(i + 1) % 4]))
+                return true;
+        }
+        return false;
+    }
+
+    private static bool SegmentsCross(XPoint a, XPoint b, XPoint c, XPoint d) =>
+        Shape.SegmentsCross(new Vector(a.X, a.Y), new Vector(b.X, b.Y), new Vector(c.X, c.Y), new Vector(d.X, d.Y));
 
     /// <summary>The model-space rectangle under a canvas rectangle.</summary>
     private static Box ModelBox(Fit fit, XRect rect)
@@ -501,15 +625,47 @@ internal static class NestReportDiagram
                 return false;
             var inside = false;
             foreach (var ring in Rings)
+                inside ^= Inside(ring, point);
+            return inside;
+        }
+
+        /// <summary>
+        /// Whether the point lies in one of the part's enclosed holes: inside its perimeter (the
+        /// largest ring) but not in its material.
+        /// </summary>
+        public bool InHole(Vector point) =>
+            Rings.Count > 1 && Box.Contains(point) && Inside(Rings.MaxBy(ring => ring.Area())!, point)
+            && !InMaterial(point);
+
+        /// <summary>Whether a model-space segment touches any contour edge.</summary>
+        public bool CrossesSegment(Vector a, Vector b)
+        {
+            // Box.Intersects is strict, which would miss a leader lying on the bounding box's edge.
+            if (System.Math.Max(a.X, b.X) < Box.Left || System.Math.Min(a.X, b.X) > Box.Right
+                || System.Math.Max(a.Y, b.Y) < Box.Bottom || System.Math.Min(a.Y, b.Y) > Box.Top)
+                return false;
+            foreach (var ring in Rings)
             {
                 var vertices = ring.Vertices;
-                for (int i = 0, j = vertices.Count - 1; i < vertices.Count; j = i++)
+                for (var i = 0; i < vertices.Count; i++)
                 {
-                    if ((vertices[i].Y > point.Y) != (vertices[j].Y > point.Y)
-                        && point.X < (vertices[j].X - vertices[i].X) * (point.Y - vertices[i].Y)
-                            / (vertices[j].Y - vertices[i].Y) + vertices[i].X)
-                        inside = !inside;
+                    if (SegmentsCross(a, b, vertices[i], vertices[(i + 1) % vertices.Count]))
+                        return true;
                 }
+            }
+            return false;
+        }
+
+        private static bool Inside(Polygon ring, Vector point)
+        {
+            var inside = false;
+            var vertices = ring.Vertices;
+            for (int i = 0, j = vertices.Count - 1; i < vertices.Count; j = i++)
+            {
+                if ((vertices[i].Y > point.Y) != (vertices[j].Y > point.Y)
+                    && point.X < (vertices[j].X - vertices[i].X) * (point.Y - vertices[i].Y)
+                        / (vertices[j].Y - vertices[i].Y) + vertices[i].X)
+                    inside = !inside;
             }
             return inside;
         }
@@ -550,7 +706,7 @@ internal static class NestReportDiagram
             return System.Math.Sqrt(x * x + y * y);
         }
 
-        private static bool SegmentsCross(Vector a, Vector b, Vector c, Vector d)
+        internal static bool SegmentsCross(Vector a, Vector b, Vector c, Vector d)
         {
             static double Cross(Vector o, Vector p, Vector q) => (p.X - o.X) * (q.Y - o.Y) - (p.Y - o.Y) * (q.X - o.X);
             var d1 = Cross(c, d, a);

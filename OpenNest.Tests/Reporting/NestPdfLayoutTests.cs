@@ -212,7 +212,9 @@ public sealed class NestPdfLayoutTests : IDisposable
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
         var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
         Assert.Empty(plan.Groups);
-        Assert.Equal(2, plan.Labels.Count);
+        // The washers stay unlabeled; a lone obstacle part gets its ID on a leader.
+        Assert.DoesNotContain(plan.Labels, label => label.Id == "2");
+        Assert.Equal(cutoff ? 2 : 3, plan.Labels.Count);
     }
 
     [Fact]
@@ -298,10 +300,116 @@ public sealed class NestPdfLayoutTests : IDisposable
 
         var label = Assert.Single(plan.Labels);
         Assert.Empty(plan.Groups);
+        Assert.Null(label.Anchor);
         var center = plan.Fit.Model(new PdfSharp.Drawing.XPoint(label.Box.X + label.Box.Width / 2, label.Box.Y + label.Box.Height / 2));
         var bounds = snapshot.Plates[0].Parts[0].Geometry.Bounds;
         Assert.InRange(center.X - (bounds.Left + bounds.Right) / 2, -0.5, 0.5);
         Assert.InRange(center.Y - (bounds.Bottom + bounds.Top) / 2, -0.5, 0.5);
+    }
+
+    [Fact]
+    public void Plan_PartsTooThinForTheirIdsGetLeaderLabelsBesideThem()
+    {
+        // From N26-2CJ: a 0.5 x 20 in strip and a 1 in wide half ring on a 48 x 96 sheet are a
+        // few points wide at overview scale. The strip was left unlabeled; the ring's ID went in
+        // its open side, off the part, with nothing tying it to the ring.
+        var nest = new Nest("Thin parts") { Units = Units.Inches };
+        var strip = NestReportTestData.Rectangle("Strip", 0.5, 20);
+        var ring = new Drawing("Half ring", HalfRing(outer: 10, inner: 9));
+        var block = NestReportTestData.Rectangle("Block", 30, 20);
+        nest.Drawings.Add(strip);
+        nest.Drawings.Add(ring);
+        nest.Drawings.Add(block);
+        var plate = new Plate(48, 96) { Quantity = 1, PartSpacing = 0.25 };
+        plate.Parts.Add(new Part(block, new Vector(1, 1)));
+        plate.Parts.Add(new Part(strip, new Vector(40, 1)));
+        plate.Parts.Add(new Part(ring, new Vector(30, 24)));
+        nest.Plates.Add(plate);
+        var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
+
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+
+        Assert.Equal(3, plan.Labels.Count);
+        Assert.Empty(plan.Groups);
+        Assert.Null(plan.Labels.Single(label => label.Part == 0).Anchor);
+        var parts = snapshot.Plates[0].Parts;
+        foreach (var index in new[] { 1, 2 })
+        {
+            var label = plan.Labels.Single(label => label.Part == index);
+            var anchor = plan.Fit.Model(Assert.NotNull(label.Anchor));
+            var bounds = parts[index].Geometry.Bounds;
+            Assert.InRange(anchor.X, bounds.Left, bounds.Right);
+            Assert.InRange(anchor.Y, bounds.Bottom, bounds.Top);
+            // The ID sits off the material, clear of the other parts, a short leader away.
+            foreach (var other in new[] { 0, 1 })
+                Assert.False(label.Box.IntersectsWith(plan.Fit.Rect(parts[other].Geometry.Bounds)));
+            var center = plan.Fit.Model(new PdfSharp.Drawing.XPoint(label.Box.X + label.Box.Width / 2, label.Box.Y + label.Box.Height / 2));
+            var radius = System.Math.Sqrt(System.Math.Pow(center.X - 40, 2) + System.Math.Pow(center.Y - 34, 2));
+            Assert.False(radius is >= 9 and <= 10, "The ID covers the ring's band.");
+            var nearX = System.Math.Clamp(label.Anchor!.Value.X, label.Box.Left, label.Box.Right);
+            var nearY = System.Math.Clamp(label.Anchor.Value.Y, label.Box.Top, label.Box.Bottom);
+            Assert.InRange(System.Math.Sqrt(System.Math.Pow(nearX - label.Anchor.Value.X, 2)
+                + System.Math.Pow(nearY - label.Anchor.Value.Y, 2)), 0, 4 * label.Box.Height);
+        }
+        // Every anchor lies in its own part's band: the ring's is between its two radii.
+        var ringAnchor = plan.Fit.Model(plan.Labels.Single(label => label.Part == 2).Anchor!.Value);
+        Assert.InRange(System.Math.Sqrt(System.Math.Pow(ringAnchor.X - 40, 2) + System.Math.Pow(ringAnchor.Y - 34, 2)), 9, 10);
+        Assert.True(ringAnchor.X >= 40);
+    }
+
+    [SkippableTheory]
+    [InlineData(0.5, true)]
+    [InlineData(3, false)]
+    public void Write_LeaderLabelDrawsADotOnThePart(double width, bool leader)
+    {
+        var nest = new Nest("Strip") { Units = Units.Inches };
+        var strip = NestReportTestData.Rectangle("Strip", width, 20);
+        nest.Drawings.Add(strip);
+        var plate = new Plate(48, 96) { Quantity = 1 };
+        plate.Parts.Add(new Part(strip, new Vector(40, 1)));
+        nest.Plates.Add(plate);
+        var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
+        Assert.Equal(leader, Assert.Single(NestReportDiagram.Plan(snapshot.Plates[0], 720, 320).Labels).Anchor != null);
+
+        var path = Write(nest);
+
+        using var pdf = PdfReader.Open(path, PdfDocumentOpenMode.Import);
+        var diagram = ReportPdf.ContentStreams(pdf.Pages[1]).Last();
+        // Nothing else on this all-straight plate draws a curve: only the leader's anchor dot.
+        Assert.Equal(leader, Regex.IsMatch(diagram, @"(?m)\sc\s*$"));
+    }
+
+    [Fact]
+    public void Plan_LoneTinyPartGetsALeaderButAnUngroupableClusterDoesNot()
+    {
+        // The dense nest's washer cluster cannot be grouped around the obstacle: its washers stay
+        // unlabeled rather than each sprouting a leader. A lone washer elsewhere gets one.
+        var nest = NestReportTestData.CreateDenseNest();
+        nest.Plates[0].Parts.Add(new Part(NestReportTestData.Rectangle("Obstacle", 0.1, 0.1), new Vector(63.2, 31.2)));
+        var lone = new Drawing("Lone washer", NestReportTestData.HoledSquare(1, 0.25));
+        nest.Drawings.Add(lone);
+        nest.Plates[0].Parts.Add(new Part(lone, new Vector(80, 80)));
+        var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
+
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+
+        Assert.Empty(plan.Groups);
+        Assert.DoesNotContain(plan.Labels, label => label.Id == "2");
+        var leader = Assert.Single(plan.Labels, label => label.Part == snapshot.Plates[0].Parts.Length - 1);
+        Assert.NotNull(leader.Anchor);
+    }
+
+    /// <summary>The right half of a ring centered at (<paramref name="outer"/>, <paramref name="outer"/>).</summary>
+    private static Program HalfRing(double outer, double inner)
+    {
+        var center = new Vector(outer, outer);
+        var program = new Program();
+        program.Codes.Add(new RapidMove(outer, 2 * outer));
+        program.Codes.Add(new ArcMove(new Vector(outer, 0), center, RotationType.CW));
+        program.Codes.Add(new LinearMove(outer, outer - inner));
+        program.Codes.Add(new ArcMove(new Vector(outer, outer + inner), center, RotationType.CCW));
+        program.Codes.Add(new LinearMove(outer, 2 * outer));
+        return program;
     }
 
     [SkippableFact]

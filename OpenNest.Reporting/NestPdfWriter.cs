@@ -461,6 +461,16 @@ public static class NestPdfWriter
         var groupPen = new XPen(XColors.Black, 0.6) { DashPattern = [1, 3] };
         foreach (var group in view.Groups)
             gfx.DrawRectangle(groupPen, group.Boundary);
+        // Leaders first, so each label's white box covers the end that runs to its center.
+        var leader = new XPen(XColors.Black, 0.5);
+        foreach (var label in view.Labels)
+        {
+            if (label.Anchor is not { } anchor)
+                continue;
+            gfx.DrawLine(leader, anchor, new XPoint(label.Box.X + label.Box.Width / 2, label.Box.Y + label.Box.Height / 2));
+            const double dot = 1.2;
+            gfx.DrawEllipse(XBrushes.Black, anchor.X - dot, anchor.Y - dot, 2 * dot, 2 * dot);
+        }
         var font = NestReportDiagram.LabelFont();
         foreach (var label in view.Labels.Concat(view.Groups.Select(group => group.Label)))
         {
