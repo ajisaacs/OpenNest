@@ -514,5 +514,18 @@ namespace OpenNest.Properties {
                 this["ShapeLibraryInputs"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Name")]
+        // The Drawings tab's sort order: an OpenNest.Desktop.DrawingSortOrder name.
+        public string DrawingSortOrder {
+            get {
+                return ((string)(this["DrawingSortOrder"]));
+            }
+            set {
+                this["DrawingSortOrder"] = value;
+            }
+        }
     }
 }

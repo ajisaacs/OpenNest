@@ -58,6 +58,7 @@
             editDrawingsButton = new System.Windows.Forms.ToolStripButton();
             toolStripButton3 = new System.Windows.Forms.ToolStripButton();
             hideNestedButton = new System.Windows.Forms.ToolStripButton();
+            sortDrawingsButton = new System.Windows.Forms.ToolStripDropDownButton();
             ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
             splitContainer.Panel1.SuspendLayout();
             splitContainer.SuspendLayout();
@@ -208,7 +209,7 @@
             // 
             toolStrip2.GripStyle = System.Windows.Forms.ToolStripGripStyle.Hidden;
             toolStrip2.ImageScalingSize = new System.Drawing.Size(20, 20);
-            toolStrip2.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { toolStripButton2, shapeLibraryButton, drawingLibraryButton, editDrawingsButton, toolStripButton3, hideNestedButton });
+            toolStrip2.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { toolStripButton2, shapeLibraryButton, drawingLibraryButton, editDrawingsButton, toolStripButton3, hideNestedButton, sortDrawingsButton });
             toolStrip2.Location = new System.Drawing.Point(4, 3);
             toolStrip2.Name = "toolStrip2";
             toolStrip2.Size = new System.Drawing.Size(265, 27);
@@ -280,6 +281,14 @@
             hideNestedButton.Text = "Hide fully nested drawings";
             hideNestedButton.CheckedChanged += HideNestedButton_CheckedChanged;
             // 
+            // sortDrawingsButton
+            // 
+            sortDrawingsButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            sortDrawingsButton.Name = "sortDrawingsButton";
+            sortDrawingsButton.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
+            sortDrawingsButton.Size = new System.Drawing.Size(43, 24);
+            sortDrawingsButton.Text = "Sort drawings";
+            // 
             // EditNestForm
             // 
             AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -329,6 +338,7 @@
         private System.Windows.Forms.ToolStripButton editDrawingsButton;
         private System.Windows.Forms.ToolStripButton toolStripButton3;
         private System.Windows.Forms.ToolStripButton hideNestedButton;
+        private System.Windows.Forms.ToolStripDropDownButton sortDrawingsButton;
         private System.Windows.Forms.ToolStripButton toolStripLabel2;
     }
 }

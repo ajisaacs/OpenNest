@@ -57,6 +57,13 @@ namespace OpenNest.Forms
         // the check and the call is then re-created on the pool thread while this window is
         // being disposed ("Dispose() cannot be called while doing CreateHandle()").
         private readonly SynchronizationContext uiContext;
+
+        /// <summary>The Drawings tab's order; a new window starts with the last one chosen.</summary>
+        private DrawingSortOrder drawingSortOrder = DrawingSort.Parse(Settings.Default.DrawingSortOrder);
+
+        /// <summary>The sort button's icon, drawn once and shared by every nest window.</summary>
+        private static Bitmap sortDrawingsImage;
+
         private bool updatingPlateList;
         private bool addingToSet;
         private CutSimulatorForm cutSimulatorForm;
@@ -499,6 +506,7 @@ namespace OpenNest.Forms
             drawingListBox1.DrawingPickedUp += drawingListBox1_DrawingPickedUp;
             drawingListBox1.DrawingDropped += drawingListBox1_DrawingDropped;
             drawingListBox1.EmptyTextClicked += (_, _) => hideNestedButton.Checked = false;
+            InitializeSortDrawingsButton();
             Activated += (_, _) => UpdateDrawingLibraryCommand();
             UpdateDrawingLibraryCommand();
             PlateView.BeginChangeHandler = BeginChange;
@@ -585,17 +593,8 @@ namespace OpenNest.Forms
 
             drawingListBox1.Items.Clear();
 
-            foreach (var dwg in Nest.Drawings.OrderBy(d => d.Name).ToList())
-            {
-                if (
-                    hideNestedButton.Checked
-                    && dwg.Quantity.Required > 0
-                    && dwg.Quantity.Remaining == 0
-                )
-                    continue;
-
+            foreach (var dwg in ArrangeDrawings())
                 drawingListBox1.Items.Add(dwg);
-            }
 
             if (selected != null && drawingListBox1.Items.Contains(selected))
                 drawingListBox1.SelectedItem = selected;
@@ -605,6 +604,77 @@ namespace OpenNest.Forms
 
             drawingListBox1.EndUpdate();
             UpdateDrawingListEmptyText();
+        }
+
+        /// <summary>The drawings the list shows, in the chosen order, less any Hide Fully Nested hides.</summary>
+        private List<Drawing> ArrangeDrawings() =>
+            DrawingSort.Arrange(Nest.Drawings, drawingSortOrder, hideNestedButton.Checked);
+
+        /// <summary>
+        /// Rebuilds the list only when its drawings or their order changed, so a placement that
+        /// leaves the list as it was does not flicker or move the selection.
+        /// </summary>
+        private void RefreshDrawingListOrder()
+        {
+            var arranged = ArrangeDrawings();
+            var unchanged = arranged.Count == drawingListBox1.Items.Count;
+            for (var i = 0; unchanged && i < arranged.Count; i++)
+                unchanged = ReferenceEquals(arranged[i], drawingListBox1.Items[i]);
+
+            if (!unchanged)
+                UpdateDrawingList();
+        }
+
+        private void InitializeSortDrawingsButton()
+        {
+            sortDrawingsButton.Image = sortDrawingsImage ??= CreateSortDrawingsImage();
+            foreach (var (order, text) in DrawingSort.Choices)
+            {
+                var item = new ToolStripMenuItem(text) { Tag = order, Checked = order == drawingSortOrder };
+                item.Click += SortDrawingsItem_Click;
+                sortDrawingsButton.DropDownItems.Add(item);
+            }
+            UpdateSortDrawingsToolTip();
+        }
+
+        private void SortDrawingsItem_Click(object sender, EventArgs e)
+        {
+            var order = (DrawingSortOrder)((ToolStripMenuItem)sender).Tag;
+            foreach (ToolStripMenuItem item in sortDrawingsButton.DropDownItems)
+                item.Checked = (DrawingSortOrder)item.Tag == order;
+
+            if (order == drawingSortOrder)
+                return;
+
+            drawingSortOrder = order;
+            Settings.Default.DrawingSortOrder = order.ToString();
+            Settings.Default.Save();
+            UpdateSortDrawingsToolTip();
+            UpdateDrawingList();
+        }
+
+        private void UpdateSortDrawingsToolTip()
+        {
+            var text = DrawingSort.Choices.First(c => c.Order == drawingSortOrder).Text;
+            sortDrawingsButton.ToolTipText = $"Sort drawings: {text}";
+        }
+
+        /// <summary>Three bars shortening downward beside a down arrow: the sort button's icon.</summary>
+        private static Bitmap CreateSortDrawingsImage()
+        {
+            var image = new Bitmap(20, 20);
+            using var g = Graphics.FromImage(image);
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            using var bar = new SolidBrush(Color.FromArgb(70, 70, 70));
+            g.FillRectangle(bar, 2, 3, 10, 3);
+            g.FillRectangle(bar, 2, 9, 7, 3);
+            g.FillRectangle(bar, 2, 15, 4, 3);
+
+            using var arrow = new SolidBrush(Color.FromArgb(30, 136, 229));
+            g.FillRectangle(arrow, 13.5f, 2, 3, 11);
+            g.FillPolygon(arrow, new[] { new PointF(10.5f, 12), new PointF(19.5f, 12), new PointF(15, 18.5f) });
+            return image;
         }
 
         /// <summary>
@@ -1829,29 +1899,8 @@ namespace OpenNest.Forms
                     if (IsDisposed || Disposing || !drawingListBox1.IsHandleCreated)
                         return;
 
-                    if (hideNestedButton.Checked)
-                    {
-                        drawingListBox1.BeginUpdate();
-
-                        for (var i = drawingListBox1.Items.Count - 1; i >= 0; i--)
-                        {
-                            var dwg = (Drawing)drawingListBox1.Items[i];
-                            if (dwg.Quantity.Required > 0 && dwg.Quantity.Remaining == 0)
-                                drawingListBox1.Items.RemoveAt(i);
-                        }
-
-                        foreach (var dwg in Nest.Drawings.OrderBy(d => d.Name))
-                        {
-                            if (dwg.Quantity.Required > 0 && dwg.Quantity.Remaining == 0)
-                                continue;
-
-                            if (!drawingListBox1.Items.Contains(dwg))
-                                drawingListBox1.Items.Add(dwg);
-                        }
-
-                        drawingListBox1.EndUpdate();
-                    }
-
+                    // Placing parts can hide a drawing or, sorted by remaining quantity, move it.
+                    RefreshDrawingListOrder();
                     UpdateDrawingListEmptyText();
                     drawingListBox1.Invalidate();
 
