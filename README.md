@@ -5,10 +5,6 @@ A Windows desktop application for CNC nesting — imports DXF, DWG and SVG drawi
 <p>
   <a href="screenshots/screenshot-cut-simulator.png"><img src="screenshots/screenshot-cut-simulator.png" width="860" alt="OpenNest - cut simulator replaying a 137-part plate in cut order"></a>
 </p>
-<p>
-  <a href="screenshots/screenshot-nest-1.png"><img src="screenshots/screenshot-nest-1.png" width="420" alt="OpenNest - parts nested on a 36x36 plate"></a>
-  <a href="screenshots/screenshot-nest-2.png"><img src="screenshots/screenshot-nest-2.png" width="420" alt="OpenNest - 44 parts nested on a 60x120 plate"></a>
-</p>
 
 ## Features
 
