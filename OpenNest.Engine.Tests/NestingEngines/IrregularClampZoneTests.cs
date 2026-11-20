@@ -34,7 +34,9 @@ public class IrregularClampZoneTests
         Assert.Equal(9, Assert.Single(result.Plates).Placements.Count);
         AssertDiscsClearClamps(result, 1);
         LayoutAssert.Valid(job, result);
-        Assert.Contains(result.Plates[0].Placements, p => p.Y - 1 < stock.WorkArea.Bottom + 0.05);
+        // A disc drops between the clamps, below their tops: only the clamps are blocked, not
+        // the band they sit in. The squeezed sheet wedges it on a clamp's corner, short of the edge.
+        Assert.Contains(result.Plates[0].Placements, p => p.Y - 1 < 0.625);
     }
 
     [Theory]

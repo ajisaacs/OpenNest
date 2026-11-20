@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using OpenNest.CutOffs;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
 
@@ -68,6 +69,28 @@ public sealed class IrregularNestingEngine : INestingEngine
 
     /// <summary>Most parts a plan may hold for the sheet-reduction pass to try it.</summary>
     internal const int MaxReduceParts = 40;
+
+    /// <summary>Whether the last sheet is squeezed; off only in tests of the search before it.</summary>
+    internal bool SqueezeLastSheet { get; init; } = true;
+
+    /// <summary>
+    /// Step, in radians (30 degrees), of the extra orientations the squeeze offers a part that
+    /// may turn freely, beside the catalog's.
+    /// </summary>
+    internal const double SqueezeAngleStep = System.Math.PI / 6;
+
+    /// <summary>
+    /// Axes the last sheet is squeezed along: the one the job's offcut must come off, else along
+    /// the length of the stock, and across it too when the stock is taller than it is long.
+    /// </summary>
+    internal static IEnumerable<PackAxis> SqueezeAxes(NestJob job, NestPlateStock stock)
+    {
+        if (job.Options.OffcutCut != CutOffAxis.Horizontal)
+            yield return PackAxis.X;
+        if (job.Options.OffcutCut == CutOffAxis.Horizontal
+            || (job.Options.OffcutCut == null && stock.WorkArea.Width > stock.WorkArea.Length))
+            yield return PackAxis.Y;
+    }
 
     /// <summary>
     /// Deterministic work budget, in free-region subtractions, after which no further variant
@@ -218,6 +241,17 @@ public sealed class IrregularNestingEngine : INestingEngine
             if (!ReferenceEquals(reduced, improved))
             {
                 improved = reduced;
+                ReportPlan(job, types, improved, progress, token);
+            }
+        }
+        // Last, shorten the last sheet: its parts packed again in a given order, largest first,
+        // inside ever shorter strips. Replaces the result only by beating it.
+        if (SqueezeLastSheet)
+        {
+            var squeezed = solver.Squeeze(improved);
+            if (!ReferenceEquals(squeezed, improved))
+            {
+                improved = squeezed;
                 ReportPlan(job, types, improved, progress, token);
             }
         }
@@ -629,6 +663,63 @@ public sealed class IrregularNestingEngine : INestingEngine
             }
             if (!snake.Zip(greedy).All(p => p.First.SequenceEqual(p.Second)))
                 yield return snake;
+        }
+
+        /// <summary>
+        /// Packs the last sheet of a complete plan again inside ever shorter strips
+        /// (<see cref="OrderedSqueeze"/>), along each of <see cref="SqueezeAxes"/>; a shorter
+        /// sheet replaces it when the plan then beats the one given.
+        /// </summary>
+        public Plan Squeeze(Plan plan)
+        {
+            if (plan.Unplaced != 0 || plan.Sheets.Count == 0)
+                return plan;
+            var last = plan.Sheets[^1];
+            var stock = last.Stock;
+            if (stock.Outline != null || last.Parts.Count < 2 || last.Parts.Count > OrderedSqueeze.MaxParts)
+                return plan;
+            var best = plan;
+            foreach (var axis in SqueezeAxes(job, stock))
+            {
+                token.ThrowIfCancellationRequested();
+                var fill = new OrderedSqueeze(types, CacheFor(stock), stock, ClampsFor(stock), Work, SqueezeOrientations)
+                    .Fill(last.Parts, axis, token);
+                if (fill == null)
+                    continue;
+                var sheets = plan.Sheets.Take(plan.Sheets.Count - 1).Append(fill).ToList();
+                var candidate = plan with
+                {
+                    Sheets = sheets,
+                    Cost = NestJobCost.RequireFinite(plan.Cost - NetCost(job.Options, last) + NetCost(job.Options, fill)),
+                };
+                if (candidate.IsBetterThan(best))
+                    best = candidate;
+            }
+            return best;
+        }
+
+        private readonly Dictionary<int, IReadOnlyList<Orientation>> squeezeOrientations = new();
+
+        /// <summary>
+        /// The orientations the squeeze offers <paramref name="type"/>: the catalog's, and for a
+        /// part that may turn freely also every <see cref="SqueezeAngleStep"/> that gives another
+        /// outline. Built once per type per solve, as each owns no-fit polygons.
+        /// </summary>
+        private IReadOnlyList<Orientation> SqueezeOrientations(PartType type)
+        {
+            if (squeezeOrientations.TryGetValue(type.Index, out var found))
+                return found;
+            var all = type.Orientations.ToList();
+            if (type.Perimeter != null && all.Count > 0 && type.Part.Rotation.Kind == RotationPolicyKind.Automatic)
+            {
+                var angles = all.Select(o => o.Rotation).ToList();
+                for (var turn = 0; turn * SqueezeAngleStep < 2 * System.Math.PI - 1e-9; turn++)
+                    angles.Add(turn * SqueezeAngleStep);
+                foreach (var angle in RotationCandidates.DistinctOutlines(type.Perimeter, angles).Skip(all.Count))
+                    if (Orient(type, angle) is { } extra)
+                        all.Add(extra);
+            }
+            return squeezeOrientations[type.Index] = all;
         }
 
         /// <summary>Next private orientation index: far above the catalog's, pair and block poses.</summary>

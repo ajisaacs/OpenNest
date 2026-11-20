@@ -14,7 +14,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 | Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the engine listed first here |
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; the sheet that finishes the job is also squeezed into a shorter or narrower bin; stock chosen sheet by sheet by salvage-credited look-ahead cost |
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
-| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants (each also keeping a stock that finished the job when the per-sheet estimate passed it over for a plan that ended up dearer) and a tail re-plan, then grouped variants that pack like parts together, then a banded variant that packs each sheet in full-height strips, each group as its Lattice band or each strip from the largest parts down, then a sheet-reduction pass that packs edge parts first and turns a key part by its contacts; under a time limit it first reports a quick plan without Lattice blocks, and after its search keeps trying seeded variants until the limit |
+| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants (each also keeping a stock that finished the job when the per-sheet estimate passed it over for a plan that ended up dearer) and a tail re-plan, then grouped variants that pack like parts together, then a banded variant that packs each sheet in full-height strips, each group as its Lattice band or each strip from the largest parts down, then a sheet-reduction pass that packs edge parts first and turns a key part by its contacts, then a squeeze that packs the last sheet again, largest part first, in ever shorter strips; under a time limit it first reports a quick plan without Lattice blocks, and after its search keeps trying seeded variants until the limit |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
 | Lattice, Strip, Vertical Remnant, Horizontal Remnant | Many copies of a few parts | The fixed placement strategies behind interactive fill; Lattice is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder; the pairs phase fills the strip its grid leaves with rows of pairs when they hold more than single parts, and also tiles herringbone pairs: the part turned so a hull edge lies along a sheet axis, nested into its own row, with every other row reversed), and the remnant strategies run it ranked to keep the largest drop. In whole jobs, all four place a plate with any fixed or bounded part rotation by the rotation-aware ordered placer instead |
 
@@ -405,6 +405,39 @@ hug opposite edges never meet there.
 On a job of ten one-off brackets (four 112-inch tapered bars, four gussets, two small plates) on
 60 x 120 with a clamp rail, the bars stacked three to a sheet and the plan took three sheets; the
 pass packs two bars, two gussets and a plate per sheet, the middle bar turned 4.4 degrees, on two.
+
+### Last-sheet squeeze
+
+Last of all, Irregular shortens the last sheet of a complete plan (`OrderedSqueeze`), when that
+sheet is rectangular and holds 2 to 30 parts. The frontier rule lets the sheet state pick the next
+part and sends small parts first, so a part as long as the layout can end up behind them and set
+the sheet's length. A person lays the big parts along one edge, stacks the rest on them and drops
+the small ones into the gaps.
+
+- The sheet's parts are packed again inside a strip ending 0.5% of the work area short of where
+  they reach now. They go in a given order, largest first to begin with, each at the lowest point
+  any of its orientations reaches across the strip, then nearest the strip's start. A part that
+  does not fit is left out.
+- A local search over the order looks for one that leaves none out: the best move of one part to
+  another position, while a move improves the decode (less part area left out, then parts sitting
+  lower), then the best order so far with three swaps from a fixed seed. Decodes that share the
+  first parts of an order share those placements.
+- A strip that takes every part is followed by a shorter one, starting from the order that
+  worked, until a strip's search spends its work (600,000 counted blockers for 11 parts or more,
+  less by the fourth power of the count below that) or the squeeze its total (3,000,000), or the
+  strip has less room than the parts' area. Orders already decoded cost no work, so a search also
+  ends after two rounds per part in a row that place nothing new: a few parts have few orders.
+- A part that may turn freely is also offered every 30 degrees beside its catalog orientations;
+  a part with a rotation policy keeps the catalog's. Positions are vertices of exact free regions
+  (no-fit polygons, clamps, unchanged spacing), as everywhere in this engine.
+- The strip runs along the stock's length, and across it too when the stock is taller than it is
+  long; a job's `OffcutCut` picks the one axis its offcut counts on. The squeezed sheet replaces
+  the plan's only when the plan then ranks better, so a result is never worse for it.
+
+On a job of eleven one-off parts (two 55-inch plates, two rings, four sectors, an arc and two
+strips on 48 x 96 with a clamp rail) the search ended the layout at 75.2 with a 55-inch plate
+behind the sectors; the squeeze stacks both plates along the bottom with everything else above
+and beside them, ends at 62.1, and leaves a 33.4 x 47.5 drop rather than 20.3 x 47.5.
 
 ## Flat bar
 
