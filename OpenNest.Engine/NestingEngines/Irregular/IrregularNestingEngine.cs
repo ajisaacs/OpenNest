@@ -29,8 +29,11 @@ namespace OpenNest.Engine.NestingEngines.Irregular;
 ///
 /// Fully deterministic: no clocks or randomness influence any decision. The weights come from
 /// fixed seeds 1, 2, 3, ..., so an extended search depends only on how far it got.
+///
+/// This file holds the engine's settings and the order of its passes (<see cref="Search"/>);
+/// the Solver beside it packs sheets and builds plans, and its other half improves a plan.
 /// </summary>
-public sealed class IrregularNestingEngine : INestingEngine
+public sealed partial class IrregularNestingEngine : INestingEngine
 {
     /// <summary>Strategy variants, tried in order: (front direction, area exponent beta).
     /// The cutout packer proposal tries the same variants on a cutout.</summary>
@@ -104,6 +107,19 @@ public sealed class IrregularNestingEngine : INestingEngine
     /// </summary>
     internal bool PruneStockTrials { get; init; } = true;
 
+    /// <summary>Spread of the seeded type weights: each is e^(±WeightSpread) at most.</summary>
+    internal const double WeightSpread = 0.4;
+
+    /// <summary>The placement-rule weights for one seed, one per part type.</summary>
+    internal static double[] SeedWeights(int seed, int typeCount)
+    {
+        var random = new Random(seed);
+        var weights = new double[typeCount];
+        for (var i = 0; i < weights.Length; i++)
+            weights[i] = System.Math.Exp(WeightSpread * (2 * random.NextDouble() - 1));
+        return weights;
+    }
+
     /// <summary>
     /// One private drawing per part geometry, shared by the best-fit pair and Fill block
     /// catalogs and by every solve of this instance (a pipeline's cutout trial and its ordinary
@@ -131,25 +147,13 @@ public sealed class IrregularNestingEngine : INestingEngine
         ArgumentNullException.ThrowIfNull(job);
         token.ThrowIfCancellationRequested();
         var types = PartCatalog.Build(job);
-        using var solver = new Solver(job, types, progress, token, WorkBudget, DrawingFor, SheetPacked, BatchSelected, TailReplaced,
-            TailReplanning, PruneStockTrials);
-
-        // Pair-only orientations may fit stock even when the sampled single poses do not.
-        // Demand that neither a single nor a pair can fit is reported unplaced.
-        var demand = new int[types.Count];
-        foreach (var type in types)
-        {
-            var placeable = job.Plates.Any(stock =>
-                stock.Quantity != 0
-                && type.Orientations.Any(o => stock.Fits(o.Width, o.Height))
-            );
-            demand[type.Index] = placeable || solver.PairFits(type)
-                || (type.Part.Quantity > 2 && type.Orientations.Count > 0) ? type.Part.Quantity : 0;
-        }
+        using var solver = new Solver(this, job, types, progress, token);
+        var demand = solver.PlaceableDemand();
+        var search = new Search(this, job, types, solver, demand, progress, token);
 
         // More searching can only end in cancellation, so it needs a listener for its plans, and
         // it needs demand and two or more types, or every weighted decode repeats a variant.
-        var searchOn = job.Options.SearchUntilCancelled && token.CanBeCanceled && progress != null
+        var untilCancelled = job.Options.SearchUntilCancelled && token.CanBeCanceled && progress != null
             && types.Count > 1 && demand.Any(d => d > 0);
 
         // A solve that ends only at its limit reports a quick plan first: the first variant without
@@ -159,36 +163,10 @@ public sealed class IrregularNestingEngine : INestingEngine
         // plan that passes the layout check, so a quick plan that fails the check hides none of them.
         // Without a type of three or more copies no block is ever prepared, and the quick plan would
         // only repeat the first variant.
-        if (searchOn && demand.Any(d => d > 2))
-        {
-            var quick = solver.QuickPlan(demand);
-            if (quick.Sheets.Count > 0)
-                ReportPlan(job, types, quick, progress, token);
-        }
+        if (untilCancelled && demand.Any(d => d > 2))
+            search.QuickPlan();
 
-        Plan? best = null;
-        foreach (var (axis, beta) in Variants)
-        {
-            token.ThrowIfCancellationRequested();
-            if (best != null && solver.Work.Value >= WorkBudget)
-                break;
-            var plan = solver.Plan(demand, axis, beta);
-            ReportAlternatives(job, types, solver.Alternatives, progress, token);
-            if (best == null || plan.IsBetterThan(best))
-            {
-                best = plan;
-                ReportPlan(job, types, best, progress, token);
-            }
-            else
-                ReportAlternative(job, types, plan, progress, token);
-            if (best.Unplaced == 0 && best.Sheets.Count == 0)
-                break;
-        }
-
-        // The last sheets hold the leftovers, which is where waste concentrates; re-plan them.
-        var improved = solver.ImproveTail(best!, WorkBudget * 2);
-        if (!ReferenceEquals(improved, best))
-            ReportPlan(job, types, improved, progress, token);
+        search.StrategyVariants();
 
         // Like parts grouped, the groups' stragglers filling the gaps after them. These run last, on
         // their own budget, so the search above is the same with or without them; a grouped plan
@@ -196,760 +174,190 @@ public sealed class IrregularNestingEngine : INestingEngine
         // budget is spent.
         var groups = GroupLikeParts && GroupedFill.Applies(types, demand);
         if (groups)
+            search.GroupedVariants();
+
+        // Then full-height strips: each like-part group as a band of its Lattice pattern, or strip by
+        // strip with the largest part first and the rest in its gaps; per sheet the better wins.
+        if (BandLikeParts && groups)
+            search.BandedVariant();
+
+        // Then try to drop a sheet: split the parts over one sheet fewer and pack each sheet edge
+        // first, the key part turned by its contacts. Replaces the result only by beating it.
+        if (ReduceSheets)
+            search.ReduceSheets();
+
+        // Last, shorten the last sheet: its parts packed again in a given order, largest first,
+        // inside ever shorter strips. Replaces the result only by beating it.
+        if (SqueezeLastSheet)
+            search.SqueezeLastSheet();
+
+        if (untilCancelled)
+            search.SeededVariants(groups);
+        return BuildResult(job, types, search.Best, progress, token);
+    }
+
+    /// <summary>
+    /// One solve's passes, in the order <see cref="Solve"/> runs them. Each keeps the best plan so
+    /// far and reports what it finds; reporting never changes the search.
+    /// </summary>
+    private sealed class Search(
+        IrregularNestingEngine engine,
+        NestJob job,
+        IReadOnlyList<PartType> types,
+        Solver solver,
+        int[] demand,
+        IProgress<NestJobProgress>? progress,
+        CancellationToken token
+    )
+    {
+        private Plan? best;
+
+        /// <summary>The best plan so far; the strategy variants find the first.</summary>
+        public Plan Best => best ?? throw new InvalidOperationException("The strategy variants have not run.");
+
+        private long WorkBudget => engine.WorkBudget;
+
+        /// <summary>Reports the first variant decoded without Lattice blocks; it never becomes the best.</summary>
+        public void QuickPlan()
+        {
+            var quick = solver.QuickPlan(demand);
+            if (quick.Sheets.Count > 0)
+                Report(quick);
+        }
+
+        /// <summary>
+        /// Decodes <see cref="Variants"/> until the work budget is spent, keeps the best and re-plans
+        /// its tail: the last sheets hold the leftovers, which is where waste concentrates.
+        /// </summary>
+        public void StrategyVariants()
+        {
+            Plan? leader = null;
+            foreach (var (axis, beta) in Variants)
+            {
+                token.ThrowIfCancellationRequested();
+                if (leader != null && solver.Work.Value >= WorkBudget)
+                    break;
+                var plan = solver.Plan(demand, new Strategy(axis, beta));
+                ReportAlternatives();
+                if (leader == null || plan.IsBetterThan(leader))
+                {
+                    leader = plan;
+                    Report(leader);
+                }
+                else
+                    ReportAlternative(plan);
+                if (leader.Unplaced == 0 && leader.Sheets.Count == 0)
+                    break;
+            }
+
+            best = leader!;
+            Replace(solver.ImproveTail(leader!, WorkBudget * 2));
+        }
+
+        /// <summary>Decodes the grouped variants, none starting once the work budget is spent.</summary>
+        public void GroupedVariants()
+        {
             foreach (var axis in GroupedAxes(job))
             {
                 token.ThrowIfCancellationRequested();
                 if (solver.Work.Value >= WorkBudget)
                     break;
-                var plan = solver.Plan(demand, axis, 1.0, grouped: true);
-                ReportAlternatives(job, types, solver.Alternatives, progress, token);
-                if (!plan.IsBetterThan(improved))
-                {
-                    ReportAlternative(job, types, plan, progress, token);
-                    continue;
-                }
-                ReportPlan(job, types, plan, progress, token);
-                improved = solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2);
-                if (!ReferenceEquals(improved, plan))
-                    ReportPlan(job, types, improved, progress, token);
+                Offer(solver.Plan(demand, Strategy.Grouped(axis)));
             }
-        // Then full-height strips: each like-part group as a band of its Lattice pattern, or strip by
-        // strip with the largest part first and the rest in its gaps; per sheet the better wins.
-        // Strips ignore priority, so only jobs of one priority band; it starts while the work
-        // spent stays under the ungrouped and grouped budgets together.
-        if (BandLikeParts && groups && job.Parts.Select(p => p.Priority).Distinct().Count() == 1
-            && solver.Work.Value < BandedWorkLimit * WorkBudget)
+        }
+
+        /// <summary>
+        /// Decodes the banded variant. Strips ignore priority, so only for jobs of one priority
+        /// band; it starts while the work spent stays under the ungrouped and grouped budgets
+        /// together.
+        /// </summary>
+        public void BandedVariant()
         {
+            if (job.Parts.Select(p => p.Priority).Distinct().Count() != 1
+                || solver.Work.Value >= BandedWorkLimit * WorkBudget)
+                return;
             token.ThrowIfCancellationRequested();
-            var plan = solver.Plan(demand, PackAxis.X, 1.0, banded: true);
-            ReportAlternatives(job, types, solver.Alternatives, progress, token);
-            if (plan.IsBetterThan(improved))
+            Offer(solver.Plan(demand, Strategy.Banded));
+        }
+
+        public void ReduceSheets() => Replace(solver.ReduceSheets(Best));
+
+        public void SqueezeLastSheet() => Replace(solver.Squeeze(Best));
+
+        /// <summary>
+        /// Decodes seed after seed, cycling the variants and, when the job groups, the grouped
+        /// variants among them, and re-plans the tail of each plan that beats the best so far;
+        /// ends only when the token is cancelled.
+        /// </summary>
+        public void SeededVariants(bool groups)
+        {
+            var grouped = groups ? GroupedAxes(job).ToArray() : Array.Empty<PackAxis>();
+            for (var seed = 1; ; seed = seed == int.MaxValue ? 1 : seed + 1)
             {
-                ReportPlan(job, types, plan, progress, token);
-                improved = solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2);
-                if (!ReferenceEquals(improved, plan))
-                    ReportPlan(job, types, improved, progress, token);
+                token.ThrowIfCancellationRequested();
+                var pick = seed % (Variants.Length + grouped.Length);
+                var weights = SeedWeights(seed, types.Count);
+                var plan = solver.Plan(demand, pick < Variants.Length
+                    ? new Strategy(Variants[pick].Axis, Variants[pick].Beta, weights)
+                    : Strategy.Grouped(grouped[pick - Variants.Length], weights));
+                if (plan.IsBetterThan(Best))
+                    Adopt(plan);
             }
+        }
+
+        /// <summary>
+        /// Takes a variant's plan: it becomes the best by beating it, and is otherwise reported as
+        /// another layout, like the complete plans its decode passed over.
+        /// </summary>
+        private void Offer(Plan plan)
+        {
+            ReportAlternatives();
+            if (plan.IsBetterThan(Best))
+                Adopt(plan);
             else
-                ReportAlternative(job, types, plan, progress, token);
+                ReportAlternative(plan);
         }
-        // Then try to drop a sheet: split the parts over one sheet fewer and pack each sheet edge
-        // first, the key part turned by its contacts. Replaces the result only by beating it.
-        if (ReduceSheets)
-        {
-            var reduced = solver.ReduceSheets(improved);
-            if (!ReferenceEquals(reduced, improved))
-            {
-                improved = reduced;
-                ReportPlan(job, types, improved, progress, token);
-            }
-        }
-        // Last, shorten the last sheet: its parts packed again in a given order, largest first,
-        // inside ever shorter strips. Replaces the result only by beating it.
-        if (SqueezeLastSheet)
-        {
-            var squeezed = solver.Squeeze(improved);
-            if (!ReferenceEquals(squeezed, improved))
-            {
-                improved = squeezed;
-                ReportPlan(job, types, improved, progress, token);
-            }
-        }
-        if (searchOn)
-            SearchUntilCancelled(job, types, solver, demand, improved, groups, progress, token);
-        return BuildResult(job, types, improved, progress, token);
-    }
 
-    /// <summary>Spread of the seeded type weights: each is e^(±WeightSpread) at most.</summary>
-    internal const double WeightSpread = 0.4;
-
-    /// <summary>The placement-rule weights for one seed, one per part type.</summary>
-    internal static double[] SeedWeights(int seed, int typeCount)
-    {
-        var random = new Random(seed);
-        var weights = new double[typeCount];
-        for (var i = 0; i < weights.Length; i++)
-            weights[i] = System.Math.Exp(WeightSpread * (2 * random.NextDouble() - 1));
-        return weights;
-    }
-
-    /// <summary>
-    /// Decodes seed after seed, cycling the variants and grouped variants, and re-plans the tail of each plan that
-    /// beats the best so far; ends only when the token is cancelled.
-    /// </summary>
-    private void SearchUntilCancelled(
-        NestJob job,
-        IReadOnlyList<PartType> types,
-        Solver solver,
-        int[] demand,
-        Plan best,
-        bool groups,
-        IProgress<NestJobProgress>? progress,
-        CancellationToken token
-    )
-    {
-        // Grouped decodes take their turn among the variants when the job groups.
-        var grouped = groups ? GroupedAxes(job).ToArray() : Array.Empty<PackAxis>();
-        for (var seed = 1; ; seed = seed == int.MaxValue ? 1 : seed + 1)
+        /// <summary>Makes a plan that beat the best the new best, and re-plans its tail on a fresh budget.</summary>
+        private void Adopt(Plan plan)
         {
-            token.ThrowIfCancellationRequested();
-            var pick = seed % (Variants.Length + grouped.Length);
-            var plan = pick < Variants.Length
-                ? solver.Plan(demand, Variants[pick].Axis, Variants[pick].Beta, SeedWeights(seed, types.Count))
-                : solver.Plan(demand, grouped[pick - Variants.Length], 1.0, SeedWeights(seed, types.Count), grouped: true);
-            if (!plan.IsBetterThan(best))
-                continue;
             // Report before the tail re-plan, which the limit may cut short.
-            ReportPlan(job, types, plan, progress, token);
-            best = solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2);
-            if (!ReferenceEquals(best, plan))
-                ReportPlan(job, types, best, progress, token);
+            Report(plan);
+            best = plan;
+            Replace(solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2));
+        }
+
+        /// <summary>Takes a pass's result, which is the plan it was given unless it found a better one.</summary>
+        private void Replace(Plan result)
+        {
+            if (ReferenceEquals(result, best))
+                return;
+            best = result;
+            Report(result);
+        }
+
+        /// <summary>Reports a new best whole-job plan.</summary>
+        private void Report(Plan plan)
+        {
+            if (progress != null)
+                CandidateProgress.ReportPlan(BuildResult(job, types, plan, null, token), progress);
+        }
+
+        /// <summary>Reports a whole-job plan that lost to the best so far, as another layout a
+        /// front end may offer.</summary>
+        private void ReportAlternative(Plan plan)
+        {
+            if (progress != null && plan.Sheets.Count > 0)
+                CandidateProgress.ReportAlternative(BuildResult(job, types, plan, null, token), progress);
+        }
+
+        /// <summary>Reports the complete plans the last decode found beside the one it returned.</summary>
+        private void ReportAlternatives()
+        {
+            foreach (var plan in solver.Alternatives)
+                ReportAlternative(plan);
         }
     }
-
-    /// <summary>Reports a new best whole-job plan; reporting never changes the search.</summary>
-    private static void ReportPlan(NestJob job, IReadOnlyList<PartType> types, Plan plan,
-        IProgress<NestJobProgress>? progress, CancellationToken token)
-    {
-        if (progress == null)
-            return;
-        CandidateProgress.ReportPlan(BuildResult(job, types, plan, null, token), progress);
-    }
-
-    /// <summary>Reports a whole-job plan that lost to the best so far, as another layout a front
-    /// end may offer; reporting never changes the search.</summary>
-    private static void ReportAlternative(NestJob job, IReadOnlyList<PartType> types, Plan plan,
-        IProgress<NestJobProgress>? progress, CancellationToken token)
-    {
-        if (progress == null || plan.Sheets.Count == 0)
-            return;
-        CandidateProgress.ReportAlternative(BuildResult(job, types, plan, null, token), progress);
-    }
-
-    /// <summary>Reports the complete plans a pass found beside the one it returned.</summary>
-    private static void ReportAlternatives(NestJob job, IReadOnlyList<PartType> types, IReadOnlyList<Plan> plans,
-        IProgress<NestJobProgress>? progress, CancellationToken token)
-    {
-        foreach (var plan in plans)
-            ReportAlternative(job, types, plan, progress, token);
-    }
-
-    /// <summary>Exercises the production physical-tail lifecycle from a test-owned incumbent.
-    /// This does not alter normal Solve or expose a public packing API.</summary>
-    internal NestJobResult ImproveTailForTesting(NestJob job, IReadOnlyList<SheetFill> physicalPlan)
-    {
-        var types = PartCatalog.Build(job);
-        using var solver = new Solver(job, types, null, default, WorkBudget, DrawingFor, SheetPacked, BatchSelected, TailReplaced);
-        var unplaced = job.Parts.Sum(p => p.Quantity) - physicalPlan.Sum(s => s.Parts.Count);
-        var plan = new Plan(physicalPlan, physicalPlan.Sum(s => NetCost(job.Options, s)), unplaced,
-            unplaced == 0 ? NestJobStopReason.Completed : NestJobStopReason.NoPlacementFound, NestJobCost.UsesExplicitCosts(job),
-            job.Options);
-        return BuildResult(job, types, solver.ImproveTail(plan, WorkBudget * 2), null, default);
-    }
-
-    /// <summary>Runs the sheet-reduction pass on a test-owned complete plan.</summary>
-    internal NestJobResult ReduceSheetsForTesting(NestJob job, IReadOnlyList<SheetFill> physicalPlan)
-    {
-        var types = PartCatalog.Build(job);
-        using var solver = new Solver(job, types, null, default, WorkBudget, DrawingFor, SheetPacked, BatchSelected, TailReplaced);
-        var plan = new Plan(physicalPlan, physicalPlan.Sum(s => NetCost(job.Options, s)), 0, NestJobStopReason.Completed,
-            NestJobCost.UsesExplicitCosts(job), job.Options);
-        return BuildResult(job, types, solver.ReduceSheets(plan), null, default);
-    }
-
-    /// <summary>Decodes one variant with the given type weights, whole demand placeable; for
-    /// tests of the weighted placement rule only.</summary>
-    internal NestJobResult PlanForTesting(NestJob job, int variant, IReadOnlyList<double>? weights)
-    {
-        var types = PartCatalog.Build(job);
-        using var solver = new Solver(job, types, null, default, WorkBudget, DrawingFor, SheetPacked, BatchSelected, TailReplaced);
-        var demand = types.Select(t => t.Part.Quantity).ToArray();
-        var (axis, beta) = Variants[variant];
-        return BuildResult(job, types, solver.Plan(demand, axis, beta, weights), null, default);
-    }
-
-    /// <summary>The quick plan a time-limited solve reports first, whole demand placeable; for tests.</summary>
-    internal NestJobResult QuickPlanForTesting(NestJob job)
-    {
-        var types = PartCatalog.Build(job);
-        using var solver = new Solver(job, types, null, default, WorkBudget, DrawingFor, SheetPacked, BatchSelected, TailReplaced);
-        return BuildResult(job, types, solver.QuickPlan(types.Select(t => t.Part.Quantity).ToArray()), null, default);
-    }
-
-    /// <summary>Shared state for one solve: job, catalog, NFP caches, effort meter.</summary>
-    private sealed class Solver(
-        NestJob job,
-        IReadOnlyList<PartType> types,
-        IProgress<NestJobProgress>? progress,
-        CancellationToken token,
-        long workBudget,
-        Func<NestJobPart, Drawing> drawingFor,
-        Action? sheetPacked,
-        Action<RepeatBatch>? batchSelected,
-        Action<int>? tailReplaced,
-        Action<long>? tailReplanning = null,
-        bool pruneTrials = true
-    ) : IDisposable
-    {
-        public void Dispose()
-        {
-            foreach (var catalog in blocks.Values)
-                catalog.Dispose();
-        }
-
-        private const int MaxTail = 3;
-        private readonly Dictionary<double, NoFitCache> caches = new();
-        private readonly Dictionary<NestPlateStock, ClampObstacles> clamps = new();
-        private readonly Dictionary<NestPlateStock, PackBoundary?> boundaries = new();
-        private readonly Dictionary<double, IReadOnlyDictionary<int, IReadOnlyList<PairPose>>> pairs = new();
-        private readonly Dictionary<double, BlockCatalog> blocks = new();
-        private readonly IReadOnlyDictionary<string, NestJobPart> parts = job.Parts.ToDictionary(p => p.Id, StringComparer.Ordinal);
-
-        /// <summary>Work at which the current grouped plan stops starting new fills.</summary>
-        private long groupedBudget;
-
-        private BlockCatalog BlocksFor(NestPlateStock stock)
-        {
-            var spacing = System.Math.Max(0, stock.PartSpacing);
-            if (!blocks.TryGetValue(spacing, out var found))
-                blocks[spacing] = found = new BlockCatalog(spacing, types, PairsFor(stock), Work, workBudget, drawingFor);
-            return found;
-        }
-
-        public WorkCounter Work { get; private set; } = new();
-
-        /// <summary>Whether the decode under way is <see cref="QuickPlan"/>'s, which offers no blocks.</summary>
-        private bool quick;
-
-        /// <summary>
-        /// The first variant decoded without Lattice blocks, on a work meter of its own, so the
-        /// search after it runs as without it: what it adds to the shared caches (no-fit polygons,
-        /// pairs, clamps, boundaries) depends only on the job, never on when it was built.
-        /// </summary>
-        public Plan QuickPlan(int[] demand)
-        {
-            var meter = Work;
-            Work = new WorkCounter();
-            quick = true;
-            try
-            {
-                return Plan(demand, Variants[0].Axis, Variants[0].Beta);
-            }
-            finally
-            {
-                Work = meter;
-                quick = false;
-                Alternatives = Array.Empty<Plan>();
-            }
-        }
-
-        private double Penalty => NestJobCost.UnplacedPartPenalty(job);
-
-        /// <summary>
-        /// One sheet against another for the same demand: more part area placed first, then lower net
-        /// cost, then the larger compactness offcut; negative when <paramref name="a"/> is better.
-        /// </summary>
-        private int CompareSheets(SheetFill a, SheetFill b)
-        {
-            static int Compare(double x, double y) =>
-                System.Math.Abs(x - y) <= 1e-9 * System.Math.Max(1, System.Math.Max(System.Math.Abs(x), System.Math.Abs(y)))
-                    ? 0 : x.CompareTo(y);
-            var area = Compare(b.PartArea, a.PartArea);
-            if (area != 0)
-                return area;
-            var cost = Compare(NetCost(job.Options, a), NetCost(job.Options, b));
-            return cost != 0 ? cost : Compare(Offcut(job.Options, b), Offcut(job.Options, a));
-        }
-
-        public Plan Plan(int[] demand, PackAxis axis, double beta, IReadOnlyList<double>? weights = null, bool grouped = false,
-            bool banded = false)
-        {
-            groupedBudget = Work.Value + workBudget;
-            var finishers = new List<Run>();
-            var run = Decode(demand, axis, beta, new Dictionary<string, int>(StringComparer.Ordinal), job.Options.MaxPlates, null,
-                weights, grouped, banded, finishers);
-            // The decode picks each sheet's stock on an estimate of what the leftovers will cost,
-            // so a stock that finished the job outright can lose the pick to a plan that ends up
-            // dearer. Each such finished plan competes with the decode's own; a tie keeps the decode.
-            var decoded = ToPlan(run);
-            var best = decoded;
-            var plans = new List<Plan> { decoded };
-            foreach (var finisher in finishers)
-            {
-                var plan = ToPlan(finisher);
-                plans.Add(plan);
-                if (plan.IsBetterThan(best))
-                    best = plan;
-            }
-            plans.Remove(best);
-            plans.Sort((a, b) => a.IsBetterThan(b) ? -1 : b.IsBetterThan(a) ? 1 : 0);
-            Alternatives = plans.Take(MaxAlternatives).ToList();
-            return best;
-        }
-
-        /// <summary>Most plans one <see cref="Plan"/> call keeps beside the one it returns.</summary>
-        private const int MaxAlternatives = 6;
-
-        /// <summary>
-        /// The complete plans the last <see cref="Plan"/> call found beside the one it returned,
-        /// best first: the job finished on another stock at some sheet, or the decode's own plan
-        /// when one of those beat it.
-        /// </summary>
-        public IReadOnlyList<Plan> Alternatives { get; private set; } = Array.Empty<Plan>();
-
-        private Plan ToPlan(Run run)
-        {
-            var unplaced = types.Sum(t => t.Part.Quantity) - run.Sheets.Sum(s => s.Parts.Count);
-            var reason = run.Reason;
-            if (unplaced > 0 && reason == NestJobStopReason.Completed)
-                reason = NestJobStopReason.NoPlacementFound; // Demand no stock can hold.
-            return new Plan(run.Sheets, NestJobCost.RequireFinite(run.Net + unplaced * Penalty), unplaced, reason,
-                NestJobCost.UsesExplicitCosts(job), job.Options);
-        }
-
-        /// <summary>
-        /// Takes the parts off the last k sheets (k = 1..3) and re-plans just that demand with
-        /// every stock forced as the first sheet, under every variant; the cheapest complete
-        /// re-plan that beats the current tail replaces it. Tails are small and effort is metered.
-        /// </summary>
-        public Plan ImproveTail(Plan plan, long budget)
-        {
-            tailReplanning?.Invoke(budget - Work.Value);
-            var sheets = plan.Sheets.ToList();
-            for (var k = 1; k <= System.Math.Min(MaxTail, sheets.Count); k++)
-            {
-                if (Work.Value >= budget)
-                    break;
-                var prefix = sheets.Take(sheets.Count - k).ToList();
-                var tail = sheets.Skip(sheets.Count - k).ToList();
-                var tailParts = tail.Sum(s => s.Parts.Count);
-                var tailNet = tail.Sum(s => NetCost(job.Options, s));
-                var tailDemand = new int[types.Count];
-                foreach (var part in tail.SelectMany(s => s.Parts))
-                    tailDemand[part.Orientation.TypeIndex]++;
-                var used = prefix
-                    .GroupBy(s => s.Stock.Id)
-                    .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
-                int? cap = job.Options.MaxPlates is int max ? max - prefix.Count : null;
-
-                Run? bestRun = null;
-                var bestNet = tailNet - (NestJobCost.UsesExplicitCosts(job) ? 0 : 1e-9 * System.Math.Max(1, tailNet));
-                foreach (var (axis, beta) in Variants)
-                    foreach (var first in job.Plates)
-                    {
-                        token.ThrowIfCancellationRequested();
-                        var run = Decode(tailDemand, axis, beta, used, cap, first);
-                        if (run.Sheets.Sum(s => s.Parts.Count) != tailParts || run.Net >= bestNet)
-                            continue;
-                        bestRun = run;
-                        bestNet = run.Net;
-                    }
-
-                if (bestRun == null)
-                    continue;
-                sheets = prefix.Concat(bestRun.Sheets).ToList();
-                plan = plan with { Sheets = sheets.ToList(), Cost = plan.Cost - (tailNet - bestRun.Net) };
-                tailReplaced?.Invoke(k);
-            }
-            return plan;
-        }
-
-        /// <summary>
-        /// One banded sheet: like parts as full-height bands side by side, or strip by strip with
-        /// the largest part's band or column and the others in its gaps; the better sheet wins, a
-        /// tie keeping the bands. Falls back to the ordinary fill when nothing bands.
-        /// </summary>
-        private SheetFill Banded(NestPlateStock stock, int[] remaining, IReadOnlyList<double>? weights,
-            Func<IReadOnlyList<int>?, double?, FrontierPacker> packer)
-        {
-            // A sheet that cannot take all the remaining parts fills to its end anyway: it keeps
-            // whichever places more, the ordinary fill or strips largest part first (one partial
-            // sheet carried), which leave the small parts for the gaps of the sheets after it.
-            var work = stock.WorkArea;
-            FrontierPacker Within(OpenNest.Geometry.Box box) => new(types, CacheFor(stock), PairsFor(stock), stock,
-                PackAxis.Y, 1.0, Work, null, ClampsFor(stock), null, weights, null, null, box);
-            if (types.Sum(t => remaining[t.Index] * t.Area) > work.Length * work.Width)
-            {
-                var plain = packer(null, null).Fill(remaining, token);
-                var full = new BandedFill(types, BlocksFor(stock), stock, ClampsFor(stock), () => packer(null, null),
-                    CompareSheets, Work, Work.Value + workBudget).FillStrips(remaining, Within, token, 1);
-                return full != null && CompareSheets(full, plain) < 0 ? full : plain;
-            }
-            var bands = new BandedFill(types, BlocksFor(stock), stock, ClampsFor(stock), () => packer(null, null),
-                CompareSheets, Work, groupedBudget).Fill(remaining, token);
-            var strips = new BandedFill(types, BlocksFor(stock), stock, ClampsFor(stock), () => packer(null, null),
-                CompareSheets, Work, Work.Value + workBudget).FillStrips(remaining, box => new FrontierPacker(types,
-                CacheFor(stock), PairsFor(stock), stock, PackAxis.Y, 1.0, Work, null, ClampsFor(stock), null, weights,
-                null, null, box), token);
-            if (bands == null)
-                return strips ?? packer(null, null).Fill(remaining, token);
-            return strips != null && CompareSheets(strips, bands) < 0 ? strips : bands;
-        }
-
-        /// <summary>
-        /// Drops sheets while it can: the parts of a complete plan on one stock are split over
-        /// one sheet fewer (by area, largest first onto the lightest sheet, then dealt in a snake)
-        /// and each sheet packed by <see cref="EdgeFirstFill"/>. A split that packs every sheet
-        /// replaces the plan when it beats it.
-        /// </summary>
-        public Plan ReduceSheets(Plan plan)
-        {
-            while (plan.Unplaced == 0 && plan.Sheets.Count >= 2)
-            {
-                token.ThrowIfCancellationRequested();
-                var stock = plan.Sheets[0].Stock;
-                if (stock.Outline != null || plan.Sheets.Any(s => !ReferenceEquals(s.Stock, stock)))
-                    break;
-                var instances = plan.Sheets.SelectMany(s => s.Parts).Select(p => p.Orientation.TypeIndex)
-                    .OrderByDescending(t => types[t].Area).ThenBy(t => t).ToList();
-                var target = plan.Sheets.Count - 1;
-                var room = stock.WorkArea.Length * stock.WorkArea.Width;
-                if (instances.Count > MaxReduceParts || instances.Sum(t => types[t].Area) > target * room)
-                    break;
-
-                Plan? found = null;
-                foreach (var bins in Splits(instances, target))
-                {
-                    var sheets = new List<SheetFill>();
-                    foreach (var bin in bins)
-                    {
-                        var fill = new EdgeFirstFill(types, CacheFor(stock), stock, ClampsFor(stock), Work,
-                            () => new FrontierPacker(types, CacheFor(stock), PairsFor(stock), stock, PackAxis.X, 1.0, Work,
-                                null, ClampsFor(stock)),
-                            Orient).Fill(bin, token);
-                        if (fill == null)
-                            break;
-                        sheets.Add(fill);
-                    }
-                    if (sheets.Count < target)
-                        continue;
-                    var candidate = new Plan(sheets, NestJobCost.RequireFinite(sheets.Sum(s => NetCost(job.Options, s))), 0,
-                        NestJobStopReason.Completed, NestJobCost.UsesExplicitCosts(job), job.Options);
-                    if (candidate.IsBetterThan(plan))
-                        found = candidate;
-                    break;
-                }
-                if (found == null)
-                    break;
-                plan = found;
-            }
-            return plan;
-        }
-
-        /// <summary>Per-sheet demands for <paramref name="count"/> sheets: largest part first onto
-        /// the lightest sheet, then the same parts dealt out in a snake.</summary>
-        private IEnumerable<int[][]> Splits(IReadOnlyList<int> instances, int count)
-        {
-            var greedy = Enumerable.Range(0, count).Select(_ => new int[types.Count]).ToArray();
-            var load = new double[count];
-            foreach (var t in instances)
-            {
-                var lightest = 0;
-                for (var i = 1; i < count; i++)
-                    if (load[i] < load[lightest] - 1e-9)
-                        lightest = i;
-                greedy[lightest][t]++;
-                load[lightest] += types[t].Area;
-            }
-            yield return greedy;
-            if (count < 2)
-                yield break;
-            var snake = Enumerable.Range(0, count).Select(_ => new int[types.Count]).ToArray();
-            for (var i = 0; i < instances.Count; i++)
-            {
-                var round = i / count;
-                var slot = i % count;
-                snake[round % 2 == 0 ? slot : count - 1 - slot][instances[i]]++;
-            }
-            if (!snake.Zip(greedy).All(p => p.First.SequenceEqual(p.Second)))
-                yield return snake;
-        }
-
-        /// <summary>
-        /// Packs the last sheet of a complete plan again inside ever shorter strips
-        /// (<see cref="OrderedSqueeze"/>), along each of <see cref="SqueezeAxes"/>; a shorter
-        /// sheet replaces it when the plan then beats the one given.
-        /// </summary>
-        public Plan Squeeze(Plan plan)
-        {
-            if (plan.Unplaced != 0 || plan.Sheets.Count == 0)
-                return plan;
-            var last = plan.Sheets[^1];
-            var stock = last.Stock;
-            if (stock.Outline != null || last.Parts.Count < 2 || last.Parts.Count > OrderedSqueeze.MaxParts)
-                return plan;
-            var best = plan;
-            foreach (var axis in SqueezeAxes(job, stock))
-            {
-                token.ThrowIfCancellationRequested();
-                var fill = new OrderedSqueeze(types, CacheFor(stock), stock, ClampsFor(stock), Work, SqueezeOrientations)
-                    .Fill(last.Parts, axis, token);
-                if (fill == null)
-                    continue;
-                var sheets = plan.Sheets.Take(plan.Sheets.Count - 1).Append(fill).ToList();
-                var candidate = plan with
-                {
-                    Sheets = sheets,
-                    Cost = NestJobCost.RequireFinite(plan.Cost - NetCost(job.Options, last) + NetCost(job.Options, fill)),
-                };
-                if (candidate.IsBetterThan(best))
-                    best = candidate;
-            }
-            return best;
-        }
-
-        private readonly Dictionary<int, IReadOnlyList<Orientation>> squeezeOrientations = new();
-
-        /// <summary>
-        /// The orientations the squeeze offers <paramref name="type"/>: the catalog's, and for a
-        /// part that may turn freely also every <see cref="SqueezeAngleStep"/> that gives another
-        /// outline. Built once per type per solve, as each owns no-fit polygons.
-        /// </summary>
-        private IReadOnlyList<Orientation> SqueezeOrientations(PartType type)
-        {
-            if (squeezeOrientations.TryGetValue(type.Index, out var found))
-                return found;
-            var all = type.Orientations.ToList();
-            if (type.Perimeter != null && all.Count > 0 && type.Part.Rotation.Kind == RotationPolicyKind.Automatic)
-            {
-                var angles = all.Select(o => o.Rotation).ToList();
-                for (var turn = 0; turn * SqueezeAngleStep < 2 * System.Math.PI - 1e-9; turn++)
-                    angles.Add(turn * SqueezeAngleStep);
-                foreach (var angle in RotationCandidates.DistinctOutlines(type.Perimeter, angles).Skip(all.Count))
-                    if (Orient(type, angle) is { } extra)
-                        all.Add(extra);
-            }
-            return squeezeOrientations[type.Index] = all;
-        }
-
-        /// <summary>Next private orientation index: far above the catalog's, pair and block poses.</summary>
-        private int solvedOrientations = 1_000_000;
-
-        /// <summary>A pose of <paramref name="type"/> at a solved angle, with its own NFP cache key.</summary>
-        private Orientation? Orient(PartType type, double angle) =>
-            PartCatalog.CreateOrientation(type, solvedOrientations++, angle);
-
-        private NoFitCache CacheFor(NestPlateStock stock)
-        {
-            var clearance = System.Math.Max(0, stock.PartSpacing);
-            if (!caches.TryGetValue(clearance, out var cache))
-                caches[clearance] = cache = new NoFitCache(clearance);
-            return cache;
-        }
-
-        /// <summary>An outlined sheet's usable material as the packer's boundary, built once per
-        /// stock per solve; null for a rectangular sheet, which keeps the work-area path.</summary>
-        private PackBoundary? BoundaryFor(NestPlateStock stock)
-        {
-            if (stock.Outline == null)
-                return null;
-            if (!boundaries.TryGetValue(stock, out var found))
-                boundaries[stock] = found = new PackBoundary(stock.Outline.Material(stock.PlacementOrigin),
-                    stock.OutlineInset, stock.WorkArea, CacheFor(stock));
-            return found;
-        }
-
-        private ClampObstacles? ClampsFor(NestPlateStock stock)
-        {
-            if (stock.ClampZones.Count == 0)
-                return null;
-            if (!clamps.TryGetValue(stock, out var found))
-                clamps[stock] = found = new ClampObstacles(stock);
-            return found;
-        }
-
-        public bool PairFits(PartType type)
-        {
-            if (type.Part.Quantity < 2 || type.Orientations.Count == 0)
-                return false;
-            return job.Plates.Any(stock => stock.Quantity != 0
-                && PairsFor(stock).TryGetValue(type.Index, out var candidates)
-                && candidates.Any(pair => stock.Fits(pair.Width, pair.Height)));
-        }
-
-        /// <summary>Best-fit pairs for this stock's spacing, built once per solve.</summary>
-        private IReadOnlyDictionary<int, IReadOnlyList<PairPose>> PairsFor(NestPlateStock stock)
-        {
-            var clearance = System.Math.Max(0, stock.PartSpacing);
-            if (!pairs.TryGetValue(clearance, out var found))
-            {
-                // The best-fit plate filter only needs the largest sheet at this spacing;
-                // each packer still checks the pair against its own work area.
-                var sheets = job.Plates.Where(p => System.Math.Max(0, p.PartSpacing) == clearance).ToList();
-                pairs[clearance] = found = PairCatalog.Build(types, clearance,
-                    sheets.Max(p => p.Size.Length), sheets.Max(p => p.Size.Width), token, drawingFor);
-            }
-            return found;
-        }
-
-        /// <summary>
-        /// Greedy sheet-by-sheet decode. <paramref name="usedBefore"/> seeds finite-stock
-        /// accounting, <paramref name="sheetCap"/> bounds the sheets this run may add, and
-        /// <paramref name="first"/>, when set, forces the stock of the first sheet.
-        /// <paramref name="finishers"/>, when set, receives every complete run the decode passed
-        /// over: the sheets chosen so far plus a trial sheet that took all the remaining parts
-        /// but was not the sheet chosen. Collecting them never changes the decode.
-        /// </summary>
-        private Run Decode(
-            int[] demand,
-            PackAxis axis,
-            double beta,
-            IReadOnlyDictionary<string, int> usedBefore,
-            int? sheetCap,
-            NestPlateStock? first,
-            IReadOnlyList<double>? weights = null,
-            bool grouped = false,
-            bool banded = false,
-            List<Run>? finishers = null
-        )
-        {
-            var remaining = (int[])demand.Clone();
-            var used = job.Plates.ToDictionary(s => s.Id, s => usedBefore.GetValueOrDefault(s.Id), StringComparer.Ordinal);
-            var sheets = new List<SheetFill>();
-            var net = 0.0;
-            NestJobStopReason reason;
-
-            while (true)
-            {
-                token.ThrowIfCancellationRequested();
-                if (remaining.All(r => r == 0))
-                {
-                    reason = NestJobStopReason.Completed;
-                    break;
-                }
-                if (sheetCap is int cap && sheets.Count >= cap)
-                {
-                    reason = NestJobStopReason.PlateLimitReached;
-                    break;
-                }
-
-                var trials = new List<(SheetFill Fill, double Net)>();
-                var areaLeft = types.Sum(t => remaining[t.Index] * t.Area);
-                foreach (var stock in job.Plates)
-                {
-                    token.ThrowIfCancellationRequested();
-                    if (sheets.Count == 0 && first != null && !ReferenceEquals(stock, first))
-                        continue;
-                    if (stock.Quantity is int available && used[stock.Id] >= available)
-                        continue;
-                    // Only once the block budget is spent: before that a skipped trial would leave
-                    // block attempts and work unspent that a later trial could then use.
-                    if (pruneTrials && finishers == null && Work.Value >= workBudget && CannotWin(stock, trials, areaLeft))
-                        continue;
-                    progress?.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stock.Id, sheets.Count, 0, 0));
-                    // Grouped fills pack groups from singles and pairs: Fill blocks cost far more per
-                    // fill there and gave no denser groups. A banded fill's bands are Fill patterns
-                    // already; its gap fill takes singles and pairs.
-                    FrontierPacker Packer(IReadOnlyList<int>? ranks, double? reach) => new(types, CacheFor(stock),
-                        PairsFor(stock), stock, axis, beta, Work, grouped || banded || quick ? null : BlocksFor(stock), ClampsFor(stock), BoundaryFor(stock),
-                        weights, ranks, reach);
-                    var fill = banded
-                        ? Banded(stock, remaining, weights, Packer)
-                        : grouped && GroupedFill.Applies(types, remaining)
-                        ? new GroupedFill(types, Packer, axis, stock.Outline == null, CompareSheets, Work, groupedBudget)
-                            .Fill(remaining, token)
-                        : Packer(null, null).Fill(remaining, token);
-                    sheetPacked?.Invoke();
-                    if (fill.Parts.Count > 0)
-                        trials.Add((fill, NetCost(job.Options, fill)));
-                }
-
-                if (trials.Count == 0)
-                {
-                    var exhausted = job.Plates.Any(s => s.Quantity is int q && used[s.Id] >= q);
-                    reason = exhausted ? NestJobStopReason.StockExhausted : NestJobStopReason.NoPlacementFound;
-                    break;
-                }
-
-                // Look-ahead: charge whatever a trial leaves behind at the best efficiency any trial
-                // achieved, so a sheet that finishes the job competes fairly with a denser partial one.
-                var remainingArea = types.Sum(t => remaining[t.Index] * t.Area);
-                var bestRatio = trials.Min(t => t.Net / System.Math.Max(t.Fill.PartArea, 1e-12));
-                var chosen = trials
-                    .Select((t, order) => (t.Fill, t.Net, order, Estimate: NestJobCost.RequireFinite(t.Net + System.Math.Max(0, remainingArea - t.Fill.PartArea) * bestRatio)))
-                    .OrderBy(t => t.Estimate)
-                    .ThenByDescending(t => t.Fill.Parts.Count)
-                    .ThenByDescending(t => NestJobCost.TieBreakKey(Offcut(job.Options, t.Fill)))
-                    .ThenBy(t => t.order)
-                    .First();
-
-                if (finishers != null)
-                {
-                    var left = remaining.Sum();
-                    for (var i = 0; i < trials.Count; i++)
-                    {
-                        if (i == chosen.order || trials[i].Fill.Parts.Count != left)
-                            continue;
-                        // Each run owns its sheets' part lists, as the chosen copies below do.
-                        var finished = sheets.Select(s => s with { Parts = s.Parts.ToList() }).Append(trials[i].Fill).ToList();
-                        finishers.Add(new Run(finished, NestJobCost.RequireFinite(net + trials[i].Net), NestJobStopReason.Completed));
-                    }
-                }
-
-                var outstanding = types.ToDictionary(t => t.Part.Id, t => remaining[t.Index], StringComparer.Ordinal);
-                var counts = chosen.Fill.Parts.GroupBy(p => types[p.Orientation.TypeIndex].Part.Id, StringComparer.Ordinal)
-                    .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
-                // Count all stock still available, not just the forced-first trial subset.
-                var availableEntries = job.Plates.Count(s => s.Quantity == null || used[s.Id] < s.Quantity);
-                // Fill has no partial/budget exit: it returns after states empty or Choose finds
-                // no supported placement. WorkBudget only controls later variants/block preparation.
-                var copies = CompletedLayoutRepeat.Limit(outstanding, counts, searchCompleted: true, availableEntries,
-                    chosen.Fill.Stock.Quantity - used[chosen.Fill.Stock.Id], sheetCap - sheets.Count);
-                if (copies > 1)
-                {
-                    try
-                    {
-                        NestJobValidator.ValidateCandidate(new PlateCandidate(chosen.Fill.Parts.Select(p =>
-                            new NestJobPlacement(types[p.Orientation.TypeIndex].Part.Id, 0, p.X, p.Y, p.Orientation.Rotation))),
-                            chosen.Fill.Stock, outstanding, parts);
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        copies = 1; // Uncertified candidates retain ordinary allocation/final validation.
-                    }
-                }
-                batchSelected?.Invoke(new RepeatBatch(chosen.Fill.Stock.Id, copies, availableEntries, sheets.Count,
-                    sheets.Count == 0 && first != null));
-                for (var copy = 0; copy < copies; copy++)
-                {
-                    token.ThrowIfCancellationRequested();
-                    // Poses are immutable records over the read-only catalog; each physical sheet
-                    // owns a separate list so tail replanning can remove/replace individual copies.
-                    sheets.Add(chosen.Fill with { Parts = chosen.Fill.Parts.ToList() });
-                    net = NestJobCost.RequireFinite(net + chosen.Net);
-                }
-                used[chosen.Fill.Stock.Id] = checked(used[chosen.Fill.Stock.Id] + copies);
-                foreach (var type in types)
-                    if (counts.TryGetValue(type.Part.Id, out var count))
-                        remaining[type.Index] = checked(remaining[type.Index] - checked(count * copies));
-            }
-
-            return new Run(sheets, net, reason);
-        }
-
-        /// <summary>
-        /// Whether a trial of <paramref name="stock"/> could neither be chosen nor change the
-        /// choice, so the decode may skip it: its least possible net cost (the whole sheet, less
-        /// full salvage credit) already exceeds the best estimate so far, and over the remaining
-        /// part area it cannot have a better cost ratio than the best so far. Later trials only
-        /// lower the ratio and the estimates, so the decode picks the same sheet without it.
-        /// </summary>
-        private bool CannotWin(NestPlateStock stock, List<(SheetFill Fill, double Net)> trials, double areaLeft)
-        {
-            if (trials.Count == 0 || stock.Cost < 0 || areaLeft <= 0)
-                return false;
-            var rate = job.Options.SalvageRate != 0 && job.Options.MinimumSalvageDimension > 0 ? job.Options.SalvageRate : 0;
-            if (rate is < 0 or > 1)
-                return false;
-            var least = (stock.Cost ?? stock.Area) * (1 - rate);
-            var ratio = trials.Min(t => t.Net / System.Math.Max(t.Fill.PartArea, 1e-12));
-            var estimate = trials.Min(t => t.Net + System.Math.Max(0, areaLeft - t.Fill.PartArea) * ratio);
-            const double Margin = 1 + 1e-9;
-            return least > estimate * Margin && least >= ratio * areaLeft * Margin;
-        }
-    }
-
-    private sealed record Run(IReadOnlyList<SheetFill> Sheets, double Net, NestJobStopReason Reason);
 
     private static NestJobResult BuildResult(NestJob job, IReadOnlyList<PartType> types,
         Plan plan, IProgress<NestJobProgress>? progress, CancellationToken token)
@@ -965,51 +373,37 @@ public sealed class IrregularNestingEngine : INestingEngine
         return builder.Build(plan.Reason);
     }
 
-    private static double NetCost(NestJobOptions options, SheetFill fill) =>
-        fill.Parts.Count == 0 ? NestJobCost.GrossSheetCost(fill.Stock)
-            : NestJobCost.NetSheetCost(options, fill.Stock, Envelope(fill));
-
-    /// <summary>Equal-cost tie-break: the fill's <see cref="NestJobCost.CompactnessOffcut(NestJobOptions, NestPlateStock, OpenNest.Geometry.Box)"/>.</summary>
-    private static double Offcut(NestJobOptions options, SheetFill fill) =>
-        fill.Parts.Count == 0 ? 0 : NestJobCost.CompactnessOffcut(options, fill.Stock, Envelope(fill));
-
-    private static OpenNest.Geometry.Box Envelope(SheetFill fill)
-    {
-        var left = fill.Parts.Min(p => p.Left);
-        var bottom = fill.Parts.Min(p => p.Bottom);
-        return new OpenNest.Geometry.Box(left, bottom,
-            fill.Parts.Max(p => p.Right) - left, fill.Parts.Max(p => p.Top) - bottom);
-    }
-
-    /// <summary>Ranked by unplaced parts, cost, sheet count, then compactness offcut (without salvage
-    /// credit every one-sheet plan costs the same); full ties keep the incumbent.</summary>
-    private sealed record Plan(IReadOnlyList<SheetFill> Sheets, double Cost, int Unplaced, NestJobStopReason Reason,
-        bool Priced, NestJobOptions Options)
-    {
-        private double Offcut => Sheets.Sum(s => IrregularNestingEngine.Offcut(Options, s));
-
-        public bool IsBetterThan(Plan other)
+    /// <summary>Exercises the production physical-tail lifecycle from a test-owned incumbent.
+    /// This does not alter normal Solve or expose a public packing API.</summary>
+    internal NestJobResult ImproveTailForTesting(NestJob job, IReadOnlyList<SheetFill> physicalPlan) =>
+        ForTesting(job, (solver, _) =>
         {
-            if (Unplaced != other.Unplaced)
-                return Unplaced < other.Unplaced;
-            if (Priced && Cost != other.Cost)
-                return Cost < other.Cost;
-            var scale = System.Math.Max(1, System.Math.Max(Cost, other.Cost));
-            if (System.Math.Abs(Cost - other.Cost) > 1e-9 * scale)
-                return Cost < other.Cost;
-            if (Sheets.Count != other.Sheets.Count)
-                return Sheets.Count < other.Sheets.Count;
-            var offcut = Offcut;
-            var otherOffcut = other.Offcut;
-            return offcut - otherOffcut > 1e-9 * System.Math.Max(1, System.Math.Max(offcut, otherOffcut));
-        }
-    }
-}
+            var unplaced = job.Parts.Sum(p => p.Quantity) - physicalPlan.Sum(s => s.Parts.Count);
+            var plan = PlanOf(job, physicalPlan, physicalPlan.Sum(s => NetCost(job.Options, s)), unplaced,
+                unplaced == 0 ? NestJobStopReason.Completed : NestJobStopReason.NoPlacementFound);
+            return solver.ImproveTail(plan, WorkBudget * 2);
+        });
 
-/// <summary>Deterministic effort meter shared by all packers in one solve.</summary>
-internal sealed class WorkCounter
-{
-    private long value;
-    public long Value => Interlocked.Read(ref value);
-    public void Add(long amount) => Interlocked.Add(ref value, amount);
+    /// <summary>Runs the sheet-reduction pass on a test-owned complete plan.</summary>
+    internal NestJobResult ReduceSheetsForTesting(NestJob job, IReadOnlyList<SheetFill> physicalPlan) =>
+        ForTesting(job, (solver, _) => solver.ReduceSheets(PlanOf(job, physicalPlan,
+            physicalPlan.Sum(s => NetCost(job.Options, s)), 0, NestJobStopReason.Completed)));
+
+    /// <summary>Decodes one variant with the given type weights, whole demand placeable; for
+    /// tests of the weighted placement rule only.</summary>
+    internal NestJobResult PlanForTesting(NestJob job, int variant, IReadOnlyList<double>? weights) =>
+        ForTesting(job, (solver, demand) =>
+            solver.Plan(demand, new Strategy(Variants[variant].Axis, Variants[variant].Beta, weights)));
+
+    /// <summary>The quick plan a time-limited solve reports first, whole demand placeable; for tests.</summary>
+    internal NestJobResult QuickPlanForTesting(NestJob job) =>
+        ForTesting(job, (solver, demand) => solver.QuickPlan(demand));
+
+    /// <summary>The result of a plan made on a solver of this engine's, given the whole demand.</summary>
+    private NestJobResult ForTesting(NestJob job, Func<Solver, int[], Plan> plan)
+    {
+        var types = PartCatalog.Build(job);
+        using var solver = new Solver(this, job, types, null, default);
+        return BuildResult(job, types, plan(solver, types.Select(t => t.Part.Quantity).ToArray()), null, default);
+    }
 }
