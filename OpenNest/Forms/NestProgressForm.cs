@@ -204,7 +204,11 @@ namespace OpenNest.Forms
             Controls.Add(header);
             Controls.Add(footer);
             MinimumSize = new System.Drawing.Size(640, 420);
-            ClientSize = new System.Drawing.Size(920, 600);
+            // Tall enough that the layout cards stay readable while the search runs.
+            var screen = Owner != null ? Screen.FromControl(Owner) : Screen.FromPoint(Cursor.Position);
+            Size = new System.Drawing.Size(
+                Size.Width - ClientSize.Width + 920,
+                System.Math.Max(MinimumSize.Height, (int)(screen.WorkingArea.Height * 0.8)));
             ResumeLayout(true);
         }
 
