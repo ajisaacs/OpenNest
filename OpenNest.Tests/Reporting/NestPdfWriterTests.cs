@@ -135,7 +135,7 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Equal(before, NestReportBuilderTests.Fingerprint(nest));
     }
 
-    [Fact]
+    [SkippableFact]
     public void Write_TabbedLeadInPartStrokesEachOpenContourSeparately()
     {
         var nest = NestReportTestData.CreateTabbedNest();
@@ -153,7 +153,7 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Contains("1*", ReportPdf.Pages(path)[1]);
     }
 
-    [Fact]
+    [SkippableFact]
     public void Write_OutlineInTwoTabbedPiecesFillsAsOneShape()
     {
         // A 5 x 1 in bar cut in two pieces around two 0.1 in tabs.
