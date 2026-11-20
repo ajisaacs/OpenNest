@@ -134,6 +134,60 @@ public class MachineCuttingDefaultsTests
         Assert.Equal(new Spacing(1, 2, 3, 4), nest.PlateDefaults.EdgeSpacing);
     }
 
+    private static MachineConfig SizedMachine(UnitSystem units, params string[] sizes)
+    {
+        var machine = Machine(LineArc, units: units);
+        machine.Materials[0].Thicknesses[0].Value = units == UnitSystem.Millimeters ? 6.35 : 0.25;
+        machine.Materials[0].Thicknesses[0].PlateSizes = sizes.ToList();
+        return machine;
+    }
+
+    [Fact]
+    public void PlateOptionsFor_ListsTheThicknessesPlateSizes_ShorterSideFirst()
+    {
+        var machine = SizedMachine(UnitSystem.Inches, "60x120", "48X96", "100 x 50", "60x120", "120x60", "bogus", "0x10", "");
+
+        var options = MachineCuttingDefaults.PlateOptionsFor(machine, NestOf(0.25, "A36"));
+
+        Assert.Equal(new[] { (60.0, 120.0), (48.0, 96.0), (50.0, 100.0) }, options.Select(o => (o.Width, o.Length)));
+        Assert.All(options, o => Assert.Equal((0.0, (int?)null, (string)null), (o.Cost, o.Quantity, o.Id)));
+    }
+
+    [Fact]
+    public void PlateOptionsFor_StandardSizesAreInches_CustomOnesTheMachinesUnits()
+    {
+        var machine = SizedMachine(UnitSystem.Millimeters, "48x96", "1500x3000");
+
+        var inches = MachineCuttingDefaults.PlateOptionsFor(machine, NestOf(0.25, "A36"));
+        var millimeters = MachineCuttingDefaults.PlateOptionsFor(machine, NestOf(6.35, "A36", Units.Millimeters));
+
+        Assert.Equal(new[] { 48, 96, 1500 / 25.4, 3000 / 25.4 }, inches.SelectMany(o => new[] { o.Width, o.Length }), new DoubleTolerance(1e-9));
+        Assert.Equal(new[] { 48 * 25.4, 96 * 25.4, 1500, 3000 }, millimeters.SelectMany(o => new[] { o.Width, o.Length }), new DoubleTolerance(1e-9));
+    }
+
+    [Fact]
+    public void ApplyPlateSizesTo_ReplacesTheNestsOptions_OnlyWhenTheMachineListsSome()
+    {
+        var nest = NestOf(0.25, "A36");
+        nest.PlateOptions = new List<PlateOption> { new() { Width = 72, Length = 144, Cost = 5 } };
+
+        Assert.False(MachineCuttingDefaults.ApplyPlateSizesTo(nest, SizedMachine(UnitSystem.Inches)));
+        Assert.False(MachineCuttingDefaults.ApplyPlateSizesTo(nest, null));
+        Assert.False(MachineCuttingDefaults.ApplyPlateSizesTo(NestOf(0.5, "A36"), SizedMachine(UnitSystem.Inches, "60x120")));
+        Assert.Equal(72, Assert.Single(nest.PlateOptions).Width);
+
+        Assert.True(MachineCuttingDefaults.ApplyPlateSizesTo(nest, SizedMachine(UnitSystem.Inches, "60x120")));
+        var option = Assert.Single(nest.PlateOptions);
+        Assert.Equal((60.0, 120.0, 0.0), (option.Width, option.Length, option.Cost));
+    }
+
+    private sealed class DoubleTolerance(double tolerance) : IEqualityComparer<double>
+    {
+        public bool Equals(double x, double y) => System.Math.Abs(x - y) <= tolerance;
+
+        public int GetHashCode(double obj) => 0;
+    }
+
     [Fact]
     public void Spacing_SurvivesTheMachineFile()
     {

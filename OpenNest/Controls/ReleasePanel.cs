@@ -79,6 +79,13 @@ namespace OpenNest.Controls
         { get; set; } = RenestAsync;
 
         /// <summary>
+        /// The machine configuration of a nest being released, whose plate sizes for the nest's
+        /// material and thickness Nest after release offers; replaced by tests.
+        /// </summary>
+        internal Func<Nest, MachineConfig> FindMachine { get; set; } =
+            nest => MachineSettings.FindMachine(nest.Machine);
+
+        /// <summary>
         /// The MaterialLedger stock one Make Nests run nests on; replaced by tests.
         /// </summary>
         internal Func<ReleaseLedgerStock> CreateLedgerStock { get; set; } =
@@ -751,10 +758,17 @@ namespace OpenNest.Controls
             cancellation = new CancellationTokenSource();
             UpdateCommands();
             var merges = await RereadMergesAsync(ChosenMerges(), cancellation.Token);
-            session = new SetReleaseSession(sets, library, nests, serverUrl, ReadPackage, WriteNest, CreateNest, ReadNest,
-                !nestAfter ? null
+            Func<Nest, CancellationToken, Task<SetReleaseRenest>> renest = !nestAfter ? null
                 : live == null ? (nest, token) => Renest(nest, ledger, token)
-                : LiveRenest(live, ledger));
+                : LiveRenest(live, ledger);
+            session = new SetReleaseSession(sets, library, nests, serverUrl, ReadPackage, WriteNest, CreateNest, ReadNest,
+                renest == null ? null : (nest, token) =>
+                {
+                    // After the ledger, Auto Nest chooses among the machine's plate sizes for
+                    // the nest's material and thickness, when it lists any.
+                    MachineCuttingDefaults.ApplyPlateSizesTo(nest, FindMachine(nest));
+                    return renest(nest, token);
+                });
             var progress = new Progress<SetReleaseProgress>(ShowProgress);
             if (live != null)
             {

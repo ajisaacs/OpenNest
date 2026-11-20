@@ -412,6 +412,57 @@ public class SetReleaseFormsTests
     }
 
     [Fact]
+    public void NestAfterRelease_NestsOnTheMachinesPlateSizesForTheMaterial_NotThePlateDefault()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var library = new PackageLibrary();
+                var a = library.Add("SYN-A", "Synthetic Steel");
+                var sets = new InMemoryDrawingSets();
+                var set = CreateSet(sets, (a, 3));
+                var opened = new List<Nest>();
+                var machine = new MachineConfig
+                {
+                    Name = "Fiber 1",
+                    Units = UnitSystem.Inches,
+                    Materials =
+                    {
+                        new MaterialConfig
+                        {
+                            Name = "Synthetic Steel",
+                            Grade = "Grade A",
+                            Thicknesses = { new ThicknessConfig { Value = 0.25, PlateSizes = { "48x96" } } },
+                        },
+                    },
+                };
+
+                var (host, panel) = ShowPanel(sets, library, new MemoryNests(), (nest, _) => opened.Add(nest));
+                using var _ = host;
+                panel.CreateNest = (group, _) =>
+                {
+                    var nest = new Nest("N26-0201") { Units = group.Units };
+                    nest.PlateDefaults.Size = new OpenNest.Geometry.Size(60, 120);
+                    return Task.FromResult(nest);
+                };
+                panel.FindMachine = _ => machine;
+                Field<CheckBox>(panel, "nestAfterReleaseCheckBox").Checked = true;
+                panel.AddSet(set);
+
+                Run(panel.ReleaseAsync());
+
+                var nest = Assert.Single(opened);
+                Assert.Equal(3, nest.Plates.Sum(p => p.Parts.Count * p.Quantity));
+                Assert.All(nest.Plates, p => Assert.Equal((48.0, 96.0),
+                    (System.Math.Min(p.Size.Width, p.Size.Length), System.Math.Max(p.Size.Width, p.Size.Length))));
+                var option = Assert.Single(nest.PlateOptions);
+                Assert.Equal((48.0, 96.0), (option.Width, option.Length));
+            },
+            TestTimeout,
+            "The machine plate sizes release test did not complete.");
+    }
+
+    [Fact]
     public void NestAfterRelease_Unticked_SaysAMergedDraftIsLeftWithoutSheets()
     {
         StaTestThread.Run(

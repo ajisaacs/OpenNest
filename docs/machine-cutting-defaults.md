@@ -92,6 +92,16 @@ with no material or thickness gives it the record's (`LibraryDrawingInsert`), an
 spacing. Drawings from files carry no thickness, so they leave the nest blank. Plates are kept as they are, except
 an untouched trailing empty sheet, which follows the plate defaults.
 
+## Plate sizes
+
+Each thickness's Plate Sizes tab lists the sheet sizes stocked for it: standard sizes
+(`PlateSizes`, always inches) and custom ones typed as `W x L` in the machine's units.
+Make Nests with Nest after release ticked nests each released nest on these, after any
+MaterialLedger stock: they become the nest's plate-size options, in the nest's units, and
+Auto Nest chooses among them (`MachineCuttingDefaults.ApplyPlateSizesTo`). A thickness
+listing none leaves the nest's plate defaults and options as they were. File > New, BOM
+import and the Auto Nest dialog do not read them.
+
 ## Cut-offs
 
 The plate view's part clearance, overtravel, minimum segment length and direction come from

@@ -228,6 +228,64 @@ public static class MachineCuttingDefaults
     }
 
     /// <summary>
+    /// The plate sizes the machine lists for the nest's material and thickness (its Plate Sizes
+    /// tab), as plate-size options in the nest's units with the shorter side as the width, in
+    /// the order listed; empty when it lists none or has no settings for the nest. A standard
+    /// size ("60x120", <see cref="PlateSizes"/>) is in inches; a custom one is in the machine's
+    /// units. A label that is not two positive dimensions, or repeats an earlier size, is skipped.
+    /// </summary>
+    public static List<PlateOption> PlateOptionsFor(MachineConfig? machine, Nest nest)
+    {
+        ArgumentNullException.ThrowIfNull(nest);
+        var options = new List<PlateOption>();
+        if (Find(machine, nest)?.PlateSizes is not { Count: > 0 } labels)
+            return options;
+
+        foreach (var label in labels)
+        {
+            double width, length, scale;
+            if (OpenNest.Shapes.PlateSizes.TryGet(label, out var standard))
+                (width, length, scale) = (standard.Width, standard.Length, Scale(Units.Inches, nest.Units));
+            else if (TryParsePlateSize(label, out width, out length))
+                scale = Scale(machine!.Units, nest.Units);
+            else
+                continue;
+
+            var (shorter, longer) = (System.Math.Min(width, length) * scale, System.Math.Max(width, length) * scale);
+            if (options.Any(o => System.Math.Abs(o.Width - shorter) <= OpenNest.Math.Tolerance.Epsilon
+                && System.Math.Abs(o.Length - longer) <= OpenNest.Math.Tolerance.Epsilon))
+                continue;
+            options.Add(new PlateOption { Width = shorter, Length = longer });
+        }
+        return options;
+    }
+
+    /// <summary>
+    /// Gives the nest the machine's plate sizes for its material and thickness as its plate-size
+    /// options (<see cref="PlateOptionsFor"/>), replacing any it had, so Auto Nest chooses among
+    /// them. Returns false, changing nothing, when the machine lists none for the nest.
+    /// </summary>
+    public static bool ApplyPlateSizesTo(Nest nest, MachineConfig? machine)
+    {
+        var options = PlateOptionsFor(machine, nest);
+        if (options.Count == 0)
+            return false;
+        nest.PlateOptions = options;
+        return true;
+    }
+
+    // "50x100", "50 x 100" or "50X100": two positive finite dimensions.
+    private static bool TryParsePlateSize(string? label, out double width, out double length)
+    {
+        width = length = 0;
+        var parts = (label ?? "").Split(new[] { 'x', 'X', '×' }, StringSplitOptions.TrimEntries);
+        return parts.Length == 2
+            && double.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out width)
+            && double.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out length)
+            && double.IsFinite(width) && double.IsFinite(length) && width > 0 && length > 0;
+    }
+
+    /// <summary>
     /// Runs <paramref name="edit"/>, then, when it changed the nest's material, grade or
     /// thickness, applies the machine's spacing for them (<see cref="ApplySpacingTo"/>). A
     /// spacing the edit changed itself is the user's choice and stays.

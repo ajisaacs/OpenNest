@@ -807,9 +807,14 @@ every drawing's required quantity with the selected engine, in two steps:
    (`OpenNest.Desktop.ReleaseRenest`). A draft being merged into is renested from
    scratch, but the codes it was saved with still count as on another nest, so
    its own earlier sheets are not offered again.
-2. **Then the plate defaults.** Copies the ledger stock cannot hold are nested on
-   the nest's plate defaults (Tools > Nest Defaults) and plate-size options.
-   These sheets have no ledger code.
+2. **Then the machine's plate sizes.** Copies the ledger stock cannot hold are
+   nested on the plate sizes the nest's machine lists for its material, grade and
+   thickness (Tools > Machine Configuration, the thickness's Plate Sizes tab), with
+   Auto Nest choosing among them; the nest keeps them as its plate-size options, replacing
+   any a merged draft had (`MachineCuttingDefaults.ApplyPlateSizesTo`). When the
+   machine lists none for the nest, they are nested on the nest's plate defaults
+   (Tools > Nest Defaults) and plate-size options, as before. These sheets have no
+   ledger code.
 
 When the nest has no material or thickness, or the ledger is not set up on the
 PC, cannot be reached, rejects the API key, has no mapping for the material or
