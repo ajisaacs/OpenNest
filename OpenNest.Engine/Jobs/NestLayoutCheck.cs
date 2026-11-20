@@ -206,6 +206,8 @@ public static class NestLayoutCheck
             InflateBy = InflationFor(spacing);
         }
 
+        internal ShapeProfile Profile => profile;
+        internal Vector Location => location;
         internal SpacingOutline Raw { get; }
         internal double Spacing { get; }
         internal double InflateBy { get; }
@@ -215,6 +217,23 @@ public static class NestLayoutCheck
 
         internal NativeContours Native => native ??= NativeContours.Of(profile, location);
     }
+
+    /// <summary>
+    /// The layout check's outline verdict for a prepared part on <paramref name="stock"/>: true
+    /// on a rectangular sheet, else whether its material lies in the usable area within
+    /// <paramref name="slack"/>. The spacing outline's perimeter is the candidate and
+    /// <see cref="NativeContours.Region"/> confirms a failure, exactly as
+    /// <see cref="Violations(NestJob, NestJobResult)"/> judges a placed part, so the whole-job
+    /// runner validates candidates with it. A part without a perimeter is not held.
+    /// </summary>
+    internal static bool InsideOutline(PreparedPlacement a, NestPlateStock stock, double slack) =>
+        stock.Outline == null
+        || (a.Raw != null && InsideOutline(stock, a.Raw, a.Profile, a.Location, slack));
+
+    private static bool InsideOutline(NestPlateStock stock, SpacingOutline material, ShapeProfile profile,
+        Vector location, double slack) =>
+        stock.OutlineHolds(new PathsD { ClipperBridge.ToPath(material.Perimeter, positive: true) },
+            () => NativeContours.Region(profile.Perimeter, location), slack);
 
     private static ShapeProfile Transform(JobPartGeometry geometry, double rotation)
     {
@@ -549,11 +568,11 @@ public static class NestLayoutCheck
                 continue;
             }
 
-            // An outlined sheet: the circumscribed material must lie in the usable area, which
-            // keeps the largest edge spacing from every edge and obstacle, within the same slack.
-            if (stock != null && Outline(part, 0) is { } material
-                && !stock.OutlineHolds(new PathsD { ClipperBridge.ToPath(material.Perimeter, positive: true) },
-                    NestTolerances.WorkAreaSlack))
+            // An outlined sheet: the material must lie in the usable area, which keeps the largest
+            // edge spacing from every edge and obstacle, within the same slack. The outline
+            // circumscribes arcs, so what it flags is confirmed on the native contours.
+            if (stock != null && Profile(part) is { } profile && Outline(profile, part.Location, 0) is { } material
+                && !InsideOutline(stock, material, profile, part.Location, NestTolerances.WorkAreaSlack))
             {
                 result.Add(
                     $"'{DisplayName(part, requirements)}' at ({part.Location.X:F2},{part.Location.Y:F2}) falls outside the outline "

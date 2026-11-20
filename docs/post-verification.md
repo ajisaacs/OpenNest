@@ -134,7 +134,10 @@ shows the first three check categories, even when there are no findings:
   outside the plate's work area, so closer to an edge than that side's edge spacing, or, on
   an outlined sheet, closer than the largest edge spacing to the outline or an obstacle.
   This is the bound Auto Nest's layout check applies, so a layout it accepted stays clear;
-  shortfalls up to `SpacingSlack` pass. Leads may run into the edge spacing. The finding
+  shortfalls up to `SpacingSlack` pass. An outline is tested on the spacing outline and what
+  that flags is confirmed on the part's native contour (`NativeContours.Region`), as for part
+  spacing, so a round part resting on the usable edge is clear on an outlined sheet as it is
+  on a rectangle. Leads may run into the edge spacing. The finding
   says the part is outside the work area and gives the gap and the side's spacing, as in
   `'name' is outside the work area: 0.200 from the plate's left edge, inside its 0.500 edge
   spacing.` (`PostVerificationKind.EdgeSpacing`). Zero edge spacing allows contact with the edge.

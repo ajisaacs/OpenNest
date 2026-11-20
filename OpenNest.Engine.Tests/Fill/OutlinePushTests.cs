@@ -25,9 +25,6 @@ public class OutlinePushTests
     private const double NotchWidth = 3;
     private const double Edge = 0.25;
 
-    // How far short of a wall a box push stops: the chord tolerance plus two Clipper grid units.
-    private const double BoxMargin = SpacingOutline.ChordTolerance + 0.0002 + 1e-9;
-
     private static SheetOutline NotchedSheet(IEnumerable<IEnumerable<Vector>> obstacles = null) =>
         new(new[]
         {
@@ -95,15 +92,17 @@ public class OutlinePushTests
         return new Vector(sheet.X, sheet.Y);
     }
 
-    /// <summary>The edge review's verdict: the circumscribed material keeps the edge spacing
-    /// from the outline and its obstacles, within the shared slack.</summary>
+    /// <summary>The edge review's outline test: the material keeps the edge spacing from the
+    /// outline and its obstacles, within the shared slack; what the circumscribed outline flags
+    /// is confirmed on the native contours.</summary>
     private static bool KeepsTheOutline(Plate plate, Part part)
     {
         // The drawing's own material: a placed program can carry leads. No test here rotates a part.
         var profile = new ShapeProfile(ConvertProgram.ToGeometry(part.BaseDrawing.Program).ForNesting().ToList());
         var material = SpacingOutline.Build(profile, part.Location, 0);
         var region = new PathsD { ClipperBridge.ToPath(material.Perimeter, positive: true) };
-        return plate.Outline.Holds(region, Edge, Origin(plate), SpacingOutline.SpacingSlack);
+        return plate.Outline.Holds(region, () => NativeContours.Region(profile.Perimeter, part.Location),
+            Edge, Origin(plate), SpacingOutline.SpacingSlack);
     }
 
     [Fact]
@@ -181,18 +180,38 @@ public class OutlinePushTests
     }
 
     [Fact]
-    public void ARoundPartStopsWhereTheEdgeReviewStillPasses()
+    public void ARoundPartRestsOnTheWallAsOnThePlateEdge()
     {
-        // The review circumscribes arcs, so a disc must stop that much short of the wall.
+        // The arc is slid as an arc and the review confirms on native contours: no chord gap.
         var plate = MakePlate();
         var mover = Add(plate, DiscProgram(1.5), 20, 1);
+        var moving = new List<Part> { mover };
         Assert.True(KeepsTheOutline(plate, mover));
 
-        Compactor.Push(new List<Part> { mover }, plate, PushDirection.Left);
+        Compactor.Push(moving, plate, PushDirection.Left);
 
-        Assert.InRange(mover.BoundingBox.Left, NotchLength + Edge - 1e-6,
-            NotchLength + Edge + SpacingOutline.ChordTolerance);
+        Assert.Equal(NotchLength + Edge, mover.BoundingBox.Left, 6);
         Assert.True(KeepsTheOutline(plate, mover));
+        Assert.Equal(0, Compactor.Push(moving, plate, PushDirection.Left), 6);
+
+        // Down the wall to the plate's own edge, where the box test holds it: still clean.
+        Compactor.Push(moving, plate, PushDirection.Down);
+        Assert.Equal(Edge, mover.BoundingBox.Bottom, 6);
+        Assert.Equal(NotchLength + Edge, mover.BoundingBox.Left, 6);
+        Assert.True(KeepsTheOutline(plate, mover));
+    }
+
+    [Fact]
+    public void ARoundPartPastTheWallByMoreThanTheSlackFailsTheReview()
+    {
+        var plate = MakePlate();
+        var resting = Add(plate, DiscProgram(1.5), NotchLength + Edge, 0.25);
+        var within = Add(plate, DiscProgram(1.5), NotchLength + Edge - 0.0003, 0.25);
+        var past = Add(plate, DiscProgram(1.5), NotchLength + Edge - 0.001, 0.25);
+
+        Assert.True(KeepsTheOutline(plate, resting));
+        Assert.True(KeepsTheOutline(plate, within));
+        Assert.False(KeepsTheOutline(plate, past));
     }
 
     [Fact]
@@ -295,15 +314,12 @@ public class OutlinePushTests
         Compactor.SettlePlacement(moving, plate, PushDirection.Left, PushDirection.Down,
             boundingBoxesOnly: boundingBoxesOnly);
 
-        // A box push stops a hair short of a wall; the geometry pushes then close it.
-        var wall = NotchLength + Edge;
-        Assert.InRange(copy.BoundingBox.Left, wall - 1e-6, wall + (boundingBoxesOnly ? BoxMargin : 1e-6));
+        Assert.Equal(NotchLength + Edge, copy.BoundingBox.Left, 6);
         Assert.Equal(Edge, copy.BoundingBox.Bottom, 6);
         Assert.True(KeepsTheOutline(plate, copy));
     }
 
-    // A circumscribed arc reaches past the part's bounding box, so a box resting on the wall
-    // left the perimeter inside it and the following geometry push ran through the wall.
+    // A box push rests the box on the wall; the material in it must still be held there.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -317,7 +333,7 @@ public class OutlinePushTests
             Compactor.SettlePlacement(new List<Part> { disc }, plate, PushDirection.Left, PushDirection.Down,
                 boundingBoxesOnly: boundingBoxesOnly);
 
-            Assert.InRange(disc.BoundingBox.Bottom, NotchWidth + Edge - 1e-6, NotchWidth + Edge + BoxMargin);
+            Assert.Equal(NotchWidth + Edge, disc.BoundingBox.Bottom, 6);
             Assert.True(KeepsTheOutline(plate, disc), $"radius {radius}");
         }
     }
@@ -333,23 +349,23 @@ public class OutlinePushTests
         Compactor.SettlePlacement(new List<Part> { obround }, plate, PushDirection.Left, PushDirection.Down,
             boundingBoxesOnly: boundingBoxesOnly);
 
-        Assert.InRange(obround.BoundingBox.Left, NotchLength + Edge - 1e-6, NotchLength + Edge + BoxMargin);
+        Assert.Equal(NotchLength + Edge, obround.BoundingBox.Left, 6);
         Assert.True(KeepsTheOutline(plate, obround));
     }
 
     [Fact]
-    public void BoxPushStopsShortOfTheWallSoTheNextGeometryPushIsHeld()
+    public void BoxPushRestsOnTheWallAndTheNextGeometryPushIsHeld()
     {
         var plate = MakePlate();
         var mover = Add(plate, DiscProgram(1.5), 2, 12);
         var moving = new List<Part> { mover };
 
         Compactor.PushBoundingBox(moving, plate, PushDirection.Down);
-        Assert.InRange(mover.BoundingBox.Bottom, NotchWidth + Edge + SpacingOutline.ChordTolerance,
-            NotchWidth + Edge + BoxMargin);
+        Assert.Equal(NotchWidth + Edge, mover.BoundingBox.Bottom, 6);
+        Assert.True(KeepsTheOutline(plate, mover));
 
-        var closed = Compactor.Push(moving, plate, PushDirection.Down);
-        Assert.InRange(closed, 0, BoxMargin);
+        Assert.Equal(0, Compactor.Push(moving, plate, PushDirection.Down), 6);
+        Assert.Equal(0, Compactor.PushBoundingBox(moving, plate, PushDirection.Down), 6);
         Assert.True(KeepsTheOutline(plate, mover));
     }
 

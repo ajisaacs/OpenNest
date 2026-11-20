@@ -167,6 +167,54 @@ public class PlateEdgeReviewTests
         Assert.Empty(Find(report, PostVerificationKind.EdgeSpacing));
     }
 
+    // The outline test circumscribes arcs by up to 0.001, more than the slack, so a disc whose
+    // true bounds rest on the work-area edge used to warn on an outlined sheet only.
+    [Theory]
+    [InlineData(20, 0.25)] // bottom edge of the sheet's box
+    [InlineData(0.25, 10)] // left edge
+    [InlineData(20, 23.75)] // top edge
+    [InlineData(56.75, 10)] // right edge
+    [InlineData(1, 3.25)] // the notch's top, an outline wall inside the box
+    [InlineData(6.25, 0.25)] // the notch's side and the bottom edge at once
+    public void OutlinedSheet_RoundPartRestingOnTheUsableEdge_IsClear(double x, double y)
+    {
+        var report = PostVerificationAnalyzer.Analyze(Notched(Edges(0.25), Disc(x, y)));
+
+        Assert.Empty(Find(report, PostVerificationKind.OffPlate));
+        Assert.Empty(Find(report, PostVerificationKind.EdgeSpacing));
+    }
+
+    [Fact]
+    public void OutlinedSheet_RoundPartOnTheSheetEdge_IsNotOffPlate()
+    {
+        // No edge spacing: the disc rests on the sheet's own edge and on the notch's top.
+        var report = PostVerificationAnalyzer.Analyze(Notched(new Spacing(), Disc(20, 0), Disc(1, 3)));
+
+        Assert.Empty(Find(report, PostVerificationKind.OffPlate));
+        Assert.Empty(Find(report, PostVerificationKind.EdgeSpacing));
+    }
+
+    [Fact]
+    public void OutlinedSheet_RoundPartPastTheUsableEdge_StillWarns()
+    {
+        // Within the slack passes; 0.001 into the notch's edge spacing does not.
+        var within = PostVerificationAnalyzer.Analyze(Notched(Edges(0.25), Disc(1, 3.25 - 0.0003)));
+        Assert.Empty(Find(within, PostVerificationKind.EdgeSpacing));
+
+        var past = PostVerificationAnalyzer.Analyze(Notched(Edges(0.25), Disc(1, 3.249)));
+        Assert.Empty(Find(past, PostVerificationKind.OffPlate));
+        var finding = Assert.Single(Find(past, PostVerificationKind.EdgeSpacing));
+        Assert.Contains("inside the 0.250 edge spacing of the plate's outline", finding.Message);
+
+        var beside = PostVerificationAnalyzer.Analyze(Notched(Edges(0.25), Disc(6.249, 0.25)));
+        Assert.Single(Find(beside, PostVerificationKind.EdgeSpacing));
+
+        // 0.001 into the missing corner itself is off the plate.
+        var off = PostVerificationAnalyzer.Analyze(Notched(new Spacing(), Disc(1, 2.999)));
+        var offPlate = Assert.Single(Find(off, PostVerificationKind.OffPlate));
+        Assert.Contains("lies outside the plate's outline", offPlate.Message);
+    }
+
     [Fact]
     public void CutOffParts_AreExempt()
     {
@@ -214,4 +262,20 @@ public class PlateEdgeReviewTests
 
     private static Part Square(double x, double y, double size, string name = "square") =>
         new(new Drawing(name, MakeSquareProgram(0, 0, size)), new Vector(x, y));
+
+    /// <summary>A radius 1.5 disc whose bounds start at (x, y).</summary>
+    private static Part Disc(double x, double y) =>
+        new(new Drawing("disc", MakeCircleProgram(1.5, 1.5, 1.5)), new Vector(x, y));
+
+    /// <summary>A 60 x 27 sheet missing a 6 x 3 rectangle at its lower-left corner.</summary>
+    private static Nest Notched(Spacing edges, params Part[] parts)
+    {
+        var nest = NestWith(edges, parts);
+        nest.Plates[0].Outline = new SheetOutline(new[]
+        {
+            new Vector(6, 0), new Vector(60, 0), new Vector(60, 27),
+            new Vector(0, 27), new Vector(0, 3), new Vector(6, 3),
+        });
+        return nest;
+    }
 }

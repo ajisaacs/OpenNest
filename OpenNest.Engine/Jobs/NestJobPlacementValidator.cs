@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Clipper2Lib;
 using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
 
@@ -69,6 +68,12 @@ internal static class NestJobPlacementValidator
                 );
             poses.Add((geometries[placement.PartId], placement));
             spaced.Add(null);
+            // An outlined sheet is judged by the layout check's own test, so both accept the same
+            // poses. A rectangle needs no outline prepared for it.
+            if (stock.Outline != null && !NestLayoutCheck.InsideOutline(Spaced(placed.Count), stock, Epsilon))
+                throw new InvalidOperationException(
+                    "Candidate placement falls outside the usable stock area."
+                );
             for (var k = 0; k < placed.Count; k++)
             {
                 var other = placed[k];
@@ -121,12 +126,7 @@ internal static class NestJobPlacementValidator
         foreach (var cutout in shape.Cutouts)
             if (!FitsWorkArea(cutout, workArea))
                 return false;
-        if (stock.Outline == null)
-            return true;
-        // The circumscribed perimeter must lie in the outline's usable area; holes are inside it.
-        var perimeter = ClipperBridge.ToPath(
-            ClipperBridge.Flatten(shape.Perimeter, NestTolerances.ValidationOutline, circumscribe: true), positive: true);
-        return stock.OutlineHolds(new PathsD { perimeter }, Epsilon);
+        return true;
     }
 
     private static bool FitsWorkArea(Shape contour, Box workArea)

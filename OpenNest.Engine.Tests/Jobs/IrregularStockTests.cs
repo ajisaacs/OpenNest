@@ -183,6 +183,120 @@ public class IrregularStockTests
         Assert.Empty(NestLayoutCheck.Violations(corner, fine));
     }
 
+    // A disc turned 0.1 rad puts a vertex of its circumscribed outline about 0.0009 past its
+    // true bottom and top: on an outlined sheet that used to be a violation, on a rectangle not.
+    private const double Turned = 0.1;
+    private const double Radius = 1.5;
+
+    private static readonly Spacing Quarter = new(0.25, 0.25, 0.25, 0.25);
+
+    /// <summary>Disc centers resting on the Ell's usable edge at 0.25 edge spacing: the box's
+    /// bottom and left edges, and the arm's top (y = 24), an outline wall inside the box.</summary>
+    public static TheoryData<double, double> OnTheUsableEdge => new()
+    {
+        { 20, 0.25 + Radius },
+        { 0.25 + Radius, 20 },
+        { 70, 23.75 - Radius },
+    };
+
+    private static NestJob DiscJob(SheetOutline outline) =>
+        new([new NestJobPart("disc", PartGeometrySnapshot.FromProgram(TestShapes.Disc(Radius)), 1)],
+            [Stock(outline, edge: Quarter)]);
+
+    private static NestJobResult DiscAt(NestJob job, double x, double y) =>
+        new(NestJobStatus.Complete, NestJobStopReason.Completed,
+            [new NestJobPlateResult(0, job.Plates[0], [new NestJobPlacement("disc", 0, x, y, Turned)])],
+            [new PartFulfillment("disc", 1, 1, 0)], [new StockUsage("drop", 1, 0)]);
+
+    [Theory]
+    [MemberData(nameof(OnTheUsableEdge))]
+    public void LayoutCheck_AcceptsARoundPartRestingOnTheUsableEdge(double x, double y)
+    {
+        var job = DiscJob(Ell());
+
+        Assert.Empty(NestLayoutCheck.Violations(job, DiscAt(job, x, y)));
+    }
+
+    [Fact]
+    public void LayoutCheck_RejectsARoundPartPastTheUsableEdge()
+    {
+        // 0.001 into the edge spacing of the arm's top: the true material is past the edge.
+        var job = DiscJob(Ell());
+
+        var violation = Assert.Single(NestLayoutCheck.Violations(job, DiscAt(job, 70, 23.751 - Radius)));
+        Assert.Contains("outline", violation);
+    }
+
+    [Theory]
+    [MemberData(nameof(OnTheUsableEdge))]
+    public void Runner_AcceptsARoundCandidateRestingOnTheUsableEdge(double x, double y)
+    {
+        var job = DiscJob(Ell());
+
+        NestJobValidator.ValidateCandidate(new PlateCandidate([new NestJobPlacement("disc", 0, x, y, Turned)]),
+            job.Plates[0], new Dictionary<string, int> { ["disc"] = 1 }, job.Parts.ToDictionary(p => p.Id));
+    }
+
+    [Fact]
+    public void Runner_RefusesARoundCandidatePastTheUsableEdge()
+    {
+        var job = DiscJob(Ell());
+        var candidate = new PlateCandidate([new NestJobPlacement("disc", 0, 70, 23.751 - Radius, Turned)]);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => NestJobValidator.ValidateCandidate(
+            candidate, job.Plates[0], new Dictionary<string, int> { ["disc"] = 1 }, job.Parts.ToDictionary(p => p.Id)));
+        Assert.Contains("usable stock area", exception.Message);
+    }
+
+    [Fact]
+    public void RunnerAndLayoutCheck_AgreeOnARoundPartAtASlantedEdge()
+    {
+        // The chamfer runs from (72, 48) to (96, 24); its middle is (84, 36). The disc backs off
+        // along the normal from resting on the usable edge (0.25 inside), turned every which way:
+        // no straight box edge helps here, so both checks must reach one verdict pose by pose.
+        var job = DiscJob(Chamfered());
+        var parts = job.Parts.ToDictionary(p => p.Id);
+
+        bool Runner(NestJobPlacement pose)
+        {
+            try
+            {
+                NestJobValidator.ValidateCandidate(new PlateCandidate([pose]), job.Plates[0],
+                    new Dictionary<string, int> { ["disc"] = 1 }, parts);
+                return true;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+        }
+
+        NestJobPlacement Pose(double back, double turn)
+        {
+            var d = (0.25 + Radius + back) / System.Math.Sqrt(2);
+            return new NestJobPlacement("disc", 0, 84 - d, 36 - d, turn);
+        }
+
+        bool Layout(NestJobPlacement pose) => NestLayoutCheck.Violations(job, new NestJobResult(
+            NestJobStatus.Complete, NestJobStopReason.Completed,
+            [new NestJobPlateResult(0, job.Plates[0], [pose])],
+            [new PartFulfillment("disc", 1, 1, 0)], [new StockUsage("drop", 1, 0)])).Count == 0;
+
+        for (var k = -8; k <= 8; k++)
+            for (var t = 0; t < 12; t++)
+            {
+                var pose = Pose(k * 0.00005, t * 0.137);
+                Assert.True(Runner(pose) == Layout(pose), $"back {k * 0.00005}, turn {t * 0.137}");
+            }
+
+        // Clear of the edge by a grid unit both accept; 0.001 past it both refuse.
+        for (var t = 0; t < 12; t++)
+        {
+            Assert.True(Runner(Pose(0.0001, t * 0.137)) && Layout(Pose(0.0001, t * 0.137)), $"turn {t * 0.137}");
+            Assert.False(Runner(Pose(-0.001, t * 0.137)) || Layout(Pose(-0.001, t * 0.137)), $"turn {t * 0.137}");
+        }
+    }
+
     [Fact]
     public void Runner_RefusesACandidateOutsideTheOutline()
     {

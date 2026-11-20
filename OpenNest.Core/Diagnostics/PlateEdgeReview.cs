@@ -25,6 +25,13 @@ namespace OpenNest.Diagnostics;
 /// it accepted stays clear. Shortfalls up to <see cref="SpacingOutline.SpacingSlack"/> pass. Leads
 /// may run into the edge spacing; only off the sheet do they warn.
 /// </para>
+/// <para>
+/// The sheet's box is tested on the material's true bounds. An outline is tested on the
+/// <see cref="SpacingOutline"/>, whose circumscribed arcs reach past the material by more than
+/// the slack, and a failure there is confirmed on <see cref="NativeContours.Region"/>
+/// (<see cref="SheetOutline.Holds(PathsD, Func{PathsD}, double, Vector, double)"/>), so a round
+/// part resting on an edge reads the same on an outlined sheet as on a rectangle.
+/// </para>
 /// Cut-off parts are exempt: they run to the sheet edge by design.
 /// </summary>
 internal static class PlateEdgeReview
@@ -139,20 +146,24 @@ internal static class PlateEdgeReview
         var bounds = profile.Perimeter.BoundingBox.Translate(location);
         if (Describe(Furthest(null, bounds, bounds.Center, frame.Sheet)) is { } past)
             return past;
+        // An outlined sheet: the spacing outline finds the candidates and the native contours
+        // confirm them, as for part spacing, so an arc resting on an edge is not a finding.
         PathsD region = null;
+        PathsD native = null;
+        PathsD Native() => native ??= NativeContours.Region(profile.Perimeter, location);
         if (frame.Outline != null)
         {
             var material = SpacingOutline.Build(profile, location, 0)
                 ?? throw new ArgumentException("Part material has no closed perimeter.");
             region = new PathsD { ClipperBridge.ToPath(material.Perimeter, positive: true) };
-            if (!frame.Outline.Holds(region, 0, frame.Origin, Slack))
+            if (!frame.Outline.Holds(region, Native, 0, frame.Origin, Slack))
                 return new Verdict(true, "lies outside the plate's outline or over one of its obstacles.",
                     bounds.Center);
         }
         if (Shortest(bounds, frame.Sheet, frame.Work) is { } close)
             return new Verdict(false, $"is outside the work area: {close.Gap:F3} from the plate's {close.Edge} "
                 + $"edge, inside its {close.Spacing:F3} edge spacing.", close.Marker);
-        if (region != null && frame.Inset > 0 && !frame.Outline.Holds(region, frame.Inset, frame.Origin, Slack))
+        if (region != null && frame.Inset > 0 && !frame.Outline.Holds(region, Native, frame.Inset, frame.Origin, Slack))
             return new Verdict(false, $"is outside the work area: inside the {frame.Inset:F3} edge spacing of the "
                 + "plate's outline or one of its obstacles.", bounds.Center);
         return null;

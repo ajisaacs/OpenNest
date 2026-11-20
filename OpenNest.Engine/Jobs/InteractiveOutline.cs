@@ -13,12 +13,12 @@ namespace OpenNest.Engine.Jobs;
 /// work area stays the pushes' own box test; these walls add only what the outline takes away
 /// from it, so a rectangular sheet has none and its pushes are unchanged.
 /// <para>
-/// A moving part is measured as the edge review measures it against an outline: the
-/// circumscribed perimeter (<see cref="SpacingOutline"/>) of its clean drawing material, without
-/// leads, so a push that stops at a wall rests exactly where that review still passes. A box
-/// push stops <see cref="BoxMargin"/> short, so the perimeter of the part in that box is still
-/// clear of the wall. A part that already lies in a wall, deeper than the review's slack, is not
-/// held by it, like a part already overlapping another: it can be pushed back out.
+/// A moving part is measured by its true material, as the edge review confirms it against an
+/// outline: the perimeter of its clean drawing material, without leads, slid with its arcs as
+/// arcs, so a round part rests on a wall as it rests on the plate edge and that review passes.
+/// A box push rests the box on the wall. A part that already lies in a wall, deeper than the
+/// review's slack, is not held by it, like a part already overlapping another: it can be
+/// pushed back out.
 /// </para>
 /// </summary>
 internal sealed class InteractiveOutline
@@ -28,11 +28,6 @@ internal sealed class InteractiveOutline
     /// differ by a unit there, and a sliver that thin would sit under every part resting on the
     /// plate edge. The box test already holds that edge.</summary>
     private static readonly double EdgeClip = 2 * System.Math.Pow(10, -ClipperBridge.Precision);
-
-    /// <summary>How far a part's circumscribed perimeter can reach past its bounding box: the
-    /// chord tolerance, and the grid the perimeter is built on. A box resting on a wall without
-    /// it leaves the perimeter inside the wall, where the next geometry push would not be held.</summary>
-    private static readonly double BoxMargin = SpacingOutline.ChordTolerance + EdgeClip;
 
     private static readonly InteractiveOutline None = new(new List<Wall>());
 
@@ -88,27 +83,27 @@ internal sealed class InteractiveOutline
 
     /// <summary>
     /// The shorter of <paramref name="distance"/> and how far <paramref name="moving"/> travels
-    /// along <paramref name="direction"/> before its circumscribed perimeter meets a wall.
+    /// along <paramref name="direction"/> before the perimeter of its material meets a wall.
     /// </summary>
     public double Travel(Part moving, Vector direction, double distance)
     {
         if (walls.Count == 0)
             return distance;
-        var reach = moving.BoundingBox.Offset(BoxMargin);
-        return Travel(reach, () => PerimeterLines(moving), direction, distance);
+        // The material lies within the placed program's bounds, leads included.
+        return Travel(moving.BoundingBox, () => Material(moving), direction, distance);
     }
 
     /// <summary>As <see cref="Travel(Part, Vector, double)"/> for a part's bounding box: the
-    /// box pushes move a part as its box, which stops <see cref="BoxMargin"/> short of a wall.</summary>
+    /// box pushes move a part as its box, which rests on a wall.</summary>
     public double Travel(Box moving, Vector direction, double distance)
     {
         if (walls.Count == 0)
             return distance;
-        var grown = moving.Offset(BoxMargin);
-        return Travel(grown, () => BoxLines(grown), direction, distance);
+        return Travel(moving, () => (BoxLines(moving), new PathsD { BoxPath(moving) }), direction, distance);
     }
 
-    private double Travel(Box reach, Func<List<Entity>> movingLines, Vector direction, double distance)
+    private double Travel(Box reach, Func<(List<Entity> Boundary, PathsD Region)> material, Vector direction,
+        double distance)
     {
         var opposite = -direction;
         List<Entity> lines = null;
@@ -124,12 +119,12 @@ internal sealed class InteractiveOutline
             if (!SpatialQuery.PerpendicularOverlap(reach, wall.Bounds, direction))
                 continue;
 
-            lines ??= movingLines();
+            if (lines == null)
+                (lines, region) = material();
             if (lines.Count == 0)
                 return distance;
 
             // Already in this wall: the slide kernel answers for boundaries that start apart.
-            region ??= new PathsD { new PathD(lines.Select(line => ((Line)line).StartPoint).Select(p => new PointD(p.X, p.Y))) };
             if (wall.Core.Count > 0 && Clipper.Intersect(region, wall.Core, FillRule.NonZero, ClipperBridge.Precision)
                     .Sum(path => System.Math.Abs(Clipper.Area(path))) > 0)
                 continue;
@@ -189,11 +184,12 @@ internal sealed class InteractiveOutline
     }
 
     /// <summary>The part's material perimeter as the edge review takes it: the drawing's clean
-    /// material at the part's pose (no leads, seam overcut trimmed), arcs circumscribed at the
-    /// spacing outline's chord tolerance. Empty without a closed perimeter.</summary>
-    private static List<Entity> PerimeterLines(Part part)
+    /// material at the part's pose (no leads, seam overcut trimmed). The boundary is its native
+    /// lines and arcs, for the slide; the region is what the review confirms an outline with
+    /// (<see cref="NativeContours.Region"/>). Empty without a closed perimeter.</summary>
+    private static (List<Entity> Boundary, PathsD Region) Material(Part part)
     {
-        var lines = new List<Entity>();
+        var boundary = new List<Entity>();
         ShapeProfile profile;
         try
         {
@@ -201,25 +197,33 @@ internal sealed class InteractiveOutline
         }
         catch (ArgumentException)
         {
-            return lines;
+            return (boundary, new PathsD());
         }
 
-        var outline = profile == null ? null : SpacingOutline.Build(profile, part.Location, 0);
-        if (outline?.Perimeter != null)
-            AddLoop(ClipperBridge.ToPath(outline.Perimeter, positive: true), lines);
-        return lines;
+        if (profile?.Perimeter == null)
+            return (boundary, new PathsD());
+        // The profile is the drawing's, at the origin: move copies, never its entities.
+        foreach (var entity in profile.Perimeter.Entities)
+        {
+            var moved = entity.Clone();
+            moved.Offset(part.Location);
+            boundary.Add(moved);
+        }
+        return (boundary, NativeContours.Region(profile.Perimeter, part.Location));
     }
 
     private static List<Entity> BoxLines(Box box)
     {
         var lines = new List<Entity>(4);
-        AddLoop(new PathD
-        {
-            new PointD(box.Left, box.Bottom), new PointD(box.Right, box.Bottom),
-            new PointD(box.Right, box.Top), new PointD(box.Left, box.Top),
-        }, lines);
+        AddLoop(BoxPath(box), lines);
         return lines;
     }
+
+    private static PathD BoxPath(Box box) => new()
+    {
+        new PointD(box.Left, box.Bottom), new PointD(box.Right, box.Bottom),
+        new PointD(box.Right, box.Top), new PointD(box.Left, box.Top),
+    };
 
     /// <summary><see cref="Core"/> is the wall less the edge review's slack on every side: a
     /// part resting on the wall never reaches it, a part lying in the wall does.</summary>

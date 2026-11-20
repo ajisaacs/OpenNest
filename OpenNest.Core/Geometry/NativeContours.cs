@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Clipper2Lib;
 using OpenNest.Math;
 
 namespace OpenNest.Geometry
@@ -11,7 +12,8 @@ namespace OpenNest.Geometry
     /// so two convex arcs facing each other exactly at the spacing can overlap there; these
     /// contours measure that gap to within a tenth of the slack. Every spacing verdict (Auto
     /// Nest's layout check, the whole-job runner's candidate validation and the pre-post review)
-    /// confirms with them, so none can disagree.
+    /// confirms with them, so none can disagree. <see cref="Region"/> confirms an outlined
+    /// sheet's edge test the same way.
     /// </summary>
     public sealed class NativeContours
     {
@@ -46,6 +48,27 @@ namespace OpenNest.Geometry
                 holeLines = holes.Select(hole => hole.ToLines()).ToList(),
                 Bounds = perimeter.BoundingBox,
             };
+        }
+
+        /// <summary>
+        /// A perimeter (already rotated) at <paramref name="location"/> as a Clipper region, to
+        /// confirm a sheet-edge candidate the <see cref="SpacingOutline"/> found on an outlined
+        /// sheet. Arcs are circumscribed at <see cref="ChordTolerance"/> and the result is clipped to the
+        /// perimeter's own bounds, which a circumscribed arc reaches past and the material never
+        /// does. It always contains the material, so nothing past an edge is hidden, and a round
+        /// part resting on a straight edge of the sheet's box is judged as a square one is.
+        /// </summary>
+        public static PathsD Region(Shape perimeter, Vector location)
+        {
+            System.ArgumentNullException.ThrowIfNull(perimeter);
+            var path = ClipperBridge.ToPath(World(perimeter, location, ChordTolerance), positive: true);
+            var bounds = perimeter.BoundingBox.Translate(location);
+            var box = new PathD
+            {
+                new PointD(bounds.Left, bounds.Bottom), new PointD(bounds.Right, bounds.Bottom),
+                new PointD(bounds.Right, bounds.Top), new PointD(bounds.Left, bounds.Top),
+            };
+            return Clipper.Intersect(new PathsD { path }, new PathsD { box }, FillRule.NonZero, ClipperBridge.Precision);
         }
 
         /// <summary>

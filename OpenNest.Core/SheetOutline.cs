@@ -134,6 +134,23 @@ namespace OpenNest
             return outside.Sum(p => System.Math.Abs(Clipper.Area(p))) <= 0;
         }
 
+        /// <summary>
+        /// <see cref="Holds(PathsD, double, Vector, double)"/> for a part's material, judged as part
+        /// spacing is. <paramref name="outline"/>, the perimeter of the part's
+        /// <see cref="SpacingOutline"/>, is the candidate test: it circumscribes arcs by up to its
+        /// chord tolerance, more than the slacks in use, so a round part whose material keeps the
+        /// inset can fail it. A failure is confirmed on <paramref name="native"/>, the part's
+        /// <see cref="NativeContours.Region"/>, built only then. Both contain the material, so a
+        /// part past the usable area by more than the slack fails both. Auto Nest's layout check,
+        /// the whole-job runner's candidate validation and the pre-post edge review all judge an
+        /// outlined sheet this way, each with its own slack.
+        /// </summary>
+        public bool Holds(PathsD outline, Func<PathsD> native, double inset, Vector origin, double slack)
+        {
+            ArgumentNullException.ThrowIfNull(native);
+            return Holds(outline, inset, origin, slack) || Holds(native(), inset, origin, slack);
+        }
+
         /// <summary>This outline turned a quarter turn about the origin, re-normalized to start
         /// at the origin, as <see cref="Plate.Rotate90"/> turns the sheet.</summary>
         public SheetOutline Rotated90(RotationType direction)

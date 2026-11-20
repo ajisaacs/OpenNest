@@ -149,6 +149,16 @@ public sealed class NestPlateStock
     public bool OutlineHolds(PathsD region, double slack) =>
         Outline == null || Outline.Holds(region, OutlineInset, PlacementOrigin, slack);
 
+    /// <summary>
+    /// <see cref="OutlineHolds(PathsD, double)"/> for a part's material: <paramref name="outline"/>
+    /// (the circumscribed perimeter) is the candidate test, and a failure is confirmed on
+    /// <paramref name="native"/>, the perimeter's <see cref="NativeContours.Region"/>, as
+    /// <see cref="SheetOutline.Holds(PathsD, Func{PathsD}, double, Vector, double)"/> describes.
+    /// The layout check and the runner's candidate validation both judge an outline with it.
+    /// </summary>
+    public bool OutlineHolds(PathsD outline, Func<PathsD> native, double slack) =>
+        Outline == null || Outline.Holds(outline, native, OutlineInset, PlacementOrigin, slack);
+
     /// <summary>Available physical sheets: null is unlimited, zero is legal but unavailable.</summary>
     public int? Quantity { get; }
     public double PartSpacing { get; }
