@@ -1,7 +1,10 @@
 # OpenNest
 
-A Windows desktop application for CNC nesting — imports DXF drawings, arranges parts on material plates, and exports layouts as DXF or G-code for cutting.
+A Windows desktop application for CNC nesting — imports DXF, DWG and SVG drawings, arranges parts on material plates, and exports layouts as DXF, SVG or G-code for cutting.
 
+<p>
+  <a href="screenshots/screenshot-cut-simulator.png"><img src="screenshots/screenshot-cut-simulator.png" width="860" alt="OpenNest - cut simulator replaying a 137-part plate in cut order"></a>
+</p>
 <p>
   <a href="screenshots/screenshot-nest-1.png"><img src="screenshots/screenshot-nest-1.png" width="420" alt="OpenNest - parts nested on a 36x36 plate"></a>
   <a href="screenshots/screenshot-nest-2.png"><img src="screenshots/screenshot-nest-2.png" width="420" alt="OpenNest - 44 parts nested on a 60x120 plate"></a>
@@ -9,7 +12,7 @@ A Windows desktop application for CNC nesting — imports DXF drawings, arranges
 
 ## Features
 
-- **Import / export** — DXF & DWG parts (ACadSharp), Excel BOMs, bend-line detection, built-in parametric shapes; export DXF or post-processed G-code.
+- **Import / export** — DXF, DWG (ACadSharp) and SVG parts, Excel BOMs, bend-line detection, built-in parametric shapes; export plates as DXF, SVG or post-processed G-code, and single drawings from the CAD Converter as DXF, DWG or SVG with their bends. [SVG import and export](docs/svg-import-export.md).
 - **Nesting** — automatic multi-plate/multi-material jobs, interlocking pair evaluation, and built-in or plug-in engines. [Choose an engine](docs/nesting-engines.md).
 - **Plate operations** — manual sheet cut-offs, [plate- or nest-wide automatic scrap cutoffs with a minimum tail-to-keep setting](docs/automatic-scrap-cutoffs.md), oversized-part splitting (straight, weld-gap tabs, spike-groove), interactive editing, and spacing-aware pushes that can slide along or away from touching parts.
 - **Visual overlap check** — highlight shared material on the active plate, rechecked automatically after edits, including containment and cutouts, with area shading, pair markers, and hover details through View > Overlap Check. [Usage and limitations](docs/geometry/visual-overlap-check.md).
@@ -45,7 +48,7 @@ dotnet run --project OpenNest.Avalonia/OpenNest.Avalonia.csproj # cross-platform
 2. Import DXFs via the CAD Converter (layer/color filtering, per-entity exclude and cut/etch/display-only roles, bend detection, G-code preview) or create built-in shapes
 3. Define plate size, material, quadrant, spacing
 4. Fill — the engine arranges parts
-5. Optionally add cut-off lines, apply Part Sequencing to order crossing cut-offs before their parts, then save `.nest`, export DXF, or post-process to G-code
+5. Optionally add cut-off lines, apply Part Sequencing to order crossing cut-offs before their parts, then save `.nest`, export DXF or SVG, or post-process to G-code
 
 Review part spacing before cutting, especially for interlocking pairs. See [pair-spacing checks and current limitations](docs/geometry/pair-spacing.md).
 
@@ -84,7 +87,7 @@ Run `dotnet run --project OpenNest.Console -- --help` for the complete options a
 | **OpenNest** | WinForms desktop app |
 | **OpenNest.Core** | Domain model, geometry, CNC primitives; [material-overlap diagnostics](docs/geometry/visual-overlap-check.md) |
 | **OpenNest.Engine** | Nesting algorithms and whole-job contracts |
-| **OpenNest.IO** | DXF/DWG, `.nest`, G-code, BOM I/O; CAD import |
+| **OpenNest.IO** | DXF/DWG/SVG, `.nest`, G-code, BOM I/O; CAD import |
 | **OpenNest.Console** | Headless batch nesting |
 | **OpenNest.Api / .Data** | Programmatic pipeline; machine & cutting-parameter data |
 | **OpenNest.Gpu** | GPU-accelerated pair evaluation (ILGPU) |
@@ -106,7 +109,8 @@ Default compares the built-in Irregular, Rectangles and Circles engines and keep
 | Format | Import | Export |
 |--------|--------|--------|
 | DXF | Yes | Yes |
-| DWG | Yes | No |
+| DWG | Yes | Yes (single drawings, CAD Converter) |
+| SVG | Yes | Yes |
 | Excel BOM | Yes | No |
 | G-code | No | Yes (post-processors) |
 | `.nest` | Yes | Yes |
