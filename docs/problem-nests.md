@@ -77,6 +77,42 @@ ending sooner is only reported, with the line to record. A line without `ends` c
 count alone. Every run prints each nest's end, and a missing baseline's failure prints the whole
 line, the end rounded up to a tenth.
 
+#### Saved layouts
+
+A nest can also hold the layout its baseline describes, so nobody has to nest the old code again
+to see it or to compare with it. Set `OPENNEST_PROBLEM_NESTS_RECORD=1` and run the `auto-nest`
+area:
+
+```sh
+OPENNEST_PROBLEM_NESTS_SERVER=http://<server>:<port> OPENNEST_PROBLEM_NESTS_CHECKS=auto-nest \
+OPENNEST_PROBLEM_NESTS_RECORD=1 \
+  dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
+  --filter "Category=ProblemNests" --logger "console;verbosity=detailed"
+```
+
+Each nest whose layout is valid, complete and no worse than its baseline is saved back as a new
+revision: its plates are replaced by the layout Auto Nest just made, on the sheets the job nested
+on (the first plate's spacing, quadrant and clamps, so the saved nest gives the same job again),
+and its line becomes `auto-nest: 1 sheets, ends 62.2, layout saved`. A nest without a baseline
+gets its first one this way instead of failing. What was on the plates before, usually the hand
+layout that showed the problem, stays in the nest's earlier revisions.
+
+- A layout worse than the baseline fails as always and is never recorded. To accept one, edit
+  the line by hand, then record.
+- A layout within the tolerance past the recorded end keeps that end, so recording again and
+  again cannot let the baseline creep.
+- A nest that also guards a planner area or `fill` is not saved: those tests read its plates.
+  Neither is a layout that leaves one of the nest's sheet sizes unused, because the job takes
+  its sizes from the plates. Both print the line to write by hand.
+- A nest whose saved layout and line already match is left alone, so a run that changes
+  nothing adds no revisions.
+
+Without the variable nothing is written. A run then says, for each nest whose line ends in
+`layout saved`, whether Auto Nest still makes exactly that layout (`the saved layout, unchanged`)
+or another one (`not the saved layout`): the same sheets and sizes, with every part at the same
+pose. An engine change meant to leave layouts alone can be checked against the corpus that way
+without a second run on master.
+
 ### Fill nests
 
 `ProblemNests_FillNoWorseThanTheirBaselines` takes the nests whose `checks:` line names `fill`
@@ -136,6 +172,7 @@ Plates use their own cutting parameters. A plate without them uses line lead-ins
    `fill: 1=33`, the part count each listed plate's fill reaches today (`fill (Strip): 1=33` for
    a strategy other than Lattice). A fill plate must hold one drawing: the fill uses it.
    To get the line, save without one and run the test: the failure prints the observed line.
+   An Auto Nest problem can have its line and layout [recorded](#saved-layouts) instead.
    Add a `checks:` line naming the [areas](#areas) the problem was in, such as `checks: part-order`.
 4. Save. Every save keeps the earlier versions, so a baseline change can be reviewed later.
 

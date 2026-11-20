@@ -31,11 +31,15 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
     internal const string TimeoutVariable = "OPENNEST_PROBLEM_NESTS_TIMEOUT";
     internal const string CutOffsVariable = "OPENNEST_PROBLEM_NESTS_CUTOFFS";
     internal const string ChecksVariable = "OPENNEST_PROBLEM_NESTS_CHECKS";
+    internal const string RecordVariable = "OPENNEST_PROBLEM_NESTS_RECORD";
     internal const string Timeout = "Timeout";
     internal const string PlanningLine = "planning:";
     internal const string CutOffPlanningLine = "planning with cut-offs:";
     internal const string ChecksLine = "checks:";
     internal const string AutoNestLine = "auto-nest:";
+
+    /// <summary>Ends an "auto-nest:" line whose nest holds the layout the line describes.</summary>
+    internal const string LayoutSavedMark = "layout saved";
 
     /// <summary>The area of a nest whose problem was Auto Nest's layout, not its cutting plan.</summary>
     internal const string AutoNestArea = "auto-nest";
@@ -112,6 +116,11 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
     /// "auto-nest: 2 sheets" baseline. A baseline that also says where the last sheet ends
     /// ("auto-nest: 1 sheets, ends 62.2") fails a layout whose last sheet reaches further along
     /// its length: a job that does not fill its last sheet can get worse without another sheet.
+    /// A line ending in "layout saved" says the nest's plates are that baseline layout, and the
+    /// run reports whether Auto Nest still makes it. With <see cref="RecordVariable"/> set to 1,
+    /// a nest whose layout is no worse than its baseline is saved back with that layout as its
+    /// plates and the line brought up to date, so the baseline can be opened, or compared with,
+    /// without nesting the old code again.
     /// </summary>
     [SkippableFact]
     public async Task ProblemNests_AutoNestNoWorseThanTheirBaselines()
@@ -125,11 +134,13 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
         var limit = TimeSpan.FromSeconds(int.TryParse(Environment.GetEnvironmentVariable(TimeoutVariable), out var seconds)
             && seconds > 0 ? seconds : 120);
 
+        var recording = Environment.GetEnvironmentVariable(RecordVariable) == "1";
         var failures = new List<string>();
         var nested = 0;
         foreach (var record in records)
         {
-            if (!Checks(CommentLine(record.Comments, ChecksLine)).Contains(AutoNestArea))
+            var guards = Checks(CommentLine(record.Comments, ChecksLine));
+            if (!guards.Contains(AutoNestArea))
                 continue;
             nested++;
             var bytes = await repository.GetFileAsync(record.Id)
@@ -137,12 +148,16 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
             var baseline = SheetBaseline(record.Comments);
             var endBaseline = EndBaseline(record.Comments);
             var watch = Stopwatch.StartNew();
-            var (sheets, end, problem) = AutoNest(bytes, limit);
+            var run = AutoNest(bytes, limit);
+            var (sheets, end, problem) = (run.Sheets, run.End, run.Problem);
             output.WriteLine($"{record.Name}: {(problem ?? $"{sheets} sheets, ends {Number(end)}")} "
                 + $"(baseline {baseline?.ToString() ?? "none"}{(endBaseline is { } recorded ? $", ends {Number(recorded)}" : "")}), "
                 + $"{watch.Elapsed.TotalSeconds:0.0} s");
+            var failed = failures.Count;
             if (problem != null)
                 failures.Add($"{record.Name}: {problem}");
+            else if (baseline == null && recording && CannotSave(guards, run) == null)
+                output.WriteLine("  no baseline yet.");
             else if (baseline == null)
                 failures.Add($"{record.Name} has no Auto Nest baseline. Add this line to its comments: "
                     + AutoNestBaselineLine(sheets, end));
@@ -154,37 +169,216 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
                 failures.Add($"{record.Name}: the last sheet ends at {Number(end)}, worse than baseline {Number(ends)}.");
             else if (endBaseline is { } before && end < before - 2 * EndTolerance)
                 output.WriteLine($"  ends before {Number(before)}; update the baseline: {AutoNestBaselineLine(sheets, end)}");
+            if (problem != null)
+                continue;
+
+            var kept = LayoutSaved(record.Comments);
+            var same = kept && SameLayout(bytes, run.Job, run.Result);
+            if (kept)
+                output.WriteLine(same ? "  the saved layout, unchanged." : "  not the saved layout.");
+            if (!recording || failures.Count != failed)
+                continue;
+            // A layout inside the tolerance past the recorded end keeps that end: recording
+            // again and again must not let the baseline creep.
+            var keptEnd = endBaseline is { } known && sheets == baseline && end > known ? known : (double?)null;
+            var numbers = keptEnd is { } stays ? $"{AutoNestLine} {sheets} sheets, ends {Number(stays)}"
+                : AutoNestBaselineLine(sheets, end);
+            if (CannotSave(guards, run) is { } why)
+            {
+                output.WriteLine($"  not saved: {why}. Its line would be: {numbers}");
+                continue;
+            }
+            var line = numbers + ", " + LayoutSavedMark;
+            if (same && string.Equals(CommentLine(record.Comments, AutoNestLine)?.Trim(), line[AutoNestLine.Length..].Trim(),
+                StringComparison.OrdinalIgnoreCase))
+                continue;
+            var (archive, updated) = WithLayout(bytes, record, run.Job, run.Result,
+                WithAutoNestLine(record.Comments, line));
+            var saved = await repository.UpdateFileAsync(record.Id, archive, updated, record.Revision);
+            output.WriteLine($"  saved as revision {saved.Revision}: {line}");
         }
         Skip.If(nested == 0, $"No nest on {server} checks {AutoNestArea}.");
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
-    // Auto Nest on the nest's demand: sheet count and where the last sheet ends, or why the
-    // layout cannot be kept.
-    private static (int Sheets, double End, string Problem) AutoNest(byte[] bytes, TimeSpan limit)
+    /// <summary>One Auto Nest of a problem nest: its sheet count and where its last sheet ends,
+    /// or why the layout cannot be kept; the job and result when the engine returned one.</summary>
+    internal sealed record AutoNestRun(int Sheets, double End, string Problem, NestJob Job, NestJobResult Result);
+
+    // Auto Nest on the nest's demand.
+    private static AutoNestRun AutoNest(byte[] bytes, TimeSpan limit)
+    {
+        try
+        {
+            var job = AutoNestJob(bytes);
+            using var cancellation = new CancellationTokenSource(limit);
+            var result = OpenNest.Engine.Jobs.NestingEngineRegistry.Create("Default").Solve(job, token: cancellation.Token);
+            var violations = OpenNest.Engine.Jobs.NestLayoutCheck.Violations(job, result);
+            if (violations.Count != 0)
+                return new AutoNestRun(result.Plates.Count, 0, "invalid layout: " + string.Join(" | ", violations.Take(3)), job, result);
+            var unplaced = result.Fulfillment.Sum(f => f.Unplaced);
+            return unplaced != 0 ? new AutoNestRun(result.Plates.Count, 0, $"{unplaced} parts unplaced", job, result)
+                : new AutoNestRun(result.Plates.Count, LastSheetEnd(job, result), null, job, result);
+        }
+        catch (OperationCanceledException)
+        {
+            return new AutoNestRun(0, 0, Timeout, null, null);
+        }
+    }
+
+    /// <summary>
+    /// The Auto Nest job of a problem nest, as the benchmark builds it from a saved nest: every
+    /// drawing's required quantity, the sheet sizes of the nest's plates, and the first plate's
+    /// spacing, quadrant and clamps. Its parts are the nest's drawings with a required quantity,
+    /// in the nest's order.
+    /// </summary>
+    internal static NestJob AutoNestJob(byte[] bytes)
     {
         var path = Path.Combine(Path.GetTempPath(), $"opennest-problem-{Guid.NewGuid():N}.nest");
         try
         {
             File.WriteAllBytes(path, bytes);
-            var job = OpenNest.Benchmark.JobLoader.Load(path).Single().BuildNestJob(maxPlates: 100);
-            using var cancellation = new CancellationTokenSource(limit);
-            var result = OpenNest.Engine.Jobs.NestingEngineRegistry.Create("Default").Solve(job, token: cancellation.Token);
-            var violations = OpenNest.Engine.Jobs.NestLayoutCheck.Violations(job, result);
-            if (violations.Count != 0)
-                return (result.Plates.Count, 0, "invalid layout: " + string.Join(" | ", violations.Take(3)));
-            var unplaced = result.Fulfillment.Sum(f => f.Unplaced);
-            return unplaced != 0 ? (result.Plates.Count, 0, $"{unplaced} parts unplaced")
-                : (result.Plates.Count, LastSheetEnd(job, result), null);
-        }
-        catch (OperationCanceledException)
-        {
-            return (0, 0, Timeout);
+            return OpenNest.Benchmark.JobLoader.Load(path).Single().BuildNestJob(maxPlates: 100);
         }
         finally
         {
             File.Delete(path);
         }
+    }
+
+    /// <summary>Whether the "auto-nest:" line says the nest's plates are its baseline layout.</summary>
+    internal static bool LayoutSaved(string comments) =>
+        CommentLine(comments, AutoNestLine)?.Contains(LayoutSavedMark, StringComparison.OrdinalIgnoreCase) == true;
+
+    /// <summary>The comments with their "auto-nest:" line replaced by <paramref name="line"/>,
+    /// or with it added as the last line when they have none.</summary>
+    internal static string WithAutoNestLine(string comments, string line)
+    {
+        var text = comments ?? "";
+        var newline = text.Contains("\r\n") ? "\r\n" : "\n";
+        var lines = text.Replace("\r\n", "\n").Split('\n').ToList();
+        var index = lines.FindIndex(l => l.Trim().StartsWith(AutoNestLine, StringComparison.OrdinalIgnoreCase));
+        if (index >= 0)
+            lines[index] = line;
+        else
+        {
+            while (lines.Count > 0 && lines[^1].Trim().Length == 0)
+                lines.RemoveAt(lines.Count - 1);
+            lines.Add(line);
+        }
+        return string.Join(newline, lines);
+    }
+
+    /// <summary>
+    /// Why a run's layout cannot replace the nest's plates; null when it can. Planning and fill
+    /// tests read a nest's plates as their input, and the Auto Nest job takes its sheet sizes
+    /// from them, so a layout on only some of those sizes would change the job it came from.
+    /// </summary>
+    internal static string CannotSave(IReadOnlyCollection<string> guards, AutoNestRun run)
+    {
+        var others = guards.Where(g => g != AutoNestArea).ToList();
+        if (others.Count != 0)
+            return $"it also guards {string.Join(", ", others)}, whose tests read its plates";
+        var offered = run.Job.Plates.Select(p => (p.Size.Width, p.Size.Length)).Distinct().ToList();
+        var used = run.Result.Plates.Select(p => (p.Stock.Size.Width, p.Stock.Size.Length)).Distinct().ToList();
+        return offered.Except(used).Any()
+            ? "the layout leaves a sheet size of the nest unused, and the job takes its sizes from the plates"
+            : null;
+    }
+
+    /// <summary>
+    /// The nest with its plates replaced by <paramref name="result"/>'s sheets and its notes by
+    /// <paramref name="comments"/>, as an archive and the record to save it with. Each sheet is
+    /// the plate its stock describes (the job's spacing, quadrant and clamps), so the saved nest
+    /// gives the same job again; parts are bound to the nest's own drawings.
+    /// </summary>
+    internal static (byte[] Archive, NestRecord Record) WithLayout(byte[] bytes, NestRecord record,
+        NestJob job, NestJobResult result, string comments)
+    {
+        using var input = new MemoryStream(bytes);
+        var nest = new NestReader(input).Read();
+        NestRecordFactory.ApplyMetadata(nest, record);
+        nest.Notes = comments;
+        var drawings = JobDrawings(nest, job);
+        nest.Plates.Clear();
+        foreach (var sheet in result.Plates)
+        {
+            var plate = OpenNest.Engine.Jobs.Adapters.DrawingJobMapper.CreatePlate(sheet.Stock);
+            foreach (var pose in sheet.Placements)
+            {
+                var part = new Part(drawings[pose.PartId]);
+                part.Rotate(pose.Rotation);
+                part.Location = new OpenNest.Geometry.Vector(pose.X, pose.Y);
+                part.UpdateBounds();
+                plate.Parts.Add(part);
+            }
+            nest.Plates.Add(plate);
+        }
+        nest.UpdateDrawingQuantities();
+        using var written = new MemoryStream();
+        if (!new NestWriter(nest).Write(written))
+            throw new InvalidOperationException($"'{record.Name}' could not be written with its new layout.");
+        var archive = written.ToArray();
+        return (archive, NestRecordFactory.FromNest(nest, record.Id, archive.LongLength));
+    }
+
+    /// <summary>
+    /// Whether the nest's plates hold exactly <paramref name="result"/>: the same sheets in
+    /// order, each of the same size with the same drawings at the same poses (within the file's
+    /// coordinate precision), in any part order.
+    /// </summary>
+    internal static bool SameLayout(byte[] bytes, NestJob job, NestJobResult result)
+    {
+        using var input = new MemoryStream(bytes);
+        var nest = new NestReader(input).Read();
+        var drawings = JobDrawings(nest, job);
+        var plates = nest.Plates.Where(p => p.Parts.Any(part => !part.BaseDrawing.IsCutOff)).ToList();
+        if (plates.Count != result.Plates.Count || plates.Any(p => p.Quantity != 1))
+            return false;
+        for (var i = 0; i < plates.Count; i++)
+        {
+            var sheet = result.Plates[i];
+            var size = sheet.Stock.Size;
+            if (System.Math.Abs(plates[i].Size.Width - size.Width) > PoseTolerance
+                || System.Math.Abs(plates[i].Size.Length - size.Length) > PoseTolerance)
+                return false;
+            var left = plates[i].Parts.Where(part => !part.BaseDrawing.IsCutOff).ToList();
+            if (left.Count != sheet.Placements.Count)
+                return false;
+            foreach (var pose in sheet.Placements)
+            {
+                var match = left.FindIndex(part => ReferenceEquals(part.BaseDrawing, drawings[pose.PartId])
+                    && System.Math.Abs(part.Location.X - pose.X) <= PoseTolerance
+                    && System.Math.Abs(part.Location.Y - pose.Y) <= PoseTolerance
+                    && SameAngle(part.Rotation, pose.Rotation));
+                if (match < 0)
+                    return false;
+                left.RemoveAt(match);
+            }
+        }
+        return true;
+    }
+
+    // The job's part ids to the nest's drawings: a drawing's id is new on every read, so they
+    // pair up by position, the job's parts being the nest's wanted drawings in order.
+    private static Dictionary<string, Drawing> JobDrawings(Nest nest, NestJob job)
+    {
+        var wanted = nest.Drawings.Where(d => d.Quantity.Required > 0).ToList();
+        if (wanted.Count != job.Parts.Count)
+            throw new InvalidOperationException(
+                $"The nest wants {wanted.Count} drawings and the job has {job.Parts.Count} parts.");
+        return job.Parts.Select((part, index) => (part.Id, Drawing: wanted[index]))
+            .ToDictionary(p => p.Id, p => p.Drawing);
+    }
+
+    // A saved coordinate keeps ten decimals; poses this close are the same pose.
+    private const double PoseTolerance = 1e-6;
+
+    private static bool SameAngle(double a, double b)
+    {
+        var turn = 2 * System.Math.PI;
+        var difference = System.Math.Abs(a - b) % turn;
+        return System.Math.Min(difference, turn - difference) <= PoseTolerance;
     }
 
     /// <summary>The sheet count of an "auto-nest: 2 sheets" comment line; null when there is none.</summary>
@@ -664,6 +858,159 @@ public class ProblemNestBaselineTests
 
             Assert.Equal(6, ProblemNestRegressionTests.LastSheetEnd(job, builder.Build(NestJobStopReason.Completed)), 6);
         }
+    }
+
+    [Fact]
+    public void LayoutSaved_ReadsTheMarkAndLeavesTheNumbersReadable()
+    {
+        const string comments = "The layout is saved: see below.\nchecks: auto-nest\nauto-nest: 1 sheets, ends 62.2, layout saved";
+
+        Assert.True(ProblemNestRegressionTests.LayoutSaved(comments));
+        Assert.Equal(1, ProblemNestRegressionTests.SheetBaseline(comments));
+        Assert.Equal(62.2, ProblemNestRegressionTests.EndBaseline(comments));
+        Assert.False(ProblemNestRegressionTests.LayoutSaved("Hand layout saved in revision 1.\nauto-nest: 2 sheets"));
+        Assert.False(ProblemNestRegressionTests.LayoutSaved(null));
+    }
+
+    [Fact]
+    public void WithAutoNestLine_ReplacesTheLineOrAddsOne()
+    {
+        const string line = "auto-nest: 1 sheets, ends 62.2, layout saved";
+
+        Assert.Equal("Ended at 75.2.\r\nchecks: auto-nest\r\n" + line + "\r\nnotes",
+            ProblemNestRegressionTests.WithAutoNestLine("Ended at 75.2.\r\nchecks: auto-nest\r\n  Auto-Nest: 2 sheets\r\nnotes", line));
+        Assert.Equal("checks: auto-nest\n" + line, ProblemNestRegressionTests.WithAutoNestLine("checks: auto-nest\n\n", line));
+        Assert.Equal(line, ProblemNestRegressionTests.WithAutoNestLine(null, line));
+    }
+
+    [Fact]
+    public void WithLayout_SavesTheResultAsTheNestsPlatesAndGivesTheSameJobAgain()
+    {
+        var bytes = HandLaidNest(out var record);
+        var job = ProblemNestRegressionTests.AutoNestJob(bytes);
+        var stock = Assert.Single(job.Plates);
+        var part = Assert.Single(job.Parts);
+        var builder = new NestJobResultBuilder(job);
+        builder.AddSheet(stock, new[]
+        {
+            (part.Id, 1.0, 2.0, 0.0),
+            (part.Id, 9.5, 2.0, System.Math.PI / 2),
+            (part.Id, 1.0, 5.25, 0.0),
+        });
+        var result = builder.Build(NestJobStopReason.Completed);
+        const string comments = "checks: auto-nest\nauto-nest: 1 sheets, ends 9.5, layout saved";
+
+        var (archive, updated) = ProblemNestRegressionTests.WithLayout(bytes, record, job, result, comments);
+
+        Assert.False(ProblemNestRegressionTests.SameLayout(bytes, job, result));
+        Assert.True(ProblemNestRegressionTests.SameLayout(archive, job, result));
+        // Read again, the nest's drawings have new ids: the layout is still the saved one.
+        var reread = ProblemNestRegressionTests.AutoNestJob(archive);
+        Assert.True(ProblemNestRegressionTests.SameLayout(archive, reread, Relaid(reread, result)));
+        Assert.Equal(comments, updated.Comments);
+        Assert.Equal(record.Id, updated.Id);
+        Assert.Equal("problem", updated.Name);
+        Assert.Equal(1, updated.PlateCount);
+        Assert.Equal(3, updated.PartCount);
+        using var stream = new MemoryStream(archive);
+        var nest = new NestReader(stream).Read();
+        Assert.Equal(comments, nest.Notes);
+        Assert.Equal(3, Assert.Single(nest.Drawings).Quantity.Nested);
+        // The saved plate is the sheet the job nested on, so the nest gives that job again.
+        var sheet = Assert.Single(reread.Plates);
+        Assert.Equal(stock.Size, sheet.Size);
+        Assert.Equal(stock.PartSpacing, sheet.PartSpacing);
+        Assert.Equal(stock.EdgeSpacing, sheet.EdgeSpacing);
+        Assert.Equal(stock.Quadrant, sheet.Quadrant);
+        Assert.Equal(stock.ClampZones.Select(z => (z.Id, z.Bounds.X, z.Bounds.Y, z.Bounds.Length, z.Bounds.Width)),
+            sheet.ClampZones.Select(z => (z.Id, z.Bounds.X, z.Bounds.Y, z.Bounds.Length, z.Bounds.Width)));
+        Assert.Equal(3, Assert.Single(reread.Parts).Quantity);
+    }
+
+    [Fact]
+    public void SameLayout_TellsAMovedOrTurnedPartAndAnotherSheetCount()
+    {
+        var bytes = HandLaidNest(out var record);
+        var job = ProblemNestRegressionTests.AutoNestJob(bytes);
+        var stock = job.Plates[0];
+        var id = job.Parts[0].Id;
+        NestJobResult Layout(params (string, double, double, double)[][] sheets)
+        {
+            var builder = new NestJobResultBuilder(job);
+            foreach (var sheet in sheets)
+                builder.AddSheet(stock, sheet);
+            return builder.Build(NestJobStopReason.Completed);
+        }
+        var saved = Layout([(id, 1.0, 2.0, 0.0), (id, 6.0, 2.0, 0.0), (id, 11.0, 2.0, 0.0)]);
+        var (archive, _) = ProblemNestRegressionTests.WithLayout(bytes, record, job, saved, "");
+
+        // Part order does not matter, and neither does a whole turn.
+        Assert.True(ProblemNestRegressionTests.SameLayout(archive, job,
+            Layout([(id, 11.0, 2.0, 2 * System.Math.PI), (id, 1.0, 2.0, 0.0), (id, 6.0, 2.0, 0.0)])));
+        Assert.False(ProblemNestRegressionTests.SameLayout(archive, job,
+            Layout([(id, 1.0, 2.0, 0.0), (id, 6.0, 2.0, 0.0), (id, 11.001, 2.0, 0.0)])));
+        Assert.False(ProblemNestRegressionTests.SameLayout(archive, job,
+            Layout([(id, 1.0, 2.0, 0.0), (id, 6.0, 2.0, 0.0), (id, 11.0, 2.0, System.Math.PI)])));
+        Assert.False(ProblemNestRegressionTests.SameLayout(archive, job,
+            Layout([(id, 1.0, 2.0, 0.0), (id, 6.0, 2.0, 0.0)], [(id, 1.0, 2.0, 0.0)])));
+    }
+
+    [Fact]
+    public void CannotSave_KeepsPlatesOtherTestsReadAndSheetSizesTheJobNeeds()
+    {
+        var bytes = HandLaidNest(out _);
+        var job = ProblemNestRegressionTests.AutoNestJob(bytes);
+        var builder = new NestJobResultBuilder(job);
+        builder.AddSheet(job.Plates[0], new[] { (job.Parts[0].Id, 1.0, 2.0, 0.0) });
+        var run = new ProblemNestRegressionTests.AutoNestRun(1, 5, null, job, builder.Build(NestJobStopReason.Completed));
+
+        Assert.Null(ProblemNestRegressionTests.CannotSave(["auto-nest"], run));
+        Assert.Contains("part-order", ProblemNestRegressionTests.CannotSave(["auto-nest", "part-order"], run));
+        // A second sheet size the layout does not use would leave the job when the plates are replaced.
+        var wider = new NestJob(job.Parts, job.Plates.Append(
+            new NestPlateStock("other", new OpenNest.Geometry.Size(30, 40), partSpacing: 0.25)));
+        var partial = new NestJobResultBuilder(wider);
+        partial.AddSheet(wider.Plates[0], new[] { (wider.Parts[0].Id, 1.0, 2.0, 0.0) });
+        Assert.Contains("sheet size", ProblemNestRegressionTests.CannotSave(["auto-nest"],
+            new ProblemNestRegressionTests.AutoNestRun(1, 5, null, wider, partial.Build(NestJobStopReason.Completed))));
+    }
+
+    // The same poses for another reading of the same nest, whose part ids differ.
+    private static NestJobResult Relaid(NestJob job, NestJobResult result)
+    {
+        var builder = new NestJobResultBuilder(job);
+        foreach (var sheet in result.Plates)
+            builder.AddSheet(job.Plates[0], sheet.Placements.Select(p => (job.Parts[0].Id, p.X, p.Y, p.Rotation)));
+        return builder.Build(NestJobStopReason.Completed);
+    }
+
+    // Three 4 x 3 rectangles wanted, one laid by hand on a 20 x 40 sheet with a clamp.
+    private static byte[] HandLaidNest(out NestRecord record)
+    {
+        var program = new OpenNest.CNC.Program();
+        program.MoveTo(0, 0);
+        program.LineTo(4, 0);
+        program.LineTo(4, 3);
+        program.LineTo(0, 3);
+        program.LineTo(0, 0);
+        var drawing = new Drawing("rectangle", program);
+        drawing.Quantity.Required = 3;
+        var nest = new Nest("problem");
+        nest.Drawings.Add(drawing);
+        var plate = new Plate(20, 40)
+        {
+            PartSpacing = 0.25,
+            EdgeSpacing = new OpenNest.Geometry.Spacing(0.3, 0.75, 0.3, 0.25),
+        };
+        plate.ClampZones.Add(new OpenNest.Clamps.ClampZone("clamp-1", new OpenNest.Geometry.Box(19.25, 0, 1.5, 0.625)));
+        var part = Part.CreateAtOrigin(drawing);
+        part.Location = new OpenNest.Geometry.Vector(30, 10);
+        plate.Parts.Add(part);
+        nest.Plates.Add(plate);
+        using var stream = new MemoryStream();
+        Assert.True(new NestWriter(nest).Write(stream));
+        record = new NestRecord { Id = Guid.NewGuid(), Revision = 1, Name = "problem", Comments = "checks: auto-nest" };
+        return stream.ToArray();
     }
 
     [Fact]
