@@ -175,7 +175,9 @@ Machine clamps appear on the plate diagram as white, diagonally hatched
 rectangles drawn under the parts, and IDs keep clear of them like any other
 obstacle. A clamp taken off the sheet is a dashed rectangle crossed out, drawn
 over the parts (they may sit where it was) so the operator sees it must come off
-before cutting. A legend line explains them only on plates that have clamps.
+before cutting. Only a removed clamp gets a legend line under the diagram; hatched
+clamps and the rulers explain themselves, which leaves room for ten parts-table
+rows on a plate page even with an estimated cut time.
 
 Rulers sit beside the diagram: a horizontal one below it and a vertical one to its
 left, each spanning the sheet and reading its plate coordinates (negative in

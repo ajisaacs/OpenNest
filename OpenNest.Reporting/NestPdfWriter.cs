@@ -27,7 +27,7 @@ public static class NestPdfWriter
     private const double CardFontSize = 8;
     private const double PortraitWidth = 540;
     private const double LandscapeWidth = 720;
-    private const double OverviewHeight = 320;
+    private const double OverviewHeight = 265;
 
     private static readonly XColor Fill = XColor.FromArgb(222, 222, 222);
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
@@ -357,21 +357,17 @@ public static class NestPdfWriter
         var overview = AddReservedArea(section, plan.Size.Height);
         areas.Add((overview, [(gfx, _) => DrawRulers(gfx, plate, plan, snapshot.Units), (gfx, _) => DrawView(gfx, plate, plan)]));
 
-        var notes = new List<string>();
-        if (plate.Clamps.Length > 0)
-            notes.Add(plate.Clamps.Any(clamp => clamp.Removed)
-                ? "Hatched rectangles are machine clamps. A dashed rectangle crossed out is a clamp to remove before cutting."
-                : "Hatched rectangles are machine clamps.");
-        notes.Add($"Rulers show sheet coordinates in {UnitsName(snapshot)}.");
-        for (var i = 0; i < notes.Count; i++)
+        // Only a removed clamp needs words: it is an action before cutting. Hatched clamps and the
+        // rulers (their unit sits in the corner) explain themselves, and the room goes to parts rows.
+        if (plate.Clamps.Any(clamp => clamp.Removed))
         {
-            var note = section.AddParagraph(notes[i]);
+            var note = section.AddParagraph("A dashed rectangle crossed out is a clamp to remove before cutting.");
             note.Format.Font.Size = 7.5;
-            if (i == 0)
-                note.Format.SpaceBefore = Unit.FromPoint(4);
-            if (i == notes.Count - 1)
-                note.Format.SpaceAfter = Unit.FromPoint(4);
+            note.Format.SpaceBefore = Unit.FromPoint(4);
         }
+        var gap = section.AddParagraph();
+        gap.Format.Font.Size = 1;
+        gap.Format.SpaceAfter = Unit.FromPoint(4);
 
         var names2 = snapshot.Drawings.ToDictionary(drawing => drawing.Id, drawing => drawing.Name, StringComparer.Ordinal);
         var perSheet = plate.Parts.GroupBy(part => part.ReportId, StringComparer.Ordinal)
@@ -729,9 +725,6 @@ public static class NestPdfWriter
             paragraph.AddText(lines[line]);
         }
     }
-
-    private static string UnitsName(NestReportSnapshot snapshot) =>
-        snapshot.Units == "mm" ? "millimeters (mm)" : "inches (in)";
 
     private static string Material(NestReportSnapshot snapshot)
     {

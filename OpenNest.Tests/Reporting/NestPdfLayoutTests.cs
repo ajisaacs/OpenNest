@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using OpenNest.Clamps;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.IO;
@@ -99,6 +100,40 @@ public sealed class NestPdfLayoutTests : IDisposable
     }
 
     [SkippableFact]
+    public void Write_TenDrawingsFitOnePlatePageEvenWithCutTimeAndARemovedClamp()
+    {
+        var nest = new Nest("Ten drawings")
+        {
+            Material = new Material("Stainless Steel", "304", 0.289),
+            Thickness = 0.135,
+            Units = Units.Inches,
+        };
+        // A 48 x 96 sheet fills the diagram's full height, the worst case for the parts table.
+        var plate = new Plate(48, 96) { Quantity = 1, PartSpacing = 0.25 };
+        for (var i = 0; i < 10; i++)
+        {
+            var drawing = NestReportTestData.Rectangle($"Part {i + 1:D2}", 4, 4);
+            nest.Drawings.Add(drawing);
+            plate.Parts.Add(new Part(drawing, new Vector(2 + i * 6, 10)));
+        }
+        plate.SetClampRail(new ClampRail(3, 1.5, [6, 24, 44]));
+        Assert.True(plate.SetClampRemoved("clamp-2", true));
+        nest.Plates.Add(plate);
+        var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
+        snapshot = snapshot with { Plates = [snapshot.Plates[0] with { CutTime = TimeSpan.FromMinutes(12) }] };
+        var path = Path.Combine(directory, "ten.report.pdf");
+        NestPdfWriter.Write(snapshot, path);
+
+        var pages = ReportPdf.Pages(path);
+        Assert.Equal(2, pages.Length);
+        var platePage = pages[1];
+        Assert.Contains("Est. cut time:", platePage);
+        Assert.Contains("A dashed rectangle crossed out is a clamp to remove before cutting.", platePage);
+        for (var i = 1; i <= 10; i++)
+            Assert.Matches($@"(?m)^{i}\s+Part {i:D2}\s+1\s+1$", platePage);
+    }
+
+    [SkippableFact]
     public void Write_LongNamesAndNotesWrapWithoutLosingTextOrOverflowingColumns()
     {
         var nest = NestReportTestData.CreateMultiPlateNest();
@@ -146,10 +181,10 @@ public sealed class NestPdfLayoutTests : IDisposable
         var pages = ReportPdf.Pages(path);
 
         Assert.Equal(5, pages.Length);
-        // Values carry their own units; only the plate page's ruler note names them.
+        // Values carry their own units; the plate page's rulers show theirs in the corner.
         Assert.DoesNotContain("Units:", pages[0]);
         Assert.Contains("3 mm", pages[0]);
-        Assert.Contains("millimeters (mm)", pages[1]);
+        Assert.Matches(@"(?m)^mm -?\d", pages[1]);
         Assert.Matches(@"24 x 48 mm", pages[2]);
         using var pdf = PdfReader.Open(path, PdfDocumentOpenMode.Import);
         var stream = ReportPdf.ContentStreams(pdf.Pages[1]).Last();
@@ -175,7 +210,7 @@ public sealed class NestPdfLayoutTests : IDisposable
     {
         var nest = NestReportTestData.CreateDenseNest();
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 265);
         var group = Assert.Single(plan.Groups);
         Assert.Equal("2", group.Label.Id);
         Assert.Equal(Enumerable.Range(2, 24), group.Parts.Order());
@@ -188,7 +223,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         foreach (var label in labels)
         {
             Assert.True(label.Box.Width >= ReportText.Size(label.Id, font).Width);
-            Assert.True(new PdfSharp.Drawing.XRect(0, 0, 720, 320).Contains(label.Box));
+            Assert.True(new PdfSharp.Drawing.XRect(0, 0, 720, 265).Contains(label.Box));
             Assert.DoesNotContain(labels, other => other != label && other.Box.IntersectsWith(label.Box));
         }
         var path = Write(nest);
@@ -210,7 +245,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         drawing.IsCutOff = cutoff;
         nest.Plates[0].Parts.Add(new Part(drawing, new Vector(63.2, 31.2)));
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 265);
         Assert.Empty(plan.Groups);
         // The washers stay unlabeled; a lone obstacle part gets its ID on a leader.
         Assert.DoesNotContain(plan.Labels, label => label.Id == "2");
@@ -236,7 +271,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         frame.Codes.Add(new LinearMove(5, 5));
         nest.Plates[0].Parts.Add(new Part(new Drawing("Frame", frame), new Vector(50, 20)));
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 265);
         var group = Assert.Single(plan.Groups);
         Assert.Equal("2", group.Label.Id);
         Assert.Equal(24, group.Parts.Count);
@@ -253,7 +288,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         for (var i = 14; i < 26; i++)
             plate.Parts[i].Offset(25, 0);
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 265);
         Assert.Equal(2, plan.Groups.Count);
         Assert.All(plan.Groups, group => Assert.Equal(12, group.Parts.Count));
         Assert.False(plan.Groups[0].Boundary.IntersectsWith(plan.Groups[1].Boundary));
@@ -273,7 +308,7 @@ public sealed class NestPdfLayoutTests : IDisposable
             plate.Parts.Add(new Part(other, new Vector(right + plate.PartSpacing, 30 + row * 1.5)));
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
 
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 265);
 
         Assert.Equal(2, plan.Groups.Count);
         Assert.Equal(["2", "3"], plan.Groups.Select(group => group.Label.Id).Order());
@@ -296,7 +331,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         nest.Plates.Add(plate);
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
 
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 265);
 
         var label = Assert.Single(plan.Labels);
         Assert.Empty(plan.Groups);
@@ -327,7 +362,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         nest.Plates.Add(plate);
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
 
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 265);
 
         Assert.Equal(3, plan.Labels.Count);
         Assert.Empty(plan.Groups);
@@ -369,7 +404,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         plate.Parts.Add(new Part(strip, new Vector(40, 1)));
         nest.Plates.Add(plate);
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
-        Assert.Equal(leader, Assert.Single(NestReportDiagram.Plan(snapshot.Plates[0], 720, 320).Labels).Anchor != null);
+        Assert.Equal(leader, Assert.Single(NestReportDiagram.Plan(snapshot.Plates[0], 720, 265).Labels).Anchor != null);
 
         var path = Write(nest);
 
@@ -391,7 +426,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         nest.Plates[0].Parts.Add(new Part(lone, new Vector(80, 80)));
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
 
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 265);
 
         Assert.Empty(plan.Groups);
         Assert.DoesNotContain(plan.Labels, label => label.Id == "2");
@@ -416,7 +451,7 @@ public sealed class NestPdfLayoutTests : IDisposable
     public void Write_LabelOnHoledPartAvoidsTheHole()
     {
         var snapshot = NestReportBuilder.Capture(NestReportTestData.CreateNest(), NestReportTestData.GeneratedAt);
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 265);
         var label = plan.Labels.First(label => label.Part == 0);
         var hole = snapshot.Plates[0].Parts[0].Geometry.Contours.SelectMany(c => c.Segments).Single(s => s.Center != null);
         var holeBox = plan.Fit.Rect(new ReportBounds(hole.Center!.X - hole.Radius, hole.Center.Y - hole.Radius,
@@ -441,7 +476,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         nest.Plates.Add(plate);
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
 
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 265);
 
         foreach (var label in plan.Labels)
         {
@@ -471,7 +506,7 @@ public sealed class NestPdfLayoutTests : IDisposable
     {
         // A square with a central hole has four equally deep poles; every copy must pick the same one.
         var snapshot = NestReportBuilder.Capture(NestReportTestData.CreateDenseNest(), NestReportTestData.GeneratedAt);
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 265);
         var offsets = plan.Labels.GroupBy(label => label.Id).SelectMany(group =>
         {
             var relative = group.Select(label =>

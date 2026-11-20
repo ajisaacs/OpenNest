@@ -72,10 +72,10 @@ public sealed class NestReportClampsAndRulersTests : IDisposable
     public void Plan_RulersHugTheSheetWithLegibleTicksAndLabelsKeepClearOfThemAndTheClamps()
     {
         var plate = NestReportBuilder.Capture(ClampedNest(removeMiddle: false), NestReportTestData.GeneratedAt).Plates[0];
-        var plan = NestReportDiagram.Plan(plate, 720, 320);
+        var plan = NestReportDiagram.Plan(plate, 720, 265);
         var rulers = plan.Rulers;
         var sheet = plan.Fit.Rect(plate.Bounds);
-        var canvas = new XRect(0, 0, 720, 320);
+        var canvas = new XRect(0, 0, 720, 265);
 
         Assert.True(canvas.Contains(rulers.Horizontal), $"{rulers.Horizontal}");
         Assert.True(canvas.Contains(rulers.Vertical), $"{rulers.Vertical}");
@@ -111,13 +111,15 @@ public sealed class NestReportClampsAndRulersTests : IDisposable
     {
         var nest = ClampedNest(removeMiddle: true);
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 265);
         var path = Path.Combine(directory, "clamps.report.pdf");
         NestPdfWriter.Write(snapshot, path);
 
         var page = ReportPdf.Pages(path)[1];
-        Assert.Matches(@"Hatched rectangles are machine clamps\.\s+A dashed rectangle crossed out is a clamp to remove before cutting\.", page);
-        Assert.Contains("Rulers show sheet coordinates in inches (in).", page);
+        // Only the removed clamp gets a legend line: it is an action before cutting.
+        Assert.Contains("A dashed rectangle crossed out is a clamp to remove before cutting.", page);
+        Assert.DoesNotContain("Hatched rectangles", page);
+        Assert.DoesNotContain("Rulers show", page);
         // The horizontal ruler's numbers share one row, the units in the corner before them.
         var bounds = snapshot.Plates[0].Bounds;
         var numbers = plan.Rulers.Majors(bounds.Left, bounds.Right).Select(plan.Rulers.Format);
@@ -139,6 +141,6 @@ public sealed class NestReportClampsAndRulersTests : IDisposable
 
         var page = ReportPdf.Pages(path)[1];
         Assert.DoesNotContain("clamp", page, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Rulers show sheet coordinates in inches (in).", page);
+        Assert.DoesNotContain("Rulers show", page);
     }
 }
