@@ -13,28 +13,153 @@ using OpenNest.Math;
 
 namespace OpenNest.Engine.NestingEngines.Irregular;
 
-/// <summary>Per-solve, per-spacing Fill proposals. Only the members occupy material.</summary>
+/// <summary>
+/// Per-solve, per-spacing Fill proposals: a type's Lattice pattern in a rectangle, as a block for
+/// the frontier packer (<see cref="Get"/>) or as a band (<see cref="Band"/>). Only the members
+/// occupy material.
+///
+/// Every proposal is a whole Fill of its own, so the catalog keeps what it built, charges it to
+/// the solve's work meter and limits the blocks a type may ask for. Later decisions read that
+/// meter: when a proposal is charged, and how much, is part of the engine's result.
+/// </summary>
 internal sealed class BlockCatalog : IDisposable
 {
+    /// <summary>Fewest copies in a block or band; a Fill of fewer proposes nothing.</summary>
+    private const int MinCopies = 3;
+
+    /// <summary>Most blocks <see cref="Get"/> prepares per type; bands are not limited.</summary>
+    private const int MaxPreparationsPerType = 8;
+
+    /// <summary>Free rectangles of a sheet that blocks are offered: its largest.</summary>
+    private const int MaxRectangles = 2;
+
+    /// <summary>Clearance kept from occupied material beyond its spacing and flattening tolerance.</summary>
+    private const double OccupiedMargin = 0.001;
+
+    /// <summary>Miter limit of the offset that grows occupied material by its clearance.</summary>
+    private const double MiterLimit = 2;
+
+    /// <summary>Margin for Fill's boundary rounding in a <see cref="Footprint"/>.</summary>
+    private const double FillRoundingMargin = 0.001;
+
+    /// <summary>Decimals a certified pose's position is rounded to.</summary>
+    private const int PositionDecimals = 8;
+
+    /// <summary>Decimals a certified pose's rotation, in radians, is rounded to.</summary>
+    private const int RotationDecimals = 10;
+
     private readonly double spacing;
+
+    /// <summary>The spacing a band is filled at: one grid unit wider; see <see cref="Band"/>.</summary>
+    private readonly double bandSpacing;
+
     private readonly WorkCounter counter;
     private readonly long budget;
-    private readonly Dictionary<int, Drawing> drawings = new();
     private readonly Func<NestJobPart, Drawing>? drawingFor;
+
+    /// <summary>The catalog's own drawing per type, made only without <see cref="drawingFor"/>.</summary>
+    private readonly Dictionary<int, Drawing> drawings = new();
+
+    /// <summary>Per type, the orientations members are bound to: the type's own, its pairs' and
+    /// those its proposals added.</summary>
     private readonly Dictionary<int, List<Orientation>> orientations = new();
-    private readonly Dictionary<int, (double Width, double Area)> footprints = new();
-    private readonly Dictionary<int, int> attempts = new();
-    internal int PreparationCount => attempts.Values.Sum();
-    private readonly Dictionary<(int Type, int Quantity, double Length, double Width), IReadOnlyList<Placed>> cache = new();
-    private readonly Dictionary<(int Type, int Quantity, double Length, double Width), BandEntry> bands = new();
+
+    private readonly Dictionary<int, Footprint> footprints = new();
+
+    /// <summary>Per type, the blocks <see cref="Get"/> has prepared.</summary>
+    private readonly Dictionary<int, int> preparations = new();
+
+    private readonly Dictionary<PatternKey, IReadOnlyList<Placed>> blocks = new();
+
+    /// <summary>Guarded by its own lock, as are its entries' members and charge.</summary>
+    private readonly Dictionary<PatternKey, BandEntry> bands = new();
+
+    /// <summary>What a pattern is kept under: its type, the copies wanted and the size of its box.</summary>
+    private readonly record struct PatternKey(int Type, int Quantity, double Length, double Width);
+
+    /// <summary>A pattern asked for: up to <c>Quantity</c> copies of the type in a box the size of
+    /// the rectangle.</summary>
+    private readonly record struct Request(PartType Type, int Quantity, Box Rectangle)
+    {
+        public PatternKey Key => new(Type.Index, Quantity, Rectangle.Length, Rectangle.Width);
+
+        /// <summary>Whether nothing can come of it: too few copies wanted, a type with no outline or
+        /// a box with no area.</summary>
+        public bool IsEmpty =>
+            Quantity < MinCopies || Type.Orientations.Count == 0 || Rectangle.Length <= 0 || Rectangle.Width <= 0;
+
+        /// <summary>
+        /// Work charged for one Fill proposal. The Fill is a full independent NFP-based pack whose
+        /// own operations never touch the solve's effort meter; this charges it by the factors that
+        /// drive its real cost, demand and outline complexity, so the shared budget sees it.
+        /// </summary>
+        public long Cost
+        {
+            get
+            {
+                var vertices = Type.Orientations.Count > 0 ? Type.Orientations[0].Outline.Count : 1;
+                return (long)Quantity * Quantity * System.Math.Max(1, vertices);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Lower bounds on the true part's width at any rotation and on its area: the outline's
+    /// convex-hull width and area, less what flattening within the outline's tolerance (and a
+    /// margin for Fill's boundary rounding) could hide.
+    /// </summary>
+    private readonly record struct Footprint(double Width, double Area)
+    {
+        public static Footprint Of(Orientation orientation)
+        {
+            var outline = orientation.Outline;
+            var width = HullWidth(outline);
+            var perimeter = Perimeter(outline);
+            return new(double.IsFinite(width) ? width - 2 * orientation.Tolerance - FillRoundingMargin : 0,
+                System.Math.Abs(Clipper.Area(outline)) - perimeter * (orientation.Tolerance + FillRoundingMargin));
+        }
+
+        /// <summary>The convex hull's least extent across any of its edges; infinite for a hull with
+        /// no edge.</summary>
+        private static double HullWidth(PathD outline)
+        {
+            var hull = ConvexHull.Compute(outline.Select(p => new Vector(p.x, p.y)).ToList()).Vertices;
+            var width = double.PositiveInfinity;
+            for (var i = 0; i < hull.Count; i++)
+            {
+                var a = hull[i];
+                var b = hull[(i + 1) % hull.Count];
+                var length = a.DistanceTo(b);
+                if (length <= Tolerance.Epsilon)
+                    continue;
+                var across = hull.Max(p =>
+                    System.Math.Abs((b.X - a.X) * (p.Y - a.Y) - (b.Y - a.Y) * (p.X - a.X)) / length);
+                width = System.Math.Min(width, across);
+            }
+            return width;
+        }
+
+        private static double Perimeter(PathD outline)
+        {
+            var perimeter = 0.0;
+            for (var i = 0; i < outline.Count; i++)
+            {
+                var a = outline[i];
+                var b = outline[(i + 1) % outline.Count];
+                perimeter += System.Math.Sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
+            }
+            return perimeter;
+        }
+    }
 
     /// <summary>
     /// A built band pattern: its members, or while only prefetched, its certified poses awaiting
-    /// orientations. The work it cost is charged on its first ordinary request.
+    /// orientations; no poses is an empty pattern. The work it cost is charged on its first
+    /// ordinary request.
     /// </summary>
-    private sealed class BandEntry(IReadOnlyList<Placed>? members, NestJobPlacement[]? poses, long cost)
+    private sealed class BandEntry(NestJobPlacement[]? poses, long cost)
     {
-        public IReadOnlyList<Placed>? Members { get; set; } = members;
+        public IReadOnlyList<Placed>? Members { get; set; } = poses == null ? Array.Empty<Placed>() : null;
         public NestJobPlacement[]? Poses { get; } = poses;
         public long Cost { get; } = cost;
         public bool Charged { get; set; }
@@ -47,63 +172,40 @@ internal sealed class BlockCatalog : IDisposable
         Func<NestJobPart, Drawing>? drawingFor = null)
     {
         this.spacing = spacing;
+        bandSpacing = spacing + System.Math.Pow(10, -NoFitCache.Precision);
         this.counter = counter;
         this.budget = budget;
         this.drawingFor = drawingFor;
         foreach (var type in types)
         {
-            var poses = type.Orientations.ToList();
-            if (pairs.TryGetValue(type.Index, out var found))
-                poses.AddRange(found.SelectMany(p => new[] { p.A, p.B }));
-            orientations[type.Index] = poses.Distinct().ToList();
+            orientations[type.Index] = WithPairOrientations(type, pairs);
             if (type.Orientations.Count > 0)
-                footprints[type.Index] = Footprint(type.Orientations[0]);
+                footprints[type.Index] = Footprint.Of(type.Orientations[0]);
         }
     }
 
-    /// <summary>
-    /// Lower bounds on the true part's width at any rotation and on its area: the outline's
-    /// convex-hull width and area, less what flattening within the outline's tolerance (and a
-    /// margin for Fill's boundary rounding) could hide.
-    /// </summary>
-    private static (double Width, double Area) Footprint(Orientation orientation)
+    /// <summary>The type's orientations, then those of its pairs that are not among them.</summary>
+    private static List<Orientation> WithPairOrientations(PartType type,
+        IReadOnlyDictionary<int, IReadOnlyList<PairPose>> pairs)
     {
-        var outline = orientation.Outline;
-        var hull = ConvexHull.Compute(outline.Select(p => new Vector(p.x, p.y)).ToList()).Vertices;
-        var width = double.PositiveInfinity;
-        for (var i = 0; i < hull.Count; i++)
-        {
-            var a = hull[i];
-            var b = hull[(i + 1) % hull.Count];
-            var length = a.DistanceTo(b);
-            if (length <= Tolerance.Epsilon)
-                continue;
-            var across = hull.Max(p => System.Math.Abs((b.X - a.X) * (p.Y - a.Y) - (b.Y - a.Y) * (p.X - a.X)) / length);
-            width = System.Math.Min(width, across);
-        }
-        var perimeter = 0.0;
-        for (var i = 0; i < outline.Count; i++)
-        {
-            var a = outline[i];
-            var b = outline[(i + 1) % outline.Count];
-            perimeter += System.Math.Sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
-        }
-        const double margin = 0.001;
-        return (double.IsFinite(width) ? width - 2 * orientation.Tolerance - margin : 0,
-            System.Math.Abs(Clipper.Area(outline)) - perimeter * (orientation.Tolerance + margin));
+        var poses = type.Orientations.ToList();
+        if (pairs.TryGetValue(type.Index, out var found))
+            poses.AddRange(found.SelectMany(p => new[] { p.A, p.B }));
+        return poses.Distinct().ToList();
     }
 
-    /// <summary>
-    /// True when the rectangle cannot hold three copies of the type: it is narrower than the part
-    /// at every rotation, or smaller than three parts. Fill could return at most two members there,
-    /// which never form a block, so its proposal is known to be empty without running it.
-    /// </summary>
-    private bool CannotHoldBlock(PartType type, Box rectangle) =>
-        footprints.TryGetValue(type.Index, out var footprint)
-        && (System.Math.Min(rectangle.Length, rectangle.Width) < footprint.Width
-            || rectangle.Area() < 3 * footprint.Area);
+    /// <summary>Blocks prepared so far, over all types.</summary>
+    internal int PreparationCount => preparations.Values.Sum();
 
-    internal static IReadOnlyList<Box> Rectangles(Box work, IReadOnlyList<Placed> placed, double spacing)
+    /// <summary>
+    /// The free rectangles of a work area blocks are offered: the largest clear of the parts
+    /// placed, their spacing included.
+    /// </summary>
+    internal static IReadOnlyList<Box> Rectangles(Box work, IReadOnlyList<Placed> placed, double spacing) =>
+        MaximalRectangles.InRegion(FreeRegion(work, placed, spacing)).OrderByDescending(b => b.Area())
+            .ThenBy(b => b.Left).ThenBy(b => b.Bottom).ThenBy(b => b.Length).Take(MaxRectangles).ToArray();
+
+    private static PathsD FreeRegion(Box work, IReadOnlyList<Placed> placed, double spacing)
     {
         var free = new PathsD { new PathD
         {
@@ -115,75 +217,101 @@ internal sealed class BlockCatalog : IDisposable
             // Physical occupied material, not a reference-point region for any moving part.
             // The catalog currently prepares solid outlines; future profile preparation owns holes.
             var blocked = Clipper.InflatePaths(new PathsD { part.Orientation.Outline },
-                spacing + part.Orientation.Tolerance + 0.001, JoinType.Miter, EndType.Polygon,
-                2, NoFitCache.Precision);
+                spacing + part.Orientation.Tolerance + OccupiedMargin, JoinType.Miter, EndType.Polygon,
+                MiterLimit, NoFitCache.Precision);
             free = Clipper.Difference(free, Clipper.TranslatePaths(blocked, part.X, part.Y),
                 FillRule.NonZero, NoFitCache.Precision);
         }
-        return MaximalRectangles.InRegion(free).OrderByDescending(b => b.Area())
-            .ThenBy(b => b.Left).ThenBy(b => b.Bottom).ThenBy(b => b.Length).Take(2).ToArray();
+        return free;
     }
 
+    /// <summary>
+    /// The type's Lattice pattern in the rectangle, up to <paramref name="quantity"/> copies, as a
+    /// block: kept per type, quantity and rectangle size once prepared. Empty when no block comes
+    /// of it, or when the type's preparations or the solve's work budget are spent.
+    /// </summary>
     public IReadOnlyList<Placed> Get(PartType type, int quantity, Box rectangle, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        if (quantity <= 2 || type.Orientations.Count == 0 || rectangle.Length <= 0 || rectangle.Width <= 0)
+        var request = new Request(type, quantity, rectangle);
+        if (request.IsEmpty)
             return Array.Empty<Placed>();
-        var key = (type.Index, quantity, rectangle.Length, rectangle.Width);
-        if (cache.TryGetValue(key, out var cached))
-            return cached;
-        if (rectangle.Area() < 3 * type.Area || attempts.GetValueOrDefault(type.Index) >= 8 || counter.Value >= budget)
+        var key = request.Key;
+        if (blocks.TryGetValue(key, out var kept))
+            return kept;
+        if (CannotPrepare(request))
             return Array.Empty<Placed>();
-        attempts[type.Index] = attempts.GetValueOrDefault(type.Index) + 1;
-        var result = Build(type, quantity, rectangle, token);
-        cache[key] = result;
-        return result;
+        preparations[type.Index] = PreparationsOf(type) + 1;
+        var block = Prepare(request, token);
+        blocks[key] = block;
+        return block;
+    }
+
+    /// <summary>
+    /// Whether no block is prepared for the request: its rectangle is smaller than three parts,
+    /// or the type's preparations or the solve's work budget are spent.
+    /// </summary>
+    private bool CannotPrepare(Request request) =>
+        request.Rectangle.Area() < MinCopies * request.Type.Area
+        || PreparationsOf(request.Type) >= MaxPreparationsPerType
+        || counter.Value >= budget;
+
+    private int PreparationsOf(PartType type) => preparations.GetValueOrDefault(type.Index);
+
+    /// <summary>
+    /// Charges a block's proposal and makes it. A rectangle that cannot hold a block is charged
+    /// and counted as if filled, so the meter, and every later decision it steers, reads the same
+    /// as when the Fill ran.
+    /// </summary>
+    private IReadOnlyList<Placed> Prepare(Request request, CancellationToken token)
+    {
+        counter.Add(request.Cost);
+        if (CannotHoldBlock(request))
+            return Array.Empty<Placed>();
+        var type = request.Type;
+        var poses = Propose(request, spacing, DrawingOf(type), token);
+        return poses == null ? Array.Empty<Placed>() : Bind(type, poses, orientations[type.Index], token);
+    }
+
+    /// <summary>
+    /// True when the rectangle cannot hold three copies of the type: it is narrower than the part
+    /// at every rotation, or smaller than three parts. Fill could return at most two members there,
+    /// which never form a block, so its proposal is known to be empty without running it.
+    /// </summary>
+    private bool CannotHoldBlock(Request request)
+    {
+        var rectangle = request.Rectangle;
+        return footprints.TryGetValue(request.Type.Index, out var footprint)
+            && (System.Math.Min(rectangle.Length, rectangle.Width) < footprint.Width
+                || rectangle.Area() < MinCopies * footprint.Area);
     }
 
     /// <summary>
     /// The type's Lattice pattern in a box of the given size, up to <paramref name="quantity"/>
     /// copies, for a band; unlike <see cref="Get"/> it is not limited in attempts per type. The
     /// pattern is filled one grid unit wider than the spacing: Fill sets parts exactly the spacing
-    /// apart, which the stricter certification below can reject for curved parts (a stack of
-    /// circles), and losing the band then loses its densest pattern.
-    /// </summary>
-    public IReadOnlyList<Placed> Band(PartType type, int quantity, Box rectangle, CancellationToken token) =>
-        Band(type, quantity, rectangle, token, prefetch: null);
-
-    /// <summary>
-    /// <see cref="Band(PartType, int, Box, CancellationToken)"/>, or with a <paramref name="prefetch"/>
-    /// drawing (see <see cref="PrefetchDrawing"/>) a build ahead of need that may run in parallel
-    /// with other prefetches, even of the same type, each with its own drawing. A prefetch charges
-    /// no work and adds no orientations: the pattern's first ordinary request charges it and binds
-    /// its poses to the catalog's orientations, so the work meter and the orientations read as if
-    /// the pattern were built then.
+    /// apart, which the stricter certification can reject for curved parts (a stack of circles),
+    /// and losing the band then loses its densest pattern.
+    ///
+    /// With a <paramref name="prefetch"/> drawing (see <see cref="PrefetchDrawing"/>) the pattern
+    /// is built ahead of need, which may run in parallel with other prefetches, even of the same
+    /// type, each with its own drawing. A prefetch charges no work and adds no orientations: the
+    /// pattern's first ordinary request charges it and binds its poses to the catalog's
+    /// orientations, so the work meter and the orientations read as if the pattern were built then.
     /// </summary>
     public IReadOnlyList<Placed> Band(PartType type, int quantity, Box rectangle, CancellationToken token,
-        Drawing? prefetch)
+        Drawing? prefetch = null)
     {
         token.ThrowIfCancellationRequested();
-        if (quantity <= 2 || type.Orientations.Count == 0 || rectangle.Length <= 0 || rectangle.Width <= 0)
+        var request = new Request(type, quantity, rectangle);
+        if (request.IsEmpty)
             return Array.Empty<Placed>();
-        var key = (type.Index, quantity, rectangle.Length, rectangle.Width);
-        BandEntry? entry;
-        lock (bands)
-            bands.TryGetValue(key, out entry);
-        if (entry == null)
-        {
-            // Types may build bands in parallel: each type's drawing and orientation list are its
-            // own. Prefetches of one type fill their own drawings and only read the orientations.
-            var (members, poses) = CannotHoldBlock(type, rectangle)
-                ? (Array.Empty<Placed>(), null)
-                : Propose(type, quantity, rectangle, token,
-                    spacing + System.Math.Pow(10, -NoFitCache.Precision), prefetch ?? DrawingOf(type));
-            lock (bands)
-                if (!bands.TryGetValue(key, out entry))
-                    bands[key] = entry = new BandEntry(members, poses, Cost(type, quantity));
-        }
+        var entry = BandFor(request, token, prefetch);
         if (prefetch != null)
             return entry.Members ?? Bind(type, entry.Poses!, orientations[type.Index].ToList(), token);
         lock (bands)
         {
+            // The first ordinary request pays for the pattern, whichever request built it.
             if (!entry.Charged)
             {
                 counter.Add(entry.Cost);
@@ -199,6 +327,29 @@ internal sealed class BlockCatalog : IDisposable
         return bound;
     }
 
+    /// <summary>The band's entry, its pattern proposed here when the catalog has none; charges
+    /// nothing and binds nothing.</summary>
+    private BandEntry BandFor(Request request, CancellationToken token, Drawing? prefetch)
+    {
+        var key = request.Key;
+        BandEntry? entry;
+        lock (bands)
+            bands.TryGetValue(key, out entry);
+        if (entry != null)
+            return entry;
+        // Types may build bands in parallel: each type's drawing and orientation list are its
+        // own. Prefetches of one type fill their own drawings and only read the orientations.
+        var poses = CannotHoldBlock(request)
+            ? null
+            : Propose(request, bandSpacing, prefetch ?? DrawingOf(request.Type), token);
+        lock (bands)
+        {
+            if (!bands.TryGetValue(key, out entry))
+                bands[key] = entry = new BandEntry(poses, request.Cost);
+            return entry;
+        }
+    }
+
     /// <summary>
     /// A private drawing of the type for one prefetching thread: Fill sorts a drawing's cached
     /// best-fit list in place, so two fills of one drawing must not run at once. It draws the same
@@ -208,50 +359,7 @@ internal sealed class BlockCatalog : IDisposable
 
     public static void ReleasePrefetch(Drawing drawing) => BestFitCache.Invalidate(drawing);
 
-    /// <summary>Work charged for one Fill proposal; see <see cref="Build"/>.</summary>
-    private static long Cost(PartType type, int quantity)
-    {
-        var vertices = type.Orientations.Count > 0 ? type.Orientations[0].Outline.Count : 1;
-        return (long)quantity * quantity * System.Math.Max(1, vertices);
-    }
-
-    private IReadOnlyList<Placed> Build(PartType type, int quantity, Box rectangle, CancellationToken token)
-    {
-        // PrivatePlateFill.Run below is a full independent NFP-based pack whose own operations
-        // never touch this solve's effort meter; charge it here using the same factors - demand
-        // and outline complexity - that drive its real cost, so the shared budget actually sees it.
-        // A rectangle that cannot hold a block is charged and counted as if filled, so the meter,
-        // and every later decision it steers, reads the same as when the Fill ran.
-        counter.Add(Cost(type, quantity));
-        if (CannotHoldBlock(type, rectangle))
-            return Array.Empty<Placed>();
-        var (members, poses) = Propose(type, quantity, rectangle, token, spacing, DrawingOf(type));
-        return members ?? Bind(type, poses!, orientations[type.Index], token);
-    }
-
     private Drawing DrawingOf(PartType type) => drawingFor?.Invoke(type.Part) ?? OwnDrawing(type);
-
-    /// <summary>
-    /// The Fill proposal's certified poses, or its members when there are none to bind: empty
-    /// when Fill fails or certification rejects it.
-    /// </summary>
-    private (IReadOnlyList<Placed>? Members, NestJobPlacement[]? Poses) Propose(PartType type, int quantity,
-        Box rectangle, CancellationToken token, double fillSpacing, Drawing drawing)
-    {
-        try
-        {
-            var members = PrivatePlateFill.Run(drawing, type.Part.Rotation, fillSpacing,
-                rectangle.Length, rectangle.Width, quantity, token);
-            token.ThrowIfCancellationRequested();
-            var poses = Certify(type, members.Take(quantity).ToArray(), spacing, token);
-            return poses == null ? (Array.Empty<Placed>(), null) : (null, poses);
-        }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException
-            or NotSupportedException or ArithmeticException)
-        {
-            return (Array.Empty<Placed>(), null);
-        }
-    }
 
     private Drawing OwnDrawing(PartType type)
     {
@@ -270,6 +378,30 @@ internal sealed class BlockCatalog : IDisposable
         drawings.Clear();
     }
 
+    /// <summary>
+    /// The certified poses of the request's Fill of <paramref name="drawing"/> at
+    /// <paramref name="fillSpacing"/>; null when Fill fails or certification rejects it.
+    /// </summary>
+    private NestJobPlacement[]? Propose(Request request, double fillSpacing, Drawing drawing, CancellationToken token)
+    {
+        var (type, quantity, rectangle) = request;
+        try
+        {
+            var members = PrivatePlateFill.Run(drawing, type.Part.Rotation, fillSpacing,
+                rectangle.Length, rectangle.Width, quantity, token);
+            token.ThrowIfCancellationRequested();
+            return Certify(type, members.Take(quantity).ToArray(), spacing, token);
+        }
+        catch (Exception ex) when (IsProposalFailure(ex))
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Whether the exception is a proposal that failed rather than a solve that must stop.</summary>
+    private static bool IsProposalFailure(Exception ex) =>
+        ex is ArgumentException or InvalidOperationException or NotSupportedException or ArithmeticException;
+
     /// <summary>The members certified and bound to <paramref name="orientations"/>; empty when they
     /// cannot form a block.</summary>
     internal static IReadOnlyList<Placed> Resolve(PartType type, IReadOnlyList<Part> members,
@@ -287,20 +419,36 @@ internal sealed class BlockCatalog : IDisposable
         CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        if (members.Count <= 2)
+        if (members.Count < MinCopies)
             return null;
         var geometry = JobPartGeometry.TryRead(type.Part.Geometry);
         if (geometry == null)
             return null;
-        // Canonical rebinding is already performed by FillItem. Quantization removes sub-grid
-        // arithmetic differences from equivalent Fill proposals; certify the resulting poses.
-        var poses = members.Select(p => new NestJobPlacement(type.Part.Id, 0,
-            System.Math.Round(p.Location.X, 8), System.Math.Round(p.Location.Y, 8),
-            System.Math.Round(Angle.NormalizeRad(p.Rotation), 10)))
-            .OrderBy(p => p.X).ThenBy(p => p.Y).ThenBy(p => p.Rotation).ToArray();
-        if (poses.Any(p => !double.IsFinite(p.X) || !double.IsFinite(p.Y) || !double.IsFinite(p.Rotation)
-            || !type.Part.Rotation.Allows(p.Rotation)))
+        var poses = QuantizedPoses(type, members);
+        if (poses.Any(p => !IsAllowed(type, p)))
             return null;
+        return KeepSpacing(geometry, poses, spacing, token) ? poses : null;
+    }
+
+    /// <summary>
+    /// The members' poses in a fixed order. Canonical rebinding is already performed by FillItem;
+    /// quantization removes sub-grid arithmetic differences from equivalent Fill proposals, and
+    /// the poses certified are the quantized ones.
+    /// </summary>
+    private static NestJobPlacement[] QuantizedPoses(PartType type, IReadOnlyList<Part> members) =>
+        members.Select(p => new NestJobPlacement(type.Part.Id, 0,
+            System.Math.Round(p.Location.X, PositionDecimals), System.Math.Round(p.Location.Y, PositionDecimals),
+            System.Math.Round(Angle.NormalizeRad(p.Rotation), RotationDecimals)))
+            .OrderBy(p => p.X).ThenBy(p => p.Y).ThenBy(p => p.Rotation).ToArray();
+
+    private static bool IsAllowed(PartType type, NestJobPlacement pose) =>
+        double.IsFinite(pose.X) && double.IsFinite(pose.Y) && double.IsFinite(pose.Rotation)
+        && type.Part.Rotation.Allows(pose.Rotation);
+
+    /// <summary>Whether every pair of the poses keeps the spacing.</summary>
+    private static bool KeepSpacing(JobPartGeometry geometry, NestJobPlacement[] poses, double spacing,
+        CancellationToken token)
+    {
         // Each member outlined once, not once per pair it is tested in.
         var prepared = poses.Select(p => NestLayoutCheck.Prepare(geometry, p, spacing)).ToArray();
         for (var i = 0; i < poses.Length; i++)
@@ -308,9 +456,9 @@ internal sealed class BlockCatalog : IDisposable
             {
                 token.ThrowIfCancellationRequested();
                 if (!NestLayoutCheck.Clears(prepared[i], prepared[j]))
-                    return null;
+                    return false;
             }
-        return poses;
+        return true;
     }
 
     /// <summary>
@@ -327,22 +475,29 @@ internal sealed class BlockCatalog : IDisposable
             foreach (var pose in poses)
             {
                 token.ThrowIfCancellationRequested();
-                var orientation = orientations.FirstOrDefault(o => o.Rotation == pose.Rotation);
+                var orientation = OrientationAt(type, orientations, pose.Rotation);
                 if (orientation == null)
-                {
-                    orientation = PartCatalog.CreateOrientation(type, orientations.Max(o => o.Index) + 1, pose.Rotation);
-                    if (orientation == null)
-                        return Array.Empty<Placed>();
-                    orientations.Add(orientation);
-                }
+                    return Array.Empty<Placed>();
                 result.Add(new Placed(orientation, pose.X - poses[0].X, pose.Y - poses[0].Y));
             }
             return result;
         }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException
-            or NotSupportedException or ArithmeticException)
+        catch (Exception ex) when (IsProposalFailure(ex))
         {
             return Array.Empty<Placed>();
         }
+    }
+
+    /// <summary>The orientation at the rotation, made and added to <paramref name="orientations"/>
+    /// when missing; null when it cannot be made.</summary>
+    private static Orientation? OrientationAt(PartType type, List<Orientation> orientations, double rotation)
+    {
+        var orientation = orientations.FirstOrDefault(o => o.Rotation == rotation);
+        if (orientation != null)
+            return orientation;
+        orientation = PartCatalog.CreateOrientation(type, orientations.Max(o => o.Index) + 1, rotation);
+        if (orientation != null)
+            orientations.Add(orientation);
+        return orientation;
     }
 }
