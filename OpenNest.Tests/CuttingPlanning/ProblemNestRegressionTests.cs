@@ -109,7 +109,9 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
     /// Runs Auto Nest (the Default engine, the nest's own sheet sizes, spacing and clamps, as the
     /// benchmark builds the job) on every nest that guards <see cref="AutoNestArea"/>, and fails
     /// when a layout is invalid, leaves parts unplaced or needs more sheets than its
-    /// "auto-nest: 2 sheets" baseline.
+    /// "auto-nest: 2 sheets" baseline. A baseline that also says where the last sheet ends
+    /// ("auto-nest: 1 sheets, ends 62.2") fails a layout whose last sheet reaches further along
+    /// its length: a job that does not fill its last sheet can get worse without another sheet.
     /// </summary>
     [SkippableFact]
     public async Task ProblemNests_AutoNestNoWorseThanTheirBaselines()
@@ -133,25 +135,33 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
             var bytes = await repository.GetFileAsync(record.Id)
                 ?? throw new InvalidOperationException($"'{record.Name}' has no file.");
             var baseline = SheetBaseline(record.Comments);
+            var endBaseline = EndBaseline(record.Comments);
             var watch = Stopwatch.StartNew();
-            var (sheets, problem) = AutoNest(bytes, limit);
-            output.WriteLine($"{record.Name}: {(problem ?? $"{sheets} sheets")} (baseline {baseline?.ToString() ?? "none"}), "
+            var (sheets, end, problem) = AutoNest(bytes, limit);
+            output.WriteLine($"{record.Name}: {(problem ?? $"{sheets} sheets, ends {Number(end)}")} "
+                + $"(baseline {baseline?.ToString() ?? "none"}{(endBaseline is { } recorded ? $", ends {Number(recorded)}" : "")}), "
                 + $"{watch.Elapsed.TotalSeconds:0.0} s");
             if (problem != null)
                 failures.Add($"{record.Name}: {problem}");
             else if (baseline == null)
-                failures.Add($"{record.Name} has no Auto Nest baseline. Add this line to its comments: {AutoNestLine} {sheets} sheets");
+                failures.Add($"{record.Name} has no Auto Nest baseline. Add this line to its comments: "
+                    + AutoNestBaselineLine(sheets, end));
             else if (sheets > baseline)
                 failures.Add($"{record.Name}: {sheets} sheets, worse than baseline {baseline}.");
             else if (sheets < baseline)
-                output.WriteLine($"  better than {baseline}; update the baseline.");
+                output.WriteLine($"  better than {baseline}; update the baseline: {AutoNestBaselineLine(sheets, end)}");
+            else if (endBaseline is { } ends && end > ends + EndTolerance)
+                failures.Add($"{record.Name}: the last sheet ends at {Number(end)}, worse than baseline {Number(ends)}.");
+            else if (endBaseline is { } before && end < before - 2 * EndTolerance)
+                output.WriteLine($"  ends before {Number(before)}; update the baseline: {AutoNestBaselineLine(sheets, end)}");
         }
         Skip.If(nested == 0, $"No nest on {server} checks {AutoNestArea}.");
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
-    // Auto Nest on the nest's demand: sheet count, or why the layout cannot be kept.
-    private static (int Sheets, string Problem) AutoNest(byte[] bytes, TimeSpan limit)
+    // Auto Nest on the nest's demand: sheet count and where the last sheet ends, or why the
+    // layout cannot be kept.
+    private static (int Sheets, double End, string Problem) AutoNest(byte[] bytes, TimeSpan limit)
     {
         var path = Path.Combine(Path.GetTempPath(), $"opennest-problem-{Guid.NewGuid():N}.nest");
         try
@@ -162,13 +172,14 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
             var result = OpenNest.Engine.Jobs.NestingEngineRegistry.Create("Default").Solve(job, token: cancellation.Token);
             var violations = OpenNest.Engine.Jobs.NestLayoutCheck.Violations(job, result);
             if (violations.Count != 0)
-                return (result.Plates.Count, "invalid layout: " + string.Join(" | ", violations.Take(3)));
+                return (result.Plates.Count, 0, "invalid layout: " + string.Join(" | ", violations.Take(3)));
             var unplaced = result.Fulfillment.Sum(f => f.Unplaced);
-            return unplaced != 0 ? (result.Plates.Count, $"{unplaced} parts unplaced") : (result.Plates.Count, null);
+            return unplaced != 0 ? (result.Plates.Count, 0, $"{unplaced} parts unplaced")
+                : (result.Plates.Count, LastSheetEnd(job, result), null);
         }
         catch (OperationCanceledException)
         {
-            return (0, Timeout);
+            return (0, 0, Timeout);
         }
         finally
         {
@@ -180,6 +191,53 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
     internal static int? SheetBaseline(string comments) =>
         CommentLine(comments, AutoNestLine) is { } line && Regex.Match(line, @"\d+") is { Success: true } count
             ? int.Parse(count.Value) : null;
+
+    /// <summary>
+    /// Where the last sheet ends, from an "auto-nest: 1 sheets, ends 62.2" comment line; null when
+    /// the line records none, which leaves the end unchecked.
+    /// </summary>
+    internal static double? EndBaseline(string comments) =>
+        CommentLine(comments, AutoNestLine) is { } line && EndEntry().Match(line) is { Success: true } end
+            ? double.Parse(end.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) : null;
+
+    // A recorded end is rounded to a tenth; a layout within half of that is the same layout.
+    internal const double EndTolerance = 0.05;
+
+    /// <summary>The baseline line for a result, its end rounded up to a tenth so the result meets it.</summary>
+    internal static string AutoNestBaselineLine(int sheets, double end) =>
+        $"{AutoNestLine} {sheets} sheets, ends {Number(System.Math.Ceiling(end * 10 - 1e-6) / 10)}";
+
+    private static string Number(double value) =>
+        value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// How far along the sheet's length the last sheet's material reaches, measured from the end
+    /// of the sheet the layout starts at: the length less the wider strip left free at either end.
+    /// The same figure in every quadrant, and the right edge of a layout packed from the left.
+    /// </summary>
+    internal static double LastSheetEnd(NestJob job, NestJobResult result)
+    {
+        if (result.Plates.Count == 0)
+            return 0;
+        var sheet = result.Plates[^1];
+        if (sheet.Placements.Count == 0)
+            return 0;
+        var parts = job.Parts.ToDictionary(p => p.Id);
+        double left = double.PositiveInfinity, right = double.NegativeInfinity;
+        foreach (var placement in sheet.Placements)
+        {
+            var part = new Part(OpenNest.Engine.Jobs.Adapters.DrawingJobMapper.CreateDrawing(parts[placement.PartId]));
+            part.Rotate(placement.Rotation);
+            part.Location = new OpenNest.Geometry.Vector(placement.X, placement.Y);
+            part.UpdateBounds();
+            var box = NestLayoutCheck.MaterialBounds(part);
+            left = System.Math.Min(left, box.Left);
+            right = System.Math.Max(right, box.Right);
+        }
+        var length = sheet.Stock.Size.Length;
+        var sheetLeft = sheet.Stock.Quadrant is 1 or 4 ? 0 : -length;
+        return length - System.Math.Max(left - sheetLeft, sheetLeft + length - right);
+    }
 
     /// <summary>
     /// Fills each plate listed in the "fill: 1=33" baseline of every nest that guards
@@ -508,6 +566,9 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
 
     [GeneratedRegex(@"(\d+)\s*=\s*(\d+)")]
     private static partial Regex FillEntry();
+
+    [GeneratedRegex(@"\bends\s+(?:at\s+)?(\d+(?:\.\d+)?)", RegexOptions.IgnoreCase)]
+    private static partial Regex EndEntry();
 }
 
 public class ProblemNestBaselineTests
@@ -552,6 +613,57 @@ public class ProblemNestBaselineTests
         Assert.Equal(2, ProblemNestRegressionTests.SheetBaseline("Three sheets before the fix.\nchecks: auto-nest\nauto-nest: 2 sheets"));
         Assert.Null(ProblemNestRegressionTests.SheetBaseline("planning: 1=Ready"));
         Assert.Equal(["auto-nest"], ProblemNestRegressionTests.Checks("auto-nest"));
+    }
+
+    [Fact]
+    public void EndBaseline_ReadsWhereTheLastSheetEndsWhenTheLineSaysSo()
+    {
+        const string comments = "Ended at 75.2 before the fix.\nchecks: auto-nest\nauto-nest: 1 sheets, ends 62.2";
+
+        Assert.Equal(1, ProblemNestRegressionTests.SheetBaseline(comments));
+        Assert.Equal(62.2, ProblemNestRegressionTests.EndBaseline(comments));
+        Assert.Equal(1575, ProblemNestRegressionTests.EndBaseline("auto-nest: 2 sheets, ends at 1575"));
+        Assert.Null(ProblemNestRegressionTests.EndBaseline("It ends 80 along.\nauto-nest: 2 sheets"));
+        Assert.Null(ProblemNestRegressionTests.EndBaseline("planning: 1=Ready"));
+    }
+
+    [Fact]
+    public void AutoNestBaselineLine_RoundsTheEndUpSoTheResultMeetsIt()
+    {
+        var line = ProblemNestRegressionTests.AutoNestBaselineLine(1, 62.132);
+
+        Assert.Equal("auto-nest: 1 sheets, ends 62.2", line);
+        Assert.Equal(1, ProblemNestRegressionTests.SheetBaseline(line));
+        Assert.True(62.132 <= ProblemNestRegressionTests.EndBaseline(line) + ProblemNestRegressionTests.EndTolerance);
+        Assert.Equal("auto-nest: 2 sheets, ends 40", ProblemNestRegressionTests.AutoNestBaselineLine(2, 40));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void LastSheetEnd_MeasuresFromTheNearerEndInEveryQuadrant(int quadrant)
+    {
+        // A 4 x 3 rectangle 2 from one end of a 20-long sheet ends 6 along, whichever end that is.
+        var program = new OpenNest.CNC.Program();
+        program.MoveTo(0, 0);
+        program.LineTo(4, 0);
+        program.LineTo(4, 3);
+        program.LineTo(0, 3);
+        program.LineTo(0, 0);
+        var part = new NestJobPart("part", PartGeometrySnapshot.FromProgram(program), 1);
+        var stock = new NestPlateStock("sheet", new OpenNest.Geometry.Size(10, 20), quadrant: quadrant);
+        var job = new NestJob(new[] { part }, new[] { stock });
+        var sheetLeft = quadrant is 1 or 4 ? 0 : -20;
+
+        foreach (var x in new[] { sheetLeft + 2.0, sheetLeft + 20 - 2 - 4.0 })
+        {
+            var builder = new NestJobResultBuilder(job);
+            builder.AddSheet(stock, new[] { (part.Id, x, stock.WorkArea.Bottom, 0.0) });
+
+            Assert.Equal(6, ProblemNestRegressionTests.LastSheetEnd(job, builder.Build(NestJobStopReason.Completed)), 6);
+        }
     }
 
     [Fact]

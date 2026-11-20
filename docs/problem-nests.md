@@ -68,6 +68,15 @@ fewer sheets are only reported. Run it with `OPENNEST_PROBLEM_NESTS_CHECKS=auto-
 naming only planner areas skips it, and the planning test skips nests guarding only `auto-nest`
 and runs not at all for a filter naming only `auto-nest`.
 
+A job that does not fill its last sheet can get worse without taking another sheet, so the line
+may also say where that sheet ends: `auto-nest: 1 sheets, ends 62.2`. The end is how far along the
+sheet's length the last sheet's material reaches, measured from the end of the sheet the layout
+starts at (the right edge of a layout packed from the left; the same figure in every quadrant).
+With the baseline's sheet count, a layout ending more than 0.05 past the recorded end fails; one
+ending sooner is only reported, with the line to record. A line without `ends` checks the sheet
+count alone. Every run prints each nest's end, and a missing baseline's failure prints the whole
+line, the end rounded up to a tenth.
+
 ### Fill nests
 
 `ProblemNests_FillNoWorseThanTheirBaselines` takes the nests whose `checks:` line names `fill`
@@ -122,7 +131,8 @@ Plates use their own cutting parameters. A plate without them uses line lead-ins
    and which commit fixed it, if any.
 3. Add a baseline line to the comments, with plate numbers counted from the first plate:
    `planning: 1=NoSolutionWithinBudget 2=BestEffort`. An Auto Nest problem takes
-   `auto-nest: 2 sheets` instead, the sheet count Auto Nest reaches today, and a fill problem
+   `auto-nest: 2 sheets` instead, the sheet count Auto Nest reaches today (`auto-nest: 1 sheets,
+   ends 62.2` when the problem was how far a part-filled last sheet reached), and a fill problem
    `fill: 1=33`, the part count each listed plate's fill reaches today (`fill (Strip): 1=33` for
    a strategy other than Lattice). A fill plate must hold one drawing: the fill uses it.
    To get the line, save without one and run the test: the failure prints the observed line.
