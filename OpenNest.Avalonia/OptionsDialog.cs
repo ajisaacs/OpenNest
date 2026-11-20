@@ -46,10 +46,7 @@ namespace OpenNest.Avalonia
         private readonly ComboBox clonePlacement = new() { Width = 200 };
         private readonly TextBox serverUrl = new() { Watermark = "http://server:port" };
         private readonly TextBox updateFeedUrl = new();
-        private readonly CheckBox includeDevBuilds = new()
-        {
-            Content = "Include development builds (latest master; takes effect after restart)",
-        };
+        private readonly ComboBox updateChannel = new() { Width = 300 };
         private readonly List<(CheckBox Enabled, string Name)> strategies = new();
 
         private OptionsDialog(string settingsPath)
@@ -89,7 +86,7 @@ namespace OpenNest.Avalonia
             saveFeed.Click += async (_, _) => await SaveFeedAsync();
             var updates = Group(
                 "Auto-update feed URL (blank: nest server mirror in Database mode, else GitHub Releases)",
-                UrlRow(updateFeedUrl, saveFeed), includeDevBuilds);
+                UrlRow(updateFeedUrl, saveFeed), UpdateChannelRow());
 
             var ledger = new TextBlock
             {
@@ -146,7 +143,8 @@ namespace OpenNest.Avalonia
             var options = DesktopOptions.Read(settings);
             serverUrl.Text = DesktopSettings.ServerUrl;
             updateFeedUrl.Text = UpdateFeedOption.Read(settings);
-            includeDevBuilds.IsChecked = options.UpdateIncludeDevBuilds;
+            updateChannel.ItemsSource = UpdateChannelOption.Choices.Select(c => c.Text).ToList();
+            updateChannel.SelectedIndex = UpdateChannelOption.IndexOf(options.UpdateChannel);
             createNewNest.IsChecked = options.CreateNewNestOnOpen;
             autoSizeFactor.Value = (decimal)options.AutoSizePlateFactorForEditing;
             planningEffort.Value = (decimal)options.CuttingPlanEffortForEditing;
@@ -166,7 +164,7 @@ namespace OpenNest.Avalonia
         private DesktopOptions FromControls() => new()
         {
             CreateNewNestOnOpen = createNewNest.IsChecked == true,
-            UpdateIncludeDevBuilds = includeDevBuilds.IsChecked == true,
+            UpdateChannel = UpdateChannelOption.At(updateChannel.SelectedIndex),
             // A cleared box keeps the value it had, as a WinForms numeric box does.
             AutoSizePlateFactor = (double)(autoSizeFactor.Value ?? (decimal)DesktopOptions.Defaults.AutoSizePlateFactor),
             CuttingPlanEffort = (double)(planningEffort.Value ?? (decimal)DesktopOptions.Defaults.CuttingPlanEffort),
@@ -261,6 +259,21 @@ namespace OpenNest.Avalonia
                 ToolTip.SetTip(editor, tip);
             grid.Children.Add(text);
             grid.Children.Add(editor);
+        }
+
+        private Grid UpdateChannelRow()
+        {
+            var row = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("Auto,Auto"),
+                RowDefinitions = new RowDefinitions("Auto"),
+                ColumnSpacing = 12,
+            };
+            AddRow(row, 0, "Updates:", updateChannel,
+                "Development builds are made from every finished change. Once a day or once "
+                + "a week waits that long after this copy last updated; Help > Check for "
+                + "Updates... always looks now. Takes effect after a restart.");
+            return row;
         }
 
         private static Grid UrlRow(TextBox box, Button button)

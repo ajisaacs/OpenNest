@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenNest.Desktop;
 using OpenNest.Forms;
 using OpenNest.Properties;
 using Velopack;
@@ -26,6 +27,8 @@ namespace OpenNest
     /// In Database mode without such a URL, the nest server's mirror of the same feed
     /// (<c>{server}/updates/stable</c> or <c>/dev</c>) is read first, so a shop's workstations
     /// share one GitHub check and one download; GitHub is the fallback when the server has none.
+    /// On the once-a-day and once-a-week development channels the background check waits until
+    /// <see cref="DevBuildSchedule.BackgroundCheckDue"/>; <see cref="CheckNowAsync"/> never waits.
     /// </remarks>
     public sealed class UpdaterService : IDisposable
     {
@@ -39,6 +42,9 @@ namespace OpenNest
         private readonly SemaphoreSlim _checkLock = new(1, 1);
         private Timer _timer;
         private UpdateInfo _pendingUpdate;
+        private readonly UpdateChannel _channel = UpdateChannel.DevEveryBuild;
+        private readonly bool _recordsRunningVersion;
+        private DateTimeOffset? _runningSince;
 
         /// <summary>The outcome of <see cref="CheckNowAsync"/>.</summary>
         public enum CheckResult
@@ -57,7 +63,11 @@ namespace OpenNest
         public UpdaterService()
             : this(Settings.Default.UpdateFeedUrl, Settings.Default.UpdateIncludeDevBuilds,
                 NestStorage.Settings.IsDatabaseMode ? NestStorage.Settings.ServerUrl : null)
-        { }
+        {
+            _channel = UpdateChannelOption.Read(
+                Settings.Default.UpdateIncludeDevBuilds, Settings.Default.UpdateDevBuildInterval);
+            _recordsRunningVersion = true;
+        }
 
         public UpdaterService(string feedUrl, bool includeDevBuilds, string serverUrl = null)
         {
@@ -126,7 +136,36 @@ namespace OpenNest
             if (_manager is null || !_manager.IsInstalled)
                 return;
 
+            if (_recordsRunningVersion)
+                RecordRunningVersion();
+
             _timer = new Timer(_ => _ = TickAsync(), null, FirstCheckDelay, CheckInterval);
+        }
+
+        /// <summary>
+        /// Starts the once-a-day/once-a-week clock the first time this copy runs a version,
+        /// however that version arrived (background update, Check for Updates, an installer).
+        /// </summary>
+        private void RecordRunningVersion()
+        {
+            try
+            {
+                var storedVersion = Settings.Default.UpdateRunningVersion;
+                var storedSince = DevBuildSchedule.ParseSince(Settings.Default.UpdateRunningSince);
+                var (version, since) = DevBuildSchedule.Observe(
+                    storedVersion, storedSince, CurrentVersion, DateTimeOffset.Now);
+                _runningSince = since;
+                if (version == storedVersion && since == storedSince)
+                    return;
+
+                Settings.Default.UpdateRunningVersion = version;
+                Settings.Default.UpdateRunningSince = DevBuildSchedule.FormatSince(since);
+                Settings.Default.Save();
+            }
+            catch
+            {
+                // An unwritable settings file must not stop updates; the clock restarts next run.
+            }
         }
 
         /// <summary>Applies the downloaded update and restarts the process. Call only after the user agrees.</summary>
@@ -160,6 +199,9 @@ namespace OpenNest
 
         private async Task TickAsync()
         {
+            if (!DevBuildSchedule.BackgroundCheckDue(_channel, _runningSince, DateTimeOffset.Now))
+                return;
+
             try
             {
                 await CheckAndDownloadAsync();

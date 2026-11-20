@@ -51,7 +51,8 @@
             this.updateGroupBox = new System.Windows.Forms.GroupBox();
             this.updateFeedUrlBox = new System.Windows.Forms.TextBox();
             this.setUpdateFeedButton = new System.Windows.Forms.Button();
-            this.includeDevBuildsBox = new System.Windows.Forms.CheckBox();
+            this.updateChannelLabel = new System.Windows.Forms.Label();
+            this.updateChannelCombo = new System.Windows.Forms.ComboBox();
             this.ledgerGroupBox = new System.Windows.Forms.GroupBox();
             this.ledgerUrlLabel = new System.Windows.Forms.Label();
             this.ledgerUrlBox = new System.Windows.Forms.TextBox();
@@ -288,7 +289,8 @@
             //
             this.updateGroupBox.Controls.Add(this.updateFeedUrlBox);
             this.updateGroupBox.Controls.Add(this.setUpdateFeedButton);
-            this.updateGroupBox.Controls.Add(this.includeDevBuildsBox);
+            this.updateGroupBox.Controls.Add(this.updateChannelLabel);
+            this.updateGroupBox.Controls.Add(this.updateChannelCombo);
             this.updateGroupBox.Location = new System.Drawing.Point(12, 488);
             this.updateGroupBox.Name = "updateGroupBox";
             this.updateGroupBox.Size = new System.Drawing.Size(684, 88);
@@ -314,15 +316,26 @@
             this.setUpdateFeedButton.UseVisualStyleBackColor = true;
             this.setUpdateFeedButton.Click += new System.EventHandler(this.SetUpdateFeed_Click);
             //
-            // includeDevBuildsBox
+            // updateChannelLabel
             //
-            this.includeDevBuildsBox.AutoSize = true;
-            this.includeDevBuildsBox.Location = new System.Drawing.Point(12, 58);
-            this.includeDevBuildsBox.Name = "includeDevBuildsBox";
-            this.includeDevBuildsBox.Size = new System.Drawing.Size(460, 20);
-            this.includeDevBuildsBox.TabIndex = 2;
-            this.includeDevBuildsBox.Text = "Include development builds (latest master; takes effect after restart)";
-            this.includeDevBuildsBox.UseVisualStyleBackColor = true;
+            this.updateChannelLabel.AutoSize = true;
+            this.updateChannelLabel.Location = new System.Drawing.Point(12, 59);
+            this.updateChannelLabel.Name = "updateChannelLabel";
+            this.updateChannelLabel.Size = new System.Drawing.Size(56, 16);
+            this.updateChannelLabel.TabIndex = 2;
+            this.updateChannelLabel.Text = "Updates:";
+            //
+            // updateChannelCombo
+            //
+            this.updateChannelCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.updateChannelCombo.Location = new System.Drawing.Point(80, 55);
+            this.updateChannelCombo.Name = "updateChannelCombo";
+            this.updateChannelCombo.Size = new System.Drawing.Size(300, 24);
+            this.updateChannelCombo.TabIndex = 3;
+            this.toolTip1.SetToolTip(this.updateChannelCombo,
+                "Development builds are made from every finished change. Once a day or once "
+                + "a week waits that long after this copy last updated; Help > Check for "
+                + "Updates... always looks now. Takes effect after a restart.");
             //
             // ledgerGroupBox
             //
@@ -454,7 +467,8 @@
         private System.Windows.Forms.GroupBox updateGroupBox;
         private System.Windows.Forms.TextBox updateFeedUrlBox;
         private System.Windows.Forms.Button setUpdateFeedButton;
-        private System.Windows.Forms.CheckBox includeDevBuildsBox;
+        private System.Windows.Forms.Label updateChannelLabel;
+        private System.Windows.Forms.ComboBox updateChannelCombo;
         private System.Windows.Forms.GroupBox ledgerGroupBox;
         private System.Windows.Forms.Label ledgerUrlLabel;
         private System.Windows.Forms.TextBox ledgerUrlBox;

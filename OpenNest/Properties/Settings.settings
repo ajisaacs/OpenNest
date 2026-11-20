@@ -77,6 +77,15 @@
     <Setting Name="UpdateIncludeDevBuilds" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <Setting Name="UpdateDevBuildInterval" Type="System.String" Scope="User">
+      <Value Profile="(Default)">EveryBuild</Value>
+    </Setting>
+    <Setting Name="UpdateRunningVersion" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="UpdateRunningSince" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
     <Setting Name="DrawingLibraryCutType" Type="System.String" Scope="User">
       <Value Profile="(Default)">Laser</Value>
     </Setting>

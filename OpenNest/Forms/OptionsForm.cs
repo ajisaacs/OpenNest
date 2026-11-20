@@ -83,7 +83,10 @@ namespace OpenNest.Forms
             serverPicker.ForgetServer = NestStorage.ForgetServer;
             serverPicker.Bind(NestStorage.Settings);
             updateFeedUrlBox.Text = Settings.Default.UpdateFeedUrl;
-            includeDevBuildsBox.Checked = options.UpdateIncludeDevBuilds;
+            updateChannelCombo.Items.Clear();
+            foreach (var (_, text) in UpdateChannelOption.Choices)
+                updateChannelCombo.Items.Add(text);
+            updateChannelCombo.SelectedIndex = UpdateChannelOption.IndexOf(options.UpdateChannel);
             ledgerUrlBox.Text = MaterialLedgerStore.Settings.BaseUrl;
             ledgerKeyBox.Text = MaterialLedgerStore.Settings.ApiKey;
             checkBox1.Checked = options.CreateNewNestOnOpen;
@@ -120,7 +123,7 @@ namespace OpenNest.Forms
             var options = new DesktopOptions
             {
                 CreateNewNestOnOpen = checkBox1.Checked,
-                UpdateIncludeDevBuilds = includeDevBuildsBox.Checked,
+                UpdateChannel = UpdateChannelOption.At(updateChannelCombo.SelectedIndex),
                 AutoSizePlateFactor = (double)numericUpDown1.Value,
                 CuttingPlanEffort = (double)planningEffortBox.Value,
                 ColorScheme = colorSchemeCombo.SelectedItem as string ?? ColorSchemeRegistry.DefaultSchemeName,
@@ -140,7 +143,8 @@ namespace OpenNest.Forms
         private static DesktopOptions ReadOptions() => new()
         {
             CreateNewNestOnOpen = Settings.Default.CreateNewNestOnOpen,
-            UpdateIncludeDevBuilds = Settings.Default.UpdateIncludeDevBuilds,
+            UpdateChannel = UpdateChannelOption.Read(
+                Settings.Default.UpdateIncludeDevBuilds, Settings.Default.UpdateDevBuildInterval),
             AutoSizePlateFactor = Settings.Default.AutoSizePlateFactor,
             CuttingPlanEffort = Settings.Default.CuttingPlanEffort,
             ColorScheme = Settings.Default.ActiveColorScheme,
@@ -152,6 +156,8 @@ namespace OpenNest.Forms
         {
             Settings.Default.CreateNewNestOnOpen = options.CreateNewNestOnOpen;
             Settings.Default.UpdateIncludeDevBuilds = options.UpdateIncludeDevBuilds;
+            if (UpdateChannelOption.IntervalText(options.UpdateChannel) is { } interval)
+                Settings.Default.UpdateDevBuildInterval = interval;
             Settings.Default.AutoSizePlateFactor = options.AutoSizePlateFactor;
             Settings.Default.CuttingPlanEffort = options.CuttingPlanEffort;
             Settings.Default.ActiveColorScheme = options.ColorScheme;

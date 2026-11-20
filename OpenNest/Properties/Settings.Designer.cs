@@ -322,6 +322,45 @@ namespace OpenNest.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("EveryBuild")]
+        // How often development builds install: EveryBuild, Daily or Weekly.
+        public string UpdateDevBuildInterval {
+            get {
+                return ((string)(this["UpdateDevBuildInterval"]));
+            }
+            set {
+                this["UpdateDevBuildInterval"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        // The version this copy last started, for the Daily/Weekly update clock.
+        public string UpdateRunningVersion {
+            get {
+                return ((string)(this["UpdateRunningVersion"]));
+            }
+            set {
+                this["UpdateRunningVersion"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        // When this copy first started UpdateRunningVersion (round-trip UTC).
+        public string UpdateRunningSince {
+            get {
+                return ((string)(this["UpdateRunningSince"]));
+            }
+            set {
+                this["UpdateRunningSince"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("Laser")]
         // Cut type last chosen in Save to Drawing Library on this PC.
         public string DrawingLibraryCutType {

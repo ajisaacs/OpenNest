@@ -57,8 +57,13 @@ public sealed record DesktopOptions
     /// <summary>Fill strategies left out of the pipeline, stored comma-separated by name.</summary>
     public IReadOnlyCollection<string> DisabledStrategies { get; init; } = Array.Empty<string>();
 
+    /// <summary>
+    /// Which releases this copy takes: stable only, or development builds and how often.
+    /// </summary>
+    public UpdateChannel UpdateChannel { get; init; } = UpdateChannel.Stable;
+
     /// <summary>Check the rolling development-build release as well as stable releases.</summary>
-    public bool UpdateIncludeDevBuilds { get; init; }
+    public bool UpdateIncludeDevBuilds => UpdateChannelOption.IncludesDevBuilds(UpdateChannel);
 
     /// <summary>The saved values; one missing or unreadable is its WinForms default.</summary>
     public static DesktopOptions Read(IReadOnlyDictionary<string, string> settings)
@@ -74,7 +79,11 @@ public sealed record DesktopOptions
                 UserSettingText.ReadString(settings, ClonePlacementOrderName, null)),
             DisabledStrategies = FillStrategyOptions.ParseDisabled(
                 UserSettingText.ReadString(settings, DisabledStrategiesName, "")),
-            UpdateIncludeDevBuilds = UserSettingText.ReadBool(settings, UpdateIncludeDevBuildsName, Defaults.UpdateIncludeDevBuilds),
+            UpdateChannel = UpdateChannelOption.Read(
+                UserSettingText.ReadBool(
+                    settings, UpdateIncludeDevBuildsName, Defaults.UpdateIncludeDevBuilds),
+                UserSettingText.ReadString(
+                    settings, UpdateChannelOption.IntervalSettingName, null)),
         };
     }
 
@@ -87,6 +96,9 @@ public sealed record DesktopOptions
         ArgumentNullException.ThrowIfNull(settings);
         settings[CreateNewNestOnOpenName] = UserSettingText.Format(CreateNewNestOnOpen);
         settings[UpdateIncludeDevBuildsName] = UserSettingText.Format(UpdateIncludeDevBuilds);
+        // Stable keeps the stored interval, so switching back to development builds restores it.
+        if (UpdateChannelOption.IntervalText(UpdateChannel) is { } interval)
+            settings[UpdateChannelOption.IntervalSettingName] = interval;
         settings[AutoSizePlateFactorName] = UserSettingText.Format(AutoSizePlateFactor);
         settings[CuttingPlanEffortName] = UserSettingText.Format(CuttingPlanEffort);
         settings[ColorSchemeRegistry.SettingName] = string.IsNullOrEmpty(ColorScheme)

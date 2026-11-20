@@ -16,6 +16,7 @@ public class DesktopOptionsTests
         ["ClonePlacementOrder"] = "VerticalFirst",
         ["DisabledStrategies"] = "Pairs,Extents",
         ["UpdateIncludeDevBuilds"] = "True",
+        ["UpdateDevBuildInterval"] = "Weekly",
         ["UpdateFeedUrl"] = "http://feed.example/releases",
         ["LastFeedrate"] = "250",
     };
@@ -31,6 +32,7 @@ public class DesktopOptionsTests
         Assert.Equal("Dark", options.ColorScheme);
         Assert.Equal(SettleOrder.VerticalFirst, options.ClonePlacementOrder);
         Assert.Equal(new[] { "Extents", "Pairs" }, options.DisabledStrategies.OrderBy(n => n));
+        Assert.Equal(UpdateChannel.DevWeekly, options.UpdateChannel);
         Assert.True(options.UpdateIncludeDevBuilds);
     }
 
@@ -45,6 +47,7 @@ public class DesktopOptionsTests
         Assert.Equal("Classic", options.ColorScheme);
         Assert.Equal(SettleOrder.ClosestToCorner, options.ClonePlacementOrder);
         Assert.Empty(options.DisabledStrategies);
+        Assert.Equal(UpdateChannel.Stable, options.UpdateChannel);
         Assert.False(options.UpdateIncludeDevBuilds);
     }
 
@@ -59,6 +62,7 @@ public class DesktopOptionsTests
             ["ClonePlacementOrder"] = "Sideways",
             ["DisabledStrategies"] = " , ,",
             ["UpdateIncludeDevBuilds"] = "1",
+            ["UpdateDevBuildInterval"] = "Weekly",
         });
 
         Assert.Equal(DesktopOptions.Defaults with { DisabledStrategies = options.DisabledStrategies }, options);
