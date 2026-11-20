@@ -35,7 +35,7 @@ build below.
 ### Nest server mirror
 
 In Database mode an installed copy reads the nest server's mirror of the same feed first:
-`{ServerUrl}/updates/stable`, or `/updates/dev` with **Include development builds**. The
+`{ServerUrl}/updates/stable`, or `/updates/dev` on any development-build choice. The
 server makes one GitHub check every 30 minutes for every workstation and downloads each
 package once, so a shop's machines do not share GitHub's per-address limit or each download
 the package over the internet (see [the mirror's endpoints](nest-storage.md#update-feed-mirror)).
@@ -87,9 +87,27 @@ replaces the single rolling `dev-build` pre-release (tag `dev-build`, never mark
 Latest) with the same eight assets as a release. A run whose commit is no longer
 master's head publishes nothing; the newer run does.
 
-Installed copies take it only with **Tools > Options > Include development
-builds** (`UpdateIncludeDevBuilds`, restart to apply); everyone else sees full
-releases only. Velopack reads the ten newest GitHub releases, so keep a single
+Installed copies take it only when **Tools > Options > Updates** is set to a development-build
+choice; **Stable releases only** (the default) sees full releases only. A change takes effect
+after a restart. The choices are stored as `UpdateIncludeDevBuilds` plus
+`UpdateDevBuildInterval` (`EveryBuild`, `Daily` or `Weekly`), so a copy that only has the old
+**Include development builds** box checked takes every build, as before:
+
+| Choice | Background check |
+|--------|------------------|
+| Stable releases only | Every 30 minutes, full releases only |
+| Development builds, at most once a day | Waits until the calendar day after this copy first ran its current version |
+| Development builds, at most once a week | Waits until seven calendar days after that |
+| Every development build | Every 30 minutes |
+
+The clock is the day this copy first started its running version (`UpdateRunningVersion`,
+`UpdateRunningSince`), however it arrived, so taking a build through **Help > Check for
+Updates...** restarts the wait. That command never waits. Days are local calendar days, so a
+copy started a little earlier each morning still takes one build a day. The newest build is
+always the one offered: once a week means the newest build at most once a week, not a build
+held back for a week.
+
+Velopack reads the ten newest GitHub releases, so keep a single
 rolling pre-release: a pile of them could push the newest full release out of
 that window. Turning the option off leaves a copy on its development build until
 a higher full release appears. The workflow's publish job is the only automation

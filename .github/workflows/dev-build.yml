@@ -3,7 +3,7 @@ name: Development build
 # Every master push whose cross-platform tests pass becomes the rolling
 # `dev-build` pre-release: X.Y.Z-dev.N, where X.Y.Z is the minor after the
 # newest release tag and N the commit count. Installed copies take it only
-# with Tools > Options > Include development builds.
+# when Tools > Options > Updates takes development builds.
 on:
   workflow_run:
     workflows: ['Cross-platform tests']
@@ -113,8 +113,8 @@ jobs:
           cat > notes.md <<EOF
           Automatic development build of master at $SOURCE_SHA.
 
-          It may contain unfinished features. Installed copies receive it only with
-          **Tools > Options > Include development builds**; full releases are unaffected.
+          It may contain unfinished features. Installed copies receive it only when
+          **Tools > Options > Updates** takes development builds; full releases are unaffected.
           EOF
           gh release create dev-build ./*.zip ./*.sha256 velopack/* \
             --target "$SOURCE_SHA" --prerelease --latest=false \
