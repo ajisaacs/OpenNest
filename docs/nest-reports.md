@@ -84,9 +84,12 @@ PartPrintoutWriter.Write(snapshot, destinationPath);
 - Actual placed programs already contain rotations. Capture their material paths
   with the location applied once. Preserve holes and intentional tab gaps; exclude
   rapid, scribe, lead-in and lead-out paths. Keep Cut and Display contours.
-- If any material contour of a part is open, show all its contours without fill.
-  Do not close the gap or substitute the drawing's nominal outline. Cutoffs are
-  separate strokes with no product ID or quantity.
+- If any material contour of a part is open (a tabbed part), its outline keeps
+  every gap: do not close it or substitute the drawing's nominal outline. It is
+  still filled in its drawing's color, the fill bridging each tab gap with a
+  straight line, and its ID is marked `*` on the diagram and in the plate's parts
+  table, with a "* Tabbed" legend line under the diagram. Cutoffs are separate
+  strokes with no product ID or quantity.
 - Snapshots retain values, not live drawings, parts, CNC programs or mutable
   geometry. Invalid/missing/nonfinite geometry fails with drawing/plate context.
 - A drawing's weight is its net area (holes excluded) times the nest thickness
@@ -189,7 +192,8 @@ Machine clamps appear on the plate diagram as white, diagonally hatched
 rectangles drawn under the parts, and IDs keep clear of them like any other
 obstacle. A clamp taken off the sheet is a dashed rectangle crossed out, drawn
 over the parts (they may sit where it was) so the operator sees it must come off
-before cutting. Only a removed clamp gets a legend line under the diagram; hatched
+before cutting. Only a removed clamp (and a tabbed part) gets a legend line under
+the diagram, the two sharing one line; hatched
 clamps and the rulers explain themselves, which leaves room for ten parts-table
 rows on a plate page even with an estimated cut time.
 
@@ -213,8 +217,10 @@ Card thumbnails and the sheet diagram are vector paths, never raster images.
 Each thumbnail is a small PDFsharp page embedded by MigraDoc as a form XObject.
 The diagram is drawn into a fixed-height table row reserved in MigraDoc's flow,
 located after layout with `DocumentRenderer.GetRenderInfoFromPage`. Closed parts
-use one even-odd filled path, so holes stay unfilled. Parts with any open contour,
-and cutoffs (dashed), stroke each contour as its own path: PDFsharp's
+use one even-odd filled path, so holes stay unfilled. A part with any open contour
+is filled first as one even-odd path of loops (each closed contour alone, open
+pieces chained end to nearest start until the loop's own start is nearer), with
+no stroke. Its contours, and cutoffs (dashed), then stroke each contour as its own path: PDFsharp's
 `StartFigure` does not start a new subpath after an open figure, and would
 otherwise draw a false segment across a tab gap.
 

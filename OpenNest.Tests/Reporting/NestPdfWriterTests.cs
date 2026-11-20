@@ -144,12 +144,81 @@ public sealed class NestPdfWriterTests : IDisposable
         var path = WriteReport(nest);
         using var pdf = PdfReader.Open(path, PdfDocumentOpenMode.Import);
         Assert.Equal(2, pdf.PageCount);
-        // The vector diagram is the last content stream on the plate page. Each stroke-only
-        // contour must begin its own subpath; a missing move-to draws a false connecting line.
-        // The drawing area's clip path ("W* n") precedes the geometry.
+        var (fill, stroke) = TabbedPaths(pdf);
+        // The fill closes the outline across its tab gap (one subpath per loop: outline and hole).
+        Assert.Equal(NestPdfWriter.FillLoops(geometry.Contours).Count, Regex.Matches(fill, @"(?m)^[-\d. ]+ m$").Count);
+        // Each stroke-only contour must begin its own subpath; a missing move-to draws a false
+        // connecting line across the tab gap.
+        Assert.Equal(geometry.Contours.Length, Regex.Matches(stroke, @"(?m)^[-\d. ]+ m$").Count);
+        Assert.Contains("1*", ReportPdf.Pages(path)[1]);
+    }
+
+    [Fact]
+    public void Write_OutlineInTwoTabbedPiecesFillsAsOneShape()
+    {
+        // A 5 x 1 in bar cut in two pieces around two 0.1 in tabs.
+        var program = new OpenNest.CNC.Program();
+        program.Codes.Add(new OpenNest.CNC.RapidMove(0, 0));
+        program.Codes.Add(new OpenNest.CNC.LinearMove(0, 1));
+        program.Codes.Add(new OpenNest.CNC.LinearMove(4.9, 1));
+        program.Codes.Add(new OpenNest.CNC.RapidMove(5, 0.9));
+        program.Codes.Add(new OpenNest.CNC.LinearMove(5, 0));
+        program.Codes.Add(new OpenNest.CNC.LinearMove(0.1, 0));
+        var drawing = new Drawing("Two pieces", program);
+        var nest = new Nest("Two pieces") { Units = Units.Inches };
+        nest.Drawings.Add(drawing);
+        var plate = new Plate(24, 48) { Quantity = 1 };
+        plate.Parts.Add(new Part(drawing, new Vector(2, 2)));
+        nest.Plates.Add(plate);
+        var geometry = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt).Plates[0].Parts[0].Geometry;
+        Assert.Equal(2, geometry.Contours.Length);
+        Assert.All(geometry.Contours, contour => Assert.False(contour.Closed));
+
+        var path = WriteReport(nest);
+        using var pdf = PdfReader.Open(path, PdfDocumentOpenMode.Import);
+        var (fill, stroke) = TabbedPaths(pdf);
+
+        Assert.Single(Regex.Matches(fill, @"(?m)^[-\d. ]+ m$"));
+        Assert.Equal(2, Regex.Matches(stroke, @"(?m)^[-\d. ]+ m$").Count);
+        var page = ReportPdf.Pages(path)[1];
+        Assert.Matches(@"(?m)^1\*\s+Two pieces\s+1\s+1$", page);
+        Assert.Contains("* Tabbed: held in the sheet by tabs.", page);
+    }
+
+    [Fact]
+    public void FillLoops_ChainsOpenPiecesNearestEndToStartAndKeepsClosedContoursApart()
+    {
+        static ReportContour Line(double x1, double y1, double x2, double y2, bool closed = false) =>
+            new([new ReportSegment(new ReportPoint(x1, y1), new ReportPoint(x2, y2), null, 0, 0, 0)], closed);
+        var hole = new ReportContour([new ReportSegment(new ReportPoint(3, 2), new ReportPoint(3, 2),
+            new ReportPoint(2, 2), 1, 0, 2 * System.Math.PI)], true);
+        // An outline in three pieces listed out of order, a closed hole and a separate open slot.
+        var top = Line(9.9, 10, 0.1, 10);
+        var left = Line(0, 9.9, 0, 0.1);
+        var rest = new ReportContour([
+            new ReportSegment(new ReportPoint(0.1, 0), new ReportPoint(10, 0), null, 0, 0, 0),
+            new ReportSegment(new ReportPoint(10, 0), new ReportPoint(10, 9.9), null, 0, 0, 0)], false);
+        var slot = Line(20, 20, 25, 20);
+
+        var loops = NestPdfWriter.FillLoops([rest, hole, top, slot, left]);
+
+        Assert.Equal(3, loops.Count);
+        Assert.Equal([hole], loops[0]);
+        Assert.Equal([rest, top, left], loops[1]);
+        Assert.Equal([slot], loops[2]);
+    }
+
+    /// <summary>
+    /// The plate diagram's fill and stroke operators for its one tabbed part: the vector diagram
+    /// is the last content stream on the plate page, after the drawing area's clip ("W* n").
+    /// </summary>
+    private static (string Fill, string Stroke) TabbedPaths(PdfSharp.Pdf.PdfDocument pdf)
+    {
         var diagram = ReportPdf.ContentStreams(pdf.Pages[1]).Last();
         diagram = diagram[(diagram.IndexOf("W* n", StringComparison.Ordinal) + 4)..];
-        Assert.Equal(geometry.Contours.Length, Regex.Matches(diagram, @"(?m)^[-\d. ]+ m$").Count);
+        var fillEnd = diagram.IndexOf("\nf*", StringComparison.Ordinal);
+        Assert.True(fillEnd > 0, "The tabbed part is not filled.");
+        return (diagram[..fillEnd], diagram[fillEnd..]);
     }
 
     [Fact]

@@ -381,9 +381,17 @@ public static class NestPdfWriter
 
         // Only a removed clamp needs words: it is an action before cutting. Hatched clamps and the
         // rulers (their unit sits in the corner) explain themselves, and the room goes to parts rows.
+        // Tabbed parts are marked too: the tabs must be broken to free them. Both lines share one.
+        var tabbed = plate.Parts.Where(part => part.Geometry.StrokeOnly).Select(part => part.ReportId)
+            .ToHashSet(StringComparer.Ordinal);
+        var notes = new List<string>();
+        if (tabbed.Count > 0)
+            notes.Add($"{NestReportDiagram.TabbedMark} Tabbed: held in the sheet by tabs.");
         if (plate.Clamps.Any(clamp => clamp.Removed))
+            notes.Add("A dashed rectangle crossed out is a clamp to remove before cutting.");
+        if (notes.Count > 0)
         {
-            var note = section.AddParagraph("A dashed rectangle crossed out is a clamp to remove before cutting.");
+            var note = section.AddParagraph(string.Join("   ", notes));
             note.Format.Font.Size = 7.5;
             note.Format.SpaceBefore = Unit.FromPoint(4);
         }
@@ -399,7 +407,8 @@ public static class NestPdfWriter
         foreach (var drawing in snapshot.Drawings.Where(drawing => perSheet.ContainsKey(drawing.Id)))
         {
             var count = perSheet[drawing.Id];
-            var row = AddRow(parts, $"Plate {plate.Number}, drawing {drawing.Id}", false, drawing.Id, names2[drawing.Id],
+            var row = AddRow(parts, $"Plate {plate.Number}, drawing {drawing.Id}", false,
+                tabbed.Contains(drawing.Id) ? drawing.Id + NestReportDiagram.TabbedMark : drawing.Id, names2[drawing.Id],
                 count.ToString(Invariant), checked(count * plate.Copies).ToString(Invariant));
             // The ID cell carries the part's diagram color: the key when an ID could not be placed.
             var color = ColorOf(colors, drawing.Id);
@@ -587,6 +596,16 @@ public static class NestPdfWriter
     {
         if (geometry.StrokeOnly)
         {
+            // A tabbed part's outline is open at each tab. It is still filled, across the gaps,
+            // so its color identifies it; the outline keeps its gaps on top.
+            var region = new XGraphicsPath { FillMode = XFillMode.Alternate };
+            foreach (var loop in FillLoops(geometry.Contours))
+            {
+                foreach (var contour in loop)
+                    AddContour(region, contour, fit);
+                region.CloseFigure();
+            }
+            gfx.DrawPath(new XSolidBrush(fill), region);
             StrokeContours(gfx, geometry, fit, pen);
             return;
         }
@@ -599,6 +618,45 @@ public static class NestPdfWriter
         }
         path.FillMode = XFillMode.Alternate; // Even-odd: holes stay unfilled.
         gfx.DrawPath(pen, new XSolidBrush(fill), path);
+    }
+
+    /// <summary>
+    /// The contours of a part with open ones, chained into loops for filling: each closed
+    /// contour is its own loop, and the open pieces of a tabbed outline or cutout are joined end
+    /// to nearest start until the next piece's start is farther than the loop's own start, which
+    /// bridges each tab gap with a straight line.
+    /// </summary>
+    internal static List<List<ReportContour>> FillLoops(IEnumerable<ReportContour> contours)
+    {
+        static double Distance(ReportPoint a, ReportPoint b) => System.Math.Sqrt(
+            System.Math.Pow(a.X - b.X, 2) + System.Math.Pow(a.Y - b.Y, 2));
+
+        var loops = new List<List<ReportContour>>();
+        var open = new List<ReportContour>();
+        foreach (var contour in contours)
+        {
+            if (contour.Closed)
+                loops.Add([contour]);
+            else
+                open.Add(contour);
+        }
+        while (open.Count > 0)
+        {
+            var loop = new List<ReportContour> { open[0] };
+            open.RemoveAt(0);
+            var first = loop[0].Segments[0].Start;
+            while (open.Count > 0)
+            {
+                var end = loop[^1].Segments[^1].End;
+                var next = open.MinBy(contour => Distance(end, contour.Segments[0].Start))!;
+                if (Distance(end, next.Segments[0].Start) > Distance(end, first))
+                    break;
+                loop.Add(next);
+                open.Remove(next);
+            }
+            loops.Add(loop);
+        }
+        return loops;
     }
 
     /// <summary>

@@ -95,6 +95,13 @@ internal static class NestReportDiagram
     internal static double PolePrecision(ReportBounds bounds) =>
         System.Math.Max(System.Math.Max(bounds.Length, bounds.Width) * 0.005, 1e-9);
 
+    /// <summary>Appended to a tabbed part's ID: its outline is open at the tabs holding it in the sheet.</summary>
+    internal const string TabbedMark = "*";
+
+    /// <summary>A part's diagram label: its report ID, marked when the part is tabbed.</summary>
+    internal static string LabelText(ReportPlate plate, int index) =>
+        plate.Parts[index].ReportId + (plate.Parts[index].Geometry.StrokeOnly ? TabbedMark : "");
+
     internal static DiagramView Plan(ReportPlate plate, double width, double height)
     {
         var shapes = plate.Parts.Select(part => new Shape(part.Geometry)).ToList();
@@ -245,7 +252,8 @@ internal static class NestReportDiagram
                 || groups.Any(group => group.Boundary.IntersectsWith(boundary) || group.Label.Box.IntersectsWith(boundary)))
                 continue;
 
-            var size = ReportText.Size(id, font);
+            var text = members.Any(member => plate.Parts[member].Geometry.StrokeOnly) ? id + TabbedMark : id;
+            var size = ReportText.Size(text, font);
             var labelWidth = size.Width + 2 * LabelPadding;
             var labelHeight = size.Height + 2 * LabelPadding;
             var centerX = boundary.X + (boundary.Width - labelWidth) / 2;
@@ -270,7 +278,7 @@ internal static class NestReportDiagram
             var spot = BestSpot(candidates, obstacles, others, fit, Blocked, target)
                 ?? BestSpot(inside, others, others, fit, Blocked, target, required: 0, preferRoom: false);
             if (spot is { } box)
-                groups.Add(new DiagramGroup(members, boundary, new DiagramLabel(seed, id, box)));
+                groups.Add(new DiagramGroup(members, boundary, new DiagramLabel(seed, text, box)));
         }
         return groups;
     }
@@ -358,7 +366,7 @@ internal static class NestReportDiagram
         var placed = new List<DiagramLabel>();
         foreach (var index in targets)
         {
-            var id = plate.Parts[index].ReportId;
+            var id = LabelText(plate, index);
             var size = ReportText.Size(id, font);
             var width = size.Width + 2 * LabelPadding;
             var height = size.Height + 2 * LabelPadding;
@@ -379,7 +387,7 @@ internal static class NestReportDiagram
         // C shape's opening) reads as belonging to whatever is near it, so that part gets a leader.
         foreach (var index in failed.ToList())
         {
-            var id = plate.Parts[index].ReportId;
+            var id = LabelText(plate, index);
             var size = ReportText.Size(id, font);
             var area = fit.Rect(shapes[index].Bounds);
             var others = obstacles.Where((_, other) => other != index).ToList();
@@ -398,7 +406,7 @@ internal static class NestReportDiagram
         // in the part's material, but it never touches another part, cutoff, clamp or label.
         foreach (var index in failed.ToList())
         {
-            var id = plate.Parts[index].ReportId;
+            var id = LabelText(plate, index);
             var size = ReportText.Size(id, font);
             var width = size.Width + 2 * LabelPadding;
             var height = size.Height + 2 * LabelPadding;
@@ -445,14 +453,14 @@ internal static class NestReportDiagram
             .Where(group => group.Count() > 1).Select(group => group.Key).ToHashSet();
         foreach (var index in unlabeled)
         {
-            var id = plate.Parts[index].ReportId;
+            var id = LabelText(plate, index);
             var size = ReportText.Size(id, font);
             var width = size.Width + 2 * LabelPadding;
             var height = size.Height + 2 * LabelPadding;
             // Leaders are for thin parts. Tiny repeated parts that could not share a group label
             // would bury the sheet in leaders, so they stay unlabeled; a lone tiny part gets one.
             var extent = fit.Rect(shapes[index].Bounds);
-            if (shared.Contains(id) && System.Math.Max(extent.Width, extent.Height) < 2 * height)
+            if (shared.Contains(plate.Parts[index].ReportId) && System.Math.Max(extent.Width, extent.Height) < 2 * height)
                 continue;
             var anchor = fit.Point(shapes[index].Pole.X, shapes[index].Pole.Y);
             var others = obstacles.Where((_, other) => other != index).ToList();
