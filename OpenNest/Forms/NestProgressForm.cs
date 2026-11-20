@@ -228,9 +228,11 @@ namespace OpenNest.Forms
         /// The search is over and <paramref name="final"/> is its result: with other layouts to
         /// pick from, waits until the user uses one (true, in <see cref="ChosenLayout"/>) or
         /// discards them all (false). With nothing to pick from, or a layout already chosen
-        /// during the run, returns at once.
+        /// during the run, returns at once. With <paramref name="timeout"/>, <paramref name="final"/>
+        /// is used once it passes, counting down in the status line, unless the user picks a card
+        /// first, which stops the countdown.
         /// </summary>
-        internal Task<bool> ChooseLayoutAsync(NestLayoutChoice final)
+        internal Task<bool> ChooseLayoutAsync(NestLayoutChoice final, TimeSpan? timeout = null)
         {
             if (ChosenLayout != null)
                 return Task.FromResult(true);
@@ -256,7 +258,61 @@ namespace OpenNest.Forms
             stopButton.Text = "Discard";
             stopButton.Enabled = true;
             UpdateUseLayout();
+            if (timeout is { } limit)
+                StartChoiceCountdown(final, limit);
             return choice.Task;
+        }
+
+        private System.Windows.Forms.Timer choiceTimer;
+
+        // Uses the search's result when the time is up, unless a card is picked first.
+        private void StartChoiceCountdown(NestLayoutChoice final, TimeSpan limit)
+        {
+            var waited = Stopwatch.StartNew();
+            void ShowLeft(TimeSpan left) => descriptionValue.Text =
+                $"Search finished. Using the best layout in {System.Math.Max(1, (int)System.Math.Ceiling(left.TotalSeconds))} s; pick a layout to choose.";
+            ShowLeft(limit);
+            choiceTimer = new System.Windows.Forms.Timer
+            {
+                Interval = (int)System.Math.Clamp(limit.TotalMilliseconds, 1, 250),
+            };
+            choiceTimer.Tick += (s, e) =>
+            {
+                var left = limit - waited.Elapsed;
+                if (left > TimeSpan.Zero)
+                {
+                    ShowLeft(left);
+                    return;
+                }
+                StopChoiceCountdown();
+                if (ChosenLayout != null || choice == null || choice.Task.IsCompleted)
+                    return;
+                ChosenLayout = final;
+                layoutList.AllowSelection = false;
+                useLayoutButton.Enabled = false;
+                stopButton.Enabled = false;
+                choice.TrySetResult(true);
+            };
+            layoutList.SelectionChanged += PickStopsCountdown;
+            choiceTimer.Start();
+        }
+
+        private void PickStopsCountdown(object sender, EventArgs e)
+        {
+            if (choiceTimer == null)
+                return;
+            StopChoiceCountdown();
+            descriptionValue.Text = "Search finished. Pick the layout to use.";
+        }
+
+        private void StopChoiceCountdown()
+        {
+            if (choiceTimer == null)
+                return;
+            layoutList.SelectionChanged -= PickStopsCountdown;
+            choiceTimer.Stop();
+            choiceTimer.Dispose();
+            choiceTimer = null;
         }
 
         private void UpdateUseLayout()
@@ -269,6 +325,7 @@ namespace OpenNest.Forms
         {
             if (useLayoutButton == null || ChosenLayout != null || layoutList.Selected?.Accept == null)
                 return;
+            StopChoiceCountdown();
             ChosenLayout = layoutList.Selected;
             layoutList.AllowSelection = false;
             useLayoutButton.Enabled = false;
@@ -330,6 +387,7 @@ namespace OpenNest.Forms
             if (choice != null)
             {
                 // The search is over: this is Discard.
+                StopChoiceCountdown();
                 stopButton.Enabled = false;
                 choice.TrySetResult(false);
                 return;
@@ -347,6 +405,7 @@ namespace OpenNest.Forms
             if (HoldOpenUntilCompleted && !completed)
             {
                 // Closing while picking a layout discards them all, as Discard does.
+                StopChoiceCountdown();
                 if (choice != null)
                     choice.TrySetResult(false);
                 else
@@ -354,6 +413,7 @@ namespace OpenNest.Forms
                 e.Cancel = true;
                 return;
             }
+            StopChoiceCountdown();
             fadeTimer.Stop();
             fadeTimer.Dispose();
             elapsedTimer.Stop();

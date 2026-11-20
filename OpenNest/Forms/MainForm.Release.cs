@@ -16,14 +16,19 @@ namespace OpenNest.Forms
     /// <summary>
     /// Make Nests with Nest after release ticked nests here, where the operator can watch: each
     /// built nest opens in its own tab before it is saved and Auto Nest runs on it with the
-    /// usual progress window and plan strip, one nest at a time in plan order. The release
-    /// keeps only a valid layout, as headless (<see cref="NestRenest"/>), without the Keep or
-    /// validation review. Stop in the progress window, or switching tabs, stops the release.
+    /// usual progress window and plan strip, one nest at a time in plan order. Use This Layout
+    /// stops a search on the card picked; a search that finishes with several layouts waits
+    /// <see cref="ReleaseChoiceTimeout"/> for a pick (a pick stops the countdown), then goes on
+    /// with the engine's result. The release keeps only a valid layout, as headless
+    /// (<see cref="NestRenest"/>), without the Keep or validation review. Stop in the progress window, or switching tabs, stops the release.
     /// Once saved, a tab is bound to its server record; a tab whose nest was not saved
     /// (refused, failed or stopped before upload) is closed.
     /// </summary>
     public partial class MainForm : IReleaseNestingHost
     {
+        /// <summary>How long a released nest's finished search waits for a layout pick.</summary>
+        internal static readonly TimeSpan ReleaseChoiceTimeout = TimeSpan.FromSeconds(5);
+
         // Tabs Make Nests opened for nests it has not saved yet.
         private readonly List<EditNestForm> releaseTabs = new();
 
@@ -65,7 +70,8 @@ namespace OpenNest.Forms
                 // Ledger stock first, then the plate defaults: each stage is its own Auto Nest
                 // run and undo step, with its ledger codes recorded in that step.
                 var solve = SolveReleasedNest
-                    ?? ((t, r, c) => AutoNestCommand.SolveAsync(this, t, r, c));
+                    ?? ((t, r, c) => AutoNestCommand.SolveAsync(this, t, r, c,
+                        chooseLayout: true, choiceTimeout: ReleaseChoiceTimeout));
                 renested = await ReleaseRenest.RunAsync(nest, ledger, EngineSelection.EngineName,
                     AutoNestForm.DefaultMinRemnantSize,
                     request => solve(tab, request, cts),

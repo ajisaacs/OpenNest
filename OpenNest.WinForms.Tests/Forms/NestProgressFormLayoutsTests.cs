@@ -142,6 +142,71 @@ public class NestProgressFormLayoutsTests
         Assert.False(cts.IsCancellationRequested);
     });
 
+    // Runs the form's timers until the task completes or the wait gives up.
+    private static void PumpUntil(Task task, TimeSpan max)
+    {
+        var waited = System.Diagnostics.Stopwatch.StartNew();
+        while (!task.IsCompleted && waited.Elapsed < max)
+        {
+            Application.DoEvents();
+            Thread.Sleep(5);
+        }
+    }
+
+    private static Label Status(Form form) =>
+        Assert.IsType<Label>(form.Controls.Find("descriptionValue", true).Single());
+
+    [Fact]
+    public void ATimedPickUsesTheSearchResultWhenTheTimeIsUp() => WithForm((form, cts, stopped) =>
+    {
+        form.AddLayout(Columns(), best: true);
+        form.AddLayout(Row(), best: false);
+        var final = Columns();
+
+        var pick = form.ChooseLayoutAsync(final, TimeSpan.FromMilliseconds(300));
+        Assert.False(pick.IsCompleted);
+        Assert.Contains("Using the best layout in 1 s", Status(form).Text);
+        PumpUntil(pick, TimeSpan.FromSeconds(10));
+
+        Assert.True(pick.IsCompleted);
+        Assert.True(pick.Result);
+        Assert.Same(final, form.ChosenLayout);
+        Assert.False(stopped());
+        Assert.False(cts.IsCancellationRequested);
+    });
+
+    [Fact]
+    public void PickingACardStopsTheCountdown() => WithForm((form, _, _) =>
+    {
+        form.AddLayout(Columns(), best: true);
+        var row = Row();
+        form.AddLayout(row, best: false);
+
+        var pick = form.ChooseLayoutAsync(Columns(), TimeSpan.FromMilliseconds(100));
+        List(form).Pick(row);
+        PumpUntil(pick, TimeSpan.FromMilliseconds(600));
+
+        Assert.False(pick.IsCompleted);
+        Assert.Equal("Search finished. Pick the layout to use.", Status(form).Text);
+        Button(form, "useLayoutButton").PerformClick();
+        Assert.True(pick.Result);
+        Assert.Same(row, form.ChosenLayout);
+    });
+
+    [Fact]
+    public void DiscardDuringTheCountdownChoosesNothing() => WithForm((form, _, _) =>
+    {
+        form.AddLayout(Columns(), best: true);
+        form.AddLayout(Row(), best: false);
+
+        var pick = form.ChooseLayoutAsync(Columns(), TimeSpan.FromMilliseconds(200));
+        Button(form, "stopButton").PerformClick();
+        PumpUntil(Task.Delay(400), TimeSpan.FromSeconds(2));
+
+        Assert.False(pick.Result);
+        Assert.Null(form.ChosenLayout);
+    });
+
     [Fact]
     public void AFinishedSearchWithOneLayoutDoesNotAsk() => WithForm((form, _, _) =>
     {

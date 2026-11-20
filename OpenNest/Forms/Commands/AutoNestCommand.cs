@@ -230,8 +230,13 @@ namespace OpenNest.Forms.Commands
         /// during the run stops the search, and a finished run with more than one waits for the
         /// pick. The layout used is validated and bound like the engine's own result. Off, the
         /// engine's result is returned as soon as it is known.</param>
+        /// <param name="choiceTimeout">With <paramref name="chooseLayout"/>, how long a finished
+        /// run with more than one layout waits for the pick before using its own result (Make
+        /// Nests, which goes on to the next nest); picking a card stops the countdown. Null waits
+        /// until the user picks or discards.</param>
         internal static async Task<NestPipelineResult> SolveAsync(IWin32Window owner, EditNestForm target,
-            NestPipelineRequest request, CancellationTokenSource cts, bool chooseLayout = false)
+            NestPipelineRequest request, CancellationTokenSource cts, bool chooseLayout = false,
+            TimeSpan? choiceTimeout = null)
         {
             using var progressForm = new NestProgressForm(cts, showPlateRow: true)
             {
@@ -271,7 +276,8 @@ namespace OpenNest.Forms.Commands
                     }
                     receivingProgress = false;
                     if (result != null
-                        && !await progressForm.ChooseLayoutAsync(new NestLayoutChoice(result.Plates, _ => result)))
+                        && !await progressForm.ChooseLayoutAsync(new NestLayoutChoice(result.Plates, _ => result),
+                            choiceTimeout))
                     {
                         cts.Cancel();
                         throw new OperationCanceledException(cts.Token);

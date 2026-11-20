@@ -840,7 +840,11 @@ Each group's nest opens in its own main-window tab as soon as it is built, befor
 it is saved, and Auto Nest runs on it there with the usual progress window and
 live plan strip (`AutoNestCommand.SolveAsync`), one nest at a time in plan order,
 switching to each tab in turn. A nest nested on ledger stock and then the plate
-defaults shows two Auto Nest runs, one per step. The release keeps the layout as headless
+defaults shows two Auto Nest runs, one per step. As in Auto Nest, a top-layout card can be
+used during the search (**Use This Layout**, or double-click it), which stops the search and
+goes on with that layout. A search that finishes with more than one layout counts down 5
+seconds, then goes on with the engine's result; picking a card stops the countdown and the
+window waits for Use This Layout or Discard, which stops the release as Stop does. The release keeps the layout as headless
 `NestRenest` would (only a valid one, with no Keep or validation review). Stop in
 the progress window (or switching tabs, as for Auto Nest) stops the whole release,
 as the panel's Stop does: nothing is saved. Until Make Nests finishes the main
