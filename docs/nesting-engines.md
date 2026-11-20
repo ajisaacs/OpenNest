@@ -334,7 +334,10 @@ scatters the smallest parts into the gaps between groups.
   then the copies held back from them and the types with one or two copies fill the gaps under
   the usual rule. On the better order each type's narrower bands holding fewer copies (at most
   four, or a third, fewer; at most two per type) are tried in turn, kept when they improve the
-  sheet.
+  sheet. So are each type's lower bands: up to three, each asked for just short of the last
+  band's height, so each is a row or so lower (its search steps through three lengths and makes
+  no halvings). A lower band leaves a strip along the sheet that the held-back copies and other
+  parts fill, and can sit past a clamp rail whole.
 - Strips: each strip holds the largest remaining part, as its band (full or narrower) or as a
   column one to three copies wide that the part fills first, and every other part fills the
   strip's gaps, the largest piece at its leftmost, lowest point first, looking back one part
@@ -352,15 +355,20 @@ scatters the smallest parts into the gaps between groups.
   are those of building each pattern in turn. Patterns are filled one Clipper grid unit (0.0001) wider than the part spacing and
   certified at the spacing: Fill sets parts exactly the spacing apart, which the strict
   certification can reject for curved parts, and a stack of rings would lose its densest pattern.
-- A band member inside a clamp keep-out goes to the gap fill instead; a band shorter than the
-  sheet moves flush to the far edge when that keeps more of it off the clamps. Outlined sheets do
-  not band.
+- A band sits flush to the bottom. When that leaves members in a clamp keep-out, it also tries
+  flush to the top and just past the clamps lining the bottom or top edge (the work area with that
+  side moved in past the keep-outs, as the sheet-reduction pass packs it), keeping whichever holds
+  the most; members still inside a keep-out go to the gap fill. Outlined sheets do not band.
 
 Neither way wins every sheet. On the README sample parts (18 L brackets, 14 base plates, 18 clamp
 jaws, 12 flanges, 24 gussets, 14 hex covers, 30 links on 60 x 120) bands end the layout at 102.9
 (104.6 with the desktop's edge spacing and a bottom clamp rail) rather than 107.7 (108.6); with
 about twice those quantities over two sheets, strips end the second sheet at 99.9 rather than 106.2,
-and on the help tutorial's parts at 33.6 rather than 34.9. It
+and on the help tutorial's parts at 33.6 rather than 34.9. On a production job of 20 formed legs of
+each of two sizes on 60 x 120 with a bottom clamp rail, the larger leg's full-height band could
+not clear the rail, so three copies went to the gaps and the layout ended at 104.7; its band a row
+lower (two rows of nine and two copies turned across the top), flush to the top, clears the rail
+and leaves a strip below it for the smaller leg's last two copies, ending the layout at 103.9. It
 starts while the work spent stays under three work budgets and replaces the result only by
 beating it, with its own tail re-plan.
 

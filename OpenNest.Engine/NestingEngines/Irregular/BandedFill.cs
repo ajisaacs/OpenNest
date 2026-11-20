@@ -14,8 +14,9 @@ namespace OpenNest.Engine.NestingEngines.Irregular;
 ///
 /// <see cref="Fill"/> lays each like-part group out as a band: the group's Lattice pattern (the one
 /// interactive Fill gives that part alone, so a round part stacks, a hexagon tiles and an L
-/// interlocks with its pair) in the narrowest strip that holds all its copies. Bands stand side
-/// by side, then the copies held back from them and the types too few to band fill the gaps.
+/// interlocks with its pair) in the narrowest strip that holds all its copies, or a few rows lower
+/// to leave room along the sheet. Bands stand side by side, then the copies held back from them
+/// and the types too few to band fill the gaps.
 ///
 /// <see cref="FillStrips"/> builds each strip as densely as it can from any parts: the strip holds
 /// the largest remaining part, as its band or as a column of it, and every other part fills the
@@ -38,7 +39,19 @@ internal sealed class BandedFill(
     /// <summary>Fewest copies a band may hold back to be narrower; a third of them when more.</summary>
     private const int MaxHeldBack = 4;
 
-    private sealed record Band(int Type, int Copies, double Length, IReadOnlyList<Placed> Members);
+    /// <summary>A type's pattern. <c>Height</c> is the height of the box it was asked for, so a
+    /// band cut short at the sheet's end is asked for in the same box.</summary>
+    private sealed record Band(int Type, int Copies, double Length, double Height, IReadOnlyList<Placed> Members);
+
+    /// <summary>The work area's height with a side carrying clamps moved in past their keep-outs:
+    /// a band seated there clears the clamps whole.</summary>
+    private readonly (double Bottom, double Top) clear = ClearHeight(stock, clamps);
+
+    private static (double Bottom, double Top) ClearHeight(NestPlateStock stock, ClampObstacles? clamps)
+    {
+        var (area, onEdges) = ClampObstacles.ClearOfEdges(stock.WorkArea, clamps);
+        return onEdges ? (area.Bottom, area.Top) : (stock.WorkArea.Bottom, stock.WorkArea.Top);
+    }
 
     /// <summary>The fill, or null when nothing bands on this sheet.</summary>
     public SheetFill? Fill(IReadOnlyList<int> remaining, CancellationToken token)
@@ -172,7 +185,7 @@ internal sealed class BandedFill(
                 if (state.Rest[t] >= GroupedFill.MinGroup)
                 {
                     if (!bandCache.TryGetValue((t, state.Rest[t]), out var bands))
-                        bandCache[(t, state.Rest[t])] = bands = Bands(t, state.Rest[t], region, token);
+                        bandCache[(t, state.Rest[t])] = bands = Bands(t, state.Rest[t], region, region.Width, MaxSteps, Probes, token);
                     foreach (var band in bands)
                     {
                         if (band.Length > region.Right - start + 1e-9)
@@ -243,8 +256,9 @@ internal sealed class BandedFill(
 
     private sealed record StripState(List<Placed> Placed, int[] Rest, double Area, double Front);
 
-    /// <summary>A band's members starting at <paramref name="front"/>, flush to the bottom, or to
-    /// the top when that keeps more of them off the clamps; members on a clamp are left out.</summary>
+    /// <summary>A band's members starting at <paramref name="front"/>, flush to the bottom, or,
+    /// when that leaves members on the clamps, flush to the top or just past the clamps along
+    /// either side, whichever keeps the most off them; members on a clamp are left out.</summary>
     private List<Placed> Seat(Band band, double front, Box region)
     {
         var minX = band.Members.Min(p => p.Left);
@@ -253,11 +267,19 @@ internal sealed class BandedFill(
         List<Placed> Shifted(double dy) => band.Members
             .Select(m => new Placed(m.Orientation, m.X + front - minX, m.Y + dy)).Where(p => !OnClamp(p)).ToList();
         var members = Shifted(region.Bottom - minY);
-        if (members.Count < band.Members.Count && region.Top - maxY > region.Bottom - minY + 1e-9)
+        var tried = new List<double> { region.Bottom - minY };
+        foreach (var dy in new[] { region.Top - maxY, clear.Bottom - minY, clear.Top - maxY })
         {
-            var top = Shifted(region.Top - maxY);
-            if (top.Count > members.Count)
-                members = top;
+            if (members.Count == band.Members.Count)
+                break;
+            // Inside the work area, and a pose not tried yet.
+            if (dy < region.Bottom - minY - 1e-9 || dy > region.Top - maxY + 1e-9
+                || tried.Any(d => System.Math.Abs(d - dy) < 1e-9))
+                continue;
+            tried.Add(dy);
+            var seated = Shifted(dy);
+            if (seated.Count > members.Count)
+                members = seated;
         }
         return members;
     }
@@ -281,24 +303,12 @@ internal sealed class BandedFill(
             if (band.Length > room + 1e-9)
             {
                 // The sheet ends inside this band: as many copies as the room left holds.
-                var partial = Pattern(t, band.Copies, room, region.Width, token);
+                var partial = Pattern(t, band.Copies, room, band.Height, token);
                 if (partial == null)
                     continue;
                 band = partial;
             }
-            var minX = band.Members.Min(p => p.Left);
-            var minY = band.Members.Min(p => p.Bottom);
-            var maxY = band.Members.Max(p => p.Top);
-            // Flush to the bottom, or to the top when that keeps more copies off the clamps.
-            List<Placed> Shifted(double dy) => band.Members
-                .Select(m => new Placed(m.Orientation, m.X + front - minX, m.Y + dy)).Where(p => !OnClamp(p)).ToList();
-            var members = Shifted(region.Bottom - minY);
-            if (members.Count < band.Members.Count && region.Top - maxY > region.Bottom - minY + 1e-9)
-            {
-                var top = Shifted(region.Top - maxY);
-                if (top.Count > members.Count)
-                    members = top;
-            }
+            var members = Seat(band, front, region);
             var maxX = front;
             foreach (var placed in members)
             {
@@ -325,7 +335,8 @@ internal sealed class BandedFill(
     /// columns, so each next band is asked for just short of the last one's length, and a few
     /// halvings toward the area bound catch patterns the steps skip.
     /// </summary>
-    private List<Band> Bands(int t, int copies, Box region, CancellationToken token, Drawing? prefetch = null)
+    private List<Band> Bands(int t, int copies, Box region, double height, int steps, int probes,
+        CancellationToken token, Drawing? prefetch = null)
     {
         var type = types[t];
         var fewest = copies - HeldBack(copies);
@@ -339,9 +350,9 @@ internal sealed class BandedFill(
             }
         }
         var length = region.Length;
-        for (var step = 0; step < MaxSteps; step++)
+        for (var step = 0; step < steps; step++)
         {
-            var band = Pattern(t, copies, length, region.Width, token, prefetch);
+            var band = Pattern(t, copies, length, height, token, prefetch);
             if (band == null || band.Copies < fewest)
                 break;
             Keep(band);
@@ -351,12 +362,12 @@ internal sealed class BandedFill(
         if (full == null)
             return new List<Band>();
         var lo = System.Math.Max(type.Orientations.Min(o => System.Math.Min(o.Width, o.Height)),
-            copies * type.Area / region.Width);
+            copies * type.Area / height);
         var hi = full.Length;
-        for (var probe = 0; probe < Probes && hi - lo > StepShort; probe++)
+        for (var probe = 0; probe < probes && hi - lo > StepShort; probe++)
         {
             var mid = (lo + hi) / 2;
-            var band = Pattern(t, copies, mid, region.Width, token, prefetch);
+            var band = Pattern(t, copies, mid, height, token, prefetch);
             if (band != null)
                 Keep(band);
             if (band != null && band.Copies >= copies)
@@ -373,14 +384,44 @@ internal sealed class BandedFill(
     /// <see cref="Bands"/> for each type at once. Each type's search depends only on its own
     /// patterns (fixed step counts, no shared budget), so the result is the same in any order.
     /// </summary>
-    private List<Band>[] BandsInParallel(int[] typeIndexes, IReadOnlyList<int> remaining, Box region, CancellationToken token)
+    private List<Band>[] BandsInParallel(int[] typeIndexes, IReadOnlyList<int> remaining, Box region,
+        CancellationToken token)
     {
         var result = new List<Band>[typeIndexes.Length];
         System.Threading.Tasks.Parallel.For(0, typeIndexes.Length,
             new System.Threading.Tasks.ParallelOptions { CancellationToken = token },
-            i => result[i] = Bands(typeIndexes[i], remaining[typeIndexes[i]], region, token));
+            i => result[i] = BandOptions(typeIndexes[i], remaining[typeIndexes[i]], region, token));
         return result;
     }
+
+    /// <summary>
+    /// The type's bands of full work-area height (<see cref="Bands"/>), then up to
+    /// <see cref="LowerHeights"/> lower ones, each asked for just short of the last pattern's
+    /// height, so each is a row or so lower: a lower band can sit past a clamp rail whole, and
+    /// leaves a strip along the sheet that other parts fill. Lower bands search fewer lengths.
+    /// </summary>
+    private List<Band> BandOptions(int t, int copies, Box region, CancellationToken token, Drawing? prefetch = null)
+    {
+        var options = Bands(t, copies, region, region.Width, MaxSteps, Probes, token, prefetch);
+        var shortest = types[t].Orientations.Min(o => System.Math.Min(o.Width, o.Height));
+        var last = options.FirstOrDefault();
+        for (var i = 0; i < LowerHeights && last != null; i++)
+        {
+            var height = last.Members.Max(p => p.Top) - last.Members.Min(p => p.Bottom) - StepShort;
+            if (height < shortest)
+                break;
+            var lower = Bands(t, copies, region, height, LowerSteps, 0, token, prefetch);
+            options.AddRange(lower);
+            last = lower.FirstOrDefault();
+        }
+        return options;
+    }
+
+    /// <summary>Lower band heights searched per type.</summary>
+    private const int LowerHeights = 3;
+
+    /// <summary>Lengths a lower band's search steps through; it makes no probes.</summary>
+    private const int LowerSteps = 3;
 
     /// <summary>
     /// Builds the patterns of each (type, copies) band search ahead of need, the searches in
@@ -399,7 +440,7 @@ internal sealed class BandedFill(
                 var drawing = BlockCatalog.PrefetchDrawing(types[searches[i].Type]);
                 try
                 {
-                    Bands(searches[i].Type, searches[i].Copies, region, token, drawing);
+                    Bands(searches[i].Type, searches[i].Copies, region, region.Width, MaxSteps, Probes, token, drawing);
                 }
                 finally
                 {
@@ -427,7 +468,7 @@ internal sealed class BandedFill(
         // Bounds carry the arc flattening padding; a pattern they push past the box is no band.
         if (members.Count == 0 || members.Max(p => p.Top) - members.Min(p => p.Bottom) > width + 1e-9)
             return null;
-        return new Band(t, members.Count, members.Max(p => p.Right) - members.Min(p => p.Left), members);
+        return new Band(t, members.Count, members.Max(p => p.Right) - members.Min(p => p.Left), width, members);
     }
 
     /// <summary>

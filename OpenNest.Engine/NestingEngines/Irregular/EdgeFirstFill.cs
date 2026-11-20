@@ -70,35 +70,10 @@ internal sealed class EdgeFirstFill(
     /// above the clamps keeps parts flush with one straight edge instead of stepping between
     /// clamps. A clamp off every side stays an obstacle instead.
     /// </summary>
-    private readonly Box work = ClearOfClamps(stock.WorkArea, clamps).Area;
+    private readonly Box work = ClampObstacles.ClearOfEdges(stock.WorkArea, clamps).Area;
 
     /// <summary>Clamps not cleared by moving a side: obstacles inside the work area.</summary>
-    private readonly ClampObstacles? obstacles = ClearOfClamps(stock.WorkArea, clamps).OnEdges ? null : clamps;
-
-    private static (Box Area, bool OnEdges) ClearOfClamps(Box area, ClampObstacles? clamps)
-    {
-        var allOnEdges = true;
-        double left = area.Left, right = area.Right, bottom = area.Bottom, top = area.Top;
-        for (var i = 0; clamps != null && i < clamps.Count; i++)
-        {
-            var box = Clipper.GetBounds(clamps.Outline(i));
-            if (box.right <= area.Left || box.left >= area.Right || box.bottom <= area.Bottom || box.top >= area.Top)
-                continue; // Outside the work area: nothing to clear.
-            if (box.left <= area.Left + OnEdge)
-                left = System.Math.Max(left, box.right);
-            else if (box.right >= area.Right - OnEdge)
-                right = System.Math.Min(right, box.left);
-            else if (box.top <= area.Bottom + OnEdge) // Clipper RectD: top is the minimum Y.
-                bottom = System.Math.Max(bottom, box.bottom);
-            else if (box.bottom >= area.Top - OnEdge)
-                top = System.Math.Min(top, box.top);
-            else
-                allOnEdges = false;
-        }
-        if (!allOnEdges || right <= left || top <= bottom)
-            return (area, false);
-        return (new Box(left, bottom, right - left, top - bottom), true);
-    }
+    private readonly ClampObstacles? obstacles = ClampObstacles.ClearOfEdges(stock.WorkArea, clamps).OnEdges ? null : clamps;
 
     public SheetFill? Fill(IReadOnlyList<int> demand, CancellationToken token)
     {
