@@ -11,12 +11,14 @@ namespace OpenNest
         /// Nesting material of a program, without lead-ins and lead-outs: a lead is a cut
         /// into scrap, not part material, and chaining it into the perimeter leaves an open
         /// spur, so the offset contour no longer closes and every slide contact against it
-        /// blocks.
+        /// blocks. A perimeter tab leaves the same open chain, so the contour is closed
+        /// across it (<see cref="NestingMaterial.ClosedAcrossTab"/>).
         /// </summary>
         private static List<Entity> MaterialEntities(CNC.Program program) =>
             ConvertProgram.ToGeometry(program)
                 .Where(e => e.Layer != SpecialLayers.Leadin && e.Layer != SpecialLayers.Leadout)
-                .ForNesting();
+                .ForNesting()
+                .ClosedAcrossTab();
 
         public static List<Line> GetPartLines(Part part, double chordTolerance = 0.001)
         {
