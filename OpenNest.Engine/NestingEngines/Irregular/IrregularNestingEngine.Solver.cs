@@ -271,7 +271,7 @@ public sealed partial class IrregularNestingEngine
         {
             FrontierPacker Ordinary() => packer(null, null);
             FrontierPacker Within(OpenNest.Geometry.Box box) => new(types, CacheFor(stock), PairsFor(stock), stock,
-                PackAxis.Y, 1.0, Work, null, ClampsFor(stock), null, weights, null, null, box);
+                PackAxis.Y, 1.0, Work, clamps: ClampsFor(stock), typeWeights: weights, within: box);
             BandedFill Bands(long budget) => new(types, BlocksFor(stock), stock, ClampsFor(stock), Ordinary,
                 CompareSheets, Work, budget);
 

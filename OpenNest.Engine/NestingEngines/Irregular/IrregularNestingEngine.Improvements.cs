@@ -133,7 +133,7 @@ public sealed partial class IrregularNestingEngine
             {
                 var fill = new EdgeFirstFill(types, CacheFor(stock), stock, ClampsFor(stock), Work,
                     () => new FrontierPacker(types, CacheFor(stock), PairsFor(stock), stock, PackAxis.X, 1.0, Work,
-                        null, ClampsFor(stock)),
+                        clamps: ClampsFor(stock)),
                     Orient).Fill(bin, token);
                 if (fill == null)
                     return null;
