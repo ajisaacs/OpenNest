@@ -111,16 +111,36 @@ internal sealed class NoFitCache
     /// </summary>
     private static PathsD PiecewiseSum(IReadOnlyList<PathD> piecesA, IReadOnlyList<PathD> piecesB)
     {
-        var sums = new PathsD(piecesA.Count * piecesB.Count);
+        // One union of every sum meets each overlap of each pair of sums: with p and q pieces
+        // that is on the order of (p*q)^2 pairs, minutes for two outlines of a hundred vertices.
+        // So union in stages. The sums of one piece of B are A's pieces each grown by that piece,
+        // which overlap little more than neighbors do; their union is A grown by the piece. Those
+        // q unions then merge in neighboring pairs, each merge dropping the edges it buries.
+        var level = new List<PathsD>(piecesB.Count);
         foreach (var pieceB in piecesB)
         {
             var negated = new PathD(pieceB.Count);
             foreach (var p in pieceB)
                 negated.Add(new PointD(-p.x, -p.y));
+            var sums = new PathsD(piecesA.Count);
             foreach (var pieceA in piecesA)
                 sums.Add(ConvexSum(pieceA, negated));
+            level.Add(sums.Count == 1 ? sums : Clipper.Union(sums, new PathsD(), FillRule.NonZero, Precision));
         }
-        return Clipper.Union(sums, new PathsD(), FillRule.NonZero, Precision);
+        while (level.Count > 1)
+        {
+            var next = new List<PathsD>((level.Count + 1) / 2);
+            for (var i = 0; i + 1 < level.Count; i += 2)
+                next.Add(Clipper.Union(level[i], level[i + 1], FillRule.NonZero, Precision));
+            if (level.Count % 2 == 1)
+                next.Add(level[^1]);
+            level = next;
+        }
+        // A lone convex sum never went through the clipper; pass it once so every result is
+        // a cleaned, grid-rounded region.
+        return piecesA.Count == 1 && piecesB.Count == 1
+            ? Clipper.Union(level[0], new PathsD(), FillRule.NonZero, Precision)
+            : level[0];
     }
 
     /// <summary>Filled Minkowski sum, with boundary sweeps and containment unioned together.</summary>

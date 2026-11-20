@@ -236,8 +236,11 @@ convex pieces (ear clipping, then merging across every diagonal whose removal ke
 convex, all decided with exact integer cross products on the Clipper lattice); each concave
 no-fit polygon is the union of the pairwise convex sums of the two footprints' pieces, which is
 the same filled Minkowski sum the edge-pair sweep gives, at a fraction of the union's cost for
-outlines with many vertices. A footprint the clipper cannot decompose (self-touching, zero-area
-runs) keeps the single boundary/containment union.
+outlines with many vertices. The sums are unioned in stages, first those of each piece of the
+moving footprint, then the results in neighboring pairs: one union of every sum meets each
+overlap of each pair of sums, which took minutes for two outlines of a hundred vertices. A
+footprint the clipper cannot decompose (self-touching, zero-area runs) keeps the single
+boundary/containment union.
 Any remaining numerical hole is filled only when its entire ring is certified to lie in forbidden
 space, preserving genuine enclosed placement pockets without changing spacing tolerances.
 
