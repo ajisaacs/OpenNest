@@ -116,7 +116,9 @@ namespace OpenNest.Actions
 
             if (e.Button == MouseButtons.Left)
             {
-                if (plateView.SelectedParts.Count > 0)
+                // Ctrl adds to the selection: a click off the parts starts a window without
+                // clearing what is already selected.
+                if (plateView.SelectedParts.Count > 0 && !IsControlHeld)
                 {
                     var part = plateView.GetPartAtControlPoint(e.Location);
 
@@ -201,15 +203,13 @@ namespace OpenNest.Actions
 
             if (part == null)
             {
-                plateView.DeselectAll();
+                if (!IsControlHeld)
+                    plateView.DeselectAll();
                 status = Status.SetFirstPoint;
                 return false;
             }
 
-            if (
-                Control.ModifierKeys != Keys.Control
-                && plateView.SelectedParts.Contains(part) == false
-            )
+            if (!IsControlHeld && plateView.SelectedParts.Contains(part) == false)
                 plateView.DeselectAll();
 
             // A common-line member brings its whole group, so a drag moves the joined parts together.
@@ -252,6 +252,8 @@ namespace OpenNest.Actions
         }
 
         private RectangleF GetRectangle() => GetRectangle(Point1, Point2);
+
+        private static bool IsControlHeld => (Control.ModifierKeys & Keys.Control) == Keys.Control;
 
         public SelectionType SelectionType
         {
