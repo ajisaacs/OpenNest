@@ -340,7 +340,15 @@ scatters the smallest parts into the gaps between groups.
   sheet. So are each type's lower bands: up to three, each asked for just short of the last
   band's height, so each is a row or so lower (its search steps through three lengths and makes
   no halvings). A lower band leaves a strip along the sheet that the held-back copies and other
-  parts fill, and can sit past a clamp rail whole.
+  parts fill, and can sit past a clamp rail whole. When the full band is taller than the height
+  clear of the clamps lining the bottom or top edge, the first lower band is asked for at that
+  height and searched like the full band, since it is the type's full band wherever a clamp is
+  in the way. A lower band no longer than the full one, of as many copies, stands first in the
+  full band's place: it takes the same length of sheet and leaves a strip beside it for the
+  copies held back. The trials go round the types, every type's first alternative before any type's
+  second, and may spend 25,000 work whatever the budget: building the patterns is charged to
+  the same meter and can spend the whole budget, which used to leave the last types in the order
+  no trial at all.
 - Strips: each strip holds the largest remaining part, as its band (full or narrower) or as a
   column one to three copies wide that the part fills first, and every other part fills the
   strip's gaps, the largest piece at its leftmost, lowest point first, looking back one part
@@ -358,16 +366,25 @@ scatters the smallest parts into the gaps between groups.
   are those of building each pattern in turn. Patterns are filled one Clipper grid unit (0.0001) wider than the part spacing and
   certified at the spacing: Fill sets parts exactly the spacing apart, which the strict
   certification can reject for curved parts, and a stack of rings would lose its densest pattern.
+  Fill can also set copies in neighboring columns closer than the spacing (24 gussets in 59 inches
+  of height came back 0.04 apart at 0.3 spacing). The certification rejects such a pattern, and the
+  search asks again just short of its length, where Fill has to choose another (at most as many
+  retries as steps); it used to stop, leaving the type without a band.
 - A band sits flush to the bottom. When that leaves members in a clamp keep-out, it also tries
   flush to the top and just past the clamps lining the bottom or top edge (the work area with that
   side moved in past the keep-outs, as the sheet-reduction pass packs it), keeping whichever holds
-  the most; members still inside a keep-out go to the gap fill. Outlined sheets do not band.
+  the most; members still inside a keep-out go to the gap fill. Where a lower band of the type,
+  of as many copies, would stand whole in place of a band that loses members, the bands are
+  searched a second time with every such band replaced by the first one that does, and the
+  better sheet is kept (a tie keeps the first search). Outlined sheets do not band.
 
 Neither way wins every sheet. On the README sample parts (18 L brackets, 14 base plates, 18 clamp
-jaws, 12 flanges, 24 gussets, 14 hex covers, 30 links on 60 x 120) bands end the layout at 102.9
-(104.6 with the desktop's edge spacing and a bottom clamp rail) rather than 107.7 (108.6); with
+jaws, 12 flanges, 24 gussets, 14 hex covers, 30 links on 60 x 120) bands end the layout at 103.5
+(104.0 with the desktop's edge spacing and a bottom clamp rail) rather than 107.7 (108.6); with
 about twice those quantities over two sheets, strips end the second sheet at 99.9 rather than 106.2,
-and on the help tutorial's parts at 33.6 rather than 34.9. On a production job of 20 formed legs of
+and on the help tutorial's parts at 33.6 rather than 34.9. A saved nest of the sample parts on
+that clamp-rail sheet, whose drawings start their contours elsewhere, ends at 103.1, as a hand
+layout of it does; before the gussets banded and the trials went round the types it ended at 105.8. On a production job of 20 formed legs of
 each of two sizes on 60 x 120 with a bottom clamp rail, the larger leg's full-height band could
 not clear the rail, so three copies went to the gaps and the layout ended at 104.7; its band a row
 lower (two rows of nine and two copies turned across the top), flush to the top, clears the rail

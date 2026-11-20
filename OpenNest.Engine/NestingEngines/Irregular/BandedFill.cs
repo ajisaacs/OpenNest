@@ -58,6 +58,13 @@ internal sealed class BandedFill(
     /// <summary>Lengths a lower band's search steps through; it makes no probes.</summary>
     private const int LowerSteps = 3;
 
+    /// <summary>
+    /// Work the trials of narrower and lower bands may spend whatever the budget: building the
+    /// patterns is charged to the same meter and can spend the whole budget on its own, and a
+    /// trial costs a few hundredths of a pattern.
+    /// </summary>
+    private const long TrialWork = 25_000;
+
     /// <summary>Partial sheets carried strip to strip.</summary>
     private const int Beam = 4;
 
@@ -110,8 +117,33 @@ internal sealed class BandedFill(
         var options = BandOptionsByType(remaining, token);
         if (options.Count == 0)
             return null;
-        var (bands, best) = BestOrder(options, remaining, token);
-        return HoldBack(bands, best, options, remaining, token);
+        // Members a clamp takes off a band go to the gap fill; where a lower band of the type
+        // could stand there whole instead, the search runs both ways and keeps the better sheet.
+        replaceable = false;
+        var best = Search(options, remaining, replace: false, token);
+        if (replaceable)
+        {
+            var whole = Search(options, remaining, replace: true, token);
+            if (compare(whole, best) < 0)
+                best = whole;
+        }
+        return best;
+    }
+
+    /// <summary>Set when a band lost members to the clamps where a lower band of its type, of as
+    /// many copies, seats whole.</summary>
+    private bool replaceable;
+
+    /// <summary>
+    /// The best order of the types' first bands, then each type's other bands in turn. With
+    /// <paramref name="replace"/>, a band that loses members to the clamps gives way to the type's
+    /// first lower band of as many copies that seats whole.
+    /// </summary>
+    private SheetFill Search(Dictionary<int, List<Band>> options, IReadOnlyList<int> remaining, bool replace,
+        CancellationToken token)
+    {
+        var (bands, best) = BestOrder(options, remaining, replace, token);
+        return HoldBack(bands, best, options, remaining, replace, token);
     }
 
     /// <summary>
@@ -138,7 +170,7 @@ internal sealed class BandedFill(
     /// <summary>Every type's narrowest full band in the order that packs best: longest first,
     /// shortest first or largest part first.</summary>
     private (Band[] Bands, SheetFill Fill) BestOrder(Dictionary<int, List<Band>> options,
-        IReadOnlyList<int> remaining, CancellationToken token)
+        IReadOnlyList<int> remaining, bool replace, CancellationToken token)
     {
         var full = options.Values.Select(o => o[0]).ToArray();
         var orders = new[]
@@ -149,10 +181,10 @@ internal sealed class BandedFill(
             full.OrderByDescending(b => types[b.Type].Area).ThenBy(b => b.Type).ToArray(),
         };
         var bands = orders[0];
-        var best = Run(bands, remaining, token);
+        var best = Run(bands, options, remaining, replace, token);
         foreach (var order in orders.Skip(1))
         {
-            var fill = Run(order, remaining, token);
+            var fill = Run(order, options, remaining, replace, token);
             if (compare(fill, best) < 0)
             {
                 best = fill;
@@ -162,32 +194,40 @@ internal sealed class BandedFill(
         return (bands, best);
     }
 
-    /// <summary>Band by band, each of the type's other options (narrower bands holding fewer
-    /// copies, lower bands) in its place, kept while that improves the sheet.</summary>
+    /// <summary>
+    /// Each of a type's other options (narrower bands holding fewer copies, lower bands) in its
+    /// band's place, kept while that improves the sheet. The trials go round the bands, every
+    /// type's first alternative before any type's second: the budget can end them early, and it
+    /// must not end them before the last types in the order had a turn. They may spend
+    /// <see cref="TrialWork"/> whatever the budget.
+    /// </summary>
     private SheetFill HoldBack(Band[] bands, SheetFill best, Dictionary<int, List<Band>> options,
-        IReadOnlyList<int> remaining, CancellationToken token)
+        IReadOnlyList<int> remaining, bool replace, CancellationToken token)
     {
-        for (var i = 0; i < bands.Length; i++)
-        {
-            var choices = options[bands[i].Type];
-            for (var k = 1; k < choices.Count && counter.Value < budget; k++)
+        var limit = System.Math.Max(budget, counter.Value + TrialWork);
+        var most = bands.Max(b => options[b.Type].Count);
+        for (var k = 1; k < most; k++)
+            for (var i = 0; i < bands.Length && counter.Value < limit; i++)
             {
+                var choices = options[bands[i].Type];
+                if (k >= choices.Count)
+                    continue;
                 var trial = bands.ToArray();
                 trial[i] = choices[k];
-                var candidate = Run(trial, remaining, token);
+                var candidate = Run(trial, options, remaining, replace, token);
                 if (compare(candidate, best) < 0)
                 {
                     best = candidate;
                     bands = trial;
                 }
             }
-        }
         return best;
     }
 
     /// <summary>The bands seated left to right in the order given, then everything else filling
     /// around them.</summary>
-    private SheetFill Run(IReadOnlyList<Band> bands, IReadOnlyList<int> remaining, CancellationToken token)
+    private SheetFill Run(IReadOnlyList<Band> bands, Dictionary<int, List<Band>> options,
+        IReadOnlyList<int> remaining, bool replace, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         var seated = new List<Placed>();
@@ -208,6 +248,12 @@ internal sealed class BandedFill(
                 band = partial;
             }
             var members = Seat(band, front);
+            if (members.Count < band.Members.Count && Whole(band, options[band.Type], front, room) is { } whole)
+            {
+                replaceable = true;
+                if (replace)
+                    members = whole;
+            }
             seated.AddRange(members);
             rest[band.Type] -= members.Count;
             foreach (var member in members)
@@ -215,6 +261,24 @@ internal sealed class BandedFill(
             front += spacing;
         }
         return Finish(seated, seated.Sum(p => types[p.Orientation.TypeIndex].Area), rest, token);
+    }
+
+    /// <summary>
+    /// The members of the type's first lower band of as many copies as <paramref name="band"/>
+    /// that fits the room and seats whole at <paramref name="front"/>, for a band the clamps take
+    /// members off; null when there is none.
+    /// </summary>
+    private List<Placed>? Whole(Band band, List<Band> choices, double front, double room)
+    {
+        foreach (var lower in choices)
+        {
+            if (lower.Height >= band.Height || lower.Copies < band.Copies || lower.Length > room + FitSlack)
+                continue;
+            var members = Seat(lower, front);
+            if (members.Count == lower.Members.Count)
+                return members;
+        }
+        return null;
     }
 
     /// <summary>The sheet with the copies left over packed around the parts seated on it.</summary>
@@ -463,7 +527,12 @@ internal sealed class BandedFill(
     /// The type's bands of full work-area height (<see cref="FullBands"/>), then up to
     /// <see cref="LowerHeights"/> lower ones, each asked for just short of the last pattern's
     /// height, so each is a row or so lower: a lower band can sit past a clamp rail whole, and
-    /// leaves a strip along the sheet that other parts fill. Lower bands search fewer lengths.
+    /// leaves a strip along the sheet that other parts fill. Lower bands search fewer lengths,
+    /// except the first when the full band is taller than the height clear of the clamps: it is
+    /// then asked for at that height and searched like the full band, since it is the type's full
+    /// band wherever a clamp is in the way. A lower band no longer than the full one, of as many
+    /// copies, takes the same length of sheet and leaves a strip beside it, so it stands first,
+    /// in the full band's place.
     /// </summary>
     private List<Band> BandOptions(int t, int copies, CancellationToken token)
     {
@@ -472,15 +541,35 @@ internal sealed class BandedFill(
         var last = options.FirstOrDefault();
         for (var i = 0; i < LowerHeights && last != null; i++)
         {
-            var height = last.Members.Max(p => p.Top) - last.Members.Min(p => p.Bottom) - StepShort;
+            var height = Tall(last) - StepShort;
+            // Nothing between the clear height and the full band's could sit past the clamps whole.
+            var pastClamps = i == 0 && height > clear.Top - clear.Bottom - StepShort;
+            if (pastClamps)
+                height = clear.Top - clear.Bottom - StepShort;
             if (height < shortest)
                 break;
-            var lower = Bands(t, copies, height, LowerSteps, 0, token);
+            var lower = pastClamps
+                ? Bands(t, copies, height, MaxSteps, Probes, token)
+                : Bands(t, copies, height, LowerSteps, 0, token);
             options.AddRange(lower);
             last = lower.FirstOrDefault();
         }
+        if (options.Count > 1)
+        {
+            var full = options[0];
+            var lowest = options.Where(b => b.Copies >= full.Copies && b.Length <= full.Length + Same)
+                .OrderBy(Tall).First();
+            if (!ReferenceEquals(lowest, full) && Tall(lowest) < Tall(full) - Same)
+            {
+                options.Remove(lowest);
+                options.Insert(0, lowest);
+            }
+        }
         return options;
     }
+
+    /// <summary>The height a band's members take, which is at most the height it was asked for.</summary>
+    private static double Tall(Band band) => band.Members.Max(p => p.Top) - band.Members.Min(p => p.Bottom);
 
     /// <summary>The type's bands of full work-area height; see <see cref="Bands"/>.</summary>
     private List<Band> FullBands(int t, int copies, CancellationToken token, Drawing? prefetch = null) =>
@@ -490,7 +579,9 @@ internal sealed class BandedFill(
     /// The type's bands of the given height, narrowest full one first, then each narrower one
     /// holding at most <see cref="HeldBack"/> fewer copies. Lattice patterns grow in whole rows or
     /// columns, so each next band is asked for just short of the last one's length, and a few
-    /// halvings toward the area bound catch patterns the steps skip.
+    /// halvings toward the area bound catch patterns the steps skip. A pattern the certification
+    /// rejects is stepped past the same way, so a type keeps its band when Fill's first pattern
+    /// is under-spaced.
     /// </summary>
     private List<Band> Bands(int t, int copies, double height, int steps, int probes, CancellationToken token,
         Drawing? prefetch = null)
@@ -508,10 +599,23 @@ internal sealed class BandedFill(
         Band? NarrowestFull() => found.Where(b => b.Copies >= copies).OrderBy(b => b.Length).FirstOrDefault();
 
         var length = region.Length;
+        var rejections = 0;
         for (var step = 0; step < steps; step++)
         {
             var band = Pattern(t, copies, length, height, token, prefetch);
-            if (band == null || band.Copies < fewest)
+            if (band == null)
+            {
+                // Fill's pattern failed the spacing certification: just short of it Fill must
+                // choose another, which often passes and holds as many copies. Such a retry is
+                // not one of the steps, but there are no more of them than steps.
+                var rejected = blocks.RejectedBandLength(types[t], copies, new Box(0, 0, length, height));
+                if (rejected <= StepShort || rejected - StepShort >= length || rejections++ >= steps)
+                    break;
+                length = rejected - StepShort;
+                step--;
+                continue;
+            }
+            if (band.Copies < fewest)
                 break;
             Keep(band);
             length = band.Length - StepShort;

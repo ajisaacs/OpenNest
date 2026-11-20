@@ -157,8 +157,10 @@ internal sealed class BlockCatalog : IDisposable
     /// orientations; no poses is an empty pattern. The work it cost is charged on its first
     /// ordinary request.
     /// </summary>
-    private sealed class BandEntry(NestJobPlacement[]? poses, long cost)
+    private sealed class BandEntry(NestJobPlacement[]? poses, long cost, double rejected)
     {
+        /// <summary>X extent of a fill the certification rejected; zero when none was.</summary>
+        public double Rejected { get; } = rejected;
         public IReadOnlyList<Placed>? Members { get; set; } = poses == null ? Array.Empty<Placed>() : null;
         public NestJobPlacement[]? Poses { get; } = poses;
         public long Cost { get; } = cost;
@@ -269,7 +271,7 @@ internal sealed class BlockCatalog : IDisposable
         if (CannotHoldBlock(request))
             return Array.Empty<Placed>();
         var type = request.Type;
-        var poses = Propose(request, spacing, DrawingOf(type), token);
+        var poses = Propose(request, spacing, DrawingOf(type), token, out _);
         return poses == null ? Array.Empty<Placed>() : Bind(type, poses, orientations[type.Index], token);
     }
 
@@ -327,6 +329,18 @@ internal sealed class BlockCatalog : IDisposable
         return bound;
     }
 
+    /// <summary>
+    /// X extent of the fill a <see cref="Band"/> request already made got back and its
+    /// certification rejected (Fill can set copies of neighboring columns closer than the
+    /// spacing); zero when the request is unknown or nothing was rejected. A band search asks
+    /// again just short of it, where Fill must choose another pattern.
+    /// </summary>
+    public double RejectedBandLength(PartType type, int quantity, Box rectangle)
+    {
+        lock (bands)
+            return bands.TryGetValue(new Request(type, quantity, rectangle).Key, out var entry) ? entry.Rejected : 0;
+    }
+
     /// <summary>The band's entry, its pattern proposed here when the catalog has none; charges
     /// nothing and binds nothing.</summary>
     private BandEntry BandFor(Request request, CancellationToken token, Drawing? prefetch)
@@ -339,13 +353,14 @@ internal sealed class BlockCatalog : IDisposable
             return entry;
         // Types may build bands in parallel: each type's drawing and orientation list are its
         // own. Prefetches of one type fill their own drawings and only read the orientations.
+        var rejected = 0.0;
         var poses = CannotHoldBlock(request)
             ? null
-            : Propose(request, bandSpacing, prefetch ?? DrawingOf(request.Type), token);
+            : Propose(request, bandSpacing, prefetch ?? DrawingOf(request.Type), token, out rejected);
         lock (bands)
         {
             if (!bands.TryGetValue(key, out entry))
-                bands[key] = entry = new BandEntry(poses, request.Cost);
+                bands[key] = entry = new BandEntry(poses, request.Cost, rejected);
             return entry;
         }
     }
@@ -380,17 +395,27 @@ internal sealed class BlockCatalog : IDisposable
 
     /// <summary>
     /// The certified poses of the request's Fill of <paramref name="drawing"/> at
-    /// <paramref name="fillSpacing"/>; null when Fill fails or certification rejects it.
+    /// <paramref name="fillSpacing"/>; null when Fill fails or certification rejects it, then
+    /// with the X extent of the rejected fill in <paramref name="rejected"/> (zero otherwise).
     /// </summary>
-    private NestJobPlacement[]? Propose(Request request, double fillSpacing, Drawing drawing, CancellationToken token)
+    private NestJobPlacement[]? Propose(Request request, double fillSpacing, Drawing drawing, CancellationToken token,
+        out double rejected)
     {
+        rejected = 0;
         var (type, quantity, rectangle) = request;
         try
         {
             var members = PrivatePlateFill.Run(drawing, type.Part.Rotation, fillSpacing,
                 rectangle.Length, rectangle.Width, quantity, token);
             token.ThrowIfCancellationRequested();
-            return Certify(type, members.Take(quantity).ToArray(), spacing, token);
+            var kept = members.Take(quantity).ToArray();
+            var poses = Certify(type, kept, spacing, token);
+            if (poses == null && kept.Length >= MinCopies)
+            {
+                var extent = kept.Max(p => p.BoundingBox.Right) - kept.Min(p => p.BoundingBox.Left);
+                rejected = double.IsFinite(extent) ? System.Math.Max(0, extent) : 0;
+            }
+            return poses;
         }
         catch (Exception ex) when (IsProposalFailure(ex))
         {
