@@ -30,6 +30,26 @@ public static class NestPdfWriter
     private const double OverviewHeight = 265;
 
     private static readonly XColor Fill = XColor.FromArgb(222, 222, 222);
+
+    // Each drawing's fill on the plate diagram, its card thumbnail and its parts-table ID cell, so
+    // color identifies a part the ID cannot label. Light tints (ColorBrewer Set3, gray moved out
+    // since it is the unknown fill) keep black outlines and IDs legible and print in grayscale;
+    // drawings past the palette's end reuse it, the ID still telling them apart.
+    private static readonly XColor[] Palette =
+    [
+        XColor.FromArgb(141, 211, 199), XColor.FromArgb(255, 255, 179), XColor.FromArgb(190, 186, 218),
+        XColor.FromArgb(251, 128, 114), XColor.FromArgb(128, 177, 211), XColor.FromArgb(253, 180, 98),
+        XColor.FromArgb(179, 222, 105), XColor.FromArgb(252, 205, 229), XColor.FromArgb(188, 128, 189),
+        XColor.FromArgb(204, 235, 197), XColor.FromArgb(255, 237, 111), XColor.FromArgb(166, 206, 227),
+    ];
+
+    /// <summary>Each report ID's palette color, assigned in drawing (ID) order.</summary>
+    internal static IReadOnlyDictionary<string, XColor> DrawingColors(NestReportSnapshot snapshot) =>
+        snapshot.Drawings.Select((drawing, index) => (drawing.Id, Color: Palette[index % Palette.Length]))
+            .ToDictionary(entry => entry.Id, entry => entry.Color, StringComparer.Ordinal);
+
+    private static XColor ColorOf(IReadOnlyDictionary<string, XColor> colors, string id) =>
+        colors.TryGetValue(id, out var color) ? color : Fill;
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
 
     // PDFsharp/MigraDoc layout and font state is process-wide and not safe for concurrent
@@ -279,7 +299,8 @@ public static class NestPdfWriter
         var picture = cell.AddParagraph();
         picture.Format.Alignment = ParagraphAlignment.Center;
         picture.Format.SpaceBefore = picture.Format.SpaceAfter = Unit.FromPoint(2);
-        var image = picture.AddImage(Thumbnail(drawing.Geometry, inner, CardThumbnailHeight));
+        var image = picture.AddImage(Thumbnail(drawing.Geometry, inner, CardThumbnailHeight,
+            ColorOf(DrawingColors(snapshot), drawing.Id)));
         image.Width = Unit.FromPoint(inner);
         image.Height = Unit.FromPoint(CardThumbnailHeight);
 
@@ -330,6 +351,7 @@ public static class NestPdfWriter
     private static void AddPlate(Document document, NestReportSnapshot snapshot, ReportPlate plate,
         DiagramView plan, List<(Table, Action<XGraphics, XRect>[])> areas)
     {
+        var colors = DrawingColors(snapshot);
         var heading = $"Plate {plate.Number} of {snapshot.Plates.Length}";
         var header = new List<string> { $"Nest report: {snapshot.Name}", heading, SheetSize(snapshot, plate) };
         // Unset material/thickness are stated in the page body, not repeated in every header.
@@ -355,7 +377,7 @@ public static class NestPdfWriter
                 Duration(cutTime * plate.Copies) + (plate.Copies == 1 ? " (1 plate)" : $" ({plate.Copies} plates)"));
 
         var overview = AddReservedArea(section, plan.Size.Height);
-        areas.Add((overview, [(gfx, _) => DrawRulers(gfx, plate, plan, snapshot.Units), (gfx, _) => DrawView(gfx, plate, plan)]));
+        areas.Add((overview, [(gfx, _) => DrawRulers(gfx, plate, plan, snapshot.Units), (gfx, _) => DrawView(gfx, plate, plan, colors)]));
 
         // Only a removed clamp needs words: it is an action before cutting. Hatched clamps and the
         // rulers (their unit sits in the corner) explain themselves, and the room goes to parts rows.
@@ -377,8 +399,11 @@ public static class NestPdfWriter
         foreach (var drawing in snapshot.Drawings.Where(drawing => perSheet.ContainsKey(drawing.Id)))
         {
             var count = perSheet[drawing.Id];
-            AddRow(parts, $"Plate {plate.Number}, drawing {drawing.Id}", false, drawing.Id, names2[drawing.Id],
+            var row = AddRow(parts, $"Plate {plate.Number}, drawing {drawing.Id}", false, drawing.Id, names2[drawing.Id],
                 count.ToString(Invariant), checked(count * plate.Copies).ToString(Invariant));
+            // The ID cell carries the part's diagram color: the key when an ID could not be placed.
+            var color = ColorOf(colors, drawing.Id);
+            row.Cells[0].Shading.Color = new Color(color.R, color.G, color.B);
         }
     }
 
@@ -429,7 +454,8 @@ public static class NestPdfWriter
         }
     }
 
-    private static void DrawView(XGraphics gfx, ReportPlate plate, DiagramView view)
+    private static void DrawView(XGraphics gfx, ReportPlate plate, DiagramView view,
+        IReadOnlyDictionary<string, XColor> colors)
     {
         var fit = view.Fit;
         gfx.DrawRectangle(new XPen(XColors.Black, 1), fit.Rect(plate.Bounds));
@@ -439,7 +465,7 @@ public static class NestPdfWriter
             DrawClamp(gfx, fit.Rect(clamp.Bounds));
         var outline = new XPen(XColors.Black, 0.6);
         foreach (var part in plate.Parts)
-            DrawGeometry(gfx, part.Geometry, fit, outline);
+            DrawGeometry(gfx, part.Geometry, fit, outline, ColorOf(colors, part.ReportId));
         var removed = new XPen(XColors.Black, 0.6) { DashPattern = [5, 3] };
         var cross = new XPen(XColors.Black, 0.4);
         foreach (var clamp in plate.Clamps.Where(clamp => clamp.Removed))
@@ -540,7 +566,7 @@ public static class NestPdfWriter
             XStringFormats.TopRight);
     }
 
-    private static string Thumbnail(ReportGeometry geometry, double width, double height)
+    private static string Thumbnail(ReportGeometry geometry, double width, double height, XColor fill)
     {
         using var document = new PdfDocument();
         var page = document.AddPage();
@@ -549,7 +575,7 @@ public static class NestPdfWriter
         using (var gfx = XGraphics.FromPdfPage(page))
         {
             var fit = Fit.Create(geometry.Bounds, new XRect(2, 2, width - 4, height - 4));
-            DrawGeometry(gfx, geometry, fit, new XPen(XColors.Black, 0.5));
+            DrawGeometry(gfx, geometry, fit, new XPen(XColors.Black, 0.5), fill);
         }
         using var stream = new MemoryStream();
         document.Save(stream, false);
@@ -557,7 +583,7 @@ public static class NestPdfWriter
         return "base64:" + Convert.ToBase64String(stream.ToArray());
     }
 
-    private static void DrawGeometry(XGraphics gfx, ReportGeometry geometry, Fit fit, XPen pen)
+    private static void DrawGeometry(XGraphics gfx, ReportGeometry geometry, Fit fit, XPen pen, XColor fill)
     {
         if (geometry.StrokeOnly)
         {
@@ -572,7 +598,7 @@ public static class NestPdfWriter
             path.CloseFigure();
         }
         path.FillMode = XFillMode.Alternate; // Even-odd: holes stay unfilled.
-        gfx.DrawPath(pen, new XSolidBrush(Fill), path);
+        gfx.DrawPath(pen, new XSolidBrush(fill), path);
     }
 
     /// <summary>

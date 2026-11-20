@@ -392,6 +392,29 @@ internal static class NestReportDiagram
             placed.Add(new DiagramLabel(index, id, found));
             failed.Remove(index);
         }
+
+        // A strip a hair thinner than the label (closely packed bars) still takes its ID at the
+        // pole: the label may overhang its own outline by up to the clearance, so its core stays
+        // in the part's material, but it never touches another part, cutoff, clamp or label.
+        foreach (var index in failed.ToList())
+        {
+            var id = plate.Parts[index].ReportId;
+            var size = ReportText.Size(id, font);
+            var width = size.Width + 2 * LabelPadding;
+            var height = size.Height + 2 * LabelPadding;
+            var pole = fit.Point(shapes[index].Pole.X, shapes[index].Pole.Y);
+            var box = new XRect(pole.X - width / 2, pole.Y - height / 2, width, height);
+            var core = box;
+            core.Inflate(-Clearance, -Clearance);
+            var model = ModelBox(fit, box);
+            if (!canvas.Holds(box) || placed.Any(label => label.Box.IntersectsWith(box))
+                || !shapes[index].InMaterial(Center(fit, box))
+                || obstacles.Any(shape => shape.Crosses(ModelBox(fit, core)))
+                || obstacles.Where((_, other) => other != index).Any(shape => shape.Crosses(model)))
+                continue;
+            placed.Add(new DiagramLabel(index, id, box));
+            failed.Remove(index);
+        }
         return placed;
     }
 

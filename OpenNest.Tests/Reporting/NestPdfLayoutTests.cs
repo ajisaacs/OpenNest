@@ -343,6 +343,64 @@ public sealed class NestPdfLayoutTests : IDisposable
     }
 
     [Fact]
+    public void Plan_PackedStripsAHairThinnerThanTheirIdsAreEachLabeled()
+    {
+        // From N26-2CN: 13 x 1 in bars packed 0.25 in apart on a 24 x 72 sheet are 9.6 pt tall,
+        // just under the 10 pt ID, and two drawings share rows, so neither a same-ID group nor a
+        // leader could reach most of them and the middle of the sheet went unlabeled.
+        var nest = new Nest("Packed strips") { Units = Units.Inches };
+        var a = NestReportTestData.Rectangle("Strip A", 13, 1);
+        var b = NestReportTestData.Rectangle("Strip B", 13, 1);
+        nest.Drawings.Add(a);
+        nest.Drawings.Add(b);
+        var plate = new Plate(24, 72) { Quantity = 1, PartSpacing = 0.25 };
+        for (var row = 0; row < 6; row++)
+            for (var column = 0; column < 5; column++)
+                plate.Parts.Add(new Part((row + (column == 4 ? 1 : 0)) % 2 == 0 ? a : b,
+                    new Vector(1 + column * 13.25, 1 + row * 1.25)));
+        nest.Plates.Add(plate);
+        var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
+
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 265);
+
+        var parts = snapshot.Plates[0].Parts;
+        Assert.Equal(Enumerable.Range(0, parts.Length), plan.Labels.Select(label => label.Part).Order());
+        Assert.All(plan.Labels, label =>
+        {
+            Assert.Null(label.Anchor);
+            // The ID sits on its own bar, overhanging it by at most the clearance, and touches no other.
+            var own = plan.Fit.Rect(parts[label.Part].Geometry.Bounds);
+            own.Inflate(1.5, 1.5);
+            Assert.True(own.Contains(label.Box));
+            for (var other = 0; other < parts.Length; other++)
+                if (other != label.Part)
+                    Assert.False(label.Box.IntersectsWith(plan.Fit.Rect(parts[other].Geometry.Bounds)));
+        });
+    }
+
+    [Fact]
+    public void DrawingColors_AreDistinctUntilThePaletteRepeatsAndFollowIdOrder()
+    {
+        var nest = new Nest("Colors") { Units = Units.Inches };
+        var plate = new Plate(48, 96) { Quantity = 1 };
+        for (var i = 0; i < 14; i++)
+        {
+            var drawing = NestReportTestData.Rectangle($"Part {i:D2}", 2, 2);
+            nest.Drawings.Add(drawing);
+            plate.Parts.Add(new Part(drawing, new Vector(1 + i * 3, 1)));
+        }
+        nest.Plates.Add(plate);
+        var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
+
+        var colors = NestPdfWriter.DrawingColors(snapshot);
+        var ordered = snapshot.Drawings.Select(drawing => colors[drawing.Id]).ToList();
+
+        Assert.Equal(12, ordered.Take(12).Distinct().Count());
+        Assert.Equal(ordered[0], ordered[12]);
+        Assert.Equal(ordered[1], ordered[13]);
+    }
+
+    [Fact]
     public void Plan_PartsTooThinForTheirIdsGetLeaderLabelsBesideThem()
     {
         // From N26-2CJ: a 0.5 x 20 in strip and a 1 in wide half ring on a 48 x 96 sheet are a

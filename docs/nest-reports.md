@@ -149,6 +149,20 @@ room, nearest the part's center. Open space beside a concave part (inside a C
 shape's opening) never holds its ID that way, since it reads as belonging to
 whatever is nearby.
 
+A strip a hair thinner than its ID (closely packed bars) still takes the ID at its
+pole: the label may overhang the part's own outline by up to the clearance, so its
+center stays in the part's material, but it never touches another part, cutoff,
+clamp or label. Without this, packed rows of two drawings got no ID: each drawing's
+cluster rectangle took in the other's bars, so it could not be grouped, and leaders
+could only reach the bars on the edge.
+
+Each drawing has a color, assigned in ID order from a 12-color light palette
+(ColorBrewer Set3) that keeps black outlines and IDs legible and still reads in
+grayscale; drawings past the twelfth reuse it. Its parts are filled with it on the
+plate diagram and its card thumbnail, and its ID cell in the plate's parts table is
+shaded with it, so the table is the color key for a part whose ID could not be
+placed.
+
 A part still unlabeled after the groups below (a thin strip or a narrow band with
 no hole to hold its ID) gets its ID in the nearest clear space outside it, with a
 thin leader to a dot at its pole. The label keeps the usual clearance; the leader
