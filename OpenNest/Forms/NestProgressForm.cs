@@ -111,6 +111,12 @@ namespace OpenNest.Forms
         private Controls.LayoutChoiceList layoutList;
         private NestLayoutChoices layouts;
         private Button useLayoutButton;
+        private TableLayoutPanel footer;
+
+        // The footer turns green once the search finishes, so a finished nest waiting for a
+        // pick does not look like one still running.
+        internal static readonly Color FinishedBackColor = Color.FromArgb(220, 242, 214);
+        internal static readonly Color FinishedForeColor = Color.FromArgb(30, 100, 40);
         private Action stopSearch;
         private TaskCompletionSource<bool> choice;
 
@@ -150,7 +156,7 @@ namespace OpenNest.Forms
             };
 
             // Status and buttons share one line: the detail text gets the whole width.
-            var footer = new TableLayoutPanel
+            footer = new TableLayoutPanel
             {
                 Dock = DockStyle.Bottom,
                 AutoSize = true,
@@ -255,6 +261,9 @@ namespace OpenNest.Forms
             Text = "Nesting Finished";
             layoutList.BestLabel = "Best";
             descriptionValue.Text = "Search finished. Pick the layout to use.";
+            footer.BackColor = FinishedBackColor;
+            descriptionValue.ForeColor = FinishedForeColor;
+            descriptionValue.Font = new Font(descriptionValue.Font, FontStyle.Bold);
             stopButton.Text = "Discard";
             stopButton.Enabled = true;
             UpdateUseLayout();

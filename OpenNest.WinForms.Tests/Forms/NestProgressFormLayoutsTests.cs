@@ -188,6 +188,8 @@ public class NestProgressFormLayoutsTests
 
         Assert.False(pick.IsCompleted);
         Assert.Equal("Search finished. Pick the layout to use.", Status(form).Text);
+        Assert.Equal(NestProgressForm.FinishedBackColor, Status(form).Parent!.BackColor);
+        Assert.Equal(NestProgressForm.FinishedForeColor, Status(form).ForeColor);
         Button(form, "useLayoutButton").PerformClick();
         Assert.True(pick.Result);
         Assert.Same(row, form.ChosenLayout);
