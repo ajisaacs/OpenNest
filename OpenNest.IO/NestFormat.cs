@@ -92,6 +92,16 @@ namespace OpenNest.IO
             public string Name { get; init; } = "";
         }
 
+        // Shared by the lenient converters: a missing or non-numeric property reads as absent
+        // (false, value 0) rather than throwing, so each converter decides what absence means.
+        private static bool TryNumber(JsonElement owner, string name, out double value)
+        {
+            value = 0;
+            return owner.TryGetProperty(name, out var element)
+                && element.ValueKind == JsonValueKind.Number
+                && element.TryGetDouble(out value);
+        }
+
         /// <summary>
         /// Reads a malformed or wrongly typed machine, or one without a valid id, as none instead
         /// of failing the whole nest. A missing or wrongly typed name reads as empty.
@@ -230,14 +240,6 @@ namespace OpenNest.IO
                         return false;
                 return true;
             }
-
-            private static bool TryNumber(JsonElement bed, string name, out double value)
-            {
-                value = 0;
-                return bed.TryGetProperty(name, out var element)
-                    && element.ValueKind == JsonValueKind.Number
-                    && element.TryGetDouble(out value);
-            }
         }
 
         /// <summary>
@@ -341,14 +343,6 @@ namespace OpenNest.IO
                 if (value.Clearance is double clearance)
                     writer.WriteNumber("clearance", clearance);
                 writer.WriteEndObject();
-            }
-
-            private static bool TryNumber(JsonElement rail, string name, out double value)
-            {
-                value = 0;
-                return rail.TryGetProperty(name, out var element)
-                    && element.ValueKind == JsonValueKind.Number
-                    && element.TryGetDouble(out value);
             }
         }
 
@@ -890,14 +884,6 @@ namespace OpenNest.IO
                     writer.WriteEndArray();
                 }
                 writer.WriteEndObject();
-            }
-
-            private static bool TryNumber(JsonElement point, string name, out double value)
-            {
-                value = 0;
-                return point.TryGetProperty(name, out var element)
-                    && element.ValueKind == JsonValueKind.Number
-                    && element.TryGetDouble(out value);
             }
 
             private static void WritePoint(Utf8JsonWriter writer, PointDto point)

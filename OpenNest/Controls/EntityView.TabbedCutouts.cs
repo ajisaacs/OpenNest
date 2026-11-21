@@ -53,15 +53,8 @@ namespace OpenNest.Controls
 
         private bool IsPicking => IsPickingBendLine || IsPickingBreakoff || IsPickingTabbedCutout;
 
-        private bool HandleTabbedCutoutClick(MouseEventArgs e)
-        {
-            if (!IsPickingTabbedCutout || e.Button != MouseButtons.Left)
-                return false;
-            var entity = HitTestHole(e.Location);
-            if (entity != null)
-                TabbedCutoutPicked?.Invoke(this, (entity, PointControlToWorld(e.Location)));
-            return true;
-        }
+        private bool HandleTabbedCutoutClick(MouseEventArgs e) =>
+            HandlePickClick(e, IsPickingTabbedCutout, entity => entity is Line or Arc or Circle, TabbedCutoutPicked);
 
         private void RaiseCutoutTabDragged((int Cutout, int Tab) tab, Point location, bool finished)
         {
@@ -72,44 +65,10 @@ namespace OpenNest.Controls
             CutoutTabDragged?.Invoke(this, new CutoutTabDragEventArgs(tab.Cutout, tab.Tab, center, finished));
         }
 
-        private (int, int)? HitTestCutoutTab(Point location)
-        {
-            for (var c = 0; c < TabbedCutoutLayouts.Count; c++)
-            {
-                var layout = TabbedCutoutLayouts[c];
-                if (layout is not { IsValid: true })
-                    continue;
-                for (var t = 0; t < layout.TabCenters.Count; t++)
-                {
-                    var handle = PointWorldToControl(layout.PointAt(layout.TabCenters[t]));
-                    var dx = handle.X - location.X;
-                    var dy = handle.Y - location.Y;
-                    if (dx * dx + dy * dy <= TabHandleRadius * TabHandleRadius)
-                        return (c, t);
-                }
-            }
-            return null;
-        }
-
-        private Entity HitTestHole(Point controlPoint)
-        {
-            var worldPoint = PointControlToWorld(controlPoint);
-            var tolerance = LengthGuiToWorld(6);
-            Entity best = null;
-            var bestDistance = double.MaxValue;
-            foreach (var entity in Entities)
-            {
-                if (entity is not (Line or Arc or Circle) || !entity.IsVisible || entity.Layer?.IsVisible == false)
-                    continue;
-                var distance = worldPoint.DistanceTo(entity.ClosestPointTo(worldPoint));
-                if (distance < tolerance && distance < bestDistance)
-                {
-                    best = entity;
-                    bestDistance = distance;
-                }
-            }
-            return best;
-        }
+        private (int, int)? HitTestCutoutTab(Point location) =>
+            HitTestTabHandle(location, TabbedCutoutLayouts.Count, c => TabbedCutoutLayouts[c] is { IsValid: true } layout
+                ? layout.TabCenters.Select(layout.PointAt)
+                : Enumerable.Empty<Vector>());
 
         private void DrawTabbedCutouts(Graphics g)
         {
@@ -151,21 +110,12 @@ namespace OpenNest.Controls
 
                 foreach (var center in layout.TabCenters)
                 {
-                    var handle = PointWorldToGraph(layout.PointAt(center));
-                    var size = selected ? TabHandleRadius : TabHandleRadius - 2;
-                    var rect = new RectangleF(handle.X - size, handle.Y - size, size * 2, size * 2);
-                    g.FillEllipse(handleBrush, rect);
-                    g.DrawEllipse(handlePen, rect);
+                    DrawTabHandle(g, handleBrush, handlePen, layout.PointAt(center), selected);
                 }
 
                 // Each piece is pierced in the slug, at its start.
                 foreach (var (entry, slugDirection) in layout.Entries)
-                {
-                    var at = PointWorldToGraph(entry);
-                    var pierce = PointWorldToGraph(entry + slugDirection * LengthGuiToWorld(12));
-                    g.DrawLine(leadPen, pierce, at);
-                    g.DrawEllipse(leadPen, pierce.X - 2.5f, pierce.Y - 2.5f, 5f, 5f);
-                }
+                    DrawEntryMark(g, leadPen, entry, slugDirection);
             }
         }
     }

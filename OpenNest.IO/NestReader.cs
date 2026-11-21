@@ -419,63 +419,66 @@ namespace OpenNest.IO
         // The program already has breakoffs applied; a dropped definition only loses editability.
         private List<Breakoff> ReadBreakoffs(DrawingDto d)
         {
-            var breakoffs = new List<Breakoff>();
-            if (d.Breakoffs == null)
-                return breakoffs;
-
-            for (var i = 0; i < d.Breakoffs.Count; i++)
-            {
-                var dto = d.Breakoffs[i];
-                if (dto?.EdgeIds is { Count: > 0 } && dto.TabCenters != null
-                    && dto.TabWidth > 0 && double.IsFinite(dto.TabWidth)
-                    && dto.TabCenters.All(double.IsFinite))
-                {
-                    breakoffs.Add(new Breakoff
+            return ReadTabbedDefinitions(d, d.Breakoffs, "breakoff", dto =>
+                HasValidTabs(dto.EdgeIds, dto.TabWidth, dto.TabCenters)
+                    ? new Breakoff
                     {
                         EdgeIds = dto.EdgeIds.ToList(),
                         Flip = dto.Flip,
                         TabWidth = dto.TabWidth,
                         TabCenters = dto.TabCenters.ToList(),
-                    });
-                }
-                else
-                {
-                    warnings.Add($"Drawing '{d.Name}': breakoff {i + 1} could not be read; its cut geometry "
-                        + "is kept, but it can no longer be edited as a breakoff.");
-                }
-            }
-            return breakoffs;
+                    }
+                    : null);
         }
 
         // Like breakoffs: the program already has the tabs applied, so a dropped definition only
         // loses editability.
         private List<TabbedCutout> ReadTabbedCutouts(DrawingDto d)
         {
-            var cutouts = new List<TabbedCutout>();
-            if (d.TabbedCutouts == null)
-                return cutouts;
-
-            for (var i = 0; i < d.TabbedCutouts.Count; i++)
-            {
-                var dto = d.TabbedCutouts[i];
-                if (dto?.EdgeIds is { Count: > 0 } && dto.TabCenters != null
-                    && dto.TabWidth > 0 && double.IsFinite(dto.TabWidth)
-                    && dto.TabCenters.All(double.IsFinite))
-                {
-                    cutouts.Add(new TabbedCutout
+            return ReadTabbedDefinitions(d, d.TabbedCutouts, "tabbed cutout", dto =>
+                HasValidTabs(dto.EdgeIds, dto.TabWidth, dto.TabCenters)
+                    ? new TabbedCutout
                     {
                         EdgeIds = dto.EdgeIds.ToList(),
                         TabWidth = dto.TabWidth,
                         TabCenters = dto.TabCenters.ToList(),
-                    });
+                    }
+                    : null);
+        }
+
+        // Breakoffs and tabbed cutouts persist the same tab spans; read returns null for an
+        // unreadable entry, which is dropped with a warning naming its kind and 1-based position.
+        private List<T> ReadTabbedDefinitions<TDto, T>(
+            DrawingDto d, List<TDto> dtos, string kind, Func<TDto, T> read)
+            where TDto : class
+            where T : class
+        {
+            var definitions = new List<T>();
+            if (dtos == null)
+                return definitions;
+
+            for (var i = 0; i < dtos.Count; i++)
+            {
+                var dto = dtos[i];
+                var definition = dto == null ? null : read(dto);
+                if (definition != null)
+                {
+                    definitions.Add(definition);
                 }
                 else
                 {
-                    warnings.Add($"Drawing '{d.Name}': tabbed cutout {i + 1} could not be read; its cut "
-                        + "geometry is kept, but it can no longer be edited as a tabbed cutout.");
+                    warnings.Add($"Drawing '{d.Name}': {kind} {i + 1} could not be read; its cut geometry "
+                        + $"is kept, but it can no longer be edited as a {kind}.");
                 }
             }
-            return cutouts;
+            return definitions;
+        }
+
+        private static bool HasValidTabs(List<Guid> edgeIds, double tabWidth, List<double> tabCenters)
+        {
+            return edgeIds is { Count: > 0 } && tabCenters != null
+                && tabWidth > 0 && double.IsFinite(tabWidth)
+                && tabCenters.All(double.IsFinite);
         }
 
         // Dimensions are annotations: a dropped one never changes what is cut.

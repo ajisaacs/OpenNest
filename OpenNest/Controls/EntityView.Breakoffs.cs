@@ -109,13 +109,19 @@ namespace OpenNest.Controls
             }
         }
 
-        private bool HandleBreakoffClick(MouseEventArgs e)
+        private bool HandleBreakoffClick(MouseEventArgs e) =>
+            HandlePickClick(e, IsPickingBreakoff, entity => entity is Line or Arc, BreakoffEdgePicked);
+
+        // Breakoff and tabbed-cutout picking differ only in the mode flag, the kinds of entity
+        // a click may take and the event raised; a pick-mode click never falls through.
+        private bool HandlePickClick(MouseEventArgs e, bool picking, Func<Entity, bool> accepts,
+            EventHandler<(Entity Entity, Vector Point)> picked)
         {
-            if (!IsPickingBreakoff || e.Button != MouseButtons.Left)
+            if (!picking || e.Button != MouseButtons.Left)
                 return false;
-            var entity = HitTestEdge(e.Location);
+            var entity = HitTestNearest(e.Location, accepts);
             if (entity != null)
-                BreakoffEdgePicked?.Invoke(this, (entity, PointControlToWorld(e.Location)));
+                picked?.Invoke(this, (entity, PointControlToWorld(e.Location)));
             return true;
         }
 
@@ -128,26 +134,33 @@ namespace OpenNest.Controls
             TabDragged?.Invoke(this, new TabDragEventArgs(tab.Breakoff, tab.Tab, center, finished));
         }
 
-        private (int, int)? HitTestTab(Point location)
+        private (int, int)? HitTestTab(Point location) =>
+            HitTestTabHandle(location, BreakoffLayouts.Count, b => BreakoffLayouts[b] is { IsValid: true } layout
+                ? layout.TabCenters.Select(layout.PointAt)
+                : Enumerable.Empty<Vector>());
+
+        // Breakoff and tabbed-cutout tab handles hit-test alike; each layout supplies its handles'
+        // world points (none when it is invalid), and the first handle under the cursor wins.
+        private (int, int)? HitTestTabHandle(Point location, int count, Func<int, IEnumerable<Vector>> handles)
         {
-            for (var b = 0; b < BreakoffLayouts.Count; b++)
+            for (var i = 0; i < count; i++)
             {
-                var layout = BreakoffLayouts[b];
-                if (layout is not { IsValid: true })
-                    continue;
-                for (var t = 0; t < layout.TabCenters.Count; t++)
+                var t = 0;
+                foreach (var at in handles(i))
                 {
-                    var handle = PointWorldToControl(layout.PointAt(layout.TabCenters[t]));
+                    var handle = PointWorldToControl(at);
                     var dx = handle.X - location.X;
                     var dy = handle.Y - location.Y;
                     if (dx * dx + dy * dy <= TabHandleRadius * TabHandleRadius)
-                        return (b, t);
+                        return (i, t);
+                    t++;
                 }
             }
             return null;
         }
 
-        private Entity HitTestEdge(Point controlPoint)
+        // The nearest shown entity of an accepted kind within a few pixels of the point.
+        private Entity HitTestNearest(Point controlPoint, Func<Entity, bool> accepts)
         {
             var worldPoint = PointControlToWorld(controlPoint);
             var tolerance = LengthGuiToWorld(6);
@@ -155,7 +168,7 @@ namespace OpenNest.Controls
             var bestDistance = double.MaxValue;
             foreach (var entity in Entities)
             {
-                if (entity is not (Line or Arc) || !entity.IsVisible || entity.Layer?.IsVisible == false)
+                if (!accepts(entity) || !entity.IsVisible || entity.Layer?.IsVisible == false)
                     continue;
                 var distance = worldPoint.DistanceTo(entity.ClosestPointTo(worldPoint));
                 if (distance < tolerance && distance < bestDistance)
@@ -203,11 +216,7 @@ namespace OpenNest.Controls
                     var from = PointWorldToGraph(layout.PointAt(center - layout.TabWidth / 2));
                     var to = PointWorldToGraph(layout.PointAt(center + layout.TabWidth / 2));
                     g.DrawLine(tabPen, from, to);
-                    var handle = PointWorldToGraph(layout.PointAt(center));
-                    var size = selected ? TabHandleRadius : TabHandleRadius - 2;
-                    var rect = new RectangleF(handle.X - size, handle.Y - size, size * 2, size * 2);
-                    g.FillEllipse(handleBrush, rect);
-                    g.DrawEllipse(handlePen, rect);
+                    DrawTabHandle(g, handleBrush, handlePen, layout.PointAt(center), selected);
                 }
             }
 
@@ -218,12 +227,25 @@ namespace OpenNest.Controls
         private void DrawEntryMarks(Graphics g, Pen pen)
         {
             foreach (var (entry, scrap) in BreakCutEntries)
-            {
-                var at = PointWorldToGraph(entry);
-                var pierce = PointWorldToGraph(entry + scrap * LengthGuiToWorld(12));
-                g.DrawLine(pen, pierce, at);
-                g.DrawEllipse(pen, pierce.X - 2.5f, pierce.Y - 2.5f, 5f, 5f);
-            }
+                DrawEntryMark(g, pen, entry, scrap);
+        }
+
+        private void DrawEntryMark(Graphics g, Pen pen, Vector entry, Vector pierceDirection)
+        {
+            var at = PointWorldToGraph(entry);
+            var pierce = PointWorldToGraph(entry + pierceDirection * LengthGuiToWorld(12));
+            g.DrawLine(pen, pierce, at);
+            g.DrawEllipse(pen, pierce.X - 2.5f, pierce.Y - 2.5f, 5f, 5f);
+        }
+
+        // A tab's drag handle; the selected feature's handles draw larger.
+        private void DrawTabHandle(Graphics g, Brush fill, Pen outline, Vector at, bool selected)
+        {
+            var handle = PointWorldToGraph(at);
+            var size = selected ? TabHandleRadius : TabHandleRadius - 2;
+            var rect = new RectangleF(handle.X - size, handle.Y - size, size * 2, size * 2);
+            g.FillEllipse(fill, rect);
+            g.DrawEllipse(outline, rect);
         }
 
         private PointF[] Outline(IReadOnlyList<Entity> path)

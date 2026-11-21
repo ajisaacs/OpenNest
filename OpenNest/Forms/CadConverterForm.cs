@@ -550,15 +550,43 @@ namespace OpenNest.Forms
                 );
         }
 
-        private void OnAddBendLineClicked(object sender, EventArgs e)
+        private void OnAddBendLineClicked(object sender, EventArgs e) => TogglePickMode(PickTarget.BendLine);
+
+        private enum PickTarget { BendLine, Breakoff, TabbedCutout }
+
+        private bool IsPicking(PickTarget target) => target switch
         {
-            entityView1.IsPickingBreakoff = false;
-            filterPanel.SetBreakoffPickMode(false);
-            entityView1.IsPickingTabbedCutout = false;
-            filterPanel.SetTabbedCutoutPickMode(false);
-            var active = !entityView1.IsPickingBendLine;
-            entityView1.IsPickingBendLine = active;
-            filterPanel.SetPickMode(active);
+            PickTarget.BendLine => entityView1.IsPickingBendLine,
+            PickTarget.Breakoff => entityView1.IsPickingBreakoff,
+            _ => entityView1.IsPickingTabbedCutout,
+        };
+
+        private void SetPickMode(PickTarget target, bool active)
+        {
+            switch (target)
+            {
+                case PickTarget.BendLine:
+                    entityView1.IsPickingBendLine = active;
+                    filterPanel.SetPickMode(active);
+                    break;
+                case PickTarget.Breakoff:
+                    entityView1.IsPickingBreakoff = active;
+                    filterPanel.SetBreakoffPickMode(active);
+                    break;
+                default:
+                    entityView1.IsPickingTabbedCutout = active;
+                    filterPanel.SetTabbedCutoutPickMode(active);
+                    break;
+            }
+        }
+
+        // One pick mode at a time. The view's cursor follows the last mode set, so the
+        // toggled mode is set after the others are turned off.
+        private void TogglePickMode(PickTarget target)
+        {
+            foreach (var other in Enum.GetValues<PickTarget>().Where(t => t != target))
+                SetPickMode(other, false);
+            SetPickMode(target, !IsPicking(target));
         }
 
         private void OnLinePicked(object sender, Line line)
@@ -594,18 +622,18 @@ namespace OpenNest.Forms
 
         private void OnPickCanceled(object sender, EventArgs e)
         {
-            entityView1.IsPickingBendLine = false;
-            filterPanel.SetPickMode(false);
-            entityView1.IsPickingBreakoff = false;
-            filterPanel.SetBreakoffPickMode(false);
-            entityView1.IsPickingTabbedCutout = false;
-            filterPanel.SetTabbedCutoutPickMode(false);
+            foreach (var target in Enum.GetValues<PickTarget>())
+                SetPickMode(target, false);
         }
 
         // The entities the program is built from: shown, with role overrides applied and
         // display-only entities left out.
         private static List<Entity> VisibleEntities(FileListItem item) =>
             EntityRoles.ForProgram(item.Entities.Where(en => en.Layer.IsVisible && en.IsVisible), item.EntityRoles);
+
+        // The view picks on screen; the form resolves the pick against the program's entities.
+        private static Entity NearestTo(IEnumerable<Entity> candidates, Vector point) =>
+            candidates.OrderBy(en => en.ClosestPointTo(point).DistanceTo(point)).FirstOrDefault();
 
         private void RefreshBreakoffs(FileListItem item)
         {
@@ -646,29 +674,18 @@ namespace OpenNest.Forms
             return entries;
         }
 
-        private void OnAddBreakoffClicked(object sender, EventArgs e)
-        {
-            entityView1.IsPickingBendLine = false;
-            filterPanel.SetPickMode(false);
-            entityView1.IsPickingTabbedCutout = false;
-            filterPanel.SetTabbedCutoutPickMode(false);
-            var active = !entityView1.IsPickingBreakoff;
-            entityView1.IsPickingBreakoff = active;
-            filterPanel.SetBreakoffPickMode(active);
-        }
+        private void OnAddBreakoffClicked(object sender, EventArgs e) => TogglePickMode(PickTarget.Breakoff);
 
         private void OnBreakoffEdgePicked(object sender, (Entity Entity, Vector Point) pick)
         {
-            entityView1.IsPickingBreakoff = false;
-            filterPanel.SetBreakoffPickMode(false);
+            SetPickMode(PickTarget.Breakoff, false);
             var item = CurrentItem;
             if (item == null)
                 return;
 
             SplitAtJunctions(item);
             var visible = VisibleEntities(item);
-            var entity = visible.Where(en => en is Geometry.Line or Arc)
-                .OrderBy(en => en.ClosestPointTo(pick.Point).DistanceTo(pick.Point)).FirstOrDefault();
+            var entity = NearestTo(visible.Where(en => en is Geometry.Line or Arc), pick.Point);
             if (entity == null)
                 return;
             var chain = BreakoffBuilder.FindEdgeChain(visible, entity);
@@ -734,10 +751,21 @@ namespace OpenNest.Forms
             lblEntityCount.Text = $"{item.EntityCount} entities";
         }
 
-        private void OnBreakoffEdited(object sender, int index)
+        // The current item when the index addresses one of its features (breakoffs, tabbed
+        // cutouts or dimensions); null when there is no item or the index is out of range.
+        private FileListItem ItemWithFeature(int index, Func<FileListItem, int> count)
         {
             var item = CurrentItem;
-            if (item == null || index < 0 || index >= item.Breakoffs.Count)
+            return item != null && index >= 0 && index < count(item) ? item : null;
+        }
+
+        // An edit keeps the placed tabs when neither their count nor their width changed.
+        private static bool KeepsTabs(int tabCount, double tabWidth, List<double> currentCenters, double currentWidth) =>
+            tabCount == currentCenters.Count && Math.Tolerance.IsEqualTo(tabWidth, currentWidth);
+
+        private void OnBreakoffEdited(object sender, int index)
+        {
+            if (ItemWithFeature(index, i => i.Breakoffs.Count) is not { } item)
                 return;
 
             var current = item.Breakoffs[index];
@@ -747,8 +775,7 @@ namespace OpenNest.Forms
                 return;
 
             var edited = current.Clone();
-            var keepTabs = dialog.TabCount == current.TabCenters.Count
-                && Math.Tolerance.IsEqualTo(dialog.TabWidth, current.TabWidth);
+            var keepTabs = KeepsTabs(dialog.TabCount, dialog.TabWidth, current.TabCenters, current.TabWidth);
             if (!TryConfigure(item, edited, dialog, keepTabs))
                 return;
 
@@ -784,8 +811,7 @@ namespace OpenNest.Forms
 
         private void OnBreakoffRemoved(object sender, int index)
         {
-            var item = CurrentItem;
-            if (item == null || index < 0 || index >= item.Breakoffs.Count)
+            if (ItemWithFeature(index, i => i.Breakoffs.Count) is not { } item)
                 return;
 
             item.Breakoffs.RemoveAt(index);
@@ -796,8 +822,7 @@ namespace OpenNest.Forms
 
         private void OnBreakoffFlipped(object sender, int index)
         {
-            var item = CurrentItem;
-            if (item == null || index < 0 || index >= item.Breakoffs.Count)
+            if (ItemWithFeature(index, i => i.Breakoffs.Count) is not { } item)
                 return;
 
             var flipped = item.Breakoffs[index].Clone();
@@ -855,28 +880,17 @@ namespace OpenNest.Forms
             entityView1.Invalidate();
         }
 
-        private void OnAddTabbedCutoutClicked(object sender, EventArgs e)
-        {
-            entityView1.IsPickingBendLine = false;
-            filterPanel.SetPickMode(false);
-            entityView1.IsPickingBreakoff = false;
-            filterPanel.SetBreakoffPickMode(false);
-            var active = !entityView1.IsPickingTabbedCutout;
-            entityView1.IsPickingTabbedCutout = active;
-            filterPanel.SetTabbedCutoutPickMode(active);
-        }
+        private void OnAddTabbedCutoutClicked(object sender, EventArgs e) => TogglePickMode(PickTarget.TabbedCutout);
 
         private void OnTabbedCutoutPicked(object sender, (Entity Entity, Vector Point) pick)
         {
-            entityView1.IsPickingTabbedCutout = false;
-            filterPanel.SetTabbedCutoutPickMode(false);
+            SetPickMode(PickTarget.TabbedCutout, false);
             var item = CurrentItem;
             if (item == null)
                 return;
 
             var visible = VisibleEntities(item);
-            var entity = visible.Where(en => en is Geometry.Line or Arc or Circle)
-                .OrderBy(en => en.ClosestPointTo(pick.Point).DistanceTo(pick.Point)).FirstOrDefault();
+            var entity = NearestTo(visible.Where(en => en is Geometry.Line or Arc or Circle), pick.Point);
             if (entity == null)
                 return;
             var hole = TabbedCutoutBuilder.FindHole(visible, entity);
@@ -915,8 +929,7 @@ namespace OpenNest.Forms
 
         private void OnTabbedCutoutEdited(object sender, int index)
         {
-            var item = CurrentItem;
-            if (item == null || index < 0 || index >= item.TabbedCutouts.Count)
+            if (ItemWithFeature(index, i => i.TabbedCutouts.Count) is not { } item)
                 return;
 
             var current = item.TabbedCutouts[index];
@@ -926,8 +939,7 @@ namespace OpenNest.Forms
                 return;
 
             var edited = current.Clone();
-            var keepTabs = dialog.TabCount == current.TabCenters.Count
-                && Math.Tolerance.IsEqualTo(dialog.TabWidth, current.TabWidth);
+            var keepTabs = KeepsTabs(dialog.TabCount, dialog.TabWidth, current.TabCenters, current.TabWidth);
             if (!TryConfigure(item, edited, dialog, keepTabs))
                 return;
 
@@ -961,8 +973,7 @@ namespace OpenNest.Forms
 
         private void OnTabbedCutoutRemoved(object sender, int index)
         {
-            var item = CurrentItem;
-            if (item == null || index < 0 || index >= item.TabbedCutouts.Count)
+            if (ItemWithFeature(index, i => i.TabbedCutouts.Count) is not { } item)
                 return;
 
             item.TabbedCutouts.RemoveAt(index);
@@ -1061,8 +1072,7 @@ namespace OpenNest.Forms
 
         private void OnDimensionRemoved(object sender, int index)
         {
-            var item = CurrentItem;
-            if (item == null || index < 0 || index >= item.Dimensions.Count)
+            if (ItemWithFeature(index, i => i.Dimensions.Count) is not { } item)
                 return;
 
             item.Dimensions.RemoveAt(index);

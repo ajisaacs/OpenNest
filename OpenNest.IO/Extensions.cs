@@ -105,63 +105,51 @@ namespace OpenNest.IO
 
         public static List<Geometry.Line> ToOpenNest(this Polyline polyline)
         {
-            var lines = new List<Geometry.Line>();
-
-            if (polyline.Vertices.Count == 0)
-                return lines;
-
-            var layer = polyline.Layer.ToOpenNest();
-            var color = polyline.ResolveColor();
-            var lineTypeName = polyline.ResolveLineTypeName();
-            var lastPoint = polyline.Vertices[0].Location.ToOpenNest();
-
-            for (var i = 1; i < polyline.Vertices.Count; i++)
-            {
-                var nextPoint = polyline.Vertices[i].Location.ToOpenNest();
-
-                lines.Add(
-                    new Geometry.Line(lastPoint, nextPoint)
-                    {
-                        Layer = layer,
-                        Color = color,
-                        LineTypeName = lineTypeName,
-                    }
-                );
-
-                lastPoint = nextPoint;
-            }
-
             var isClosed =
                 (polyline.Flags & PolylineFlags.ClosedPolylineOrClosedPolygonMeshInM) != 0;
 
-            if (isClosed)
-                lines.Add(
-                    new Geometry.Line(lastPoint, polyline.Vertices[0].Location.ToOpenNest())
-                    {
-                        Layer = layer,
-                        Color = color,
-                        LineTypeName = lineTypeName,
-                    }
-                );
-
-            return lines;
+            return ToLines(
+                polyline,
+                polyline.Vertices.Count,
+                i => polyline.Vertices[i].Location.ToOpenNest(),
+                isClosed
+            );
         }
 
         public static List<Geometry.Line> ToOpenNest(this LwPolyline polyline)
         {
+            var isClosed = (polyline.Flags & LwPolylineFlags.Closed) != 0;
+
+            return ToLines(
+                polyline,
+                polyline.Vertices.Count,
+                i => polyline.Vertices[i].ToOpenNest(),
+                isClosed
+            );
+        }
+
+        // Both polyline kinds become the same chain of lines; only how a vertex is read and
+        // which flag marks the chain closed differ, so the callers supply those.
+        private static List<Geometry.Line> ToLines(
+            ACadSharp.Entities.Entity polyline,
+            int vertexCount,
+            Func<int, Vector> vertexAt,
+            bool isClosed
+        )
+        {
             var lines = new List<Geometry.Line>();
 
-            if (polyline.Vertices.Count == 0)
+            if (vertexCount == 0)
                 return lines;
 
             var layer = polyline.Layer.ToOpenNest();
             var color = polyline.ResolveColor();
             var lineTypeName = polyline.ResolveLineTypeName();
-            var lastPoint = polyline.Vertices[0].ToOpenNest();
+            var lastPoint = vertexAt(0);
 
-            for (var i = 1; i < polyline.Vertices.Count; i++)
+            for (var i = 1; i < vertexCount; i++)
             {
-                var nextPoint = polyline.Vertices[i].ToOpenNest();
+                var nextPoint = vertexAt(i);
 
                 lines.Add(
                     new Geometry.Line(lastPoint, nextPoint)
@@ -175,11 +163,9 @@ namespace OpenNest.IO
                 lastPoint = nextPoint;
             }
 
-            var isClosed = (polyline.Flags & LwPolylineFlags.Closed) != 0;
-
             if (isClosed)
                 lines.Add(
-                    new Geometry.Line(lastPoint, polyline.Vertices[0].ToOpenNest())
+                    new Geometry.Line(lastPoint, vertexAt(0))
                     {
                         Layer = layer,
                         Color = color,
