@@ -67,6 +67,13 @@ namespace OpenNest.Engine.Fill
         /// </summary>
         internal bool LeadingParts { get; init; } = true;
 
+        /// <summary>
+        /// When true (the default), a multi-part pattern whose next copy does not fit whole
+        /// still places the parts of that copy that do. False keeps whole copies only, so the
+        /// strip beyond the grid stays free for a remnant fill.
+        /// </summary>
+        public bool PartialCopies { get; init; } = true;
+
         private static Vector MakeOffset(NestDirection direction, double distance)
         {
             return direction == NestDirection.Horizontal
@@ -276,7 +283,8 @@ namespace OpenNest.Engine.Fill
         {
             var tiling = new List<Part>(basePattern.Parts);
             tiling.AddRange(TilePattern(basePattern, direction, cache, maxParts, out var copyDistance));
-            if (LeadingParts && basePattern.Parts.Count > 1 && !(maxParts > 0 && tiling.Count >= maxParts)
+            if (PartialCopies && LeadingParts && basePattern.Parts.Count > 1
+                && !(maxParts > 0 && tiling.Count >= maxParts)
                 && copyDistance > Tolerance.Epsilon && !double.IsPositiveInfinity(copyDistance))
                 tiling = AddLeadingParts(basePattern, tiling, direction, copyDistance);
             return tiling;
@@ -388,7 +396,7 @@ namespace OpenNest.Engine.Fill
             // next copy that didn't fit as a whole. This handles cases where
             // e.g. a 2-part pair only partially fits — one part may still be
             // within the work area even though the full pattern exceeds it.
-            if (basePattern.Parts.Count > 1 && !Full())
+            if (PartialCopies && basePattern.Parts.Count > 1 && !Full())
             {
                 var offset = MakeOffset(direction, copyDistance * count);
 
@@ -423,7 +431,8 @@ namespace OpenNest.Engine.Fill
         {
             var box = basePattern.BoundingBox;
             var useful = GetLimit(direction) - GetStart(box, direction) - GetDimension(box, direction);
-            var partial = basePattern.Parts.Count > 1 && !(maxParts > 0 && basePattern.Parts.Count >= maxParts);
+            var partial = PartialCopies && basePattern.Parts.Count > 1
+                && !(maxParts > 0 && basePattern.Parts.Count >= maxParts);
             if (partial)
             {
                 // A part of the copy before the pattern fits once the tiling moves forward

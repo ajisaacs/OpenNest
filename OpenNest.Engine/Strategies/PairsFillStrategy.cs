@@ -31,6 +31,7 @@ namespace OpenNest.Engine.Strategies
                 var filler = new PairFiller(context.Plate, comparer, dedup)
                 {
                     StripeConvergence = StripeConvergenceCache.GetOrCreate(context.SharedState),
+                    WholePairGrids = context.WholePairGrids,
                 };
                 var result = filler.Fill(
                     context.Item,

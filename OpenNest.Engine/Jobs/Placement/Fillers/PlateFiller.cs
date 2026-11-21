@@ -83,6 +83,14 @@ internal class PlateFiller
     /// </summary>
     internal bool StopAtQuantity { get; init; }
 
+    /// <summary>
+    /// When true (the default), the pairs phase also tiles each pair grid with whole pairs only
+    /// and refills the strip it leaves (<see cref="PairFiller.WholePairGrids"/>). A caller that
+    /// crops the fill to another shape turns it off: that layout fills the box but is less
+    /// regular, so fewer of its parts survive the crop.
+    /// </summary>
+    internal bool WholePairGrids { get; init; } = true;
+
     public virtual List<double> BuildAngles(
         NestItem item,
         ClassificationResult classification,
@@ -461,6 +469,7 @@ internal class PlateFiller
                 PreferredDirection
             ),
             MaxQuantity = StopAtQuantity ? System.Math.Max(0, item.Quantity) : 0,
+            WholePairGrids = WholePairGrids,
         };
         RunPipeline(context);
 

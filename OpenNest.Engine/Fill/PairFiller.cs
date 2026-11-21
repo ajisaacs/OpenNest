@@ -113,6 +113,12 @@ namespace OpenNest.Engine.Fill
         }
 
         /// <summary>
+        /// When true (the default), each pair grid is also tiled with whole pairs only, after the
+        /// others, and the strip it leaves refilled; that layout wins only by placing more parts.
+        /// </summary>
+        public bool WholePairGrids { get; init; } = true;
+
+        /// <summary>
         /// The Fill
         /// </summary>
         /// <param name="item">The item<see cref="NestItem"/></param>
@@ -170,6 +176,7 @@ namespace OpenNest.Engine.Fill
             parts = EvaluateHerringbones(
                 item.Drawing,
                 workArea,
+                targetCount,
                 parts,
                 candidates,
                 bestFits,
@@ -189,6 +196,7 @@ namespace OpenNest.Engine.Fill
         private List<Part> EvaluateHerringbones(
             Drawing drawing,
             Box workArea,
+            int targetCount,
             List<Part> best,
             List<BestFitResult> candidates,
             List<BestFitResult> bestFits,
@@ -219,6 +227,7 @@ namespace OpenNest.Engine.Fill
                             drawing,
                             workArea,
                             minCountToBeat,
+                            targetCount,
                             maxUtilization,
                             partArea,
                             bestFits,
@@ -295,6 +304,7 @@ namespace OpenNest.Engine.Fill
                         batchStart,
                         batchEnd,
                         best?.Count ?? 0,
+                        targetCount,
                         maxUtilization,
                         partArea,
                         bestFits,
@@ -368,6 +378,7 @@ namespace OpenNest.Engine.Fill
             int batchStart,
             int batchEnd,
             int minCountToBeat,
+            int targetCount,
             double maxUtilization,
             double partArea,
             List<BestFitResult> bestFits,
@@ -397,6 +408,7 @@ namespace OpenNest.Engine.Fill
                         drawing,
                         workArea,
                         minCountToBeat,
+                        targetCount,
                         maxUtilization,
                         partArea,
                         bestFits,
@@ -539,6 +551,7 @@ namespace OpenNest.Engine.Fill
         /// <param name="drawing">The drawing<see cref="Drawing"/></param>
         /// <param name="workArea">The workArea<see cref="Box"/></param>
         /// <param name="minCountToBeat">The minCountToBeat<see cref="int"/></param>
+        /// <param name="targetCount">The quantity the fill needs, or zero for as many as fit</param>
         /// <param name="maxUtilization">The maxUtilization<see cref="double"/></param>
         /// <param name="partArea">The partArea<see cref="double"/></param>
         /// <param name="bestFits">The pairs the remnant strips are also filled with</param>
@@ -549,6 +562,7 @@ namespace OpenNest.Engine.Fill
             Drawing drawing,
             Box workArea,
             int minCountToBeat,
+            int targetCount,
             double maxUtilization,
             double partArea,
             List<BestFitResult> bestFits,
@@ -559,6 +573,18 @@ namespace OpenNest.Engine.Fill
             // work, waits until the ranking or Phase 2 needs its outcome (see CompareByCount).
             var grids = new List<FillLinear.DeferredGrid>();
             var engine = new FillLinear(workArea, partSpacing) { Label = "Pairs" };
+
+            // A grid tops its last column or row up with the halves of pairs that do not fit
+            // whole, which can take a strip that would hold more parts: J-shaped bar pairs end a
+            // 48 x 96 sheet with a column of single halves where four more pairs fit. The pair
+            // turned 180 degrees would leave that strip, but it has the same bounding box, so the
+            // grid dedup never tiles it. The grid of whole pairs is tried too, after the others,
+            // leaving the strip to the remnant fill. Only a fill without a quantity tries it: a
+            // capped fill (Auto Nest's) ranks its layouts by more than count, and a whole-pair grid
+            // that wins there by one part can end its sheet later (N26-2ER).
+            var wholeGrids = new List<List<Part>>();
+            var wholeEngine = new FillLinear(workArea, partSpacing) { Label = "Pairs", PartialCopies = false };
+
             foreach (var (pattern, dir) in claimed)
             {
                 token.ThrowIfCancellationRequested();
@@ -566,8 +592,19 @@ namespace OpenNest.Engine.Fill
                 var grid = engine.FillDeferred(pattern, dir);
                 if (grid.IsPending && (grid.Count == 0 || grid.FallbackCount == 0))
                     grid.Resolve();
-                if (grid.IsPending || grid.Count > 0)
-                    grids.Add(grid);
+                if (!grid.IsPending && grid.Count == 0)
+                    continue;
+
+                grids.Add(grid);
+
+                if (WholePairGrids && targetCount <= 0 && pattern.Parts.Count > 1)
+                {
+                    // Against the grid's tiled count: a whole-pair grid as large holds no
+                    // partial copies, so it is that grid, already tried.
+                    var wholeParts = wholeEngine.Fill(pattern, dir);
+                    if (wholeParts != null && wholeParts.Count > 0 && wholeParts.Count < grid.Count)
+                        wholeGrids.Add(wholeParts);
+                }
             }
 
             if (grids.Count == 0)
@@ -576,62 +613,62 @@ namespace OpenNest.Engine.Fill
             // Sort by count descending so we try the best grids first
             SortByCount(grids);
 
-            // Early abort: if the best grid + optimistic remnant can't beat the global best, skip Phase 2
-            if (minCountToBeat > 0)
+            int Bound(List<Part> gridParts) =>
+                gridParts.Count + remnantFiller.EstimateUpperBound(gridParts, workArea, maxUtilization, partArea);
+
+            List<Part> WithRemnant(List<Part> gridParts)
             {
-                var topParts = grids[0].Resolve();
-                var topCount = topParts.Count;
-                var optimisticRemnant = remnantFiller.EstimateUpperBound(
-                    topParts,
-                    workArea,
-                    maxUtilization,
-                    partArea
+                var remnantParts = remnantFiller.Fill(gridParts, drawing, workArea, token, bestFits);
+                if (remnantParts == null || remnantParts.Count == 0)
+                    return gridParts;
+
+                var total = new List<Part>(gridParts.Count + remnantParts.Count);
+                total.AddRange(gridParts);
+                total.AddRange(remnantParts);
+                return total;
+            }
+
+            List<Part> best = null;
+
+            // Early abort: if the best grid + optimistic remnant can't beat the global best, skip Phase 2
+            var topBound = minCountToBeat > 0 ? Bound(grids[0].Resolve()) : int.MaxValue;
+            if (topBound <= minCountToBeat)
+            {
+                Debug.WriteLine(
+                    $"[PairFiller] Skipping candidate grids: best grid + estimate {topBound} <= best {minCountToBeat}"
                 );
-                if (topCount + optimisticRemnant <= minCountToBeat)
+            }
+            else
+            {
+                // Phase 2: try remnant for each grid, skip if grid is too far behind
+                foreach (var grid in grids)
                 {
-                    Debug.WriteLine(
-                        $"[PairFiller] Skipping candidate: grid {topCount} + estimate {optimisticRemnant} <= best {minCountToBeat}"
-                    );
-                    return null;
+                    token.ThrowIfCancellationRequested();
+
+                    var gridParts = grid.Resolve();
+
+                    // If this grid + max possible remnant can't beat current best, skip
+                    if (best != null && Bound(gridParts) <= best.Count)
+                        break; // sorted descending, so remaining are even smaller
+
+                    var total = WithRemnant(gridParts);
+                    if (comparer.IsBetter(total, best, workArea))
+                        best = total;
                 }
             }
 
-            // Phase 2: try remnant for each grid, skip if grid is too far behind
-            List<Part> best = null;
-
-            foreach (var grid in grids)
+            // A whole-pair grid replaces the best only by placing more parts than it and the
+            // global best: it exists to free a strip, and its bound is not monotone in its size.
+            foreach (var wholeParts in wholeGrids)
             {
                 token.ThrowIfCancellationRequested();
 
-                var gridParts = grid.Resolve();
+                var toBeat = System.Math.Max(best?.Count ?? 0, minCountToBeat);
+                if (Bound(wholeParts) <= toBeat)
+                    continue;
 
-                // If this grid + max possible remnant can't beat current best, skip
-                if (best != null)
-                {
-                    var remnantBound = remnantFiller.EstimateUpperBound(
-                        gridParts,
-                        workArea,
-                        maxUtilization,
-                        partArea
-                    );
-                    if (gridParts.Count + remnantBound <= best.Count)
-                        break; // sorted descending, so remaining are even smaller
-                }
-
-                var remnantParts = remnantFiller.Fill(gridParts, drawing, workArea, token, bestFits);
-                List<Part> total;
-                if (remnantParts != null && remnantParts.Count > 0)
-                {
-                    total = new List<Part>(gridParts.Count + remnantParts.Count);
-                    total.AddRange(gridParts);
-                    total.AddRange(remnantParts);
-                }
-                else
-                {
-                    total = gridParts;
-                }
-
-                if (comparer.IsBetter(total, best, workArea))
+                var total = WithRemnant(wholeParts);
+                if (total.Count > toBeat && comparer.IsBetter(total, best, workArea))
                     best = total;
             }
 

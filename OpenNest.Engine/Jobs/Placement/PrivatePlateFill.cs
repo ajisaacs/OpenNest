@@ -19,8 +19,9 @@ internal static class PrivatePlateFill
     /// <param name="length">X extent of the plate and work area.</param>
     /// <param name="width">Y extent of the plate and work area.</param>
     /// <param name="quantity">Copies wanted; zero fills the whole area.</param>
+    /// <param name="wholePairGrids">See <see cref="PlateFiller.WholePairGrids"/>.</param>
     internal static List<Part> Run(Drawing drawing, RotationPolicy rotation, double spacing,
-        double length, double width, int quantity, CancellationToken token)
+        double length, double width, int quantity, CancellationToken token, bool wholePairGrids = true)
     {
         var plate = new Plate(new Size(width, length)) { PartSpacing = spacing };
         // The drawing is private: stabilize this cache entry before Fill's candidate pruning.
@@ -34,7 +35,7 @@ internal static class PrivatePlateFill
         fits.AddRange(sorted);
         // A positive quantity lets supporting strategies avoid surplus rows. Zero still
         // fills the whole area (the cutout lattice caller requires an uncapped lattice).
-        var filler = new PlateFiller(plate) { StopAtQuantity = true };
+        var filler = new PlateFiller(plate) { StopAtQuantity = true, WholePairGrids = wholePairGrids };
         return filler.Fill(new NestItem
         {
             Drawing = drawing,

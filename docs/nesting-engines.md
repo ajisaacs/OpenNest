@@ -194,6 +194,31 @@ area, not their bounding box. An 8" gusset on a 16.85 x 60 strip fills 20 that w
 along their hypotenuse in an 8.75" column, and eight gussets at 45 degrees zigzagging up the strip
 beside it, against 14 in a 10.35" column of seven pairs.
 
+A grid tops its last column or row up with the parts of a pair that does not fit whole, which can
+fill a strip that would hold more parts. The pair turned 180 degrees has the same bounding box, so
+the grid dedup never tiles it to leave that strip open. The pairs phase therefore also tiles each
+pair grid with whole pairs only, after the others, and refills the strip it leaves; that grid wins
+only by placing more parts. Only fills without a quantity (Fill Plate, Fill Area) try it: in a
+capped fill, such as Auto Nest's, the grid that wins by a part can end the sheet later. The cutout
+lattice turns it off: it shifts its fill and crops it to the hole, and a regular grid keeps more
+parts through the crop than a fuller but irregular one. Best-fit pairs are found by pushing one part
+against the other from cross offsets a step apart (0.25"), so a pair held by two contacts at once
+lands up to a step short of the second. Each landed pair also slides across its push, both ways, to
+the next contact less than a step away. Two columns of 30" J-shaped bars, stacked bar on bar with
+each leg tucked past the other bar's end, take 64.9" of a 96" sheet that way rather than 65.3",
+leaving a 30.2" strip, where Fill had placed 30.
+
+A strip's densest pair grid is also completed (`GridEndInserter`): the grid is moved to each corner
+of the strip, copies of its parts slide in from the open sides at the position that strays least
+outside the grid's band, then travel deepest, and the strip beyond is filled with singles and pairs
+(without completing again). A completion replaces the strip's layout only when it places more. Each
+slide pushes against every part of the grid, so positions are swept coarsely, then finely near the
+best; a strip, a grid or a leftover strip is skipped when the parts its area could hold cannot beat
+the best so far. Completing the three densest grids made a 60 x 120 sheet of small parts fill 23%
+slower; one adds about 3%. The 30.2" strip above holds three bar pairs stood on end and one more bar
+dropped 2.3" beside them so its leg passes under its neighbor's, with a pair lying under all seven:
+33 parts, as laid out by hand.
+
 Lattice's last strategy, TiltedRemnant, adds tilted parts beside the best layout when the room
 left past it on the right or top is too narrow for the part at 0 or 90 degrees, such as a long
 part beside a grid of the same part turned 90 degrees. It moves the layout flush to the low end

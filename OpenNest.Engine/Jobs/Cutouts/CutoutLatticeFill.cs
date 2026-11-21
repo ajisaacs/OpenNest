@@ -151,8 +151,9 @@ internal static class CutoutLatticeFill
         var drawing = DrawingJobMapper.CreateDrawing(insert);
         try
         {
+            // The lattice is shifted and cropped to the hole, so it keeps the regular pair grid.
             var parts = PrivatePlateFill.Run(drawing, insert.Rotation, spacing,
-                bounds.Length + 2 * step, bounds.Width + 2 * step, 0, token);
+                bounds.Length + 2 * step, bounds.Width + 2 * step, 0, token, wholePairGrids: false);
             token.ThrowIfCancellationRequested();
             var left = bounds.Left - step;
             var bottom = bounds.Bottom - step;

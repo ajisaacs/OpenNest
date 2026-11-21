@@ -22,6 +22,12 @@ namespace OpenNest.Engine.Strategies
         /// many (see <see cref="FillLinear.MaxParts"/>). Zero fills the whole work area.
         /// </summary>
         public int MaxQuantity { get; init; }
+
+        /// <summary>
+        /// Whether the pairs phase also tries its grids with whole pairs only
+        /// (<see cref="Fill.PairFiller.WholePairGrids"/>).
+        /// </summary>
+        public bool WholePairGrids { get; init; } = true;
         public PartType PartType { get; set; }
 
         /// <summary>

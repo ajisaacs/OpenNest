@@ -26,7 +26,7 @@ namespace OpenNest.Engine.Fill
         /// Pair fills of a strip by strip size, normalized to the origin. Per filler, because
         /// they depend on the best-fit list it fills from.
         /// </summary>
-        private readonly ConcurrentDictionary<(double Width, double Length), List<Part>> pairStrips =
+        private readonly ConcurrentDictionary<(double Width, double Length, bool Complete), List<Part>> pairStrips =
             new();
 
         /// <summary>Pairs tried when tiling a strip with one pair as a grid.</summary>
@@ -34,6 +34,13 @@ namespace OpenNest.Engine.Fill
 
         /// <summary>Grid candidates tried in a row without improvement before giving up.</summary>
         private const int GridStaleLimit = 10;
+
+        /// <summary>
+        /// How many of a strip's densest grids <see cref="GridEndInserter"/> completes. Each
+        /// completion slides copies against every part of the grid, so more grids cost much more:
+        /// on a 60 x 120 sheet of small parts, three took the fill 23% longer.
+        /// </summary>
+        private const int MaxCompletedGrids = 1;
 
         private readonly ConcurrentDictionary<Drawing, double> minimumWidths =
             new(ReferenceEqualityComparer.Instance);
@@ -125,7 +132,8 @@ namespace OpenNest.Engine.Fill
             Drawing drawing,
             Box remnantBox,
             List<BestFitResult> bestFits,
-            CancellationToken token
+            CancellationToken token,
+            bool complete = true
         )
         {
             var singles = FillSingles(drawing, remnantBox, token);
@@ -138,7 +146,7 @@ namespace OpenNest.Engine.Fill
                 return singles;
 
             // Pairs replace the singles only when they place more; a tie keeps the singles.
-            var pairs = FillPairs(drawing, remnantBox, bestFits, token);
+            var pairs = FillPairs(drawing, remnantBox, bestFits, token, complete);
             return pairs != null && pairs.Count > (singles?.Count ?? 0) ? pairs : singles;
         }
 
@@ -185,22 +193,26 @@ namespace OpenNest.Engine.Fill
         /// <summary>
         /// The strip filled with rows of pairs, or null when none fit. Computed once per strip
         /// size: the layout depends only on the size, so it is laid out at the origin and moved.
+        /// With <paramref name="complete"/>, the densest pair grid is also completed with
+        /// <see cref="GridEndInserter"/>, whose own strips are filled without it.
         /// </summary>
         private List<Part> FillPairs(
             Drawing drawing,
             Box remnantBox,
             List<BestFitResult> bestFits,
-            CancellationToken token
+            CancellationToken token,
+            bool complete
         )
         {
             var key = (
                 System.Math.Round(remnantBox.Width, 6),
-                System.Math.Round(remnantBox.Length, 6)
+                System.Math.Round(remnantBox.Length, 6),
+                complete
             );
             if (!pairStrips.TryGetValue(key, out var normalized))
             {
                 var origin = new Box(0, 0, remnantBox.Length, remnantBox.Width);
-                normalized = ComputePairs(drawing, origin, bestFits, token) ?? new List<Part>();
+                normalized = ComputePairs(drawing, origin, bestFits, token, complete) ?? new List<Part>();
                 pairStrips.TryAdd(key, normalized);
             }
 
@@ -219,7 +231,8 @@ namespace OpenNest.Engine.Fill
             Drawing drawing,
             Box area,
             List<BestFitResult> bestFits,
-            CancellationToken token
+            CancellationToken token,
+            bool complete
         )
         {
             var context = new FillContext
@@ -238,9 +251,24 @@ namespace OpenNest.Engine.Fill
             var best = new StripeFiller(context, NestDirection.Horizontal).Fill();
 
             // A grid replaces the stripes only when it places more; a tie keeps the stripes.
-            var grid = TilePairs(drawing, area, bestFits, token);
+            var grid = TilePairs(drawing, area, bestFits, token, out var denseGrids);
             if (grid != null && grid.Count > (best?.Count ?? 0))
                 best = grid;
+
+            // The densest grid may leave slack where a lone part tucks in beside the last pair and
+            // a strip beyond that holds more; a completion replaces the best only when it places
+            // more. A strip already holding as many parts as its area allows has nothing to gain.
+            if (complete && drawing.Area > 0 && (best?.Count ?? 0) + 1 <= area.Area() / drawing.Area)
+            {
+                foreach (var dense in denseGrids)
+                {
+                    var completed = GridEndInserter.Complete(dense, area, partSpacing, drawing.Area,
+                        best?.Count ?? 0,
+                        strip => FillRemnantBox(drawing, strip, bestFits, token, complete: false), token);
+                    if (completed != null && completed.Count > (best?.Count ?? 0))
+                        best = completed;
+                }
+            }
 
             Debug.WriteLine(
                 $"[PairFiller] Remnant pairs: {best?.Count ?? 0} parts in "
@@ -258,7 +286,8 @@ namespace OpenNest.Engine.Fill
             Drawing drawing,
             Box area,
             List<BestFitResult> bestFits,
-            CancellationToken token
+            CancellationToken token,
+            out List<List<Part>> denseGrids
         )
         {
             var shortSide = System.Math.Min(area.Width, area.Length);
@@ -271,6 +300,7 @@ namespace OpenNest.Engine.Fill
             var engine = new FillLinear(area, partSpacing) { Label = "Pairs-Remnant" };
             List<Part> best = null;
             var sinceImproved = 0;
+            var tiled = new List<(List<Part> Parts, double Density)>();
             foreach (var fit in candidates)
             {
                 token.ThrowIfCancellationRequested();
@@ -288,7 +318,13 @@ namespace OpenNest.Engine.Fill
                     foreach (var dir in new[] { NestDirection.Horizontal, NestDirection.Vertical })
                     {
                         var parts = engine.Fill(pattern, dir);
-                        if (parts == null || parts.Count == 0 || !comparer.IsBetter(parts, best, area))
+                        if (parts == null || parts.Count == 0)
+                            continue;
+
+                        if (parts.Count > 1 && drawing.Area > 0)
+                            tiled.Add((parts, parts.Count * drawing.Area / parts.GetBoundingBox().Area()));
+
+                        if (!comparer.IsBetter(parts, best, area))
                             continue;
 
                         best = parts;
@@ -299,6 +335,12 @@ namespace OpenNest.Engine.Fill
                 sinceImproved = improved ? 0 : sinceImproved + 1;
             }
 
+            // Stable, so equally dense grids keep the order they were tiled in.
+            denseGrids = tiled
+                .OrderByDescending(t => t.Density)
+                .Select(t => t.Parts)
+                .Take(MaxCompletedGrids)
+                .ToList();
             return best;
         }
 
