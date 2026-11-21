@@ -35,12 +35,23 @@ internal static class InteractiveClamps
     }
 
     /// <summary>
-    /// Placement keep-outs inflated by the full <see cref="Plate.ClampClearance"/> - the same
+    /// Placement keep-outs inflated by the full <see cref="Plate.ClampClearance"/> (at least
+    /// <see cref="NestTolerances.SpacingSlack"/>, see <see cref="PlacementClearance"/>) - the same
     /// convention the Rectangles lane blocks and engines honor, so fill and pack produce
     /// placements with at least that clearance from the raw zone.
     /// </summary>
     public static IReadOnlyList<Box> ClearanceRectangles(Plate plate) =>
-        InflateZones(plate, plate.ClampClearance);
+        InflateZones(plate, PlacementClearance(plate));
+
+    /// <summary>
+    /// How far placement holds parts off a zone: the clamp clearance, but never less than
+    /// <see cref="NestTolerances.SpacingSlack"/>. A placement keep-out is then always at least
+    /// the slack outside the validator's (<see cref="ValidationKeepOuts"/>), which absorbs the
+    /// grid rounding of its outlines. Under the slack the validator's keep-out is the bare zone,
+    /// so a part placed flush on a zero-clearance zone could read as entering it.
+    /// </summary>
+    private static double PlacementClearance(Plate plate) =>
+        System.Math.Max(plate.ClampClearance, NestTolerances.SpacingSlack);
 
     /// <summary>
     /// The validator's exact C1 rectangle (NestLayoutCheck: clamp clearance less the shared
@@ -63,17 +74,21 @@ internal static class InteractiveClamps
 
     /// <summary>
     /// Static obstacle parts for the directional push kernels: each zone grown square by
-    /// <see cref="Plate.ClampClearance"/>, the layout check's keep-out, which the kernels then
+    /// the placement clearance (<see cref="ClearanceRectangles"/>), which the kernels then
     /// hold at zero spacing (never the part spacing). A round spacing offset would let a part
     /// tuck into the keep-out's corners.
     /// </summary>
     public static List<Part> ObstacleParts(Plate plate) =>
-        ObstaclePartsFor(ZoneRectangles(plate), plate.ClampClearance);
+        ObstaclePartsFor(ZoneRectangles(plate), PlacementClearance(plate));
 
     /// <summary>Expander walls use the clamp clearance as a fixed floor,
     /// independent of the separation target or its final achieved spacing.</summary>
     public static List<Part> WallParts(Plate plate) =>
         ObstaclePartsFor(ZoneRectangles(plate), plate.ClampClearance);
+
+    /// <summary>The rectangles of <see cref="WallParts"/>, in the same order.</summary>
+    public static IReadOnlyList<Box> WallRectangles(Plate plate) =>
+        InflateZones(plate, plate.ClampClearance);
 
     private static List<Part> ObstaclePartsFor(IReadOnlyList<Box> rectangles, double inflate)
     {

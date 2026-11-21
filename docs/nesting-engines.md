@@ -212,7 +212,9 @@ Pack and interactive whole-plate Nest still pack only into the clamp-free areas.
 Whole jobs placed by these strategies fill the clamp-free areas first. When a plate has one
 drawing to fill and that leaves demand unmet, the job also fills the sheet as if the clamps were
 absent, drops the parts on them, and keeps whichever layout the strategy ranks better (a tie
-keeps the clamp-free layout).
+keeps the clamp-free layout). The leftovers packed or placed as pairs after the fill, or on a
+sheet with nothing to fill, keep off the clamp keep-outs as well: a pair sliding into place stops
+where it touches one.
 
 Lattice's rectangle best-fit phase compares a two-block layout with a spiral: four blocks turning
 around a center, with the center filled again. The spiral starts from the rows and columns with
@@ -512,7 +514,10 @@ obstacle, so a plug-in that ignores the outline is caught as any other invalid l
 Whole-job Rectangles and Irregular exclude each stock's rectangular clamp zones,
 expanded on all sides by its clamp clearance (`NestPlateStock.ClampClearance`: the rail's
 own `Clearance`, else the bottom edge spacing). Part spacing is not added to clamp
-clearance; interactive fills, pushes and the layout check use the same clearance. Default runs and validates both lanes as usual. Empty clamp collections
+clearance; interactive fills, pushes and the layout check use the same clearance. The fill
+strategies and pushes hold parts at least the layout check's spacing slack (0.0005) off a zone
+whose clearance is smaller, zero included: the check's keep-out is then the bare zone, and its
+outlines, rounded to a 0.0001 grid, could put a flush edge inside it. Default runs and validates both lanes as usual. Empty clamp collections
 leave the existing packing path unchanged; clamps never become requested or placed parts.
 
 Every `Plate`, including plates the engine builds from stock, stores clamp zones relative

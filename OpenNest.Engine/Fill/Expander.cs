@@ -635,7 +635,7 @@ namespace OpenNest.Engine.Fill
                 var walls = plate.Parts.Where(p => !movers.Contains(p)).ToList();
                 var clampStart = movers.Count + walls.Count;
                 // Clamp walls include the clamp clearance envelope.
-                var clampBoxes = Jobs.InteractiveClamps.ClearanceRectangles(plate);
+                var clampBoxes = Jobs.InteractiveClamps.WallRectangles(plate);
                 walls.AddRange(Jobs.InteractiveClamps.WallParts(plate));
                 if (clampBoxes.Count != walls.Count + movers.Count - clampStart)
                     throw new InvalidOperationException("Clamp wall preparation changed its ordering.");

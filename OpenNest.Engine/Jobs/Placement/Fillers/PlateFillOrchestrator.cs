@@ -77,6 +77,10 @@ internal static class PlateFillOrchestrator
             }
         }
 
+        // The pack cannot see keep-outs, so it gets a remnant clear of them, as after a fill.
+        if (allParts.Count == 0 && clampKeepOuts.Count > 0)
+            workArea = LargestRemnant(plate, workArea, allParts, clampKeepOuts);
+
         var leftovers = packItems.Where(item => item.Quantity > 0).ToList();
 
         if (leftovers.Count > 0 && !token.IsCancellationRequested)
@@ -355,19 +359,25 @@ internal static class PlateFillOrchestrator
     /// <summary>
     /// Slides a pair placed by its bounding box left then down against the true outlines around
     /// it, so it takes the space its box could not. The whole-layout settle cannot: it moves
-    /// everything as one group. Clamp keep-outs stay walls, here at the part spacing.
+    /// everything as one group. Clamp keep-outs stay walls at zero spacing, as in the settle:
+    /// they already hold the clamp clearance, and the remnant the pair came from can leave it
+    /// flush on one, which at the part spacing would read as already inside the wall and let
+    /// the push carry the pair through the clamp.
     /// </summary>
     private static void CompactPair(List<Part> pair, List<Part> layout, Plate plate, Box workArea)
     {
         const double threshold = 0.01;
         const int maxIterations = 20;
 
-        var obstacles = layout.Concat(plate.Parts).Concat(InteractiveClamps.ObstacleParts(plate)).ToList();
+        var parts = new Compactor.ObstacleSet(layout.Concat(plate.Parts).ToList(), plate.PartSpacing);
+        var zones = new Compactor.ObstacleSet(InteractiveClamps.ObstacleParts(plate), 0);
+        var left = SpatialQuery.DirectionToOffset(PushDirection.Left, 1.0);
+        var down = SpatialQuery.DirectionToOffset(PushDirection.Down, 1.0);
 
         for (var i = 0; i < maxIterations; i++)
         {
-            var moved = Compactor.Push(pair, obstacles, workArea, plate.PartSpacing, PushDirection.Left)
-                + Compactor.Push(pair, obstacles, workArea, plate.PartSpacing, PushDirection.Down);
+            var moved = Compactor.Push(pair, workArea, left, parts, zones)
+                + Compactor.Push(pair, workArea, down, parts, zones);
             if (moved < threshold)
                 break;
         }
